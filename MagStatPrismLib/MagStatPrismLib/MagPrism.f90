@@ -651,8 +651,8 @@ if ( a/2. - x .eq. 0 ) then
     xh = x * lim_scl_h
     xl = x * lim_scl_l
     
-    f_3D_h = (b/2. - y) * (c/2. - z) / ( (a/2. - xh) * sqrt( (a/2. - x)**2 + (b/2. - y)**2 + (c/2. - z)**2 ) )
-    f_3D_l = (b/2. - y) * (c/2. - z) / ( (a/2. - xl) * sqrt( (a/2. - x)**2 + (b/2. - y)**2 + (c/2. - z)**2 ) )
+    f_3D_h = (b/2. - y) * (c/2. - z) / ( (a/2. - xh) * sqrt( (a/2. - xh)**2 + (b/2. - y)**2 + (c/2. - z)**2 ) )
+    f_3D_l = (b/2. - y) * (c/2. - z) / ( (a/2. - xl) * sqrt( (a/2. - xl)**2 + (b/2. - y)**2 + (c/2. - z)**2 ) )
     
     f_3D = 0.5 * ( f_3D_h + f_3D_l )
     
@@ -678,8 +678,8 @@ if ( b/2. - y .eq. 0 ) then
     yh = y * lim_scl_h
     yl = y * lim_scl_l
     
-    g_3D_h = (a/2. - x) * (c/2. - z) / ( (b/2. - yh) * sqrt( (a/2. - x)**2 + (b/2. - y)**2 + (c/2. - z)**2 ) )
-    g_3D_l = (a/2. - x) * (c/2. - z) / ( (b/2. - yl) * sqrt( (a/2. - x)**2 + (b/2. - y)**2 + (c/2. - z)**2 ) )
+    g_3D_h = (a/2. - x) * (c/2. - z) / ( (b/2. - yh) * sqrt( (a/2. - x)**2 + (b/2. - yh)**2 + (c/2. - z)**2 ) )
+    g_3D_l = (a/2. - x) * (c/2. - z) / ( (b/2. - yl) * sqrt( (a/2. - x)**2 + (b/2. - yl)**2 + (c/2. - z)**2 ) )
     
     g_3D = 0.5 * ( g_3D_h + g_3D_l )
 else    
@@ -700,8 +700,8 @@ if ( c/2. - z .eq. 0 ) then
     zh = z * lim_scl_h
     zl = z * lim_scl_l
     
-    h_3D_h = (a/2. - x) * (b/2. - y) / ( (c/2. - zh) * sqrt( (a/2. - x)**2 + (b/2. - y)**2 + (c/2. - z)**2 ) )
-    h_3D_l = (a/2. - x) * (b/2. - y) / ( (c/2. - zl) * sqrt( (a/2. - x)**2 + (b/2. - y)**2 + (c/2. - z)**2 ) )
+    h_3D_h = (a/2. - x) * (b/2. - y) / ( (c/2. - zh) * sqrt( (a/2. - x)**2 + (b/2. - y)**2 + (c/2. - zh)**2 ) )
+    h_3D_l = (a/2. - x) * (b/2. - y) / ( (c/2. - zl) * sqrt( (a/2. - x)**2 + (b/2. - y)**2 + (c/2. - zl)**2 ) )
     
     h_3D = 0.5 * ( h_3D_l + h_3D_h )
     
@@ -755,7 +755,8 @@ end function HH_3D
 subroutine getN_2D( a, b, c, x, y, z, N_out )
 real,intent(in) :: a,b,c,x,y,z
 real,intent(out),dimension(3,3) :: N_out
-
+real,parameter :: lim_scl_h=1.0001,lim_scl_l=0.9999
+real :: xl,xh,yl,yh,nom_l,nom_h,denom_l,denom_h,lim,nom,denom
 !::Diagonal elements
 N_out(1,1) = 1./(4.*pi) * ( atan(f_2D(a,b,c,x,y,z))   + atan(f_2D(a,b,c,-x,y,z))  + atan(f_2D(a,b,c,x,-y,z)) + &
                             atan(f_2D(a,b,c,x,y,-z))  + atan(f_2D(a,b,c,-x,-y,z)) + atan(f_2D(a,b,c,x,-y,-z)) + &
@@ -770,11 +771,40 @@ N_out(2,2) = 1./(4.*pi) * ( atan(g_2D(a,b,c,x,y,z))   + atan(g_2D(a,b,c,-x,y,z))
                             
 
 N_out(3,3) = 0                           
-                            
+
+
+nom = (((a/2. + x)**2)/2. + ((b/2. - y)**2)/2.) * (((a/2. - x)**2)/2. + ((b/2. + y)**2)/2.)
+denom = ((((a/2. - x)**2)/2. + ((b/2. - y)**2)/2.) * (((a/2. + x)**2)/2. + ((b/2. + y)**2)/2.))
+
+if ( denom .eq. 0 .or. nom .eq. 0 ) then
+    !Find the limit
+    xl = x * lim_scl_l
+    xh = x * lim_scl_h
+    
+    yl = y * lim_scl_l
+    yh = y * lim_scl_h
+    
+    nom_l = (((a/2. + xl)**2)/2. + ((b/2. - yl)**2)/2.) * (((a/2. - xl)**2)/2. + ((b/2. + yl)**2)/2.)
+    nom_h = (((a/2. + xh)**2)/2. + ((b/2. - yh)**2)/2.) * (((a/2. - xh)**2)/2. + ((b/2. + yh)**2)/2.)
+    
+    
+    denom_l = ((((a/2. - xl)**2)/2. + ((b/2. - yl)**2)/2.) * (((a/2. + xl)**2)/2. + ((b/2. + yl)**2)/2.))
+    denom_h = ((((a/2. - xh)**2)/2. + ((b/2. - yh)**2)/2.) * (((a/2. + xh)**2)/2. + ((b/2. + yh)**2)/2.))
+    
+    nom = 0.5 * ( nom_l + nom_h )
+    denom = 0.5 * ( denom_l + denom_h )
+    
+    lim = nom / denom
+    
+    N_out(1,2) = -1./(4.*pi) * log( lim )        
+else
+    N_out(1,2) = -1./(4.*pi) * log( nom / denom )
+endif
+
 
 !::Off-diagonal elements
-N_out(1,2) = -1./(4.*pi) * log( (((a/2. + x)**2)/2. + ((b/2. - y)**2)/2.) * (((a/2. - x)**2)/2. + ((b/2. + y)**2)/2.) / &
-                               ((((a/2. - x)**2)/2. + ((b/2. - y)**2)/2.) * (((a/2. + x)**2)/2. + ((b/2. + y)**2)/2.)) )
+!N_out(1,2) = -1./(4.*pi) * log( (((a/2. + x)**2)/2. + ((b/2. - y)**2)/2.) * (((a/2. - x)**2)/2. + ((b/2. + y)**2)/2.) / &
+!                               ((((a/2. - x)**2)/2. + ((b/2. - y)**2)/2.) * (((a/2. + x)**2)/2. + ((b/2. + y)**2)/2.)) )
                                 
 N_out(2,1) = N_out(1,2)
 
@@ -795,12 +825,18 @@ end subroutine getN_2D
 !::function f from eq. 11
 function f_2D( a, b, c, x, y, z )
 real,intent(in) :: a,b,c,x,y,z
-real :: f_2D
-
+real :: f_2D,f_2D_l,f_2D_h,xl,xh
+real,parameter :: lim_scl_h=1.0001,lim_scl_l=0.9999
 !::Numerical problem: atan(inf) = pi/2 and when a/2 = x then f_3D returns NaN (inf). 
 !::So we need to check for this and return a large number to ensure numerical stability
 if ( a/2. - x .eq. 0 ) then
-    f_2D = sign(1e10,(b/2. - y))
+    xl = x * lim_scl_l
+    xh = x * lim_scl_h
+    
+    f_2D_l = (b/2. - y) / (a/2. - xl)
+    f_2D_h = (b/2. - y) / (a/2. - xh)
+    
+    f_2D = 0.5 * ( f_2D_l + f_2D_h )
 else    
     f_2D = (b/2. - y) / (a/2. - x)
 endif
@@ -811,11 +847,18 @@ end function f_2D
 !::function g from eq. 11
 function g_2D( a, b, c, x, y, z )
 real,intent(in) :: a,b,c,x,y,z
-real :: g_2D
+real :: g_2D,g_2D_l,g_2D_h,yl,yh
+real,parameter :: lim_scl_h=1.0001,lim_scl_l=0.9999
 !::Numerical problem: atan(inf) = pi/2 and when a/2 = x then f_3D returns NaN (inf). 
 !::So we need to check for this and return a large number to ensure numerical stability
 if ( b/2. - y .eq. 0 ) then
-    g_2D = sign(1e10,(a/2. - x))
+    yl = y * lim_scl_l
+    yh = y * lim_scl_h
+    
+    g_2D_l = (a/2. - x) / (b/2. - yl)
+    g_2D_h = (a/2. - x) / (b/2. - yh)
+    
+    g_2D = 0.5 * ( g_2D_l + g_2D_h )
 else    
     g_2D = (a/2. - x) / (b/2. - y)
 endif
