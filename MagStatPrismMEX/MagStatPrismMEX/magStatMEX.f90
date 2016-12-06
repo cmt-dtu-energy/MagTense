@@ -68,10 +68,10 @@
       
       integer*4, external :: debugMLCallback
       
-      !     open (11, file='debug.txt',status='replace',
-      !+  access='sequential',form='formatted',action='write' )
-      !     write(11,*) 'START'
-    
+!     !      open (11, file='debug.txt',status='replace',
+!     !+  access='sequential',form='formatted',action='write' )
+!     !      write(11,*) 'START'
+!     !       close(11)
       
       !-----------------------------------------------------------------------
 !     Check for proper number of arguments. 
