@@ -81,7 +81,7 @@ real,dimension(:,:,:),allocatable :: rotMat,rotMatInv
 real,dimension(:,:,:,:),allocatable :: N_out
 integer :: debugRetval,endInd
 integer,parameter :: recl=2
-real,parameter :: conv_fractile=0.9
+real,parameter :: conv_fractile=0.85
 real,dimension(2) :: debArr
 lambda = 1.0
 lambda_old = lambda
