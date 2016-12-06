@@ -47,5 +47,6 @@
 		<File RelativePath=".\locate.for"/>
 		<File RelativePath=".\MagPrism.f90"/>
 		<File RelativePath=".\parameters.f90"/>
+		<File RelativePath=".\Qsort.f90"/>
 		<File RelativePath=".\util.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>
