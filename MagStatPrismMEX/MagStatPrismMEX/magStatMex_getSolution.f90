@@ -99,7 +99,8 @@
       
       allocate( solPts(ll,3), Hout(ll,3) )
       allocate( M(nn,3), dims(nn,3), pos(nn,3), rotAngles(nn,3) )
-      !allocate( rotMat(nn,3,3), rotMatInv(nn,3,3) )
+      
+      Hout(:,:) = 0
             
       
       call mxCopyPtrToReal8(mxGetPr(prhs(1)), solPts, ll * 3 )
@@ -122,6 +123,8 @@
       plhs(1) = mxCreateDoubleMatrix( ll, d_dims, ComplexFlag )
            
       call mxCopyReal8ToPtr( Hout ,mxGetPr( plhs(1) ), ll * 3 )
+      
+      deallocate( solpts, Hout, M, dims, pos, rotAngles )
          
       end subroutine
       
