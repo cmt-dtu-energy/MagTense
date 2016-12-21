@@ -275,7 +275,7 @@
       d_dims = 3;
       ComplexFlag = 0;
       plhs(1) = mxCreateDoubleMatrix(nnn,d_dims,ComplexFlag)
-      plhs(2) = mxCreateDoubleMatrix(nnn,d_dims,ComplexFlag)
+      plhs(2) = mxCreateDoubleMatrix(nn,d_dims,ComplexFlag)
       dimIteOut(1) = 1
       plhs(3) = mxCreateNumericArray(1,
      + dimIteOut,mxClassIDFromClassName('int32'),0)
