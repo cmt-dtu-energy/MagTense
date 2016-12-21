@@ -183,12 +183,12 @@ if ( maxval(stateFcnIndices) .le. m ) then
         endif
        
         
-        open (14, file='H_M.dat',	&
-			           status='unknown', form='unformatted',action='write',	&
-			           access='direct', recl=recl*n*3)
-        write(14,rec=2*i+1) Hout(1:n,:)
-        write(14,rec=2*i+2) Mout
-        close(14)
+        !open (14, file='H_M.dat',	&
+			     !      status='unknown', form='unformatted',action='write',	&
+			     !      access='direct', recl=recl*n*3)
+        !write(14,rec=2*i+1) Hout(1:n,:)
+        !write(14,rec=2*i+2) Mout
+        !close(14)
         
     enddo
     
@@ -207,7 +207,6 @@ real,intent(inout),dimension(l,3) :: Hout
 real,intent(in),dimension(n,3) :: M, dims, pos
 real,intent(in),dimension(n,3,3) :: rotMat,rotMatInv
 integer,intent(in) :: l,n, spacedim
-real,dimension(3,3) :: N_out
 real,dimension(3) :: diffPos, dotProd
 real,dimension(3,3) :: Nout
 integer :: i,j
@@ -227,7 +226,7 @@ do i=1,l
            call getN_2D(dims(j,1),dims(j,2),dims(j,3), diffPos(1), diffPos(2), diffPos(3), Nout )
         endif
         
-        call getDotProd( N_out, M(j,:), dotProd )
+        call getDotProd( Nout, M(j,:), dotProd )
         
         !::Rotate the solution back
         dotProd = matmul( rotMatInv(j,:,:), dotProd )
