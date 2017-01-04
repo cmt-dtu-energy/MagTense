@@ -88,7 +88,7 @@ lambda_old = lambda
 convCnt = 1
 lambdaCnt = 1
 
-
+call writeVersionString()
 
 !::check that maxval(stateFcnIndices) <= m
 if ( maxval(stateFcnIndices) .le. m ) then
