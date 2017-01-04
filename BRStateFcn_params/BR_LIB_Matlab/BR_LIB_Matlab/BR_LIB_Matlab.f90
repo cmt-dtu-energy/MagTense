@@ -53,8 +53,13 @@
       
 !      open (11, file='debug.txt',status='replace', access='sequential',form='formatted',action='write' )
       
-
-
+      !-----------------------------------------------------------------------	  	       
+	  open(11,file='version_BL_LIB_Matlab.txt',status='unknown',access='sequential',
+     +              form='formatted',position='rewind',action='write')     
+	  write(11,*) "BL_LIB_Matlab compiled on:"
+      write(11,*) __DATE__
+      write(11,*) __TIME__
+      !-----------------------------------------------------------------------
       
       !-----------------------------------------------------------------------
 !     Check for proper number of arguments. 
