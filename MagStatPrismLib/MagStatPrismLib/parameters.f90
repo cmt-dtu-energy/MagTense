@@ -85,5 +85,26 @@ contains
     !
     end subroutine writeDebugStringArr1DInt
   
+  subroutine writeVersionString()
+    open(11,file='version_MagStatPrismLib.txt',status='unknown',access='sequential',form='formatted',position='rewind',action='write')
     
+    write(11,*) "MagStatPrismLib compiled on:"
+    
+    write(11,*) __DATE__
+    write(11,*) __TIME__
+    !
+    !
+    !write(11,*) 'sjask'
+    !if ( present( valint ) ) then
+    !    write(11,*) txt,valint
+    !else
+    !    write(11,*) txt
+    !endif
+    !if ( present( valdbl ) ) then
+    !    write(11,*) txt,valdbl
+    !endif
+    !
+    close(11)
+    
+  end subroutine writeVersionString
 END MODULE parameters_call
