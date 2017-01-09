@@ -443,9 +443,10 @@ real,dimension(3,3) :: RotX,RotY,RotZ
 allocate( rotMat(n,3,3), rotMatInv(n,3,3) )
 
 do i=1,n
-    call getRotX( rotAngles(i,1), RotX )
-    call getRotY( rotAngles(i,2), RotY )
-    call getRotZ( rotAngles(i,3), RotZ )
+    !::The minus sign is important since a rotated prism can be represented with a rotation about the given axis in the opposite direction
+    call getRotX( -rotAngles(i,1), RotX )
+    call getRotY( -rotAngles(i,2), RotY )
+    call getRotZ( -rotAngles(i,3), RotZ )
     
     !::Find the rotation matrix as defined by yaw, pitch and roll
     !::Rot = RotZ * RotY * RotX
