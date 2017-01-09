@@ -54,6 +54,15 @@
       real*8,dimension(:,:),allocatable :: M,rotAngles
       real*8,dimension(:,:,:),allocatable :: rotMat,rotMatInv
       
+	  
+	  !-----------------------------------------------------------------------	  	       
+	     open(11,file='version_magStatMEX_getSolution.txt',
+     +   status='unknown',access='sequential',form='formatted',
+     +                       position='rewind',action='write')     
+	  write(11,*) "magStatMEX_getSolution compiled on:"
+      write(11,*) __DATE__
+      write(11,*) __TIME__
+      !-----------------------------------------------------------------------
       
       !-----------------------------------------------------------------------
 !     Check for proper number of arguments. 
