@@ -51,10 +51,15 @@
       real,dimension(:,:),allocatable :: M,S,deltaF
       
       
-      open (11, file='debug.txt',status='replace', access='sequential',form='formatted',action='write' )
+!      open (11, file='debug.txt',status='replace', access='sequential',form='formatted',action='write' )
       
-
-
+      !-----------------------------------------------------------------------	  	       
+	  open(11,file='version_BL_LIB_Matlab.txt',status='unknown',access='sequential',
+     +              form='formatted',position='rewind',action='write')     
+	  write(11,*) "BL_LIB_Matlab compiled on:"
+      write(11,*) __DATE__
+      write(11,*) __TIME__
+      !-----------------------------------------------------------------------
       
       !-----------------------------------------------------------------------
 !     Check for proper number of arguments. 
@@ -104,7 +109,7 @@
       call mxCopyPtrToReal8( mxGetPr(NsPtr), Ns, 1 )
       call mxCopyPtrToReal8( mxGetPr(rhoPtr), rho, 1 )
       call mxCopyPtrToInteger4( mxGetPr(signBetaPtr), signBeta, 1 )
-      write(11,*) 'sign',signBeta
+      !write(11,*) 'sign',signBeta
       !::Get the array dimension
       call mxCopyPtrToInteger4( mxGetPr(prhs(2)), n, 1 )
       allocate( T(n), H(n), Tc(n), M(n,2), S(n,2), deltaF(n,2) )
@@ -120,12 +125,12 @@
       call mxCopyPtrToReal8( mxGetPr(prhs(5)), p, 1 )
       call mxCopyPtrToReal8( mxGetPr(prhs(6)), Tc, n )
       
-      write(11,*) minval(T),maxval(T)
-      write(11,*) minval(H),maxval(H)
-      write(11,*) p
-      write(11,*) minval(Tc),maxval(Tc)
-      write(11,*) n
-      close(11)
+      !write(11,*) minval(T),maxval(T)
+      !write(11,*) minval(H),maxval(H)
+      !write(11,*) p
+      !write(11,*) minval(Tc),maxval(Tc)
+      !write(11,*) n
+      !close(11)
       
       !::Initializes the BR parameters
       call initializeBRParameters( kappa, eta, J, g, Ns, rho, signBeta )
