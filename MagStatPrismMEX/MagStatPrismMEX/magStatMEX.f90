@@ -23,6 +23,7 @@
 !     plhs(2) Mout(n,3),real
 !( pos, dims, dir, magType, Hext,T, n, stateFcn, stateFcnIndices, m, solPts, l, Hout, Mout )
       subroutine mexFunction(nlhs, plhs, nrhs, prhs)
+
       USE MagPrism_Call
       USE Parameters_CALL
 !     Declarations
@@ -68,12 +69,20 @@
       
       integer*4, external :: debugMLCallback
       
-      !     open (11, file='debug.txt',status='replace',
-      !+  access='sequential',form='formatted',action='write' )
-      !     write(11,*) 'START'
-    
+!     !      open (11, file='debug.txt',status='replace',
+!     !+  access='sequential',form='formatted',action='write' )
+!     !      write(11,*) 'START'
+!     !       close(11)
       
+      !-----------------------------------------------------------------------	  	       
+	     open(11,file='version_magStatMEX.txt',status='unknown',
+     +   access='sequential',form='formatted',position='rewind',
+     +                       action='write')     
+	  write(11,*) "magStatMEX compiled on:"
+      write(11,*) __DATE__
+      write(11,*) __TIME__
       !-----------------------------------------------------------------------
+
 !     Check for proper number of arguments. 
       if(nrhs .lt. 15) then
          call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput',
@@ -136,7 +145,7 @@
      +                           'Input sixteen should be double')  
       endif
       endif
-     
+	 
        !write(11,*) 'HUND'
       call mxCopyPtrToInteger4(mxGetPr(prhs(7)) , nn, 1)
       call mxCopyPtrToInteger4(mxGetPr(prhs(10)), mm, 1)
@@ -275,7 +284,7 @@
       d_dims = 3;
       ComplexFlag = 0;
       plhs(1) = mxCreateDoubleMatrix(nnn,d_dims,ComplexFlag)
-      plhs(2) = mxCreateDoubleMatrix(nnn,d_dims,ComplexFlag)
+      plhs(2) = mxCreateDoubleMatrix(nn,d_dims,ComplexFlag)
       dimIteOut(1) = 1
       plhs(3) = mxCreateNumericArray(1,
      + dimIteOut,mxClassIDFromClassName('int32'),0)

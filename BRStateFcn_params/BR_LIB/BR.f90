@@ -17,6 +17,14 @@ contains
 subroutine initializeBRParameters( kappa_, eta_, J_, g_, Ns_, rho_, signBeta_  )
 real,intent(in) :: kappa_,eta_,J_,g_,Ns_,rho_
 integer,intent(in) :: signBeta_
+
+      !-----------------------------------------------------------------------	  	       
+	  open(11,file='version_BR_LIB.txt',status='unknown',access='sequential',form='formatted',position='rewind',action='write')     
+	  write(11,*) "BL_LIB compiled on:"
+      write(11,*) __DATE__
+      write(11,*) __TIME__
+      !-----------------------------------------------------------------------
+
 !    open (11, file='debug.txt',status='old', access='sequential',form='formatted',action='write',position='append' )
     kappa = kappa_
     eta = eta_
@@ -67,7 +75,7 @@ p_cst = p
 
 !::Reset M
 M(:,:) = 0
-open (11, file='debug.txt',status='old', access='sequential',form='formatted',action='write',position='append' )
+
 do ii=1,n
         !::Main loop for doing the BR solution            
         !::The beta-parameter from BR                
@@ -141,7 +149,7 @@ do ii=1,n
         elseif ( Mval(1) .eq. 0 .AND. H_cst .gt. 0 ) then
             Mval(1) = Mval(2)                
         endif
-        write(11,*) Mval        
+         
         !::The heating curve should be the first element in the array, i.e.
         !::the maximum value of M represents this
         if ( Mval(1) .lt. Mval(2) ) then
@@ -174,7 +182,7 @@ do ii=1,n
         !endif
 enddo
 
-close(11)
+
 call cpu_time( time_end )
 
 !write(*,*) 'time for BR',time_end-time_start

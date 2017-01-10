@@ -1,6 +1,7 @@
 MODULE MagPrism_CALL
 use PARAMETERS_CALL
 use UTIL_CALL
+use qsort_c_module
 implicit none
 contains
     
@@ -73,24 +74,27 @@ real,dimension(4) :: maxRelDiffArr
 real,dimension(:,:),allocatable :: Hdem,H_old
 integer :: i,j,convCnt,lambdaCnt
 integer,parameter :: maxIte=1000
-real,parameter :: tol = 0.001
+real,parameter :: tol = 0.01
 logical :: lCh
-real,dimension(:,:),allocatable :: tmp
+real,dimension(:),allocatable :: tmp,Hnorm,Hnorm_old
 real,dimension(:,:,:),allocatable :: rotMat,rotMatInv
 real,dimension(:,:,:,:),allocatable :: N_out
-integer :: debugRetval
-
+integer :: debugRetval,endInd
+integer,parameter :: recl=2
+real,parameter :: conv_fractile=0.85
+real,dimension(2) :: debArr
 lambda = 1.0
 lambda_old = lambda
 convCnt = 1
 lambdaCnt = 1
 
-
+call writeVersionString()
 
 !::check that maxval(stateFcnIndices) <= m
 if ( maxval(stateFcnIndices) .le. m ) then
     !::Allocate the solution
-    allocate(Hout(n+l,3),Mout(n,3),Hdem(n,3),H_old(n,3),tmp(n,3))
+    allocate(Hout(n+l,3),Mout(n,3),Hdem(n,3),H_old(n,3))
+    allocate(tmp(n),Hnorm(n),Hnorm_old(n))
     Hout(:,:) = 0
     if ( present( Hint_init ) ) then
         Hout(1:n,:) = Hint_init
@@ -124,12 +128,18 @@ if ( maxval(stateFcnIndices) .le. m ) then
         call updateHysteresisTracking( T, Hout, hyst_map_init, hyst_map, n, stateFcn, stateFcnIndices, m )
         
         !::Find the relative change in the solution
+        Hnorm = sqrt( Hout(1:n,1)**2 + Hout(1:n,2)**2 + Hout(1:n,3)**2 )
+        Hnorm_old = sqrt( H_old(1:n,1)**2 + H_old(1:n,2)**2 + H_old(1:n,3)**2 );
         tmp = -1
-        do j=1,n
-            where( H_old(j,:) .ne. 0 )
-                tmp(j,:) = abs( (Hout(j,:) - H_old(j,:))/H_old(j,:) )
-            endwhere
-        enddo
+         where( Hnorm_old .ne. 0 )
+            tmp = abs( ( Hnorm - Hnorm_old ) / Hnorm_old )
+        endwhere
+        
+        call QsortC(tmp)
+        
+        endInd = ceiling( conv_fractile * n )
+        
+        
         maxRelDiff = maxval(tmp)
         maxRelDiffArr = cshift( maxRelDiffArr, 1 )
         maxRelDiffArr(1) = maxRelDiff
@@ -148,6 +158,15 @@ if ( maxval(stateFcnIndices) .le. m ) then
         !write(*,*) 'maxRelDiff,lambda,tol',maxRelDiff,lambda,tol*lambda
         !call writeDebugStringArr1D( 'Mout ', sqrt(Mout(:,1)**2+Mout(:,2)**2+Mout(:,3)**2) )
         !call writeDebugStringArr1D( 'Hout ', sqrt(Hout(:,1)**2+Hout(:,2)**2+Hout(:,3)**2) )
+        debArr(1) = tol * lambda
+        debArr(2) = tmp(endInd)
+        call writeDebugStringArr1D( 'lambda', debArr )
+        
+        if (  tmp(endInd) .lt. tol * lambda ) then
+            call writeDebugString('SolConv')            
+            exit    
+        endif        
+        
         if ( maxRelDiff .lt. tol * lambda  ) then
             if ( lambda .ne. 1 .AND. convCnt .lt. 5 ) then
                 convCnt = convCnt + 1
@@ -162,7 +181,14 @@ if ( maxval(stateFcnIndices) .le. m ) then
         else
                 convCnt = 1
         endif
+       
         
+        !open (14, file='H_M.dat',	&
+			     !      status='unknown', form='unformatted',action='write',	&
+			     !      access='direct', recl=recl*n*3)
+        !write(14,rec=2*i+1) Hout(1:n,:)
+        !write(14,rec=2*i+2) Mout
+        !close(14)
         
     enddo
     
@@ -181,7 +207,6 @@ real,intent(inout),dimension(l,3) :: Hout
 real,intent(in),dimension(n,3) :: M, dims, pos
 real,intent(in),dimension(n,3,3) :: rotMat,rotMatInv
 integer,intent(in) :: l,n, spacedim
-real,dimension(3,3) :: N_out
 real,dimension(3) :: diffPos, dotProd
 real,dimension(3,3) :: Nout
 integer :: i,j
@@ -201,7 +226,7 @@ do i=1,l
            call getN_2D(dims(j,1),dims(j,2),dims(j,3), diffPos(1), diffPos(2), diffPos(3), Nout )
         endif
         
-        call getDotProd( N_out, M(j,:), dotProd )
+        call getDotProd( Nout, M(j,:), dotProd )
         
         !::Rotate the solution back
         dotProd = matmul( rotMatInv(j,:,:), dotProd )
@@ -224,7 +249,7 @@ lCh = .false.
 if ( (maxDiff(1) .gt. maxDiff(2) .AND. maxDiff(2) .lt. maxDiff(3) .AND. maxDiff(3) .gt. maxDiff(4)) .OR. &
      (maxDiff(1) .lt. maxDiff(2) .AND. maxDiff(2) .gt. maxDiff(3) .AND. maxDiff(3) .lt. maxDiff(4))   ) then
 
-    lambda = lambda * 0.9
+    lambda = lambda * 0.95
     lCh = .true.
 endif
 
@@ -418,9 +443,10 @@ real,dimension(3,3) :: RotX,RotY,RotZ
 allocate( rotMat(n,3,3), rotMatInv(n,3,3) )
 
 do i=1,n
-    call getRotX( rotAngles(i,1), RotX )
-    call getRotY( rotAngles(i,2), RotY )
-    call getRotZ( rotAngles(i,3), RotZ )
+    !::The minus sign is important since a rotated prism can be represented with a rotation about the given axis in the opposite direction
+    call getRotX( -rotAngles(i,1), RotX )
+    call getRotY( -rotAngles(i,2), RotY )
+    call getRotZ( -rotAngles(i,3), RotZ )
     
     !::Find the rotation matrix as defined by yaw, pitch and roll
     !::Rot = RotZ * RotY * RotX
