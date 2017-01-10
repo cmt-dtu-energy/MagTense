@@ -238,6 +238,7 @@ enddo
 
 end subroutine getSolution
 
+
 !:: divides lambda by 2 and sets lCh to true, if maxDiff oscillates.
 subroutine updateLambda( lambda, maxDiff, lCh )
 real,intent(inout) :: lambda

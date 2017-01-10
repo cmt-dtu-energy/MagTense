@@ -54,6 +54,9 @@
       real*8,dimension(:,:),allocatable :: M,rotAngles
       real*8,dimension(:,:,:),allocatable :: rotMat,rotMatInv
       
+      real*8,dimension(2) :: dt
+      real*8 :: t1,t2,t3
+      
 	  
 	  !-----------------------------------------------------------------------	  	       
 	     open(11,file='version_magStatMEX_getSolution.txt',
@@ -62,6 +65,7 @@
 	  write(11,*) "magStatMEX_getSolution compiled on:"
       write(11,*) __DATE__
       write(11,*) __TIME__
+      close (11)
       !-----------------------------------------------------------------------
       
       !-----------------------------------------------------------------------
@@ -69,7 +73,7 @@
       if(nrhs .ne. 8) then
          call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput',
      +                           '8 inputs are required.')
-      elseif(nlhs .gt. 1) then
+      elseif(nlhs .gt. 2) then
          call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nOutput',
      +                           'Too many output arguments.')
       endif
@@ -117,12 +121,17 @@
       call mxCopyPtrToReal8(mxGetPr(prhs(3)), M, nn * 3 )
       call mxCopyPtrToReal8(mxGetPr(prhs(4)), dims, nn * 3 )
       call mxCopyPtrToReal8(mxGetPr(prhs(5)), pos, nn * 3 )
-      
+      !CALL CPU_TIME(t1)
       !::Call the subroutine to find the rotations matrices
       call findRotationMatrices( rotAngles, nn, rotMat, rotMatInv)
+      !CALL CPU_TIME(t2)
       !::call the subroutine to find the solution at the specified points
       call getSolution( solPts, ll, M, dims, pos, nn, spacedim, Hout, 
      +                  rotMat, rotMatInv )
+      !CALL CPU_TIME(t3)
+      
+      !dt(1) = t2-t1;
+      !dt(2) = t3-t2;
       
       !::Load the result back to Matlab
             
@@ -130,11 +139,17 @@
       ComplexFlag = 0;
       
       plhs(1) = mxCreateDoubleMatrix( ll, d_dims, ComplexFlag )
-           
+      
       call mxCopyReal8ToPtr( Hout ,mxGetPr( plhs(1) ), ll * 3 )
       
+      
+      if(nlhs .eq. 2) then
+        plhs(2) = mxCreateDoubleMatrix( 2, 1, ComplexFlag )   
+        call mxCopyReal8ToPtr( dt, mxGetPr( plhs(2) ), 2 )
+      endif
+      
       deallocate( solpts, Hout, M, dims, pos, rotAngles )
-         
+      
       end subroutine
       
       
