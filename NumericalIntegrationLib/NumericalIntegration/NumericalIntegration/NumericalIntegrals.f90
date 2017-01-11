@@ -2,8 +2,8 @@ module NumInt
     use QUADPACK
     implicit none
 
-    real,parameter :: epsabs=0.001,epsrel=0.01
-    real :: y1,y2,x,y
+    !real,parameter :: epsabs=0.001,epsrel=0.01
+    real :: y1,y2,x,y,epsabs,epsrel
     !real,external :: func
     
     abstract interface
@@ -23,11 +23,14 @@ module NumInt
 !::on the rectangular interval [xl,xh], [yl,yh]
 !::returns the result in res (kind = real)
 !::The user supplied function fun should take two arguments, x and y: fun=fun(x,y)
-subroutine integral2( fun, xl, xh, yl, yh, res, abserr, neval, ier )
+subroutine integral2( fun, xl, xh, yl, yh, eps_abs, eps_rel, res, abserr, neval, ier )
 real,external :: fun
-real,intent(in) :: xl,xh,yl,yh
+real,intent(in) :: xl,xh,yl,yh,eps_abs,eps_rel
 real,intent(inout) :: res,abserr
 integer,intent(inout) :: neval,ier
+
+epsabs = eps_abs
+epsrel = eps_rel
 
 !::Set the y-boundaries
 y1 = yl
@@ -42,7 +45,7 @@ end subroutine integral2
 !::Adopted from NR
 function h(xx)
 real h,xx
-external f
+!external f
 real ss
 real :: res,abserr
 integer :: neval,ier
