@@ -5184,7 +5184,57 @@ subroutine qawse ( f, a, b, alfa, beta, integr, epsabs, epsrel, limit, &
   abserr = errsum
 
   return
-end subroutine
+  end subroutine
+  
+  function qwgtc ( x, c, p2, p3, p4, kp )
+
+!*****************************************************************************80
+!
+!! QWGTC defines the weight function used by QC25C.
+!
+!  Discussion:
+!
+!    The weight function has the form 1 / ( X - C ).
+!
+!  Author:
+!
+!    Robert Piessens, Elise de Doncker-Kapenger, 
+!    Christian Ueberhuber, David Kahaner
+!
+!  Reference:
+!
+!    Robert Piessens, Elise de Doncker-Kapenger, 
+!    Christian Ueberhuber, David Kahaner,
+!    QUADPACK, a Subroutine Package for Automatic Integration,
+!    Springer Verlag, 1983
+!
+!  Parameters:
+!
+!    Input, real ( kind = 8 ) X, the point at which the weight function is evaluated.
+!
+!    Input, real ( kind = 8 ) C, the location of the singularity.
+!
+!    Input, real ( kind = 8 ) P2, P3, P4, parameters that are not used.
+!
+!    Input, integer ( kind = 8 ) KP, a parameter that is not used.
+!
+!    Output, real ( kind = 8 ) QWGTC, the value of the weight function at X.
+!
+  implicit none
+
+  real ( kind = 8 ) c
+  integer ( kind = 8 ) kp
+  real ( kind = 8 ) p2
+  real ( kind = 8 ) p3
+  real ( kind = 8 ) p4
+  real ( kind = 8 ) qwgtc
+  real ( kind = 8 ) x
+
+  qwgtc = 1.0E+00 / ( x - c )
+
+  return
+end function
+  
 subroutine qc25c ( f, a, b, c, result, abserr, krul, neval )
 
 !*****************************************************************************80
@@ -5279,7 +5329,7 @@ subroutine qc25c ( f, a, b, c, result, abserr, krul, neval )
   real ( kind = 8 ) p2
   real ( kind = 8 ) p3
   real ( kind = 8 ) p4
-  real ( kind = 8 ), external :: qwgtc
+  !real ( kind = 8 ), external :: qwgtc
   real ( kind = 8 ) resabs
   real ( kind = 8 ) resasc
   real ( kind = 8 ) result
@@ -5545,7 +5595,7 @@ subroutine qc25o ( f, a, b, omega, integr, nrmom, maxp1, ksave, result, &
   real ( kind = 8 ) p2
   real ( kind = 8 ) p3
   real ( kind = 8 ) p4
-  real ( kind = 8 ), external :: qwgto
+  !real ( kind = 8 ), external :: qwgto
   real ( kind = 8 ) resabs
   real ( kind = 8 ) resasc
   real ( kind = 8 ) resc12
@@ -5924,7 +5974,7 @@ subroutine qc25s ( f, a, b, bl, br, alfa, beta, ri, rj, rg, rh, result, &
   integer ( kind = 8 ) integr
   integer ( kind = 8 ) isym
   integer ( kind = 8 ) neval
-  real ( kind = 8 ), external :: qwgts
+  !real ( kind = 8 ), external :: qwgts
   real ( kind = 8 ) resabs
   real ( kind = 8 ) resasc
   real ( kind = 8 ) result
@@ -9502,54 +9552,7 @@ subroutine qsort ( limit, last, maxerr, ermax, elist, iord, nrmax )
 
   return
 end subroutine
-function qwgtc ( x, c, p2, p3, p4, kp )
 
-!*****************************************************************************80
-!
-!! QWGTC defines the weight function used by QC25C.
-!
-!  Discussion:
-!
-!    The weight function has the form 1 / ( X - C ).
-!
-!  Author:
-!
-!    Robert Piessens, Elise de Doncker-Kapenger, 
-!    Christian Ueberhuber, David Kahaner
-!
-!  Reference:
-!
-!    Robert Piessens, Elise de Doncker-Kapenger, 
-!    Christian Ueberhuber, David Kahaner,
-!    QUADPACK, a Subroutine Package for Automatic Integration,
-!    Springer Verlag, 1983
-!
-!  Parameters:
-!
-!    Input, real ( kind = 8 ) X, the point at which the weight function is evaluated.
-!
-!    Input, real ( kind = 8 ) C, the location of the singularity.
-!
-!    Input, real ( kind = 8 ) P2, P3, P4, parameters that are not used.
-!
-!    Input, integer ( kind = 8 ) KP, a parameter that is not used.
-!
-!    Output, real ( kind = 8 ) QWGTC, the value of the weight function at X.
-!
-  implicit none
-
-  real ( kind = 8 ) c
-  integer ( kind = 8 ) kp
-  real ( kind = 8 ) p2
-  real ( kind = 8 ) p3
-  real ( kind = 8 ) p4
-  real ( kind = 8 ) qwgtc
-  real ( kind = 8 ) x
-
-  qwgtc = 1.0E+00 / ( x - c )
-
-  return
-end function
 function qwgto ( x, omega, p2, p3, p4, integr )
 
 !*****************************************************************************80
