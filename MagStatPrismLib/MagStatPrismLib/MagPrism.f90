@@ -228,8 +228,8 @@ do i=1,l
         
         call getDotProd( Nout, M(j,:), dotProd )
         
-        !::Rotate the solution back
-        dotProd = matmul( rotMatInv(j,:,:), dotProd )
+        !::Rotate the solution back. No, this is not correct!
+        !dotProd = matmul( rotMatInv(j,:,:), dotProd )
         
         Hout(i,:) = Hout(i,:) - dotProd
     enddo
@@ -385,8 +385,8 @@ do i=1,n
         !::Compute the dot product between N and M
         call getDotProd( N_out(i,j,:,:), M(j,:), dotProd )
         
-        !::Rotate the solution back
-        dotProd = matmul( rotMatInv(j,:,:), dotProd )        
+        !::Rotate the solution back. No, this is not correct to do!
+        !dotProd = matmul( rotMatInv(j,:,:), dotProd )        
         
         !::Add to the solution
         Hdem(i,:) = Hdem(i,:) - dotProd
