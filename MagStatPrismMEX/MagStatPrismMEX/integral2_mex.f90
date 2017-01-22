@@ -8,7 +8,7 @@
       type modelStruct
       integer,dimension(3) :: inds
       real*8 :: z0
-      integer :: n,spacedim
+      integer :: n,spacedim,intInd
       real*8,dimension(:,:),allocatable :: dims,pos,M,rotAngles
       real*8,dimension(:,:,:),allocatable :: rotMat,rotMatInv
       endtype
@@ -116,14 +116,16 @@
               !::The diagonal components are always the first surface pair
               f_tens_ptr => F_int_diag
           elseif ( i .gt. 1 ) then
-              !::And then comes to two surface pairs with off-diagonal components
+              !::And then comes the two surface pairs with off-diagonal components
               f_tens_ptr => F_int_off_diag
           endif    
           !::Set the plane indices
           model%inds(1:3) = indices(:,i,j)
+          !::set the index of the first integration function in the integrand
+          model%intInd = j
           !::lower plane 
            model%z0 = zp(i,1,j)
-          !::Note the sign accounts for the normal vector pointing the opposite
+          
           !::direction of the other xy plane
           call integral2( f_tens_ptr, xp(i,1,j), xp(i,2,j), 
      +                                yp(i,1,j), yp(i,2,j), 
@@ -136,7 +138,7 @@
               exit
           endif
           
-      
+          !::Note the sign accounts for the normal vector pointing the opposite
           F(j) = F(j) - res
           !::upper plane
           model%z0 = zp(i,2,j)
@@ -183,7 +185,7 @@
        B = mu0 * Hsol
     
        F_int_off_diag = 
-     + 1. /mu0 * B(model%inds(2)) * B(model%inds(3))
+     + 1. /mu0 * B(model%intInd) * B(model%inds(3))
     
        return
 
