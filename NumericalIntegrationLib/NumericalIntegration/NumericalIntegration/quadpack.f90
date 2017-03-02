@@ -1,6 +1,13 @@
 module QUADPACK
+    use integrationDataTypes
     implicit none
+    
+    
+    
     contains
+    
+    
+    
     subroutine aaaa
 
 !*****************************************************************************80
@@ -84,7 +91,7 @@ module QUADPACK
 !      no attempt to satisfy any particular input error request.
 !
 !      qk15
-!      qk21
+!      qk21_x
 !      qk31
 !      qk41
 !      qk51
@@ -191,7 +198,7 @@ module QUADPACK
 !
   return
 end subroutine
-subroutine qag ( f, a, b, epsabs, epsrel, key, result, abserr, neval, ier )
+subroutine qag ( f_ptr, dat, a, b, epsabs, epsrel, key, result, abserr, neval, ier )
 
 !*****************************************************************************80
 !
@@ -284,7 +291,7 @@ subroutine qag ( f, a, b, epsabs, epsrel, key, result, abserr, neval, ier )
   real ( kind = 8 ) elist(limit)
   real ( kind = 8 ) epsabs
   real ( kind = 8 ) epsrel
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) iord(limit)
   integer ( kind = 8 ) key
@@ -292,13 +299,15 @@ subroutine qag ( f, a, b, epsabs, epsrel, key, result, abserr, neval, ier )
   integer ( kind = 8 ) neval
   real ( kind = 8 ) result
   real ( kind = 8 ) rlist(limit)
+  class(dataCollectionBase), target :: dat
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
 
-  call qage ( f, a, b, epsabs, epsrel, key, limit, result, abserr, neval, &
+  call qage ( f_ptr, dat, a, b, epsabs, epsrel, key, limit, result, abserr, neval, &
     ier, alist, blist, rlist, elist, iord, last )
 
   return
 end subroutine
-subroutine qage ( f, a, b, epsabs, epsrel, key, limit, result, abserr, neval, &
+subroutine qage ( f_ptr, dat, a, b, epsabs, epsrel, key, limit, result, abserr, neval, &
   ier, alist, blist, rlist, elist, iord, last )
 
 !*****************************************************************************80
@@ -435,7 +444,8 @@ subroutine qage ( f, a, b, epsabs, epsrel, key, limit, result, abserr, neval, &
   real ( kind = 8 ) error2
   real ( kind = 8 ) erro12
   real ( kind = 8 ) errsum
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) iord(limit)
   integer ( kind = 8 ) iroff1
@@ -449,6 +459,7 @@ subroutine qage ( f, a, b, epsabs, epsrel, key, limit, result, abserr, neval, &
   real ( kind = 8 ) resabs
   real ( kind = 8 ) result
   real ( kind = 8 ) rlist(limit)
+  class(dataCollectionBase), target :: dat
 !
 !  Test on validity of parameters.
 !
@@ -478,17 +489,17 @@ subroutine qage ( f, a, b, epsabs, epsrel, key, limit, result, abserr, neval, &
   neval = 0
 
   if ( keyf == 1 ) then
-    call qk15 ( f, a, b, result, abserr, defabs, resabs )
+    call qk15 ( f_ptr, dat, a, b, result, abserr, defabs, resabs )
   else if ( keyf == 2 ) then
-    call qk21 ( f, a, b, result, abserr, defabs, resabs )
+    call qk21_x ( f_ptr, dat, a, b, result, abserr, defabs, resabs )
   else if ( keyf == 3 ) then
-    call qk31 ( f, a, b, result, abserr, defabs, resabs )
+    call qk31 ( f_ptr, dat, a, b, result, abserr, defabs, resabs )
   else if ( keyf == 4 ) then
-    call qk41 ( f, a, b, result, abserr, defabs, resabs )
+    call qk41 ( f_ptr, dat, a, b, result, abserr, defabs, resabs )
   else if ( keyf == 5 ) then
-    call qk51 ( f, a, b, result, abserr, defabs, resabs )
+    call qk51 ( f_ptr, dat, a, b, result, abserr, defabs, resabs )
   else if ( keyf == 6 ) then
-    call qk61 ( f, a, b, result, abserr, defabs, resabs )
+    call qk61 ( f_ptr, dat, a, b, result, abserr, defabs, resabs )
   end if
 
   last = 1
@@ -543,31 +554,31 @@ subroutine qage ( f, a, b, epsabs, epsrel, key, limit, result, abserr, neval, &
     b2 = blist(maxerr)
 
     if ( keyf == 1 ) then
-      call qk15 ( f, a1, b1, area1, error1, resabs, defab1 )
+      call qk15 ( f_ptr, dat, a1, b1, area1, error1, resabs, defab1 )
     else if ( keyf == 2 ) then
-      call qk21 ( f, a1, b1, area1, error1, resabs, defab1 )
+      call qk21_x ( f_ptr, dat, a1, b1, area1, error1, resabs, defab1 )
     else if ( keyf == 3 ) then
-      call qk31 ( f, a1, b1, area1, error1, resabs, defab1 )
+      call qk31 ( f_ptr, dat, a1, b1, area1, error1, resabs, defab1 )
     else if ( keyf == 4 ) then
-      call qk41 ( f, a1, b1, area1, error1, resabs, defab1)
+      call qk41 ( f_ptr, dat, a1, b1, area1, error1, resabs, defab1)
     else if ( keyf == 5 ) then
-      call qk51 ( f, a1, b1, area1, error1, resabs, defab1 )
+      call qk51 ( f_ptr, dat, a1, b1, area1, error1, resabs, defab1 )
     else if ( keyf == 6 ) then
-      call qk61 ( f, a1, b1, area1, error1, resabs, defab1 )
+      call qk61 ( f_ptr, dat, a1, b1, area1, error1, resabs, defab1 )
     end if
 
     if ( keyf == 1 ) then
-      call qk15 ( f, a2, b2, area2, error2, resabs, defab2 )
+      call qk15 ( f_ptr, dat, a2, b2, area2, error2, resabs, defab2 )
     else if ( keyf == 2 ) then
-      call qk21 ( f, a2, b2, area2, error2, resabs, defab2 )
+      call qk21_x ( f_ptr, dat, a2, b2, area2, error2, resabs, defab2 )
     else if ( keyf == 3 ) then
-      call qk31 ( f, a2, b2, area2, error2, resabs, defab2 )
+      call qk31 ( f_ptr, dat, a2, b2, area2, error2, resabs, defab2 )
     else if ( keyf == 4 ) then
-      call qk41 ( f, a2, b2, area2, error2, resabs, defab2 )
+      call qk41 ( f_ptr, dat, a2, b2, area2, error2, resabs, defab2 )
     else if ( keyf == 5 ) then
-      call qk51 ( f, a2, b2, area2, error2, resabs, defab2 )
+      call qk51 ( f_ptr, dat, a2, b2, area2, error2, resabs, defab2 )
     else if ( keyf == 6 ) then
-      call qk61 ( f, a2, b2, area2, error2, resabs, defab2 )
+      call qk61 ( f_ptr, dat, a2, b2, area2, error2, resabs, defab2 )
     end if
 !
 !  Improve previous approximations to integral and error and
@@ -665,7 +676,7 @@ subroutine qage ( f, a, b, epsabs, epsrel, key, limit, result, abserr, neval, &
 
   return
 end subroutine
-subroutine qagi ( f, bound, inf, epsabs, epsrel, result, abserr, neval, ier )
+subroutine qagi ( f_ptr, dat, bound, inf, epsabs, epsrel, result, abserr, neval, ier )
 
 !*****************************************************************************80
 !
@@ -829,7 +840,8 @@ subroutine qagi ( f, bound, inf, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) errsum
   real ( kind = 8 ) ertest
   logical extrap
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) ierro
@@ -856,6 +868,7 @@ subroutine qagi ( f, bound, inf, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) rlist(limit)
   real ( kind = 8 ) rlist2(52)
   real ( kind = 8 ) small
+  class( dataCollectionBase), target :: dat
 !
 !  Test on validity of parameters.
 !
@@ -888,7 +901,7 @@ subroutine qagi ( f, bound, inf, epsabs, epsrel, result, abserr, neval, ier )
     boun = bound
   end if
 
-  call qk15i ( f, boun, inf, 0.0d+00, 1.0d+00, result, abserr, defabs, resabs )
+  call qk15i ( f_ptr, dat, boun, inf, 0.0d+00, 1.0d+00, result, abserr, defabs, resabs )
 !
 !  Test on accuracy.
 !
@@ -945,8 +958,8 @@ subroutine qagi ( f, bound, inf, epsabs, epsrel, result, abserr, neval, ier )
     a2 = b1
     b2 = blist(maxerr)
     erlast = errmax
-    call qk15i ( f, boun, inf, a1, b1, area1, error1, resabs, defab1 )
-    call qk15i ( f, boun, inf, a2, b2, area2, error2, resabs, defab2 )
+    call qk15i ( f_ptr, dat, boun, inf, a1, b1, area1, error1, resabs, defab1 )
+    call qk15i ( f_ptr, dat, boun, inf, a2, b2, area2, error2, resabs, defab2 )
 !
 !  Improve previous approximations to integral and error
 !  and test for accuracy.
@@ -1212,7 +1225,7 @@ subroutine qagi ( f, bound, inf, epsabs, epsrel, result, abserr, neval, ier )
 
   return
 end subroutine
-subroutine qagp ( f, a, b, npts2, points, epsabs, epsrel, result, abserr, &
+subroutine qagp ( f_ptr, dat, a, b, npts2, points, epsabs, epsrel, result, abserr, &
   neval, ier )
 
 !*****************************************************************************80
@@ -1396,7 +1409,8 @@ subroutine qagp ( f, a, b, npts2, points, epsabs, epsrel, result, abserr, &
   real ( kind = 8 ) errsum
   real ( kind = 8 ) ertest
   logical extrap
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) i
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
@@ -1438,6 +1452,7 @@ subroutine qagp ( f, a, b, npts2, points, epsabs, epsrel, result, abserr, &
   real ( kind = 8 ) rlist2(52)
   real ( kind = 8 ) sign
   real ( kind = 8 ) temp
+  class(dataCollectionBase), target :: dat
 !
 !  Test on validity of parameters.
 !
@@ -1508,7 +1523,7 @@ subroutine qagp ( f, a, b, npts2, points, epsabs, epsrel, result, abserr, &
   do i = 1, nint
 
     b1 = pts(i+1)
-    call qk21 ( f, a1, b1, area1, error1, defabs, resa )
+    call qk21_x ( f_ptr, dat, a1, b1, area1, error1, defabs, resa )
     abserr = abserr + error1
     result = result + area1
     ndin(i) = 0
@@ -1618,8 +1633,8 @@ subroutine qagp ( f, a, b, npts2, points, epsabs, epsrel, result, abserr, &
     a2 = b1
     b2 = blist(maxerr)
     erlast = errmax
-    call qk21 ( f, a1, b1, area1, error1, resa, defab1 )
-    call qk21 ( f, a2, b2, area2, error2, resa, defab2 )
+    call qk21_x ( f_ptr, dat, a1, b1, area1, error1, resa, defab1 )
+    call qk21_x ( f_ptr, dat, a2, b2, area2, error2, resa, defab2 )
 !
 !  Improve previous approximations to integral and error
 !  and test for accuracy.
@@ -1882,7 +1897,7 @@ subroutine qagp ( f, a, b, npts2, points, epsabs, epsrel, result, abserr, &
 
   return
 end subroutine
-subroutine qags ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
+subroutine qags ( f_ptr, dat, a, b, epsabs, epsrel, result, abserr, neval, ier )
 
 !*****************************************************************************80
 !
@@ -2049,7 +2064,8 @@ subroutine qags ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) errsum
   real ( kind = 8 ) ertest
   logical extrap
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) ierro
@@ -2075,6 +2091,7 @@ subroutine qags ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) rlist(limit)
   real ( kind = 8 ) rlist2(52)
   real ( kind = 8 ) small
+  class(dataCollectionBase), target :: dat
 !
 !  The dimension of rlist2 is determined by the value of
 !  limexp in QEXTR (rlist2 should be of dimension
@@ -2100,7 +2117,7 @@ subroutine qags ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
 !  First approximation to the integral.
 !
   ierro = 0
-  call qk21 ( f, a, b, result, abserr, defabs, resabs )
+  call qk21_x ( f_ptr, dat, a, b, result, abserr, defabs, resabs )
 !
 !  Test on accuracy.
 !
@@ -2156,8 +2173,8 @@ subroutine qags ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
     a2 = b1
     b2 = blist(maxerr)
     erlast = errmax
-    call qk21 ( f, a1, b1, area1, error1, resabs, defab1 )
-    call qk21 ( f, a2, b2, area2, error2, resabs, defab2 )
+    call qk21_x ( f_ptr, dat, a1, b1, area1, error1, resabs, defab1 )
+    call qk21_x ( f_ptr, dat, a2, b2, area2, error2, resabs, defab2 )
 !
 !  Improve previous approximations to integral and error
 !  and test for accuracy.
@@ -2411,7 +2428,7 @@ subroutine qags ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
 end subroutine qags
 
 !:: needed for doing double or triple integrals
-subroutine qags_x ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
+subroutine qags_x ( f_ptr, dat, a, b, epsabs, epsrel, result, abserr, neval, ier )
 
 !*****************************************************************************80
 !
@@ -2578,7 +2595,8 @@ subroutine qags_x ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) errsum
   real ( kind = 8 ) ertest
   logical extrap
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) ierro
@@ -2604,6 +2622,11 @@ subroutine qags_x ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) rlist(limit)
   real ( kind = 8 ) rlist2(52)
   real ( kind = 8 ) small
+  
+  class(dataCollectionBase), target :: dat
+  
+  !f_ptr => f
+  
 !
 !  The dimension of rlist2 is determined by the value of
 !  limexp in QEXTR (rlist2 should be of dimension
@@ -2629,7 +2652,7 @@ subroutine qags_x ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
 !  First approximation to the integral.
 !
   ierro = 0
-  call qk21 ( f, a, b, result, abserr, defabs, resabs )
+  call qk21_x ( f_ptr, dat, a, b, result, abserr, defabs, resabs )
 !
 !  Test on accuracy.
 !
@@ -2685,8 +2708,8 @@ subroutine qags_x ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
     a2 = b1
     b2 = blist(maxerr)
     erlast = errmax
-    call qk21 ( f, a1, b1, area1, error1, resabs, defab1 )
-    call qk21 ( f, a2, b2, area2, error2, resabs, defab2 )
+    call qk21_x ( f_ptr, dat, a1, b1, area1, error1, resabs, defab1 )
+    call qk21_x ( f_ptr, dat, a2, b2, area2, error2, resabs, defab2 )
 !
 !  Improve previous approximations to integral and error
 !  and test for accuracy.
@@ -2940,7 +2963,7 @@ subroutine qags_x ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
 end subroutine qags_x
 
 !::needed for doing double or triple integrals
-subroutine qags_y ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
+recursive subroutine qags_y ( f_ptr, dat, a, b, epsabs, epsrel, result, abserr, neval, ier )
 
 !*****************************************************************************80
 !
@@ -3107,7 +3130,8 @@ subroutine qags_y ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) errsum
   real ( kind = 8 ) ertest
   logical extrap
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat),intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) ierro
@@ -3133,6 +3157,7 @@ subroutine qags_y ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) rlist(limit)
   real ( kind = 8 ) rlist2(52)
   real ( kind = 8 ) small
+  class(dataCollectionBase), target :: dat
 !
 !  The dimension of rlist2 is determined by the value of
 !  limexp in QEXTR (rlist2 should be of dimension
@@ -3140,6 +3165,8 @@ subroutine qags_y ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
 !
 !  Test on validity of parameters.
 !
+ !f_ptr => f
+
   ier = 0
   neval = 0
   last = 0
@@ -3158,7 +3185,7 @@ subroutine qags_y ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
 !  First approximation to the integral.
 !
   ierro = 0
-  call qk21 ( f, a, b, result, abserr, defabs, resabs )
+  call qk21_y ( f_ptr, dat, a, b, result, abserr, defabs, resabs )
 !
 !  Test on accuracy.
 !
@@ -3214,8 +3241,8 @@ subroutine qags_y ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
     a2 = b1
     b2 = blist(maxerr)
     erlast = errmax
-    call qk21 ( f, a1, b1, area1, error1, resabs, defab1 )
-    call qk21 ( f, a2, b2, area2, error2, resabs, defab2 )
+    call qk21_y ( f_ptr, dat, a1, b1, area1, error1, resabs, defab1 )
+    call qk21_y ( f_ptr, dat, a2, b2, area2, error2, resabs, defab2 )
 !
 !  Improve previous approximations to integral and error
 !  and test for accuracy.
@@ -3469,7 +3496,7 @@ subroutine qags_y ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
 end subroutine qags_y
 
 
-subroutine qawc ( f, a, b, c, epsabs, epsrel, result, abserr, neval, ier )
+subroutine qawc ( f_ptr, dat, a, b, c, epsabs, epsrel, result, abserr, neval, ier )
 
 !*****************************************************************************80
 !
@@ -3557,7 +3584,9 @@ subroutine qawc ( f, a, b, c, epsabs, epsrel, result, abserr, neval, ier )
 !    LIMIT is the maximum number of subintervals allowed in the
 !    subdivision process of qawce. take care that limit >= 1.
 !
-  implicit none
+implicit none
+  class( dataCollectionBase ), target :: dat
+  
 
   integer ( kind = 8 ), parameter :: limit = 500
 
@@ -3570,7 +3599,8 @@ subroutine qawc ( f, a, b, c, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) c
   real ( kind = 8 ) epsabs
   real ( kind = 8 ) epsrel
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) iord(limit)
   integer ( kind = 8 ) last
@@ -3578,12 +3608,12 @@ subroutine qawc ( f, a, b, c, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) result
   real ( kind = 8 ) rlist(limit)
 
-  call qawce ( f, a, b, c, epsabs, epsrel, limit, result, abserr, neval, ier, &
+  call qawce ( f_ptr, dat, a, b, c, epsabs, epsrel, limit, result, abserr, neval, ier, &
     alist, blist, rlist, elist, iord, last )
 
   return
 end subroutine
-subroutine qawce ( f, a, b, c, epsabs, epsrel, limit, result, abserr, neval, &
+subroutine qawce ( f_ptr, dat, a, b, c, epsabs, epsrel, limit, result, abserr, neval, &
   ier, alist, blist, rlist, elist, iord, last )
 
 !*****************************************************************************80
@@ -3743,7 +3773,8 @@ subroutine qawce ( f, a, b, c, epsabs, epsrel, limit, result, abserr, neval, &
   real ( kind = 8 ) error2
   real ( kind = 8 ) erro12
   real ( kind = 8 ) errsum
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) iord(limit)
   integer ( kind = 8 ) iroff1
@@ -3756,6 +3787,9 @@ subroutine qawce ( f, a, b, c, epsabs, epsrel, limit, result, abserr, neval, &
   integer ( kind = 8 ) nrmax
   real ( kind = 8 ) result
   real ( kind = 8 ) rlist(limit)
+  class( dataCollectionBase ), target :: dat
+  
+  
 !
 !  Test on validity of parameters.
 !
@@ -3792,7 +3826,7 @@ subroutine qawce ( f, a, b, c, epsabs, epsrel, limit, result, abserr, neval, &
   end if
 
   krule = 1
-  call qc25c ( f, aa, bb, c, result, abserr, krule, neval )
+  call qc25c ( f_ptr, dat, aa, bb, c, result, abserr, krule, neval )
   last = 1
   rlist(1) = result
   elist(1) = abserr
@@ -3845,10 +3879,10 @@ subroutine qawce ( f, a, b, c, epsabs, epsrel, limit, result, abserr, neval, &
     a2 = b1
     krule = 2
 
-    call qc25c ( f, a1, b1, c, area1, error1, krule, nev )
+    call qc25c ( f_ptr, dat, a1, b1, c, area1, error1, krule, nev )
     neval = neval+nev
 
-    call qc25c ( f, a2, b2, c, area2, error2, krule, nev )
+    call qc25c ( f_ptr, dat, a2, b2, c, area2, error2, krule, nev )
     neval = neval+nev
 !
 !  Improve previous approximations to integral and error
@@ -3940,7 +3974,7 @@ subroutine qawce ( f, a, b, c, epsabs, epsrel, limit, result, abserr, neval, &
 
   return
 end subroutine
-subroutine qawf ( f, a, omega, integr, epsabs, result, abserr, neval, ier )
+subroutine qawf ( f_ptr, dat, a, omega, integr, epsabs, result, abserr, neval, ier )
 
 !*****************************************************************************80
 !
@@ -4048,7 +4082,8 @@ subroutine qawf ( f, a, omega, integr, epsabs, result, abserr, neval, ier )
   real ( kind = 8 ) elist(limit)
   real ( kind = 8 ) epsabs
   real ( kind = 8 ) erlst(limlst)
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) integr
   integer ( kind = 8 ) iord(limit)
@@ -4060,7 +4095,7 @@ subroutine qawf ( f, a, omega, integr, epsabs, result, abserr, neval, ier )
   real ( kind = 8 ) result
   real ( kind = 8 ) rlist(limit)
   real ( kind = 8 ) rslst(limlst)
-
+  class( dataCollectionBase), target :: dat
   ier = 6
   neval = 0
   result = 0.0E+00
@@ -4070,13 +4105,13 @@ subroutine qawf ( f, a, omega, integr, epsabs, result, abserr, neval, ier )
     return
   end if
 
-  call qawfe ( f, a, omega, integr, epsabs, limlst, limit, maxp1, &
+  call qawfe ( f_ptr, dat, a, omega, integr, epsabs, limlst, limit, maxp1, &
     result, abserr, neval, ier, rslst, erlst, ierlst, lst, alist, blist, &
     rlist, elist, iord, nnlog, chebmo )
 
   return
 end subroutine
-subroutine qawfe ( f, a, omega, integr, epsabs, limlst, limit, maxp1, &
+subroutine qawfe ( f_ptr, dat, a, omega, integr, epsabs, limlst, limit, maxp1, &
   result, abserr, neval, ier, rslst, erlst, ierlst, lst, alist, blist, &
   rlist, elist, iord, nnlog, chebmo )
 
@@ -4304,7 +4339,8 @@ subroutine qawfe ( f, a, omega, integr, epsabs, limlst, limit, maxp1, &
   real ( kind = 8 ) epsabs
   real ( kind = 8 ) erlst(limlst)
   real ( kind = 8 ) errsum
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) fact
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) ierlst(limlst)
@@ -4330,6 +4366,7 @@ subroutine qawfe ( f, a, omega, integr, epsabs, limlst, limit, maxp1, &
   real ( kind = 8 ) res3la(3)
   real ( kind = 8 ) rlist(limit)
   real ( kind = 8 ) rslst(limlst)
+  class( dataCollectionBase), target :: dat
 !
 !  The dimension of  psum  is determined by the value of
 !  limexp in QEXTR (psum must be
@@ -4337,6 +4374,7 @@ subroutine qawfe ( f, a, omega, integr, epsabs, limlst, limit, maxp1, &
 !
 !  Test on validity of parameters.
 !
+  
   result = 0.0E+00
   abserr = 0.0E+00
   neval = 0
@@ -4353,7 +4391,7 @@ subroutine qawfe ( f, a, omega, integr, epsabs, limlst, limit, maxp1, &
   if ( omega == 0.0E+00 ) then
 
     if ( integr == 1 ) then
-      call qagi ( f, 0.0d+00, 1, epsabs, 0.0d+00, result, abserr, neval, ier )
+      call qagi ( f_ptr, dat, 0.0d+00, 1, epsabs, 0.0d+00, result, abserr, neval, ier )
     else
       result = 0.0E+00
       abserr = 0.0E+00
@@ -4401,7 +4439,7 @@ subroutine qawfe ( f, a, omega, integr, epsabs, limlst, limit, maxp1, &
 !   dla = lst
     epsa = eps * fact
 
-    call qfour ( f, c1, c2, omega, integr, epsa, 0.0d+00, limit, lst, maxp1, &
+    call qfour ( f_ptr, dat, c1, c2, omega, integr, epsa, 0.0d+00, limit, lst, maxp1, &
       rslst(lst), erlst(lst), nev, ierlst(lst), alist, blist, rlist, elist, &
       iord, nnlog, momcom, chebmo )
 
@@ -4527,7 +4565,7 @@ subroutine qawfe ( f, a, omega, integr, epsabs, limlst, limit, maxp1, &
 
   return
 end subroutine
-subroutine qawo ( f, a, b, omega, integr, epsabs, epsrel, result, abserr, &
+subroutine qawo ( f_ptr, dat, a, b, omega, integr, epsabs, epsrel, result, abserr, &
   neval, ier )
 
 !*****************************************************************************80
@@ -4652,7 +4690,8 @@ subroutine qawo ( f, a, b, omega, integr, epsabs, epsrel, result, abserr, &
   real ( kind = 8 ) elist(limit)
   real ( kind = 8 ) epsabs
   real ( kind = 8 ) epsrel
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) integr
   integer ( kind = 8 ) iord(limit)
@@ -4662,14 +4701,15 @@ subroutine qawo ( f, a, b, omega, integr, epsabs, epsrel, result, abserr, &
   real ( kind = 8 ) omega
   real ( kind = 8 ) result
   real ( kind = 8 ) rlist(limit)
+  class( dataCollectionBase), target :: dat
 
-  call qfour ( f, a, b, omega, integr, epsabs, epsrel, limit, 1, maxp1, &
+  call qfour ( f_ptr, dat, a, b, omega, integr, epsabs, epsrel, limit, 1, maxp1, &
     result, abserr, neval, ier, alist, blist, rlist, elist, iord, nnlog, &
     momcom, chebmo )
 
   return
 end subroutine
-subroutine qaws ( f, a, b, alfa, beta, integr, epsabs, epsrel, result, &
+subroutine qaws ( f_ptr, dat, a, b, alfa, beta, integr, epsabs, epsrel, result, &
   abserr, neval, ier )
 
 !*****************************************************************************80
@@ -4780,7 +4820,8 @@ subroutine qaws ( f, a, b, alfa, beta, integr, epsabs, epsrel, result, &
   real ( kind = 8 ) elist(limit)
   real ( kind = 8 ) epsabs
   real ( kind = 8 ) epsrel
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) integr
   integer ( kind = 8 ) iord(limit)
@@ -4788,13 +4829,13 @@ subroutine qaws ( f, a, b, alfa, beta, integr, epsabs, epsrel, result, &
   integer ( kind = 8 ) neval
   real ( kind = 8 ) result
   real ( kind = 8 ) rlist(limit)
-
-  call qawse ( f, a, b, alfa, beta, integr, epsabs, epsrel, limit, result, &
+  class( dataCollectionBase), target :: dat
+  call qawse ( f_ptr, dat, a, b, alfa, beta, integr, epsabs, epsrel, limit, result, &
     abserr, neval, ier, alist, blist, rlist, elist, iord, last )
 
   return
 end subroutine
-subroutine qawse ( f, a, b, alfa, beta, integr, epsabs, epsrel, limit, &
+subroutine qawse ( f_ptr, dat, a, b, alfa, beta, integr, epsabs, epsrel, limit, &
   result, abserr, neval, ier, alist, blist, rlist, elist, iord, last )
 
 !*****************************************************************************80
@@ -4960,7 +5001,8 @@ subroutine qawse ( f, a, b, alfa, beta, integr, epsabs, epsrel, limit, &
   real ( kind = 8 ) erro12
   real ( kind = 8 ) error2
   real ( kind = 8 ) errsum
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) integr
   integer ( kind = 8 ) iord(limit)
@@ -4979,6 +5021,7 @@ subroutine qawse ( f, a, b, alfa, beta, integr, epsabs, epsrel, limit, &
   real ( kind = 8 ) ri(25)
   real ( kind = 8 ) rj(25)
   real ( kind = 8 ) rlist(limit)
+  class( dataCollectionBase), target :: dat
 !
 !  Test on validity of parameters.
 !
@@ -5010,12 +5053,12 @@ subroutine qawse ( f, a, b, alfa, beta, integr, epsabs, epsrel, limit, &
 !
   centre = 5.0E-01 * ( b + a )
 
-  call qc25s ( f, a, b, a, centre, alfa, beta, ri, rj, rg, rh, area1, &
+  call qc25s ( f_ptr, dat, a, b, a, centre, alfa, beta, ri, rj, rg, rh, area1, &
     error1, resas1, integr, nev )
 
   neval = nev
 
-  call qc25s ( f, a, b, centre, b, alfa, beta, ri, rj, rg, rh, area2, &
+  call qc25s ( f_ptr, dat, a, b, centre, b, alfa, beta, ri, rj, rg, rh, area2, &
     error2, resas2, integr, nev )
 
   last = 2
@@ -5078,12 +5121,12 @@ subroutine qawse ( f, a, b, alfa, beta, integr, epsabs, epsrel, limit, &
     a2 = b1
     b2 = blist(maxerr)
 
-    call qc25s ( f, a, b, a1, b1, alfa, beta, ri, rj, rg, rh, area1, &
+    call qc25s ( f_ptr, dat, a, b, a1, b1, alfa, beta, ri, rj, rg, rh, area1, &
       error1, resas1, integr, nev )
 
     neval = neval + nev
 
-    call qc25s ( f, a, b, a2, b2, alfa, beta, ri, rj, rg, rh, area2, &
+    call qc25s ( f_ptr, dat, a, b, a2, b2, alfa, beta, ri, rj, rg, rh, area2, &
       error2, resas2, integr, nev )
 
     neval = neval + nev
@@ -5235,7 +5278,7 @@ subroutine qawse ( f, a, b, alfa, beta, integr, epsabs, epsrel, limit, &
   return
 end function
   
-subroutine qc25c ( f, a, b, c, result, abserr, krul, neval )
+subroutine qc25c ( f_ptr, dat, a, b, c, result, abserr, krul, neval )
 
 !*****************************************************************************80
 !
@@ -5317,7 +5360,8 @@ subroutine qc25c ( f, a, b, c, result, abserr, krul, neval )
   real ( kind = 8 ) centr
   real ( kind = 8 ) cheb12(13)
   real ( kind = 8 ) cheb24(25)
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) fval(25)
   real ( kind = 8 ) hlgth
   integer ( kind = 8 ) i
@@ -5336,6 +5380,7 @@ subroutine qc25c ( f, a, b, c, result, abserr, krul, neval )
   real ( kind = 8 ) res12
   real ( kind = 8 ) res24
   real ( kind = 8 ) u
+  class( dataCollectionBase), target :: dat
   real ( kind = 8 ), parameter, dimension ( 11 ) :: x = (/ &
     9.914448613738104E-01, 9.659258262890683E-01, &
     9.238795325112868E-01, 8.660254037844386E-01, &
@@ -5343,6 +5388,7 @@ subroutine qc25c ( f, a, b, c, result, abserr, krul, neval )
     6.087614290087206E-01, 5.000000000000000E-01, &
     3.826834323650898E-01, 2.588190451025208E-01, &
     1.305261922200516E-01 /)
+ 
 !
 !  Check the position of C.
 !
@@ -5350,9 +5396,10 @@ subroutine qc25c ( f, a, b, c, result, abserr, krul, neval )
 !
 !  Apply the 15-point Gauss-Kronrod scheme.
 !
+
   if ( abs ( cc ) >= 1.1E+00 ) then
     krul = krul - 1
-    call qk15w ( f, qwgtc, c, p2, p3, p4, kp, a, b, result, abserr, &
+    call qk15w ( f_ptr, dat, qwgtc, c, p2, p3, p4, kp, a, b, result, abserr, &
       resabs, resasc )
     neval = 15
     if ( resasc == abserr ) then
@@ -5366,15 +5413,15 @@ subroutine qc25c ( f, a, b, c, result, abserr, krul, neval )
   hlgth = 5.0E-01 * ( b - a )
   centr = 5.0E-01 * ( b + a )
   neval = 25
-  fval(1) = 5.0E-01 * f(hlgth+centr)
-  fval(13) = f(centr)
-  fval(25) = 5.0E-01 * f(centr-hlgth)
+  fval(1) = 5.0E-01 * f_ptr(hlgth+centr,dat)
+  fval(13) = f_ptr(centr,dat)
+  fval(25) = 5.0E-01 * f_ptr(centr-hlgth,dat)
 
   do i = 2, 12
     u = hlgth * x(i-1)
     isym = 26 - i
-    fval(i) = f(u+centr)
-    fval(isym) = f(centr-u)
+    fval(i) = f_ptr(u+centr,dat)
+    fval(isym) = f_ptr(centr-u,dat)
   end do
 !
 !  Compute the Chebyshev series expansion.
@@ -5417,7 +5464,7 @@ subroutine qc25c ( f, a, b, c, result, abserr, krul, neval )
 
   return
 end subroutine
-subroutine qc25o ( f, a, b, omega, integr, nrmom, maxp1, ksave, result, &
+subroutine qc25o ( f_ptr, dat, a, b, omega, integr, nrmom, maxp1, ksave, result, &
   abserr, neval, resabs, resasc, momcom, chebmo )
 
 !*****************************************************************************80
@@ -5572,7 +5619,8 @@ subroutine qc25o ( f, a, b, omega, integr, nrmom, maxp1, ksave, result, &
   real ( kind = 8 ) d3(28)
   real ( kind = 8 ) estc
   real ( kind = 8 ) ests
-  real ( kind = 8 ), external :: f
+!  real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) fval(25)
   real ( kind = 8 ) hlgth
   integer ( kind = 8 ) i
@@ -5605,6 +5653,7 @@ subroutine qc25o ( f, a, b, omega, integr, nrmom, maxp1, ksave, result, &
   real ( kind = 8 ) result
   real ( kind = 8 ) sinpar
   real ( kind = 8 ) v(28)
+  class( dataCollectionBase), target :: dat
   real ( kind = 8 ), dimension ( 11 ) :: x = (/ &
     9.914448613738104E-01,     9.659258262890683E-01, &
     9.238795325112868E-01,     8.660254037844386E-01, &
@@ -5616,6 +5665,7 @@ subroutine qc25o ( f, a, b, omega, integr, nrmom, maxp1, ksave, result, &
   centr = 5.0E-01 * ( b + a )
   hlgth = 5.0E-01 * ( b - a )
   parint = omega * hlgth
+  
 !
 !  Compute the integral using the 15-point Gauss-Kronrod
 !  formula if the value of the parameter in the integrand
@@ -5625,7 +5675,7 @@ subroutine qc25o ( f, a, b, omega, integr, nrmom, maxp1, ksave, result, &
 !
   if ( abs ( parint ) <= 2.0E+00 ) then
 
-    call qk15w ( f, qwgto, omega, p2, p3, p4, integr, a, b, result, &
+    call qk15w ( f_ptr, dat, qwgto, omega, p2, p3, p4, integr, a, b, result, &
       abserr, resabs, resasc )
 
     neval = 15
@@ -5804,14 +5854,14 @@ subroutine qc25o ( f, a, b, omega, integr, nrmom, maxp1, ksave, result, &
 !  Compute the coefficients of the Chebyshev expansions
 !  of degrees 12 and 24 of the function F.
 !
-  fval(1) = 5.0E-01 * f(centr+hlgth)
-  fval(13) = f(centr)
-  fval(25) = 5.0E-01 * f(centr-hlgth)
+  fval(1) = 5.0E-01 * f_ptr(centr+hlgth,dat)
+  fval(13) = f_ptr(centr,dat)
+  fval(25) = 5.0E-01 * f_ptr(centr-hlgth,dat)
 
   do i = 2, 12
     isym = 26-i
-    fval(i) = f(hlgth*x(i-1)+centr)
-    fval(isym) = f(centr-hlgth*x(i-1))
+    fval(i) = f_ptr(hlgth*x(i-1)+centr,dat)
+    fval(isym) = f_ptr(centr-hlgth*x(i-1),dat)
   end do
 
   call qcheb ( x, fval, cheb12, cheb24 )
@@ -5865,7 +5915,7 @@ subroutine qc25o ( f, a, b, omega, integr, nrmom, maxp1, ksave, result, &
 
   return
 end subroutine
-subroutine qc25s ( f, a, b, bl, br, alfa, beta, ri, rj, rg, rh, result, &
+subroutine qc25s ( f_ptr, dat, a, b, bl, br, alfa, beta, ri, rj, rg, rh, result, &
   abserr, resasc, integr, neval )
 
 !*****************************************************************************80
@@ -5965,7 +6015,8 @@ subroutine qc25s ( f, a, b, bl, br, alfa, beta, ri, rj, rg, rh, result, &
   real ( kind = 8 ) cheb12(13)
   real ( kind = 8 ) cheb24(25)
   real ( kind = 8 ) dc
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) factor
   real ( kind = 8 ) fix
   real ( kind = 8 ) fval(25)
@@ -5985,6 +6036,7 @@ subroutine qc25s ( f, a, b, bl, br, alfa, beta, ri, rj, rg, rh, result, &
   real ( kind = 8 ) ri(25)
   real ( kind = 8 ) rj(25)
   real ( kind = 8 ) u
+  class( dataCollectionBase), target :: dat
   real ( kind = 8 ), dimension ( 11 ) :: x = (/ &
     9.914448613738104E-01,     9.659258262890683E-01, &
     9.238795325112868E-01,     8.660254037844386E-01, &
@@ -5994,6 +6046,8 @@ subroutine qc25s ( f, a, b, bl, br, alfa, beta, ri, rj, rg, rh, result, &
     1.305261922200516E-01 /)
 
   neval = 25
+  
+  
 
   if ( bl == a .and. (alfa /= 0.0E+00 .or. integr == 2 .or. integr == 4)) then
     go to 10
@@ -6004,7 +6058,7 @@ subroutine qc25s ( f, a, b, bl, br, alfa, beta, ri, rj, rg, rh, result, &
 !
 !  If a > bl and b < br, apply the 15-point Gauss-Kronrod scheme.
 !
-  call qk15w ( f, qwgts, a, b, alfa, beta, integr, bl, br, result, abserr, &
+  call qk15w ( f_ptr, dat, qwgts, a, b, alfa, beta, integr, bl, br, result, abserr, &
     resabs, resasc )
 
   neval = 15
@@ -6020,15 +6074,15 @@ subroutine qc25s ( f, a, b, bl, br, alfa, beta, ri, rj, rg, rh, result, &
   hlgth = 5.0E-01*(br-bl)
   centr = 5.0E-01*(br+bl)
   fix = b-centr
-  fval(1) = 5.0E-01*f(hlgth+centr)*(fix-hlgth)**beta
-  fval(13) = f(centr)*(fix**beta)
-  fval(25) = 5.0E-01*f(centr-hlgth)*(fix+hlgth)**beta
+  fval(1) = 5.0E-01*f_ptr(hlgth+centr,dat)*(fix-hlgth)**beta
+  fval(13) = f_ptr(centr,dat)*(fix**beta)
+  fval(25) = 5.0E-01*f_ptr(centr-hlgth,dat)*(fix+hlgth)**beta
 
   do i = 2, 12
     u = hlgth*x(i-1)
     isym = 26-i
-    fval(i) = f(u+centr)*(fix-u)**beta
-    fval(isym) = f(centr-u)*(fix+u)**beta
+    fval(i) = f_ptr(u+centr,dat)*(fix-u)**beta
+    fval(isym) = f_ptr(centr-u,dat)*(fix+u)**beta
   end do
 
   factor = hlgth**(alfa+1.0E+00)
@@ -6139,15 +6193,15 @@ subroutine qc25s ( f, a, b, bl, br, alfa, beta, ri, rj, rg, rh, result, &
   hlgth = 5.0E-01*(br-bl)
   centr = 5.0E-01*(br+bl)
   fix = centr-a
-  fval(1) = 5.0E-01*f(hlgth+centr)*(fix+hlgth)**alfa
-  fval(13) = f(centr)*(fix**alfa)
-  fval(25) = 5.0E-01*f(centr-hlgth)*(fix-hlgth)**alfa
+  fval(1) = 5.0E-01*f_ptr(hlgth+centr,dat)*(fix+hlgth)**alfa
+  fval(13) = f_ptr(centr,dat)*(fix**alfa)
+  fval(25) = 5.0E-01*f_ptr(centr-hlgth,dat)*(fix-hlgth)**alfa
 
   do i = 2, 12
     u = hlgth*x(i-1)
     isym = 26-i
-    fval(i) = f(u+centr)*(fix+u)**alfa
-    fval(isym) = f(centr-u)*(fix-u)**alfa
+    fval(i) = f_ptr(u+centr,dat)*(fix+u)**alfa
+    fval(isym) = f_ptr(centr-u,dat)*(fix-u)**alfa
   end do
 
   factor = hlgth**(beta+1.0E+00)
@@ -6643,7 +6697,7 @@ subroutine qextr ( n, epstab, result, abserr, res3la, nres )
 
   return
 end subroutine
-subroutine qfour ( f, a, b, omega, integr, epsabs, epsrel, limit, icall, &
+subroutine qfour ( f_ptr, dat, a, b, omega, integr, epsabs, epsrel, limit, icall, &
   maxp1, result, abserr, neval, ier, alist, blist, rlist, elist, iord, &
   nnlog, momcom, chebmo )
 
@@ -6896,7 +6950,8 @@ subroutine qfour ( f, a, b, omega, integr, epsabs, epsrel, limit, icall, &
   real ( kind = 8 ) ertest
   logical extall
   logical extrap
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   integer ( kind = 8 ) icall
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
@@ -6930,6 +6985,7 @@ subroutine qfour ( f, a, b, omega, integr, epsabs, epsrel, limit, icall, &
   real ( kind = 8 ) rlist2(52)
   real ( kind = 8 ) small
   real ( kind = 8 ) width
+  class( dataCollectionBase), target :: dat
 !
 !  the dimension of rlist2 is determined by  the value of
 !  limexp in QEXTR (rlist2 should be of dimension
@@ -6964,7 +7020,7 @@ subroutine qfour ( f, a, b, omega, integr, epsabs, epsrel, limit, icall, &
     momcom = 0
   end if
 
-  call qc25o ( f, a, b, domega, integr, nrmom, maxp1, 0, result, abserr, &
+  call qc25o ( f_ptr, dat, a, b, domega, integr, nrmom, maxp1, 0, result, abserr, &
     neval, defabs, resabs, momcom, chebmo )
 !
 !  Test on accuracy.
@@ -7034,12 +7090,12 @@ subroutine qfour ( f, a, b, omega, integr, epsabs, epsrel, limit, icall, &
     b2 = blist(maxerr)
     erlast = errmax
 
-    call qc25o ( f, a1, b1, domega, integr, nrmom, maxp1, 0, area1, &
+    call qc25o ( f_ptr, dat, a1, b1, domega, integr, nrmom, maxp1, 0, area1, &
       error1, nev, resabs, defab1, momcom, chebmo )
 
     neval = neval+nev
 
-    call qc25o ( f, a2, b2, domega, integr, nrmom, maxp1, 1, area2, &
+    call qc25o ( f_ptr, dat, a2, b2, domega, integr, nrmom, maxp1, 1, area2, &
       error2, nev, resabs, defab2, momcom, chebmo )
 
     neval = neval+nev
@@ -7306,7 +7362,7 @@ subroutine qfour ( f, a, b, omega, integr, epsabs, epsrel, limit, icall, &
 
   return
 end subroutine
-subroutine qk15 ( f, a, b, result, abserr, resabs, resasc )
+subroutine qk15 ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
 
 !*****************************************************************************80
 !
@@ -7387,7 +7443,8 @@ subroutine qk15 ( f, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) b
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -7407,6 +7464,7 @@ subroutine qk15 ( f, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) wg(4)
   real ( kind = 8 ) wgk(8)
   real ( kind = 8 ) xgk(8)
+  class( dataCollectionBase), target :: dat
 
   data xgk(1),xgk(2),xgk(3),xgk(4),xgk(5),xgk(6),xgk(7),xgk(8)/ &
        9.914553711208126E-01,   9.491079123427585E-01, &
@@ -7425,11 +7483,12 @@ subroutine qk15 ( f, a, b, result, abserr, resabs, resasc )
   centr = 5.0E-01*(a+b)
   hlgth = 5.0E-01*(b-a)
   dhlgth = abs(hlgth)
+  
 !
 !  Compute the 15-point Kronrod approximation to the integral,
 !  and estimate the absolute error.
 !
-  fc = f(centr)
+  fc = f_ptr(centr,dat)
   resg = fc*wg(4)
   resk = fc*wgk(8)
   resabs = abs(resk)
@@ -7437,8 +7496,8 @@ subroutine qk15 ( f, a, b, result, abserr, resabs, resasc )
   do j = 1, 3
     jtw = j*2
     absc = hlgth*xgk(jtw)
-    fval1 = f(centr-absc)
-    fval2 = f(centr+absc)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
     fv1(jtw) = fval1
     fv2(jtw) = fval2
     fsum = fval1+fval2
@@ -7450,8 +7509,8 @@ subroutine qk15 ( f, a, b, result, abserr, resabs, resasc )
   do j = 1, 4
     jtwm1 = j*2-1
     absc = hlgth*xgk(jtwm1)
-    fval1 = f(centr-absc)
-    fval2 = f(centr+absc)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
     fv1(jtwm1) = fval1
     fv2(jtwm1) = fval2
     fsum = fval1+fval2
@@ -7481,7 +7540,7 @@ subroutine qk15 ( f, a, b, result, abserr, resabs, resasc )
 
   return
 end subroutine
-subroutine qk15i ( f, boun, inf, a, b, result, abserr, resabs, resasc )
+subroutine qk15i ( f_ptr, dat, boun, inf, a, b, result, abserr, resabs, resasc )
 
 !*****************************************************************************80
 !
@@ -7562,7 +7621,8 @@ subroutine qk15i ( f, boun, inf, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) boun
   real ( kind = 8 ) centr
   real ( kind = 8 ) dinf
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -7583,6 +7643,7 @@ subroutine qk15i ( f, boun, inf, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) wg(8)
   real ( kind = 8 ) wgk(8)
   real ( kind = 8 ) xgk(8)
+  class( dataCollectionBase), target :: dat
 !
 !  the abscissae and weights are supplied for the interval
 !  (-1,1).  because of symmetry only the positive abscissae and
@@ -7619,12 +7680,12 @@ subroutine qk15i ( f, boun, inf, a, b, result, abserr, resabs, resasc )
        0.0000000000000000E+00,     4.179591836734694E-01/
 
   dinf = min ( 1, inf )
-
+  
   centr = 5.0E-01*(a+b)
   hlgth = 5.0E-01*(b-a)
   tabsc1 = boun+dinf*(1.0E+00-centr)/centr
-  fval1 = f(tabsc1)
-  if ( inf == 2 ) fval1 = fval1+f(-tabsc1)
+  fval1 = f_ptr(tabsc1,dat)
+  if ( inf == 2 ) fval1 = fval1+f_ptr(-tabsc1,dat)
   fc = (fval1/centr)/centr
 !
 !  Compute the 15-point Kronrod approximation to the integral,
@@ -7641,12 +7702,12 @@ subroutine qk15i ( f, boun, inf, a, b, result, abserr, resabs, resasc )
     absc2 = centr+absc
     tabsc1 = boun+dinf*(1.0E+00-absc1)/absc1
     tabsc2 = boun+dinf*(1.0E+00-absc2)/absc2
-    fval1 = f(tabsc1)
-    fval2 = f(tabsc2)
+    fval1 = f_ptr(tabsc1,dat)
+    fval2 = f_ptr(tabsc2,dat)
 
     if ( inf == 2 ) then
-      fval1 = fval1+f(-tabsc1)
-      fval2 = fval2+f(-tabsc2)
+      fval1 = fval1+f_ptr(-tabsc1,dat)
+      fval2 = fval2+f_ptr(-tabsc2,dat)
     end if
 
     fval1 = (fval1/absc1)/absc1
@@ -7681,7 +7742,7 @@ subroutine qk15i ( f, boun, inf, a, b, result, abserr, resabs, resasc )
 
   return
 end subroutine
-subroutine qk15w ( f, w, p1, p2, p3, p4, kp, a, b, result, abserr, resabs, &
+subroutine qk15w ( f_ptr, dat, w, p1, p2, p3, p4, kp, a, b, result, abserr, resabs, &
   resasc )
 
 !*****************************************************************************80
@@ -7760,7 +7821,8 @@ subroutine qk15w ( f, w, p1, p2, p3, p4, kp, a, b, result, abserr, resabs, &
   real ( kind = 8 ) b
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -7788,6 +7850,7 @@ subroutine qk15w ( f, w, p1, p2, p3, p4, kp, a, b, result, abserr, resabs, &
     3.818300505051889E-01,     4.179591836734694E-01 /)
   real ( kind = 8 ) wgk(8)
   real ( kind = 8 ) xgk(8)
+  class( dataCollectionBase), target :: dat
 !
 !  the abscissae and weights are given for the interval (-1,1).
 !  because of symmetry only the positive abscissae and their
@@ -7818,11 +7881,12 @@ subroutine qk15w ( f, w, p1, p2, p3, p4, kp, a, b, result, abserr, resabs, &
   centr = 5.0E-01*(a+b)
   hlgth = 5.0E-01*(b-a)
   dhlgth = abs(hlgth)
+  
 !
 !  Compute the 15-point Kronrod approximation to the integral,
 !  and estimate the error.
 !
-  fc = f(centr)*w(centr,p1,p2,p3,p4,kp)
+  fc = f_ptr(centr,dat)*w(centr,p1,p2,p3,p4,kp)
   resg = wg(4)*fc
   resk = wgk(8)*fc
   resabs = abs(resk)
@@ -7832,8 +7896,8 @@ subroutine qk15w ( f, w, p1, p2, p3, p4, kp, a, b, result, abserr, resabs, &
     absc = hlgth*xgk(jtw)
     absc1 = centr-absc
     absc2 = centr+absc
-    fval1 = f(absc1)*w(absc1,p1,p2,p3,p4,kp)
-    fval2 = f(absc2)*w(absc2,p1,p2,p3,p4,kp)
+    fval1 = f_ptr(absc1,dat)*w(absc1,p1,p2,p3,p4,kp)
+    fval2 = f_ptr(absc2,dat)*w(absc2,p1,p2,p3,p4,kp)
     fv1(jtw) = fval1
     fv2(jtw) = fval2
     fsum = fval1+fval2
@@ -7847,8 +7911,8 @@ subroutine qk15w ( f, w, p1, p2, p3, p4, kp, a, b, result, abserr, resabs, &
     absc = hlgth*xgk(jtwm1)
     absc1 = centr-absc
     absc2 = centr+absc
-    fval1 = f(absc1)*w(absc1,p1,p2,p3,p4,kp)
-    fval2 = f(absc2)*w(absc2,p1,p2,p3,p4,kp)
+    fval1 = f_ptr(absc1,dat)*w(absc1,p1,p2,p3,p4,kp)
+    fval2 = f_ptr(absc2,dat)*w(absc2,p1,p2,p3,p4,kp)
     fv1(jtwm1) = fval1
     fv2(jtwm1) = fval2
     fsum = fval1+fval2
@@ -7878,7 +7942,7 @@ subroutine qk15w ( f, w, p1, p2, p3, p4, kp, a, b, result, abserr, resabs, &
 
   return
 end subroutine
-subroutine qk21 ( f, a, b, result, abserr, resabs, resasc )
+subroutine qk21_x ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
 
 !*****************************************************************************80
 !
@@ -7934,7 +7998,8 @@ subroutine qk21 ( f, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) b
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat),intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -7954,6 +8019,9 @@ subroutine qk21 ( f, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) wg(5)
   real ( kind = 8 ) wgk(11)
   real ( kind = 8 ) xgk(11)
+  class(dataCollectionBase), target :: dat
+  
+ ! f_ptr => f
 !
 !           the abscissae and weights are given for the interval (-1,1).
 !           because of symmetry only the positive abscissae and their
@@ -8012,15 +8080,15 @@ subroutine qk21 ( f, a, b, result, abserr, resabs, resasc )
 !  integral, and estimate the absolute error.
 !
   resg = 0.0E+00
-  fc = f(centr)
+  fc = f_ptr(centr, dat)
   resk = wgk(11)*fc
   resabs = abs(resk)
 
   do j = 1, 5
     jtw = 2*j
     absc = hlgth*xgk(jtw)
-    fval1 = f(centr-absc)
-    fval2 = f(centr+absc)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
     fv1(jtw) = fval1
     fv2(jtw) = fval2
     fsum = fval1+fval2
@@ -8032,8 +8100,8 @@ subroutine qk21 ( f, a, b, result, abserr, resabs, resasc )
   do j = 1, 5
     jtwm1 = 2*j-1
     absc = hlgth*xgk(jtwm1)
-    fval1 = f(centr-absc)
-    fval2 = f(centr+absc)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
     fv1(jtwm1) = fval1
     fv2(jtwm1) = fval2
     fsum = fval1+fval2
@@ -8062,8 +8130,199 @@ subroutine qk21 ( f, a, b, result, abserr, resabs, resasc )
   end if
 
   return
-end subroutine
-subroutine qk31 ( f, a, b, result, abserr, resabs, resasc )
+end subroutine qk21_x
+
+subroutine qk21_y ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
+
+!*****************************************************************************80
+!
+!! QK21 carries out a 21 point Gauss-Kronrod quadrature rule.
+!
+!  Discussion:
+!
+!    This routine approximates
+!      I = integral ( A <= X <= B ) F(X) dx
+!    with an error estimate, and
+!      J = integral ( A <= X <= B ) | F(X) | dx
+!
+!  Author:
+!
+!    Robert Piessens, Elise de Doncker-Kapenger, 
+!    Christian Ueberhuber, David Kahaner
+!
+!  Reference:
+!
+!    Robert Piessens, Elise de Doncker-Kapenger, 
+!    Christian Ueberhuber, David Kahaner,
+!    QUADPACK, a Subroutine Package for Automatic Integration,
+!    Springer Verlag, 1983
+!
+!  Parameters:
+!
+!    Input, external real ( kind = 8 ) F, the name of the function routine, of the form
+!      function f ( x )
+!      real ( kind = 8 ) f
+!      real ( kind = 8 ) x
+!    which evaluates the integrand function.
+!
+!    Input, real ( kind = 8 ) A, B, the limits of integration.
+!
+!    Output, real ( kind = 8 ) RESULT, the estimated value of the integral.
+!    RESULT is computed by applying the 21-point Kronrod rule (resk) 
+!    obtained by optimal addition of abscissae to the 10-point Gauss 
+!    rule (resg).
+!
+!    Output, real ( kind = 8 ) ABSERR, an estimate of | I - RESULT |.
+!
+!    Output, real ( kind = 8 ) RESABS, approximation to the integral of the absolute
+!    value of F.
+!
+!    Output, real ( kind = 8 ) RESASC, approximation to the integral | F-I/(B-A) | 
+!    over [A,B].
+!
+  implicit none
+
+  real ( kind = 8 ) a
+  real ( kind = 8 ) absc
+  real ( kind = 8 ) abserr
+  real ( kind = 8 ) b
+  real ( kind = 8 ) centr
+  real ( kind = 8 ) dhlgth
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat),intent(in), pointer :: f_ptr => null ()
+  real ( kind = 8 ) fc
+  real ( kind = 8 ) fsum
+  real ( kind = 8 ) fval1
+  real ( kind = 8 ) fval2
+  real ( kind = 8 ) fv1(10)
+  real ( kind = 8 ) fv2(10)
+  real ( kind = 8 ) hlgth
+  integer ( kind = 8 ) j
+  integer ( kind = 8 ) jtw
+  integer ( kind = 8 ) jtwm1
+  real ( kind = 8 ) resabs
+  real ( kind = 8 ) resasc
+  real ( kind = 8 ) resg
+  real ( kind = 8 ) resk
+  real ( kind = 8 ) reskh
+  real ( kind = 8 ) result
+  real ( kind = 8 ) wg(5)
+  real ( kind = 8 ) wgk(11)
+  real ( kind = 8 ) xgk(11)
+  class(dataCollectionBase), target :: dat
+  
+ ! f_ptr => f
+!
+!           the abscissae and weights are given for the interval (-1,1).
+!           because of symmetry only the positive abscissae and their
+!           corresponding weights are given.
+!
+!           xgk    - abscissae of the 21-point Kronrod rule
+!                    xgk(2), xgk(4), ...  abscissae of the 10-point
+!                    Gauss rule
+!                    xgk(1), xgk(3), ...  abscissae which are optimally
+!                    added to the 10-point Gauss rule
+!
+!           wgk    - weights of the 21-point Kronrod rule
+!
+!           wg     - weights of the 10-point Gauss rule
+!
+  data xgk(1),xgk(2),xgk(3),xgk(4),xgk(5),xgk(6),xgk(7),xgk(8), &
+    xgk(9),xgk(10),xgk(11)/ &
+       9.956571630258081E-01,     9.739065285171717E-01, &
+       9.301574913557082E-01,     8.650633666889845E-01, &
+       7.808177265864169E-01,     6.794095682990244E-01, &
+       5.627571346686047E-01,     4.333953941292472E-01, &
+       2.943928627014602E-01,     1.488743389816312E-01, &
+       0.000000000000000E+00/
+!
+  data wgk(1),wgk(2),wgk(3),wgk(4),wgk(5),wgk(6),wgk(7),wgk(8), &
+    wgk(9),wgk(10),wgk(11)/ &
+       1.169463886737187E-02,     3.255816230796473E-02, &
+       5.475589657435200E-02,     7.503967481091995E-02, &
+       9.312545458369761E-02,     1.093871588022976E-01, &
+       1.234919762620659E-01,     1.347092173114733E-01, &
+       1.427759385770601E-01,     1.477391049013385E-01, &
+       1.494455540029169E-01/
+!
+  data wg(1),wg(2),wg(3),wg(4),wg(5)/ &
+       6.667134430868814E-02,     1.494513491505806E-01, &
+       2.190863625159820E-01,     2.692667193099964E-01, &
+       2.955242247147529E-01/
+!
+!
+!           list of major variables
+!
+!           centr  - mid point of the interval
+!           hlgth  - half-length of the interval
+!           absc   - abscissa
+!           fval*  - function value
+!           resg   - result of the 10-point Gauss formula
+!           resk   - result of the 21-point Kronrod formula
+!           reskh  - approximation to the mean value of f over (a,b),
+!                    i.e. to i/(b-a)
+!
+  centr = 5.0E-01*(a+b)
+  hlgth = 5.0E-01*(b-a)
+  dhlgth = abs(hlgth)
+!
+!  Compute the 21-point Kronrod approximation to the
+!  integral, and estimate the absolute error.
+!
+  resg = 0.0E+00
+  fc = f_ptr(centr, dat)
+  resk = wgk(11)*fc
+  resabs = abs(resk)
+
+  do j = 1, 5
+    jtw = 2*j
+    absc = hlgth*xgk(jtw)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
+    fv1(jtw) = fval1
+    fv2(jtw) = fval2
+    fsum = fval1+fval2
+    resg = resg+wg(j)*fsum
+    resk = resk+wgk(jtw)*fsum
+    resabs = resabs+wgk(jtw)*(abs(fval1)+abs(fval2))
+  end do
+
+  do j = 1, 5
+    jtwm1 = 2*j-1
+    absc = hlgth*xgk(jtwm1)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
+    fv1(jtwm1) = fval1
+    fv2(jtwm1) = fval2
+    fsum = fval1+fval2
+    resk = resk+wgk(jtwm1)*fsum
+    resabs = resabs+wgk(jtwm1)*(abs(fval1)+abs(fval2))
+  end do
+
+  reskh = resk*5.0E-01
+  resasc = wgk(11)*abs(fc-reskh)
+
+  do j = 1, 10
+    resasc = resasc+wgk(j)*(abs(fv1(j)-reskh)+abs(fv2(j)-reskh))
+  end do
+
+  result = resk*hlgth
+  resabs = resabs*dhlgth
+  resasc = resasc*dhlgth
+  abserr = abs((resk-resg)*hlgth)
+
+  if ( resasc /= 0.0E+00.and.abserr /= 0.0E+00) then
+    abserr = resasc*min ( 1.0E+00,(2.0E+02*abserr/resasc)**1.5E+00)
+  end if
+
+  if ( resabs > tiny ( resabs ) /(5.0E+01* epsilon ( resabs ) )) then
+    abserr = max (( epsilon ( resabs ) *5.0E+01)*resabs,abserr)
+  end if
+
+  return
+end subroutine qk21_y
+
+subroutine qk31 ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
 
 !*****************************************************************************80
 !
@@ -8120,7 +8379,8 @@ subroutine qk31 ( f, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) b
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -8140,6 +8400,7 @@ subroutine qk31 ( f, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) wg(8)
   real ( kind = 8 ) wgk(16)
   real ( kind = 8 ) xgk(16)
+  class( dataCollectionBase), target :: dat
 !
 !           the abscissae and weights are given for the interval (-1,1).
 !           because of symmetry only the positive abscissae and their
@@ -8196,11 +8457,12 @@ subroutine qk31 ( f, a, b, result, abserr, resabs, resasc )
   centr = 5.0E-01*(a+b)
   hlgth = 5.0E-01*(b-a)
   dhlgth = abs(hlgth)
+  
 !
 !  Compute the 31-point Kronrod approximation to the integral,
 !  and estimate the absolute error.
 !
-  fc = f(centr)
+  fc = f_ptr(centr,dat)
   resg = wg(8)*fc
   resk = wgk(16)*fc
   resabs = abs(resk)
@@ -8208,8 +8470,8 @@ subroutine qk31 ( f, a, b, result, abserr, resabs, resasc )
   do j = 1, 7
     jtw = j*2
     absc = hlgth*xgk(jtw)
-    fval1 = f(centr-absc)
-    fval2 = f(centr+absc)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
     fv1(jtw) = fval1
     fv2(jtw) = fval2
     fsum = fval1+fval2
@@ -8221,8 +8483,8 @@ subroutine qk31 ( f, a, b, result, abserr, resabs, resasc )
   do j = 1, 8
     jtwm1 = j*2-1
     absc = hlgth*xgk(jtwm1)
-    fval1 = f(centr-absc)
-    fval2 = f(centr+absc)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
     fv1(jtwm1) = fval1
     fv2(jtwm1) = fval2
     fsum = fval1+fval2
@@ -8251,7 +8513,7 @@ subroutine qk31 ( f, a, b, result, abserr, resabs, resasc )
 
   return
 end subroutine
-subroutine qk41 ( f, a, b, result, abserr, resabs, resasc )
+subroutine qk41 ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
 
 !*****************************************************************************80
 !
@@ -8319,7 +8581,8 @@ subroutine qk41 ( f, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) b
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -8339,6 +8602,7 @@ subroutine qk41 ( f, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) wg(10)
   real ( kind = 8 ) wgk(21)
   real ( kind = 8 ) xgk(21)
+  class( dataCollectionBase), target :: dat
 !
 !           the abscissae and weights are given for the interval (-1,1).
 !           because of symmetry only the positive abscissae and their
@@ -8392,20 +8656,21 @@ subroutine qk41 ( f, a, b, result, abserr, resabs, resasc )
   centr = 5.0E-01*(a+b)
   hlgth = 5.0E-01*(b-a)
   dhlgth = abs(hlgth)
+  
 !
 !  Compute 41-point Gauss-Kronrod approximation to the
 !  the integral, and estimate the absolute error.
 !
   resg = 0.0E+00
-  fc = f(centr)
+  fc = f_ptr(centr,dat)
   resk = wgk(21)*fc
   resabs = abs(resk)
 
   do j = 1, 10
     jtw = j*2
     absc = hlgth*xgk(jtw)
-    fval1 = f(centr-absc)
-    fval2 = f(centr+absc)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
     fv1(jtw) = fval1
     fv2(jtw) = fval2
     fsum = fval1+fval2
@@ -8417,8 +8682,8 @@ subroutine qk41 ( f, a, b, result, abserr, resabs, resasc )
   do j = 1, 10
     jtwm1 = j*2-1
     absc = hlgth*xgk(jtwm1)
-    fval1 = f(centr-absc)
-    fval2 = f(centr+absc)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
     fv1(jtwm1) = fval1
     fv2(jtwm1) = fval2
     fsum = fval1+fval2
@@ -8447,7 +8712,7 @@ subroutine qk41 ( f, a, b, result, abserr, resabs, resasc )
 
   return
 end subroutine
-subroutine qk51 ( f, a, b, result, abserr, resabs, resasc )
+subroutine qk51 ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
 
 !*****************************************************************************80
 !
@@ -8514,7 +8779,8 @@ subroutine qk51 ( f, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) b
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -8534,6 +8800,7 @@ subroutine qk51 ( f, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) wg(13)
   real ( kind = 8 ) wgk(26)
   real ( kind = 8 ) xgk(26)
+  class( dataCollectionBase), target :: dat
 !
 !           the abscissae and weights are given for the interval (-1,1).
 !           because of symmetry only the positive abscissae and their
@@ -8596,11 +8863,12 @@ subroutine qk51 ( f, a, b, result, abserr, resabs, resasc )
   centr = 5.0E-01*(a+b)
   hlgth = 5.0E-01*(b-a)
   dhlgth = abs(hlgth)
+  
 !
 !  Compute the 51-point Kronrod approximation to the integral,
 !  and estimate the absolute error.
 !
-  fc = f(centr)
+  fc = f_ptr(centr,dat)
   resg = wg(13)*fc
   resk = wgk(26)*fc
   resabs = abs(resk)
@@ -8608,8 +8876,8 @@ subroutine qk51 ( f, a, b, result, abserr, resabs, resasc )
   do j = 1, 12
     jtw = j*2
     absc = hlgth*xgk(jtw)
-    fval1 = f(centr-absc)
-    fval2 = f(centr+absc)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
     fv1(jtw) = fval1
     fv2(jtw) = fval2
     fsum = fval1+fval2
@@ -8621,8 +8889,8 @@ subroutine qk51 ( f, a, b, result, abserr, resabs, resasc )
   do j = 1, 13
     jtwm1 = j*2-1
     absc = hlgth*xgk(jtwm1)
-    fval1 = f(centr-absc)
-    fval2 = f(centr+absc)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
     fv1(jtwm1) = fval1
     fv2(jtwm1) = fval2
     fsum = fval1+fval2
@@ -8652,7 +8920,7 @@ subroutine qk51 ( f, a, b, result, abserr, resabs, resasc )
 
   return
 end subroutine
-subroutine qk61 ( f, a, b, result, abserr, resabs, resasc ) 
+subroutine qk61 ( f_ptr, dat, a, b, result, abserr, resabs, resasc ) 
 
 !*****************************************************************************80
 !
@@ -8719,7 +8987,8 @@ subroutine qk61 ( f, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) b
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -8739,6 +9008,7 @@ subroutine qk61 ( f, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) wg(15)
   real ( kind = 8 ) wgk(31)
   real ( kind = 8 ) xgk(31)
+  class( dataCollectionBase), target :: dat
 !
 !           the abscissae and weights are given for the
 !           interval (-1,1). because of symmetry only the positive
@@ -8812,20 +9082,21 @@ subroutine qk61 ( f, a, b, result, abserr, resabs, resasc )
   centr = 5.0E-01*(b+a)
   hlgth = 5.0E-01*(b-a)
   dhlgth = abs(hlgth)
+  
 !
 !  Compute the 61-point Kronrod approximation to the integral,
 !  and estimate the absolute error.
 !
   resg = 0.0E+00
-  fc = f(centr)
+  fc = f_ptr(centr,dat)
   resk = wgk(31)*fc
   resabs = abs(resk)
 
   do j = 1, 15
     jtw = j*2
     absc = hlgth*xgk(jtw)
-    fval1 = f(centr-absc)
-    fval2 = f(centr+absc)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
     fv1(jtw) = fval1
     fv2(jtw) = fval2
     fsum = fval1+fval2
@@ -8837,8 +9108,8 @@ subroutine qk61 ( f, a, b, result, abserr, resabs, resasc )
   do j = 1, 15
     jtwm1 = j*2-1
     absc = hlgth*xgk(jtwm1)
-    fval1 = f(centr-absc)
-    fval2 = f(centr+absc)
+    fval1 = f_ptr(centr-absc,dat)
+    fval2 = f_ptr(centr+absc,dat)
     fv1(jtwm1) = fval1
     fv2(jtwm1) = fval2
     fsum = fval1+fval2
@@ -9023,7 +9294,7 @@ subroutine qmomo ( alfa, beta, ri, rj, rg, rh, integr )
 
   return
 end subroutine
-subroutine qng ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
+subroutine qng ( f_ptr, dat, a, b, epsabs, epsrel, result, abserr, neval, ier )
 
 !*****************************************************************************80
 !
@@ -9115,7 +9386,8 @@ subroutine qng ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) dhlgth
   real ( kind = 8 ) epsabs
   real ( kind = 8 ) epsrel
-  real ( kind = 8 ), external :: f
+  !real ( kind = 8 ), external :: f
+  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
   real ( kind = 8 ) fcentr
   real ( kind = 8 ) fval
   real ( kind = 8 ) fval1
@@ -9150,6 +9422,7 @@ subroutine qng ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) x2(5)
   real ( kind = 8 ) x3(11)
   real ( kind = 8 ) x4(22)
+  class( dataCollectionBase), target :: dat
 !
 !           the following data statements contain the abscissae
 !           and weights of the integration rules used.
@@ -9260,6 +9533,7 @@ subroutine qng ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
   result = 0.0E+00
   abserr = 0.0E+00
   neval = 0
+  
 
   if ( epsabs < 0.0E+00 .and. epsrel < 0.0E+00 ) then
     ier = 6
@@ -9269,7 +9543,7 @@ subroutine qng ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
   hlgth = 5.0E-01 * ( b - a )
   dhlgth = abs ( hlgth )
   centr = 5.0E-01 * ( b + a )
-  fcentr = f(centr)
+  fcentr = f_ptr(centr,dat)
   neval = 21
   ier = 1
 !
@@ -9285,8 +9559,8 @@ subroutine qng ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
 
       do k = 1, 5
         absc = hlgth * x1(k)
-        fval1 = f(centr+absc)
-        fval2 = f(centr-absc)
+        fval1 = f_ptr(centr+absc,dat)
+        fval2 = f_ptr(centr-absc,dat)
         fval = fval1 + fval2
         res10 = res10 + w10(k)*fval
         res21 = res21 + w21a(k)*fval
@@ -9301,8 +9575,8 @@ subroutine qng ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
       do k = 1, 5
         ipx = ipx + 1
         absc = hlgth * x2(k)
-        fval1 = f(centr+absc)
-        fval2 = f(centr-absc)
+        fval1 = f_ptr(centr+absc,dat)
+        fval2 = f_ptr(centr-absc,dat)
         fval = fval1 + fval2
         res21 = res21 + w21b(k) * fval
         resabs = resabs + w21b(k) * ( abs ( fval1 ) + abs ( fval2 ) )
@@ -9340,7 +9614,7 @@ subroutine qng ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
       do k = 1, 11
         ipx = ipx + 1
         absc = hlgth * x3(k)
-        fval = f(absc+centr) + f(centr-absc)
+        fval = f_ptr(absc+centr,dat) + f_ptr(centr-absc,dat)
         res43 = res43 + fval * w43b(k)
         savfun(ipx) = fval
       end do
@@ -9363,7 +9637,7 @@ subroutine qng ( f, a, b, epsabs, epsrel, result, abserr, neval, ier )
 
       do k = 1, 22
         absc = hlgth * x4(k)
-        res87 = res87 + w87b(k) * ( f(absc+centr) + f(centr-absc) )
+        res87 = res87 + w87b(k) * ( f_ptr(absc+centr,dat) + f_ptr(centr-absc,dat) )
       end do
 
       result = res87 * hlgth
