@@ -55,6 +55,7 @@ integer :: neval,ier
     x = xx
     call qags_y( f, y1, y2, epsabs, epsrel, ss, abserr, neval, ier )
     h = ss
+    
 return
 end function h
 
@@ -67,6 +68,7 @@ real f,yy
 y = yy
 
 f = f_ptr(x,y)
+
 
 return
 end function f
