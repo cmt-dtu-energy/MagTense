@@ -12,7 +12,7 @@
       real*8,dimension(:,:),allocatable :: dims,pos,M,rotAngles
       real*8,dimension(:,:,:),allocatable :: rotMat,rotMatInv
       integer*8 :: cylPlane
-      integer*8,dimension(3) :: retForces
+      integer*4,dimension(3) :: retForces
       endtype
       integer*8,parameter :: phi_z_plane=1,r_phi_plane=2
       type(modelStruct) :: model
@@ -344,19 +344,19 @@
                model%z0 = zp(i,1,j)
           
               !::direction of the other xy plane
-              call integral2( f_tens_ptr, xp(i,1,j), xp(i,2,j), 
-     +                                yp(i,1,j), yp(i,2,j), 
-     +                                eps_abs, eps_rel,
-     +                                res, abserr, neval, ier )
-              if ( abserr .lt. abserr_tot ) then
-                  abserr_tot = abserr
-              endif      
-              if ( ier .gt. 0 ) then
-                  exit
-              endif
+!              call integral2( f_tens_ptr, xp(i,1,j), xp(i,2,j), 
+!     +                                yp(i,1,j), yp(i,2,j), 
+!     +                                eps_abs, eps_rel,
+!     +                                res, abserr, neval, ier )
+!              if ( abserr .lt. abserr_tot ) then
+!                  abserr_tot = abserr
+!              endif      
+!              if ( ier .gt. 0 ) then
+!                  exit
+!              endif
           
               !::Note the sign accounts for the normal vector pointing the opposite
-              F(j) = F(j) - res
+!              F(j) = F(j) - res
               !::upper plane
               model%z0 = zp(i,2,j)
            
