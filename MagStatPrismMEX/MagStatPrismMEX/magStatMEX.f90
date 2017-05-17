@@ -31,19 +31,19 @@
       
 !     mexFunction arguments:
       mwPointer plhs(*), prhs(*)
-      integer nlhs, nrhs
+      integer(kind=4) nlhs, nrhs
 
 !     Function declarations:
       mwPointer mxGetPr
       mwPointer mxCreateDoubleMatrix
       mwPointer mxCreateNumericArray
-      integer mxIsNumeric
-      integer mxIsDouble
-      integer mxIsInt32
-      integer mxIsStruct
-      integer mxIsCell
-      integer mxClassIDFromClassName
-      integer writeToConsole
+      integer(kind=4) mxIsNumeric
+      integer(kind=4) mxIsDouble
+      integer(kind=4) mxIsInt32
+      integer(kind=4) mxIsStruct
+      integer(kind=4) mxIsCell
+      integer(kind=4) mxClassIDFromClassName
+      integer(kind=4) writeToConsole
       mwPointer mxGetField
       mwPointer mxGetFieldByNumber
       mwPointer stateFcnPtr,TPtr,HPtr,MCoolPtr,MHeatPtr,nTPtr,nHPtr
