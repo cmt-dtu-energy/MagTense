@@ -81,6 +81,7 @@
 	  write(11,*) "magStatMEX compiled on:"
       write(11,*) __DATE__
       write(11,*) __TIME__
+      close(11)
       !-----------------------------------------------------------------------
 
 !     Check for proper number of arguments. 
