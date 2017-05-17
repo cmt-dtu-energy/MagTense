@@ -43,14 +43,14 @@
       function F_int_12( dat )
       real*8 :: F_int_12
       class( dataCollectionBase ), intent(in), target :: dat
-      
-      real*8,dimension(3) :: B
+      real*8 :: jacobi
+      real*8,dimension(3) :: B 
           
       !::Get the field from the model solution
-      call getB_field( dat, B )
+      call getB_field( dat, B, jacobi )
                                  
       !::Calculate the off diagonal component. 
-       F_int_12 = 1. /mu0 * B(1) * B(2)
+       F_int_12 = 1. /mu0 * jacobi * B(1) * B(2)
     
        return
 
@@ -61,12 +61,13 @@
       class( dataCollectionBase ), intent(in), target :: dat
       
       real*8,dimension(3) :: B
+      real*8 :: jacobi
           
       !::Get the field from the model solution
-      call getB_field( dat, B )
+      call getB_field( dat, B, jacobi )
                                  
       !::Calculate the off diagonal component
-       F_int_13 = 1. /mu0 * B(1) * B(3)
+       F_int_13 = 1. /mu0 * jacobi * B(1) * B(3)
     
        return
       end function F_int_13
@@ -76,12 +77,13 @@
       class( dataCollectionBase ), intent(in), target :: dat
       
       real*8,dimension(3) :: B
+      real*8 :: jacobi
           
       !::Get the field from the model solution
-      call getB_field( dat, B )
+      call getB_field( dat, B, jacobi  )
                                  
       !::Calculate the off diagonal component
-       F_int_23 = 1. /mu0 * B(2) * B(3)
+       F_int_23 = 1. /mu0 * jacobi * B(2) * B(3)
     
        return
 
@@ -115,13 +117,13 @@
       real*8 :: F_int_11
       class( dataCollectionBase ), intent(in), target :: dat
       real*8,dimension(3) :: B
-      real*8 :: Bnorm
+      real*8 :: Bnorm,jacobi
       
-      call getB_field( dat, B )
+      call getB_field( dat, B, jacobi )
       
       Bnorm = sqrt( B(1)**2 + B(2)**2 + B(3)**2 )
                                  
-      F_int_11 = 1./mu0 * 
+      F_int_11 = 1./mu0 * jacobi *
      +                   ( B(1)**2 - 0.5 * Bnorm**2 )
       
       end function F_int_11
@@ -130,13 +132,13 @@
       real*8 :: F_int_22
       class( dataCollectionBase ), intent(in), target :: dat
       real*8,dimension(3) :: B
-      real*8 :: Bnorm
+      real*8 :: Bnorm, jacobi
       
-      call getB_field( dat, B )
+      call getB_field( dat, B, jacobi )
       
       Bnorm = sqrt( B(1)**2 + B(2)**2 + B(3)**2 )
                                  
-      F_int_22 = 1./mu0 * 
+      F_int_22 = 1./mu0 * jacobi *
      +                   ( B(2)**2 - 0.5 * Bnorm**2 )
       
       end function F_int_22
@@ -145,23 +147,37 @@
       real*8 :: F_int_33
       class( dataCollectionBase ), intent(in), target :: dat
       real*8,dimension(3) :: B
-      real*8 :: Bnorm
+      real*8 :: Bnorm, jacobi
       
-      call getB_field( dat, B )
+      call getB_field( dat, B, jacobi )
       
       Bnorm = sqrt( B(1)**2 + B(2)**2 + B(3)**2 )
                                  
-      F_int_33 = 1./mu0 * 
+      F_int_33 = 1./mu0 * jacobi *  
      +                   ( B(3)**2 - 0.5 * Bnorm**2 )
       
       end function F_int_33
       
-        !::Get the field from the model solution
-        subroutine getB_field( dat, B )
+        subroutine getB_field( dat, B, jacobi )
         class( dataCollectionBase ), intent(in), target :: dat
-        class( magStatModel ), pointer :: model
+        real*8,dimension(3),intent(inout) :: B
+        real*8,intent(inout) :: jacobi
+        
+        if ( dat%coord_sys .eq. coord_sys_carth ) then
+            call getB_field_carth( dat, B )
+            jacobi = 1
+        else if ( dat%coord_sys .eq. coord_sys_cyl) then 
+            call getB_field_cyl( dat, B, jacobi )            
+        endif
+                
+        end subroutine getB_field
+        
+        !::Get the field from the model solution in carthesian coordinates
+        subroutine getB_field_carth( dat, B )
+        class( dataCollectionBase ), intent(in), target :: dat
         real*8,dimension(3),intent(inout) :: B
         
+        class( magStatModel ), pointer :: model
         real*8,dimension(3) :: Hsol, solPts
         integer*8,dimension(3) :: inds
         
@@ -199,7 +215,76 @@
      +                    model%rotMat, model%rotMatInv )
 	
         B = mu0 * Hsol
-        end subroutine getB_field
+        end subroutine getB_field_carth
+        
+        
+        !::Get the field from the model solution in cylindrical coordinates
+        subroutine getB_field_cyl( dat, B, jacobi )
+        class( dataCollectionBase ), intent(in), target :: dat
+        class( magStatModel ), pointer :: model
+        real*8,dimension(3),intent(inout) :: B
+        real*8,intent(inout) :: jacobi
+        
+        real*8,dimension(3) :: Hsol, solPts, B_carth
+        real*8 :: x,y,z,r,theta,normMult
+        
+        !::Make the down cast to get the actual data model set
+        call getDataModel( dat%model, model )
+        
+        !::Make sure the coordinate indices are mapped according to the normal vector
+        if ( abs(dat%n_vec(1)) .eq. 1 ) then
+            !theta-z plane
+            !::dat%x represents theta, dat%y represents z and dat%z0 represents R, the constant radius of the
+            !::cylinder surface
+            r = dat%z0
+            theta = dat%x            
+            z = dat%y         
+            !::part of the normal vector in the x-direction
+            normMult = cos(theta)
+        else if ( abs(dat%n_vec(2)) .eq. 1 ) then
+            !theta-z plane, y-component
+            !::dat%x represents theta, dat%y represents z and dat%z0 represents R, the constant radius of the
+            !::cylinder surface
+            r = dat%z0
+            theta = dat%x            
+            z = dat%y         
+            !::part of the normal vector in the y-direction
+            normMult = sin(theta)
+        else if ( abs(dat%n_vec(3)) .eq. 1 ) then
+            !r-theta plane
+            !::dat%x represents r, dat%y represents theta and dat%z0 represents z
+            r = dat%x
+            theta = dat%y            
+            z = dat%z0
+            normMult = 1
+        endif
+        
+        jacobi = r * normMult
+        
+        x = r * cos( theta )
+        y = r * sin( theta )
+        
+        !::Reset the solution array
+        Hsol(:) = 0
+        
+        solPts(1) = x
+        solPts(2) = y
+        solPts(3) = z
+    
+        call getSolution( solPts, 1, model%M, model%dims, model%pos, 
+     +                    model%n, model%spacedim, Hsol, 
+     +                    model%rotMat, model%rotMatInv )
+	
+        B = mu0 * Hsol
+        !Convert B from carthesian to cylindrical coordinates
+        !::r-component
+        !B(1) = B_carth(1) * cos( theta ) + B_carth(2) * sin( theta )
+        !::Theta component
+        !B(2) = -B_carth(1) * sin( theta ) + B_carth(2) * sin( theta )
+        !::z-component
+        !B(3) = B_carth(3)
+        end subroutine getB_field_cyl
+        
         
         !::Make the down cast
         subroutine getDataModel( modelIn, modelOut )
@@ -234,6 +319,7 @@
 !     prhs(10) eps_abs, real*8
 !     prhs(11) eps_rel, real*8
 !     prhs(12) retForces (optional), integer [3,1] array with 0 indicates false and otherwise true
+!     prhs(13) coord, 0 for carthesian and 1 for cylindrical. Optional parameter
 
 !     plhs(1) Fout(3) output force vector [Fx,Fy,Fz]
 !     plhs(2) ier(2), integer returned
@@ -279,8 +365,9 @@
       type( dat_ptr ), dimension(18) :: dat_arr
       type( surf_carth ) :: surf
       integer*4,dimension(3) :: rV
+      integer*4 :: coord
       integer*8,dimension(3) :: retV
-      integer :: i,j,ind
+      integer :: i,j,ind,n
       
 	  maxerr_tot = 0
 	  !-----------------------------------------------------------------------	  	       
@@ -339,7 +426,10 @@
      +                           'Input 11 should be a double')      
       elseif (nrhs .ge. 12 .and. .NOT. mxIsInt32(prhs(12)) ) then
           call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType',
-     +                           'Input 12 should be an integer')
+     +                           'Input 12 should be an integer')      
+      elseif (nrhs .ge. 13 .and. .NOT. mxIsInt32(prhs(13)) ) then
+          call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType',
+     +                           'Input 13 should be an integer')
       endif
             
       allocate( datModel )
@@ -375,10 +465,29 @@
       else
           retV(:) = 0
       endif
+    
+      if ( nrhs.ge. 13 ) then
+         call  mxCopyPtrToInteger4(mxGetPr(prhs(13)), coord,1)
+      else
+          !::Carthesian coordinates
+         coord = 0
+         n = 6
+      endif
+    
+      
+      if ( coord .eq. 1 ) then
+          !::use cylindrical coordinates
+          surf%r(1) = 0
+          surf%r(2) = sqrt( surf%x(2)**2 + surf%y(2)**2 ) * 1.01 !max( surf%x(2), surf%y(2) )
+      
+          surf%theta(1) = 0
+          surf%theta(2) = 2*pi
+          n = 4
+      endif
       !::Initialize each member of the dat_arr
       do i=1,3
-          do j=1,6             
-              ind = (i-1) * 6 + j
+          do j=1,n
+              ind = (i-1) * n + j
               
               allocate( dat_arr(ind)%dat )
               
@@ -387,38 +496,69 @@
               dat_arr(ind)%dat%epsabs = eps_abs
               dat_arr(ind)%dat%epsrel = eps_rel
               
+              if ( coord .eq. 0 ) then
+                  dat_arr(ind)%dat%coord_sys = coord_sys_carth
+              else
+                  dat_arr(ind)%dat%coord_sys = coord_sys_cyl
+              endif
+              
           enddo
-      enddo
+       enddo
+       if ( coord .eq. 1 ) then
+          !x-component
+          dat_arr(1)%dat%f_ptr => F_int_11
+          dat_arr(2)%dat%f_ptr => F_int_12
+          dat_arr(3)%dat%f_ptr => F_int_13      
+          dat_arr(4)%dat%f_ptr => F_int_13
+          !y-component
+          dat_arr(5)%dat%f_ptr => F_int_21
+          dat_arr(6)%dat%f_ptr => F_int_22
+          dat_arr(7)%dat%f_ptr => F_int_23      
+          dat_arr(8)%dat%f_ptr => F_int_23
+          !z-component
+          dat_arr(9)%dat%f_ptr => F_int_31
+          dat_arr(10)%dat%f_ptr => F_int_32
+          dat_arr(11)%dat%f_ptr => F_int_33      
+          dat_arr(12)%dat%f_ptr => F_int_33
+       elseif ( coord .eq. 0 ) then
+        
       
-      dat_arr(1)%dat%f_ptr => F_int_11
-      dat_arr(2)%dat%f_ptr => F_int_11
-      dat_arr(3)%dat%f_ptr => F_int_12
-      dat_arr(4)%dat%f_ptr => F_int_12
-      dat_arr(5)%dat%f_ptr => F_int_13
-      dat_arr(6)%dat%f_ptr => F_int_13
+          dat_arr(1)%dat%f_ptr => F_int_11
+          dat_arr(2)%dat%f_ptr => F_int_11
+          dat_arr(3)%dat%f_ptr => F_int_12
+          dat_arr(4)%dat%f_ptr => F_int_12
+          dat_arr(5)%dat%f_ptr => F_int_13
+          dat_arr(6)%dat%f_ptr => F_int_13
       
-      dat_arr(7)%dat%f_ptr => F_int_21
-      dat_arr(8)%dat%f_ptr => F_int_21
-      dat_arr(9)%dat%f_ptr => F_int_22
-      dat_arr(10)%dat%f_ptr => F_int_22
-      dat_arr(11)%dat%f_ptr => F_int_23
-      dat_arr(12)%dat%f_ptr => F_int_23
+          dat_arr(7)%dat%f_ptr => F_int_21
+          dat_arr(8)%dat%f_ptr => F_int_21
+          dat_arr(9)%dat%f_ptr => F_int_22
+          dat_arr(10)%dat%f_ptr => F_int_22
+          dat_arr(11)%dat%f_ptr => F_int_23
+          dat_arr(12)%dat%f_ptr => F_int_23
       
-      dat_arr(13)%dat%f_ptr => F_int_31
-      dat_arr(14)%dat%f_ptr => F_int_31
-      dat_arr(15)%dat%f_ptr => F_int_32
-      dat_arr(16)%dat%f_ptr => F_int_32
-      dat_arr(17)%dat%f_ptr => F_int_33
-      dat_arr(18)%dat%f_ptr => F_int_33
-
-      
+          dat_arr(13)%dat%f_ptr => F_int_31
+          dat_arr(14)%dat%f_ptr => F_int_31
+          dat_arr(15)%dat%f_ptr => F_int_32
+          dat_arr(16)%dat%f_ptr => F_int_32
+          dat_arr(17)%dat%f_ptr => F_int_33
+          dat_arr(18)%dat%f_ptr => F_int_33
+       endif
+    
+       
       
       !::find the rotation matrices once and for all
       call findRotationMatrices( datModel%rotAngles, datModel%n, 
      +                            datModel%rotMat, datModel%rotMatInv)
      
-      call surface_integral_carth( surf, dat_arr, retV, 
+      if ( coord .eq. 0 ) then
+        call surface_integral_carth( surf, dat_arr, retV, 
      +                             handleError, Fout, ier, neval )
+      else
+        call surface_integral_cyl( surf, dat_arr, retV, 
+     +                             handleError, Fout, ier, neval )
+      endif
+     
      
       !::Load the result back to Matlab
      
