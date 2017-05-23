@@ -1,17 +1,18 @@
 module integrationDataTypes
 implicit none
 
-
+integer,parameter :: coord_sys_carth=1,coord_sys_cyl=2,coord_sys_cone=3
 
 type dataCollectionBase
     real :: x1,x2,y1,y2,x,y,epsabs, epsrel,abserr_x,abserr_y
     integer :: neval_x, neval_y, ier_x, ier_y
-    real*8 :: z0
-    real*8,dimension(3) :: n_vec
+    real :: z0,cone_angle,cone_z0
+    real,dimension(3) :: n_vec
     procedure (func), pointer, nopass :: f_ptr => null ()
-    real*8,dimension(2) :: abserr_tot
-    integer*8,dimension(2) :: ier,neval       
+    real,dimension(2) :: abserr_tot
+    integer,dimension(2) :: ier,neval       
     class( dataCollectionModelBase ), pointer :: model => null ()
+    integer :: coord_sys
 end type dataCollectionBase
 
 type dataCollectionModelBase
@@ -49,7 +50,8 @@ type func_ptr
 end type func_ptr
 
 type surf_carth
-    real,dimension(2) :: x,y,z    
+    real,dimension(2) :: x,y,z,theta
+    real,dimension(3) :: r    
 end type surf_carth
 
 !::A custom type encapsulating a dataCollectionBase pointer in order to make an array
