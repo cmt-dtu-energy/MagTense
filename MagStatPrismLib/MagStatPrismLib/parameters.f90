@@ -90,8 +90,8 @@ contains
     
     write(11,*) "MagStatPrismLib compiled on:"
     
-    write(11,*) __DATE__
-    write(11,*) __TIME__
+    write(11,*)  __DATE__
+    write(11,*)  __TIME__
     !
     !
     !write(11,*) 'sjask'
