@@ -24,12 +24,12 @@ module NumInt
     
     !::two surfaces on top and bottom, respectively, each with one integral for each force component
     !::plus one surface, the cylindrical surface, each with two integrals for each force component
-    integer,parameter :: n = 4
+    integer,parameter :: n = 5
     
     integer,intent(inout),dimension(2) :: ier,neval
-    real,dimension(4,3) :: n_vec
-    real,dimension(4,2) :: xp,yp !::defines the plane of integration
-    real,dimension(4) :: zp,vecSign !::defines the position of the plane on the third axis
+    real,dimension(n,3) :: n_vec
+    real,dimension(n,2) :: xp,yp !::defines the plane of integration
+    real,dimension(n) :: zp,vecSign !::defines the position of the plane on the third axis
     integer :: i,j,ind
     real :: res
     
@@ -52,22 +52,29 @@ module NumInt
     zp(2) = surf%r(2)
     vecSign(2) = 1
     n_vec(2,:) = (/ 0, 1, 0 /)
-      
-    !::r-theta- plane, the smaller of the two conical circles
-    xp(3,1) = surf%r(1)
-    xp(3,2) = surf%r(3)
-    yp(3,:) = surf%theta
-    zp(3) = surf%z(1)
+    
+    !::theta-z plane, third integral (z-part of the normal vector)
+    xp(3,:) = surf%theta
+    yp(3,:) = surf%z
+    zp(3) = surf%r(2)
     vecSign(3) = -1
     n_vec(3,:) = (/ 0, 0, -1 /)
       
-    !::r-theta+ plane, the bigger of the two conical circles
+    !::r-theta- plane, the smaller of the two conical circles
     xp(4,1) = surf%r(1)
-    xp(4,2) = surf%r(2)
+    xp(4,2) = surf%r(3)
     yp(4,:) = surf%theta
-    zp(4) = surf%z(2)
-    vecSign(4) = 1
-    n_vec(4,:) = (/ 0, 0, 1 /)
+    zp(4) = surf%z(1)
+    vecSign(4) = -1
+    n_vec(4,:) = (/ 0, 0, -1 /)
+      
+    !::r-theta+ plane, the bigger of the two conical circles
+    xp(5,1) = surf%r(1)
+    xp(5,2) = surf%r(2)
+    yp(5,:) = surf%theta
+    zp(5) = surf%z(2)
+    vecSign(5) = 1
+    n_vec(5,:) = (/ 0, 0, 1 /)
       
     call surf_int( dat_arr, xp, yp, zp, handleError, retVector, n, vecSign, n_vec, vOut, ier, neval )
     
@@ -155,22 +162,23 @@ module NumInt
     procedure (error_handler), intent(in), pointer :: handleError
     integer,intent(in),dimension(3) :: retVector
     integer,intent(in) :: n
-    real,dimension(3),intent(in) :: vecSign
+    real,dimension(n),intent(in) :: vecSign
     real,dimension(n,3),intent(in) :: n_vec
     real,dimension(3),intent(inout) :: vOut
     integer,intent(inout),dimension(2) :: ier,neval
     real,dimension(n,2) :: xp,yp
     real,dimension(n) :: zp
-    integer :: i, j, ind    
+    integer :: i, j, ind
     real :: res
     
-    
+     
+      
     vOut(:) = 0.
     !::j loops over the three vector components     
-    do j=1,3          
-        if ( retVector(j) .eq. 0 ) then       
-            !$OMP PARALLEL PRIVATE(i,ind,res)
-            do i=1,n
+    !$OMP PARALLEL DO PRIVATE(ind,res) collapse(2)
+    do j=1,3                        
+        do i=1,n
+            if ( retVector(j) .eq. 0 ) then
                 ind = n*(j-1) + i
                 
                 dat_arr(ind)%dat%x1 = xp(i,1)
@@ -180,17 +188,20 @@ module NumInt
                 
                 dat_arr(ind)%dat%z0 = zp(i)
                 
-                dat_arr(ind)%dat%n_vec = n_vec(i,:)            
-                
+                dat_arr(ind)%dat%n_vec(1,:) = n_vec(i,:)
+
                 call integral2( dat_arr(ind)%dat, res )
-            
+                
                 call handleError(dat_arr(ind)%dat, dat_arr(ind)%dat%abserr_tot) 
-                !$OMP ATOMIC
+                !$OMP ATOMIC WRITE
                 vOut(j) = vOut(j) + vecSign(i) * res           
-            enddo      
-            !$OMP END PARALLEL
-        endif        
-    enddo            
+                !$OMP END ATOMIC
+            endif                
+        enddo                          
+    enddo   
+    !$OMP END PARALLEL DO
+    
+    
     neval = 0
     ier = 0
     do i=1,n*3
@@ -299,6 +310,7 @@ real,intent(inout) :: res
 class(dataCollectionBase),intent(inout), target :: dat
 procedure (f_int_dat), pointer :: f_ptr => null ()
 
+res = 0
 f_ptr => h
 
 call qags_x ( f_ptr, dat, dat%x1, dat%x2, dat%epsabs, dat%epsrel, res, dat%abserr_x, dat%neval_x, dat%ier_x )
@@ -313,9 +325,13 @@ real,intent(in) :: xx
 real :: ss, res
 class(dataCollectionBase), target :: dat
 procedure (f_int_dat), pointer :: f_ptr => null ()
+integer :: OMP_GET_THREAD_NUM
+integer :: threadID
 
     f_ptr => f
     dat%x = xx
+
+    
     call qags_y( f_ptr, dat, dat%y1, dat%y2, dat%epsabs, dat%epsrel, ss, dat%abserr_y, dat%neval_y, dat%ier_y )
     h = ss
     
@@ -327,7 +343,7 @@ function f( yy, dat )
 real :: f
 real,intent(in) :: yy
 class(dataCollectionBase), target :: dat
-!Called by qgausy. Calls func.
+
 
 dat%y = yy
 
