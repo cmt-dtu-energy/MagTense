@@ -1,4 +1,6 @@
-        !COMPILER-GENERATED INTERFACE MODULE: Wed Dec 21 13:01:26 2016
+        !COMPILER-GENERATED INTERFACE MODULE: Mon May 22 09:50:49 2017
+        ! This source file is for reference only and may not completely
+        ! represent the generated interface used by the compiler.
         MODULE LOCATE__genmod
           INTERFACE 
             SUBROUTINE LOCATE(XX,N,X,J)

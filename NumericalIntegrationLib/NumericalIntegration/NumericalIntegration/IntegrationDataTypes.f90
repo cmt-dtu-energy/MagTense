@@ -7,7 +7,7 @@ type dataCollectionBase
     real :: x1,x2,y1,y2,x,y,epsabs, epsrel,abserr_x,abserr_y
     integer :: neval_x, neval_y, ier_x, ier_y
     real :: z0,cone_angle,cone_z0
-    real,dimension(3) :: n_vec
+    real,dimension(1,3) :: n_vec
     procedure (func), pointer, nopass :: f_ptr => null ()
     real,dimension(2) :: abserr_tot
     integer,dimension(2) :: ier,neval       

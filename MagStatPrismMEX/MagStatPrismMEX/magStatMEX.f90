@@ -52,9 +52,10 @@
       
       mwPointer mxGetM, mxGetN
       mwSize mxGetNumberOfDimensions,dimIteOut(1)
+      
       mwPointer mxGetDimensions
       
-      mwSize nnn, d_dims
+      mwSize nnn, d_dims, sx
       integer*4 ComplexFlag
 
 !     Pointers to input/output mxArrays:
@@ -147,10 +148,10 @@
       endif
       endif
 	 
-       !write(11,*) 'HUND'
-      call mxCopyPtrToInteger4(mxGetPr(prhs(7)) , nn, 1)
-      call mxCopyPtrToInteger4(mxGetPr(prhs(10)), mm, 1)
-      call mxCopyPtrToInteger4(mxGetPr(prhs(12)), ll, 1)
+       !write(11,*) 'HUND'      
+      call mxCopyPtrToInteger4(mxGetPr(prhs(7)) , nn, 1)      
+      call mxCopyPtrToInteger4(mxGetPr(prhs(10)), mm, 1)      
+      call mxCopyPtrToInteger4(mxGetPr(prhs(12)), ll, 1)      
       call mxCopyPtrToInteger4(mxGetPr(prhs(13)), spacedim, 1)
 
       allocate(pos(nn,3),dims(nn,3),dir(nn,3),magType(nn))
@@ -159,48 +160,53 @@
       allocate(stateFcn(2*mm))
       allocate(hyst_map_init(nn),hyst_map(nn))
       
-      call mxCopyPtrToInteger4(mxGetPr(prhs(4)) , magType, nn)
-      call mxCopyPtrToInteger4(mxGetPr(prhs(9)) , stateFcnIndices,nn)
-      call mxCopyPtrToInteger4(mxGetPr(prhs(15)) , hyst_map_init, nn)
+      sx = nn
+      call mxCopyPtrToInteger4(mxGetPr(prhs(4)) , magType, sx)      
+      call mxCopyPtrToInteger4(mxGetPr(prhs(9)) , stateFcnIndices,sx)
+      call mxCopyPtrToInteger4(mxGetPr(prhs(15)) , hyst_map_init, sx)
       
-      call mxCopyPtrToReal8(mxGetPr(prhs(1)) ,pos,nn*3)
-      call mxCopyPtrToReal8(mxGetPr(prhs(2)) ,dims,nn*3)
-      call mxCopyPtrToReal8(mxGetPr(prhs(3)) ,dir,nn*3)
-      call mxCopyPtrToReal8(mxGetPr(prhs(5)) ,Hext,nn*3)
-      call mxCopyPtrToReal8(mxGetPr(prhs(6)) ,T,nn)
-      call mxCopyPtrToReal8(mxGetPr(prhs(11)),solPts,ll*3)
-      call mxCopyPtrToReal8(mxGetPr(prhs(14)),rotAngles,nn*3)
+      sx = nn * 3
+      call mxCopyPtrToReal8(mxGetPr(prhs(1)), pos, sx)
+      call mxCopyPtrToReal8(mxGetPr(prhs(2)), dims, sx)
+      call mxCopyPtrToReal8(mxGetPr(prhs(3)), dir, sx)
+      call mxCopyPtrToReal8(mxGetPr(prhs(5)), Hext, sx)
+      sx = nn
+      call mxCopyPtrToReal8(mxGetPr(prhs(6)), T, sx)
+      sx = ll * 3
+      call mxCopyPtrToReal8(mxGetPr(prhs(11)), solPts, sx)
+      sx = nn * 3
+      call mxCopyPtrToReal8(mxGetPr(prhs(14)), rotAngles, sx)
       
       
       
       do i=1,mm          
-          TPtr = mxGetField(prhs(8),i,'T')          
-          HPtr = mxGetField(prhs(8),i,'H')
-          MCoolPtr = mxGetField(prhs(8),i,'MCool')
-          MHeatPtr = mxGetField(prhs(8),i,'MHeat')
-          nTPtr = mxGetField(prhs(8),i,'nT')
-          nHPtr = mxGetField(prhs(8),i,'nH')
+          sx = i
+          TPtr = mxGetField(prhs(8),sx,'T')          
+          HPtr = mxGetField(prhs(8),sx,'H')
+          MCoolPtr = mxGetField(prhs(8),sx,'MCool')
+          MHeatPtr = mxGetField(prhs(8),sx,'MHeat')
+          nTPtr = mxGetField(prhs(8),sx,'nT')
+          nHPtr = mxGetField(prhs(8),sx,'nH')
           
-          nCritCoolPtr = mxGetField(prhs(8),i,'nCritCool')          
-          TCritCoolPtr = mxGetField(prhs(8),i,'TCritCool')
-          HCritCoolPtr = mxGetField(prhs(8),i,'HCritCool')
+          nCritCoolPtr = mxGetField(prhs(8),sx,'nCritCool')          
+          TCritCoolPtr = mxGetField(prhs(8),sx,'TCritCool')
+          HCritCoolPtr = mxGetField(prhs(8),sx,'HCritCool')
           
-          nCritHeatPtr = mxGetField(prhs(8),i,'nCritHeat')
-          TCritHeatPtr = mxGetField(prhs(8),i,'TCritHeat')
-          HCritHeatPtr = mxGetField(prhs(8),i,'HCritHeat')
+          nCritHeatPtr = mxGetField(prhs(8),sx,'nCritHeat')
+          TCritHeatPtr = mxGetField(prhs(8),sx,'TCritHeat')
+          HCritHeatPtr = mxGetField(prhs(8),sx,'HCritHeat')
           
-          call mxCopyPtrToInteger4(mxGetPr(nTPtr), stateFcn(i)%nT, 1)                             
+          
+          call mxCopyPtrToInteger4(mxGetPr(nTPtr), stateFcn(i)%nT, 1)                                       
           call mxCopyPtrToInteger4(mxGetPr(nHPtr), stateFcn(i)%nH, 1)
-          
+                    
           call mxCopyPtrToInteger4(mxGetPr(nCritCoolPtr), 
-     + stateFcn(i)%nCritCool, 1)
+     + stateFcn(i)%nCritCool, 1)          
           call mxCopyPtrToInteger4(mxGetPr(nCritHeatPtr), 
      + stateFcn(i)%nCritHeat, 1)
-          
-          call mxCopyPtrToInteger4(mxGetPr(nTPtr), 
-     + stateFcn(i+mm)%nT, 1)
-          call mxCopyPtrToInteger4(mxGetPr(nHPtr), 
-     + stateFcn(i+mm)%nH, 1)
+                    
+          call mxCopyPtrToInteger4(mxGetPr(nTPtr), stateFcn(i+mm)%nT, 1)          
+          call mxCopyPtrToInteger4(mxGetPr(nHPtr), stateFcn(i+mm)%nH, 1)
           
           allocate( stateFcn(i)%T(stateFcn(i)%nT) )
           allocate( stateFcn(i)%H(stateFcn(i)%nH) )
@@ -224,40 +230,41 @@
           stateFcn(i+mm)%H = 0
           stateFcn(i+mm)%M = 0
           
-          
-          call mxCopyPtrToReal8(mxGetPr(TPtr),stateFcn(i)%T,
-     + stateFcn(i)%nT)
-          call mxCopyPtrToReal8(mxGetPr(HPtr),
-     + stateFcn(i)%H,stateFcn(i)%nH)
-          call mxCopyPtrToReal8(mxGetPr(MCoolPtr),
-     + stateFcn(i)%M,stateFcn(i)%nT*stateFcn(i)%nH)
+          sx = stateFcn(i)%nT
+          call mxCopyPtrToReal8(mxGetPr(TPtr),stateFcn(i)%T,sx)
+          sx = stateFcn(i)%nH
+          call mxCopyPtrToReal8(mxGetPr(HPtr),stateFcn(i)%H,sx)
+          sx = stateFcn(i)%nT*stateFcn(i)%nH
+          call mxCopyPtrToReal8(mxGetPr(MCoolPtr),stateFcn(i)%M,sx)
      
+          sx = stateFcn(i+mm)%nT
+          call mxCopyPtrToReal8(mxGetPr(TPtr),stateFcn(i+mm)%T,sx)
+          sx = stateFcn(i+mm)%nH
+          call mxCopyPtrToReal8(mxGetPr(HPtr),stateFcn(i+mm)%H,sx)
+          sx = stateFcn(i+mm)%nT*stateFcn(i+mm)%nH
+          call mxCopyPtrToReal8(mxGetPr(MHeatPtr),stateFcn(i+mm)%M,sx)
      
-          call mxCopyPtrToReal8(mxGetPr(TPtr),stateFcn(i+mm)%T,
-     + stateFcn(i+mm)%nT)
-          call mxCopyPtrToReal8(mxGetPr(HPtr),
-     + stateFcn(i+mm)%H,stateFcn(i+mm)%nH)
-          call mxCopyPtrToReal8(mxGetPr(MHeatPtr),
-     + stateFcn(i+mm)%M,stateFcn(i+mm)%nT*stateFcn(i+mm)%nH)
-     
-     
+          sx = stateFcn(i)%nCritCool
           call mxCopyPtrToReal8(mxGetPr(TCritCoolPtr),
-     + stateFcn(i)%Tcrit_cool,stateFcn(i)%nCritCool )
+     + stateFcn(i)%Tcrit_cool,sx)
      
+          sx = stateFcn(i)%nCritHeat
           call mxCopyPtrToReal8(mxGetPr(TCritHeatPtr),
-     + stateFcn(i)%Tcrit_heat,stateFcn(i)%nCritHeat )
-     
+     + stateFcn(i)%Tcrit_heat,sx)
+          sx = stateFcn(i)%nCritCool
           call mxCopyPtrToReal8(mxGetPr(HCritCoolPtr),
-     + stateFcn(i)%Hcrit_cool,stateFcn(i)%nCritCool )
+     + stateFcn(i)%Hcrit_cool,sx)
      
+          sx = stateFcn(i)%nCritHeat
           call mxCopyPtrToReal8(mxGetPr(HCritHeatPtr),
-     + stateFcn(i)%Hcrit_heat,stateFcn(i)%nCritHeat )
+     + stateFcn(i)%Hcrit_heat,sx)
           
       enddo
       
       if ( nrhs .eq. 16 ) then
           allocate( H_init(nn,3) )
-          call mxCopyPtrToReal8(mxGetPr(prhs(16)) ,H_init,nn*3)
+          sx = nn*3
+          call mxCopyPtrToReal8(mxGetPr(prhs(16)) ,H_init,sx)
           !::call mexWarnMsgIdAndTxt('MATLAB:Matlab_single_mex:Debug', 'Doing calculation')
       call calcH( pos, dims, dir, magType, Hext,T, nn, stateFcn,
      +            stateFcnIndices, mm, solPts, ll, 
@@ -284,8 +291,10 @@
       
       d_dims = 3;
       ComplexFlag = 0;
-      plhs(1) = mxCreateDoubleMatrix(nnn,d_dims,ComplexFlag)
-      plhs(2) = mxCreateDoubleMatrix(nn,d_dims,ComplexFlag)
+      sx = nnn
+      plhs(1) = mxCreateDoubleMatrix(sx,d_dims,ComplexFlag)
+      sx = nn
+      plhs(2) = mxCreateDoubleMatrix(sx,d_dims,ComplexFlag)
       dimIteOut(1) = 1
       plhs(3) = mxCreateNumericArray(1,
      + dimIteOut,mxClassIDFromClassName('int32'),0)
@@ -294,11 +303,13 @@
        plhs(4) = mxCreateNumericArray(1,dimIteOut,
      + mxClassIDFromClassName('int32'),ComplexFlag)
      
-     
-      call mxCopyReal8ToPtr(Hout,mxGetPr(plhs(1)),(nn+ll)*3)
-      call mxCopyReal8ToPtr(Mout,mxGetPr(plhs(2)),nn*3)
+      sx = (nn+ll)*3
+      call mxCopyReal8ToPtr(Hout,mxGetPr(plhs(1)),sx)
+      sx = nn*3
+      call mxCopyReal8ToPtr(Mout,mxGetPr(plhs(2)),sx)
       call mxCopyInteger8ToPtr(nIte,mxGetPr(plhs(3)),1)
-      call mxCopyInteger4ToPtr(hyst_map,mxGetPr(plhs(4)),nn)
+      sx = nn
+      call mxCopyInteger4ToPtr(hyst_map,mxGetPr(plhs(4)),sx)
          
       end subroutine
       
