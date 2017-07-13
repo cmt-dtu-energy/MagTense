@@ -1,6 +1,7 @@
 MODULE parameters_CALL
 
     integer,parameter :: magTypeSoft=0,magTypeHard=1
+    integer,parameter :: formPrisme=0,formEllipse=1
     
     real,parameter :: pi=3.141592654
     

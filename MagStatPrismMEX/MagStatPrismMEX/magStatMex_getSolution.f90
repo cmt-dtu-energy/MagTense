@@ -6,14 +6,16 @@
 
 !     Gateway routine
 !     The prhs is a pointer array with the following content
-!     prhs(1) solPts (l,3), solution points
-!     prhs(2) rotAngles (n,3), rotation angles for each prism
-!     prhs(3) M (n,3) magnetization for each prism
-!     prhs(4) dims (n,3) dimensions of each prism
-!     prhs(5) pos(n,3) positions of each prism
-!     prhs(6) n, integer
-!     prhs(7) l, integer
-!     prhs(8) spacedim, integer
+!     prhs(1)  solPts (l,3), solution points
+!     prhs(2)  rotAngles (n,3), rotation angles for each prism
+!     prhs(3)  M (n,3) magnetization for each prism
+!     prhs(4)  dims (n,3) dimensions of each prism
+!     prhs(5)  pos(n,3) positions of each prism
+!     prhs(6)  n, integer
+!     prhs(7)  l, integer
+!     prhs(8)  spacedim, integer
+!     prhs(9)  Hext (l,3), external field
+!     prhs(10) formType, the type of object
       
 !     plhs(1) Hout(l,3) output field
 
@@ -50,9 +52,10 @@
 !     Pointers to input/output mxArrays:
       mwPointer :: stPr
       integer*4 :: nn, mm, ll, spacedim
-      real*8,dimension(:,:),allocatable :: pos,dims,solPts,Hout
+      real*8,dimension(:,:),allocatable :: pos,dims,solPts,Hout,Hext
       real*8,dimension(:,:),allocatable :: M,rotAngles
       real*8,dimension(:,:,:),allocatable :: rotMat,rotMatInv
+      integer*4,dimension(:),allocatable :: formType
       
       real*8,dimension(2) :: dt
       real*8 :: t1,t2,t3
@@ -70,7 +73,7 @@
       
       !-----------------------------------------------------------------------
 !     Check for proper number of arguments. 
-      if(nrhs .ne. 8) then
+      if(nrhs .ne. 10) then
          call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput',
      +                           '8 inputs are required.')
       elseif(nlhs .gt. 2) then
@@ -103,6 +106,12 @@
       elseif ( .NOT. mxIsInt32(prhs(8)) ) then
           call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType',
      +                           'Input eight should be an integer')      
+      elseif ( .NOT. mxIsDouble(prhs(9)) ) then
+          call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType',
+     +                           'Input nine should be an double')     
+      elseif ( .NOT. mxIsInt32(prhs(10)) ) then
+          call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType',
+     +                           'Input ten should be an integer') 
       endif
       
       call mxCopyPtrToInteger4(mxGetPr(prhs(6)) , nn, 1)
@@ -110,9 +119,10 @@
       call mxCopyPtrToInteger4(mxGetPr(prhs(8)), spacedim, 1)
       
       
-      allocate( solPts(ll,3), Hout(ll,3) )
+      allocate( solPts(ll,3), Hout(ll,3), Hext(ll,3) )
       allocate( M(nn,3), dims(nn,3), pos(nn,3), rotAngles(nn,3) )
-      
+      allocate( formType(nn) )
+       
       Hout(:,:) = 0
             
       
@@ -121,13 +131,15 @@
       call mxCopyPtrToReal8(mxGetPr(prhs(3)), M, nn * 3 )
       call mxCopyPtrToReal8(mxGetPr(prhs(4)), dims, nn * 3 )
       call mxCopyPtrToReal8(mxGetPr(prhs(5)), pos, nn * 3 )
+      call mxCopyPtrToReal8(mxGetPr(prhs(9)), Hext, ll * 3)
+      call mxCopyPtrToInteger4(mxGetPr(prhs(10)) , formType, nn)
       !CALL CPU_TIME(t1)
       !::Call the subroutine to find the rotations matrices
       call findRotationMatrices( rotAngles, nn, rotMat, rotMatInv)
       !CALL CPU_TIME(t2)
       !::call the subroutine to find the solution at the specified points
       call getSolution( solPts, ll, M, dims, pos, nn, spacedim, Hout, 
-     +                  rotMat, rotMatInv )
+     +                  Hext, rotMat, rotMatInv, formType )
       !CALL CPU_TIME(t3)
       
       !dt(1) = t2-t1;
