@@ -18,13 +18,7 @@ subroutine initializeBRParameters( kappa_, eta_, J_, g_, Ns_, rho_, signBeta_  )
 real,intent(in) :: kappa_,eta_,J_,g_,Ns_,rho_
 integer,intent(in) :: signBeta_
 
-      !-----------------------------------------------------------------------	  	       
-	  open(11,file='version_BR_LIB.txt',status='unknown',access='sequential',form='formatted',position='rewind',action='write')     
-	  write(11,*) "BL_LIB compiled on:"
-      write(11,*) __DATE__
-      write(11,*) __TIME__
-      close(11)
-      !-----------------------------------------------------------------------
+      
 
 !    open (11, file='debug.txt',status='old', access='sequential',form='formatted',action='write',position='append' )
     kappa = kappa_
