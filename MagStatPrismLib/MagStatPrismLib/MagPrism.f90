@@ -59,7 +59,7 @@ subroutine calcH( pos, dims, dir, magType, Hext,T, n, stateFcn, stateFcnIndices,
 real,intent(in),dimension(n,3) :: pos, dims,dir,Hext,rotAngles
 integer,intent(in),dimension(n) :: magType
 real,intent(in),dimension(n) :: T
-type(stateFunction),intent(in),dimension(m) :: stateFcn
+type(stateFunction),intent(in),dimension(2*m) :: stateFcn
 integer,intent(in),dimension(n) :: stateFcnIndices
 integer,intent(in) :: n,m,l,spacedim
 real,intent(in),dimension(l,3) :: solPts
@@ -116,10 +116,10 @@ if ( maxval(stateFcnIndices) .le. m ) then
         nIte = i
         H_old = Hout(1:n,:)
         !::Get the magnetization in each node
-        call getM(Hout(1:n,:), T, Mout, dir, magType, n, stateFcn, stateFcnIndices, m, hyst_map)
+        call getM(Hout(1:n,:), T, Mout, dir, magType, n, stateFcn, stateFcnIndices, m, hyst_map, rotMat)
         
         !::Get the demagnetizing field
-        call getHdem( Mout, n, Hdem, N_out, rotMatInv)
+        call getHdem( Mout, n, Hdem, N_out, rotMat, rotMatInv)
         
         !::Update the solution
         Hout(1:n,:) = Hout(1:n,:) + lambda * ( (Hext + Hdem) - Hout(1:n,:) )
@@ -226,6 +226,7 @@ do i=1,l
            call getN_2D(dims(j,1),dims(j,2),dims(j,3), diffPos(1), diffPos(2), diffPos(3), Nout )
         endif
         
+        !call getDotProd( Nout, matmul( rotMat(j,:,:),  M(j,:) ), dotProd )
         call getDotProd( Nout, M(j,:), dotProd )
         
         !::Rotate the solution back. 
@@ -264,10 +265,11 @@ end subroutine updateLambda
 !::the heating curve is used. It is assumed that the stateFcn array has
 !::two state functions for each material modeled, i.e. 2*m elements. The first
 !:: m elements are cooling curves while the elements from m+1 to 2m are heating curves
-subroutine getM( H, T, Mout, dir, magType, n, stateFcn, stateFcnIndices, m, hyst_map)
+subroutine getM( H, T, Mout, dir, magType, n, stateFcn, stateFcnIndices, m, hyst_map, rotMat)
 real,intent(in),dimension(n,3) :: H,dir
 real,intent(in),dimension(n) :: T
 real,intent(inout),dimension(n,3) :: Mout
+real,intent(in),dimension(n,3,3) :: rotMat
 integer,intent(in),dimension(n) :: magType
 integer,intent(in) :: n,m
 type(stateFunction),intent(in),dimension(2*m) :: stateFcn
@@ -293,6 +295,7 @@ do i=1,n
     if ( magType(i) .eq. magTypeSoft ) then
         !::Then the magnetization is along the direction of the local field
         if ( Hnorm(i) .ne. 0 ) then
+            !Mout(i,:) = Mtmp * matmul( rotMat(i,:,:), H(i,:) ) / Hnorm(i)      
             Mout(i,:) = Mtmp * H(i,:) / Hnorm(i)      
         else
             Mout(i,1) = Mtmp
@@ -366,10 +369,10 @@ end subroutine updateHysteresisTracking
 
 
 !::Find the demagnetizing field
-subroutine getHdem( M, n, Hdem, N_out, rotMatInv)
+subroutine getHdem( M, n, Hdem, N_out, rotMat, rotMatInv)
 real,intent(in),dimension(n,3) :: M
 integer,intent(in) :: n
-real,intent(in),dimension(n,3,3) :: rotMatInv
+real,intent(in),dimension(n,3,3) :: rotMat, rotMatInv
 real,intent(inout),dimension(n,3) :: Hdem
 real,intent(in),dimension(n,n,3,3) :: N_out
 real,dimension(3) :: dotProd
@@ -383,7 +386,9 @@ do i=1,n
     do j=1,n        
         
         !::Compute the dot product between N and M
+        !call getDotProd( N_out(i,j,:,:), matmul( rotMat(j,:,:),  M(j,:) ), dotProd )
         call getDotProd( N_out(i,j,:,:), M(j,:), dotProd )
+        !call getDotProd( N_out(i,j,:,:), M(j,:), dotProd )
         
         !::Rotate the solution back.
         dotProd = matmul( rotMatInv(j,:,:), dotProd )        
