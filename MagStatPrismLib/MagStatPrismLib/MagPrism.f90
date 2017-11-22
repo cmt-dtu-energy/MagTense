@@ -3,7 +3,7 @@ use PARAMETERS_CALL
 use UTIL_CALL
 use qsort_c_module
 implicit none
-contains
+    contains
     
 !::Needs a better name
 !::pos is a (n,3) array with the x,y,z coordinates for each prism
@@ -47,17 +47,27 @@ contains
 !:: nIte is an integer defining the max number of iterations
 !::
 !:: rotAngles is an (n,3) array with the rotation angles (yaw, pitch and roll) for each prism
+!::    
 !:: hyst_map_init is an(n,1) array with zeros and ones indicating whether the state of the i'th unit
 !:: is to use the cooling curve (zero) or the heating curve (one)
+!::
+!:: formType is a (n,1) array with indication of the type of shape
+!:: that the individual object has. It is defined in the constants 
+!:: so that 0 is a prism and 1 is an ellipsoid
+!:: NOTE THAT IN 2D THE CODE ONLY WORKS FOR PRISMS
+!::
+!:: 13-07-2017 rabj:
+!:: Added ellipsoids (spheroids) in 3D
 !:: 3-11-2016 kaki:
 !:: hyst_map returns the hystereis map as found by the iterated solution and has the same size as hyst_map_init
 !:: 4-11-2016 kaki
 !:: added support for defining an initial guess
 !:: Hint_init is an optional initial field (starting guess). If present it is used in stead of the applied field (Hext) as
 !:: the initial value for Hint
-subroutine calcH( pos, dims, dir, magType, Hext,T, n, stateFcn, stateFcnIndices, m, solPts, l, spacedim, Hout, Mout, nIte, rotAngles, hyst_map_init, hyst_map, Hint_init )
-real,intent(in),dimension(n,3) :: pos, dims,dir,Hext,rotAngles
-integer,intent(in),dimension(n) :: magType
+subroutine calcH( pos, dims, dir, magType, formType, Hext, T, n, stateFcn, stateFcnIndices, m, solPts, l, spacedim, Hout, Mout, nIte, rotAngles, hyst_map_init, hyst_map, Hint_init )
+real,intent(in),dimension(n,3) :: pos, dims,dir,rotAngles
+real,intent(in),dimension(n+l,3) :: Hext
+integer,intent(in),dimension(n) :: magType, formType
 real,intent(in),dimension(n) :: T
 type(stateFunction),intent(in),dimension(2*m) :: stateFcn
 integer,intent(in),dimension(n) :: stateFcnIndices
@@ -99,7 +109,7 @@ if ( maxval(stateFcnIndices) .le. m ) then
     if ( present( Hint_init ) ) then
         Hout(1:n,:) = Hint_init
     else        
-        Hout(1:n,:) = Hext
+        Hout(1:n,:) = Hext(1:n,:)
     endif
     
     Mout(:,:) = 0
@@ -109,7 +119,7 @@ if ( maxval(stateFcnIndices) .le. m ) then
     !::Get the rotation matrix and its inverse
     call findRotationMatrices( rotAngles, n, rotMat, rotMatInv)
     
-    call calcNTensor( pos, dims, N_out, n, spacedim, rotMat )
+    call calcNTensor( pos, dims, N_out, n, spacedim, rotMat, formType )
     
     !::First we find the self-consistent solution, i.e. the magnetization (magnitude and direction) in each prism    
     do i=0,maxIte
@@ -122,7 +132,7 @@ if ( maxval(stateFcnIndices) .le. m ) then
         call getHdem( Mout, n, Hdem, N_out, rotMat, rotMatInv)
         
         !::Update the solution
-        Hout(1:n,:) = Hout(1:n,:) + lambda * ( (Hext + Hdem) - Hout(1:n,:) )
+        Hout(1:n,:) = Hout(1:n,:) + lambda * ( (Hext(1:n,:) + Hdem) - Hout(1:n,:) )
         
         !::update the hysteresis tracking
         call updateHysteresisTracking( T, Hout, hyst_map_init, hyst_map, n, stateFcn, stateFcnIndices, m )
@@ -194,21 +204,23 @@ if ( maxval(stateFcnIndices) .le. m ) then
     
     
     !::Having obtained the solution we compute the magnetic field at each of the required points
-    call getSolution( solPts, l, Mout, dims, pos, n, spacedim, Hout(n+1:n+l,:), rotMat, rotMatInv )
+    call getSolution( solPts, l, Mout, dims, pos, n, spacedim, Hout(n+1:n+l,:), Hext(n+1:n+l,:), rotMat, rotMatInv, formType )
     
 endif
 
 end subroutine calcH
 
 !::Returns the solution at the required points
-subroutine getSolution( solPts, l, M, dims, pos, n, spacedim, Hout, rotMat, rotMatInv )
+subroutine getSolution( solPts, l, M, dims, pos, n, spacedim, Hout, Hext, rotMat, rotMatInv, formType )
 real,intent(in),dimension(l,3) :: solPts
+real,intent(in),dimension(l,3) :: Hext
 real,intent(inout),dimension(l,3) :: Hout
 real,intent(in),dimension(n,3) :: M, dims, pos
 real,intent(in),dimension(n,3,3) :: rotMat,rotMatInv
+integer,intent(in),dimension(n) :: formType
 integer,intent(in) :: l,n, spacedim
 real,dimension(3) :: diffPos, dotProd
-real,dimension(3,3) :: Nout
+real,dimension(3,3) :: N_out
 integer :: i,j
 
 
@@ -220,22 +232,24 @@ do i=1,l
         !::Rotate the position vector to accomodate rotation of the j'th prism
         diffPos = matmul( rotMat(j,:,:), diffPos )
         if ( spacedim .eq. 3 ) then
-           call getN_3D(dims(j,1),dims(j,2),dims(j,3), diffPos(1), diffPos(2), diffPos(3), Nout )
+           call getN_3D(dims(j,1),dims(j,2),dims(j,3), diffPos(1), diffPos(2), diffPos(3), formType(j), N_out )
         endif
         if ( spacedim .eq. 2 ) then
-           call getN_2D(dims(j,1),dims(j,2),dims(j,3), diffPos(1), diffPos(2), diffPos(3), Nout )
+           call getN_2D(dims(j,1),dims(j,2),dims(j,3), diffPos(1), diffPos(2), diffPos(3), N_out )
         endif
         
-        !call getDotProd( Nout, matmul( rotMat(j,:,:),  M(j,:) ), dotProd )
-        call getDotProd( Nout, M(j,:), dotProd )
-        
+        call getDotProd( N_out, matmul( rotMat(j,:,:), M(j,:) ), dotProd )
+                
         !::Rotate the solution back. 
         dotProd = matmul( rotMatInv(j,:,:), dotProd )
         
-        Hout(i,:) = Hout(i,:) - dotProd
+        Hout(i,:) = Hout(i,:) - dotProd       
     enddo
     
+    Hout = Hout + Hext
+    
 enddo
+
 
 end subroutine getSolution
 
@@ -295,8 +309,7 @@ do i=1,n
     if ( magType(i) .eq. magTypeSoft ) then
         !::Then the magnetization is along the direction of the local field
         if ( Hnorm(i) .ne. 0 ) then
-            !Mout(i,:) = Mtmp * matmul( rotMat(i,:,:), H(i,:) ) / Hnorm(i)      
-            Mout(i,:) = Mtmp * H(i,:) / Hnorm(i)      
+            Mout(i,:) = Mtmp * H(i,:) / Hnorm(i)                  
         else
             Mout(i,1) = Mtmp
             Mout(i,2:3) = 0        
@@ -384,11 +397,8 @@ Hdem(:,:) = 0
 do i=1,n
     !::For each prism find the contribution from all other prisms
     do j=1,n        
-        
+
         !::Compute the dot product between N and M
-        !call getDotProd( N_out(i,j,:,:), matmul( rotMat(j,:,:),  M(j,:) ), dotProd )
-        call getDotProd( N_out(i,j,:,:), M(j,:), dotProd )
-        !call getDotProd( N_out(i,j,:,:), M(j,:), dotProd )
         
         !::Rotate the solution back.
         dotProd = matmul( rotMatInv(j,:,:), dotProd )        
@@ -402,10 +412,11 @@ enddo
 
 end subroutine getHdem
 
-subroutine calcNTensor( pos, dims, N_out, n, spacedim, rotMat )
+subroutine calcNTensor( pos, dims, N_out, n, spacedim, rotMat, formType )
 real,intent(in),dimension(n,3) :: dims,pos
 real,intent(inout),allocatable,dimension(:,:,:,:) :: N_out
 real,intent(in),dimension(n,3,3) :: rotMat
+integer,intent(in),dimension(n) :: formType
 integer,intent(in) :: n, spacedim
 integer :: i,j
 real,dimension(3) :: diffPos
@@ -425,7 +436,7 @@ do i=1,n
         
         !::Find the demag. tensor
         if ( spacedim .eq. 3 ) then
-            call getN_3D(dims(j,1),dims(j,2),dims(j,3),diffPos(1),diffPos(2),diffPos(3), N_out(i,j,:,:) )
+            call getN_3D(dims(j,1),dims(j,2),dims(j,3),diffPos(1),diffPos(2),diffPos(3), formType(j), N_out(i,j,:,:) )
         elseif ( spacedim .eq. 2 ) then
             call getN_2D(dims(j,1),dims(j,2),dims(j,3),diffPos(1),diffPos(2),diffPos(3), N_out(i,j,:,:) )
         endif
@@ -453,7 +464,7 @@ do i=1,n
     call getRotX( -rotAngles(i,1), RotX )
     call getRotY( -rotAngles(i,2), RotY )
     call getRotZ( -rotAngles(i,3), RotZ )
-    
+
     !::Find the rotation matrix as defined by yaw, pitch and roll
     !::Rot = RotZ * RotY * RotX
     rotMat(i,:,:) = matmul( matmul( RotZ, RotY ), RotX )
@@ -513,7 +524,7 @@ rotMat(3,3) = cos(angle)
 end subroutine getRotY
 
 !::
-!::Returns the rotation matrix for a rotation of angle radians about the y-axis
+!::Returns the rotation matrix for a rotation of angle radians about the z-axis
 !::
 subroutine getRotZ( angle, rotMat )
 real,intent(in) :: angle
@@ -552,83 +563,235 @@ end subroutine getDotProd
 !::Calculates N from the analytical expression in 3D
 !::Given the dimensions of the prism (a,b,c) and the distance vector
 !::to it
-subroutine getN_3D( a, b, c, x, y, z, N_out )
+subroutine getN_3D( a, b, c, x, y, z, form, N_out )
 real,intent(in) :: a,b,c,x,y,z
+integer,intent(in) :: form
 real,intent(out),dimension(3,3) :: N_out
 real :: nom,denom,nom_l,nom_h,denom_l,denom_h
 !real,parameter :: zero_limit=1.006258
 real,parameter :: lim_scl_h=1.01,lim_scl_l=0.98
 real :: xl,xh,yl,yh,zl,zh,al,ah,bl,bh,cl,ch,lim
+real :: a_temp,b_temp,c_temp,a_o,b_o,c_o,x_o,y_o,z_o,f,w,A_c,alpha
 real,dimension(6) :: tmp
+integer,dimension(3) :: indx_semi
+real,dimension(3) :: coor,semi_axis
+real,dimension(3,3) :: N_demag, N_temp
 
-!::Diagonal elements
-N_out(1,1) = 1./(4.*pi) * ( atan(f_3D(a,b,c,x,y,z))   + atan(f_3D(a,b,c,-x,y,z))  + atan(f_3D(a,b,c,x,-y,z)) + &
-                            atan(f_3D(a,b,c,x,y,-z))  + atan(f_3D(a,b,c,-x,-y,z)) + atan(f_3D(a,b,c,x,-y,-z)) + &
-                            atan(f_3D(a,b,c,-x,y,-z)) + atan(f_3D(a,b,c,-x,-y,-z)) )
+!--- The demagnetization factor of a prism
+if ( form .eq. formPrisme ) then
+    !::Diagonal elements
+    N_out(1,1) = 1./(4.*pi) * ( atan(f_3D(a,b,c,x,y,z))   + atan(f_3D(a,b,c,-x,y,z))  + atan(f_3D(a,b,c,x,-y,z)) + &
+                                atan(f_3D(a,b,c,x,y,-z))  + atan(f_3D(a,b,c,-x,-y,z)) + atan(f_3D(a,b,c,x,-y,-z)) + &
+                                atan(f_3D(a,b,c,-x,y,-z)) + atan(f_3D(a,b,c,-x,-y,-z)) )
 
 
 
-N_out(2,2) = 1./(4.*pi) * ( atan(g_3D(a,b,c,x,y,z))   + atan(g_3D(a,b,c,-x,y,z))  + atan(g_3D(a,b,c,x,-y,z)) + &
-                            atan(g_3D(a,b,c,x,y,-z))  + atan(g_3D(a,b,c,-x,-y,z)) + atan(g_3D(a,b,c,x,-y,-z)) + &
-                            atan(g_3D(a,b,c,-x,y,-z)) + atan(g_3D(a,b,c,-x,-y,-z)) )
+    N_out(2,2) = 1./(4.*pi) * ( atan(g_3D(a,b,c,x,y,z))   + atan(g_3D(a,b,c,-x,y,z))  + atan(g_3D(a,b,c,x,-y,z)) + &
+                                atan(g_3D(a,b,c,x,y,-z))  + atan(g_3D(a,b,c,-x,-y,z)) + atan(g_3D(a,b,c,x,-y,-z)) + &
+                                atan(g_3D(a,b,c,-x,y,-z)) + atan(g_3D(a,b,c,-x,-y,-z)) )
                             
                             
 
-N_out(3,3) = 1./(4.*pi) * ( atan(h_3D(a,b,c,x,y,z))   + atan(h_3D(a,b,c,-x,y,z))  + atan(h_3D(a,b,c,x,-y,z)) + &
-                            atan(h_3D(a,b,c,x,y,-z))  + atan(h_3D(a,b,c,-x,-y,z)) + atan(h_3D(a,b,c,x,-y,-z)) + &
-                            atan(h_3D(a,b,c,-x,y,-z)) + atan(h_3D(a,b,c,-x,-y,-z)) )                            
+    N_out(3,3) = 1./(4.*pi) * ( atan(h_3D(a,b,c,x,y,z))   + atan(h_3D(a,b,c,-x,y,z))  + atan(h_3D(a,b,c,x,-y,z)) + &
+                                atan(h_3D(a,b,c,x,y,-z))  + atan(h_3D(a,b,c,-x,-y,z)) + atan(h_3D(a,b,c,x,-y,-z)) + &
+                                atan(h_3D(a,b,c,-x,y,-z)) + atan(h_3D(a,b,c,-x,-y,-z)) )                            
                             
 
-!::Off-diagonal elements
-nom = FF_3D(a,b,c,x,y,z)  * FF_3D(-a,-b,c,x,y,z) * FF_3D(a,-b,-c,x,y,z) * FF_3D(-a,b,-c,x,y,z)
-denom = FF_3D(a,-b,c,x,y,z) * FF_3D(-a,b,c,x,y,z)  * FF_3D(a,b,-c,x,y,z)  * FF_3D(-a,-b,-c,x,y,z)
+    !::Off-diagonal elements
+    nom = FF_3D(a,b,c,x,y,z)  * FF_3D(-a,-b,c,x,y,z) * FF_3D(a,-b,-c,x,y,z) * FF_3D(-a,b,-c,x,y,z)
+    denom = FF_3D(a,-b,c,x,y,z) * FF_3D(-a,b,c,x,y,z)  * FF_3D(a,b,-c,x,y,z)  * FF_3D(-a,-b,-c,x,y,z)
 
-if ( denom .eq. 0 .or. nom .eq. 0 ) then
+    if ( denom .eq. 0 .or. nom .eq. 0 ) then
+        !Find the limit
+        lim = getF_limit(a,b,c,x,y,z,FF_3D)
+        N_out(1,2) = -1./(4.*pi) * log( lim )        
+    else
+        N_out(1,2) = -1./(4.*pi) * log( nom / denom )
+    endif
+
+
+
+    N_out(2,1) = N_out(1,2)
+
+    nom = GG_3D(a,b,c,x,y,z)  * GG_3D(-a,-b,c,x,y,z) * GG_3D(a,-b,-c,x,y,z) * GG_3D(-a,b,-c,x,y,z)
+    denom = GG_3D(a,-b,c,x,y,z) * GG_3D(-a,b,c,x,y,z)  * GG_3D(a,b,-c,x,y,z)  * GG_3D(-a,-b,-c,x,y,z)
+
+    if ( denom .eq. 0 .or. nom .eq. 0 ) then
     !Find the limit
-    lim = getF_limit(a,b,c,x,y,z,FF_3D)
-    N_out(1,2) = -1./(4.*pi) * log( lim )        
-else
-    N_out(1,2) = -1./(4.*pi) * log( nom / denom )
-endif
-
-
-
-N_out(2,1) = N_out(1,2)
-
-nom = GG_3D(a,b,c,x,y,z)  * GG_3D(-a,-b,c,x,y,z) * GG_3D(a,-b,-c,x,y,z) * GG_3D(-a,b,-c,x,y,z)
-denom = GG_3D(a,-b,c,x,y,z) * GG_3D(-a,b,c,x,y,z)  * GG_3D(a,b,-c,x,y,z)  * GG_3D(-a,-b,-c,x,y,z)
-
-if ( denom .eq. 0 .or. nom .eq. 0 ) then
-!Find the limit
       
-    lim = getF_limit(a,b,c,x,y,z,GG_3D)       
+        lim = getF_limit(a,b,c,x,y,z,GG_3D)       
     
-    N_out(2,3) = -1./(4.*pi) * log( lim )
-else
-    N_out(2,3) = -1./(4.*pi) * log( nom/denom )
+        N_out(2,3) = -1./(4.*pi) * log( lim )
+    else
+        N_out(2,3) = -1./(4.*pi) * log( nom/denom )
+    endif
+
+
+    N_out(3,2) = N_out(2,3)
+
+    nom = HH_3D(a,b,c,x,y,z)  * HH_3D(-a,-b,c,x,y,z) * HH_3D(a,-b,-c,x,y,z) * HH_3D(-a,b,-c,x,y,z)
+    denom = HH_3D(a,-b,c,x,y,z) * HH_3D(-a,b,c,x,y,z)  * HH_3D(a,b,-c,x,y,z)  * HH_3D(-a,-b,-c,x,y,z)
+
+    if ( denom .eq. 0 .or. nom .eq. 0 ) then
+    
+        lim = getF_limit(a,b,c,x,y,z,HH_3D)           
+    
+        N_out(1,3) = -1./(4.*pi) * log( lim )
+    else
+        N_out(1,3) = -1./(4.*pi) * log( nom / denom )
+    endif
+
+
+    N_out(3,1) = N_out(1,3)
 endif
 
+!--- The demagnetization factor of ellipsoids
+!--- At present only spheroids are implemented, i.e. 
+!--- ellipsoids where two of the semi-axis are equal
+!---
+!--- The general ellipsoid with a .neq. b .neq. c
+!--- can also be implemented, but involved computing
+!--- incomplete elliptical integrals
+if ( form .eq. formEllipse ) then
+    semi_axis(1:3) = (/ a, b, c /)
+    coor(1:3) = (/ x, y, z /)
 
-N_out(3,2) = N_out(2,3)
+    !--- Manual sort
+    !--- We can have the following cases:
+    !--- a = b > c  %Do nothing
+    !--- a = b < c  %Switch a and c
+    !--- a < b = c  %Switch a and c
+    !--- a > b = c  %Do nothing
+    !--- a > b < c  %Switch b and c
+    !--- a < b > c  %Switch b and a
 
-nom = HH_3D(a,b,c,x,y,z)  * HH_3D(-a,-b,c,x,y,z) * HH_3D(a,-b,-c,x,y,z) * HH_3D(-a,b,-c,x,y,z)
-denom = HH_3D(a,-b,c,x,y,z) * HH_3D(-a,b,c,x,y,z)  * HH_3D(a,b,-c,x,y,z)  * HH_3D(-a,-b,-c,x,y,z)
+    indx_semi(1:3) = (/ 1, 2, 3 /)
 
-if ( denom .eq. 0 .or. nom .eq. 0 ) then
+    !--- a = b < c  %Switch a and c
+    if ((a == b .AND. b < c) .OR. (a < b .AND. b == c)) then
+        indx_semi(1) = 3
+        indx_semi(3) = 1
+    end if
+
+    !--- a > b < c  %Switch b and c
+    if (a > b .AND. b < c) then
+        indx_semi(2) = 3
+        indx_semi(3) = 2
+    end if
+
+    !--- a < b > c  %Switch b and a
+    if (a < b .AND. b > c) then
+        indx_semi(1) = 2
+        indx_semi(2) = 1
+    end if
+
+    a_o = semi_axis(indx_semi(1))
+    b_o = semi_axis(indx_semi(2))
+    c_o = semi_axis(indx_semi(3))
     
-    lim = getF_limit(a,b,c,x,y,z,HH_3D)           
+    x_o = coor(indx_semi(1))
+    y_o = coor(indx_semi(2))
+    z_o = coor(indx_semi(3))
+
+    !--- Internal field
+    if (x == 0 .AND. y == 0 .AND. z == 0) then
+        !--- Oblate
+        if (a_o == b_o) then
+            alpha = c_o/a_o
+        
+            N_demag(3,3) = 1./(1.-alpha**2)*(1.-alpha/(sqrt(1.-alpha**2))*acos(alpha))
+            N_demag(1,1) = (1.-N_demag(3,3))/2.
+            N_demag(2,2) = N_demag(1,1)
+        end if
     
-    N_out(1,3) = -1./(4.*pi) * log( lim )
-else
-    N_out(1,3) = -1./(4.*pi) * log( nom / denom )
+        !--- Prolate
+        if (b_o == c_o) then
+            alpha = a_o/c_o;
+        
+            N_demag(1,1) = 1./(alpha**2-1.)*(alpha/(sqrt(alpha**2-1.))*acosh(alpha)-1)
+            N_demag(2,2) = (1.-N_demag(1,1))/2.
+            N_demag(3,3) = N_demag(2,2)
+        end if
+    
+        !--- Sphere
+        if (a_o == b_o .AND. b_o == c_o) then
+            N_demag(1,1) = 1./3.
+            N_demag(2,2) = 1./3.
+            N_demag(3,3) = 1./3.
+        end if
+    
+        N_demag(1,2) = 0
+        N_demag(1,3) = 0
+        N_demag(2,1) = 0
+        N_demag(2,3) = 0
+        N_demag(3,1) = 0
+        N_demag(3,2) = 0
+        
+    !--- External field    
+    else
+    
+        !--- Oblate
+        if (a_o == b_o) then
+            f   = sqrt(a_o**2-c_o**2);
+            A_c = sqrt((x_o**2+y_o**2+z_o**2-f**2)**2+4*z_o**2*f**2);
+            w   = sqrt(1./(2*f**2)*(x_o**2+y_o**2+z_o**2+f**2+A_c));
+
+            N_demag(1,1:3) = (/ -(1./2*(asin(1./w)-sqrt(w**2-1)/w**2)-x_o**2*sqrt(w**2-1)/(w**4*A_c)) , x_o*y_o*sqrt(w**2-1)/(w**4*A_c) , z_o*x_o/(w**2*sqrt(w**2-1)*A_c) /);
+            N_demag(2,1:3) = (/ x_o*y_o*sqrt(w**2-1)/(w**4*A_c) , -(1./2*(asin(1./w)-sqrt(w**2-1)/w**2)-y_o**2*sqrt(w**2-1)/(w**4*A_c)) , z_o*y_o/(w**2*sqrt(w**2-1)*A_c) /);
+            N_demag(3,1:3) = (/ x_o*z_o/(w**2*sqrt(w**2-1)*A_c) , y_o*z_o/(w**2*sqrt(w**2-1)*A_c) , -(1./sqrt(w**2-1)-asin(1./w)-z_o**2./((w**2-1)**(3./2.)*A_c)) /);
+            N_demag = N_demag*c_o*a_o**2*f**(-3) 
+        end if
+
+        !--- Prolate
+        if (b_o == c_o) then
+            f   = sqrt(a_o**2-c_o**2);
+            A_c = sqrt((x_o**2+y_o**2+z_o**2+f**2)**2-4*x_o**2*f**2);
+            w   = sqrt(1./(2*f**2)*(x_o**2+y_o**2+z_o**2+f**2+A_c));
+
+            N_demag(1,1:3) = (/ -(1./2*log((w+1)/(w-1))-1./w-x_o**2./(w**3*A_c)) , y_o*x_o/(w*(w**2-1)*A_c) , z_o*x_o/(w*(w**2-1)*A_c) /)
+            N_demag(2,1:3) = (/x_o*y_o/(w*(w**2-1)*A_c) , -(1./2*(w/(w**2-1)+1./2*log((w-1)/(w+1)))-y_o**2*w/((w**2-1)**2*A_c)) , z_o*y_o*w/((w**2-1)**2*A_c) /)
+            N_demag(3,1:3) = (/x_o*z_o/(w*(w**2-1)*A_c) , z_o*y_o*w/((w**2-1)**2*A_c) , -(1./2*(w/(w**2-1)+1./2*log((w-1)/(w+1)))-z_o**2*w/((w**2-1)**2*A_c)) /)
+            N_demag = N_demag*a_o*c_o**2*f**(-3)
+        end if
+    
+        !--- Sphere
+        if (a_o == b_o .AND. b_o == c_o) then
+            N_demag(1,1:3) = (/ x_o**2-sqrt(x_o**2+y_o**2+z_o**2)**2/3., x_o*y_o, x_o*z_o /)
+            N_demag(2,1:3) = (/ x_o*y_o, y_o**2-sqrt(x_o**2+y_o**2+z_o**2)**2/3., y_o*z_o /)
+            N_demag(3,1:3) = (/ x_o*z_o, y_o*z_o, z_o**2-sqrt(x_o**2+y_o**2+z_o**2)**2/3. /)
+            N_demag = 3./(4.*pi*sqrt(x_o**2+y_o**2+z_o**2)**5)*N_demag
+            N_demag = 4./3.*pi*a**3*N_demag;
+        end if
+    
+        N_demag = -N_demag
+    end if
+
+    !--- Reorder N based on indx_semi
+    !--- Switch rows and columns
+    N_temp = N_demag
+    N_demag(1:3,1) = N_temp(1:3,indx_semi(1));
+    N_demag(1:3,2) = N_temp(1:3,indx_semi(2));
+    N_demag(1:3,3) = N_temp(1:3,indx_semi(3));
+    N_temp = N_demag;
+    N_demag(1,1:3) = N_temp(indx_semi(1),1:3);
+    N_demag(2,1:3) = N_temp(indx_semi(2),1:3);
+    N_demag(3,1:3) = N_temp(indx_semi(3),1:3);
+    
+    N_out = N_demag    
 endif
 
-
-
-N_out(3,1) = N_out(1,3)
-
-
-!call writeDebugStringArr2D( 'Nout ', N_out)
+!open(11,file='debug.txt',status='unknown',access='sequential',form='formatted',position='append',action='write')
+!write(11,*) "N_out"
+!write(11,*) N_out
+!write(11,*) a
+!write(11,*) b
+!write(11,*) c
+!write(11,*) x
+!write(11,*) y
+!write(11,*) z
+!close(11)
+    
+!call writeDebugStringArrD2( 'N_out ', N_out)
 
 end subroutine getN_3D
 
