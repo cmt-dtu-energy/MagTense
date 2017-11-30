@@ -1,5 +1,9 @@
 #include "fintrf.h"  
-    
+    !::
+    !::Four inputs are required: 
+    !::prhs(1) is the k parameter (with the relationship m=k^2 and Matlab conventionally uses the m-parameter while Maple uses the k-parameter)
+    !::prhs(2) the phi parameter (in radians)
+    !::prhs(3) the n parameter (used only by the incomplete elliptical integral of the third kind
       subroutine mexFunction(nlhs, plhs, nrhs, prhs)
       use SPECIALFUNCTIONS
 
@@ -34,13 +38,13 @@
       
       real*8,dimension(:),allocatable :: HK,phi,C
       real*8,dimension(:),allocatable :: fe,ee,el3
-      integer*4 :: i
-      real*8,parameter :: pi=3.141592654
+      integer*4 :: i,n_ele
+      real*8,parameter :: pi=3.141592653589793
       
 !     Check for proper number of arguments. 
       if( nrhs .ne. 4) then
          call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput',
-     +                           'three inputs are required.')
+     +                           'four inputs are required.')
       elseif(nlhs .gt. 3) then
          call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nOutput',
      +                           'Too many output arguments.')
@@ -58,19 +62,21 @@
       endif                  
       
       !::Copy the input parameters
-      call mxCopyPtrToInteger4(mxGetPr(prhs(4)), sx,1)
-      allocate(HK(sx),phi(sx),C(sx),fe(sx),ee(sx),el3(sx))
-      !sx = 1
+      call mxCopyPtrToInteger4(mxGetPr(prhs(4)), n_ele,1)
+          allocate(HK(n_ele),phi(n_ele),C(n_ele),fe(n_ele),ee(n_ele),el3(n_ele))
+      sx = n_ele
       call mxCopyPtrToReal8(mxGetPr(prhs(1)), HK, sx )
       call mxCopyPtrToReal8(mxGetPr(prhs(2)), phi, sx )
       call mxCopyPtrToReal8(mxGetPr(prhs(3)), C, sx )
       
-      !::convert from radians to degrees
-      phi = 180 / pi * phi
+      
       !::calculate the elliptical integrals
       do i=1,sx
-          call elit ( HK(i), phi(i), fe(i), ee(i) )
-          call elit3 ( phi(i), HK(i), C(i), el3(i) )
+          !call elit ( HK(i), phi(i), fe(i), ee(i) )
+          !call elit3 ( phi(i), HK(i), C(i), el3(i) )
+          fe(i) = ellf( phi(i), HK(i) )
+          ee(i) = elle( phi(i), HK(i) )
+          el3(i) = ellpi( phi(i), C(i), HK(i) )
       enddo
       
      
