@@ -59,13 +59,13 @@
       
 	  
 	  !-----------------------------------------------------------------------	  	       
-	     open(11,file='version_magStatMEX_getSolution.txt',
-     +   status='unknown',access='sequential',form='formatted',
-     +                       position='rewind',action='write')     
-	  write(11,*) "magStatMEX_getSolution compiled on:"
-      write(11,*) __DATE__
-      write(11,*) __TIME__
-      close (11)
+	  !   open(11,file='version_magStatMEX_getSolution.txt',
+   !  +   status='unknown',access='sequential',form='formatted',
+   !  +                       position='rewind',action='write')     
+	  !write(11,*) "magStatMEX_getSolution compiled on:"
+   !   write(11,*) __DATE__
+   !   write(11,*) __TIME__
+   !   close (11)
       !-----------------------------------------------------------------------
       
       !-----------------------------------------------------------------------

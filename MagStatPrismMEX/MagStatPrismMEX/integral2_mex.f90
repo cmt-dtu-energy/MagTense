@@ -440,18 +440,24 @@
       integer*8,dimension(3) :: retV
       integer*4 :: i,j,ind,n
       
-	  maxerr_tot = 0
-	  !-----------------------------------------------------------------------	  	       
-	     open(11,file='version_integral2_mex.txt',
-     +   status='unknown',access='sequential',form='formatted',
-     +                       position='rewind',action='write')     
-	  write(11,*) "integral2_mex compiled on:"
-      write(11,*) __DATE__
-      write(11,*) __TIME__
-      close(11)
-      !-----------------------------------------------------------------------
+      integer*4 mexCallMATLAB
+      integer*4 nlhs_cb, nrhs_cb
+      mwPointer plhs_cb(1), prhs_cb(1),mxCreateString
+      character*(4) functionName_cb
+      integer*4 :: tmp
       
-      !-----------------------------------------------------------------------
+      functionName_cb = "disp"
+      nlhs_cb = 0
+      nrhs_cb = 1
+      
+      prhs_cb(1) = mxCreateString("test trold")
+      
+      tmp = mexCallMATLAB(nlhs_cb, plhs_cb, nrhs_cb, prhs_cb, "disp")
+      
+      !call mxCopyPtrToCharacter( mxGetPr(prhs_cb(1)), returnval, 10 )
+      
+	  maxerr_tot = 0
+	 
       
 !      open(11,file='pts_cone.txt',
 !     +   status='unknown',access='sequential',form='formatted',
