@@ -163,6 +163,7 @@
         class( dataCollectionBase ), intent(in), target :: dat
         real*8,dimension(3),intent(inout) :: B
         real*8,intent(inout) :: jacobi
+        real*8,dimension(3) :: Hext
         
         if ( dat%coord_sys .eq.  coord_sys_carth ) then
             call getB_field_carth( dat, B )
@@ -178,10 +179,11 @@
         !::Get the field from the model solution in carthesian coordinates
         subroutine getB_field_carth( dat, B )
         class( dataCollectionBase ), intent(in), target :: dat
+        integer*4,dimension(1) :: formType
         real*8,dimension(3),intent(inout) :: B
         
         class( magStatModel ), pointer :: model
-        real*8,dimension(3) :: Hsol, solPts
+        real*8,dimension(3) :: Hsol, solPts,hext
         integer*8,dimension(3) :: inds
         
         !::Make the down cast to get the actual data model set
@@ -212,10 +214,11 @@
         solPts(inds(1)) = dat%x
         solPts(inds(2)) = dat%y
         solPts(inds(3)) = dat%z0;
-    
+        formType(1) = 0
+        Hext(:) = 0.
         call getSolution( solPts, 1, model%M, model%dims, model%pos, 
-     +                    model%n, model%spacedim, Hsol, 
-     +                    model%rotMat, model%rotMatInv )
+     +                    model%n, model%spacedim, Hsol, Hext,
+     +                    model%rotMat, model%rotMatInv, formType )
 	
         B = mu0 * Hsol
         end subroutine getB_field_carth
@@ -228,7 +231,8 @@
         real*8,dimension(3),intent(inout) :: B
         real*8,intent(inout) :: jacobi
         
-        real*8,dimension(3) :: Hsol, solPts, B_carth
+        real*8,dimension(3) :: Hsol, solPts, B_carth,Hext
+        integer*4,dimension(1) :: formtype(1)
         real*8 :: x,y,z,r,theta,normMult
         
         !::Make the down cast to get the actual data model set
@@ -270,12 +274,16 @@
         
         !::Reset the solution array
         Hsol(:) = 0
+        Hext(:) = 0
+        formtype(1) = 0
         
         solPts(1) = x
         solPts(2) = y
         solPts(3) = z
+        
         !write(11,*) x,y,z
-        call getSolution( solPts, 1, model%M, model%dims, model%pos, model%n, model%spacedim, Hsol, model%rotMat, model%rotMatInv )
+        call getSolution( solPts, 1, model%M, model%dims, model%pos, model%n, model%spacedim, Hsol, Hext,
+     +                          model%rotMat, model%rotMatInv, formType )
 	
         B = mu0 * Hsol
        
@@ -288,8 +296,8 @@
         class( magStatModel ), pointer :: model
         real*8,dimension(3),intent(inout) :: B
         real*8,intent(inout) :: jacobi
-        
-        real*8,dimension(3) :: Hsol, solPts, B_carth
+        integer*4,dimension(1) :: formType
+        real*8,dimension(3) :: Hsol, solPts, B_carth,Hext
         real*8 :: x,y,z,r,theta,normMult
         
         !::Make the down cast to get the actual data model set
@@ -331,6 +339,8 @@
         
         !::Reset the solution array
         Hsol(:) = 0
+        Hext(:) = 0
+        formType(1) = 0
         
         solPts(1) = x
         solPts(2) = y
@@ -338,8 +348,8 @@
     
         
         call getSolution( solPts, 1, model%M, model%dims, model%pos, 
-     +                    model%n, model%spacedim, Hsol, 
-     +                    model%rotMat, model%rotMatInv )
+     +                    model%n, model%spacedim, Hsol, Hext, 
+     +                    model%rotMat, model%rotMatInv, formType )
 	
         B = mu0 * Hsol
      
