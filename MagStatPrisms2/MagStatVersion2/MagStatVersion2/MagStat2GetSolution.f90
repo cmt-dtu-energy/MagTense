@@ -47,11 +47,12 @@ module MagStat2GetSolution
     !::
     !::Specific implementation for a single cylindrical tile
     !::
-    subroutine getFieldFromCylTile( cylTile, H, pts, n_ele )
+    subroutine getFieldFromCylTile( cylTile, H, pts, n_ele, N_out )
     type(MagTile), intent(inout) :: cylTile
     real,dimension(n_ele,3),intent(inout) :: H
     real,dimension(n_ele,3) :: pts
     integer,intent(in) :: n_ele
+    real,dimension(3,3,n_ele),intent(inout),optional :: N_out
     real,dimension(:),allocatable :: r,x,phi
     real :: phi_orig,z_orig
     real,dimension(3) :: M_orig,M_tmp
@@ -83,6 +84,7 @@ module MagStat2GetSolution
           !Offset the z-coordinate
           cylTile%z0 = z_orig - pts(i,3)
           call getN( cylTile, r(i), N )
+          if ( present(N_out) .eq. .true. ) N_out(:,:,i) = N
           !Get the rotation vector
           call getRotZ( -phi(i), Rz )
           !Rotate the magnetization vector

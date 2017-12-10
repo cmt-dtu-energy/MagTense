@@ -3,9 +3,10 @@
 
     
     !::
-    !::prhs(1) is a struct containing the tile information
+    !::prhs(1) is a struct array of size n_tiles containing the tile information
     !::prhs(2) is an [n,3] array containing the pts at which the solution is required
-    !::prhs(3) is an integer representing the number of points, n
+    !::prhs(3) is an integer representing the number of tiles, n_tiles
+    !::prhs(4) is an integer representing the number of points, n
     !::plhs(1) is a [n,3] double matrix containing the output magnetic field
       subroutine mexFunction(nlhs, plhs, nrhs, prhs)
       use MagStat2GetSolution
