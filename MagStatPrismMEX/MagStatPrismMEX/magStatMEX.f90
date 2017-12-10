@@ -182,6 +182,9 @@
       call mxCopyPtrToInteger4(mxGetPr(prhs(12)), ll, 1)
       call mxCopyPtrToInteger4(mxGetPr(prhs(7)), nn, 1)
       call mxCopyPtrToInteger4(mxGetPr(prhs(10)), mm, 1)
+      call mxCopyPtrToInteger4(mxGetPr(prhs(12)), ll, 1)
+      call mxCopyPtrToInteger4(mxGetPr(prhs(7)), nn, 1)
+      call mxCopyPtrToInteger4(mxGetPr(prhs(10)), mm, 1)
 
       allocate(pos(nn,3),solPts(ll,3))
       allocate(dims(nn,3),dir(nn,3),magType(nn),formType(nn))
