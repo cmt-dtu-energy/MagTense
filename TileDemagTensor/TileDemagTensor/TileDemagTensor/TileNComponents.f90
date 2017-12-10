@@ -4,16 +4,18 @@ module TileNComponents
     implicit none
     
     
-    type CylPiece
-        real :: r0, theta0, z0, dr, dtheta, dz    
+    type MagTile
+        real :: r0, theta0, z0, dr, dtheta, dz,Mrem
         real,dimension(3) :: M
-    end type CylPiece
+        real,dimension(3) :: u_ea,u_oa1,u_oa2    
+        real :: mu_r_ea,mu_r_oa
+    end type MagTile
     
     real,parameter :: pi=3.141592653589793
     
     contains
     subroutine  getN( cylP, x, N )
-    type(CylPiece),intent(in) :: cylP
+    type(MagTile),intent(in) :: cylP
     real,intent(in) :: x
     class( dataCollectionBase ), pointer :: dat
     real :: theta1, theta2
@@ -103,7 +105,7 @@ module TileNComponents
             - int_sin_dDdy_dz_dtheta1 - int_cos_dDdx_dz_dtheta1 &
             + cos(theta2) * int_dDdy_dr_dz2 - sin(theta2) * int_dDdx_dr_dz2 &
             -(cos(theta1) * int_dDdy_dr_dz1 - sin(theta1) * int_dDdx_dr_dz1)
-
+    deallocate(dat)
     end subroutine getN
 
         !Note on the definitions of elliptic integrals in Matlab and in Maple
