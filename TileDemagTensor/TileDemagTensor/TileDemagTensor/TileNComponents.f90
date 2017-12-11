@@ -541,8 +541,14 @@ module TileNComponents
         function int_dDdy_dr_dz_fct( r, z, thetas, x )
         real :: int_dDdy_dr_dz_fct
         real,intent(in) :: r,z,thetas,x
-            int_dDdy_dr_dz_fct = -sin(thetas) * ( r*x*cos(thetas) - x**2 - z**2 ) / ( L( x, thetas, z) * M( r, x, thetas, z ) )
-            return
+            !::necessary to enforce the integrand to be zero when theta is small since there is a discontinuity (zero over zero problem)
+            !::
+            if ( abs(sin(thetas)) .lt. 1e-15 ) then
+                int_dDdy_dr_dz_fct = 0.0
+           else            
+                int_dDdy_dr_dz_fct = -sin(thetas) * ( r*x*cos(thetas) - x**2 - z**2 ) / ( L( x, thetas, z) * M( r, x, thetas, z ) )
+           endif           
+           return
         end function
          
         !!Returns the definite integral of int( int( dDdz * r * dr * dtheta ) )

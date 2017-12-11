@@ -23,25 +23,27 @@ module MagStat2GetSolution
     
     integer :: i
     real,dimension(:,:),allocatable :: H_tmp
+    real,dimension(:,:,:),allocatable :: N_out
     
     
-    allocate(H_tmp(n_ele,3))
+    allocate(H_tmp(n_ele,3),N_out(3,3,n_ele))
     H(:,:) = 0.
+    N_out(:,:,:) = 0.
     
-    !$OMP PARALLEL DO PRIVATE(i,H_tmp)
+    !$OMP PARALLEL DO PRIVATE(i,H_tmp,N_out)
     do i=1,n_tiles
         H_tmp(:,:) = 0.
         
         !::Here a selection of which subroutine to use should be done, i.e. whether the tile
         !:: is cylindrical, a prism or an ellipsoid
-        call getFieldFromCylTile( tiles(i), H_tmp, pts, n_ele )
+        call getFieldFromCylTile( tiles(i), H_tmp, pts, n_ele, N_out )
         !$OMP CRITICAL
         H = H + H_tmp
         !$OMP END CRITICAL
     enddo
     !$OMP END PARALLEL DO
     
-    deallocate(H_tmp)
+    deallocate(H_tmp,N_out)
     end subroutine getFieldFromTiles
     
     !::
@@ -52,7 +54,7 @@ module MagStat2GetSolution
     real,dimension(n_ele,3),intent(inout) :: H
     real,dimension(n_ele,3) :: pts
     integer,intent(in) :: n_ele
-    real,dimension(3,3,n_ele),intent(inout),optional :: N_out
+    real,dimension(3,3,n_ele),intent(inout) :: N_out
     real,dimension(:),allocatable :: r,x,phi
     real :: phi_orig,z_orig
     real,dimension(3) :: M_orig,M_tmp
@@ -84,7 +86,7 @@ module MagStat2GetSolution
           !Offset the z-coordinate
           cylTile%z0 = z_orig - pts(i,3)
           call getN( cylTile, r(i), N )
-          if ( present(N_out) .eq. .true. ) N_out(:,:,i) = N
+          N_out(:,:,i) = N
           !Get the rotation vector
           call getRotZ( -phi(i), Rz )
           !Rotate the magnetization vector
