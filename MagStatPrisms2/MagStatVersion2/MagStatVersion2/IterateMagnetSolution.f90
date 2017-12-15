@@ -1,6 +1,6 @@
 module IterateMagnetSolution
 use MagStat2GetSolution
-    
+
     implicit none
     
     
@@ -92,18 +92,24 @@ subroutine iterateMagnetization( tiles, n, err_max )
         H(:,:) = 0
         
         do i=1,n
-           !find the contribution to the internal field of the i'th tile from all tiles
-           !this should later be vectorized and moved to fortran for
-           !performance issues           
-           pts(1) = cos(tiles(i)%theta0) * tiles(i)%r0
-           pts(2) = sin(tiles(i)%theta0) * tiles(i)%r0
-           pts(3) = tiles(i)%z0
+            select case (tiles(i)%tileType )
+            case (tileTypeCylPiece)
+                !find the contribution to the internal field of the i'th tile from all tiles           
+                pts(1) = cos(tiles(i)%theta0) * tiles(i)%r0
+                pts(2) = sin(tiles(i)%theta0) * tiles(i)%r0
+                pts(3) = tiles(i)%z0
+            case(tileTypePrism)
+                pts = tiles(i)%offset
+            case default
+                
+            end select
+            
            
-          !::Get the field in the i'th tile from all tiles           
-          call getFieldFromTiles( tiles, H(i,:), pts, n, 1 )           
+           !::Get the field in the i'th tile from all tiles           
+           call getFieldFromTiles( tiles, H(i,:), pts, n, 1 )           
            
-           !subtract the magnetization of the i'th tile to get H
-           H(i,:) = H(i,:) - tiles(i)%M
+            !subtract the magnetization of the i'th tile to get H
+            H(i,:) = H(i,:) - tiles(i)%M
         enddo
         
         cnt = cnt + 1

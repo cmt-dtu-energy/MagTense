@@ -18,7 +18,7 @@
 !     Function declarations:
       mwPointer mxGetPr
       mwPointer mxCreateDoubleMatrix
-      mwPointer mxCreateNumericArray
+      mwPointer mxCreateNumericArray,mxCreateNumericMatrix
       integer*4 mxIsNumeric
       integer*4 mxIsDouble
       integer*4 mxIsInt32
@@ -39,14 +39,16 @@
       mwPointer :: stPr      
       type(MagTile),allocatable,dimension(:) :: cylTile
       mwPointer :: r0Ptr,theta0Ptr,z0Ptr,drPtr,dthetaPtr,dzPtr,MPtr,u_eaPtr,u_oa1Ptr,u_oa2Ptr,mur_eaPtr,mur_oaPtr,MremPtr
+      mwPointer :: tileTypePtr,offsetPtr,rotAnglesPtr,rectDimsPtr
       mwPointer,dimension(:,:),allocatable :: pvalue
+      real*8,dimension(3) :: rectDims
       integer*4 :: n_tiles
       mwSize,dimension(2) :: dims
       mwSize :: s1,s2
       mwIndex :: i
       real*8 :: err_max
       
-      integer*4,parameter :: nfields=13
+      integer*4,parameter :: nfields=17
       character(len=10),dimension(nfields) :: fieldnames
       
 !     Check for proper number of arguments. 
@@ -81,6 +83,10 @@
       fieldnames(11) = 'mu_r_ea'
       fieldnames(12) = 'mu_r_oa'
       fieldnames(13) = 'Mrem'
+      fieldnames(14) = 'tileType'
+      fieldnames(15) = 'offset'
+      fieldnames(16) = 'rotAngles'
+      fieldnames(17) = 'abc'
       
       !::Copy the number of tiles
       call mxCopyPtrToInteger4(mxGetPr(prhs(2)), n_tiles,1)
@@ -106,6 +112,10 @@
           mur_eaPtr = mxGetField(prhs(1),i,fieldnames(11))
           mur_oaPtr = mxGetField(prhs(1),i,fieldnames(12))
           MremPtr = mxGetField(prhs(1),i,fieldnames(13))
+          tileTypePtr = mxGetField(prhs(1),i,fieldnames(14))
+          offsetPtr = mxGetField(prhs(1),i,fieldnames(15))
+          rotAnglesPtr = mxGetField(prhs(1),i,fieldnames(16))
+          rectDimsPtr =  mxGetField(prhs(1),sx,fieldnames(17))
       
           call mxCopyPtrToReal8(mxGetPr(r0Ptr), cylTile(i)%r0, 1 )
           call mxCopyPtrToReal8(mxGetPr(theta0Ptr), cylTile(i)%theta0, 1 )
@@ -120,6 +130,13 @@
           call mxCopyPtrToReal8(mxGetPr(mur_eaPtr), cylTile(i)%mu_r_ea, 1 )
           call mxCopyPtrToReal8(mxGetPr(mur_oaPtr), cylTile(i)%mu_r_oa, 1 )
           call mxCopyPtrToReal8(mxGetPr(MremPtr), cylTile(i)%Mrem, 1 )
+          call mxCopyPtrToInteger4(mxGetPr(tileTypePtr), cylTile(i)%tileType, 1 )
+          call mxCopyPtrToReal8(mxGetPr(offsetPtr), cylTile(i)%offset, 3 )
+          call mxCopyPtrToReal8(mxGetPr(rotAnglesPtr), cylTile(i)%rotAngles, 3 )
+          call mxCopyPtrToReal8(mxGetPr(rectDimsPtr), rectDims, 3 )
+          cylTile(i)%a = rectDims(1)
+          cylTile(i)%b = rectDims(2)
+          cylTile(i)%c = rectDims(3)
       enddo
       
       !::do the calculation
@@ -195,6 +212,27 @@
           pvalue(i,13) = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
           call mxCopyReal8ToPtr( cylTile(i)%Mrem, mxGetPr( pvalue(i,13) ), 1 )
           call mxSetField( plhs(1), i, fieldnames(13), pvalue(i,13) )
+          
+          classid = mxClassIDFromClassName('int32')
+          pvalue(i,14) = mxCreateNumericMatrix(s1,s2,classid,ComplexFlag)
+          call mxCopyInteger4ToPtr( cylTile(i)%tileType, mxGetPr( pvalue(i,14) ), 1 )
+          call mxSetField( plhs(1), i, fieldnames(14), pvalue(i,14) )
+          
+          s2 = 3
+          pvalue(i,15) = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
+          call mxCopyReal8ToPtr( cylTile(i)%offset, mxGetPr( pvalue(i,15) ), 3 )
+          call mxSetField( plhs(1), i, fieldnames(15), pvalue(i,15) )
+          
+          pvalue(i,16) = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
+          call mxCopyReal8ToPtr( cylTile(i)%offset, mxGetPr( pvalue(i,16) ), 3 )
+          call mxSetField( plhs(1), i, fieldnames(16), pvalue(i,16) )
+          
+          pvalue(i,17) = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
+          rectDims(1) = cylTile(i)%a
+          rectDims(2) = cylTile(i)%b
+          rectDims(3) = cylTile(i)%c
+          call mxCopyReal8ToPtr( rectDims, mxGetPr( pvalue(i,17) ), 3 )
+          call mxSetField( plhs(1), i, fieldnames(17), pvalue(i,17) )
           
       enddo
       
