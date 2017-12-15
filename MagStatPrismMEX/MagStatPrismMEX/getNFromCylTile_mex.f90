@@ -39,8 +39,10 @@
       mwPointer :: stPr
       real*8,dimension(:,:),allocatable :: pts,H
       real*8,dimension(:,:,:),allocatable :: N
+      real*8,dimension(3) :: rectDims
       type(MagTile):: cylTile
       mwPointer :: r0Ptr,theta0Ptr,z0Ptr,drPtr,dthetaPtr,dzPtr,MPtr,u_eaPtr,u_oa1Ptr,u_oa2Ptr,mur_eaPtr,mur_oaPtr,MremPtr
+      mwPointer :: tileTypePtr,offsetPtr,rotAnglesPtr,rectDimsPtr
       integer*4 :: n_ele
       mwSize,dimension(3) :: dims
       mwIndex :: i
@@ -79,6 +81,10 @@
         mur_eaPtr = mxGetField(prhs(1),sx,'mu_r_ea')
         mur_oaPtr = mxGetField(prhs(1),sx,'mu_r_oa')
         MremPtr = mxGetField(prhs(1),sx,'Mrem')
+        tileTypePtr = mxGetField(prhs(1),sx,'tileType')
+        offsetPtr = mxGetField(prhs(1),sx,'offset')
+        rotAnglesPtr = mxGetField(prhs(1),sx,'rotAngles')
+        rectDimsPtr =  mxGetField(prhs(1),sx,'abc')
       
         call mxCopyPtrToReal8(mxGetPr(r0Ptr), cylTile%r0, 1 )
         call mxCopyPtrToReal8(mxGetPr(theta0Ptr), cylTile%theta0, 1 )
@@ -93,7 +99,13 @@
         call mxCopyPtrToReal8(mxGetPr(mur_eaPtr), cylTile%mu_r_ea, 1 )
         call mxCopyPtrToReal8(mxGetPr(mur_oaPtr), cylTile%mu_r_oa, 1 )
         call mxCopyPtrToReal8(mxGetPr(MremPtr), cylTile%Mrem, 1 )
-      
+        call mxCopyPtrToInteger4(mxGetPr(tileTypePtr), cylTile%tileType, 1 )
+        call mxCopyPtrToReal8(mxGetPr(offsetPtr), cylTile%offset, 3 )
+        call mxCopyPtrToReal8(mxGetPr(rotAnglesPtr), cylTile%rotAngles, 3 )
+        call mxCopyPtrToReal8(mxGetPr(rectDimsPtr), rectDims, 3 )
+        cylTile%a = rectDims(1)
+        cylTile%b = rectDims(2)
+        cylTile%c = rectDims(3)
       
       !::copy the number of points where the tensor field is required
       call mxCopyPtrToInteger4(mxGetPr(prhs(3)), n_ele,1)

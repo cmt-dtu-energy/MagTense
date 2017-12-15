@@ -399,7 +399,7 @@ do i=1,n
     do j=1,n        
 
         !::Compute the dot product between N and M
-        !call getDotProd( N_out(i,j,:,:), M(j,:), dotProd )
+        call getDotProd( N_out(i,j,:,:), matmul( rotMat(j,:,:), M(j,:) ), dotProd )
         
         !::Rotate the solution back.
         dotProd = matmul( rotMatInv(j,:,:), dotProd )        

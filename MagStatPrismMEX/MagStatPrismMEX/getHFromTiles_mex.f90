@@ -39,8 +39,10 @@
 !     Pointers to input/output mxArrays:
       mwPointer :: stPr
       real*8,dimension(:,:),allocatable :: pts,H      
+      real*8,dimension(3) :: rectDims
       type(MagTile),allocatable,dimension(:) :: cylTile
       mwPointer :: r0Ptr,theta0Ptr,z0Ptr,drPtr,dthetaPtr,dzPtr,MPtr,u_eaPtr,u_oa1Ptr,u_oa2Ptr,mur_eaPtr,mur_oaPtr,MremPtr
+      mwPointer :: tileTypePtr,offsetPtr,rotAnglesPtr,rectDimsPtr
       integer*4 :: n_ele,n_tiles
       mwSize,dimension(3) :: dims
       mwIndex :: i
@@ -86,6 +88,10 @@
           mur_eaPtr = mxGetField(prhs(1),i,'mu_r_ea')
           mur_oaPtr = mxGetField(prhs(1),i,'mu_r_oa')
           MremPtr = mxGetField(prhs(1),i,'Mrem')
+          tileTypePtr = mxGetField(prhs(1),i,'tileType')
+          offsetPtr = mxGetField(prhs(1),i,'offset')
+          rotAnglesPtr = mxGetField(prhs(1),i,'rotAngles')
+          rectDimsPtr =  mxGetField(prhs(1),sx,'abc')
       
           call mxCopyPtrToReal8(mxGetPr(r0Ptr), cylTile(i)%r0, 1 )
           call mxCopyPtrToReal8(mxGetPr(theta0Ptr), cylTile(i)%theta0, 1 )
@@ -100,6 +106,13 @@
           call mxCopyPtrToReal8(mxGetPr(mur_eaPtr), cylTile(i)%mu_r_ea, 1 )
           call mxCopyPtrToReal8(mxGetPr(mur_oaPtr), cylTile(i)%mu_r_oa, 1 )
           call mxCopyPtrToReal8(mxGetPr(MremPtr), cylTile(i)%Mrem, 1 )
+          call mxCopyPtrToInteger4(mxGetPr(tileTypePtr), cylTile(i)%tileType, 1 )
+          call mxCopyPtrToReal8(mxGetPr(offsetPtr), cylTile(i)%offset, 3 )
+          call mxCopyPtrToReal8(mxGetPr(rotAnglesPtr), cylTile(i)%rotAngles, 3 )
+          call mxCopyPtrToReal8(mxGetPr(rectDimsPtr), rectDims, 3 )
+          cylTile(i)%a = rectDims(1)
+          cylTile(i)%b = rectDims(2)
+          cylTile(i)%c = rectDims(3)
       enddo
       
       
