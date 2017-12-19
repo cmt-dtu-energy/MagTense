@@ -1,5 +1,7 @@
-module IterateMagnetSolution
-use MagStat2GetSolution
+
+    module IterateMagnetSolution
+
+    use MagStat2GetSolution
 
     implicit none
     
@@ -20,7 +22,7 @@ subroutine iterateMagnetization( tiles, n, err_max )
     integer,intent(in) :: n    
     real,optional :: err_max
     
-    integer,parameter :: cnt_max = 30
+    integer,parameter :: cnt_max = 30    
         
     logical :: done
     integer :: i,j,cnt,i_err
