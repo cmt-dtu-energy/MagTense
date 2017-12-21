@@ -2,6 +2,7 @@
 module MagTileIO
 
 use TileNComponents
+use MagStatParameters
 implicit none
     
     contains
@@ -20,10 +21,10 @@ implicit none
     integer :: nfields
     real*8,dimension(3) :: rectDims
     mwPointer :: r0Ptr,theta0Ptr,z0Ptr,drPtr,dthetaPtr,dzPtr,MPtr,u_eaPtr,u_oa1Ptr,u_oa2Ptr,mur_eaPtr,mur_oaPtr,MremPtr
-    mwPointer :: tileTypePtr,offsetPtr,rotAnglesPtr,rectDimsPtr
+    mwPointer :: tileTypePtr,offsetPtr,rotAnglesPtr,rectDimsPtr,magnetTypePtr,stateFunctionIndexPtr
     mwPointer :: mxGetField, mxGetPr
     
-        call getFieldnames( fieldnames, nfields )
+        call getTileFieldnames( fieldnames, nfields )
         do i=1,n_tiles
             r0Ptr = mxGetField(prhs,i,fieldnames(1))
             theta0Ptr = mxGetField(prhs,i,fieldnames(2))
@@ -42,6 +43,8 @@ implicit none
             offsetPtr = mxGetField(prhs,i,fieldnames(15))
             rotAnglesPtr = mxGetField(prhs,i,fieldnames(16))
             rectDimsPtr =  mxGetField(prhs,i,fieldnames(17))
+            magnetTypePtr =  mxGetField(prhs,i,fieldnames(18))
+            stateFunctionIndexPtr =  mxGetField(prhs,i,fieldnames(19))
       
             sx = 1
             call mxCopyPtrToReal8(mxGetPr(r0Ptr), cylTile(i)%r0, sx )
@@ -67,6 +70,9 @@ implicit none
             cylTile(i)%a = rectDims(1)
             cylTile(i)%b = rectDims(2)
             cylTile(i)%c = rectDims(3)
+            sx = 1
+            call mxCopyPtrToInteger4(mxGetPr(magnetTypePtr), cylTile(i)%magnetType, sx )            
+            call mxCopyPtrToInteger4(mxGetPr(stateFunctionIndexPtr), cylTile(i)%stateFunctionIndex, sx )
         enddo        
         deallocate(fieldnames)
     end subroutine loadMagTile
@@ -92,7 +98,7 @@ implicit none
     
     
     
-      call getFieldnames( fieldnames, nfields )
+      call getTileFieldnames( fieldnames, nfields )
     
       !::Load the result back to Matlab      
       ComplexFlag = 0
@@ -179,7 +185,7 @@ implicit none
           call mxSetField( plhs, i, fieldnames(15), pvalue(i,15) )
           
           pvalue(i,16) = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
-          call mxCopyReal8ToPtr( cylTile(i)%offset, mxGetPr( pvalue(i,16) ), sx )
+          call mxCopyReal8ToPtr( cylTile(i)%rotAngles, mxGetPr( pvalue(i,16) ), sx )
           call mxSetField( plhs, i, fieldnames(16), pvalue(i,16) )
           
           pvalue(i,17) = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
@@ -189,16 +195,29 @@ implicit none
           call mxCopyReal8ToPtr( rectDims, mxGetPr( pvalue(i,17) ), sx )
           call mxSetField( plhs, i, fieldnames(17), pvalue(i,17) )
           
+          s2 = 1
+          sx = 1
+          classid = mxClassIDFromClassName('int32')
+          pvalue(i,18) = mxCreateNumericMatrix(s1,s2,classid,ComplexFlag)
+          call mxCopyInteger4ToPtr( cylTile(i)%magnetType, mxGetPr( pvalue(i,18) ), sx )
+          call mxSetField( plhs, i, fieldnames(18), pvalue(i,18) )
+          
+          classid = mxClassIDFromClassName('int32')
+          pvalue(i,19) = mxCreateNumericMatrix(s1,s2,classid,ComplexFlag)
+          call mxCopyInteger4ToPtr( cylTile(i)%stateFunctionIndex, mxGetPr( pvalue(i,19) ), sx )
+          call mxSetField( plhs, i, fieldnames(19), pvalue(i,19) )
+          
       enddo
       
       deallocate(pvalue,fieldnames)
     
     end subroutine returnMagTile
     
-    
-    subroutine getFieldnames( fieldnames, nfields)
+    !::
+    !::Returns an array with the names of the fields expected in the tile struct
+    subroutine getTileFieldnames( fieldnames, nfields)
     integer,intent(out) :: nfields
-    integer,parameter :: nf=17
+    integer,parameter :: nf=19
     character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -221,9 +240,78 @@ implicit none
         fieldnames(15) = 'offset'
         fieldnames(16) = 'rotAngles'
         fieldnames(17) = 'abc'
+        fieldnames(18) = 'magnetType'
+        fieldnames(19) = 'stfcnIndex'
     
         
-    end subroutine getFieldnames
+    end subroutine getTileFieldnames
+    
+    !::
+    !::Loads the statefunction struct from Matlab to Fortran
+    !::
+    subroutine loadMagStateFunction( prhs, stateFunction, n )
+    mwPointer, intent(in) :: prhs
+    type(MagStatStateFunction),dimension(n),intent(inout) :: stateFunction
+    integer,intent(in) :: n
+    
+    mwPointer :: mxGetField, mxGetPr
+    
+    mwIndex :: i
+    mwSize :: sx
+    mwPointer :: TPtr,HPtr,MPtr,nTPtr,nHPtr
+    character(len=10),dimension(:),allocatable :: fieldnames    
+    integer :: nfields
+    
+    call getStateFunctionFieldnames( fieldnames, nfields )
+    
+    
+    do i=1,n    
+        TPtr = mxGetField(prhs,i,fieldnames(1))
+        HPtr = mxGetField(prhs,i,fieldnames(2))
+        MPtr = mxGetField(prhs,i,fieldnames(3))
+        nTPtr = mxGetField(prhs,i,fieldnames(4))
+        nHPtr = mxGetField(prhs,i,fieldnames(5))
+              
+        sx = 1
+        call mxCopyPtrToInteger4(mxGetPr(nTPtr), stateFunction(i)%nT, sx )                    
+        call mxCopyPtrToInteger4(mxGetPr(nHPtr), stateFunction(i)%nH, sx )            
+        
+        allocate( stateFunction(i)%T(stateFunction(i)%nT) )
+        allocate( stateFunction(i)%H(stateFunction(i)%nH) )
+        allocate( stateFunction(i)%M(stateFunction(i)%nT,stateFunction(i)%nH) )
+        
+        sx = stateFunction(i)%nT
+        call mxCopyPtrToReal8(mxGetPr(TPtr), stateFunction(i)%T, sx )
+        sx = stateFunction(i)%nH
+        call mxCopyPtrToReal8(mxGetPr(HPtr), stateFunction(i)%H, sx )
+        
+        sx = stateFunction(i)%nT*stateFunction(i)%nH
+        call mxCopyPtrToReal8(mxGetPr(MPtr), stateFunction(i)%M, sx )
+        
+        
+    enddo
+    
+    deallocate( fieldnames )
+    
+    end subroutine loadMagStateFunction
+    
+    !::Returns an array with the field names expected in the state function struct
+    subroutine getStateFunctionFieldnames( fieldnames, nfields )
+    integer,intent(out) :: nfields
+    integer,parameter :: nf=5
+    character(len=10),dimension(:),intent(out),allocatable :: fieldnames
+    
+    nfields = nf
+    
+    allocate( fieldnames(nfields) )
+    
+    fieldnames(1) = 'T'
+    fieldnames(2) = 'H'
+    fieldnames(3) = 'M'
+    fieldnames(4) = 'nT'
+    fieldnames(5) = 'nH'
+    
+    end subroutine getStateFunctionFieldnames
     
 end module MagTileIO
     

@@ -32,7 +32,7 @@
     H(:,:) = 0.
     N_out(:,:,:) = 0.
     
-    !$OMP PARALLEL DO PRIVATE(i,H_tmp,N_out)
+    
     do i=1,n_tiles
         H_tmp(:,:) = 0.
         
@@ -48,13 +48,11 @@
             
             
         end select
-        
-        
-        !$OMP CRITICAL
+    
         H = H + H_tmp
-        !$OMP END CRITICAL
+    
     enddo
-    !$OMP END PARALLEL DO
+    
     
     deallocate(H_tmp,N_out)
     end subroutine getFieldFromTiles
@@ -152,8 +150,8 @@
         !::5. Rotate the resulting field back to the global coordinate system
         dotProd = matmul( rotMatInv, dotProd )        
         
-        !::. Update the solution
-        H(i,:) = dotProd
+        !::. Update the solution. The minus sign comes from the definition of the demag tensor (the demagfield is assumed negative)
+        H(i,:) = -dotProd
     enddo
     end subroutine getFieldFromRectangularPrismTile
     
@@ -258,6 +256,8 @@
         Rz(1,2) = -sin(phi)
         Rz(2,1) = sin(phi)
         Rz(2,2) = cos(phi)
+        
+        Rz(3,3) = 1.
     
     end subroutine getRotZ
     
