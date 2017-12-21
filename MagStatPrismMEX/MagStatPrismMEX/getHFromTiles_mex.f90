@@ -59,9 +59,11 @@
       call loadMagTile( prhs(1), cylTile, n_tiles )
       
       !::Copy the points at which the solution is required
-      call mxCopyPtrToInteger4(mxGetPr(prhs(4)), n_ele,1)
+      
+      call mxCopyPtrToInteger4(mxGetPr(prhs(4)), n_ele, 1 )
       allocate(pts(n_ele,3),H(n_ele,3))      
-      call mxCopyPtrToReal8(mxGetPr(prhs(2)), pts, n_ele*3)
+      sx = n_ele * 3
+      call mxCopyPtrToReal8(mxGetPr(prhs(2)), pts, sx )
       
       !::do the calculation
       H(:,:) = 0
@@ -75,8 +77,9 @@
       classid = mxClassIDFromClassName('double')
       
       !Return the H field
+      sx = 3 * n_ele
       plhs(1) = mxCreateNumericArray( 2, dims, classid, ComplexFlag )
-      call mxCopyReal8ToPtr( H, mxGetPr( plhs(1) ), 3*n_ele )
+      call mxCopyReal8ToPtr( H, mxGetPr( plhs(1) ), sx )
       
       deallocate(cylTile,pts,H)
             

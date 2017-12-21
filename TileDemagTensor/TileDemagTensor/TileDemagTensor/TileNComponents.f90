@@ -15,13 +15,15 @@ module TileNComponents
         real,dimension(3) :: M
         real,dimension(3) :: u_ea,u_oa1,u_oa2    
         real :: mu_r_ea,mu_r_oa,Mrem
-        integer :: tileType        
+        integer :: tileType        !::defines whether the tile is cylindrical, a prism, an ellipsoid and so on
         real,dimension(3) :: offset !::the centre coordinates relative to the global coordinate system
         real,dimension(3) :: rotAngles !:: rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
+        integer :: magnetType !::defines whether the tile is a hard or soft magnet
+        integer :: stateFunctionIndex !::index matching an entry into an array of type MagStatStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
     end type MagTile
     
     integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeEllipsoid=3
-    
+    integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2
     
     
     contains
