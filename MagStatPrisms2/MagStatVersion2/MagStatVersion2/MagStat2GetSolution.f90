@@ -28,12 +28,14 @@
     real,dimension(:,:,:),allocatable :: N_out
     
     
-    allocate(H_tmp(n_ele,3),N_out(3,3,n_ele))
+    
     H(:,:) = 0.
     N_out(:,:,:) = 0.
     
-    
+    !$OMP PARALLEL DO PRIVATE(i,H_tmp,N_out)
     do i=1,n_tiles
+        !Make sure to allocate H_tmp on the heap and for each thread
+        allocate( H_tmp(n_ele,3),N_out(3,3,n_ele) )
         H_tmp(:,:) = 0.
         
         !::Here a selection of which subroutine to use should be done, i.e. whether the tile
@@ -48,14 +50,57 @@
             
             
         end select
-    
+        !$OMP CRITICAL
         H = H + H_tmp
-    
+        !$OMP END CRITICAL
+        deallocate(H_tmp,N_out)
     enddo
-    
-    
-    deallocate(H_tmp,N_out)
+    !$OMP END PARALLEL DO
+    !::subtract M of a tile in points that are inside that tile in order to actually get H (only for CylindricalTiles as these actually calculate the B-field (divided by mu0)
+    call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_ele)
+        
     end subroutine getFieldFromTiles
+    
+    
+    subroutine SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_pts)
+    real,dimension(n_pts,3),intent(inout) :: H
+    type(MagTile),dimension(n_tiles),intent(in) :: tiles
+    real,dimension(n_pts,3),intent(in) :: pts
+    integer,intent(in) :: n_tiles,n_pts
+    
+    real,dimension(:),allocatable :: r,theta,z
+    real :: rmin,rmax,thetamin,thetamax,zmin,zmax
+    integer :: i
+    
+    allocate( r(n_pts), theta(n_pts), z(n_pts) )
+    !::Convert from Cartesian to cylindrical coordinates
+    r = sqrt( pts(:,1)**2 + pts(:,2)**2 )
+    theta = acos( pts(:,1) / r )
+    z = pts(:,3)
+    
+    !::loop over each tile
+    do i=1,n_tiles
+        if ( tiles(i)%tileType .eq. tileTypeCylPiece ) then
+            rmin = tiles(i)%r0 - tiles(i)%dr/2
+            rmax = tiles(i)%r0 + tiles(i)%dr/2
+        
+            thetamin = tiles(i)%theta0 - tiles(i)%dtheta/2
+            thetamax = tiles(i)%theta0 + tiles(i)%dtheta/2
+        
+            zmin = tiles(i)%z0 - tiles(i)%dz/2
+            zmax = tiles(i)%z0 + tiles(i)%dz/2
+        
+            !::then the point is inside the tile and the M-vector of that tile should be subtracted in order to get H
+            where( rmin .le. r .AND. r .le. rmax .AND. thetamin .le. theta .AND. theta .le. thetamax .AND. zmin .le. z .AND. z .le. zmax )
+                H(:,1) = H(:,1) - tiles(i)%M(1)
+                H(:,2) = H(:,2) - tiles(i)%M(2)
+                H(:,3) = H(:,3) - tiles(i)%M(3)
+            endwhere
+        endif
+        
+    enddo
+    deallocate(r,theta,z)
+    end subroutine SubtractMFromCylindricalTiles
     
     !::
     !::Specific implementation for a single cylindrical tile
@@ -67,23 +112,30 @@
     integer,intent(in) :: n_ele
     real,dimension(3,3,n_ele),intent(inout) :: N_out
     real,dimension(:),allocatable :: r,x,phi
+    real,dimension(:,:),allocatable :: pts_local
     real :: phi_orig,z_orig
     real,dimension(3) :: M_orig,M_tmp
     real,dimension(3,3) :: N,Rz
     integer :: i
     
       !::Run the calculation
-      allocate( r(n_ele), x(n_ele), phi(n_ele))
+      allocate( r(n_ele), x(n_ele), phi(n_ele), pts_local(n_ele,3) )
+      
+      !::Include the offset between the global coordinate system and the tile's coordinate system
+      !::the pts array is always in global coordinates
+      pts_local(:,1) = pts(:,1) - cylTile%offset(1)
+      pts_local(:,2) = pts(:,2) - cylTile%offset(2)
+      pts_local(:,3) = pts(:,3) - cylTile%offset(3)
       
       x(:) = 0.
       phi(:) = 0.
       H(:,:) = 0.
       !the length of the radius vector
-      r = sqrt( pts(:,1)**2 + pts(:,2)**2 )
+      r = sqrt( pts_local(:,1)**2 + pts_local(:,2)**2 )
       !Find the rotation angle. It is assumed that r != 0 in all points since the tensor-field diverges here      
-      phi = acos( pts(:,1) / r )
+      phi = acos( pts_local(:,1) / r )
       !Change the sign if y is negative
-      where ( pts(:,2) .lt. 0 )
+      where ( pts_local(:,2) .lt. 0 )
           phi = -phi
       endwhere
       
@@ -95,7 +147,7 @@
           !Offset the angle
           cylTile%theta0 = phi_orig - phi(i)
           !Offset the z-coordinate
-          cylTile%z0 = z_orig - pts(i,3)
+          cylTile%z0 = z_orig - pts_local(i,3)
           call getN_CylPiece( cylTile, r(i), N )
           N_out(:,:,i) = N
           !Get the rotation vector
@@ -114,7 +166,7 @@
           cylTile%z0 = z_orig
       enddo
       
-      deallocate(r,x,phi)
+      deallocate(r,x,phi,pts_local)
     
     end subroutine getFieldFromCylTile
     

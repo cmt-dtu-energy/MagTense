@@ -98,15 +98,15 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
            
            !::When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is slowed
            !::If the tile is a cylinder piece then M should be subtracted due to the way the tensor was derived. If the tile is a prism them M should not be subtracted. Really idiotic (Kaspar, 21-12-2017)
-           select case (tiles(i)%tileType )
-           case (tileTypeCylPiece)
-               H(i,:) = H_old(i,:) + lambda * ( H(i,:) - tiles(i)%M - H_old(i,:) )
-           case(tileTypePrism)
-               H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
-           case default
-                
-            end select
-           
+           !select case (tiles(i)%tileType )
+           !case (tileTypeCylPiece)
+           !    H(i,:) = H_old(i,:) + lambda * ( H(i,:) - tiles(i)%M - H_old(i,:) )
+           !case(tileTypePrism)
+           !    H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
+           !case default
+           !     
+           ! end select
+           H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
         enddo
         
         !::Update iteration step
