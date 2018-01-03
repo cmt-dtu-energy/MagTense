@@ -28,8 +28,10 @@
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
 		<File RelativePath=".\EllipticIncomplete_mex.f90"/>
+		<File RelativePath=".\getHFromTiles_mex.f90"/>
+		<File RelativePath=".\getNFromCylTile_mex.f90"/>
 		<File RelativePath=".\integral2_mex.f90"/>
+		<File RelativePath=".\IterateMagnetization_mex.f90"/>
 		<File RelativePath=".\magStatMEX.f90"/>
-		<File RelativePath=".\magStatMex_getSolution.f90"/>
-		<File RelativePath=".\N_cyl_piece_mex.f90"/></Filter></Files>
+		<File RelativePath=".\magStatMex_getSolution.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>
