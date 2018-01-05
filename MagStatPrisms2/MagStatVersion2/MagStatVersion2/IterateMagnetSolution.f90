@@ -4,6 +4,7 @@
     use MagStat2GetSolution
     use MagStatParameters
     use MagStatUtil
+    use MagTileIO
     implicit none
     
     
@@ -135,7 +136,9 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
         endif
         
         lambdaCnt = lambdaCnt + 1
-           
+        call displayIteration( err, err_max * lambda )
+                      
+        
     enddo    
     deallocate(H,H_old,Hnorm,Hnorm_old)    
 end subroutine IterateMagnetization
