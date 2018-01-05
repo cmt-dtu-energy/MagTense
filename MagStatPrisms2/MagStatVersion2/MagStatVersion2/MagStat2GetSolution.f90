@@ -2,7 +2,7 @@
     module MagStat2GetSolution
 
     use TileNComponents
-
+    use MagTileIO
     implicit none
     
     
@@ -23,14 +23,16 @@
     real,dimension(n_ele,3),intent(in) :: pts
     integer,intent(in) :: n_tiles,n_ele
     
-    integer :: i
+    integer :: i,prgCnt,tid,prog,OMP_GET_THREAD_NUM
     real,dimension(:,:),allocatable :: H_tmp
     real,dimension(:,:,:),allocatable :: N_out
-    
+    integer,parameter :: cbCnt = 10
     
     
     H(:,:) = 0.
     N_out(:,:,:) = 0.
+    prgCnt = 0
+    prog = 0
     
     !$OMP PARALLEL DO PRIVATE(i,H_tmp,N_out)
     do i=1,n_tiles
@@ -52,6 +54,16 @@
         end select
         !$OMP CRITICAL
         H = H + H_tmp
+        !prgCnt = prgCnt + 1
+        !tid = omp_get_thread_num()
+        !if ( tid .eq. 0 ) then
+        !    if ( floor( 100. * prgCnt / (1.*n_tiles) ) .ge. cbCnt ) then
+        !        prgCnt = 0
+        !        prog = prog + 10                
+        !        call displayProgress( prog )
+        !    endif
+        !endif        
+        
         !$OMP END CRITICAL
         deallocate(H_tmp,N_out)
     enddo
