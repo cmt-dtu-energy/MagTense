@@ -30,16 +30,20 @@
     
     
     H(:,:) = 0.
-    N_out(:,:,:) = 0.
+    
     prgCnt = 0
     prog = 0
     
+  
     !$OMP PARALLEL DO PRIVATE(i,H_tmp,N_out)
     do i=1,n_tiles
+        
         !Make sure to allocate H_tmp on the heap and for each thread
+        !$OMP CRITICAL
         allocate( H_tmp(n_ele,3),N_out(3,3,n_ele) )
         H_tmp(:,:) = 0.
-        
+        N_out(:,:,:) = 0.
+        !$OMP END CRITICAL
         !::Here a selection of which subroutine to use should be done, i.e. whether the tile
         !:: is cylindrical, a prism or an ellipsoid
         select case (tiles(i)%tileType )
@@ -48,10 +52,11 @@
         case (tileTypePrism)
             call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele, N_out )
         case (tileTypeEllipsoid)
-        case default
-            
+        case default        
             
         end select
+        
+        
         !$OMP CRITICAL
         H = H + H_tmp
         !prgCnt = prgCnt + 1
@@ -63,9 +68,13 @@
         !        call displayProgress( prog )
         !    endif
         !endif        
-        
-        !$OMP END CRITICAL
         deallocate(H_tmp,N_out)
+       !$OMP END CRITICAL
+       
+        
+        
+        
+        
     enddo
     !$OMP END PARALLEL DO
     !::subtract M of a tile in points that are inside that tile in order to actually get H (only for CylindricalTiles as these actually calculate the B-field (divided by mu0)
@@ -88,6 +97,11 @@
     !::Convert from Cartesian to cylindrical coordinates
     r = sqrt( pts(:,1)**2 + pts(:,2)**2 )
     theta = acos( pts(:,1) / r )
+    !Correct for being in either the third or foruth quadrants
+    where ( pts(:,2) .lt. 0 )
+        theta = 2 * pi - theta    
+    endwhere
+    
     z = pts(:,3)
     
     !::loop over each tile
@@ -146,9 +160,9 @@
       r = sqrt( pts_local(:,1)**2 + pts_local(:,2)**2 )
       !Find the rotation angle. It is assumed that r != 0 in all points since the tensor-field diverges here      
       phi = acos( pts_local(:,1) / r )
-      !Change the sign if y is negative
+      !correct for being in the third or foruth quadrants
       where ( pts_local(:,2) .lt. 0 )
-          phi = -phi
+          phi = 2 * pi - phi !phi = -phi
       endwhere
       
       !save the original orientation of the tile
