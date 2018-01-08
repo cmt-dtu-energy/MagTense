@@ -53,7 +53,9 @@ end type func_ptr
 
 type surf_carth
     real,dimension(2) :: x,y,z,theta
-    real,dimension(3) :: r    
+    real,dimension(3) :: r  
+    integer :: coord,n_surfaces
+    real :: cone_angle,z0
 end type surf_carth
 
 !::A custom type encapsulating a dataCollectionBase pointer in order to make an array
