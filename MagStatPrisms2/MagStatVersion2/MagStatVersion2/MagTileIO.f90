@@ -7,6 +7,51 @@ implicit none
     
     contains
     
+    subroutine displayProgress( prog )
+    integer,intent(in) :: prog
+    
+    integer :: mexCallMATLAB, nlhs_cb, nrhs_cb, tmp
+    mwPointer plhs_cb(1), prhs_cb(1),mxCreateString
+    character*(4) functionName_cb,prog_str   
+    character(len=8) :: fmt
+
+    fmt = '(I4.2)'
+    write (prog_str,fmt) prog
+    
+    
+    functionName_cb = "disp"
+    nlhs_cb = 0
+    nrhs_cb = 1
+      
+    prhs_cb(1) = mxCreateString(prog_str)
+      
+    tmp = mexCallMATLAB(nlhs_cb, plhs_cb, nrhs_cb, prhs_cb, "disp")
+    
+    end subroutine displayProgress
+    
+    subroutine displayIteration( err, err_max )
+    real,intent(in) :: err,err_max
+    
+    integer :: mexCallMATLAB, nlhs_cb, nrhs_cb, tmp
+    mwPointer plhs_cb(1), prhs_cb(1),mxCreateString
+    character*(4) :: functionName_cb
+    character*(100) :: prog_str   
+    character(len=8) :: fmt
+
+    fmt = '(f15.7)'
+    write (prog_str,*) "err: ",err,"Max. err: ",err_max
+    
+    
+    functionName_cb = "disp"
+    nlhs_cb = 0
+    nrhs_cb = 1
+      
+    prhs_cb(1) = mxCreateString(prog_str)
+      
+    tmp = mexCallMATLAB(nlhs_cb, plhs_cb, nrhs_cb, prhs_cb, "disp")
+    
+    end subroutine displayIteration
+    
     !::
     !::Loads the data from Matlab into a fortran struct
     !::

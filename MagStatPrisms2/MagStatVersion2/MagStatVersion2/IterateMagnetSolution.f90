@@ -4,6 +4,7 @@
     use MagStat2GetSolution
     use MagStatParameters
     use MagStatUtil
+    use MagTileIO
     implicit none
     
     
@@ -62,6 +63,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
         
         !::Loop over each prism and set their respective magnetization vectors
         do i=1,n
+            
             select case ( tiles(i)%magnetType )
             case ( MagnetTypeHard )
                 call getM_HardMagnet( H(i,:), tiles(i) )
@@ -78,6 +80,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
         H(:,:) = 0
         !::Get the field at the center at each tile from all other tiles
         do i=1,n
+            
             select case (tiles(i)%tileType )
             case (tileTypeCylPiece)
                 !find the contribution to the internal field of the i'th tile from all tiles           
@@ -107,6 +110,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
            !     
            ! end select
            H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
+           
         enddo
         
         !::Update iteration step
@@ -135,7 +139,9 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
         endif
         
         lambdaCnt = lambdaCnt + 1
-           
+        call displayIteration( err, err_max * lambda )
+                      
+        
     enddo    
     deallocate(H,H_old,Hnorm,Hnorm_old)    
 end subroutine IterateMagnetization
