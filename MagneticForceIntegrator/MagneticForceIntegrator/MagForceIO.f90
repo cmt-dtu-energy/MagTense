@@ -75,6 +75,14 @@ module MagForceIO
                 surf%theta(1) = 0
                 surf%theta(2) = 2*pi
                 surf%n_surfaces = 4
+            case default
+                surf%r(1) = 0
+                surf%r(2) = sqrt( surf%x(2)**2 + surf%y(2)**2 ) 
+      
+                surf%theta(1) = 0
+                surf%theta(2) = 2*pi
+                surf%n_surfaces = 4
+                surf%coord = 2
             end select
             
         
@@ -85,7 +93,7 @@ module MagForceIO
     !::Returns an array with the names of the fields expected in the tile struct
     subroutine getMagForceSurfFieldnames( fieldnames, nfields)
     integer,intent(out) :: nfields
-    integer,parameter :: nf=9
+    integer,parameter :: nf=6
     character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -96,8 +104,7 @@ module MagForceIO
         fieldnames(3) = 'z'
         fieldnames(4) = 'cone_angle'
         fieldnames(5) = 'z0'
-        fieldnames(6) = 'coord'
-        fieldnames(7) = 'n_surfaces'        
+        fieldnames(6) = 'coord'          
         
         
         

@@ -42,8 +42,8 @@
 !Check the type of the inputs      
       if ( .NOT. mxIsStruct(prhs(1)) ) then
           call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input one should be a struct')
-      else if ( .NOT. mxIsDouble(prhs(2)) ) then
-          call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input two should be a double')      
+      else if ( .NOT. mxIsInt32(prhs(2)) ) then
+          call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input two should be an integer')      
       else if ( .NOT. mxIsStruct(prhs(3)) ) then
           call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input three should be a struct')      
       endif                  
@@ -75,7 +75,7 @@
       plhs(1) = mxCreateNumericArray( 2, dims, classid, ComplexFlag )
       call mxCopyReal8ToPtr( Fout, mxGetPr( plhs(1) ), sx )
       
-      deallocate(magModel%tiles,magModel)
+      deallocate(magModel)
             
       end subroutine
       
