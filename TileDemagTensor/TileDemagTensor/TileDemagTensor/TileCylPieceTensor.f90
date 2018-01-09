@@ -492,7 +492,7 @@ module TileCylPieceTensor
         int_r_dDdz_dr_dtheta_fct = -zs * (r * x * cos(theta) - x**2 - zs**2 ) / ( M(r, x, theta, zs) * L(x, theta, zs) )
         end function
         
-        
+        !::2018-01-09 Kaspar: Something is not correct with this function
         subroutine int_sin_dDdz_dz_dtheta( dat, val1, val2 )
         real,intent(inout) :: val1,val2    
         class(dataCollectionBase), intent(inout), target :: dat
@@ -509,7 +509,7 @@ module TileCylPieceTensor
         function int_sin_dDdz_dz_dtheta_fct( theta, z, rs, x )
         real :: int_sin_dDdz_dz_dtheta_fct
         real,intent(in) :: theta,z,rs,x
-        int_sin_dDdz_dz_dtheta_fct = - sqrt(rs**2 - 2*rs*x*cos(theta) + x**2 + z**2) / ( rs * x )
+        int_sin_dDdz_dz_dtheta_fct = - sqrt(rs**2 - 2*rs*x*cos(theta) + x**2 + z**2) / x
         return
         end function
         

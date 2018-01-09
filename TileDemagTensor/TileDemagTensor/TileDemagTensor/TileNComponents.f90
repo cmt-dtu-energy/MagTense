@@ -109,15 +109,16 @@ module TileNComponents
                 + sin(theta1) * int_dDdx_dr_dz1 - sin(theta2) * int_dDdx_dr_dz2 &
                 + int_r_dDdz_dr_dtheta2 - int_r_dDdz_dr_dtheta1
         
-        !N(2,3) = int_sin_dDdz_dz_dtheta1 - int_sin_dDdz_dz_dtheta2 &
-        !    + cos(theta1) * int_dDdz_dr_dz1 - cos(theta2) * int_dDdz_dr_dz2
+        N(2,3) = int_sin_dDdz_dz_dtheta1 - int_sin_dDdz_dz_dtheta2 &
+            + cos(theta1) * int_dDdz_dr_dz1 - cos(theta2) * int_dDdz_dr_dz2
         
         N(3,1) = int_r_dDdx_dr_dtheta1 - int_r_dDdx_dr_dtheta2
                 
         N(3,2) = int_r_dDdy_dr_dtheta1 - int_r_dDdy_dr_dtheta2
         !::2018-01-08. Kaspar makes this hack to ensure consistency - there is an unknown problem with this component; it should be symmetric with 3,2 and appears not to be
         !::It is therefore forced to be symmetric for the time being until the problem has been figured out.
-        N(2,3) = N(3,2)
+        !::2018-01-09. Kaspar figured out the probrlem in one of the tensor-functions (there was a division with r which should not be there). It is now fixed
+        !N(2,3) = N(3,2)
         
         N(3,3) = int_sin_dDdy_dz_dtheta2 + int_cos_dDdx_dz_dtheta2 &
             - int_sin_dDdy_dz_dtheta1 - int_cos_dDdx_dz_dtheta1 &
