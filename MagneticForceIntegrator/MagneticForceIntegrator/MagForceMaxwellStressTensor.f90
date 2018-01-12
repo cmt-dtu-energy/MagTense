@@ -40,6 +40,22 @@ module MagForceMaxwellStressTensor
 
       end function F_int_12
       
+      function F_int_12_vec( yy,dat )
+      class( dataCollectionBase ), intent(in), target :: dat
+      real,dimension(:),intent(in) :: yy
+      real,dimension(size(yy)) :: F_int_12_vec      
+      real,dimension(size(yy)) :: jacobi
+      real,dimension(size(yy),3) :: B 
+      !::Get the field from the model solution
+      call getB_field_vec( yy, dat, B, jacobi )
+      
+      !::Calculate the off diagonal component. 
+       F_int_12_vec = 1. /mu0 * jacobi * B(:,1) * B(:,2)
+    
+       return
+
+      end function F_int_12_vec
+      
       function F_int_13( dat )
       real :: F_int_13
       class( dataCollectionBase ), intent(in), target :: dat
@@ -55,6 +71,24 @@ module MagForceMaxwellStressTensor
     
        return
       end function F_int_13
+      
+      function F_int_13_vec( yy, dat )
+      class( dataCollectionBase ), intent(in), target :: dat
+      real,dimension(:),intent(in) :: yy
+      real,dimension(size(yy)) :: F_int_13_vec            
+      real,dimension(size(yy),3) :: B
+      real,dimension(size(yy)) :: jacobi
+      
+      
+      !::Get the field from the model solution
+      call getB_field_vec( yy, dat, B, jacobi )
+                                 
+      !::Calculate the off diagonal component
+       F_int_13_vec = 1. /mu0 * jacobi * B(:,1) * B(:,3)
+    
+       return
+      end function F_int_13_vec
+      
       
       function F_int_23( dat )
       real :: F_int_23
@@ -73,6 +107,25 @@ module MagForceMaxwellStressTensor
 
       end function F_int_23
       
+      
+      function F_int_23_vec( yy, dat )      
+      class( dataCollectionBase ), intent(in), target :: dat
+      real,dimension(:),intent(in) :: yy
+      real,dimension(size(yy)) :: F_int_23_vec      
+      real,dimension(size(yy),3) :: B
+      real,dimension(size(yy)) :: jacobi
+          
+      !::Get the field from the model solution
+      call getB_field_vec( yy, dat, B, jacobi  )
+                                 
+      !::Calculate the off diagonal component
+       F_int_23_vec = 1. /mu0 * jacobi * B(:,2) * B(:,3)
+    
+       return
+
+      end function F_int_23_vec
+      
+      
       function F_int_21( dat )
       real :: F_int_21
       class( dataCollectionBase ), intent(in), target :: dat
@@ -80,6 +133,16 @@ module MagForceMaxwellStressTensor
       F_int_21 = F_int_12( dat )
       
       end function F_int_21
+      
+      
+      function F_int_21_vec( yy, dat )      
+      class( dataCollectionBase ), intent(in), target :: dat
+      real,dimension(:),intent(in) :: yy
+      real,dimension(size(yy)) :: F_int_21_vec
+      
+      F_int_21_vec = F_int_12_vec( yy, dat )
+      
+      end function F_int_21_vec
       
       function F_int_31( dat )
       real :: F_int_31
@@ -89,6 +152,17 @@ module MagForceMaxwellStressTensor
       
       end function F_int_31
       
+      
+      function F_int_31_vec( yy, dat )      
+      class( dataCollectionBase ), intent(in), target :: dat
+      real,dimension(:),intent(in) :: yy
+      real,dimension(size(yy)) :: F_int_31_vec
+      
+      F_int_31_vec = F_int_13_vec( yy, dat )
+      
+      end function F_int_31_vec
+      
+      
       function F_int_32( dat )
       real :: F_int_32
       class( dataCollectionBase ), intent(in), target :: dat
@@ -96,21 +170,47 @@ module MagForceMaxwellStressTensor
       F_int_32 = F_int_23( dat )
       
       end function F_int_32
+      
+      
+      function F_int_32_vec( yy, dat )      
+      class( dataCollectionBase ), intent(in), target :: dat
+      real,dimension(:),intent(in) :: yy
+      real,dimension(size(yy)) :: F_int_32_vec
+      
+      F_int_32_vec = F_int_23_vec( yy, dat )
+      
+      end function F_int_32_vec
                   
       function F_int_11( dat )
       real :: F_int_11
       class( dataCollectionBase ), intent(in), target :: dat
       real,dimension(3) :: B
       real :: Bnorm,jacobi
-      
+            
       call getB_field( dat, B, jacobi )
       
+      
       Bnorm = sqrt( B(1)**2 + B(2)**2 + B(3)**2 )
-                                 
+           
       F_int_11 = 1./mu0 * jacobi * ( B(1)**2 - 0.5 * Bnorm**2 )
       
-      
       end function F_int_11
+      
+      function F_int_11_vec( yy, dat )      
+      class( dataCollectionBase ), intent(in), target :: dat
+      real,dimension(:),intent(in) :: yy
+      real,dimension(size(yy)) :: F_int_11_vec
+      real,dimension(size(yy),3) :: B
+      real,dimension(size(yy)) :: Bnorm,jacobi
+      
+      call getB_field_vec( yy, dat, B, jacobi )
+      
+      Bnorm = sqrt( B(:,1)**2 + B(:,2)**2 + B(:,3)**2 )
+      
+      F_int_11_vec = 1./mu0 * jacobi * ( B(:,1)**2 - 0.5 * Bnorm**2 )
+    
+      
+      end function F_int_11_vec
       
       function F_int_22( dat )
       real :: F_int_22
@@ -126,6 +226,22 @@ module MagForceMaxwellStressTensor
       
       end function F_int_22
       
+      
+      function F_int_22_vec( yy, dat )      
+      class( dataCollectionBase ), intent(in), target :: dat
+      real,dimension(:),intent(in) :: yy
+      real,dimension(size(yy)) :: F_int_22_vec
+      real,dimension(size(yy),3) :: B
+      real,dimension(size(yy)) :: Bnorm, jacobi
+
+      call getB_field_vec( yy, dat, B, jacobi )
+      
+      Bnorm = sqrt( B(:,1)**2 + B(:,2)**2 + B(:,3)**2 )
+                                 
+      F_int_22_vec = 1./mu0 * jacobi * ( B(:,2)**2 - 0.5 * Bnorm**2 )
+      
+      end function F_int_22_vec
+      
       function F_int_33( dat )
       real :: F_int_33
       class( dataCollectionBase ), intent(in), target :: dat
@@ -139,6 +255,22 @@ module MagForceMaxwellStressTensor
       F_int_33 = 1./mu0 * jacobi * ( B(3)**2 - 0.5 * Bnorm**2 )
       
       end function F_int_33
+      
+      
+      function F_int_33_vec( yy, dat )      
+      class( dataCollectionBase ), intent(in), target :: dat
+      real,dimension(:),intent(in) :: yy
+      real,dimension(size(yy)) :: F_int_33_vec
+      real,dimension(size(yy),3) :: B
+      real,dimension(size(yy)) :: Bnorm, jacobi
+      
+      call getB_field_vec( yy, dat, B, jacobi )
+      
+      Bnorm = sqrt( B(:,1)**2 + B(:,2)**2 + B(:,3)**2 )
+                                 
+      F_int_33_vec = 1./mu0 * jacobi * ( B(:,3)**2 - 0.5 * Bnorm**2 )
+      
+      end function F_int_33_vec
       
        !::Returns the B-field given the specific dat model and jacobi-multiplier
         subroutine getB_field( dat, B, jacobi )
@@ -157,6 +289,25 @@ module MagForceMaxwellStressTensor
         endif
                 
         end subroutine getB_field
+        
+        
+        subroutine getB_field_vec( yy, dat, B, jacobi )
+        class( dataCollectionBase ), intent(in), target :: dat
+        real,dimension(:),intent(in) :: yy
+        real,dimension(size(yy),3),intent(inout) :: B
+        real,dimension(size(yy)),intent(inout) :: jacobi
+        real,dimension(size(yy),3) :: Hext
+        
+        if ( dat%coord_sys .eq.  coord_sys_carth ) then
+            !call getB_field_cart_vec( dat, B )
+            !jacobi = 1
+        elseif (dat%coord_sys .eq. coord_sys_cyl ) then
+            call getB_field_cyl_vec( yy, dat, B, jacobi )     
+        elseif ( dat%coord_sys .eq. coord_sys_cone ) then
+            !call getB_field_cone_vec( dat, B, jacobi )
+        endif
+              
+        end subroutine getB_field_vec
         
         !::Get the field from the model solution in Cartesian coordinates
         subroutine getB_field_cart( dat, B )
@@ -264,6 +415,70 @@ module MagForceMaxwellStressTensor
         B = mu0 * Hsol
        
         end subroutine getB_field_cyl
+        
+        
+        !::Get the field from the model solution in cylindrical coordinates
+        !::Vectorized
+        subroutine getB_field_cyl_vec( yy, dat, B, jacobi )
+        class( dataCollectionBase ), intent(in), target :: dat
+        class( magStatModel ), pointer :: model
+        real,dimension(:),intent(in) :: yy
+        real,dimension(size(yy),3),intent(inout) :: B
+        real,dimension(size(yy)),intent(inout) :: jacobi        
+        real,dimension(size(yy),3) :: Hsol, solPts 
+        real,dimension(size(yy)) :: x,y,z,theta,normMult
+        real :: r
+        
+        !::Make the down cast to get the actual data model set
+        call getDataModel( dat%model, model )
+        
+        !::Make sure the coordinate indices are mapped according to the normal vector
+        if ( abs(dat%n_vec(1,1)) .eq. 1 ) then
+            !theta-z plane
+            !::dat%x represents theta, dat%y represents z and dat%z0 represents R, the constant radius of the
+            !::cylinder surface
+            r = dat%z0
+            theta = dat%x        
+            z = yy
+            !::part of the normal vector in the x-direction
+            normMult = cos(theta)
+        else if ( abs(dat%n_vec(1,2)) .eq. 1 ) then
+            !theta-z plane, y-component
+            !::dat%x represents theta, dat%y represents z and dat%z0 represents R, the constant radius of the
+            !::cylinder surface
+            r = dat%z0
+            theta = dat%x            
+            z = yy  
+            !::part of the normal vector in the y-direction
+            normMult = sin(theta)
+        else if ( abs(dat%n_vec(1,3)) .eq. 1 ) then
+            !r-theta plane
+            !::dat%x represents r, dat%y represents theta and dat%z0 represents z
+            r = dat%x
+            theta = yy
+            
+            z = dat%z0
+            normMult = 1
+        endif
+        
+        jacobi = r * normMult
+        
+        x = r * cos( theta )
+        y = r * sin( theta )
+        
+        !::Reset the solution array
+        Hsol(:,:) = 0        
+        
+        solPts(:,1) = x
+        solPts(:,2) = y
+        solPts(:,3) = z
+        
+        !::Get the solution from the MagStatVersion2 library
+        call getFieldFromTiles( model%tiles, Hsol, solPts, model%n_tiles, size(yy) )
+        
+        B = mu0 * Hsol
+       
+        end subroutine getB_field_cyl_vec
        
         
         !::Get the field from the model solution on the surface of a cone

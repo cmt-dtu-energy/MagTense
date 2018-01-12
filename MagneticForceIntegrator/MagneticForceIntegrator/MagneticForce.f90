@@ -16,11 +16,11 @@ module MagneticForce
     type( surf_carth ), intent(in) :: surf
     real,dimension(3),intent(out) :: F
     
-    real,parameter :: eps_abs = 1e-10,eps_rel = 1e-6
+    real,parameter :: eps_abs = 1e-4,eps_rel = 1e-3
     class( magStatModel ), target :: datModel
     type( dat_ptr ), dimension(18) :: dat_arr
-    integer*8,dimension(2) :: ier,neval
-    integer*8,dimension(3) :: retV
+    integer,dimension(2) :: ier,neval
+    integer,dimension(3) :: retV
     integer :: i,j,ind
     
     !::Always get all three force components
@@ -42,6 +42,8 @@ module MagneticForce
               
               dat_arr(ind)%dat%coord_sys = surf%coord              
               
+              !::progress callback function
+              dat_arr(ind)%dat%progCallback => MagForceProgCallback
           enddo
        enddo
        select case ( surf%coord )
@@ -64,7 +66,7 @@ module MagneticForce
         dat_arr(13)%dat%f_ptr => F_int_33 !theta-z surface, z part of diff. area
         dat_arr(14)%dat%f_ptr => F_int_33 !r-theta surface, bottom
         dat_arr(15)%dat%f_ptr => F_int_33!r-theta surface, top
-        call surface_integral_cone( surf, dat_arr, retV, handleError, F, ier, neval )
+        call surface_integral_cone( surf, dat_arr(1:15), retV, handleError, F, ier, neval )
        case ( coord_sys_cyl )
            !x-component
           dat_arr(1)%dat%f_ptr => F_int_11
@@ -74,12 +76,12 @@ module MagneticForce
           !y-component
           dat_arr(5)%dat%f_ptr => F_int_21
           dat_arr(6)%dat%f_ptr => F_int_22
-          dat_arr(7)%dat%f_ptr => F_int_23      
+          dat_arr(7)%dat%f_ptr => F_int_23
           dat_arr(8)%dat%f_ptr => F_int_23
           !z-component
           dat_arr(9)%dat%f_ptr => F_int_31
           dat_arr(10)%dat%f_ptr => F_int_32
-          dat_arr(11)%dat%f_ptr => F_int_33      
+          dat_arr(11)%dat%f_ptr => F_int_33
           dat_arr(12)%dat%f_ptr => F_int_33
           
           call surface_integral_cyl( surf, dat_arr, retV, handleError, F, ier, neval )
