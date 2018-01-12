@@ -110,5 +110,35 @@ module MagForceIO
         
     end subroutine getMagForceSurfFieldnames
     
+    !::Progess callback to Matlab
+    function MagForceProgCallback( dat )
+      real :: MagForceProgCallback
+      class( dataCollectionBase ), intent(in), target :: dat
+            
+      integer :: mexCallMATLAB, nlhs_cb, nrhs_cb, tmp
+      mwPointer plhs_cb(1), prhs_cb(1),mxCreateString
+      character*(4) :: functionName_cb
+      character*(100) :: prog_str   
+      character(len=8) :: fmt
+
+      fmt = '(f15.7)'
+      write (prog_str,*) "neval_x : ",dat%progCallbackCnt
+    
+    
+      functionName_cb = "disp"
+      nlhs_cb = 0
+      nrhs_cb = 1
+      
+      prhs_cb(1) = mxCreateString(prog_str)
+      
+      tmp = mexCallMATLAB(nlhs_cb, plhs_cb, nrhs_cb, prhs_cb, "disp")
+      
+            
+      MagForceProgCallback = 0
+    
+      return
+
+      end function MagForceProgCallback
+    
 end module MagForceIO
     
