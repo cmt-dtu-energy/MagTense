@@ -90,23 +90,31 @@
     integer,intent(in) :: n_tiles,n_pts
     
     real,dimension(:),allocatable :: r,theta,z
+    real,dimension(:,:),allocatable :: pts_local
     real :: rmin,rmax,thetamin,thetamax,zmin,zmax
     integer :: i
     
-    allocate( r(n_pts), theta(n_pts), z(n_pts) )
-    !::Convert from Cartesian to cylindrical coordinates
-    r = sqrt( pts(:,1)**2 + pts(:,2)**2 )
-    theta = acos( pts(:,1) / r )
-    !Correct for being in either the third or foruth quadrants
-    where ( pts(:,2) .lt. 0 )
-        theta = 2 * pi - theta    
-    endwhere
-    
-    z = pts(:,3)
-    
+    allocate( r(n_pts), theta(n_pts), z(n_pts),  pts_local(n_pts,3) )
+              
     !::loop over each tile
     do i=1,n_tiles
         if ( tiles(i)%tileType .eq. tileTypeCylPiece ) then
+            
+            !::Include the offset between the global coordinate system and the tile's coordinate system
+            !::the pts array is always in global coordinates
+            pts_local(:,1) = pts(:,1) - tiles(i)%offset(1)
+            pts_local(:,2) = pts(:,2) - tiles(i)%offset(2)
+            pts_local(:,3) = pts(:,3) - tiles(i)%offset(3)
+            !::Convert from Cartesian to cylindrical coordinates
+            r = sqrt( pts_local(:,1)**2 + pts_local(:,2)**2 )
+            theta = acos( pts_local(:,1) / r )
+            !Correct for being in either the third or foruth quadrants
+            where ( pts_local(:,2) .lt. 0 )
+                theta = 2 * pi - theta    
+            endwhere
+    
+            z = pts_local(:,3)
+            
             rmin = tiles(i)%r0 - tiles(i)%dr/2
             rmax = tiles(i)%r0 + tiles(i)%dr/2
         
@@ -125,7 +133,7 @@
         endif
         
     enddo
-    deallocate(r,theta,z)
+    deallocate(r,theta,z,pts_local)
     end subroutine SubtractMFromCylindricalTiles
     
     !::

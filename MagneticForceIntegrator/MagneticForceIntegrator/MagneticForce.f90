@@ -20,11 +20,9 @@ module MagneticForce
     class( magStatModel ), target :: datModel
     type( dat_ptr ), dimension(18) :: dat_arr
     integer,dimension(2) :: ier,neval
-    integer,dimension(3) :: retV
     integer :: i,j,ind
     
-    !::Always get all three force components
-    retV(:) = 0
+    
             
       !::Initialize each member of the dat_arr
       do i=1,3
@@ -66,7 +64,7 @@ module MagneticForce
         dat_arr(13)%dat%f_ptr => F_int_33 !theta-z surface, z part of diff. area
         dat_arr(14)%dat%f_ptr => F_int_33 !r-theta surface, bottom
         dat_arr(15)%dat%f_ptr => F_int_33!r-theta surface, top
-        call surface_integral_cone( surf, dat_arr(1:15), retV, handleError, F, ier, neval )
+        call surface_integral_cone( surf, dat_arr(1:15), handleError, F, ier, neval )
        case ( coord_sys_cyl )
            !x-component
           dat_arr(1)%dat%f_ptr => F_int_11
@@ -84,7 +82,7 @@ module MagneticForce
           dat_arr(11)%dat%f_ptr => F_int_33
           dat_arr(12)%dat%f_ptr => F_int_33
           
-          call surface_integral_cyl( surf, dat_arr, retV, handleError, F, ier, neval )
+          call surface_integral_cyl( surf, dat_arr, handleError, F, ier, neval )
        case ( coord_sys_carth )
           dat_arr(1)%dat%f_ptr => F_int_11
           dat_arr(2)%dat%f_ptr => F_int_11
@@ -107,7 +105,7 @@ module MagneticForce
           dat_arr(17)%dat%f_ptr => F_int_33
           dat_arr(18)%dat%f_ptr => F_int_33
           
-          call surface_integral_carth( surf, dat_arr, retV, handleError, F, ier, neval )
+          call surface_integral_carth( surf, dat_arr, handleError, F, ier, neval )
        end select
     
     

@@ -79,6 +79,7 @@ type surf_carth
     real,dimension(3) :: r  
     integer(kind=4) :: coord,n_surfaces
     real :: cone_angle,z0
+    integer,dimension(3) :: retVec
 end type surf_carth
 
 !::A custom type encapsulating a dataCollectionBase pointer in order to make an array

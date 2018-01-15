@@ -84,9 +84,9 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
             select case (tiles(i)%tileType )
             case (tileTypeCylPiece)
                 !find the contribution to the internal field of the i'th tile from all tiles           
-                pts(1) = cos(tiles(i)%theta0) * tiles(i)%r0
-                pts(2) = sin(tiles(i)%theta0) * tiles(i)%r0
-                pts(3) = tiles(i)%z0
+                pts(1) = cos(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(1)
+                pts(2) = sin(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(2)
+                pts(3) = tiles(i)%z0 + tiles(i)%offset(3)
             case(tileTypePrism)
                 pts = tiles(i)%offset
             case default
