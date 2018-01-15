@@ -30,7 +30,7 @@ module MagForceIO
     mwSize :: sx
     integer :: nfields
     real*8,dimension(3) :: rectDims
-    mwPointer :: xPtr,yPtr,zPtr,coneAnglePtr,z0Ptr,coordPtr
+    mwPointer :: xPtr,yPtr,zPtr,coneAnglePtr,z0Ptr,coordPtr,retVecPtr
     mwPointer :: mxGetField, mxGetPr
     
         call getMagForceSurfFieldnames( fieldnames, nfields )
@@ -40,7 +40,8 @@ module MagForceIO
         zPtr = mxGetField(prhs,sx,fieldnames(3))
         coneAnglePtr = mxGetField(prhs,sx,fieldnames(4))
         z0Ptr = mxGetField(prhs,sx,fieldnames(5))
-        coordPtr = mxGetField(prhs,sx,fieldnames(6))        
+        coordPtr = mxGetField(prhs,sx,fieldnames(6))
+        retVecPtr = mxGetField(prhs,sx,fieldnames(7))
         
         !::Copy from Matlab
         sx = 2
@@ -52,6 +53,9 @@ module MagForceIO
         call mxCopyPtrToReal8(mxGetPr(coneAnglePtr), surf%cone_angle, sx )
         call mxCopyPtrToReal8(mxGetPr(z0Ptr), surf%z0, sx )        
         call mxCopyPtrToInteger4(mxGetPr(coordPtr), surf%coord, sx )        
+        
+        sx = 3
+        call mxCopyPtrToInteger4(mxGetPr(retVecPtr), surf%retVec, sx )        
         
         !::Setup the parameters
         select case ( surf%coord )
@@ -93,7 +97,7 @@ module MagForceIO
     !::Returns an array with the names of the fields expected in the tile struct
     subroutine getMagForceSurfFieldnames( fieldnames, nfields)
     integer,intent(out) :: nfields
-    integer,parameter :: nf=6
+    integer,parameter :: nf=7
     character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -104,7 +108,8 @@ module MagForceIO
         fieldnames(3) = 'z'
         fieldnames(4) = 'cone_angle'
         fieldnames(5) = 'z0'
-        fieldnames(6) = 'coord'          
+        fieldnames(6) = 'coord'      
+        fieldnames(7) = 'retVec'
         
         
         

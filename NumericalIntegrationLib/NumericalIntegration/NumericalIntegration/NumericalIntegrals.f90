@@ -9,16 +9,13 @@ module NumInt
  !::surf defines the min and max vals of the x, y and z integration limits
     !::dat_arr is an array of 18 elements each being a pointer to a data structure
     !::used by the integration routine
-    !::retVector is a 3-element logical vector that determines if the component of the
-    !::vector should be computed
     !::handleError is a pointer to a specific subroutine that deals with any errors from the integration
     !::vOut is a 3-element vector that returns the solution of the three vector components
     !::ier is a 2-element array with error-codes from the x- and y-integrations
     !::neval is a 2-element arrant with the maximum number of function evaluations from the x- and y-integrations
-    subroutine surface_integral_cone( surf, dat_arr, retVector, handleError, vOut, ier, neval )
+    subroutine surface_integral_cone( surf, dat_arr, handleError, vOut, ier, neval )
     type( surf_carth ), intent(in) :: surf
     type( dat_ptr ), intent(inout), dimension(15) :: dat_arr
-    integer,intent(in),dimension(3) :: retVector
     procedure (error_handler), intent(in), pointer :: handleError
     
     real,dimension(3),intent(inout) :: vOut
@@ -77,25 +74,22 @@ module NumInt
     vecSign(5) = 1
     n_vec(5,:) = (/ 0, 0, 1 /)
       
-    call surf_int( dat_arr, xp, yp, zp, handleError, retVector, n, vecSign, n_vec, vOut, ier, neval )
+    call surf_int( dat_arr, xp, yp, zp, handleError, surf%retVec, n, vecSign, n_vec, vOut, ier, neval )
     
     end subroutine surface_integral_cone
     
     
     !::surf defines the min and max vals of the x, y and z integration limits
     !::dat_arr is an array of 18 elements each being a pointer to a data structure
-    !::used by the integration routine
-    !::retVector is a 3-element logical vector that determines if the component of the
-    !::vector should be computed
+    !::used by the integration routine    
     !::handleError is a pointer to a specific subroutine that deals with any errors from the integration
     !::vOut is a 3-element vector that returns the solution of the three vector components
     !::ier is a 2-element array with error-codes from the x- and y-integrations
     !::neval is a 2-element arrant with the maximum number of function evaluations from the x- and y-integrations
-    subroutine surface_integral_cyl( surf, dat_arr, retVector, handleError, vOut, ier, neval )
+    subroutine surface_integral_cyl( surf, dat_arr, handleError, vOut, ier, neval )
     type( surf_carth ), intent(in) :: surf
     type( dat_ptr ), intent(inout), dimension(12) :: dat_arr
-    integer,intent(in),dimension(3) :: retVector
-    procedure (error_handler), intent(in), pointer :: handleError
+     procedure (error_handler), intent(in), pointer :: handleError
     
     real,dimension(3),intent(inout) :: vOut
     
@@ -144,7 +138,7 @@ module NumInt
     vecSign(4) = 1
     n_vec(4,:) = (/ 0, 0, 1 /)
       
-    call surf_int( dat_arr, xp, yp, zp, handleError, retVector, n, vecSign, n_vec, vOut, ier, neval )
+    call surf_int( dat_arr, xp, yp, zp, handleError, surf%retVec, n, vecSign, n_vec, vOut, ier, neval )
     
     end subroutine surface_integral_cyl
     
@@ -224,16 +218,13 @@ module NumInt
     !::surf defines the min and max vals of the x, y and z integration limits
     !::dat_arr is an array of 18 elements each being a pointer to a data structure
     !::used by the integration routine
-    !::retVector is a 3-element logical vector that determines if the component of the
-    !::vector should be computed
     !::handleError is a pointer to a specific subroutine that deals with any errors from the integration
     !::vOut is a 3-element vector that returns the solution of the three vector components
     !::ier is a 2-element array with error-codes from the x- and y-integrations
     !::neval is a 2-element arrant with the maximum number of function evaluations from the x- and y-integrations
-    subroutine surface_integral_carth( surf, dat_arr, retVector, handleError, vOut, ier, neval )
+    subroutine surface_integral_carth( surf, dat_arr, handleError, vOut, ier, neval )
     type( surf_carth ), intent(in) :: surf
     type( dat_ptr ), intent(inout), dimension(18) :: dat_arr
-    integer,intent(in),dimension(3) :: retVector
     procedure (error_handler), intent(in), pointer :: handleError
     
     real,dimension(3),intent(inout) :: vOut
@@ -295,7 +286,7 @@ module NumInt
     vecSign(6) = 1
     n_vec(6,:) = (/ 0, 0, 1 /)
     
-    call surf_int( dat_arr, xp, yp, zp, handleError, retVector, n, vecSign, n_vec, vOut, ier, neval )
+    call surf_int( dat_arr, xp, yp, zp, handleError, surf%retVec, n, vecSign, n_vec, vOut, ier, neval )
     
    
     end subroutine surface_integral_carth

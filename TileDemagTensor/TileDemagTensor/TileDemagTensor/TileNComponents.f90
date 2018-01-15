@@ -85,7 +85,7 @@ module TileNComponents
         
         call int_r_dDdz_dr_dtheta( dat, int_r_dDdz_dr_dtheta1, int_r_dDdz_dr_dtheta2 )
         
-        call int_sin_dDdz_dz_dtheta( dat, int_sin_dDdz_dz_dtheta1, int_sin_dDdz_dz_dtheta2 )
+       call int_sin_dDdz_dz_dtheta( dat, int_sin_dDdz_dz_dtheta1, int_sin_dDdz_dz_dtheta2 )
         
         
         theta1 = dat%theta1
@@ -105,16 +105,20 @@ module TileNComponents
         N(2,1) = int_sin_dDdx_dz_dtheta1 - int_sin_dDdx_dz_dtheta2 &
             + cos(theta1) * int_dDdx_dr_dz1 - cos(theta2) * int_dDdx_dr_dz2
         
+        
         N(2,2) = int_cos_dDdx_dz_dtheta2 - int_cos_dDdx_dz_dtheta1 &
                 + sin(theta1) * int_dDdx_dr_dz1 - sin(theta2) * int_dDdx_dr_dz2 &
                 + int_r_dDdz_dr_dtheta2 - int_r_dDdz_dr_dtheta1
         
         N(2,3) = int_sin_dDdz_dz_dtheta1 - int_sin_dDdz_dz_dtheta2 &
             + cos(theta1) * int_dDdz_dr_dz1 - cos(theta2) * int_dDdz_dr_dz2
-        
         N(3,1) = int_r_dDdx_dr_dtheta1 - int_r_dDdx_dr_dtheta2
+       
                 
         N(3,2) = int_r_dDdy_dr_dtheta1 - int_r_dDdy_dr_dtheta2
+               
+        
+        
         !::2018-01-08. Kaspar makes this hack to ensure consistency - there is an unknown problem with this component; it should be symmetric with 3,2 and appears not to be
         !::It is therefore forced to be symmetric for the time being until the problem has been figured out.
         !::2018-01-09. Kaspar figured out the probrlem in one of the tensor-functions (there was a division with r which should not be there). It is now fixed
