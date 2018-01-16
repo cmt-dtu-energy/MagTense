@@ -169,9 +169,10 @@
       r = sqrt( pts_local(:,1)**2 + pts_local(:,2)**2 )
       !Find the rotation angle. It is assumed that r != 0 in all points since the tensor-field diverges here      
       phi = acos( pts_local(:,1) / r )
-      !correct for being in the third or foruth quadrants
+      !correct for being in the third or fourth quadrants
       where ( pts_local(:,2) .lt. 0 )
-          phi = 2 * pi - phi !phi = -phi
+          !phi = 2 * pi - phi
+          phi = -phi
       endwhere
       
       !save the original orientation of the tile
