@@ -47,14 +47,14 @@ implicit none
         allocate(xarr(2))
         xarr(1) = a
         xarr(2) = b
-		s=0.5_DP*(b-a)*sum(func( xarr, dat ))
+		s=0.5_DP*(b-a)*sum(func( xarr, dat, 2 ))
         deallocate(xarr)
     else        
 		it=2**(n-2)
 		del=(b-a)/it
         allocate(xarr(it))
         xarr = arth(a+0.5_DP*del,del,it)
-		fsum=sum(func(xarr,dat))
+		fsum=sum(func(xarr,dat,it))
         deallocate(xarr)
 		s=0.5_DP*(s+del*fsum)
 	end if

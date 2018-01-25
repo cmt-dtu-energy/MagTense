@@ -82,6 +82,22 @@ module MagneticForce
           dat_arr(11)%dat%f_ptr => F_int_33
           dat_arr(12)%dat%f_ptr => F_int_33
           
+          !x-component
+          dat_arr(1)%dat%f_ptr_vec => F_int_11_vec
+          dat_arr(2)%dat%f_ptr_vec => F_int_12_vec
+          dat_arr(3)%dat%f_ptr_vec => F_int_13_vec
+          dat_arr(4)%dat%f_ptr_vec => F_int_13_vec
+          !y-component
+          dat_arr(5)%dat%f_ptr_vec => F_int_21_vec
+          dat_arr(6)%dat%f_ptr_vec => F_int_22_vec
+          dat_arr(7)%dat%f_ptr_vec => F_int_23_vec
+          dat_arr(8)%dat%f_ptr_vec => F_int_23_vec
+          !z-component
+          dat_arr(9)%dat%f_ptr_vec => F_int_31_vec
+          dat_arr(10)%dat%f_ptr_vec => F_int_32_vec
+          dat_arr(11)%dat%f_ptr_vec => F_int_33_vec
+          dat_arr(12)%dat%f_ptr_vec => F_int_33_vec
+          
           call surface_integral_cyl( surf, dat_arr, handleError, F, ier, neval )
        case ( coord_sys_carth )
           dat_arr(1)%dat%f_ptr => F_int_11

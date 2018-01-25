@@ -40,21 +40,25 @@ module MagForceMaxwellStressTensor
 
       end function F_int_12
       
-      function F_int_12_vec( yy,dat )
+      subroutine F_int_12_vec( yy,dat, n, res )
       class( dataCollectionBase ), intent(in), target :: dat
-      real,dimension(:),intent(in) :: yy
-      real,dimension(size(yy)) :: F_int_12_vec      
-      real,dimension(size(yy)) :: jacobi
-      real,dimension(size(yy),3) :: B 
+      integer,intent(in) :: n
+      real,dimension(n),intent(in) :: yy
+      real,dimension(n) :: res
+      real,dimension(:),allocatable :: jacobi
+      real,dimension(:,:),allocatable :: B 
+      
+      allocate(jacobi(n),B(n,3))
       !::Get the field from the model solution
-      call getB_field_vec( yy, dat, B, jacobi )
+      call getB_field_vec( yy, dat, B, jacobi, n )
       
       !::Calculate the off diagonal component. 
-       F_int_12_vec = 1. /mu0 * jacobi * B(:,1) * B(:,2)
+       res = 1. /mu0 * jacobi * B(:,1) * B(:,2)
     
+       deallocate(jacobi,B)
        return
 
-      end function F_int_12_vec
+      end subroutine F_int_12_vec
       
       function F_int_13( dat )
       real :: F_int_13
@@ -72,22 +76,26 @@ module MagForceMaxwellStressTensor
        return
       end function F_int_13
       
-      function F_int_13_vec( yy, dat )
+      subroutine F_int_13_vec( yy, dat, n, res )
       class( dataCollectionBase ), intent(in), target :: dat
-      real,dimension(:),intent(in) :: yy
-      real,dimension(size(yy)) :: F_int_13_vec            
-      real,dimension(size(yy),3) :: B
-      real,dimension(size(yy)) :: jacobi
+      integer,intent(in) :: n
+      real,dimension(n),intent(in) :: yy
+      real,dimension(n) :: res         
+      real,dimension(:),allocatable :: jacobi
+      real,dimension(:,:),allocatable :: B 
+      
+      allocate(jacobi(n),B(n,3))
       
       
       !::Get the field from the model solution
-      call getB_field_vec( yy, dat, B, jacobi )
+      call getB_field_vec( yy, dat, B, jacobi, n )
                                  
       !::Calculate the off diagonal component
-       F_int_13_vec = 1. /mu0 * jacobi * B(:,1) * B(:,3)
+       res = 1. /mu0 * jacobi * B(:,1) * B(:,3)
     
+       deallocate(jacobi,B)
        return
-      end function F_int_13_vec
+      end subroutine F_int_13_vec
       
       
       function F_int_23( dat )
@@ -108,22 +116,26 @@ module MagForceMaxwellStressTensor
       end function F_int_23
       
       
-      function F_int_23_vec( yy, dat )      
+      subroutine F_int_23_vec( yy, dat, n, res )      
       class( dataCollectionBase ), intent(in), target :: dat
-      real,dimension(:),intent(in) :: yy
-      real,dimension(size(yy)) :: F_int_23_vec      
-      real,dimension(size(yy),3) :: B
-      real,dimension(size(yy)) :: jacobi
+      integer,intent(in) :: n
+      real,dimension(n),intent(in) :: yy
+      real,dimension(n) :: res      
+      real,dimension(:),allocatable :: jacobi
+      real,dimension(:,:),allocatable :: B 
+      
+      allocate(jacobi(n),B(n,3))
           
       !::Get the field from the model solution
-      call getB_field_vec( yy, dat, B, jacobi  )
+      call getB_field_vec( yy, dat, B, jacobi, n  )
                                  
       !::Calculate the off diagonal component
-       F_int_23_vec = 1. /mu0 * jacobi * B(:,2) * B(:,3)
+       res = 1. /mu0 * jacobi * B(:,2) * B(:,3)
     
+       deallocate(jacobi,B)
        return
 
-      end function F_int_23_vec
+      end subroutine F_int_23_vec
       
       
       function F_int_21( dat )
@@ -135,14 +147,15 @@ module MagForceMaxwellStressTensor
       end function F_int_21
       
       
-      function F_int_21_vec( yy, dat )      
+      subroutine F_int_21_vec( yy, dat, n, res )      
       class( dataCollectionBase ), intent(in), target :: dat
-      real,dimension(:),intent(in) :: yy
-      real,dimension(size(yy)) :: F_int_21_vec
+      integer,intent(in) :: n
+      real,dimension(n),intent(in) :: yy
+      real,dimension(n) :: res
       
-      F_int_21_vec = F_int_12_vec( yy, dat )
+      call F_int_12_vec( yy, dat, n, res )
       
-      end function F_int_21_vec
+      end subroutine F_int_21_vec
       
       function F_int_31( dat )
       real :: F_int_31
@@ -153,14 +166,15 @@ module MagForceMaxwellStressTensor
       end function F_int_31
       
       
-      function F_int_31_vec( yy, dat )      
+      subroutine F_int_31_vec( yy, dat, n, res )      
       class( dataCollectionBase ), intent(in), target :: dat
-      real,dimension(:),intent(in) :: yy
-      real,dimension(size(yy)) :: F_int_31_vec
+      integer,intent(in) :: n
+      real,dimension(n),intent(in) :: yy
+      real,dimension(n) :: res
       
-      F_int_31_vec = F_int_13_vec( yy, dat )
+      call F_int_13_vec( yy, dat, n, res )
       
-      end function F_int_31_vec
+      end subroutine F_int_31_vec
       
       
       function F_int_32( dat )
@@ -172,14 +186,15 @@ module MagForceMaxwellStressTensor
       end function F_int_32
       
       
-      function F_int_32_vec( yy, dat )      
+      subroutine F_int_32_vec( yy, dat, n, res )      
       class( dataCollectionBase ), intent(in), target :: dat
-      real,dimension(:),intent(in) :: yy
-      real,dimension(size(yy)) :: F_int_32_vec
+      integer,intent(in) :: n
+      real,dimension(n),intent(in) :: yy
+      real,dimension(n) :: res
       
-      F_int_32_vec = F_int_23_vec( yy, dat )
+      call F_int_23_vec( yy, dat, n, res )
       
-      end function F_int_32_vec
+      end subroutine F_int_32_vec
                   
       function F_int_11( dat )
       real :: F_int_11
@@ -196,21 +211,24 @@ module MagForceMaxwellStressTensor
       
       end function F_int_11
       
-      function F_int_11_vec( yy, dat )      
+      subroutine F_int_11_vec( yy, dat, n, res )      
       class( dataCollectionBase ), intent(in), target :: dat
-      real,dimension(:),intent(in) :: yy
-      real,dimension(size(yy)) :: F_int_11_vec
-      real,dimension(size(yy),3) :: B
-      real,dimension(size(yy)) :: Bnorm,jacobi
+      integer,intent(in) :: n
+      real,dimension(n),intent(in) :: yy      
+      real,dimension(n):: res
+      real,dimension(:,:),allocatable :: B
+      real,dimension(:),allocatable :: Bnorm,jacobi
       
-      call getB_field_vec( yy, dat, B, jacobi )
+      allocate(B(n,3),Bnorm(n),jacobi(n))
+      
+      call getB_field_vec( yy, dat, B, jacobi, n )
       
       Bnorm = sqrt( B(:,1)**2 + B(:,2)**2 + B(:,3)**2 )
       
-      F_int_11_vec = 1./mu0 * jacobi * ( B(:,1)**2 - 0.5 * Bnorm**2 )
+      res = 1./mu0 * jacobi * ( B(:,1)**2 - 0.5 * Bnorm**2 )
     
-      
-      end function F_int_11_vec
+      deallocate(B,Bnorm,jacobi)
+      end subroutine F_int_11_vec
       
       function F_int_22( dat )
       real :: F_int_22
@@ -227,20 +245,24 @@ module MagForceMaxwellStressTensor
       end function F_int_22
       
       
-      function F_int_22_vec( yy, dat )      
+      subroutine  F_int_22_vec( yy, dat, n, res )
       class( dataCollectionBase ), intent(in), target :: dat
-      real,dimension(:),intent(in) :: yy
-      real,dimension(size(yy)) :: F_int_22_vec
-      real,dimension(size(yy),3) :: B
-      real,dimension(size(yy)) :: Bnorm, jacobi
+      integer,intent(in) :: n
+      real,dimension(n),intent(in) :: yy
+      real,dimension(n) :: res
+      real,dimension(:),allocatable :: jacobi,Bnorm
+      real,dimension(:,:),allocatable :: B 
+      
+      allocate(jacobi(n),B(n,3),Bnorm(n))
 
-      call getB_field_vec( yy, dat, B, jacobi )
+      call getB_field_vec( yy, dat, B, jacobi, n )
       
       Bnorm = sqrt( B(:,1)**2 + B(:,2)**2 + B(:,3)**2 )
                                  
-      F_int_22_vec = 1./mu0 * jacobi * ( B(:,2)**2 - 0.5 * Bnorm**2 )
+      res = 1./mu0 * jacobi * ( B(:,2)**2 - 0.5 * Bnorm**2 )
       
-      end function F_int_22_vec
+      deallocate(jacobi,B,Bnorm)
+      end subroutine F_int_22_vec
       
       function F_int_33( dat )
       real :: F_int_33
@@ -257,20 +279,24 @@ module MagForceMaxwellStressTensor
       end function F_int_33
       
       
-      function F_int_33_vec( yy, dat )      
+      subroutine F_int_33_vec( yy, dat, n, res )      
       class( dataCollectionBase ), intent(in), target :: dat
-      real,dimension(:),intent(in) :: yy
-      real,dimension(size(yy)) :: F_int_33_vec
-      real,dimension(size(yy),3) :: B
-      real,dimension(size(yy)) :: Bnorm, jacobi
+      integer,intent(in) :: n
+      real,dimension(n),intent(in) :: yy
+      real,dimension(n) :: res
+      real,dimension(:),allocatable :: jacobi,Bnorm
+      real,dimension(:,:),allocatable :: B 
       
-      call getB_field_vec( yy, dat, B, jacobi )
+      allocate(jacobi(n),B(n,3),Bnorm(n))
+      
+      call getB_field_vec( yy, dat, B, jacobi, n )
       
       Bnorm = sqrt( B(:,1)**2 + B(:,2)**2 + B(:,3)**2 )
                                  
-      F_int_33_vec = 1./mu0 * jacobi * ( B(:,3)**2 - 0.5 * Bnorm**2 )
+      res = 1./mu0 * jacobi * ( B(:,3)**2 - 0.5 * Bnorm**2 )
       
-      end function F_int_33_vec
+      deallocate(jacobi,B,Bnorm)
+      end subroutine F_int_33_vec
       
        !::Returns the B-field given the specific dat model and jacobi-multiplier
         subroutine getB_field( dat, B, jacobi )
@@ -291,18 +317,18 @@ module MagForceMaxwellStressTensor
         end subroutine getB_field
         
         
-        subroutine getB_field_vec( yy, dat, B, jacobi )
+        subroutine getB_field_vec( yy, dat, B, jacobi, n )
         class( dataCollectionBase ), intent(in), target :: dat
-        real,dimension(:),intent(in) :: yy
-        real,dimension(size(yy),3),intent(inout) :: B
-        real,dimension(size(yy)),intent(inout) :: jacobi
-        real,dimension(size(yy),3) :: Hext
+        integer,intent(in) :: n
+        real,dimension(n),intent(in) :: yy
+        real,dimension(n,3),intent(inout) :: B
+        real,dimension(n),intent(inout) :: jacobi        
         
         if ( dat%coord_sys .eq.  coord_sys_carth ) then
             !call getB_field_cart_vec( dat, B )
             !jacobi = 1
         elseif (dat%coord_sys .eq. coord_sys_cyl ) then
-            call getB_field_cyl_vec( yy, dat, B, jacobi )     
+            call getB_field_cyl_vec( yy, dat, B, jacobi, n )     
         elseif ( dat%coord_sys .eq. coord_sys_cone ) then
             !call getB_field_cone_vec( dat, B, jacobi )
         endif
@@ -419,15 +445,18 @@ module MagForceMaxwellStressTensor
         
         !::Get the field from the model solution in cylindrical coordinates
         !::Vectorized
-        subroutine getB_field_cyl_vec( yy, dat, B, jacobi )
+        subroutine getB_field_cyl_vec( yy, dat, B, jacobi, n )
         class( dataCollectionBase ), intent(in), target :: dat
         class( magStatModel ), pointer :: model
-        real,dimension(:),intent(in) :: yy
-        real,dimension(size(yy),3),intent(inout) :: B
-        real,dimension(size(yy)),intent(inout) :: jacobi        
-        real,dimension(size(yy),3) :: Hsol, solPts 
-        real,dimension(size(yy)) :: x,y,z,theta,normMult
+        integer,intent(in) :: n
+        real,dimension(n),intent(in) :: yy
+        real,dimension(n,3),intent(inout) :: B
+        real,dimension(n),intent(inout) :: jacobi        
+        real,dimension(:,:),allocatable :: Hsol, solPts 
+        real,dimension(:),allocatable :: x,y,z,theta,normMult
         real :: r
+        
+        allocate(Hsol(n,3),solPts(n,3),x(n),y(n),z(n),theta(n),normMult(n))
         
         !::Make the down cast to get the actual data model set
         call getDataModel( dat%model, model )
@@ -474,9 +503,11 @@ module MagForceMaxwellStressTensor
         solPts(:,3) = z
         
         !::Get the solution from the MagStatVersion2 library
-        call getFieldFromTiles( model%tiles, Hsol, solPts, model%n_tiles, size(yy) )
+        call getFieldFromTiles( model%tiles, Hsol, solPts, model%n_tiles, n )
         
         B = mu0 * Hsol
+        
+        deallocate(Hsol,solPts,x,y,z,theta,normMult)
        
         end subroutine getB_field_cyl_vec
        
