@@ -311,19 +311,6 @@ call qags_x ( f_ptr, dat, dat%x1, dat%x2, dat%epsabs, dat%epsrel, res, dat%abser
 
 end subroutine integral2
 
-subroutine integral2_vec( dat, res )
-real,intent(inout) :: res
-class(dataCollectionBase),intent(inout), target :: dat
-procedure (f_int_dat_vec), pointer :: f_ptr => null ()
-integer*4 :: tmp
-res = 0
-f_ptr => h_vec
-
-dat%progCallbackCnt = 0
-tmp = dat%progCallback( dat )
-res = qromb_mod( f_ptr, dat, dat%x1, dat%x2 )
-
-end subroutine integral2_vec
 
 !::Adopted from NR
 function h(xx, dat)
@@ -331,14 +318,14 @@ real :: h
 real,intent(in) :: xx
 real :: ss, res
 class(dataCollectionBase), target :: dat
-procedure (f_int_dat), pointer :: f_ptr => null ()
+procedure (f_int_dat_vec), pointer :: f_ptr => null ()
 real :: tmp
 
-    f_ptr => f
+    f_ptr => f_vec
     dat%x = xx
 
     
-    call qags_y( f_ptr, dat, dat%y1, dat%y2, dat%epsabs, dat%epsrel, ss, dat%abserr_y, dat%neval_y, dat%ier_y )    
+    call qags_y_vec( f_ptr, dat, dat%y1, dat%y2, dat%epsabs, dat%epsrel, ss, dat%abserr_y, dat%neval_y, dat%ier_y )    
     h = ss
     !h = qromb_mod( f_ptr, dat, dat%y1, dat%y2 )
     
@@ -353,34 +340,7 @@ real :: tmp
 return
 end function h
 
-function h_vec(xx, dat)
-real,dimension(:),intent(in) :: xx
-real,dimension(size(xx)) :: h_vec
-real :: ss, res
-class(dataCollectionBase), target :: dat
-procedure (f_int_dat_vec), pointer :: f_ptr => null ()
-real :: tmp
-integer :: i
-integer*4 :: tmp2
 
-    f_ptr => f_vec
-    
-    do i=1,size(xx)
-        dat%x = xx(i)
-        dat%progCallbackCnt = size(xx)
-        tmp2 = dat%progCallback( dat )
-        h_vec = qromb_mod( f_ptr, dat, dat%y1, dat%y2 )
-    enddo
-    if ( mod( dat%progCallbackCnt, 10 ) .eq. 0 ) then
-        !::Progress callback
-        tmp = dat%progCallback( dat )
-    endif    
-        
-    dat%progCallbackCnt = dat%progCallbackCnt + 1
-    
-    
-return
-end function h_vec
 
 !::adopted from NR
 function f( yy, dat )
@@ -396,16 +356,20 @@ f = dat%f_ptr(dat)
 return
 end function f
 
-function f_vec( yy, dat )
-real,dimension(:),intent(in) :: yy
-real,dimension(size(yy)) :: f_vec
-class(dataCollectionBase), intent(in),target :: dat
-        
-f_vec = dat%f_ptr_vec(yy,dat)
+function f_vec( yy, dat, n )
+integer,intent(in) :: n
+real,intent(in),dimension(n) :: yy
+real,dimension(n) :: f_vec
+class(dataCollectionBase),intent(inout), target :: dat
+
+call dat%f_ptr_vec(yy, dat, n, f_vec )
+!res = dat%f_ptr_vec(yy,dat,n)
+
 
 
 
 return
 end function f_vec
+
 
 end module NumInt
