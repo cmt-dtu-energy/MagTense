@@ -20,11 +20,16 @@ module TileNComponents
         real,dimension(3) :: rotAngles !:: rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
         integer :: magnetType !::defines whether the tile is a hard or soft magnet
         integer :: stateFunctionIndex !::index matching an entry into an array of type MagStatStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+        
+        !::internal variables that are used for averaging the internal field
+        integer,dimension(3) :: n_ave
+        real,dimension(:,:),allocatable :: H_ave_pts,H_ave
+        integer :: fieldEvaluation
     end type MagTile
     
     integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeEllipsoid=3
     integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2
-    
+    integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     
     contains
     

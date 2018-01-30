@@ -82,33 +82,34 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
         do i=1,n
             
             select case (tiles(i)%tileType )
-            case (tileTypeCylPiece)
+            case (tileTypeCylPiece)                
                 !find the contribution to the internal field of the i'th tile from all tiles           
-                pts(1) = cos(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(1)
-                pts(2) = sin(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(2)
-                pts(3) = tiles(i)%z0 + tiles(i)%offset(3)
+                if ( tiles(i)%fieldEvaluation == fieldEvaluationCentre ) then
+                    pts(1) = cos(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(1)
+                    pts(2) = sin(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(2)
+                    pts(3) = tiles(i)%z0 + tiles(i)%offset(3)
+                    !::Get the field in the i'th tile from all tiles           
+                    call getFieldFromTiles( tiles, H(i,:), pts, n, 1 )
+                elseif ( tiles(i)%fieldEvaluation == fieldEvaluationAverage ) then                    
+                    !::Get the field in the i'th tile from all tiles  
+                    tiles(i)%H_ave(:,:) = 0.
+                    call getFieldFromTiles( tiles, tiles(i)%H_ave(:,:), tiles(i)%H_ave_pts, n, tiles(i)%n_ave(1) * tiles(i)%n_ave(2) * tiles(i)%n_ave(3) )
+                    H(i,1) = sum( tiles(i)%H_ave(:,1) ) / tiles(i)%n_ave(1)
+                    H(i,2) = sum( tiles(i)%H_ave(:,2) ) / tiles(i)%n_ave(2)
+                    H(i,3) = sum( tiles(i)%H_ave(:,3) ) / tiles(i)%n_ave(3)
+                endif
+                    
             case(tileTypePrism)
                 pts = tiles(i)%offset
+                !::Get the field in the i'th tile from all tiles           
+                call getFieldFromTiles( tiles, H(i,:), pts, n, 1 )
             case default
                 
             end select
             
-           
-           !::Get the field in the i'th tile from all tiles           
-           call getFieldFromTiles( tiles, H(i,:), pts, n, 1 )           
-           
-           !subtract the magnetization of the i'th tile to get H
-           
+                   
            !::When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is slowed
-           !::If the tile is a cylinder piece then M should be subtracted due to the way the tensor was derived. If the tile is a prism them M should not be subtracted. Really idiotic (Kaspar, 21-12-2017)
-           !select case (tiles(i)%tileType )
-           !case (tileTypeCylPiece)
-           !    H(i,:) = H_old(i,:) + lambda * ( H(i,:) - tiles(i)%M - H_old(i,:) )
-           !case(tileTypePrism)
-           !    H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
-           !case default
-           !     
-           ! end select
+           
            H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
            
         enddo
