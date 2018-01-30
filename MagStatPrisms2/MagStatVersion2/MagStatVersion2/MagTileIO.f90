@@ -287,6 +287,7 @@ implicit none
         fieldnames(17) = 'abc'
         fieldnames(18) = 'magnetType'
         fieldnames(19) = 'stfcnIndex'
+        
     
         
     end subroutine getTileFieldnames
