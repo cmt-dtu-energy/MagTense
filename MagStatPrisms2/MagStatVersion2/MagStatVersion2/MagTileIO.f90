@@ -61,13 +61,16 @@ implicit none
     integer,intent(in) :: n_tiles    
     type(MagTile),intent(inout),dimension(n_tiles) :: cylTile
     
-    mwIndex :: i
+    mwIndex :: i,j,k,l
     mwSize :: sx
-    integer :: nfields
+    integer :: nfields,cnt,n
     real*8,dimension(3) :: rectDims
     mwPointer :: r0Ptr,theta0Ptr,z0Ptr,drPtr,dthetaPtr,dzPtr,MPtr,u_eaPtr,u_oa1Ptr,u_oa2Ptr,mur_eaPtr,mur_oaPtr,MremPtr
     mwPointer :: tileTypePtr,offsetPtr,rotAnglesPtr,rectDimsPtr,magnetTypePtr,stateFunctionIndexPtr
     mwPointer :: mxGetField, mxGetPr
+    real,dimension(:),allocatable :: r, theta, z
+    real :: dr,dtheta,dz
+    
     
         call getTileFieldnames( fieldnames, nfields )
         do i=1,n_tiles
@@ -118,6 +121,37 @@ implicit none
             sx = 1
             call mxCopyPtrToInteger4(mxGetPr(magnetTypePtr), cylTile(i)%magnetType, sx )            
             call mxCopyPtrToInteger4(mxGetPr(stateFunctionIndexPtr), cylTile(i)%stateFunctionIndex, sx )
+            
+            
+            if ( cyltile(i)%tiletype == tiletypecylpiece ) then
+                cyltile(i)%fieldevaluation  = fieldevaluationaverage
+                cyltile(i)%n_ave(1) = 5
+                cyltile(i)%n_ave(2) = 5
+                cyltile(i)%n_ave(3) = 1
+                n = cyltile(i)%n_ave(1)*cyltile(i)%n_ave(2)*cyltile(i)%n_ave(3)
+                allocate(cyltile(i)%H_ave_pts(n,3),cyltile(i)%H_ave(n,3),r(n),theta(n),z(n) )
+                dr = cyltile(i)%dr / cyltile(i)%n_ave(1)
+                dtheta = cyltile(i)%dtheta / cyltile(i)%n_ave(2)
+                dz = cyltile(i)%dz / cyltile(i)%n_ave(3)
+                cnt = 1
+                do j=1,cyltile(i)%n_ave(1)
+                    do k=1,cyltile(i)%n_ave(2)
+                        do l=1,cyltile(i)%n_ave(3)
+                            r(cnt) = dr/2 + (j-1)*dr + cylTile(i)%r0 - cylTile(i)%dr / 2
+                            theta(cnt) = dtheta/2 + (k-1)*dtheta + cylTile(i)%theta0 - cylTile(i)%dtheta / 2
+                            z(cnt) = dz/2 + (l-1)*dz + cylTile(i)%z0 - cylTile(i)%dz / 2
+                            cnt = cnt + 1
+                        enddo
+                    enddo
+                enddo
+                cyltile(i)%h_ave_pts(:,1) = r * cos( theta ) + cyltile(i)%offset(1)
+                cyltile(i)%h_ave_pts(:,2) = r * sin( theta ) + cyltile(i)%offset(2)
+                cyltile(i)%h_ave_pts(:,3) = z + cyltile(i)%offset(3)
+                deallocate(r,theta,z)
+            endif
+            
+            
+            
         enddo        
         deallocate(fieldnames)
     end subroutine loadMagTile
