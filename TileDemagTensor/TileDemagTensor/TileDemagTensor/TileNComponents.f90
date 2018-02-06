@@ -24,6 +24,8 @@ module TileNComponents
         !::internal variables that are used for averaging the internal field
         integer,dimension(3) :: n_ave
         real,dimension(:,:),allocatable :: H_ave_pts,H_ave
+        real,dimension(:,:,:,:),allocatable :: N_ave_pts
+        logical :: isIterating
         integer :: fieldEvaluation
     end type MagTile
     

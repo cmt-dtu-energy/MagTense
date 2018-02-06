@@ -54,13 +54,13 @@
       
       !::copy the number of points where the tensor field is required
       call mxCopyPtrToInteger4(mxGetPr(prhs(3)), n_ele,1)
-      allocate(pts(n_ele,3),N(3,3,n_ele),H(n_ele,3))      
+      allocate(pts(n_ele,3),N(n_ele,3,3),H(n_ele,3))      
       call mxCopyPtrToReal8(mxGetPr(prhs(2)), pts, n_ele*3)
       
       !::do the calculation
       N(:,:,:) = 0
       H(:,:) = 0      
-      call getFieldFromCylTile( cylTile(1), H, pts, n_ele, N )
+      call getFieldFromCylTile( cylTile(1), H, pts, n_ele, N, .false. )
       
       !::Load the result back to Matlab
       
