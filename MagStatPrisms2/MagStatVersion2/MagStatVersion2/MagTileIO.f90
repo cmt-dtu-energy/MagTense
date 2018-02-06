@@ -122,17 +122,21 @@ implicit none
             call mxCopyPtrToInteger4(mxGetPr(magnetTypePtr), cylTile(i)%magnetType, sx )            
             call mxCopyPtrToInteger4(mxGetPr(stateFunctionIndexPtr), cylTile(i)%stateFunctionIndex, sx )
             
-            
+            !cylTile(i)%fieldEvaluation = fieldEvaluationCentre
             if ( cyltile(i)%tiletype == tiletypecylpiece ) then
                 cyltile(i)%fieldevaluation  = fieldevaluationaverage
                 cyltile(i)%n_ave(1) = 5
                 cyltile(i)%n_ave(2) = 5
-                cyltile(i)%n_ave(3) = 1
+                cyltile(i)%n_ave(3) = 5
                 n = cyltile(i)%n_ave(1)*cyltile(i)%n_ave(2)*cyltile(i)%n_ave(3)
-                allocate(cyltile(i)%H_ave_pts(n,3),cyltile(i)%H_ave(n,3),r(n),theta(n),z(n) )
+                allocate(cyltile(i)%H_ave_pts(n,3),cyltile(i)%H_ave(n,3),r(n),theta(n),z(n))                
                 dr = cyltile(i)%dr / cyltile(i)%n_ave(1)
                 dtheta = cyltile(i)%dtheta / cyltile(i)%n_ave(2)
                 dz = cyltile(i)%dz / cyltile(i)%n_ave(3)
+                
+                !::set as default value so other users of the code don't have to update.
+                cylTile(i)%isIterating = .false.
+                
                 cnt = 1
                 do j=1,cyltile(i)%n_ave(1)
                     do k=1,cyltile(i)%n_ave(2)
@@ -147,6 +151,7 @@ implicit none
                 cyltile(i)%h_ave_pts(:,1) = r * cos( theta ) + cyltile(i)%offset(1)
                 cyltile(i)%h_ave_pts(:,2) = r * sin( theta ) + cyltile(i)%offset(2)
                 cyltile(i)%h_ave_pts(:,3) = z + cyltile(i)%offset(3)
+                cylTile(i)%H_ave(:,:) = 0.
                 deallocate(r,theta,z)
             endif
             

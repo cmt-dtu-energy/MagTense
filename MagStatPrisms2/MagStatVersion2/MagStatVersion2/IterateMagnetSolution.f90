@@ -7,7 +7,6 @@
     use MagTileIO
     implicit none
     
-    
     contains
     
     
@@ -66,13 +65,18 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
             
             select case ( tiles(i)%magnetType )
             case ( MagnetTypeHard )
-                call getM_HardMagnet( H(i,:), tiles(i) )
+                if ( tiles(i)%tileType .eq. tileTypeCylPiece ) then
+                    call getM_HardMagnet_n( tiles(i)%H_ave, tiles(i), tiles(i).n_ave(1)*tiles(i).n_ave(2)*tiles(i).n_ave(3) )
+                else
+                    call getM_HardMagnet_1( H(i,:), tiles(i) )
+                endif
+                
             case ( MagnetTypeSoft )
                 call getM_SoftMagnet( T, H(i,:), tiles(i), stateFunction, n_stf)
             case default
             end select
             
-            
+            tiles(i)%isIterating = .true.
         enddo
         !reset H array
         H_old = H
@@ -84,33 +88,34 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
             select case (tiles(i)%tileType )
             case (tileTypeCylPiece)                
                 !find the contribution to the internal field of the i'th tile from all tiles           
+                pts(1) = cos(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(1)
+                pts(2) = sin(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(2)
+                pts(3) = tiles(i)%z0 + tiles(i)%offset(3)
                 if ( tiles(i)%fieldEvaluation == fieldEvaluationCentre ) then
-                    pts(1) = cos(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(1)
-                    pts(2) = sin(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(2)
-                    pts(3) = tiles(i)%z0 + tiles(i)%offset(3)
-                    !::Get the field in the i'th tile from all tiles           
-                    call getFieldFromTiles( tiles, H(i,:), pts, n, 1 )
+                    
+                    
                 elseif ( tiles(i)%fieldEvaluation == fieldEvaluationAverage ) then                    
-                    !::Get the field in the i'th tile from all tiles  
+                    !::Get the field in the pre-defined points
                     tiles(i)%H_ave(:,:) = 0.
-                    call getFieldFromTiles( tiles, tiles(i)%H_ave(:,:), tiles(i)%H_ave_pts, n, tiles(i)%n_ave(1) * tiles(i)%n_ave(2) * tiles(i)%n_ave(3) )
-                    H(i,1) = sum( tiles(i)%H_ave(:,1) ) / tiles(i)%n_ave(1)
-                    H(i,2) = sum( tiles(i)%H_ave(:,2) ) / tiles(i)%n_ave(2)
-                    H(i,3) = sum( tiles(i)%H_ave(:,3) ) / tiles(i)%n_ave(3)
+                    call getFieldFromTiles( tiles, tiles(i)%H_ave(:,:), tiles(i)%H_ave_pts, n, tiles(i)%n_ave(1) * tiles(i)%n_ave(2) * tiles(i)%n_ave(3), tiles(i)%N_ave_pts )
+                    !H(i,1) = sum( tiles(i)%H_ave(:,1) ) / tiles(i)%n_ave(1)
+                    !H(i,2) = sum( tiles(i)%H_ave(:,2) ) / tiles(i)%n_ave(2)
+                    !H(i,3) = sum( tiles(i)%H_ave(:,3) ) / tiles(i)%n_ave(3)
                 endif
                     
             case(tileTypePrism)
-                pts = tiles(i)%offset
-                !::Get the field in the i'th tile from all tiles           
-                call getFieldFromTiles( tiles, H(i,:), pts, n, 1 )
+                pts = tiles(i)%offset                
             case default
                 
             end select
             
+            !::Get the field in the i'th tile from all tiles           
+            call getFieldFromTiles( tiles, H(i,:), pts, n, 1 )
+            
                    
-           !::When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is slowed
+            !::When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is slowed
            
-           H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
+            H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
            
         enddo
         
@@ -168,7 +173,7 @@ end subroutine updateLambda
 !::H is a vector with three elements containing the magnetic field
 !::tile is of type MagTile and is the tile under consideration
 !::
-subroutine getM_HardMagnet( H, tile )
+subroutine getM_HardMagnet_1( H, tile )
     real,dimension(3), intent(in) :: H
     type(MagTile), intent(inout) :: tile
 
@@ -210,7 +215,65 @@ subroutine getM_HardMagnet( H, tile )
     tile%M(2) = dot_product( (M(1) * tile%u_ea + M(2) * tile%u_oa1 + M(3) * tile%u_oa2), un_y )
     tile%M(3) = dot_product( (M(1) * tile%u_ea + M(2) * tile%u_oa1 + M(3) * tile%u_oa2), un_z ) 
     
-end subroutine getM_HardMagnet
+end subroutine getM_HardMagnet_1
+
+!::
+!::n is the number of field evaluations
+!::
+subroutine getM_HardMagnet_n( H, tile, n )
+    real,dimension(n,3), intent(in) :: H
+    type(MagTile), intent(inout) :: tile
+    integer,intent(in) :: n
+
+    real,dimension(3) :: M,un_x,un_y,un_z
+    real :: H_par,H_trans_1,H_trans_2
+    integer :: i
+    
+    un_x(1) = 1
+    un_x(2:3) = 0
+    
+    un_y(1) = 0
+    un_y(2) = 1
+    un_y(3) = 0
+    
+    un_z(1:2) = 0
+    un_z(3) = 1
+    
+    !Find the M vector in the i'th tile given the total internal field
+    !at the i'th tile's center
+    !Magnetization in the orthonormal basis of the easy axis
+    M = 0
+    
+    do i=1,n
+    
+        !Magnetic field along the easy axis
+        H_par = dot_product( H(i,:), tile%u_ea )
+           
+        !Magnetization along the easy axis       
+        M(1) = M(1) + tile%Mrem + (tile%mu_r_ea - 1) * H_par
+
+        !Magnetic field orthogonal to the easy axis
+        H_trans_1 = dot_product( H(i,:), tile%u_oa1 )
+        !Magnetization orthogonal to the easy axis       
+        M(2) = M(2) + (tile%mu_r_oa - 1) * H_trans_1
+
+        !the other magnetic field component orthogonal to the easy axis
+        H_trans_2 = dot_product( H(i,:), tile%u_oa2 )
+        !Magnetization orthogonal to the easy axis       
+        M(3) = M(3) + (tile%mu_r_oa - 1) * H_trans_2
+        
+    enddo
+    !::get the average value
+    M = M / n
+    !magnetization of the i'th tile (defined with respect to the global
+    !coordinate system)
+    tile%M(1) = dot_product( (M(1) * tile%u_ea + M(2) * tile%u_oa1 + M(3) * tile%u_oa2), un_x )
+    tile%M(2) = dot_product( (M(1) * tile%u_ea + M(2) * tile%u_oa1 + M(3) * tile%u_oa2), un_y )
+    tile%M(3) = dot_product( (M(1) * tile%u_ea + M(2) * tile%u_oa1 + M(3) * tile%u_oa2), un_z ) 
+    
+    
+end subroutine getM_HardMagnet_n
+
 
 !::
 !::Derives the magnetization of a soft ferromagnet given the input field and the state function
