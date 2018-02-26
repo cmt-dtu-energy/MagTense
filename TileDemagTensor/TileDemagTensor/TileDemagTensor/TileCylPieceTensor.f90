@@ -561,7 +561,13 @@ module TileCylPieceTensor
     function  B( r, x )
     real :: B
     real,intent(in) :: r,x
-        B = -4 * r * x / ( r + x )**2
+        if ( abs( r + x  ) .lt. 1e-10 ) then
+            !::The limit of B as x -> -r is zero
+            B = 0.
+        else
+            B = -4 * r * x / ( r + x )**2
+        endif
+            
         return
     end
 
@@ -570,7 +576,13 @@ module TileCylPieceTensor
         real,intent(in) :: r, x, z
             
             !K = 2 * sqrt( r * x / ( ( r + x )**2 + z**2 ) )
-            K = 4 * r * x / ( ( r + x )**2 + z**2 )
+            
+            if ( z .eq. 0 .AND. abs( r + x ) .lt. 1e-10 ) then
+                K = 0.
+            else                
+                K = 4 * r * x / ( ( r + x )**2 + z**2 )
+            endif
+            
             !::The implementation used here needs the k parameter and not the m parameter (as used by Matlab). Remember that m = k^2
             !K = K**2
             return

@@ -26,22 +26,17 @@
     
     integer :: i,prgCnt,tid,prog,OMP_GET_THREAD_NUM
     real,dimension(:,:),allocatable :: H_tmp
-    real,dimension(:,:,:,:),allocatable :: N_out
     integer,parameter :: cbCnt = 10
     logical :: useStoredN
-    
-    
-    allocate( N_out( n_tiles, n_ele, 3, 3 ) )
-    N_out(:,:,:,:) = 0.
     
     
     if ( present( Nout ) ) then 
         if ( .NOT. allocated(Nout) ) then
             allocate(Nout(n_tiles,n_ele,3,3))
+            Nout(:,:,:,:) = 0.
             useStoredN = .false.
         else
-            useStoredN = .true.
-            N_out(:,:,:,:) = Nout(:,:,:,:)
+            useStoredN = .true.  
         endif
     else
         useStoredN = .false.
@@ -66,9 +61,19 @@
         !:: is cylindrical, a prism or an ellipsoid
         select case (tiles(i)%tileType )
         case (tileTypeCylPiece)
-            call getFieldFromCylTile( tiles(i), H_tmp, pts, n_ele, N_out(i,:,:,:), useStoredN )    
+            if ( present(Nout) ) then
+                call getFieldFromCylTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )    
+            else
+                call getFieldFromCylTile( tiles(i), H_tmp, pts, n_ele )
+            endif
+            
         case (tileTypePrism)
-            call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele, N_out(i,:,:,:) )
+            if ( present(Nout) ) then
+                call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+            else
+                call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele )
+            endif
+            
         case (tileTypeEllipsoid)
         case default        
             
@@ -95,13 +100,6 @@
     !$OMP END PARALLEL DO
     !::subtract M of a tile in points that are inside that tile in order to actually get H (only for CylindricalTiles as these actually calculate the B-field (divided by mu0)
     call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_ele)
-        
-    
-    if ( present( Nout ) ) then
-        Nout = N_out
-    endif
-    deallocate(N_out)
-        
     
     end subroutine getFieldFromTiles
     
@@ -168,14 +166,15 @@
     real,dimension(n_ele,3),intent(inout) :: H
     real,dimension(n_ele,3) :: pts
     integer,intent(in) :: n_ele
-    real,dimension(n_ele,3,3),intent(inout) :: N_out
+    real,dimension(n_ele,3,3),intent(inout),optional :: N_out
     real,dimension(:),allocatable :: r,x,phi
     real,dimension(:,:),allocatable :: pts_local
     real :: phi_orig,z_orig
     real,dimension(3) :: M_orig,M_tmp
     real,dimension(3,3) :: N,Rz
     integer :: i
-    logical,intent(in) :: useStoredN
+    logical,intent(in),optional :: useStoredN
+    
     
       !::Run the calculation
       allocate( r(n_ele), x(n_ele), phi(n_ele), pts_local(n_ele,3) )
@@ -210,16 +209,20 @@
           cylTile%theta0 = phi_orig - phi(i)
           !Offset the z-coordinate
           cylTile%z0 = z_orig - pts_local(i,3)
-          if ( useStoredN .eq. .false. ) then
-              call getN_CylPiece( cylTile, r(i), N )
-              if ( cylTile%isIterating .eq. .true. ) then
-                N_out(i,:,:) = N
-              endif              
+          if ( present( useStoredN ) .eq. .true. ) then
+              if ( useStoredN .eq. .false. ) then
+                  call getN_CylPiece( cylTile, r(i), N )
+              
+                  N_out(i,:,:) = N
+              
+              else
+                  N = N_out(i,:,:)
+              endif
           else
-              N = N_out(i,:,:)
+              call getN_CylPiece( cylTile, r(i), N )
           endif
           
-          N_out(i,:,:) = N
+          
           !Get the rotation vector
           call getRotZ( -phi(i), Rz )
           !Rotate the magnetization vector
@@ -243,14 +246,15 @@
     !::
     !::Returns the magnetic field from a rectangular prism
     !::
-    subroutine getFieldFromRectangularPrismTile( prismTile, H, pts, n_ele, N_out )
+    subroutine getFieldFromRectangularPrismTile( prismTile, H, pts, n_ele, N_out, useStoredN )
     type(MagTile),intent(in) :: prismTile
     real,dimension(n_ele,3),intent(inout) :: H
     real,dimension(n_ele,3) :: pts
     integer,intent(in) :: n_ele
-    real,dimension(n_ele,3,3),intent(inout) :: N_out
+    real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+    logical,intent(in),optional :: useStoredN
     real,dimension(3) :: diffPos,dotProd
-    real,dimension(3,3) :: rotMat,rotMatInv    
+    real,dimension(3,3) :: rotMat,rotMatInv,N
     integer :: i
     
     !::get the rotation matrices
@@ -263,11 +267,20 @@
         !::2. rotate the position vector according to the rotation of the prism
         diffPos = matmul( rotMat, diffPos )
         
-        !::3. get the demag tensor
-        call getN_prism_3D( prismTile, diffPos, N_out(i,:,:) )
+        !::3. get the demag tensor                
+        if ( present( useStoredN ) .eq. .true. ) then
+            if ( useStoredN .eq. .false. ) then
+                 call getN_prism_3D( prismTile, diffPos, N )
+                 N_out(i,:,:) = N
+            else
+                N = N_out(i,:,:)
+            endif
+        else
+            call getN_prism_3D( prismTile, diffPos, N )
+        endif
         
         !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
-        call getDotProd( N_out(:,:,i), matmul( rotMat, prismTile%M ), dotProd )
+        call getDotProd( N, matmul( rotMat, prismTile%M ), dotProd )
         
         !::5. Rotate the resulting field back to the global coordinate system
         dotProd = matmul( rotMatInv, dotProd )        
