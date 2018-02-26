@@ -3,6 +3,12 @@ use PARAMETERS_CALL
 use UTIL_CALL
 use qsort_c_module
 implicit none
+
+    type( N_custom)
+
+    real*4 :: N11,N12,N13,N22,N33,N23
+
+    endtype  N_custom
     contains
     
 !::Needs a better name
@@ -64,7 +70,7 @@ implicit none
 !:: added support for defining an initial guess
 !:: Hint_init is an optional initial field (starting guess). If present it is used in stead of the applied field (Hext) as
 !:: the initial value for Hint
-subroutine calcH( pos, dims, dir, magType, formType, Hext, T, n, stateFcn, stateFcnIndices, m, solPts, l, spacedim, Hout, Mout, nIte, rotAngles, hyst_map_init, hyst_map, Hint_init )
+subroutine calcH( pos, dims, dir, magType, formType, Hext, T, n, stateFcn, stateFcnIndices, m, solPts, l, spacedim, Hout, Mout, nIte, rotAngles, hyst_map_init, hyst_map, Hint_init, N_out )
 real,intent(in),dimension(n,3) :: pos, dims,dir,rotAngles
 real,intent(in),dimension(n+l,3) :: Hext
 integer,intent(in),dimension(n) :: magType, formType
@@ -88,7 +94,7 @@ real,parameter :: tol = 0.01
 logical :: lCh
 real,dimension(:),allocatable :: tmp,Hnorm,Hnorm_old
 real,dimension(:,:,:),allocatable :: rotMat,rotMatInv
-real,dimension(:,:,:,:),allocatable :: N_out
+type(N_custom),dimension(:,:),allocatable :: N_out
 integer :: debugRetval,endInd
 integer,parameter :: recl=2
 real,parameter :: conv_fractile=0.85
@@ -119,7 +125,11 @@ if ( maxval(stateFcnIndices) .le. m ) then
     !::Get the rotation matrix and its inverse
     call findRotationMatrices( rotAngles, n, rotMat, rotMatInv)
     
-    call calcNTensor( pos, dims, N_out, n, spacedim, rotMat, formType )
+    if ( .NOT. allocated(N_out) ) then
+        allocate( N_out(n,n) )
+        call calcNTensor( pos, dims, N_out, n, spacedim, rotMat, formType )
+    endif
+    
     
     !::First we find the self-consistent solution, i.e. the magnetization (magnitude and direction) in each prism    
     do i=0,maxIte
@@ -387,7 +397,7 @@ real,intent(in),dimension(n,3) :: M
 integer,intent(in) :: n
 real,intent(in),dimension(n,3,3) :: rotMat, rotMatInv
 real,intent(inout),dimension(n,3) :: Hdem
-real,intent(in),dimension(n,n,3,3) :: N_out
+type(N_custom),intent(in),dimension(n,n) :: N_out
 real,dimension(3) :: dotProd
 integer :: i,j
 
@@ -399,7 +409,7 @@ do i=1,n
     do j=1,n        
 
         !::Compute the dot product between N and M
-        call getDotProd( N_out(i,j,:,:), matmul( rotMat(j,:,:), M(j,:) ), dotProd )
+        call getDotProd( N_out(i,j), matmul( rotMat(j,:,:), M(j,:) ), dotProd )
         
         !::Rotate the solution back.
         dotProd = matmul( rotMatInv(j,:,:), dotProd )        
@@ -413,16 +423,18 @@ enddo
 
 end subroutine getHdem
 
+
+
 subroutine calcNTensor( pos, dims, N_out, n, spacedim, rotMat, formType )
 real,intent(in),dimension(n,3) :: dims,pos
-real,intent(inout),allocatable,dimension(:,:,:,:) :: N_out
+type(N_custom),intent(inout),allocatable,dimension(:,:,:,:) :: N_out
 real,intent(in),dimension(n,3,3) :: rotMat
 integer,intent(in),dimension(n) :: formType
 integer,intent(in) :: n, spacedim
 integer :: i,j
 real,dimension(3) :: diffPos
 
-allocate( N_out(n,n,3,3) )
+allocate( N_out(n,n) )
 
 !$OMP PARALLEL DO PRIVATE(i,j,diffPos)
 do i=1,n
@@ -437,7 +449,14 @@ do i=1,n
         
         !::Find the demag. tensor
         if ( spacedim .eq. 3 ) then
-            call getN_3D(dims(j,1),dims(j,2),dims(j,3),diffPos(1),diffPos(2),diffPos(3), formType(j), N_out(i,j,:,:) )
+            !call getN_3D(dims(j,1),dims(j,2),dims(j,3),diffPos(1),diffPos(2),diffPos(3), formType(j), N_out(i,j,:,:) )
+            call getN_3D(dims(j,1),dims(j,2),dims(j,3),diffPos(1),diffPos(2),diffPos(3), formType(j), N(:,:) )
+            N_out(i,j)%N11 = N(1,1)
+            N_out(i,j)%N12 = N(1,2)
+            N_out(i,j)%N13 = N(1,3)
+            N_out(i,j)%N22 = N(2,2)
+            N_out(i,j)%N23 = N(2,3)
+            N_out(i,j)%N33 = N(3,3)
         elseif ( spacedim .eq. 2 ) then
             call getN_2D(dims(j,1),dims(j,2),dims(j,3),diffPos(1),diffPos(2),diffPos(3), N_out(i,j,:,:) )
         endif
@@ -549,14 +568,17 @@ end subroutine getRotZ
 
 !:: Calculates the dot product between (3x3)-matrix and (3)-vector
 subroutine getDotProd( N, M, dot_prod )
-real,intent(in),dimension(3,3) :: N
+type(N_custom),intent(in) :: N
 real,intent(in),dimension(3) :: M
 real,intent(inout),dimension(3) :: dot_prod
 
-dot_prod(1) = sum(N(1,:) * M(:))
-dot_prod(2) = sum(N(2,:) * M(:))
-dot_prod(3) = sum(N(3,:) * M(:))
+!dot_prod(1) = sum(N(1,:) * M(:))
+!dot_prod(2) = sum(N(2,:) * M(:))
+!dot_prod(3) = sum(N(3,:) * M(:))
 
+dot_prod(1) = N%N11 * M(1) + N%N12 * M(2) + N%N13 * M(3)
+dot_prod(2) = N%N12 * M(1) + N%N22 * M(2) + N%N13 * M(3)
+dot_prod(3) = N%N13 * M(1) + N%N22 * M(2) + N%N33 * M(3)
 
 end subroutine getDotProd
 
