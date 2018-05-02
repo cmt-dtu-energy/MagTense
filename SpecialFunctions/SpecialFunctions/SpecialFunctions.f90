@@ -255,7 +255,7 @@ end
       
       FUNCTION rf(x,y,z)
       REAL rf,x,y,z,ERRTOL,TINY,BIG,THIRD,C1,C2,C3,C4
-      PARAMETER (ERRTOL=.08,TINY=1.5e-38,BIG=3.E37,THIRD=1./3.,C1=1./24.,C2=.1,C3=3./44.,C4=1./14.)
+      PARAMETER (ERRTOL=.08,TINY=1.e-308,BIG=1.E308,THIRD=1./3.,C1=1./24.,C2=.1,C3=3./44.,C4=1./14.)
       REAL alamb,ave,delx,dely,delz,e2,e3,sqrtx,sqrty,sqrtz,xt,yt,zt
       if(min(x,y,z).lt.0..or.min(x+y,x+z,y+z).lt.TINY.or.max(x,y,z).gt.BIG)pause 'invalid arguments in rf'
       xt=x
