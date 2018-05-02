@@ -63,7 +63,7 @@ module TileCylPieceTensor
                         
         if ( theta1 .lt. 0 .and. theta2 .lt. 0 ) then
             dtheta = theta2-theta1
-            theta1 = theta1-2*pi*floor(theta1/(2*pi))
+            theta1 = theta1 - 2 * pi * floor(theta1/(2*pi))
             theta2 = theta1 + dtheta
         elseif ( theta2 .gt. 2*pi ) then
             dtheta = theta2 - theta1
@@ -76,20 +76,23 @@ module TileCylPieceTensor
             !first integrate from theta1 to zero
             val1 = int_cos_dDdx_dz_dtheta_fct( 0., z2, r1, x ) - int_cos_dDdx_dz_dtheta_fct( theta1, z2, r1, x ) - ( int_cos_dDdx_dz_dtheta_fct( 0., z1, r1, x ) - int_cos_dDdx_dz_dtheta_fct( theta1, z1, r1, x ) )
             !then integrate from zero to theta2
-            val1 = val1 + ( 2 * int_cos_dDdx_dz_dtheta_fct( 0., z2, r1, x ) - int_cos_dDdx_dz_dtheta_fct( theta2, z2, r1, x )) - int_cos_dDdx_dz_dtheta_fct( 0., z2, r1, x ) - ( ( 2 * int_cos_dDdx_dz_dtheta_fct( 0., z1, r1, x ) - int_cos_dDdx_dz_dtheta_fct( theta2, z1, r1, x ) ) - int_cos_dDdx_dz_dtheta_fct( 0., z1, r1, x ) )        
+            val1 = val1 + ( int_cos_dDdx_dz_dtheta_fct( 0., z2, r1, x ) - int_cos_dDdx_dz_dtheta_fct( theta2, z2, r1, x ) ) - ( int_cos_dDdx_dz_dtheta_fct( 0., z1, r1, x ) - int_cos_dDdx_dz_dtheta_fct( theta2, z1, r1, x ) )
+            !val1 = -val1
         else
-            val1 = -(int_cos_dDdx_dz_dtheta_fct(theta2,z2,r1,x) - int_cos_dDdx_dz_dtheta_fct(theta1, z2, r1,x) - ( int_cos_dDdx_dz_dtheta_fct(theta2,z1,r1,x) - int_cos_dDdx_dz_dtheta_fct(theta1,z1,r1,x) ))
+            val1 = -(int_cos_dDdx_dz_dtheta_fct( theta2, z2, r1, x ) - int_cos_dDdx_dz_dtheta_fct( theta1, z2, r1, x ) - ( int_cos_dDdx_dz_dtheta_fct( theta2, z1, r1, x ) - int_cos_dDdx_dz_dtheta_fct( theta1, z1, r1, x ) ) )            
+            
         endif
         
         if ( theta1 .lt. 0 .AND. theta2 .gt. 0 ) then
             !first integrate from theta1 to zero
             val2 = int_cos_dDdx_dz_dtheta_fct( 0., z2, r2, x ) - int_cos_dDdx_dz_dtheta_fct( theta1, z2, r2, x ) - ( int_cos_dDdx_dz_dtheta_fct( 0., z1, r2, x ) - int_cos_dDdx_dz_dtheta_fct( theta1, z1, r2, x ) )
             !then integrate from zero to theta2
-            val2 = val2 + ( 2 * int_cos_dDdx_dz_dtheta_fct( 0., z2, r2, x ) - int_cos_dDdx_dz_dtheta_fct( theta2, z2, r2, x )) - int_cos_dDdx_dz_dtheta_fct( 0., z2, r2, x ) - ( ( 2 * int_cos_dDdx_dz_dtheta_fct( 0., z1, r2, x ) - int_cos_dDdx_dz_dtheta_fct( theta2, z1, r2, x ) ) - int_cos_dDdx_dz_dtheta_fct( 0., z1, r2, x ) )        
+            val2 = val2 + ( int_cos_dDdx_dz_dtheta_fct( 0., z2, r2, x ) - int_cos_dDdx_dz_dtheta_fct( theta2, z2, r2, x ) ) - ( int_cos_dDdx_dz_dtheta_fct( 0., z1, r2, x ) - int_cos_dDdx_dz_dtheta_fct( theta2, z1, r2, x ) )             
+            !val2 = -val2
         else
-            val2 = -(int_cos_dDdx_dz_dtheta_fct(theta2,z2,r2,x) - int_cos_dDdx_dz_dtheta_fct(theta1, z2, r2,x) - ( int_cos_dDdx_dz_dtheta_fct(theta2,z1,r2,x) - int_cos_dDdx_dz_dtheta_fct(theta1,z1,r2,x) ))
+            val2 = -(int_cos_dDdx_dz_dtheta_fct( theta2, z2, r2, x ) - int_cos_dDdx_dz_dtheta_fct( theta1, z2, r2, x ) - ( int_cos_dDdx_dz_dtheta_fct( theta2, z1, r2, x ) - int_cos_dDdx_dz_dtheta_fct( theta1, z1, r2, x ) ) )            
         endif
-                       
+                
     end subroutine
     function int_cos_dDdx_dz_dtheta_fct( theta, z, rs, x )        
     real :: int_cos_dDdx_dz_dtheta_fct
@@ -194,11 +197,11 @@ module TileCylPieceTensor
             
         if ( theta1 .lt. 0 .AND. theta2 .lt. 0 ) then
             dtheta = theta2-theta1
-            theta1 = theta1-2*pi*floor(theta1/(2*pi))
+            theta1 = theta1 - 2 * pi * floor(theta1/(2*pi))
             theta2 = theta1 + dtheta
         elseif ( theta2 .gt. 2*pi ) then
             dtheta = theta2 - theta1
-            theta2 = theta2-2*pi*floor(theta2/(2*pi))
+            theta2 = theta2 - 2*pi*floor(theta2/(2*pi))
             theta1 = theta2 - dtheta
         endif
             
@@ -208,6 +211,8 @@ module TileCylPieceTensor
             val1 = int_sin_dDdy_dz_dtheta_fct( 0., z2, r1, x ) - int_sin_dDdy_dz_dtheta_fct( theta1, z2, r1, x ) - ( int_sin_dDdy_dz_dtheta_fct( 0., z1, r1, x ) - int_sin_dDdy_dz_dtheta_fct( theta1, z1, r1, x ) )
             !then integrate from zero to theta2
             val1 = val1 + ( int_sin_dDdy_dz_dtheta_fct( 0., z2, r1, x ) - int_sin_dDdy_dz_dtheta_fct( theta2, z2, r1, x ) ) - ( int_sin_dDdy_dz_dtheta_fct( 0., z1, r1, x ) - int_sin_dDdy_dz_dtheta_fct( theta2, z1, r1, x ) ) 
+            
+            !val1 = -val1
         else
             val1 = -(int_sin_dDdy_dz_dtheta_fct( theta2, z2, r1, x ) - int_sin_dDdy_dz_dtheta_fct( theta1, z2, r1, x )  - ( int_sin_dDdy_dz_dtheta_fct( theta2, z1, r1, x ) - int_sin_dDdy_dz_dtheta_fct( theta1, z1, r1, x ) ) )
         endif
@@ -217,10 +222,12 @@ module TileCylPieceTensor
             val2 = int_sin_dDdy_dz_dtheta_fct( 0., z2, r2, x ) - int_sin_dDdy_dz_dtheta_fct( theta1, z2, r2, x ) - ( int_sin_dDdy_dz_dtheta_fct( 0., z1, r2, x ) - int_sin_dDdy_dz_dtheta_fct( theta1, z1, r2, x ) )
             !then integrate from zero to theta2
             val2 = val2 + ( int_sin_dDdy_dz_dtheta_fct( 0., z2, r2, x ) - int_sin_dDdy_dz_dtheta_fct( theta2, z2, r2, x ) ) - ( int_sin_dDdy_dz_dtheta_fct( 0., z1, r2, x ) - int_sin_dDdy_dz_dtheta_fct( theta2, z1, r2, x ) ) 
+            
+            !val2 = -val2
         else
             val2 = -(int_sin_dDdy_dz_dtheta_fct( theta2, z2, r2, x ) - int_sin_dDdy_dz_dtheta_fct( theta1, z2, r2, x )  - ( int_sin_dDdy_dz_dtheta_fct( theta2, z1, r2, x ) - int_sin_dDdy_dz_dtheta_fct( theta1, z1, r2, x ) ) )
         endif
-            
+        
     end
     
     function int_sin_dDdy_dz_dtheta_fct( theta, z, rs, x )
@@ -554,7 +561,13 @@ module TileCylPieceTensor
     function  B( r, x )
     real :: B
     real,intent(in) :: r,x
-        B = -4 * r * x / ( r + x )**2
+        if ( abs( r + x  ) .lt. 1e-10 ) then
+            !::The limit of B as x -> -r is zero
+            B = 0.
+        else
+            B = -4 * r * x / ( r + x )**2
+        endif
+            
         return
     end
 
@@ -563,7 +576,13 @@ module TileCylPieceTensor
         real,intent(in) :: r, x, z
             
             !K = 2 * sqrt( r * x / ( ( r + x )**2 + z**2 ) )
-            K = 4 * r * x / ( ( r + x )**2 + z**2 )
+            
+            if ( z .eq. 0 .AND. abs( r + x ) .lt. 1e-10 ) then
+                K = 0.
+            else                
+                K = 4 * r * x / ( ( r + x )**2 + z**2 )
+            endif
+            
             !::The implementation used here needs the k parameter and not the m parameter (as used by Matlab). Remember that m = k^2
             !K = K**2
             return

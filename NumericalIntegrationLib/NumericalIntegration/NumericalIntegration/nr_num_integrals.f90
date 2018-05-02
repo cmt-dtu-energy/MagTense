@@ -8,14 +8,14 @@ implicit none
     
     FUNCTION qromb_mod(func,dat,a,b)
 	USE nrtype; USE nrutil, ONLY : nrerror
-	USE nr, ONLY : polint,trapzd
+	USE nr, ONLY : polint
 	IMPLICIT NONE
 	REAL(DP), INTENT(IN) :: a,b
     class(dataCollectionBase), intent(inout),target :: dat
 	REAL(DP) :: qromb_mod
 	procedure (f_int_dat_vec),intent(in), pointer :: func => null ()
 	INTEGER(I4B), PARAMETER :: JMAX=20,JMAXP=JMAX+1,K=5,KM=K-1
-	REAL(DP), PARAMETER :: EPS=1.0e-6_DP
+	REAL(DP), PARAMETER :: EPS=1.0e-4_DP
 	REAL(DP), DIMENSION(JMAXP) :: h,s
 	REAL(DP) :: dqromb
 	INTEGER(I4B) :: j
@@ -32,6 +32,8 @@ implicit none
 	call nrerror('qromb: too many steps')
     END FUNCTION qromb_mod
     
+    
+    
     SUBROUTINE trapzd_mod(func,dat,a,b,s,n)
 	USE nrtype; USE nrutil, ONLY : arth
 	IMPLICIT NONE
@@ -47,7 +49,7 @@ implicit none
         allocate(xarr(2))
         xarr(1) = a
         xarr(2) = b
-		s=0.5_DP*(b-a)*sum(func( xarr, dat, 2 ))
+		s=0.5_DP*(b-a) * sum( func( (/ a,b /), dat, 2 ) )
         deallocate(xarr)
     else        
 		it=2**(n-2)
@@ -58,8 +60,10 @@ implicit none
         deallocate(xarr)
 		s=0.5_DP*(s+del*fsum)
 	end if
-	END SUBROUTINE trapzd_mod
+    END SUBROUTINE trapzd_mod
 
+    
+    
     
     
     end module nr_num_integrals

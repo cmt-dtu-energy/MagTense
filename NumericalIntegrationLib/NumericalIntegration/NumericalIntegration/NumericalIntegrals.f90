@@ -301,13 +301,15 @@ subroutine integral2( dat, res )
 real,intent(inout) :: res
 class(dataCollectionBase),intent(inout), target :: dat
 procedure (f_int_dat), pointer :: f_ptr => null ()
+!procedure (f_int_dat_vec), pointer :: f_ptr => null ()
 
 res = 0
+!f_ptr => h_vec
 f_ptr => h
 
 dat%progCallbackCnt = 0
 call qags_x ( f_ptr, dat, dat%x1, dat%x2, dat%epsabs, dat%epsrel, res, dat%abserr_x, dat%neval_x, dat%ier_x )
-
+!res = qromb_mod( f_ptr, dat, dat%x1, dat%x2 )
 
 end subroutine integral2
 
@@ -327,8 +329,7 @@ real :: tmp
     
     call qags_y_vec( f_ptr, dat, dat%y1, dat%y2, dat%epsabs, dat%epsrel, ss, dat%abserr_y, dat%neval_y, dat%ier_y )    
     h = ss
-    !h = qromb_mod( f_ptr, dat, dat%y1, dat%y2 )
-    
+        
     if ( mod( dat%progCallbackCnt, 100 ) .eq. 0 ) then
         !::Progress callback
         tmp = dat%progCallback( dat )
@@ -340,6 +341,33 @@ real :: tmp
 return
 end function h
 
+function h_vec(xx, dat, n)
+integer,intent(in) :: n
+real,dimension(n) :: h_vec
+real,intent(in),dimension(n) :: xx
+real :: ss, res
+class(dataCollectionBase), target :: dat
+procedure (f_int_dat_vec), pointer :: f_ptr => null ()
+real :: tmp
+integer :: i
+
+    do i=1,n
+        f_ptr => f_vec
+        dat%x = xx(i)
+
+        h_vec(i) = qromb_mod( f_ptr, dat, dat%y1, dat%y2 )
+    
+        if ( mod( dat%progCallbackCnt, 100 ) .eq. 0 ) then
+            !::Progress callback
+            tmp = dat%progCallback( dat )
+        endif
+        
+        dat%progCallbackCnt = dat%progCallbackCnt + 1
+    enddo
+    
+    
+return
+end function h_vec
 
 
 !::adopted from NR
@@ -363,9 +391,6 @@ real,dimension(n) :: f_vec
 class(dataCollectionBase),intent(inout), target :: dat
 
 call dat%f_ptr_vec(yy, dat, n, f_vec )
-!res = dat%f_ptr_vec(yy,dat,n)
-
-
 
 
 return
