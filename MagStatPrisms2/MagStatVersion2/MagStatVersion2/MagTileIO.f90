@@ -125,8 +125,8 @@ implicit none
             
             if ( cyltile(i)%tiletype == tiletypecylpiece ) then
                 cyltile(i)%fieldevaluation  = fieldevaluationaverage
-                cyltile(i)%n_ave(1) = 5
-                cyltile(i)%n_ave(2) = 5
+                cyltile(i)%n_ave(1) = 1
+                cyltile(i)%n_ave(2) = 1
                 cyltile(i)%n_ave(3) = 1
                 n = cyltile(i)%n_ave(1)*cyltile(i)%n_ave(2)*cyltile(i)%n_ave(3)
                 allocate(cyltile(i)%H_ave_pts(n,3),cyltile(i)%H_ave(n,3),r(n),theta(n),z(n) )
