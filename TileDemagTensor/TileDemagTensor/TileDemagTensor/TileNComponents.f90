@@ -1,6 +1,7 @@
 module TileNComponents
     use TileCylPieceTensor
     use TileRectanagularPrismTensor
+    use TileCircPieceTensor
     implicit none
     
     !::General base-type for alle the different tile types
@@ -29,7 +30,7 @@ module TileNComponents
         integer :: fieldEvaluation
     end type MagTile
     
-    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeEllipsoid=3
+    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeEllipsoid=4
     integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2
     integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     
@@ -141,6 +142,134 @@ module TileNComponents
     deallocate(dat)
     end subroutine getN_CylPiece
 
+    subroutine getN_circPiece( tile, pos, Nout )
+    type(MagTile),intent(in) :: tile
+    class( dataCollectionBase ), pointer :: dat
+    real,dimension(3),intent(in) :: pos
+    real,dimension(3,3),intent(inout) :: Nout
+    real :: int_ddx_dy_dz_val,int_ddx_dx_dz_val,int_ddx_cos_dtheta_dz_val,int_ddx_sin_dtheta_dz_val
+    real :: int_ddx_dx_dy_val1,int_ddx_dx_dy_val2,int_ddy_dy_dz_val, int_ddy_dx_dz_val,int_ddy_cos_dtheta_dz_val
+    real :: int_ddy_sin_dtheta_dz_val, int_ddy_dx_dy_val1,int_ddy_dx_dy_val2,int_ddz_dy_dz_val
+    real :: int_ddz_dx_dz_val,int_ddz_cos_dtheta_dz_val,int_ddz_sin_dtheta_dz_val,int_ddz_dx_dy_val1,int_ddz_dx_dy_val2
+    real :: phi,Nxx,Nyy,Nzz,Nxy,Nyx,Nxz,Nzx,Nyz,Nzy
+    real :: R,x,y
+            Nout(:,:) = 0.            
+
+            !get the integration limits            
+             allocate(dat)
+
+            !get the integration limits
+            dat%r1 = tile%r0 - tile%dr/2
+            dat%r2 = tile%r0 + tile%dr/2
+
+            dat%theta1 = tile%theta0 - tile%dtheta/2
+            dat%theta2 = tile%theta0 + tile%dtheta/2
+            
+            dat%z1 = tile%z0 - tile%dz/2
+            dat%z2 = tile%z0 + tile%dz/2    
+            
+            dat%x = pos(1)
+            dat%y = pos(2)
+            dat%z = pos(3)
+            
+            x = pos(1)
+            y = pos(2)
+            R = tile%r0 + tile%dr/2
+           
+            !x-component of the field
+            !yz-plane (Mx)
+            call int_ddx_dy_dz( dat, int_ddx_dy_dz_val )
+                        
+            !xz-plane (My)
+            call int_ddx_dx_dz( dat, int_ddx_dx_dz_val )
+                        
+            !theta-z-plane (Mr=cos(theta0)*Mx + sin(theta0)*My)
+            call int_ddx_cos_dtheta_dz( dat, int_ddx_cos_dtheta_dz_val )            
+            
+            call int_ddx_sin_dtheta_dz( dat, int_ddx_sin_dtheta_dz_val )            
+            
+            !xy-plane (Mz) (UP,positive)
+            call int_ddx_dx_dy( dat, int_ddx_dx_dy_val1, int_ddx_dx_dy_val2 )            
+            
+            
+            !y-component of the field
+            !yz-plane (Mx)
+            call int_ddy_dy_dz( dat, int_ddy_dy_dz_val )
+                        
+            !xz-plane (My)
+            call int_ddy_dx_dz( dat, int_ddy_dx_dz_val )
+                        
+            !theta-z-plane (Mr=cos(theta0)*Mx + sin(theta0)*My)
+            call int_ddy_cos_dtheta_dz( dat, int_ddy_cos_dtheta_dz_val )
+            call int_ddy_sin_dtheta_dz( dat, int_ddy_sin_dtheta_dz_val )
+            
+            
+            !xy-plane (Mz) (UP,positive, DOWN negative)
+            call int_ddy_dx_dy( dat, int_ddy_dx_dy_val1, int_ddy_dx_dy_val2 )
+                        
+            !z-component of the field
+            !yz-plane (Mx)
+            call int_ddz_dy_dz( dat, int_ddz_dy_dz_val )            
+            
+            !xz-plane (My)
+            call int_ddz_dx_dz( dat, int_ddz_dx_dz_val )            
+            
+            !theta-z-plane (Mr=cos(theta0)*Mx + sin(theta0)*My)
+            call int_ddz_cos_dtheta_dz(dat, int_ddz_cos_dtheta_dz_val )
+            call int_ddz_sin_dtheta_dz(dat, int_ddz_sin_dtheta_dz_val )
+            
+            
+            !xy-plane (Mz) (UP,positive)
+            call int_ddz_dx_dy ( dat, int_ddz_dx_dy_val1, int_ddz_dx_dy_val2 )
+                        
+            !define the rotation-trick-variable
+            phi = atan2(y,x)
+            
+
+            
+            Nxx = int_ddx_dy_dz_val + R/(4*pi) * &
+                ( cos(phi) * ( cos(phi) * int_ddx_cos_dtheta_dz_val - sin(phi) * int_ddx_sin_dtheta_dz_val ) &
+                + sin(phi) * ( cos(phi) * int_ddy_cos_dtheta_dz_val - sin(phi) * int_ddy_sin_dtheta_dz_val ) )
+            
+            !Kaspar: Something is not correct with int_ddx_sin_dtheta_dz. 
+            !Kaspar: Fixed!
+            Nxy = int_ddx_dx_dz_val + R/(4*pi) * &
+                ( cos(phi) * ( sin(phi) * int_ddx_cos_dtheta_dz_val + cos(phi) * int_ddx_sin_dtheta_dz_val ) &
+                + sin(phi) * ( sin(phi) * int_ddy_cos_dtheta_dz_val + cos(phi) * int_ddy_sin_dtheta_dz_val ) )
+            
+            
+            Nxz = int_ddx_dx_dy_val2 - int_ddx_dx_dy_val1
+                                    
+            Nyx = int_ddy_dy_dz_val + R/(4*pi) * &
+                ( sin(phi) * ( cos(phi) * int_ddx_cos_dtheta_dz_val - sin(phi) * int_ddx_sin_dtheta_dz_val ) &
+                - cos(phi) * ( cos(phi) * int_ddy_cos_dtheta_dz_val - sin(phi) * int_ddy_sin_dtheta_dz_val ) )
+            
+            Nyy = int_ddy_dx_dz_val + R/(4*pi) * &
+                ( sin(phi) * ( sin(phi) * int_ddx_cos_dtheta_dz_val + cos(phi) * int_ddx_sin_dtheta_dz_val ) &
+                - cos(phi) * ( sin(phi) * int_ddy_cos_dtheta_dz_val + cos(phi) * int_ddy_sin_dtheta_dz_val ) )
+            
+            Nyz = int_ddy_dx_dy_val2 - int_ddy_dx_dy_val1
+            
+            Nzx = int_ddz_dy_dz_val - R/(4*pi) * ( cos(phi) * int_ddz_cos_dtheta_dz_val - sin(phi) * int_ddz_sin_dtheta_dz_val )
+            
+            Nzy = int_ddz_dx_dz_val - R/(4*pi) * ( sin(phi) * int_ddz_cos_dtheta_dz_val + cos(phi) * int_ddz_sin_dtheta_dz_val )
+            
+            Nzz = int_ddz_dx_dy_val2 - int_ddz_dx_dy_val1
+            
+            Nout(1,1) = Nxx;
+            Nout(1,2) = Nxy;
+            Nout(1,3) = Nxz;
+            Nout(2,1) = Nyx;
+            Nout(2,2) = Nyy;
+            Nout(2,3) = Nyz;
+            Nout(3,1) = Nzx;
+            Nout(3,2) = Nzy;
+            Nout(3,3) = Nzz;
+
+        deallocate(dat)
+    
+    end subroutine getN_circPiece
+    
     
     !::Calculates N from the analytical expression in 3D
     !::Given the prism tile (prism) and the position vector to it (pos = (x,y,z) )
