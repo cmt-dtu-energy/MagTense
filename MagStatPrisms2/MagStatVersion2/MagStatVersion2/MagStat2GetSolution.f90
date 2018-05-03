@@ -145,9 +145,9 @@
             zmin = tiles(i)%z0 - tiles(i)%dz/2
             zmax = tiles(i)%z0 + tiles(i)%dz/2
         
-            where( rmin .le. r .AND. r .le. rmax .AND. zmin .le. z .AND. z .le. zmax  .AND. thetamin .le. theta .AND. theta .le. thetamax .OR. &
-                   rmin .le. r .AND. r .le. rmax .AND. zmin .le. z .AND. z .le. zmax  .AND. thetamin - 2*pi .le. theta .AND. theta .le. thetamax - 2*pi .OR. &
-                   rmin .le. r .AND. r .le. rmax .AND. zmin .le. z .AND. z .le. zmax  .AND. thetamin + 2*pi .le. theta .AND. theta .le. thetamax + 2*pi )
+            where( rmin .le. r .AND. r .lt. rmax .AND. zmin .le. z .AND. z .lt. zmax  .AND. thetamin .le. theta .AND. theta .lt. thetamax .OR. &
+                   rmin .le. r .AND. r .lt. rmax .AND. zmin .le. z .AND. z .lt. zmax  .AND. thetamin - 2*pi .le. theta .AND. theta .lt. thetamax - 2*pi .OR. &
+                   rmin .le. r .AND. r .lt. rmax .AND. zmin .le. z .AND. z .lt. zmax  .AND. thetamin + 2*pi .le. theta .AND. theta .lt. thetamax + 2*pi )
                 H(:,1) = H(:,1) - tiles(i)%M(1)
                 H(:,2) = H(:,2) - tiles(i)%M(2)
                 H(:,3) = H(:,3) - tiles(i)%M(3)
