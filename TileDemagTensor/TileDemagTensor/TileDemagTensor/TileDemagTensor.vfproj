@@ -44,7 +44,9 @@
 		<Filter Name="Header Files" Filter="fi;fd"/>
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
+		<File RelativePath=".\TileCircPieceTensor.f90"/>
 		<File RelativePath=".\TileCylPieceTensor.f90"/>
 		<File RelativePath=".\TileNComponents.f90"/>
-		<File RelativePath=".\TileRectangularPrismTensor.f90"/></Filter></Files>
+		<File RelativePath=".\TileRectangularPrismTensor.f90"/>
+		<File RelativePath=".\TileTensorHelperFunctions.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>
