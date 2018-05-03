@@ -5,7 +5,7 @@ integer,parameter :: coord_sys_carth=1,coord_sys_cyl=2,coord_sys_cone=3
 
 type dataCollectionBase
     real :: r1, r2, theta1, theta2, z1, z2, rs, thetas, zs
-    real :: x1,x2,y1,y2,x,y,epsabs, epsrel,abserr_x,abserr_y        
+    real :: x1,x2,y1,y2,x,y,z,epsabs, epsrel,abserr_x,abserr_y        
     integer :: neval_x, neval_y, ier_x, ier_y,progCallbackCnt
     real :: z0,cone_angle,cone_z0
     real,dimension(1,3) :: n_vec
