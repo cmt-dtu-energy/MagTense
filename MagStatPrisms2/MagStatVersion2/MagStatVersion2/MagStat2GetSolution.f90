@@ -1,6 +1,6 @@
 
     module MagStat2GetSolution
-
+    
     use TileNComponents
     use MagTileIO
     implicit none
@@ -75,9 +75,9 @@
             endif
         case (tileTypeCircPiece )
              if ( present(Nout) ) then
-                call getFieldFromCircPiecePrismTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+                call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
             else
-                call getFieldFromCircPiecePrismTile( tiles(i), H_tmp, pts, n_ele )
+                call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_ele )
             endif
         case (tileTypeEllipsoid)
         case default        

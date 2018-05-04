@@ -2,6 +2,7 @@ module TileCircPieceTensor
     use QuadPack
     use SpecialFunctions
     use TileTensorHelperFunctions
+    
     implicit none
     
     contains
@@ -25,7 +26,7 @@ module TileCircPieceTensor
         
         val = 0.
            
-        call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+        call getParameters_rot_trick( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
             
         if ( theta1 .lt. 0. .AND. theta2 .lt. 0. ) then
             dtheta = theta2-theta1
@@ -58,8 +59,7 @@ module TileCircPieceTensor
     elE = elle( C_no_sign(thetap), K(R,xrot,zp) )
     elPi = ellpi( C_no_sign(thetap), B(R,xrot), K(R,xrot,zp) )
     
-    int_ddx_cos_dtheta_dz_fct = zp/(2*R*xrot**2*(R+xrot)*sqrt((R+xrot)**2+zp**2)) &
-            * (-(xrot-R)*(R**2+xrot**2) * elPi + (R+xrot)*(((R+xrot)**2+zp**2)*elE - (2*R**2+zp**2)*elF))              
+    int_ddx_cos_dtheta_dz_fct = zp/(2*R*xrot**2*(R+xrot)*sqrt((R+xrot)**2+zp**2)) * (-(xrot-R)*(R**2+xrot**2) * elPi + (R+xrot)*(((R+xrot)**2+zp**2)*elE - (2*R**2+zp**2)*elF))              
     end function int_ddx_cos_dtheta_dz_fct
     
     
@@ -72,7 +72,7 @@ module TileCircPieceTensor
         
     val = 0.
            
-    call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+    call getParameters_rot_trick( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
                                              
             
     val = int_ddx_sin_dtheta_dz_fct(theta2,z2,R,xrot) - int_ddx_sin_dtheta_dz_fct(theta1,z2,R,xrot) - ( int_ddx_sin_dtheta_dz_fct(theta2,z1,R,xrot) - int_ddx_sin_dtheta_dz_fct(theta1,z1,R,xrot) )
@@ -95,7 +95,7 @@ module TileCircPieceTensor
         
     val = 0.
            
-    call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+    call getParameters_rot_trick( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
                                                                              
     val = int_ddy_cos_dtheta_dz_fct(theta2,z2,R,xrot) - int_ddy_cos_dtheta_dz_fct(theta1,z2,R,xrot) - ( int_ddy_cos_dtheta_dz_fct(theta2,z1,R,xrot) - int_ddy_cos_dtheta_dz_fct(theta1,z1,R,xrot) )
 
@@ -117,7 +117,7 @@ module TileCircPieceTensor
         
     val = 0.
            
-    call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+    call getParameters_rot_trick( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
         
     if ( theta1 .lt. 0 .AND. theta2 .lt. 0. ) then
         dtheta = theta2-theta1
@@ -162,7 +162,7 @@ module TileCircPieceTensor
         
          val = 0.
            
-         call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+         call getParameters_rot_trick( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
             
         if ( theta1 .lt. 0 .AND. theta2 .lt. 0 ) then
             dtheta = theta2-theta1
@@ -207,7 +207,7 @@ module TileCircPieceTensor
         
         val = 0.
            
-        call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )    
+        call getParameters_rot_trick( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )    
             
         val = int_ddz_sin_dtheta_dz_fct(theta2,z2,R,xrot) - int_ddz_sin_dtheta_dz_fct(theta1,z2,R,xrot) - ( int_ddz_sin_dtheta_dz_fct(theta2,z1,R,xrot) - int_ddz_sin_dtheta_dz_fct(theta1,z1,R,xrot) )
             
@@ -230,6 +230,8 @@ module TileCircPieceTensor
      real :: dtheta,theta0
             
      call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+     
+    
      
      call getCorners( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
                                    
@@ -430,8 +432,8 @@ module TileCircPieceTensor
          call getCorners( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
          
          
-            val11 = int_ddy_dx_dy_fct1(x2,z1, y3, x, y, z) - int_ddy_dx_dy_fct1(x1,z1, y3, x, y, z)
-            val12 = int_ddy_dx_dy_fct1(x2,z2, y3, x, y, z) - int_ddy_dx_dy_fct1(x1,z2, y3, x, y, z)
+            val11 = int_ddy_dx_dy_fct1(x1,z1, y3, x, y, z) - int_ddy_dx_dy_fct1(x3,z1, y3, x, y, z)
+            val12 = int_ddy_dx_dy_fct1(x1,z2, y3, x, y, z) - int_ddy_dx_dy_fct1(x3,z2, y3, x, y, z)
             
             dat%x = x
             dat%y = y
@@ -488,8 +490,8 @@ module TileCircPieceTensor
          call getCorners( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
            
             
-            val11 = int_ddz_dx_dy_fct1( y2, z1, y3, x, y, z ) - int_ddz_dx_dy_fct1( y1, z1, y3, x, y, z )
-            val12 = int_ddz_dx_dy_fct1( y2, z2, y3, x, y, z ) - int_ddz_dx_dy_fct1( y1, z2, y3, x, y, z )
+            val11 = int_ddz_dx_dy_fct1( y2, z1, x3, x, y, z ) - int_ddz_dx_dy_fct1( y1, z1, x3, x, y, z )
+            val12 = int_ddz_dx_dy_fct1( y2, z2, x3, x, y, z ) - int_ddz_dx_dy_fct1( y1, z2, x3, x, y, z )
                         
             
             f_ptr => int_ddz_dx_dy_fct2
@@ -542,7 +544,7 @@ module TileCircPieceTensor
          end function
         
         
-    subroutine getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+    subroutine getParameters_rot_trick( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
     class(dataCollectionBase), intent(in), target :: dat
     real,intent(inout) :: x,y,z,R,theta1,theta2,z1,z2, xrot, phi
     
@@ -551,6 +553,8 @@ module TileCircPieceTensor
     !integration limits of theta
     theta1 = dat%theta1
     theta2 = dat%theta2
+    
+        
     !integration limits of z
     z1 = dat%z1
     z2 = dat%z2
@@ -562,7 +566,8 @@ module TileCircPieceTensor
     !do the "change integration limits" trick
     xrot = sqrt( x**2 + y**2 )
 
-    phi = atan2(y,x)
+    !phi = atan2(y,x)
+    phi = atan2_custom( y, x )
         
     theta1 = theta1 - phi
     theta2 = theta2 - phi
@@ -570,6 +575,34 @@ module TileCircPieceTensor
     !Translate z limits to eliminate the z-coordinate        
     z1 = z1 - z
     z2 = z2 - z            
+            
+    end subroutine getParameters_rot_trick
+    
+    
+    subroutine getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+    class(dataCollectionBase), intent(in), target :: dat
+    real,intent(inout) :: x,y,z,R,theta1,theta2,z1,z2, xrot, phi
+    
+    !radius of the circle piece (distance to the curved face from origo)
+    R = dat%r2
+    !integration limits of theta
+    theta1 = dat%theta1
+    theta2 = dat%theta2
+    
+        
+    !integration limits of z
+    z1 = dat%z1
+    z2 = dat%z2
+    
+    !coordinates at which the solution is sought
+    x = dat%x
+    y = dat%y
+    z = dat%z
+    !do the "change integration limits" trick
+    xrot = sqrt( x**2 + y**2 )
+
+    phi = atan2_custom( y, x )
+        
             
     end subroutine getParameters
     

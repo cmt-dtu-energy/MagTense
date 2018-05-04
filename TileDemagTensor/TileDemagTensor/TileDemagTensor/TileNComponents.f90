@@ -223,7 +223,7 @@ module TileNComponents
             call int_ddz_dx_dy ( dat, int_ddz_dx_dy_val1, int_ddz_dx_dy_val2 )
                         
             !define the rotation-trick-variable
-            phi = atan2(y,x)
+            phi = atan2_custom( y, x )
             
 
             
@@ -256,15 +256,15 @@ module TileNComponents
             
             Nzz = int_ddz_dx_dy_val2 - int_ddz_dx_dy_val1
             
-            Nout(1,1) = Nxx;
-            Nout(1,2) = Nxy;
-            Nout(1,3) = Nxz;
-            Nout(2,1) = Nyx;
-            Nout(2,2) = Nyy;
-            Nout(2,3) = Nyz;
-            Nout(3,1) = Nzx;
-            Nout(3,2) = Nzy;
-            Nout(3,3) = Nzz;
+            Nout(1,1) = Nxx
+            Nout(1,2) = Nxy
+            Nout(1,3) = Nxz
+            Nout(2,1) = Nyx
+            Nout(2,2) = Nyy
+            Nout(2,3) = Nyz
+            Nout(3,1) = Nzx
+            Nout(3,2) = Nzy
+            Nout(3,3) = Nzz
 
         deallocate(dat)
     
