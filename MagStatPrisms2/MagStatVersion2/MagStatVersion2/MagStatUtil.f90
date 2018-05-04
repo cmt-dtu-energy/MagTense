@@ -32,7 +32,9 @@ module MagStatUtil
         +    y_lin *( (1.-x_lin) * table(ind_x,ind_y+1) + x_lin*table(ind_x+1,ind_y+1) ) 
 
 
-end subroutine getBilinInterp
+    end subroutine getBilinInterp
+    
+    
     
 end module
     

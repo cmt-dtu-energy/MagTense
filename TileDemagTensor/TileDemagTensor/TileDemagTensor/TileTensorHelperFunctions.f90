@@ -80,5 +80,27 @@ module TileTensorHelperFunctions
            P = sqrt( (x-xp)**2 + (y-yp)**2 + (z-zp)**2 )
      end function
     
+     
+     
+    function atan2_custom( y, x )
+    real,intent(in) :: x,y
+    real :: atan2_custom
+    
+     if ( x .ge. 0 .AND. y .ge. 0 ) then
+        !first quadrant
+        atan2_custom = atan( y/x )
+    elseif ( x .lt. 0 .AND. y .ge. 0 ) then
+        !second quadrant
+        atan2_custom = pi - atan( abs(y/x) )
+    elseif (x .lt. 0 .AND. y .lt. 0 ) then
+        !third
+        atan2_custom = pi + atan( abs(y/x) )
+    elseif ( x .ge. 0 .AND. y .lt. 0 ) then
+        !fourth 
+        atan2_custom = 2*pi - atan( abs(y/x) )
+    endif
+    
+    end function
+     
 end module TileTensorHelperFunctions
     

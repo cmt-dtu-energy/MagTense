@@ -60,7 +60,12 @@
       !::do the calculation
       N(:,:,:) = 0
       H(:,:) = 0      
-      call getFieldFromCylTile( cylTile(1), H, pts, n_ele, N, .false. )
+      if ( cylTile(1)%tileType .eq. tileTypeCylPiece ) then
+            call getFieldFromCylTile( cylTile(1), H, pts, n_ele, N, .false. )
+      else if (cylTile(1)%tileType .eq. tileTypeCircPiece ) then          
+          call getFieldFromCircPieceTile( cylTile(1), H, pts, n_ele, N, .false. )
+      endif
+      
       
       !::Load the result back to Matlab
       
