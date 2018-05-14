@@ -64,6 +64,8 @@
             call getFieldFromCylTile( cylTile(1), H, pts, n_ele, N, .false. )
       else if (cylTile(1)%tileType .eq. tileTypeCircPiece ) then          
           call getFieldFromCircPieceTile( cylTile(1), H, pts, n_ele, N, .false. )
+     else if (cylTile(1)%tileType .eq. tileTypeCircPieceInverted ) then          
+          call getFieldFromCircPieceInvertedTile( cylTile(1), H, pts, n_ele, N, .false. )
       endif
       
       
