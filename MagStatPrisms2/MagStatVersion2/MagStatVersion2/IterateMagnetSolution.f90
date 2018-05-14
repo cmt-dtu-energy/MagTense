@@ -107,6 +107,8 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
                 pts = tiles(i)%offset                
             case(tileTypeCircPiece)
                 pts = tiles(i)%offset    
+            case(tileTypeCircPieceInverted)
+                pts = tiles(i)%offset    
             case default
                 
             end select
