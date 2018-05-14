@@ -30,7 +30,7 @@ module TileNComponents
         integer :: fieldEvaluation
     end type MagTile
     
-    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeEllipsoid=4
+    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeEllipsoid=10
     integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2
     integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     

@@ -79,6 +79,12 @@
             else
                 call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_ele )
             endif
+        case (tileTypeCircPieceInverted )
+             if ( present(Nout) ) then
+                call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+            else
+                call getFieldFromCircPieceInvetedTile( tiles(i), H_tmp, pts, n_ele )
+            endif
         case (tileTypeEllipsoid)
         case default        
             
@@ -341,6 +347,54 @@
         H(i,:) = -dotProd
     enddo
     end subroutine getFieldFromCircPieceTile
+    
+    
+      !::
+    !::Returns the magnetic field from a piece of circle that is inverted, i.e. pointing inwards
+    !::
+    subroutine getFieldFromCircPieceInvertedTile( circTile, H, pts, n_ele, N_out, useStoredN )
+    type(MagTile),intent(in) :: circTile
+    real,dimension(n_ele,3),intent(inout) :: H
+    real,dimension(n_ele,3) :: pts
+    integer,intent(in) :: n_ele
+    real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+    logical,intent(in),optional :: useStoredN
+    real,dimension(3) :: diffPos,dotProd
+    real,dimension(3,3) :: rotMat,rotMatInv,N
+    integer :: i
+    
+    !::get the rotation matrices
+    call getRotationMatrices( circTile, rotMat, rotMatInv)
+    
+    do i=1,n_ele
+        !::1. The relative position vector between the origo of the current tile and the point at which the tensor is required
+        diffPos = pts(i,:) - circTile%offset
+        
+        !::2. rotate the position vector according to the rotation of the prism
+        diffPos = matmul( rotMat, diffPos )
+        
+        !::3. get the demag tensor                
+        if ( present( useStoredN ) .eq. .true. ) then
+            if ( useStoredN .eq. .false. ) then
+                 call getN_circPiece_Inv( circTile, diffPos, N )
+                 N_out(i,:,:) = N
+            else
+                N = N_out(i,:,:)
+            endif
+        else
+            call getN_prism_3D( circTile, diffPos, N )
+        endif
+        
+        !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
+        call getDotProd( N, matmul( rotMat, circTile%M ), dotProd )
+        
+        !::5. Rotate the resulting field back to the global coordinate system
+        dotProd = matmul( rotMatInv, dotProd )        
+        
+        !::. Update the solution. The minus sign comes from the definition of the demag tensor (the demagfield is assumed negative)
+        H(i,:) = -dotProd
+    enddo
+    end subroutine getFieldFromCircPieceInvertedTile
     
 
 !---------------------------------------------------------------------------------------!
