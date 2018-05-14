@@ -241,6 +241,25 @@ module TileCircPieceTensor
     val = sign(1.,cos(theta0)) * ( int_ddx_dx_dz_fct( x1, z2, y3, x, y, z, theta0 ) - int_ddx_dx_dz_fct( x3, z2, y3, x, y, z, theta0 ) - ( int_ddx_dx_dz_fct(x1,z1, y3, x, y, z, theta0) - int_ddx_dx_dz_fct(x3,z1, y3, x, y, z, theta0) ) )
                         
     end subroutine
+    !::for the inverted circ piece, i.e. pointing radially inwards
+    subroutine int_ddx_dx_dz_inv( dat, val )
+     real,intent(inout) :: val
+     class(dataCollectionBase), intent(inout), target :: dat
+     real :: x,y,z,R,theta1,theta2,z1,z2,xrot,phi
+     real :: x1,x2,x3,y1,y2,y3
+     real :: dtheta,theta0
+            
+     call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+     
+     call getCorners_inv( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
+                                   
+    !multiply with sign(cos(theta0)) in order to take the order of
+    !integration into account properly (when in 2nd and 3rd
+    !quadrants x1 < x3 while in 1st and 4th x3 < x1)
+    !change sign as the normal vector is now pointing along the positive y-axis
+    val = -sign(1.,cos(theta0)) * ( int_ddx_dx_dz_fct( x3, z2, y3, x, y, z, theta0 ) - int_ddx_dx_dz_fct( x2, z2, y3, x, y, z, theta0 ) - ( int_ddx_dx_dz_fct(x3,z1, y3, x, y, z, theta0) - int_ddx_dx_dz_fct(x2,z1, y3, x, y, z, theta0) ) )
+                        
+    end subroutine
     
     
     function int_ddx_dx_dz_fct( xp, zp, y3, x, y, z, theta0 )
@@ -263,7 +282,22 @@ module TileCircPieceTensor
      call getCorners( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
      val = sign(1.,cos(theta0)) * sign(1.,sin(theta0)) * ( int_ddy_dx_dz_fct( x1, z2, y3, x, y, z, theta0 ) - int_ddy_dx_dz_fct( x3, z2, y3, x, y, z, theta0 ) - ( int_ddy_dx_dz_fct(x1,z1, y3, x, y, z, theta0 ) - int_ddy_dx_dz_fct(x3,z1, y3, x, y, z, theta0 )) )
 
-     end subroutine    
+     end subroutine  
+     
+     subroutine int_ddy_dx_dz_inv(dat, val )
+     real,intent(inout) :: val
+     class(dataCollectionBase), intent(inout), target :: dat
+     real :: x,y,z,R,theta1,theta2,z1,z2,xrot,phi
+     real :: x1,x2,x3,y1,y2,y3
+     real :: dtheta,theta0
+            
+     call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+     
+     call getCorners_inv( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
+     !Change the sign as the normal vector is pointing along the positive y-axis
+     val = -sign(1.,cos(theta0)) * sign(1.,sin(theta0)) * ( int_ddy_dx_dz_fct( x3, z2, y3, x, y, z, theta0 ) - int_ddy_dx_dz_fct( x2, z2, y3, x, y, z, theta0 ) - ( int_ddy_dx_dz_fct(x3,z1, y3, x, y, z, theta0 ) - int_ddy_dx_dz_fct(x2,z1, y3, x, y, z, theta0 )) )
+
+     end subroutine  
      
     function int_ddy_dx_dz_fct( xp, zp, y3, x, y, z, theta0 )
         real,intent(in) :: xp,zp, y3, x, y, z, theta0
@@ -285,6 +319,20 @@ module TileCircPieceTensor
      call getCorners( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
                         
       val = sign(1.,cos(theta0)) * ( int_ddz_dx_dz_fct( x1, z2, y3, x, y, z, theta0 ) - int_ddz_dx_dz_fct( x3, z2, y3, x, y, z, theta0 ) - ( int_ddz_dx_dz_fct(x1,z1, y3, x, y, z, theta0) - int_ddz_dx_dz_fct(x3,z1, y3, x, y, z, theta0) ) )
+    end subroutine
+    
+    subroutine int_ddz_dx_dz_inv(dat, val )
+     real,intent(inout) :: val
+     class(dataCollectionBase), intent(inout), target :: dat
+     real :: x,y,z,R,theta1,theta2,z1,z2,xrot,phi
+     real :: x1,x2,x3,y1,y2,y3
+     real :: dtheta,theta0
+            
+     call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+     
+     call getCorners_inv( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
+     !change the sign since the normal vector is now pointing along the positive y-axis
+      val = -sign(1.,cos(theta0)) * ( int_ddz_dx_dz_fct( x3, z2, y3, x, y, z, theta0 ) - int_ddz_dx_dz_fct( x2, z2, y3, x, y, z, theta0 ) - ( int_ddz_dx_dz_fct(x3,z1, y3, x, y, z, theta0) - int_ddz_dx_dz_fct(x2,z1, y3, x, y, z, theta0) ) )
     end subroutine
         
     
@@ -310,6 +358,22 @@ module TileCircPieceTensor
 
     end subroutine
     
+    !::inverted version of the circ piece integral
+    subroutine int_ddx_dy_dz_inv(dat, val )
+     real,intent(inout) :: val
+     class(dataCollectionBase), intent(inout), target :: dat
+     real :: x,y,z,R,theta1,theta2,z1,z2,xrot,phi
+     real :: x1,x2,x3,y1,y2,y3
+     real :: dtheta,theta0
+            
+     call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+     
+     call getCorners_inv( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
+     !sign change as we are now pointing along the positive x-axis with the normal vector  
+     val = -sign(1.,cos(theta0)) * sign(1.,sin(theta0)) * (int_ddx_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - int_ddx_dy_dz_fct( y1, z2, x3, x, y, z, theta0 ) - ( int_ddx_dy_dz_fct(y3,z1, x3, x, y, z, theta0) - int_ddx_dy_dz_fct(y1,z1, x3, x, y, z, theta0) ))
+
+    end subroutine
+    
     function int_ddx_dy_dz_fct( yp, zp, x3, x, y, z, theta0 )
         real,intent(in) :: yp,zp, x3, x, y, z, theta0
         real :: int_ddx_dy_dz_fct
@@ -332,6 +396,21 @@ module TileCircPieceTensor
             
        end subroutine
         
+       subroutine int_ddy_dy_dz_inv(dat, val )
+         real,intent(inout) :: val
+         class(dataCollectionBase), intent(inout), target :: dat
+         real :: x,y,z,R,theta1,theta2,z1,z2,xrot,phi
+         real :: x1,x2,x3,y1,y2,y3
+         real :: dtheta,theta0
+            
+         call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+     
+         call getCorners_inv( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
+            !change the sign as the normal vector is pointing along the positive y-axis
+         val = sign(1.,cos(theta0)) * sign(1.,sin(theta0)) * ( int_ddy_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - int_ddy_dy_dz_fct( y1, z2, x3, x, y, z, theta0 ) - ( int_ddy_dy_dz_fct(y3,z1, x3, x, y, z, theta0) - int_ddy_dy_dz_fct(y1,z1, x3, x, y, z, theta0) ) )
+            
+       end subroutine
+       
        function int_ddy_dy_dz_fct( yp, zp, x3, x, y, z, theta0 )
         real,intent(in) :: yp,zp, x3, x, y, z, theta0
         real :: int_ddy_dy_dz_fct
@@ -351,6 +430,20 @@ module TileCircPieceTensor
          call getCorners( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
                                  
          val = sign(1.,sin(theta0)) * ( int_ddz_dy_dz_fct( y2, z2, x3, x, y, z, theta0 ) - int_ddz_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - ( int_ddz_dy_dz_fct(y2,z1, x3, x, y, z, theta0) - int_ddz_dy_dz_fct(y3,z1, x3, x, y, z, theta0) ) )
+       end subroutine
+       
+       subroutine int_ddz_dy_dz_inv(dat, val )
+         real,intent(inout) :: val
+         class(dataCollectionBase), intent(inout), target :: dat
+         real :: x,y,z,R,theta1,theta2,z1,z2,xrot,phi
+         real :: x1,x2,x3,y1,y2,y3
+         real :: dtheta,theta0
+            
+         call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+     
+         call getCorners_inv( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
+         !change the sign since the normal vector is now pointing along the positive x-axis                  
+         val = -sign(1.,sin(theta0)) * ( int_ddz_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - int_ddz_dy_dz_fct( y1, z2, x3, x, y, z, theta0 ) - ( int_ddz_dy_dz_fct(y3,z1, x3, x, y, z, theta0) - int_ddz_dy_dz_fct(y1,z1, x3, x, y, z, theta0) ) )
        end subroutine
        
        function int_ddz_dy_dz_fct( yp, zp, x3, x, y, z, theta0 )
@@ -395,6 +488,43 @@ module TileCircPieceTensor
             val2 = sign(1.,sin(theta0))*sign(1.,cos(theta0))/(4*pi) * ( val22 - val12 )
             
         end subroutine
+        !::for the radially inwards pointing circ piece
+        subroutine int_ddx_dx_dy_inv(dat, val1, val2 )
+         real,intent(inout) :: val1, val2
+         class(dataCollectionBase), intent(inout), target :: dat
+         real :: x,y,z,R,theta1,theta2,z1,z2,xrot,phi
+         real :: x1,x2,x3,y1,y2,y3
+         real :: dtheta,theta0
+         real :: val11,val12,val21,val22
+         procedure (f_int_dat), pointer :: f_ptr => null ()
+            
+         call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+     
+         call getCorners_inv( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
+                                    
+                        
+          val11 = int_ddx_dx_dy_fct1(y3,z1, x3, x, y, z) - int_ddx_dx_dy_fct1(y1,z1, x3, x, y, z)
+          val12 = int_ddx_dx_dy_fct1(y3,z2, x3, x, y, z) - int_ddx_dx_dy_fct1(y1,z2, x3, x, y, z)
+            
+          dat%x = x
+          dat%y = y
+          dat%z = z
+          dat%thetas = theta0
+          dat%rs = R
+          dat%zs = z1
+          f_ptr => int_ddx_dx_dy_fct2
+          call qags_x ( f_ptr, dat, y1, y2, dat%epsabs, dat%epsrel, val21, dat%abserr_x, dat%neval_x, dat%ier_x )
+        
+          dat%zs = z2
+          call qags_x ( f_ptr, dat, y1, y2, dat%epsabs, dat%epsrel, val22, dat%abserr_x, dat%neval_x, dat%ier_x )
+            
+            
+          val1 = sign(1.,sin(theta0))*sign(1.,cos(theta0))/(4*pi) * ( val11 - val21 )
+          
+          val2 = sign(1.,sin(theta0))*sign(1.,cos(theta0))/(4*pi) * ( val12 - val22 )
+            
+        end subroutine
+        
         
         function int_ddx_dx_dy_fct1( yp, zp, x3, x, y, z )
         real,intent(in) :: yp,zp, x3, x, y, z
@@ -451,6 +581,43 @@ module TileCircPieceTensor
             val1 = sign(1.,sin(theta0))*sign(1.,cos(theta0))/(4*pi) * ( val21 - val11 )
             
             val2 = sign(1.,sin(theta0))*sign(1.,cos(theta0))/(4*pi) * ( val22 - val12 )
+         
+           
+        end subroutine
+        
+        subroutine int_ddy_dx_dy_inv(dat, val1, val2 )
+         real,intent(inout) :: val1, val2
+         class(dataCollectionBase), intent(inout), target :: dat
+         real :: x,y,z,R,theta1,theta2,z1,z2,xrot,phi
+         real :: x1,x2,x3,y1,y2,y3
+         real :: dtheta,theta0
+         real :: val11,val12,val21,val22
+         procedure (f_int_dat), pointer :: f_ptr => null ()
+            
+         call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+     
+         call getCorners_inv( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
+         
+         
+            val11 = int_ddy_dx_dy_fct1(x3,z1, y3, x, y, z) - int_ddy_dx_dy_fct1(x1,z1, y3, x, y, z)
+            val12 = int_ddy_dx_dy_fct1(x3,z2, y3, x, y, z) - int_ddy_dx_dy_fct1(x1,z2, y3, x, y, z)
+            
+            dat%x = x
+            dat%y = y
+            dat%z = z
+            dat%thetas = theta0
+            dat%rs = R
+            dat%zs = z1
+            f_ptr => int_ddy_dx_dy_fct2
+            call qags_x ( f_ptr, dat, x1, x3, dat%epsabs, dat%epsrel, val21, dat%abserr_x, dat%neval_x, dat%ier_x )
+        
+            dat%zs = z2
+            call qags_x ( f_ptr, dat, x1, x3, dat%epsabs, dat%epsrel, val22, dat%abserr_x, dat%neval_x, dat%ier_x )
+            
+            
+            val1 = sign(1.,sin(theta0))*sign(1.,cos(theta0))/(4*pi) * ( val11 - val21 )
+            
+            val2 = sign(1.,sin(theta0))*sign(1.,cos(theta0))/(4*pi) * ( val12 - val22 )
          
            
         end subroutine
@@ -515,6 +682,49 @@ module TileCircPieceTensor
             !integrate from sqrt(R^2-y^2) to x3
             val1 = -1*sign(1.,sin(theta0))*sign(1.,cos(theta0))/(4*pi) * ( val11 + val21 )  
             val2 = -1*sign(1.,sin(theta0))*sign(1.,cos(theta0))/(4*pi) * ( val12 + val22 )  
+            
+         end subroutine
+         
+         subroutine int_ddz_dx_dy_inv(dat, val1, val2 )
+         real,intent(inout) :: val1,val2
+         class(dataCollectionBase), intent(inout), target :: dat
+         real :: x,y,z,R,theta1,theta2,z1,z2,xrot,phi
+         real :: x1,x2,x3,y1,y2,y3
+         real :: dtheta,theta0
+         real :: val11,val22,val12,val21
+         procedure (f_int_dat), pointer :: f_ptr => null ()
+            
+         call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
+     
+         call getCorners_inv( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
+           
+            
+            val11 = int_ddz_dx_dy_fct1( y3, z1, x3, x, y, z ) - int_ddz_dx_dy_fct1( y1, z1, x3, x, y, z )
+            val12 = int_ddz_dx_dy_fct1( y3, z2, x3, x, y, z ) - int_ddz_dx_dy_fct1( y1, z2, x3, x, y, z )
+                        
+            
+            f_ptr => int_ddz_dx_dy_fct2
+            
+            dat%x = x
+            dat%y = y
+            dat%z = z
+            dat%thetas = theta0
+            dat%rs = R
+            dat%zs = z1
+            
+            call qags_x ( f_ptr, dat, y1, y3, dat%epsabs, dat%epsrel, val21, dat%abserr_x, dat%neval_x, dat%ier_x )
+            
+            dat%zs = z2
+            
+            call qags_x ( f_ptr, dat, y1, y3, dat%epsabs, dat%epsrel, val22, dat%abserr_x, dat%neval_x, dat%ier_x )
+            
+            !sign(cos(theta0)) is caused by the order of integration; in
+            !the first and fourth quadrants we integrate from x3 to
+            !sqrt(R^2-y^2) while in the second and third quadrants we
+            !integrate from sqrt(R^2-y^2) to x3
+            !change the sign as the x=x3 constant line is to the right of the curved line
+            val1 = 1*sign(1.,sin(theta0))*sign(1.,cos(theta0))/(4*pi) * ( val11 + val21 )  
+            val2 = 1*sign(1.,sin(theta0))*sign(1.,cos(theta0))/(4*pi) * ( val12 + val22 )  
             
          end subroutine
         
@@ -637,6 +847,41 @@ module TileCircPieceTensor
 
         x3 = x2
         y3 = y1
+                         
+    end subroutine
+    
+    !::Returns the corners of the inverted circ piece, i.e. one that is pointing radially inwards
+     subroutine getCorners_inv( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
+    real,intent(in) :: R, theta1, theta2
+    real,intent(inout) :: theta0, dtheta, x1, x2, x3, y1, y2, y3
+    real :: a,b
+    dtheta = theta2-theta1
+    theta0 = theta1 + dtheta/2
+    if ( cos(theta0) .ge. 0 .AND. sin(theta0).ge.0 ) then
+        !first quadrant
+        a = theta0-dtheta/2
+        b = theta0+dtheta/2            
+    elseif ( cos(theta0) .lt.0 .AND. sin(theta0) .ge.0 ) then
+        !second quadrant
+        a = theta0+dtheta/2
+        b = theta0-dtheta/2
+    elseif ( cos(theta0) .lt.0 .AND. sin(theta0) .lt.0 ) then
+        !third
+        a = theta0-dtheta/2
+        b = theta0+dtheta/2
+    elseif ( cos(theta0) .ge.0 .AND. sin(theta0) .lt.0 ) then
+        !fourth 
+        a = theta0+dtheta/2
+        b = theta0-dtheta/2
+    endif
+        x1 = R * cos( a )
+        y1 = R * sin( a )
+
+        x2 = R * cos( b )
+        y2 = R * sin( b )
+
+        x3 = x1
+        y3 = y2
                          
     end subroutine
     
