@@ -129,7 +129,7 @@ module TileCircPieceTensor
         theta1 = theta2 - dtheta
     endif
                                                               
-    if ( theta1 .lt. 0. .AND. theta2 .gt. 0. ) then
+    if ( theta1 .le. 0. .AND. theta2 .gt. 0. ) then
         !first integrate from theta1 to zero
         val = int_ddy_sin_dtheta_dz_fct( 0., z2, R, xrot ) - int_ddy_sin_dtheta_dz_fct( theta1, z2, R, xrot ) - ( int_ddy_sin_dtheta_dz_fct( 0., z1, R, xrot ) - int_ddy_sin_dtheta_dz_fct( theta1, z1, R, xrot ) )
         !then integrate from zero to theta2
@@ -231,14 +231,13 @@ module TileCircPieceTensor
             
      call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
      
-    
-     
      call getCorners( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
                                    
     !multiply with sign(cos(theta0)) in order to take the order of
     !integration into account properly (when in 2nd and 3rd
     !quadrants x1 < x3 while in 1st and 4th x3 < x1)
     val = sign(1.,cos(theta0)) * ( int_ddx_dx_dz_fct( x1, z2, y3, x, y, z, theta0 ) - int_ddx_dx_dz_fct( x3, z2, y3, x, y, z, theta0 ) - ( int_ddx_dx_dz_fct(x1,z1, y3, x, y, z, theta0) - int_ddx_dx_dz_fct(x3,z1, y3, x, y, z, theta0) ) )
+    
                         
     end subroutine
     !::for the inverted circ piece, i.e. pointing radially inwards
@@ -264,9 +263,17 @@ module TileCircPieceTensor
     
     function int_ddx_dx_dz_fct( xp, zp, y3, x, y, z, theta0 )
         real,intent(in) :: xp,zp, y3, x, y, z, theta0
-        real :: int_ddx_dx_dz_fct
-     
-        int_ddx_dx_dz_fct = -sign(1.,sin(theta0))/ (4*pi) * log( zp-z + P(x,y,z,xp,y3,zp) )
+        real :: int_ddx_dx_dz_fct,arg
+        
+        arg = zp-z + P(x,y,z,xp,y3,zp)
+        
+        if ( arg .lt. 10*tiny(1.) ) then
+            arg = 10*tiny(1.)
+        endif
+             
+        int_ddx_dx_dz_fct = -sign(1.,sin(theta0))/ (4*pi) * log( arg )
+        
+                
     end function
     
     
@@ -280,7 +287,9 @@ module TileCircPieceTensor
      call getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
      
      call getCorners( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
+     
      val = sign(1.,cos(theta0)) * sign(1.,sin(theta0)) * ( int_ddy_dx_dz_fct( x1, z2, y3, x, y, z, theta0 ) - int_ddy_dx_dz_fct( x3, z2, y3, x, y, z, theta0 ) - ( int_ddy_dx_dz_fct(x1,z1, y3, x, y, z, theta0 ) - int_ddy_dx_dz_fct(x3,z1, y3, x, y, z, theta0 )) )
+     !val = sign(1.,sin(theta0)) * ( int_ddy_dx_dz_fct( x1, z2, y3, x, y, z, theta0 ) - int_ddy_dx_dz_fct( x3, z2, y3, x, y, z, theta0 ) - ( int_ddy_dx_dz_fct(x1,z1, y3, x, y, z, theta0 ) - int_ddy_dx_dz_fct(x3,z1, y3, x, y, z, theta0 )) )
 
      end subroutine  
      
@@ -302,8 +311,15 @@ module TileCircPieceTensor
     function int_ddy_dx_dz_fct( xp, zp, y3, x, y, z, theta0 )
         real,intent(in) :: xp,zp, y3, x, y, z, theta0
         real :: int_ddy_dx_dz_fct
-     
-        int_ddy_dx_dz_fct = -1/(4*pi) * atan( sign(1.,cos(theta0))*(x-xp)*(z-zp)/ ((y-y3)* P(x,y,z,xp,y3,zp)) )
+        !::Make sure the limit when y-y3 -> 0 is covered. 
+        !::In this limit the derivative of the nominator will go to zero (per l'Hopital's rule) 
+        !::and the denominator is finite (the derivative of P wrt y is non-zero when x-xp != 0 or z-zp != 0, which is then a requirement
+        if ( abs(y-y3) .lt. 10*tiny(1.) ) then
+            int_ddy_dx_dz_fct = -1/(4*pi) * atan( huge(1.) )
+        else    
+            int_ddy_dx_dz_fct = -1/(4*pi) * atan( sign(1.,cos(theta0))*(x-xp)*(z-zp)/ ((y-y3)* P(x,y,z,xp,y3,zp)) )
+        endif
+        
     end function
     
     
@@ -339,8 +355,17 @@ module TileCircPieceTensor
     function int_ddz_dx_dz_fct( xp, zp, y3, x, y, z, theta0 )
         real,intent(in) :: xp,zp, y3, x, y, z, theta0
         real :: int_ddz_dx_dz_fct
-     
-        int_ddz_dx_dz_fct =  -sign(1.,sin(theta0)) / (4*pi) * log( xp-x + P(x,y,z,xp,y3,zp) )
+        real :: arg
+        
+        arg = xp-x + P(x,y,z,xp,y3,zp)
+        
+        if ( arg .le. 10*tiny(1.) ) then
+            arg = 10*tiny(1.)
+        endif      
+        
+        int_ddz_dx_dz_fct =  -sign(1.,sin(theta0)) / (4*pi) * log( arg )
+        
+        
     end function
         
     subroutine int_ddx_dy_dz(dat, val )
@@ -354,7 +379,8 @@ module TileCircPieceTensor
      
      call getCorners( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
                                                      
-     val = sign(1.,cos(theta0)) * sign(1.,sin(theta0)) * (int_ddx_dy_dz_fct( y2, z2, x3, x, y, z, theta0 ) - int_ddx_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - ( int_ddx_dy_dz_fct(y2,z1, x3, x, y, z, theta0) - int_ddx_dy_dz_fct(y3,z1, x3, x, y, z, theta0) ))
+     !val = sign(1.,cos(theta0)) * sign(1.,sin(theta0)) * (int_ddx_dy_dz_fct( y2, z2, x3, x, y, z, theta0 ) - int_ddx_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - ( int_ddx_dy_dz_fct(y2,z1, x3, x, y, z, theta0) - int_ddx_dy_dz_fct(y3,z1, x3, x, y, z, theta0) ))
+     val = sign(1.,cos(theta0)) * (int_ddx_dy_dz_fct( y2, z2, x3, x, y, z, theta0 ) - int_ddx_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - ( int_ddx_dy_dz_fct(y2,z1, x3, x, y, z, theta0) - int_ddx_dy_dz_fct(y3,z1, x3, x, y, z, theta0) ))
 
     end subroutine
     
@@ -378,7 +404,13 @@ module TileCircPieceTensor
         real,intent(in) :: yp,zp, x3, x, y, z, theta0
         real :: int_ddx_dy_dz_fct
      
-        int_ddx_dy_dz_fct =  -1/(4*pi) * atan( sign(1.,sin(theta0)) * (y-yp) * (z-zp) / ((x-x3) * P(x,y,z,x3,yp,zp)) )
+        !::Cover the limit when x-x3 goes to zero
+        if ( abs( x-x3 ) .lt. 10*tiny(1.) ) then
+            int_ddx_dy_dz_fct = -1/(4*pi) * atan(  huge(1.) )
+        else            
+            int_ddx_dy_dz_fct =  -1/(4*pi) * atan( sign(1.,sin(theta0)) * (y-yp) * (z-zp) / ((x-x3) * P(x,y,z,x3,yp,zp)) )
+        endif
+        
     end function
     
        subroutine int_ddy_dy_dz(dat, val )
@@ -393,6 +425,8 @@ module TileCircPieceTensor
          call getCorners( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
             
          val = -sign(1.,cos(theta0)) * sign(1.,sin(theta0)) * ( int_ddy_dy_dz_fct( y2, z2, x3, x, y, z, theta0 ) - int_ddy_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - ( int_ddy_dy_dz_fct(y2,z1, x3, x, y, z, theta0) - int_ddy_dy_dz_fct(y3,z1, x3, x, y, z, theta0) ) )
+         !val = -sign(1.,sin(theta0)) *  ( int_ddy_dy_dz_fct( y2, z2, x3, x, y, z, theta0 ) - int_ddy_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - ( int_ddy_dy_dz_fct(y2,z1, x3, x, y, z, theta0) - int_ddy_dy_dz_fct(y3,z1, x3, x, y, z, theta0) ) )
+         
             
        end subroutine
         
@@ -413,9 +447,17 @@ module TileCircPieceTensor
        
        function int_ddy_dy_dz_fct( yp, zp, x3, x, y, z, theta0 )
         real,intent(in) :: yp,zp, x3, x, y, z, theta0
-        real :: int_ddy_dy_dz_fct
-     
-        int_ddy_dy_dz_fct =  1 / (4*pi) * log( zp-z + P(x,y,z,x3,yp,zp) )
+        real :: int_ddy_dy_dz_fct,arg
+        
+        arg = zp-z + P(x,y,z,x3,yp,zp)
+        
+        if ( arg .le. 10*tiny(1.) ) then
+            arg = 10*tiny(1.)
+        endif
+            
+        int_ddy_dy_dz_fct =  1 / (4*pi) * log( arg )
+        
+        
        end function
     
        subroutine int_ddz_dy_dz(dat, val )
@@ -448,9 +490,18 @@ module TileCircPieceTensor
        
        function int_ddz_dy_dz_fct( yp, zp, x3, x, y, z, theta0 )
         real,intent(in) :: yp,zp, x3, x, y, z, theta0
-        real :: int_ddz_dy_dz_fct
-     
-        int_ddz_dy_dz_fct = -sign(1.,cos(theta0)) / (4*pi) * log( yp-y + P(x,y,z,x3,yp,zp) )
+        real :: int_ddz_dy_dz_fct,arg
+        
+        arg = yp-y + P(x,y,z,x3,yp,zp)
+        
+        if ( arg .le. 10*tiny(1.) ) then
+            arg = 10*tiny(1.)
+        endif
+        
+        
+        int_ddz_dy_dz_fct = -sign(1.,cos(theta0)) / (4*pi) * log( arg )
+        
+        
        end function
        
         subroutine int_ddx_dx_dy(dat, val1, val2 )
@@ -528,9 +579,16 @@ module TileCircPieceTensor
         
         function int_ddx_dx_dy_fct1( yp, zp, x3, x, y, z )
         real,intent(in) :: yp,zp, x3, x, y, z
-        real :: int_ddx_dx_dy_fct1
-     
-            int_ddx_dx_dy_fct1 = log( yp-y + P(x,y,z,x3,yp,zp) )
+        real :: int_ddx_dx_dy_fct1,arg
+        
+            arg = yp-y + P(x,y,z,x3,yp,zp)
+            if ( arg .le. 10*tiny(1.) ) then
+                arg = 10*tiny(1.)
+            endif     
+                
+            int_ddx_dx_dy_fct1 = log( arg )
+            
+            
         end function
         
         
@@ -599,8 +657,8 @@ module TileCircPieceTensor
          call getCorners_inv( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
          
          
-            val11 = int_ddy_dx_dy_fct1(x3,z1, y3, x, y, z) - int_ddy_dx_dy_fct1(x1,z1, y3, x, y, z)
-            val12 = int_ddy_dx_dy_fct1(x3,z2, y3, x, y, z) - int_ddy_dx_dy_fct1(x1,z2, y3, x, y, z)
+            val11 = int_ddy_dx_dy_fct1(x3,z1, y3, x, y, z) - int_ddy_dx_dy_fct1(x2,z1, y3, x, y, z)
+            val12 = int_ddy_dx_dy_fct1(x3,z2, y3, x, y, z) - int_ddy_dx_dy_fct1(x2,z2, y3, x, y, z)
             
             dat%x = x
             dat%y = y
@@ -609,10 +667,10 @@ module TileCircPieceTensor
             dat%rs = R
             dat%zs = z1
             f_ptr => int_ddy_dx_dy_fct2
-            call qags_x ( f_ptr, dat, x1, x3, dat%epsabs, dat%epsrel, val21, dat%abserr_x, dat%neval_x, dat%ier_x )
+            call qags_x ( f_ptr, dat, x2, x3, dat%epsabs, dat%epsrel, val21, dat%abserr_x, dat%neval_x, dat%ier_x )
         
             dat%zs = z2
-            call qags_x ( f_ptr, dat, x1, x3, dat%epsabs, dat%epsrel, val22, dat%abserr_x, dat%neval_x, dat%ier_x )
+            call qags_x ( f_ptr, dat, x2, x3, dat%epsabs, dat%epsrel, val22, dat%abserr_x, dat%neval_x, dat%ier_x )
             
             
             val1 = sign(1.,sin(theta0))*sign(1.,cos(theta0))/(4*pi) * ( val11 - val21 )
@@ -624,9 +682,17 @@ module TileCircPieceTensor
         
         function int_ddy_dx_dy_fct1( xp, zp, y3, x, y, z )
         real,intent(in) :: xp,zp, y3, x, y, z
-        real :: int_ddy_dx_dy_fct1
-     
-            int_ddy_dx_dy_fct1 = log( xp-x + P(x,y,z,xp,y3,zp) )
+        real :: int_ddy_dx_dy_fct1,arg
+        
+            arg = xp-x + P(x,y,z,xp,y3,zp)
+            
+            if ( arg .le. 10*tiny(1.) ) then
+                arg = 10*tiny(1.)
+            endif
+            
+            int_ddy_dx_dy_fct1 = log( arg )
+            
+            
         end function
         
         function int_ddy_dx_dy_fct2( xp, dat )              
@@ -732,8 +798,14 @@ module TileCircPieceTensor
          real,intent(in) :: yp, zp, x3, x, y, z
          real :: int_ddz_dx_dy_fct1
          
-         int_ddz_dx_dy_fct1 =  atan( ((x-x3)*(y-yp) ) / ((z-zp)*P(x,y,z,x3,yp,zp))   )
-         
+         !::Cover the limit where z-zp goes to zero
+         if ( abs ( z-zp ) .lt. 10*tiny(1.) ) then
+             int_ddz_dx_dy_fct1 = atan(  huge(1.) )
+         else
+             
+            int_ddz_dx_dy_fct1 =  atan( ((x-x3)*(y-yp) ) / ((z-zp)*P(x,y,z,x3,yp,zp))   )
+         endif
+                  
          end function
          
          function int_ddz_dx_dy_fct2( yp, dat )         

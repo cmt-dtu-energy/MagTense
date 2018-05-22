@@ -83,7 +83,7 @@
              if ( present(Nout) ) then
                 call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
             else
-                call getFieldFromCircPieceInvetedTile( tiles(i), H_tmp, pts, n_ele )
+                call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_ele )
             endif
         case (tileTypeEllipsoid)
         case default        
@@ -334,7 +334,7 @@
                 N = N_out(i,:,:)
             endif
         else
-            call getN_prism_3D( circTile, diffPos, N )
+            call getN_circPiece( circTile, diffPos, N )
         endif
         
         !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
@@ -343,8 +343,8 @@
         !::5. Rotate the resulting field back to the global coordinate system
         dotProd = matmul( rotMatInv, dotProd )        
         
-        !::. Update the solution. The minus sign comes from the definition of the demag tensor (the demagfield is assumed negative)
-        H(i,:) = -dotProd
+        !::. Update the solution. 
+        H(i,:) = dotProd
     enddo
     end subroutine getFieldFromCircPieceTile
     
@@ -382,7 +382,7 @@
                 N = N_out(i,:,:)
             endif
         else
-            call getN_prism_3D( circTile, diffPos, N )
+            call getN_circPiece_Inv( circTile, diffPos, N )
         endif
         
         !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
@@ -391,8 +391,8 @@
         !::5. Rotate the resulting field back to the global coordinate system
         dotProd = matmul( rotMatInv, dotProd )        
         
-        !::. Update the solution. The minus sign comes from the definition of the demag tensor (the demagfield is assumed negative)
-        H(i,:) = -dotProd
+        !::. Update the solution. 
+        H(i,:) = dotProd
     enddo
     end subroutine getFieldFromCircPieceInvertedTile
     

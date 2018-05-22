@@ -8,6 +8,11 @@ module MagStatParameters
         integer :: nT,nH
     endtype MagStatStateFunction
     
+    type NStoreArr
+        real,dimension(:,:,:,:),allocatable :: N    
+    endtype NStoreArr
+    
+    
     contains
 end module MagStatParameters
     
