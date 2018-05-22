@@ -34,6 +34,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
     real,dimension(3) :: M
     real,dimension(:,:),allocatable :: H,H_old
     real,dimension(:),allocatable :: Hnorm,Hnorm_old
+    type(NStoreArr),dimension(:),allocatable :: Nstore
     real,dimension(3) :: pts    
     real :: H_par,H_trans_1,H_trans_2,err,lambda    
     real,dimension(4) :: maxRelDiffArr
@@ -45,6 +46,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
     i_err = 0
     
     allocate(H(n,3),H_old(n,3),Hnorm(n),Hnorm_old(n))
+    allocate(Nstore(n))
     H(:,:) = 0
     maxRelDiffArr(:) = 0.
     cnt = 0
@@ -93,28 +95,37 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
                 pts(3) = tiles(i)%z0 + tiles(i)%offset(3)
                 if ( tiles(i)%fieldEvaluation == fieldEvaluationCentre ) then
                     
+            
                     
                 elseif ( tiles(i)%fieldEvaluation == fieldEvaluationAverage ) then                    
-                    !::Get the field in the pre-defined points
+                    !::Get the field in the pre-defined points. This is used to find the average magnetization (a few lines up in the call to getM_HardMagnet_n)
                     tiles(i)%H_ave(:,:) = 0.
                     call getFieldFromTiles( tiles, tiles(i)%H_ave(:,:), tiles(i)%H_ave_pts, n, tiles(i)%n_ave(1) * tiles(i)%n_ave(2) * tiles(i)%n_ave(3), tiles(i)%N_ave_pts )
-                    !H(i,1) = sum( tiles(i)%H_ave(:,1) ) / tiles(i)%n_ave(1)
-                    !H(i,2) = sum( tiles(i)%H_ave(:,2) ) / tiles(i)%n_ave(2)
-                    !H(i,3) = sum( tiles(i)%H_ave(:,3) ) / tiles(i)%n_ave(3)
+                    
                 endif
                     
             case(tileTypePrism)
                 pts = tiles(i)%offset                
+            
             case(tileTypeCircPiece)
-                pts = tiles(i)%offset    
+                !find the center point of the circ piece
+                pts(1) = 0.5 * ( tiles(i)%r0 + tiles(i)%dr/2 ) * ( cos( tiles(i)%theta0 + tiles(i)%dtheta/2 ) + cos( tiles(i)%theta0 - tiles(i)%dtheta/2 ) ) + tiles(i)%offset(1)
+                pts(2) = 0.5 * ( tiles(i)%r0 + tiles(i)%dr/2 ) * ( sin( tiles(i)%theta0 + tiles(i)%dtheta/2 ) + sin( tiles(i)%theta0 - tiles(i)%dtheta/2 ) ) + tiles(i)%offset(2)
+                pts(3) = tiles(i)%z0 + tiles(i)%offset(3)
+                                
+            
             case(tileTypeCircPieceInverted)
-                pts = tiles(i)%offset    
+                pts(1) = 0.5 * ( tiles(i)%r0 + tiles(i)%dr/2 ) * ( cos( tiles(i)%theta0 + tiles(i)%dtheta/2 ) + cos( tiles(i)%theta0 - tiles(i)%dtheta/2 ) ) + tiles(i)%offset(1)
+                pts(2) = 0.5 * ( tiles(i)%r0 + tiles(i)%dr/2 ) * ( sin( tiles(i)%theta0 + tiles(i)%dtheta/2 ) + sin( tiles(i)%theta0 - tiles(i)%dtheta/2 ) ) + tiles(i)%offset(2)
+                pts(3) = tiles(i)%z0 + tiles(i)%offset(3)
+                
+            
             case default
                 
             end select
             
             !::Get the field in the i'th tile from all tiles           
-            call getFieldFromTiles( tiles, H(i,:), pts, n, 1 )
+            call getFieldFromTiles( tiles, H(i,:), pts, n, 1, Nstore(i)%N )
             
                    
             !::When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is slowed
@@ -153,7 +164,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
                       
         
     enddo    
-    deallocate(H,H_old,Hnorm,Hnorm_old)    
+    deallocate(H,H_old,Hnorm,Hnorm_old,Nstore)    
 end subroutine IterateMagnetization
     
 

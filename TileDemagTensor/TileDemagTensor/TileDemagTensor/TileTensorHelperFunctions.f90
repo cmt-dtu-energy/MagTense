@@ -86,6 +86,8 @@ module TileTensorHelperFunctions
     real,intent(in) :: x,y
     real :: atan2_custom
     
+    !atan2_custom = atan2( y, x )
+    
      if ( x .ge. 0 .AND. y .ge. 0 ) then
         !first quadrant
         atan2_custom = atan( y/x )

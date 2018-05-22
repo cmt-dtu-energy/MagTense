@@ -25,7 +25,7 @@
 
 !     Pointers to input/output mxArrays:
       real*8,dimension(:,:),allocatable :: pts,H
-      real*8,dimension(:,:,:),allocatable :: N
+      real*8,dimension(:,:,:,:),allocatable :: N
       type(MagTile),dimension(1):: cylTile
       integer*4 :: n_ele
       mwSize,dimension(3) :: dims      
@@ -54,18 +54,20 @@
       
       !::copy the number of points where the tensor field is required
       call mxCopyPtrToInteger4(mxGetPr(prhs(3)), n_ele,1)
-      allocate(pts(n_ele,3),N(n_ele,3,3),H(n_ele,3))      
+      allocate(pts(n_ele,3),N(1,n_ele,3,3),H(n_ele,3))      
       call mxCopyPtrToReal8(mxGetPr(prhs(2)), pts, n_ele*3)
       
       !::do the calculation
-      N(:,:,:) = 0
+      N(:,:,:,:) = 0
       H(:,:) = 0      
       if ( cylTile(1)%tileType .eq. tileTypeCylPiece ) then
             call getFieldFromCylTile( cylTile(1), H, pts, n_ele, N, .false. )
       else if (cylTile(1)%tileType .eq. tileTypeCircPiece ) then          
           call getFieldFromCircPieceTile( cylTile(1), H, pts, n_ele, N, .false. )
-     else if (cylTile(1)%tileType .eq. tileTypeCircPieceInverted ) then          
+      else if (cylTile(1)%tileType .eq. tileTypeCircPieceInverted ) then          
           call getFieldFromCircPieceInvertedTile( cylTile(1), H, pts, n_ele, N, .false. )
+      else if (cylTile(1)%tileType .eq. tileTypePrism ) then          
+          call getFieldFromRectangularPrismTile( cylTile(1), H, pts, n_ele, N, .false. )
       endif
       
       
@@ -73,9 +75,9 @@
       
       ComplexFlag = 0
       
-      dims(1) = 3
+      dims(1) = n_ele
       dims(2) = 3
-      dims(3) = n_ele
+      dims(3) = 3
       classid = mxClassIDFromClassName('double')
       
       !Return the N field
