@@ -356,9 +356,24 @@ module TileNComponents
     real :: int_ddy_sin_dtheta_dz_val, int_ddy_dx_dy_val1,int_ddy_dx_dy_val2,int_ddz_dy_dz_val
     real :: int_ddz_dx_dz_val,int_ddz_cos_dtheta_dz_val,int_ddz_sin_dtheta_dz_val,int_ddz_dx_dy_val1,int_ddz_dx_dy_val2
     real :: phi,Nxx,Nyy,Nzz,Nxy,Nyx,Nxz,Nzx,Nyz,Nzy
-    real :: R,x,y
+    real :: R,x,y,theta0,dtheta
+    real,dimension(3,3) :: RefMatr,SymmMatr
+    real,dimension(3) :: pos_
+    integer :: i
             Nout(:,:) = 0.            
 
+            !::Hack to circumvent problem with x=0, y=0 and z=0
+            pos_ = pos
+            do i=1,3
+                if ( abs(pos(i)) .le. 1e-10 .AND. pos(i) .ge. 0. ) then
+                    pos_(i) = 1e-10 
+                elseif ( abs(pos(i)) .le. 1e-10 .AND. pos(i) .lt. 0. ) then
+                    pos_(i) = -1e-10
+                endif
+            enddo
+            
+            
+            
             !get the integration limits            
              allocate(dat)
 
@@ -366,20 +381,67 @@ module TileNComponents
             dat%r1 = tile%r0 - tile%dr/2
             dat%r2 = tile%r0 + tile%dr/2
 
-            dat%theta1 = tile%theta0 - tile%dtheta/2
-            dat%theta2 = tile%theta0 + tile%dtheta/2
+            theta0 = tile%theta0
+            dtheta = tile%dtheta
+                        
             
             dat%z1 = tile%z0 - tile%dz/2
             dat%z2 = tile%z0 + tile%dz/2    
             
-            dat%x = pos(1)
-            dat%y = pos(2)
-            dat%z = pos(3)
+            dat%x = pos_(1)
+            dat%y = pos_(2)
+            dat%z = pos_(3)
             
-            x = pos(1)
-            y = pos(2)
+            !::Rotate to 1st quadrant and mirror the x- and y-coordinates accordingly
+            dat%x = dat%x * sign(1.,cos(theta0))
+            dat%y = dat%y * sign(1.,sin(theta0))
+            
+            x = dat%x
+            y = dat%y
             R = tile%r0 + tile%dr/2
-           
+
+            
+            
+            !::Reflection matrix for correctly mirroring the N-tensor
+            !::Note that the reflection is on the field and not the tensor components
+            SymmMatr(:,:) = 1.
+            RefMatr(:,:) = 0.
+            RefMatr(1,1) = 1.
+            RefMatr(2,2) = 1.
+            RefMatr(3,3) = 1.
+            
+            !define the rotation-trick-variable            
+            phi = atan2_custom( y, x )
+            
+            if ( sign(1.,cos(tile%theta0)) .lt. 0. .AND. sign(1.,sin(tile%theta0)) .ge. 0. ) then
+                !Second quadrant                
+                theta0 = pi - theta0
+                !::Reflection about the y-axis (i.e. Mx and Hx changes sign)
+                SymmMatr(:,1) = -1. 
+                RefMatr(1,1) = -1.
+            elseif ( sign(1.,cos(tile%theta0)) .lt. 0. .AND. sign(1.,sin(tile%theta0)) .lt. 0. ) then
+                !Third quadrant
+                theta0 = theta0 - pi
+                !::Reflection about the y-axis (Mx and Hx change sign)
+                SymmMatr(:,1) = -1.
+                RefMatr(2,2) = -1.
+                !::reflection about the x-axis (My and Hy change sign)
+                SymmMatr(:,2) = -1.                                
+                RefMatr(1,1) = -1.
+            elseif ( sign(1.,cos(tile%theta0)) .ge. 0. .AND. sign(1.,sin(tile%theta0)) .lt. 0. ) then
+                !Fourth quadrant
+                theta0 = 2*pi - theta0
+                
+                !::Reflection about the x-axis (My and Hy change sign)
+                SymmMatr(:,2) = -1.                
+                RefMatr(2,2) = -1.
+            
+            endif
+                            
+            
+            dat%theta1 = theta0 - tile%dtheta/2
+            dat%theta2 = theta0 + tile%dtheta/2
+            
             !x-component of the field
             !yz-plane (Mx)
             call int_ddx_dy_dz_inv( dat, int_ddx_dy_dz_val )
@@ -388,13 +450,9 @@ module TileNComponents
             call int_ddx_dx_dz_inv( dat, int_ddx_dx_dz_val )
                         
             !theta-z-plane (Mr=cos(theta0)*Mx + sin(theta0)*My)
-            !All the integrals coming from the circularly curved path only need to have the sign changed 
-            !(the normal vector to the piece of the circle is now pointing radially inwards)
             call int_ddx_cos_dtheta_dz( dat, int_ddx_cos_dtheta_dz_val )            
-            int_ddx_cos_dtheta_dz_val = -int_ddx_cos_dtheta_dz_val
             
-            call int_ddx_sin_dtheta_dz( dat, int_ddx_sin_dtheta_dz_val )  
-            int_ddx_sin_dtheta_dz_val = -int_ddx_sin_dtheta_dz_val
+            call int_ddx_sin_dtheta_dz( dat, int_ddx_sin_dtheta_dz_val )            
             
             !xy-plane (Mz) (UP,positive)
             call int_ddx_dx_dy_inv( dat, int_ddx_dx_dy_val1, int_ddx_dx_dy_val2 )            
@@ -409,9 +467,7 @@ module TileNComponents
                         
             !theta-z-plane (Mr=cos(theta0)*Mx + sin(theta0)*My)
             call int_ddy_cos_dtheta_dz( dat, int_ddy_cos_dtheta_dz_val )
-            int_ddy_cos_dtheta_dz_val = -int_ddy_cos_dtheta_dz_val
             call int_ddy_sin_dtheta_dz( dat, int_ddy_sin_dtheta_dz_val )
-            int_ddy_sin_dtheta_dz_val = -int_ddy_sin_dtheta_dz_val
             
             
             !xy-plane (Mz) (UP,positive, DOWN negative)
@@ -426,18 +482,13 @@ module TileNComponents
             
             !theta-z-plane (Mr=cos(theta0)*Mx + sin(theta0)*My)
             call int_ddz_cos_dtheta_dz(dat, int_ddz_cos_dtheta_dz_val )
-            int_ddz_cos_dtheta_dz_val = -int_ddz_cos_dtheta_dz_val
             call int_ddz_sin_dtheta_dz(dat, int_ddz_sin_dtheta_dz_val )
-            int_ddz_sin_dtheta_dz_val = -int_ddz_sin_dtheta_dz_val
             
             
             !xy-plane (Mz) (UP,positive)
             call int_ddz_dx_dy_inv ( dat, int_ddz_dx_dy_val1, int_ddz_dx_dy_val2 )
                         
-            !define the rotation-trick-variable
-            phi = atan2_custom( y, x )
             
-
             
             Nxx = int_ddx_dy_dz_val + R/(4*pi) * &
                 ( cos(phi) * ( cos(phi) * int_ddx_cos_dtheta_dz_val - sin(phi) * int_ddx_sin_dtheta_dz_val ) &
@@ -477,6 +528,9 @@ module TileNComponents
             Nout(3,1) = Nzx
             Nout(3,2) = Nzy
             Nout(3,3) = Nzz
+            
+            !::Mirror the solution (change sign of  Mx if mirror in y-axis, sign of My if mirror in x-axis)
+            Nout = matmul( RefMatr, SymmMatr * Nout )
 
         deallocate(dat)
     

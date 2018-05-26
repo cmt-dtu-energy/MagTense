@@ -85,6 +85,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
         !make sure to reset the H field
         H(:,:) = 0
         !::Get the field at the center at each tile from all other tiles
+        !$OMP PARALLEL DO PRIVATE(i,pts)    
         do i=1,n
             
             select case (tiles(i)%tileType )
@@ -133,7 +134,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
             H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
            
         enddo
-        
+        !$OMP END PARALLEL DO
         !::Update iteration step
         cnt = cnt + 1
         if ( cnt .gt. 1 ) then
