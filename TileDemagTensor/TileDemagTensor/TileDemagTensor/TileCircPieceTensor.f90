@@ -379,8 +379,8 @@ module TileCircPieceTensor
      
      call getCorners( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
                                                      
-     !val = sign(1.,cos(theta0)) * sign(1.,sin(theta0)) * (int_ddx_dy_dz_fct( y2, z2, x3, x, y, z, theta0 ) - int_ddx_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - ( int_ddx_dy_dz_fct(y2,z1, x3, x, y, z, theta0) - int_ddx_dy_dz_fct(y3,z1, x3, x, y, z, theta0) ))
-     val = sign(1.,cos(theta0)) * (int_ddx_dy_dz_fct( y2, z2, x3, x, y, z, theta0 ) - int_ddx_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - ( int_ddx_dy_dz_fct(y2,z1, x3, x, y, z, theta0) - int_ddx_dy_dz_fct(y3,z1, x3, x, y, z, theta0) ))
+     val = sign(1.,cos(theta0)) * sign(1.,sin(theta0)) * (int_ddx_dy_dz_fct( y2, z2, x3, x, y, z, theta0 ) - int_ddx_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - ( int_ddx_dy_dz_fct(y2,z1, x3, x, y, z, theta0) - int_ddx_dy_dz_fct(y3,z1, x3, x, y, z, theta0) ))
+     !val = sign(1.,cos(theta0)) * (int_ddx_dy_dz_fct( y2, z2, x3, x, y, z, theta0 ) - int_ddx_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - ( int_ddx_dy_dz_fct(y2,z1, x3, x, y, z, theta0) - int_ddx_dy_dz_fct(y3,z1, x3, x, y, z, theta0) ))
 
     end subroutine
     
