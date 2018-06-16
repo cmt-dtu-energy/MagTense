@@ -2,6 +2,7 @@ module TileNComponents
     use TileCylPieceTensor
     use TileRectanagularPrismTensor
     use TileCircPieceTensor
+    use TilePlanarCoilTensor
     implicit none
     
     !::General base-type for alle the different tile types
@@ -30,7 +31,7 @@ module TileNComponents
         integer :: fieldEvaluation
     end type MagTile
     
-    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeEllipsoid=10
+    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeEllipsoid=10,tileTypePlanarCoil=101
     integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2
     integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     
@@ -167,10 +168,10 @@ module TileNComponents
             !::Hack to circumvent problem with x=0, y=0 and z=0
             pos_ = pos
             do i=1,3
-                if ( abs(pos(i)) .le. 1e-10 .AND. pos(i) .ge. 0. ) then
-                    pos_(i) = 1e-10 
-                elseif ( abs(pos(i)) .le. 1e-10 .AND. pos(i) .lt. 0. ) then
-                    pos_(i) = -1e-10
+                if ( abs(pos(i)) .le. 1e-20 .AND. pos(i) .ge. 0. ) then
+                    pos_(i) = 1e-20 
+                elseif ( abs(pos(i)) .le. 1e-20 .AND. pos(i) .lt. 0. ) then
+                    pos_(i) = -1e-20
                 endif
             enddo
             
@@ -363,12 +364,14 @@ module TileNComponents
             Nout(:,:) = 0.            
 
             !::Hack to circumvent problem with x=0, y=0 and z=0
+            !::15-6-2018: Note from Kaspar: Hacks like this WILL come back and bite you in the ass
+            !::Changed 1e-10 to 1e-20 - otherwise the orders when trying to do anything serious get messed up
             pos_ = pos
             do i=1,3
-                if ( abs(pos(i)) .le. 1e-10 .AND. pos(i) .ge. 0. ) then
-                    pos_(i) = 1e-10 
-                elseif ( abs(pos(i)) .le. 1e-10 .AND. pos(i) .lt. 0. ) then
-                    pos_(i) = -1e-10
+                if ( abs(pos(i)) .le. 1e-20 .AND. pos(i) .ge. 0. ) then
+                    pos_(i) = 1e-20 
+                elseif ( abs(pos(i)) .le. 1e-20 .AND. pos(i) .lt. 0. ) then
+                    pos_(i) = -1e-20
                 endif
             enddo
             
@@ -451,8 +454,11 @@ module TileNComponents
                         
             !theta-z-plane (Mr=cos(theta0)*Mx + sin(theta0)*My)
             call int_ddx_cos_dtheta_dz( dat, int_ddx_cos_dtheta_dz_val )            
+            !::Change the sign since the inverted circ piece has the opposite normal vectors
+            int_ddx_cos_dtheta_dz_val = -int_ddx_cos_dtheta_dz_val
             
             call int_ddx_sin_dtheta_dz( dat, int_ddx_sin_dtheta_dz_val )            
+            int_ddx_sin_dtheta_dz_val = -int_ddx_sin_dtheta_dz_val
             
             !xy-plane (Mz) (UP,positive)
             call int_ddx_dx_dy_inv( dat, int_ddx_dx_dy_val1, int_ddx_dx_dy_val2 )            
@@ -467,7 +473,9 @@ module TileNComponents
                         
             !theta-z-plane (Mr=cos(theta0)*Mx + sin(theta0)*My)
             call int_ddy_cos_dtheta_dz( dat, int_ddy_cos_dtheta_dz_val )
+            int_ddy_cos_dtheta_dz_val = -int_ddy_cos_dtheta_dz_val
             call int_ddy_sin_dtheta_dz( dat, int_ddy_sin_dtheta_dz_val )
+            int_ddy_sin_dtheta_dz_val = -int_ddy_sin_dtheta_dz_val
             
             
             !xy-plane (Mz) (UP,positive, DOWN negative)
@@ -482,7 +490,9 @@ module TileNComponents
             
             !theta-z-plane (Mr=cos(theta0)*Mx + sin(theta0)*My)
             call int_ddz_cos_dtheta_dz(dat, int_ddz_cos_dtheta_dz_val )
+            int_ddz_cos_dtheta_dz_val = -int_ddz_cos_dtheta_dz_val
             call int_ddz_sin_dtheta_dz(dat, int_ddz_sin_dtheta_dz_val )
+            int_ddz_sin_dtheta_dz_val = -int_ddz_sin_dtheta_dz_val
             
             
             !xy-plane (Mz) (UP,positive)
@@ -624,6 +634,58 @@ module TileNComponents
     
     end subroutine
         
+    
+    !::
+    !::Returns the demag tensor for a planar coil with inner radius Rin, outer radius Rout
+    !::and NL windings between these two radii. Each winding is assumed to carry the same current, I, which
+    !::is considered to be equivalent to the magnetization of the "tile"
+    !::It is assumed tha NL = 100 yields a good approximation to a continuous coil. Then the field strength is governed by the current, I
+    subroutine getN_PlanarCoil( tile, pos, Nout )
+    type(MagTile),intent(in) :: tile
+    class( dataCollectionBase ), pointer :: dat
+    real,dimension(3),intent(in) :: pos
+    real,dimension(3,3),intent(inout) :: Nout
+    
+    real,dimension(2) :: Npol,tmp
+    real :: r,z,theta,Rin,Rout,R_loop
+    integer :: i
+    integer,parameter :: NL=100
+    
+    Npol(:) = 0.
+    tmp(:) = 0.
+    Nout(:,:) = 0.
+    
+    allocate(dat)
+    
+    
+    
+    !::Get the loop dimensions
+    Rin = tile%a
+    Rout = tile%b
+    
+    !::Convert to polar coordinates
+    r = sqrt( pos(1)**2 + pos(2)**2 )
+    z = pos(3)
+    theta = atan2( pos(2), pos(1) )
+    
+    do i=1,NL
+        R_loop = Rin + (Rout - Rin) * (i-1.)/(NL-1.)
+        call getTensorFromSingleLoop( dat, R_loop, r , z, tmp )
+        Npol = Npol + tmp
+    enddo
+    
+    !::Convert from polar to Cartesian coordinates
+    !::The resulting tensor is diagonal as there are no cross-terms
+    !::due to the symmetry of the coil
+    Nout(1,1) = cos( theta ) * Npol(1)
+    Nout(2,2) = sin( theta ) * Npol(1)
+    Nout(3,3) = Npol(2)
+    
+    deallocate(dat)
+    end subroutine getN_PlanarCoil
+    
+    
+    
 end module TileNComponents
     
     

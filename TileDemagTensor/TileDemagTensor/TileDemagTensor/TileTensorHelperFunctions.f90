@@ -2,7 +2,7 @@ module TileTensorHelperFunctions
     use QuadPack
     implicit none
 
-    real,parameter :: pi=3.141592653589793
+    real,parameter :: pi=3.141592653589793,mu0=4*pi*1e-7
     contains
     
     
@@ -48,7 +48,7 @@ module TileTensorHelperFunctions
     function  B( r, x )
     real :: B
     real,intent(in) :: r,x
-        if ( abs( r + x  ) .lt. 1e-10 ) then
+        if ( abs( r + x  ) .lt. 1e-20 ) then
             !::The limit of B as x -> -r is zero
             B = 0.
         else
@@ -64,7 +64,7 @@ module TileTensorHelperFunctions
             
             !K = 2 * sqrt( r * x / ( ( r + x )**2 + z**2 ) )
             
-            if ( z .eq. 0 .AND. abs( r + x ) .lt. 1e-10 ) then
+            if ( z .eq. 0 .AND. abs( r + x ) .lt. 10*tiny(1.) ) then
                 K = 0.
             else                
                 K = 4 * r * x / ( ( r + x )**2 + z**2 )

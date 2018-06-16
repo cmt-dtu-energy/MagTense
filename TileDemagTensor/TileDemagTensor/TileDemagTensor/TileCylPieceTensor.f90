@@ -448,7 +448,7 @@ module TileCylPieceTensor
         real,intent(in) :: r,z,thetas,x
             !::necessary to enforce the integrand to be zero when theta is small since there is a discontinuity (zero over zero problem)
             !::
-            if ( abs(sin(thetas)) .lt. 1e-10 ) then
+            if ( abs(sin(thetas)) .lt. 1e-20 ) then
                 int_dDdy_dr_dz_fct = 0.0
            else            
                 int_dDdy_dr_dz_fct = -sin(thetas) * ( r*x*cos(thetas) - x**2 - z**2 ) / ( L( x, thetas, z) * M( r, x, thetas, z ) )

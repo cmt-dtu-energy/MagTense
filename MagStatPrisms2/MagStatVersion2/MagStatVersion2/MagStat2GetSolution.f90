@@ -48,15 +48,15 @@
     prgCnt = 0
     prog = 0
     
-    allocate( H_tmp(n_ele,3) )    
-    ! $OMP PARALLEL DO PRIVATE(i,H_tmp)    
+    
+    !$OMP PARALLEL DO PRIVATE(i,H_tmp)    
     do i=1,n_tiles
         
         !Make sure to allocate H_tmp on the heap and for each thread
-        ! $OMP CRITICAL
-        
+        !$OMP CRITICAL
+        allocate( H_tmp(n_ele,3) )       
         H_tmp(:,:) = 0.        
-        ! $OMP END CRITICAL
+        !$OMP END CRITICAL
         !::Here a selection of which subroutine to use should be done, i.e. whether the tile
         !:: is cylindrical, a prism or an ellipsoid
         select case (tiles(i)%tileType )
@@ -86,12 +86,19 @@
                 call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_ele )
             endif
         case (tileTypeEllipsoid)
+        case (tileTypePlanarCoil )
+            if ( present(Nout) ) then
+                call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+            else
+                call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_ele )            
+            endif
+            
         case default        
             
         end select
         
         
-        ! $OMP CRITICAL
+        !$OMP CRITICAL
         H = H + H_tmp
         !prgCnt = prgCnt + 1
         !tid = omp_get_thread_num()
@@ -102,15 +109,15 @@
         !        call displayProgress( prog )
         !    endif
         !endif        
-        
-       ! $OMP END CRITICAL
+        deallocate(H_tmp)    
+       !$OMP END CRITICAL
        
         
         
     enddo
-    ! $OMP END PARALLEL DO
+    !$OMP END PARALLEL DO
     
-    deallocate(H_tmp)    
+    
     
     !::subtract M of a tile in points that are inside that tile in order to actually get H (only for CylindricalTiles as these actually calculate the B-field (divided by mu0)
     call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_ele)
@@ -325,7 +332,8 @@
         !::1. The relative position vector between the origo of the current tile and the point at which the tensor is required
         diffPos = pts(i,:) - circTile%offset
         
-        !::2. rotate the position vector according to the rotation of the prism
+        !::2. rotate the position vector according to the rotation of the tile, i.e. rotate
+        !::the position vector to align with the local coordinate system of the tile
         diffPos = matmul( rotMat, diffPos )
         
         !::3. get the demag tensor                
@@ -398,6 +406,59 @@
         H(i,:) = dotProd
     enddo
     end subroutine getFieldFromCircPieceInvertedTile
+    
+    
+    !::
+    !::Returns the field from a planar coil with N windings and the current I running through it
+    !::Rotation has not been implemented yet for this tile type
+    !::tile%M is assumed to contain the current as tile%M = [I,0,0] in the unit of Amps
+    !::
+    subroutine getFieldFromPlanarCoilTile( tile, H, pts, n_ele, N_out, useStoredN )
+    type(MagTile),intent(in) :: tile
+    real,dimension(n_ele,3),intent(inout) :: H
+    real,dimension(n_ele,3) :: pts
+    integer,intent(in) :: n_ele
+    real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+    logical,intent(in),optional :: useStoredN
+    real,dimension(3) :: diffPos,dotProd
+    real,dimension(3,3) :: N
+    !real,dimension(3,3) :: rotMat,rotMatInv
+    integer :: i
+    
+    !::get the rotation matrices
+    !call getRotationMatrices( tile, rotMat, rotMatInv)
+    
+    do i=1,n_ele
+        !::1. The relative position vector between the origo of the current tile and the point at which the tensor is required
+        diffPos = pts(i,:) - tile%offset
+        
+        !::2. rotate the position vector according to the rotation of the prism
+       ! diffPos = matmul( rotMat, diffPos )
+        
+        !::3. get the demag tensor                
+        if ( present( useStoredN ) .eq. .true. ) then
+            if ( useStoredN .eq. .false. ) then
+                call getN_PlanarCoil( tile, diffPos, N )
+                 
+                N_out(i,:,:) = N
+            else
+                N = N_out(i,:,:)
+            endif
+        else
+            call getN_PlanarCoil( tile, diffPos, N )
+        endif
+        
+        !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
+        !call getDotProd( N, matmul( rotMat, tile%M ), dotProd )
+        call getDotProd( N, tile%M, dotProd )
+        
+        !::5. Rotate the resulting field back to the global coordinate system
+        !dotProd = matmul( rotMatInv, dotProd )        
+        
+        !::. Update the solution. 
+        H(i,:) = dotProd
+    enddo
+    end subroutine getFieldFromPlanarCoilTile
     
 
 !---------------------------------------------------------------------------------------!
