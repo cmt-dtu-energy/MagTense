@@ -38,6 +38,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
     real,dimension(3) :: pts    
     real :: H_par,H_trans_1,H_trans_2,err,lambda    
     real,dimension(4) :: maxRelDiffArr
+    real,dimension(3,3) :: rotMat,rotMatInv
     logical :: lCh
     
     !::set default error margin if nothing has been specified by the user
@@ -64,28 +65,29 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
         
         !::Loop over each prism and set their respective magnetization vectors
         do i=1,n
-            
-            select case ( tiles(i)%magnetType )
-            case ( MagnetTypeHard )
-                if ( tiles(i)%tileType .eq. tileTypeCylPiece ) then
-                    call getM_HardMagnet_n( tiles(i)%H_ave, tiles(i), tiles(i).n_ave(1)*tiles(i).n_ave(2)*tiles(i).n_ave(3) )
-                else
-                    call getM_HardMagnet_1( H(i,:), tiles(i) )
-                endif
+            if ( tiles(i)%tileType .lt. 100 ) then
+                select case ( tiles(i)%magnetType )
+                case ( MagnetTypeHard )
+                    if ( tiles(i)%tileType .eq. tileTypeCylPiece ) then
+                        call getM_HardMagnet_n( tiles(i)%H_ave, tiles(i), tiles(i).n_ave(1)*tiles(i).n_ave(2)*tiles(i).n_ave(3) )
+                    else
+                        call getM_HardMagnet_1( H(i,:), tiles(i) )
+                    endif
                 
-            case ( MagnetTypeSoft )
-                call getM_SoftMagnet( T, H(i,:), tiles(i), stateFunction, n_stf)
-            case default
-            end select
+                case ( MagnetTypeSoft )
+                    call getM_SoftMagnet( T, H(i,:), tiles(i), stateFunction, n_stf)
+                case default
+                end select
             
-            tiles(i)%isIterating = .true.
+                tiles(i)%isIterating = .true.
+            endif            
         enddo
         !reset H array
         H_old = H
         !make sure to reset the H field
         H(:,:) = 0
         !::Get the field at the center at each tile from all other tiles
-        !$OMP PARALLEL DO PRIVATE(i,pts)    
+        
         do i=1,n
             
             select case (tiles(i)%tileType )
@@ -106,35 +108,64 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
                 endif
                     
             case(tileTypePrism)
+                !::no rotation is needed as the offset of the prism is with respect to the center of the prism
                 pts = tiles(i)%offset                
             
             case(tileTypeCircPiece)
                 !find the center point of the circ piece
-                pts(1) = 0.5 * ( tiles(i)%r0 + tiles(i)%dr/2 ) * ( cos( tiles(i)%theta0 + tiles(i)%dtheta/2 ) + cos( tiles(i)%theta0 - tiles(i)%dtheta/2 ) ) + tiles(i)%offset(1)
-                pts(2) = 0.5 * ( tiles(i)%r0 + tiles(i)%dr/2 ) * ( sin( tiles(i)%theta0 + tiles(i)%dtheta/2 ) + sin( tiles(i)%theta0 - tiles(i)%dtheta/2 ) ) + tiles(i)%offset(2)
-                pts(3) = tiles(i)%z0 + tiles(i)%offset(3)
+                !::First find the center point of the piece in the reference frame of the piece itself
+                pts(1) = 0.5 * ( tiles(i)%r0 + tiles(i)%dr/2 ) * ( cos( tiles(i)%theta0 + tiles(i)%dtheta/2 ) + cos( tiles(i)%theta0 - tiles(i)%dtheta/2 ) )
+                pts(2) = 0.5 * ( tiles(i)%r0 + tiles(i)%dr/2 ) * ( sin( tiles(i)%theta0 + tiles(i)%dtheta/2 ) + sin( tiles(i)%theta0 - tiles(i)%dtheta/2 ) )
+                pts(3) = tiles(i)%z0
+                
+                !::Then rotate this point about the three principal axes
+                !::Note that the rotMat gives the rotation from the global coordinate system to the 
+                !::reference system of the tile
+                !::The rotMatInv matrix gives the rotation from the tile's local coordinate system to the global one
+                !::and is just the inverse rotation of the former.
+                call getRotationMatrices( tiles(i), rotMat, rotMatInv)
+                !::We require the point in the global coordinate system.
+                pts = matmul( rotMatInv, pts )
+                !::Finally add the offset to translate the circ piece
+                pts = pts + tiles(i)%offset
                                 
             
             case(tileTypeCircPieceInverted)
-                pts(1) = 0.5 * ( tiles(i)%r0 + tiles(i)%dr/2 ) * ( cos( tiles(i)%theta0 + tiles(i)%dtheta/2 ) + cos( tiles(i)%theta0 - tiles(i)%dtheta/2 ) ) + tiles(i)%offset(1)
-                pts(2) = 0.5 * ( tiles(i)%r0 + tiles(i)%dr/2 ) * ( sin( tiles(i)%theta0 + tiles(i)%dtheta/2 ) + sin( tiles(i)%theta0 - tiles(i)%dtheta/2 ) ) + tiles(i)%offset(2)
-                pts(3) = tiles(i)%z0 + tiles(i)%offset(3)
+                !find the center point of the circ piece
+                !::First find the center point of the piece in the reference frame of the piece itself
+                pts(1) = 0.5 * ( tiles(i)%r0 + tiles(i)%dr/2 ) * ( cos( tiles(i)%theta0 + tiles(i)%dtheta/2 ) + cos( tiles(i)%theta0 - tiles(i)%dtheta/2 ) )
+                pts(2) = 0.5 * ( tiles(i)%r0 + tiles(i)%dr/2 ) * ( sin( tiles(i)%theta0 + tiles(i)%dtheta/2 ) + sin( tiles(i)%theta0 - tiles(i)%dtheta/2 ) )
+                pts(3) = tiles(i)%z0
                 
+                !::Then rotate this point about the three principal axes
+                !::Note that the rotMat gives the rotation from the global coordinate system to the 
+                !::reference system of the tile
+                !::The rotMatInv matrix gives the rotation from the tile's local coordinate system to the global one
+                !::and is just the inverse rotation of the former.
+                call getRotationMatrices( tiles(i), rotMat, rotMatInv)
+                !::We require the point in the global coordinate system.
+                pts = matmul( rotMatInv, pts )
+                !::Finally add the offset to translate the circ piece
+                pts = pts + tiles(i)%offset
+                
+                            
             
             case default
                 
             end select
-            
-            !::Get the field in the i'th tile from all tiles           
-            call getFieldFromTiles( tiles, H(i,:), pts, n, 1, Nstore(i)%N )
+            !::Tiles with type >100 are special tiles like a coil that are not iterated over
+            if ( tiles(i)%tileType .lt. 100 ) then
+                !::Get the field in the i'th tile from all tiles           
+                call getFieldFromTiles( tiles, H(i,:), pts, n, 1, Nstore(i)%N )
             
                    
-            !::When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is slowed
+                !::When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is slowed
            
-            H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
-           
+                H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
+            endif
+                       
         enddo
-        !$OMP END PARALLEL DO
+        
         !::Update iteration step
         cnt = cnt + 1
         if ( cnt .gt. 1 ) then
