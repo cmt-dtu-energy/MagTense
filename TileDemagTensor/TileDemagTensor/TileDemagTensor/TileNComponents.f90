@@ -28,7 +28,7 @@ module TileNComponents
         real,dimension(:,:),allocatable :: H_ave_pts,H_ave
         real,dimension(:,:,:,:),allocatable :: N_ave_pts
         logical :: isIterating
-        integer :: fieldEvaluation
+        integer :: fieldEvaluation,includeInIteration
     end type MagTile
     
     integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeEllipsoid=10,tileTypePlanarCoil=101
@@ -168,10 +168,10 @@ module TileNComponents
             !::Hack to circumvent problem with x=0, y=0 and z=0
             pos_ = pos
             do i=1,3
-                if ( abs(pos(i)) .le. 1e-20 .AND. pos(i) .ge. 0. ) then
-                    pos_(i) = 1e-20 
-                elseif ( abs(pos(i)) .le. 1e-20 .AND. pos(i) .lt. 0. ) then
-                    pos_(i) = -1e-20
+                if ( abs(pos(i)) .le. 1e-15 .AND. pos(i) .ge. 0. ) then
+                    pos_(i) = 1e-15
+                elseif ( abs(pos(i)) .le. 1e-15 .AND. pos(i) .lt. 0. ) then
+                    pos_(i) = -1e-15
                 endif
             enddo
             
@@ -291,8 +291,7 @@ module TileNComponents
             !xy-plane (Mz) (UP,positive)
             call int_ddz_dx_dy ( dat, int_ddz_dx_dy_val1, int_ddz_dx_dy_val2 )
                         
-            
-            
+                        
             Nxx = int_ddx_dy_dz_val + R/(4*pi) * &
                 ( cos(phi) * ( cos(phi) * int_ddx_cos_dtheta_dz_val - sin(phi) * int_ddx_sin_dtheta_dz_val ) &
                 + sin(phi) * ( cos(phi) * int_ddy_cos_dtheta_dz_val - sin(phi) * int_ddy_sin_dtheta_dz_val ) )
@@ -368,10 +367,10 @@ module TileNComponents
             !::Changed 1e-10 to 1e-20 - otherwise the orders when trying to do anything serious get messed up
             pos_ = pos
             do i=1,3
-                if ( abs(pos(i)) .le. 1e-20 .AND. pos(i) .ge. 0. ) then
-                    pos_(i) = 1e-20 
-                elseif ( abs(pos(i)) .le. 1e-20 .AND. pos(i) .lt. 0. ) then
-                    pos_(i) = -1e-20
+                if ( abs(pos(i)) .le. 1e-15 .AND. pos(i) .ge. 0. ) then
+                    pos_(i) = 1e-15
+                elseif ( abs(pos(i)) .le. 1e-15 .AND. pos(i) .lt. 0. ) then
+                    pos_(i) = -1e-15
                 endif
             enddo
             

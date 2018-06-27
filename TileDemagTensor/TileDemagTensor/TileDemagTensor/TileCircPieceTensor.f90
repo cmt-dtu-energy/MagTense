@@ -1,4 +1,4 @@
-module TileCircPieceTensor
+    module TileCircPieceTensor
     use QuadPack
     use SpecialFunctions
     use TileTensorHelperFunctions
@@ -47,19 +47,23 @@ module TileCircPieceTensor
         else
             val = (int_ddx_cos_dtheta_dz_fct(theta2,z2,R,xrot) - int_ddx_cos_dtheta_dz_fct(theta1, z2,R,xrot) - ( int_ddx_cos_dtheta_dz_fct(theta2,z1,R,xrot) - int_ddx_cos_dtheta_dz_fct(theta1,z1,R,xrot) ))
         endif                    
-    
+        !val = int_ddx_cos_dtheta_dz_fct(theta2,z2,R,xrot)
     end subroutine int_ddx_cos_dtheta_dz
     
     function int_ddx_cos_dtheta_dz_fct( thetap, zp, R, xrot )
     real,intent(in) :: thetap,zp,R,xrot
     real :: int_ddx_cos_dtheta_dz_fct
     real :: elf,elE,elPi
-        
-    elf = ellf( C_no_sign(thetap), K(R,xrot,zp) )
-    elE = elle( C_no_sign(thetap), K(R,xrot,zp) )
-    elPi = ellpi( C_no_sign(thetap), B(R,xrot), K(R,xrot,zp) )
+            
+    if ( abs(xrot) .lt. 1e-9 ) then
+        int_ddx_cos_dtheta_dz_fct = 0
+    else
+        elf = ellf( C_no_sign(thetap), K(R,xrot,zp) )
+        elE = elle( C_no_sign(thetap), K(R,xrot,zp) )
+        elPi = ellpi( C_no_sign(thetap), B(R,xrot), K(R,xrot,zp) )
+        int_ddx_cos_dtheta_dz_fct = zp/(2*R*xrot**2*(R+xrot)*sqrt((R+xrot)**2+zp**2)) * (-(xrot-R)*(R**2+xrot**2) * elPi + (R+xrot)*(((R+xrot)**2+zp**2)*elE - (2*R**2+zp**2)*elF))              
+    endif
     
-    int_ddx_cos_dtheta_dz_fct = zp/(2*R*xrot**2*(R+xrot)*sqrt((R+xrot)**2+zp**2)) * (-(xrot-R)*(R**2+xrot**2) * elPi + (R+xrot)*(((R+xrot)**2+zp**2)*elE - (2*R**2+zp**2)*elF))              
     end function int_ddx_cos_dtheta_dz_fct
     
     
@@ -83,8 +87,11 @@ module TileCircPieceTensor
     real,intent(in) :: thetap,zp,R,xrot
     real :: int_ddx_sin_dtheta_dz_fct
     
-    int_ddx_sin_dtheta_dz_fct = -1/(4*R*xrot**2) * ( (R**2-xrot**2)*log(M(R,xrot,thetap,zp)-zp) + (xrot**2-R**2)*log(M(R,xrot,thetap,zp)+zp) - 2*zp*M(R,xrot,thetap,zp) )
-    
+    if ( abs(xrot) .lt. 1e-9 ) then
+        int_ddx_sin_dtheta_dz_fct = 0
+    else
+        int_ddx_sin_dtheta_dz_fct = -1/(4*R*xrot**2) * ( (R**2-xrot**2)*log(M(R,xrot,thetap,zp)-zp) + (xrot**2-R**2)*log(M(R,xrot,thetap,zp)+zp) - 2*zp*M(R,xrot,thetap,zp) )
+    endif
     end function
     
     subroutine int_ddy_cos_dtheta_dz( dat, val )
@@ -105,7 +112,12 @@ module TileCircPieceTensor
     real,intent(in) :: thetap,zp,R,xrot
     real :: int_ddy_cos_dtheta_dz_fct
         
-        int_ddy_cos_dtheta_dz_fct = -1/(2*R*xrot**2) * ( (R**2+xrot**2)*log(M(R,xrot,thetap,zp)+zp) + zp*M(R,xrot,thetap,zp) )
+        if ( abs(xrot) .lt. 1e-9 ) then
+            int_ddy_cos_dtheta_dz_fct = 0
+        else
+            int_ddy_cos_dtheta_dz_fct = -1/(2*R*xrot**2) * ( (R**2+xrot**2)*log(M(R,xrot,thetap,zp)+zp) + zp*M(R,xrot,thetap,zp) )
+        endif
+        
     end function
     
     
@@ -151,7 +163,12 @@ module TileCircPieceTensor
         elE = elle( C_no_sign(thetap), K(R,xrot,zp) )
         elPi = ellpi( C_no_sign(thetap), B(R,xrot), K(R,xrot,zp) )
         
-        int_ddy_sin_dtheta_dz_fct = zp  / ( 2*R*xrot**2*sqrt((R+xrot)**2+zp**2) ) * ( (xrot-R)**2*elPi + ( (R+xrot)**2 + zp**2 ) * elE - 2* ( xrot**2 + R**2 + zp**2/2) * elF) 
+        if ( abs(xrot) .lt. 1e-9 ) then
+            int_ddy_sin_dtheta_dz_fct = 0.
+        else        
+            int_ddy_sin_dtheta_dz_fct = zp  / ( 2*R*xrot**2*sqrt((R+xrot)**2+zp**2) ) * ( (xrot-R)**2*elPi + ( (R+xrot)**2 + zp**2 ) * elE - 2* ( xrot**2 + R**2 + zp**2/2) * elF) 
+        endif
+        
      end function
      
      subroutine int_ddz_cos_dtheta_dz( dat, val )
@@ -397,19 +414,23 @@ module TileCircPieceTensor
      call getCorners_inv( R, theta1, theta2, theta0, dtheta, x1, x2, x3, y1, y2, y3 )
      !sign change as we are now pointing along the positive x-axis with the normal vector  
      val = -sign(1.,cos(theta0)) * sign(1.,sin(theta0)) * (int_ddx_dy_dz_fct( y3, z2, x3, x, y, z, theta0 ) - int_ddx_dy_dz_fct( y1, z2, x3, x, y, z, theta0 ) - ( int_ddx_dy_dz_fct(y3,z1, x3, x, y, z, theta0) - int_ddx_dy_dz_fct(y1,z1, x3, x, y, z, theta0) ))
-
+     !val = int_ddx_dy_dz_fct( y3, z2, x3, x, y, z, theta0 )
     end subroutine
     
     function int_ddx_dy_dz_fct( yp, zp, x3, x, y, z, theta0 )
         real,intent(in) :: yp,zp, x3, x, y, z, theta0
-        real :: int_ddx_dy_dz_fct
+        real :: int_ddx_dy_dz_fct,arg
      
+        arg = sign(1.,sin(theta0)) * (y-yp) * (z-zp) / ((x-x3) * P(x,y,z,x3,yp,zp))
+        
+        
         !::Cover the limit when x-x3 goes to zero
-        if ( abs( x-x3 ) .lt. 10*tiny(1.) ) then
-            int_ddx_dy_dz_fct = -1/(4*pi) * atan(  huge(1.) )
-        else            
-            int_ddx_dy_dz_fct =  -1/(4*pi) * atan( sign(1.,sin(theta0)) * (y-yp) * (z-zp) / ((x-x3) * P(x,y,z,x3,yp,zp)) )
-        endif
+    !    if ( abs( x-x3 ) .lt. 10*tiny(1.) .or. abs(y-yp) .lt. 1e-12 .or. P(x,y,z,x3,yp,zp) .lt. 1e-12) then
+    !        int_ddx_dy_dz_fct = -1/(4*pi) * atan(  huge(1.) )
+    !    else            
+    !        int_ddx_dy_dz_fct =  -1/(4*pi) * atan( arg )
+    !    endif
+        int_ddx_dy_dz_fct = -1./(4.*pi)*atan( arg )
         
     end function
     
@@ -820,8 +841,10 @@ module TileCircPieceTensor
          theta0 = dat%thetas
          R = dat%rs
          zp = dat%zs
+         !::Kaspar, 18-6-2018: Find the limits of this function when the nominator and denominator both approach zero
+         !::In this limit when y-yp goes towards zero the total fraction goes towards ( x-R ) / ( sqrt(R^2-2xR+x^2+z^2) z )
          
-         int_ddz_dx_dy_fct2 =  (x-sign(1.,cos(theta0))*sqrt(R**2-yp**2))*(z-zp)/(P(x,y,z,sign(1.,cos(theta0))*sqrt(R**2-yp**2),yp,zp)*((y-yp)**2+(z-zp)**2))
+            int_ddz_dx_dy_fct2 =  (x-sign(1.,cos(theta0))*sqrt(R**2-yp**2))*(z-zp)/(P(x,y,z,sign(1.,cos(theta0))*sqrt(R**2-yp**2),yp,zp)*((y-yp)**2+(z-zp)**2))
          
          end function
         

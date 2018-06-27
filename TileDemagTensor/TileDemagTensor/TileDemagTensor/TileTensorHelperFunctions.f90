@@ -64,7 +64,8 @@ module TileTensorHelperFunctions
             
             !K = 2 * sqrt( r * x / ( ( r + x )**2 + z**2 ) )
             
-            if ( z .eq. 0 .AND. abs( r + x ) .lt. 10*tiny(1.) ) then
+            !if ( z .lt. 10*tiny(1.) .OR. abs( r + x ) .lt. 10*tiny(1.) ) then
+            if ( z .lt. 1e-20 .AND. abs( r + x ) .lt. 1e-20 .OR. abs(r * x) .lt. 1e-20) then
                 K = 0.
             else                
                 K = 4 * r * x / ( ( r + x )**2 + z**2 )
