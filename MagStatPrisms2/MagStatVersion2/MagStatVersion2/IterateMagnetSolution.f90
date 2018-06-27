@@ -27,7 +27,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
     real,optional :: err_max
     
     
-    integer,parameter :: cnt_max = 100
+    integer,parameter :: cnt_max = 200
         
     logical :: done
     integer :: i,j,cnt,i_err,lambdaCnt
