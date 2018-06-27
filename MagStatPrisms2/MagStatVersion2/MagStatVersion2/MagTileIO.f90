@@ -29,6 +29,9 @@ implicit none
     
     end subroutine displayProgress
     
+    
+    
+    
     subroutine displayIteration( err, err_max )
     real,intent(in) :: err,err_max
     
@@ -66,7 +69,7 @@ implicit none
     integer :: nfields,cnt,n
     real*8,dimension(3) :: rectDims
     mwPointer :: r0Ptr,theta0Ptr,z0Ptr,drPtr,dthetaPtr,dzPtr,MPtr,u_eaPtr,u_oa1Ptr,u_oa2Ptr,mur_eaPtr,mur_oaPtr,MremPtr
-    mwPointer :: tileTypePtr,offsetPtr,rotAnglesPtr,rectDimsPtr,magnetTypePtr,stateFunctionIndexPtr
+    mwPointer :: tileTypePtr,offsetPtr,rotAnglesPtr,rectDimsPtr,magnetTypePtr,stateFunctionIndexPtr,includeInIterationPtr
     mwPointer :: mxGetField, mxGetPr
     real,dimension(:),allocatable :: r, theta, z
     real :: dr,dtheta,dz
@@ -93,6 +96,7 @@ implicit none
             rectDimsPtr =  mxGetField(prhs,i,fieldnames(17))
             magnetTypePtr =  mxGetField(prhs,i,fieldnames(18))
             stateFunctionIndexPtr =  mxGetField(prhs,i,fieldnames(19))
+            includeInIterationPtr =  mxGetField(prhs,i,fieldnames(20))
       
             sx = 1
             call mxCopyPtrToReal8(mxGetPr(r0Ptr), cylTile(i)%r0, sx )
@@ -111,6 +115,7 @@ implicit none
             call mxCopyPtrToReal8(mxGetPr(mur_oaPtr), cylTile(i)%mu_r_oa, sx )
             call mxCopyPtrToReal8(mxGetPr(MremPtr), cylTile(i)%Mrem, sx )
             call mxCopyPtrToInteger4(mxGetPr(tileTypePtr), cylTile(i)%tileType, sx )
+            call mxCopyPtrToInteger4(mxGetPr(includeInIterationPtr), cylTile(i)%includeInIteration, sx )
             sx = 3
             call mxCopyPtrToReal8(mxGetPr(offsetPtr), cylTile(i)%offset, sx )
             call mxCopyPtrToReal8(mxGetPr(rotAnglesPtr), cylTile(i)%rotAngles, sx )
@@ -291,6 +296,12 @@ implicit none
           call mxCopyInteger4ToPtr( cylTile(i)%stateFunctionIndex, mxGetPr( pvalue(i,19) ), sx )
           call mxSetField( plhs, i, fieldnames(19), pvalue(i,19) )
           
+          
+          classid = mxClassIDFromClassName('int32')
+          pvalue(i,20) = mxCreateNumericMatrix(s1,s2,classid,ComplexFlag)
+          call mxCopyInteger4ToPtr( cylTile(i)%includeInIteration, mxGetPr( pvalue(i,20) ), sx )
+          call mxSetField( plhs, i, fieldnames(20), pvalue(i,20) )
+          
       enddo
       
       deallocate(pvalue,fieldnames)
@@ -301,7 +312,7 @@ implicit none
     !::Returns an array with the names of the fields expected in the tile struct
     subroutine getTileFieldnames( fieldnames, nfields)
     integer,intent(out) :: nfields
-    integer,parameter :: nf=19
+    integer,parameter :: nf=20
     character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -326,6 +337,7 @@ implicit none
         fieldnames(17) = 'abc'
         fieldnames(18) = 'magnetType'
         fieldnames(19) = 'stfcnIndex'
+        fieldnames(20) = 'inclIter'
         
     
         
