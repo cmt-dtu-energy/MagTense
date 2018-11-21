@@ -29,18 +29,20 @@
       type(MagTile),allocatable,dimension(:) :: cylTile  
       type(MagStatStateFunction),allocatable,dimension(:) :: stateFunctions
       
-      integer*4 :: n_tiles,n_statefunctions
+      integer*4 :: n_tiles,n_statefunctions,max_ite
       real*8 :: err_max,T
       
 !     Check for proper number of arguments. 
-      if( nrhs .ne. 6) then
+      if( nrhs .lt. 6) then
          call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput',
-     +                           'five inputs are required.')
+     +                           'at least six inputs are required.')
       elseif(nlhs .gt. 1) then
          call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nOutput',
      +                           'Too many output arguments.')
       endif
 
+      max_ite = 100
+      
 !Check the type of the inputs      
       if ( .NOT. mxIsStruct(prhs(1)) ) then
           call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input one should be a struct')      
@@ -54,6 +56,12 @@
           call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input five should be a double')      
       else if ( .NOT. mxIsDouble(prhs(6)) ) then
           call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input six should be a double')      
+      else if ( nrhs .gt. 6 ) then
+            if ( .NOT. mxIsInt32(prhs(7)) ) then
+                call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input seven (optional) should be an integer')                      
+            else
+                call mxCopyPtrToInteger4(mxGetPr(prhs(7)), max_ite,1)
+            endif            
       endif                  
       
       
@@ -79,7 +87,7 @@
       call loadMagStateFunction( prhs(3), stateFunctions, n_statefunctions )
             
       !::do the calculation
-      call iterateMagnetization( cylTile, n_tiles,stateFunctions, n_statefunctions, T, err_max )
+      call iterateMagnetization( cylTile, n_tiles,stateFunctions, n_statefunctions, T, err_max, max_ite )
       
       !::Return the updated struct array to matlab
       call returnMagTile( cylTile, n_tiles, plhs(1) )

@@ -48,14 +48,14 @@
     prgCnt = 0
     prog = 0
     
-    
     ! $OMP PARALLEL DO PRIVATE(i,H_tmp)    
     do i=1,n_tiles
+
         
         !Make sure to allocate H_tmp on the heap and for each thread
         ! $OMP CRITICAL
-        allocate( H_tmp(n_ele,3) )       
         H_tmp(:,:) = 0.        
+        
         ! $OMP END CRITICAL
         !::Here a selection of which subroutine to use should be done, i.e. whether the tile
         !:: is cylindrical, a prism or an ellipsoid
@@ -109,7 +109,6 @@
         !        call displayProgress( prog )
         !    endif
         !endif        
-        deallocate(H_tmp)    
        ! $OMP END CRITICAL
        
         
