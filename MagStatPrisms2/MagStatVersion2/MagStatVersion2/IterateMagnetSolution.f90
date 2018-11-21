@@ -28,7 +28,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max, max
     integer,optional :: max_ite
     
     
-    
+    integer,parameter :: cnt_max = 200
         
     logical :: done
     integer :: i,j,cnt,i_err,lambdaCnt
@@ -219,8 +219,6 @@ logical,intent(inout) :: lCh
 lCh = .false.
 
 if ( (maxDiff(1) .gt. maxDiff(2) .AND. maxDiff(2) .lt. maxDiff(3) .AND. maxDiff(3) .gt. maxDiff(4)) .OR. &
-     (maxDiff(1) .lt. maxDiff(2) .AND. maxDiff(2) .gt. maxDiff(3) .AND. maxDiff(3) .lt. maxDiff(4)) .OR. &
-      maxDiff(1) .gt. maxDiff(2) .AND. maxDiff(2) .gt. maxDiff(3) .AND. maxDiff(3) .gt. maxDiff(4) ) then
 
     lambda = lambda * 0.5
     lCh = .true.
