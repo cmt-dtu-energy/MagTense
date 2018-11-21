@@ -10,6 +10,7 @@ Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "NumericalIntegration", "Num
 EndProject
 Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "MagneticForceIntegrator", "..\..\MagneticForceIntegrator\MagneticForceIntegrator\MagneticForceIntegrator.vfproj", "{29D23C66-59FB-4DB5-82EB-FA42BB059B55}"
 	ProjectSection(ProjectDependencies) = postProject
+		{8E741223-89C0-4FF6-8494-90473CAAC362} = {8E741223-89C0-4FF6-8494-90473CAAC362}
 		{B0835ED5-D7CE-4A15-8EB1-66739151CA32} = {B0835ED5-D7CE-4A15-8EB1-66739151CA32}
 	EndProjectSection
 EndProject
