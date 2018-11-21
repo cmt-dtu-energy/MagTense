@@ -14,8 +14,7 @@ module MagForceIO
         real,dimension(:,:),allocatable :: dims,pos,M,rotAngles
         real,dimension(:,:,:),allocatable :: rotMat,rotMatInv         
     end type magStatModel
-            
-    real,parameter :: mu0=4*pi*1e-7
+                
     
     contains
     

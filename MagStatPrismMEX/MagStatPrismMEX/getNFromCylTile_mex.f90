@@ -45,7 +45,7 @@
       else if ( .NOT. mxIsDouble(prhs(2)) ) then
           call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input two should be a double')      
       else if ( .NOT. mxIsInt32(prhs(3)) ) then
-          call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input three should be a integer')      
+          call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input three should be an integer')            
       endif                  
             
       !::Copy the input parameters
@@ -56,6 +56,9 @@
       call mxCopyPtrToInteger4(mxGetPr(prhs(3)), n_ele,1)
       allocate(pts(n_ele,3),N(1,n_ele,3,3),H(n_ele,3))      
       call mxCopyPtrToReal8(mxGetPr(prhs(2)), pts, n_ele*3)
+      
+      
+      
       
       !::do the calculation
       N(:,:,:,:) = 0

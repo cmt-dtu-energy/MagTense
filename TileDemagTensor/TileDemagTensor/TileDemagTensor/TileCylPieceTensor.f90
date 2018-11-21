@@ -101,7 +101,9 @@ module TileCylPieceTensor
     real :: elF,elE,elPi
     
     elf = ellf( C_no_sign(theta), K(rs,x,z) )
+    
     elE = elle( C_no_sign(theta), K(rs,x,z) )
+    
     elPi = ellpi( C_no_sign(theta), B(rs,x), K(rs,x,z) )
     
     int_cos_dDdx_dz_dtheta_fct = z / ( 2*x**2 * ( rs + x ) * sqrt((rs+x)**2+z**2 ) )&
@@ -448,7 +450,7 @@ module TileCylPieceTensor
         real,intent(in) :: r,z,thetas,x
             !::necessary to enforce the integrand to be zero when theta is small since there is a discontinuity (zero over zero problem)
             !::
-            if ( abs(sin(thetas)) .lt. 1e-20 ) then
+            if ( abs(sin(thetas)) .lt. 1e-14 ) then
                 int_dDdy_dr_dz_fct = 0.0
            else            
                 int_dDdy_dr_dz_fct = -sin(thetas) * ( r*x*cos(thetas) - x**2 - z**2 ) / ( L( x, thetas, z) * M( r, x, thetas, z ) )

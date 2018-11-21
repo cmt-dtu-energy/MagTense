@@ -18,11 +18,12 @@
 !::Error state is returned in i_err:
 !::0 no error
 !:: -1 max number of iterations reached without satisfying the minimum error
-subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max,displayIteration_fct )
+subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max, max_ite, displayIteration_fct )
     type(MagTile),dimension(n),intent(inout) :: tiles
     integer,intent(in) :: n
     type(MagStatStateFunction),intent(in),dimension(n_stf) :: stateFunction    
     integer,intent(in) :: n_stf
+
     real,intent(in) :: T    
     real,optional :: err_max
     INTERFACE
@@ -31,7 +32,8 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max,disp
 		END FUNCTION displayIteration_fct
 	END INTERFACE
     
-    integer,parameter :: cnt_max = 100
+    
+    integer,parameter :: cnt_max = 200
         
     logical :: done
     integer :: i,j,cnt,i_err,lambdaCnt
@@ -48,6 +50,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max,disp
     !::set default error margin if nothing has been specified by the user
     if ( .not. present(err_max) ) err_max = 1e-10
     
+    if ( .not. present(max_ite) ) max_ite = 100
     i_err = 0
     
     allocate(H(n,3),H_old(n,3),Hnorm(n),Hnorm_old(n),err_val(n))
@@ -162,8 +165,9 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max,disp
                 !::Tiles with type >100 are special tiles like a coil that are not iterated over
                 if ( tiles(i)%tileType .lt. 100 ) then
                     !::Get the field in the i'th tile from all tiles           
+                    
                     call getFieldFromTiles( tiles, H(i,:), pts, n, 1, Nstore(i)%N )
-            
+                    
                    
                     !::When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is slowed
            
@@ -191,7 +195,8 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max,disp
             if ( err .lt. err_max * lambda ) then
                 done = .true.
                 
-            else if ( cnt .gt. cnt_max ) then     
+
+            else if ( cnt .gt. max_ite ) then     
                 done = .true.
                 i_err = -1
             endif    
@@ -203,6 +208,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max,disp
         endif
         
         lambdaCnt = lambdaCnt + 1
+
          !call displayIteration( err, err_max * lambda )
          tmp = displayIteration_fct( err, err_max * lambda )
         
@@ -220,7 +226,6 @@ logical,intent(inout) :: lCh
 lCh = .false.
 
 if ( (maxDiff(1) .gt. maxDiff(2) .AND. maxDiff(2) .lt. maxDiff(3) .AND. maxDiff(3) .gt. maxDiff(4)) .OR. &
-     (maxDiff(1) .lt. maxDiff(2) .AND. maxDiff(2) .gt. maxDiff(3) .AND. maxDiff(3) .lt. maxDiff(4))   ) then
 
     lambda = lambda * 0.5
     lCh = .true.
