@@ -54,6 +54,10 @@ module TileTensorHelperFunctions
         else
             B = -4 * r * x / ( r + x )**2
         endif
+        
+        if ( B .le. (-1 + 1e-10) ) then
+            B = -1 + 1e-10
+        endif
             
         return
     end

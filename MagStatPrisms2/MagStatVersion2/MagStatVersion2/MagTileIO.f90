@@ -130,25 +130,25 @@ implicit none
             !cylTile(i)%fieldEvaluation = fieldEvaluationCentre
             if ( cyltile(i)%tiletype == tiletypecylpiece ) then
                 cyltile(i)%fieldevaluation  = fieldevaluationaverage
-                cyltile(i)%n_ave(1) = 5
-                cyltile(i)%n_ave(2) = 5
-                cyltile(i)%n_ave(3) = 5
+                cyltile(i)%n_ave(1) = 1 !5
+                cyltile(i)%n_ave(2) = 1 !5
+                cyltile(i)%n_ave(3) = 1 !5
                 n = cyltile(i)%n_ave(1)*cyltile(i)%n_ave(2)*cyltile(i)%n_ave(3)
-                allocate(cyltile(i)%H_ave_pts(n,3),cyltile(i)%H_ave(n,3),r(n),theta(n),z(n))                
+                allocate(cyltile(i)%h_ave_pts(n,3),cyltile(i)%h_ave(n,3),r(n),theta(n),z(n))                
                 dr = cyltile(i)%dr / cyltile(i)%n_ave(1)
                 dtheta = cyltile(i)%dtheta / cyltile(i)%n_ave(2)
                 dz = cyltile(i)%dz / cyltile(i)%n_ave(3)
                 
                 !::set as default value so other users of the code don't have to update.
-                cylTile(i)%isIterating = .false.
+                cyltile(i)%isiterating = .false.
                 
                 cnt = 1
                 do j=1,cyltile(i)%n_ave(1)
                     do k=1,cyltile(i)%n_ave(2)
                         do l=1,cyltile(i)%n_ave(3)
-                            r(cnt) = dr/2 + (j-1)*dr + cylTile(i)%r0 - cylTile(i)%dr / 2
-                            theta(cnt) = dtheta/2 + (k-1)*dtheta + cylTile(i)%theta0 - cylTile(i)%dtheta / 2
-                            z(cnt) = dz/2 + (l-1)*dz + cylTile(i)%z0 - cylTile(i)%dz / 2
+                            r(cnt) = dr/2 + (j-1)*dr + cyltile(i)%r0 - cyltile(i)%dr / 2
+                            theta(cnt) = dtheta/2 + (k-1)*dtheta + cyltile(i)%theta0 - cyltile(i)%dtheta / 2
+                            z(cnt) = dz/2 + (l-1)*dz + cyltile(i)%z0 - cyltile(i)%dz / 2
                             cnt = cnt + 1
                         enddo
                     enddo
@@ -156,7 +156,7 @@ implicit none
                 cyltile(i)%h_ave_pts(:,1) = r * cos( theta ) + cyltile(i)%offset(1)
                 cyltile(i)%h_ave_pts(:,2) = r * sin( theta ) + cyltile(i)%offset(2)
                 cyltile(i)%h_ave_pts(:,3) = z + cyltile(i)%offset(3)
-                cylTile(i)%H_ave(:,:) = 0.
+                cyltile(i)%h_ave(:,:) = 0.
                 deallocate(r,theta,z)
             endif
             

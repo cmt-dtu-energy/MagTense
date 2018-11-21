@@ -56,9 +56,20 @@ module TileNComponents
     real :: int_r_dDdz_dr_dtheta1, int_r_dDdz_dr_dtheta2
     real :: int_sin_dDdz_dz_dtheta1,int_sin_dDdz_dz_dtheta2
     real,dimension(3,3), intent(inout) :: N
+    real :: x_
             
         N(:,:) = 0
         allocate(dat)
+        
+        
+        x_ = x
+        
+        if ( abs(x) .le. 1e-15 .AND. x .ge. 0. ) then
+            x_ = 1e-15
+        elseif ( abs(x) .le. 1e-15 .AND. x .lt. 0. ) then
+            x_ = -1e-15
+        endif
+        
 
         !get the integration limits
         dat%r1 = cylP%r0 - cylP%dr/2
@@ -70,7 +81,7 @@ module TileNComponents
         dat%z1 = cylP%z0 - cylP%dz/2
         dat%z2 = cylP%z0 + cylP%dz/2                
          
-        dat%x = x
+        dat%x = x_
         
         call int_dDdx_dr_dz( dat, int_dDdx_dr_dz1, int_dDdx_dr_dz2 )
         
