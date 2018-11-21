@@ -37,6 +37,44 @@ module TileNComponents
     
     contains
     
+    subroutine setupEvaluationPoints( cylTile )
+    type(MagTile),intent(inout) :: cylTile
+    real,dimension(:),allocatable :: r, theta, z
+    real :: dr,dtheta,dz
+    integer :: n
+    integer :: cnt,j,k,l
+    
+        cyltile%fieldevaluation  = fieldevaluationaverage
+        cyltile%n_ave(1) = 5
+        cyltile%n_ave(2) = 5
+        cyltile%n_ave(3) = 5
+        n = cyltile%n_ave(1)*cyltile%n_ave(2)*cyltile%n_ave(3)
+        allocate(cyltile%H_ave_pts(n,3),cyltile%H_ave(n,3),r(n),theta(n),z(n))                
+        dr = cyltile%dr / cyltile%n_ave(1)
+        dtheta = cyltile%dtheta / cyltile%n_ave(2)
+        dz = cyltile%dz / cyltile%n_ave(3)
+                
+        !::set as default value so other users of the code don't have to update.
+        cylTile%isIterating = .false.
+                
+        cnt = 1
+        do j=1,cyltile%n_ave(1)
+            do k=1,cyltile%n_ave(2)
+                do l=1,cyltile%n_ave(3)
+                    r(cnt) = dr/2 + (j-1)*dr + cylTile%r0 - cylTile%dr / 2
+                    theta(cnt) = dtheta/2 + (k-1)*dtheta + cylTile%theta0 - cylTile%dtheta / 2
+                    z(cnt) = dz/2 + (l-1)*dz + cylTile%z0 - cylTile%dz / 2
+                    cnt = cnt + 1
+                enddo
+            enddo
+        enddo
+        cyltile%h_ave_pts(:,1) = r * cos( theta ) + cyltile%offset(1)
+        cyltile%h_ave_pts(:,2) = r * sin( theta ) + cyltile%offset(2)
+        cyltile%h_ave_pts(:,3) = z + cyltile%offset(3)
+        cylTile%H_ave(:,:) = 0.
+        deallocate(r,theta,z)            
+        
+    end subroutine setupEvaluationPoints
     
     subroutine  getN_CylPiece( cylP, x, N )
     type(MagTile),intent(in) :: cylP
@@ -633,6 +671,10 @@ module TileNComponents
     
     end subroutine
         
+    subroutine getN_dummy( k )
+    integer :: k
+    
+    end subroutine getN_dummy
     
     !::
     !::Returns the demag tensor for a planar coil with inner radius Rin, outer radius Rout
