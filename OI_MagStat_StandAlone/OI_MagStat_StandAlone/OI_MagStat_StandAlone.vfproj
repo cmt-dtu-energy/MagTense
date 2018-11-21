@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VisualStudioProject ProjectCreator="Intel Fortran" Keyword="Console Application" Version="11.0" ProjectIdGuid="{0A26DC6C-7534-4D77-B463-800D7199DD0C}">
+	<Platforms>
+		<Platform Name="Win32"/>
+		<Platform Name="x64"/></Platforms>
+	<Configurations>
+		<Configuration Name="Debug|Win32">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" WarnInterfaces="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" GenerateDebugInformation="true" SubSystem="subSystemConsole"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
+		<Configuration Name="Release|Win32">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" AdditionalIncludeDirectories="..\..\TileDemagTensor\TileDemagTensor\TileDemagTensor\x64\Release\" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" RuntimeLibrary="rtMultiThreadedDLL"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" AdditionalLibraryDirectories="..\..\TileDemagTensor\TileDemagTensor\TileDemagTensor\x64\Release\" SubSystem="subSystemConsole"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
+		<Configuration Name="Debug|x64">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\NumericalIntegrationLib\NumericalIntegration\NumericalIntegration\x64\debug\;..\..\SpecialFunctions\SpecialFunctions\x64\debug\;..\..\MagStatPrisms2\MagStatVersion2\MagStatVersion2\x64\debug\;..\..\TileDemagTensor\TileDemagTensor\TileDemagTensor\x64\debug\;C:\Program Files\MATLAB\R2017a\extern\lib\win64\microsoft\" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" AdditionalLibraryDirectories="..\..\NumericalIntegrationLib\NumericalIntegration\NumericalIntegration\x64\debug\;..\..\SpecialFunctions\SpecialFunctions\x64\debug\;..\..\MagStatPrisms2\MagStatVersion2\MagStatVersion2\x64\debug\;..\..\TileDemagTensor\TileDemagTensor\TileDemagTensor\x64\debug\;C:\Program Files\MATLAB\R2017a\extern\lib\win64\microsoft\" LinkLibraryDependencies="false" GenerateDebugInformation="true" SubSystem="subSystemConsole" AdditionalDependencies="TileDemagTensor.lib MagStatVersion2.lib SpecialFunctions.lib NumericalIntegration.lib libmex.lib libmx.lib"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
+		<Configuration Name="Release|x64">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\NumericalIntegrationLib\NumericalIntegration\NumericalIntegration\x64\Release\;..\..\SpecialFunctions\SpecialFunctions\x64\Release\;..\..\MagStatPrisms2\MagStatVersion2\MagStatVersion2\x64\Release\;..\..\TileDemagTensor\TileDemagTensor\TileDemagTensor\x64\Release\;" RealKIND="realKIND8"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalYes" SuppressStartupBanner="true" AdditionalLibraryDirectories="..\..\NumericalIntegrationLib\NumericalIntegration\NumericalIntegration\x64\Release\;..\..\SpecialFunctions\SpecialFunctions\x64\Release\;..\..\MagStatPrisms2\MagStatVersion2\MagStatVersion2\x64\Release\;..\..\TileDemagTensor\TileDemagTensor\TileDemagTensor\x64\Release\;" LinkLibraryDependencies="false" SubSystem="subSystemConsole" AdditionalDependencies="TileDemagTensor.lib MagStatVersion2.lib SpecialFunctions.lib NumericalIntegration.lib"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration></Configurations>
+	<Files>
+		<Filter Name="Header Files" Filter="fi;fd"/>
+		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
+		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
+		<File RelativePath=".\IO.f90"/>
+		<File RelativePath=".\OI_MagStat_StandAlone.f90"/></Filter>
+		<File RelativePath=".\ReadMe.txt"/></Files>
+	<Globals/></VisualStudioProject>

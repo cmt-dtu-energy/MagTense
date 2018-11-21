@@ -4,7 +4,7 @@
     use MagStat2GetSolution
     use MagStatParameters
     use MagStatUtil
-    use MagTileIO
+    !use MagTileIO
     implicit none
     
     contains
@@ -18,16 +18,20 @@
 !::Error state is returned in i_err:
 !::0 no error
 !:: -1 max number of iterations reached without satisfying the minimum error
-subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
+subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max,displayIteration_fct )
     type(MagTile),dimension(n),intent(inout) :: tiles
     integer,intent(in) :: n
     type(MagStatStateFunction),intent(in),dimension(n_stf) :: stateFunction    
     integer,intent(in) :: n_stf
-    real,intent(in) :: T
+    real,intent(in) :: T    
     real,optional :: err_max
+    INTERFACE
+		FUNCTION displayIteration_fct(err,err_max)		
+		REAL, INTENT(IN) :: err,err_max		
+		END FUNCTION displayIteration_fct
+	END INTERFACE
     
-    
-    integer,parameter :: cnt_max = 200
+    integer,parameter :: cnt_max = 100
         
     logical :: done
     integer :: i,j,cnt,i_err,lambdaCnt
@@ -36,7 +40,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
     real,dimension(:),allocatable :: Hnorm,Hnorm_old,err_val
     type(NStoreArr),dimension(:),allocatable :: Nstore
     real,dimension(3) :: pts    
-    real :: H_par,H_trans_1,H_trans_2,err,lambda    
+    real :: H_par,H_trans_1,H_trans_2,err,lambda,tmp
     real,dimension(4) :: maxRelDiffArr
     real,dimension(3,3) :: rotMat,rotMatInv
     logical :: lCh
@@ -199,8 +203,8 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max )
         endif
         
         lambdaCnt = lambdaCnt + 1
-        call displayIteration( err, err_max * lambda )
-                      
+         !call displayIteration( err, err_max * lambda )
+         tmp = displayIteration_fct( err, err_max * lambda )
         
     enddo    
     deallocate(H,H_old,Hnorm,Hnorm_old,Nstore,err_val)

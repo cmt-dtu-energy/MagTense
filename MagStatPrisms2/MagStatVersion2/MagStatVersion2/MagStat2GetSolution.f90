@@ -49,14 +49,14 @@
     prog = 0
     
     
-    !$OMP PARALLEL DO PRIVATE(i,H_tmp)    
+    ! $OMP PARALLEL DO PRIVATE(i,H_tmp)    
     do i=1,n_tiles
         
         !Make sure to allocate H_tmp on the heap and for each thread
-        !$OMP CRITICAL
+        ! $OMP CRITICAL
         allocate( H_tmp(n_ele,3) )       
         H_tmp(:,:) = 0.        
-        !$OMP END CRITICAL
+        ! $OMP END CRITICAL
         !::Here a selection of which subroutine to use should be done, i.e. whether the tile
         !:: is cylindrical, a prism or an ellipsoid
         select case (tiles(i)%tileType )
@@ -98,7 +98,7 @@
         end select
         
         
-        !$OMP CRITICAL
+        ! $OMP CRITICAL
         H = H + H_tmp
         !prgCnt = prgCnt + 1
         !tid = omp_get_thread_num()
@@ -110,12 +110,12 @@
         !    endif
         !endif        
         deallocate(H_tmp)    
-       !$OMP END CRITICAL
+       ! $OMP END CRITICAL
        
         
         
     enddo
-    !$OMP END PARALLEL DO
+    ! $OMP END PARALLEL DO
     
     
     
