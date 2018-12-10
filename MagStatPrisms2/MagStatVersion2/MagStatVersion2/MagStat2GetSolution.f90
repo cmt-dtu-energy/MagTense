@@ -9,6 +9,10 @@
     
     contains
     
+    
+    
+
+    
     !::
     !::General function to call given a number of (different) tiles    
     !::Input arguments
@@ -30,6 +34,7 @@
     logical :: useStoredN
     
     
+    
     if ( present( Nout ) ) then 
         if ( .NOT. allocated(Nout) ) then
             allocate(Nout(n_tiles,n_ele,3,3))
@@ -42,7 +47,7 @@
         useStoredN = .false.
     endif
                 
-    
+    allocate(H_tmp(n_ele,3))
     H(:,:) = 0.
     
     prgCnt = 0
@@ -116,7 +121,7 @@
     enddo
     ! $OMP END PARALLEL DO
     
-    
+    deallocate(H_tmp)
     
     !::subtract M of a tile in points that are inside that tile in order to actually get H (only for CylindricalTiles as these actually calculate the B-field (divided by mu0)
     call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_ele)
@@ -273,42 +278,239 @@
     integer,intent(in) :: n_ele
     real,dimension(n_ele,3,3),intent(inout),optional :: N_out
     logical,intent(in),optional :: useStoredN
-    real,dimension(3) :: diffPos,dotProd
+    
+    
+    procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
+    
+    N_tensor => getN_prism_3D
+    
+    !! check to see if we should use symmetry
+    if ( prismTile%exploitSymmetry .eq. 1 ) then        
+        call getFieldFromTile_symm(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN )        
+    else        
+        call getFieldFromTile( prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN )       
+    endif
+    
+    !! The minus sign comes from the definition of the demag tensor (the demagfield is assumed negative)
+    H = -1. * H
+    
+    end subroutine getFieldFromRectangularPrismTile
+    
+    
+    subroutine getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+    type(MagTile),intent(in) :: tile
+    real,dimension(n_ele,3),intent(inout) :: H
+    real,dimension(n_ele,3),intent(in) :: pts
+    integer,intent(in) :: n_ele
+    procedure (N_tensor_subroutine), pointer, intent(in) :: N_tensor
+    real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+    logical,intent(in),optional:: useStoredN
+            
     real,dimension(3,3) :: rotMat,rotMatInv,N
     integer :: i
+    real,dimension(3) :: diffPos,dotProd        
     
-    !::get the rotation matrices
-    call getRotationMatrices( prismTile, rotMat, rotMatInv)
+        !! get the rotation matrices
+        call getRotationMatrices( tile, rotMat, rotMatInv)
     
-    do i=1,n_ele
-        !::1. The relative position vector between the origo of the current tile and the point at which the tensor is required
-        diffPos = pts(i,:) - prismTile%offset
+        do i=1,n_ele
+            !::1. The relative position vector between the origo of the current tile and the point at which the tensor is required
+            diffPos = pts(i,:) - tile%offset
         
-        !::2. rotate the position vector according to the rotation of the prism
-        diffPos = matmul( rotMat, diffPos )
+            !::2. rotate the position vector according to the rotation of the prism
+            diffPos = matmul( rotMat, diffPos )
         
-        !::3. get the demag tensor                
-        if ( present( useStoredN ) .eq. .true. ) then
-            if ( useStoredN .eq. .false. ) then
-                 call getN_prism_3D( prismTile, diffPos, N )
-                 N_out(i,:,:) = N
+            !::3. get the demag tensor                
+            if ( present( useStoredN ) .eq. .true. ) then
+                if ( useStoredN .eq. .false. ) then
+                     call N_tensor( tile, diffPos, N )
+                     N_out(i,:,:) = N
+                else
+                    N = N_out(i,:,:)
+                endif
             else
-                N = N_out(i,:,:)
+                call N_tensor( tile, diffPos, N )
             endif
-        else
-            call getN_prism_3D( prismTile, diffPos, N )
+        
+            !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
+            call getDotProd( N, matmul( rotMat, tile%M ), dotProd )
+        
+            !::5. Rotate the resulting field back to the global coordinate system
+            dotProd = matmul( rotMatInv, dotProd )        
+        
+            !::. Update the solution.
+            H(i,:) = dotProd
+        enddo
+    
+    end subroutine getFieldFromTile
+    
+    
+    !> assumes 8-fold symmetry in the tile, i.e. that it has siblings at 7 other locations according to the conventional
+    !! mirror operations about the global coordinate planes
+    !! @param prismTile is the tile in question
+    !! @param H the field vector to be updated by this calculation
+    !! @param pts the points at which to find the solution (n_ele,3)
+    !! @param n_ele integer, no. of points at which to evaluate
+    !! @param N_tensor pointer to the subroutine that calculates the N-tensor
+    !! @N_out the resulting demag tensor for each of the points in question 
+    !! @ useStoredN logical. If true then use the values in N_out else calculate the tensor
+    !!
+    subroutine getFieldFromTile_symm(tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+    type(MagTile),intent(in) :: tile
+    real,dimension(n_ele,3),intent(inout) :: H
+    real,dimension(n_ele,3),intent(in) :: pts
+    integer,intent(in) :: n_ele
+    procedure (N_tensor_subroutine), pointer, intent(in) :: N_tensor
+    real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+    logical,intent(in),optional:: useStoredN
+    
+        
+    real,dimension(:,:,:),allocatable :: N_tmp    
+    real,dimension(3,3) :: rotMat,rotMatInv,N
+    integer :: i,j
+    real,dimension(3) :: diffPos,dotProd
+    real,dimension(8,3,3) :: symm_op_M, symm_op_H
+    logical :: useStoredN_tmp
+    
+    !! get the rotation matrices for the tile
+    call getRotationMatrices( tile, rotMat, rotMatInv)
+    
+    !! get the symmetry operation matrices
+    !! symm_op_M is to be applied to the magnetization vector while
+    !! symm_op_H is to be applied to the full expression and the diffPos
+    call getSymmOpMatrices( symm_op_M, symm_op_H, tile%symmetryOps )
+    
+    allocate( N_tmp(n_ele,3,3) )
+    N_tmp(:,:,:) = 0.
+    
+    if ( present( useStoredN ) .eq. .false. ) then
+        useStoredN_tmp = .false.
+    else
+        useStoredN_tmp = useStoredN
+    endif
+    
+    !! go through each point
+    do i=1,n_ele
+                  
+        
+        if ( useStoredN_tmp .eq. .false. ) then
+            
+            !! loop over each symmetry operation
+            do j=1,8                        
+                
+                !! The relative position vector between the origo of the current tile and the point at which the tensor is required
+                !! apply symmetry operation to the point of interest (and leave the tile intact)
+                diffPos = matmul( symm_op_H(j,:,:), pts(i,:) ) - tile%offset
+                
+                !! rotate the position vector according to the rotation of the tile
+                diffPos = matmul( rotMat, diffPos )            
+                
+                !! do the calculation
+                call N_tensor( tile, diffPos, N )
+                    
+                !! Change the sign of N according to the mirror symmetry (or anti-symmetry)
+                !! Note that this is an element-by-element multiplication and not a matrix multiplication
+                N = matmul( symm_op_H(j,:,:), matmul( N, symm_op_M(j,:,:) ) )
+                !! remember to add the solution as we are exploting 8-fold symmetry
+                N_tmp(i,:,:) = N + N_tmp(i,:,:)
+            enddo                                     
+        else                
+            N_tmp(i,:,:) = N_out(i,:,:)
         endif
         
-        !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
-        call getDotProd( N, matmul( rotMat, prismTile%M ), dotProd )
+        !! rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
+        call getDotProd( N_tmp(i,:,:), matmul( rotMat, tile%M ), dotProd )
         
-        !::5. Rotate the resulting field back to the global coordinate system
+        !! Rotate the resulting field back to the global coordinate system
         dotProd = matmul( rotMatInv, dotProd )        
         
-        !::. Update the solution. The minus sign comes from the definition of the demag tensor (the demagfield is assumed negative)
-        H(i,:) = -dotProd
+        !! Update the solution. 
+        H(i,:) = dotProd
+        
     enddo
-    end subroutine getFieldFromRectangularPrismTile
+    
+    if ( present(N_out) .eq. .true. ) then
+        N_out = N_tmp
+    endif
+    
+    
+    deallocate(N_tmp)
+    end subroutine getFieldFromTile_symm
+    
+    !>Returns the 8 symmetry operation matrices for
+    !! conventional mirroring about the three principal planes and their combinations
+    !! @param symm_op_M array of 8 3x3 matrices containing the symmetry ops for the magnetization
+    !! @param symm_op_H correspondingly but for the field and the point of interest
+    !! @param symm_ops is a (3,1) array with the symmetry operations to perform along the three principal planes (xy, xz and yz)
+    !! if @param symm_ops is 1 the operation is symmetric, if it is -1 the operation is anti-symmetric
+    subroutine getSymmOpMatrices( symm_M, symm_H, symm_ops )
+    real,dimension(8,3,3),intent(inout) :: symm_M, symm_H
+    real,dimension(3),intent(in) :: symm_ops
+    real,dimension(3,3) :: SymmX,SymmY,SymmZ    
+    real :: theta_x,theta_y,theta_z
+    
+    SymmX(:,:) = 0.
+    SymmX(1,1) = -1.
+    SymmX(2,2) = 1.
+    SymmX(3,3) = 1.
+    
+    SymmY = SymmX
+    SymmY(1,1) = 1.
+    SymmY(2,2) = -1.
+    
+    SymmZ = SymmY
+    SymmZ(2,2) = 1.
+    SymmZ(3,3) = -1.
+    
+    
+    !! reset
+    symm_M(:,:,:) = 0.    
+    
+    !! insert unit matrices
+    symm_M(:,1,1) = 1.
+    symm_M(:,2,2) = 1.
+    symm_M(:,3,3) = 1.
+    
+    symm_H = symm_M
+    
+    !!the octants are defined so that 1-4 are the same as the normal quadrants and 5-8 likewise but for negative z
+    
+    !! first operation is unity, i.e. nothing happens
+    
+    !! from 1st to 2nd octant, i.e. about yz plane    
+    !! apply the symmetric / anti-symmetric op and mirror back to the original position
+    symm_M(2,:,:) = matmul( SymmX(:,:) * symm_ops(3), SymmX(:,:) )
+    
+    symm_H(2,:,:) = SymmX
+    
+    !!from the 1st to the 4th octant, i.e. about the xz-plane    
+    symm_M(3,:,:) = matmul( SymmY(:,:) * symm_ops(2), SymmY(:,:) )
+    
+    symm_H(3,:,:) = SymmY
+    
+    !!from the 1st to the 5th octant, i.e. about the xy-plane    
+    symm_M(4,:,:) = matmul( SymmZ(:,:) * symm_ops(1), SymmZ(:,:) )
+    
+    symm_H(4,:,:) = SymmZ
+    
+    !! from the 1st to the 3rd octant (through the 2nd octant), i.e. first about yz and then about xz
+    symm_M(5,:,:) = matmul( symm_M(3,:,:) , symm_M(2,:,:) )
+    symm_H(5,:,:) = matmul( symm_H(3,:,:) , symm_H(2,:,:) )
+    
+    !! from the 1st to the 6th octant, i.e. first about yz and the about xy
+    symm_M(6,:,:) = matmul( symm_M(4,:,:), symm_M(2,:,:) )
+    symm_H(6,:,:) = matmul( symm_H(4,:,:), symm_H(2,:,:) )
+    
+    !! from the 1st to the 8th octants i.e. first about xy and then about xz
+    symm_M(7,:,:) = matmul( symm_M(4,:,:), symm_M(3,:,:) )
+    symm_H(7,:,:) = matmul( symm_H(4,:,:), symm_H(3,:,:) )
+    
+    !! from the 1st to the 7th octant i.e. firsth through yz, then through xy and then through xz
+    symm_M(8,:,:) = matmul( symm_M(2,:,:), matmul( symm_M(3,:,:), symm_M(4,:,:) ) )
+    symm_H(8,:,:) = matmul( symm_H(2,:,:), matmul( symm_H(3,:,:), symm_H(4,:,:) ) )
+    
+    end subroutine getSymmOpMatrices
+    
     
       !::
     !::Returns the magnetic field from a rectangular prism
@@ -320,42 +522,51 @@
     integer,intent(in) :: n_ele
     real,dimension(n_ele,3,3),intent(inout),optional :: N_out
     logical,intent(in),optional :: useStoredN
-    real,dimension(3) :: diffPos,dotProd
-    real,dimension(3,3) :: rotMat,rotMatInv,N
-    integer :: i
     
-    !::get the rotation matrices
-    call getRotationMatrices( circTile, rotMat, rotMatInv)
     
-    do i=1,n_ele
-        !::1. The relative position vector between the origo of the current tile and the point at which the tensor is required
-        diffPos = pts(i,:) - circTile%offset
+    procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
+    
+    N_tensor => getN_circPiece
+    !! check to see if we should use symmetry
+    if ( circTile%exploitSymmetry .eq. 1 ) then
         
-        !::2. rotate the position vector according to the rotation of the tile, i.e. rotate
-        !::the position vector to align with the local coordinate system of the tile
-        diffPos = matmul( rotMat, diffPos )
-        
-        !::3. get the demag tensor                
-        if ( present( useStoredN ) .eq. .true. ) then
-            if ( useStoredN .eq. .false. ) then
-                 call getN_circPiece( circTile, diffPos, N )
-                 N_out(i,:,:) = N
-            else
-                N = N_out(i,:,:)
-            endif
-        else
-            call getN_circPiece( circTile, diffPos, N )
-        endif
-        
-        !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
-        call getDotProd( N, matmul( rotMat, circTile%M ), dotProd )
-        
-        !::5. Rotate the resulting field back to the global coordinate system
-        dotProd = matmul( rotMatInv, dotProd )        
-        
-        !::. Update the solution. 
-        H(i,:) = dotProd
-    enddo
+        call getFieldFromTile_symm( circTile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+    else
+        call getFieldFromTile( circTile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+        !!::get the rotation matrices
+        !call getRotationMatrices( circTile, rotMat, rotMatInv)
+        !
+        !do i=1,n_ele
+        !    !::1. The relative position vector between the origo of the current tile and the point at which the tensor is required
+        !    diffPos = pts(i,:) - circTile%offset
+        !
+        !    !::2. rotate the position vector according to the rotation of the tile, i.e. rotate
+        !    !::the position vector to align with the local coordinate system of the tile
+        !    diffPos = matmul( rotMat, diffPos )
+        !
+        !    !::3. get the demag tensor                
+        !    if ( present( useStoredN ) .eq. .true. ) then
+        !        if ( useStoredN .eq. .false. ) then
+        !             call getN_circPiece( circTile, diffPos, N )
+        !             N_out(i,:,:) = N
+        !        else
+        !            N = N_out(i,:,:)
+        !        endif
+        !    else
+        !        call getN_circPiece( circTile, diffPos, N )
+        !    endif
+        !
+        !    !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
+        !    call getDotProd( N, matmul( rotMat, circTile%M ), dotProd )
+        !
+        !    !::5. Rotate the resulting field back to the global coordinate system
+        !    dotProd = matmul( rotMatInv, dotProd )        
+        !
+        !    !::. Update the solution. 
+        !    H(i,:) = dotProd
+        !enddo
+    endif
+    
     end subroutine getFieldFromCircPieceTile
     
     
@@ -369,41 +580,51 @@
     integer,intent(in) :: n_ele
     real,dimension(n_ele,3,3),intent(inout),optional :: N_out
     logical,intent(in),optional :: useStoredN
-    real,dimension(3) :: diffPos,dotProd
-    real,dimension(3,3) :: rotMat,rotMatInv,N
-    integer :: i
     
-    !::get the rotation matrices
-    call getRotationMatrices( circTile, rotMat, rotMatInv)
     
-    do i=1,n_ele
-        !::1. The relative position vector between the origo of the current tile and the point at which the tensor is required
-        diffPos = pts(i,:) - circTile%offset
+    procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
+    
+    N_tensor => getN_circPiece_Inv
+    !! check to see if we should use symmetry
+    if ( circTile%exploitSymmetry .eq. 1 ) then
         
-        !::2. rotate the position vector according to the rotation of the prism
-        diffPos = matmul( rotMat, diffPos )
-        
-        !::3. get the demag tensor                
-        if ( present( useStoredN ) .eq. .true. ) then
-            if ( useStoredN .eq. .false. ) then
-                 call getN_circPiece_Inv( circTile, diffPos, N )
-                 N_out(i,:,:) = N
-            else
-                N = N_out(i,:,:)
-            endif
-        else
-            call getN_circPiece_Inv( circTile, diffPos, N )
-        endif
-        
-        !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
-        call getDotProd( N, matmul( rotMat, circTile%M ), dotProd )
-        
-        !::5. Rotate the resulting field back to the global coordinate system
-        dotProd = matmul( rotMatInv, dotProd )        
-        
-        !::. Update the solution. 
-        H(i,:) = dotProd
-    enddo
+        call getFieldFromTile_symm( circTile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+    else
+        call getFieldFromTile( circTile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+        !
+        !!::get the rotation matrices
+        !call getRotationMatrices( circTile, rotMat, rotMatInv)
+        !
+        !do i=1,n_ele
+        !    !::1. The relative position vector between the origo of the current tile and the point at which the tensor is required
+        !    diffPos = pts(i,:) - circTile%offset
+        !
+        !    !::2. rotate the position vector according to the rotation of the prism
+        !    diffPos = matmul( rotMat, diffPos )
+        !
+        !    !::3. get the demag tensor                
+        !    if ( present( useStoredN ) .eq. .true. ) then
+        !        if ( useStoredN .eq. .false. ) then
+        !             call getN_circPiece_Inv( circTile, diffPos, N )
+        !             N_out(i,:,:) = N
+        !        else
+        !            N = N_out(i,:,:)
+        !        endif
+        !    else
+        !        call getN_circPiece_Inv( circTile, diffPos, N )
+        !    endif
+        !
+        !    !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
+        !    call getDotProd( N, matmul( rotMat, circTile%M ), dotProd )
+        !
+        !    !::5. Rotate the resulting field back to the global coordinate system
+        !    dotProd = matmul( rotMatInv, dotProd )        
+        !
+        !    !::. Update the solution. 
+        !    H(i,:) = dotProd
+        !enddo
+    endif
+    
     end subroutine getFieldFromCircPieceInvertedTile
     
     

@@ -41,12 +41,11 @@ implicit none
     
     end subroutine displayProgress
     
+   
     
-    
-    
-    subroutine displayIteration( err, err_max )
+    function displayIteration_Matlab( err, err_max )
     real,intent(in) :: err,err_max
-    
+    real :: displayIteration_Matlab
     integer :: mexCallMATLAB, nlhs_cb, nrhs_cb, tmp
     mwPointer plhs_cb(1), prhs_cb(1),mxCreateString
     character*(4) :: functionName_cb
@@ -57,27 +56,17 @@ implicit none
     fmt = '(f15.7)'
     write (prog_str,*) "err: ",err,"Max. err: ",err_max
     
-    !< test if we are inside Matlab or called from a stand-alone. The simple test
-    !! is whether io.txt exists in the current path (false for Matlab, true for stand-alone)
-    !! nothing bad should happen if in fact we are called from ML but the file somehow
-    !! exists - the written output will just not be shown to the user
-    
-    inquire( file='io.txt', EXIST=ex )
-    
-    if ( ex .eq. .true. ) then
-        write(*,*) prog_str    
-    else            
-    
-        functionName_cb = "disp"
-        nlhs_cb = 0
-        nrhs_cb = 1
+    functionName_cb = "disp"
+    nlhs_cb = 0
+    nrhs_cb = 1
       
-        prhs_cb(1) = mxCreateString(prog_str)
+    prhs_cb(1) = mxCreateString(prog_str)
       
-        tmp = mexCallMATLAB(nlhs_cb, plhs_cb, nrhs_cb, prhs_cb, "disp")
-    endif
+    tmp = mexCallMATLAB(nlhs_cb, plhs_cb, nrhs_cb, prhs_cb, "disp")
     
-    end subroutine displayIteration
+    displayIteration_Matlab = 1
+    
+    end function displayIteration_Matlab
     
     !::
     !::Loads the data from Matlab into a fortran struct
@@ -94,7 +83,7 @@ implicit none
     real*8,dimension(3) :: rectDims
     mwPointer :: r0Ptr,theta0Ptr,z0Ptr,drPtr,dthetaPtr,dzPtr,MPtr,u_eaPtr,u_oa1Ptr,u_oa2Ptr,mur_eaPtr,mur_oaPtr,MremPtr
     mwPointer :: tileTypePtr,offsetPtr,rotAnglesPtr,rectDimsPtr,magnetTypePtr,stateFunctionIndexPtr,includeInIterationPtr
-    mwPointer :: mxGetField, mxGetPr
+    mwPointer :: mxGetField, mxGetPr,colorPtr,symmetryPtr,symmetryOpsPtr
     
     
     
@@ -120,6 +109,9 @@ implicit none
             magnetTypePtr =  mxGetField(prhs,i,fieldnames(18))
             stateFunctionIndexPtr =  mxGetField(prhs,i,fieldnames(19))
             includeInIterationPtr =  mxGetField(prhs,i,fieldnames(20))
+            colorPtr =  mxGetField(prhs,i,fieldnames(21))
+            symmetryPtr =  mxGetField(prhs,i,fieldnames(22))
+            symmetryOpsPtr =  mxGetField(prhs,i,fieldnames(23))
       
             sx = 1
             call mxCopyPtrToReal8(mxGetPr(r0Ptr), cylTile(i)%r0, sx )
@@ -139,6 +131,8 @@ implicit none
             call mxCopyPtrToReal8(mxGetPr(MremPtr), cylTile(i)%Mrem, sx )
             call mxCopyPtrToInteger4(mxGetPr(tileTypePtr), cylTile(i)%tileType, sx )
             call mxCopyPtrToInteger4(mxGetPr(includeInIterationPtr), cylTile(i)%includeInIteration, sx )
+            call mxCopyPtrToInteger4(mxGetPr(symmetryPtr), cylTile(i)%exploitSymmetry, sx )
+            
             sx = 3
             call mxCopyPtrToReal8(mxGetPr(offsetPtr), cylTile(i)%offset, sx )
             call mxCopyPtrToReal8(mxGetPr(rotAnglesPtr), cylTile(i)%rotAngles, sx )
@@ -146,9 +140,15 @@ implicit none
             cylTile(i)%a = rectDims(1)
             cylTile(i)%b = rectDims(2)
             cylTile(i)%c = rectDims(3)
+            
+            call mxCopyPtrToReal8(mxGetPr(colorPtr), cylTile(i)%color, sx )
+            
             sx = 1
             call mxCopyPtrToInteger4(mxGetPr(magnetTypePtr), cylTile(i)%magnetType, sx )            
             call mxCopyPtrToInteger4(mxGetPr(stateFunctionIndexPtr), cylTile(i)%stateFunctionIndex, sx )
+            
+            sx = 3
+            call mxCopyPtrToReal8(mxGetPr(symmetryOpsPtr), cylTile(i)%symmetryOps, sx )
             
             !cylTile(i)%fieldEvaluation = fieldEvaluationCentre
             if ( cyltile(i)%tiletype == tiletypecylpiece ) then
@@ -298,6 +298,32 @@ implicit none
           call mxCopyInteger4ToPtr( cylTile(i)%includeInIteration, mxGetPr( pvalue(i,20) ), sx )
           call mxSetField( plhs, i, fieldnames(20), pvalue(i,20) )
           
+          !! load the color assumed to be an RGB triplet, i.e. an array with 3 elements
+          s1 = 1
+          s2 = 3
+          sx = 3
+          pvalue(i,21) = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
+          call mxCopyReal8ToPtr( cylTile(i)%color, mxGetPr( pvalue(i,21) ), sx )
+          call mxSetField( plhs, i, fieldnames(21), pvalue(i,21) )
+          
+          !! load the symmetry flag (if false don't assume symmetry, if true (1) then assume symmetry
+          s1 = 1
+          s2 = 1
+          sx = 1
+          classid = mxClassIDFromClassName('int32')
+          pvalue(i,22) = mxCreateNumericMatrix(s1,s2,classid,ComplexFlag)
+          call mxCopyInteger4ToPtr( cylTile(i)%exploitSymmetry, mxGetPr( pvalue(i,22) ), sx )
+          call mxSetField( plhs, i, fieldnames(22), pvalue(i,22) )
+          
+          
+          s1 = 1
+          s2 = 3
+          sx = 3
+          pvalue(i,23) = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
+          call mxCopyReal8ToPtr( cylTile(i)%symmetryOps, mxGetPr( pvalue(i,23) ), sx )
+          call mxSetField( plhs, i, fieldnames(23), pvalue(i,23) )
+          
+          
       enddo
       
       deallocate(pvalue,fieldnames)
@@ -308,7 +334,7 @@ implicit none
     !::Returns an array with the names of the fields expected in the tile struct
     subroutine getTileFieldnames( fieldnames, nfields)
     integer,intent(out) :: nfields
-    integer,parameter :: nf=20
+    integer,parameter :: nf=23
     character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -334,6 +360,9 @@ implicit none
         fieldnames(18) = 'magnetType'
         fieldnames(19) = 'stfcnIndex'
         fieldnames(20) = 'inclIter'
+        fieldnames(21) = 'color'
+        fieldnames(22) = 'useSymm'
+        fieldnames(23) = 'symmOps'
         
     
         
