@@ -20,16 +20,34 @@ module TileNComponents
         integer :: tileType        !::defines whether the tile is cylindrical, a prism, an ellipsoid and so on
         real,dimension(3) :: offset !::the centre coordinates relative to the global coordinate system
         real,dimension(3) :: rotAngles !:: rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
+        real,dimension(3) :: color !! color rgb triplet
         integer :: magnetType !::defines whether the tile is a hard or soft magnet
         integer :: stateFunctionIndex !::index matching an entry into an array of type MagStatStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+        integer :: includeInIteration,exploitSymmetry
+        real,dimension(3) :: symmetryOps !! 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
         
         !::internal variables that are used for averaging the internal field
         integer,dimension(3) :: n_ave
         real,dimension(:,:),allocatable :: H_ave_pts,H_ave
         real,dimension(:,:,:,:),allocatable :: N_ave_pts
         logical :: isIterating
-        integer :: fieldEvaluation,includeInIteration
+        integer :: fieldEvaluation
     end type MagTile
+    
+    
+    !> Interface for the call to a specific implementation of the demagnetization tensor
+    !! @param prismTile is the tile from which the tensor is wanted
+    !! @param diffPos is a (3,1) vector with the relative position of the point of interest (relative to the tile's offset)
+    !! @param N is a (3,3) matrix where the tensor is returned to
+    abstract interface
+      
+      subroutine N_tensor_subroutine ( prismTile, diffPos, N )
+         import MagTile
+         type(MagTile),intent(in) :: prismTile
+         real,dimension(3),intent(in) :: diffPos
+         real,dimension(3,3),intent(inout) :: N
+      end subroutine N_tensor_subroutine
+    end interface
     
     integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeEllipsoid=10,tileTypePlanarCoil=101
     integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2
