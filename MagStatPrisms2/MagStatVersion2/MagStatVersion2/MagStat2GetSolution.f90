@@ -2,7 +2,7 @@
     module MagStat2GetSolution
     
     use TileNComponents
-    use MagTileIO
+    !use MagTileIO
     implicit none
     
     
