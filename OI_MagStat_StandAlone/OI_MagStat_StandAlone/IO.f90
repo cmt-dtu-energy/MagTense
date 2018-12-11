@@ -1,4 +1,4 @@
-MODULE IO_CALL
+MODULE IO_CALL_MagStat
     use TileNComponents
     use MagStatParameters
     !use MagTileIO
@@ -11,22 +11,22 @@ MODULE IO_CALL
         type(MagStatStateFunction),dimension(1) :: stateFcn
         logical :: returnSolution
     end type MagTileIOSetts
-    
+
     
     contains
     
     !> function for displaying output (to the terminal)
     !! @param err the current relative error
     !! @param err_max the current maximum allowed error
-    function displayIteration_fct( err, err_max )
+    function dispIte_fct( err, err_max )
     real,intent(in) :: err,err_max
-    real :: displayIteration_fct
+    integer :: dispIte_fct
     
     write(*,*) err,err_max
     
-    displayIteration_fct = 0
+    dispIte_fct = 0
     
-    end function displayIteration_fct
+    end function dispIte_fct
     
     !> Wrapper function for loading tiles from a file of any supported type.
     !! However, we only support a simple ASCII file format at the moment
@@ -208,5 +208,5 @@ MODULE IO_CALL
     
     end subroutine loadSolutionPoints
     
-END MODULE IO_CALL
+END MODULE IO_CALL_MagStat
     

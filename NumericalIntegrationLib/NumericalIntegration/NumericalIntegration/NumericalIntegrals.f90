@@ -1,7 +1,7 @@
 module NumInt
     use QUADPACK
     use integrationDataTypes
-    use nr_num_integrals
+!    use nr_num_integrals
     implicit none
     
     contains
@@ -341,33 +341,33 @@ real :: tmp
 return
 end function h
 
-function h_vec(xx, dat, n)
-integer,intent(in) :: n
-real,dimension(n) :: h_vec
-real,intent(in),dimension(n) :: xx
-real :: ss, res
-class(dataCollectionBase), target :: dat
-procedure (f_int_dat_vec), pointer :: f_ptr => null ()
-real :: tmp
-integer :: i
-
-    do i=1,n
-        f_ptr => f_vec
-        dat%x = xx(i)
-
-        h_vec(i) = qromb_mod( f_ptr, dat, dat%y1, dat%y2 )
-    
-        if ( mod( dat%progCallbackCnt, 100 ) .eq. 0 ) then
-            !::Progress callback
-            tmp = dat%progCallback( dat )
-        endif
-        
-        dat%progCallbackCnt = dat%progCallbackCnt + 1
-    enddo
-    
-    
-return
-end function h_vec
+!function h_vec(xx, dat, n)
+!integer,intent(in) :: n
+!real,dimension(n) :: h_vec
+!real,intent(in),dimension(n) :: xx
+!real :: ss, res
+!class(dataCollectionBase), target :: dat
+!procedure (f_int_dat_vec), pointer :: f_ptr => null ()
+!real :: tmp
+!integer :: i
+!
+!    do i=1,n
+!        f_ptr => f_vec
+!        dat%x = xx(i)
+!
+!        h_vec(i) = qromb_mod( f_ptr, dat, dat%y1, dat%y2 )
+!    
+!        if ( mod( dat%progCallbackCnt, 100 ) .eq. 0 ) then
+!            !::Progress callback
+!            tmp = dat%progCallback( dat )
+!        endif
+!        
+!        dat%progCallbackCnt = dat%progCallbackCnt + 1
+!    enddo
+!    
+!    
+!return
+!end function h_vec
 
 
 !::adopted from NR

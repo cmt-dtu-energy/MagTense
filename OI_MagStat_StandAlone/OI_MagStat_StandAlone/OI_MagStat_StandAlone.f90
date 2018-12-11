@@ -15,7 +15,7 @@
     program OI_MagStat_StandAlone
     use TileNComponents
     use IterateMagnetSolution
-    use IO_CALL
+    use IO_CALL_MagStat
     implicit none
 
     character(len=1000) :: file_tiles_in,file_tiles_out,file_setup,file_field_pts,file_field_out
@@ -24,9 +24,11 @@
     integer :: n_tiles,n_pts
     real,dimension(:,:),allocatable :: pts,H
     real :: start,finish
-    
+    procedure(displayIteration_fct),pointer :: disp_fct => null()
     call cpu_time(start)
     
+    disp_fct => dispIte_fct
+    write(*,*) 'sjask'
     !::Read the file named io.txt which should be located in the same folder as the executable
     !pause
     open(11,file='io.txt',status='old',access='sequential',form='formatted',action='read')
@@ -46,7 +48,7 @@
     !::If requested, save the iterated tiles
     if ( setts%iterateSolution ) then
         write(*,*) 'Doing iteration'
-        call iterateMagnetization( tiles, n_tiles, setts%stateFcn, 1, setts%T, setts%maxErr, displayIteration_fct )
+        call iterateMagnetization( tiles, n_tiles, setts%stateFcn, 1, setts%T, setts%maxErr, setts%nIteMax, disp_fct )
         
         !< save the iterated tiles
         call loadTiles( tiles, file_tiles_out, 1 )

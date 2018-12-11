@@ -13,21 +13,21 @@ module TileTensorHelperFunctions
         real, intent(in) :: x, theta, z
             L = x**2 * ( cos(theta)**2 - 1 ) - z**2
             return
-        end
+        end function
 
         function G_p( r, x, theta, z )
         real :: G_p
         real,intent(in) ::r,x,theta,z
             G_p = ( M(r,x,theta,z) + r ) / sqrt(x**2+z**2)
             return
-        end
+        end function
 
         function G_m( r, x, theta, z )
         real :: G_m
         real,intent(in) ::r,x,theta,z
             G_m = ( M(r,x,theta,z) - r ) / sqrt(x**2+z**2)
             return
-        end
+        end function
 
         !Returns the M helper function
         function M( r, x, theta, z )
@@ -35,14 +35,14 @@ module TileTensorHelperFunctions
         real,intent(in) :: r, x, theta, z
             M = sqrt( r**2 - 2 * x * r * cos(theta) + x**2 + z**2 )
             return
-    end
+         end function M
 
     function C_no_sign( theta )
     real :: C_no_sign
     real,intent(in) :: theta
         C_no_sign = asin( cos( theta/2 ) )
         return
-    end
+    end function
         !Returns the B helper function
     !::The minus sign is due to the convention that in numerical recipes the incomplete elliptic integral of third kind is defined as 1/(1+n).... where in Matlab it is 1/(1-n)....
     function  B( r, x )
@@ -60,7 +60,7 @@ module TileTensorHelperFunctions
         endif
             
         return
-    end
+    end function
 
         function K( r, x, z )
         real :: K
@@ -78,7 +78,7 @@ module TileTensorHelperFunctions
             !::The implementation used here needs the k parameter and not the m parameter (as used by Matlab). Remember that m = k^2
             !K = K**2
             return
-     end
+     end function
      function P(x,y,z,xp,yp,zp)
      real, intent(in) :: x,y,z,xp,yp,zp
      real :: P
