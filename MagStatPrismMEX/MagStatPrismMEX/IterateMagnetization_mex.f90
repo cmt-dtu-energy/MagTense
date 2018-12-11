@@ -87,7 +87,7 @@
       call loadMagStateFunction( prhs(3), stateFunctions, n_statefunctions )
             
       !::do the calculation
-      call iterateMagnetization( cylTile, n_tiles,stateFunctions, n_statefunctions, T, err_max, max_ite )
+      call iterateMagnetization( cylTile, n_tiles,stateFunctions, n_statefunctions, T, err_max, max_ite, displayIteration_Matlab )
       
       !::Return the updated struct array to matlab
       call returnMagTile( cylTile, n_tiles, plhs(1) )
