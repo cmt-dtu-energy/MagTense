@@ -6,6 +6,13 @@
     use MagStatUtil
     !use MagTileIO
     implicit none
+
+     INTERFACE
+                FUNCTION displayIteration_fct(err,err_max)
+                REAL, INTENT(IN) :: err,err_max
+                integer :: displayIteration_fct
+                END FUNCTION displayIteration_fct
+     END INTERFACE
     
     contains
     
@@ -18,21 +25,18 @@
 !::Error state is returned in i_err:
 !::0 no error
 !:: -1 max number of iterations reached without satisfying the minimum error
-subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max, max_ite, displayIteration_fct )
+subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max, max_ite, dispIteFct )
     type(MagTile),dimension(n),intent(inout) :: tiles
     integer,intent(in) :: n
     type(MagStatStateFunction),intent(in),dimension(n_stf) :: stateFunction    
     integer,intent(in) :: n_stf
+    procedure(displayIteration_fct),pointer :: dispIteFct
 
     real,intent(in) :: T    
     real,optional :: err_max
     integer,optional :: max_ite
     
-    INTERFACE
-		FUNCTION displayIteration_fct(err,err_max)		
-		REAL, INTENT(IN) :: err,err_max		
-		END FUNCTION displayIteration_fct
-	END INTERFACE
+    
     
     
     integer,parameter :: cnt_max = 200
@@ -212,7 +216,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max, max
         lambdaCnt = lambdaCnt + 1
 
          !call displayIteration( err, err_max * lambda )
-         tmp = displayIteration_fct( err, err_max * lambda )
+         tmp = dispIteFct( err, err_max * lambda )
         
     enddo    
     deallocate(H,H_old,Hnorm,Hnorm_old,Nstore,err_val)
