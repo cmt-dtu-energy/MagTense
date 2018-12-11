@@ -32,7 +32,7 @@
 		<File RelativePath=".\getMagForce_mex.f90"/>
 		<File RelativePath=".\getNFromCylTile_mex.f90"/>
 		<File RelativePath=".\integral2_mex.f90"/>
-		<File RelativePath=".\iterateMagnetization_mex.f90"/>
+		<File RelativePath=".\IterateMagnetization_mex.f90"/>
 		<File RelativePath=".\magStatMEX.f90"/>
 		<File RelativePath=".\magStatMex_getSolution.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>
