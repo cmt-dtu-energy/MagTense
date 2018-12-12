@@ -109,6 +109,16 @@ MODULE IO_CALL_MagStat
             write(12,*) tiles(i)%rotAngles(1),tiles(i)%rotAngles(2),tiles(i)%rotAngles(3)
         endif
         
+        
+        !!use symmetry and symmetry operations and color
+        if ( mode .eq. 0 ) then
+            read(11,*) tiles(i)%exploitSymmetry,tiles(i)%symmetryOps(1),tiles(i)%symmetryOps(2),tiles(i)%symmetryOps(3)
+            read(11,*) tiles(i)%color(1),tiles(i)%color(2),tiles(i)%color(3)
+        else
+            write(12,*)  tiles(i)%exploitSymmetry,tiles(i)%symmetryOps(1),tiles(i)%symmetryOps(2),tiles(i)%symmetryOps(3)
+            write(12,*) tiles(i)%color(1),tiles(i)%color(2),tiles(i)%color(3)
+        endif
+        
         !<finally, setup the evaluation points
         if ( mode .eq. 0 ) then
             call setupEvaluationPoints( tiles(i) )
