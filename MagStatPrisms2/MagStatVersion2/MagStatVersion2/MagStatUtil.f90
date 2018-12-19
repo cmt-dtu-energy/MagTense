@@ -36,5 +36,7 @@ module MagStatUtil
     
     
     
+    
+    
 end module
     

@@ -30,7 +30,7 @@
       type(MagStatStateFunction),allocatable,dimension(:) :: stateFunctions
       
       integer*4 :: n_tiles,n_statefunctions,max_ite
-      real*8 :: err_max,T
+      real*8 :: err_max,T,resumeIteration
       
 !     Check for proper number of arguments. 
       if( nrhs .lt. 6) then
@@ -42,6 +42,8 @@
       endif
 
       max_ite = 100
+      !! default value is zero, i.e. do not resume iteration
+      resumeIteration = 0.
       
 !Check the type of the inputs      
       if ( .NOT. mxIsStruct(prhs(1)) ) then
@@ -57,11 +59,18 @@
       else if ( .NOT. mxIsDouble(prhs(6)) ) then
           call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input six should be a double')      
       else if ( nrhs .gt. 6 ) then
-            if ( .NOT. mxIsInt32(prhs(7)) ) then
+           if ( .NOT. mxIsInt32(prhs(7)) ) then
                 call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input seven (optional) should be an integer')                      
-            else
-                call mxCopyPtrToInteger4(mxGetPr(prhs(7)), max_ite,1)
-            endif            
+           else
+               call mxCopyPtrToInteger4(mxGetPr(prhs(7)), max_ite,1)
+           endif            
+           if ( nrhs .gt. 7 ) then          
+               if ( .NOT. mxIsDouble(prhs(8)) ) then
+                     call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input eight (optional) should be a real')                      
+                 else
+                     call mxCopyPtrToReal8(mxGetPr(prhs(8)), resumeIteration,1)
+                 endif            
+           endif          
       endif                  
       
       
@@ -87,7 +96,8 @@
       call loadMagStateFunction( prhs(3), stateFunctions, n_statefunctions )
             
       !::do the calculation
-      call iterateMagnetization( cylTile, n_tiles,stateFunctions, n_statefunctions, T, err_max, max_ite, displayIteration_Matlab )
+      call iterateMagnetization( cylTile, n_tiles,stateFunctions, n_statefunctions, T, err_max, max_ite, 
+     +     displayIteration_Matlab, resumeIteration )
       
       !::Return the updated struct array to matlab
       call returnMagTile( cylTile, n_tiles, plhs(1) )
