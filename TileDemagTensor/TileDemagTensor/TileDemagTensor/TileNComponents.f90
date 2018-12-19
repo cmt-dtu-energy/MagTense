@@ -25,6 +25,7 @@ module TileNComponents
         integer :: stateFunctionIndex !::index matching an entry into an array of type MagStatStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
         integer :: includeInIteration,exploitSymmetry
         real,dimension(3) :: symmetryOps !! 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
+        real :: Mrel !! the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
         
         !::internal variables that are used for averaging the internal field
         integer,dimension(3) :: n_ave
