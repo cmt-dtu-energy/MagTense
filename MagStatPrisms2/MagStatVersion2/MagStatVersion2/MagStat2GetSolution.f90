@@ -13,14 +13,15 @@
     
 
     
-    !::
-    !::General function to call given a number of (different) tiles    
-    !::Input arguments
-    !::tiles: Array of type MagTile, size n_tiles
-    !::H the output magnetic field, size [n_ele,3]
-    !::pts the points at which the field should be evaluated, size [n_ele,3]
-    !::integer n_tiles, the number of tiles
-    !::integer n_ele, the number of points at which to evaluate the field
+    !>
+    !!General function to call given a number of (different) tiles    
+    !!Input arguments
+    !!@param tiles: Array of type MagTile, size n_tiles
+    !!@paramH the output magnetic field, size [n_ele,3]
+    !!@parampts the points at which the field should be evaluated, size [n_ele,3]
+    !!@param n_tiles, the number of tiles
+    !!@param n_ele, the number of points at which to evaluate the field
+    !!@param Nout the demag tensor calculated by this function (size (n_tiles,n_pts,3,3) )
     subroutine getFieldFromTiles( tiles, H, pts, n_tiles, n_ele, Nout )
     type(MagTile),intent(inout),dimension(n_tiles) :: tiles
     real,dimension(n_ele,3),intent(inout) :: H

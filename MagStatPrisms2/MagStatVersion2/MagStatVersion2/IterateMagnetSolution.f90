@@ -252,7 +252,7 @@ subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max, max
         !::Update iteration step
         cnt = cnt + 1
         !! only for debugging purposes, saves the magnetization out to a binary file
-        call saveMagnetizationDebug( tiles, n, cnt )
+        !call saveMagnetizationDebug( tiles, n, cnt )
         if ( cnt .gt. 2 ) then
             !Hnorm = sqrt( H(:,1)**2 + H(:,2)**2 + H(:,3)**2 )
             !Hnorm_old = sqrt( H_old(:,1)**2 + H_old(:,2)**2 + H_old(:,3)**2 )
@@ -314,7 +314,8 @@ logical,intent(inout) :: lCh
 lCh = .false.
 
 if ( (maxDiff(1) .gt. maxDiff(2) .AND. maxDiff(2) .lt. maxDiff(3) .AND. maxDiff(3) .gt. maxDiff(4)) .OR. &
-     maxDiff(4) .gt. maxDiff(3) .AND. maxDiff(3) .gt. maxDiff(2) .AND. maxDiff(2) .gt. maxDiff(1) ) then
+     maxDiff(4) .gt. maxDiff(3) .AND. maxDiff(3) .gt. maxDiff(2) .AND. maxDiff(2) .gt. maxDiff(1) .OR. &
+     maxDiff(4) .gt. maxDiff(3) .AND. maxDiff(3) .gt. maxDiff(2) .AND. maxDiff(2) .lt. maxDiff(1) ) then
     lambda = lambda * 0.5
     lCh = .true.
 endif
