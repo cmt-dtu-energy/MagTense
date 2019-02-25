@@ -23,12 +23,15 @@
     type(MagTileIOSetts) :: setts
     integer :: n_tiles,n_pts
     real,dimension(:,:),allocatable :: pts,H
-    real :: start,finish
+    real :: start,finish,resumeIteration
     procedure(displayIteration_fct),pointer :: disp_fct => null()
     call cpu_time(start)
     
     disp_fct => dispIte_fct
-    write(*,*) 'sjask'
+    
+    !!no support for resuming iterations at the moment
+    resumeIteration = 0
+    
     !::Read the file named io.txt which should be located in the same folder as the executable
     !pause
     open(11,file='io.txt',status='old',access='sequential',form='formatted',action='read')
@@ -48,7 +51,7 @@
     !::If requested, save the iterated tiles
     if ( setts%iterateSolution ) then
         write(*,*) 'Doing iteration'
-        call iterateMagnetization( tiles, n_tiles, setts%stateFcn, 1, setts%T, setts%maxErr, setts%nIteMax, disp_fct )
+        call iterateMagnetization( tiles, n_tiles, setts%stateFcn, 1, setts%T, setts%maxErr, setts%nIteMax, disp_fct, resumeIteration )
         
         !< save the iterated tiles
         call loadTiles( tiles, file_tiles_out, 1 )

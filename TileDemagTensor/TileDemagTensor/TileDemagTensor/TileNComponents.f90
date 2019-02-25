@@ -64,9 +64,9 @@ module TileNComponents
     integer :: cnt,j,k,l
     
         cyltile%fieldevaluation  = fieldevaluationaverage
-        cyltile%n_ave(1) = 5
-        cyltile%n_ave(2) = 5
-        cyltile%n_ave(3) = 5
+        cyltile%n_ave(1) = 1
+        cyltile%n_ave(2) = 1
+        cyltile%n_ave(3) = 1
         n = cyltile%n_ave(1)*cyltile%n_ave(2)*cyltile%n_ave(3)
         allocate(cyltile%H_ave_pts(n,3),cyltile%H_ave(n,3),r(n),theta(n),z(n))                
         dr = cyltile%dr / cyltile%n_ave(1)
@@ -208,6 +208,9 @@ module TileNComponents
             - int_sin_dDdy_dz_dtheta1 - int_cos_dDdx_dz_dtheta1 &
             + cos(theta2) * int_dDdy_dr_dz2 - sin(theta2) * int_dDdx_dr_dz2 &
             -(cos(theta1) * int_dDdy_dr_dz1 - sin(theta1) * int_dDdx_dr_dz1)
+        
+        N = N * 1./(4.*pi)
+        
     deallocate(dat)
     end subroutine getN_CylPiece
 
@@ -698,6 +701,9 @@ module TileNComponents
 
 
     N_out(3,1) = N_out(1,3)
+    
+    !!Change the sign so that the output tensor follows the same definition as all the other tensors
+    N_out = -1.* N_out
     
     end subroutine
         

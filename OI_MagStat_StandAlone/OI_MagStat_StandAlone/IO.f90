@@ -118,6 +118,13 @@ MODULE IO_CALL_MagStat
             write(12,*)  tiles(i)%exploitSymmetry,tiles(i)%symmetryOps(1),tiles(i)%symmetryOps(2),tiles(i)%symmetryOps(3)
             write(12,*) tiles(i)%color(1),tiles(i)%color(2),tiles(i)%color(3)
         endif
+        !!The relative change in M at the last iteration
+        if ( mode .eq. 0 ) then
+            read(11,*) tiles(i)%Mrel
+        else
+            write(12,*) tiles(i)%Mrel
+        endif
+        
         
         !<finally, setup the evaluation points
         if ( mode .eq. 0 ) then
