@@ -196,8 +196,8 @@
     real,dimension(:),allocatable :: r,x,phi
     real,dimension(:,:),allocatable :: pts_local
     real :: phi_orig,z_orig
-    real,dimension(3) :: M_orig,M_tmp
-    real,dimension(3,3) :: N,Rz
+    real,dimension(3) :: M_orig !,M_tmp
+    real,dimension(3,3) :: N,Rz,Rz_inv
     integer :: i
     logical,intent(in),optional :: useStoredN
     
@@ -239,26 +239,45 @@
               if ( useStoredN .eq. .false. ) then
                   call getN_CylPiece( cylTile, r(i), N )
               
+                  !>Change basis from rotation trick coordinate system to the local system of the tile
+                  !!The magnetic field in the global coordinate system is given by:
+                  !!H = Rot(phi) * ( N *  (Rot(-phi) * M) )
+                  !!Get the rotation matrix for rotating the magnetization with the trick-angle
+                  call getRotZ( -phi(i), Rz_inv )
+                  !!Get the rotation matrix for rotating the magnetic field back to the original coordinate system
+                  call getRotZ( phi(i), Rz )
+                  N = matmul( Rz, N )
+                  N = matmul( N, Rz_inv )
+                  
                   N_out(i,:,:) = N
               
               else
                   N = N_out(i,:,:)
               endif
           else
-              call getN_CylPiece( cylTile, r(i), N )
+               call getN_CylPiece( cylTile, r(i), N )
+               !>Change basis from rotation trick coordinate system to the local system of the tile
+               !!The magnetic field in the global coordinate system is given by:
+               !!H = Rot(phi) * ( N *  (Rot(-phi) * M) )
+               !!Get the rotation matrix for rotating the magnetization with the trick-angle
+               call getRotZ( -phi(i), Rz_inv )
+               !!Get the rotation matrix for rotating the magnetic field back to the original coordinate system
+               call getRotZ( phi(i), Rz )
+               N = matmul( Rz, N )
+               N = matmul( N, Rz_inv )
+                  
+               N_out(i,:,:) = N
           endif
           
-          
-          !Get the rotation vector
-          call getRotZ( -phi(i), Rz )
           !Rotate the magnetization vector
-          M_tmp = matmul( Rz, M_orig )
+          !M_tmp = matmul( Rz, M_orig )
           !find the field at the rotated point
-          H(i,:) = 1./(4.*pi) * matmul( N, M_tmp )
+          !H(i,:) = matmul( N, M_tmp )
           !get the negative rotation
-          call getRotZ( phi(i), Rz )
+          !call getRotZ( phi(i), Rz )
           !rotate the field back to the original orientation
-          H(i,:) = matmul( Rz, H(i,:) )
+          !H(i,:) = matmul( Rz, H(i,:) )
+          H(i,:) = matmul( N, M_orig )
           
           !Revert the changes in angle and z position
           cylTile%theta0 = phi_orig
@@ -293,7 +312,8 @@
     endif
     
     !! The minus sign comes from the definition of the demag tensor (the demagfield is assumed negative)
-    H = -1. * H
+    !! Change in the tensor subroutine in order to make the behavior of the tensor components of the various geometries conform
+    !H = -1. * H
     
     end subroutine getFieldFromRectangularPrismTile
     
