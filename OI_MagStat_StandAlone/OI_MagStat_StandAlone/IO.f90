@@ -1,4 +1,4 @@
-MODULE IO_CALL
+MODULE IO_CALL_MagStat
     use TileNComponents
     use MagStatParameters
     !use MagTileIO
@@ -11,22 +11,22 @@ MODULE IO_CALL
         type(MagStatStateFunction),dimension(1) :: stateFcn
         logical :: returnSolution
     end type MagTileIOSetts
-    
+
     
     contains
     
     !> function for displaying output (to the terminal)
     !! @param err the current relative error
     !! @param err_max the current maximum allowed error
-    function displayIteration_fct( err, err_max )
+    function dispIte_fct( err, err_max )
     real,intent(in) :: err,err_max
-    real :: displayIteration_fct
+    integer :: dispIte_fct
     
     write(*,*) err,err_max
     
-    displayIteration_fct = 0
+    dispIte_fct = 0
     
-    end function displayIteration_fct
+    end function dispIte_fct
     
     !> Wrapper function for loading tiles from a file of any supported type.
     !! However, we only support a simple ASCII file format at the moment
@@ -108,6 +108,23 @@ MODULE IO_CALL
             write(12,*) tiles(i)%offset(1),tiles(i)%offset(2),tiles(i)%offset(3)
             write(12,*) tiles(i)%rotAngles(1),tiles(i)%rotAngles(2),tiles(i)%rotAngles(3)
         endif
+        
+        
+        !!use symmetry and symmetry operations and color
+        if ( mode .eq. 0 ) then
+            read(11,*) tiles(i)%exploitSymmetry,tiles(i)%symmetryOps(1),tiles(i)%symmetryOps(2),tiles(i)%symmetryOps(3)
+            read(11,*) tiles(i)%color(1),tiles(i)%color(2),tiles(i)%color(3)
+        else
+            write(12,*)  tiles(i)%exploitSymmetry,tiles(i)%symmetryOps(1),tiles(i)%symmetryOps(2),tiles(i)%symmetryOps(3)
+            write(12,*) tiles(i)%color(1),tiles(i)%color(2),tiles(i)%color(3)
+        endif
+        !!The relative change in M at the last iteration
+        if ( mode .eq. 0 ) then
+            read(11,*) tiles(i)%Mrel
+        else
+            write(12,*) tiles(i)%Mrel
+        endif
+        
         
         !<finally, setup the evaluation points
         if ( mode .eq. 0 ) then
@@ -208,5 +225,5 @@ MODULE IO_CALL
     
     end subroutine loadSolutionPoints
     
-END MODULE IO_CALL
+END MODULE IO_CALL_MagStat
     
