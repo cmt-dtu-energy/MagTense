@@ -7,6 +7,9 @@ implicit none
     
     contains
     
+    
+   
+    
     subroutine displayProgress( prog )
     integer,intent(in) :: prog
     
@@ -45,7 +48,7 @@ implicit none
     
     function displayIteration_Matlab( err, err_max )
     real,intent(in) :: err,err_max
-    real :: displayIteration_Matlab
+    integer :: displayIteration_Matlab
     integer :: mexCallMATLAB, nlhs_cb, nrhs_cb, tmp
     mwPointer plhs_cb(1), prhs_cb(1),mxCreateString
     character*(4) :: functionName_cb
@@ -83,7 +86,7 @@ implicit none
     real*8,dimension(3) :: rectDims
     mwPointer :: r0Ptr,theta0Ptr,z0Ptr,drPtr,dthetaPtr,dzPtr,MPtr,u_eaPtr,u_oa1Ptr,u_oa2Ptr,mur_eaPtr,mur_oaPtr,MremPtr
     mwPointer :: tileTypePtr,offsetPtr,rotAnglesPtr,rectDimsPtr,magnetTypePtr,stateFunctionIndexPtr,includeInIterationPtr
-    mwPointer :: mxGetField, mxGetPr,colorPtr,symmetryPtr,symmetryOpsPtr
+    mwPointer :: mxGetField, mxGetPr,colorPtr,symmetryPtr,symmetryOpsPtr,MrelPtr
     
     
     
@@ -112,6 +115,7 @@ implicit none
             colorPtr =  mxGetField(prhs,i,fieldnames(21))
             symmetryPtr =  mxGetField(prhs,i,fieldnames(22))
             symmetryOpsPtr =  mxGetField(prhs,i,fieldnames(23))
+            MrelPtr =  mxGetField(prhs,i,fieldnames(24))
       
             sx = 1
             call mxCopyPtrToReal8(mxGetPr(r0Ptr), cylTile(i)%r0, sx )
@@ -149,6 +153,9 @@ implicit none
             
             sx = 3
             call mxCopyPtrToReal8(mxGetPr(symmetryOpsPtr), cylTile(i)%symmetryOps, sx )
+            
+            sx = 1
+            call mxCopyPtrToReal8(mxGetPr(MrelPtr), cylTile(i)%Mrel, sx )
             
             !cylTile(i)%fieldEvaluation = fieldEvaluationCentre
             if ( cyltile(i)%tiletype == tiletypecylpiece ) then
@@ -323,6 +330,13 @@ implicit none
           call mxCopyReal8ToPtr( cylTile(i)%symmetryOps, mxGetPr( pvalue(i,23) ), sx )
           call mxSetField( plhs, i, fieldnames(23), pvalue(i,23) )
           
+          s1 = 1
+          s2 = 1
+          sx = 1
+          pvalue(i,24) = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
+          call mxCopyReal8ToPtr( cylTile(i)%Mrel, mxGetPr( pvalue(i,24) ), sx )
+          call mxSetField( plhs, i, fieldnames(24), pvalue(i,24) )
+          
           
       enddo
       
@@ -334,7 +348,7 @@ implicit none
     !::Returns an array with the names of the fields expected in the tile struct
     subroutine getTileFieldnames( fieldnames, nfields)
     integer,intent(out) :: nfields
-    integer,parameter :: nf=23
+    integer,parameter :: nf=24
     character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -363,6 +377,7 @@ implicit none
         fieldnames(21) = 'color'
         fieldnames(22) = 'useSymm'
         fieldnames(23) = 'symmOps'
+        fieldnames(24) = 'Mrel'
         
     
         
@@ -401,6 +416,7 @@ implicit none
         allocate( stateFunction(i)%T(stateFunction(i)%nT) )
         allocate( stateFunction(i)%H(stateFunction(i)%nH) )
         allocate( stateFunction(i)%M(stateFunction(i)%nT,stateFunction(i)%nH) )
+        allocate( stateFunction(i)%y2a(stateFunction(i)%nH) )
         
         sx = stateFunction(i)%nT
         call mxCopyPtrToReal8(mxGetPr(TPtr), stateFunction(i)%T, sx )
@@ -410,6 +426,9 @@ implicit none
         sx = stateFunction(i)%nT*stateFunction(i)%nH
         call mxCopyPtrToReal8(mxGetPr(MPtr), stateFunction(i)%M, sx )
         
+        !! make the spline derivatives for later interpolation
+        !call splie2( sngl(stateFunction(i)%T), sngl(stateFunction(i)%H), sngl(stateFunction(i)%M), sngl(stateFunction(i)%nT), sngl(stateFunction(i)%nH), sngl(stateFunction(i)%y2a) )
+    !    call spline( stateFunction(i)%H, stateFunction(i)%M(1,:), 1e30, 1e30, stateFunction(i)%y2a, stateFunction(i)%nH )
         
     enddo
     

@@ -231,7 +231,7 @@ module TileCylPieceTensor
             val2 = -(int_sin_dDdy_dz_dtheta_fct( theta2, z2, r2, x ) - int_sin_dDdy_dz_dtheta_fct( theta1, z2, r2, x )  - ( int_sin_dDdy_dz_dtheta_fct( theta2, z1, r2, x ) - int_sin_dDdy_dz_dtheta_fct( theta1, z1, r2, x ) ) )
         endif
         
-    end
+    end subroutine
     
     function int_sin_dDdy_dz_dtheta_fct( theta, z, rs, x )
     real :: int_sin_dDdy_dz_dtheta_fct
@@ -245,7 +245,7 @@ module TileCylPieceTensor
     int_sin_dDdy_dz_dtheta_fct = -1./2.*z  / ( x**2*sqrt((rs+x)**2+z**2) ) * ( ( rs - x )**2 * elPi + ( ( rs + x )**2 + z**2 ) * elE -2 * ( rs**2 + x**2 +1./2.*z**2 ) * elF )
 
     return
-    end
+    end function
     
         !!Returns the definite integral of rs * int(int(cos(theta)*dDdy *
         !!dz*dtheta) from z1 to z2 and theta1 to theta2 with respect to the point
@@ -260,7 +260,7 @@ module TileCylPieceTensor
             val1 = int_r_cos_dDdy_dz_dtheta_fct( theta2, z2, r1, x ) - int_r_cos_dDdy_dz_dtheta_fct( theta1, z2, r1, x ) - ( int_r_cos_dDdy_dz_dtheta_fct( theta2, z1, r1, x ) - int_r_cos_dDdy_dz_dtheta_fct( theta1, z1, r1, x ) )
             
             val2 = int_r_cos_dDdy_dz_dtheta_fct( theta2, z2, r2, x ) - int_r_cos_dDdy_dz_dtheta_fct( theta1, z2, r2, x ) - ( int_r_cos_dDdy_dz_dtheta_fct( theta2, z1, r2, x ) - int_r_cos_dDdy_dz_dtheta_fct( theta1, z1, r2, x ) )            
-        end
+        end subroutine 
         
         function int_r_cos_dDdy_dz_dtheta_fct( theta, z, rs, x )
             real :: int_r_cos_dDdy_dz_dtheta_fct
@@ -359,7 +359,7 @@ module TileCylPieceTensor
         
         call qags_x ( f_ptr, dat, dat%theta1, dat%theta2, dat%epsabs, dat%epsrel, val2, dat%abserr_x, dat%neval_x, dat%ier_x )
 
-        end
+        end subroutine
         
         function int_cos_dDdz_dz_dtheta_fct_int( theta, dat )
             real :: int_cos_dDdz_dz_dtheta_fct_int
@@ -429,7 +429,7 @@ module TileCylPieceTensor
             call qags_x ( f_ptr, dat, dat%z1, dat%z2, dat%epsabs, dat%epsrel, val2, dat%abserr_x, dat%neval_x, dat%ier_x )
             
             
-        end
+        end subroutine
         
         function int_dDdy_dr_dz_fct_int( z, dat )
         real :: int_dDdy_dr_dz_fct_int
@@ -514,7 +514,7 @@ module TileCylPieceTensor
             val1 = int_sin_dDdz_dz_dtheta_fct( theta2, z2, r1, x ) - int_sin_dDdz_dz_dtheta_fct( theta1, z2, r1, x ) - ( int_sin_dDdz_dz_dtheta_fct(theta2, z1, r1, x) - int_sin_dDdz_dz_dtheta_fct(theta1, z1, r1, x) )
             
             val2 = int_sin_dDdz_dz_dtheta_fct( theta2, z2, r2, x ) - int_sin_dDdz_dz_dtheta_fct( theta1, z2, r2, x ) - ( int_sin_dDdz_dz_dtheta_fct(theta2, z1, r2, x) - int_sin_dDdz_dz_dtheta_fct(theta1, z1, r2, x) )
-        end
+        end subroutine
         
         function int_sin_dDdz_dz_dtheta_fct( theta, z, rs, x )
         real :: int_sin_dDdz_dz_dtheta_fct
@@ -536,7 +536,7 @@ module TileCylPieceTensor
         z2 = dat%z2
     
         x = dat%x
-        end
+        end subroutine
     
 end module TileCylPieceTensor
     

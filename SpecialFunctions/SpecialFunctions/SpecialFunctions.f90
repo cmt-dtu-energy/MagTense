@@ -110,7 +110,7 @@ module SPECIALFUNCTIONS
   end if
 
   return
-end
+end subroutine
 subroutine elit3 ( phi_, hk, c, el3 )
 
 !*****************************************************************************80
@@ -213,7 +213,7 @@ subroutine elit3 ( phi_, hk, c, el3 )
   el3 = c1 * el3
 
   return
-end
+end subroutine
 
       FUNCTION ellf(phi,ak)
       REAL ellf,ak,phi
@@ -224,7 +224,7 @@ end
       s=sin(phi)
       ellf=s*rf(cos(phi)**2,(1.-s**2*ak),1.)
       return
-      END
+      END function
 
 
       FUNCTION elle(phi,ak)
@@ -237,7 +237,7 @@ end
       q=(1.-s**2*ak)
       elle=s*(rf(cc,q,1.)-((s**2*ak))*rd(cc,q,1.)/3.)
       return
-      END
+      END function
 
 
       FUNCTION ellpi(phi,en,ak)
@@ -331,7 +331,7 @@ end
       rj=3.*sum+fac*(1.+ed*(-C1+C5*ed-C6*ee)+eb*(C7+delp*(-C8+delp*C4))+delp*ea*(C2-delp*C3)-C2*delp*ec)/(ave*sqrt(ave))
       if (p.le.0.) rj=a*(b*rj+3.*(rcx-rf(xt,yt,zt)))
       return
-      END
+      END function
 
       FUNCTION rc(x,y)
       REAL rc,x,y,ERRTOL,TINY,SQRTNY,BIG,TNBG,COMP1,COMP2,THIRD,C1,C2,C3,C4
@@ -356,7 +356,7 @@ end
       if(abs(s).gt.ERRTOL)goto 1
       rc=w*(1.+s*s*(C1+s*(C2+s*(C3+s*C4))))/sqrt(ave)
       return
-      END
+      END function
       
       FUNCTION rd(x,y,z)
       REAL rd,x,y,z,ERRTOL,TINY,BIG,C1,C2,C3,C4,C5,C6
@@ -390,7 +390,7 @@ end
       ee=ed+ec+ec
       rd=3.*sum+fac*(1.+ed*(-C1+C5*ed-C6*delz*ee)+delz*(C2*ee+delz*(-C3*ec+delz*C4*ea)))/(ave*sqrt(ave))
       return
-      END
+      END function
 
 
 end module
