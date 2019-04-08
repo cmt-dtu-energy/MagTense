@@ -429,8 +429,7 @@
                 !! do the calculation
                 call N_tensor( tile, diffPos, N )
                     
-                !! Change the sign of N according to the mirror symmetry (or anti-symmetry)
-                !! Note that this is an element-by-element multiplication and not a matrix multiplication
+                !! Change the sign of N according to the mirror symmetry (or anti-symmetry)                
                 N = matmul( symm_op_H(j,:,:), matmul( N, symm_op_M(j,:,:) ) )
                 !! remember to add the solution as we are exploting 8-fold symmetry
                 N_tmp(i,:,:) = N + N_tmp(i,:,:)
