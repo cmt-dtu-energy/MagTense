@@ -1,0 +1,103 @@
+\documentclass[]{article}
+
+\usepackage[latin1]{inputenc}
+\usepackage[english]{babel} 
+\usepackage[dvips]{graphicx} 
+\usepackage{amsmath} 
+\usepackage{geometry}
+\usepackage{amsfonts}
+\usepackage{amssymb} 
+\usepackage{mathrsfs}
+%\usepackage{unicode-math}
+\usepackage[final]{pdfpages}
+\usepackage{sidecap}
+%\usepackage{subfigure}
+\usepackage{hyperref}
+\usepackage[makeroom]{cancel}
+\usepackage{subfig}
+
+
+\newcommand{\p}{\partial}
+\newcommand{\nb}{\bs{\nabla}}
+\newcommand{\bt}[1]{\textbf{#1}}
+\newcommand{\tx}[1]{\text{#1}}
+\newcommand{\mt}[1]{\mathrm{#1}}
+\newcommand{\bs}[1]{\boldsymbol{#1}}
+\newcommand{\mc}[1]{\mathcal{#1}}
+\newcommand{\e}[1]{\hat{\bs{e}}_{#1}}
+\newcommand{\Eq}[1]{\begin{equation}#1\end{equation}}
+\newcommand{\HalfFig}[1]{\includegraphics[width=65mm]{#1}}
+\newcommand{\FullFig}[1]{\includegraphics[width=150mm]{#1}}
+\bibliographystyle{plain}
+\definecolor{linkcol}{rgb}{0,0,1}
+\definecolor{citecol}{rgb}{0,0,1}
+\newcommand{\RED}[1]{\textcolor{red}{#1}}
+\newcommand{\BLUE}[1]{\textcolor{blue}{#1}}
+% Change this to change the informations included in the pdf file
+% See hyperref documentation for information on those parameters
+%\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=blue,
+}
+
+\begin{document}
+\section*{Differential operators on polyhedral unstructured meshes}
+\subsection*{Goal}
+Let us consider a scalar function $\phi:\mathbb{R}^3 \rightarrow \mathbb{R}$, and a mesh composed by $N$ polyhedral cells $\{c_i\}_{1,\dots,N}$. We assume to know the value of $\phi$ on each cell. We denote by $\phi_i$ the value of $\phi$ on the $i^{\text{\scriptsize th}}$ cell.  Similarly, we denote by $(\partial_x \phi)_i$ the value of the $x$ derivative of $\phi$  on the $i^{\text{\scriptsize th}}$ cell. The goal is to construct a matrix $D^{(x)}$ which calculates the $x$ derivative:
+\Eq{(\partial_x \phi)_i = \sum_j D^{(x)}_{ij} \phi_j}
+and similarly for the $y$ and $z$ derivatives.
+\subsection*{Concept}
+The method is based on the Green-Gauss theorem (see Sec.~III.A of Ref.~\cite{Sozer2014}). The average gradient of $\phi$ over one cell is:
+\Eq{(\overline{ \bs{\nabla}\phi})_i  =\frac{1}{V_i} \int_{c_i} dV  \bs{\nabla}\phi = \frac{1}{V_i}  \oint_{\partial c_i} dA\, \phi \, \hat{\bs{n}}}
+where $V_i$ denotes the volume of a cell, $\partial c_i$ the external surface, and $ \hat{\bs{n}}$ the unit vector normal to the surface at a given point. %The $x$, $y$, and $z$ derivative are obtained from the gradient by 
+For a polyhedral cell we have:
+ \Eq{(\overline{ \bs{\nabla}\phi})_i  \rightarrow  \frac{1}{V_i} \sum_f  \overline{\phi}_f  \hat{\bs{n}}_f A_f\label{eq:TheGradient1}}
+where the index $f$ runs over the external faces of the $i^{\text{\scriptsize th}}$ cell, $ \hat{\bs{n}}_f$ denotes the  unit vector normal to the  $f^{\text{\scriptsize th}}$ face, $A_f$ its area, and $\overline{\phi}_f $ is the average value of $\phi$ over the face. It is thus necessary to evaluate the face average $\overline{\phi}_f $. As pointed out in  Ref.~\cite{Sozer2014}, several alternative methods exist, the simplest being averaging the two values assumed by $\phi$ over the the two cells $i$ and $i'$ that share the face $f$ (see Sec.~III.A.1 of Ref.~\cite{Sozer2014}).
+\subsection*{Implementation}
+%Let us not consider the boundaries for now. This assumption means that each face is shared by exactly two cells.
+The set of all the normal vectors to the faces is denoted by:
+\Eq{\{ \hat{\bs{n}}_f\}  }
+We introduce the matrix $B$ having number of rows equal to the total number of faces, and number of columns equal to the total number of cells. The entry $B_{f j}$ is equal to $+1$ if the face $f$ belongs to the cell $j$ and the normal is direct outwards, is equal to  $-1$ if the face $f$ belongs to the cell $j$ and the normal is direct inwards,  and is equal to $0$ otherwise (i.e. if the face $f$ does not belong to the cell $j$).
+By letting the index $f$ run over \emph{all} the faces (instead of only those belonging to the $i^{\text{\scriptsize th}}$ cell), we can modify Eq.~\ref{eq:TheGradient1}:
+ \Eq{(\overline{ \bs{\nabla}\phi})_i =  \frac{1}{V_i} \sum_f B_{fi}  \overline{\phi}_f  \hat{\bs{n}}_f A_f \label{eq:TheGradient2}}
+As mentioned, we can calculate  $\overline{\phi}_f $ by averaging the value of $\phi$ over the two cells adjacent to the face $f$:
+\Eq{ \overline{\phi}_f  = \frac{1}{\sum_h |B_{fh}|}\sum_j |B_{fj}| \phi_j \label{eq:FaceAvrg}}
+The quantity $\sum_h |B_{fh}|$ corresponds to the number of cells sharing the face $f$, (i.e. $2$ is the face is shared between two cells, and $1$ if the face is on the boundary).
+Plugging Eq.~\ref{eq:FaceAvrg} into Eq.~\ref{eq:TheGradient2} we get:
+ \Eq{(\overline{ \bs{\nabla}\phi})_i =  \frac{1}{V_i} \sum_f B_{fi} \hat{\bs{n}}_f A_f  \frac{1}{\sum_h |B_{fh}|}\sum_j |B_{fj}| \phi_j  = \sum_j \bs{D}_{ij}\phi_j }
+with
+ \Eq{  \bs{D}_{ij}  =  \frac{1}{V_i} \sum_f B_{fi} \hat{\bs{n}}_f A_f  \frac{1}{\sum_h |B_{fh}|}| B_{fj} |}
+The matrix $D^{(x)}$ is obtained from $ \bs{D}$ by taking the scalar product with the unit vector $\hat{\bs{e}}_x$, and similarly for the $y$ and $z$ components of the gradient.
+
+\begin{thebibliography}{19}
+
+\expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
+\expandafter\ifx\csname bibnamefont\endcsname\relax
+  \def\bibnamefont#1{#1}\fi
+\expandafter\ifx\csname bibfnamefont\endcsname\relax
+  \def\bibfnamefont#1{#1}\fi
+\expandafter\ifx\csname citenamefont\endcsname\relax
+  \def\citenamefont#1{#1}\fi
+\expandafter\ifx\csname url\endcsname\relax
+  \def\url#1{\texttt{#1}}\fi
+\expandafter\ifx\csname urlprefix\endcsname\relax\def\urlprefix{URL }\fi
+\providecommand{\bibinfo}[2]{#2}
+\providecommand{\eprint}[2][]{\url{#2}}
+
+
+\bibitem{Sozer2014}
+\bibinfo{author}{\bibfnamefont{E. Sozer}},
+\bibinfo{author}{\bibfnamefont{C. Brehm}},
+\bibnamefont{and}
+\bibinfo{author}{\bibfnamefont{C.C. Kiris}},
+\emph{\bibinfo{title}{Gradient Calculation Methods on Arbitrary Polyhedral Unstructured Meshes for Cell-Centered CFD Solvers}},
+\href{http://dx.doi.org/10.2514/6.2014-1440}{
+\bibinfo{journal}{52nd Aerospace Sciences Meeting} 
+(\bibinfo{year}{2014}).}
+
+\end{thebibliography}
+
+\end{document}
