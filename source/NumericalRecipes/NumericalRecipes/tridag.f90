@@ -5,7 +5,7 @@
 	REAL(DP), DIMENSION(:), INTENT(OUT) :: u
 	REAL(DP), DIMENSION(size(b)) :: gam
 	INTEGER(I4B) :: n,j
-	REAL(SP) :: bet
+	REAL(DP) :: bet
 	n=assert_eq((/size(a)+1,size(b),size(c)+1,size(r),size(u)/),'tridag_ser')
 	bet=b(1)
 	if (bet == 0.0) call nrerror('tridag_ser: Error at code stage 1')
@@ -26,13 +26,13 @@
 	USE nrtype; USE nrutil, ONLY : assert_eq,nrerror
 	USE nr, ONLY : tridag_ser
 	IMPLICIT NONE
-	REAL(SP), DIMENSION(:), INTENT(IN) :: a,b,c,r
-	REAL(SP), DIMENSION(:), INTENT(OUT) :: u
+	REAL(DP), DIMENSION(:), INTENT(IN) :: a,b,c,r
+	REAL(DP), DIMENSION(:), INTENT(OUT) :: u
 	INTEGER(I4B), PARAMETER :: NPAR_TRIDAG=4
 	INTEGER(I4B) :: n,n2,nm,nx
-	REAL(SP), DIMENSION(size(b)/2) :: y,q,piva
-	REAL(SP), DIMENSION(size(b)/2-1) :: x,z
-	REAL(SP), DIMENSION(size(a)/2) :: pivc
+	REAL(DP), DIMENSION(size(b)/2) :: y,q,piva
+	REAL(DP), DIMENSION(size(b)/2-1) :: x,z
+	REAL(DP), DIMENSION(size(a)/2) :: pivc
 	n=assert_eq((/size(a)+1,size(b),size(c)+1,size(r),size(u)/),'tridag_par')
 	if (n < NPAR_TRIDAG) then
 		call tridag_ser(a,b,c,r,u)
