@@ -44,12 +44,13 @@
 		<Filter Name="Header Files" Filter="fi;fd"/>
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
-		<File RelativePath="..\..\..\..\numerical_recipes\nr_full304\legacy\nr2\f90_210\recipes\locate.f90"/>
-		<File RelativePath="..\..\..\..\numerical_recipes\nr_full304\legacy\nr2\f90_210\recipes\nr.f90"/>
-		<File RelativePath="..\..\..\..\numerical_recipes\nr_full304\legacy\nr2\f90_210\recipes\nrtype.f90"/>
-		<File RelativePath="..\..\..\..\numerical_recipes\nr_full304\legacy\nr2\f90_210\recipes\nrutil.f90"/>
-		<File RelativePath="..\..\..\..\numerical_recipes\nr_full304\legacy\nr2\f90_210\recipes\polint.f90"/>
-		<File RelativePath="..\..\..\..\numerical_recipes\nr_full304\legacy\nr2\f90_210\recipes\spline.f90"/>
-		<File RelativePath="..\..\..\..\numerical_recipes\nr_full304\legacy\nr2\f90_210\recipes\splint.f90"/>
-		<File RelativePath="..\..\..\..\numerical_recipes\nr_full304\legacy\nr2\f90_210\recipes\tridag.f90"/></Filter></Files>
+		<File RelativePath=".\locate.f90"/>
+		<File RelativePath=".\nr.f90"/>
+		<File RelativePath=".\nrtype.f90"/>
+		<File RelativePath=".\nrutil.f90"/>
+		<File RelativePath=".\polint.f90"/>
+		<File RelativePath=".\spline.f90"/>
+		<File RelativePath=".\splint.f90"/>
+		<File RelativePath=".\trapzd.f90"/>
+		<File RelativePath=".\tridag.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>

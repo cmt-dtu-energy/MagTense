@@ -1509,8 +1509,8 @@ MODULE nr
 	INTERFACE
 		FUNCTION locate(xx,x)
 		USE nrtype
-		REAL(SP), DIMENSION(:), INTENT(IN) :: xx
-		REAL(SP), INTENT(IN) :: x
+		REAL(DP), DIMENSION(:), INTENT(IN) :: xx
+		REAL(DP), INTENT(IN) :: x
 		INTEGER(I4B) :: locate
 		END FUNCTION locate
 	END INTERFACE
@@ -3008,15 +3008,15 @@ MODULE nr
 	INTERFACE tridag
 		RECURSIVE SUBROUTINE tridag_par(a,b,c,r,u)
 		USE nrtype
-		REAL(SP), DIMENSION(:), INTENT(IN) :: a,b,c,r
-		REAL(SP), DIMENSION(:), INTENT(OUT) :: u
+		REAL(DP), DIMENSION(:), INTENT(IN) :: a,b,c,r
+		REAL(DP), DIMENSION(:), INTENT(OUT) :: u
 		END SUBROUTINE tridag_par
 	END INTERFACE
 	INTERFACE
 		SUBROUTINE tridag_ser(a,b,c,r,u)
 		USE nrtype
-		REAL(SP), DIMENSION(:), INTENT(IN) :: a,b,c,r
-		REAL(SP), DIMENSION(:), INTENT(OUT) :: u
+		REAL(DP), DIMENSION(:), INTENT(IN) :: a,b,c,r
+		REAL(DP), DIMENSION(:), INTENT(OUT) :: u
 		END SUBROUTINE tridag_ser
 	END INTERFACE
 	INTERFACE

@@ -32,7 +32,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../../TileDemagTensor/TileDemagTensor/TileDemagTensor/x64/release/;../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/x64/Release/;../../../SpecialFunctions/SpecialFunctions/x64/Release/;c:\Program Files\MATLAB\R2017a\extern\include\;../../../NumericalRecipes/NumericalRecipes/x64/Release/" FixedFormLineLength="fixedLength132" RealKIND="realKIND8" RuntimeLibrary="rtMultiThreadedDLL"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../../TileDemagTensor/TileDemagTensor/TileDemagTensor/x64/release/;../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/x64/Release/;../../../SpecialFunctions/SpecialFunctions/x64/Release/;c:\Program Files\MATLAB\R2018b\extern\include\;../../../NumericalRecipes/NumericalRecipes/x64/Release/" FixedFormLineLength="fixedLength132" RealKIND="realKIND8" RuntimeLibrary="rtMultiThreadedDLL"/>
 				<Tool Name="VFLibrarianTool"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
