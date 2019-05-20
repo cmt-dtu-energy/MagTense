@@ -300,7 +300,7 @@ subroutine qag ( f_ptr, dat, a, b, epsabs, epsrel, key, result, abserr, neval, i
   real ( kind = 8 ) result
   real ( kind = 8 ) rlist(limit)
   class(dataCollectionBase), target :: dat
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr
 
   call qage ( f_ptr, dat, a, b, epsabs, epsrel, key, limit, result, abserr, neval, &
     ier, alist, blist, rlist, elist, iord, last )
@@ -445,7 +445,7 @@ subroutine qage ( f_ptr, dat, a, b, epsabs, epsrel, key, limit, result, abserr, 
   real ( kind = 8 ) erro12
   real ( kind = 8 ) errsum
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) iord(limit)
   integer ( kind = 8 ) iroff1
@@ -841,7 +841,7 @@ subroutine qagi ( f_ptr, dat, bound, inf, epsabs, epsrel, result, abserr, neval,
   real ( kind = 8 ) ertest
   logical extrap
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) ierro
@@ -1410,7 +1410,7 @@ subroutine qagp ( f_ptr, dat, a, b, npts2, points, epsabs, epsrel, result, abser
   real ( kind = 8 ) ertest
   logical extrap
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) i
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
@@ -2065,7 +2065,7 @@ subroutine qags ( f_ptr, dat, a, b, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) ertest
   logical extrap
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) ierro
@@ -2596,7 +2596,7 @@ subroutine qags_x ( f_ptr, dat, a, b, epsabs, epsrel, result, abserr, neval, ier
   real ( kind = 8 ) ertest
   logical extrap
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) ierro
@@ -3130,7 +3130,7 @@ subroutine qags_x_vec ( f_ptr, dat, a, b, epsabs, epsrel, result, abserr, neval,
   real ( kind = 8 ) ertest
   logical extrap
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat_vec), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat_vec), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) ierro
@@ -3665,7 +3665,7 @@ subroutine qags_y ( f_ptr, dat, a, b, epsabs, epsrel, result, abserr, neval, ier
   real ( kind = 8 ) ertest
   logical extrap
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat),intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat),intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) ierro
@@ -4197,7 +4197,7 @@ subroutine qags_y_vec ( f_ptr, dat, a, b, epsabs, epsrel, result, abserr, neval,
   real ( kind = 8 ) ertest
   logical extrap
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat_vec), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat_vec), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) ierro
@@ -4667,7 +4667,7 @@ implicit none
   real ( kind = 8 ) epsabs
   real ( kind = 8 ) epsrel
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) iord(limit)
   integer ( kind = 8 ) last
@@ -4841,7 +4841,7 @@ subroutine qawce ( f_ptr, dat, a, b, c, epsabs, epsrel, limit, result, abserr, n
   real ( kind = 8 ) erro12
   real ( kind = 8 ) errsum
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) iord(limit)
   integer ( kind = 8 ) iroff1
@@ -5150,7 +5150,7 @@ subroutine qawf ( f_ptr, dat, a, omega, integr, epsabs, result, abserr, neval, i
   real ( kind = 8 ) epsabs
   real ( kind = 8 ) erlst(limlst)
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) integr
   integer ( kind = 8 ) iord(limit)
@@ -5407,7 +5407,7 @@ subroutine qawfe ( f_ptr, dat, a, omega, integr, epsabs, limlst, limit, maxp1, &
   real ( kind = 8 ) erlst(limlst)
   real ( kind = 8 ) errsum
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fact
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) ierlst(limlst)
@@ -5758,7 +5758,7 @@ subroutine qawo ( f_ptr, dat, a, b, omega, integr, epsabs, epsrel, result, abser
   real ( kind = 8 ) epsabs
   real ( kind = 8 ) epsrel
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) integr
   integer ( kind = 8 ) iord(limit)
@@ -5888,7 +5888,7 @@ subroutine qaws ( f_ptr, dat, a, b, alfa, beta, integr, epsabs, epsrel, result, 
   real ( kind = 8 ) epsabs
   real ( kind = 8 ) epsrel
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) integr
   integer ( kind = 8 ) iord(limit)
@@ -6069,7 +6069,7 @@ subroutine qawse ( f_ptr, dat, a, b, alfa, beta, integr, epsabs, epsrel, limit, 
   real ( kind = 8 ) error2
   real ( kind = 8 ) errsum
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) ier
   integer ( kind = 8 ) integr
   integer ( kind = 8 ) iord(limit)
@@ -6428,7 +6428,7 @@ subroutine qc25c ( f_ptr, dat, a, b, c, result, abserr, krul, neval )
   real ( kind = 8 ) cheb12(13)
   real ( kind = 8 ) cheb24(25)
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fval(25)
   real ( kind = 8 ) hlgth
   integer ( kind = 8 ) i
@@ -6687,7 +6687,7 @@ subroutine qc25o ( f_ptr, dat, a, b, omega, integr, nrmom, maxp1, ksave, result,
   real ( kind = 8 ) estc
   real ( kind = 8 ) ests
 !  real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fval(25)
   real ( kind = 8 ) hlgth
   integer ( kind = 8 ) i
@@ -7083,7 +7083,7 @@ subroutine qc25s ( f_ptr, dat, a, b, bl, br, alfa, beta, ri, rj, rg, rh, result,
   real ( kind = 8 ) cheb24(25)
   real ( kind = 8 ) dc
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   real ( kind = 8 ) factor
   real ( kind = 8 ) fix
   real ( kind = 8 ) fval(25)
@@ -8018,7 +8018,7 @@ subroutine qfour ( f_ptr, dat, a, b, omega, integr, epsabs, epsrel, limit, icall
   logical extall
   logical extrap
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   integer ( kind = 8 ) icall
   integer ( kind = 8 ) id
   integer ( kind = 8 ) ier
@@ -8511,7 +8511,7 @@ subroutine qk15 ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -8689,7 +8689,7 @@ subroutine qk15i ( f_ptr, dat, boun, inf, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) centr
   real ( kind = 8 ) dinf
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -8889,7 +8889,7 @@ subroutine qk15w ( f_ptr, dat, w, p1, p2, p3, p4, kp, a, b, result, abserr, resa
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -9066,7 +9066,7 @@ subroutine qk21_x ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat),intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat),intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -9257,7 +9257,7 @@ subroutine qk21_x_vec ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat_vec),intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat_vec),intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -9457,7 +9457,7 @@ subroutine qk21_y ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat),intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat),intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -9648,7 +9648,7 @@ subroutine qk21_y_vec ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat_vec),intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat_vec),intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -9849,7 +9849,7 @@ subroutine qk31 ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -10051,7 +10051,7 @@ subroutine qk41 ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -10249,7 +10249,7 @@ subroutine qk51 ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -10457,7 +10457,7 @@ subroutine qk61 ( f_ptr, dat, a, b, result, abserr, resabs, resasc )
   real ( kind = 8 ) centr
   real ( kind = 8 ) dhlgth
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fc
   real ( kind = 8 ) fsum
   real ( kind = 8 ) fval1
@@ -10856,7 +10856,7 @@ subroutine qng ( f_ptr, dat, a, b, epsabs, epsrel, result, abserr, neval, ier )
   real ( kind = 8 ) epsabs
   real ( kind = 8 ) epsrel
   !real ( kind = 8 ), external :: f
-  procedure (f_int_dat), intent(in), pointer :: f_ptr => null ()
+  procedure (f_int_dat), intent(in), pointer :: f_ptr 
   real ( kind = 8 ) fcentr
   real ( kind = 8 ) fval
   real ( kind = 8 ) fval1
