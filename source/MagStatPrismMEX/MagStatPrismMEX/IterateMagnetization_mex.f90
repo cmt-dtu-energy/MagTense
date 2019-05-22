@@ -27,7 +27,7 @@
     
 !     Pointers to input/output mxArrays:      
       type(MagTile),allocatable,dimension(:) :: cylTile  
-      type(MagStatStateFunction),allocatable,dimension(:) :: stateFunctions
+      type(MagStateFunction),allocatable,dimension(:) :: stateFunctions
       
       integer*4 :: n_tiles,n_statefunctions,max_ite
       real*8 :: err_max,T,resumeIteration

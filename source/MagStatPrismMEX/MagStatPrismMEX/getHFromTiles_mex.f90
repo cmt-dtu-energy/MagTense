@@ -10,7 +10,7 @@
     !::plhs(1) is a [n,3] double matrix containing the output magnetic field
       subroutine mexFunction(nlhs, plhs, nrhs, prhs)
       use MagTileIO
-      use MagStat2GetSolution
+      use DemagFieldGetSolution
       implicit none
       
 !     mexFunction arguments:

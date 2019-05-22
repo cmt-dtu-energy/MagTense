@@ -1,7 +1,7 @@
 module MagForceMaxwellStressTensor
     use IntegrationDataTypes
     use NumInt
-    use MagStat2GetSolution
+    use DemagFieldGetSolution
     use MagForceIO
     implicit none
     
