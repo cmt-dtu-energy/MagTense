@@ -72,18 +72,18 @@ with
  \Eq{  \bs{D}_{ij}  =  \frac{1}{V_i} \sum_f B_{fi} \hat{\bs{n}}_f A_f  \frac{1}{\sum_h |B_{fh}|}| B_{fj} |}
 The matrix $D^{(x)}$ is obtained from $ \bs{D}$ by taking the scalar product with the unit vector $\hat{\bs{e}}_x$, and similarly for the $y$ and $z$ components of the gradient.
 \subsection*{Least Squares Interpolation}
-It can be shown (Sec.~IV.B of Ref.~\cite{Sozer2014}) that the na{\"\i}ve averaging approach discussed above carries a zero'th order error term, that is, though the estimated face value $\overline{\phi}_f $ converges as the cell size becomes infinitely small, it does not converge to the correct value. A slightly more sophisticated method follows from Taylor expanding the value $\phi_i$ at the $i^{th}$ cell around the center of the face,
+It can be shown (Sec.~IV.B of Ref.~\cite{Sozer2014}) that the na{\"\i}ve averaging approach discussed above carries a zero'th order error term for non-uniform cell spacing, that is, though the estimated face value $\overline{\phi}_f $ converges as the cell size becomes infinitely small, it does not converge to the correct value. A slightly more sophisticated method follows from Taylor expanding the value $\phi_i$ at the $i^{th}$ cell around the center of the face,
 \Eq{\phi_i = \phi_f + \Delta x_i\phi_{f,x} + \Delta y_i\phi_{f,y} + \Delta z_i\phi_{f,z} + \dots,}
 where $\dots$ refers to higher order terms. If we introduce the functional
 \Eq{F(w_i,\phi_i,\phi_{f,x},\phi_{f,y},\phi_{f,z},\dots) = \sum_{i=1}^N w_i\left[\Delta\phi_i + \Delta x_i\phi_{f,x} + \Delta y_i\phi_{f,y} + \Delta z_i\phi_{f,z} + \dots\right]^2,}
-where $w_i$ are weights for each point $i$ and $\Delta\phi_i = \phi_f - \phi_i$, then all of the following is standard procedure for the least squares method. Minimizing $F$ yields the equations
-\Eq{\frac{\p f}{\p \phi_f} =  \sum_{i=1}^N 2 w_i\left[\Delta\phi_i + \Delta x_i\phi_{f,x} + \Delta y_i\phi_{f,y} + \Delta z_i\phi_{f,z} + \dots\right] = 0}
-\Eq{\frac{\p f}{\p \phi_{f,x}} =  \sum_{i=1}^N 2 w_i\Delta x\left[\Delta\phi_i + \Delta x_i\phi_{f,x} + \Delta y_i\phi_{f,y} + \Delta z_i\phi_{f,z} + \dots\right] = 0}
-\Eq{\frac{\p f}{\p \phi_{f,y}} =  \sum_{i=1}^N 2 w_i\Delta y\left[\Delta\phi_i + \Delta x_i\phi_{f,x} + \Delta y_i\phi_{f,y} + \Delta z_i\phi_{f,z} + \dots\right] = 0}
-\Eq{\frac{\p f}{\p \phi_{f,z}} =  \sum_{i=1}^N 2 w_i\Delta z\left[\Delta\phi_i + \Delta x_i\phi_{f,x} + \Delta y_i\phi_{f,y} + \Delta z_i\phi_{f,z} + \dots\right] = 0}
+where $w_i$ are user-defined weights for each point $i$ and $\Delta\phi_i = \phi_f - \phi_i$, then all of the following is standard procedure for the least squares method. Minimizing $F$ yields the equations
+\Eq{\frac{\p F}{\p \phi_f} =  \sum_{i=1}^N 2 w_i\left[\Delta\phi_i + \Delta x_i\phi_{f,x} + \Delta y_i\phi_{f,y} + \Delta z_i\phi_{f,z} + \dots\right] = 0}
+\Eq{\frac{\p F}{\p \phi_{f,x}} =  \sum_{i=1}^N 2 w_i\Delta x\left[\Delta\phi_i + \Delta x_i\phi_{f,x} + \Delta y_i\phi_{f,y} + \Delta z_i\phi_{f,z} + \dots\right] = 0}
+\Eq{\frac{\p F}{\p \phi_{f,y}} =  \sum_{i=1}^N 2 w_i\Delta y\left[\Delta\phi_i + \Delta x_i\phi_{f,x} + \Delta y_i\phi_{f,y} + \Delta z_i\phi_{f,z} + \dots\right] = 0}
+\Eq{\frac{\p F}{\p \phi_{f,z}} =  \sum_{i=1}^N 2 w_i\Delta z\left[\Delta\phi_i + \Delta x_i\phi_{f,x} + \Delta y_i\phi_{f,y} + \Delta z_i\phi_{f,z} + \dots\right] = 0}
 which allow us to write up a linear system of equations,
-\Eq{G\Phi_f = H\phi \rightarrow \Phi_f = G^{-1}H\phi,}
-where $\Phi_f = [\phi_f,\phi_{f,x},\phi{f,y},\phi{f,z}]^T$, $\phi = [\phi_1,\phi_2,\dots,\phi_i,\dots,\phi_N]$,
+\Eq{G\Phi_f = H\phi \rightarrow \Phi_f = G^{-1}H\phi,\label{eq:FaceLeastSquares}}
+where $\Phi_f = [\phi_f,\phi_{f,x},\phi_{f,y},\phi_{f,z}]^T$, $\phi = [\phi_1,\phi_2,\dots,\phi_i,\dots,\phi_N]$,
 \Eq{G =
 \begin{bmatrix}
     \sum w_i       & \sum w_i \Delta x_i & \sum w_i \Delta y_i & \sum w_i \Delta z_i \\
@@ -100,7 +100,18 @@ where $\Phi_f = [\phi_f,\phi_{f,x},\phi{f,y},\phi{f,z}]^T$, $\phi = [\phi_1,\phi
 \end{bmatrix}.}
 Since we are interested in $\phi_f$, only the first row of $G^{-1}H$ is of interest, saving computational effort and leaving the final estimate
 \Eq{\overline{\phi}_f  = \sum_{i = 1}^N\sum_{k = 1}^o G^{-1}_{1,k} H_{k,i} \phi_i,}
-with $o$ given by the desired accuracy of the Taylor approximation (here $o=4$ for the three-dimensional $1^{st}$ order expansion). The weights $w_i$ can be chosen freely, usually as a function of geometrical parameters such as inverse distance or cell volumes (Ref.~\cite{Grande2016}). In Ref.~\cite{Sozer2014}, this method is tested for different 2D meshes with weights $w_i = 1/d_{if}$ as the inverse distance between the face center and the center of cell $i$. Results compare favorably with other unstructured mesh gradient methods and are at least $1^{st}$ accurate excluding, possibly, numerical rounding errors. 
+with $o$ given by the desired accuracy of the Taylor approximation (here $o=4$ for the three-dimensional $1^{st}$ order expansion). The weights $w_i$ can be chosen freely, usually as a function of geometrical parameters such as inverse distance or cell volumes (Ref.~\cite{Grande2016}). In Ref.~\cite{Sozer2014}, this method is tested for different 2D meshes with weights $w_i = 1/d_{if}$ as the inverse distance between the face center and the center of cell $i$. Results compare favorably with other unstructured mesh gradient methods and are at least $1^{st}$ order accurate excluding, possibly, numerical rounding errors. 
+
+\subsection*{Calculating the Laplacian}
+While the above yields an estimate of the gradient $(\overline{ \bs{\nabla}\phi})_i$ it can easily be extended to an estimated Laplacian using not the Green-Gauss theorem but the divergence theorem:
+\Eq{(\overline{ \bs{\nabla}^2\phi})_i  =\frac{1}{V_i} \int_{c_i} dV  \bs{\nabla}^2\phi = \frac{1}{V_i}  \oint_{\partial c_i} dA\, \bs{\nabla}\phi \cdot\, \hat{\bs{n}},}
+leading to
+\Eq{(\overline{ \bs{\nabla}^2\phi})_i\rightarrow \frac{1}{V_i}\sum_f(\overline{ \bs{\nabla}\phi})_f\cdot\hat{\bs{n}_f}A_f }
+for polyhedral cells. Naturally, this requires an estimate of the gradient at the faces, $(\overline{ \bs{\nabla}\phi})_f$, but returning to the linear system of equations of Eq.~\ref{eq:FaceLeastSquares}, we find
+\Eq{\overline{\phi}_{f,x}  = \sum_{i = 1}^N\sum_{k = 1}^o G^{-1}_{2,k} H_{k,i} \phi_i,\qquad
+       \overline{\phi}_{f,y}  = \sum_{i = 1}^N\sum_{k = 1}^o G^{-1}_{3,k} H_{k,i} \phi_i\quad \mathrm{and}\quad
+       \overline{\phi}_{f,z}  = \sum_{i = 1}^N\sum_{k = 1}^o G^{-1}_{4,k} H_{k,i} \phi_i.}
+It is at present unclear if this method has been tested in the literature. The above can of course be extended to higher order Taylor approximations and alternative weighting functions. Since $G^{-1}$ is only calculated at the beginning of the procedure, it would very inexpensive to have different weightings $w_{x,i}$, $w_{y,i}$ and $w_{z,i}$ for the different components of the gradient, but as a first foray, $1^{st}$  order Taylor approximations with inverse distance weights should do nicely.
 \subsection*{Voronoi diagram automatic strategy}
 .
 \begin{thebibliography}{19}
