@@ -8,7 +8,7 @@
     !::prhs(3) is an integer representing the number of points, n
     !::plhs(1) is a [3,3,n] double array containing the output tensor field
       subroutine mexFunction(nlhs, plhs, nrhs, prhs)
-      use MagStat2GetSolution
+      use DemagFieldGetSolution
       use MagTileIO
       implicit none
       

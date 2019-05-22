@@ -1,7 +1,7 @@
 #include "fintrf.h"  
 module MagForceIO
     use IntegrationDataTypes
-    use MagStat2GetSolution
+    use DemagFieldGetSolution
     implicit none
 
     !::Data model for the integration of the Maxwell stress tensor

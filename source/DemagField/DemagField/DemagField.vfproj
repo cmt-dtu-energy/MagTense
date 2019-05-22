@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VisualStudioProject ProjectType="typeStaticLibrary" ProjectCreator="Intel Fortran" Keyword="Static Library" Version="11.0" ProjectIdGuid="{982041ED-A185-4F5C-9926-AD8E0941B6D0}">
+	<Platforms>
+		<Platform Name="Win32"/>
+		<Platform Name="x64"/></Platforms>
+	<Configurations>
+		<Configuration Name="Debug|Win32" ConfigurationType="typeStaticLibrary">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" AdditionalIncludeDirectories="../../../TileDemagTensor/TileDemagTensor/TileDemagTensor/x64/release/" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
+				<Tool Name="VFLibrarianTool"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/></Configuration>
+		<Configuration Name="Release|Win32" ConfigurationType="typeStaticLibrary">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" AdditionalIncludeDirectories="../../../TileDemagTensor/TileDemagTensor/TileDemagTensor/x64/release/" RealKIND="realKIND8" RuntimeLibrary="rtMultiThreadedDLL"/>
+				<Tool Name="VFLibrarianTool"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/></Configuration>
+		<Configuration Name="Debug|x64" ConfigurationType="typeStaticLibrary">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../../TileDemagTensor/TileDemagTensor/TileDemagTensor/x64/debug/;../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/;c:\Program Files\MATLAB\R2017a\extern\include\" WarnInterfaces="true" RealKIND="realKIND8" FloatingPointExceptionHandling="fpe0" FloatingPointModel="strict" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+				<Tool Name="VFLibrarianTool"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/></Configuration>
+		<Configuration Name="Release|x64" ConfigurationType="typeStaticLibrary">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../TileDemagTensor/TileDemagTensor/x64/release/;../../NumericalIntegration/NumericalIntegration/x64/Release/;../../SpecialFunctions/SpecialFunctions/x64/Release/;../../NumericalRecipes/NumericalRecipes/x64/Release/" FixedFormLineLength="fixedLength132" RealKIND="realKIND8" RuntimeLibrary="rtMultiThreadedDLL"/>
+				<Tool Name="VFLibrarianTool"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/></Configuration></Configurations>
+	<Files>
+		<Filter Name="Header Files" Filter="fi;fd"/>
+		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
+		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
+		<File RelativePath=".\DemagFieldGetSolution.f90">
+			<FileConfiguration Name="Release|x64">
+				<Tool Name="VFFortranCompilerTool" AdditionalIncludeDirectories="../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/;../../../TileDemagTensor/TileDemagTensor/TileDemagTensor/x64/release/" OpenMP="OpenMPParallelCode"/></FileConfiguration></File>
+		<File RelativePath=".\IterateMagnetSolution.f90"/>
+		<File RelativePath=".\MagParameters.f90"/>
+		<File RelativePath=".\MagTileIO.f90"/>
+		<File RelativePath=".\MagUtil.f90"/>
+		<File RelativePath=".\spline.f90"/></Filter></Files>
+	<Globals/></VisualStudioProject>
