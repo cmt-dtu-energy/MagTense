@@ -62,7 +62,6 @@
     
         !::set default error margin if nothing has been specified by the user
         if ( .not. present(err_max) ) err_max = 1e-10
-    
         if ( .not. present(max_ite) ) max_ite = 100
         i_err = 0
     
@@ -134,7 +133,6 @@
             H_old = H   !< Teset H array
             H(:,:) = 0  !< Make sure to reset the H field
         
-        
             !! Get the field at the center at each tile from all other tiles        
             do i=1,n
                 if ( tiles(i)%includeInIteration .ne. 0 ) then
@@ -194,7 +192,6 @@
                         pts = matmul( rotMatInv, pts )  !< We require the point in the global coordinate system.
                         
                         pts = pts + tiles(i)%offset     !< Finally add the offset to translate the circ piece
-                
                             
             
                     case default
@@ -398,6 +395,7 @@
     
         Hnorm = sqrt( H(1)**2 + H(2)**2 + H(3)**2 )
     
+    !!@ As getBilinInterp is only called here, can MagUtil.f90 be deprecated?
        ! call getBilinInterp( stateFunction(tile%stateFunctionIndex)%M, stateFunction(tile%stateFunctionIndex)%T, &
        !                  stateFunction(tile%stateFunctionIndex)%H, stateFunction(tile%stateFunctionIndex)%nT, &
        !                  stateFunction(tile%stateFunctionIndex)%nH, T, Hnorm, Mnorm )   
