@@ -1,4 +1,8 @@
-	FUNCTION locate(xx,x)
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !! Numerical Recipies function
+    !!
+    FUNCTION locate(xx,x)
 	USE nrtype
 	IMPLICIT NONE
 	REAL(DP), DIMENSION(:), INTENT(IN) :: xx
