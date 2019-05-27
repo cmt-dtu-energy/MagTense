@@ -161,66 +161,7 @@
         !H = -1. * H
     
     end subroutine getFieldFromRectangularPrismTile      
-    
-    
-    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    !>
-    !!Function to calcuate H within a cylindrical tile that is rotated, as for CylindricalTiles it is actually the B-field divided by mu0 that is calculated
-    !!
-    subroutine SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_pts)
-        real,dimension(n_pts,3),intent(inout) :: H
-        type(MagTile),dimension(n_tiles),intent(in) :: tiles
-        real,dimension(n_pts,3),intent(in) :: pts
-        integer,intent(in) :: n_tiles,n_pts
-    
-        real,dimension(:),allocatable :: r,theta,z
-        real,dimension(:,:),allocatable :: pts_local
-        real :: rmin,rmax,thetamin,thetamax,zmin,zmax
-        integer :: i
-    
-        allocate( r(n_pts), theta(n_pts), z(n_pts),  pts_local(n_pts,3) )
-              
-        !::loop over each tile
-        do i=1,n_tiles
-            if ( tiles(i)%tileType .eq. tileTypeCylPiece ) then
-            
-                !::Include the offset between the global coordinate system and the tile's coordinate system
-                !::the pts array is always in global coordinates
-                pts_local(:,1) = pts(:,1) - tiles(i)%offset(1)
-                pts_local(:,2) = pts(:,2) - tiles(i)%offset(2)
-                pts_local(:,3) = pts(:,3) - tiles(i)%offset(3)
-                !::Convert from Cartesian to cylindrical coordinates
-                r = sqrt( pts_local(:,1)**2 + pts_local(:,2)**2 )
-                theta = acos( pts_local(:,1) / r )
-                !Correct for being in either the third or foruth quadrants
-                where ( pts_local(:,2) .lt. 0 )
-                    theta = 2 * pi - theta    
-                endwhere
-    
-                z = pts_local(:,3)
-            
-                rmin = tiles(i)%r0 - tiles(i)%dr/2
-                rmax = tiles(i)%r0 + tiles(i)%dr/2
         
-                thetamin = tiles(i)%theta0 - tiles(i)%dtheta/2
-                thetamax = tiles(i)%theta0 + tiles(i)%dtheta/2                   
-            
-                zmin = tiles(i)%z0 - tiles(i)%dz/2
-                zmax = tiles(i)%z0 + tiles(i)%dz/2
-        
-                where( rmin .le. r .AND. r .lt. rmax .AND. zmin .le. z .AND. z .lt. zmax  .AND. thetamin .le. theta .AND. theta .lt. thetamax .OR. &
-                       rmin .le. r .AND. r .lt. rmax .AND. zmin .le. z .AND. z .lt. zmax  .AND. thetamin - 2*pi .le. theta .AND. theta .lt. thetamax - 2*pi .OR. &
-                       rmin .le. r .AND. r .lt. rmax .AND. zmin .le. z .AND. z .lt. zmax  .AND. thetamin + 2*pi .le. theta .AND. theta .lt. thetamax + 2*pi )
-                    H(:,1) = H(:,1) - tiles(i)%M(1)
-                    H(:,2) = H(:,2) - tiles(i)%M(2)
-                    H(:,3) = H(:,3) - tiles(i)%M(3)
-                endwhere
-            endif
-        
-        enddo
-        deallocate(r,theta,z,pts_local)
-    end subroutine SubtractMFromCylindricalTiles
-    
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>
@@ -327,6 +268,65 @@
         deallocate(r,x,phi,pts_local)
     
     end subroutine getFieldFromCylTile
+    
+    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Function to calcuate H within a cylindrical tile that is rotated, as for CylindricalTiles it is actually the B-field divided by mu0 that is calculated
+    !!
+    subroutine SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_pts)
+        real,dimension(n_pts,3),intent(inout) :: H
+        type(MagTile),dimension(n_tiles),intent(in) :: tiles
+        real,dimension(n_pts,3),intent(in) :: pts
+        integer,intent(in) :: n_tiles,n_pts
+    
+        real,dimension(:),allocatable :: r,theta,z
+        real,dimension(:,:),allocatable :: pts_local
+        real :: rmin,rmax,thetamin,thetamax,zmin,zmax
+        integer :: i
+    
+        allocate( r(n_pts), theta(n_pts), z(n_pts),  pts_local(n_pts,3) )
+              
+        !::loop over each tile
+        do i=1,n_tiles
+            if ( tiles(i)%tileType .eq. tileTypeCylPiece ) then
+            
+                !::Include the offset between the global coordinate system and the tile's coordinate system
+                !::the pts array is always in global coordinates
+                pts_local(:,1) = pts(:,1) - tiles(i)%offset(1)
+                pts_local(:,2) = pts(:,2) - tiles(i)%offset(2)
+                pts_local(:,3) = pts(:,3) - tiles(i)%offset(3)
+                !::Convert from Cartesian to cylindrical coordinates
+                r = sqrt( pts_local(:,1)**2 + pts_local(:,2)**2 )
+                theta = acos( pts_local(:,1) / r )
+                !Correct for being in either the third or foruth quadrants
+                where ( pts_local(:,2) .lt. 0 )
+                    theta = 2 * pi - theta    
+                endwhere
+    
+                z = pts_local(:,3)
+            
+                rmin = tiles(i)%r0 - tiles(i)%dr/2
+                rmax = tiles(i)%r0 + tiles(i)%dr/2
+        
+                thetamin = tiles(i)%theta0 - tiles(i)%dtheta/2
+                thetamax = tiles(i)%theta0 + tiles(i)%dtheta/2                   
+            
+                zmin = tiles(i)%z0 - tiles(i)%dz/2
+                zmax = tiles(i)%z0 + tiles(i)%dz/2
+        
+                where( rmin .le. r .AND. r .lt. rmax .AND. zmin .le. z .AND. z .lt. zmax  .AND. thetamin .le. theta .AND. theta .lt. thetamax .OR. &
+                       rmin .le. r .AND. r .lt. rmax .AND. zmin .le. z .AND. z .lt. zmax  .AND. thetamin - 2*pi .le. theta .AND. theta .lt. thetamax - 2*pi .OR. &
+                       rmin .le. r .AND. r .lt. rmax .AND. zmin .le. z .AND. z .lt. zmax  .AND. thetamin + 2*pi .le. theta .AND. theta .lt. thetamax + 2*pi )
+                    H(:,1) = H(:,1) - tiles(i)%M(1)
+                    H(:,2) = H(:,2) - tiles(i)%M(2)
+                    H(:,3) = H(:,3) - tiles(i)%M(3)
+                endwhere
+            endif
+        
+        enddo
+        deallocate(r,theta,z,pts_local)
+    end subroutine SubtractMFromCylindricalTiles
     
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
