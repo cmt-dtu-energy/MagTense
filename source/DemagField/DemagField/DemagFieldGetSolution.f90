@@ -2,23 +2,19 @@
     module DemagFieldGetSolution
     
     use TileNComponents
-!    use MagTileIO
+
     implicit none
-    
-    
-    
+      
     contains
     
-    
-    
-
-    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>
-    !!General function to call given a number of (different) tiles    
-    !!Input arguments
+    !!General function to call given a number of (different) tiles
+    !!The demagnetization tensor Nout can be provided. If this is the case, the function uses this for calculations. Other it is computed.
+    !!Input arguments:
     !!@param tiles: Array of type MagTile, size n_tiles
-    !!@paramH the output magnetic field, size [n_ele,3]
-    !!@parampts the points at which the field should be evaluated, size [n_ele,3]
+    !!@param H the output magnetic field, size [n_ele,3]
+    !!@param pts the points at which the field should be evaluated, size [n_ele,3]
     !!@param n_tiles, the number of tiles
     !!@param n_ele, the number of points at which to evaluate the field
     !!@param Nout the demag tensor calculated by this function (size (n_tiles,n_pts,3,3) )
@@ -34,8 +30,7 @@
     integer,parameter :: cbCnt = 10
     logical :: useStoredN
     
-    
-    
+    !!If Nout is provided, the function uses this for calculations
     if ( present( Nout ) ) then 
         if ( .NOT. allocated(Nout) ) then
             allocate(Nout(n_tiles,n_ele,3,3))
@@ -56,15 +51,14 @@
     
     ! $OMP PARALLEL DO PRIVATE(i,H_tmp)    
     do i=1,n_tiles
-
         
         !Make sure to allocate H_tmp on the heap and for each thread
         ! $OMP CRITICAL
         H_tmp(:,:) = 0.        
         
         ! $OMP END CRITICAL
-        !::Here a selection of which subroutine to use should be done, i.e. whether the tile
-        !:: is cylindrical, a prism or an ellipsoid
+        !! Here a selection of which subroutine to use should be done, i.e. whether the tile
+        !! is cylindrical, a prism or an ellipsoid or another geometry
         select case (tiles(i)%tileType )
         case (tileTypeCylPiece)
             if ( present(Nout) ) then
@@ -92,6 +86,7 @@
                 call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_ele )
             endif
         case (tileTypeEllipsoid)
+            !!@todo add the existing code for spheroids, and correct Ellipsoids to Spheroids
         case (tileTypePlanarCoil )
             if ( present(Nout) ) then
                 call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
@@ -103,7 +98,7 @@
             
         end select
         
-        
+        !!@todo Can this code be removed as well as the variables prgCnt and prog?
         ! $OMP CRITICAL
         H = H + H_tmp
         !prgCnt = prgCnt + 1
@@ -124,12 +119,16 @@
     
     deallocate(H_tmp)
     
-    !::subtract M of a tile in points that are inside that tile in order to actually get H (only for CylindricalTiles as these actually calculate the B-field (divided by mu0)
+    !!Subtract M of a tile in points that are inside that tile in order to actually get H (only for CylindricalTiles as these actually calculate the B-field (divided by mu0)
+    !!@todo Should this function not only be called if tileTypeCylPiece?
     call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_ele)
     
     end subroutine getFieldFromTiles
     
     
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Function to calcuate H within a cylindrical tile that is rotated, as for CylindricalTiles it is actually the B-field divided by mu0 that is calculated
     subroutine SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_pts)
     real,dimension(n_pts,3),intent(inout) :: H
     type(MagTile),dimension(n_tiles),intent(in) :: tiles
@@ -184,9 +183,10 @@
     deallocate(r,theta,z,pts_local)
     end subroutine SubtractMFromCylindricalTiles
     
-    !::
-    !::Specific implementation for a single cylindrical tile
-    !::
+    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the magnetic field from a cylindrical tile
     subroutine getFieldFromCylTile( cylTile, H, pts, n_ele, N_out, useStoredN )
     type(MagTile), intent(inout) :: cylTile
     real,dimension(n_ele,3),intent(inout) :: H
@@ -203,9 +203,7 @@
     
     
       !::Run the calculation
-      allocate( r(n_ele), x(n_ele), phi(n_ele), pts_local(n_ele,3) )
-      
-      
+      allocate( r(n_ele), x(n_ele), phi(n_ele), pts_local(n_ele,3) )    
       
       !::Include the offset between the global coordinate system and the tile's coordinate system
       !::the pts array is always in global coordinates
@@ -216,30 +214,32 @@
       x(:) = 0.
       phi(:) = 0.
       H(:,:) = 0.
-      !the length of the radius vector
-      r = sqrt( pts_local(:,1)**2 + pts_local(:,2)**2 )
-      !Find the rotation angle. It is assumed that r != 0 in all points since the tensor-field diverges here      
+      
+      r = sqrt( pts_local(:,1)**2 + pts_local(:,2)**2 ) !< The length of the radius vector
+      
+      !!Find the rotation angle. It is assumed that r != 0 in all points since the tensor-field diverges here      
       phi = acos( pts_local(:,1) / r )
-      !correct for being in the third or fourth quadrants
+      
+      !!Correct for being in the third or fourth quadrants
       where ( pts_local(:,2) .lt. 0 )
           !phi = 2 * pi - phi
           phi = -phi
       endwhere
       
-      !save the original orientation of the tile
+      !!Save the original orientation of the tile
       phi_orig = cylTile%theta0
       z_orig = cylTile%z0      
       M_orig = cylTile%M
       do i=1,n_ele
-          !Offset the angle
-          cylTile%theta0 = phi_orig - phi(i)
-          !Offset the z-coordinate
-          cylTile%z0 = z_orig - pts_local(i,3)
+          
+          cylTile%theta0 = phi_orig - phi(i) !< Offset the angle
+          cylTile%z0 = z_orig - pts_local(i,3) !< Offset the z-coordinate
+          
           if ( present( useStoredN ) .eq. .true. ) then
               if ( useStoredN .eq. .false. ) then
                   call getN_CylPiece( cylTile, r(i), N )
               
-                  !>Change basis from rotation trick coordinate system to the local system of the tile
+                  !<Change basis from rotation trick coordinate system to the local system of the tile
                   !!The magnetic field in the global coordinate system is given by:
                   !!H = Rot(phi) * ( N *  (Rot(-phi) * M) )
                   !!Get the rotation matrix for rotating the magnetization with the trick-angle
@@ -256,7 +256,7 @@
               endif
           else
                call getN_CylPiece( cylTile, r(i), N )
-               !>Change basis from rotation trick coordinate system to the local system of the tile
+               !<Change basis from rotation trick coordinate system to the local system of the tile
                !!The magnetic field in the global coordinate system is given by:
                !!H = Rot(phi) * ( N *  (Rot(-phi) * M) )
                !!Get the rotation matrix for rotating the magnetization with the trick-angle
@@ -269,6 +269,7 @@
                N_out(i,:,:) = N
           endif
           
+          !!@todo Can this code be removed?
           !Rotate the magnetization vector
           !M_tmp = matmul( Rz, M_orig )
           !find the field at the rotated point
@@ -279,7 +280,7 @@
           !H(i,:) = matmul( Rz, H(i,:) )
           H(i,:) = matmul( N, M_orig )
           
-          !Revert the changes in angle and z position
+          !!Revert the changes in angle and z position
           cylTile%theta0 = phi_orig
           cylTile%z0 = z_orig
       enddo
@@ -288,9 +289,10 @@
     
     end subroutine getFieldFromCylTile
     
-    !::
-    !::Returns the magnetic field from a rectangular prism
-    !::
+    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the magnetic field from a rectangular prism
     subroutine getFieldFromRectangularPrismTile( prismTile, H, pts, n_ele, N_out, useStoredN )
     type(MagTile),intent(in) :: prismTile
     real,dimension(n_ele,3),intent(inout) :: H
@@ -299,18 +301,18 @@
     real,dimension(n_ele,3,3),intent(inout),optional :: N_out
     logical,intent(in),optional :: useStoredN
     
-    
     procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
     
     N_tensor => getN_prism_3D
     
-    !! check to see if we should use symmetry
+    !! Check to see if we should use symmetry
     if ( prismTile%exploitSymmetry .eq. 1 ) then        
         call getFieldFromTile_symm(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN )        
     else        
         call getFieldFromTile( prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN )       
     endif
     
+    !!@todo Can this be removed?
     !! The minus sign comes from the definition of the demag tensor (the demagfield is assumed negative)
     !! Change in the tensor subroutine in order to make the behavior of the tensor components of the various geometries conform
     !H = -1. * H
@@ -318,6 +320,9 @@
     end subroutine getFieldFromRectangularPrismTile
     
     
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Calculates the actual field from a rectangular prism
     subroutine getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
     type(MagTile),intent(in) :: tile
     real,dimension(n_ele,3),intent(inout) :: H
@@ -335,13 +340,13 @@
         call getRotationMatrices( tile, rotMat, rotMatInv)
     
         do i=1,n_ele
-            !::1. The relative position vector between the origo of the current tile and the point at which the tensor is required
+            !! The relative position vector between the origo of the current tile and the point at which the tensor is required
             diffPos = pts(i,:) - tile%offset
         
-            !::2. rotate the position vector according to the rotation of the prism
+            !! Rotate the position vector according to the rotation of the prism
             diffPos = matmul( rotMat, diffPos )
         
-            !::3. get the demag tensor                
+            !! Get the demag tensor                
             if ( present( useStoredN ) .eq. .true. ) then
                 if ( useStoredN .eq. .false. ) then
                      call N_tensor( tile, diffPos, N )
@@ -353,20 +358,21 @@
                 call N_tensor( tile, diffPos, N )
             endif
         
-            !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
+            !! Rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
             call getDotProd( N, matmul( rotMat, tile%M ), dotProd )
         
-            !::5. Rotate the resulting field back to the global coordinate system
+            !! Rotate the resulting field back to the global coordinate system
             dotProd = matmul( rotMatInv, dotProd )        
         
-            !::. Update the solution.
+            !! Update the solution.
             H(i,:) = dotProd
         enddo
     
     end subroutine getFieldFromTile
     
     
-    !> assumes 8-fold symmetry in the tile, i.e. that it has siblings at 7 other locations according to the conventional
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !> This function assumes 8-fold symmetry in the tile, i.e. that it has siblings at 7 other locations according to the conventional
     !! mirror operations about the global coordinate planes
     !! @param prismTile is the tile in question
     !! @param H the field vector to be updated by this calculation
@@ -384,13 +390,13 @@
     procedure (N_tensor_subroutine), pointer, intent(in) :: N_tensor
     real,dimension(n_ele,3,3),intent(inout),optional :: N_out
     logical,intent(in),optional:: useStoredN
-    
         
     real,dimension(:,:,:),allocatable :: N_tmp    
     real,dimension(3,3) :: rotMat,rotMatInv,N
     integer :: i,j
     real,dimension(3) :: diffPos,dotProd
     real,dimension(8,3,3) :: symm_op_M, symm_op_H
+    !!@todo Why is this temporary variable used instead of just useStoredN
     logical :: useStoredN_tmp
     
     !! get the rotation matrices for the tile
@@ -411,8 +417,7 @@
     endif
     
     !! go through each point
-    do i=1,n_ele
-                  
+    do i=1,n_ele                  
         
         if ( useStoredN_tmp .eq. .false. ) then
             
@@ -457,7 +462,9 @@
     deallocate(N_tmp)
     end subroutine getFieldFromTile_symm
     
-    !>Returns the 8 symmetry operation matrices for
+    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !> Returns the 8 symmetry operation matrices for
     !! conventional mirroring about the three principal planes and their combinations
     !! @param symm_op_M array of 8 3x3 matrices containing the symmetry ops for the magnetization
     !! @param symm_op_H correspondingly but for the field and the point of interest
@@ -480,8 +487,7 @@
     
     SymmZ = SymmY
     SymmZ(2,2) = 1.
-    SymmZ(3,3) = -1.
-    
+    SymmZ(3,3) = -1.  
     
     !! reset
     symm_M(:,:,:) = 0.    
@@ -532,9 +538,10 @@
     end subroutine getSymmOpMatrices
     
     
-      !::
-    !::Returns the magnetic field from a rectangular prism
-    !::
+    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the magnetic field from a tile that is a piece of circle
     subroutine getFieldFromCircPieceTile( circTile, H, pts, n_ele, N_out, useStoredN )
     type(MagTile),intent(in) :: circTile
     real,dimension(n_ele,3),intent(inout) :: H
@@ -542,7 +549,6 @@
     integer,intent(in) :: n_ele
     real,dimension(n_ele,3,3),intent(inout),optional :: N_out
     logical,intent(in),optional :: useStoredN
-    
     
     procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
     
@@ -553,6 +559,7 @@
         call getFieldFromTile_symm( circTile, H, pts, n_ele, N_tensor, N_out, useStoredN )
     else
         call getFieldFromTile( circTile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+        !!@todo Can this code be removed?
         !!::get the rotation matrices
         !call getRotationMatrices( circTile, rotMat, rotMatInv)
         !
@@ -590,17 +597,16 @@
     end subroutine getFieldFromCircPieceTile
     
     
-      !::
-    !::Returns the magnetic field from a piece of circle that is inverted, i.e. pointing inwards
-    !::
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the magnetic field from a piece of circle that is inverted, i.e. pointing inwards
     subroutine getFieldFromCircPieceInvertedTile( circTile, H, pts, n_ele, N_out, useStoredN )
     type(MagTile),intent(in) :: circTile
     real,dimension(n_ele,3),intent(inout) :: H
     real,dimension(n_ele,3) :: pts
     integer,intent(in) :: n_ele
     real,dimension(n_ele,3,3),intent(inout),optional :: N_out
-    logical,intent(in),optional :: useStoredN
-    
+    logical,intent(in),optional :: useStoredN  
     
     procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
     
@@ -611,6 +617,7 @@
         call getFieldFromTile_symm( circTile, H, pts, n_ele, N_tensor, N_out, useStoredN )
     else
         call getFieldFromTile( circTile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+        !!@todo Can this code be removed?
         !
         !!::get the rotation matrices
         !call getRotationMatrices( circTile, rotMat, rotMatInv)
@@ -648,11 +655,11 @@
     end subroutine getFieldFromCircPieceInvertedTile
     
     
-    !::
-    !::Returns the field from a planar coil with N windings and the current I running through it
-    !::Rotation has not been implemented yet for this tile type
-    !::tile%M is assumed to contain the current as tile%M = [I,0,0] in the unit of Amps
-    !::
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the field from a planar coil with N windings and the current I running through it
+    !!tile%M is assumed to contain the current as tile%M = [I,0,0] in the unit of Amps
+    !!@todo Rotation has not been implemented yet for this tile type
     subroutine getFieldFromPlanarCoilTile( tile, H, pts, n_ele, N_out, useStoredN )
     type(MagTile),intent(in) :: tile
     real,dimension(n_ele,3),intent(inout) :: H
@@ -669,13 +676,13 @@
     !call getRotationMatrices( tile, rotMat, rotMatInv)
     
     do i=1,n_ele
-        !::1. The relative position vector between the origo of the current tile and the point at which the tensor is required
+        !! The relative position vector between the origo of the current tile and the point at which the tensor is required
         diffPos = pts(i,:) - tile%offset
         
-        !::2. rotate the position vector according to the rotation of the prism
+        !! rotate the position vector according to the rotation of the prism
        ! diffPos = matmul( rotMat, diffPos )
         
-        !::3. get the demag tensor                
+        !! Get the demag tensor                
         if ( present( useStoredN ) .eq. .true. ) then
             if ( useStoredN .eq. .false. ) then
                 call getN_PlanarCoil( tile, diffPos, N )
@@ -688,23 +695,26 @@
             call getN_PlanarCoil( tile, diffPos, N )
         endif
         
-        !::4. rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
+        !! Rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
         !call getDotProd( N, matmul( rotMat, tile%M ), dotProd )
         call getDotProd( N, tile%M, dotProd )
         
-        !::5. Rotate the resulting field back to the global coordinate system
+        !! Rotate the resulting field back to the global coordinate system
         !dotProd = matmul( rotMatInv, dotProd )        
         
-        !::. Update the solution. 
+        !! Update the solution. 
         H(i,:) = dotProd
     enddo
     end subroutine getFieldFromPlanarCoilTile
     
 
 !---------------------------------------------------------------------------------------!
-    !::Helper routines
-
-    !::Dot product between (3,3) matrix and (1,3) vector
+!------------------------------ Helper routines ----------------------------------------!
+!---------------------------------------------------------------------------------------!
+    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !! Dot product between (3,3) matrix and (1,3) vector
     subroutine getDotProd( N, M, dot_prod )
         real,intent(in),dimension(3,3) :: N
         real,intent(in),dimension(3) :: M
@@ -714,84 +724,83 @@
         dot_prod(2) = sum(N(2,:) * M(:))
         dot_prod(3) = sum(N(3,:) * M(:))
 
-
     end subroutine getDotProd
     
     
-    !::
-    !::Calculates the rotation matrix and its inverse for a given tile
-    !::
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !! Calculates the rotation matrix and its inverse for a given tile
     subroutine getRotationMatrices( tile, rotMat, rotMatInv)
-    type(MagTile),intent(in) :: tile    
-    real,intent(inout),dimension(3,3) :: rotMat,rotMatInv
+        type(MagTile),intent(in) :: tile    
+        real,intent(inout),dimension(3,3) :: rotMat,rotMatInv
     
-    real,dimension(3,3) :: RotX,RotY,RotZ
+        real,dimension(3,3) :: RotX,RotY,RotZ
 
+        !! The minus sign is important since a rotated prism can be represented with a rotation about the given axis in the opposite direction
+        call getRotX( -tile%rotAngles(1), RotX )
+        call getRotY( -tile%rotAngles(2), RotY )
+        call getRotZ( -tile%rotAngles(3), RotZ )
 
-    !::The minus sign is important since a rotated prism can be represented with a rotation about the given axis in the opposite direction
-    call getRotX( -tile%rotAngles(1), RotX )
-    call getRotY( -tile%rotAngles(2), RotY )
-    call getRotZ( -tile%rotAngles(3), RotZ )
-
-    !::Find the rotation matrix as defined by yaw, pitch and roll
-    !::Rot = RotZ * RotY * RotX
-    rotMat = matmul( matmul( RotZ, RotY ), RotX )
-    !::As the rotation matrices are orthogonal we have that înv(R) = transp(R)
-    !:: And thus inv(R1R2) = transp(R2)transp(R1) (note the change in multiplication order)
-    !::and that transp( R1R2R3 ) = transp(R3)transp(R1R2) = transp(R3) transp(R2) transp(R1)
-    !:: inv(Rot) = inv(RotZ * RotY * RotX ) =>
-    !:: inv(Rot) = transp(Rot) = transp( RotZ * RotY * RotX )
-    !::                        = transp( RotX ) * transp( RotZ * RotY )
-    !::                        = transp( RotX ) * transp( RotY ) * transp( RotZ )
-    rotMatInv = matmul( matmul( transpose(RotX), transpose(RotY) ), transpose( RotZ ) )
+        !::Find the rotation matrix as defined by yaw, pitch and roll
+        !::Rot = RotZ * RotY * RotX
+        rotMat = matmul( matmul( RotZ, RotY ), RotX )
+        !::As the rotation matrices are orthogonal we have that înv(R) = transp(R)
+        !:: And thus inv(R1R2) = transp(R2)transp(R1) (note the change in multiplication order)
+        !::and that transp( R1R2R3 ) = transp(R3)transp(R1R2) = transp(R3) transp(R2) transp(R1)
+        !:: inv(Rot) = inv(RotZ * RotY * RotX ) =>
+        !:: inv(Rot) = transp(Rot) = transp( RotZ * RotY * RotX )
+        !::                        = transp( RotX ) * transp( RotZ * RotY )
+        !::                        = transp( RotX ) * transp( RotY ) * transp( RotZ )
+        rotMatInv = matmul( matmul( transpose(RotX), transpose(RotY) ), transpose( RotZ ) )
     
-
     end subroutine getRotationMatrices
 
-    !::
-    !::Returns the rotation matrix for a rotation of angle radians about the x-axis
-    !::
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !! Returns the rotation matrix for a rotation of angle radians about the x-axis
     subroutine getRotX( angle, rotMat )
-    real,intent(in) :: angle
-    real,intent(inout),dimension(3,3) :: rotMat
+        real,intent(in) :: angle
+        real,intent(inout),dimension(3,3) :: rotMat
 
-    !::fortran matrices are (row,col)
-    rotMat(1,1) = 1
-    !::Top row
-    rotMat(1,2:3) = 0
-    !::left column
-    rotMat(2:3,1) = 0
-    rotMat(2,2) = cos(angle)
-    rotMat(3,3) = cos(angle)
-    rotMat(2,3) = -sin(angle)
-    rotMat(3,2) = sin(angle)
+        !! Fortran matrices are (row,col)
+        rotMat(1,1) = 1
+        !! Top row
+        rotMat(1,2:3) = 0
+        !! Left column
+        rotMat(2:3,1) = 0
+        rotMat(2,2) = cos(angle)
+        rotMat(3,3) = cos(angle)
+        rotMat(2,3) = -sin(angle)
+        rotMat(3,2) = sin(angle)
 
     end subroutine getRotX
 
-    !::
-    !::Returns the rotation matrix for a rotation of angle radians about the y-axis
-    !::
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !! Returns the rotation matrix for a rotation of angle radians about the y-axis
     subroutine getRotY( angle, rotMat )
-    real,intent(in) :: angle
-    real,intent(inout),dimension(3,3) :: rotMat
+        real,intent(in) :: angle
+        real,intent(inout),dimension(3,3) :: rotMat
 
-    !::fortran matrices are (row,col)
-    !::top row
-    rotMat(1,1) = cos(angle)
-    rotMat(1,2) = 0
-    rotMat(1,3) = sin(angle)
-    !::middle row
-    rotMat(2,1) = 0
-    rotMat(2,2) = 1
-    rotMat(2,3) = 0
-    !::bottom row
-    rotMat(3,1) = -sin(angle)
-    rotMat(3,2) = 0
-    rotMat(3,3) = cos(angle)
+        !! Fortran matrices are (row,col)
+        !! Top row
+        rotMat(1,1) = cos(angle)
+        rotMat(1,2) = 0
+        rotMat(1,3) = sin(angle)
+        !! Middle row
+        rotMat(2,1) = 0
+        rotMat(2,2) = 1
+        rotMat(2,3) = 0
+        !! Bottom row
+        rotMat(3,1) = -sin(angle)
+        rotMat(3,2) = 0
+        rotMat(3,3) = cos(angle)
 
     end subroutine getRotY
     
-    !::Get rotation matrix for rotation about the z-axis
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !! Get rotation matrix for rotation about the z-axis
     subroutine getRotZ( phi, Rz )
         real*8,intent(in) :: phi
         real*8,dimension(3,3),intent(inout) :: Rz
