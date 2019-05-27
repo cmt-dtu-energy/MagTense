@@ -1,4 +1,4 @@
-
+#include "fintrf.h"
     module MagTileIO
 
     use TileNComponents

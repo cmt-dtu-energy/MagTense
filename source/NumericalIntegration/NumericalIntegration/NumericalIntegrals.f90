@@ -317,35 +317,36 @@
     end subroutine integral2
 
     
-    !!@todo These function from NR should be in the NR project?
-
-    !::Adopted from NR
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !! Helper function
+    !! Adopted from NR
     function h(xx, dat)
-    real :: h
-    real,intent(in) :: xx
-    real :: ss, res
-    class(dataCollectionBase), target :: dat
-    procedure (f_int_dat_vec), pointer :: f_ptr => null ()
-    real :: tmp
+        real :: h
+        real,intent(in) :: xx
+        real :: ss, res
+        class(dataCollectionBase), target :: dat
+        procedure (f_int_dat_vec), pointer :: f_ptr => null ()
+        real :: tmp
 
         f_ptr => f_vec
         dat%x = xx
 
-    
         call qags_y_vec( f_ptr, dat, dat%y1, dat%y2, dat%epsabs, dat%epsrel, ss, dat%abserr_y, dat%neval_y, dat%ier_y )    
         h = ss
         
         if ( mod( dat%progCallbackCnt, 100 ) .eq. 0 ) then
-            !::Progress callback
+            !! Progress callback
             tmp = dat%progCallback( dat )
         endif
     
     
         dat%progCallbackCnt = dat%progCallbackCnt + 1
     
-    return
+        return
     end function h
 
+    !!@todo Can this be removed?
     !function h_vec(xx, dat, n)
     !integer,intent(in) :: n
     !real,dimension(n) :: h_vec
@@ -374,31 +375,37 @@
     !return
     !end function h_vec
 
-
-    !::adopted from NR
+    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !! Helper function
+    !! Adopted from NR
     function f( yy, dat )
-    real :: f
-    real,intent(in) :: yy
-    class(dataCollectionBase),intent(inout), target :: dat
+        real :: f
+        real,intent(in) :: yy
+        class(dataCollectionBase),intent(inout), target :: dat
 
+        dat%y = yy
 
-    dat%y = yy
+        f = dat%f_ptr(dat)
 
-    f = dat%f_ptr(dat)
-
-    return
+        return
     end function f
 
+    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !! Helper function
+    !! Adopted from NR
     function f_vec( yy, dat, n )
-    integer,intent(in) :: n
-    real,intent(in),dimension(n) :: yy
-    real,dimension(n) :: f_vec
-    class(dataCollectionBase),intent(inout), target :: dat
+        integer,intent(in) :: n
+        real,intent(in),dimension(n) :: yy
+        real,dimension(n) :: f_vec
+        class(dataCollectionBase),intent(inout), target :: dat
 
-    call dat%f_ptr_vec(yy, dat, n, f_vec )
+        call dat%f_ptr_vec(yy, dat, n, f_vec )
 
-
-    return
+        return
     end function f_vec
 
 
