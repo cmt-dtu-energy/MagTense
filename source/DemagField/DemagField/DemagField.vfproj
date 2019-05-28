@@ -50,6 +50,5 @@
 		<File RelativePath=".\IterateMagnetSolution.f90"/>
 		<File RelativePath=".\MagParameters.f90"/>
 		<File RelativePath=".\MagTileIO.f90"/>
-		<File RelativePath=".\MagUtil.f90"/>
 		<File RelativePath=".\spline.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>

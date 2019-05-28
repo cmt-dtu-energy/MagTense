@@ -3,7 +3,6 @@
 
     use DemagFieldGetSolution
     use MagParameters
-    use MagUtil
     use spline
 
     implicit none
@@ -394,11 +393,6 @@
         real :: Hnorm,Mnorm
     
         Hnorm = sqrt( H(1)**2 + H(2)**2 + H(3)**2 )
-    
-    !!@ As getBilinInterp is only called here, can MagUtil.f90 be deprecated?
-       ! call getBilinInterp( stateFunction(tile%stateFunctionIndex)%M, stateFunction(tile%stateFunctionIndex)%T, &
-       !                  stateFunction(tile%stateFunctionIndex)%H, stateFunction(tile%stateFunctionIndex)%nT, &
-       !                  stateFunction(tile%stateFunctionIndex)%nH, T, Hnorm, Mnorm )   
     
         index = tile%stateFunctionIndex
         !call splint( stateFunction(index)%H, stateFunction(index)%M(1,:), stateFunction(index)%y2a, Hnorm, Mnorm, stateFunction(index)%nH )
