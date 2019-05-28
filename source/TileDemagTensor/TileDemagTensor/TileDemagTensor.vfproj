@@ -32,8 +32,8 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" AdditionalIncludeDirectories="../../../NumericalIntegration/NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/" OpenMPConditionalCompilation="false" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" FloatingPointModel="precise"/>
-				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="../../Numericalintegration/NumericalIntegration/x64/release/;../../SpecialFunctions/SpecialFunctions/x64/release/"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" AdditionalIncludeDirectories="../../../NumericalIntegration/NumericalIntegration/x64/release/;" OpenMPConditionalCompilation="false" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" FloatingPointModel="precise"/>
+				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="../../Numericalintegration/NumericalIntegration/x64/release/;"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>
@@ -44,6 +44,7 @@
 		<Filter Name="Header Files" Filter="fi;fd"/>
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
+		<File RelativePath=".\SpecialFunctions.f90"/>
 		<File RelativePath=".\TileCircPieceTensor.f90"/>
 		<File RelativePath=".\TileCylPieceTensor.f90"/>
 		<File RelativePath=".\TileNComponents.f90"/>
