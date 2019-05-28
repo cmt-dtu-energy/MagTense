@@ -15,7 +15,7 @@
     program MagTense_StandAlone
         use TileNComponents
         use IterateMagnetSolution
-        use IO_CALL_Mag
+        use StandAlone_IO
         implicit none
 
         character(len=1000) :: file_tiles_in,file_tiles_out,file_setup,file_field_pts,file_field_out
