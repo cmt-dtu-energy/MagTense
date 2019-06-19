@@ -94,9 +94,9 @@ where $\Phi_f = [\phi_f,\phi_{f,x},\phi_{f,y},\phi_{f,z}]^T$, $\phi = [\phi_1,\p
 \, \mathrm{and}\, H = 
 \begin{bmatrix}
     w_{1} & w_{2} & \dots  \\
-    w_{1}\Delta x_i & w_{2}\Delta x_i &  \dots \\
-    w_{1}\Delta y_i & w_{2}\Delta y_i &  \dots \\
-    w_{1}\Delta z_i & w_{2}\Delta z_i &  \dots
+    w_{1}\Delta x_1 & w_{2}\Delta x_2 &  \dots \\
+    w_{1}\Delta y_1 & w_{2}\Delta y_2 &  \dots \\
+    w_{1}\Delta z_1 & w_{2}\Delta z_2 &  \dots
 \end{bmatrix}.}
 Since we are interested in $\phi_f$, only the first row of $G^{-1}H$ is of interest, saving computational effort and leaving the final estimate
 \Eq{\overline{\phi}_f  = \sum_{i = 1}^N\sum_{k = 1}^o G^{-1}_{1,k} H_{k,i} \phi_i,}
