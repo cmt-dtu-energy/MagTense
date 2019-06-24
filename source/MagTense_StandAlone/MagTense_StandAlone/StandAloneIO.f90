@@ -68,7 +68,7 @@ MODULE StandAlone_IO
             if ( mode .eq. 0 ) then
                 read(11,*) tiles(i)%r0,tiles(i)%theta0,tiles(i)%z0,tiles(i)%dr,tiles(i)%dtheta,tiles(i)%dz
             else
-                write(12,*) tiles(i)%r0,tiles(i)%theta0,tiles(i)%z0,tiles(i)%dr,tiles(i)%dtheta,tiles(i)%dz
+                write(12,"(6F15.7)") tiles(i)%r0,tiles(i)%theta0,tiles(i)%z0,tiles(i)%dr,tiles(i)%dtheta,tiles(i)%dz
             endif
         
             !! abc
