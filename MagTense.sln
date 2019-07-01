@@ -3,27 +3,27 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27130.2010
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "DemagField", "..\DemagField\DemagField\DemagField.vfproj", "{982041ED-A185-4F5C-9926-AD8E0941B6D0}"
+Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "DemagField", "source\DemagField\DemagField\DemagField.vfproj", "{982041ED-A185-4F5C-9926-AD8E0941B6D0}"
 	ProjectSection(ProjectDependencies) = postProject
 		{492B3D0E-197B-4119-9331-4B36E8205074} = {492B3D0E-197B-4119-9331-4B36E8205074}
 		{B0835ED5-D7CE-4A15-8EB1-66739151CA32} = {B0835ED5-D7CE-4A15-8EB1-66739151CA32}
 	EndProjectSection
 EndProject
-Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "NumericalIntegration", "..\NumericalIntegration\NumericalIntegration\NumericalIntegration.vfproj", "{B0835ED5-D7CE-4A15-8EB1-66739151CA32}"
+Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "NumericalIntegration", "source\NumericalIntegration\NumericalIntegration\NumericalIntegration.vfproj", "{B0835ED5-D7CE-4A15-8EB1-66739151CA32}"
 EndProject
-Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "TileDemagTensor", "..\TileDemagTensor\TileDemagTensor\TileDemagTensor.vfproj", "{492B3D0E-197B-4119-9331-4B36E8205074}"
+Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "TileDemagTensor", "source\TileDemagTensor\TileDemagTensor\TileDemagTensor.vfproj", "{492B3D0E-197B-4119-9331-4B36E8205074}"
 	ProjectSection(ProjectDependencies) = postProject
 		{B0835ED5-D7CE-4A15-8EB1-66739151CA32} = {B0835ED5-D7CE-4A15-8EB1-66739151CA32}
 	EndProjectSection
 EndProject
-Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "MagTense_StandAlone", "..\MagTense_StandAlone\MagTense_StandAlone\MagTense_StandAlone.vfproj", "{0A26DC6C-7534-4D77-B463-800D7199DD0C}"
+Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "MagTense_StandAlone", "source\MagTense_StandAlone\MagTense_StandAlone\MagTense_StandAlone.vfproj", "{0A26DC6C-7534-4D77-B463-800D7199DD0C}"
 	ProjectSection(ProjectDependencies) = postProject
 		{492B3D0E-197B-4119-9331-4B36E8205074} = {492B3D0E-197B-4119-9331-4B36E8205074}
 		{B0835ED5-D7CE-4A15-8EB1-66739151CA32} = {B0835ED5-D7CE-4A15-8EB1-66739151CA32}
 		{982041ED-A185-4F5C-9926-AD8E0941B6D0} = {982041ED-A185-4F5C-9926-AD8E0941B6D0}
 	EndProjectSection
 EndProject
-Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "MagneticForceIntegrator", "..\MagneticForceIntegrator\MagneticForceIntegrator\MagneticForceIntegrator.vfproj", "{29D23C66-59FB-4DB5-82EB-FA42BB059B55}"
+Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "MagneticForceIntegrator", "source\MagneticForceIntegrator\MagneticForceIntegrator\MagneticForceIntegrator.vfproj", "{29D23C66-59FB-4DB5-82EB-FA42BB059B55}"
 	ProjectSection(ProjectDependencies) = postProject
 		{492B3D0E-197B-4119-9331-4B36E8205074} = {492B3D0E-197B-4119-9331-4B36E8205074}
 		{0A26DC6C-7534-4D77-B463-800D7199DD0C} = {0A26DC6C-7534-4D77-B463-800D7199DD0C}

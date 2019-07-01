@@ -2,13 +2,13 @@
 FC = /opt/intel/bin/ifort
 
 
-FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/ \
-	-I../../../SpecialFunctions/SpecialFunctions/ -I../../../TileDemagTensor/TileDemagTensor/TileDemagTensor/
+FFLAGS = -r8 -O3 -fpp -fpe0 -fp-model source -fpic -I../../NumericalIntegration/NumericalIntegration/ \
+	-I../../TileDemagTensor/TileDemagTensor/
 
 
 #FC = /usr/bin/gfortran
 
-#FFLAGS = -O3 -fopenmp -fdefault-real-8 -ffixed-line-length-none -fPIC
+#FFLAGS = -O3 -fpp -fopenmp -fdefault-real-8 -ffixed-line-length-none -fPIC
 
 
 
@@ -25,21 +25,21 @@ FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I../../../NumericalIntegrationLib
 .for.o:
 	$(FC) -c $(FFLAGS) $<
 
-MagStatPrism2Lib = $(FC) locate.o MagStatParameters.o MagStatUtil.o MagStat2GetSolution.o IterateMagnetSolution.o
+DemagFieldLib = $(FC) DemagFieldGetSolution.o MagParameters.o MagTileIO.o spline.o IterateMagnetSolution.o
 
-MagStatPrism2lib.a: $(MagStatPrism2Lib)
-	ar rc MagStatPrism2lib.a locate.o MagStatParameters.o MagStatUtil.o  MagStat2GetSolution.o IterateMagnetSolution.o
+DemagFieldLib.a: $(DemagFieldLib)
+	ar rc DemagFieldLib.a DemagFieldGetSolution.o MagParameters.o MagTileIO.o  spline.o IterateMagnetSolution.o
 
 
 clean:
 	rm -f *.o *.x *.mod *.a
 
 
-locate.o	:locate.for
-MagStatParameters.o	:MagStatParameters.f90
-MagStatUtil.o	:MagStatUtil.f90 locate.o
-MagStat2GetSolution.o	:MagStat2GetSolution.f90
-IterateMagnetSolution.o	:IterateMagnetSolution.f90 MagStatParameters.o MagStat2GetSolution.o MagStatUtil.o
+DemagFieldGetSolution.o	:DemagFieldGetSolution.f90
+MagParameters.o	:MagParameters.f90
+MagTileIO.o	:MagTileIO.f90
+spline.o	:spline.f90
+IterateMagnetSolution.o	:IterateMagnetSolution.f90 MagParameters.o DemagFieldGetSolution.o spline.o MagTileIO.o
 
 
 

@@ -1,13 +1,12 @@
 
 FC = /opt/intel/bin/ifort
 
-NumIntLib = ../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/
-SpecFuncLib = ../../SpecialFunctions/SpecialFunctions/
-DemagTensorLib = ../../TileDemagTensor/TileDemagTensor/TileDemagTensor/
-MagStatLib = ../../MagStatPrisms2/MagStatVersion2/MagStatVersion2/
+NumIntLib = ../../NumericalIntegration/NumericalIntegration/
+TileDemagTensorLib = ../../TileDemagTensor/TileDemagTensor/
+DemagFieldLib = ../../DemagField/DemagField/
 
 
-FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I$(NumIntLib) -I$(SpecFuncLib) -I$(DemagTensorLib) -I$(MagStatLib)
+FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I$(NumIntLib) -I$(TileDemagTensorLib) -I$(DemagFieldLib)
 
 
 #FC = /usr/bin/gfortran
@@ -29,12 +28,12 @@ FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I$(NumIntLib) -I$(SpecFuncLib) -I
 .for.o:
 	$(FC) -c $(FFLAGS) $<
 
-MagStatPrism.x = IO.o OI_MagStat_StandAlone.o
+MagTense.x = StandAloneIO.o MagTense_StandAlone.o
 
-MagStatPrism.x: $(MagStatPrism.x)
-	$(FC) $(FFLAGS) $(MagStatPrism.x) -Wl,--start-group $(NumIntLib)NumericalIntegrationlib.a \
-	$(SpecFuncLib)special_functions_lib.a $(DemagTensorLib)TileDemagTensorlib.a $(MagStatLib)MagStatPrism2lib.a \
-	 -Wl,--end-group -o MagStatPrism.x
+MagTense.x: $(MagTense.x)
+	$(FC) $(FFLAGS) $(MagTense.x) -Wl,--start-group $(NumIntLib)NumericalIntegrationlib.a \
+	$(TileDemagTensorLib)TileDemagTensorlib.a $(DemagFieldLib)DemagFieldLib.a \
+	 -Wl,--end-group -o MagTense.x
 
 
 clean:
@@ -42,7 +41,7 @@ clean:
 
 
 IO.o	:IO.f90
-OI_MagStat_StandAlone.o		:OI_MagStat_StandAlone.f90 IO.o
+MagTense_StandAlone.o		:MagTense_StandAlone.f90 StandAloneIO.o
 
 
 
