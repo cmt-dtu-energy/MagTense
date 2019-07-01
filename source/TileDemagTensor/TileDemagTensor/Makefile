@@ -2,8 +2,7 @@
 FC = /opt/intel/bin/ifort
 
 
-FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/ \
-	-I../../../SpecialFunctions/SpecialFunctions/
+FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I../../NumericalIntegration/NumericalIntegration/ \
 
 
 #FC = /usr/bin/gfortran
@@ -25,16 +24,16 @@ FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I../../../NumericalIntegrationLib
 .for.o:
 	$(FC) -c $(FFLAGS) $<
 
-TileDemagTensorLib = $(FC) TileTensorHelperFunctions.o TileCircPieceTensor.o TileCylPieceTensor.o TileRectangularPrismTensor.o TilePlanarCoilTensor.o  TileNComponents.o
+TileDemagTensorLib = $(FC) SpecialFunctions.o TileTensorHelperFunctions.o TileCircPieceTensor.o TileCylPieceTensor.o TileRectangularPrismTensor.o TilePlanarCoilTensor.o  TileNComponents.o
 
 TileDemagTensorlib.a: $(TileDemagTensorLib)
-	ar rc TileDemagTensorlib.a TileTensorHelperFunctions.o TileCircPieceTensor.o TileCylPieceTensor.o TileRectangularPrismTensor.o TilePlanarCoilTensor.o  TileNComponents.o
+	ar rc TileDemagTensorlib.a SpecialFunctions.o TileTensorHelperFunctions.o TileCircPieceTensor.o TileCylPieceTensor.o TileRectangularPrismTensor.o TilePlanarCoilTensor.o  TileNComponents.o
 
 
 clean:
 	rm -f *.o *.x *.mod *.a
 
-
+SpecialFunctions.o	:SpecialFunctions.f90
 TileTensorHelperFunctions.o	:TileTensorHelperFunctions.f90
 TileCircPieceTensor.o	:TileCircPieceTensor.f90 TileTensorHelperFunctions.o
 TileCylPieceTensor.o   :TileCylPieceTensor.f90 TileTensorHelperFunctions.o

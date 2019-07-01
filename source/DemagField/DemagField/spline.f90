@@ -56,7 +56,8 @@ module spline
   r8vec_distinct = .true.
 
   return
-end
+end function r8vec_distinct
+    
     function pchst ( arg1, arg2 )
 
 !*****************************************************************************80
@@ -112,7 +113,8 @@ end
   end if
 
   return
-end
+end function pchst
+    
     subroutine basis_function_b_val ( tdata, tval, yval )
 
 !*****************************************************************************80
@@ -205,7 +207,8 @@ end
   end if
 
   return
-end
+end subroutine basis_function_b_val
+    
 subroutine basis_function_beta_val ( beta1, beta2, tdata, tval, yval )
 
 !*****************************************************************************80
@@ -340,7 +343,8 @@ subroutine basis_function_beta_val ( beta1, beta2, tdata, tval, yval )
     + 2.0D+00 * beta1**3 )
 
   return
-end
+end subroutine basis_function_beta_val
+
 subroutine basis_matrix_b_uni ( mbasis )
 
 !*****************************************************************************80
@@ -387,7 +391,8 @@ subroutine basis_matrix_b_uni ( mbasis )
     (/ 4, 4 /) ), kind = 8 ) / 6.0D+00
 
   return
-end
+end subroutine basis_matrix_b_uni
+
 subroutine basis_matrix_beta_uni ( beta1, beta2, mbasis )
 
 !*****************************************************************************80
@@ -467,7 +472,8 @@ subroutine basis_matrix_beta_uni ( beta1, beta2, mbasis )
   mbasis(1:4,1:4) = mbasis(1:4,1:4) / delta
 
   return
-end
+end subroutine basis_matrix_beta_uni
+
 subroutine basis_matrix_bezier ( mbasis )
 
 !*****************************************************************************80
@@ -533,7 +539,8 @@ subroutine basis_matrix_bezier ( mbasis )
   mbasis(4,4) =  0.0D+00
 
   return
-end
+end subroutine basis_matrix_bezier
+
 subroutine basis_matrix_hermite ( mbasis )
 
 !*****************************************************************************80
@@ -596,7 +603,8 @@ subroutine basis_matrix_hermite ( mbasis )
   mbasis(4,4) =  0.0D+00
 
   return
-end
+end subroutine basis_matrix_hermite
+
 subroutine basis_matrix_overhauser_nonuni ( alpha, beta, mbasis )
 
 !*****************************************************************************80
@@ -657,7 +665,8 @@ subroutine basis_matrix_overhauser_nonuni ( alpha, beta, mbasis )
   mbasis(4,4) =   0.0D+00
 
   return
-end
+end subroutine basis_matrix_overhauser_nonuni
+
 subroutine basis_matrix_overhauser_nul ( alpha, mbasis )
 
 !*****************************************************************************80
@@ -707,7 +716,8 @@ subroutine basis_matrix_overhauser_nul ( alpha, mbasis )
   mbasis(3,3) =   0.0D+00
 
   return
-end
+end subroutine basis_matrix_overhauser_nul
+
 subroutine basis_matrix_overhauser_nur ( beta, mbasis )
 
 !*****************************************************************************80
@@ -758,7 +768,8 @@ subroutine basis_matrix_overhauser_nur ( beta, mbasis )
   mbasis(3,3) =   0.0D+00
 
   return
-end
+end subroutine basis_matrix_overhauser_nur
+
 subroutine basis_matrix_overhauser_uni ( mbasis )
 
 !*****************************************************************************80
@@ -821,7 +832,8 @@ subroutine basis_matrix_overhauser_uni ( mbasis )
   mbasis(4,4) =   0.0D+00
 
   return
-end
+end subroutine basis_matrix_overhauser_uni
+
 subroutine basis_matrix_overhauser_uni_l ( mbasis )
 
 !*****************************************************************************80
@@ -867,7 +879,8 @@ subroutine basis_matrix_overhauser_uni_l ( mbasis )
   mbasis(3,3) =   0.0D+00
 
   return
-end
+end subroutine basis_matrix_overhauser_uni_l
+
 subroutine basis_matrix_overhauser_uni_r ( mbasis )
 
 !*****************************************************************************80
@@ -913,7 +926,8 @@ subroutine basis_matrix_overhauser_uni_r ( mbasis )
   mbasis(3,3) =   0.0D+00
 
   return
-end
+end subroutine basis_matrix_overhauser_uni_r
+
 subroutine basis_matrix_tmp ( left, n, mbasis, ndata, tdata, ydata, tval, yval )
 
 !*****************************************************************************80
@@ -1010,7 +1024,8 @@ subroutine basis_matrix_tmp ( left, n, mbasis, ndata, tdata, ydata, tval, yval )
   end do
 
   return
-end
+end subroutine basis_matrix_tmp
+
 subroutine bc_val ( n, t, xcon, ycon, xval, yval )
 
 !*****************************************************************************80
@@ -1087,7 +1102,8 @@ subroutine bc_val ( n, t, xcon, ycon, xval, yval )
   yval = dot_product ( ycon(0:n), bval(0:n) )
 
   return
-end
+end subroutine bc_val
+
 function bez_val ( n, x, a, b, y )
 
 !*****************************************************************************80
@@ -1180,7 +1196,8 @@ function bez_val ( n, x, a, b, y )
   bez_val = dot_product ( y(0:n), bval(0:n) )
 
   return
-end
+end function bez_val
+
 subroutine bp01 ( n, x, bern )
 
 !*****************************************************************************80
@@ -1287,7 +1304,8 @@ subroutine bp01 ( n, x, bern )
   end if
 
   return
-end
+end subroutine bp01
+
 subroutine bpab ( n, a, b, x, bern )
 
 !*****************************************************************************80
@@ -1391,7 +1409,8 @@ subroutine bpab ( n, a, b, x, bern )
   end if
 
   return
-end
+end subroutine bpab
+
 subroutine bpab_approx ( n, a, b, ydata, xval, yval )
 
 !*****************************************************************************80
@@ -1479,7 +1498,8 @@ subroutine bpab_approx ( n, a, b, ydata, xval, yval )
   yval = dot_product ( ydata(0:n), bvec(0:n) )
 
   return
-end
+end subroutine bpab_approx 
+
 subroutine chfev ( x1, x2, f1, f2, d1, d2, ne, xe, fe, next, ierr )
 
 !*****************************************************************************80
@@ -1633,7 +1653,8 @@ subroutine chfev ( x1, x2, f1, f2, d1, d2, ne, xe, fe, next, ierr )
   end do
 
   return
-end
+end subroutine chfev
+
 !subroutine data_to_dif ( ntab, xtab, ytab, diftab )
 !
 !!*****************************************************************************80
@@ -1770,7 +1791,8 @@ subroutine dif_val ( ntab, xtab, diftab, xval, yval )
   end do
 
   return
-end
+end subroutine dif_val
+
 subroutine least_set_old ( ntab, xtab, ytab, ndeg, ptab, b, c, d, eps, ierror )
 
 !*****************************************************************************80
@@ -2018,7 +2040,8 @@ subroutine least_set_old ( ntab, xtab, ytab, ndeg, ptab, b, c, d, eps, ierror )
   eps = sqrt ( eps / real ( ntab, kind = 8 ) )
 
   return
-end
+end subroutine least_set_old
+
 subroutine least_val_old ( x, ndeg, b, c, d, value )
 
 !*****************************************************************************80
@@ -2099,7 +2122,8 @@ subroutine least_val_old ( x, ndeg, b, c, d, value )
   end if
 
   return
-end
+end subroutine least_val_old
+
 subroutine least_set ( point_num, x, f, w, nterms, b, c, d )
 
 !*****************************************************************************80
@@ -2260,7 +2284,8 @@ subroutine least_set ( point_num, x, f, w, nterms, b, c, d )
   end do
 
   return
-end
+end subroutine least_set
+
 subroutine least_val ( nterms, b, c, d, x, px )
 
 !*****************************************************************************80
@@ -2359,7 +2384,8 @@ subroutine least_val ( nterms, b, c, d, x, px )
   end do
 
   return
-end
+end subroutine least_val
+
 subroutine least_val2 ( nterms, b, c, d, x, px, pxp )
 
 !*****************************************************************************80
@@ -2461,7 +2487,8 @@ subroutine least_val2 ( nterms, b, c, d, x, px, pxp )
   end do
 
   return
-end
+end subroutine least_val2
+
 subroutine parabola_val2 ( dim_num, ndata, tdata, ydata, left, tval, yval )
 
 !*****************************************************************************80
@@ -2590,7 +2617,7 @@ subroutine parabola_val2 ( dim_num, ndata, tdata, ydata, left, tval, yval )
   end do
 
   return
-end
+end subroutine parabola_val2 
 
 subroutine r8_swap ( x, y )
 
@@ -2626,7 +2653,8 @@ subroutine r8_swap ( x, y )
   y = z
 
   return
-end
+end subroutine r8_swap
+
 function r8_uniform_01 ( seed )
 
 !*****************************************************************************80
@@ -2697,7 +2725,8 @@ function r8_uniform_01 ( seed )
   r8_uniform_01 = real ( seed, kind = 8 ) * 4.656612875E-10
 
   return
-end
+end function r8_uniform_01 
+
 subroutine r83_mxv ( n, a, x, b )
 
 !*****************************************************************************80
@@ -2754,7 +2783,8 @@ subroutine r83_mxv ( n, a, x, b )
   b(2:n)   = b(2:n)   + a(3,1:n-1) * x(1:n-1)
 
   return
-end
+end subroutine r83_mxv
+
 subroutine r83_np_fs ( n, a, b, x )
 
 !*****************************************************************************80
@@ -2838,7 +2868,8 @@ subroutine r83_np_fs ( n, a, b, x )
   end do
 
   return
-end
+end subroutine r83_np_fs
+
 subroutine r83_uniform ( n, seed, a )
 
 !*****************************************************************************80
@@ -2895,7 +2926,8 @@ subroutine r83_uniform ( n, seed, a )
   a(3,n) = 0.0D+00
 
   return
-end
+end subroutine r83_uniform
+
 subroutine r85_np_fs ( n, a, b, x )
 
 !*****************************************************************************80
@@ -3006,7 +3038,8 @@ subroutine r85_np_fs ( n, a, b, x )
   end do
 
   return
-end
+end subroutine r85_np_fs
+
 subroutine r85_print ( n, a, title )
 
 !*****************************************************************************80
@@ -3061,7 +3094,8 @@ subroutine r85_print ( n, a, title )
   call r85_print_some ( n, a, 1, 1, n, n, title )
 
   return
-end
+end subroutine r85_print
+
 subroutine r85_print_some ( n, a, ilo, jlo, ihi, jhi, title )
 
 !*****************************************************************************80
@@ -3193,7 +3227,8 @@ subroutine r85_print_some ( n, a, ilo, jlo, ihi, jhi, title )
   end do
 
   return
-end
+end subroutine r85_print_some
+
 subroutine r8ge_fs ( n, a, b, info )
 
 !*****************************************************************************80
@@ -3326,7 +3361,8 @@ subroutine r8ge_fs ( n, a, b, info )
   end do
 
   return
-end
+end subroutine r8ge_fs
+
 subroutine r8vec_bracket ( n, x, xval, left, right )
 
 !*****************************************************************************80
@@ -3392,7 +3428,8 @@ subroutine r8vec_bracket ( n, x, xval, left, right )
   right = n
 
   return
-end
+end subroutine r8vec_bracket
+
 subroutine r8vec_bracket3 ( n, t, tval, left )
 
 !*****************************************************************************80
@@ -3560,7 +3597,7 @@ subroutine r8vec_bracket3 ( n, t, tval, left )
   end if
 
   return
-end
+end subroutine r8vec_bracket3
 
 subroutine r8vec_even ( n, alo, ahi, a )
 
@@ -3618,7 +3655,8 @@ subroutine r8vec_even ( n, alo, ahi, a )
   end if
 
   return
-end
+end subroutine r8vec_even
+
 subroutine r8vec_indicator ( n, a )
 
 !*****************************************************************************80
@@ -3659,7 +3697,8 @@ subroutine r8vec_indicator ( n, a )
   end do
 
   return
-end
+end subroutine r8vec_indicator 
+
 subroutine r8vec_order_type ( n, a, order )
 
 !*****************************************************************************80
@@ -3790,7 +3829,8 @@ subroutine r8vec_order_type ( n, a, order )
   end do
 
   return
-end
+end subroutine r8vec_order_type 
+
 subroutine r8vec_print ( n, a, title )
 
 !*****************************************************************************80
@@ -3837,7 +3877,8 @@ subroutine r8vec_print ( n, a, title )
   end do
 
   return
-end
+end subroutine r8vec_print
+
 subroutine r8vec_sort_bubble_a ( n, a )
 
 !*****************************************************************************80
@@ -3888,7 +3929,8 @@ subroutine r8vec_sort_bubble_a ( n, a )
   end do
 
   return
-end
+end subroutine r8vec_sort_bubble_a
+
 subroutine r8vec_uniform_01 ( n, seed, r )
 
 !*****************************************************************************80
@@ -3962,7 +4004,8 @@ subroutine r8vec_uniform_01 ( n, seed, r )
   end do
 
   return
-end
+end subroutine r8vec_uniform_01
+
 subroutine r8vec_unique_count ( n, a, tol, unique_num )
 
 !*****************************************************************************80
@@ -4026,7 +4069,8 @@ subroutine r8vec_unique_count ( n, a, tol, unique_num )
   end do
 
   return
-end
+end subroutine r8vec_unique_count 
+
 subroutine spline_b_val ( ndata, tdata, ydata, tval, yval )
 
 !*****************************************************************************80
@@ -4142,7 +4186,8 @@ subroutine spline_b_val ( ndata, tdata, ydata, tval, yval )
   end if
 
   return
-end
+end subroutine spline_b_val
+
 subroutine spline_beta_val ( beta1, beta2, ndata, tdata, ydata, tval, yval )
 
 !*****************************************************************************80
@@ -4289,7 +4334,8 @@ subroutine spline_beta_val ( beta1, beta2, ndata, tdata, ydata, tval, yval )
   end if
 
   return
-end
+end subroutine spline_beta_val
+
 subroutine spline_bezier_val ( dim_num, interval_num, data_val, point_num, &
   point_t, point_val )
 
@@ -4388,7 +4434,8 @@ subroutine spline_bezier_val ( dim_num, interval_num, data_val, point_num, &
   end do
 
   return
-end
+end subroutine spline_bezier_val
+  
 subroutine spline_constant_val ( ndata, tdata, ydata, tval, yval )
 
 !*****************************************************************************80
@@ -4459,7 +4506,8 @@ subroutine spline_constant_val ( ndata, tdata, ydata, tval, yval )
   yval = ydata(ndata)
 
   return
-end
+end subroutine spline_constant_val
+
 subroutine spline_cubic_set_full ( n, t, y, ibcbeg, ybcbeg, ibcend, ybcend, ypp )
 
 !*****************************************************************************80
@@ -4706,7 +4754,8 @@ subroutine spline_cubic_set_full ( n, t, y, ibcbeg, ybcbeg, ibcend, ybcend, ypp 
   end if
 
   return
-end
+end subroutine spline_cubic_set_full
+
 subroutine spline_cubic_set ( n, t, y, ibcbeg, ybcbeg, ibcend, ybcend, ypp )
 
 !*****************************************************************************80
@@ -4957,7 +5006,8 @@ subroutine spline_cubic_set ( n, t, y, ibcbeg, ybcbeg, ibcend, ybcend, ypp )
   end if
 
   return
-end
+end subroutine spline_cubic_set
+
 subroutine penta ( n, a1, a2, a3, a4, a5, b, x )
 
 !*****************************************************************************80
@@ -5041,7 +5091,8 @@ subroutine penta ( n, a1, a2, a3, a4, a5, b, x )
   end do
 
   return
-end
+end subroutine penta
+
 subroutine spline_cubic_val ( n, t, y, ypp, tval, yval, ypval, yppval )
 
 !*****************************************************************************80
@@ -5145,7 +5196,8 @@ subroutine spline_cubic_val ( n, t, y, ypp, tval, yval, ypval, yppval )
   yppval = ypp(left) + dt * ( ypp(right) - ypp(left) ) / h
 
   return
-end
+end subroutine spline_cubic_val
+
 subroutine spline_cubic_val2 ( n, t, y, ypp, left, tval, yval, ypval, yppval )
 
 !*****************************************************************************80
@@ -5261,7 +5313,8 @@ subroutine spline_cubic_val2 ( n, t, y, ypp, left, tval, yval, ypval, yppval )
   yppval = ypp(left) + dt * ( ypp(right) - ypp(left) ) / h
 
   return
-end
+end subroutine spline_cubic_val2
+
 subroutine spline_hermite_set ( ndata, tdata, ydata, ypdata, c )
 
 !*****************************************************************************80
@@ -5356,7 +5409,8 @@ subroutine spline_hermite_set ( ndata, tdata, ydata, ypdata, c )
   c(4,ndata) = 0.0D+00
 
   return
-end
+end subroutine spline_hermite_set
+
 subroutine spline_hermite_val ( ndata, tdata, c, tval, sval, spval )
 
 !*****************************************************************************80
@@ -5458,7 +5512,8 @@ subroutine spline_hermite_val ( ndata, tdata, c, tval, sval, spval )
   spval = c(2,left) + dt * ( 2.0D+00 * c(3,left) + dt * 3.0D+00 * c(4,left) )
 
   return
-end
+end subroutine spline_hermite_val
+
 subroutine spline_linear_int ( ndata, tdata, ydata, a, b, int_val )
 
 !*****************************************************************************80
@@ -5601,7 +5656,8 @@ subroutine spline_linear_int ( ndata, tdata, ydata, a, b, int_val )
   end if
 
   return
-end
+end subroutine spline_linear_int
+
 subroutine spline_linear_intset ( n, int_x, int_v, data_x, data_y )
 
 !*****************************************************************************80
@@ -5698,7 +5754,8 @@ subroutine spline_linear_intset ( n, int_x, int_v, data_x, data_y )
   call r83_np_fs ( n, a, data_y, data_y )
 
   return
-end
+end subroutine spline_linear_intset
+
 subroutine spline_linear_val ( ndata, tdata, ydata, tval, yval, ypval )
 
 !*****************************************************************************80
@@ -5773,7 +5830,8 @@ subroutine spline_linear_val ( ndata, tdata, ydata, tval, yval, ypval )
   yval = ydata(left) +  ( tval - tdata(left) ) * ypval
 
   return
-end
+end subroutine spline_linear_val
+
 subroutine spline_overhauser_nonuni_val ( ndata, tdata, ydata, tval, yval )
 
 !*****************************************************************************80
@@ -5908,7 +5966,8 @@ subroutine spline_overhauser_nonuni_val ( ndata, tdata, ydata, tval, yval )
   end if
 
   return
-end
+end subroutine spline_overhauser_nonuni_val
+
 subroutine spline_overhauser_uni_val ( ndata, tdata, ydata, tval, yval )
 
 !*****************************************************************************80
@@ -5994,7 +6053,8 @@ subroutine spline_overhauser_uni_val ( ndata, tdata, ydata, tval, yval )
   end if
 
   return
-end
+end subroutine spline_overhauser_uni_val
+
 subroutine spline_overhauser_val ( dim_num, ndata, tdata, ydata, tval, yval )
 
 !*****************************************************************************80
@@ -6139,7 +6199,8 @@ subroutine spline_overhauser_val ( dim_num, ndata, tdata, ydata, tval, yval )
   end if
 
   return
-end
+end subroutine spline_overhauser_val
+
 !subroutine spline_pchip_set ( n, x, f, d )
 !
 !!*****************************************************************************80
@@ -6368,6 +6429,7 @@ end
 !
 !  return
 !end
+
 subroutine spline_pchip_val ( n, x, f, d, ne, xe, fe )
 
 !*****************************************************************************80
@@ -6631,7 +6693,8 @@ subroutine spline_pchip_val ( n, x, f, d, ne, xe, fe )
   end do
 
   return
-end
+end subroutine spline_pchip_val
+
 subroutine spline_quadratic_val ( ndata, tdata, ydata, tval, yval, ypval )
 
 !*****************************************************************************80
@@ -6747,7 +6810,8 @@ subroutine spline_quadratic_val ( ndata, tdata, ydata, tval, yval, ypval )
   ypval = dif1 + dif2 * ( 2.0D+00 * tval - t1 - t2 )
 
   return
-end
+end subroutine spline_quadratic_val
+
 subroutine timestamp ( )
 
 !*****************************************************************************80
@@ -6825,5 +6889,6 @@ subroutine timestamp ( )
     d, trim ( month(m) ), y, h, ':', n, ':', s, '.', mm, trim ( ampm )
 
   return
-end
+end subroutine timestamp
+
 end module spline

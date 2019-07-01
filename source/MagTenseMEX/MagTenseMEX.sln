@@ -1,7 +1,9 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
-Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "MagStatPrismMEX", "MagStatPrismMEX\MagStatPrismMEX.vfproj", "{7DC31451-6AB4-45E3-8466-31CF5EB70E93}"
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.705
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "MagTenseMEX", "MagTenseMEX\MagTenseMEX.vfproj", "{7DC31451-6AB4-45E3-8466-31CF5EB70E93}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,5 +18,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EA3BF92D-F82D-4E96-88D0-3C1665424FFB}
 	EndGlobalSection
 EndGlobal
