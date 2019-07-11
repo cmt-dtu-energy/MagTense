@@ -27,10 +27,10 @@ tile.offset = [0,0,0];
 
 %set the easy axis of the cube. This is expected to be with respect to the global
 %coordinate system basis
-tile.u_ea = [0,0,1];
+tile.u_ea = [0,1,0];
 %ensure the two hard axes are perpendicular and normalized
 tile.u_oa1 = [1,0,0];
-tile.u_oa2 = [0,1,0];
+tile.u_oa2 = [0,0,1];
 
 %set the relative permeability for the easy axis
 tile.mu_r_ea = 1.06;
@@ -66,4 +66,16 @@ z = 0.00;
 surf_and_con( X,Y,Hnorm);
 xlabel('x');
 ylabel('y');
+
+%%plot the magnetic field (H). Notice how the field opposes the
+%%magnetization inside the cube.
+getFigure();
+quiver(X,Y,H(:,:,1),H(:,:,2),2,'linewidth',2);
+contour(X,Y,Hnorm,'linewidth',2);
+plotTiles(tile,true);
+alpha 0.3;
+axis equal;
+xlabel('x');
+ylabel('y');
+
 end
