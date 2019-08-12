@@ -4,7 +4,7 @@ Requirements:
 
 - Python installation
 - Numpy package
-- Fortran compiler: gfortran or ifort
+- Fortran compiler: gfortran >= 5 or ifort
 
 ## Fortran compiler: **gfortran** from MinGW64
 
@@ -18,11 +18,21 @@ Open terminal, navigate to this folder and run Makefile in activated Python virt
     mingw32-make.exe
     ```
 
-- Linux
+- Linux:
 
     ```bash
     cd PATH/TO/THIS/FOLDER
     source ../venv/bin/activate
+    make
+    ```
+
+- Linux (jess.dtu.dk)
+
+    ```bash
+    cd PATH/TO/THIS/FOLDER
+    module use -a /home/MET/modules/module_files
+    module load compilers/gcc-5.1
+    # TODO Setup for Python environment (Python 3.7 with modules in requirements.txt)
     make
     ```
 

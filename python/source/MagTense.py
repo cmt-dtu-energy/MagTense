@@ -301,7 +301,7 @@ def run_simulation(tiles, points, grid=None, plot=False, max_error=0.00001, max_
                         util_plot.create_plot(updated_tiles, solution, grid=grid)
         return updated_tiles, solution
 
-def iterate_magnetization(tiles, max_error=0.00001, max_it=500, iterate_solution=True, T = 300.):
+def iterate_magnetization(tiles, max_error=0.00001, max_it=500, T = 300.):
         max_error = max_error # max relative error
         max_it = max_it # max number of iterations
         T = T # temperature for the state function of iron (arbitrary here as we ignore temperature variation in the iron)
