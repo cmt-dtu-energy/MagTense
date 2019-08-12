@@ -46,7 +46,7 @@ module TilePlanarCoilTensor
     
     function int_fctI1( theta, dat )
     real,intent(in) :: theta
-    class(dataCollectionBase), target :: dat
+    class(dataCollectionBase), intent(inout), target :: dat
     real :: int_fctI1
     
     int_fctI1 = 1. / ( 1 - dat%b * cos(theta) )**(3./2.)
@@ -56,7 +56,7 @@ module TilePlanarCoilTensor
     
     function int_fctI2( theta, dat )
     real,intent(in) :: theta
-    class(dataCollectionBase), target :: dat
+    class(dataCollectionBase), intent(inout), target :: dat
     real :: int_fctI2
     
     int_fctI2 = cos(theta) / ( 1 - dat%b * cos(theta) )**(3./2.)
