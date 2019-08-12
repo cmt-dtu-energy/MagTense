@@ -29,7 +29,7 @@
           function func ( dat )
              import dataCollectionBase
              real :: func
-             class( dataCollectionBase ) :: dat
+             class(dataCollectionBase), intent(inout), target :: dat
           end function func
     end interface
 
@@ -38,7 +38,7 @@
              import dataCollectionBase
              integer,intent(in) :: n
              real,dimension(n) :: yy
-             class( dataCollectionBase ) :: dat
+             class(dataCollectionBase), intent(inout), target :: dat
              real,dimension(n) :: res
          
           end subroutine func_vec
@@ -49,7 +49,7 @@
              import dataCollectionBase
              real :: f_int_dat
              real, intent (in) :: x
-             class( dataCollectionBase ) :: dat
+             class(dataCollectionBase), intent(inout), target :: dat
           end function f_int_dat
     end interface
 
@@ -60,7 +60,7 @@
              integer,intent(in) :: n
              real,intent (in),dimension(n) :: x
              real,dimension(n) :: f_int_dat_vec        
-             class( dataCollectionBase ) :: dat
+             class(dataCollectionBase), intent(inout), target :: dat
           end function f_int_dat_vec
     end interface
 
@@ -86,7 +86,7 @@
 
     !! A custom type encapsulating a dataCollectionBase pointer in order to make an array
     type dat_ptr
-        class( dataCollectionBase ), pointer :: dat
+        class(dataCollectionBase), pointer :: dat
     end type dat_ptr
 
     

@@ -901,7 +901,7 @@ subroutine qagi ( f_ptr, dat, bound, inf, epsabs, epsrel, result, abserr, neval,
     boun = bound
   end if
 
-  call qk15i ( f_ptr, dat, boun, inf, 0.0d+00, 1.0d+00, result, abserr, defabs, resabs )
+  call qk15i ( f_ptr, dat, boun, inf, 0.0E+00, 1.0E+00, result, abserr, defabs, resabs )
 !
 !  Test on accuracy.
 !
@@ -5458,7 +5458,7 @@ subroutine qawfe ( f_ptr, dat, a, omega, integr, epsabs, limlst, limit, maxp1, &
   if ( omega == 0.0E+00 ) then
 
     if ( integr == 1 ) then
-      call qagi ( f_ptr, dat, 0.0d+00, 1, epsabs, 0.0d+00, result, abserr, neval, ier )
+      call qagi ( f_ptr, dat, 0.0E+00, int8(1), epsabs, 0.0E+00, result, abserr, neval, ier )
     else
       result = 0.0E+00
       abserr = 0.0E+00
@@ -5506,7 +5506,7 @@ subroutine qawfe ( f_ptr, dat, a, omega, integr, epsabs, limlst, limit, maxp1, &
 !   dla = lst
     epsa = eps * fact
 
-    call qfour ( f_ptr, dat, c1, c2, omega, integr, epsa, 0.0d+00, limit, lst, maxp1, &
+    call qfour ( f_ptr, dat, c1, c2, omega, integr, epsa, 0.0E+00, limit, lst, maxp1, &
       rslst(lst), erlst(lst), nev, ierlst(lst), alist, blist, rlist, elist, &
       iord, nnlog, momcom, chebmo )
 
@@ -5770,7 +5770,7 @@ subroutine qawo ( f_ptr, dat, a, b, omega, integr, epsabs, epsrel, result, abser
   real ( kind = 8 ) rlist(limit)
   class( dataCollectionBase), target :: dat
 
-  call qfour ( f_ptr, dat, a, b, omega, integr, epsabs, epsrel, limit, 1, maxp1, &
+  call qfour ( f_ptr, dat, a, b, omega, integr, epsabs, epsrel, limit, int8(1), maxp1, &
     result, abserr, neval, ier, alist, blist, rlist, elist, iord, nnlog, &
     momcom, chebmo )
 
@@ -8087,7 +8087,7 @@ subroutine qfour ( f_ptr, dat, a, b, omega, integr, epsabs, epsrel, limit, icall
     momcom = 0
   end if
 
-  call qc25o ( f_ptr, dat, a, b, domega, integr, nrmom, maxp1, 0, result, abserr, &
+  call qc25o ( f_ptr, dat, a, b, domega, integr, nrmom, maxp1, int8(0), result, abserr, &
     neval, defabs, resabs, momcom, chebmo )
 !
 !  Test on accuracy.
@@ -8157,12 +8157,12 @@ subroutine qfour ( f_ptr, dat, a, b, omega, integr, epsabs, epsrel, limit, icall
     b2 = blist(maxerr)
     erlast = errmax
 
-    call qc25o ( f_ptr, dat, a1, b1, domega, integr, nrmom, maxp1, 0, area1, &
+    call qc25o ( f_ptr, dat, a1, b1, domega, integr, nrmom, maxp1, int8(0), area1, &
       error1, nev, resabs, defab1, momcom, chebmo )
 
     neval = neval+nev
 
-    call qc25o ( f_ptr, dat, a2, b2, domega, integr, nrmom, maxp1, 1, area2, &
+    call qc25o ( f_ptr, dat, a2, b2, domega, integr, nrmom, maxp1, int8(1), area2, &
       error2, nev, resabs, defab2, momcom, chebmo )
 
     neval = neval+nev
