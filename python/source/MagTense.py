@@ -126,31 +126,6 @@ class Tiles():
         def get_color(self, i):
                 return self.color[i]
 
-class MagneticFieldIntensity():
-        def __init__(self, points=None, H=None):
-                self.field = {}
-                if points is not None:
-                        for i, point in enumerate(points):
-                                point_hash = (point[0], point[1], point[2])
-                                self.field[point_hash] = H[i]
-
-        def get_average_magnetic_flux(self):
-                norm = self.get_norm_magnetic_flux()
-                average = sum(norm.values())/len(norm)
-                return average
-
-        def get_p2p(self):
-                norm = self.get_norm_magnetic_flux()
-                return max(norm.values())-min(norm.values())
-        
-        def get_norm_magnetic_flux(self):
-                norm = {}
-                # vacuum permeability
-                mu0 = 4*math.pi*1e-7
-                for point in self.field:
-                        norm[point] = np.linalg.norm(self.field[point])*mu0
-                return norm
-
 
 class Grid():
         def __init__(self, places, area):
@@ -234,6 +209,22 @@ class Grid():
         def clear_grid(self):
                 self.grid = np.zeros(self.places.tolist())
 
+def get_average_magnetic_flux(H):
+        norm = get_norm_magnetic_flux(H)
+        average = sum(norm)/len(norm)
+        return average
+
+def get_p2p(H):
+        norm = get_norm_magnetic_flux(H)
+        return max(norm)-min(norm)
+
+def get_norm_magnetic_flux(H):
+        norm = np.zeros(shape=len(H))
+        mu0 = 4*math.pi*1e-7 # vacuum permeability
+        norm = [np.linalg.norm(H_point)*mu0 for H_point in H]
+        return norm
+
+
 def setup(places, area, n_tiles=0, filled_positions=None, mag_angles=[], eval_points=[20, 20, 1], eval_mode="uniform", B_rem=1.2):
         # Check format of input parameters
         if len(places) != 3:
@@ -290,18 +281,18 @@ def run_simulation(tiles, points, grid=None, plot=False, max_error=0.00001, max_
                 updated_tiles.M_rel = Mrel_out
         
         if return_field is True:
-                solution = MagneticFieldIntensity(points, H)
+                solution = H
         else:
                 solution = None
 
         if plot==True:
                 if grid is None:
-                        util_plot.create_plot(updated_tiles, solution)
+                        util_plot.create_plot(updated_tiles, points, H)
                 else:
-                        util_plot.create_plot(updated_tiles, solution, grid=grid)
+                        util_plot.create_plot(updated_tiles, points, H, grid=grid)
         return updated_tiles, solution
 
-def iterate_magnetization(tiles, max_error=0.00001, max_it=500, T = 300.):
+def iterate_magnetization(tiles, max_error=0.00001, max_it=500, T=300.):
         max_error = max_error # max relative error
         max_it = max_it # max number of iterations
         T = T # temperature for the state function of iron (arbitrary here as we ignore temperature variation in the iron)

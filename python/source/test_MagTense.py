@@ -23,8 +23,7 @@ def main():
     iterated_tiles = MagTense.iterate_magnetization(tiles)
     N = MagTense.get_N_tensor(iterated_tiles,points)
     H = MagTense.get_H_field(iterated_tiles,points,N)
-    solution = MagTense.MagneticFieldIntensity(points, H)
-    util_plot.create_plot(iterated_tiles, solution, grid=grid)
+    util_plot.create_plot(iterated_tiles, points, H, grid=grid)
 
     # All steps in one command - iterate_solution = True, return_field = True
     # N is not reused for calculating the H field
