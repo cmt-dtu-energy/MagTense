@@ -765,7 +765,7 @@
         !::Find the rotation matrix as defined by yaw, pitch and roll
         !::Rot = RotZ * RotY * RotX
         rotMat = matmul( matmul( RotZ, RotY ), RotX )
-        !::As the rotation matrices are orthogonal we have that �nv(R) = transp(R)
+        !::As the rotation matrices are orthogonal we have that inv(R) = transp(R)
         !:: And thus inv(R1R2) = transp(R2)transp(R1) (note the change in multiplication order)
         !::and that transp( R1R2R3 ) = transp(R3)transp(R1R2) = transp(R3) transp(R2) transp(R1)
         !:: inv(Rot) = inv(RotZ * RotY * RotX ) =>
