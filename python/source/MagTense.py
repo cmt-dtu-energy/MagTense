@@ -1,11 +1,11 @@
 import os
 import sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + '/../lib_mag')
 import numpy as np
 import math
 import random as rand
 
 import util_plot
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + '/../lib_mag')
 import MagTenseSource
 
 class Tiles():
@@ -172,7 +172,6 @@ class Grid():
                 return tiles
         
         def set_eval_points(self, n_points, mode):
-                # points = []
                 counter = 0
                 points = np.zeros(shape=(n_points[0]*n_points[1]*n_points[2],3), dtype=np.float64, order='F')
                 if mode == "uniform":
@@ -180,9 +179,6 @@ class Grid():
                         for i in range(0,n_points[0]):
                                 for j in range(0, n_points[1]):
                                         for k in range(0, n_points[2]):
-                                                # new_point = EvalPoint()
-                                                # new_point.set_coordinates(i*seg[0]+seg[0]/2, j*seg[1]+seg[1]/2, k*seg[2]+seg[2]/2)
-                                                # points.append(new_point)
                                                 points[counter] = [i*seg[0]+seg[0]/2, j*seg[1]+seg[1]/2, k*seg[2]+seg[2]/2]
                                                 counter = counter + 1
                 elif mode == "center":
@@ -193,10 +189,6 @@ class Grid():
                         for i in range(0,n_points[0]):
                                 for j in range(0, n_points[1]):
                                         for k in range(0, n_points[2]):
-                                                # new_point = EvalPoint()
-                                                # new_pos = [i*seg, j*seg_angle, k*seg_layer] + center
-                                                # new_point.set_pos(new_pos)
-                                                # points.append(new_point)
                                                 points[counter] = [i*seg, j*seg_angle, k*seg_layer] + center
                                                 counter = counter + 1
                 elif mode == "costumized":
@@ -247,7 +239,7 @@ def setup(places, area, n_tiles=0, filled_positions=None, mag_angles=[], eval_po
         # Assign magnetization angles for tiles
         if not mag_angles:
                 for _ in range(tiles.get_n()):
-                        mag_angles = mag_angles.append(2 * math.pi * rand.random())       
+                        mag_angles.append(2 * math.pi * rand.random())       
         tiles.set_remanence(B_rem / (4*math.pi*1e-7))
         tiles.set_mag_angle(mag_angles)
         # Setting display color of magnets: red - [1, 0, 0] 
