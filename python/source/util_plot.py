@@ -38,23 +38,23 @@ def plot_cubes(axes, cubes):
             ax.add_collection3d(Poly3DCollection(surfaces, facecolors=cubes.get_color(i), linewidths=1, edgecolors=cubes.get_color(i), alpha=.25))
 
 
-def plot_field(axes, magneticfield):
+def plot_field(axes, points, H):
     ax = axes
     cmap = cm.get_cmap('Blues')
     # Max color is set to norm of 30000
     norm = colors.Normalize(vmin=0, vmax=30000)
     # Set length of field arrows depending on number of evaluated points
-    if len(magneticfield.field) > 1000:
+    if len(points) > 1000:
         len_arrow = 0.01
-    elif len(magneticfield.field) > 500:
+    elif len(points) > 500:
         len_arrow = 0.025
-    elif len(magneticfield.field) > 100:
+    elif len(points) > 100:
         len_arrow = 0.05
     else:
         len_arrow = 0.075
-    for point, field_vector in magneticfield.field.items():
-        ax.quiver(point[0], point[1], point[2], field_vector[0], field_vector[1], field_vector[2],
-                  colors=cmap(norm(np.linalg.norm(field_vector))), pivot='middle', length=len_arrow, normalize=True)
+    for i, point in enumerate(points):
+        ax.quiver(point[0], point[1], point[2], H[i][0], H[i][1], H[i][2], colors=cmap(norm(np.linalg.norm(H[i]))),
+        pivot='middle', length=len_arrow, normalize=True)
     plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax)
 
 
@@ -139,11 +139,11 @@ def zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale=0.1)
     return (zoom_scroll, zoom_onpress)
 
 
-def create_plot(cubes, magneticfield, grid=None):
+def create_plot(cubes, eval_points, H, grid=None):
     fig = plt.figure()
     ax = fig.gca(projection='3d')
     plot_cubes(ax, cubes)
-    plot_field(ax, magneticfield)
+    plot_field(ax, eval_points, H)
     if grid is not None:
         plot_grid(ax, grid)
     # Workaround added get_proj function inside site-packages\mpl_toolkits\mplot3d\axes3d.py
