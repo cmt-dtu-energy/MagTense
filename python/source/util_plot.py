@@ -76,6 +76,8 @@ def plot_grid(ax, grid):
             pass
         segs.append(np.array([[1, 0, mark_z], [1, 1, mark_z]]))
         segs.append(np.array([[1, 0, mark_z], [1, 1, mark_z]]))
+        segs.append(np.array([[0, 1, mark_z], [1, 1, mark_z]]))
+        segs.append(np.array([[0, 1, mark_z], [1, 1, mark_z]]))
     segs.append(np.array([[1, 1, grid.area[2]], [0, 1, grid.area[2]]]))
     line_segments = Line3DCollection(segs, colors='0.75')
     ax.add_collection(line_segments)
