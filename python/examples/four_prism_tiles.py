@@ -9,11 +9,13 @@ import MagTenseStandalone
 import util_plot
 
 def main():
-    # Defining grid and positions, angles of magnets
+    # Defining grid
     places = [10, 10, 1]
     area = [1, 1, 0.01]
+    # Defining occupied places in grid
     filled_positions = [[2, 4, 0], [4, 2, 0], [4, 6, 0], [6, 4, 0]]
-    mag_angles = [0, math.pi, math.pi, 0]
+    # Defining angle of magnetization in spherical coordinates (azimuth, polar angle) for each tile
+    mag_angles = [[0, math.pi/2], [math.pi, math.pi/2], [math.pi, math.pi/2], [0, math.pi/2]]
 
     # Optional parameters for setup: n_magnets, filled_positions, mag_angles, eval_points, eval_mode, B_rem
     (tiles, points, grid) = MagTense.setup(places, area, filled_positions=filled_positions, mag_angles=mag_angles)
