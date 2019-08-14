@@ -85,14 +85,14 @@ class Tiles():
                 return self.offset[i]
 
         def set_easy_axis_i(self, easy_axis, i):
-                self.u_ea[i] = easy_axis
+                self.u_ea[i] = np.around(easy_axis, decimals=9)
                 self.M[i] = self.M_rem[i] * self.u_ea[i]
         
         def set_oa1_i(self, other_axis, i):
-                self.u_oa1[i] = other_axis
+                self.u_oa1[i] = np.around(other_axis, decimals=9)
         
         def set_oa2_i(self, other_axis, i):
-                self.u_oa2[i] = other_axis
+                self.u_oa2[i] = np.around(other_axis, decimals=9)
         
         def set_remanence(self, M_rem):
                 if isinstance(M_rem, int) or isinstance(M_rem, float):
@@ -108,10 +108,12 @@ class Tiles():
                 for i,mag_angle in enumerate(mag_angles):
                         self.set_mag_angle_i(mag_angle,i)
 
-        def set_mag_angle_i(self, theta, i):
-                self.set_easy_axis_i([np.around(math.cos(theta), decimals=9), np.around(math.sin(theta), decimals=9), 0], i)
-                self.set_oa1_i([np.around(math.sin(theta), decimals=9), np.around(-math.cos(theta), decimals=9), 0], i)
-                self.set_oa2_i([0, 0, 1], i)
+        def set_mag_angle_i(self, spherical_angles, i):
+                azimuth = spherical_angles[0]
+                polar_angle = spherical_angles[1]
+                self.set_easy_axis_i([math.sin(polar_angle) * math.cos(azimuth), math.sin(polar_angle) * math.sin(azimuth), math.cos(polar_angle)], i)
+                self.set_oa1_i([math.sin(polar_angle) * math.sin(azimuth), math.sin(polar_angle) * (-math.cos(azimuth)), 0], i)
+                self.set_oa2_i([0.5*math.sin(2*polar_angle) * math.cos(azimuth), 0.5*math.sin(2*polar_angle) * math.sin(azimuth), -math.pow(math.sin(polar_angle),2)], i)
         
         def set_color(self, color):
                 if isinstance(color[0], int) or isinstance(color[0], float):
