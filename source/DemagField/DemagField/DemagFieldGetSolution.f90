@@ -215,8 +215,8 @@
             cylTile%theta0 = phi_orig - phi(i) !< Offset the angle
             cylTile%z0 = z_orig - pts_local(i,3) !< Offset the z-coordinate
           
-            if ( present( useStoredN ) .eq. .true. ) then
-                if ( useStoredN .eq. .false. ) then
+            if ( present( useStoredN ) .eqv. .true. ) then
+                if ( useStoredN .eqv. .false. ) then
                     call getN_CylPiece( cylTile, r(i), N )
               
                     !<Change basis from rotation trick coordinate system to the local system of the tile
@@ -476,8 +476,8 @@
            ! diffPos = matmul( rotMat, diffPos )
         
             !! Get the demag tensor                
-            if ( present( useStoredN ) .eq. .true. ) then
-                if ( useStoredN .eq. .false. ) then
+            if ( present( useStoredN ) .eqv. .true. ) then
+                if ( useStoredN .eqv. .false. ) then
                     call getN_PlanarCoil( tile, diffPos, N )
                  
                     N_out(i,:,:) = N
@@ -535,8 +535,8 @@
             diffPos = matmul( rotMat, diffPos )
         
             !! Get the demag tensor                
-            if ( present( useStoredN ) .eq. .true. ) then
-                if ( useStoredN .eq. .false. ) then
+            if ( present( useStoredN ) .eqv. .true. ) then
+                if ( useStoredN .eqv. .false. ) then
                      call N_tensor( tile, diffPos, N )
                      N_out(i,:,:) = N
                 else
@@ -598,7 +598,7 @@
         allocate( N_tmp(n_ele,3,3) )
         N_tmp(:,:,:) = 0.
     
-        if ( present( useStoredN ) .eq. .false. ) then
+        if ( present( useStoredN ) .eqv. .false. ) then
             useStoredN_tmp = .false.
         else
             useStoredN_tmp = useStoredN
@@ -607,7 +607,7 @@
         !! go through each point
         do i=1,n_ele                  
         
-            if ( useStoredN_tmp .eq. .false. ) then
+            if ( useStoredN_tmp .eqv. .false. ) then
             
                 !! loop over each symmetry operation
                 do j=1,8                        
@@ -642,7 +642,7 @@
         
         enddo
     
-        if ( present(N_out) .eq. .true. ) then
+        if ( present(N_out) .eqv. .true. ) then
             N_out = N_tmp
         endif
     
@@ -765,7 +765,7 @@
         !::Find the rotation matrix as defined by yaw, pitch and roll
         !::Rot = RotZ * RotY * RotX
         rotMat = matmul( matmul( RotZ, RotY ), RotX )
-        !::As the rotation matrices are orthogonal we have that înv(R) = transp(R)
+        !::As the rotation matrices are orthogonal we have that inv(R) = transp(R)
         !:: And thus inv(R1R2) = transp(R2)transp(R1) (note the change in multiplication order)
         !::and that transp( R1R2R3 ) = transp(R3)transp(R1R2) = transp(R3) transp(R2) transp(R1)
         !:: inv(Rot) = inv(RotZ * RotY * RotX ) =>
@@ -838,7 +838,6 @@
         Rz(3,3) = 1.
     
     end subroutine getRotZ
-    
     
     end module DemagFieldGetSolution
     
