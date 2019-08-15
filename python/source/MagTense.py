@@ -83,6 +83,12 @@ class Tiles():
 
         def get_offset(self, i):
                 return self.offset[i]
+        
+        def set_rotation_i(self, rotation, i):
+                self.rot[i] = rotation
+
+        def get_rotation(self, i):
+                return self.rot[i]
 
         def set_easy_axis_i(self, easy_axis, i):
                 self.u_ea[i] = np.around(easy_axis, decimals=9)
@@ -109,12 +115,19 @@ class Tiles():
                         self.set_mag_angle_i(mag_angle,i)
 
         def set_mag_angle_i(self, spherical_angles, i):
-                azimuth = spherical_angles[0]
-                polar_angle = spherical_angles[1]
-                self.set_easy_axis_i([math.sin(polar_angle) * math.cos(azimuth), math.sin(polar_angle) * math.sin(azimuth), math.cos(polar_angle)], i)
-                self.set_oa1_i([math.sin(polar_angle) * math.sin(azimuth), math.sin(polar_angle) * (-math.cos(azimuth)), 0], i)
-                self.set_oa2_i([0.5*math.sin(2*polar_angle) * math.cos(azimuth), 0.5*math.sin(2*polar_angle) * math.sin(azimuth), -math.pow(math.sin(polar_angle),2)], i)
-        
+                if len(spherical_angles) != 2:
+                        print("Azimuth and polar angle have to be set!\nExiting!")
+                        exit()
+                else:
+                        azimuth = spherical_angles[0]
+                        polar_angle = spherical_angles[1]
+                        self.set_easy_axis_i([math.sin(polar_angle) * math.cos(azimuth), math.sin(polar_angle) * math.sin(azimuth), math.cos(polar_angle)], i)
+                        self.set_oa1_i([math.sin(polar_angle) * math.sin(azimuth), math.sin(polar_angle) * (-math.cos(azimuth)), 0], i)
+                        self.set_oa2_i([0.5*math.sin(2*polar_angle) * math.cos(azimuth), 0.5*math.sin(2*polar_angle) * math.sin(azimuth), -math.pow(math.sin(polar_angle),2)], i)
+
+        def get_M(self, i):
+                return self.M[i]
+
         def set_color(self, color):
                 if isinstance(color[0], int) or isinstance(color[0], float):
                         self.color[:] = color
@@ -147,29 +160,32 @@ class Grid():
                         grid_positions = []
                         
                         while n_tiles > 0:
-                                new_pos = [rand.randrange(self.places[0]-1), rand.randrange(self.places[1]-1), rand.randrange(self.places[2]-1)]
+                                new_pos = [rand.randrange(self.places[0]), rand.randrange(self.places[1]), rand.randrange(self.places[2])]
                                 if new_pos in grid_positions:
                                         continue
                                 else:
                                         grid_positions.append(new_pos)
                                         n_tiles = n_tiles - 1
                 
-                tiles = Tiles(len(grid_positions))
-                # Set grid position of tile
-                tiles.set_grid_pos(grid_positions)
-                # Set size of tile
-                tiles.set_size(self.size_tile)
-                # Set tile type: 2 = prism
-                tiles.set_tile_type(2)
+                if len(grid_positions) == 0:
+                        tiles = None
+                else:
+                        tiles = Tiles(len(grid_positions))
+                        # Set grid position of tile
+                        tiles.set_grid_pos(grid_positions)
+                        # Set size of tile
+                        tiles.set_size(self.size_tile)
+                        # Set tile type: 2 = prism
+                        tiles.set_tile_type(2)
 
-                for i,pos in enumerate(grid_positions):
-                        if True in np.greater_equal(np.asarray(pos), self.places):
-                                print(("Desired position {} is not in the grid!").format(pos))
-                                exit()
-                        self.grid[pos] = 1
+                        for i,pos in enumerate(grid_positions):
+                                if True in np.greater_equal(np.asarray(pos), self.places):
+                                        print(("Desired position {} is not in the grid!").format(pos))
+                                        exit()
+                                self.grid[pos] = 1
 
-                        # Extract Cartesian coordinates of tile
-                        tiles.set_offset_i(np.around((pos * self.size_tile) + self.size_tile/2, decimals=9),i)
+                                # Extract Cartesian coordinates of tile
+                                tiles.set_offset_i(np.around((pos * self.size_tile) + self.size_tile/2, decimals=9),i)
 
                 return tiles
         
@@ -235,17 +251,18 @@ def setup(places, area, n_tiles=0, filled_positions=None, mag_angles=[], eval_po
         points = meshgrid.set_eval_points(eval_points, eval_mode)
         # Fill grid with magnetic tiles
         if filled_positions is None:
-                tiles = meshgrid.get_tiles(n_tiles)
+                tiles = meshgrid.get_tiles(n_tiles=n_tiles)
         else:
                 tiles = meshgrid.get_tiles(grid_positions=filled_positions)
         # Assign magnetization angles for tiles
-        if not mag_angles:
-                for _ in range(tiles.get_n()):
-                        mag_angles.append(2 * math.pi * rand.random())       
-        tiles.set_remanence(B_rem / (4*math.pi*1e-7))
-        tiles.set_mag_angle(mag_angles)
-        # Setting display color of magnets: red - [1, 0, 0] 
-        tiles.set_color([1, 0, 0])     
+        if tiles is not None:
+                if not mag_angles:
+                        for _ in range(tiles.get_n()):
+                                mag_angles.append(2 * math.pi * rand.random())       
+                tiles.set_remanence(B_rem / (4*math.pi*1e-7))
+                tiles.set_mag_angle(mag_angles)
+                # Setting display color of magnets: red - [1, 0, 0] 
+                tiles.set_color([1, 0, 0])     
         return tiles, points, meshgrid
 
 # Function for running MagTense with the Fortran source code as Python module
@@ -284,6 +301,7 @@ def run_simulation(tiles, points, grid=None, plot=False, max_error=0.00001, max_
                         util_plot.create_plot(updated_tiles, points, H)
                 else:
                         util_plot.create_plot(updated_tiles, points, H, grid=grid)
+        
         return updated_tiles, solution
 
 def iterate_magnetization(tiles, max_error=0.00001, max_it=500, T=300.):
@@ -301,7 +319,7 @@ def iterate_magnetization(tiles, max_error=0.00001, max_it=500, T=300.):
         updated_tiles = tiles
         updated_tiles.M = M_out
         updated_tiles.M_rel = Mrel_out
-        
+
         return updated_tiles
 
 def get_N_tensor(tiles, points):

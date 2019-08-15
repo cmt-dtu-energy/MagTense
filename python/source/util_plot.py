@@ -2,6 +2,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cm
@@ -25,11 +26,11 @@ def plot_cubes(axes, cubes):
     # Plotting for MagTense
     else:
         for i in range(cubes.get_n()):
-            # TODO Rotate the cubes according to the angles specified in cubes.getRot()
-            # Rotation about x-axis: [[1, 0, 0], [0, cos(rot_x), -sin(rot_x)], [0, sin(rot_x), cos(rot_x)]]
-            # Rotation about y-axis: [[cos(rot_y), 0, sin(rot_y)], [0, 1, 0], [-sin(rot_y), 0, cos(rot_y)]]
-            # Rotation about z-axis: [[cos(rot_z), -sin(rot_z), 0], [sin(rot_z), cos(rot_z), 0], [0, 0, 1]]
-            ver_cube = ver * cubes.get_size(i) + cubes.get_offset(i)
+            ver_cube = ver * cubes.get_size(i)
+            R = get_rotmat(cubes.get_rotation(i))
+            ver_cube = (np.dot(R, ver_cube.T)).T
+            ver_cube = ver_cube + cubes.get_offset(i)
+
             # Define the faces of the unit cubic
             fac = np.array([[0, 1, 2, 3], [3, 2, 4, 5], [5, 6, 7, 4],
                             [0, 1, 7, 6], [5, 6, 0, 3], [1, 2, 4, 7]])
@@ -37,6 +38,22 @@ def plot_cubes(axes, cubes):
             # plot sides
             ax.add_collection3d(Poly3DCollection(surfaces, facecolors=cubes.get_color(i), linewidths=1, edgecolors=cubes.get_color(i), alpha=.25))
 
+            # Plot vector of magnetization in the center of the cube
+            ax.quiver(cubes.get_offset(i)[0], cubes.get_offset(i)[1], cubes.get_offset(i)[2], cubes.get_M(i)[0], cubes.get_M(i)[1], cubes.get_M(i)[2],\
+                color=cubes.get_color(i), length=np.linalg.norm(cubes.get_size(i))/4, pivot='middle', normalize=True)
+
+def get_rotmat(rot):
+    rot_x = [1, 0, 0], [0, math.cos(rot[0]), -math.sin(rot[0])], [0, math.sin(rot[0]), math.cos(rot[0])]
+    rot_y = [math.cos(rot[1]), 0, math.sin(rot[1])], [0, 1, 0], [-math.sin(rot[1]), 0, math.cos(rot[1])]
+    rot_z = [math.cos(rot[2]), -math.sin(rot[2]), 0], [math.sin(rot[2]), math.cos(rot[2]), 0], [0, 0, 1]
+    R = np.matmul(rot_x, np.matmul(rot_y, rot_z))
+    # cx,cy,cz = np.cos(theta) 
+    # sx,sy,sz = np.sin(theta)
+    # R = np.zeros((3,3))
+    # R.flat = (cx*cz - sx*cy*sz, cx*sz + sx*cy*cz, sx*sy,
+    #     -sx*cz - cx*cy*sz, -sx*sz + cx*cy*cz, 
+    #     cx*sy, sy*sz, -sy*cz, cy)
+    return R 
 
 def plot_field(axes, points, H):
     ax = axes
@@ -144,8 +161,10 @@ def zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale=0.1)
 def create_plot(cubes, eval_points, H, grid=None):
     fig = plt.figure()
     ax = fig.gca(projection='3d')
-    plot_cubes(ax, cubes)
-    plot_field(ax, eval_points, H)
+    if cubes is not None:
+        plot_cubes(ax, cubes)
+    if eval_points is not None and H is not None:
+        plot_field(ax, eval_points, H)
     if grid is not None:
         plot_grid(ax, grid)
     # Workaround added get_proj function inside site-packages\mpl_toolkits\mplot3d\axes3d.py
