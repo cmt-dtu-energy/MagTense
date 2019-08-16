@@ -53,8 +53,7 @@ class Tiles():
 
         def set_grid_pos_i(self, grid_pos, i):
                 self.grid_pos[i] = grid_pos
-        
-      
+             
         def set_size(self, sizes):
                 if isinstance(sizes[0], int) or isinstance(sizes[0], float):
                         self.size[:] = sizes
@@ -67,6 +66,29 @@ class Tiles():
         
         def get_size(self, i):
                 return self.size[i]
+        
+        def set_center_pos(self, center_positions):
+                for i,center_pos in enumerate(center_positions):
+                        self.set_center_pos_i(center_pos,i)
+
+        def set_center_pos_i(self, center_pos, i):
+                self.center_pos[i] = center_pos
+        
+        def get_center_pos(self, i):
+                return self.center_pos[i]
+        
+        def set_dev_center(self, devs):
+                if isinstance(devs[0], int) or isinstance(devs[0], float):
+                        self.dev_center[:] = devs
+                else:
+                        for i,dev_center in enumerate(devs):
+                                self.set_dev_center_i(dev_center,i)
+
+        def set_dev_center_i(self, dev_center, i):
+                self.dev_center[i] = dev_center
+        
+        def get_dev_center(self, i):
+                return self.dev_center[i]
         
         def set_tile_type(self, tile_types):
                 if isinstance(tile_types, int) or isinstance(tile_types, float):
