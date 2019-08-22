@@ -53,7 +53,7 @@ tile = IterateMagnetization( tile, [], [], 1e-6, 100 );
 %define a range of points spanning the xy plane at z=0
 x = linspace( -0.05,0.05, 20);
 y = linspace( -0.06,0.06, 21);
-z = 0.00;
+z = 0.0251;
 
 %use meshgrid to fill out the span
 [X,Y,Z] = meshgrid(x,y,z);
@@ -61,7 +61,8 @@ z = 0.00;
 
 %get the field
 [H,Hnorm] = getHMagTense( tile, X, Y, Z );
-
+H = H .* mu0;
+Hnorm = Hnorm .* mu0;
 %Plot the solution in a contour map
 surf_and_con( X,Y,Hnorm);
 xlabel('x');
@@ -78,4 +79,37 @@ axis equal;
 xlabel('x');
 ylabel('y');
 
+
+%define a range of points spanning the xy plane at z=0
+x = linspace( -0.05,0.05, 20);
+y = 0.025 + 5e-3; %height above the cube
+z = linspace( -0.06,0.06, 21);
+
+%use meshgrid to fill out the span
+[X,Y,Z] = meshgrid(x,y,z);
+
+
+%get the field
+[H,Hnorm] = getHMagTense( tile, X, Y, Z );
+H = H .* mu0;
+Hnorm = Hnorm .* mu0;
+
+%Plot the solution in a contour map
+surf_and_con( squeeze(X),squeeze(Z),Hnorm);
+xlabel('x');
+ylabel('z');
+
+
+getFigure();
+quiver(squeeze(X),squeeze(Z),H(:,:,1),H(:,:,3),2,'linewidth',2);
+contour(squeeze(X),squeeze(Z),Hnorm,'linewidth',2);
+
+alpha 0.3;
+axis equal;
+xlabel('x');
+ylabel('z');
+
+getFigure();contour(squeeze(X),squeeze(Z),H(:,:,1),'linewidth',2,'showtext','on');
+xlabel('x');
+ylabel('z');
 end
