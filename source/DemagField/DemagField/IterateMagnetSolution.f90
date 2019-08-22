@@ -82,7 +82,7 @@
         
         !!Iteration loop
         do
-            if ( done .eq. .true. ) then
+            if ( done .eqv. .true. ) then
                 exit
             endif
         
@@ -105,7 +105,7 @@
                         case ( MagnetTypeHard )
                             !!@todo Why is the CylPiece handled in a special way?
                             if ( tiles(i)%tileType .eq. tileTypeCylPiece ) then
-                                call getM_HardMagnet_n( tiles(i)%H_ave, tiles(i), tiles(i).n_ave(1)*tiles(i).n_ave(2)*tiles(i).n_ave(3) )
+                                call getM_HardMagnet_n( tiles(i)%H_ave, tiles(i), tiles(i)%n_ave(1)*tiles(i)%n_ave(2)*tiles(i)%n_ave(3) )
                             else
                                 call getM_HardMagnet_1( H(i,:), tiles(i) )
                             endif
@@ -249,7 +249,7 @@
             !! Update lambda
             if ( cnt .gt. 4 .AND. lambdaCnt .gt. 4 ) then            
                 call updateLambda( lambda, maxRelDiffArr, lCh )
-                if ( lCh .eq. .true. ) lambdaCnt = 1
+                if ( lCh .eqv. .true. ) lambdaCnt = 1
             endif
         
             lambdaCnt = lambdaCnt + 1
@@ -437,6 +437,107 @@
         deallocate(M)
     
     end subroutine saveMagnetizationDebug
+
+
+    subroutine loadTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles)
+        !::Specific for a cylindrical tile piece
+        real(8),dimension(n_tiles,3),intent(in) :: centerPos
+        real(8),dimension(n_tiles,3),intent(in) :: dev_center
+            
+        !::Specific for a rectangular prism
+        real(8),dimension(n_tiles,3),intent(in) :: rect_size
+            
+        !::Generel variables, shared among all tile types
+        real(8),dimension(n_tiles,3),intent(in) :: Mag
+        real(8),dimension(n_tiles,3),intent(in) :: u_ea,u_oa1,u_oa2    
+        real(8),dimension(n_tiles),intent(in) :: mu_r_ea,mu_r_oa,Mrem
+        integer(4),dimension(n_tiles),intent(in) :: tileType        !::defines whether the tile is cylindrical, a prism, an ellipsoid and so on
+        real(8),dimension(n_tiles,3),intent(in) :: offset !::the centre coordinates relative to the global coordinate system
+        real(8),dimension(n_tiles,3),intent(in) :: rotAngles !:: rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
+        real(8),dimension(n_tiles,3),intent(in) :: color !! color rgb triplet
+        integer(4),dimension(n_tiles),intent(in) :: magnetType !::defines whether the tile is a hard or soft magnet
+        integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex !::index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+        integer(4),dimension(n_tiles),intent(in) :: includeInIteration,exploitSymmetry
+        real(8),dimension(n_tiles,3),intent(in) :: symmetryOps !! 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
+        real(8),dimension(n_tiles),intent(in) :: Mrel !! the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
+
+        type(MagTile),dimension(n_tiles),intent(inout) :: tiles
+        integer(4),intent(in) :: n_tiles
+        integer :: i
+
+        do i=1,n_tiles
+            tiles(i)%r0 = centerPos(i,1)
+            tiles(i)%theta0 = centerPos(i,2)
+            tiles(i)%z0 = centerPos(i,3)
+            tiles(i)%dr = dev_center(i,1)
+            tiles(i)%dtheta = dev_center(i,2)
+            tiles(i)%dz = dev_center(i,3)
+            tiles(i)%a = rect_size(i,1)
+            tiles(i)%b = rect_size(i,2)
+            tiles(i)%c = rect_size(i,3)
+            tiles(i)%M = Mag(i,:)
+            tiles(i)%u_ea = u_ea(i,:)
+            tiles(i)%u_oa1 = u_oa1(i,:)
+            tiles(i)%u_oa2 = u_oa2(i,:)
+            tiles(i)%mu_r_ea = mu_r_ea(i)
+            tiles(i)%mu_r_oa = mu_r_oa(i)
+            tiles(i)%Mrem = Mrem(i)
+            tiles(i)%tileType = tileType(i)
+            tiles(i)%offset = offset(i,:)
+            tiles(i)%rotAngles = rotAngles(i,:)
+            tiles(i)%color = color(i,:)
+            tiles(i)%magnetType = magnetType(i)
+            tiles(i)%stateFunctionIndex = stateFunctionIndex(i)
+            tiles(i)%includeInIteration = includeInIteration(i)
+            tiles(i)%exploitSymmetry = exploitSymmetry(i)
+            tiles(i)%symmetryOps = symmetryOps(i,:)
+            tiles(i)%Mrel = Mrel(i)
+
+            if ( tiles(i)%tileType ==  tileTypeCylPiece ) then
+                call setupEvaluationPoints( tiles(i) )
+            endif
+
+        enddo
+
+    end subroutine loadTiles
+
+    
+    subroutine loadMagStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
+        
+        integer,intent(in) :: nT,nH
+        type(MagStateFunction),dimension(n_stateFcn),intent(inout) :: stateFcn
+        real,dimension(nH,nT),intent(in) :: data_stateFcn
+        integer,intent(in) :: n_stateFcn
+        integer :: i, j, k
+
+        do i=1,n_stateFcn
+            stateFcn(i)%nT = nT-1
+            stateFcn(i)%nH = nH-1
+            allocate( stateFcn(i)%M(stateFcn(i)%nT,stateFcn(i)%nH) )
+            allocate( stateFcn(i)%T(stateFcn(i)%nT) )
+            allocate( stateFcn(i)%H(stateFcn(i)%nH) )
+            allocate( stateFcn(i)%y2a(stateFcn(i)%nH) )
+        
+            stateFcn(i)%T(1) = data_stateFcn(1,2)
+            stateFcn(i)%T(2) = data_stateFcn(1,3)
+            stateFcn(i)%T(3) = data_stateFcn(1,4)
+
+            do j=2,nH
+                k = j - 1
+                stateFcn(i)%H(k) = data_stateFcn(j,1)
+                stateFcn(i)%M(1,k) = data_stateFcn(j,2)
+                stateFcn(i)%M(2,k) = data_stateFcn(j,3)
+                stateFcn(i)%M(3,k) = data_stateFcn(j,4)
+                
+                !! make the spline derivatives for later interpolation
+                !call splie2( sngl(stateFunction(i)%T), sngl(stateFunction(i)%H), sngl(stateFunction(i)%M), sngl(stateFunction(i)%nT), sngl(stateFunction(i)%nH), sngl(stateFunction(i)%y2a) )
+                !!@todo If this code is deprecated, the spline.f90 code can be removed as it is only called here.
+                !call spline( stateFunction(i)%H, stateFunction(i)%M(1,:), 1e30, 1e30, stateFunction(i)%y2a, stateFunction(i)%nH )
+            
+            enddo
+        enddo
+
+    end subroutine loadMagStateFunction  
     
     end module IterateMagnetSolution
     

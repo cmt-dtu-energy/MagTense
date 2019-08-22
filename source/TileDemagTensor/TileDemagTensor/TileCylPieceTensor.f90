@@ -39,7 +39,7 @@ module TileCylPieceTensor
         
     function int_dDdx_dr_dz_fct( z,  dat )
     real,intent(in) :: z
-    class(dataCollectionBase), target :: dat     
+    class(dataCollectionBase), intent(inout), target :: dat     
     real :: int_dDdx_dr_dz_fct,r1,r2,thetas,x
         
     r1 = dat%r1
@@ -154,7 +154,7 @@ module TileCylPieceTensor
     
     function int_r_dDdx_dr_dtheta_fct( theta, dat )
     real :: int_r_dDdx_dr_dtheta_fct
-    class(dataCollectionBase), target :: dat
+    class(dataCollectionBase), intent(inout), target :: dat
     real,intent(in) :: theta
     real :: r1,r2,x,zs
         
@@ -313,7 +313,7 @@ module TileCylPieceTensor
     
     function int_r_dDdy_dr_dtheta_fct( theta, dat )
     real :: int_r_dDdy_dr_dtheta_fct
-    class(dataCollectionBase), target :: dat
+    class(dataCollectionBase), intent(inout), target :: dat
     real,intent(in) :: theta
     real :: r1,r2,x,zs
         

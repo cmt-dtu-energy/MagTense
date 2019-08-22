@@ -106,7 +106,7 @@ end function r8vec_distinct
   real ( kind = 8 ) arg2
   real ( kind = 8 ) pchst
 
-  pchst = sign ( 1.0D+00, arg1 ) * sign ( 1.0D+00, arg2 )
+  pchst = sign ( real(1.0D+00), arg1 ) * sign ( real(1.0D+00), arg2 )
 
   if ( arg1 == 0.0D+00 .or. arg2 == 0.0D+00 ) then
     pchst = 0.0D+00

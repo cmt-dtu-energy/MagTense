@@ -43,5 +43,5 @@ mex -g -Lsource\MagneticForceIntegrator\MagneticForceIntegrator\x64\release\ -lM
        -Isource\TileDemagTensor\TileDemagTensor\x64\release\ ...        
     source\MagTenseMEX\MagTenseMEX\getMagForce_mex.f90 COMPFLAGS="$COMPFLAGS /O2 /Qopenmp /extend_source:132 /real_size:64  /fpe:0"
         
-movefile getMagForce_mex.mexw64 MEX_files\getMagForce_mex.mexw64
-movefile getMagForce_mex.mexw64.pdb MEX_files\getMagForce_mex.mexw64.pdb
+movefile getMagForce_mex.mexw64 matlab\MEX_files\getMagForce_mex.mexw64
+movefile getMagForce_mex.mexw64.pdb matlab\MEX_files\getMagForce_mex.mexw64.pdb

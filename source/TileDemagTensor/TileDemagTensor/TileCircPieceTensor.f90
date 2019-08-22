@@ -615,7 +615,7 @@
         
         function int_ddx_dx_dy_fct2( yp, dat )              
         real,intent(in) :: yp
-        class(dataCollectionBase), target :: dat
+        class(dataCollectionBase), intent(inout), target :: dat
         real :: x,y,z,theta0,R,zp
         real :: int_ddx_dx_dy_fct2
             x = dat%x
@@ -718,7 +718,7 @@
         
         function int_ddy_dx_dy_fct2( xp, dat )              
         real,intent(in) :: xp
-        class(dataCollectionBase), target :: dat
+        class(dataCollectionBase), intent(inout), target :: dat
         real :: x,y,z,theta0,R,zp
         real :: int_ddy_dx_dy_fct2
             x = dat%x
@@ -831,7 +831,7 @@
          
          function int_ddz_dx_dy_fct2( yp, dat )         
          real,intent(in) :: yp
-         class(dataCollectionBase), target :: dat
+         class(dataCollectionBase), intent(inout), target :: dat
          real :: int_ddz_dx_dy_fct2
          real :: zp, x, y, z, theta0,R
          
