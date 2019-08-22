@@ -622,7 +622,7 @@ module TileNComponents
     subroutine getN_prism_3D( prism, pos, N_out )
     type(MagTile),intent(in) :: prism
     real,intent(in),dimension(3) :: pos
-    real,intent(out),dimension(3,3) :: N_out
+    real,intent(inout),dimension(3,3) :: N_out
     
     real :: a,b,c,x,y,z
     real :: nom,denom,nom_l,nom_h,denom_l,denom_h    
