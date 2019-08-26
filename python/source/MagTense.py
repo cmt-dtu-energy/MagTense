@@ -22,14 +22,14 @@ class Tiles():
                 self.mu_r_ea = np.ones(shape=(n), dtype=np.float64, order='F')
                 self.mu_r_oa = np.ones(shape=(n), dtype=np.float64, order='F')
                 self.M_rem = np.zeros(shape=(n), dtype=np.float64, order='F')
-                self.tile_type = np.ones(n, dtype=np.int32, order='F') # 1 = cylinder, 2 = prism, 3 = ellipsoid
+                self.tile_type = np.ones(n, dtype=np.int32, order='F') # 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 10 = ellipsoid
                 self.offset = np.zeros(shape=(n,3), dtype=np.float64, order='F') # offset of global coordinates
                 self.rot = np.zeros(shape=(n,3), dtype=np.float64, order='F')
                 self.color = np.zeros(shape=(n,3), dtype=np.float64, order='F')
                 self.magnetic_type = np.ones(n, dtype=np.int32, order='F') # 1 = hard magnet, 2 = soft magnet
                 self.stfcn_index = np.ones(shape=(n), dtype=np.int32, order='F') # default index into the state function
                 self.incl_it = np.ones(shape=(n), dtype=np.int32, order='F') # if equal to zero the tile is not included in the iteration
-                self.use_sym = np.ones(shape=(n), dtype=np.int32, order='F') # whether to exploit symmetry
+                self.use_sym = np.zeros(shape=(n), dtype=np.int32, order='F') # whether to exploit symmetry
                 self.sym_op = np.ones(shape=(n,3), dtype=np.float64, order='F') # 1 for symmetry and -1 for anti-symmetry respectively to the planes
                 self.M_rel = np.zeros(shape=(n), dtype=np.float64, order='F')                
                 
@@ -99,6 +99,9 @@ class Tiles():
 
         def set_tile_type_i(self, tile_type, i):
                 self.tile_type[i] = tile_type
+        
+        def get_tile_type(self, i):
+                return self.tile_type[i]
 
         def set_offset_i(self, offset, i):
                 self.offset[i] = offset

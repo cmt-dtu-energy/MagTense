@@ -59,7 +59,7 @@ class Tile():
                 self.offset = np.zeros(shape=(3), dtype=np.float64, order='F') # offset of global coordinates
                 self.rot = np.zeros(shape=(3), dtype=np.float64, order='F')
                 self.color = np.array([1, 0, 0], dtype=np.float64, order='F')
-                self.use_sym = 1 # whether to exploit symmetry
+                self.use_sym = 0 # whether to exploit symmetry
                 self.sym_op = np.array([1, 1, 1], dtype=np.float64, order='F') # 1 for symmetry and -1 for anti-symmetry respectively to the planes
                 self.M_rel = 0.
 
@@ -80,11 +80,20 @@ class Tile():
         def set_tile_type(self, tile_type):
                 self.tile_type = tile_type
 
+        def get_tile_type(self):
+                return self.tile_type
+
         def set_offset(self, offset):
                 self.offset[:] = offset[:]
 
         def get_offset(self):
                 return self.offset
+        
+        def set_rotation(self, rotation):
+                self.rot[:] = rotation[:]
+        
+        def get_rotation(self):
+                return self.rot
 
         def set_easy_axis(self, easy_axis):
                 self.u_ea[:] = easy_axis[:]
@@ -100,9 +109,14 @@ class Tile():
                 self.M_rem = M_rem
         
         def set_mag_angle(self, theta):
-                self.set_easy_axis([np.around(math.cos(theta), decimals=9), np.around(math.sin(theta), decimals=9), 0])
-                self.set_oa1([np.around(math.sin(theta), decimals=9), np.around(-math.cos(theta), decimals=9), 0])
-                self.set_oa2([0, 0, 1])
+                azimuth = theta[0]
+                polar_angle = theta[1]
+                self.set_easy_axis([math.sin(polar_angle) * math.cos(azimuth), math.sin(polar_angle) * math.sin(azimuth), math.cos(polar_angle)])
+                self.set_oa1([math.sin(polar_angle) * math.sin(azimuth), math.sin(polar_angle) * (-math.cos(azimuth)), 0])
+                self.set_oa2([0.5*math.sin(2*polar_angle) * math.cos(azimuth), 0.5*math.sin(2*polar_angle) * math.sin(azimuth), -math.pow(math.sin(polar_angle),2)])
+        
+        def get_M(self):
+                return self.M
         
         def get_color(self):
                 return self.color
@@ -334,7 +348,6 @@ class Grid():
                 else:
                         print("Please specify a valid area of interest!")
                         exit()
-                create_points_txt(points)
                 return points
 
         def clear_grid(self):
@@ -373,6 +386,7 @@ def setup(places, area, n_tiles=0, filled_positions=None, mag_angles=[], eval_po
 # Function for running standalone MagTense
 def run_simulation(tiles, points, grid=None, plot=False, output=False):
         create_tiles_txt(tiles)
+        create_points_txt(points)
         filepath = os.path.join(DIRPATH_MAGTENSE, 'MagTense_StandAlone.exe')
         result = subprocess.run(filepath, cwd=DIRPATH_MAGTENSE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         if output==True:
