@@ -31,9 +31,9 @@ def main():
     tile_standalone.set_mag_angle([math.pi/3, math.pi/4])
 
     # Load reference points from COMSOL calculation
-    path_COMSOL_eval = os.path.dirname(os.path.abspath(__file__)) + '/../util/evaluations/'
+    path_COMSOL_eval = os.path.dirname(os.path.abspath(__file__)) + '/../../documentation/examples_FEM_validation/Validation_prism/'
 
-    with open(os.path.join(path_COMSOL_eval, 'Example_prism_normH_x_rot_rev.txt'), "r") as file:
+    with open(os.path.join(path_COMSOL_eval, 'Validation_prism_normH_x.txt'), "r") as file:
                 Tx = file.readlines()[8:]
     Tx_split = np.asarray([line.split() for line in Tx], dtype=np.float64)
     x = Tx_split[:,0]
@@ -41,10 +41,10 @@ def main():
     off = np.ones(len(x))
     eval_points_x = np.c_[x, off*offset[1], off*offset[2]]
 
-    # (updated_tiles_x, H_x) = MagTense.run_simulation(tile_val, eval_points_x)
+    (updated_tiles_x, H_x) = MagTense.run_simulation(tile_val, eval_points_x)
     # Testing the standalone version
-    (updated_tiles_x, H_dict_x) = MagTenseStandalone.run_simulation([tile_standalone], eval_points_x)
-    H_x = np.array(list(H_dict_x.field.values()))
+    # (updated_tiles_x, H_dict_x) = MagTenseStandalone.run_simulation([tile_standalone], eval_points_x)
+    # H_x = np.array(list(H_dict_x.field.values()))
 
     H_norm_x_MagTense  = MagTense.get_norm_magnetic_flux(H_x)
     error = abs(H_norm_x_COMSOL - H_norm_x_MagTense)
@@ -54,15 +54,15 @@ def main():
 
     fig, ax = plt.subplots(1,3)
     fig.suptitle("MagTensePython vs. COMSOL")    
-    ax[0].plot(x, H_norm_x_COMSOL, 'b', label='COMSOL')
-    ax[0].plot(x, H_norm_x_MagTense, 'r', label='MagTense')
+    ax[0].plot(x, H_norm_x_COMSOL, 'bx', label='COMSOL')
+    ax[0].plot(x, H_norm_x_MagTense, 'r*', label='MagTense')
     # ax[0].plot(x, error, 'g', label= 'Error')
     ax[0].legend()
     ax[0].set_xlabel('x_axis')
     ax[0].set_ylabel('H_norm')
 
 
-    with open(os.path.join(path_COMSOL_eval, 'Example_prism_normH_y_rot_rev.txt'), "r") as file:
+    with open(os.path.join(path_COMSOL_eval, 'Validation_prism_normH_y.txt'), "r") as file:
                 Ty = file.readlines()[8:]
     Ty_split = np.asarray([line.split() for line in Ty], dtype=np.float64)
     y = Ty_split[:,0]
@@ -70,10 +70,10 @@ def main():
     off = np.ones(len(y))
     eval_points_y = np.c_[off*offset[0], y, off*offset[2]]
 
-    # (updated_tiles_y, H_y) = MagTense.run_simulation(tile_val, eval_points_y)
+    (updated_tiles_y, H_y) = MagTense.run_simulation(tile_val, eval_points_y)
     # Testing the standalone version
-    (updated_tiles_y, H_dict_y) = MagTenseStandalone.run_simulation([tile_standalone], eval_points_y)
-    H_y = np.array(list(H_dict_y.field.values()))
+    # (updated_tiles_y, H_dict_y) = MagTenseStandalone.run_simulation([tile_standalone], eval_points_y)
+    # H_y = np.array(list(H_dict_y.field.values()))
 
     H_norm_y_MagTense  = MagTense.get_norm_magnetic_flux(H_y)
     error = abs(H_norm_y_COMSOL - H_norm_y_MagTense)
@@ -81,14 +81,14 @@ def main():
     # Standard parameters in settings: max_error=0.00001, max_it=500
     # util_plot.create_plot(updated_tiles_y, eval_points_y, H_y)
   
-    ax[1].plot(y, H_norm_y_COMSOL, 'b', label='COMSOL')
-    ax[1].plot(y, H_norm_y_MagTense, 'r', label='MagTense')
+    ax[1].plot(y, H_norm_y_COMSOL, 'bx', label='COMSOL')
+    ax[1].plot(y, H_norm_y_MagTense, 'r*', label='MagTense')
     # ax[1].plot(y, error, 'g', label= 'Error')
     ax[1].legend()
     ax[1].set_xlabel('y_axis')
     ax[1].set_ylabel('H_norm')
 
-    with open(os.path.join(path_COMSOL_eval, 'Example_prism_normH_z_rot_rev.txt'), "r") as file:
+    with open(os.path.join(path_COMSOL_eval, 'Validation_prism_normH_z.txt'), "r") as file:
                 Tz = file.readlines()[8:]
     Tz_split = np.asarray([line.split() for line in Tz], dtype=np.float64)
     z = Tz_split[:,0]
@@ -96,10 +96,10 @@ def main():
     off = np.ones(len(z))
     eval_points_z = np.c_[off*offset[0], off*offset[1], z]
 
-    # (updated_tiles_z, H_z) = MagTense.run_simulation(tile_val, eval_points_z)
+    (updated_tiles_z, H_z) = MagTense.run_simulation(tile_val, eval_points_z)
     # Testing the standalone version
-    (updated_tiles_z, H_dict_z) = MagTenseStandalone.run_simulation([tile_standalone], eval_points_z)
-    H_z = np.array(list(H_dict_z.field.values()))
+    # (updated_tiles_z, H_dict_z) = MagTenseStandalone.run_simulation([tile_standalone], eval_points_z)
+    # H_z = np.array(list(H_dict_z.field.values()))
 
     H_norm_z_MagTense  = MagTense.get_norm_magnetic_flux(H_z)
     error = abs(H_norm_z_COMSOL - H_norm_z_MagTense)
@@ -107,8 +107,8 @@ def main():
     # Standard parameters in settings: max_error=0.00001, max_it=500
     # util_plot.create_plot(updated_tiles_z, eval_points_z, H_z)
   
-    ax[2].plot(z, H_norm_z_COMSOL, 'b', label='COMSOL')
-    ax[2].plot(z, H_norm_z_MagTense, 'r', label='MagTense')
+    ax[2].plot(z, H_norm_z_COMSOL, 'bx', label='COMSOL')
+    ax[2].plot(z, H_norm_z_MagTense, 'r*', label='MagTense')
     # ax[2].plot(z, error, 'g', label= 'Error')
     ax[2].legend()
     ax[2].set_xlabel('z_axis')
