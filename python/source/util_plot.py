@@ -8,45 +8,102 @@ import matplotlib.colors as colors
 import matplotlib.cm as cm
 
 
-def plot_cubes(axes, cubes):
+def plot_cube(axes, size, offset, rotation, M, color):
     ax = axes
+
     # Define the vertices of the unit cubic and move them in order to center the cube on origo
     ver = np.array([[1, 1, 0], [0, 1, 0], [0, 1, 1], [1, 1, 1], [0, 0, 1], [1, 0, 1], [1, 0, 0], [0, 0, 0]]) - 0.5
+    ver_cube = ver * size
+    R = get_rotmat(rotation)
+    ver_cube = (np.dot(R, ver_cube.T)).T
+    ver_cube = ver_cube + offset
 
-    # Plotting for MagTenseStandalone
-    if isinstance(cubes, list):
-        for cube in cubes:
-            ver_cube = ver * cube.get_size() + cube.get_offset()
-            # Define the faces of the unit cubic
-            fac = np.array([[0, 1, 2, 3], [3, 2, 4, 5], [5, 6, 7, 4],
-                            [0, 1, 7, 6], [5, 6, 0, 3], [1, 2, 4, 7]])
-            surfaces = ver_cube[fac]
-            # plot sides
-            ax.add_collection3d(Poly3DCollection(surfaces, facecolors=cube.get_color(), linewidths=1, edgecolors=cube.get_color(), alpha=.25))
-    # Plotting for MagTense
-    else:
-        for i in range(cubes.get_n()):
-            ver_cube = ver * cubes.get_size(i)
-            R = get_rotmat(cubes.get_rotation(i))
-            ver_cube = (np.dot(R, ver_cube.T)).T
-            ver_cube = ver_cube + cubes.get_offset(i)
+    print(ver_cube)
 
-            # Define the faces of the unit cubic
-            fac = np.array([[0, 1, 2, 3], [3, 2, 4, 5], [5, 6, 7, 4],
-                            [0, 1, 7, 6], [5, 6, 0, 3], [1, 2, 4, 7]])
-            surfaces = ver_cube[fac]
-            # plot sides
-            ax.add_collection3d(Poly3DCollection(surfaces, facecolors=cubes.get_color(i), linewidths=1, edgecolors=cubes.get_color(i), alpha=.25))
+    # Define the faces of the unit cubic
+    fac = np.array([[0, 1, 2, 3], [3, 2, 4, 5], [5, 6, 7, 4],
+                    [0, 1, 7, 6], [5, 6, 0, 3], [1, 2, 4, 7]])
+    surfaces = ver_cube[fac]
 
-            # Plot vector of magnetization in the center of the cube
-            ax.quiver(cubes.get_offset(i)[0], cubes.get_offset(i)[1], cubes.get_offset(i)[2], cubes.get_M(i)[0], cubes.get_M(i)[1], cubes.get_M(i)[2],\
-                color=cubes.get_color(i), length=np.linalg.norm(cubes.get_size(i))/4, pivot='middle', normalize=True)
+    # plot sides
+    ax.add_collection3d(Poly3DCollection(surfaces, facecolors=color, linewidths=1, edgecolors=color, alpha=.25))
+
+    # Plot vector of magnetization in the center of the cube
+    ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(size)/4, pivot='middle', normalize=True)
+
+
+def plot_cylindrical_tile(axes, center_pos, dev_center, offset, rotation, M, color):
+    ax = axes
+    r, theta, z = center_pos[:]
+    dr, dtheta, dz = dev_center[:]
+    xc = center_pos[0]*math.cos(center_pos[1])
+    yc = center_pos[0]*math.sin(center_pos[1]) 
+    zc = center_pos[2]
+    center = np.array([xc, yc, zc])
+
+    # Define cylindrical tile regarding to its local spherical coordinate system
+    ver_cyl = np.array([[(r - dr/2) * math.cos(theta - dtheta/2), (r - dr/2) * math.sin(theta - dtheta/2), z - dz/2],\
+        [(r + dr/2) * math.cos(theta - dtheta/2), (r + dr/2) * math.sin(theta - dtheta/2), z - dz/2],\
+        [(r - dr/2) * math.cos(theta + dtheta/2), (r - dr/2) * math.sin(theta + dtheta/2), z - dz/2],\
+        [(r + dr/2) * math.cos(theta + dtheta/2), (r + dr/2) * math.sin(theta + dtheta/2), z - dz/2],\
+        [(r - dr/2) * math.cos(theta - dtheta/2), (r - dr/2) * math.sin(theta - dtheta/2), z + dz/2],\
+        [(r + dr/2) * math.cos(theta - dtheta/2), (r + dr/2) * math.sin(theta - dtheta/2), z + dz/2],\
+        [(r - dr/2) * math.cos(theta + dtheta/2), (r - dr/2) * math.sin(theta + dtheta/2), z + dz/2],\
+        [(r + dr/2) * math.cos(theta + dtheta/2), (r + dr/2) * math.sin(theta + dtheta/2), z + dz/2]])
+    
+    # Add rotation
+    R = get_rotmat([rotation[0], rotation[1], 0])
+    ver_cyl = (np.dot(R, ver_cyl.T)).T
+    center = (np.dot(R, center.T)).T
+    
+    # Creating curves
+    seg_theta = np.linspace(theta - dtheta/2, theta + dtheta/2, 100)
+    seg_curves = np.zeros(shape=(4,3,100))
+    count = 0
+    for radius in [r - dr/2, r + dr/2]:
+        seg_x = radius * np.cos(seg_theta)
+        seg_y = radius * np.sin(seg_theta)
+
+        for height in [z - dz/2, z + dz/2]:
+            seg_z = np.linspace(height, height, 100)
+            curve = np.asarray([seg_x, seg_y, seg_z])
+
+            for k in range(curve.shape[1]):
+                curve[:,k] = (np.dot(R, curve[:,k].T)).T + offset
+
+            seg_curves[count] = curve
+            count = count + 1
+    
+    # Moving tile with offset
+    ver_cyl = ver_cyl + offset
+
+    # Corner points
+    ax.plot(ver_cyl[:,0], ver_cyl[:,1], ver_cyl[:,2], 'ro')
+    
+    # Connecting lines
+    fac = np.array([[0,1], [2,3], [0,4], [1,5], [2,6], [6,7], [4,5], [3,7]])
+    lines = ver_cyl[fac]
+    for line in lines:
+        ax.plot(line[:,0], line[:,1], line[:,2], color=color)
+
+    # Define the faces of the cylinder
+    fac = np.array([[0, 4, 5, 1], [2, 6, 7, 3]])
+    surfaces = ver_cyl[fac]
+    # Plot sides
+    ax.add_collection3d(Poly3DCollection(surfaces, facecolors=color, linewidths=1, edgecolors=color, alpha=.25))
+
+    for seg_curve in seg_curves:
+        ax.plot(seg_curve[0], seg_curve[1], seg_curve[2], color=color)
+
+    # Plot vector of magnetization in the center of the cube
+    ax.quiver(offset[0] + center[0], offset[1] + center[1], offset[2] + center[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(dr)/2, pivot='middle', normalize=True)
+
 
 def get_rotmat(rot):
     rot_x = [1, 0, 0], [0, math.cos(rot[0]), -math.sin(rot[0])], [0, math.sin(rot[0]), math.cos(rot[0])]
     rot_y = [math.cos(rot[1]), 0, math.sin(rot[1])], [0, 1, 0], [-math.sin(rot[1]), 0, math.cos(rot[1])]
     rot_z = [math.cos(rot[2]), -math.sin(rot[2]), 0], [math.sin(rot[2]), math.cos(rot[2]), 0], [0, 0, 1]
-    R = np.matmul(rot_x, np.matmul(rot_y, rot_z))
+    R = np.matmul(np.matmul(rot_x, rot_y), rot_z)
     # cx,cy,cz = np.cos(theta) 
     # sx,sy,sz = np.sin(theta)
     # R = np.zeros((3,3))
@@ -158,13 +215,35 @@ def zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale=0.1)
     return (zoom_scroll, zoom_onpress)
 
 
-def create_plot(cubes, eval_points, H, grid=None):
+def create_plot(tiles, eval_points, H, grid=None):
     fig = plt.figure()
     ax = fig.gca(projection='3d')
-    if cubes is not None:
-        plot_cubes(ax, cubes)
+    if tiles is not None:
+        # Plotting for MagTenseStandalone
+        if isinstance(tiles, list):
+            for tile in tiles:
+                if (tile.get_tile_type() == 2):
+                    plot_cube(ax, tile.get_size(), tile.get_offset(), tile.get_rotation(), tile.get_M(), tile.get_color())
+        # Plotting for MagTense
+        else:
+            for i in range(tiles.get_n()):
+                # 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 10 = ellipsoid
+                if (tiles.get_tile_type(i) == 1):
+                    plot_cylindrical_tile(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
+                elif (tiles.get_tile_type(i) == 2):
+                    plot_cube(ax, tiles.get_size(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))   
+                elif (tiles.get_tile_type(i) == 3):
+                    pass
+                elif (tiles.get_tile_type(i) == 4):
+                    pass
+                elif (tiles.get_tile_type(i) == 5):
+                    pass
+                else:
+                    print("Tile type not supported!")
+
     if eval_points is not None and H is not None:
         plot_field(ax, eval_points, H)
+
     if grid is not None:
         plot_grid(ax, grid)
     # Workaround added get_proj function inside site-packages\mpl_toolkits\mplot3d\axes3d.py
