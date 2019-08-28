@@ -32,7 +32,7 @@ def plot_cube(axes, size, offset, rotation, M, color):
     ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(size)/4, pivot='middle', normalize=True)
 
 
-def plot_cylindrical_tile(axes, center_pos, dev_center, offset, rotation, M, color):
+def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color):
     ax = axes
     resolution = 100
     r, theta, z = center_pos[:]
@@ -98,13 +98,98 @@ def plot_cylindrical_tile(axes, center_pos, dev_center, offset, rotation, M, col
     # Plot curved surfaces
     curved_surfaces = np.zeros(shape=(4*(resolution-1),4,3))
     comb = np.array([[0, 1], [1, 3], [2, 3], [0, 2]])
-    for j in range(curved_surfaces.shape[1]):   
+    for j in range(comb.shape[0]):   
         for i in range(resolution-1):        
             curved_surfaces[i+(resolution-1)*j] = [seg_curves[comb[j][0]][:,i], seg_curves[comb[j][1]][:,i], seg_curves[comb[j][1]][:,i+1], seg_curves[comb[j][0]][:,i+1]]
     ax.add_collection3d(Poly3DCollection(curved_surfaces, facecolors=color, linewidths=1, alpha=.25))
 
     # Plot vector of magnetization in the center of the cube
     ax.quiver(offset[0] + center[0], offset[1] + center[1], offset[2] + center[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(dr)/2, pivot='middle', normalize=True)
+
+def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv=False):
+    ax = axes
+    resolution = 100
+    r, theta, z = center_pos[:]
+    dr, dtheta, dz = dev_center[:]
+    
+    # Calculating radius of inner edge
+    p1 = np.array([r * math.cos(theta - dtheta/2), r * math.sin(theta - dtheta/2)])
+    p2 = np.array([r * math.cos(theta + dtheta/2), r * math.sin(theta + dtheta/2)])
+    r_mid = np.linalg.norm((p1 + p2)/2)
+    
+    # Difference between circpiece and circpiece_inv
+    if inv is False:
+        r_inner = r_mid - np.linalg.norm(p2-p1)/2
+    else:
+        r_inner = r_mid + np.linalg.norm(p2-p1)/2
+
+    xc = (r_inner + (r-r_inner)/2)*math.cos(center_pos[1])
+    yc = (r_inner + (r-r_inner)/2)*math.sin(center_pos[1]) 
+    zc = center_pos[2]
+    center = np.array([xc, yc, zc])
+
+
+    # Define circ piece regarding to its local spherical coordinate system
+    ver_cyl = np.array([[r * math.cos(theta - dtheta/2), r * math.sin(theta - dtheta/2), z - dz/2],\
+        [r * math.cos(theta + dtheta/2), r * math.sin(theta + dtheta/2), z - dz/2],\
+        [r * math.cos(theta - dtheta/2), r * math.sin(theta - dtheta/2), z + dz/2],\
+        [r * math.cos(theta + dtheta/2), r * math.sin(theta + dtheta/2), z + dz/2],\
+        [r_inner * math.cos(theta), r_inner * math.sin(theta), z + dz/2],\
+        [r_inner * math.cos(theta), r_inner * math.sin(theta), z - dz/2]])
+    
+    # Add rotation
+    R = get_rotmat([rotation[0], rotation[1], 0])
+    ver_cyl = (np.dot(R, ver_cyl.T)).T
+    center = (np.dot(R, center.T)).T
+    
+    # Creating curves
+    seg_theta = np.linspace(theta - dtheta/2, theta + dtheta/2, resolution)
+    seg_curves = np.zeros(shape=(4,3,resolution))
+    count = 0
+    for height in [z - dz/2, z + dz/2]:
+        seg_x = r * np.cos(seg_theta)
+        seg_y = r * np.sin(seg_theta)
+        seg_z = np.linspace(height, height, resolution)
+        curve = np.asarray([seg_x, seg_y, seg_z])
+
+        for k in range(curve.shape[1]):
+            curve[:,k] = (np.dot(R, curve[:,k].T)).T + offset
+
+        seg_curves[count] = curve
+        count = count + 1
+    
+    # Moving tile with offset
+    ver_cyl = ver_cyl + offset
+
+    # Corner points
+    # ax.plot(ver_cyl[:,0], ver_cyl[:,1], ver_cyl[:,2], 'ro')
+
+    # Define the faces of the cylinder
+    fac = np.array([[0, 5, 4, 2], [1, 5, 4, 3]])
+    surfaces = ver_cyl[fac]
+    
+    # Plot rectangular sides
+    ax.add_collection3d(Poly3DCollection(surfaces, facecolors=color, linewidths=1, edgecolors=color, alpha=.25))
+    
+    # Plot curves
+    for seg_curve in seg_curves:
+        ax.plot(seg_curve[0], seg_curve[1], seg_curve[2], color=color)
+    
+    # Plot curved surfaces
+    curved_surfaces = np.zeros(shape=(resolution-1,4,3))
+    for i in range(resolution-1):        
+        curved_surfaces[i] = [seg_curves[0][:,i], seg_curves[1][:,i], seg_curves[1][:,i+1], seg_curves[0][:,i+1]]
+    ax.add_collection3d(Poly3DCollection(curved_surfaces, facecolors=color, linewidths=1, alpha=.25))
+
+    # Plot triangular
+    triangle_surfaces = np.zeros(shape=(2*(resolution-1),3,3))
+    for j in range(2):   
+        for i in range(resolution-1):        
+            triangle_surfaces[i+(resolution-1)*j] = [seg_curves[j][:,i], ver_cyl[5-j], seg_curves[j][:,i+1]]
+    ax.add_collection3d(Poly3DCollection(triangle_surfaces, facecolors=color, linewidths=1, alpha=.25))
+
+    # Plot vector of magnetization in the center of the cube
+    ax.quiver(offset[0] + center[0], offset[1] + center[1], offset[2] + center[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(r-r_inner)/2, pivot='middle', normalize=True)
 
 
 def get_rotmat(rot):
@@ -237,13 +322,13 @@ def create_plot(tiles, eval_points, H, grid=None):
             for i in range(tiles.get_n()):
                 # 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 10 = ellipsoid
                 if (tiles.get_tile_type(i) == 1):
-                    plot_cylindrical_tile(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
+                    plot_cylindrical(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
                 elif (tiles.get_tile_type(i) == 2):
                     plot_cube(ax, tiles.get_size(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))   
                 elif (tiles.get_tile_type(i) == 3):
-                    pass
+                    plot_circpiece(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
                 elif (tiles.get_tile_type(i) == 4):
-                    pass
+                    plot_circpiece(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i), inv=True)
                 elif (tiles.get_tile_type(i) == 5):
                     pass
                 else:
