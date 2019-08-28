@@ -34,6 +34,7 @@ def plot_cube(axes, size, offset, rotation, M, color):
 
 def plot_cylindrical_tile(axes, center_pos, dev_center, offset, rotation, M, color):
     ax = axes
+    resolution = 100
     r, theta, z = center_pos[:]
     dr, dtheta, dz = dev_center[:]
     xc = center_pos[0]*math.cos(center_pos[1])
@@ -57,15 +58,15 @@ def plot_cylindrical_tile(axes, center_pos, dev_center, offset, rotation, M, col
     center = (np.dot(R, center.T)).T
     
     # Creating curves
-    seg_theta = np.linspace(theta - dtheta/2, theta + dtheta/2, 100)
-    seg_curves = np.zeros(shape=(4,3,100))
+    seg_theta = np.linspace(theta - dtheta/2, theta + dtheta/2, resolution)
+    seg_curves = np.zeros(shape=(4,3,resolution))
     count = 0
     for radius in [r - dr/2, r + dr/2]:
         seg_x = radius * np.cos(seg_theta)
         seg_y = radius * np.sin(seg_theta)
 
         for height in [z - dz/2, z + dz/2]:
-            seg_z = np.linspace(height, height, 100)
+            seg_z = np.linspace(height, height, resolution)
             curve = np.asarray([seg_x, seg_y, seg_z])
 
             for k in range(curve.shape[1]):
@@ -78,7 +79,7 @@ def plot_cylindrical_tile(axes, center_pos, dev_center, offset, rotation, M, col
     ver_cyl = ver_cyl + offset
 
     # Corner points
-    ax.plot(ver_cyl[:,0], ver_cyl[:,1], ver_cyl[:,2], 'ro')
+    # ax.plot(ver_cyl[:,0], ver_cyl[:,1], ver_cyl[:,2], 'ro')
     
     # Connecting lines
     fac = np.array([[0,1], [2,3], [0,4], [1,5], [2,6], [6,7], [4,5], [3,7]])
@@ -89,11 +90,18 @@ def plot_cylindrical_tile(axes, center_pos, dev_center, offset, rotation, M, col
     # Define the faces of the cylinder
     fac = np.array([[0, 4, 5, 1], [2, 6, 7, 3]])
     surfaces = ver_cyl[fac]
-    # Plot sides
+    # Plot rectangular sides
     ax.add_collection3d(Poly3DCollection(surfaces, facecolors=color, linewidths=1, edgecolors=color, alpha=.25))
-
+    # Plot curves
     for seg_curve in seg_curves:
         ax.plot(seg_curve[0], seg_curve[1], seg_curve[2], color=color)
+    # Plot curved surfaces
+    curved_surfaces = np.zeros(shape=(4*(resolution-1),4,3))
+    comb = np.array([[0, 1], [1, 3], [2, 3], [0, 2]])
+    for j in range(curved_surfaces.shape[1]):   
+        for i in range(resolution-1):        
+            curved_surfaces[i+(resolution-1)*j] = [seg_curves[comb[j][0]][:,i], seg_curves[comb[j][1]][:,i], seg_curves[comb[j][1]][:,i+1], seg_curves[comb[j][0]][:,i+1]]
+    ax.add_collection3d(Poly3DCollection(curved_surfaces, facecolors=color, linewidths=1, alpha=.25))
 
     # Plot vector of magnetization in the center of the cube
     ax.quiver(offset[0] + center[0], offset[1] + center[1], offset[2] + center[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(dr)/2, pivot='middle', normalize=True)
@@ -103,7 +111,7 @@ def get_rotmat(rot):
     rot_x = [1, 0, 0], [0, math.cos(rot[0]), -math.sin(rot[0])], [0, math.sin(rot[0]), math.cos(rot[0])]
     rot_y = [math.cos(rot[1]), 0, math.sin(rot[1])], [0, 1, 0], [-math.sin(rot[1]), 0, math.cos(rot[1])]
     rot_z = [math.cos(rot[2]), -math.sin(rot[2]), 0], [math.sin(rot[2]), math.cos(rot[2]), 0], [0, 0, 1]
-    R = np.matmul(np.matmul(rot_x, rot_y), rot_z)
+    R = np.matmul(np.matmul(rot_z, rot_y), rot_x)
     # cx,cy,cz = np.cos(theta) 
     # sx,sy,sz = np.sin(theta)
     # R = np.zeros((3,3))
