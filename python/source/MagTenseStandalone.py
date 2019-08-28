@@ -52,7 +52,7 @@ class Tile():
                 self.M_rem = 0.
                 self.mu_r_ea = 1.
                 self.mu_r_oa = 1.
-                self.tile_type = 2 # 1 = cylinder, 2 = prism, 3 = ellipsoid
+                self.tile_type = 2 # 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 10 = ellipsoid
                 self.magentic_type = 1 # 1 = hard magnet, 2 = soft magnet
                 self.stfcn_index = 1 # default index into the state function
                 self.incl_it = 1 # if equal to zero the tile is not included in the iteration
