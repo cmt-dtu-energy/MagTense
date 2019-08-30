@@ -162,3 +162,10 @@ $RECYCLE.BIN/
 *.png
 
 *.asv
+
+# MagTense evaluations
+executable/io.txt
+executable/test_tiles.txt
+executable/tiles_out.txt
+executable/std_alone_points.txt
+executable/H_out.txt

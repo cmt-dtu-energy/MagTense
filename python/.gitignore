@@ -106,12 +106,8 @@ venv.bak/
 # Visual Studio Code configurations
 .vscode/
 
-# MagTense evaluations
-util/io.txt
-util/test_tiles.txt
-util/tiles_out.txt
-util/std_alone_points.txt
-util/H_out.txt
+# Evaluations
+util/evaluations/
 
 # Compiled MagTense source code to python module 
 lib_mag/*.o
