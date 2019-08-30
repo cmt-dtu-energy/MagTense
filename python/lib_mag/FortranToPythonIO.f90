@@ -126,24 +126,24 @@ subroutine getHFromTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_
         
             H_tmp(:,:) = 0.        
 
-            select case (tiles(i)%tileType )
+            select case ( tiles(i)%tileType )
 
-            case (tileTypeCylPiece)
+            case ( tileTypeCylPiece )
                 call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
 
-            case (tileTypePrism)
+            case ( tileTypePrism )
                 call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
 
-            case (tileTypeCircPiece )
+            case ( tileTypeCircPiece )
                  call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
 
-            case (tileTypeCircPieceInverted )
+            case ( tileTypeCircPieceInverted )
                  call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
 
-            case (tileTypeEllipsoid)
+            case ( tileTypeEllipsoid )
                 !!@todo add the existing code for spheroids, and correct Ellipsoids to Spheroids
 
-            case (tileTypePlanarCoil )
+            case ( tileTypePlanarCoil )
                 call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
             
             case default        
@@ -154,7 +154,7 @@ subroutine getHFromTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_
 
         enddo
     
-        call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_pts)
+        call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_pts )
 
     else
         write(*,*) 'Finding solution at requested points'
@@ -209,7 +209,7 @@ subroutine IterateTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_o
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
     
     !::load state function from table
-    call loadMagStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn)
+    call loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn)
     
     write(*,*) 'Doing iteration'
     call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, disp_fct, resumeIteration )
@@ -277,7 +277,7 @@ subroutine runSimulation( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
 
     !::load state function from table
-    call loadMagStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
+    call loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
     
     if ( iterateSolution .eqv. .true. ) then
         write(*,*) 'Doing iteration'

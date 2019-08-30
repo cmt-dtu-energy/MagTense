@@ -38,7 +38,7 @@ MODULE StandAlone_IO
     !! @param tiles array of tiles to be returned
     !! @param file Absolute file with the tile information
     !! @param mode 0 for read, 1 for write to file
-    subroutine loadTiles( tiles, file, mode )
+    subroutine loadTilesStandalone( tiles, file, mode )
         type(MagTile),intent(inout),dimension(:),allocatable :: tiles
         character(len=1000),intent(in) :: file
         integer, intent(in) :: mode
@@ -142,7 +142,7 @@ MODULE StandAlone_IO
             close (12)
         endif
             
-    end subroutine loadTiles
+    end subroutine loadTilesStandalone
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>
@@ -158,7 +158,7 @@ MODULE StandAlone_IO
         
         open(12,file=file,status='unknown',access='sequential',form='formatted',action='write')    
         do i=1,n
-            write(12,"(F17.7,A,F17.7,A,F17.7)") H(i,1),',',H(i,2),',',H(i,3)
+            write(12,*) H(i,1),',',H(i,2),',',H(i,3)
         enddo
     
         close(12)

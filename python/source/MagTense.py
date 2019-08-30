@@ -358,7 +358,7 @@ def get_N_tensor(tiles, points):
 
 def get_H_field(tiles, points, N=None):
         if N is None:
-                N = np.zeros(shape=(tiles.get_n,len(points),3,3), dtype=np.float64, order='F')
+                N = np.zeros(shape=(tiles.get_n(),len(points),3,3), dtype=np.float64, order='F')
                 useN = False
         else:
                 useN = True

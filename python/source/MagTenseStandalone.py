@@ -7,7 +7,7 @@ import random as rand
 import util_plot
 
 # Path of MagTense
-DIRPATH_MAGTENSE = os.path.join(os.path.dirname(__file__), '../util/')
+DIRPATH_MAGTENSE = os.path.join(os.path.dirname(__file__), '../../executable')
 # Input and output files required for MagTense defined in ../util/io.txt
 # Settings for MagTense: settings_std_alone.txt
 FILENAME_SETTINGS = 'settings_std_alone.txt'
@@ -82,6 +82,18 @@ class Tile():
 
         def get_tile_type(self):
                 return self.tile_type
+        
+        def set_center_pos(self, center_pos):
+                self.center_pos[:] = center_pos[:]
+
+        def get_center_pos(self):
+                return self.center_pos
+
+        def set_dev_center(self, dev_center):
+                self.dev_center[:] = dev_center[:]
+
+        def get_dev_center(self):
+                return self.dev_center
 
         def set_offset(self, offset):
                 self.offset[:] = offset[:]
@@ -264,12 +276,13 @@ class MagneticFieldIntensity():
                 with open(os.path.join(DIRPATH_MAGTENSE, FILENAME_OUTPUT_FIELD), "r") as file:
                         for i, line in enumerate(file.readlines()):
                                 values = line.strip().split(",")
+                                values = [value.strip() for value in values]
                                 point_hash = (points[i][0], points[i][1], points[i][2])
                                 self.field[point_hash] = np.array([float(values[0]), float(values[1]), float(values[2])])
                                 
 
 def create_points_txt(points):
-        input = ("{n_points} :number of tiles \n").format(n_points=len(points))
+        input = ("{n_points} :number of points \n").format(n_points=len(points))
         for point in points:
                 # input = input + ("{p_x}, {p_y}, {p_z} :x,y,z\n").format(p_x=point.x, p_y=point.y, p_z=point.z)
                 input = input + ("{p_x}, {p_y}, {p_z} :x,y,z\n").format(p_x=point[0], p_y=point[1], p_z=point[2])  

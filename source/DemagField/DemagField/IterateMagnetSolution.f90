@@ -502,7 +502,7 @@
     end subroutine loadTiles
 
     
-    subroutine loadMagStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
+    subroutine loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
         
         integer,intent(in) :: nT,nH
         type(MagStateFunction),dimension(n_stateFcn),intent(inout) :: stateFcn
@@ -537,7 +537,7 @@
             enddo
         enddo
 
-    end subroutine loadMagStateFunction  
+    end subroutine loadStateFunction  
     
     end module IterateMagnetSolution
     
