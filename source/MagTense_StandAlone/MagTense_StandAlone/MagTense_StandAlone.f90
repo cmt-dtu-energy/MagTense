@@ -42,7 +42,7 @@
         close(11)
     
         !! Load the input file containing all the tile information
-        call loadTiles( tiles, file_tiles_in, 0 )
+        call loadTilesStandalone( tiles, file_tiles_in, 0 )
         n_tiles = size(tiles)
         
         !! Load the model settings file
@@ -54,7 +54,7 @@
             call iterateMagnetization( tiles, n_tiles, setts%stateFcn, 1, setts%T, setts%maxErr, setts%nIteMax, disp_fct, resumeIteration )
         
             !< save the iterated tiles
-            call loadTiles( tiles, file_tiles_out, 1 )
+            call loadTilesStandalone( tiles, file_tiles_out, 1 )
         endif
     
         

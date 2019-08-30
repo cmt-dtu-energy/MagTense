@@ -245,8 +245,7 @@
                 call getRotZ( phi(i), Rz )
                 N = matmul( Rz, N )
                 N = matmul( N, Rz_inv )
-                  
-                N_out(i,:,:) = N
+                
             endif
           
             !!@todo Can this code be removed?

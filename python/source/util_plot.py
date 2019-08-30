@@ -90,11 +90,14 @@ def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color):
     # Define the faces of the cylinder
     fac = np.array([[0, 4, 5, 1], [2, 6, 7, 3]])
     surfaces = ver_cyl[fac]
+
     # Plot rectangular sides
     ax.add_collection3d(Poly3DCollection(surfaces, facecolors=color, linewidths=1, edgecolors=color, alpha=.25))
+    
     # Plot curves
     for seg_curve in seg_curves:
         ax.plot(seg_curve[0], seg_curve[1], seg_curve[2], color=color)
+    
     # Plot curved surfaces
     curved_surfaces = np.zeros(shape=(4*(resolution-1),4,3))
     comb = np.array([[0, 1], [1, 3], [2, 3], [0, 2]])
@@ -127,7 +130,6 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
     yc = (r_inner + (r-r_inner)/2)*math.sin(center_pos[1]) 
     zc = center_pos[2]
     center = np.array([xc, yc, zc])
-
 
     # Define circ piece regarding to its local spherical coordinate system
     ver_cyl = np.array([[r * math.cos(theta - dtheta/2), r * math.sin(theta - dtheta/2), z - dz/2],\
@@ -181,7 +183,7 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
         curved_surfaces[i] = [seg_curves[0][:,i], seg_curves[1][:,i], seg_curves[1][:,i+1], seg_curves[0][:,i+1]]
     ax.add_collection3d(Poly3DCollection(curved_surfaces, facecolors=color, linewidths=1, alpha=.25))
 
-    # Plot triangular
+    # Plot triangular surfaces
     triangle_surfaces = np.zeros(shape=(2*(resolution-1),3,3))
     for j in range(2):   
         for i in range(resolution-1):        
@@ -329,7 +331,8 @@ def create_plot(tiles, eval_points, H, grid=None):
                     plot_circpiece(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
                 elif (tiles.get_tile_type(i) == 4):
                     plot_circpiece(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i), inv=True)
-                elif (tiles.get_tile_type(i) == 5):
+                elif (tiles.get_tile_type(i) == 10):
+                    # TODO plot_ellipsoid()
                     pass
                 else:
                     print("Tile type not supported!")
