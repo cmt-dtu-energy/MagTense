@@ -23,6 +23,8 @@
       mwSize sx            
       integer*4 ComplexFlag,classid
 
+      integer*4,dimension(18,2) :: ier, neval
+      
 !     Pointers to input/output mxArrays:        
       type( magStatModel ),pointer :: magModel
       type(surf_carth) :: surf
@@ -34,7 +36,7 @@
       if( nrhs .ne. 3 ) then
          call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput',
      +                           'three inputs are required.')
-      elseif(nlhs .gt. 1) then
+      elseif(nlhs .gt. 3) then
          call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nOutput',
      +                           'Too many output arguments.')
       endif
@@ -61,7 +63,7 @@
       !::Copy the input parameters      
       call loadMagTile( prhs(1), magModel%tiles, magModel%n_tiles )
       Fout(:) = 0
-      call getForce( magModel, surf, Fout )
+      call getForce( magModel, surf, Fout, ier, neval )
       
       !::Load the result back to Matlab      
       ComplexFlag = 0
@@ -74,6 +76,26 @@
       sx = 3
       plhs(1) = mxCreateNumericArray( 2, dims, classid, ComplexFlag )
       call mxCopyReal8ToPtr( Fout, mxGetPr( plhs(1) ), sx )
+      
+      if ( nrhs .ge. 2 ) then
+          !Return the integer errors
+          dims(1) = 18
+          dims(2) = 2
+          classid = mxClassIDFromClassName('int32')
+          plhs(2) = mxCreateNumericArray( 2, dims, classid, ComplexFlag )
+          sx = 36
+          call mxCopyReal8ToPtr( ier, mxGetPr( plhs(2) ), sx )
+      endif
+      
+      if ( nrhs .ge. 3 ) then
+          !Return the no. of evaluations
+          dims(1) = 18
+          dims(2) = 2
+          classid = mxClassIDFromClassName('int32')
+          plhs(3) = mxCreateNumericArray( 2, dims, classid, ComplexFlag )
+          sx = 36
+          call mxCopyReal8ToPtr( neval, mxGetPr( plhs(3) ), sx )
+      endif
       
       deallocate(magModel)
             

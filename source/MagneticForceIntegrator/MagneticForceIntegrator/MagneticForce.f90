@@ -12,14 +12,14 @@ module MagneticForce
     !::
     !::Calculates the magnetic force vector, F, given the tiles (in datModel) by integrating Maxwell's stress tensor over the surface surf.
     !::
-    subroutine getForce( datModel, surf, F )    
+    subroutine getForce( datModel, surf, F, ier, neval )    
     type( surf_carth ), intent(in) :: surf
     real,dimension(3),intent(out) :: F
     
     real,parameter :: eps_abs = 1e-4,eps_rel = 1e-3
     class( magStatModel ), target :: datModel
     type( dat_ptr ), dimension(18) :: dat_arr
-    integer,dimension(2) :: ier,neval
+    integer,dimension(18,2),intent(inout) :: ier,neval
     integer :: i,j,ind
     
     
@@ -64,7 +64,7 @@ module MagneticForce
         dat_arr(13)%dat%f_ptr => F_int_33 !theta-z surface, z part of diff. area
         dat_arr(14)%dat%f_ptr => F_int_33 !r-theta surface, bottom
         dat_arr(15)%dat%f_ptr => F_int_33!r-theta surface, top
-        call surface_integral_cone( surf, dat_arr(1:15), handleError, F, ier, neval )
+        call surface_integral_cone( surf, dat_arr(1:15), handleError, F, ier(1:15,:), neval(1:15,:) )
        case ( coord_sys_cyl )
            !x-component
           dat_arr(1)%dat%f_ptr => F_int_11
@@ -98,7 +98,7 @@ module MagneticForce
           dat_arr(11)%dat%f_ptr_vec => F_int_33_vec
           dat_arr(12)%dat%f_ptr_vec => F_int_33_vec
           
-          call surface_integral_cyl( surf, dat_arr, handleError, F, ier, neval )
+          call surface_integral_cyl( surf, dat_arr, handleError, F, ier(1:12,:), neval(1:12,:) )
        case ( coord_sys_carth )
           dat_arr(1)%dat%f_ptr => F_int_11
           dat_arr(2)%dat%f_ptr => F_int_11

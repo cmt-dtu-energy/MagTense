@@ -1,4 +1,6 @@
-clearvars
+%use clear all as this also clears dependencies to the .mex files and thus
+%they can be overwritten
+clear all
     
 mex -g -Lsource\DemagField\DemagField\x64\release\ -lDemagField...
        -Isource\DemagField\DemagField\x64\release\ ...
