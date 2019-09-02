@@ -1,0 +1,21 @@
+The various Fortran source codes are in /source/
+
+BRStateFcn_params is a library for running the Bean-Rodbell model including a finite pressure
+
+deprecated includes old (unused and non-concurrent) code
+
+MagneticForceIntegrator is the library for calculating forces on a magnet
+
+MagStatPrismMex is a pseudo-project for maintaining the entry-mex-fortran files that are compiled with buildMagStatPrism2_All.m in the root
+
+MagStatPrism2 is the main library for the model
+
+NumericalIntegrationlib is a dedicated library for doing numerical integrals (in 1dD and 2D)
+
+NumericalRecipes includes (some of ) the NR library
+
+OI_MagStat_StandAlone is a library for making a stand-alone version of the code (a .exe file)
+
+SpecialFunctions is a library that contains the implementation of various special functions such as elliptic integrals
+
+TileDemagTensor is the core of the package and contains all the analytical / semi-analytical implementations of the demag tensor field for various geometries
