@@ -28,7 +28,7 @@
         !! plus one surface, the cylindrical surface, each with two integrals for each force component
         integer,parameter :: n = 5
     
-        integer,intent(inout),dimension(2) :: ier,neval
+        integer,intent(inout),dimension(15,2) :: ier,neval
         real,dimension(n,3) :: n_vec
         real,dimension(n,2) :: xp,yp    !< defines the plane of integration
         real,dimension(n) :: zp,vecSign !< defines the position of the plane on the third axis
@@ -102,7 +102,7 @@
         !! plus one surface, the cylindrical surface, each with two integrals for each force component
         integer,parameter :: n = 4
     
-        integer,intent(inout),dimension(2) :: ier,neval
+        integer,intent(inout),dimension(12,2) :: ier,neval
         real,dimension(4,3) :: n_vec
         real,dimension(4,2) :: xp,yp    !! defines the plane of integration
         real,dimension(4) :: zp,vecSign !! defines the position of the plane on the third axis
@@ -111,7 +111,10 @@
     
         vOut(:) = 0.    !< Reset input array
     
+        
+        
         neval = 0
+        ier = 0
       
         !! Setup the three planes to be integrated over
         !! theta-z plane, first integral (x-part of the normal vector)
@@ -166,7 +169,7 @@
         real,dimension(n),intent(in) :: vecSign
         real,dimension(n,3),intent(in) :: n_vec
         real,dimension(3),intent(inout) :: vOut
-        integer,intent(inout),dimension(2) :: ier,neval
+        integer,intent(inout),dimension(n,2) :: ier,neval        
         real,dimension(n,2) :: xp,yp
         real,dimension(n) :: zp
         integer :: i, j, ind
@@ -194,27 +197,17 @@
                     call handleError(dat_arr(ind)%dat, dat_arr(ind)%dat%abserr_tot) 
     
                     vOut(j) = vOut(j) + vecSign(i) * res           
-    
+                    
+                    ier(ind,1) = dat_arr(i)%dat%ier_x
+                    ier(ind,2) = dat_arr(i)%dat%ier_y
+                    
+                    neval(ind,1) = dat_arr(i)%dat%neval_x
+                    neval(ind,2) = dat_arr(i)%dat%neval_y
+                    
                 endif                
             enddo                          
         enddo   
     
-        neval = 0
-        ier = 0
-        do i=1,n*3
-            neval(1) = neval(1) + dat_arr(i)%dat%neval_x
-            neval(2) = neval(2) + dat_arr(i)%dat%neval_y
-        
-            if ( dat_arr(i)%dat%ier_x .ne. 0 ) then
-                ier(1) = dat_arr(i)%dat%ier_x
-            endif
-        
-            if ( dat_arr(i)%dat%ier_y .ne. 0 ) then
-                ier(2) = dat_arr(i)%dat%ier_y
-            endif
-      
-        enddo
-
     end subroutine surf_int
     
     
