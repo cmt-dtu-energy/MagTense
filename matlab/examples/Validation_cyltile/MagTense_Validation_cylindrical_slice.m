@@ -1,7 +1,7 @@
 
 %%This function compares MagTense to a FEM simulations for a single permanent magnet.
 function [] = MagTense_Validation_cylindrical_slice()
-
+close all
 %make sure to source the right path for the generic Matlab routines
 addpath(genpath('../util/'));
 addpath('../../MEX_files/');
@@ -27,8 +27,8 @@ tile.dtheta = pi/4;
 tile.dz = 0.1;
 
 %set the center position of the prism (centered at Origo)
-%tile.offset = [0.8, -0.1, 0.3];
- tile.offset = [0,0,0];
+tile.offset = [0.8, -0.1, 0.3];
+% tile.offset = [0,0,0];
 
 %set the rotation of the prism (centered at Origo)
 %the rotation is such that there is first rotation around the z-axis (last
@@ -76,12 +76,32 @@ pts(1:numel(x),:) = [x; zeros(1,numel(y))+tile.offset(2); zeros(1,numel(z))+tile
 pts((numel(x)+1):(numel(x)+numel(y)),:) = [zeros(1,numel(x))+tile.offset(1); y; zeros(1,numel(z))+tile.offset(3)]';
 pts((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)),:) = [zeros(1,numel(x))+tile.offset(1); zeros(1,numel(y))+tile.offset(2); z]';
 
+delta = 1e-4;
+x = [ linspace(tile.offset(1)*(1-delta),tile.offset(1),10) linspace(tile.offset(1),tile.offset(1)*(1+delta),10)];
+y = tile.offset(2);
+z = tile.offset(3);
+
+pts = zeros(length(x),3);
+pts(:,2) = y;
+pts(:,3) = z;
+pts(:,1) = x;
+
 %get the field
 H = getHFromTiles_mex( tile, pts, int32( length(tile) ), int32( length(pts(:,1)) ) );
-         
+
+N = getNFromTile_mex( tile, pts, int32( length(pts(:,1)) ) );         
+
 %Find the norm of the field
 Hnorm = squeeze( sqrt( sum(H.^2,2) ) );
-
+getFigure(true);
+plot(x,N(:,1,1),'-o');
+plot(x,N(:,2,2),'-o');
+plot(x,N(:,3,3),'-o');
+plot(x,N(:,1,2),'-o');
+plot(x,N(:,1,3),'-o');
+plot(x,N(:,2,3),'-o');
+getFigure(true);
+plot(x,H,'-o');
 %Make a figure
 figure1 = figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto');
 fig1 = axes('Parent',figure1,'Layer','top','FontSize',16);
