@@ -112,37 +112,31 @@ def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color):
 def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv=False):
     ax = axes
     resolution = 100
-    r, theta, z = center_pos[:]
+    r_center, theta, z = center_pos[:]
     dr, dtheta, dz = dev_center[:]
-    
-    # Calculating radius of inner edge
-    p1 = np.array([r * math.cos(theta - dtheta/2), r * math.sin(theta - dtheta/2)])
-    p2 = np.array([r * math.cos(theta + dtheta/2), r * math.sin(theta + dtheta/2)])
-    r_mid = np.linalg.norm((p1 + p2)/2)
-    
-    # Difference between circpiece and circpiece_inv
-    if inv is False:
-        r_inner = r_mid - np.linalg.norm(p2-p1)/2
-    else:
-        r_inner = r_mid + np.linalg.norm(p2-p1)/2
 
-    xc = (r_inner + (r-r_inner)/2)*math.cos(center_pos[1])
-    yc = (r_inner + (r-r_inner)/2)*math.sin(center_pos[1]) 
-    zc = center_pos[2]
-    center = np.array([xc, yc, zc])
+    r = r_center + dr/2
+    
+    # Difference between circpiece and circpiece_inv and check in which quadrant the circpiece is
+    if ((0 < theta < math.pi/2 or math.pi < theta < 3*math.pi/2 or -math.pi/2 > theta > -math.pi) and not inv) \
+        or ( (math.pi/2 < theta < math.pi or 3*math.pi/2 < theta < 2*math.pi or 0 > theta > -math.pi/2) and inv):
+        corner_x =  r * math.cos(theta + dtheta/2)
+        corner_y =  r * math.sin(theta - dtheta/2)
+    else:
+        corner_x =  r * math.cos(theta - dtheta/2)
+        corner_y =  r * math.sin(theta + dtheta/2)
 
     # Define circ piece regarding to its local spherical coordinate system
     ver_cyl = np.array([[r * math.cos(theta - dtheta/2), r * math.sin(theta - dtheta/2), z - dz/2],\
         [r * math.cos(theta + dtheta/2), r * math.sin(theta + dtheta/2), z - dz/2],\
         [r * math.cos(theta - dtheta/2), r * math.sin(theta - dtheta/2), z + dz/2],\
         [r * math.cos(theta + dtheta/2), r * math.sin(theta + dtheta/2), z + dz/2],\
-        [r_inner * math.cos(theta), r_inner * math.sin(theta), z + dz/2],\
-        [r_inner * math.cos(theta), r_inner * math.sin(theta), z - dz/2]])
+        [corner_x, corner_y, z + dz/2],\
+        [corner_x, corner_y, z - dz/2]])
     
     # Add rotation
     R = get_rotmat([rotation[0], rotation[1], 0])
     ver_cyl = (np.dot(R, ver_cyl.T)).T
-    center = (np.dot(R, center.T)).T
     
     # Creating curves
     seg_theta = np.linspace(theta - dtheta/2, theta + dtheta/2, resolution)
@@ -164,8 +158,9 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
     ver_cyl = ver_cyl + offset
 
     # Corner points
-    # ax.plot(ver_cyl[:,0], ver_cyl[:,1], ver_cyl[:,2], 'ro')
-
+    ax.plot(ver_cyl[:,0], ver_cyl[:,1], ver_cyl[:,2], 'ro')
+    print(ver_cyl)
+    
     # Define the faces of the cylinder
     fac = np.array([[0, 5, 4, 2], [1, 5, 4, 3]])
     surfaces = ver_cyl[fac]
@@ -191,7 +186,8 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
     ax.add_collection3d(Poly3DCollection(triangle_surfaces, facecolors=color, linewidths=1, alpha=.25))
 
     # Plot vector of magnetization in the center of the cube
-    ax.quiver(offset[0] + center[0], offset[1] + center[1], offset[2] + center[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(r-r_inner)/2, pivot='middle', normalize=True)
+    ax.quiver(offset[0] + (center_pos[0])*math.cos(center_pos[1]), offset[1] + (center_pos[0])*math.sin(center_pos[1]),\
+        offset[2] + center_pos[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(r_center-dr)/2, pivot='middle', normalize=True)
 
 
 def get_rotmat(rot):
