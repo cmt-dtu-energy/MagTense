@@ -180,8 +180,11 @@
         real,dimension(3,3) :: N,Rz,Rz_inv
         integer :: i
         logical,intent(in),optional :: useStoredN
-    
-    
+        real :: x_nan_val
+        
+        x_nan_val = 0.
+        x_nan_val = 0./x_nan_val
+        
         !::Run the calculation
         allocate( r(n_ele), x(n_ele), phi(n_ele), pts_local(n_ele,3) )    
       
@@ -196,11 +199,19 @@
         H(:,:) = 0.
       
         r = sqrt( pts_local(:,1)**2 + pts_local(:,2)**2 ) !< The length of the radius vector
-      
-        !!Find the rotation angle. It is assumed that r != 0 in all points since the tensor-field diverges here      
+        
+        !>Find the rotation angle. It is assumed that r != 0 in all points since the tensor-field diverges here      
         phi = acos( pts_local(:,1) / r )
-      
-        !!Correct for being in the third or fourth quadrants
+        
+        !>When the evaluation point is too close to the cylindrical tile's origin the solution
+        !>becomes unstable numerically and we have to cap the r value here. We are working on a 
+        !>better solution as the demag field should be continuous (and indeed is).
+        where ( r .lt. 1e-6 )
+            phi = x_nan_val
+        endwhere
+        
+        
+        !>Correct for being in the third or fourth quadrants
         where ( pts_local(:,2) .lt. 0 )
             !phi = 2 * pi - phi
             phi = -phi
@@ -211,14 +222,31 @@
         z_orig = cylTile%z0      
         M_orig = cylTile%M
         do i=1,n_ele
+            if ( isnan(phi(i)) .eq. .false. ) then
+                cylTile%theta0 = phi_orig - phi(i) !< Offset the angle
+                cylTile%z0 = z_orig - pts_local(i,3) !< Offset the z-coordinate
           
-            cylTile%theta0 = phi_orig - phi(i) !< Offset the angle
-            cylTile%z0 = z_orig - pts_local(i,3) !< Offset the z-coordinate
-          
-            if ( present( useStoredN ) .eqv. .true. ) then
-                if ( useStoredN .eqv. .false. ) then
-                    call getN_CylPiece( cylTile, r(i), N )
+                if ( present( useStoredN ) .eqv. .true. ) then
+                    if ( useStoredN .eqv. .false. ) then
+                        call getN_CylPiece( cylTile, r(i), N )
               
+                        !<Change basis from rotation trick coordinate system to the local system of the tile
+                        !!The magnetic field in the global coordinate system is given by:
+                        !!H = Rot(phi) * ( N *  (Rot(-phi) * M) )
+                        !!Get the rotation matrix for rotating the magnetization with the trick-angle
+                        call getRotZ( -phi(i), Rz_inv )
+                        !!Get the rotation matrix for rotating the magnetic field back to the original coordinate system
+                        call getRotZ( phi(i), Rz )
+                        N = matmul( Rz, N )
+                        N = matmul( N, Rz_inv )
+                  
+                        N_out(i,:,:) = N
+              
+                    else
+                        N = N_out(i,:,:)
+                    endif
+                else
+                    call getN_CylPiece( cylTile, r(i), N )
                     !<Change basis from rotation trick coordinate system to the local system of the tile
                     !!The magnetic field in the global coordinate system is given by:
                     !!H = Rot(phi) * ( N *  (Rot(-phi) * M) )
@@ -228,40 +256,28 @@
                     call getRotZ( phi(i), Rz )
                     N = matmul( Rz, N )
                     N = matmul( N, Rz_inv )
-                  
-                    N_out(i,:,:) = N
-              
-                else
-                    N = N_out(i,:,:)
-                endif
-            else
-                call getN_CylPiece( cylTile, r(i), N )
-                !<Change basis from rotation trick coordinate system to the local system of the tile
-                !!The magnetic field in the global coordinate system is given by:
-                !!H = Rot(phi) * ( N *  (Rot(-phi) * M) )
-                !!Get the rotation matrix for rotating the magnetization with the trick-angle
-                call getRotZ( -phi(i), Rz_inv )
-                !!Get the rotation matrix for rotating the magnetic field back to the original coordinate system
-                call getRotZ( phi(i), Rz )
-                N = matmul( Rz, N )
-                N = matmul( N, Rz_inv )
                 
+                endif
+          
+                !!@todo Can this code be removed?
+                !Rotate the magnetization vector
+                !M_tmp = matmul( Rz, M_orig )
+                !find the field at the rotated point
+                !H(i,:) = matmul( N, M_tmp )
+                !get the negative rotation
+                !call getRotZ( phi(i), Rz )
+                !rotate the field back to the original orientation
+                !H(i,:) = matmul( Rz, H(i,:) )
+                H(i,:) = matmul( N, M_orig )
+          
+                !!Revert the changes in angle and z position
+                cylTile%theta0 = phi_orig
+                cylTile%z0 = z_orig
+            else
+                N(:,:) = x_nan_val
+                H(i,:) = x_nan_val
             endif
-          
-            !!@todo Can this code be removed?
-            !Rotate the magnetization vector
-            !M_tmp = matmul( Rz, M_orig )
-            !find the field at the rotated point
-            !H(i,:) = matmul( N, M_tmp )
-            !get the negative rotation
-            !call getRotZ( phi(i), Rz )
-            !rotate the field back to the original orientation
-            !H(i,:) = matmul( Rz, H(i,:) )
-            H(i,:) = matmul( N, M_orig )
-          
-            !!Revert the changes in angle and z position
-            cylTile%theta0 = phi_orig
-            cylTile%z0 = z_orig
+            
         enddo
       
         deallocate(r,x,phi,pts_local)
