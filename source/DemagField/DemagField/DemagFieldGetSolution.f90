@@ -222,7 +222,7 @@
         z_orig = cylTile%z0      
         M_orig = cylTile%M
         do i=1,n_ele
-            if ( isnan(phi(i)) .eq. .false. ) then
+            if ( isnan(phi(i)) .eqv. .false. ) then
                 cylTile%theta0 = phi_orig - phi(i) !< Offset the angle
                 cylTile%z0 = z_orig - pts_local(i,3) !< Offset the z-coordinate
           
