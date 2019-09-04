@@ -314,7 +314,7 @@
                 !::Convert from Cartesian to cylindrical coordinates
                 r = sqrt( pts_local(:,1)**2 + pts_local(:,2)**2 )
                 theta = acos( pts_local(:,1) / r )
-                !Correct for being in either the third or foruth quadrants
+                !Correct for being in either the third or fourth quadrants
                 where ( pts_local(:,2) .lt. 0 )
                     theta = 2 * pi - theta    
                 endwhere
