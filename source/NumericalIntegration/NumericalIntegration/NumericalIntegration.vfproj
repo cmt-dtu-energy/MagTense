@@ -46,7 +46,7 @@
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
 		<File RelativePath=".\IntegrationDataTypes.f90"/>
 		<File RelativePath=".\NumericalIntegrals.f90"/>
-		<File RelativePath=".\ODE.f90"/>
+		<File RelativePath=".\ODE_MagTense.f90"/>
 		<File RelativePath=".\quadpack.f90"/>
 		<File RelativePath=".\RKSuitef90.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>
