@@ -1,7 +1,7 @@
 
 %%This function compares MagTense to a FEM simulations for a single permanent magnet.
-function [] = MagTense_Validation_cylindrical_slice()
-close all
+function [] = MagTense_Validation_prism()
+
 %make sure to source the right path for the generic Matlab routines
 addpath(genpath('../util/'));
 addpath('../../MEX_files/');
@@ -28,31 +28,22 @@ tile.dz = 0.1;
 
 %set the center position of the prism (centered at Origo)
 tile.offset = [0.8, -0.1, 0.3];
-<<<<<<< Updated upstream
 % tile.offset = [0,0,0];
-=======
-%  tile.offset = [0,0,0];
->>>>>>> Stashed changes
 
 %set the rotation of the prism (centered at Origo)
 %the rotation is such that there is first rotation around the z-axis (last
 %entry in rotAngles), then around the y-axis (middle entry), and finally
 %around the x-axis (first entry in rotAngles). Thus here, the tile is frist
 %rotated pi/4 around z, than -pi/3 around y and finally pi/2 around x.
-tile.rotAngles = [0,0,0];%[-pi /6, pi /5, pi /2];
+tile.rotAngles = [-pi /6, pi /5, pi /2];
 
 %set the easy axis of the cube. This is expected to be with respect to the global
 %coordinate system basis
-tile.u_ea = [0.35355339, 0.35355339, 0.8660254];
-tile.u_ea = tile.u_ea ./ norm(tile.u_ea);
+tile.u_ea = [0.35355339, 0.35355339, 0.8660254]/norm([0.35355339, 0.35355339, 0.8660254]);
 
 %ensure the two hard axes are perpendicular and normalized
-tile.u_oa1 = [0.35355339, -0.35355339,  0.        ];
-tile.u_oa1 = tile.u_oa1 ./ norm(tile.u_oa1);
-
-tile.u_oa2 = [0.30618622,  0.30618622, -0.25      ];
-tile.u_oa2 = tile.u_oa2 ./ norm(tile.u_oa2);
-
+tile.u_oa1 = [0.35355339, -0.35355339,  0.        ]/norm([0.35355339, -0.35355339,  0.        ]);
+tile.u_oa2 = [0.30618622,  0.30618622, -0.25      ]/norm([0.30618622,  0.30618622, -0.25      ]);
 
 %set the relative permeability for the easy axis
 tile.mu_r_ea = 1.00;
@@ -80,36 +71,12 @@ pts(1:numel(x),:) = [x; zeros(1,numel(y))+tile.offset(2); zeros(1,numel(z))+tile
 pts((numel(x)+1):(numel(x)+numel(y)),:) = [zeros(1,numel(x))+tile.offset(1); y; zeros(1,numel(z))+tile.offset(3)]';
 pts((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)),:) = [zeros(1,numel(x))+tile.offset(1); zeros(1,numel(y))+tile.offset(2); z]';
 
-<<<<<<< Updated upstream
-delta = 1e-4;
-x = [ linspace(tile.offset(1)*(1-delta),tile.offset(1),10) linspace(tile.offset(1),tile.offset(1)*(1+delta),10)];
-y = tile.offset(2);
-z = tile.offset(3);
-
-pts = zeros(length(x),3);
-pts(:,2) = y;
-pts(:,3) = z;
-pts(:,1) = x;
-=======
-N = getNTensor_experiment( tile, pts );
->>>>>>> Stashed changes
-
 %get the field
 H = getHFromTiles_mex( tile, pts, int32( length(tile) ), int32( length(pts(:,1)) ) );
-
-N = getNFromTile_mex( tile, pts, int32( length(pts(:,1)) ) );         
-
+         
 %Find the norm of the field
 Hnorm = squeeze( sqrt( sum(H.^2,2) ) );
-getFigure(true);
-plot(x,N(:,1,1),'-o');
-plot(x,N(:,2,2),'-o');
-plot(x,N(:,3,3),'-o');
-plot(x,N(:,1,2),'-o');
-plot(x,N(:,1,3),'-o');
-plot(x,N(:,2,3),'-o');
-getFigure(true);
-plot(x,H,'-o');
+
 %Make a figure
 figure1 = figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto');
 fig1 = axes('Parent',figure1,'Layer','top','FontSize',16);
