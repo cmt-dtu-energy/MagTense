@@ -13,11 +13,10 @@ module ODE_MagTense_CALL
     subroutine ODE_RK_Suite()
     
     !>First call the setup
-    call SETUP(NEQ,TSTART,YSTART,TEND,TOL,THRES,METHOD,TASK,ERRASS,
-                       HSTART,WORK,LENWRK,MESAGE)
+    !call SETUP(NEQ,TSTART,YSTART,TEND,TOL,THRES,METHOD,TASK,ERRASS,HSTART,WORK,LENWRK,MESAGE)
 
     !> Then loop over the desired time points and call the integrator
-    call UT(F,TWANT,TGOT,YGOT,YPGOT,YMAX,WORK,UFLAG)
+    !call UT(F,TWANT,TGOT,YGOT,YPGOT,YMAX,WORK,UFLAG)
     
     end subroutine ODE_RK_Suite
     
