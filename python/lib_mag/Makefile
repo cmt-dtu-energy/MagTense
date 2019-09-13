@@ -32,7 +32,7 @@ CFLAGS = -fPIC # ==> universal for ifort, gfortran, pgi
 ifeq ($(OS),Windows_NT)
 	LIBTOOL = ar src
 	CLEAN_FILES = -del libsrc.a *.o *.mod *.pyd
-	CLEAN_FOLDER = -rmdir Release src.* /s /Q
+	CLEAN_FOLDER = -rmdir Release src.win-amd64-3.7 /s /Q
 else
 	ifeq (${UNAME}, Darwin)
   		LIBTOOL = libtool -static -o
