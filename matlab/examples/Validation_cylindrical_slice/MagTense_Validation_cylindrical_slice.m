@@ -1,6 +1,6 @@
 
 %%This function compares MagTense to a FEM simulations for a single permanent magnet.
-function [] = MagTense_Validation_prism()
+function [] = MagTense_Validation_cylindrical_slice()
 
 %make sure to source the right path for the generic Matlab routines
 addpath(genpath('../util/'));
@@ -28,14 +28,14 @@ tile.dz = 0.1;
 
 %set the center position of the prism (centered at Origo)
 tile.offset = [0.8, -0.1, 0.3];
-% tile.offset = [0,0,0];
 
 %set the rotation of the prism (centered at Origo)
 %the rotation is such that there is first rotation around the z-axis (last
 %entry in rotAngles), then around the y-axis (middle entry), and finally
 %around the x-axis (first entry in rotAngles). Thus here, the tile is frist
 %rotated pi/4 around z, than -pi/3 around y and finally pi/2 around x.
-tile.rotAngles = [-pi /6, pi /5, pi /2];
+tile.rotAngles = [0, 0, 0];
+% tile.rotAngles = [-pi /6, pi /5, pi /2];
 
 %set the easy axis of the cube. This is expected to be with respect to the global
 %coordinate system basis
@@ -67,9 +67,9 @@ y = -0.5:0.001:1.5;
 z = -1:0.001:1;
 
 pts = zeros( numel(x)+numel(y)+numel(z), 3 );
-pts(1:numel(x),:) = [x; zeros(1,numel(y))+tile.offset(2); zeros(1,numel(z))+tile.offset(3)]';
-pts((numel(x)+1):(numel(x)+numel(y)),:) = [zeros(1,numel(x))+tile.offset(1); y; zeros(1,numel(z))+tile.offset(3)]';
-pts((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)),:) = [zeros(1,numel(x))+tile.offset(1); zeros(1,numel(y))+tile.offset(2); z]';
+pts(1:numel(x),:) = [x; zeros(1,numel(y))+tile.offset(2)+tile.r0; zeros(1,numel(z))+tile.offset(3)+tile.z0]';
+pts((numel(x)+1):(numel(x)+numel(y)),:) = [zeros(1,numel(x))+tile.offset(1); y; zeros(1,numel(z))+tile.offset(3)+tile.z0]';
+pts((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)),:) = [zeros(1,numel(x))+tile.offset(1); zeros(1,numel(y))+tile.offset(2)+tile.r0; z]';
 
 %get the field
 H = getHFromTiles_mex( tile, pts, int32( length(tile) ), int32( length(pts(:,1)) ) );
@@ -90,13 +90,13 @@ plot(y,4*pi*1e-7*Hnorm((numel(x)+1):(numel(x)+numel(y))),'g.');
 plot(z,4*pi*1e-7*Hnorm((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z))),'b.');
 
 % %Load comparison data from FEM simulation
-% data_FEM_x = load('..\..\..\documentation\examples_FEM_validation\Validation_prism\Validation_prism_normH_x.txt');
-% data_FEM_y = load('..\..\..\documentation\examples_FEM_validation\Validation_prism\Validation_prism_normH_y.txt');
-% data_FEM_z = load('..\..\..\documentation\examples_FEM_validation\Validation_prism\Validation_prism_normH_z.txt');
-% 
-% plot(data_FEM_x(:,1),data_FEM_x(:,2),'ro');
-% plot(data_FEM_y(:,1),data_FEM_y(:,2),'go');
-% plot(data_FEM_z(:,1),data_FEM_z(:,2),'bo');
+data_FEM_x = load('..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_normH_x.txt');
+data_FEM_y = load('..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_normH_y.txt');
+data_FEM_z = load('..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_normH_z.txt');
+
+plot(data_FEM_x(:,1),data_FEM_x(:,2),'ro');
+plot(data_FEM_y(:,1),data_FEM_y(:,2),'go');
+plot(data_FEM_z(:,1),data_FEM_z(:,2),'bo');
 
 h_l = legend('MagTense, x for y,z=offset','MagTense, y for x,z=offset','MagTense, z for x,y=offset','FEM, x for y,z=offset','FEM, y for x,z=offset','FEM, z for x,y=offset','Location','West');
 set(h_l,'fontsize',10);
