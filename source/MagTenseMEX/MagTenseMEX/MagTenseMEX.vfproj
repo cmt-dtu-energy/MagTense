@@ -30,5 +30,6 @@
 		<File RelativePath=".\getHFromTiles_mex.f90"/>
 		<File RelativePath=".\getMagForce_mex.f90"/>
 		<File RelativePath=".\getNFromTile_mex.f90"/>
-		<File RelativePath=".\IterateMagnetization_mex.f90"/></Filter></Files>
+		<File RelativePath=".\IterateMagnetization_mex.f90"/>
+		<File RelativePath=".\MagTenseODE.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>
