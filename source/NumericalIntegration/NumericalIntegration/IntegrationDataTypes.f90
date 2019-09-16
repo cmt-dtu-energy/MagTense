@@ -5,6 +5,26 @@
 
     integer,parameter :: coord_sys_carth=1,coord_sys_cyl=2,coord_sys_cone=3
 
+    !---------------------------------------------------------------------------    
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Defines the interface of the function to be integrated.
+    !> Should return n values
+    !> @param[in] t the time at which the derivative is requested
+    !> @param[in] y array size n holding the y_i values corresponding to the time t
+    !> @param[inout] dydt array size n for the derivatives at the time t
+    !---------------------------------------------------------------------------    
+    abstract interface
+          subroutine dydt_fct ( t, y, dydt )  
+             real,intent(in) :: t
+             real,dimension(:),intent(in) :: y
+             real,dimension(:),intent(inout) :: dydt
+         
+          end subroutine dydt_fct
+    end interface
+    
+    
+    
     type dataCollectionBase
         real :: r1, r2, theta1, theta2, z1, z2, rs, thetas, zs
         real :: x1,x2,y1,y2,x,y,z,epsabs, epsrel,abserr_x,abserr_y,b   

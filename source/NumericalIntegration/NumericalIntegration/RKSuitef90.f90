@@ -27,6 +27,7 @@ module rksuite_90
 !          see main doc for contact details
 !
 use rksuite_90_prec, only:wp
+use integrationDataTypes
 
 implicit none
 
@@ -932,6 +933,12 @@ end if
 !
 end subroutine collect_garbage_r1
 
+!---------------------------------------------------------------------------   
+!> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+!> @brief Modified by Kaspar K. Nielsen in September 2019 in order for the
+!> subroutine to accept a procedural pointer for the function evaluation
+!---------------------------------------------------------------------------   
+
 recursive subroutine range_integrate_r1(comm,f,t_want,t_got,y_got,yderiv_got, &
                                         flag)
 !
@@ -948,15 +955,20 @@ real(kind=wp), dimension(:), intent(out) :: y_got, yderiv_got        !dep!
 integer, intent(out), optional :: flag
 type(rk_comm_real_1d), intent(inout) :: comm
 !
-interface 
-   function f(t,y)
-      use rksuite_90_prec, only:wp
-      real(kind=wp), intent(in) :: t                                 !indep!
-      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
-      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
-   end function f
-end interface
+!The folllowing interface has been outcommented by kaki in order to update the 
+!subroutine to use procedural pointers.
+!interface 
+!   function f(t,y)
+!      use rksuite_90_prec, only:wp
+!      real(kind=wp), intent(in) :: t                                 !indep!
+!      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
+!      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
+!   end function f
+!end interface
 !
+
+procedure(dydt_fct), pointer :: f 
+
 character(len=*), parameter :: srname="RANGE_INTEGRATE"
 !
 real(kind=wp) :: hmin, t_now                                         !indep!
@@ -1183,14 +1195,19 @@ real(kind=wp), intent(out) :: t_now                                  !indep!
 integer, intent(out), optional :: flag
 type(rk_comm_real_1d), intent(inout) :: comm
 real(kind=wp), dimension(:), intent(out) :: y_now, yderiv_now        !dep!
-interface
-   function f(t,y)
-      use rksuite_90_prec, only:wp
-      real(kind=wp), intent(in) :: t                                 !indep!
-      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
-      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
-   end function f
-end interface
+!The following interface has been outcommented by kaki in order to update
+!for using a procedural pointer instead
+!interface
+!   function f(t,y)
+!      use rksuite_90_prec, only:wp
+!      real(kind=wp), intent(in) :: t                                 !indep!
+!      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
+!      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
+!   end function f
+!end interface
+
+procedure(dydt_fct), pointer :: f 
+
 !
 character(len=*), parameter :: srname="STEP_INTEGRATE"
 !
@@ -1241,7 +1258,11 @@ body: do
 !
    if (comm%at_t_start) then
 !
-      comm%yp = f(comm%t,comm%y); comm%f_count = comm%f_count + 1
+       !Has been outcommented by kaki in order to update for using a procedural pointer instead
+      !comm%yp = f(comm%t,comm%y); comm%f_count = comm%f_count + 1
+       call f( comm%t,comm%y, comm%yp )
+       comm%f_count = comm%f_count + 1
+       
       if (comm%erason) comm%ge_yp = comm%yp
 !
 !  The weights for the control of the error depend on the size of the
@@ -1507,7 +1528,9 @@ body: do
 !
 !  Call F to evaluate YP.
 !
-         comm%yp = f(comm%t,comm%y); comm%f_count = comm%f_count + 1
+          !Outcommented by kaki in order to use a procedural pointer instead
+         !comm%yp = f(comm%t,comm%y); comm%f_count = comm%f_count + 1
+          call f(comm%t,comm%y,comm%yp); comm%f_count = comm%f_count + 1
       end if
 !
 !  If global error assessment is desired, advance the secondary
@@ -1576,14 +1599,17 @@ subroutine truerr_r1(comm,f,ier)
 type(rk_comm_real_1d), intent(inout) :: comm
 integer, intent(inout) :: ier
 !
-interface
-   function f(t,y)
-      use rksuite_90_prec, only:wp
-      real(kind=wp), intent(in) :: t                                 !indep!
-      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
-      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
-   end function f
-end interface
+!Outcommented by kaki in order to accomodate a procedural pointer instead
+!interface
+!   function f(t,y)
+!      use rksuite_90_prec, only:wp
+!      real(kind=wp), intent(in) :: t                                 !indep!
+!      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
+!      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
+!   end function f
+!end interface
+procedure(dydt_fct), pointer :: f
+
 !
 real(kind=wp) :: hmin, hsec                                          !indep!
 real(kind=wp) :: diff, errmax, mxerlc, tsec, ge_err, ge_test1, ge_test2
@@ -1662,7 +1688,9 @@ body: do
 !
 !  Call F to evaluate GE_YP.
 !
-         ge_yp = f(tsec,ge_y); comm%ge_f_count = comm%ge_f_count + 1
+          !Outcommented in order to use a procedural pointer instead
+         !ge_yp = f(tsec,ge_y); comm%ge_f_count = comm%ge_f_count + 1
+          call f(tsec,ge_y,ge_yp); comm%ge_f_count = comm%ge_f_count + 1
       end if
 !
    end do
@@ -1717,14 +1745,16 @@ real(kind=wp), dimension(:), intent(in) :: y, yp                     !dep!
 real(kind=wp), dimension(:), intent(out) ::  errest, y_new           !dep!
 real(kind=wp), dimension(:,:), intent(out) :: stages                 !dep!
 !
-interface
-   function f(t,y)
-      use rksuite_90_prec, only:wp
-      real(kind=wp), intent(in) :: t                                 !indep!
-      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
-      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
-   end function f
-end interface
+!Outcommented in order to accomodate for a procedural pointer
+!interface
+!   function f(t,y)
+!      use rksuite_90_prec, only:wp
+!      real(kind=wp), intent(in) :: t                                 !indep!
+!      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
+!      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
+!   end function f
+!end interface
+procedure(dydt_fct), pointer :: f
 !
 real(kind=wp) :: tstg                                                !indep!
 integer :: i, j
@@ -1775,7 +1805,9 @@ attempt_step: do
 !
       tstg = tnow + c(i)*htry
       if (main .and. comm%at_t_end .and. c(i)==one) tstg = comm%t_end
-      stages(:,ptr(i)) = f(tstg,y_new)
+      !Outcommented in order to use a procedural pointer instead
+      !stages(:,ptr(i)) = f(tstg,y_new)
+      call f(tstg,y_new,stages(:,ptr(i)) )
 !
 !  Increment the counter for the number of function evaluations
 !  depending on whether the primary or secondary integration is taking
@@ -1959,14 +1991,16 @@ type(rk_comm_real_1d), intent(inout), target :: comm
 logical, intent(in) :: toomch
 logical, intent(out) :: sure_stiff
 !
-interface 
-   function f(t,y)
-      use rksuite_90_prec, only:wp
-      real(kind=wp), intent(in) :: t                                 !indep!
-      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
-      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
-   end function f
-end interface
+!Outcommented in order to use a procedural pointer instead
+!interface 
+!   function f(t,y)
+!      use rksuite_90_prec, only:wp
+!      real(kind=wp), intent(in) :: t                                 !indep!
+!      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
+!      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
+!   end function f
+!end interface
+procedure(dydt_fct), pointer :: f   
 !
 logical :: maybe_stiff, lots_of_fails
 !
@@ -2216,14 +2250,16 @@ real(kind=wp), intent(in) :: vdotv
 real(kind=wp), dimension(:), intent(in) :: v                         !dep!
 real(kind=wp), dimension(size(v,1)) :: approx_jacobian               !dep!
 !
-interface
-   function f(t,y)
-      use rksuite_90_prec, only:wp
-      real(kind=wp), intent(in) :: t                                 !indep!
-      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
-      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
-   end function f
-end interface
+!Outcommented in order to use a procedural pointer instead
+!interface
+!   function f(t,y)
+!      use rksuite_90_prec, only:wp
+!      real(kind=wp), intent(in) :: t                                 !indep!
+!      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
+!      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
+!   end function f
+!end interface
+procedure(dydt_fct), pointer :: f
 !
 real(kind=wp) :: temp1
 !
@@ -2233,7 +2269,9 @@ real(kind=wp) :: temp1
 temp1 = scale/sqrt(vdotv)
 comm%vtemp = y + temp1*v
 !
-approx_jacobian = f(comm%t,comm%vtemp)
+!Outcommented in order to use a procedural pointer instead
+!approx_jacobian = f(comm%t,comm%vtemp)
+call f(comm%t,comm%vtemp,approx_jacobian)
 comm%f_count = comm%f_count + 1
 !
 !  Form the difference approximation.  At the same time undo
@@ -2628,14 +2666,16 @@ type(rk_comm_real_1d), intent(inout), target :: comm
 real(kind=wp), dimension(:), intent(out), optional :: y_want         !dep!
 real(kind=wp), dimension(:), intent(out), optional :: yderiv_want    !dep!
 !
-interface
-   function f(t,y)
-      use rksuite_90_prec, only:wp
-      real(kind=wp), intent(in) :: t                                 !indep!
-      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
-      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
-   end function f
-end interface
+!Outcommented in order to accomodate for using a procedural pointer instead
+!interface
+!   function f(t,y)
+!      use rksuite_90_prec, only:wp
+!      real(kind=wp), intent(in) :: t                                 !indep!
+!      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
+!      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
+!   end function f
+!end interface
+procedure(dydt_fct), pointer :: f
 !
 character(len=*),parameter :: srname="INTERPOLATE"
 integer :: ier, jer, nrec, state, npcls
@@ -2761,14 +2801,16 @@ subroutine form_intrp(f,p)
 !
 real(kind=wp), intent(out), dimension(:,:) :: p                      !dep!
 !
-interface
-   function f(t,y)
-      use rksuite_90_prec, only:wp
-      real(kind=wp), intent(in) :: t                                 !indep!
-      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
-      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
-   end function f
-end interface
+!Outcommented for using a procedural pointer instead
+!interface
+!   function f(t,y)
+!      use rksuite_90_prec, only:wp
+!      real(kind=wp), intent(in) :: t                                 !indep!
+!      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
+!      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
+!   end function f
+!end interface
+procedure(dydt_fct), pointer :: f
 !
 real(kind=wp), dimension(:,:), pointer :: r                          !real!
 real(kind=wp), dimension(:,:), pointer :: stages                     !dep!
@@ -2883,14 +2925,16 @@ subroutine extra_stages(f,ytemp,xstage)
 !
 real(kind=wp), dimension(:), intent(out) :: ytemp, xstage            !dep!
 !
-interface 
-   function f(t,y)
-      use rksuite_90_prec, only:wp
-      real(kind=wp), intent(in) :: t                                 !indep!
-      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
-      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
-   end function f
-end interface
+!Outcommented for using a procedural pointer instead
+!interface 
+!   function f(t,y)
+!      use rksuite_90_prec, only:wp
+!      real(kind=wp), intent(in) :: t                                 !indep!
+!      real(kind=wp), dimension(:), intent(in) :: y                   !dep!
+!      real(kind=wp), dimension(size(y,1)) :: f                       !dep!
+!   end function f
+!end interface
+procedure(dydt_fct), pointer :: f
 !
 real(kind=wp), dimension(:,:), pointer :: stages                     !dep!
 real(kind=wp), dimension(:), pointer :: yp, y_old, yp_old            !dep!
@@ -2932,12 +2976,18 @@ do i = 9, 11
    end do
    ytemp = y_old + h_old*ytemp
    select case(i)
-      case(9)
-         stages(:,7) = f(t_old+c(i)*h_old,ytemp)
-      case(10)
-         xstage = f(t_old+c(i)*h_old,ytemp)
-      case(11)
-         stages(:,1) = f(t_old+c(i)*h_old,ytemp)
+   case(9)
+       !changed to a procedural pointer instead
+         !stages(:,7) = f(t_old+c(i)*h_old,ytemp)
+       call f(t_old+c(i)*h_old,ytemp,stages(:,7))
+   case(10)
+       !changed to a procedural pointer instead
+         !xstage = f(t_old+c(i)*h_old,ytemp)
+        call f(t_old+c(i)*h_old,ytemp,xstage)
+   case(11)
+       !changed to a procedural pointer instead
+         !stages(:,1) = f(t_old+c(i)*h_old,ytemp)
+       call  f(t_old+c(i)*h_old,ytemp,stages(:,1))
    end select
    comm%f_count = comm%f_count + 1
 end do
