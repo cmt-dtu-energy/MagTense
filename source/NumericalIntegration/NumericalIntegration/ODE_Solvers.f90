@@ -55,7 +55,11 @@ implicit none
     !Pointer to the function output
     plhs = mxCreateNumericArray( nDim, dims, classid, ComplexFlag )
     
-    tmp = mexCallMATLAB(nlhs, plhs, nrhs, prhs, "dSigma2")
+    tmp = mexCallMATLAB(nlhs, plhs, nrhs, prhs, "dSigma_kaki")
+    
+    !Load the resulting dydt back into Fortran
+    sx = neq
+    call mxCopyPtrToReal8( mxGetPr( plhs(1) ), dydt, sx )
     
     end subroutine dydt_ML
     
@@ -126,7 +130,7 @@ implicit none
     real,dimension(neq,nt),intent(inout) :: yderiv_out  !>Array returning dy/dt at the times in t_out
     !real,dimension(neq),intent(in) :: f             !>The function that gived the dy/dt array at a specific t and y value
     
-    real,parameter :: tol = 0.0001              !>Parameter for the relative tolerance. Will be parameterized when the code is running properly
+    real :: tol                                 !>Relative tolerance. Will be parameterized when the code is running properly
     real,dimension(:),allocatable :: thres      !>arrays used by the initiater     
     
     character(len=1) :: task,method             !>Which version of the solver to use. = 'u' or 'U' for normal and 'C' or 'c' for complicated, Which RK method to use. 1 = RK23, 2 = RK45 and 3 = RK78
@@ -139,8 +143,11 @@ implicit none
     !Perform allocations. 
     allocate(thres(neq))
     
+    !tolerance
+    tol = 1e-4
+    
     !set thres to the low value
-    thres(:) = 1e-10
+    thres(:) = 1e-20
     
     !Set the method to RK45 as default (will be parameterized later as the code evolves)
     !L or l for 23, M or m for 45 and H o h for 67
@@ -159,10 +166,10 @@ implicit none
 
     !First time is the same as the input
     t_out(1) = t(1)
-    
+    y_out(:,1) = ystart
     !Call the integrator
     do i=2,nt
-     !   call range_integrate( setup_comm, fct, t(i), t_out(i), y_out(:,i), yderiv_out(:,i), flag )
+        call range_integrate( setup_comm, fct, t(i), t_out(i), y_out(:,i), yderiv_out(:,i), flag )
     enddo
     
     !Clean up

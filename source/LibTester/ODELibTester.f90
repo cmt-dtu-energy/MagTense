@@ -15,10 +15,10 @@
     
     procedure(dydt_fct), pointer :: fct      
     
-    fct => dydt_ML
+    !fct => dydt_ML
     
     !kaki: should be "mex'ed"
-    call MagTense_ODE( fct, t, y0, t_out, y_out )
+    !call MagTense_ODE( fct, t, y0, t_out, y_out )
     
     
     end program ODELibTester
