@@ -26,12 +26,12 @@ module LandauLifshitzSolution
     
     integer :: n                                    !> No of grid points
     
-    !there are three magnetization components per grid point
-    n = size(M)/3   
-    
-    Mx = M(1:n)
-    My = M(n+1:2*n)
-    Mz = M(2*n+1:3*n)
+    !!there are three magnetization components per grid point
+    !n = size(M)/3   
+    !
+    !Mx = M(1:n)
+    !My = M(n+1:2*n)
+    !Mz = M(2*n+1:3*n)
     
     !Matlab code. Note that we now denote the magnetization M and not Sigma
 !    NN = round(numel(Sigma)/3) ;
@@ -273,9 +273,9 @@ module LandauLifshitzSolution
     !Note that Jfact and A2 are defined in the module. 
     !Jfact 
     !A2 is the interaction matrix that needs to be computed in the initialization
-    Hjx = - 2. * Jfact * matmul( A2, Mx )
-    Hjy = - 2. * Jfact * matmul( A2, My )
-    Hjz = - 2. * Jfact * matmul( A2, Mz )
+    !Hjx = - 2. * Jfact * matmul( A2, Mx )
+    !Hjy = - 2. * Jfact * matmul( A2, My )
+    !Hjz = - 2. * Jfact * matmul( A2, Mz )
     
     end subroutine getExchangeTerms
     
@@ -305,7 +305,7 @@ module LandauLifshitzSolution
     !---------------------------------------------------------------------------   
     subroutine initializeInteractionMatrices()
     
-    call ComputeExchangeTerm3D()
+    !call ComputeExchangeTerm3D()
     
     end subroutine initializeInteractionMatrices()
     
@@ -317,7 +317,7 @@ module LandauLifshitzSolution
     !---------------------------------------------------------------------------   
     subroutine ComputeExchangeTerm3D()
     
-    allocate(A_exch())
+    !allocate(A_exch
     
 !    
 !    function A = ComputeExchangeTerm3D(N,dx,dy,dz)
