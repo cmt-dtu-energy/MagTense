@@ -1,344 +1,914 @@
-module LandauLifshitzSolution
+include 'mkl_spblas.f90'
+    module LandauLifshitzSolution
     use ODE_Solvers
     use integrationDataTypes
-    
+    use MKL_SPBLAS
+    use spline
+    use DemagFieldGetSolution
     implicit none
     
     !>------------------
-    !> Variables inside the module shared between subroutine calls
+    !> Custom types
     !>------------------
     
-    real,dimension(:,:),allocatable :: A_exch       !> Exchange term matrix
+    type MicroMagGrid
+        integer :: nx, ny, nz
+        real :: Lx,Ly,Lz
+        real :: dx,dy,dz
+        real,dimension(:,:,:),allocatable :: x,y,z
+        integer :: gridType
+    end type MicroMagGrid
     
-    private :: A_exch
+    !> Stores a table in one variable
+    type MicroMagTable1D
+        real,dimension(:),allocatable :: x,y        
+    end type MicroMagTable1D
+    
+    
+    !>-----------------
+    !> Overall data structure for a micro magnetism problem.
+    !> The design intention is such that a problem may be restarted given the information stored in this struct
+    !>-----------------
+    type MicroMagProblem
+        type(MicroMagGrid) :: grid              !> Grid of the problem
+        
+        type(sparse_matrix_t) :: A_exch         !> Exchange term matrix
+        
+        real,dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
+        real,dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
+        real,dimension(:,:),allocatable :: Kzz          !> Demag field tensor split out into the nine symmetric components
+        
+        integer :: ProblemMode                  !> Defines the problem mode (new or continued from previous solution)
+        
+        integer :: solver                       !> Determines what type of solver to use
+        
+        real :: A0,Ms,K0,gamma,alpha0,MaxT0     !> User defined coefficients determining part of the problem.
+        
+        type(MicroMagTable1D) :: HextX,HextY,HextZ  !> Tables for the external field along the x-, y- and z-directions          
+        
+        real :: t_start, t_end                  !> Starting and ending times
+        
+    end type MicroMagProblem
+    
+    !>-----------------
+    !> Data structure for a micro magnetism solution.
+    !> The design intention is such that a problem may be restarted given the information stored in this struct
+    !>-----------------
+    type MicroMagSolution
+        real,dimension(:),allocatable :: HjX,HjY,HjZ    !> Effective fields for the exchange term (X,Y and Z-directions, respectively)
+        real,dimension(:),allocatable :: HhX,HhY,HhZ    !> Effective fields for the external field (X,Y and Z-directions, respectively)
+        real,dimension(:),allocatable :: HkX,HkY,HkZ    !> Effective fields for the anisotropy energy term (X,Y and Z-directions, respectively)        
+        real,dimension(:),allocatable :: HmX,HmY,HmZ    !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
+        real,dimension(:),allocatable :: Mx,My,Mz       !> The magnetization components
+                
+        
+        real :: Jfact,Hfact,Mfact,Kfact                 !> Constant factors used for the determination of the effective fields
+    end type MicroMagSolution
+    
+    
+    !>------------
+    !> Parameters
+    !>------------
+    
+    integer,parameter :: gridTypeUniform=1
+    integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
+    integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverImplicit=3
+    
+    
+    
+    !>Module variables
+    type(MicroMagSolution) :: gb_solution
+    type(MicroMagProblem) :: gb_problem
+    
+    real,dimension(:),allocatable :: crossX,crossY,crossZ   !>Cross product terms
+    real,dimension(:),allocatable :: HeffX,HeffY,HeffZ      !>Effective fields
+    real,dimension(:),allocatable :: HeffX2,HeffY2,HeffZ2      !>Effective fields
+    
+    private :: gb_solution,gb_problem,crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2
     
     contains
     
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
     !> @brief
-    !> @param[in] t the current time at which the solution is desired
-    !> @param[in] M the magnetization at the current time, size [3n,1] with n being the no. of grid points
+    !> @param[inout] prob data structure containing the problem to be solved
+    !> @param[inout] sol data structure containing the solution    
     !>-----------------------------------------
-    subroutine SolveLandauLifshitzEquation( t, M)
-    real,intent(in) :: t                            !> Current time
-    real,intent(in),dimension(:),intent(in) :: M    !> Current magnetization vector, organized such that 1:n is Mx, n+1:2n My and 2n+1:3n Mz
+    subroutine SolveLandauLifshitzEquation( prob, sol )    
+    type(MicroMagProblem),intent(inout) :: prob      !> The problem data structure
+    type(MicroMagSolution),intent(inout) :: sol    !> The solution data structure
     
-    integer :: n                                    !> No of grid points
+    !Save internal representation of the problem and the solution
+    gb_solution = sol
+    gb_problem = prob
     
-    !!there are three magnetization components per grid point
-    !n = size(M)/3   
-    !
-    !Mx = M(1:n)
-    !My = M(n+1:2*n)
-    !Mz = M(2*n+1:3*n)
+    !Calculate the interaction matrices
+    call initializeInteractionMatrices( gb_problem )
     
-    !Matlab code. Note that we now denote the magnetization M and not Sigma
-!    NN = round(numel(Sigma)/3) ;
-!
-!SigmaX = Sigma(0*NN+[1:NN]) ;
-!SigmaY = Sigma(1*NN+[1:NN]) ;
-!SigmaZ = Sigma(2*NN+[1:NN]) ;
-!
+    !Initialize the solution, i.e. allocate various arrays
+    call initializeSolution( gb_problem, gb_solution )
     
-    !Following Matlab code has been ignored as we are not supporting heterogeneous grid(yet)
+    !Set the initial values for M
     
-!%% Demagnetization: Long range (coarse grids)
-!
-!HmXcTOT = zeros(NN,1) ;
-!HmYcTOT = zeros(NN,1) ;
-!HmZcTOT = zeros(NN,1) ;
+    !Do the solution
     
-    
-!for k=2:numel(AvrgMatrix)
-!    % get sigma over coarse grid (average)
-!    SigmaXC = AvrgMatrix{k}*SigmaX ;
-!    SigmaYC = AvrgMatrix{k}*SigmaY ;
-!    SigmaZC = AvrgMatrix{k}*SigmaZ ;
-!    % calculate demag. field over coarse grid   
-!
-!    HmXc = DemagTensor.KglobXX{k}*SigmaXC+DemagTensor.KglobXY{k}*SigmaYC+DemagTensor.KglobXZ{k}*SigmaZC ;
-!    HmYc = DemagTensor.KglobYX{k}*SigmaXC+DemagTensor.KglobYY{k}*SigmaYC+DemagTensor.KglobYZ{k}*SigmaZC ;
-!    HmZc = DemagTensor.KglobZX{k}*SigmaXC+DemagTensor.KglobZY{k}*SigmaYC+DemagTensor.KglobZZ{k}*SigmaZC ;
-!    '' ; 
-!
-!    % get demag. field over fine grid (copy)   
-!    HmXcTOT = HmXcTOT - Mfact*CopyMatrix{k}*HmXc ;  % Coarser
-!    HmYcTOT = HmYcTOT - Mfact*CopyMatrix{k}*HmYc ;  % Coarser
-!    HmZcTOT = HmZcTOT - Mfact*CopyMatrix{k}*HmZc ;  % Coarser
-!end
-!
-    
-    !---end deletion
-    
-    !Exchange term
-    
-    
-    
-    !Matlab code
-!%%  Exchange 
-!ThisHjX = AA.HjX(SigmaX,SigmaY,SigmaZ,t) ;
-!ThisHjY = AA.HjY(SigmaX,SigmaY,SigmaZ,t) ;
-!ThisHjZ = AA.HjZ(SigmaX,SigmaY,SigmaZ,t) ;
-!
-!%% External field
-!ThisHhX = AA.HhX(SigmaX,SigmaY,SigmaZ,t) ;
-!ThisHhY = AA.HhY(SigmaX,SigmaY,SigmaZ,t) ;
-!ThisHhZ = AA.HhZ(SigmaX,SigmaY,SigmaZ,t) ;
-!%% Demagnetization
-!if numel(CopyMatrix)>0
-!    ThisHmX = AA.HmX(SigmaX,SigmaY,SigmaZ,t) + HmXcTOT ; % fine + coarser
-!    ThisHmY = AA.HmY(SigmaX,SigmaY,SigmaZ,t) + HmYcTOT ; % fine + coarser
-!    ThisHmZ = AA.HmZ(SigmaX,SigmaY,SigmaZ,t) + HmZcTOT ; % fine + coarser
-!else
-!    ThisHmX = AA.HmX(SigmaX,SigmaY,SigmaZ,t) ; % fine 
-!    ThisHmY = AA.HmY(SigmaX,SigmaY,SigmaZ,t) ; % fine
-!    ThisHmZ = AA.HmZ(SigmaX,SigmaY,SigmaZ,t) ; % fine
-!end
-!%% Anisotropy
-!ThisHkX = AA.HkX(SigmaX,SigmaY,SigmaZ,t) ;
-!ThisHkY = AA.HkY(SigmaX,SigmaY,SigmaZ,t) ;
-!ThisHkZ = AA.HkZ(SigmaX,SigmaY,SigmaZ,t) ;
-!
-!ThisHeffX = ThisHjX + ThisHhX + ThisHmX + ThisHkX ;
-!ThisHeffY = ThisHjY + ThisHhY + ThisHmY + ThisHkY ;
-!ThisHeffZ = ThisHjZ + ThisHhZ + ThisHmZ + ThisHkZ ;
-!
-!%% Calculate Precession and Damping terms from Heff
-!
-!% Compute m x heff (Precession term)
-!TheCrossX = -(SigmaY.*ThisHeffZ - SigmaZ.*ThisHeffY) ;
-!TheCrossY = -(SigmaZ.*ThisHeffX - SigmaX.*ThisHeffZ) ;
-!TheCrossZ = -(SigmaX.*ThisHeffY - SigmaY.*ThisHeffX) ;
-!% Compute m x m x heff (Damping term)
-!ThisHeffX2 = +SigmaY.*TheCrossZ-SigmaZ.*TheCrossY ;
-!ThisHeffY2 = +SigmaZ.*TheCrossX-SigmaX.*TheCrossZ ;
-!ThisHeffZ2 = +SigmaX.*TheCrossY-SigmaY.*TheCrossX ;
-!
-!%% Calculate time-derivative of Sigma
-!
-!if isequal(class(alpha),'double') % alpha is time-independent
-!    dSigmaX = alpha.*ThisHeffX2 + gamma.*TheCrossX ;
-!    dSigmaY = alpha.*ThisHeffY2 + gamma.*TheCrossY ;
-!    dSigmaZ = alpha.*ThisHeffZ2 + gamma.*TheCrossZ ;
-!    dSigma = [dSigmaX;dSigmaY;dSigmaZ] ;
-!    dSigmaRMS = sqrt(sum((dSigma./alpha).^2)/NN) ;
-!else % alpha is time-dependent
-!    dSigmaX = alpha(t).*ThisHeffX2 + gamma.*TheCrossX ;
-!    dSigmaY = alpha(t).*ThisHeffY2 + gamma.*TheCrossY ;
-!    dSigmaZ = alpha(t).*ThisHeffZ2 + gamma.*TheCrossZ ;
-!    dSigma = [dSigmaX;dSigmaY;dSigmaZ] ;
-!    dSigmaRMS = sqrt(sum((dSigma./alpha(t)).^2)/NN) ;
-!end
-!
-!%% 
-!%kaki: changed TheData from a global variable to something loaded from
-!%disk...
-!%global TheData
-!load('thedata_kaki.mat');
-!% TheData = get(PlotStruct.hF,'userdata') ;
-!LastT = TheData.LastT ;
-!LastPlottedT = TheData.LastPlottedT ;
-!TheData.LastT = t ;
-!if isfield(TheData,'LastDSigma')
-!LastDSigma = TheData.LastDSigma ;
-!UsePrevDSigma = 1 ;
-!else
-!UsePrevDSigma = 0 ;    
-!end
-!TheData.LastDSigma = dSigma ;
-!% if UsePrevDSigma
-!% dSigma = dSigma + .9.*LastDSigma ;
-!% % disp('y')
-!% end
-!TheData.dSigmaRMS = dSigmaRMS ;
-!% set(PlotStruct.hF,'userdata',TheData) ;
-!
-!%% Exit ??
-!if t>.01
-!   ''   ;
-!end
-!if ~((t-LastT)> 0) 
-!    return
-!end
-!
-!if ~isfinite(PlotStruct.DeltaT)
-!    return
-!end
-!
-!%% Update surface and arrows plot
-!
-!% ThisCData =  reshape(ColorFromHorPsiTheta01(SigmaX,SigmaY,SigmaZ),N,N,N,3) ;
-!% set(PlotStruct.hS,'cdata',ThisCData) ;
-!% TheUdata = reshape(SigmaX,N(1),N(2),N(3)) ;
-!% TheVdata = reshape(SigmaY,N(1),N(2),N(3)) ;
-!% TheWdata = reshape(SigmaZ,N(1),N(2),N(3)) ;
-!% disp(num2str(mean(sqrt(TheUdata(:).^2+TheVdata(:).^2+TheWdata(:).^2)))) ;
-!
-!
-!%% update  hysteresis loop 
-!if PlotStruct.DrawIt
-!    if isfield(PlotStruct,'HystDir')
-!        SsX = -sum(SigmaX)./prod(N) ;
-!        SsY = -sum(SigmaY)./prod(N) ;
-!        SsZ = -sum(SigmaZ)./prod(N) ;
-!        
-!        SsK = SsX*PlotStruct.HystDir(1) + SsY*PlotStruct.HystDir(2) + SsZ*PlotStruct.HystDir(3) ;
-!        
-!        SsK = [get(PlotStruct.hL6x,'ydata'),SsK] ;
-!        %         SsY = [get(PlotStruct.hL6y,'ydata'),SsY] ;
-!        %         SsZ = [get(PlotStruct.hL6z,'ydata'),SsZ] ;
-!        %
-!        ThisHhK(1) = ThisHhX(1)*PlotStruct.HystDir(1) + ThisHhX(2)*PlotStruct.HystDir(2) + ThisHhX(3)*PlotStruct.HystDir(3) ;
-!        HsK = [get(PlotStruct.hL6x,'xdata'),ThisHhK(1)./PlotStruct.MaxHn] ;
-!        set(PlotStruct.hL6x,'xdata',HsK,'ydata',SsK) ;
-!        set(PlotStruct.hL7x,'xdata',HsK(end),'ydata',SsK(end)) ;
-!        set(PlotStruct.hA2,'xlim',1.1.*[-1,+1],'ylim',1.1.*[-1,+1]) ;
-!    else
-!    if PlotStruct.MaxHn~=0
-!        SsX = -sum(SigmaX)./prod(N) ;
-!        SsY = -sum(SigmaY)./prod(N) ;
-!        SsZ = -sum(SigmaZ)./prod(N) ;
-!        
-!        SsX = [get(PlotStruct.hL6x,'ydata'),SsX] ;
-!        SsY = [get(PlotStruct.hL6y,'ydata'),SsY] ;
-!        SsZ = [get(PlotStruct.hL6z,'ydata'),SsZ] ;
-!        
-!        HsX = [get(PlotStruct.hL6x,'xdata'),ThisHhX(1)./PlotStruct.MaxHn] ;
-!        HsY = [get(PlotStruct.hL6y,'xdata'),ThisHhY(1)./PlotStruct.MaxHn] ;
-!        HsZ = [get(PlotStruct.hL6z,'xdata'),ThisHhZ(1)./PlotStruct.MaxHn] ;
-!    end
-!    
-!    if PlotStruct.MaxHn~=0
-!        set(PlotStruct.hL6x,'xdata',HsX,'ydata',SsX) ;
-!        set(PlotStruct.hL7x,'xdata',HsX(end),'ydata',SsX(end)) ;
-!        set(PlotStruct.hL6y,'xdata',HsY,'ydata',SsY) ;
-!        set(PlotStruct.hL7y,'xdata',HsY(end),'ydata',SsY(end)) ;
-!        set(PlotStruct.hL6z,'xdata',HsZ,'ydata',SsZ) ;
-!        set(PlotStruct.hL7z,'xdata',HsZ(end),'ydata',SsZ(end)) ;
-!        set(PlotStruct.hA2,'xlim',1.1.*[-1,+1],'ylim',1.1.*[-1,+1]) ;
-!    end
-!    end
-!end
-!%% Exit ?
-!
-!if ~((t-LastPlottedT)> PlotStruct.DeltaT)
-!    return
-!end
-!
-!disp(['Here ',num2str(t)]) ;
-!if PlotStruct.DrawIt
-!    set(PlotStruct.hQ,'udata',reshape(SigmaX,N(1),N(2),N(3)),'vdata',reshape(SigmaY,N(1),N(2),N(3)),'wdata',reshape(SigmaZ,N(1),N(2),N(3))) ;
-!    %set(PlotStruct.hQ,'udata',SigmaX,'vdata',SigmaY,'wdata',SigmaZ) ;
-!    set(gcf,'name',[' t = ',num2str(t)]) ;
-!
-!    % view(t*300,45) ;
-!    drawnow ;
-!    TheData.LastPlottedT = t ;
-!    % set(PlotStruct.hF,'userdata',TheData) ;
-!end
-!
-!%% Save gif frame
-!if PlotStruct.SaveGif
-!
-!    frame = getframe(gcf);
-!    im = frame2im(frame);
-!    [Agif,map] = rgb2ind(im,256);
-!
-!    if t ~= 0
-!        imwrite(Agif,map,PlotStruct.GifFilename,'gif','WriteMode','append','DelayTime',1/30);
-!    end
-!end
+    !Clean up
+    deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2)
     
     end subroutine SolveLandauLifshitzEquation
 
-    
-    !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
-    !> @brief
-    !> Calculates and returns the exchange terms
-    !> @param[in] Mx the magnetization in the x-direction, size (n,1)
-    !> @param[in] My the magnetization in the y-direction, size (n,1)
-    !> @param[in] Mz the magnetization in the z-direction, size (n,1)
-    !> @param[in] time    
-    !> @param[inout] Hjx, the output field, size (n,1)
-    !> @param[inout] Hjy, the output field, size (n,1)
-    !> @param[inout] Hjz, the output field, size (n,1)
-    !>-----------------------------------------
-    subroutine getExchangeTerms( Mx, My, Mz, t, Hjx, Hjy, Hjz )
-    real,dimension(:),intent(in) :: Mx,My,Mz
-    real,intent(in) :: t
-    real,dimension(:),intent(inout) :: Hjx,Hjy,Hjz
-    
-    !Note that Jfact and A2 are defined in the module. 
-    !Jfact 
-    !A2 is the interaction matrix that needs to be computed in the initialization
-    !Hjx = - 2. * Jfact * matmul( A2, Mx )
-    !Hjy = - 2. * Jfact * matmul( A2, My )
-    !Hjz = - 2. * Jfact * matmul( A2, Mz )
-    
-    end subroutine getExchangeTerms
-    
-    
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
     !> @brief
     !> Defines the function that gives the derivative dmdt that is to be integrated
-    !> in the Landau-Lifshitz equation
+    !> in the Landau-Lifshitz equation. This function only works on a uniform grid
     !> @param[in] t the time at which the derivative is requested
     !> @param[in] m array size n holding the m_i values corresponding to the time t
     !> @param[inout] dmdt array size n for the derivatives at the time t
     !---------------------------------------------------------------------------    
     subroutine dmdt_fct ( t, m, dmdt )  
-             real,intent(in) :: t
-             real,dimension(:),intent(in) :: m
-             real,dimension(:),intent(inout) :: dmdt
-         
+    real,intent(in) :: t
+    real,dimension(:),intent(in) :: m
+    real,dimension(:),intent(inout) :: dmdt
+    integer :: ntot
+    
+
+    
+    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+    if ( .not. allocated(crossX) ) then
+        allocate( crossX(ntot), crossY(ntot), crossZ(ntot) )
+        allocate( HeffX(ntot), HeffY(ntot), HeffZ(ntot) )
+        allocate( HeffX2(ntot), HeffY2(ntot), HeffZ2(ntot) )
+    endif
+    
+    
+    !Update the magnetization
+    gb_solution%Mx = m(1:ntot)
+    gb_solution%My = m(ntot+1:2*ntot)
+    gb_solution%Mz = m(2*ntot+1:3*ntot)
              
+    !Exchange term    
+    call updateExchangeTerms( gb_problem, gb_solution )
+    
+    !External field
+    call updateExternalField( gb_problem, gb_solution, t )
+    
+    !Demag. field
+    call updateDemagfield( gb_problem, gb_solution )
+    
+    !Anisotropy term
+    call updateAnisotropy(  gb_problem, gb_solution )
+    
+    !Effective field
+    HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
+    HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY
+    HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ
+    
+    !Compute m x heff (Precession term)    
+    crossX = -1. * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
+    crossY = -1. * ( gb_solution%Mz * Heffx - gb_solution%Mx * HeffZ )
+    crossZ = -1. * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
+    
+    !Compute m x m x heff (Damping term)
+    HeffX2 = gb_solution%My * crossZ - gb_solution%Mz * crossY
+    HeffY2 = gb_solution%Mz * crossX - gb_solution%Mx * crossZ
+    HeffZ2 = gb_solution%Mx * crossY - gb_solution%My * crossX
+    
+    !Compute the time derivative of m
+    !dMxdt
+    dmdt(1:ntot) = alpha(t,gb_problem) * HeffX2 + gb_problem%gamma * crossX
+    !dMydt
+    dmdt(ntot+1:2*ntot) = alpha(t,gb_problem) * HeffY2 + gb_problem%gamma * crossY
+    !dMzdt
+    dmdt(2*ntot+1:3*ntot) = alpha(t,gb_problem) * HeffZ2 + gb_problem%gamma * crossZ
+    
              
+    
+
     end subroutine dmdt_fct
+    
+    !>--------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Calulates the alpha-coefficient for the Landau-Lifshitz equation (can be time dependent)
+    !> @param[in] t the time at which to evaluate alpha
+    !> @param[in] problem the problem on which the solution is solved
+    function alpha( t, problem )
+    real :: alpha
+    real,intent(in) :: t
+    type(MicroMagProblem),intent(in) :: problem
+    
+    alpha = problem%alpha0 * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
+    !MySim.alpha = @(t) -65104e-17*(10.^(7*min(t,MaxT0)/MaxT0)); 
+    
+    end function alpha
+    
+    
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Initializes the solution arrays
+    !> @param[in] problem the problem from which the solution is found
+    !> @param[inout] solution the solution data structure
+    subroutine initializeSolution( problem, solution )
+    type(MicroMagProblem),intent(in) :: problem
+    type(MicroMagSolution),intent(inout) :: solution
+    
+    integer :: ntot
+    
+    if ( problem%problemMode .eq. ProblemModeNew ) then
+        !No. of grid points
+        ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+        !Magnetization
+        allocate( solution%Mx(ntot), solution%My(ntot), solution%Mz(ntot) )
+        solution%Mx(:) = 0.
+        solution%My(:) = 0.
+        solution%Mz(:) = 0.
+        !Exchange effective field
+        allocate( solution%HjX(ntot), solution%HjY(ntot), solution%HjZ(ntot) )
+        solution%HjX(:) = 0.
+        solution%HjY(:) = 0.
+        solution%HjZ(:) = 0.
+        
+        !External effective field
+        allocate( solution%HhX(ntot), solution%HhY(ntot), solution%HhZ(ntot) )
+        solution%HhX(:) = 0.
+        solution%HhY(:) = 0.
+        solution%HhZ(:) = 0.
+        
+        !Anisotropy
+        allocate( solution%HkX(ntot), solution%HkY(ntot), solution%HkZ(ntot) )
+        solution%HkX(:) = 0.
+        solution%HkY(:) = 0.
+        solution%HkZ(:) = 0.
+        
+        !Demag field
+        allocate( solution%HmX(ntot), solution%HmY(ntot), solution%HmZ(ntot) )
+        solution%HmX(:) = 0.
+        solution%HmY(:) = 0.
+        solution%HmZ(:) = 0.
+        
+    endif
+    
+    !"J" : exchange term
+    solution%Jfact = problem%A0 / ( mu0 * problem%Ms )
+    !"H" : external field term (b.c. user input is in Tesla)
+    solution%Hfact = 1./mu0
+    !"M" : demagnetization term
+    solution%Mfact = problem%Ms
+    !"K" : anisotropy term
+    solution%Kfact = problem%K0 / ( mu0 * problem%Ms )
+    
+    end subroutine initializeSolution
+    
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Calculates and returns the exchange terms
+    !> @param[in] problem, the struct containing the current problem
+    !> @param[inout] solution, struct containing the current solution    
+    !>-----------------------------------------
+    subroutine updateExchangeTerms( problem, solution )
+    type(MicroMagProblem),intent(in) :: problem
+    type(MicroMagSolution),intent(inout) :: solution
+    
+    integer :: stat
+    type(MATRIX_DESCR) :: descr
+    real :: alpha
+    
+    descr%type = SPARSE_MATRIX_TYPE_GENERAL
+    descr%mode = SPARSE_FILL_MODE_FULL
+    descr%diag = SPARSE_DIAG_NON_UNIT
+    
+    
+    
+    alpha = -2 * solution%Jfact
+    
+    !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
+    !y = alpha * (A_exch * Mx )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, 0., solution%HjX )
+    
+    !Effective field in the Y-direction
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, 0., solution%HjY )
+    
+    !Effective field in the Z-direction
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, 0., solution%HjZ )
+    
+    end subroutine updateExchangeTerms
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Calculates and returns the external field
+    !> @param[in] problem, the struct containing the current problem
+    !> @param[inout] solution, struct containing the current solution    
+    !> @param[in] t the current time
+    !>-----------------------------------------
+    subroutine updateExternalField( problem, solution, t )
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
+    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+    real,intent(in) :: t                                !> The time
+    
+    real :: HX, HY, HZ                               !> External field values
+    
+    if ( problem%solver .eq. MicroMagSolverExplicit .OR. problem%solver .eq. MicroMagSolverDynamic ) then
+        
+        call spline_b_val ( size(problem%HextX%x), problem%HextX%x, problem%HextX%y, t, HX )
+        call spline_b_val ( size(problem%HextY%x), problem%HextY%x, problem%HextY%y, t, HY )
+        call spline_b_val ( size(problem%HextZ%x), problem%HextZ%x, problem%HextZ%y, t, HZ )
+        
+        solution%HhX = solution%Hfact * HX
+        solution%HhY = solution%Hfact * HY
+        solution%HhZ = solution%Hfact * HZ
+        
+        
+    elseif ( problem%solver .eq. MicroMagSolverImplicit ) then
+    !not implemented yet
+    endif
+    
+    
+    end subroutine updateExternalField
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Calculates and returns the effective field from the anisotropy
+    !> @param[in] problem, the struct containing the current problem
+    !> @param[inout] solution, struct containing the current solution        
+    !>-----------------------------------------
+    subroutine updateAnisotropy( problem, solution)
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
+    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+    
+    real :: alpha                                       !> Multiplicative scalar factor
+    type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
+    
+    
+    descr%type = SPARSE_MATRIX_TYPE_GENERAL
+    descr%mode = SPARSE_FILL_MODE_FULL
+    descr%diag = SPARSE_DIAG_NON_UNIT
+    
+    
+    alpha = -2.*solution%Kfact
+    
+!    solution%HkX = -2. * solution%Kfact * ( )
+!    
+!    !Kxx * Mx
+!    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%Kxx, descr, solution%Mx, 0., tmp1 )
+!    
+!    !Kxy * My
+!    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%Kxy, descr, solution%My, 0., tmp2 )
+!    
+!    !Kxz * Mz
+!    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%Kxz, descr, solution%Mz, 0., tmp3 )
+!    
+!    !The total x-direction anisotropy field
+!    solution%HkX
+!    
+!    AA.HkX = @(Sx,Sy,Sz,t) - (2*Kfact).*((Kxx).*Sx + (Kxy).*Sy + (Kxz).*Sz) ;
+!AA.HkY = @(Sx,Sy,Sz,t) - (2*Kfact).*((Kyx).*Sx + (Kyy).*Sy + (Kyz).*Sz) ;
+!AA.HkZ = @(Sx,Sy,Sz,t) - (2*Kfact).*((Kzx).*Sx + (Kzy).*Sy + (Kzz).*Sz) ;
+    
+    end subroutine updateAnisotropy
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Calculates and returns the effective demag field
+    !> @param[in] problem, the struct containing the current problem
+    !> @param[inout] solution, struct containing the current solution        
+    !>-----------------------------------------
+    subroutine updateDemagfield( problem, solution)
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
+    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+    
+    if ( problem%grid%gridType .eq. GridTypeUniform ) then
+        call updateDemagfield_uniform( problem, solution)
+    endif
+    
+    
+    end subroutine updateDemagfield
+    
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Calculates and returns the effective demag field on a uniform grid
+    !> @param[in] problem, the struct containing the current problem
+    !> @param[inout] solution, struct containing the current solution        
+    !>-----------------------------------------
+    subroutine updateDemagfield_uniform( problem, solution)
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
+    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+    
+    !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
+    !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
+    solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
+    solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
+    solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
+    
+    
+    
+    end subroutine updateDemagfield_uniform
+    
     
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
     !> @brief
     !> Initializes the interaction matrices
+    !> @param[inout] problem struct containing the problem information    
     !---------------------------------------------------------------------------   
-    subroutine initializeInteractionMatrices()
-    
-    !call ComputeExchangeTerm3D()
-    
-    end subroutine initializeInteractionMatrices()
+    subroutine initializeInteractionMatrices( problem )
+    type(MicroMagProblem), intent(inout) :: problem         !> Struct containing the grid information
     
     
-      !>-----------------------------------------
+    !Setup the grid
+    call setupGrid( problem%grid )
+    
+    !Demagnetization tensor matrix
+    call ComputeDemagfieldTensor( problem )
+    
+    !Anisotropy matrix
+    !Not implemented yet
+    
+    !Exhange term matrix
+    call ComputeExchangeTerm3D( problem%grid, problem%A_exch )
+    
+    
+    end subroutine initializeInteractionMatrices
+    
+    
+    !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
     !> @brief
-    !> Calculates the exhange term
+    !> Sets up the grid for the model. Only uniform grid is supported currently, but this will change in due time
+    !> @param[inout] grid the struct that contains the information about the current grid
+    !>-----------------------------------------
+    
+    subroutine setupGrid( grid )
+    type(MicroMagGrid),intent(inout) :: grid            !> Grid information to be generated
+    integer :: i
+    
+    !Setup the grid depending on which type of grid it is
+    if ( grid%gridType .eq. gridTypeUniform ) then
+        
+        !Allocate the grid
+        allocate( grid%x(grid%nx,grid%ny,grid%nz),grid%y(grid%nx,grid%ny,grid%nz),grid%z(grid%nx,grid%ny,grid%nz) )
+        
+        if ( grid%nx .gt. 1 ) then
+            grid%dx = grid%Lx / (grid%nx-1)                        
+            do i=1,grid%nx
+                grid%x(i,:,:) = -grid%Lx/2 + (i-1) * grid%dx
+            enddo
+            
+        else
+            grid%x(:,:,:) = 0.
+            grid%dx = grid%Lx
+        endif
+    
+        if ( grid%ny .gt. 1 ) then
+            grid%dy = grid%Ly / (grid%ny-1)                        
+            do i=1,grid%ny
+                grid%y(:,i,:) = -grid%Ly/2 + (i-1) * grid%dy
+            enddo            
+        else
+            grid%y(:,:,:) = 0.
+            grid%dy = grid%Ly
+        endif
+
+        if ( grid%nz .gt. 1 ) then
+            grid%dz = grid%Lz / (grid%nz-1)                        
+            do i=1,grid%nz
+                grid%z(:,:,i) = -grid%Lz/2 + (i-1) * grid%dz
+            enddo            
+        else
+            grid%z(:,:,:) = 0.
+            grid%dz = grid%Lz
+        endif
+    endif
+    
+    
+    end subroutine setupGrid
+    
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Calculates and returns the demag field tensor
+    !> @param[inout] problem, the struct containing the problem
+    
+    !>-----------------------------------------
+    subroutine ComputeDemagfieldTensor( problem )
+    type(MicroMagProblem),intent(inout) :: problem      !> Grid data structure    
+    
+    
+    type(MagTile),dimension(1) :: tile                  !> Tile representing the current tile under consideration
+    real,dimension(:,:),allocatable :: H,pts            !> The field and the corresponding evaluation point arrays
+    integer :: i,j,k,nx,ny,nz,ntot,ind                  !> Internal counters and index variables
+    real,dimension(:,:,:,:),allocatable :: Nout         !> Temporary storage for the demag tensor    
+    integer,dimension(1) :: shp
+    
+    if ( problem%grid%gridType .eq. gridTypeUniform ) then
+        nx = problem%grid%nx
+        ny = problem%grid%ny
+        nz = problem%grid%nz
+        ntot = nx * ny * nz
+        
+        !Demag tensor components
+        allocate( problem%Kxx(ntot,ntot), problem%Kxy(ntot,ntot), problem%Kxz(ntot,ntot) )
+        allocate( problem%Kyy(ntot,ntot), problem%Kyz(ntot,ntot) )
+        allocate( problem%Kzz(ntot,ntot) )
+        
+        
+        allocate(H(ntot,3),pts(ntot,3))
+        
+        !Setup template tile
+        tile(1)%tileType = 2 !(for prism)
+        !dimensions of the tile
+        tile(1)%a = problem%grid%dx
+        tile(1)%b = problem%grid%dy
+        tile(1)%c = problem%grid%dz
+        tile(1)%exploitSymmetry = 0 !0 for no and this is important
+        tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+        tile(1)%M(:) = 0.
+        
+        !Set up the points at which the field is to be evaluated (the centers of all the tiles)
+        shp(1) = ntot
+        pts(:,1) = reshape( problem%grid%x, shp )
+        pts(:,2) = reshape( problem%grid%y, shp )
+        pts(:,3) = reshape( problem%grid%z, shp )
+        
+        !for each element find the tensor for all evaluation points (i.e. all elements)
+        do k=1,nz
+            do j=1,ny                
+                do i=1,nx
+                    !Set the center of the tile to be the current point
+                    tile(1)%offset(1) = problem%grid%x(i,j,k)
+                    tile(1)%offset(2) = problem%grid%y(i,j,k)
+                    tile(1)%offset(3) = problem%grid%z(i,j,k)
+                    !Nout will be allocated by the subroutine. Should be de-allocated afterwards for consistency
+                    call getFieldFromTiles( tile, H, pts, 1, ntot, Nout )
+                    
+                    !Copy Nout into the proper structure used by the micro mag model
+                    ind = (i-1) * ny * nz + (j-1) * nz + k
+                    
+                    problem%Kxx(ind,:) = Nout(1,:,1,1)
+                    problem%Kxy(ind,:) = Nout(1,:,1,2)
+                    problem%Kxz(ind,:) = Nout(1,:,1,3)
+                    
+                    !Not stored due to symmetry  (Kxy = Kyx)
+                    !Kyx(ind,:) = Nout(1,:,2,1)
+                    problem%Kyy(ind,:) = Nout(1,:,2,2)
+                    problem%Kyz(ind,:) = Nout(1,:,2,3)
+                    
+                    !Not stored due to symmetry (Kxz = Kzx)
+                    !Kzx(ind,:) = Nout(1,:,3,1)
+                    !Not stored due to symmetry (Kyz = Kzy)
+                    !Kzy(ind,:) = Nout(1,:,3,2)
+                    problem%Kzz(ind,:) = Nout(1,:,3,3)
+                    
+                    deallocate(Nout)
+                enddo
+            enddo
+        enddo
+        
+        !Clean up
+        deallocate(H,pts)
+    endif
+    
+    
+    end subroutine ComputeDemagfieldTensor
+    
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Calculates the exhange term matrix
+    !> which means it produces the differential operator d^2/dx^2 + d^2/dy^2 + d^2/dz^2 and returns this in the sparse matrix A
     !---------------------------------------------------------------------------   
-    subroutine ComputeExchangeTerm3D()
+    subroutine ComputeExchangeTerm3D( grid, A )
+    type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
+    type(sparse_matrix_t),intent(inout) :: A          !> The returned matrix from the sparse matrix creator
     
-    !allocate(A_exch
+    if ( grid%gridType .eq. gridTypeUniform ) then
+        call ComputeExchangeTerm3D_Uniform( grid, A )
+    endif
     
-!    
-!    function A = ComputeExchangeTerm3D(N,dx,dy,dz)
-!% Returns exchange matrix divided by finite difference factors.
-!% Calculations use central-difference and Neumann b.c. (equivalent to no
-!% b.c. when the diagonal is not present, see below).
-!% N is the number of tiles along each space dimension. dx, dy and dz are
-!% distances between grid points. The diagonal is empty since the cross
-!% products of the LL equation make it vanish anyway.
-!x1=repmat([ones(N(1)-1,1)/dx^2;0],N(2)*N(3),1); % x-dimension neighbors
-!x2=repmat([0;ones(N(1)-1,1)/dx^2],N(2)*N(3),1);
-!y1=repmat([ones((N(2)-1)*N(1),1)/dy^2;zeros(N(1),1)],N(3),1); % y-dimension neighbors
-!y2=repmat([zeros(N(1),1);ones((N(2)-1)*N(1),1)/dy^2],N(3),1);
-!z1=ones(prod(N),1)/dz^2; % z-dimension neighbors
-!z2=ones(prod(N),1)/dz^2;
-!A = spdiags([z1,y1,x1,x2,y2,z2],[-N(1)*N(2),-N(1),-1,+1,+N(1),N(1)*N(2)],prod(N),prod(N));
-!
-!'' ;
-!end
     
     end subroutine ComputeExchangeTerm3D
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Calculates the exhange term matrix on a uniform grid
+    !> which means it produces the differential operator d^2/dx^2 + d^2/dy^2 + d^2/dz^2 and returns this in the sparse matrix A
+    !---------------------------------------------------------------------------   
+    subroutine ComputeExchangeTerm3D_Uniform( grid, A )
+    type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
+    type(sparse_matrix_t),intent(inout) :: A          !> The returned matrix from the sparse matrix creator
+    
+    integer :: stat                                   !> Status value for the various sparse matrix operations    
+    real,dimension(:),allocatable :: values           !> Array containing the on-zero values of the sparse matrix
+    type(sparse_matrix_t) :: d2dx2, d2dy2, d2dz2      !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
+    type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
+    integer :: ind, ntot,colInd,rowInd                !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated
+    integer,dimension(:),allocatable :: cols          !> Columns array keeping the index of the first element in values of the i'th column of a sparse matrix
+    integer,dimension(:),allocatable :: rows_start,rows_end! > rows_start and rows_end are relevant for the sparse matrix definition
+    integer :: i,j,k,nx,ny,nz                         !> For-loop counters
+    
+    
+    !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
+    !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
+    
+    nx = grid%nx
+    ny = grid%ny
+    nz = grid%nz
+    
+    !----------------------------------d^2dx^2 begins -----------------------------!
+    !Make the d^2/dx^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz
+    ntot = 3 * nx*ny*nz - 2*ny*nz
+    allocate(values(ntot),cols(ntot),rows_start(nx*ny*nz),rows_end(nx*ny*nz))
+    
+    ind = 1
+    rowInd = 1
+    do k=1,nz
+        do j=1,ny
+            
+            colInd = (k-1)*ny + (j-1)*nx + 1
+            
+            !The left boundary
+            values(ind) = -1.
+            cols(ind) = colInd
+            rows_start(rowInd) = ind            
+            ind = ind + 1
+            
+            values(ind) = 1.
+            cols(ind) = colInd + 1
+            rows_end(rowInd) = ind
+            rowInd = rowInd + 1
+            ind = ind + 1
+            
+            !Go through one row at a time
+            do i=2,nx-1
+                            
+                !Left-most point
+                values( ind ) = 1.
+                cols(ind) = colInd
+                !update where the row starts
+                rows_start(rowInd) = ind           
+                
+                ind = ind + 1
+                
+                !Center point
+                values( ind + 1 ) = -2.
+                cols(ind) = colInd + 1
+                ind = ind + 1
+                
+                !Right-most point
+                values( ind + 2 ) = 1.
+                cols(ind) = colInd + 2
+                rows_end(rowInd) = ind
+                rowInd = rowInd + 1
+                ind = ind + 1
+                
+                colInd = colInd + 1
+            enddo            
+            !The right boundary
+            values(ind) = 1.
+            cols(ind) = colInd
+            !update where the row starts
+            rows_start(rowInd) = ind            
+            ind = ind + 1
+            values(ind) = -1.
+            cols(ind) = colInd+1
+            rows_end(rowInd) = ind
+            rowInd = rowInd + 1
+            ind = ind + 1            
+        enddo
+    enddo
+    !Multiply by the discretization
+    values = values * 1./grid%dx**2
+        
+    !Create the sparse matrix for the d^2dx^2
+    stat = mkl_sparse_d_create_csr ( d2dx2, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, rows_start, rows_end, cols, values)
+       
+    
+    !----------------------------------d^2dx^2 ends -----------------------------!
+    
+    
+    !----------------------------------d^2dy^2 begins ----------------------------!
+    
+    !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2
+    values(:) = 0.
+    cols(:) = 0
+    rows_start(:) = 0
+    rows_end(:) = 0
+    ind = 1
+    rowInd = 1
+    do k=1,nz
+        !The bottom boundary
+        do i=1,nx
+            values(ind) = -1.
+            cols(ind) = (k-1) * nx * ny + i
+            rows_start(rowInd) = ind
+            
+            !increment to next element
+            ind = ind + 1
+            
+            values(ind) = 1.
+            cols(ind) = (k-1) * nx * ny + nx + i
+            rows_end(rowInd) = ind
+            rowInd = rowInd + 1
+            
+            !increment to next element
+            ind = ind + 1
+        enddo
+        
+        !Everything in between
+        do j=2,ny-1
+                    
+            
+            do i=1,nx
+                
+                values(ind) = 1.
+                cols(ind) = (k-1) * nx * ny + (j-2) * nx + i
+                rows_start(rowInd) = ind
+                !increment to next element
+                ind = ind + 1  
+                
+                values(ind) = -2.
+                cols(ind) = (k-1) * nx * ny + (j-1) * nx + i
+            
+                !increment to next element
+                ind = ind + 1
+            
+                values(ind) = 1.
+                cols(ind) = (k-1) * nx * ny + j * nx + i
+                rows_end(rowInd) = ind
+                rowInd = rowInd + 1
+                
+                !increment to next element
+                ind = ind + 1
+                
+            enddo
+                        
+        
+        enddo
+        
+        !The top boundary    
+        do i=1,nx
+            
+            values(ind) = 1.
+            cols(ind) = k * nx * ny - 2*nx + i
+            rows_start(rowInd) = ind
+            
+            !increment to next element
+            ind = ind + 1            
+            
+            values(ind) = -1.
+            cols(ind) = k * nx * ny - nx + i
+            rows_end(rowInd) = ind
+            rowInd = rowInd + 1
+            
+            ind = ind + 1
+            
+            
+        enddo
+    enddo
+    
+    !Multiply by the discretization
+    values = values * 1./grid%dy**2
+        
+    !Create the sparse matrix for the d^2dy^2
+    stat = mkl_sparse_d_create_csr ( d2dy2, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, rows_start, rows_end, cols, values)
+    
+    !----------------------------------d^2dy^2 ends ----------------------------!
+    
+    !----------------------------------d^2dz^2 begins ----------------------------!
+    !Make the d^2/dz^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2 and d^2dy^2
+    values(:) = 0.
+    cols(:) = 0
+    rows_start(:) = 0
+    rows_end(:) = 0
+    ind = 1
+    rowInd = 1
+    
+    !The z=1 face
+    do i=1,nx
+        do j=1,ny
+            !central value
+            values(ind) = -1.
+            cols(ind) = (j-1) * nx + i
+            rows_start(rowInd) = ind
+            
+            !increment position
+            ind = ind + 1
+            
+            !right-most value
+            values(ind) = 1.
+            cols(ind) = nx * ny + (j-1)*nx + i
+            rows_end(rowInd) = ind
+            rowInd = rowInd + 1
+            
+            !increment position
+            ind = ind + 1
+        enddo
+    enddo
+    !Everything in between
+    do k=2,nz-1
+        do i=1,nx
+            do j=1,ny
+                !left-most value
+                values(ind) = 1.
+                cols(ind) = nx * ny * k + (j-1) * nx + i
+                rows_start(rowInd) = ind
+            
+                !increment position
+                ind = ind + 1
+                
+                !central value
+                values(ind) = -2.
+                cols(ind) = nx * ny * (k-1) + (j-1) * nx + i
+                
+            
+                !increment position
+                ind = ind + 1
+                
+                
+                values(ind) = -1.
+                cols(ind) = nx * ny * (k-2) + (j-1) * nx + i
+                rows_end(rowInd) = ind
+                rowInd = rowInd + 1
+                
+                !increment position
+                ind = ind + 1
+                
+            enddo
+        enddo
+        
+    enddo
+    
+    
+    !The z=nz face
+    do i=1,nx
+        do j=1,ny
+            
+            !left-most value
+            values(ind) = 1.
+            cols(ind) = nx * ny * (nz-2) + (j-1) * nx + i
+            rows_start(rowInd) = ind
+            
+            !increment position
+            ind = ind + 1
+            
+            !central value
+            values(ind) = -1.
+            cols(ind) = nx * ny * (nz-1) + (j-1) * nx + i
+            rows_end(rowInd) = ind
+            rowInd = rowInd + 1
+            
+            !increment position
+            ind = ind + 1
+            
+            
+        enddo
+    enddo
+    
+    
+    !Multiply by the discretization
+    values = values * 1./grid%dz**2
+        
+    !Create the sparse matrix for the d^2dz^2
+    stat = mkl_sparse_d_create_csr ( d2dz2, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, rows_start, rows_end, cols, values)
+    !----------------------------------d^2dz^2 ends ----------------------------!
+    
+            
+    !Finally, add up the three diagonals and store in the output sparse matrix, A
+    !store the results temporarily in tmp4
+    stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2, 1., d2dy2, tmp)    
+    
+    stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2, 1., tmp, A)
+        
+    !Clean up 
+    stat = mkl_sparse_destroy (d2dx2)
+    stat = mkl_sparse_destroy (d2dy2)
+    stat = mkl_sparse_destroy (d2dz2)
+    stat = mkl_sparse_destroy (tmp)
+    
+    deallocate(values,cols,rows_start,rows_end)
+    
+    
+    
+
+    !Clean up
+    deallocate(values)
+    stat = mkl_sparse_destroy (d2dx2)
+    stat = mkl_sparse_destroy (d2dy2)
+    stat = mkl_sparse_destroy (d2dz2)
+    
+    end subroutine ComputeExchangeTerm3D_Uniform
     
     
 end module LandauLifshitzSolution
