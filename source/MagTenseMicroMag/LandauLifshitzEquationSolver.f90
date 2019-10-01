@@ -30,13 +30,10 @@ include 'mkl_spblas.f90'
     !> The design intention is such that a problem may be restarted given the information stored in this struct
     !>-----------------
     type MicroMagProblem
+        !Below is stuff that needs to be provided by the "user":
         type(MicroMagGrid) :: grid              !> Grid of the problem
         
-        type(sparse_matrix_t) :: A_exch         !> Exchange term matrix
-        
-        real,dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
-        real,dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
-        real,dimension(:,:),allocatable :: Kzz          !> Demag field tensor split out into the nine symmetric components
+        real,dimension(:,:),allocatable :: u_ea !> Easy axis vectors that should have the dimensions (n,3) where n is the no. of grid points and thus u_ea(i,3) is the i'th point's z-component
         
         integer :: ProblemMode                  !> Defines the problem mode (new or continued from previous solution)
         
@@ -47,6 +44,17 @@ include 'mkl_spblas.f90'
         type(MicroMagTable1D) :: HextX,HextY,HextZ  !> Tables for the external field along the x-, y- and z-directions          
         
         real :: t_start, t_end                  !> Starting and ending times
+        
+        !Below is stuff that is computed when the solver initializes
+        
+        type(sparse_matrix_t) :: A_exch         !> Exchange term matrix
+        
+        real,dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
+        real,dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
+        real,dimension(:,:),allocatable :: Kzz          !> Demag field tensor split out into the nine symmetric components
+        
+        real,dimension(:),allocatable :: Axx,Axy,Axz,Ayy,Ayz,Azz    !> Anisotropy vectors assuming local anisotropy only, i.e. no interaction between grains
+        
         
     end type MicroMagProblem
     
@@ -107,6 +115,7 @@ include 'mkl_spblas.f90'
     
     !Initialize the solution, i.e. allocate various arrays
     call initializeSolution( gb_problem, gb_solution )
+        
     
     !Set the initial values for M
     
@@ -284,7 +293,7 @@ include 'mkl_spblas.f90'
     
     
     
-    alpha = -2 * solution%Jfact
+    alpha = 2 * solution%Jfact
     
     !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
     !y = alpha * (A_exch * Mx )
@@ -353,23 +362,12 @@ include 'mkl_spblas.f90'
     
     alpha = -2.*solution%Kfact
     
-!    solution%HkX = -2. * solution%Kfact * ( )
-!    
-!    !Kxx * Mx
-!    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%Kxx, descr, solution%Mx, 0., tmp1 )
-!    
-!    !Kxy * My
-!    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%Kxy, descr, solution%My, 0., tmp2 )
-!    
-!    !Kxz * Mz
-!    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%Kxz, descr, solution%Mz, 0., tmp3 )
-!    
-!    !The total x-direction anisotropy field
-!    solution%HkX
-!    
-!    AA.HkX = @(Sx,Sy,Sz,t) - (2*Kfact).*((Kxx).*Sx + (Kxy).*Sy + (Kxz).*Sz) ;
-!AA.HkY = @(Sx,Sy,Sz,t) - (2*Kfact).*((Kyx).*Sx + (Kyy).*Sy + (Kyz).*Sz) ;
-!AA.HkZ = @(Sx,Sy,Sz,t) - (2*Kfact).*((Kzx).*Sx + (Kzy).*Sy + (Kzz).*Sz) ;
+    !Notice that the anisotropy matrix is symmetric and so Axy = Ayx etc.
+    solution%Hkx = alpha * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
+    solution%Hky = alpha * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
+    solution%Hkz = alpha * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
+    
+
     
     end subroutine updateAnisotropy
     
@@ -431,7 +429,7 @@ include 'mkl_spblas.f90'
     call ComputeDemagfieldTensor( problem )
     
     !Anisotropy matrix
-    !Not implemented yet
+    call ComputeAnisotropyTerm3D( problem )
     
     !Exhange term matrix
     call ComputeExchangeTerm3D( problem%grid, problem%A_exch )
@@ -910,6 +908,51 @@ include 'mkl_spblas.f90'
     
     end subroutine ComputeExchangeTerm3D_Uniform
     
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Calculates the anisotropy term sparse matrix assuming the effective field anisotropy is linear in m    
+    !> @param[inout] problem the data structure containing the problem
+    !---------------------------------------------------------------------------   
+    subroutine ComputeAnisotropyTerm3D( problem )
+    type(MicroMagProblem),intent(inout) :: problem       !> Struct containing the problem
+    
+    
+    if ( problem%grid%gridType .eq. gridTypeUniform ) then
+        call ComputeAnisotropyTerm3D_Uniform( problem )
+    endif
+    
+    
+    end subroutine ComputeAnisotropyTerm3D
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Calculates the anisotropy term matrix on a uniform grid  
+    !> @param[inout] problem the data structure containing the problem
+    !---------------------------------------------------------------------------   
+    subroutine ComputeAnisotropyTerm3D_Uniform( problem )
+    type(MicroMagProblem),intent(inout) :: problem             !> Struct containing the problem
+    
+    
+    integer :: nx,ny,nz,ntot
+    
+        nx = problem%grid%nx
+        ny = problem%grid%ny
+        nz = problem%grid%nz
+        ntot = nx * ny * nz
+        
+        !Allocate the anisotropy vectors and note that the operation is symmetric so we do not need to store three of the nine components
+        allocate( problem%Axx(ntot),problem%Axy(ntot),problem%Axz(ntot),problem%Ayy(ntot),problem%Ayz(ntot),problem%Azz(ntot) )
+        
+        problem%Axx = problem%u_ea(:,1) * problem%u_ea(:,1)
+        problem%Axy = problem%u_ea(:,1) * problem%u_ea(:,2)
+        problem%Axz = problem%u_ea(:,1) * problem%u_ea(:,3)
+        problem%Ayy = problem%u_ea(:,2) * problem%u_ea(:,2)
+        problem%Ayz = problem%u_ea(:,2) * problem%u_ea(:,3)
+        problem%Azz = problem%u_ea(:,3) * problem%u_ea(:,3)
+    
+    end subroutine ComputeAnisotropyTerm3D_Uniform
     
 end module LandauLifshitzSolution
     
