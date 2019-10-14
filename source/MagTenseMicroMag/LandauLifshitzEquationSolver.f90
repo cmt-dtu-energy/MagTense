@@ -1,88 +1,15 @@
-include 'mkl_spblas.f90'
+!include 'mkl_spblas.f90'
     module LandauLifshitzSolution
     use ODE_Solvers
     use integrationDataTypes
     use MKL_SPBLAS
-    use spline
+    use MicroMagParameters
+    use MagTenseMicroMagIO
+    !use spline
     use DemagFieldGetSolution
     implicit none
     
-    !>------------------
-    !> Custom types
-    !>------------------
-    
-    type MicroMagGrid
-        integer :: nx, ny, nz
-        real :: Lx,Ly,Lz
-        real :: dx,dy,dz
-        real,dimension(:,:,:),allocatable :: x,y,z
-        integer :: gridType
-    end type MicroMagGrid
-    
-    !> Stores a table in one variable
-    type MicroMagTable1D
-        real,dimension(:),allocatable :: x,y        
-    end type MicroMagTable1D
-    
-    
-    !>-----------------
-    !> Overall data structure for a micro magnetism problem.
-    !> The design intention is such that a problem may be restarted given the information stored in this struct
-    !>-----------------
-    type MicroMagProblem
-        !Below is stuff that needs to be provided by the "user":
-        type(MicroMagGrid) :: grid              !> Grid of the problem
-        
-        real,dimension(:,:),allocatable :: u_ea !> Easy axis vectors that should have the dimensions (n,3) where n is the no. of grid points and thus u_ea(i,3) is the i'th point's z-component
-        
-        integer :: ProblemMode                  !> Defines the problem mode (new or continued from previous solution)
-        
-        integer :: solver                       !> Determines what type of solver to use
-        
-        real :: A0,Ms,K0,gamma,alpha0,MaxT0     !> User defined coefficients determining part of the problem.
-        
-        type(MicroMagTable1D) :: HextX,HextY,HextZ  !> Tables for the external field along the x-, y- and z-directions          
-        
-        real :: t_start, t_end                  !> Starting and ending times
-        
-        !Below is stuff that is computed when the solver initializes
-        
-        type(sparse_matrix_t) :: A_exch         !> Exchange term matrix
-        
-        real,dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
-        real,dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
-        real,dimension(:,:),allocatable :: Kzz          !> Demag field tensor split out into the nine symmetric components
-        
-        real,dimension(:),allocatable :: Axx,Axy,Axz,Ayy,Ayz,Azz    !> Anisotropy vectors assuming local anisotropy only, i.e. no interaction between grains
-        
-        
-    end type MicroMagProblem
-    
-    !>-----------------
-    !> Data structure for a micro magnetism solution.
-    !> The design intention is such that a problem may be restarted given the information stored in this struct
-    !>-----------------
-    type MicroMagSolution
-        real,dimension(:),allocatable :: HjX,HjY,HjZ    !> Effective fields for the exchange term (X,Y and Z-directions, respectively)
-        real,dimension(:),allocatable :: HhX,HhY,HhZ    !> Effective fields for the external field (X,Y and Z-directions, respectively)
-        real,dimension(:),allocatable :: HkX,HkY,HkZ    !> Effective fields for the anisotropy energy term (X,Y and Z-directions, respectively)        
-        real,dimension(:),allocatable :: HmX,HmY,HmZ    !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
-        real,dimension(:),allocatable :: Mx,My,Mz       !> The magnetization components
-                
-        
-        real :: Jfact,Hfact,Mfact,Kfact                 !> Constant factors used for the determination of the effective fields
-    end type MicroMagSolution
-    
-    
-    !>------------
-    !> Parameters
-    !>------------
-    
-    integer,parameter :: gridTypeUniform=1
-    integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
-    integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverImplicit=3
-    
-    
+   
     
     !>Module variables
     type(MicroMagSolution) :: gb_solution
@@ -103,26 +30,41 @@ include 'mkl_spblas.f90'
     !> @param[inout] sol data structure containing the solution    
     !>-----------------------------------------
     subroutine SolveLandauLifshitzEquation( prob, sol )    
-    type(MicroMagProblem),intent(inout) :: prob      !> The problem data structure
-    type(MicroMagSolution),intent(inout) :: sol    !> The solution data structure
-    
+    type(MicroMagProblem),intent(inout) :: prob     !> The problem data structure
+    type(MicroMagSolution),intent(inout) :: sol     !> The solution data structure    
+    integer :: ntot                                 !> total no. of tiles
+    procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
+    procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
     !Save internal representation of the problem and the solution
     gb_solution = sol
     gb_problem = prob
     
+    call displayMatlabMessage( 'Initializing matrices' )
     !Calculate the interaction matrices
     call initializeInteractionMatrices( gb_problem )
     
+    call displayMatlabMessage( 'Initializing solution' )
     !Initialize the solution, i.e. allocate various arrays
     call initializeSolution( gb_problem, gb_solution )
         
+    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+    !Set the initial values for m (remember that M is organized such that mx = m(1:ntot), my = m(ntot+1:2*ntot), mz = m(2*ntot+1:3*ntot)
+    allocate(gb_solution%t_out(size(gb_problem%t)),gb_solution%M_out(3*ntot,size(gb_problem%t)))
     
-    !Set the initial values for M
     
+    call displayMatlabMessage( 'Running solution' )
     !Do the solution
+    fct => dmdt_fct
+    cb_fct => displayMatlabProgessMessage
+    call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, gb_solution%M_out, cb_fct )
+    
     
     !Clean up
     deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2)
+    
+    !Make sure to return the correct state
+    sol = gb_solution
+    prob = gb_problem
     
     end subroutine SolveLandauLifshitzEquation
 
@@ -320,17 +262,14 @@ include 'mkl_spblas.f90'
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     real,intent(in) :: t                                !> The time
     
-    real :: HX, HY, HZ                               !> External field values
     
     if ( problem%solver .eq. MicroMagSolverExplicit .OR. problem%solver .eq. MicroMagSolverDynamic ) then
         
-        call spline_b_val ( size(problem%HextX%x), problem%HextX%x, problem%HextX%y, t, HX )
-        call spline_b_val ( size(problem%HextY%x), problem%HextY%x, problem%HextY%y, t, HY )
-        call spline_b_val ( size(problem%HextZ%x), problem%HextZ%x, problem%HextZ%y, t, HZ )
         
-        solution%HhX = solution%Hfact * HX
-        solution%HhY = solution%Hfact * HY
-        solution%HhZ = solution%Hfact * HZ
+        
+        solution%HhX = solution%Hfact * problem%HextX
+        solution%HhY = solution%Hfact * problem%HextY
+        solution%HhZ = solution%Hfact * problem%HextZ
         
         
     elseif ( problem%solver .eq. MicroMagSolverImplicit ) then
@@ -615,7 +554,7 @@ include 'mkl_spblas.f90'
     integer,dimension(:),allocatable :: cols          !> Columns array keeping the index of the first element in values of the i'th column of a sparse matrix
     integer,dimension(:),allocatable :: rows_start,rows_end! > rows_start and rows_end are relevant for the sparse matrix definition
     integer :: i,j,k,nx,ny,nz                         !> For-loop counters
-    
+    type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
     
     !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
@@ -792,119 +731,119 @@ include 'mkl_spblas.f90'
     rows_end(:) = 0
     ind = 1
     rowInd = 1
-    
-    !The z=1 face
-    do i=1,nx
-        do j=1,ny
-            !central value
-            values(ind) = -1.
-            cols(ind) = (j-1) * nx + i
-            rows_start(rowInd) = ind
-            
-            !increment position
-            ind = ind + 1
-            
-            !right-most value
-            values(ind) = 1.
-            cols(ind) = nx * ny + (j-1)*nx + i
-            rows_end(rowInd) = ind
-            rowInd = rowInd + 1
-            
-            !increment position
-            ind = ind + 1
-        enddo
-    enddo
-    !Everything in between
-    do k=2,nz-1
+    if ( nz .gt. 1 ) then
+        !The z=1 face
         do i=1,nx
             do j=1,ny
-                !left-most value
-                values(ind) = 1.
-                cols(ind) = nx * ny * k + (j-1) * nx + i
+                !central value
+                values(ind) = -1.
+                cols(ind) = (j-1) * nx + i
                 rows_start(rowInd) = ind
             
                 !increment position
                 ind = ind + 1
-                
-                !central value
-                values(ind) = -2.
-                cols(ind) = nx * ny * (k-1) + (j-1) * nx + i
-                
             
-                !increment position
-                ind = ind + 1
-                
-                
-                values(ind) = -1.
-                cols(ind) = nx * ny * (k-2) + (j-1) * nx + i
+                !right-most value
+                values(ind) = 1.
+                cols(ind) = nx * ny + (j-1)*nx + i
                 rows_end(rowInd) = ind
                 rowInd = rowInd + 1
-                
+            
                 !increment position
                 ind = ind + 1
-                
             enddo
         enddo
+        !Everything in between
+        do k=2,nz-1
+            do i=1,nx
+                do j=1,ny
+                    !left-most value
+                    values(ind) = 1.
+                    cols(ind) = nx * ny * k + (j-1) * nx + i
+                    rows_start(rowInd) = ind
+            
+                    !increment position
+                    ind = ind + 1
+                
+                    !central value
+                    values(ind) = -2.
+                    cols(ind) = nx * ny * (k-1) + (j-1) * nx + i
+                
+            
+                    !increment position
+                    ind = ind + 1
+                
+                
+                    values(ind) = -1.
+                    cols(ind) = nx * ny * (k-2) + (j-1) * nx + i
+                    rows_end(rowInd) = ind
+                    rowInd = rowInd + 1
+                
+                    !increment position
+                    ind = ind + 1
+                
+                enddo
+            enddo
         
-    enddo
-    
-    
-    !The z=nz face
-    do i=1,nx
-        do j=1,ny
-            
-            !left-most value
-            values(ind) = 1.
-            cols(ind) = nx * ny * (nz-2) + (j-1) * nx + i
-            rows_start(rowInd) = ind
-            
-            !increment position
-            ind = ind + 1
-            
-            !central value
-            values(ind) = -1.
-            cols(ind) = nx * ny * (nz-1) + (j-1) * nx + i
-            rows_end(rowInd) = ind
-            rowInd = rowInd + 1
-            
-            !increment position
-            ind = ind + 1
-            
-            
         enddo
-    enddo
     
     
-    !Multiply by the discretization
-    values = values * 1./grid%dz**2
+        !The z=nz face
+        do i=1,nx
+            do j=1,ny
+            
+                !left-most value
+                values(ind) = 1.
+                cols(ind) = nx * ny * (nz-2) + (j-1) * nx + i
+                rows_start(rowInd) = ind
+            
+                !increment position
+                ind = ind + 1
+            
+                !central value
+                values(ind) = -1.
+                cols(ind) = nx * ny * (nz-1) + (j-1) * nx + i
+                rows_end(rowInd) = ind
+                rowInd = rowInd + 1
+            
+                !increment position
+                ind = ind + 1
+            
+            
+            enddo
+        enddo
+    
+    
+        !Multiply by the discretization
+        values = values * 1./grid%dz**2
         
-    !Create the sparse matrix for the d^2dz^2
-    stat = mkl_sparse_d_create_csr ( d2dz2, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, rows_start, rows_end, cols, values)
+        !Create the sparse matrix for the d^2dz^2
+        stat = mkl_sparse_d_create_csr ( d2dz2, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, rows_start, rows_end, cols, values)
+    endif
+    
     !----------------------------------d^2dz^2 ends ----------------------------!
     
             
     !Finally, add up the three diagonals and store in the output sparse matrix, A
     !store the results temporarily in tmp4
     stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2, 1., d2dy2, tmp)    
+    if ( nz .gt. 1 ) then    
+        stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2, 1., tmp, A)
+        !clean up
+        stat = mkl_sparse_destroy (d2dz2)    
+    else
+        descr%type = SPARSE_MATRIX_TYPE_GENERAL
+        descr%mode = SPARSE_FILL_MODE_FULL
+        descr%diag = SPARSE_DIAG_NON_UNIT
+        stat = mkl_sparse_copy ( tmp, descr, A )
+    endif
     
-    stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2, 1., tmp, A)
-        
-    !Clean up 
-    stat = mkl_sparse_destroy (d2dx2)
-    stat = mkl_sparse_destroy (d2dy2)
-    stat = mkl_sparse_destroy (d2dz2)
-    stat = mkl_sparse_destroy (tmp)
-    
+    !clean up
     deallocate(values,cols,rows_start,rows_end)
     
-    
-    
-
-    !Clean up
-    deallocate(values)
     stat = mkl_sparse_destroy (d2dx2)
     stat = mkl_sparse_destroy (d2dy2)
-    stat = mkl_sparse_destroy (d2dz2)
+    
     
     end subroutine ComputeExchangeTerm3D_Uniform
     
