@@ -93,7 +93,7 @@
         real*8,dimension(3) :: rectDims
         mwPointer :: r0Ptr,theta0Ptr,z0Ptr,drPtr,dthetaPtr,dzPtr,MPtr,u_eaPtr,u_oa1Ptr,u_oa2Ptr,mur_eaPtr,mur_oaPtr,MremPtr
         mwPointer :: tileTypePtr,offsetPtr,rotAnglesPtr,rectDimsPtr,magnetTypePtr,stateFunctionIndexPtr,includeInIterationPtr
-        mwPointer :: mxGetField, mxGetPr,colorPtr,symmetryPtr,symmetryOpsPtr,MrelPtr
+        mwPointer :: mxGetField, mxGetPr,colorPtr,symmetryPtr,symmetryOpsPtr,MrelPtr,vertPtr
     
         call getTileFieldnames( fieldnames, nfields )
         do i=1,n_tiles
@@ -121,6 +121,7 @@
             symmetryPtr =  mxGetField(prhs,i,fieldnames(22))
             symmetryOpsPtr =  mxGetField(prhs,i,fieldnames(23))
             MrelPtr =  mxGetField(prhs,i,fieldnames(24))
+            VertPtr =  mxGetField(prhs,i,fieldnames(25))
       
             sx = 1
             call mxCopyPtrToReal8(mxGetPr(r0Ptr), cylTile(i)%r0, sx )
@@ -161,6 +162,9 @@
             
             sx = 1
             call mxCopyPtrToReal8(mxGetPr(MrelPtr), cylTile(i)%Mrel, sx )
+            
+            sx = 12
+            call mxCopyPtrToReal8(mxGetPr(VertPtr), cylTile(i)%vert, sx )
             
             !cylTile(i)%fieldEvaluation = fieldEvaluationCentre
             if ( cyltile(i)%tiletype == tiletypecylpiece ) then
@@ -339,6 +343,14 @@
             call mxCopyReal8ToPtr( cylTile(i)%Mrel, mxGetPr( pvalue(i,24) ), sx )
             call mxSetField( plhs, i, fieldnames(24), pvalue(i,24) )
           
+            
+            s1 = 3
+            s2 = 4
+            sx = 12
+            pvalue(i,25) = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
+            call mxCopyReal8ToPtr( cylTile(i)%vert, mxGetPr( pvalue(i,25) ), sx )
+            call mxSetField( plhs, i, fieldnames(25), pvalue(i,25) )
+            
         enddo
       
         deallocate(pvalue,fieldnames)
@@ -351,7 +363,7 @@
     !!
     subroutine getTileFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=24
+        integer,parameter :: nf=25
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -382,6 +394,7 @@
         fieldnames(22) = 'useSymm'
         fieldnames(23) = 'symmOps'
         fieldnames(24) = 'Mrel'
+        fieldnames(25) = 'vertices'
         
     end subroutine getTileFieldnames
     

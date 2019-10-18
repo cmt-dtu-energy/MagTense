@@ -1,6 +1,53 @@
 module SPECIALFUNCTIONS
     implicit none
     contains 
+    
+    !---------------------------------------------------------------------------    
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Simple sorting function. Code implemented from Stack-overflow: https://stackoverflow.com/questions/54005339/sorting-an-array-from-lowest-to-greatest-fortran
+    !> @param[in] arr the array to be sorted (n,1)
+    !> @param[inout] arr_out sorted array (ascending order)
+    !> @param[inout] ind indices such that arr_out = arr(ind)
+    !---------------------------------------------------------------------------            
+    subroutine simple_sort( arr, arr_out, ind )
+        
+    real,dimension(:),intent(in) :: arr
+    real,dimension(:),intent(inout) :: arr_out
+    integer,dimension(:),intent(inout) :: ind
+    LOGICAL, DIMENSION(size(arr)) :: mk
+    integer :: i,sz
+    integer,dimension(1) :: tmp
+    
+    mk(:) = .true.
+    
+    
+    sz = size(arr)
+    do i = 1, sz
+        arr_out(i) = MINVAL(arr,mk)
+        tmp = MINLOC(arr,mk)
+        ind(i) = tmp(1)
+        mk(MINLOC(arr,mk)) = .FALSE.
+    enddo
+    
+    
+    end subroutine simple_sort
+    
+     !---------------------------------------------------------------------------    
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Calculates the cross product of a and b and returns it
+    !---------------------------------------------------------------------------            
+    FUNCTION cross(a, b)
+      real, DIMENSION(3) :: cross
+      real, DIMENSION(3), INTENT(IN) :: a, b
+
+      cross(1) = a(2) * b(3) - a(3) * b(2)
+      cross(2) = a(3) * b(1) - a(1) * b(3)
+      cross(3) = a(1) * b(2) - a(2) * b(1)
+    END FUNCTION cross
+
+    
     subroutine elit ( hk, phi_, fe, ee )
 
 !*****************************************************************************80

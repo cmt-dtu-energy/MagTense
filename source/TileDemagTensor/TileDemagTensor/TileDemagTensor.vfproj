@@ -50,5 +50,6 @@
 		<File RelativePath=".\TileNComponents.f90"/>
 		<File RelativePath=".\TilePlanarCoilTensor.f90"/>
 		<File RelativePath=".\TileRectangularPrismTensor.f90"/>
-		<File RelativePath=".\TileTensorHelperFunctions.f90"/></Filter></Files>
+		<File RelativePath=".\TileTensorHelperFunctions.f90"/>
+		<File RelativePath=".\TileTriangle.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>

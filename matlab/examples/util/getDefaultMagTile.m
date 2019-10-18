@@ -58,4 +58,8 @@ function tile = getDefaultMagTile()
     
     %latest relative error of the iteration (set to dummy value initially)
     tile.Mrel = 0.;
+    
+    %vertices used when the tile is a tetrahedron (and later, when it can
+    %be a general surface made of triangular elements)
+    tile.vertices = zeros(3,4);
 end
