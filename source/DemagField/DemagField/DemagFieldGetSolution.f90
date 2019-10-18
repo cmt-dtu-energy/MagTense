@@ -86,6 +86,13 @@
                 else
                     call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_ele )
                 endif
+            case (tileTypeTetrahedron )
+                 if ( present(Nout) ) then
+                    call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+                else
+                    call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_ele )
+                endif
+                
             case (tileTypeEllipsoid)
                 !!@todo add the existing code for spheroids, and correct Ellipsoids to Spheroids
             case (tileTypePlanarCoil )
@@ -162,6 +169,34 @@
     
     end subroutine getFieldFromRectangularPrismTile      
         
+    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the magnetic field from a tetrahedron
+    !!
+    subroutine getFieldFromTetrahedronTile( tile, H, pts, n_ele, N_out, useStoredN )
+        type(MagTile),intent(in) :: tile
+        real,dimension(n_ele,3),intent(inout) :: H
+        real,dimension(n_ele,3) :: pts
+        integer,intent(in) :: n_ele
+        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        logical,intent(in),optional :: useStoredN
+    
+        procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
+    
+        N_tensor => getN_tensor_tetrahedron
+    
+        !! Check to see if we should use symmetry
+        if ( tile%exploitSymmetry .eq. 1 ) then        
+            call getFieldFromTile_symm( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )        
+        else        
+            call getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )       
+        endif
+    
+       
+    
+    end subroutine getFieldFromTetrahedronTile      
+    
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>
