@@ -91,12 +91,12 @@ implicit none
     type(rk_comm_real_1d) :: setup_comm         !>Stores all the stuff used by setup
     integer :: flag                             !>Flag indicating how the integration went
     integer :: i                                !>Counter variable
-    
+    integer,parameter :: n_write=100
     !Perform allocations. 
     allocate(thres(neq))
     
     !tolerance
-    tol = 1e-4
+    tol = 1e-6
     
     !set thres to the low value
     thres(:) = 1e-20
@@ -121,7 +121,10 @@ implicit none
     y_out(:,1) = ystart
     !Call the integrator
     do i=2,nt
-        call callback( 'Running solution', i )
+        if ( mod(i,n_write) .eq. 0 ) then
+            call callback( 'Running solution', i )
+        endif
+        
         call range_integrate( setup_comm, fct, t(i), t_out(i), y_out(:,i), yderiv_out(:,i), flag )
     enddo
     

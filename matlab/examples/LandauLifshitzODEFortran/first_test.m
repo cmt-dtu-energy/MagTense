@@ -7,8 +7,11 @@ addpath('../util');
 %test the Fortran implementation of the LL-ODE solver
 %get the default problem
 problem = getDefaultMicroMagProblem();
-problem.nt = 5;
-problem.t = linspace(0,1,5);
+Sigma = load('sigma_test1.mat');
+problem.m0 = Sigma.Sigma;
+problem.t = linspace(0,1,1000);
+problem.Hext = [0,0,0];
 solution = struct();
 %call the solver
+problem.nt = int32(length(problem.t));
 solution = MagTenseLandauLifshitzSolver_mex( problem, solution );

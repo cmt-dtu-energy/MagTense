@@ -144,7 +144,7 @@
         mwSize :: s1,s2,sx
         mwPointer :: pt,pm
         mwPointer :: mxCreateStructArray, mxCreateDoubleMatrix,mxGetPr,mxCreateNumericMatrix    
-        
+        mwIndex :: ind
         character(len=10),dimension(:),allocatable :: fieldnames    
         integer :: nfields,ntot ,nt
     
@@ -161,20 +161,22 @@
         ! Create the return array of structs      
         plhs = mxCreateStructArray( sx, dims, nfields, fieldnames)
       
-        s1 = ntot
+        ind = 1
+        
+        s1 = nt
         s2 = 1
         pt = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
         sx = s1 * s2
         call mxCopyReal8ToPtr( solution%t_out, mxGetPr( pt ), sx )
-        call mxSetField( plhs, 1, fieldnames(1), pt )
-        
+        call mxSetField( plhs, ind, fieldnames(1), pt )
+          
         
         s1 = ntot
         s2 = nt
-        pt = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
+        pm = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
         sx = s1 * s2
         call mxCopyReal8ToPtr( solution%M_out, mxGetPr( pm ), sx )
-        call mxSetField( plhs, 1, fieldnames(2), pm )
+        call mxSetField( plhs, ind, fieldnames(2), pm )
       
         !Clean up
         deallocate(fieldnames)
@@ -234,8 +236,8 @@
         allocate(fieldnames(nfields))
         
         !! Setup the names of the members of the input struct
-        fieldnames(1) = 't_out'
-        fieldnames(2) = 'Mout'
+        fieldnames(1) = 't'
+        fieldnames(2) = 'M'
         
         
         

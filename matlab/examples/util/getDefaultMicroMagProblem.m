@@ -37,14 +37,14 @@ problem.K0 = 0;
 problem.gamma = 0;
 
 %
-problem.alpha = -65104e-10;
+problem.alpha = -65104e-17;
 
 problem.MaxT0 = 2;
 
 problem.Hext = [1,1,1]./sqrt(3);
 
 %solution times
-problem.nt = int32(100);
+problem.nt = int32(1000);
 problem.t = linspace(0,1,problem.nt);
 
 %initial magnetization (mx = m0(1:n), my = m(n+1:2n), mz = m(2n+1:3n) with
