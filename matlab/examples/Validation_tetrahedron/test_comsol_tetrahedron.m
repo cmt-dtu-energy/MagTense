@@ -17,6 +17,8 @@ mu0 = 4*pi*1e-7;
 %define four vertices that are not co-planar or colinear
 v = [[2.5,3,1];[2,1,4];[1.5,4,3];[4.5,5,2]]';
 
+
+
 %define center where the field is plotted along the axis
 c =  [3,3,2.5];
 

@@ -235,7 +235,7 @@
     
     
     
-    alpha = 2 * solution%Jfact
+    alpha = -2 * solution%Jfact
     
     !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
     !y = alpha * (A_exch * Mx )
@@ -344,7 +344,7 @@
     !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
     solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
     solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
-    solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
+    solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
     
     
     
