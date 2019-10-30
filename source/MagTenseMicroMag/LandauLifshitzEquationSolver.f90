@@ -1,4 +1,4 @@
-!include 'mkl_spblas.f90'
+include 'mkl_spblas.f90'
     module LandauLifshitzSolution
     use ODE_Solvers
     use integrationDataTypes
@@ -556,6 +556,12 @@
     integer :: i,j,k,nx,ny,nz                         !> For-loop counters
     type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
     
+    real,dimension(:,:),allocatable :: x,y
+    real,dimension(:),allocatable :: xx,yy
+    integer,dimension(1) :: shp1D
+    integer,dimension(2) :: shp2D
+    real :: alpha
+    
     !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
     
@@ -837,6 +843,38 @@
         descr%diag = SPARSE_DIAG_NON_UNIT
         stat = mkl_sparse_copy ( tmp, descr, A )
     endif
+    
+    !Debug. Get the sparse matrix out as a dense matrix and write it to disk
+    !Make dense matrix a n x n identity matrix
+    allocate( x( nx*ny*nz, nx*ny*nz ), xx(nx*ny*nz*nx*ny*nz), y(nx*ny*nz,nx*ny*nz), yy(nx*ny*nz*nx*ny*nz) )
+    x(:,:) = 0.
+    y(:,:) = 0.
+    xx(:) = 0.
+    yy(:) = 0
+    do i=1,nx*ny*nz
+        x(i,i) = 1.
+    enddo
+    
+    shp1D(1) = nx*ny*nz*nx*ny*nz
+        
+    alpha = 1.
+    
+    xx = reshape( x, shp1D )
+    
+    stat = mkl_sparse_d_mm( SPARSE_OPERATION_NON_TRANSPOSE, alpha, A, descr, SPARSE_LAYOUT_COLUMN_MAJOR, xx, nx*ny*nz, nx*ny*nz, 0., yy, nx*ny*nz )
+    
+    shp2D(1) = nx*ny*nz
+    shp2D(2) = nx*ny*nz
+    y = reshape( yy, shp2D )
+    
+     open (11, file='debug.dat',	&
+			           status='unknown', form='unformatted',	&
+			           access='direct', recl=2*nx*ny*nz*nx*ny*nz)
+
+     write(11,*) y
+     
+    close(11)
+    deallocate(x,xx,y,yy)
     
     !clean up
     deallocate(values,cols,rows_start,rows_end)
