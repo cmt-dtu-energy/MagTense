@@ -7,6 +7,7 @@ addpath('../util');
 %test the Fortran implementation of the LL-ODE solver
 %get the default problem
 problem = getDefaultMicroMagProblem();
+
 Sigma = load('sigma_test1.mat');
 problem.m0 = Sigma.Sigma;
 problem.t = linspace(0,1,1000);
