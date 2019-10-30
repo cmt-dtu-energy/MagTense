@@ -556,11 +556,15 @@ include 'mkl_spblas.f90'
     integer :: i,j,k,nx,ny,nz                         !> For-loop counters
     type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
     
+    !Debugger variables
     real,dimension(:,:),allocatable :: x,y
     real,dimension(:),allocatable :: xx,yy
+    real :: alpha,beta
     integer,dimension(1) :: shp1D
     integer,dimension(2) :: shp2D
-    real :: alpha
+    integer :: columns,ldx,ldy
+    real(kind=4),dimension(:),allocatable :: values_s
+    real,dimension(:,:),allocatable :: A_dense
     
     !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
@@ -576,10 +580,9 @@ include 'mkl_spblas.f90'
     
     ind = 1
     rowInd = 1
+    colInd = 1
     do k=1,nz
         do j=1,ny
-            
-            colInd = (k-1)*ny + (j-1)*nx + 1
             
             !The left boundary
             values(ind) = -1.
@@ -589,9 +592,10 @@ include 'mkl_spblas.f90'
             
             values(ind) = 1.
             cols(ind) = colInd + 1
-            rows_end(rowInd) = ind
+            rows_end(rowInd) = ind+1
             rowInd = rowInd + 1
             ind = ind + 1
+            
             
             !Go through one row at a time
             do i=2,nx-1
@@ -600,19 +604,18 @@ include 'mkl_spblas.f90'
                 values( ind ) = 1.
                 cols(ind) = colInd
                 !update where the row starts
-                rows_start(rowInd) = ind           
-                
+                rows_start(rowInd) = ind                           
                 ind = ind + 1
                 
                 !Center point
-                values( ind + 1 ) = -2.
+                values( ind ) = -2.
                 cols(ind) = colInd + 1
                 ind = ind + 1
                 
                 !Right-most point
-                values( ind + 2 ) = 1.
+                values( ind ) = 1.
                 cols(ind) = colInd + 2
-                rows_end(rowInd) = ind
+                rows_end(rowInd) = ind+1
                 rowInd = rowInd + 1
                 ind = ind + 1
                 
@@ -624,16 +627,37 @@ include 'mkl_spblas.f90'
             !update where the row starts
             rows_start(rowInd) = ind            
             ind = ind + 1
+            
             values(ind) = -1.
             cols(ind) = colInd+1
-            rows_end(rowInd) = ind
+            rows_end(rowInd) = ind+1
             rowInd = rowInd + 1
-            ind = ind + 1            
+            ind = ind + 1     
+            
+            colInd = colInd + 2
         enddo
     enddo
     !Multiply by the discretization
     values = values * 1./grid%dx**2
         
+    allocate(A_dense(nx*ny*nz,nx*ny*nz))
+    A_dense(:,:) = 0.
+    do i=1,nx*ny*nz
+        do j=1,rows_end(i)-rows_start(i)
+            A_dense(i,cols(rows_start(i)+j-1)) = values( rows_start(i) + j - 1 )
+        enddo
+    enddo
+    
+    open (11, file='anisotropy_debug_d2xdx2.dat',	&
+			           status='unknown', form='unformatted',	&
+			           access='direct', recl=2*nx*ny*nz*nx*ny*nz)
+
+    write(11,rec=1) A_dense
+    
+    close(11)
+    
+    deallocate(A_dense)
+    
     !Create the sparse matrix for the d^2dx^2
     stat = mkl_sparse_d_create_csr ( d2dx2, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, rows_start, rows_end, cols, values)
        
@@ -832,7 +856,29 @@ include 'mkl_spblas.f90'
             
     !Finally, add up the three diagonals and store in the output sparse matrix, A
     !store the results temporarily in tmp4
-    stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2, 1., d2dy2, tmp)    
+    deallocate(values,rows_start,rows_end,cols)
+    allocate(values(3),rows_start(2),rows_end(2),cols(3))
+    values(:) = 1.
+    
+    rows_start(1) = 1
+    rows_start(2) = 3
+    rows_end(1) = 3
+    rows_end(2) = 4
+    
+    cols(1) = 1
+    cols(2) = 2 
+    cols(3) = 1
+    !cols(4) = 2    
+    
+    alpha = 1.
+    stat = mkl_sparse_d_create_csr ( tmp, SPARSE_INDEX_BASE_ONE, 2, 2, rows_start, rows_end, cols, values)
+    
+    stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2, 1.d0, d2dx2, A)    
+    
+    
+    !stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2, 1., d2dy2, A)    
+    alpha = 1.
+    stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2, alpha, d2dx2, A)    
     if ( nz .gt. 1 ) then    
         stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2, 1., tmp, A)
         !clean up
@@ -844,36 +890,45 @@ include 'mkl_spblas.f90'
         stat = mkl_sparse_copy ( tmp, descr, A )
     endif
     
-    !Debug. Get the sparse matrix out as a dense matrix and write it to disk
-    !Make dense matrix a n x n identity matrix
-    allocate( x( nx*ny*nz, nx*ny*nz ), xx(nx*ny*nz*nx*ny*nz), y(nx*ny*nz,nx*ny*nz), yy(nx*ny*nz*nx*ny*nz) )
+    !Debug. Output the sparse matrix as a dense matrix
+    
+    
+    
+    allocate( x(nx*ny*nz,nx*ny*nz), y(nx*ny*nz,nx*ny*nz) )
+    allocate( xx(nx*ny*nz*nx*ny*nz), yy(nx*ny*nz*nx*ny*nz) )
+    
     x(:,:) = 0.
-    y(:,:) = 0.
     xx(:) = 0.
-    yy(:) = 0
+    
     do i=1,nx*ny*nz
         x(i,i) = 1.
     enddo
     
     shp1D(1) = nx*ny*nz*nx*ny*nz
-        
-    alpha = 1.
     
     xx = reshape( x, shp1D )
     
-    stat = mkl_sparse_d_mm( SPARSE_OPERATION_NON_TRANSPOSE, alpha, A, descr, SPARSE_LAYOUT_COLUMN_MAJOR, xx, nx*ny*nz, nx*ny*nz, 0., yy, nx*ny*nz )
+    alpha = 1.
+    beta = 0.
+    
+    columns = nx*ny*nz
+    ldx = nx*ny*nz
+    ldy = nx*ny*nz
+    
+    stat = mkl_sparse_d_mm (SPARSE_OPERATION_NON_TRANSPOSE, alpha, A, descr, SPARSE_LAYOUT_COLUMN_MAJOR, xx, columns, ldx, beta, yy, ldy)
     
     shp2D(1) = nx*ny*nz
     shp2D(2) = nx*ny*nz
     y = reshape( yy, shp2D )
     
-     open (11, file='debug.dat',	&
+    open (11, file='anisotropy_debug.dat',	&
 			           status='unknown', form='unformatted',	&
 			           access='direct', recl=2*nx*ny*nz*nx*ny*nz)
 
-     write(11,*) y
-     
+    write(11,rec=1) y
+    
     close(11)
+    
     deallocate(x,xx,y,yy)
     
     !clean up
