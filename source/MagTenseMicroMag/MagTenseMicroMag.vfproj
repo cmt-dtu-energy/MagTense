@@ -23,7 +23,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Debug|x64" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2019a\extern\include\;..\NumericalIntegration\NumericalIntegration\x64\debug\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2019b\extern\include\;..\NumericalIntegration\NumericalIntegration\x64\debug\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\NumericalIntegration\x64\debug\;..\DemagField\DemagField\x64\debug\"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -32,7 +32,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019\windows\mkl\include\;..\NumericalIntegration\NumericalIntegration\x64\release\;c:\Program Files\MATLAB\R2019a\extern\include\;" RealKIND="realKIND8" UseMkl="mklParallel"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;c:\Program Files\MATLAB\R2019b\extern\include\;" RealKIND="realKIND8" UseMkl="mklParallel"/>
 				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;..\DemagField\DemagField\x64\release\"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -45,6 +45,7 @@
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
 		<File RelativePath=".\LandauLifshitzEquationSolver.f90"/>
+		<File RelativePath=".\LLODE_Debug.f90"/>
 		<File RelativePath=".\MagTenseMicroMagIO.f90"/>
 		<File RelativePath=".\MicroMagParameters.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>

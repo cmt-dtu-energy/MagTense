@@ -11,7 +11,7 @@ problem = struct();
 
 %grid resolution
 problem.grid_n = [int32(81),int32(21),int32(1)];
-problem.grid_n = [int32(3), int32(3), int32(1)];
+%problem.grid_n = [int32(3), int32(3), int32(1)];
 ntot = prod(problem.grid_n);
 %size of the (rectangular) domain in each direction
 problem.grid_L = [500e-9,125e-9,3e-9];%m
