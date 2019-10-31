@@ -141,9 +141,10 @@
     
         integer :: ComplexFlag,classid,mxClassIDFromClassName
         mwSize,dimension(1) :: dims
-        mwSize :: s1,s2,sx
+        mwSize :: s1,s2,sx,ndim
+        mwSize,dimension(3) :: dims_3
         mwPointer :: pt,pm
-        mwPointer :: mxCreateStructArray, mxCreateDoubleMatrix,mxGetPr,mxCreateNumericMatrix    
+        mwPointer :: mxCreateStructArray, mxCreateDoubleMatrix,mxGetPr,mxCreateNumericMatrix,mxCreateNumericArray
         mwIndex :: ind
         character(len=10),dimension(:),allocatable :: fieldnames    
         integer :: nfields,ntot ,nt
@@ -151,7 +152,7 @@
         call getSolutionFieldnames( fieldnames, nfields)
     
         nt = size(solution%t_out)
-        ntot = size(solution%M_out(:,1))
+        ntot = size(solution%M_out(1,:,1))
         
         ! Load the result back to Matlab      
         ComplexFlag = 0
@@ -171,10 +172,14 @@
         call mxSetField( plhs, ind, fieldnames(1), pt )
           
         
-        s1 = ntot
-        s2 = nt
-        pm = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
-        sx = s1 * s2
+        ndim = 3
+        dims_3(1) = nt
+        dims_3(2) = ntot
+        dims_3(3) = 3
+        classid = mxClassIDFromClassName( 'double' )
+        !pm = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
+        pm = mxCreateNumericArray( ndim, dims_3, classid, ComplexFlag)
+        sx = dims_3(1) * dims_3(2) * dims_3(3)
         call mxCopyReal8ToPtr( solution%M_out, mxGetPr( pm ), sx )
         call mxSetField( plhs, ind, fieldnames(2), pm )
       

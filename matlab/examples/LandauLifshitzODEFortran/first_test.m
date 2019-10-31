@@ -3,7 +3,7 @@ close all
 
 addpath('../../Mex_files');
 addpath('../util');
-
+tic
 %test the Fortran implementation of the LL-ODE solver
 %get the default problem
 problem = getDefaultMicroMagProblem();
@@ -16,3 +16,6 @@ solution = struct();
 %call the solver
 problem.nt = int32(length(problem.t));
 solution = MagTenseLandauLifshitzSolver_mex( problem, solution );
+toc
+
+ml_sol = load('SigmaRes.mat');

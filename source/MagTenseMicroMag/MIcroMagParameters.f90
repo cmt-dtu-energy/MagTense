@@ -1,4 +1,4 @@
-include 'mkl_spblas.f90'
+
     module MicroMagParameters
     use MKL_SPBLAS
     
@@ -18,6 +18,20 @@ include 'mkl_spblas.f90'
     type MicroMagTable1D
         real,dimension(:),allocatable :: x,y        
     end type MicroMagTable1D
+    
+    !>---------------
+    !> Wrapper type for sparse matrices. It appears that Intel's MKL
+    !> SPBLAS does not copy the input arrays with the values etc when making a
+    !> sparse matrix and we therefore need to store these values close to the sparse
+    !> matrix handle    
+    type MagTenseSparse
+        type(sparse_matrix_t) :: A                                      !> Sparse matrix handle to MKL
+        real,dimension(:),allocatable :: values                         !> the non-zero values
+        integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
+        integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
+        integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
+    end type MagTenseSparse
+    
     
     
     !>-----------------
@@ -67,7 +81,7 @@ include 'mkl_spblas.f90'
         real,dimension(:),allocatable :: Mx,My,Mz       !> The magnetization components used internally as the solution progresses
                         
         real,dimension(:),allocatable :: t_out          !> Output times at which the solution was computed
-        real,dimension(:,:),allocatable :: M_out        !> The magnetization at each of these times
+        real,dimension(:,:,:),allocatable :: M_out        !> The magnetization at each of these times
         
         real :: Jfact,Hfact,Mfact,Kfact                 !> Constant factors used for the determination of the effective fields
     end type MicroMagSolution
