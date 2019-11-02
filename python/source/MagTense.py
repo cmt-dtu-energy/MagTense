@@ -172,12 +172,13 @@ class Tiles():
                         self.set_mag_angle_i(mag_angle,i)
 
         def set_mag_angle_i(self, spherical_angles, i):
+                # polar angle [0, pi], azimuth [0, 2*pi]
                 if isinstance(spherical_angles, int) or isinstance(spherical_angles, float):
                         print("Azimuth and polar angle have to be set!\nExiting!")
                         exit()
                 else:
-                        azimuth = spherical_angles[0]
-                        polar_angle = spherical_angles[1]
+                        polar_angle = spherical_angles[0]
+                        azimuth = spherical_angles[1]
                         self.set_easy_axis_i([math.sin(polar_angle) * math.cos(azimuth), math.sin(polar_angle) * math.sin(azimuth), math.cos(polar_angle)], i)
                         self.set_oa1_i([math.sin(polar_angle) * math.sin(azimuth), math.sin(polar_angle) * (-math.cos(azimuth)), 0], i)
                         self.set_oa2_i([0.5*math.sin(2*polar_angle) * math.cos(azimuth), 0.5*math.sin(2*polar_angle) * math.sin(azimuth), -math.pow(math.sin(polar_angle),2)], i)
@@ -315,7 +316,8 @@ def setup(places, area, n_tiles=0, filled_positions=None, mag_angles=[], eval_po
         if tiles is not None:
                 if not mag_angles:
                         for _ in range(tiles.get_n()):
-                                mag_angles.append([0, 2*math.pi * rand.random()])       
+                                # polar angle [0, pi], azimuth [0, 2*pi]
+                                mag_angles.append([math.pi * rand.random(), 2*math.pi * rand.random()])       
                 tiles.set_remanence(B_rem / (4*math.pi*1e-7))
                 tiles.set_mag_angle(mag_angles)
                 # Setting display color of magnets: red - [1, 0, 0] 
