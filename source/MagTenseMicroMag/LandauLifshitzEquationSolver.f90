@@ -498,20 +498,20 @@ include 'mkl_spblas.f90'
                     !Copy Nout into the proper structure used by the micro mag model
                     ind = (i-1) * ny * nz + (j-1) * nz + k
                     
-                    problem%Kxx(ind,:) = Nout(1,:,1,1)
-                    problem%Kxy(ind,:) = Nout(1,:,1,2)
-                    problem%Kxz(ind,:) = Nout(1,:,1,3)
+                    problem%Kxx(:,ind) = Nout(1,:,1,1)
+                    problem%Kxy(:,ind) = Nout(1,:,1,2)
+                    problem%Kxz(:,ind) = Nout(1,:,1,3)
                     
                     !Not stored due to symmetry  (Kxy = Kyx)
                     !Kyx(ind,:) = Nout(1,:,2,1)
-                    problem%Kyy(ind,:) = Nout(1,:,2,2)
-                    problem%Kyz(ind,:) = Nout(1,:,2,3)
+                    problem%Kyy(:,ind) = Nout(1,:,2,2)
+                    problem%Kyz(:,ind) = Nout(1,:,2,3)
                     
                     !Not stored due to symmetry (Kxz = Kzx)
                     !Kzx(ind,:) = Nout(1,:,3,1)
                     !Not stored due to symmetry (Kyz = Kzy)
                     !Kzy(ind,:) = Nout(1,:,3,2)
-                    problem%Kzz(ind,:) = Nout(1,:,3,3)
+                    problem%Kzz(:,ind) = Nout(1,:,3,3)
                     
                     deallocate(Nout)
                 enddo
@@ -851,7 +851,7 @@ include 'mkl_spblas.f90'
     
     stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, 1.d0, d2dy2%A, tmp)    
     
-    call writeSparseMatrixToDisk( tmp, nx*ny*nz, 'A_exch.dat' )
+    !call writeSparseMatrixToDisk( tmp, nx*ny*nz, 'A_exch.dat' )
     
     if ( nz .gt. 1 ) then    
         stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, 1., tmp, A)
