@@ -33,7 +33,7 @@ include 'mkl_spblas.f90'
     subroutine SolveLandauLifshitzEquation( prob, sol )    
     type(MicroMagProblem),intent(inout) :: prob     !> The problem data structure
     type(MicroMagSolution),intent(inout) :: sol     !> The solution data structure    
-    integer :: ntot                                 !> total no. of tiles
+    integer :: ntot,i,j,k,ind                       !> total no. of tiles
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
     real,dimension(:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
@@ -45,12 +45,26 @@ include 'mkl_spblas.f90'
     call displayMatlabMessage( 'Initializing matrices' )
     !Calculate the interaction matrices
     call initializeInteractionMatrices( gb_problem )
+    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+    
+    allocate( gb_solution%pts(ntot,3) )
+    do k=1,gb_problem%grid%nz
+        do j=1,gb_problem%grid%ny            
+            do i=1,gb_problem%grid%nx
+                ind = i + (j-1) * gb_problem%grid%nx + (k-1) * gb_problem%grid%nx * gb_problem%grid%ny
+                gb_solution%pts(ind,1) = gb_problem%grid%x(i,j,k)
+                gb_solution%pts(ind,2) = gb_problem%grid%y(i,j,k)
+                gb_solution%pts(ind,3) = gb_problem%grid%z(i,j,k)
+            enddo
+        enddo
+    enddo
+    
     
     call displayMatlabMessage( 'Initializing solution' )
     !Initialize the solution, i.e. allocate various arrays
     call initializeSolution( gb_problem, gb_solution )
         
-    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+    
     !Set the initial values for m (remember that M is organized such that mx = m(1:ntot), my = m(ntot+1:2*ntot), mz = m(2*ntot+1:3*ntot)
     allocate(gb_solution%t_out(size(gb_problem%t)),gb_solution%M_out(size(gb_problem%t),ntot,3))
     
@@ -496,7 +510,7 @@ include 'mkl_spblas.f90'
                     call getFieldFromTiles( tile, H, pts, 1, ntot, Nout )
                     
                     !Copy Nout into the proper structure used by the micro mag model
-                    ind = (i-1) * ny * nz + (j-1) * nz + k
+                    ind = (k-1) * nx * ny + (j-1) * nx + i
                     
                     problem%Kxx(:,ind) = Nout(1,:,1,1)
                     problem%Kxy(:,ind) = Nout(1,:,1,2)
@@ -522,6 +536,18 @@ include 'mkl_spblas.f90'
         deallocate(H,pts)
     endif
     
+    open (11, file='Kdemag.dat',	&
+			           status='unknown', form='unformatted',	&
+			           access='direct', recl=2*nx*ny*nz*nx*ny*nz)
+
+    write(11,rec=1) problem%Kxx
+    write(11,rec=2) problem%Kxy
+    write(11,rec=3) problem%Kxz
+    write(11,rec=4) problem%Kyy
+    write(11,rec=5) problem%Kyz
+    write(11,rec=6) problem%Kzz
+    
+    close(11)
     
     end subroutine ComputeDemagfieldTensor
     
