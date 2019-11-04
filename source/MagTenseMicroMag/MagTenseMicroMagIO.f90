@@ -143,7 +143,7 @@
         mwSize,dimension(1) :: dims
         mwSize :: s1,s2,sx,ndim
         mwSize,dimension(3) :: dims_3
-        mwPointer :: pt,pm
+        mwPointer :: pt,pm,pp
         mwPointer :: mxCreateStructArray, mxCreateDoubleMatrix,mxGetPr,mxCreateNumericMatrix,mxCreateNumericArray
         mwIndex :: ind
         character(len=10),dimension(:),allocatable :: fieldnames    
@@ -183,6 +183,14 @@
         call mxCopyReal8ToPtr( solution%M_out, mxGetPr( pm ), sx )
         call mxSetField( plhs, ind, fieldnames(2), pm )
       
+        
+        s1 = ntot
+        s2 = 3
+        pp = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
+        sx = s1 * s2
+        call mxCopyReal8ToPtr( solution%pts, mxGetPr( pp ), sx )
+        call mxSetField( plhs, ind, fieldnames(3), pp )
+        
         !Clean up
         deallocate(fieldnames)
     
@@ -234,7 +242,7 @@
     !>-----------------------------------------
     subroutine getSolutionFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=2
+        integer,parameter :: nf=3
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -243,6 +251,7 @@
         !! Setup the names of the members of the input struct
         fieldnames(1) = 't'
         fieldnames(2) = 'M'
+        fieldnames(3) = 'pts'
         
         
         

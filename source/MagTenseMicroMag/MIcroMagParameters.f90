@@ -83,6 +83,8 @@
         real,dimension(:),allocatable :: t_out          !> Output times at which the solution was computed
         real,dimension(:,:,:),allocatable :: M_out        !> The magnetization at each of these times
         
+        real,dimension(:,:),allocatable :: pts          !> n,3 array with the points (x,y,z) of the centers of the tiles
+        
         real :: Jfact,Hfact,Mfact,Kfact                 !> Constant factors used for the determination of the effective fields
     end type MicroMagSolution
     
