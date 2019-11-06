@@ -11,6 +11,8 @@
         real :: Lx,Ly,Lz
         real :: dx,dy,dz
         real,dimension(:,:,:),allocatable :: x,y,z
+        real,dimension(:), allocatable :: dV
+        
         integer :: gridType
     end type MicroMagGrid
     
