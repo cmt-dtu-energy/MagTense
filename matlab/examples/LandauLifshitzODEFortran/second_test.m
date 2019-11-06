@@ -6,16 +6,17 @@ addpath('../util');
 tic
 %test the Fortran implementation of the LL-ODE solver
 %get the default problem
-problem = DefaultMicroMagProblem();
+%takes the size of the grid as arguments (nx,ny,nz)
+problem = DefaultMicroMagProblem(39,9,3);
 
 
 %setup specific problem corresponding to the test provided in
 %Script_3D_TestPhysParamsDynTestAppl01.m
 problem.gamma = 1e20; % precession term
 problem.alpha = -3e19;
-problem.K0 = 0;%5e5; % anisotropy term
-problem.grid_n = [int32(39),int32(9),int32(3)];
-
+problem.K0 = 5e5; % anisotropy term
+%specify the anisotropy to be along the negative z-direction
+problem.u_ea(:,3) = -1;
 
 problem.m0(:) = 1/sqrt(3);
 problem.t = linspace(0,1,1000);

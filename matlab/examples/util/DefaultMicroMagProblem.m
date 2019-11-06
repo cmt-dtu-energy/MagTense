@@ -55,9 +55,12 @@ properties
     phi    
 end
 methods
-    function obj = DefaultMicroMagProblem()
+    function obj = DefaultMicroMagProblem(nx,ny,nz)
+        nx = int32(nx);
+        ny = int32(ny);
+        nz = int32(nz);
         %grid resolution
-        obj.grid_n = [int32(81),int32(21),int32(1)];
+        obj.grid_n = [nx,ny,nz];
         %grid_n = [int32(3), int32(3), int32(1)];
         obj.ntot = prod(obj.grid_n);
         %size of the (rectangular) domain in each direction
