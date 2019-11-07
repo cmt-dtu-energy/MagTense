@@ -11,6 +11,8 @@
         real :: Lx,Ly,Lz
         real :: dx,dy,dz
         real,dimension(:,:,:),allocatable :: x,y,z
+        real,dimension(:), allocatable :: dV
+        
         real,dimension(:,:),allocatable :: pts  !> Array with the x,y,z points on list form, i.e. pts(i,:) is the x,y,z components of the i'th point
         integer :: gridType
     end type MicroMagGrid
@@ -83,6 +85,8 @@
                         
         real,dimension(:),allocatable :: t_out          !> Output times at which the solution was computed
         real,dimension(:,:,:),allocatable :: M_out        !> The magnetization at each of these times
+        
+        real,dimension(:,:),allocatable :: pts          !> n,3 array with the points (x,y,z) of the centers of the tiles
         
         real :: Jfact,Hfact,Mfact,Kfact                 !> Constant factors used for the determination of the effective fields
     end type MicroMagSolution

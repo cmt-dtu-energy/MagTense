@@ -19,3 +19,6 @@ solution = MagTenseLandauLifshitzSolver_mex( problem, solution );
 toc
 
 ml_sol = load('SigmaRes.mat');
+nx=81;ny=21;n=nx*ny;nt=1000;Mx=reshape(ml_sol.SigmaSol(:,1:n),[nt,nx,ny]);My=reshape(ml_sol.SigmaSol(:,n+1:2*n),[nt,nx,ny]);Mz=reshape(ml_sol.SigmaSol(:,2*n+1:3*n),[nt,nx,ny]);
+close all;ind=10;
+figure;hold on;plot(solution.t,solution.M(:,ind,2));plot(ml_sol.t,My(:,ind),'--');
