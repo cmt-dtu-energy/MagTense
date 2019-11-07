@@ -53,7 +53,7 @@
         
         real :: A0,Ms,K0,gamma,alpha0,MaxT0         !> User defined coefficients determining part of the problem.
         
-        real :: HextX,HextY,HextZ                   !> Applied field along x-, y- and z-direction, single value (constant field)
+        real,dimension(:,:),allocatable :: Hext     !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
         
         real,dimension(:),allocatable :: t          !> Time array for the desired output times
         real,dimension(:),allocatable :: m0         !>Initial value of the magnetization

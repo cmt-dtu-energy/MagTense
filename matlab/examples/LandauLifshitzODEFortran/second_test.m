@@ -1,3 +1,4 @@
+
 clear all
 close all
 
@@ -6,7 +7,9 @@ addpath('../util');
 tic
 %test the Fortran implementation of the LL-ODE solver
 %get the default problem
-%takes the size of the grid as arguments (nx,ny,nz)
+%takes the size of the grid as arguments (nx,ny,nz) and a function handle
+%that produces the desired field (if not present zero applied field is
+%inferred)
 problem = DefaultMicroMagProblem(39,9,3);
 
 
@@ -18,12 +21,20 @@ problem.K0 = 5e5; % anisotropy term
 %specify the anisotropy to be along the negative z-direction
 problem.u_ea(:,3) = -1;
 
+%initial magnetization
 problem.m0(:) = 1/sqrt(3);
-problem.t = linspace(0,1,1000);
-problem.Hext = [0,0,0];
+%time grid on which to solve the problem
+problem = problem.setTime( linspace(0,2,100) );
+HystDir = [0,1,1] ;
+HystDir = HystDir./norm(HystDir);
+
+HextFct = @(t) (t>1)' * HystDir;
+
+problem = problem.setHext( HextFct );
+
 solution = struct();
+
 %call the solver
-problem.nt = int32(length(problem.t));
 %convert the class obj to a struct so it can be loaded into fortran
 prob_struct = struct(problem);
 solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );

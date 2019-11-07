@@ -21,11 +21,11 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem,ntot,nt
+        integer :: nFieldsProblem,ntot,nt, nt_Hext
         mwPointer :: nGridPtr,LGridPtr,dGridPtr,typeGridPtr, ueaProblemPtr, modeProblemPtr,solverProblemPtr
         mwPointer :: A0ProblemPtr,MsProblemPtr,K0ProblemPtr,gammaProblemPtr,alpha0ProblemPtr,MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr,HextProblemPtr,tProblemPtr
-        mwPointer :: mxGetField, mxGetPr
+        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr
         integer,dimension(3) :: int_arr
         real,dimension(3) :: real_arr
         
@@ -97,28 +97,39 @@
         
         sx = 1
         MaxT0ProblemPtr = mxGetField( prhs, i, problemFields(12) )
-        call mxCopyPtrToReal8(mxGetPr(MaxT0ProblemPtr), problem%MaxT0, sx )
+        call mxCopyPtrToReal8(mxGetPr(MaxT0ProblemPtr), problem%MaxT0, sx )                
         
-        sx = 3
-        HextProblemPtr = mxGetField( prhs, i, problemFields(13) )
-        call mxCopyPtrToReal8(mxGetPr(HextProblemPtr), real_arr, sx )
-        problem%HextX = real_arr(1)
-        problem%HextY = real_arr(2)
-        problem%HextZ = real_arr(3)
+        !load the no. of time steps in the applied field
+        sx = 1
+        ntHextProblemPtr = mxGetField( prhs, i, problemFields(13) )
+        call mxCopyPtrToInteger4(mxGetPr(ntHextProblemPtr), nt_Hext, sx )
+        
+        
+
+        !Applied field as a function of time evaluated at the timesteps specified in nt_Hext
+        !problem%Hext(:,1) is the time grid while problem%Hext(:,2:4) are the x-,y- and z-components of the applied field
+        sx = nt_Hext * 4
+        allocate( problem%Hext(nt_Hext,4) )
+        HextProblemPtr = mxGetField( prhs, i, problemFields(14) )
+        call mxCopyPtrToReal8(mxGetPr(HextProblemPtr), problem%Hext, sx )
+        
         
         !Load the no. of time steps required
         sx = 1
-        ntProblemPtr = mxGetField( prhs, i, problemFields(14) )
+        ntProblemPtr = mxGetField( prhs, i, problemFields(15) )
         call mxCopyPtrToInteger4(mxGetPr(ntProblemPtr), nt, sx )
         
         allocate( problem%t(nt) )
-        tProblemPtr = mxGetField(prhs,i,problemFields(15) )
+        tProblemPtr = mxGetField(prhs,i,problemFields(16) )
         sx = nt
         call mxCopyPtrToReal8(mxGetPr(tProblemPtr), problem%t, sx )
         
+        
+        
+        
         !Initial magnetization
         allocate( problem%m0(3*ntot) )
-        m0ProblemPtr = mxGetField(prhs,i,problemFields(16))
+        m0ProblemPtr = mxGetField(prhs,i,problemFields(17))
         sx = ntot * 3
         call mxCopyPtrToReal8(mxGetPr(m0ProblemPtr), problem%m0, sx )
         
@@ -205,7 +216,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=16
+        integer,parameter :: nf=17
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -224,10 +235,11 @@
         fieldnames(10) = 'gamma'
         fieldnames(11) = 'alpha'
         fieldnames(12) = 'MaxT0'
-        fieldnames(13) = 'Hext'    
-        fieldnames(14) = 'nt'
-        fieldnames(15) = 't'
-        fieldnames(16) = 'm0'
+        fieldnames(13) = 'nt_Hext'
+        fieldnames(14) = 'Hext'    
+        fieldnames(15) = 'nt'
+        fieldnames(16) = 't'
+        fieldnames(17) = 'm0'
         
         
     end subroutine getProblemFieldnames

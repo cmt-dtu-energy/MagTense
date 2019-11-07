@@ -6,7 +6,7 @@
     use MicroMagParameters
     use MagTenseMicroMagIO
     use LLODE_Debug
-    !use spline
+    use util_call
     use DemagFieldGetSolution
     implicit none
     
@@ -288,15 +288,18 @@
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     real,intent(in) :: t                                !> The time
-    
+    real :: HextX,HextY,HextZ
     
     if ( problem%solver .eq. MicroMagSolverExplicit .OR. problem%solver .eq. MicroMagSolverDynamic ) then
         
+        !Interpolate to get the applied field at time t
+        call interp1( problem%Hext(:,1), problem%Hext(:,2), t, size(problem%Hext(:,1)), HextX )
+        call interp1( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
+        call interp1( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
         
-        
-        solution%HhX = solution%Hfact * problem%HextX
-        solution%HhY = solution%Hfact * problem%HextY
-        solution%HhZ = solution%Hfact * problem%HextZ
+        solution%HhX = solution%Hfact * HextX
+        solution%HhY = solution%Hfact * HextY
+        solution%HhZ = solution%Hfact * HextZ
         
         
     elseif ( problem%solver .eq. MicroMagSolverImplicit ) then
@@ -553,40 +556,12 @@
         enddo
         
     
-        open (11, file='K.dat',	&
-			           status='unknown', form='unformatted',	&
-			           access='direct', recl=2*ntot*ntot)
-
-    write(11,rec=1) problem%Kxx
-    
-    write(11,rec=2) problem%Kxy
-    
-    write(11,rec=3) problem%Kxz
-    
-    write(11,rec=4) problem%Kyy
-    
-    write(11,rec=5) problem%Kyz
-    
-    write(11,rec=6) problem%Kzz
-    
-    close(11)
         
         !Clean up
         deallocate(H)
     endif
     
-    open (11, file='Kdemag.dat',	&
-			           status='unknown', form='unformatted',	&
-			           access='direct', recl=2*nx*ny*nz*nx*ny*nz)
-
-    write(11,rec=1) problem%Kxx
-    write(11,rec=2) problem%Kxy
-    write(11,rec=3) problem%Kxz
-    write(11,rec=4) problem%Kyy
-    write(11,rec=5) problem%Kyz
-    write(11,rec=6) problem%Kzz
-    
-    close(11)
+  
     
     end subroutine ComputeDemagfieldTensor
     
@@ -939,7 +914,7 @@
     stat = mkl_sparse_destroy (d2dx2%A)
     stat = mkl_sparse_destroy (d2dy2%A)
     
-    call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_exch.dat' )
+    !call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_exch.dat' )
     
     end subroutine ComputeExchangeTerm3D_Uniform
     
