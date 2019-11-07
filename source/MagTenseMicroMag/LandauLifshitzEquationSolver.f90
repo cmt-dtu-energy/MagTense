@@ -59,6 +59,11 @@
         enddo
     enddo
     
+         open (15, file='file_dmdt_call.txt',   &
+			status='unknown', access='sequential',	&
+			form='formatted', position='append',&
+			action='write' )
+
     
     call displayMatlabMessage( 'Initializing solution' )
     !Initialize the solution, i.e. allocate various arrays
@@ -87,6 +92,8 @@
     sol = gb_solution
     prob = gb_problem
     
+    close(15)
+    
     end subroutine SolveLandauLifshitzEquation
 
     !>-----------------------------------------
@@ -105,6 +112,7 @@
     integer :: ntot
     
 
+    write(15,*) 't'
     
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     if ( .not. allocated(crossX) ) then
@@ -119,14 +127,22 @@
     gb_solution%My = m(ntot+1:2*ntot)
     gb_solution%Mz = m(2*ntot+1:3*ntot)
              
+    
     !Exchange term    
     call updateExchangeTerms( gb_problem, gb_solution )
+    
+    
+    
     
     !External field
     call updateExternalField( gb_problem, gb_solution, t )
     
+    
+    
     !Demag. field
     call updateDemagfield( gb_problem, gb_solution )
+    
+    
     
     !Anisotropy term
     call updateAnisotropy(  gb_problem, gb_solution )
@@ -161,7 +177,6 @@
     dmdt(ntot+1:2*ntot) = dmdt(ntot+1:2*ntot) * gb_problem%grid%dV
     
     dmdt(1+2*ntot:3*ntot) = dmdt(1+2*ntot:3*ntot) * gb_problem%grid%dV
-    
 
     end subroutine dmdt_fct
     
@@ -376,8 +391,6 @@
     solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
     solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
     
-    
-    
     end subroutine updateDemagfield_uniform
     
     
@@ -428,9 +441,9 @@
         grid%pts(:,:) = 0.
         
         if ( grid%nx .gt. 1 ) then
-            grid%dx = grid%Lx / (grid%nx-1)                        
+            grid%dx = grid%Lx / grid%nx
             do i=1,grid%nx
-                grid%x(i,:,:) = -grid%Lx/2 + (i-1) * grid%dx
+                grid%x(i,:,:) = -grid%Lx/2 + (i-1) * grid%dx + grid%dx/2
             enddo
             
         else
@@ -439,9 +452,9 @@
         endif
     
         if ( grid%ny .gt. 1 ) then
-            grid%dy = grid%Ly / (grid%ny-1)                        
+            grid%dy = grid%Ly / grid%ny
             do i=1,grid%ny
-                grid%y(:,i,:) = -grid%Ly/2 + (i-1) * grid%dy
+                grid%y(:,i,:) = -grid%Ly/2 + (i-1) * grid%dy + grid%dy/2
             enddo            
         else
             grid%y(:,:,:) = 0.
@@ -449,9 +462,9 @@
         endif
 
         if ( grid%nz .gt. 1 ) then
-            grid%dz = grid%Lz / (grid%nz-1)                        
+            grid%dz = grid%Lz / grid%nz
             do i=1,grid%nz
-                grid%z(:,:,i) = -grid%Lz/2 + (i-1) * grid%dz
+                grid%z(:,:,i) = -grid%Lz/2 + (i-1) * grid%dz + grid%dz/2
             enddo            
         else
             grid%z(:,:,:) = 0.
