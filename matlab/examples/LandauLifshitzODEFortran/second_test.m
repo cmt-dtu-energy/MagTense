@@ -24,7 +24,7 @@ problem.u_ea(:,3) = -1;
 %initial magnetization
 problem.m0(:) = 1/sqrt(3);
 %time grid on which to solve the problem
-problem = problem.setTime( linspace(0,2,100) );
+problem = problem.setTime( linspace(0,2,200) );
 HystDir = [0,1,1] ;
 HystDir = HystDir./norm(HystDir);
 
