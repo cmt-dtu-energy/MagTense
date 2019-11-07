@@ -393,13 +393,15 @@ include 'mkl_spblas.f90'
     
     subroutine setupGrid( grid )
     type(MicroMagGrid),intent(inout) :: grid            !> Grid information to be generated
-    integer :: i
+    integer :: i,j,k,ind
     
     !Setup the grid depending on which type of grid it is
     if ( grid%gridType .eq. gridTypeUniform ) then
         
         !Allocate the grid
         allocate( grid%x(grid%nx,grid%ny,grid%nz),grid%y(grid%nx,grid%ny,grid%nz),grid%z(grid%nx,grid%ny,grid%nz) )
+        allocate( grid%pts(grid%nx*grid%ny*grid%nz,3) )
+        grid%pts(:,:) = 0.
         
         if ( grid%nx .gt. 1 ) then
             grid%dx = grid%Lx / (grid%nx-1)                        
@@ -433,6 +435,17 @@ include 'mkl_spblas.f90'
         endif
     endif
     
+    do k=1,grid%nz
+        do j=1,grid%ny
+            do i=1,grid%nx
+                ind  = i + (j-1) * grid%nx + (k-1) * grid%ny * grid%nx
+                grid%pts( ind, 1 ) = grid%x(i,j,k)
+                grid%pts( ind, 2 ) = grid%y(i,j,k)
+                grid%pts( ind, 3 ) = grid%z(i,j,k)
+            enddo
+        enddo
+    enddo
+    
     
     end subroutine setupGrid
     
@@ -447,12 +460,11 @@ include 'mkl_spblas.f90'
     subroutine ComputeDemagfieldTensor( problem )
     type(MicroMagProblem),intent(inout) :: problem      !> Grid data structure    
     
-    
     type(MagTile),dimension(1) :: tile                  !> Tile representing the current tile under consideration
-    real,dimension(:,:),allocatable :: H,pts            !> The field and the corresponding evaluation point arrays
+    real,dimension(:,:),allocatable :: H            !> The field and the corresponding evaluation point arrays
     integer :: i,j,k,nx,ny,nz,ntot,ind                  !> Internal counters and index variables
     real,dimension(:,:,:,:),allocatable :: Nout         !> Temporary storage for the demag tensor    
-    integer,dimension(1) :: shp
+   ! integer,dimension(1) :: shp
     
     if ( problem%grid%gridType .eq. gridTypeUniform ) then
         nx = problem%grid%nx
@@ -466,7 +478,7 @@ include 'mkl_spblas.f90'
         allocate( problem%Kzz(ntot,ntot) )
         
         
-        allocate(H(ntot,3),pts(ntot,3))
+        allocate(H(ntot,3))
         
         !Setup template tile
         tile(1)%tileType = 2 !(for prism)
@@ -479,10 +491,10 @@ include 'mkl_spblas.f90'
         tile(1)%M(:) = 0.
         
         !Set up the points at which the field is to be evaluated (the centers of all the tiles)
-        shp(1) = ntot
-        pts(:,1) = reshape( problem%grid%x, shp )
-        pts(:,2) = reshape( problem%grid%y, shp )
-        pts(:,3) = reshape( problem%grid%z, shp )
+        !shp(1) = ntot
+        !pts(:,1) = reshape( problem%grid%x, shp )
+        !pts(:,2) = reshape( problem%grid%y, shp )
+        !pts(:,3) = reshape( problem%grid%z, shp )
         
         !for each element find the tensor for all evaluation points (i.e. all elements)
         do k=1,nz
@@ -493,7 +505,7 @@ include 'mkl_spblas.f90'
                     tile(1)%offset(2) = problem%grid%y(i,j,k)
                     tile(1)%offset(3) = problem%grid%z(i,j,k)
                     !Nout will be allocated by the subroutine. Should be de-allocated afterwards for consistency
-                    call getFieldFromTiles( tile, H, pts, 1, ntot, Nout )
+                    call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout )
                     
                     !Copy Nout into the proper structure used by the micro mag model
                     ind = (i-1) * ny * nz + (j-1) * nz + k
@@ -518,8 +530,27 @@ include 'mkl_spblas.f90'
             enddo
         enddo
         
+    
+        open (11, file='K.dat',	&
+			           status='unknown', form='unformatted',	&
+			           access='direct', recl=2*ntot*ntot)
+
+    write(11,rec=1) problem%Kxx
+    
+    write(11,rec=2) problem%Kxy
+    
+    write(11,rec=3) problem%Kxz
+    
+    write(11,rec=4) problem%Kyy
+    
+    write(11,rec=5) problem%Kyz
+    
+    write(11,rec=6) problem%Kzz
+    
+    close(11)
+        
         !Clean up
-        deallocate(H,pts)
+        deallocate(H)
     endif
     
     

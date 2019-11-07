@@ -11,6 +11,7 @@
         real :: Lx,Ly,Lz
         real :: dx,dy,dz
         real,dimension(:,:,:),allocatable :: x,y,z
+        real,dimension(:,:),allocatable :: pts  !> Array with the x,y,z points on list form, i.e. pts(i,:) is the x,y,z components of the i'th point
         integer :: gridType
     end type MicroMagGrid
     
