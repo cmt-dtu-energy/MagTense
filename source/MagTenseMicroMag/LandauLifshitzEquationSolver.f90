@@ -1,4 +1,4 @@
-include 'mkl_spblas.f90'
+#include 'mkl_spblas.f90'
     module LandauLifshitzSolution
     use ODE_Solvers
     use integrationDataTypes
@@ -33,7 +33,7 @@ include 'mkl_spblas.f90'
     subroutine SolveLandauLifshitzEquation( prob, sol )    
     type(MicroMagProblem),intent(inout) :: prob     !> The problem data structure
     type(MicroMagSolution),intent(inout) :: sol     !> The solution data structure    
-    integer :: ntot                                 !> total no. of tiles
+    integer :: ntot,i,j,k,ind                       !> total no. of tiles
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
     real,dimension(:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
@@ -45,12 +45,26 @@ include 'mkl_spblas.f90'
     call displayMatlabMessage( 'Initializing matrices' )
     !Calculate the interaction matrices
     call initializeInteractionMatrices( gb_problem )
+    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+    
+    allocate( gb_solution%pts(ntot,3) )
+    do k=1,gb_problem%grid%nz
+        do j=1,gb_problem%grid%ny            
+            do i=1,gb_problem%grid%nx
+                ind = i + (j-1) * gb_problem%grid%nx + (k-1) * gb_problem%grid%nx * gb_problem%grid%ny
+                gb_solution%pts(ind,1) = gb_problem%grid%x(i,j,k)
+                gb_solution%pts(ind,2) = gb_problem%grid%y(i,j,k)
+                gb_solution%pts(ind,3) = gb_problem%grid%z(i,j,k)
+            enddo
+        enddo
+    enddo
+    
     
     call displayMatlabMessage( 'Initializing solution' )
     !Initialize the solution, i.e. allocate various arrays
     call initializeSolution( gb_problem, gb_solution )
         
-    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+    
     !Set the initial values for m (remember that M is organized such that mx = m(1:ntot), my = m(ntot+1:2*ntot), mz = m(2*ntot+1:3*ntot)
     allocate(gb_solution%t_out(size(gb_problem%t)),gb_solution%M_out(size(gb_problem%t),ntot,3))
     
@@ -140,7 +154,13 @@ include 'mkl_spblas.f90'
     !dMzdt
     dmdt(2*ntot+1:3*ntot) = alpha(t,gb_problem) * HeffZ2 + gb_problem%gamma * crossZ
     
-             
+    !Now convert to proper units by multiplying with the volume of each tile thus obtaining the total magnetization for each tile
+    
+    dmdt(1:ntot) = dmdt(1:ntot) * gb_problem%grid%dV
+    
+    dmdt(ntot+1:2*ntot) = dmdt(ntot+1:2*ntot) * gb_problem%grid%dV
+    
+    dmdt(1+2*ntot:3*ntot) = dmdt(1+2*ntot:3*ntot) * gb_problem%grid%dV
     
 
     end subroutine dmdt_fct
@@ -156,8 +176,8 @@ include 'mkl_spblas.f90'
     real,intent(in) :: t
     type(MicroMagProblem),intent(in) :: problem
     
-    alpha = problem%alpha0 * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
-    !MySim.alpha = @(t) -65104e-17*(10.^(7*min(t,MaxT0)/MaxT0)); 
+    alpha = problem%alpha0 ! * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
+    
     
     end function alpha
     
@@ -400,6 +420,7 @@ include 'mkl_spblas.f90'
         
         !Allocate the grid
         allocate( grid%x(grid%nx,grid%ny,grid%nz),grid%y(grid%nx,grid%ny,grid%nz),grid%z(grid%nx,grid%ny,grid%nz) )
+        allocate( grid%dV( grid%nx * grid%ny * grid%nz ) )
         allocate( grid%pts(grid%nx*grid%ny*grid%nz,3) )
         grid%pts(:,:) = 0.
         
@@ -435,6 +456,7 @@ include 'mkl_spblas.f90'
         endif
     endif
     
+    grid%dV(:) = grid%dx * grid%dy * grid%dz
     do k=1,grid%nz
         do j=1,grid%ny
             do i=1,grid%nx
@@ -508,22 +530,22 @@ include 'mkl_spblas.f90'
                     call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout )
                     
                     !Copy Nout into the proper structure used by the micro mag model
-                    ind = (i-1) * ny * nz + (j-1) * nz + k
+                    ind = (k-1) * nx * ny + (j-1) * nx + i
                     
-                    problem%Kxx(ind,:) = Nout(1,:,1,1)
-                    problem%Kxy(ind,:) = Nout(1,:,1,2)
-                    problem%Kxz(ind,:) = Nout(1,:,1,3)
+                    problem%Kxx(:,ind) = Nout(1,:,1,1)
+                    problem%Kxy(:,ind) = Nout(1,:,1,2)
+                    problem%Kxz(:,ind) = Nout(1,:,1,3)
                     
                     !Not stored due to symmetry  (Kxy = Kyx)
                     !Kyx(ind,:) = Nout(1,:,2,1)
-                    problem%Kyy(ind,:) = Nout(1,:,2,2)
-                    problem%Kyz(ind,:) = Nout(1,:,2,3)
+                    problem%Kyy(:,ind) = Nout(1,:,2,2)
+                    problem%Kyz(:,ind) = Nout(1,:,2,3)
                     
                     !Not stored due to symmetry (Kxz = Kzx)
                     !Kzx(ind,:) = Nout(1,:,3,1)
                     !Not stored due to symmetry (Kyz = Kzy)
                     !Kzy(ind,:) = Nout(1,:,3,2)
-                    problem%Kzz(ind,:) = Nout(1,:,3,3)
+                    problem%Kzz(:,ind) = Nout(1,:,3,3)
                     
                     deallocate(Nout)
                 enddo
@@ -553,6 +575,18 @@ include 'mkl_spblas.f90'
         deallocate(H)
     endif
     
+    open (11, file='Kdemag.dat',	&
+			           status='unknown', form='unformatted',	&
+			           access='direct', recl=2*nx*ny*nz*nx*ny*nz)
+
+    write(11,rec=1) problem%Kxx
+    write(11,rec=2) problem%Kxy
+    write(11,rec=3) problem%Kxz
+    write(11,rec=4) problem%Kyy
+    write(11,rec=5) problem%Kyz
+    write(11,rec=6) problem%Kzz
+    
+    close(11)
     
     end subroutine ComputeDemagfieldTensor
     
@@ -601,7 +635,7 @@ include 'mkl_spblas.f90'
     
     !----------------------------------d^2dx^2 begins -----------------------------!
     !Make the d^2/dx^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz
-    ntot = 3 * nx*ny*nz - 2*ny*nz
+    ntot = nz * ( ny * 4 + ny * (nx-2)*3 )
     allocate(d2dx2%values(ntot),d2dx2%cols(ntot),d2dx2%rows_start(nx*ny*nz),d2dx2%rows_end(nx*ny*nz))
     
     ind = 1
@@ -678,7 +712,7 @@ include 'mkl_spblas.f90'
     
     
     !----------------------------------d^2dy^2 begins ----------------------------!
-    
+    ntot = nz * ( nx * 2 + (ny-2) * nx * 3 + nx * 2 )
     !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2
     allocate(d2dy2%values(ntot),d2dy2%cols(ntot),d2dy2%rows_start(nx*ny*nz),d2dy2%rows_end(nx*ny*nz))
     
@@ -772,103 +806,103 @@ include 'mkl_spblas.f90'
     
     
     !----------------------------------d^2dz^2 begins ----------------------------!
-    !if ( nz .gt. 1 ) then
-    !!Make the d^2/dz^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2 and d^2dy^2
-    !values(:) = 0.
-    !cols(:) = 0
-    !rows_start(:) = 0
-    !rows_end(:) = 0
-    !ind = 1
-    !rowInd = 1
-    !!if ( nz .gt. 1 ) then
-    !    !The z=1 face
-    !    do i=1,nx
-    !        do j=1,ny
-    !            !central value
-    !            values(ind) = -1.
-    !            cols(ind) = (j-1) * nx + i
-    !            rows_start(rowInd) = ind
-    !        
-    !            !increment position
-    !            ind = ind + 1
-    !        
-    !            !right-most value
-    !            values(ind) = 1.
-    !            cols(ind) = nx * ny + (j-1)*nx + i
-    !            rows_end(rowInd) = ind
-    !            rowInd = rowInd + 1
-    !        
-    !            !increment position
-    !            ind = ind + 1
-    !        enddo
-    !    enddo
-    !    !Everything in between
-    !    do k=2,nz-1
-    !        do i=1,nx
-    !            do j=1,ny
-    !                !left-most value
-    !                values(ind) = 1.
-    !                cols(ind) = nx * ny * k + (j-1) * nx + i
-    !                rows_start(rowInd) = ind
-    !        
-    !                !increment position
-    !                ind = ind + 1
-    !            
-    !                !central value
-    !                values(ind) = -2.
-    !                cols(ind) = nx * ny * (k-1) + (j-1) * nx + i
-    !            
-    !        
-    !                !increment position
-    !                ind = ind + 1
-    !            
-    !            
-    !                values(ind) = -1.
-    !                cols(ind) = nx * ny * (k-2) + (j-1) * nx + i
-    !                rows_end(rowInd) = ind
-    !                rowInd = rowInd + 1
-    !            
-    !                !increment position
-    !                ind = ind + 1
-    !            
-    !            enddo
-    !        enddo
-    !    
-    !    enddo
-    !
-    !
-    !    !The z=nz face
-    !    do i=1,nx
-    !        do j=1,ny
-    !        
-    !            !left-most value
-    !            values(ind) = 1.
-    !            cols(ind) = nx * ny * (nz-2) + (j-1) * nx + i
-    !            rows_start(rowInd) = ind
-    !        
-    !            !increment position
-    !            ind = ind + 1
-    !        
-    !            !central value
-    !            values(ind) = -1.
-    !            cols(ind) = nx * ny * (nz-1) + (j-1) * nx + i
-    !            rows_end(rowInd) = ind
-    !            rowInd = rowInd + 1
-    !        
-    !            !increment position
-    !            ind = ind + 1
-    !        
-    !        
-    !        enddo
-    !    enddo
-    !
-    !
-    !    !Multiply by the discretization
-    !    values = values * 1./grid%dz**2
-    !    
-    !    !Create the sparse matrix for the d^2dz^2
-    !    stat = mkl_sparse_d_create_csr ( d2dz2, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, rows_start, rows_end, cols, values)
-    !endif
+    if ( nz .gt. 1 ) then
+        !Make the d^2/dz^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2 and d^2dy^2
+        ntot = 2 * 2 * nx * ny + 3 * (nz-2) * nx * ny
+        !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2
+        allocate(d2dz2%values(ntot),d2dz2%cols(ntot),d2dz2%rows_start(nx*ny*nz),d2dz2%rows_end(nx*ny*nz))
+    
+        ind = 1
+        rowInd = 1
+        colInd = 1
+        !The z=1 face        
+        do j=1,ny
+            do i=1,nx
+                !central value
+                d2dz2%values(ind) = -1.
+                d2dz2%cols(ind) = colInd
+                d2dz2%rows_start(rowInd) = ind
+            
+                !increment position
+                ind = ind + 1
+            
+                !right-most value
+                d2dz2%values(ind) = 1.
+                d2dz2%cols(ind) = nx * ny + colInd
+                d2dz2%rows_end(rowInd) = ind + 1
+                rowInd = rowInd + 1
+            
+                !increment position
+                ind = ind + 1
+                colInd = colInd + 1
+            enddo
+        enddo
+        !Everything in between
+        do k=2,nz-1            
+            do j=1,ny
+                do i=1,nx
+                    !left-most value
+                    d2dz2%values(ind) = 1.
+                    d2dz2%cols(ind) = colInd - nx * ny
+                    d2dz2%rows_start(rowInd) = ind
+            
+                    !increment position
+                    ind = ind + 1
+                
+                    !central value
+                    d2dz2%values(ind) = -2.
+                    d2dz2%cols(ind) = colInd
+                            
+                    !increment position
+                    ind = ind + 1
+                
+                    !right-most value
+                    d2dz2%values(ind) = 1.
+                    d2dz2%cols(ind) = colInd + nx * ny
+                    d2dz2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                
+                    !increment position
+                    ind = ind + 1
+                    colInd = colInd + 1
+                enddo
+            enddo
+        
+        enddo
+    
+    
+        !The z=nz face        
+        do j=1,ny
+            do i=1,nx
+                
+                !left-most value
+                d2dz2%values(ind) = 1.
+                d2dz2%cols(ind) = colInd - nx * ny
+                d2dz2%rows_start(rowInd) = ind
+            
+                !increment position
+                ind = ind + 1
+            
+                !central value
+                d2dz2%values(ind) = -1.
+                d2dz2%cols(ind) = colInd
+                d2dz2%rows_end(rowInd) = ind + 1
+                rowInd = rowInd + 1
+            
+                !increment position
+                ind = ind + 1
+                colInd = colInd + 1
+            
+            enddo
+        enddo
+    
+    
+        !Multiply by the discretization
+        d2dz2%values = d2dz2%values * 1./grid%dz**2
+        
+        !Create the sparse matrix for the d^2dz^2
+        stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
+    endif
     
     !----------------------------------d^2dz^2 ends ----------------------------!
     
@@ -876,19 +910,19 @@ include 'mkl_spblas.f90'
     !Finally, add up the three diagonals and store in the output sparse matrix, A
     !store the results temporarily in tmp4
     
-    !call writeSparseMatrixToDisk( d2dx2%A, nx*ny*nz, 'd2dx2.dat' )
+    !call writeSparseMatrixToDisk( d2dz2%A, nx*ny*nz, 'd2dz2.dat' )
     !call writeSparseMatrixToDisk( d2dy2%A, nx*ny*nz, 'd2dy2.dat' )
     
     
     stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, 1.d0, d2dy2%A, tmp)    
     
-    call writeSparseMatrixToDisk( tmp, nx*ny*nz, 'A_exch.dat' )
+    !call writeSparseMatrixToDisk( tmp, nx*ny*nz, 'A_exch.dat' )
     
     if ( nz .gt. 1 ) then    
         stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, 1., tmp, A)
-        !clean up
-        stat = mkl_sparse_destroy (d2dz2%A)
+        !clean up        
         deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
+        stat = mkl_sparse_destroy (d2dz2%A)
     else
         descr%type = SPARSE_MATRIX_TYPE_GENERAL
         descr%mode = SPARSE_FILL_MODE_FULL
@@ -896,7 +930,7 @@ include 'mkl_spblas.f90'
         stat = mkl_sparse_copy ( tmp, descr, A )
     endif
     
-    
+    !call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_total.dat' )
     
     !clean up
     deallocate(d2dx2%values,d2dx2%cols,d2dx2%rows_start,d2dx2%rows_end)
@@ -905,6 +939,7 @@ include 'mkl_spblas.f90'
     stat = mkl_sparse_destroy (d2dx2%A)
     stat = mkl_sparse_destroy (d2dy2%A)
     
+    call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_exch.dat' )
     
     end subroutine ComputeExchangeTerm3D_Uniform
     
