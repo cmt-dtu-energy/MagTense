@@ -44,7 +44,7 @@ def plot_tetrahedron(axes, vertices, M, color):
     volume = np.linalg.norm(np.dot((vert[0] - vert[3]), np.cross((vert[1] - vert[3]), (vert[2] - vert[3])))) / 6
 
     # Plot vector of magnetization in the center of the cube
-    ax.quiver(np.mean(vert[:,0]), np.mean(vert[:,1]), np.mean(vert[:,2]), M[0], M[1], M[2], color=color, length=volume/4, pivot='middle', normalize=True)
+    ax.quiver(np.mean(vert[:,0]), np.mean(vert[:,1]), np.mean(vert[:,2]), M[0], M[1], M[2], color=color, length=volume*5, pivot='middle', normalize=True)
 
 
 def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color):
@@ -174,7 +174,6 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
 
     # Corner points
     ax.plot(ver_cyl[:,0], ver_cyl[:,1], ver_cyl[:,2], 'ro')
-    print(ver_cyl)
     
     # Define the faces of the cylinder
     fac = np.array([[0, 5, 4, 2], [1, 5, 4, 3]])
@@ -200,9 +199,16 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
             triangle_surfaces[i+(resolution-1)*j] = [seg_curves[j][:,i], ver_cyl[5-j], seg_curves[j][:,i+1]]
     ax.add_collection3d(Poly3DCollection(triangle_surfaces, facecolors=color, linewidths=1, alpha=.25))
 
+    min_side = r*min(abs(math.cos(theta + dtheta/2) - math.cos(theta - dtheta/2)), abs(math.sin(theta + dtheta/2) - math.sin(theta - dtheta/2)))
+
+    if inv:
+        r_M = r + 0.25*min_side
+    else:
+        r_M = r - 0.5*min_side
+
     # Plot vector of magnetization in the center of the cube
-    ax.quiver(offset[0] + (center_pos[0])*math.cos(center_pos[1]), offset[1] + (center_pos[0])*math.sin(center_pos[1]),\
-        offset[2] + center_pos[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(r_center-dr)/2, pivot='middle', normalize=True)
+    ax.quiver(offset[0] + (r_M)*math.cos(center_pos[1]), offset[1] + (r_M)*math.sin(center_pos[1]),\
+        offset[2] + center_pos[2], M[0], M[1], M[2], color=color, length=0.5*min_side, pivot='middle', normalize=True)
 
 
 def get_rotmat(rot):
