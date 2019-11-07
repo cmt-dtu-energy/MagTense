@@ -41,12 +41,6 @@ properties
 
     MaxT0
 
-    Hext
-
-    %solution times
-    nt
-    t
-
     %initial magnetization (mx = m0(1:n), my = m(n+1:2n), mz = m(2n+1:3n) with
     %n = no. of elements )
     m0
@@ -54,8 +48,23 @@ properties
     theta
     phi    
 end
+
+properties (SetAccess=private,GetAccess=public)
+    %applied field, should be (nt_Hext,3)
+    Hext
+    %no. of time steps in the applied field    
+    nt_Hext
+    %time axis of the applied field
+    t_Hext
+    
+    %solution times
+    nt
+    %should have size (nt,1)
+    t
+end
+
 methods
-    function obj = DefaultMicroMagProblem(nx,ny,nz)
+    function obj = DefaultMicroMagProblem(nx,ny,nz,HextFct)
         nx = int32(nx);
         ny = int32(ny);
         nz = int32(nz);
@@ -91,13 +100,17 @@ methods
         obj.alpha = -65104e-17;
 
         obj.MaxT0 = 2;
-
-        obj.Hext = [1,1,1]./sqrt(3);
-
+        
         %solution times
         obj.nt = int32(1000);
         obj.t = linspace(0,1,obj.nt);
 
+        if ~exist('HextFct')
+            HextFct = @(t) [1,1,1]./sqrt(3);
+        end
+        obj = obj.setHextTime( 10 * obj.nt );
+        obj.Hext = HextFct(obj.t);
+        
         %initial magnetization (mx = m0(1:n), my = m(n+1:2n), mz = m(2n+1:3n) with
         %n = no. of elements )
         obj.m0 = zeros(obj.ntot * 3, 1 );
@@ -108,5 +121,29 @@ methods
         obj.m0(obj.ntot+1:2*obj.ntot) = sin(obj.theta) .* sin(obj.phi);
         obj.m0(2*obj.ntot+1:3*obj.ntot) = cos(obj.theta);
     end
+    
+    %%Calculates the applied field as a function of time on the time grid
+    %%already specified in this instance (obj) of the class given the
+    %%function handle fct
+    function obj = setHext( obj, fct )
+        
+        obj = obj.setHextTime( 10 * obj.nt );
+        obj.Hext = zeros( obj.nt_Hext, 4 );
+        
+        obj.Hext(:,1) = obj.t_Hext;
+        
+        obj.Hext(:,2:4) = fct( obj.t_Hext );
+    end
+    
+    function obj = setTime( obj, t )
+        obj.t = t;
+        obj.nt = int32(length(t));
+    end
+    
+    function obj = setHextTime( obj, nt )
+        obj.nt_Hext = int32( nt );
+        obj.t_Hext = linspace( min(obj.t), max(obj.t), obj.nt_Hext );
+    end
+    
 end
 end
