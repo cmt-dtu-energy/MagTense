@@ -3,6 +3,16 @@
 The fortran code can be directly called from Python.
 The tool f2py of the numpy package is used to wrap the interface file *lib_mag/FortranToPythonIO.f90*.
 
+## Prerequisites
+
+The required packages to run the code can be found in *documentation/environment.yml*.
+
+For creating a conda environment in the current folder run:
+
+```Powershell
+conda env create --prefix ./envs -f ./documentation/environment.yml
+```
+
 ## Accessible functions
 
 - **iterate_magnetization**(tiles, **options):  
@@ -96,6 +106,5 @@ The tool f2py of the numpy package is used to wrap the interface file *lib_mag/F
 
 ## Additional remarks
 
-The required packages to run the code can be found in *documentation/requirements.txt*.  
 In order to run the code the Fortran code has to be wrapped with f2py on your machine.  
 The usage of the corresponding Makefile can be found in subfolder *lib_mag/*.
