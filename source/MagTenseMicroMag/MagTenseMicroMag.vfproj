@@ -33,7 +33,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;c:\Program Files\MATLAB\R2019a\extern\include\;c:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019\windows\mkl\lib\intel64_win\;c:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019\windows\mkl\include\" RealKIND="realKIND8" UseMkl="mklParallel"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;c:\Program Files\MATLAB\R2019b\extern\include\" RealKIND="realKIND8" UseMkl="mklParallel"/>
 				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;..\DemagField\DemagField\x64\release\"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>

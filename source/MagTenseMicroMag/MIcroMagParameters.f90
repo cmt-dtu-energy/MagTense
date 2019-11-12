@@ -1,4 +1,5 @@
-
+include 'mkl_spblas.f90'
+    
     module MicroMagParameters
     use MKL_SPBLAS
     

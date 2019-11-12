@@ -1,4 +1,3 @@
-#include 'mkl_spblas.f90'
     module LandauLifshitzSolution
     use ODE_Solvers
     use integrationDataTypes
@@ -59,10 +58,10 @@
         enddo
     enddo
     
-         open (15, file='file_dmdt_call.txt',   &
-			status='unknown', access='sequential',	&
-			form='formatted', position='append',&
-			action='write' )
+!      open (15, file='file_dmdt_call.txt',   &
+!			status='unknown', access='sequential',	&
+!			form='formatted', position='append',&
+!			action='write' )
 
     
     call displayMatlabMessage( 'Initializing solution' )
@@ -92,7 +91,7 @@
     sol = gb_solution
     prob = gb_problem
     
-    close(15)
+!    close(15)
     
     end subroutine SolveLandauLifshitzEquation
 
@@ -112,7 +111,7 @@
     integer :: ntot
     
 
-    write(15,*) 't'
+    !write(15,*) 't'
     
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     if ( .not. allocated(crossX) ) then
@@ -170,13 +169,17 @@
     !dMzdt
     dmdt(2*ntot+1:3*ntot) = alpha(t,gb_problem) * HeffZ2 + gb_problem%gamma * crossZ
     
+    !write(15,*) alpha(t,gb_problem)
+    !write(15,*) gb_problem%gamma
+    !write(15,*) dmdt(1)
+    
     !Now convert to proper units by multiplying with the volume of each tile thus obtaining the total magnetization for each tile
     
-    dmdt(1:ntot) = dmdt(1:ntot) * gb_problem%grid%dV
+    !dmdt(1:ntot) = dmdt(1:ntot) * gb_problem%grid%dV
     
-    dmdt(ntot+1:2*ntot) = dmdt(ntot+1:2*ntot) * gb_problem%grid%dV
+    !dmdt(ntot+1:2*ntot) = dmdt(ntot+1:2*ntot) * gb_problem%grid%dV
     
-    dmdt(1+2*ntot:3*ntot) = dmdt(1+2*ntot:3*ntot) * gb_problem%grid%dV
+    !dmdt(1+2*ntot:3*ntot) = dmdt(1+2*ntot:3*ntot) * gb_problem%grid%dV
 
     end subroutine dmdt_fct
     
