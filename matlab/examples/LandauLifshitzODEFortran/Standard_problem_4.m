@@ -3,8 +3,8 @@ clearvars
 
 figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
 
-addpath('MEX_files');
-addpath('util');
+addpath('..\..\MEX_files');
+addpath('..\util');
 tic
 %test the Fortran implementation of the LL-ODE solver
 %get the default problem
@@ -14,6 +14,7 @@ tic
 problem = DefaultMicroMagProblem(36,9,1);
 
 problem.alpha = -4.42e-6;
+problem.gamma = 0;
 
 %initial magnetization
 problem.m0(:) = 1/sqrt(3);
@@ -68,7 +69,7 @@ plot(fig1,problem.t,mean(solution_t.M(:,:,3),2),'bx');
 % figure; hold all; for i=2:4; plot(problem.Hext(:,1),problem.Hext(:,i),'.'); end;
 
 % Run the Matlab version of the micromagnetism code
-addpath('..\micromagnetism')
+addpath('..\..\micromagnetism')
 tic
 Script_3D_TestDynamicsStdProbl4(fig1);
 toc
