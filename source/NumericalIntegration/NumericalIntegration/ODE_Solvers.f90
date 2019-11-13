@@ -99,7 +99,7 @@ implicit none
     tol = 1e-6
     
     !set thres to the low value
-    thres(:) = 1e-20
+    thres(:) = 1e-10
     
     !Set the method to RK45 as default (will be parameterized later as the code evolves)
     !L or l for 23, M or m for 45 and H o h for 67
