@@ -1,4 +1,3 @@
-#include 'mkl_spblas.f90'
     module LandauLifshitzSolution
     use ODE_Solvers
     use integrationDataTypes
@@ -6,7 +5,7 @@
     use MicroMagParameters
     use MagTenseMicroMagIO
     use LLODE_Debug
-    !use spline
+    use util_call
     use DemagFieldGetSolution
     implicit none
     
@@ -58,7 +57,13 @@
             enddo
         enddo
     enddo
+        
     
+!      open (15, file='file_dmdt_call.txt',   &
+!			status='unknown', access='sequential',	&
+!			form='formatted', position='append',&
+!			action='write' )
+
     
     call displayMatlabMessage( 'Initializing solution' )
     !Initialize the solution, i.e. allocate various arrays
@@ -87,6 +92,9 @@
     sol = gb_solution
     prob = gb_problem
     
+!    close(15)
+    
+    
     end subroutine SolveLandauLifshitzEquation
 
     !>-----------------------------------------
@@ -105,6 +113,7 @@
     integer :: ntot
     
 
+    !write(15,*) 't'
     
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     if ( .not. allocated(crossX) ) then
@@ -119,14 +128,22 @@
     gb_solution%My = m(ntot+1:2*ntot)
     gb_solution%Mz = m(2*ntot+1:3*ntot)
              
+    
     !Exchange term    
     call updateExchangeTerms( gb_problem, gb_solution )
+    
+    
+    
     
     !External field
     call updateExternalField( gb_problem, gb_solution, t )
     
+    
+    
     !Demag. field
     call updateDemagfield( gb_problem, gb_solution )
+    
+    
     
     !Anisotropy term
     call updateAnisotropy(  gb_problem, gb_solution )
@@ -148,20 +165,23 @@
     
     !Compute the time derivative of m
     !dMxdt
-    dmdt(1:ntot) = alpha(t,gb_problem) * HeffX2 + gb_problem%gamma * crossX
+    dmdt(1:ntot) = gb_problem%gamma * crossX + alpha(t,gb_problem) * HeffX2 
     !dMydt
-    dmdt(ntot+1:2*ntot) = alpha(t,gb_problem) * HeffY2 + gb_problem%gamma * crossY
+    dmdt(ntot+1:2*ntot) = gb_problem%gamma * crossY + alpha(t,gb_problem) * HeffY2 
     !dMzdt
-    dmdt(2*ntot+1:3*ntot) = alpha(t,gb_problem) * HeffZ2 + gb_problem%gamma * crossZ
+    dmdt(2*ntot+1:3*ntot) = gb_problem%gamma * crossZ + alpha(t,gb_problem) * HeffZ2 
+    
+    !write(15,*) alpha(t,gb_problem)
+    !write(15,*) gb_problem%gamma
+    !write(15,*) dmdt(1)
     
     !Now convert to proper units by multiplying with the volume of each tile thus obtaining the total magnetization for each tile
     
-    dmdt(1:ntot) = dmdt(1:ntot) * gb_problem%grid%dV
+    !dmdt(1:ntot) = dmdt(1:ntot) * gb_problem%grid%dV
     
-    dmdt(ntot+1:2*ntot) = dmdt(ntot+1:2*ntot) * gb_problem%grid%dV
+    !dmdt(ntot+1:2*ntot) = dmdt(ntot+1:2*ntot) * gb_problem%grid%dV
     
-    dmdt(1+2*ntot:3*ntot) = dmdt(1+2*ntot:3*ntot) * gb_problem%grid%dV
-    
+    !dmdt(1+2*ntot:3*ntot) = dmdt(1+2*ntot:3*ntot) * gb_problem%grid%dV
 
     end subroutine dmdt_fct
     
@@ -288,15 +308,18 @@
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     real,intent(in) :: t                                !> The time
-    
+    real :: HextX,HextY,HextZ
     
     if ( problem%solver .eq. MicroMagSolverExplicit .OR. problem%solver .eq. MicroMagSolverDynamic ) then
         
+        !Interpolate to get the applied field at time t
+        call interp1( problem%Hext(:,1), problem%Hext(:,2), t, size(problem%Hext(:,1)), HextX )
+        call interp1( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
+        call interp1( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
         
-        
-        solution%HhX = solution%Hfact * problem%HextX
-        solution%HhY = solution%Hfact * problem%HextY
-        solution%HhZ = solution%Hfact * problem%HextZ
+        solution%HhX = solution%Hfact * HextX
+        solution%HhY = solution%Hfact * HextY
+        solution%HhZ = solution%Hfact * HextZ
         
         
     elseif ( problem%solver .eq. MicroMagSolverImplicit ) then
@@ -366,13 +389,39 @@
     subroutine updateDemagfield_uniform( problem, solution)
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+    integer :: stat
+    type(matrix_descr) :: descr
     
-    !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
-    !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
-    solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
-    solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
-    solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
-    
+    if ( problem%demag_threshold .gt. 0. ) then
+        descr%type = SPARSE_MATRIX_TYPE_GENERAL
+        descr%mode = SPARSE_FILL_MODE_FULL
+        descr%diag = SPARSE_DIAG_NON_UNIT
+        !Do the matrix multiplications using sparse matrices        
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(1)%A, descr, solution%Mx, 0., solution%HmX )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(2)%A, descr, solution%My, 1., solution%HmX )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(3)%A, descr, solution%Mz, 1., solution%HmX )
+        
+        solution%HmX = solution%HmX * (-solution%Mfact )
+        
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(2)%A, descr, solution%Mx, 0., solution%HmY )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(4)%A, descr, solution%My, 1., solution%HmY )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(5)%A, descr, solution%Mz, 1., solution%HmY )
+        
+        solution%HmY = solution%HmY * (-solution%Mfact )
+        
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(3)%A, descr, solution%Mx, 0., solution%HmZ )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(5)%A, descr, solution%My, 1., solution%HmZ )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(6)%A, descr, solution%Mz, 1., solution%HmZ )
+        
+        solution%HmZ = solution%HmZ * (-solution%Mfact )
+    else
+        
+        !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
+        !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
+        solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
+        solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
+        solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
+    endif
     
     
     end subroutine updateDemagfield_uniform
@@ -413,7 +462,7 @@
     
     subroutine setupGrid( grid )
     type(MicroMagGrid),intent(inout) :: grid            !> Grid information to be generated
-    integer :: i
+    integer :: i,j,k,ind
     
     !Setup the grid depending on which type of grid it is
     if ( grid%gridType .eq. gridTypeUniform ) then
@@ -421,11 +470,13 @@
         !Allocate the grid
         allocate( grid%x(grid%nx,grid%ny,grid%nz),grid%y(grid%nx,grid%ny,grid%nz),grid%z(grid%nx,grid%ny,grid%nz) )
         allocate( grid%dV( grid%nx * grid%ny * grid%nz ) )
+        allocate( grid%pts(grid%nx*grid%ny*grid%nz,3) )
+        grid%pts(:,:) = 0.
         
         if ( grid%nx .gt. 1 ) then
-            grid%dx = grid%Lx / (grid%nx-1)                        
+            grid%dx = grid%Lx / grid%nx
             do i=1,grid%nx
-                grid%x(i,:,:) = -grid%Lx/2 + (i-1) * grid%dx
+                grid%x(i,:,:) = -grid%Lx/2 + (i-1) * grid%dx + grid%dx/2
             enddo
             
         else
@@ -434,9 +485,9 @@
         endif
     
         if ( grid%ny .gt. 1 ) then
-            grid%dy = grid%Ly / (grid%ny-1)                        
+            grid%dy = grid%Ly / grid%ny
             do i=1,grid%ny
-                grid%y(:,i,:) = -grid%Ly/2 + (i-1) * grid%dy
+                grid%y(:,i,:) = -grid%Ly/2 + (i-1) * grid%dy + grid%dy/2
             enddo            
         else
             grid%y(:,:,:) = 0.
@@ -444,9 +495,9 @@
         endif
 
         if ( grid%nz .gt. 1 ) then
-            grid%dz = grid%Lz / (grid%nz-1)                        
+            grid%dz = grid%Lz / grid%nz
             do i=1,grid%nz
-                grid%z(:,:,i) = -grid%Lz/2 + (i-1) * grid%dz
+                grid%z(:,:,i) = -grid%Lz/2 + (i-1) * grid%dz + grid%dz/2
             enddo            
         else
             grid%z(:,:,:) = 0.
@@ -455,6 +506,17 @@
     endif
     
     grid%dV(:) = grid%dx * grid%dy * grid%dz
+    do k=1,grid%nz
+        do j=1,grid%ny
+            do i=1,grid%nx
+                ind  = i + (j-1) * grid%nx + (k-1) * grid%ny * grid%nx
+                grid%pts( ind, 1 ) = grid%x(i,j,k)
+                grid%pts( ind, 2 ) = grid%y(i,j,k)
+                grid%pts( ind, 3 ) = grid%z(i,j,k)
+            enddo
+        enddo
+    enddo
+    
     
     end subroutine setupGrid
     
@@ -469,12 +531,12 @@
     subroutine ComputeDemagfieldTensor( problem )
     type(MicroMagProblem),intent(inout) :: problem      !> Grid data structure    
     
-    
     type(MagTile),dimension(1) :: tile                  !> Tile representing the current tile under consideration
-    real,dimension(:,:),allocatable :: H,pts            !> The field and the corresponding evaluation point arrays
+    real,dimension(:,:),allocatable :: H            !> The field and the corresponding evaluation point arrays
     integer :: i,j,k,nx,ny,nz,ntot,ind                  !> Internal counters and index variables
     real,dimension(:,:,:,:),allocatable :: Nout         !> Temporary storage for the demag tensor    
-    integer,dimension(1) :: shp
+    
+   ! integer,dimension(1) :: shp
     
     if ( problem%grid%gridType .eq. gridTypeUniform ) then
         nx = problem%grid%nx
@@ -488,7 +550,7 @@
         allocate( problem%Kzz(ntot,ntot) )
         
         
-        allocate(H(ntot,3),pts(ntot,3))
+        allocate(H(ntot,3))
         
         !Setup template tile
         tile(1)%tileType = 2 !(for prism)
@@ -501,10 +563,10 @@
         tile(1)%M(:) = 0.
         
         !Set up the points at which the field is to be evaluated (the centers of all the tiles)
-        shp(1) = ntot
-        pts(:,1) = reshape( problem%grid%x, shp )
-        pts(:,2) = reshape( problem%grid%y, shp )
-        pts(:,3) = reshape( problem%grid%z, shp )
+        !shp(1) = ntot
+        !pts(:,1) = reshape( problem%grid%x, shp )
+        !pts(:,2) = reshape( problem%grid%y, shp )
+        !pts(:,3) = reshape( problem%grid%z, shp )
         
         !for each element find the tensor for all evaluation points (i.e. all elements)
         do k=1,nz
@@ -515,7 +577,7 @@
                     tile(1)%offset(2) = problem%grid%y(i,j,k)
                     tile(1)%offset(3) = problem%grid%z(i,j,k)
                     !Nout will be allocated by the subroutine. Should be de-allocated afterwards for consistency
-                    call getFieldFromTiles( tile, H, pts, 1, ntot, Nout )
+                    call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout )
                     
                     !Copy Nout into the proper structure used by the micro mag model
                     ind = (k-1) * nx * ny + (j-1) * nx + i
@@ -540,24 +602,88 @@
             enddo
         enddo
         
+    
+        
         !Clean up
-        deallocate(H,pts)
+        deallocate(H)
     endif
     
-    open (11, file='Kdemag.dat',	&
-			           status='unknown', form='unformatted',	&
-			           access='direct', recl=2*nx*ny*nz*nx*ny*nz)
-
-    write(11,rec=1) problem%Kxx
-    write(11,rec=2) problem%Kxy
-    write(11,rec=3) problem%Kxz
-    write(11,rec=4) problem%Kyy
-    write(11,rec=5) problem%Kyz
-    write(11,rec=6) problem%Kzz
     
-    close(11)
+    
+   !trial. Make a sparse matrix out of the dense matrices by specifying a threshold
+    if ( problem%demag_threshold .gt. 0. ) then
+        call ConvertDenseToSparse( problem%Kxx, problem%K_s(1), problem%demag_threshold)
+        call ConvertDenseToSparse( problem%Kxy, problem%K_s(2), problem%demag_threshold)
+        call ConvertDenseToSparse( problem%Kxz, problem%K_s(3), problem%demag_threshold)
+        call ConvertDenseToSparse( problem%Kyy, problem%K_s(4), problem%demag_threshold)
+        call ConvertDenseToSparse( problem%Kyz, problem%K_s(5), problem%demag_threshold)
+        call ConvertDenseToSparse( problem%Kzz, problem%K_s(6), problem%demag_threshold)
+    endif
+    
     
     end subroutine ComputeDemagfieldTensor
+    
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Converts the dense matrix D (size nx,ny) to a sparse matrix K (size nx,y) )
+    !> @params[in] threshold a number specifying the lower limit of values in D that should be considered non-zero
+    !>-----------------------------------------
+    subroutine ConvertDenseToSparse( D, K, threshold)
+    real,dimension(:,:),intent(in) :: D                 !> Dense input matrix    
+    real,intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
+    type(MagTenseSparse),intent(inout) :: K                           !> Sparse matrix allocation
+    
+    integer :: nx,ny, nnonzero
+    
+    logical,dimension(:,:),allocatable :: mask          !> mask used for finding non-zero values
+    integer,dimension(:),allocatable :: colInds         !> Used for storing the values 1...n used for indexing
+    integer :: i,j,ind,stat
+    
+    nx = size(D(:,1))
+    ny = size(D(1,:))
+    
+    allocate(mask(nx,ny))
+    
+    mask = abs(D) .gt. threshold
+    
+    nnonzero = count( mask )
+    
+    allocate( K%values(nnonzero),K%cols(nnonzero))
+    allocate( K%rows_start(nx), K%rows_end(nx), colInds(ny) )
+    
+    do i=1,ny
+        colInds(i) = i
+    enddo
+    
+    
+    !loop over each row
+    ind = 1
+    do i=1,nx
+        !find all non-zero elements in the i'th row of D
+        !starting index of the i'th row
+        K%rows_start(i) = ind
+        do j=1,ny
+            if ( mask(i,j) .eq. .true. ) then
+                K%values( ind ) = D(i,j)
+                
+                K%cols( ind ) = j
+                
+                ind = ind + 1
+            endif
+        enddo                                        
+        !ending index of the i'th row
+        K%rows_end(i) = ind
+    enddo
+    
+    !make sparse matrix
+    stat = mkl_sparse_d_create_csr ( K%A, SPARSE_INDEX_BASE_ONE, nx, ny, K%rows_start, K%rows_end, K%cols, K%values)
+    
+    !clean up
+    deallocate(colInds)
+    
+    end subroutine ConvertDenseToSparse
     
     
     !>-----------------------------------------
@@ -908,7 +1034,7 @@
     stat = mkl_sparse_destroy (d2dx2%A)
     stat = mkl_sparse_destroy (d2dy2%A)
     
-    call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_exch.dat' )
+    !call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_exch.dat' )
     
     end subroutine ComputeExchangeTerm3D_Uniform
     

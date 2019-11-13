@@ -17,8 +17,8 @@ t = hgtransform;
         p0 = p0 + tiles(i).offset;
         
         un = tiles(i).M / sqrt(sum(tiles(i).M.^2));        
-        p1 = p0 - dl * un;
-        p2 = p0 + dl * un;
+        p1 = p0 - dl * un';
+        p2 = p0 + dl * un';
         mArrow3(p1,p2,tiles(i).rotAngles,1,'color','k','parent',t);
         
         %plot the easy axis as well
@@ -26,7 +26,7 @@ t = hgtransform;
            un = tiles(i).u_ea;
            p1 = p0 - dl * un;
            p2 = p0 + dl * un;
-           mArrow3(p1,p2,tiles(i).rotAngles,1,'color','b');
+%            mArrow3(p1,p2,tiles(i).rotAngles,1,'color','b');
         end
         if isfield(tiles(i),'graphRotxAng')
             Rx=makehgtform('xrotate',tiles(i).graphRotxAng);

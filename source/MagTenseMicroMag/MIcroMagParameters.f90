@@ -1,4 +1,5 @@
-
+include 'mkl_spblas.f90'
+    
     module MicroMagParameters
     use MKL_SPBLAS
     
@@ -13,6 +14,7 @@
         real,dimension(:,:,:),allocatable :: x,y,z
         real,dimension(:), allocatable :: dV
         
+        real,dimension(:,:),allocatable :: pts  !> Array with the x,y,z points on list form, i.e. pts(i,:) is the x,y,z components of the i'th point
         integer :: gridType
     end type MicroMagGrid
     
@@ -52,15 +54,18 @@
         
         real :: A0,Ms,K0,gamma,alpha0,MaxT0         !> User defined coefficients determining part of the problem.
         
-        real :: HextX,HextY,HextZ                   !> Applied field along x-, y- and z-direction, single value (constant field)
+        real,dimension(:,:),allocatable :: Hext     !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
         
         real,dimension(:),allocatable :: t          !> Time array for the desired output times
         real,dimension(:),allocatable :: m0         !>Initial value of the magnetization
         
+        real :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         
         !Below is stuff that is computed when the solver initializes
         
         type(sparse_matrix_t) :: A_exch         !> Exchange term matrix
+        
+        type(MagTenseSparse),dimension(6) :: K_s !> Sparse matrices (used if the threshold is >0 )
         
         real,dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
         real,dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
