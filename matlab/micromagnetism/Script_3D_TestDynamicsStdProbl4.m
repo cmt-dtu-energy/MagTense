@@ -30,7 +30,8 @@ MySim.Lz = 3e-9 ;
 %% Get initial state
 MySim.MaxT = 1 ; MySim.MaxT = 1e3 ; %% HERE !!!!!
 MaxT0 = 2 ;
-MySim.alpha = @(t) -65104e-17*(10.^(7*min(t,MaxT0)/MaxT0)); 
+% MySim.alpha = @(t) -65104e-17*(10.^(7*min(t,MaxT0)/MaxT0)); 
+MySim.alpha = -4.42e-6;
 MySim.tt = 0 ;
 
 MySim.InitialState = 'OldSol' ;
