@@ -59,10 +59,13 @@ include 'mkl_spblas.f90'
         real,dimension(:),allocatable :: t          !> Time array for the desired output times
         real,dimension(:),allocatable :: m0         !>Initial value of the magnetization
         
+        real :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         
         !Below is stuff that is computed when the solver initializes
         
         type(sparse_matrix_t) :: A_exch         !> Exchange term matrix
+        
+        type(MagTenseSparse),dimension(6) :: K_s !> Sparse matrices (used if the threshold is >0 )
         
         real,dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
         real,dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components

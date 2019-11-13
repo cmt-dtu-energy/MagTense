@@ -57,6 +57,7 @@
             enddo
         enddo
     enddo
+        
     
 !      open (15, file='file_dmdt_call.txt',   &
 !			status='unknown', access='sequential',	&
@@ -92,6 +93,7 @@
     prob = gb_problem
     
 !    close(15)
+    
     
     end subroutine SolveLandauLifshitzEquation
 
@@ -163,11 +165,11 @@
     
     !Compute the time derivative of m
     !dMxdt
-    dmdt(1:ntot) = alpha(t,gb_problem) * HeffX2 + gb_problem%gamma * crossX
+    dmdt(1:ntot) = gb_problem%gamma * crossX + alpha(t,gb_problem) * HeffX2 
     !dMydt
-    dmdt(ntot+1:2*ntot) = alpha(t,gb_problem) * HeffY2 + gb_problem%gamma * crossY
+    dmdt(ntot+1:2*ntot) = gb_problem%gamma * crossY + alpha(t,gb_problem) * HeffY2 
     !dMzdt
-    dmdt(2*ntot+1:3*ntot) = alpha(t,gb_problem) * HeffZ2 + gb_problem%gamma * crossZ
+    dmdt(2*ntot+1:3*ntot) = gb_problem%gamma * crossZ + alpha(t,gb_problem) * HeffZ2 
     
     !write(15,*) alpha(t,gb_problem)
     !write(15,*) gb_problem%gamma
@@ -387,12 +389,40 @@
     subroutine updateDemagfield_uniform( problem, solution)
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+    integer :: stat
+    type(matrix_descr) :: descr
     
-    !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
-    !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
-    solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
-    solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
-    solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
+    if ( problem%demag_threshold .gt. 0. ) then
+        descr%type = SPARSE_MATRIX_TYPE_GENERAL
+        descr%mode = SPARSE_FILL_MODE_FULL
+        descr%diag = SPARSE_DIAG_NON_UNIT
+        !Do the matrix multiplications using sparse matrices        
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(1)%A, descr, solution%Mx, 0., solution%HmX )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(2)%A, descr, solution%My, 1., solution%HmX )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(3)%A, descr, solution%Mz, 1., solution%HmX )
+        
+        solution%HmX = solution%HmX * (-solution%Mfact )
+        
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(2)%A, descr, solution%Mx, 0., solution%HmY )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(4)%A, descr, solution%My, 1., solution%HmY )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(5)%A, descr, solution%Mz, 1., solution%HmY )
+        
+        solution%HmY = solution%HmY * (-solution%Mfact )
+        
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(3)%A, descr, solution%Mx, 0., solution%HmZ )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(5)%A, descr, solution%My, 1., solution%HmZ )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(6)%A, descr, solution%Mz, 1., solution%HmZ )
+        
+        solution%HmZ = solution%HmZ * (-solution%Mfact )
+    else
+        
+        !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
+        !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
+        solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
+        solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
+        solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
+    endif
+    
     
     end subroutine updateDemagfield_uniform
     
@@ -505,6 +535,7 @@
     real,dimension(:,:),allocatable :: H            !> The field and the corresponding evaluation point arrays
     integer :: i,j,k,nx,ny,nz,ntot,ind                  !> Internal counters and index variables
     real,dimension(:,:,:,:),allocatable :: Nout         !> Temporary storage for the demag tensor    
+    
    ! integer,dimension(1) :: shp
     
     if ( problem%grid%gridType .eq. gridTypeUniform ) then
@@ -577,9 +608,82 @@
         deallocate(H)
     endif
     
-  
+    
+    
+   !trial. Make a sparse matrix out of the dense matrices by specifying a threshold
+    if ( problem%demag_threshold .gt. 0. ) then
+        call ConvertDenseToSparse( problem%Kxx, problem%K_s(1), problem%demag_threshold)
+        call ConvertDenseToSparse( problem%Kxy, problem%K_s(2), problem%demag_threshold)
+        call ConvertDenseToSparse( problem%Kxz, problem%K_s(3), problem%demag_threshold)
+        call ConvertDenseToSparse( problem%Kyy, problem%K_s(4), problem%demag_threshold)
+        call ConvertDenseToSparse( problem%Kyz, problem%K_s(5), problem%demag_threshold)
+        call ConvertDenseToSparse( problem%Kzz, problem%K_s(6), problem%demag_threshold)
+    endif
+    
     
     end subroutine ComputeDemagfieldTensor
+    
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Converts the dense matrix D (size nx,ny) to a sparse matrix K (size nx,y) )
+    !> @params[in] threshold a number specifying the lower limit of values in D that should be considered non-zero
+    !>-----------------------------------------
+    subroutine ConvertDenseToSparse( D, K, threshold)
+    real,dimension(:,:),intent(in) :: D                 !> Dense input matrix    
+    real,intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
+    type(MagTenseSparse),intent(inout) :: K                           !> Sparse matrix allocation
+    
+    integer :: nx,ny, nnonzero
+    
+    logical,dimension(:,:),allocatable :: mask          !> mask used for finding non-zero values
+    integer,dimension(:),allocatable :: colInds         !> Used for storing the values 1...n used for indexing
+    integer :: i,j,ind,stat
+    
+    nx = size(D(:,1))
+    ny = size(D(1,:))
+    
+    allocate(mask(nx,ny))
+    
+    mask = abs(D) .gt. threshold
+    
+    nnonzero = count( mask )
+    
+    allocate( K%values(nnonzero),K%cols(nnonzero))
+    allocate( K%rows_start(nx), K%rows_end(nx), colInds(ny) )
+    
+    do i=1,ny
+        colInds(i) = i
+    enddo
+    
+    
+    !loop over each row
+    ind = 1
+    do i=1,nx
+        !find all non-zero elements in the i'th row of D
+        !starting index of the i'th row
+        K%rows_start(i) = ind
+        do j=1,ny
+            if ( mask(i,j) .eq. .true. ) then
+                K%values( ind ) = D(i,j)
+                
+                K%cols( ind ) = j
+                
+                ind = ind + 1
+            endif
+        enddo                                        
+        !ending index of the i'th row
+        K%rows_end(i) = ind
+    enddo
+    
+    !make sparse matrix
+    stat = mkl_sparse_d_create_csr ( K%A, SPARSE_INDEX_BASE_ONE, nx, ny, K%rows_start, K%rows_end, K%cols, K%values)
+    
+    !clean up
+    deallocate(colInds)
+    
+    end subroutine ConvertDenseToSparse
     
     
     !>-----------------------------------------
