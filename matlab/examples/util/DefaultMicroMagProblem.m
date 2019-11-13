@@ -47,6 +47,13 @@ properties
     %x-direction
     theta
     phi    
+    
+    %threshold for whether to attempt making the demag tensors sparse
+    % if dem_thres>0 then all values in the demag tensors that are
+    % absolutely below dem_thres are set to exactly 0 and subsequently the
+    % tensors are made into sparse matrices, i.e. if abs(K) < dem_thres
+    % then K = 0
+    dem_thres
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -94,10 +101,10 @@ methods
         obj.K0 = 0; 
 
         %precession constant
-        obj.gamma = 0;
+        obj.gamma = 2.211e5; %m/A*s
 
         %
-        obj.alpha = -65104e-17;
+        obj.alpha = 0.02;
 
         obj.MaxT0 = 2;
         
@@ -106,20 +113,22 @@ methods
         obj.t = linspace(0,1,obj.nt);
 
         if ~exist('HextFct')
-            HextFct = @(t) [1,1,1]./sqrt(3);
+            HextFct = @(t) (t>=0)' * [0,0,0];
         end
         obj = obj.setHextTime( 10 * obj.nt );
-        obj.Hext = HextFct(obj.t);
+        obj = obj.setHext(HextFct);
         
         %initial magnetization (mx = m0(1:n), my = m(n+1:2n), mz = m(2n+1:3n) with
         %n = no. of elements )
-        obj.m0 = zeros(obj.ntot * 3, 1 );
+        obj.m0 = zeros(obj.ntot, 3 );
         %x-direction
         obj.theta = pi * rand(obj.ntot,1);
         obj.phi = 2*pi*rand(obj.ntot,1);
         obj.m0(1:obj.ntot) = sin(obj.theta) .* cos(obj.phi);
         obj.m0(obj.ntot+1:2*obj.ntot) = sin(obj.theta) .* sin(obj.phi);
         obj.m0(2*obj.ntot+1:3*obj.ntot) = cos(obj.theta);
+        %initial value of the demag threshold is zero, i.e. it is not used
+        obj.dem_thres = 0;
     end
     
     %%Calculates the applied field as a function of time on the time grid

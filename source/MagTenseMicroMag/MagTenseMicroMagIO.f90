@@ -25,7 +25,7 @@
         mwPointer :: nGridPtr,LGridPtr,dGridPtr,typeGridPtr, ueaProblemPtr, modeProblemPtr,solverProblemPtr
         mwPointer :: A0ProblemPtr,MsProblemPtr,K0ProblemPtr,gammaProblemPtr,alpha0ProblemPtr,MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr,HextProblemPtr,tProblemPtr
-        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr
+        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr
         integer,dimension(3) :: int_arr
         real,dimension(3) :: real_arr
         
@@ -133,7 +133,10 @@
         sx = ntot * 3
         call mxCopyPtrToReal8(mxGetPr(m0ProblemPtr), problem%m0, sx )
         
-        
+        !Demagnetization threshold value        
+        demThresProblemPtr = mxGetField(prhs,i,problemFields(18))
+        sx = 1
+        call mxCopyPtrToReal8(mxGetPr(demThresProblemPtr), problem%demag_threshold, sx )
             
         !Clean-up 
         deallocate(problemFields)
@@ -216,7 +219,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=17
+        integer,parameter :: nf=18
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -240,6 +243,7 @@
         fieldnames(15) = 'nt'
         fieldnames(16) = 't'
         fieldnames(17) = 'm0'
+        fieldnames(18) = 'dem_thres'
         
         
     end subroutine getProblemFieldnames
