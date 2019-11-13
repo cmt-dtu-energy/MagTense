@@ -2,7 +2,7 @@ function DefaultSetupStruct = DefaultProblemParameters()
     MU0 = pi*4e-7 ; % Vacuum permeability
 
     %% Grid Parameters
-    nHalfTimes = [0,1,2] ;  % from coarsest (1) to finest (K)
+%     nHalfTimes = [0,1,2] ;  % from coarsest (1) to finest (K)
 
     %% "H" : External field parameters
     MaxHx = 0 ; % max x component of external field vector [T]
@@ -82,7 +82,7 @@ function DefaultSetupStruct = DefaultProblemParameters()
     DefaultSetupStruct.HsX = HsX;
     DefaultSetupStruct.HsY = HsY;
     DefaultSetupStruct.HsZ = HsZ;
-    DefaultSetupStruct.nHalfTimes = nHalfTimes;
+%     DefaultSetupStruct.nHalfTimes = nHalfTimes;
     DefaultSetupStruct.InitialState = InitialState;
     DefaultSetupStruct.Lx = Lx;
     DefaultSetupStruct.Ly = Ly;

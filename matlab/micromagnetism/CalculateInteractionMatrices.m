@@ -7,12 +7,11 @@ function InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct)
     end
 
     %% All the one-time calculations:
-    nTimes = 2.*nHalfTimes+1 ;
-    Nprod = cumprod(nTimes,2) ;
-    K = size(nHalfTimes,2) ;
+    Nprod = cumprod(nGrid,2) ;
+    K = size(nGrid,2) ;
 
     % N = Nprod(:,end) ;    %--- Remark: Had to change this code
-    N = Nprod ;
+    N = Nprod ;  
 
     %% Space Grid
     % NN = prod(N) ; % total number of tiles
@@ -20,7 +19,7 @@ function InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct)
     [InteractionMatrices.X,InteractionMatrices.Y,InteractionMatrices.Z] = ndgrid(x,y,z) ; % always ndgrid, never meshgrid. Meshgrid varies y before x.
 
     %% Demag Tensors (approximate method: "Many Ranges")
-    [InteractionMatrices.AvrgMatrix,InteractionMatrices.CopyMatrix,InteractionMatrices.DemagTensor] = CreateManyRangesDemagTensors3D(N,K,nTimes,Nprod,dx,dy,dz) ;
+    [InteractionMatrices.AvrgMatrix,InteractionMatrices.CopyMatrix,InteractionMatrices.DemagTensor] = CreateManyRangesDemagTensors3D(N,K,nGrid,Nprod,dx,dy,dz) ;
     disp('Demag Done') ;
 
     %% Anisotropy Matrix
