@@ -1,6 +1,6 @@
 clear all
 close all
-
+tic
 addpath('../../Mex_files');
 addpath('../util');
 tic
@@ -19,7 +19,7 @@ problem.K0 = 5e5; % anisotropy term
 problem.u_ea(:,3) = -1;
 
 problem.m0(:) = 1/sqrt(3);
-problem.t = linspace(0,1,1000);
+problem.t = linspace(0,1,100);
 problem.Hext = [0,0,0];
 solution = struct();
 %call the solver
