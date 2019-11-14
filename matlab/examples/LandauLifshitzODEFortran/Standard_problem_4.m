@@ -3,8 +3,8 @@ clearvars
 
 figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
 
-addpath('MEX_files');
-addpath('util');
+addpath('../../MEX_files');
+addpath('../util');
 tic
 %test the Fortran implementation of the LL-ODE solver
 %get the default problem
@@ -43,7 +43,7 @@ problem = DefaultMicroMagProblem(36,9,1);
 % problem.alpha = -4.42e3/problem.Ms;
 problem.alpha = -4.42e-6 ;
 problem.gamma = -2.21e-4 ;
-
+problem.dem_thres = 1e-6;
 % problem = problem.setTime( linspace(0,1e15,100) ); % 1e16
 problem = problem.setTime( linspace(0,1,200) ); %
 HystDir = -[-24.6,4.3,0]/1000 ;

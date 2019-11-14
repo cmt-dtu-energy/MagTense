@@ -101,7 +101,7 @@ methods
         obj.K0 = 0; 
 
         %precession constant
-        obj.gamma = 2.211e5; %m/A*s
+        obj.gamma = 0; %m/A*s
 
         %
         obj.alpha = 0.02;
