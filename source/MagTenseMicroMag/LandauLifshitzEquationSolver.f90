@@ -32,10 +32,10 @@
     subroutine SolveLandauLifshitzEquation( prob, sol )    
     type(MicroMagProblem),intent(inout) :: prob     !> The problem data structure
     type(MicroMagSolution),intent(inout) :: sol     !> The solution data structure    
-    integer :: ntot,i,j,k,ind                       !> total no. of tiles
+    integer :: ntot,i,j,k,ind,nt                     !> total no. of tiles
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
-    real,dimension(:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
+    real,dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
     
     !Save internal representation of the problem and the solution
     gb_solution = sol
@@ -59,10 +59,6 @@
     enddo
         
     
-!      open (15, file='file_dmdt_call.txt',   &
-!			status='unknown', access='sequential',	&
-!			form='formatted', position='append',&
-!			action='write' )
 
     
     call displayMatlabMessage( 'Initializing solution' )
@@ -71,28 +67,61 @@
         
     
     !Set the initial values for m (remember that M is organized such that mx = m(1:ntot), my = m(ntot+1:2*ntot), mz = m(2*ntot+1:3*ntot)
-    allocate(gb_solution%t_out(size(gb_problem%t)),gb_solution%M_out(size(gb_problem%t),ntot,3))
+    allocate(gb_solution%t_out(size(gb_problem%t)))
     
     
     call displayMatlabMessage( 'Running solution' )
     !Do the solution
     fct => dmdt_fct
     cb_fct => displayMatlabProgessMessage
-    allocate(M_out(3*ntot,size(gb_solution%t_out)))
-    call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out, cb_fct )
     
-    gb_solution%M_out(:,:,1) = transpose( M_out(1:ntot,:) )
-    gb_solution%M_out(:,:,2) = transpose( M_out((ntot+1):2*ntot,:) )
-    gb_solution%M_out(:,:,3) = transpose( M_out((2*ntot+1):3*ntot,:) )
     
+    if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
+        !Go through a range of applied fields and find the equilibrium solution for each of them
+        !The no. of applied fields to consider
+        nt = size( gb_problem%t ) 
+        
+        !has an extra nt results as this is the total time-dependent solution for each applied field
+        allocate(M_out(3*ntot,nt,nt))   
+        allocate(gb_solution%M_out(size(gb_problem%t),ntot,nt,3))
+        
+        
+        !loop over the range of applied fields
+        do i=1,nt
+            !Applied field
+            gb_solution%HextInd = i
+            
+            call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct )
+            
+            !the initial state of the next solution is the previous solution result
+            gb_problem%m0 = M_out(:,nt,i)
+            
+            gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
+            gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
+            gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
+            
+        enddo
+        
+        
+    else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
+        !Simply do a time evolution as specified in the problem        
+        allocate(M_out(3*ntot,size(gb_problem%t),1))    
+        allocate(gb_solution%M_out(size(gb_problem%t),ntot,1,3))
+        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct )
+    
+        gb_solution%M_out(:,:,1,1) = transpose( M_out(1:ntot,:,1) )
+        gb_solution%M_out(:,:,1,2) = transpose( M_out((ntot+1):2*ntot,:,1) )
+        gb_solution%M_out(:,:,1,3) = transpose( M_out((2*ntot+1):3*ntot,:,1) )
+        
+    endif
     !Clean up
-    deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2,M_out)
+    deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
     
     !Make sure to return the correct state
     sol = gb_solution
     prob = gb_problem
     
-!    close(15)
+
     
     
     end subroutine SolveLandauLifshitzEquation
@@ -113,7 +142,7 @@
     integer :: ntot
     
 
-    !write(15,*) 't'
+    
     
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     if ( .not. allocated(crossX) ) then
@@ -171,17 +200,7 @@
     !dMzdt
     dmdt(2*ntot+1:3*ntot) = gb_problem%gamma * crossZ + alpha(t,gb_problem) * HeffZ2 
     
-    !write(15,*) alpha(t,gb_problem)
-    !write(15,*) gb_problem%gamma
-    !write(15,*) dmdt(1)
-    
-    !Now convert to proper units by multiplying with the volume of each tile thus obtaining the total magnetization for each tile
-    
-    !dmdt(1:ntot) = dmdt(1:ntot) * gb_problem%grid%dV
-    
-    !dmdt(ntot+1:2*ntot) = dmdt(ntot+1:2*ntot) * gb_problem%grid%dV
-    
-    !dmdt(1+2*ntot:3*ntot) = dmdt(1+2*ntot:3*ntot) * gb_problem%grid%dV
+
 
     end subroutine dmdt_fct
     
@@ -196,8 +215,12 @@
     real,intent(in) :: t
     type(MicroMagProblem),intent(in) :: problem
     
-    alpha = problem%alpha0 ! * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
-    
+    if ( problem%MaxT0 .gt. 0 ) then
+        !In this case alpha is allowed to increase as a function of time with a cap given by MaxT0 as specified in the problem
+        alpha = problem%alpha0 * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
+    else
+        alpha = problem%alpha0 ! * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
+    endif
     
     end function alpha
     
@@ -310,7 +333,12 @@
     real,intent(in) :: t                                !> The time
     real :: HextX,HextY,HextZ
     
-    if ( problem%solver .eq. MicroMagSolverExplicit .OR. problem%solver .eq. MicroMagSolverDynamic ) then
+    if ( problem%solver .eq. MicroMagSolverExplicit ) then
+        !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
+        solution%HhX = solution%Hfact * problem%Hext(solution%HextInd,2)
+        solution%HhY = solution%Hfact * problem%Hext(solution%HextInd,3)
+        solution%HhZ = solution%Hfact * problem%Hext(solution%HextInd,4)
+    elseif ( problem%solver .eq. MicroMagSolverDynamic ) then
         
         !Interpolate to get the applied field at time t
         call interp1( problem%Hext(:,1), problem%Hext(:,2), t, size(problem%Hext(:,1)), HextX )

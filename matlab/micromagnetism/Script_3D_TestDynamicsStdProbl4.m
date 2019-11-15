@@ -17,7 +17,7 @@ MySim.Ms = 8.0e5 ;
 MySim.MaxH = 0.1 ;
 MySim.MaxHx = MySim.MaxH*sqrt(3) ;  
 % MySim.nHalfTimes = round([20;5;0]*1);
-MySim.nGrid = round([36;9;1]);
+MySim.nGrid = round([72;18;2]);
 
 % MySim.DemagTensorFileName = 'DemagStdProb4_x109y26z0' ;
 MySim.DemagTensorFileName = nan;
@@ -73,7 +73,10 @@ figure; quiver(InteractionMatrices.X(:),InteractionMatrices.Y(:),SigmaX,SigmaY);
 MySim.alpha = -4.42e-6 ;
 MySim.gamma = -2.21e-4 ;
 
+%field 1
 MySim.Field_dir = -[-24.6,4.3,0]./1000 ;
+%field 2
+MySim.Field_dir = -[-35.5,-6.3,0]/1000 ;
 
 MySim.HsX = @(t) MySim.Field_dir(1) + 0.*t ;
 MySim.HsY = @(t) MySim.Field_dir(2) + 0.*t ;
