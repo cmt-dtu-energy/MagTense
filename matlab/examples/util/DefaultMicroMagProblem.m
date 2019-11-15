@@ -106,7 +106,11 @@ methods
         %
         obj.alpha = 0.02;
 
-        obj.MaxT0 = 2;
+        %if set to zero then the alpha parameter remains constant.
+        %if MaxT0 > 0 then alpha = alpha0 * 10^( 7 * min(t,MaxT0)/MaxT0 )
+        %thus scaling with the solution time. This is used in the explicit
+        %solver for tuning into the correct time scale of the problem
+        obj.MaxT0 = 0;
         
         %solution times
         obj.nt = int32(1000);
