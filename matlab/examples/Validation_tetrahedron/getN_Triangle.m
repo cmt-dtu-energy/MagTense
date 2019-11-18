@@ -2,21 +2,14 @@
 
 function [N,P] = getN_Triangle( v, r )
 %% Calculates and returns the demag tensor, N, given the four vertices,
-<<<<<<< HEAD
-%% v (size 3,4) and at the positions r (size 3,n)) from a triangular face
-=======
 %% v (size 3,4) and at the positions r (size 3,n)) from a triangluar surface
->>>>>>> master
 %% defined by vertices 1-3. The last vertex defines the orientation of the normal to the triangular
 %% surface such that the normal points away from this vertex.
 %% the array v is the four vertices organized as column vectors, 
 %% i.e. v(:,1) is the first vertex etc.
 
-<<<<<<< HEAD
-%test if the three vertices are collinear. If so, return without further
-=======
+
 %test if the three vertices are colinear. If so, return without further
->>>>>>> master
 %calculation
 numErr = 1e-15;
 d1 = norm(v(:,1)-v(:,2));
@@ -46,11 +39,9 @@ e1 = e1/norm(e1);
 e3 = cross( e1, v(:,2)-v(:,3) );
 e3 = e3 / norm(e3);
 
-<<<<<<< HEAD
-%ensure the fourth vertex is not in the triangular plane
-=======
+
 %ensure the fourth vertex is not in the triangluar plane
->>>>>>> master
+
 if abs( dot( (v(:,4)-v(:,1)), e3 ) ) <= numErr 
     disp('Vertices are all in the same plane');
     N = [];
@@ -86,18 +77,16 @@ D = cos(angles(3)) * norm( v(:,2)-v(:,3) ) * e1 + v(:,3);
 vp = zeros(3,3);
 for i=1:3;vp(:,i) = Pinv * ( v(:,i)-D );end
 
-<<<<<<< HEAD
-threshold = 1e-10;
-=======
 
->>>>>>> master
+threshold = 1e-10;
+
 
 %% find the tensor in the local system
 
 %transform the point of interest to the local system
 r_t = Pinv * ( r - D );
 
-<<<<<<< HEAD
+
 for i=1:3
     if abs(r_t(i)) < threshold
         sgn = sign(r_t(i));
@@ -117,34 +106,17 @@ N1_a(1,3) = Nxz( r_t, vp(1,1), vp(2,2) );
 [N1_a(2,3),N1_n(2,3)] = Nyz( r_t, vp(1,1), vp(2,2) );
 
 [N1_a(3,3),N1_n(3,3)] = Nzz( r_t, vp(1,1), vp(2,2) );
-=======
-%right triangle in the first quadrant
-N1_a = zeros(3,3);
-N1_n = N1_a;
-[N1_a(1,3),N1_n(1,3)] = Nxz_right( r_t, vp(1,1), vp(2,2) );
-
-[N1_a(2,3),N1_n(2,3)] = Nyz_right( r_t, vp(1,1), vp(2,2) );
-
-[N1_a(3,3),N1_n(3,3)] = Nzz_right( r_t, vp(1,1), vp(2,2) );
->>>>>>> master
 
 
 %right triangle in the second quadrant
 N2_a = zeros(3,3);
 N2_n = N2_a;
-<<<<<<< HEAD
+
 N2_a(1,3) = -Nxz( r_t, vp(1,3), vp(2,2) );
 
 N2_a(2,3) = -Nyz( r_t, vp(1,3), vp(2,2) );
 
 N2_a(3,3) = -Nzz( r_t, vp(1,3), vp(2,2) );
-=======
-[N2_a(1,3),N2_n(1,3)] = Nxz_left( r_t, vp(1,3), vp(2,2) );
-
-[N2_a(2,3),N2_n(2,3)] = Nyz_left( r_t, vp(1,3), vp(2,2) );
-
-[N2_a(3,3),N2_n(3,3)] = Nzz_left( r_t, vp(1,3), vp(2,2) );
->>>>>>> master
 
 
 %total N in the local coordinate system
@@ -157,7 +129,7 @@ N = P * Na * Pinv;
 
 end
 
-<<<<<<< HEAD
+
 function [N1] = Nxz( r, l, h )
 %% Returns the Nxz tensor component in the local coordinate system
     N1 = -1/(4*pi) .* ( F_Nxz(r,h,l,h) - F_Nxz(r,0,l,h) - ( G_Nxz(r,h) - G_Nxz(r,0) ) );
@@ -165,21 +137,6 @@ function [N1] = Nxz( r, l, h )
     %N2 = N1;%-1/(4*pi) .* numint_xz( r, l, h );
 end
 
-=======
-function [N1,N2] = Nxz_right( r, l, h )
-%% Returns the Nxz tensor component in the local coordinate system
-    N1 = -1/(4*pi) .* ( F_Nxz(r,h,l,h) - F_Nxz(r,0,l,h) - ( G_Nxz(r,h) - G_Nxz(r,0) ) );
-    
-    N2 = N1;%-1/(4*pi) .* numint_xz( r, l, h );
-end
-
-function [N1,N2] = Nxz_left( r, l, h )
-%% Returns the Nxz tensor component in the local coordinate system
-    N1 = -1/(4*pi) .* ( ( G_Nxz(r,h) - G_Nxz(r,0) ) -( F_Nxz(r,h,l,h) - F_Nxz(r,0,l,h) ) );
-    
-    N2 = N1;%1/(4*pi) .* numint_xz( r, l, h );
-end
->>>>>>> master
 
 function val = numint_xz( r, l, h )
         
@@ -206,17 +163,12 @@ end
 function F = F_Nxz( r, yp, l, h )
 %% r is the position vectors, i.e. r(1,:) are the x-values, r(2,:) the y-values and r(3,:) the z-values
 %RUBI solution (Int):
-<<<<<<< HEAD
     arg = (l^2 - l*r(1,:) + h*r(2,:) - h*yp.*(1+l^2/h^2))./...
         ( sqrt(h^2+l^2).*sqrt( l^2 - 2*l*r(1,:) + r(1,:).^2 + r(2,:).^2 - 2*yp.*(l^2-l*r(1,:)+h*r(2,:))/h + yp^2*(1+l^2/h^2) + r(3,:).^2) );
     if abs(arg-1) < 1e-15 
         arg = 1-1e-15;
     end
     F = h / sqrt( h^2 + l^2 ) .* atanh( arg );
-=======
-    F = h / sqrt( h^2 + l^2 ) .* atanh( (l^2 - l*r(1,:) + h*r(2,:) - h*yp.*(1+l^2/h^2))./...
-        ( sqrt(h^2+l^2).*sqrt( l^2 - 2*l*r(1,:) + r(1,:).^2 + r(2,:).^2 - 2*yp.*(l^2-l*r(1,:)+h*r(2,:))/h + yp^2*(1+l^2/h^2) + r(3,:).^2) ) );
->>>>>>> master
 
     %Mathematica solution (Integrate)
 %    F2 = -h/sqrt(h^2+l^2) * log( h*l*r(1,:) + l^2*(yp-h) + h^2*(yp-r(2,:)) + ...
@@ -231,24 +183,13 @@ function G = G_Nxz( r, yp )
     G = atanh( ( r(2,:)-yp )./ (sqrt(r(1,:).^2+(r(2,:)-yp).^2+r(3,:).^2)) );
 end
 
-<<<<<<< HEAD
 function [N1,N2] = Nyz( r, l, h )
-=======
-function [N1,N2] = Nyz_right( r, l, h )
->>>>>>> master
+
    %% returns the Nyz component of the tensor in the local coordinate system
    N1 = -1/(4*pi) * ( K_Nyz(r,l,l,h) - K_Nyz(r,0,l,h) - ( L_Nyz(r,l) - L_Nyz(r,0) ) );
    
    N2 = N1;%-1/(4*pi) * numint_yz( r, l, h );
 end
-<<<<<<< HEAD
-=======
-function [N1,N2] = Nyz_left( r, l, h )
-   %% returns the Nyz component of the tensor in the local coordinate system
-   N1 = -1/(4*pi) * ( K_Nyz(r,0,l,h) - K_Nyz(r,l,l,h) - ( L_Nyz(r,0) - L_Nyz(r,l) ) );
-   N2 = N1;%1/(4*pi) * numint_yz( r, l, h );
-end
->>>>>>> master
 
 function val = numint_yz( r, l, h )
         
@@ -276,23 +217,12 @@ function L = L_Nyz( r, xp )
     L = atanh( (r(1,:) - xp) ./ (sqrt((r(1,:)-xp).^2+r(2,:).^2+r(3,:).^2)) );
 end
 
-<<<<<<< HEAD
 function [N1,N2] = Nzz( r, l, h )
-=======
-function [N1,N2] = Nzz_right( r, l, h )
->>>>>>> master
+
     N1 = -1/(4*pi) .* ( P_Nzz( r, l, l, h ) - P_Nzz( r, 0, l, h ) - ( Q_Nzz(r,l) - Q_Nzz(r,0) ) );
     N2 = N1;%-1/(4*pi) * numint_zz( r, l, h );
 end
-
-<<<<<<< HEAD
-=======
-function [N1,N2] = Nzz_left( r, l, h )
-    N1 = -1/(4*pi) .* ( P_Nzz( r, 0, l, h ) - P_Nzz( r, l, l, h ) - ( Q_Nzz(r,0) - Q_Nzz(r,l) ) );
-    N2 = N1;%1/(4*pi) * numint_zz( r, l, h );
-end
->>>>>>> master
-
+    
 function val = numint_zz( r, l, h )
         
     xmax = @(y) l.*(1-y./h);
