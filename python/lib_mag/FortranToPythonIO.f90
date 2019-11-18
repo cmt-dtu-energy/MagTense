@@ -22,7 +22,7 @@ function dispIte_fct( err, err_max )
 end function dispIte_fct
 
 
-subroutine getNFromTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+subroutine getNFromTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, N )
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
@@ -30,6 +30,9 @@ subroutine getNFromTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_
         
     !::Specific for a rectangular prism
     real(8),dimension(n_tiles,3),intent(in) :: rect_size
+
+    !::Specific for a tetrahedron
+    real(8),dimension(n_tiles,3,4),intent(in) :: vertices
         
     !::Generel variables, shared among all tile types
     real(8),dimension(n_tiles,3),intent(in) :: Mag
@@ -55,7 +58,7 @@ subroutine getNFromTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_
     integer :: i
 
     !::initialise MagTile with specified parameters
-    call loadTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    call loadTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
 
     !::do the calculation
@@ -70,13 +73,15 @@ subroutine getNFromTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_
             call getFieldFromCircPieceInvertedTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
         else if (tiles(i)%tileType .eq. tileTypePrism ) then    
             call getFieldFromRectangularPrismTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+        else if (tiles(i)%tileType .eq. tileTypeTetrahedron ) then    
+            call getFieldFromTetrahedronTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
         endif
     enddo
 
 end subroutine getNFromTiles
 
 
-subroutine getHFromTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+subroutine getHFromTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, N, useProvidedN )
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
@@ -84,6 +89,9 @@ subroutine getHFromTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_
         
     !::Specific for a rectangular prism
     real(8),dimension(n_tiles,3),intent(in) :: rect_size
+
+    !::Specific for a tetrahedron
+    real(8),dimension(n_tiles,3,4),intent(in) :: vertices
         
     !::Generel variables, shared among all tile types
     real(8),dimension(n_tiles,3),intent(in) :: Mag
@@ -113,7 +121,7 @@ subroutine getHFromTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_
     integer :: i
 
     !::initialise MagTile with specified parameters
-    call loadTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    call loadTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
 
     if ( useProvidedN .eqv. .true. ) then
@@ -140,6 +148,9 @@ subroutine getHFromTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_
             case ( tileTypeCircPieceInverted )
                  call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
 
+            case ( tileTypeTetrahedron )
+                 call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
+
             case ( tileTypeEllipsoid )
                 !!@todo add the existing code for spheroids, and correct Ellipsoids to Spheroids
 
@@ -164,7 +175,7 @@ subroutine getHFromTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_
 end subroutine getHFromTiles
 
 
-subroutine IterateTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+subroutine IterateTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, nT, nH, n_stateFcn, data_stateFcn, T, maxErr, nIteMax, Mag_out, Mrel_out )
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
@@ -172,7 +183,10 @@ subroutine IterateTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_o
         
     !::Specific for a rectangular prism
     real(8),dimension(n_tiles,3),intent(in) :: rect_size
-        
+    
+    !::Specific for a tetrahedron
+    real(8),dimension(n_tiles,3,4),intent(in) :: vertices
+
     !::Generel variables, shared among all tile types
     real(8),dimension(n_tiles,3),intent(in) :: Mag
     real(8),dimension(n_tiles,3),intent(out) :: Mag_out
@@ -205,7 +219,7 @@ subroutine IterateTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_o
     disp_fct => dispIte_fct
 
     !::initialise MagTile with specified parameters
-    call loadTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    call loadTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
     
     !::load state function from table
@@ -222,7 +236,7 @@ subroutine IterateTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_o
 end subroutine IterateTiles
 
 
-subroutine runSimulation( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+subroutine runSimulation( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, n_stateFcn, nT, nH, data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out )
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
@@ -230,6 +244,9 @@ subroutine runSimulation( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_
         
     !::Specific for a rectangular prism
     real(8),dimension(n_tiles,3),intent(in) :: rect_size
+
+    !::Specific for a tetrahedron
+    real(8),dimension(n_tiles,3,4),intent(in) :: vertices
         
     !::Generel variables, shared among all tile types
     real(8),dimension(n_tiles,3),intent(in) :: Mag
@@ -273,7 +290,7 @@ subroutine runSimulation( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_
     resumeIteration = 0
 
     !::initialise MagTile with specified parameters
-    call loadTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    call loadTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
 
     !::load state function from table

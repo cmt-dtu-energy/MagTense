@@ -3,6 +3,7 @@ module TileNComponents
     use TileRectanagularPrismTensor
     use TileCircPieceTensor
     use TilePlanarCoilTensor
+    use TileTriangle
     implicit none
     
     !::General base-type for alle the different tile types
@@ -26,6 +27,7 @@ module TileNComponents
         integer :: includeInIteration,exploitSymmetry
         real,dimension(3) :: symmetryOps !! 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
         real :: Mrel !! the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
+        real,dimension(3,4) :: vert !Vertices, used e.g. by a tetrahedron
         
         !::internal variables that are used for averaging the internal field
         integer,dimension(3) :: n_ave
@@ -33,6 +35,8 @@ module TileNComponents
         real,dimension(:,:,:,:),allocatable :: N_ave_pts
         logical :: isIterating
         integer :: fieldEvaluation
+        
+        
     end type MagTile
     
     
@@ -50,7 +54,7 @@ module TileNComponents
       end subroutine N_tensor_subroutine
     end interface
     
-    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeEllipsoid=10,tileTypePlanarCoil=101
+    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeEllipsoid=10,tileTypePlanarCoil=101
     integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2
     integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     
@@ -709,6 +713,27 @@ module TileNComponents
     
     end subroutine
         
+    
+    subroutine getN_tensor_tetrahedron ( tile, r, N )         
+         type(MagTile),intent(in) :: tile
+         real,dimension(3),intent(in) :: r
+         real,dimension(3,3),intent(inout) :: N
+         
+         real,dimension(3,3) :: N_tmp,P
+         integer :: i
+         
+         N(:,:) = 0.
+         
+         !Loop through all the four triangular faces
+         do i=1,4
+            call getN_Triangle( cshift( tile%vert, (i-1), 2 ), r, N_tmp, P )
+            N = N + N_tmp
+         enddo
+         
+         
+      end subroutine getN_tensor_tetrahedron
+    
+    
     subroutine getN_dummy( k )
     integer :: k
     

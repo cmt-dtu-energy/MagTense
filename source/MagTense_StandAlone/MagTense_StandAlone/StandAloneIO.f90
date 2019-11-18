@@ -43,7 +43,7 @@ MODULE StandAlone_IO
         character(len=1000),intent(in) :: file
         integer, intent(in) :: mode
     
-        integer :: n,i
+        integer :: n,i,j
     
         write(*,*) 'Loading tiles',mode
         !! open file as read and allocate array of tiles
@@ -127,6 +127,17 @@ MODULE StandAlone_IO
                 read(11,*) tiles(i)%Mrel
             else
                 write(12,"(F15.7,A)") tiles(i)%Mrel,',   :Mrel'
+            endif   
+            
+            if ( mode .eq. 0 ) then
+                do j=1,4
+                    read(11,*) tiles(i)%vert(:,j)
+                enddo                
+            else
+                do j=1,4
+                    write(12,"(F15.7,A)") tiles(i)%vert(:,j),',   :vert'
+                enddo
+                
             endif   
         
             !<finally, setup the evaluation points
