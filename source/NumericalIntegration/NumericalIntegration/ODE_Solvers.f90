@@ -120,12 +120,12 @@ implicit none
     t_out(1) = t(1)
     y_out(:,1) = ystart
     !Call the integrator
-    do i=2,nt
-        if ( mod(i,n_write) .eq. 0 ) then
-            call callback( 'Running solution', i )
-        endif
-        
+    do i=2,nt                
         call range_integrate( setup_comm, fct, t(i), t_out(i), y_out(:,i), yderiv_out(:,i), flag )
+        
+        if ( mod(i,n_write) .eq. 0 ) then
+            call callback( 'Time', t_out(i) )
+        endif
     enddo
     
     !Clean up

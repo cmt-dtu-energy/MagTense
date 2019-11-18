@@ -322,5 +322,18 @@
         
     end subroutine displayMatlabProgessMessage
     
+    subroutine displayMatlabProgessTime( mess, time  )
+        character(*),intent(in) :: mess
+        real,intent(in) :: time
+        character*(4) :: prog_str   
+                
+            
+        write (prog_str,*) time
+        
+        call displayMatlabMessage( mess )
+        call displayMatlabMessage( prog_str )
+        
+    end subroutine displayMatlabProgessTime
+    
     end module MagTenseMicroMagIO
     
