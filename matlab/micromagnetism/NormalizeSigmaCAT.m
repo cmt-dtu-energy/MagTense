@@ -1,6 +1,6 @@
 function [Sigma] = NormalizeSigmaCAT(Sigma)
 NN = round(numel(Sigma)/3) ;
-% N = round(NN^(1/3)) ;
+
 SigmaX = Sigma(0*NN+[1:NN]) ;
 SigmaY = Sigma(1*NN+[1:NN]) ;
 SigmaZ = Sigma(2*NN+[1:NN]) ;

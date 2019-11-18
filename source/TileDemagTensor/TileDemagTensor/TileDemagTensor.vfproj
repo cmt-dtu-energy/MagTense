@@ -32,7 +32,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" AdditionalIncludeDirectories="../../../NumericalIntegration/NumericalIntegration/x64/release/;" OpenMPConditionalCompilation="false" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" FloatingPointModel="precise"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" AdditionalIncludeDirectories="../../../NumericalIntegration/NumericalIntegration/x64/release/;" OpenMPConditionalCompilation="false" EnableEnhancedInstructionSet="codeArchSSE3" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" FloatingPointModel="precise"/>
 				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="../../Numericalintegration/NumericalIntegration/x64/release/;"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>

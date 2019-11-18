@@ -11,10 +11,7 @@ function Sigma = InitialSigma(ProblemSetupStruct,InteractionMatrices)
     X = InteractionMatrices.X;
     Y = InteractionMatrices.Y;
     Z = InteractionMatrices.Z;
-%     names = fieldnames(InteractionMatrices);
-%     for i=1:length(names)
-%         eval([names{i} '=InteractionMatrices.' names{i} ';']);
-%     end
+
     
 %% Initial Sigma
 if ischar(ProblemSetupStruct.SigmaInitialFileName) 
