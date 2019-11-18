@@ -22,12 +22,12 @@ t = hgtransform;
         mArrow3(p1,p2,tiles(i).rotAngles,1,'color','k','parent',t);
         
         %plot the easy axis as well
-        if tiles(i).tileType == getMagTileType( 'cylinder' ) && tiles(i).magnetType == getMagnetType('hard')
-           un = tiles(i).u_ea;
-           p1 = p0 - dl * un;
-           p2 = p0 + dl * un;
-           mArrow3(p1,p2,tiles(i).rotAngles,1,'color','b');
-        end
+%         if tiles(i).tileType == getMagTileType( 'cylinder' ) && tiles(i).magnetType == getMagnetType('hard')
+%            un = tiles(i).u_ea;
+%            p1 = p0 - dl * un;
+%            p2 = p0 + dl * un;
+%            mArrow3(p1,p2,tiles(i).rotAngles,1,'color','b');
+%         end
         if isfield(tiles(i),'graphRotxAng')
             Rx=makehgtform('xrotate',tiles(i).graphRotxAng);
             t.Matrix=Rx;    
