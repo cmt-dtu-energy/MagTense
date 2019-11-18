@@ -439,13 +439,16 @@
     end subroutine saveMagnetizationDebug
 
 
-    subroutine loadTiles( centerPos, dev_center, rect_size, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles)
+    subroutine loadTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles)
         !::Specific for a cylindrical tile piece
         real(8),dimension(n_tiles,3),intent(in) :: centerPos
         real(8),dimension(n_tiles,3),intent(in) :: dev_center
             
         !::Specific for a rectangular prism
         real(8),dimension(n_tiles,3),intent(in) :: rect_size
+
+        !::Specific for a tetrahedron
+        real(8),dimension(n_tiles,3,4),intent(in) :: vertices
             
         !::Generel variables, shared among all tile types
         real(8),dimension(n_tiles,3),intent(in) :: Mag
@@ -475,6 +478,10 @@
             tiles(i)%a = rect_size(i,1)
             tiles(i)%b = rect_size(i,2)
             tiles(i)%c = rect_size(i,3)
+            tiles(i)%vert(:,1) = vertices(i,:,1)
+            tiles(i)%vert(:,2) = vertices(i,:,2)
+            tiles(i)%vert(:,3) = vertices(i,:,3)
+            tiles(i)%vert(:,4) = vertices(i,:,4)
             tiles(i)%M = Mag(i,:)
             tiles(i)%u_ea = u_ea(i,:)
             tiles(i)%u_oa1 = u_oa1(i,:)

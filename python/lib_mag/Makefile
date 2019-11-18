@@ -54,7 +54,7 @@ PYTHON_MODN = MagTenseSource
 #=======================================================================
 # names (without suffix), f90 sources
 LIBSRC_SOURCES = IntegrationDataTypes quadpack SpecialFunctions TileTensorHelperFunctions \
-TileRectangularPrismTensor TileCircPieceTensor TileCylPieceTensor TilePlanarCoilTensor \
+TileRectangularPrismTensor TileCircPieceTensor TileCylPieceTensor TilePlanarCoilTensor TileTriangle\
 TileNComponents DemagFieldGetSolution spline MagParameters IterateMagnetSolution
 
 # file names
