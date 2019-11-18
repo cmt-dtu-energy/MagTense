@@ -171,6 +171,10 @@ class Tiles():
                 for i,mag_angle in enumerate(mag_angles):
                         self.set_mag_angle_i(mag_angle,i)
 
+        def set_mag_angle_rand(self):
+                for i in range(self.n):
+                        self.set_mag_angle_i([math.pi * rand.random(), 2*math.pi * rand.random()], i)                      
+
         def set_mag_angle_i(self, spherical_angles, i):
                 # polar angle [0, pi], azimuth [0, 2*pi]
                 if isinstance(spherical_angles, int) or isinstance(spherical_angles, float):
