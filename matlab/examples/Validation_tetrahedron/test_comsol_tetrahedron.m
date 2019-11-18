@@ -43,7 +43,7 @@ for kk=1:3
     end
     toc
     %load comsol solution
-    cms_path = 'comsol_tetrahedron/';
+    cms_path = '..\..\..\documentation\examples_FEM_validation\Validation_tetrahedron\';
     H_comsol = load( [cms_path 'Validation_tetrahedron_normH_' char(nms(kk)) '.txt'] );
 
     cla(fig1);
@@ -52,8 +52,8 @@ for kk=1:3
     xlabel(fig1,[ char(nms(kk)) ' position  []']);
     ylabel(fig1,'Field norm [T]');
     outfile = ['comsol_magtense_tetrahedron_comp_dir_ ' char(nms(kk))];
-    print('-dpng',[outfile '.png'] );
-    saveas(fig1,[outfile '.fig']);
+%     print('-dpng',[outfile '.png'] );
+%     saveas(fig1,[outfile '.fig']);
     
     plot(fig2,H_comsol(:,1),H_comsol(:,2),'ko','linewidth',1,'markersize',6);
     plot(fig2,x,sqrt(sum(H.^2,1)),'-','linewidth',2,'color',col_map(kk,:));

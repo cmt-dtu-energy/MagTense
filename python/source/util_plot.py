@@ -18,8 +18,6 @@ def plot_cube(axes, size, offset, rotation, M, color):
     ver_cube = (np.dot(R, ver_cube.T)).T
     ver_cube = ver_cube + offset
 
-    print(ver_cube)
-
     # Define the faces of the unit cubic
     fac = np.array([[0, 1, 2, 3], [3, 2, 4, 5], [5, 6, 7, 4],
                     [0, 1, 7, 6], [5, 6, 0, 3], [1, 2, 4, 7]])
@@ -30,6 +28,23 @@ def plot_cube(axes, size, offset, rotation, M, color):
 
     # Plot vector of magnetization in the center of the cube
     ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(size)/4, pivot='middle', normalize=True)
+
+def plot_tetrahedron(axes, vertices, M, color):
+    ax = axes
+    vert = np.transpose(vertices)
+
+    # Define the faces of the tetrahedron
+    fac = np.array([[0, 1, 2,], [1, 2, 3], [0, 2, 3], [0, 1, 3]])
+    surfaces = vert[fac]
+
+    # plot sides
+    ax.add_collection3d(Poly3DCollection(surfaces, facecolors=color, linewidths=1, edgecolors=color, alpha=.25))
+
+    # Volume of tetrahedron in order to relate the size of the magnetization vector
+    volume = np.linalg.norm(np.dot((vert[0] - vert[3]), np.cross((vert[1] - vert[3]), (vert[2] - vert[3])))) / 6
+
+    # Plot vector of magnetization in the center of the cube
+    ax.quiver(np.mean(vert[:,0]), np.mean(vert[:,1]), np.mean(vert[:,2]), M[0], M[1], M[2], color=color, length=volume*5, pivot='middle', normalize=True)
 
 
 def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color):
@@ -159,7 +174,6 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
 
     # Corner points
     ax.plot(ver_cyl[:,0], ver_cyl[:,1], ver_cyl[:,2], 'ro')
-    print(ver_cyl)
     
     # Define the faces of the cylinder
     fac = np.array([[0, 5, 4, 2], [1, 5, 4, 3]])
@@ -185,9 +199,16 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
             triangle_surfaces[i+(resolution-1)*j] = [seg_curves[j][:,i], ver_cyl[5-j], seg_curves[j][:,i+1]]
     ax.add_collection3d(Poly3DCollection(triangle_surfaces, facecolors=color, linewidths=1, alpha=.25))
 
+    min_side = r*min(abs(math.cos(theta + dtheta/2) - math.cos(theta - dtheta/2)), abs(math.sin(theta + dtheta/2) - math.sin(theta - dtheta/2)))
+
+    if inv:
+        r_M = r + 0.25*min_side
+    else:
+        r_M = r - 0.5*min_side
+
     # Plot vector of magnetization in the center of the cube
-    ax.quiver(offset[0] + (center_pos[0])*math.cos(center_pos[1]), offset[1] + (center_pos[0])*math.sin(center_pos[1]),\
-        offset[2] + center_pos[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(r_center-dr)/2, pivot='middle', normalize=True)
+    ax.quiver(offset[0] + (r_M)*math.cos(center_pos[1]), offset[1] + (r_M)*math.sin(center_pos[1]),\
+        offset[2] + center_pos[2], M[0], M[1], M[2], color=color, length=0.5*min_side, pivot='middle', normalize=True)
 
 
 def get_rotmat(rot):
@@ -318,7 +339,7 @@ def create_plot(tiles, eval_points, H, grid=None):
         # Plotting for MagTense
         else:
             for i in range(tiles.get_n()):
-                # 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 10 = ellipsoid
+                # 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 5 = tetrahedron, 10 = ellipsoid
                 if (tiles.get_tile_type(i) == 1):
                     plot_cylindrical(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
                 elif (tiles.get_tile_type(i) == 2):
@@ -327,6 +348,8 @@ def create_plot(tiles, eval_points, H, grid=None):
                     plot_circpiece(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
                 elif (tiles.get_tile_type(i) == 4):
                     plot_circpiece(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i), inv=True)
+                elif (tiles.get_tile_type(i) == 5):
+                    plot_tetrahedron(ax, tiles.get_vertices(i), tiles.get_M(i), tiles.get_color(i))
                 elif (tiles.get_tile_type(i) == 10):
                     # TODO plot_ellipsoid()
                     pass

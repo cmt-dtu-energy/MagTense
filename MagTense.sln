@@ -36,6 +36,13 @@ Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "LibTester", "source\LibTest
 		{B0835ED5-D7CE-4A15-8EB1-66739151CA32} = {B0835ED5-D7CE-4A15-8EB1-66739151CA32}
 	EndProjectSection
 EndProject
+Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "MagTenseMicroMag", "source\MagTenseMicroMag\MagTenseMicroMag.vfproj", "{5BABA548-4CB8-4DE7-AB76-30503578B7AF}"
+	ProjectSection(ProjectDependencies) = postProject
+		{492B3D0E-197B-4119-9331-4B36E8205074} = {492B3D0E-197B-4119-9331-4B36E8205074}
+		{B0835ED5-D7CE-4A15-8EB1-66739151CA32} = {B0835ED5-D7CE-4A15-8EB1-66739151CA32}
+		{982041ED-A185-4F5C-9926-AD8E0941B6D0} = {982041ED-A185-4F5C-9926-AD8E0941B6D0}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -92,6 +99,14 @@ Global
 		{7752492A-B108-4561-AF62-8020AB157F2D}.Release|x64.Build.0 = Release|x64
 		{7752492A-B108-4561-AF62-8020AB157F2D}.Release|x86.ActiveCfg = Release|Win32
 		{7752492A-B108-4561-AF62-8020AB157F2D}.Release|x86.Build.0 = Release|Win32
+		{5BABA548-4CB8-4DE7-AB76-30503578B7AF}.Debug|x64.ActiveCfg = Debug|x64
+		{5BABA548-4CB8-4DE7-AB76-30503578B7AF}.Debug|x64.Build.0 = Debug|x64
+		{5BABA548-4CB8-4DE7-AB76-30503578B7AF}.Debug|x86.ActiveCfg = Debug|Win32
+		{5BABA548-4CB8-4DE7-AB76-30503578B7AF}.Debug|x86.Build.0 = Debug|Win32
+		{5BABA548-4CB8-4DE7-AB76-30503578B7AF}.Release|x64.ActiveCfg = Release|x64
+		{5BABA548-4CB8-4DE7-AB76-30503578B7AF}.Release|x64.Build.0 = Release|x64
+		{5BABA548-4CB8-4DE7-AB76-30503578B7AF}.Release|x86.ActiveCfg = Release|Win32
+		{5BABA548-4CB8-4DE7-AB76-30503578B7AF}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
