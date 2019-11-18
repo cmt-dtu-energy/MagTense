@@ -35,7 +35,7 @@
     abstract interface
           subroutine callback_fct ( mess, prog )  
              character(*),intent(in) :: mess
-             integer,intent(in) :: prog
+             real,intent(in) :: prog
          
           end subroutine callback_fct
     end interface

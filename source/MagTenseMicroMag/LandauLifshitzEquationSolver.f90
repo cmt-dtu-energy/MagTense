@@ -73,7 +73,7 @@
     call displayMatlabMessage( 'Running solution' )
     !Do the solution
     fct => dmdt_fct
-    cb_fct => displayMatlabProgessMessage
+    cb_fct => displayMatlabProgessTime
     
     
     if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
