@@ -23,6 +23,22 @@
           end subroutine dydt_fct
     end interface
     
+     !---------------------------------------------------------------------------    
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Defines an interface for progress callback to Matlab
+    !> Should return n values
+    !> @param[in] t the time at which the derivative is requested
+    !> @param[in] y array size n holding the y_i values corresponding to the time t
+    !> @param[inout] dydt array size n for the derivatives at the time t
+    !---------------------------------------------------------------------------    
+    abstract interface
+          subroutine callback_fct ( mess, prog )  
+             character(*),intent(in) :: mess
+             integer,intent(in) :: prog
+         
+          end subroutine callback_fct
+    end interface
     
     
     type dataCollectionBase

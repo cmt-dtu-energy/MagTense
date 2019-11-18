@@ -46,13 +46,17 @@ tile.Mrem = 1.2 / mu0;
 %%example. The 1e-6 argument is the maximum relative error (change in
 %%magnetization from one iteration to the next) allowed before convergence
 %%is reached. Finally, 100 reflects the max. no. of allowed iterations
-tile = IterateMagnetization( tile, [], [], 1e-6, 100 );
+tl2 = tile;
+tl2.offset(2) = 0.1;
+tl2.u_ea(2) = -1;
+tiles = [tile,tl2];
+tile = IterateMagnetization( tiles, [], [], 1e-6, 100 );
 
 
 %%Now find the field in a set of points
 %define a range of points spanning the xy plane at z=0
 x = linspace( -0.05,0.05, 20);
-y = linspace( -0.06,0.06, 21);
+y = linspace( -0.06,0.16, 51);
 z = 0.0251;
 
 %use meshgrid to fill out the span
