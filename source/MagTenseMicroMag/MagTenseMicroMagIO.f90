@@ -328,7 +328,7 @@
         character*(4) :: prog_str   
                 
             
-        write (prog_str,*) time
+        write (prog_str,'(F4.2)') time
         
         call displayMatlabMessage( mess )
         call displayMatlabMessage( prog_str )
