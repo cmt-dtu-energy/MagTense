@@ -61,6 +61,8 @@ include 'mkl_spblas.f90'
         
         real :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         
+        integer :: setTimeDisplay                   !> Determines how often the timestep is shown in Matlab
+        
         !Below is stuff that is computed when the solver initializes
         
         type(sparse_matrix_t) :: A_exch         !> Exchange term matrix

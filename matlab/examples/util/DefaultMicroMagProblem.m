@@ -41,6 +41,9 @@ properties
 
     MaxT0
 
+    %Sets how often timestep is displayed from Fortran
+    setTimeDis
+    
     %initial magnetization (mx = m0(1:n), my = m(n+1:2n), mz = m(2n+1:3n) with
     %n = no. of elements )
     m0
@@ -115,6 +118,8 @@ methods
         %solution times
         obj.nt = int32(1000);
         obj.t = linspace(0,1,obj.nt);
+        
+        obj.setTimeDis = int32(10);
 
         if ~exist('HextFct')
             HextFct = @(t) (t>=0)' * [0,0,0];
