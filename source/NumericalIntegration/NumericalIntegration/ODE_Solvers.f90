@@ -124,7 +124,7 @@ implicit none
         call range_integrate( setup_comm, fct, t(i), t_out(i), y_out(:,i), yderiv_out(:,i), flag )
         
         if ( mod(i,n_write) .eq. 0 ) then
-            call callback( 'Time', t_out(i) )
+            call callback( 'Time', i )
         endif
     enddo
     

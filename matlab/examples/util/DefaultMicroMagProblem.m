@@ -91,7 +91,7 @@ methods
         %new or old problem
         obj.ProblemMod = getMicroMagProblemMode( 'new' );
         %solver type ('Explicit', 'Implicit' or 'Dynamic')
-        obj.solver = getMicroMagSolver( 'Explicit' );
+        obj.solver = getMicroMagSolver( 'Dynamic' );
 
         % Exchange term constant
         obj.A0 = 1.3e-11;
