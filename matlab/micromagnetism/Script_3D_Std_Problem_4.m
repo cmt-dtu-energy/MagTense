@@ -1,4 +1,4 @@
-function Script_3D_TestDynamicsStdProbl4(fig1,MySim)
+function Script_3D_Std_Problem_4(fig1,MySim)
 disp('Running Matlab model')
 
 if (~exist('fig1','var'))

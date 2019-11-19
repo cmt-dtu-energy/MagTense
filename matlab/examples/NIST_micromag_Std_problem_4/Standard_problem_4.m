@@ -82,7 +82,7 @@ addpath('..\..\micromagnetism')
 tic
 Matlab_model_params.nGrid = resolution';
 Matlab_model_params.Field_dir = HystDir;
-Script_3D_TestDynamicsStdProbl4(fig1,Matlab_model_params);
+Script_3D_Std_Problem_4(fig1,Matlab_model_params);
 toc
 
 %% Compare with published solutions available from NIST webpage
