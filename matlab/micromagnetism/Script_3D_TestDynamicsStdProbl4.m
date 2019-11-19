@@ -1,4 +1,4 @@
-function Script_3D_TestDynamicsStdProbl4(fig1)
+function Script_3D_TestDynamicsStdProbl4(fig1,MySim)
 disp('Running Matlab model')
 
 if (~exist('fig1','var'))
@@ -6,10 +6,11 @@ if (~exist('fig1','var'))
 end
 
 %% Calculates dynamic solution to mumag std prob 4
-clearvars -except fig1
+clearvars -except fig1 MySim
 
 %% Create Preset
-a = memory
+% a = memory
+MySim.SaveTheResult = 0;
 MySim.K0 = 0 ;
 MySim.Kz = 0 ;
 MySim.A0 = 1.3e-11 ;
@@ -17,7 +18,7 @@ MySim.Ms = 8.0e5 ;
 MySim.MaxH = 0.1 ;
 MySim.MaxHx = MySim.MaxH*sqrt(3) ;  
 % MySim.nHalfTimes = round([20;5;0]*1);
-MySim.nGrid = round([72;18;2]);
+% MySim.nGrid = round([36;9;1]);
 
 % MySim.DemagTensorFileName = 'DemagStdProb4_x109y26z0' ;
 MySim.DemagTensorFileName = nan;
@@ -28,8 +29,9 @@ MySim.Ly = 125e-9 ;
 MySim.Lz = 3e-9 ; 
 
 %% Get initial state
-MySim.MaxT = 1 ; MySim.MaxT = 1e3 ; %% HERE !!!!!
-MaxT0 = 2 ;
+% MySim.MaxT = 1 ; 
+MySim.MaxT = 1e3 ; %% HERE !!!!!
+% MaxT0 = 2 ;
 % MySim.alpha = @(t) -65104e-17*(10.^(7*min(t,MaxT0)/MaxT0)); 
 MySim.alpha = -4.42e-6;
 MySim.tt = 0 ;
@@ -73,10 +75,11 @@ figure; quiver(InteractionMatrices.X(:),InteractionMatrices.Y(:),SigmaX,SigmaY);
 MySim.alpha = -4.42e-6 ;
 MySim.gamma = -2.21e-4 ;
 
-%field 1
-MySim.Field_dir = -[-24.6,4.3,0]./1000 ;
-%field 2
-MySim.Field_dir = -[-35.5,-6.3,0]/1000 ;
+    %field 1
+%     MySim.Field_dir = -[-24.6,4.3,0]./1000 ;
+    %field 2
+%     MySim.Field_dir = -[-35.5,-6.3,0]/1000 ;
+
 
 MySim.HsX = @(t) MySim.Field_dir(1) + 0.*t ;
 MySim.HsY = @(t) MySim.Field_dir(2) + 0.*t ;
@@ -115,16 +118,5 @@ end
 plot(fig1, MySim.t,Mx,'ro')
 plot(fig1, MySim.t,My,'go')
 plot(fig1, MySim.t,Mz,'bo')
-ylabel('<M_i>/M_s')
-xlabel('Time [ns]')
-
-%-- Compare with published solutions
-data = load('FIELD_1_SM_DT25.txt');
-% data2 = load('MicroMagus_TimeDep_AllMagnProj_Field2.txt');
-plot(fig1,data(:,1),data(:,2),'r-');
-plot(fig1,data(:,1),data(:,3),'g-');
-plot(fig1,data(:,1),data(:,4),'b-');
-
-xlim(fig1,[0 1])
 
 end
