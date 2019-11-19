@@ -47,10 +47,8 @@
           call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input two should be a struct')
       endif
       
-      
       !Load the problem from Matlab into Fortran
       call loadMicroMagProblem( prhs(1), problem )
-           
             
       !Call the ODE solver
       call SolveLandauLifshitzEquation( problem, solution )    

@@ -1,5 +1,4 @@
 #include "fintrf.h"  
-#include 'mkl_spblas.f90'
 
     module LLODE_Debug
     use MKL_SPBLAS

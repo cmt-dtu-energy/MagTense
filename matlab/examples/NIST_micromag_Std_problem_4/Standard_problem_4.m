@@ -26,6 +26,7 @@ problem.m0(:) = 1/sqrt(3);
 
 %time grid on which to solve the problem
 problem = problem.setTime( linspace(0,100,200) );
+problem.setTimeDis = int32(10);
 HystDir = -[1,1,1] ;
 
 %time-dependent applied field
@@ -50,6 +51,7 @@ problem.alpha = -4.42e-6 ;
 problem.gamma = -2.21e-4 ;
 problem.dem_thres = 1e-6;
 problem = problem.setTime( linspace(0,1,200) ); %
+problem.setTimeDis = int32(10);
 
 if (NIST_field == 1)
     %field 1

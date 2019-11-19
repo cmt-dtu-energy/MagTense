@@ -25,7 +25,7 @@
         mwPointer :: nGridPtr,LGridPtr,dGridPtr,typeGridPtr, ueaProblemPtr, modeProblemPtr,solverProblemPtr
         mwPointer :: A0ProblemPtr,MsProblemPtr,K0ProblemPtr,gammaProblemPtr,alpha0ProblemPtr,MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr,HextProblemPtr,tProblemPtr
-        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr
+        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr, setTimeDisplayProblemPtr
         integer,dimension(3) :: int_arr
         real,dimension(3) :: real_arr
         
@@ -58,7 +58,7 @@
         call mxCopyPtrToInteger4(mxGetPr(typeGridPtr), problem%grid%gridType, sx )
         
         
-        !Finished loading the grid------------------------------------------
+        !Finished loading the grid-----------------------------------------
         
         !Start loading the problem
         !Allocate memory for the easy axis vectors
@@ -124,20 +124,23 @@
         sx = nt
         call mxCopyPtrToReal8(mxGetPr(tProblemPtr), problem%t, sx )
         
-        
-        
-        
         !Initial magnetization
         allocate( problem%m0(3*ntot) )
-        m0ProblemPtr = mxGetField(prhs,i,problemFields(17))
+        m0ProblemPtr = mxGetField(prhs,i,problemFields(17) )
         sx = ntot * 3
         call mxCopyPtrToReal8(mxGetPr(m0ProblemPtr), problem%m0, sx )
         
         !Demagnetization threshold value        
-        demThresProblemPtr = mxGetField(prhs,i,problemFields(18))
+        demThresProblemPtr = mxGetField(prhs,i,problemFields(18) )
         sx = 1
         call mxCopyPtrToReal8(mxGetPr(demThresProblemPtr), problem%demag_threshold, sx )
-            
+    
+        !Set how often to display the timestep in Matlab
+        sx = 1
+        setTimeDisplayProblemPtr = mxGetField( prhs, i, problemFields(19) )
+        call mxCopyPtrToInteger4(mxGetPr(setTimeDisplayProblemPtr), problem%setTimeDisplay, sx )
+    
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -220,7 +223,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=18
+        integer,parameter :: nf=19
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -231,7 +234,7 @@
         fieldnames(2) = 'grid_L'
         fieldnames(3) = 'grid_type'
         fieldnames(4) = 'u_ea'
-        fieldnames(5) = 'ProblemMode'
+        fieldnames(5) = 'ProblemMod'
         fieldnames(6) = 'solver'
         fieldnames(7) = 'A0'
         fieldnames(8) = 'Ms'
@@ -245,6 +248,7 @@
         fieldnames(16) = 't'
         fieldnames(17) = 'm0'
         fieldnames(18) = 'dem_thres'
+        fieldnames(19) = 'setTimeDis'
         
         
     end subroutine getProblemFieldnames
