@@ -11,12 +11,14 @@ clearvars -except fig1 MySim
 %% Setup problem
 MySim.SaveTheResult = 0;
 
+mu0 = 4*pi*1e-7;
+
 MySim.K0 = 0 ;
 MySim.Kz = 1 ;
 % MySim.A0 = 6.98131700798e-10 ;
 MySim.A0 = 1.74532925199e-10;
 MySim.Ms = 1000e3 ;
-MySim.MaxH = 0.1 ;
+MySim.MaxH = 1/mu0*0.1 ;
 MySim.MaxHx = MySim.MaxH*sqrt(3) ;  
 MySim.nGrid = [20;4;1] ;
 
@@ -24,9 +26,9 @@ MySim.Lx = 5e-6 ;
 MySim.Ly = 1e-6 ;
 MySim.Lz = 1e-7 ; 
 MySim.FreqH = pi/2 ;
- MySim.MaxT = 5 ;
-MySim.MaxT0 = 2 ;
-MySim.alpha = @(t) -10000e-10*(10.^(5*min(t,MySim.MaxT0)/MySim.MaxT0));
+MySim.MaxT = 5e-9 ;
+MySim.MaxT0 = 2e-9 ;
+MySim.alpha = @(t) 1e3*(10.^(5*min(t,MySim.MaxT0)/MySim.MaxT0));
 
 MySim.HystDir = [1,1,1]./sqrt(3) ;
 
@@ -39,7 +41,7 @@ MySim.HsY = @(t) MySim.HystDir(2).*t ;
 MySim.HsZ = @(t) MySim.HystDir(3).*t ;
     
 
-MySim.t = linspace(-MySim.MaxH,0.159*MySim.MaxH,101);
+MySim.t = linspace(MySim.MaxH,-0.159*MySim.MaxH,101);
 
 MySim.SigmaXfun = @(X,Y,Z) 1/sqrt(3)+0.*X ;
 MySim.SigmaYfun = @(X,Y,Z) 1/sqrt(3)+0.*Y ;
@@ -69,17 +71,17 @@ for k=1:size(SigmaSol,1)
     Mz(k) = mean(SigmaZ./SigmaN) ;
     Mk(k) = Mx(k)*MySim.HystDir(1) + My(k)*MySim.HystDir(2) + Mz(k)*MySim.HystDir(3) ;
 end
-plot(fig1,-MySim.t,Mk,'ok') %Minus signs added to correspond to regular hysteresis plots.
+plot(fig1,mu0*MySim.t,Mk,'ro') %Minus signs added to correspond to regular hysteresis plots.
 
 
 %% The explicit solver
 MySim.UseImplicitSolver = 0;
 MySim.UseExplicitSolver = 1;
 
-MySim.MaxT = 2 ;
-MySim.HsX = @(t) MySim.HystDir(1).*(-MySim.MaxH +t.*(2*MySim.MaxH./MySim.MaxT)) ;
-MySim.HsY = @(t) MySim.HystDir(2).*(-MySim.MaxH +t.*(2*MySim.MaxH./MySim.MaxT)) ;
-MySim.HsZ = @(t) MySim.HystDir(3).*(-MySim.MaxH +t.*(2*MySim.MaxH./MySim.MaxT)) ;
+MySim.MaxT = 2e-9 ;
+MySim.HsX = @(t) MySim.HystDir(1).*(MySim.MaxH -t.*(2*MySim.MaxH./MySim.MaxT)) ;
+MySim.HsY = @(t) MySim.HystDir(2).*(MySim.MaxH -t.*(2*MySim.MaxH./MySim.MaxT)) ;
+MySim.HsZ = @(t) MySim.HystDir(3).*(MySim.MaxH -t.*(2*MySim.MaxH./MySim.MaxT)) ;
 MySim.tt = linspace(0,1,26).*MySim.MaxT ;
 
 MySim.CalcEigenvalue = 1 ;
@@ -97,8 +99,5 @@ for k=1:size(SigmaSol2,1)
     Mz2(k) = mean(SigmaZ) ;
     Mk2(k) = Mx2(k)*MySim.HystDir(1) + My2(k)*MySim.HystDir(2) + Mz2(k)*MySim.HystDir(3) ;
 end
-plot(fig1,-linspace(-MySim.MaxH,MySim.MaxH,numel(Mx2)),Mk2,'.-r')
-legend('"Implicit method"', 'Explicit method','Location','SouthEast')
-ylabel('M')
-xlabel('H_{applied} [T]')
+plot(fig1,mu0*linspace(MySim.MaxH,-MySim.MaxH,numel(Mx2)),Mk2,'r.-')
 end

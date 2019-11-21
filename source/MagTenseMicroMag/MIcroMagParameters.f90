@@ -94,7 +94,7 @@ include 'mkl_spblas.f90'
         
         real,dimension(:,:),allocatable :: pts          !> n,3 array with the points (x,y,z) of the centers of the tiles
         
-        real :: Jfact,Hfact,Mfact,Kfact                 !> Constant factors used for the determination of the effective fields
+        real :: Jfact,Mfact,Kfact                 !> Constant factors used for the determination of the effective fields
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
     end type MicroMagSolution
