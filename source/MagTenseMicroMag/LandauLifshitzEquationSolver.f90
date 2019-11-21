@@ -194,11 +194,11 @@
     
     !Compute the time derivative of m
     !dMxdt
-    dmdt(1:ntot) = gb_problem%gamma * crossX + alpha(t,gb_problem) * HeffX2 
+    dmdt(1:ntot) = -gb_problem%gamma * crossX - alpha(t,gb_problem) * HeffX2 
     !dMydt
-    dmdt(ntot+1:2*ntot) = gb_problem%gamma * crossY + alpha(t,gb_problem) * HeffY2 
+    dmdt(ntot+1:2*ntot) = -gb_problem%gamma * crossY - alpha(t,gb_problem) * HeffY2 
     !dMzdt
-    dmdt(2*ntot+1:3*ntot) = gb_problem%gamma * crossZ + alpha(t,gb_problem) * HeffZ2 
+    dmdt(2*ntot+1:3*ntot) = -gb_problem%gamma * crossZ - alpha(t,gb_problem) * HeffZ2 
     
 
 
@@ -275,7 +275,7 @@
     !"J" : exchange term
     solution%Jfact = problem%A0 / ( mu0 * problem%Ms )
     !"H" : external field term (b.c. user input is in Tesla)
-    solution%Hfact = 1./mu0
+    !solution%Hfact = 1./mu0
     !"M" : demagnetization term
     solution%Mfact = problem%Ms
     !"K" : anisotropy term
@@ -297,7 +297,7 @@
     
     integer :: stat
     type(MATRIX_DESCR) :: descr
-    real :: alpha
+    real :: prefact
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -305,17 +305,17 @@
     
     
     
-    alpha = -2 * solution%Jfact
+    prefact = -2 * solution%Jfact
     
-    !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
-    !y = alpha * (A_exch * Mx )
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, 0., solution%HjX )
+    !Effective field in the X-direction. Note that the scalar prefact is multiplied on from the left, such that
+    !y = prefact * (A_exch * Mx )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, prefact, problem%A_exch, descr, solution%Mx, 0., solution%HjX )
     
     !Effective field in the Y-direction
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, 0., solution%HjY )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, prefact, problem%A_exch, descr, solution%My, 0., solution%HjY )
     
     !Effective field in the Z-direction
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, 0., solution%HjZ )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, prefact, problem%A_exch, descr, solution%Mz, 0., solution%HjZ )
     
     end subroutine updateExchangeTerms
     
@@ -335,9 +335,9 @@
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
         !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
-        solution%HhX = solution%Hfact * problem%Hext(solution%HextInd,2)
-        solution%HhY = solution%Hfact * problem%Hext(solution%HextInd,3)
-        solution%HhZ = solution%Hfact * problem%Hext(solution%HextInd,4)
+        solution%HhX = -problem%Hext(solution%HextInd,2)
+        solution%HhY = -problem%Hext(solution%HextInd,3)
+        solution%HhZ = -problem%Hext(solution%HextInd,4)
     elseif ( problem%solver .eq. MicroMagSolverDynamic ) then
         
         !Interpolate to get the applied field at time t
@@ -345,9 +345,9 @@
         call interp1( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
         call interp1( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
         
-        solution%HhX = solution%Hfact * HextX
-        solution%HhY = solution%Hfact * HextY
-        solution%HhZ = solution%Hfact * HextZ
+        solution%HhX = -HextX
+        solution%HhY = -HextY
+        solution%HhZ = -HextZ
         
         
     elseif ( problem%solver .eq. MicroMagSolverImplicit ) then
@@ -368,7 +368,7 @@
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     
-    real :: alpha                                       !> Multiplicative scalar factor
+    real :: prefact                                       !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
     
     
@@ -377,12 +377,12 @@
     descr%diag = SPARSE_DIAG_NON_UNIT
     
     
-    alpha = -2.*solution%Kfact
+    prefact = -2.*solution%Kfact
     
     !Notice that the anisotropy matrix is symmetric and so Axy = Ayx etc.
-    solution%Hkx = alpha * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-    solution%Hky = alpha * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-    solution%Hkz = alpha * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
+    solution%Hkx = prefact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
+    solution%Hky = prefact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
+    solution%Hkz = prefact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
     
 
     

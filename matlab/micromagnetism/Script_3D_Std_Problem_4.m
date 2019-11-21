@@ -15,8 +15,8 @@ MySim.K0 = 0 ;
 MySim.Kz = 0 ;
 MySim.A0 = 1.3e-11 ;
 MySim.Ms = 8.0e5 ;
-MySim.MaxH = 0.1 ;
-MySim.MaxHx = MySim.MaxH*sqrt(3) ;  
+% MySim.MaxH = 0.1 ;
+% MySim.MaxHx = MySim.MaxH*sqrt(3) ;  
 % MySim.nHalfTimes = round([20;5;0]*1);
 % MySim.nGrid = round([36;9;1]);
 
@@ -29,11 +29,10 @@ MySim.Ly = 125e-9 ;
 MySim.Lz = 3e-9 ; 
 
 %% Get initial state
-% MySim.MaxT = 1 ; 
-MySim.MaxT = 1e3 ; %% HERE !!!!!
+MySim.MaxT = 1e-6;
 % MaxT0 = 2 ;
 % MySim.alpha = @(t) -65104e-17*(10.^(7*min(t,MaxT0)/MaxT0)); 
-MySim.alpha = -4.42e-6;
+MySim.alpha = 4.42e3;
 MySim.tt = 0 ;
 
 MySim.InitialState = 'OldSol' ;
@@ -72,8 +71,8 @@ end
 figure; quiver(InteractionMatrices.X(:),InteractionMatrices.Y(:),SigmaX,SigmaY); axis equal;  title('Starting state - Matlab')
 
 %% Perform dynamic calculation with first field
-MySim.alpha = -4.42e-6 ;
-MySim.gamma = -2.21e-4 ;
+MySim.alpha = 4.42e3 ;
+MySim.gamma = 2.21e5 ;
 
     %field 1
 %     MySim.Field_dir = -[-24.6,4.3,0]./1000 ;
@@ -85,7 +84,7 @@ MySim.HsX = @(t) MySim.Field_dir(1) + 0.*t ;
 MySim.HsY = @(t) MySim.Field_dir(2) + 0.*t ;
 MySim.HsZ = @(t) MySim.Field_dir(3) + 0.*t ;
     
-MySim.t = linspace(0,1,200);    % 1 ns for now, ~3 ns for proper solution
+MySim.t = linspace(0,1e-9,200);    % 1 ns for now, ~3 ns for proper solution
 
 MySim.InitialState = 'OldSol' ;
 MySim.SigmaIN = SigmaInit(end,:) ;
