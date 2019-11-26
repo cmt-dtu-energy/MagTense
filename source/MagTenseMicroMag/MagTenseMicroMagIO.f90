@@ -159,7 +159,7 @@
         integer :: ComplexFlag,classid,mxClassIDFromClassName
         mwSize,dimension(1) :: dims
         mwSize :: s1,s2,sx,ndim
-        mwSize,dimension(3) :: dims_4
+        mwSize,dimension(4) :: dims_4
         mwPointer :: pt,pm,pp
         mwPointer :: mxCreateStructArray, mxCreateDoubleMatrix,mxGetPr,mxCreateNumericMatrix,mxCreateNumericArray
         mwIndex :: ind
