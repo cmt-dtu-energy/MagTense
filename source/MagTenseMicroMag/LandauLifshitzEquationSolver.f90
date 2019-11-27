@@ -1,7 +1,9 @@
+!#include "blas.f90"
     module LandauLifshitzSolution
     use ODE_Solvers
     use integrationDataTypes
     use MKL_SPBLAS
+    !use BLAS95
     use MicroMagParameters
     use MagTenseMicroMagIO
     use LLODE_Debug
@@ -15,9 +17,9 @@
     type(MicroMagSolution) :: gb_solution
     type(MicroMagProblem) :: gb_problem
     
-    real,dimension(:),allocatable :: crossX,crossY,crossZ   !>Cross product terms
-    real,dimension(:),allocatable :: HeffX,HeffY,HeffZ      !>Effective fields
-    real,dimension(:),allocatable :: HeffX2,HeffY2,HeffZ2      !>Effective fields
+    real(DP),dimension(:),allocatable :: crossX,crossY,crossZ   !>Cross product terms
+    real(DP),dimension(:),allocatable :: HeffX,HeffY,HeffZ      !>Effective fields
+    real(DP),dimension(:),allocatable :: HeffX2,HeffY2,HeffZ2      !>Effective fields
     
     private :: gb_solution,gb_problem,crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2
     
@@ -35,7 +37,13 @@
     integer :: ntot,i,j,k,ind,nt                     !> total no. of tiles
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
-    real,dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
+    real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
+    
+    integer :: val
+    val = 0
+    call displayMatlabProgessMessage( 'before', val )
+    call hello(val)
+    call displayMatlabProgessMessage( 'after', val )
     
     !Save internal representation of the problem and the solution
     gb_solution = sol
@@ -136,9 +144,9 @@
     !> @param[inout] dmdt array size n for the derivatives at the time t
     !---------------------------------------------------------------------------    
     subroutine dmdt_fct ( t, m, dmdt )  
-    real,intent(in) :: t
-    real,dimension(:),intent(in) :: m
-    real,dimension(:),intent(inout) :: dmdt
+    real(DP),intent(in) :: t
+    real(DP),dimension(:),intent(in) :: m
+    real(DP),dimension(:),intent(inout) :: dmdt
     integer :: ntot
     
 
@@ -211,8 +219,8 @@
     !> @param[in] t the time at which to evaluate alpha
     !> @param[in] problem the problem on which the solution is solved
     function alpha( t, problem )
-    real :: alpha
-    real,intent(in) :: t
+    real(DP) :: alpha
+    real(DP),intent(in) :: t
     type(MicroMagProblem),intent(in) :: problem
     
     if ( problem%MaxT0 .gt. 0 ) then
@@ -297,7 +305,7 @@
     
     integer :: stat
     type(MATRIX_DESCR) :: descr
-    real :: alpha
+    real(DP) :: alpha
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -309,13 +317,13 @@
     
     !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
     !y = alpha * (A_exch * Mx )
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, 0., solution%HjX )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, 0.d0, solution%HjX )
     
     !Effective field in the Y-direction
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, 0., solution%HjY )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, 0.d0, solution%HjY )
     
     !Effective field in the Z-direction
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, 0., solution%HjZ )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, 0.d0, solution%HjZ )
     
     end subroutine updateExchangeTerms
     
@@ -330,8 +338,8 @@
     subroutine updateExternalField( problem, solution, t )
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
-    real,intent(in) :: t                                !> The time
-    real :: HextX,HextY,HextZ
+    real(DP),intent(in) :: t                                !> The time
+    real(DP) :: HextX,HextY,HextZ
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
         !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
@@ -368,7 +376,7 @@
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     
-    real :: alpha                                       !> Multiplicative scalar factor
+    real(DP) :: alpha                                       !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
     
     
@@ -425,21 +433,21 @@
         descr%mode = SPARSE_FILL_MODE_FULL
         descr%diag = SPARSE_DIAG_NON_UNIT
         !Do the matrix multiplications using sparse matrices        
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(1)%A, descr, solution%Mx, 0., solution%HmX )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(2)%A, descr, solution%My, 1., solution%HmX )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(3)%A, descr, solution%Mz, 1., solution%HmX )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(1)%A, descr, solution%Mx, 0.d0, solution%HmX )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(2)%A, descr, solution%My, 1.d0, solution%HmX )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(3)%A, descr, solution%Mz, 1.d0, solution%HmX )
         
         solution%HmX = solution%HmX * (-solution%Mfact )
         
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(2)%A, descr, solution%Mx, 0., solution%HmY )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(4)%A, descr, solution%My, 1., solution%HmY )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(5)%A, descr, solution%Mz, 1., solution%HmY )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(2)%A, descr, solution%Mx, 0.d0, solution%HmY )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(4)%A, descr, solution%My, 1.d0, solution%HmY )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(5)%A, descr, solution%Mz, 1.d0, solution%HmY )
         
         solution%HmY = solution%HmY * (-solution%Mfact )
         
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(3)%A, descr, solution%Mx, 0., solution%HmZ )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(5)%A, descr, solution%My, 1., solution%HmZ )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(6)%A, descr, solution%Mz, 1., solution%HmZ )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(3)%A, descr, solution%Mx, 0.d0, solution%HmZ )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(5)%A, descr, solution%My, 1.d0, solution%HmZ )
+        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(6)%A, descr, solution%Mz, 1.d0, solution%HmZ )
         
         solution%HmZ = solution%HmZ * (-solution%Mfact )
     else
@@ -449,6 +457,19 @@
         solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
         solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
         solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
+        
+        !call dgemm( problem%Kxx, solution%Mx, solution%HmX, 'N', 'N', -solution%Mfact )
+        !call dgemm( problem%Kxy, solution%My, solution%HmX, 'N', 'N', -solution%Mfact, 1.d0 )
+        !call dgemm( problem%Kxz, solution%Mz, solution%HmX, 'N', 'N', -solution%Mfact, 1.d0 )
+        !
+        !call dgemm( problem%Kxy, solution%Mx, solution%HmY, 'N', 'N', -solution%Mfact )
+        !call dgemm( problem%Kyy, solution%My, solution%HmY, 'N', 'N', -solution%Mfact, 1.d0 )
+        !call dgemm( problem%Kyz, solution%Mz, solution%HmY, 'N', 'N', -solution%Mfact, 1.d0 )
+        !
+        !call dgemm( problem%Kxz, solution%Mx, solution%HmZ, 'N', 'N', -solution%Mfact )
+        !call dgemm( problem%Kyz, solution%My, solution%HmZ, 'N', 'N', -solution%Mfact, 1.d0 )
+        !call dgemm( problem%Kzz, solution%Mz, solution%HmZ, 'N', 'N', -solution%Mfact, 1.d0 )
+        
     endif
     
     
@@ -560,9 +581,9 @@
     type(MicroMagProblem),intent(inout) :: problem      !> Grid data structure    
     
     type(MagTile),dimension(1) :: tile                  !> Tile representing the current tile under consideration
-    real,dimension(:,:),allocatable :: H            !> The field and the corresponding evaluation point arrays
+    real(DP),dimension(:,:),allocatable :: H            !> The field and the corresponding evaluation point arrays
     integer :: i,j,k,nx,ny,nz,ntot,ind                  !> Internal counters and index variables
-    real,dimension(:,:,:,:),allocatable :: Nout         !> Temporary storage for the demag tensor    
+    real(DP),dimension(:,:,:,:),allocatable :: Nout         !> Temporary storage for the demag tensor    
     
    ! integer,dimension(1) :: shp
     
@@ -659,8 +680,8 @@
     !> @params[in] threshold a number specifying the lower limit of values in D that should be considered non-zero
     !>-----------------------------------------
     subroutine ConvertDenseToSparse( D, K, threshold)
-    real,dimension(:,:),intent(in) :: D                 !> Dense input matrix    
-    real,intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
+    real(DP),dimension(:,:),intent(in) :: D                 !> Dense input matrix    
+    real(DP),intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
     type(MagTenseSparse),intent(inout) :: K                           !> Sparse matrix allocation
     
     integer :: nx,ny, nnonzero
@@ -1042,7 +1063,7 @@
     !call writeSparseMatrixToDisk( tmp, nx*ny*nz, 'A_exch.dat' )
     
     if ( nz .gt. 1 ) then    
-        stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, 1., tmp, A)
+        stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, 1.d0, tmp, A)
         !clean up        
         deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
         stat = mkl_sparse_destroy (d2dz2%A)
