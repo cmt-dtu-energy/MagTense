@@ -11,7 +11,7 @@ tic
 %takes the size of the grid as arguments (nx,ny,nz) and a function handle
 %that produces the desired field (if not present zero applied field is
 %inferred)
-problem = DefaultMicroMagProblem(72,18,2);
+problem = DefaultMicroMagProblem(36,9,1);
 
 problem.alpha = -4.42e-6;
 problem.gamma = 0;
@@ -39,7 +39,7 @@ solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
 
 %setup problem for the time-dependent solver
 
-problem = DefaultMicroMagProblem(72,18,2);
+problem = DefaultMicroMagProblem(36,9,1);
 % problem.gamma = -2.21e5;
 % problem.alpha = -4.42e3/problem.Ms;
 problem.alpha = -4.42e-6 ;
