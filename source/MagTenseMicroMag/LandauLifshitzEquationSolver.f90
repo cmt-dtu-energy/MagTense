@@ -9,6 +9,7 @@
     use LLODE_Debug
     use util_call
     use DemagFieldGetSolution
+    use FortranCuda
     implicit none
     
    
@@ -42,7 +43,7 @@
     integer :: val
     val = 0
     call displayMatlabProgessMessage( 'before', val )
-    call hello(val)
+    call testCuda()
     call displayMatlabProgessMessage( 'after', val )
     
     !Save internal representation of the problem and the solution
