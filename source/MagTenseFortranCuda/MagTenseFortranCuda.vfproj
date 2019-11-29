@@ -24,7 +24,7 @@
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Debug|x64" ConfigurationType="typeStaticLibrary">
 				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" WarnInterfaces="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
-				<Tool Name="VFLibrarianTool"/>
+				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64\;cuda\" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>
@@ -33,7 +33,7 @@
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" ConfigurationType="typeStaticLibrary">
 				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true"/>
-				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64\;../CUDATest/" AdditionalDependencies="cudart_static.lib  myCudaKernel.obj myIntelWrapper.obj"/>
+				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64\;cuda\" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>

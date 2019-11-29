@@ -1,5 +1,5 @@
 clearvars
-close all
+%close all
 
 figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
 
@@ -11,8 +11,8 @@ tic
 %takes the size of the grid as arguments (nx,ny,nz) and a function handle
 %that produces the desired field (if not present zero applied field is
 %inferred)
-problem = DefaultMicroMagProblem(36,9,1);
-
+problem = DefaultMicroMagProblem(36*3,9*3,1);
+problem = problem.setUseCuda(true);
 problem.alpha = -4.42e-6;
 problem.gamma = 0;
 
@@ -36,9 +36,9 @@ prob_struct = struct(problem);
 
 
 solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
-
+toc
 %setup problem for the time-dependent solver
-
+figure; sjask = squeeze(solution.M(end,:,:)); quiver(solution.pts(:,1),solution.pts(:,2),sjask(:,1),sjask(:,2)); axis equal; title('Starting state - Fortran')
 problem = DefaultMicroMagProblem(36,9,1);
 % problem.gamma = -2.21e5;
 % problem.alpha = -4.42e3/problem.Ms;

@@ -64,6 +64,8 @@ include 'mkl_spblas.f90'
         
         real(DP) :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         
+        integer :: useCuda                          !> Defines whether to attempt using CUDA or not
+        
         !Below is stuff that is computed when the solver initializes
         
         type(sparse_matrix_t) :: A_exch         !> Exchange term matrix
@@ -87,7 +89,7 @@ include 'mkl_spblas.f90'
         real(DP),dimension(:),allocatable :: HjX,HjY,HjZ    !> Effective fields for the exchange term (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: HhX,HhY,HhZ    !> Effective fields for the external field (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: HkX,HkY,HkZ    !> Effective fields for the anisotropy energy term (X,Y and Z-directions, respectively)        
-        real(DP),dimension(:),allocatable :: HmX,HmY,HmZ    !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
+        real*4,dimension(:),allocatable :: HmX,HmY,HmZ    !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
         real(DP),dimension(:),allocatable :: Mx,My,Mz       !> The magnetization components used internally as the solution progresses
                         
         real(DP),dimension(:),allocatable :: t_out          !> Output times at which the solution was computed
@@ -108,6 +110,6 @@ include 'mkl_spblas.f90'
     integer,parameter :: gridTypeUniform=1
     integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
     integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverImplicit=3
-    
+    integer,parameter :: useCudaTrue=1,useCudaFalse=0
     
 end module MicroMagParameters    
