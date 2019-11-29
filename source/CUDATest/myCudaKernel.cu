@@ -13,8 +13,33 @@ __global__ void vecAdd(float *a, float *b, float *c, int n)
         c[id] = a[id] + b[id];
 }
  
-void vecAdd_wrapper()
+float* internalBuffer;
+int nBuf;
+
+void cu_initBuf( float* buf, int* n)
 {
+	nBuf = *n;
+	
+	internalBuffer = (float*)malloc(nBuf*sizeof(float));
+	
+	for ( int i = 0; i < nBuf; i++ )
+	{
+		internalBuffer[i] = buf[i];
+	}
+}
+ 
+ void cu_destroy()
+ {
+	free(internalBuffer);
+ }
+ 
+void cu_vecAdd_wrapper(float* val, int* nn)
+{
+	for ( int uu=0; uu < *nn; uu++ )
+	{
+		val[uu] = internalBuffer[uu] * 3;
+	}
+		
     // Size of vectors
     int n = 100000;
  
@@ -73,6 +98,7 @@ void vecAdd_wrapper()
     for(i=0; i<n; i++)
         sum += h_c[i];
     printf("final result: %f\n", sum/n);
+ 	
  
     // Release device memory
     cudaFree(d_a);
@@ -83,4 +109,6 @@ void vecAdd_wrapper()
     free(h_a);
     free(h_b);
     free(h_c);
+	
+
 }

@@ -40,11 +40,6 @@
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
     real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
     
-    integer :: val
-    val = 0
-    call displayMatlabProgessMessage( 'before', val )
-    call testCuda()
-    call displayMatlabProgessMessage( 'after', val )
     
     !Save internal representation of the problem and the solution
     gb_solution = sol
@@ -55,6 +50,10 @@
     call initializeInteractionMatrices( gb_problem )
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     
+    if ( gb_problem%useCuda .eq. useCudaTrue ) then
+        !Initialize the Cuda arrays and load the demag tensors into the GPU memory
+        call cudaInit( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+    endif
     allocate( gb_solution%pts(ntot,3) )
     do k=1,gb_problem%grid%nz
         do j=1,gb_problem%grid%ny            
@@ -126,6 +125,9 @@
     !Clean up
     deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
     
+    if ( gb_problem%useCuda .eq. useCudaTrue ) then
+        call cudaDestroy()
+    endif
     !Make sure to return the correct state
     sol = gb_solution
     prob = gb_problem
@@ -428,49 +430,42 @@
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     integer :: stat
     type(matrix_descr) :: descr
+    real*4 :: pref
     
     if ( problem%demag_threshold .gt. 0. ) then
         descr%type = SPARSE_MATRIX_TYPE_GENERAL
         descr%mode = SPARSE_FILL_MODE_FULL
         descr%diag = SPARSE_DIAG_NON_UNIT
         !Do the matrix multiplications using sparse matrices        
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(1)%A, descr, solution%Mx, 0.d0, solution%HmX )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(2)%A, descr, solution%My, 1.d0, solution%HmX )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(3)%A, descr, solution%Mz, 1.d0, solution%HmX )
-        
-        solution%HmX = solution%HmX * (-solution%Mfact )
-        
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(2)%A, descr, solution%Mx, 0.d0, solution%HmY )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(4)%A, descr, solution%My, 1.d0, solution%HmY )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(5)%A, descr, solution%Mz, 1.d0, solution%HmY )
-        
-        solution%HmY = solution%HmY * (-solution%Mfact )
-        
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(3)%A, descr, solution%Mx, 0.d0, solution%HmZ )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(5)%A, descr, solution%My, 1.d0, solution%HmZ )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(6)%A, descr, solution%Mz, 1.d0, solution%HmZ )
-        
-        solution%HmZ = solution%HmZ * (-solution%Mfact )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(1)%A, descr, solution%Mx, 0.d0, solution%HmX )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(2)%A, descr, solution%My, 1.d0, solution%HmX )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(3)%A, descr, solution%Mz, 1.d0, solution%HmX )
+        !
+        !solution%HmX = solution%HmX * (-solution%Mfact )
+        !
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(2)%A, descr, solution%Mx, 0.d0, solution%HmY )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(4)%A, descr, solution%My, 1.d0, solution%HmY )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(5)%A, descr, solution%Mz, 1.d0, solution%HmY )
+        !
+        !solution%HmY = solution%HmY * (-solution%Mfact )
+        !
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(3)%A, descr, solution%Mx, 0.d0, solution%HmZ )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(5)%A, descr, solution%My, 1.d0, solution%HmZ )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(6)%A, descr, solution%Mz, 1.d0, solution%HmZ )
+        !
+        !solution%HmZ = solution%HmZ * (-solution%Mfact )
     else
-        
+        if ( problem%useCuda .eq. useCudaFalse ) then
         !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
         !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
-        solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
-        solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
-        solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
+            solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
+            solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
+            solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
+        else
+            pref = sngl(-1 * solution%Mfact)
         
-        !call dgemm( problem%Kxx, solution%Mx, solution%HmX, 'N', 'N', -solution%Mfact )
-        !call dgemm( problem%Kxy, solution%My, solution%HmX, 'N', 'N', -solution%Mfact, 1.d0 )
-        !call dgemm( problem%Kxz, solution%Mz, solution%HmX, 'N', 'N', -solution%Mfact, 1.d0 )
-        !
-        !call dgemm( problem%Kxy, solution%Mx, solution%HmY, 'N', 'N', -solution%Mfact )
-        !call dgemm( problem%Kyy, solution%My, solution%HmY, 'N', 'N', -solution%Mfact, 1.d0 )
-        !call dgemm( problem%Kyz, solution%Mz, solution%HmY, 'N', 'N', -solution%Mfact, 1.d0 )
-        !
-        !call dgemm( problem%Kxz, solution%Mx, solution%HmZ, 'N', 'N', -solution%Mfact )
-        !call dgemm( problem%Kyz, solution%My, solution%HmZ, 'N', 'N', -solution%Mfact, 1.d0 )
-        !call dgemm( problem%Kzz, solution%Mz, solution%HmZ, 'N', 'N', -solution%Mfact, 1.d0 )
-        
+            call cudaMatrVecMult( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
+        endif 
     endif
     
     
