@@ -1,4 +1,4 @@
-function Script_3D_TestDynamicsStdProbl4(fig1)
+function Script_3D_TestDynamicsStdProbl4(fig1,resFac)
 disp('Running Matlab model')
 
 if (~exist('fig1','var'))
@@ -6,7 +6,7 @@ if (~exist('fig1','var'))
 end
 
 %% Calculates dynamic solution to mumag std prob 4
-clearvars -except fig1
+clearvars -except fig1 resFac
 
 %% Create Preset
 a = memory
@@ -17,7 +17,7 @@ MySim.Ms = 8.0e5 ;
 MySim.MaxH = 0.1 ;
 MySim.MaxHx = MySim.MaxH*sqrt(3) ;  
 % MySim.nHalfTimes = round([20;5;0]*1);
-MySim.nGrid = round([72;18;2]);
+MySim.nGrid = round([resFac*36;resFac*9;1]);
 
 % MySim.DemagTensorFileName = 'DemagStdProb4_x109y26z0' ;
 MySim.DemagTensorFileName = nan;
