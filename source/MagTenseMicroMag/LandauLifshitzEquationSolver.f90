@@ -167,26 +167,37 @@
     gb_solution%Mx = m(1:ntot)
     gb_solution%My = m(ntot+1:2*ntot)
     gb_solution%Mz = m(2*ntot+1:3*ntot)
-             
     
+    !Make a parallel region where one task does the CPU stuff and the other the GPU stuff asynchronously
+    
+    !$omp parallel
+    !make sure to run on one thread that then spawns from the thread pool as the tasks are started
+    !$omp single
+    
+    !define the task for the CPU stuff
+    !$omp task
     !Exchange term    
     call updateExchangeTerms( gb_problem, gb_solution )
-    
-    
     
     
     !External field
     call updateExternalField( gb_problem, gb_solution, t )
     
-    
-    
-    !Demag. field
-    call updateDemagfield( gb_problem, gb_solution )
-    
-    
-    
     !Anisotropy term
     call updateAnisotropy(  gb_problem, gb_solution )
+    
+    !$omp end task
+    
+    !define the task for the GPU stuff. It is assumed that the GPU stuff takes roughly the same time as the CPU stuff for this to work
+    !$omp task
+    !Demag. field
+    call updateDemagfield( gb_problem, gb_solution )
+    !$omp end task
+    
+    
+    !finish the single and parallel regions
+    !$omp end single
+    !$omp end parallel
     
     !Effective field
     HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
