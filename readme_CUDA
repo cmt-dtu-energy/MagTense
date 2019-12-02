@@ -33,20 +33,22 @@ The strategy then is to make the CUDA GPU kernel in C++, compile this with the n
  
  And this should produce a .exe file that runs....
  
+ MAGTENSE EXAMPLE BEGINS HERE
+ 
  Concrete example (in MagTense):
  
- From the x64 Native Tools prompt navigate to the MagTense dir: MagTense/source/CUDATest/
+ From the x64 Native Tools prompt navigate to the MagTense dir: 
  
- nvcc -c myCudaKernel.cu
+ MagTense/source/CUDATest/
+ 
+ Compile with nvcc 
+ 
+ nvcc -c MagTenseCudaBlas.cu
  
  From the Intel 64 prompt:
  (compile the C++ wrapper with icl including the cuda stuff)
  
- icl -c myIntelWrapper.cxx myCudaKernel.obj  /link "c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64\cudart_static.lib"
+ icl -c MagTenseCudaBlasICLWrapper.cxx MagTenseCudaBlas.obj  /link "c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64\cublas.lib"
  
- 
-(compile the fortran caller with ifort)
-ifort MyFortranModule.f90 MyFortrantestProgram.f90 myIntelWrapper.obj myCudaKernel.obj "c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64\cudart_static.lib"
-
-And that's it!
+ Then compile MagTense as usual (there is a project in the MagTense solution that deals with CUDA)
  
