@@ -17,6 +17,8 @@ addpath('../util');
 tic
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
+problem.setUseCuda( true );
+
 problem.alpha = 4.42e3;
 problem.gamma = 0;
 
@@ -48,7 +50,7 @@ problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 % problem.alpha = -4.42e3/problem.Ms;
 problem.alpha = 4.42e3 ;
 problem.gamma = 2.21e5 ;
-problem.dem_thres = 1e-6;
+problem.dem_thres = 0;%1e-6;
 problem = problem.setTime( linspace(0,1e-9,200) ); %
 problem.setTimeDis = int32(10);
 

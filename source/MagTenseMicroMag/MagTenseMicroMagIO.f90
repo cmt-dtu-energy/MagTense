@@ -137,9 +137,8 @@
         call mxCopyPtrToReal8(mxGetPr(demThresProblemPtr), problem%demag_threshold, sx )
     
         !Set how often to display the timestep in Matlab
-        sx = 1
-        setTimeDisplayProblemPtr = mxGetField( prhs, i, problemFields(19) )
-        call mxCopyPtrToInteger4(mxGetPr(setTimeDisplayProblemPtr), problem%setTimeDisplay, sx )
+        problem%setTimeDisplay = 100 !needs to be updated to proper IO eventually...
+        
     
         
         sx = 1
