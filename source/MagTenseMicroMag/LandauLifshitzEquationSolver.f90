@@ -1,12 +1,15 @@
+!#include "blas.f90"
     module LandauLifshitzSolution
     use ODE_Solvers
     use integrationDataTypes
     use MKL_SPBLAS
+    !use BLAS95
     use MicroMagParameters
     use MagTenseMicroMagIO
     use LLODE_Debug
     use util_call
     use DemagFieldGetSolution
+    use FortranCuda
     implicit none
     
    
@@ -15,9 +18,9 @@
     type(MicroMagSolution) :: gb_solution
     type(MicroMagProblem) :: gb_problem
     
-    real,dimension(:),allocatable :: crossX,crossY,crossZ   !>Cross product terms
-    real,dimension(:),allocatable :: HeffX,HeffY,HeffZ      !>Effective fields
-    real,dimension(:),allocatable :: HeffX2,HeffY2,HeffZ2      !>Effective fields
+    real(DP),dimension(:),allocatable :: crossX,crossY,crossZ   !>Cross product terms
+    real(DP),dimension(:),allocatable :: HeffX,HeffY,HeffZ      !>Effective fields
+    real(DP),dimension(:),allocatable :: HeffX2,HeffY2,HeffZ2      !>Effective fields
     
     private :: gb_solution,gb_problem,crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2
     
@@ -35,7 +38,8 @@
     integer :: ntot,i,j,k,ind,nt                     !> total no. of tiles
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
-    real,dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
+    real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
+    
     
     !Save internal representation of the problem and the solution
     gb_solution = sol
@@ -46,6 +50,10 @@
     call initializeInteractionMatrices( gb_problem )
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     
+    if ( gb_problem%useCuda .eq. useCudaTrue ) then
+        !Initialize the Cuda arrays and load the demag tensors into the GPU memory
+        call cudaInit( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+    endif
     allocate( gb_solution%pts(ntot,3) )
     do k=1,gb_problem%grid%nz
         do j=1,gb_problem%grid%ny            
@@ -117,6 +125,9 @@
     !Clean up
     deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
     
+    if ( gb_problem%useCuda .eq. useCudaTrue ) then
+        call cudaDestroy()
+    endif
     !Make sure to return the correct state
     sol = gb_solution
     prob = gb_problem
@@ -136,9 +147,9 @@
     !> @param[inout] dmdt array size n for the derivatives at the time t
     !---------------------------------------------------------------------------    
     subroutine dmdt_fct ( t, m, dmdt )  
-    real,intent(in) :: t
-    real,dimension(:),intent(in) :: m
-    real,dimension(:),intent(inout) :: dmdt
+    real(DP),intent(in) :: t
+    real(DP),dimension(:),intent(in) :: m
+    real(DP),dimension(:),intent(inout) :: dmdt
     integer :: ntot
     
 
@@ -156,26 +167,37 @@
     gb_solution%Mx = m(1:ntot)
     gb_solution%My = m(ntot+1:2*ntot)
     gb_solution%Mz = m(2*ntot+1:3*ntot)
-             
     
+    !Make a parallel region where one task does the CPU stuff and the other the GPU stuff asynchronously
+    
+    !$omp parallel
+    !make sure to run on one thread that then spawns from the thread pool as the tasks are started
+    !$omp single
+    
+    !define the task for the CPU stuff
+    !$omp task
     !Exchange term    
     call updateExchangeTerms( gb_problem, gb_solution )
-    
-    
     
     
     !External field
     call updateExternalField( gb_problem, gb_solution, t )
     
-    
-    
-    !Demag. field
-    call updateDemagfield( gb_problem, gb_solution )
-    
-    
-    
     !Anisotropy term
     call updateAnisotropy(  gb_problem, gb_solution )
+    
+    !$omp end task
+    
+    !define the task for the GPU stuff. It is assumed that the GPU stuff takes roughly the same time as the CPU stuff for this to work
+    !$omp task
+    !Demag. field
+    call updateDemagfield( gb_problem, gb_solution )
+    !$omp end task
+    
+    
+    !finish the single and parallel regions
+    !$omp end single
+    !$omp end parallel
     
     !Effective field
     HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
@@ -211,8 +233,8 @@
     !> @param[in] t the time at which to evaluate alpha
     !> @param[in] problem the problem on which the solution is solved
     function alpha( t, problem )
-    real :: alpha
-    real,intent(in) :: t
+    real(DP) :: alpha
+    real(DP),intent(in) :: t
     type(MicroMagProblem),intent(in) :: problem
     
     if ( problem%MaxT0 .gt. 0 ) then
@@ -297,25 +319,17 @@
     
     integer :: stat
     type(MATRIX_DESCR) :: descr
-    real :: prefact
-    
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
     
     
     
-    prefact = -2 * solution%Jfact
     
-    !Effective field in the X-direction. Note that the scalar prefact is multiplied on from the left, such that
-    !y = prefact * (A_exch * Mx )
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, prefact, problem%A_exch, descr, solution%Mx, 0., solution%HjX )
     
     !Effective field in the Y-direction
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, prefact, problem%A_exch, descr, solution%My, 0., solution%HjY )
     
     !Effective field in the Z-direction
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, prefact, problem%A_exch, descr, solution%Mz, 0., solution%HjZ )
     
     end subroutine updateExchangeTerms
     
@@ -330,14 +344,9 @@
     subroutine updateExternalField( problem, solution, t )
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
-    real,intent(in) :: t                                !> The time
-    real :: HextX,HextY,HextZ
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
         !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
-        solution%HhX = -problem%Hext(solution%HextInd,2)
-        solution%HhY = -problem%Hext(solution%HextInd,3)
-        solution%HhZ = -problem%Hext(solution%HextInd,4)
     elseif ( problem%solver .eq. MicroMagSolverDynamic ) then
         
         !Interpolate to get the applied field at time t
@@ -345,9 +354,6 @@
         call interp1( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
         call interp1( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
         
-        solution%HhX = -HextX
-        solution%HhY = -HextY
-        solution%HhZ = -HextZ
         
         
     elseif ( problem%solver .eq. MicroMagSolverImplicit ) then
@@ -368,7 +374,6 @@
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     
-    real :: prefact                                       !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
     
     
@@ -377,12 +382,9 @@
     descr%diag = SPARSE_DIAG_NON_UNIT
     
     
-    prefact = -2.*solution%Kfact
+
     
     !Notice that the anisotropy matrix is symmetric and so Axy = Ayx etc.
-    solution%Hkx = prefact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-    solution%Hky = prefact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-    solution%Hkz = prefact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
     
 
     
@@ -419,36 +421,42 @@
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     integer :: stat
     type(matrix_descr) :: descr
+    real*4 :: pref
     
     if ( problem%demag_threshold .gt. 0. ) then
         descr%type = SPARSE_MATRIX_TYPE_GENERAL
         descr%mode = SPARSE_FILL_MODE_FULL
         descr%diag = SPARSE_DIAG_NON_UNIT
         !Do the matrix multiplications using sparse matrices        
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(1)%A, descr, solution%Mx, 0., solution%HmX )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(2)%A, descr, solution%My, 1., solution%HmX )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(3)%A, descr, solution%Mz, 1., solution%HmX )
-        
-        solution%HmX = solution%HmX * (-solution%Mfact )
-        
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(2)%A, descr, solution%Mx, 0., solution%HmY )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(4)%A, descr, solution%My, 1., solution%HmY )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(5)%A, descr, solution%Mz, 1., solution%HmY )
-        
-        solution%HmY = solution%HmY * (-solution%Mfact )
-        
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(3)%A, descr, solution%Mx, 0., solution%HmZ )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(5)%A, descr, solution%My, 1., solution%HmZ )
-        stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.0, problem%K_s(6)%A, descr, solution%Mz, 1., solution%HmZ )
-        
-        solution%HmZ = solution%HmZ * (-solution%Mfact )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(1)%A, descr, solution%Mx, 0.d0, solution%HmX )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(2)%A, descr, solution%My, 1.d0, solution%HmX )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(3)%A, descr, solution%Mz, 1.d0, solution%HmX )
+        !
+        !solution%HmX = solution%HmX * (-solution%Mfact )
+        !
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(2)%A, descr, solution%Mx, 0.d0, solution%HmY )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(4)%A, descr, solution%My, 1.d0, solution%HmY )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(5)%A, descr, solution%Mz, 1.d0, solution%HmY )
+        !
+        !solution%HmY = solution%HmY * (-solution%Mfact )
+        !
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(3)%A, descr, solution%Mx, 0.d0, solution%HmZ )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(5)%A, descr, solution%My, 1.d0, solution%HmZ )
+        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(6)%A, descr, solution%Mz, 1.d0, solution%HmZ )
+        !
+        !solution%HmZ = solution%HmZ * (-solution%Mfact )
     else
-        
+        if ( problem%useCuda .eq. useCudaFalse ) then
         !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
         !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
-        solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
-        solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
-        solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
+            solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
+            solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
+            solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
+        else
+            pref = sngl(-1 * solution%Mfact)
+        
+            call cudaMatrVecMult( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
+        endif 
     endif
     
     
@@ -560,9 +568,9 @@
     type(MicroMagProblem),intent(inout) :: problem      !> Grid data structure    
     
     type(MagTile),dimension(1) :: tile                  !> Tile representing the current tile under consideration
-    real,dimension(:,:),allocatable :: H            !> The field and the corresponding evaluation point arrays
+    real(DP),dimension(:,:),allocatable :: H            !> The field and the corresponding evaluation point arrays
     integer :: i,j,k,nx,ny,nz,ntot,ind                  !> Internal counters and index variables
-    real,dimension(:,:,:,:),allocatable :: Nout         !> Temporary storage for the demag tensor    
+    real(DP),dimension(:,:,:,:),allocatable :: Nout         !> Temporary storage for the demag tensor    
     
    ! integer,dimension(1) :: shp
     
@@ -659,8 +667,8 @@
     !> @params[in] threshold a number specifying the lower limit of values in D that should be considered non-zero
     !>-----------------------------------------
     subroutine ConvertDenseToSparse( D, K, threshold)
-    real,dimension(:,:),intent(in) :: D                 !> Dense input matrix    
-    real,intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
+    real(DP),dimension(:,:),intent(in) :: D                 !> Dense input matrix    
+    real(DP),intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
     type(MagTenseSparse),intent(inout) :: K                           !> Sparse matrix allocation
     
     integer :: nx,ny, nnonzero
@@ -1042,7 +1050,7 @@
     !call writeSparseMatrixToDisk( tmp, nx*ny*nz, 'A_exch.dat' )
     
     if ( nz .gt. 1 ) then    
-        stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, 1., tmp, A)
+        stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, 1.d0, tmp, A)
         !clean up        
         deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
         stat = mkl_sparse_destroy (d2dz2%A)

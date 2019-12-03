@@ -1,8 +1,9 @@
 #include "fintrf.h"  
-include 'mkl_spblas.f90'
+
 
     module LLODE_Debug
     use MKL_SPBLAS
+    use MicroMagParameters
     implicit none
     
     contains
@@ -17,12 +18,12 @@ include 'mkl_spblas.f90'
     integer,intent(in) :: n
     character(*),intent(in) :: filename
     
-    real,dimension(:,:),allocatable :: x,y      !> The dense matrix to be created
-    real,dimension(:), allocatable :: xx,yy     
+    real(DP),dimension(:,:),allocatable :: x,y      !> The dense matrix to be created
+    real(DP),dimension(:), allocatable :: xx,yy     
     integer,dimension(1) :: shp1D
     integer,dimension(2) :: shp2D
     integer :: i, stat
-    real :: alpha, beta
+    real(DP) :: alpha, beta
     type(matrix_descr) :: descr 
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
