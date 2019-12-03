@@ -7,10 +7,10 @@ addpath('../../MEX_files');
 addpath('../util');
 times = zeros(5,2);
 
-res = [1,2,3,4,5];
+res = [1,2,3,4,5,6,7];
 
-for i=1:1
-    resFac = 2;%res(i);
+for i=6:6
+    resFac = res(i);
     for j=1:1%:2
         tic
         %test the Fortran implementation of the LL-ODE solver
