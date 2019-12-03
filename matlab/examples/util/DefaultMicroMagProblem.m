@@ -57,6 +57,11 @@ properties
     % tensors are made into sparse matrices, i.e. if abs(K) < dem_thres
     % then K = 0
     dem_thres
+    
+    %defines whether to attempt using CUDA (will crash if no appropriate
+    %NVIDIA driver is present or if insufficient memory is available. 0 for
+    %do not use cuda, 1 for do use (int32)
+    useCuda
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -138,6 +143,8 @@ methods
         obj.m0(2*obj.ntot+1:3*obj.ntot) = cos(obj.theta);
         %initial value of the demag threshold is zero, i.e. it is not used
         obj.dem_thres = 0;
+        %set use cuda to default not
+        obj.useCuda = int32(0);
     end
     
     %%Calculates the applied field as a function of time on the time grid
@@ -161,6 +168,15 @@ methods
     function obj = setHextTime( obj, nt )
         obj.nt_Hext = int32( nt );
         obj.t_Hext = linspace( min(obj.t), max(obj.t), obj.nt_Hext );
+    end
+    
+    function obj = setUseCuda( obj, enabled )
+        
+       if enabled
+           obj.useCuda = int32(1);
+       else
+           obj.useCuda = int32(0);
+       end
     end
     
 end

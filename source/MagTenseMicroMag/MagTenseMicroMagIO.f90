@@ -21,13 +21,14 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem,ntot,nt, nt_Hext
+        integer :: nFieldsProblem,ntot,nt, nt_Hext,useCuda
         mwPointer :: nGridPtr,LGridPtr,dGridPtr,typeGridPtr, ueaProblemPtr, modeProblemPtr,solverProblemPtr
         mwPointer :: A0ProblemPtr,MsProblemPtr,K0ProblemPtr,gammaProblemPtr,alpha0ProblemPtr,MaxT0ProblemPtr
-        mwPointer :: ntProblemPtr, m0ProblemPtr,HextProblemPtr,tProblemPtr
+        mwPointer :: ntProblemPtr, m0ProblemPtr,HextProblemPtr,tProblemPtr,useCudaPtr
         mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr, setTimeDisplayProblemPtr
         integer,dimension(3) :: int_arr
         real,dimension(3) :: real_arr
+        
         
         !Get the expected names of the fields
         call getProblemFieldnames( problemFields, nFieldsProblem)
@@ -141,6 +142,15 @@
         call mxCopyPtrToInteger4(mxGetPr(setTimeDisplayProblemPtr), problem%setTimeDisplay, sx )
     
         
+        sx = 1
+        useCudaPtr = mxGetField( prhs, i, problemFields(19) )
+        call mxCopyPtrToInteger4(mxGetPr(useCudaPtr), useCuda, sx )
+        if ( useCuda .eq. 1 ) then
+            problem%useCuda = useCudaTrue
+        else
+            problem%useCuda = useCudaFalse
+        endif
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -248,7 +258,7 @@
         fieldnames(16) = 't'
         fieldnames(17) = 'm0'
         fieldnames(18) = 'dem_thres'
-        fieldnames(19) = 'setTimeDis'
+        fieldnames(19) = 'useCuda'
         
         
     end subroutine getProblemFieldnames

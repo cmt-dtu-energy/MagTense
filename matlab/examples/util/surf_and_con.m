@@ -1,4 +1,4 @@
-function [h_colorbar,h_surf,h_contour] = surf_and_con(XI,YI,ZI,fig1)
+function [h_colorbar,h_surf,h_contour,fig1] = surf_and_con(XI,YI,ZI,fig1)
     isFigureHandle = 0;
     
     if (exist('fig1','var'))
