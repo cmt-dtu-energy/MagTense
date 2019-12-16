@@ -11,15 +11,12 @@ close all
 addpath('../util/');
 addpath('../../Mex_files/');
 
-%Define magnet geometry using MagTense. The magnet considered is a cylinder
-%with length 10 mm and diameter 10 mm with a remanence of 1.1 T. MagTense
-%does not directly support this primitive (yet) so we have to build up the
-%geometry by using four cylindrical tiles (one for each quadrant).
+%Define magnet geometry using MagTense. The magnet considered is a
+%cube with side lengths 10 mm
 
-%Radius of the magnet
-R0 = 0.005;%m
-%Length of the magnet
-L = 0.01;%m
+%side length of the magnet
+d = 0.01;%m
+
 %remanence of the magnet
 Mrem = 1.2;%R
 
@@ -29,7 +26,7 @@ mu0 = 4*pi*1e-7;
 %get the default tile
 tile1 = getDefaultMagTile();
 %set the tile type to cylinder
-tile1.tileType = getMagTileType('cylinder');
+tile1.tileType = getMagTileType('prism');
 %set the remanence 
 tile1.Mrem = Mrem/mu0;%A/m
 %the easy axis permeability
@@ -39,28 +36,15 @@ tile1.mu_r_oa = 1.18;
 %ensure the tile is a permanent magnet
 tile1.magnetType = getMagnetType('hard');
 %the size of the tile
-tile1.dtheta = pi/2;
-tile1.dr = R0 * 0.99; %the cylindrical piece cannot go to zero for technical reasons
-tile1.dz = L;
-tile1.r0 = R0/2;
-tile1.theta0 = pi/4;
+tile1.abc = [d,d,d];
 %set the easy axis and the hard axes
-tile1.u_ea = [0,0,1];
+tile1.u_ea = [1,0,0];
 tile1.u_oa1 = [0,1,0];
-tile1.u_oa2 = [1,0,0];
+tile1.u_oa2 = [0,0,1];
 
-%make the three other parts of the cylinder
-tile2 = tile1;
-tile2.theta0 = 3/4 * pi;
-
-tile3 = tile1;
-tile3.theta0 = 5/4 * pi;
-
-tile4 = tile1;
-tile4.theta0 = 7/4 * pi;
 
 %boundle the tiles into an array
-tiles = [tile1 tile2 tile3 tile4];
+tiles = [tile1];
 
 %find the self-consistent magnetization (in this case only caused by the
 %demagnetizing field)
@@ -68,9 +52,10 @@ tiles = IterateMagnetization( tiles, [], [], 1e-6, 100 );
 
 %%Now find the field in a set of points
 %define a range of points spanning the xy plane at z=0
-y = linspace( 0,R0*2, 51);
-z = linspace( L/2+0.001,L, 40);
-x = 0.0001;
+x = linspace( d/2+1e-4, d, 51 );
+y = linspace( 0, d, 50 );
+z = 0.0001;
+
 
 %use meshgrid to fill out the span
 [X,Y,Z] = meshgrid(x,y,z);
@@ -82,7 +67,7 @@ H = H .* mu0;
 Hnorm = Hnorm .* mu0;
 
 %plot the field
-surf_and_con(squeeze(Z),squeeze(Y),Hnorm);
+surf_and_con(squeeze(X),squeeze(Y),Hnorm);
 
 %now get on with integration of the equations of motion:
 %ms * d^2x/dt^2 = F_mag_x - C * R * |dx/dt| * (dx/dt / |dx/dt| )
@@ -107,7 +92,7 @@ R = 2.5e-6;%m
 %particle mass
 
 %Volume of magnetite
-V_Fe = 7.24e-19;%kg/m^3
+V_Fe = 7.24e-19;%m^3
 %magnetite density
 rho_Fe = 5200;%kg/m^3
 %polymer volume
@@ -121,44 +106,50 @@ m = 2.83e-13;%Am^2
 %Drag coefficient
 C = 6 * pi * mu;
 
+
 %bundle into struct
-dat = struct( 'ms', ms, 'C', C, 'R', R, 'm', m, 'L', L );
+dat = struct( 'ms', ms, 'C', C, 'R', R, 'm', m, 'd', d );
 
 %note that y_init(1) and y_init(3) are the initial positions in x,y while
 %y_init(2) and y_init(4) are initial velocities
-y_init = [L/2 + 0.005, 0, 0.005, 0];
+y_init = [d/2 + 0.002, 0, 0.001, 0];
 
 %Make a grid in x and y (really z and y) for Hnorm and use this to 
 %interpolate in       
-ny = 100;
-nz = 101;
+nx = 100;
+ny = 101;
+
+x_tmp = linspace( d/2, y_init(1) * 1.1, nx );
 y_tmp = linspace( 0.00001, y_init(3)*1.1, ny );
-z_tmp = linspace( L/2+0.0001, y_init(1) * 1.1, nz );
-[dat.Z,dat.Y] = meshgrid(z_tmp,y_tmp);
+[dat.X,dat.Y] = meshgrid(x_tmp,y_tmp);
 pts = zeros(numel(dat.Y),3);
-pts(:,1) = 0.0001;%x position, cannot be exactly zero
+pts(:,1) = dat.X(:);
 pts(:,2) = dat.Y(:);
-pts(:,3) = dat.Z(:);
+pts(:,3) = 0;
 H = getHFromTiles_mex( tiles, pts, int32( length(tiles) ), int32( length(pts(:,1)) ) );
 H = H .* mu0;
 dat.Hnorm = sqrt(sum(H.^2,2));%note that H and B are identical outside the magnet
-dat.Hnorm = reshape( dat.Hnorm, [ny,nz] );    
+dat.Hnorm = reshape( dat.Hnorm, [ny,nx] );    
 
 %anonymous function to pass arguments
 fct = @(t,y) ode_func( t, y, dat );
 %time grid for the solution
-t_in = linspace(0,1,10);
+t_in = linspace(0,10,300);
 
 
-opts = odeset('OutputFcn',@plotODE);
+opts = odeset('OutputFcn',@plotODE,'RelTol',1e-3);
 figure
-subplot(2,1,1);
+subplot(3,1,1);
 xlabel('x pos [mm]');
 ylabel('y pos [mm]');
 hold on
-subplot(2,1,2);
+subplot(3,1,2);
 xlabel('Time [s]');
-ylabel('Velocity [mm/s]');
+ylabel('x velocity [mm/s]');
+hold on
+subplot(3,1,3);
+xlabel('Time [s]');
+ylabel('y velocity [mm/s]');
 hold on
 
 [t,y] = ode45( fct, t_in, y_init, opts );
@@ -168,13 +159,13 @@ end
 function status = plotODE( t, y, flag )
     if isempty(flag)
         cols = lines(2);
-        subplot(2,1,1);
+        subplot(3,1,1);
         plot(y(1)*1e3,y(3)*1e3,'.','color',cols(1,:));
         
         
-        subplot(2,1,2);
-        hold on
+        subplot(3,1,2);        
         plot(t(1),y(2)*1e3,'.','color',cols(1,:));
+        subplot(3,1,3);        
         plot(t(1),y(4)*1e3,'o','color',cols(2,:));
         
         drawnow
@@ -199,26 +190,31 @@ function [yp] = ode_func(t,y,dat)
     R = dat.R;
     m = dat.m;
     
+    
     %get the magnetic flux through numerical differentiation of 
     %Fmag = grad( m dot B ) assuming m = |m| B/|B| =>
     %Fmag = grad( |m| * |B| ) = |m| * grad( |B| ) as |m| is assumed
     %constant
     %distance to differentiate over
     delta = 1e-6;%m
-    xx = 0.0001;%cannot be exactly zero for numerical reasons
+    xx = [y(1)-delta, y(1)+delta];
     %y-direction
     yy = [y(3)-delta, y(3)+delta];
     %x-direction (modeled as z due to the nature of the cylindrical tile
     %and the laziness of the programmer not to include rotation)
-    zz = [y(1)-delta, y(1)+delta];
+    zz = 0;
        
     
-    Hnorm_z = interp2( dat.Z, dat.Y, dat.Hnorm, zz, [y(3), y(3)] );
-    Hnorm_y = interp2( dat.Z, dat.Y, dat.Hnorm, [y(1), y(1)], yy );
+    Hnorm_x = interp2( dat.X, dat.Y, dat.Hnorm, xx, [y(3), y(3)] );
+    Hnorm_y = interp2( dat.X, dat.Y, dat.Hnorm, [y(1), y(1)], yy );
    
     Fmag = zeros(2,1);    
-    Fmag(1) = m * ( Hnorm_z(2) - Hnorm_z(1) ) / ( zz(2) - zz(1) );
+    Fmag(1) = m * ( Hnorm_x(2) - Hnorm_x(1) ) / ( xx(2) - xx(1) );
     Fmag(2) = m * ( Hnorm_y(2) - Hnorm_y(1) ) / ( yy(2) - yy(1) );
+    
+    if ~isfinite(Fmag) | ~isfinite(Hnorm_x) | ~isfinite(Hnorm_y)
+        disp('NAN!!!');
+    end
     %re-write d^2x/dt^2 = F/ms - C/ms*R*dx/dt to two first order equations
     %dx/dt = gamma (yp(1))
     %dgamma/dt = d^2x/dt^2 (yp(2))
@@ -228,11 +224,20 @@ function [yp] = ode_func(t,y,dat)
     
     yp = zeros(4,1);
     %x-direction
-    yp(1) = y(2);
-    yp(2) = Fmag(1) / ms - C/ms * R * y(2); %note that dx/dt = gamma = y(2)
-    
+    %check if the particle has reached the boundary
+    if y(1) <= min(dat.X(:))
+        yp(1) = 0;
+        yp(2) = 0;
+    else
+        yp(1) = y(2);
+        yp(2) = Fmag(1) / ms - C/ms * R * y(2); %note that dx/dt = gamma = y(2)
+    end
     %y-direction
-    yp(3) = y(4);
-    yp(4) = Fmag(2) / ms - C/ms * R * y(4);%note that dy/dt = beta = y(4)
-    
+    if y(3) <= min(dat.Y(:))
+        yp(3) = 0;
+        yp(4) = 0;
+    else                
+        yp(3) = y(4);
+        yp(4) = Fmag(2) / ms - C/ms * R * y(4);%note that dy/dt = beta = y(4)
+    end
 end
