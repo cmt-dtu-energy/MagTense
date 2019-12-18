@@ -100,7 +100,7 @@
             !Applied field
             gb_solution%HextInd = i
             
-            call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct )
+            call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay )
             
             !the initial state of the next solution is the previous solution result
             gb_problem%m0 = M_out(:,nt,i)
@@ -116,7 +116,7 @@
         !Simply do a time evolution as specified in the problem        
         allocate(M_out(3*ntot,size(gb_problem%t),1))    
         allocate(gb_solution%M_out(size(gb_problem%t),ntot,1,3))
-        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct )
+        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay )
     
         gb_solution%M_out(:,:,1,1) = transpose( M_out(1:ntot,:,1) )
         gb_solution%M_out(:,:,1,2) = transpose( M_out((ntot+1):2*ntot,:,1) )
@@ -205,11 +205,11 @@
     
     !Compute the time derivative of m
     !dMxdt
-    dmdt(1:ntot) = gb_problem%gamma * crossX + alpha(t,gb_problem) * HeffX2 
+    dmdt(1:ntot) = -gb_problem%gamma * crossX - alpha(t,gb_problem) * HeffX2 
     !dMydt
-    dmdt(ntot+1:2*ntot) = gb_problem%gamma * crossY + alpha(t,gb_problem) * HeffY2 
+    dmdt(ntot+1:2*ntot) = -gb_problem%gamma * crossY - alpha(t,gb_problem) * HeffY2 
     !dMzdt
-    dmdt(2*ntot+1:3*ntot) = gb_problem%gamma * crossZ + alpha(t,gb_problem) * HeffZ2 
+    dmdt(2*ntot+1:3*ntot) = -gb_problem%gamma * crossZ - alpha(t,gb_problem) * HeffZ2 
     
 
 
@@ -293,7 +293,7 @@
     !"J" : exchange term
     solution%Jfact = problem%A0 / ( mu0 * problem%Ms )
     !"H" : external field term (b.c. user input is in Tesla)
-    solution%Hfact = 1./mu0
+    !solution%Hfact = 1./mu0
     !"M" : demagnetization term
     solution%Mfact = problem%Ms
     !"K" : anisotropy term
@@ -323,7 +323,6 @@
     
     
     
-    alpha = -2 * solution%Jfact
     beta = 0.
     
     !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
@@ -349,14 +348,12 @@
     subroutine updateExternalField( problem, solution, t )
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
-    real(DP),intent(in) :: t                                !> The time
-    real(DP) :: HextX,HextY,HextZ
+    real,intent(in) :: t
+    
+    real :: HextX,HextY,HextZ
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
         !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
-        solution%HhX = solution%Hfact * problem%Hext(solution%HextInd,2)
-        solution%HhY = solution%Hfact * problem%Hext(solution%HextInd,3)
-        solution%HhZ = solution%Hfact * problem%Hext(solution%HextInd,4)
     elseif ( problem%solver .eq. MicroMagSolverDynamic ) then
         
         !Interpolate to get the applied field at time t
@@ -364,9 +361,6 @@
         call interp1( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
         call interp1( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
         
-        solution%HhX = solution%Hfact * HextX
-        solution%HhY = solution%Hfact * HextY
-        solution%HhZ = solution%Hfact * HextZ
         
         
     elseif ( problem%solver .eq. MicroMagSolverImplicit ) then
@@ -387,7 +381,6 @@
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     
-    real(DP) :: alpha                                       !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
     
     
@@ -396,12 +389,9 @@
     descr%diag = SPARSE_DIAG_NON_UNIT
     
     
-    alpha = -2.*solution%Kfact
+
     
     !Notice that the anisotropy matrix is symmetric and so Axy = Ayx etc.
-    solution%Hkx = alpha * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-    solution%Hky = alpha * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-    solution%Hkz = alpha * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
     
 
     
