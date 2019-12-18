@@ -62,6 +62,9 @@ properties
     %NVIDIA driver is present or if insufficient memory is available. 0 for
     %do not use cuda, 1 for do use (int32)
     useCuda
+    
+    %defines which approximation (if any) to use for the demag tensor 
+    dem_appr
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -145,6 +148,9 @@ methods
         obj.dem_thres = 0;
         %set use cuda to default not
         obj.useCuda = int32(0);
+        %set the demag approximation to the default, i.e. use no
+        %approximation
+        obj.dem_appr = getMicroMagDemagApproximation('none');
     end
     
     %%Calculates the applied field as a function of time on the time grid
