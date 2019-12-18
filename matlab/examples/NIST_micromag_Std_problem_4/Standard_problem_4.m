@@ -17,7 +17,10 @@ tic
 %that produces the desired field (if not present zero applied field is
 %inferred)
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
-
+%problem.dem_appr = getMicroMagDemagApproximation('fft_thres');
+problem.dem_appr = getMicroMagDemagApproximation('none');
+problem.dem_thres = 0;%1e-2;
+problem = problem.setUseCuda(true);
 problem.alpha = -4.42e-6;
 problem.gamma = 0;
 

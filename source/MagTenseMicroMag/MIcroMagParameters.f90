@@ -1,8 +1,8 @@
 include 'mkl_spblas.f90'
-    
+include "mkl_dfti.f90"    
     module MicroMagParameters
     use MKL_SPBLAS
-    
+    Use MKL_DFTI   
     INTEGER, PARAMETER :: SP = KIND(1.0E0)
     INTEGER, PARAMETER :: DP = KIND(1.0D0)
     
@@ -33,13 +33,20 @@ include 'mkl_spblas.f90'
     !> matrix handle    
     type MagTenseSparse
         type(sparse_matrix_t) :: A                                      !> Sparse matrix handle to MKL
-        real(DP),dimension(:),allocatable :: values                         !> the non-zero values
+        real*4,dimension(:),allocatable :: values                         !> the non-zero values
         integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
         integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
         integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
     end type MagTenseSparse
     
-    
+    !Complex version
+    type MagTenseSparse_c
+        type(sparse_matrix_t) :: A                                      !> Sparse matrix handle to MKL
+        complex(kind=4),dimension(:),allocatable :: values                         !> the non-zero values
+        integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
+        integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
+        integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
+    end type MagTenseSparse_c
     
     !>-----------------
     !> Overall data structure for a micro magnetism problem.
@@ -62,15 +69,18 @@ include 'mkl_spblas.f90'
         real(DP),dimension(:),allocatable :: t          !> Time array for the desired output times
         real(DP),dimension(:),allocatable :: m0         !>Initial value of the magnetization
         
-        real(DP) :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
+        real*4 :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         
         integer :: useCuda                          !> Defines whether to attempt using CUDA or not
+        
+        integer :: demag_approximation                  !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         
         !Below is stuff that is computed when the solver initializes
         
         type(sparse_matrix_t) :: A_exch         !> Exchange term matrix
         
-        type(MagTenseSparse),dimension(6) :: K_s !> Sparse matrices (used if the threshold is >0 )
+        type(MagTenseSparse),dimension(6) :: K_s         !> Sparse matrices (used if the threshold is >0 )
+        type(MagTenseSparse_c),dimension(6) :: K_s_c       !> Sparse matrices (used if the threshold is >0 ), complex version
         
         real(DP),dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
         real(DP),dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
@@ -79,6 +89,9 @@ include 'mkl_spblas.f90'
         real(DP),dimension(:),allocatable :: Axx,Axy,Axz,Ayy,Ayz,Azz    !> Anisotropy vectors assuming local anisotropy only, i.e. no interaction between grains
         
         
+        
+        type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H       !> Handle for the FFT MKL stuff
+        
     end type MicroMagProblem
     
     !>-----------------
@@ -86,12 +99,14 @@ include 'mkl_spblas.f90'
     !> The design intention is such that a problem may be restarted given the information stored in this struct
     !>-----------------
     type MicroMagSolution
-        real(DP),dimension(:),allocatable :: HjX,HjY,HjZ    !> Effective fields for the exchange term (X,Y and Z-directions, respectively)
-        real(DP),dimension(:),allocatable :: HhX,HhY,HhZ    !> Effective fields for the external field (X,Y and Z-directions, respectively)
-        real(DP),dimension(:),allocatable :: HkX,HkY,HkZ    !> Effective fields for the anisotropy energy term (X,Y and Z-directions, respectively)        
-        real*4,dimension(:),allocatable :: HmX,HmY,HmZ    !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
-        real(DP),dimension(:),allocatable :: Mx,My,Mz       !> The magnetization components used internally as the solution progresses
-                        
+        real*4,dimension(:),allocatable :: HjX,HjY,HjZ                     !> Effective fields for the exchange term (X,Y and Z-directions, respectively)
+        real(DP),dimension(:),allocatable :: HhX,HhY,HhZ                   !> Effective fields for the external field (X,Y and Z-directions, respectively)
+        real(DP),dimension(:),allocatable :: HkX,HkY,HkZ                   !> Effective fields for the anisotropy energy term (X,Y and Z-directions, respectively)        
+        real*4,dimension(:),allocatable :: HmX,HmY,HmZ                     !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
+        real*4,dimension(:),allocatable :: Mx,My,Mz                        !> The magnetization components used internally as the solution progresses
+        complex(kind=4),dimension(:),allocatable :: Mx_FT, My_FT, Mz_FT    !> Fourier transform of Mx, My and Mz (complex)
+        complex(kind=4),dimension(:),allocatable :: HmX_c,HmY_c,HmZ_c      !> Complex version of the demag field, used for the Fourier cut-off approach
+        
         real(DP),dimension(:),allocatable :: t_out          !> Output times at which the solution was computed
         real(DP),dimension(:,:,:,:),allocatable :: M_out        !> The magnetization at each of these times (n,3,nt,nt)
         
@@ -111,5 +126,6 @@ include 'mkl_spblas.f90'
     integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
     integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverImplicit=3
     integer,parameter :: useCudaTrue=1,useCudaFalse=0
+    integer,parameter :: DemagApproximationNothing=1,DemagApproximationThreshold=2,DemagApproximationFFTThreshold=3
     
 end module MicroMagParameters    

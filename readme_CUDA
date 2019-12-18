@@ -39,7 +39,7 @@ The strategy then is to make the CUDA GPU kernel in C++, compile this with the n
  
  From the x64 Native Tools prompt navigate to the MagTense dir: 
  
- MagTense/source/CUDATest/
+ MagTense/source/MagTenseFortranCUDA/cuda
  
  Compile with nvcc 
  

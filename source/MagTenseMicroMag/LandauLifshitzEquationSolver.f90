@@ -1,9 +1,9 @@
-!#include "blas.f90"
+
     module LandauLifshitzSolution
     use ODE_Solvers
     use integrationDataTypes
     use MKL_SPBLAS
-    !use BLAS95
+    Use MKL_DFTI
     use MicroMagParameters
     use MagTenseMicroMagIO
     use LLODE_Debug
@@ -35,7 +35,7 @@
     subroutine SolveLandauLifshitzEquation( prob, sol )    
     type(MicroMagProblem),intent(inout) :: prob     !> The problem data structure
     type(MicroMagSolution),intent(inout) :: sol     !> The solution data structure    
-    integer :: ntot,i,j,k,ind,nt                     !> total no. of tiles
+    integer :: ntot,i,j,k,ind,nt,stat               !> total no. of tiles
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
     real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
@@ -76,6 +76,7 @@
     
     !Set the initial values for m (remember that M is organized such that mx = m(1:ntot), my = m(ntot+1:2*ntot), mz = m(2*ntot+1:3*ntot)
     allocate(gb_solution%t_out(size(gb_problem%t)))
+    
     
     
     call displayMatlabMessage( 'Running solution' )
@@ -125,6 +126,11 @@
     !Clean up
     deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
     
+    !clean-up
+    stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
+    
+        
+    
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
         call cudaDestroy()
     endif
@@ -168,14 +174,7 @@
     gb_solution%My = m(ntot+1:2*ntot)
     gb_solution%Mz = m(2*ntot+1:3*ntot)
     
-    !Make a parallel region where one task does the CPU stuff and the other the GPU stuff asynchronously
     
-    !$omp parallel
-    !make sure to run on one thread that then spawns from the thread pool as the tasks are started
-    !$omp single
-    
-    !define the task for the CPU stuff
-    !$omp task
     !Exchange term    
     call updateExchangeTerms( gb_problem, gb_solution )
     
@@ -185,19 +184,9 @@
     
     !Anisotropy term
     call updateAnisotropy(  gb_problem, gb_solution )
-    
-    !$omp end task
-    
-    !define the task for the GPU stuff. It is assumed that the GPU stuff takes roughly the same time as the CPU stuff for this to work
-    !$omp task
+        
     !Demag. field
-    call updateDemagfield( gb_problem, gb_solution )
-    !$omp end task
-    
-    
-    !finish the single and parallel regions
-    !$omp end single
-    !$omp end parallel
+    call updateDemagfield( gb_problem, gb_solution )        
     
     !Effective field
     HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
@@ -292,6 +281,13 @@
         solution%HmY(:) = 0.
         solution%HmZ(:) = 0.
         
+        if ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) then
+            !allocate the Fourier Transform of the magnetization
+            allocate( solution%Mx_FT(ntot), solution%My_FT(ntot), solution%Mz_FT(ntot) )
+            allocate( solution%HmX_c(ntot), solution%HmY_c(ntot), solution%HmZ_c(ntot) )
+        endif
+        
+        
     endif
     
     !"J" : exchange term
@@ -319,7 +315,7 @@
     
     integer :: stat
     type(MATRIX_DESCR) :: descr
-    real(DP) :: alpha
+    real*4 :: alpha, beta
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -328,16 +324,17 @@
     
     
     alpha = -2 * solution%Jfact
+    beta = 0.
     
     !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
     !y = alpha * (A_exch * Mx )
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, 0.d0, solution%HjX )
+    stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, beta, solution%HjX )
     
     !Effective field in the Y-direction
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, 0.d0, solution%HjY )
+    stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, beta, solution%HjY )
     
     !Effective field in the Z-direction
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, 0.d0, solution%HjZ )
+    stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, beta, solution%HjZ )
     
     end subroutine updateExchangeTerms
     
@@ -439,33 +436,112 @@
     subroutine updateDemagfield_uniform( problem, solution)
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
-    integer :: stat
+    integer :: stat,ntot,i
     type(matrix_descr) :: descr
-    real*4 :: pref
+    real*4 :: pref,alpha,beta
+    complex(kind=4) :: alpha_c, beta_c
     
-    if ( problem%demag_threshold .gt. 0. ) then
-        descr%type = SPARSE_MATRIX_TYPE_GENERAL
+     descr%type = SPARSE_MATRIX_TYPE_GENERAL
         descr%mode = SPARSE_FILL_MODE_FULL
         descr%diag = SPARSE_DIAG_NON_UNIT
-        !Do the matrix multiplications using sparse matrices        
-        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(1)%A, descr, solution%Mx, 0.d0, solution%HmX )
-        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(2)%A, descr, solution%My, 1.d0, solution%HmX )
-        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(3)%A, descr, solution%Mz, 1.d0, solution%HmX )
-        !
-        !solution%HmX = solution%HmX * (-solution%Mfact )
-        !
-        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(2)%A, descr, solution%Mx, 0.d0, solution%HmY )
-        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(4)%A, descr, solution%My, 1.d0, solution%HmY )
-        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(5)%A, descr, solution%Mz, 1.d0, solution%HmY )
-        !
-        !solution%HmY = solution%HmY * (-solution%Mfact )
-        !
-        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(3)%A, descr, solution%Mx, 0.d0, solution%HmZ )
-        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(5)%A, descr, solution%My, 1.d0, solution%HmZ )
-        !stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, 1.d0, problem%K_s(6)%A, descr, solution%Mz, 1.d0, solution%HmZ )
-        !
-        !solution%HmZ = solution%HmZ * (-solution%Mfact )
-    else
+    
+    if ( problem%demag_approximation .eq. DemagApproximationThreshold ) then
+       
+        !Do the matrix multiplications using sparse matrices 
+        alpha = 1.0
+        beta = 0.
+        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(1)%A, descr, solution%Mx, beta, solution%HmX )
+        beta = 1.0
+        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My, beta, solution%HmX )
+        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz, beta, solution%HmX )
+        
+        solution%HmX = solution%HmX * (-solution%Mfact )
+        beta = 0.
+        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx, beta, solution%HmY )
+        beta = 1.0
+        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My, beta, solution%HmY )
+        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz, beta, solution%HmY )
+        
+        solution%HmY = solution%HmY * (-solution%Mfact )
+        beta = 0.
+        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx, beta, solution%HmZ )
+        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My, alpha, solution%HmZ )
+        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz, alpha, solution%HmZ )
+        
+        solution%HmZ = solution%HmZ * (-solution%Mfact )
+    elseif ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) then
+        !fourier transform Mx, My and Mz
+        ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+                
+        !Convert to complex format
+        do i=1,ntot
+            solution%Mx_FT(i) = cmplx( solution%Mx(i), 0. )
+            solution%My_FT(i) = cmplx( solution%My(i), 0. )
+            solution%Mz_FT(i) = cmplx( solution%Mz(i), 0. )
+        enddo
+        
+        stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mx_FT )
+        !normalization
+        solution%Mx_FT = solution%Mx_FT / ntot
+                
+        stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%My_FT )
+        !normalization
+        solution%My_FT = solution%My_FT / ntot
+        
+        stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mz_FT )
+        !normalization
+        solution%Mz_FT = solution%Mz_FT / ntot
+            
+        !sparse matrix multiplication with the demag matrices in fourier space...                
+        ! use problem%K_s(1..6) with cuda or MKL to do the sparse matrix-vector product with the FFT(M) and subsequently the IFT on the whole thing to get H
+        
+        !First Hx = Kxx * Mx + Kxy * My + Kxz * Mz
+        
+        alpha_c = cmplx(1.,0)
+        beta_c = cmplx(0.,0.)
+        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(1)%A, descr, solution%Mx_FT, beta_c, solution%HmX_c )
+        beta_c = cmplx(1.0,0.)
+        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%My_FT, beta_c, solution%HmX_c )
+        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(3)%A, descr, solution%Mz_FT, beta_c, solution%HmX_c )
+        
+        
+        !Fourier transform backwards to get the field
+        stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmX_C )
+        
+        !Get the field
+        solution%HmX = -solution%Mfact * real(solution%HmX_c)
+        
+        
+        !Second Hy = Kyx * Mx + Kyy * My + Kyz * Mz        
+        beta_c = cmplx(0.,0.)
+        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%Mx_FT, beta_c, solution%HmY_c )
+        beta_c = cmplx(1.0,0.)
+        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(4)%A, descr, solution%My_FT, beta_c, solution%HmY_c )
+        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(5)%A, descr, solution%Mz_FT, beta_c, solution%HmY_c )
+        
+        !Fourier transform backwards to get the field
+        stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmY_c )
+        
+        !Get the field        
+        solution%HmY = -solution%Mfact * real(solution%HmY_c)
+        
+        
+        
+        !Third Hz = Kzx * Mx + Kzy * My + Kzz * Mz        
+        beta_c = cmplx(0.,0.)
+        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(3)%A, descr, solution%Mx_FT, beta_c, solution%HmZ_c )
+        beta_c = cmplx(1.0,0.)
+        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(5)%A, descr, solution%My_FT, beta_c, solution%HmZ_c )
+        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(6)%A, descr, solution%Mz_FT, beta_c, solution%HmZ_c )
+        
+        !Fourier transform backwards to get the field
+        stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmZ_c )
+        !finally, get the field out        
+        solution%HmZ = -solution%Mfact * real(solution%HmZ_c)
+        
+    
+        
+    else        
         if ( problem%useCuda .eq. useCudaFalse ) then
         !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
         !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
@@ -585,14 +661,18 @@
     
     !>-----------------------------------------
     subroutine ComputeDemagfieldTensor( problem )
-    type(MicroMagProblem),intent(inout) :: problem      !> Grid data structure    
+    type(MicroMagProblem),intent(inout) :: problem               !> Grid data structure    
     
-    type(MagTile),dimension(1) :: tile                  !> Tile representing the current tile under consideration
-    real(DP),dimension(:,:),allocatable :: H            !> The field and the corresponding evaluation point arrays
-    integer :: i,j,k,nx,ny,nz,ntot,ind                  !> Internal counters and index variables
-    real(DP),dimension(:,:,:,:),allocatable :: Nout         !> Temporary storage for the demag tensor    
-    
-   ! integer,dimension(1) :: shp
+    type(MagTile),dimension(1) :: tile                           !> Tile representing the current tile under consideration
+    real(DP),dimension(:,:),allocatable :: H                     !> The field and the corresponding evaluation point arrays
+    integer :: i,j,k,nx,ny,nz,ntot,ind                           !> Internal counters and index variables
+    real(DP),dimension(:,:,:,:),allocatable :: Nout              !> Temporary storage for the demag tensor            
+    complex(kind=4),dimension(:,:),allocatable :: eye,FT,IFT     !> Identity matrix, the indentity matrix' fourier transform and its inverse fourier transform
+    type(DFTI_DESCRIPTOR), POINTER :: desc_handle                !> Handle for the FFT MKL stuff
+    integer :: status
+    complex(kind=4),dimension(:,:),allocatable :: Kxx_c, Kxy_c, Kxz_c, Kyy_c, Kyz_c, Kzz_c !> Temporary matrices for storing the complex version of the demag matrices
+    complex(kind=4) :: thres
+    integer,dimension(3) :: L                                                !> Array specifying the dimensions of the fft
     
     if ( problem%grid%gridType .eq. gridTypeUniform ) then
         nx = problem%grid%nx
@@ -617,12 +697,7 @@
         tile(1)%exploitSymmetry = 0 !0 for no and this is important
         tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
         tile(1)%M(:) = 0.
-        
-        !Set up the points at which the field is to be evaluated (the centers of all the tiles)
-        !shp(1) = ntot
-        !pts(:,1) = reshape( problem%grid%x, shp )
-        !pts(:,2) = reshape( problem%grid%y, shp )
-        !pts(:,3) = reshape( problem%grid%z, shp )
+                
         
         !for each element find the tensor for all evaluation points (i.e. all elements)
         do k=1,nz
@@ -667,13 +742,113 @@
     
     
    !trial. Make a sparse matrix out of the dense matrices by specifying a threshold
-    if ( problem%demag_threshold .gt. 0. ) then
+    if ( problem%demag_approximation .eq. DemagApproximationThreshold ) then
         call ConvertDenseToSparse( problem%Kxx, problem%K_s(1), problem%demag_threshold)
         call ConvertDenseToSparse( problem%Kxy, problem%K_s(2), problem%demag_threshold)
         call ConvertDenseToSparse( problem%Kxz, problem%K_s(3), problem%demag_threshold)
         call ConvertDenseToSparse( problem%Kyy, problem%K_s(4), problem%demag_threshold)
         call ConvertDenseToSparse( problem%Kyz, problem%K_s(5), problem%demag_threshold)
         call ConvertDenseToSparse( problem%Kzz, problem%K_s(6), problem%demag_threshold)
+    elseif ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) then
+        !Apply the fast fourier transform concept, remove values below a certain threshold and then convert to a sparse matrix
+        !for use in the field calculation later on
+        
+        !We have the following:
+        ! H = N * M => 
+        ! H = IFT * FT * N * IFT * FT * M
+        ! with FT = FFT( eye(n,n) ) and IFT = IFFT( eye(n,n) )
+        ! The matrix N' = FT * N * IFT is then reduced to a sparse matrix
+        ! through N'(N'<demag_threshold) = 0 and then N' = sparse(N')
+        
+        !create the FT and IFT matrices
+        allocate(eye(ntot,ntot),FT(ntot,ntot),IFT(ntot,ntot) )
+        
+        
+        !make the identity matrix
+        eye(:,:) = 0
+        do i=1,ntot
+            eye(i,i) = cmplx(1.,0)
+        enddo
+        
+        !get the FFT and the IFFT of the identity matrix
+        L(1) = nx
+        L(2) = ny
+        L(3) = nz
+        status = DftiCreateDescriptor( desc_handle, DFTI_SINGLE, DFTI_COMPLEX, 3, L )
+        !Set the descriptor to not override the input array (change of a default setting)
+        status = DftiSetValue( desc_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE )
+                
+        status = DftiCommitDescriptor( desc_handle )
+        
+        do i=1,ntot
+            status = DftiComputeForward( desc_handle, eye(:,i), FT(:,i) )            
+        enddo
+        
+        !Find the inverse of the fourier transform
+        !We need to check if we should divide by the no of elements
+        IFT = transpose(conjg(FT)) / ntot
+        
+        
+        !do the change of basis of each of the demag tensor matrices
+        !And make room for the very temporary complex output matrices
+        allocate( Kxx_c(ntot,ntot), Kxy_c(ntot,ntot), Kxz_c(ntot,ntot) )
+        allocate( Kyy_c(ntot,ntot), Kyz_c(ntot,ntot), Kzz_c(ntot,ntot) )
+        
+        
+        Kxx_c = matmul( matmul( FT, problem%Kxx ), IFT )
+        Kxy_c = matmul( matmul( FT, problem%Kxy ), IFT )
+        Kxz_c = matmul( matmul( FT, problem%Kxz ), IFT )
+        Kyy_c = matmul( matmul( FT, problem%Kyy ), IFT )
+        Kyz_c = matmul( matmul( FT, problem%Kyz ), IFT )
+        Kzz_c = matmul( matmul( FT, problem%Kzz ), IFT )
+        
+        
+        open (11, file='ft_Kxx_ift.dat',	&
+			           status='unknown', form='unformatted',	&
+			           access='direct', recl=1*ntot*ntot)
+
+        write(11,rec=1) real(Kxx_c)
+        write(11,rec=2) aimag(Kxx_c)        
+    
+        close(11)
+        
+        open (11, file='ft_Kxx_ift.dat',	&
+			           status='unknown', form='unformatted',	&
+			           access='direct', recl=2*ntot*ntot)
+        
+        write(11,rec=2) problem%Kxx
+        
+        close(11)
+        
+        !Apply the thresholding
+        thres = cmplx(problem%demag_threshold,0.)
+        call ConvertDenseToSparse_c( Kxx_c, problem%K_s_c(1), thres)
+        call ConvertDenseToSparse_c( Kxy_c, problem%K_s_c(2), thres)
+        call ConvertDenseToSparse_c( Kxz_c, problem%K_s_c(3), thres)
+        call ConvertDenseToSparse_c( Kyy_c, problem%K_s_c(4), thres)
+        call ConvertDenseToSparse_c( Kyz_c, problem%K_s_c(5), thres)
+        call ConvertDenseToSparse_c( Kzz_c, problem%K_s_c(6), thres)
+        
+        
+        
+        !then use problem%K_s(1..6) with cuda or MKL to do the sparse matrix-vector product with the FFT(M) and subsequently the IFT on the whole thing to get H
+        
+        !clean-up
+        status = DftiFreeDescriptor(desc_handle)
+        deallocate(Kxx_c,Kxy_c,Kxz_c,Kyy_c,Kyz_c,Kzz_c)
+        deallocate(eye,FT,IFT)
+        !deallocate(problem%Kxx,problem%Kxy,problem%Kxz)
+        !deallocate(problem%Kyy,problem%Kyz,problem%Kzz)
+        
+        !Make descriptor handles for the FFT of M and IFFT of H
+        status = DftiCreateDescriptor( problem%desc_hndl_FFT_M_H, DFTI_SINGLE, DFTI_COMPLEX, 3, L )
+        
+        status = DftiCommitDescriptor( problem%desc_hndl_FFT_M_H )
+        
+        
+        
+        
+        
     endif
     
     
@@ -688,7 +863,7 @@
     !>-----------------------------------------
     subroutine ConvertDenseToSparse( D, K, threshold)
     real(DP),dimension(:,:),intent(in) :: D                 !> Dense input matrix    
-    real(DP),intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
+    real*4,intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
     type(MagTenseSparse),intent(inout) :: K                           !> Sparse matrix allocation
     
     integer :: nx,ny, nnonzero
@@ -734,12 +909,76 @@
     enddo
     
     !make sparse matrix
-    stat = mkl_sparse_d_create_csr ( K%A, SPARSE_INDEX_BASE_ONE, nx, ny, K%rows_start, K%rows_end, K%cols, K%values)
+    stat = mkl_sparse_s_create_csr ( K%A, SPARSE_INDEX_BASE_ONE, nx, ny, K%rows_start, K%rows_end, K%cols, K%values)
     
     !clean up
     deallocate(colInds)
     
     end subroutine ConvertDenseToSparse
+    
+    
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @brief
+    !> Converts the dense matrix D (size nx,ny) to a sparse matrix K (size nx,y) )
+    !> With the matrices being of type complex(kind=4)
+    !> @params[in] threshold a number specifying the lower limit of values in D that should be considered non-zero
+    !>-----------------------------------------
+    subroutine ConvertDenseToSparse_c( D, K, threshold)
+    complex(kind=4),dimension(:,:),intent(in) :: D          !> Dense input matrix    
+    type(MagTenseSparse_c),intent(inout) :: K                 !> Sparse matrix allocation
+    complex(kind=4),intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
+    
+    
+    integer :: nx,ny, nnonzero
+    
+    logical,dimension(:,:),allocatable :: mask          !> mask used for finding non-zero values
+    integer,dimension(:),allocatable :: colInds         !> Used for storing the values 1...n used for indexing
+    integer :: i,j,ind,stat
+    
+    nx = size(D(:,1))
+    ny = size(D(1,:))
+    
+    allocate(mask(nx,ny))
+    
+    mask = abs(D) .gt. abs(threshold)
+    
+    nnonzero = count( mask )
+    
+    allocate( K%values(nnonzero),K%cols(nnonzero))
+    allocate( K%rows_start(nx), K%rows_end(nx), colInds(ny) )
+    
+    do i=1,ny
+        colInds(i) = i
+    enddo
+    
+    
+    !loop over each row
+    ind = 1
+    do i=1,nx
+        !find all non-zero elements in the i'th row of D
+        !starting index of the i'th row
+        K%rows_start(i) = ind
+        do j=1,ny
+            if ( mask(i,j) .eq. .true. ) then
+                K%values( ind ) = D(i,j)
+                
+                K%cols( ind ) = j
+                
+                ind = ind + 1
+            endif
+        enddo                                        
+        !ending index of the i'th row
+        K%rows_end(i) = ind
+    enddo
+    
+    !make sparse matrix
+    stat = mkl_sparse_c_create_csr ( K%A, SPARSE_INDEX_BASE_ONE, nx, ny, K%rows_start, K%rows_end, K%cols, K%values)
+    
+    !clean up
+    deallocate(colInds)
+    
+    end subroutine ConvertDenseToSparse_c
     
     
     !>-----------------------------------------
@@ -775,7 +1014,7 @@
     integer :: ind, ntot,colInd,rowInd                !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
     integer :: i,j,k,nx,ny,nz                         !> For-loop counters
     type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
-    
+    real*4 :: const
     
     !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
@@ -856,7 +1095,7 @@
     
     
     !Create the sparse matrix for the d^2dx^2
-    stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
+    stat = mkl_sparse_s_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
     
     
     !----------------------------------d^2dx^2 ends -----------------------------!
@@ -951,7 +1190,7 @@
     d2dy2%values = d2dy2%values * 1./grid%dy**2
         
     !Create the sparse matrix for the d^2dy^2
-    stat = mkl_sparse_d_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
+    stat = mkl_sparse_s_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
     
     !----------------------------------d^2dy^2 ends ----------------------------!
     
@@ -1052,7 +1291,7 @@
         d2dz2%values = d2dz2%values * 1./grid%dz**2
         
         !Create the sparse matrix for the d^2dz^2
-        stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
+        stat = mkl_sparse_s_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
     endif
     
     !----------------------------------d^2dz^2 ends ----------------------------!
@@ -1064,13 +1303,13 @@
     !call writeSparseMatrixToDisk( d2dz2%A, nx*ny*nz, 'd2dz2.dat' )
     !call writeSparseMatrixToDisk( d2dy2%A, nx*ny*nz, 'd2dy2.dat' )
     
-    
-    stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, 1.d0, d2dy2%A, tmp)    
+    const = 1.
+    stat = mkl_sparse_s_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dy2%A, tmp)    
     
     !call writeSparseMatrixToDisk( tmp, nx*ny*nz, 'A_exch.dat' )
     
     if ( nz .gt. 1 ) then    
-        stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, 1.d0, tmp, A)
+        stat = mkl_sparse_s_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, const, tmp, A)
         !clean up        
         deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
         stat = mkl_sparse_destroy (d2dz2%A)

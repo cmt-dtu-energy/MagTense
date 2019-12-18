@@ -67,4 +67,66 @@
     
     end subroutine writeSparseMatrixToDisk
     
+    
+    !>-------------------------------------------
+    !> Writes the sparse matrix A to disk
+    !> @params[in] A sparse matrix according to the Intel MKL format
+    !> @params[in] n the no. of rows and columns in A (assumed to be square)
+    !>-------------------------------------------
+    subroutine writeSparseMatrixToDisk_c( A, n, filename )
+    type(sparse_matrix_t),intent(in) :: A
+    integer,intent(in) :: n
+    character(*),intent(in) :: filename
+    
+    complex(kind=4),dimension(:,:),allocatable :: x,y      !> The dense matrix to be created
+    complex(kind=4),dimension(:), allocatable :: xx,yy     
+    integer,dimension(1) :: shp1D
+    integer,dimension(2) :: shp2D
+    integer :: i, stat
+    complex(kind=4) :: alpha, beta
+    type(matrix_descr) :: descr 
+    
+    descr%type = SPARSE_MATRIX_TYPE_GENERAL
+    descr%mode = SPARSE_FILL_MODE_FULL
+    descr%diag = SPARSE_DIAG_NON_UNIT
+    
+    allocate( x(n,n), y(n,n) )
+    allocate( xx(n*n), yy(n*n) )
+    
+    x(:,:) = cmplx(0.,0.)
+    xx(:) = cmplx(0.,0.)
+    
+    !make unit matrix
+    do i=1,n
+        x(i,i) = cmplx(1.,0.)
+    enddo
+    
+    shp1D(1) = n*n
+    
+    xx = reshape( x, shp1D )
+    
+    alpha = cmplx(1.,0.)
+    beta = cmplx(0.,0.)
+    
+    
+    stat = mkl_sparse_c_mm (SPARSE_OPERATION_NON_TRANSPOSE, alpha, A, descr, SPARSE_LAYOUT_COLUMN_MAJOR, xx, n, n, beta, yy, n)
+    
+    shp2D(1) = n
+    shp2D(2) = n
+    y = reshape( yy, shp2D )
+    
+    open (11, file=filename,	&
+			           status='unknown', form='unformatted',	&
+			           access='direct', recl=1*n*n)
+
+    write(11,rec=1) real(y)
+    write(11,rec=2) aimag(y)
+    
+    close(11)
+    
+    deallocate(x,xx,y,yy)
+    
+    end subroutine writeSparseMatrixToDisk_c
+    
+    
 end module LLODE_Debug

@@ -41,6 +41,9 @@ properties
 
     MaxT0
 
+    %Sets how often timestep is displayed from Fortran
+    setTimeDis
+    
     %initial magnetization (mx = m0(1:n), my = m(n+1:2n), mz = m(2n+1:3n) with
     %n = no. of elements )
     m0
@@ -59,6 +62,9 @@ properties
     %NVIDIA driver is present or if insufficient memory is available. 0 for
     %do not use cuda, 1 for do use (int32)
     useCuda
+    
+    %defines which approximation (if any) to use for the demag tensor 
+    dem_appr
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -115,11 +121,13 @@ methods
         %if MaxT0 > 0 then alpha = alpha0 * 10^( 7 * min(t,MaxT0)/MaxT0 )
         %thus scaling with the solution time. This is used in the explicit
         %solver for tuning into the correct time scale of the problem
-        obj.MaxT0 = 0;
+        obj.MaxT0 = 2;
         
         %solution times
         obj.nt = int32(1000);
         obj.t = linspace(0,1,obj.nt);
+        
+        obj.setTimeDis = int32(10);
 
         if ~exist('HextFct')
             HextFct = @(t) (t>=0)' * [0,0,0];
@@ -140,6 +148,9 @@ methods
         obj.dem_thres = 0;
         %set use cuda to default not
         obj.useCuda = int32(0);
+        %set the demag approximation to the default, i.e. use no
+        %approximation
+        obj.dem_appr = getMicroMagDemagApproximation('none');
     end
     
     %%Calculates the applied field as a function of time on the time grid
