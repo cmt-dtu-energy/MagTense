@@ -713,7 +713,7 @@ module TileNComponents
     
     end subroutine
         
-    
+    !> Returns the general tetrahedron solution
     subroutine getN_tensor_tetrahedron ( tile, r, N )         
          type(MagTile),intent(in) :: tile
          real,dimension(3),intent(in) :: r
