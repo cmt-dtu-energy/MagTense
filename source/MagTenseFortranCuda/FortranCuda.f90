@@ -81,7 +81,7 @@
     end subroutine cudaInit
     
     subroutine cudaMatrVecMult( Mx_in, My_in, Mz_in, Hx, Hy, Hz, pref )
-    real*8,dimension(:),intent(in) :: Mx_in,My_in,Mz_in
+    real*4,dimension(:),intent(in) :: Mx_in,My_in,Mz_in
     real*4,dimension(:),intent(inout) :: Hx,Hy,Hz
     real*4,intent(in) :: pref
     integer :: i,n
@@ -89,14 +89,14 @@
     n = size(Mx)
     
     !Convert the M arrays to float
-    do i=1,n
-        Mx(i) = sngl(Mx_in(i))    
-        My(i) = sngl(My_in(i))
-        Mz(i) = sngl(Mz_in(i))
-    enddo
-    
+    !do i=1,n
+    !    Mx(i) = sngl(Mx_in(i))    
+    !    My(i) = sngl(My_in(i))
+    !    Mz(i) = sngl(Mz_in(i))
+    !enddo
+    !
     !call cuda to do the matrix-vector multiplication
-    call cu_icl_MVMult_GetH( Mx, My, Mz, Hx, Hy, Hz, n, pref )
+    call cu_icl_MVMult_GetH( Mx_in, My_in, Mz_in, Hx, Hy, Hz, n, pref )
     end subroutine cudaMatrVecMult
     
     
