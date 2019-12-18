@@ -168,14 +168,7 @@
     gb_solution%My = m(ntot+1:2*ntot)
     gb_solution%Mz = m(2*ntot+1:3*ntot)
     
-    !Make a parallel region where one task does the CPU stuff and the other the GPU stuff asynchronously
     
-    !$omp parallel
-    !make sure to run on one thread that then spawns from the thread pool as the tasks are started
-    !$omp single
-    
-    !define the task for the CPU stuff
-    !$omp task
     !Exchange term    
     call updateExchangeTerms( gb_problem, gb_solution )
     
@@ -186,18 +179,9 @@
     !Anisotropy term
     call updateAnisotropy(  gb_problem, gb_solution )
     
-    !$omp end task
-    
-    !define the task for the GPU stuff. It is assumed that the GPU stuff takes roughly the same time as the CPU stuff for this to work
-    !$omp task
+        
     !Demag. field
     call updateDemagfield( gb_problem, gb_solution )
-    !$omp end task
-    
-    
-    !finish the single and parallel regions
-    !$omp end single
-    !$omp end parallel
     
     !Effective field
     HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
@@ -313,25 +297,34 @@
     !> @param[in] problem, the struct containing the current problem
     !> @param[inout] solution, struct containing the current solution    
     !>-----------------------------------------
-    subroutine updateExchangeTerms( problem, solution )
+     subroutine updateExchangeTerms( problem, solution )
     type(MicroMagProblem),intent(in) :: problem
     type(MicroMagSolution),intent(inout) :: solution
     
     integer :: stat
     type(MATRIX_DESCR) :: descr
+    real :: prefact
+    
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
     
     
     
+    prefact = -2 * solution%Jfact
     
+    !Effective field in the X-direction. Note that the scalar prefact is multiplied on from the left, such that
+    !y = prefact * (A_exch * Mx )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, prefact, problem%A_exch, descr, solution%Mx, 0., solution%HjX )
     
     !Effective field in the Y-direction
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, prefact, problem%A_exch, descr, solution%My, 0., solution%HjY )
     
     !Effective field in the Z-direction
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, prefact, problem%A_exch, descr, solution%Mz, 0., solution%HjZ )
     
     end subroutine updateExchangeTerms
+
     
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
@@ -349,7 +342,11 @@
     real :: HextX,HextY,HextZ
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
-        !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
+         !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
+        solution%HhX = -problem%Hext(solution%HextInd,2)
+        solution%HhY = -problem%Hext(solution%HextInd,3)
+        solution%HhZ = -problem%Hext(solution%HextInd,4)
+
     elseif ( problem%solver .eq. MicroMagSolverDynamic ) then
         
         !Interpolate to get the applied field at time t
@@ -357,7 +354,10 @@
         call interp1( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
         call interp1( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
         
-        
+         solution%HhX = -HextX
+        solution%HhY = -HextY
+        solution%HhZ = -HextZ
+
         
     elseif ( problem%solver .eq. MicroMagSolverImplicit ) then
     !not implemented yet
