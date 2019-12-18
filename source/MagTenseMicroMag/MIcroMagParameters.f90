@@ -71,6 +71,7 @@ include "mkl_dfti.f90"
         
         real*4 :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         
+        integer :: setTimeDisplay
         integer :: useCuda                          !> Defines whether to attempt using CUDA or not
         integer :: demag_approximation                  !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         
@@ -111,6 +112,7 @@ include "mkl_dfti.f90"
         
         real(DP),dimension(:,:),allocatable :: pts          !> n,3 array with the points (x,y,z) of the centers of the tiles
         
+        real(DP) :: Jfact,Mfact,Kfact
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
     end type MicroMagSolution

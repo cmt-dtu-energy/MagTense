@@ -155,6 +155,7 @@
         demApproxPtr = mxGetField( prhs, i, problemFields(20) )
         call mxCopyPtrToInteger4(mxGetPr(demApproxPtr), problem%demag_approximation, sx )
         
+        problem%setTimeDisplay = 100
         
         !Clean-up 
         deallocate(problemFields)

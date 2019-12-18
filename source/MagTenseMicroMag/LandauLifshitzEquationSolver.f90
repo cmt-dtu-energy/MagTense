@@ -322,7 +322,7 @@
     descr%diag = SPARSE_DIAG_NON_UNIT
     
     
-    
+    alpha = -2 * solution%Jfact
     beta = 0.
     
     !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
@@ -354,6 +354,9 @@
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
         !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
+        solution%HhX = -problem%Hext(solution%HextInd,2)
+        solution%HhY = -problem%Hext(solution%HextInd,3)
+        solution%HhZ = -problem%Hext(solution%HextInd,4)
     elseif ( problem%solver .eq. MicroMagSolverDynamic ) then
         
         !Interpolate to get the applied field at time t
@@ -361,7 +364,9 @@
         call interp1( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
         call interp1( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
         
-        
+        solution%HhX = -HextX
+        solution%HhY = -HextY
+        solution%HhZ = -HextZ
         
     elseif ( problem%solver .eq. MicroMagSolverImplicit ) then
     !not implemented yet
@@ -378,9 +383,10 @@
     !> @param[inout] solution, struct containing the current solution        
     !>-----------------------------------------
     subroutine updateAnisotropy( problem, solution)
-    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
+   type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     
+    real :: prefact                                       !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
     
     
@@ -389,9 +395,12 @@
     descr%diag = SPARSE_DIAG_NON_UNIT
     
     
-
+    prefact = -2.*solution%Kfact
     
     !Notice that the anisotropy matrix is symmetric and so Axy = Ayx etc.
+    solution%Hkx = prefact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
+    solution%Hky = prefact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
+    solution%Hkz = prefact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
     
 
     
