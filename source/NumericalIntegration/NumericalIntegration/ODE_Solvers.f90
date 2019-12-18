@@ -25,12 +25,13 @@ implicit none
     !> @param[in] callback function pointer for progress updates to Matlab
     !> more parameters to come as we progress in the build-up of this function (error, options such as tolerances etc)
     !---------------------------------------------------------------------------
-    subroutine MagTense_ODE( fct, t, y0, t_out, y_out, callback )
+    subroutine MagTense_ODE( fct, t, y0, t_out, y_out, callback, callback_display )
     procedure(dydt_fct), pointer :: fct                     !>Input function pointer for the function to be integrated
     procedure(callback_fct), pointer :: callback            !> Callback function
     real,dimension(:),intent(in) :: t,y0                    !>requested time (size m) and initial values ofy (size n)
     real,dimension(:),intent(inout) :: t_out                !>actual time values at which the y_i are found, size m
     real,dimension(:,:),intent(inout) :: y_out              !>Function values at the times t_out, size [n,m]
+    integer,intent(in) :: callback_display                  !>Sets at what time index values Fortran displays the results in Matlab
     
     integer :: neq, nt    
     real,allocatable,dimension(:,:) :: yderiv_out           !>The derivative of y_i wrt t at each time step
@@ -48,7 +49,7 @@ implicit none
     
     
     !Call the solver
-    call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, callback )
+    call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, callback, callback_display )
     
     deallocate(yderiv_out)
     
@@ -72,7 +73,7 @@ implicit none
     !> @param[inut] yderiv_out output array with dy_i/dt at each time
     !> @param[in] callback procedure pointer to callback to Matlab for progress updates
     !---------------------------------------------------------------------------
-    subroutine MagTense_ODE_RKSuite( fct, neq, t, nt, ystart,  t_out, y_out, yderiv_out, callback )
+    subroutine MagTense_ODE_RKSuite( fct, neq, t, nt, ystart,  t_out, y_out, yderiv_out, callback, callback_display )
     procedure(dydt_fct), pointer :: fct                  !>Input function pointer for the function to be integrated
     integer,intent(in) :: neq,nt                         !>Input no. of equations and no. of time steps
     real,dimension(nt),intent(in) :: t                   !>Input time array, size nt
@@ -80,7 +81,8 @@ implicit none
     real,dimension(nt),intent(inout) :: t_out            !>Array for the actual time values where the solution was found
     real,dimension(neq,nt),intent(inout) :: y_out        !>Array returning the solution at the times in t_out
     real,dimension(neq,nt),intent(inout) :: yderiv_out   !>Array returning dy/dt at the times in t_out
-    procedure(callback_fct), pointer :: callback         !> Callback function
+    procedure(callback_fct), pointer :: callback         !>Callback function
+    integer,intent(in) :: callback_display               !>Sets at what time index values Fortran displays the results in Matlab
     
     real :: tol                                 !>Relative tolerance. Will be parameterized when the code is running properly
     real,dimension(:),allocatable :: thres      !>arrays used by the initiater     
@@ -91,7 +93,7 @@ implicit none
     type(rk_comm_real_1d) :: setup_comm         !>Stores all the stuff used by setup
     integer :: flag                             !>Flag indicating how the integration went
     integer :: i                                !>Counter variable
-    integer,parameter :: n_write=100
+    !integer,parameter :: n_write=100
     !Perform allocations. 
     allocate(thres(neq))
     
@@ -123,7 +125,7 @@ implicit none
     do i=2,nt                
         call range_integrate( setup_comm, fct, t(i), t_out(i), y_out(:,i), yderiv_out(:,i), flag )
         
-        if ( mod(i,n_write) .eq. 0 ) then
+        if ( mod(i,callback_display) .eq. 0 ) then
             call callback( 'Time', i )
         endif
     enddo

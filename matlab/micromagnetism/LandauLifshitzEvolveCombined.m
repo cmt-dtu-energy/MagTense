@@ -29,7 +29,7 @@ CopyMatrix = InteractionMatrices.CopyMatrix;
 %% Effective field parameter prefactors
 
 Jfact = A0/(MU0*Ms) ;   % "J" : exchange term
-Hfact = 1/MU0 ;         % "H" : external field term (b.c. user input is in Tesla)
+% Hfact = 1/MU0 ;         % "H" : external field term (b.c. user input is in Tesla)
 Mfact = Ms ;            % "M" : demagnetization term
 Kfact = K0/(MU0*Ms) ;   % "K" : anisotropy term
 
@@ -52,21 +52,21 @@ AA.HmZ = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobZX{1}*Sx+DemagTensor.KglobZY{1
 % "H" : Effective field : external field
 
 if UseExplicitSolver | UseDynamicSolver
-    AA.HhX = @(Sx,Sy,Sz,t) + (Hfact*HsX(t)).*O ;
-    AA.HhY = @(Sx,Sy,Sz,t) + (Hfact*HsY(t)).*O ;
-    AA.HhZ = @(Sx,Sy,Sz,t) + (Hfact*HsZ(t)).*O ;
+    AA.HhX = @(Sx,Sy,Sz,t) - HsX(t).*O ;
+    AA.HhY = @(Sx,Sy,Sz,t) - HsY(t).*O ;
+    AA.HhZ = @(Sx,Sy,Sz,t) - HsZ(t).*O ;
 end
 
 if UseImplicitSolver
-    AA.HhX = @(Sx,Sy,Sz,t) + (Hfact*ddHsX*(t)).*O ;
-    AA.HhY = @(Sx,Sy,Sz,t) + (Hfact*ddHsY*(t)).*O ;
-    AA.HhZ = @(Sx,Sy,Sz,t) + (Hfact*ddHsZ*(t)).*O ;
+    AA.HhX = @(Sx,Sy,Sz,t) - ddHsX*(t).*O ;
+    AA.HhY = @(Sx,Sy,Sz,t) - ddHsY*(t).*O ;
+    AA.HhZ = @(Sx,Sy,Sz,t) - ddHsZ*(t).*O ;
 
     %
     
-    AA.ddHhX = @(Sx,Sy,Sz,t) + (Hfact*ddHsX).*O +0.*t ;
-    AA.ddHhY = @(Sx,Sy,Sz,t) + (Hfact*ddHsY).*O +0.*t ;
-    AA.ddHhZ = @(Sx,Sy,Sz,t) + (Hfact*ddHsZ).*O +0.*t ;
+    AA.ddHhX = @(Sx,Sy,Sz,t) - ddHsX.*O +0.*t ;
+    AA.ddHhY = @(Sx,Sy,Sz,t) - ddHsY.*O +0.*t ;
+    AA.ddHhZ = @(Sx,Sy,Sz,t) - ddHsZ.*O +0.*t ;
 end
 
 % "K" : Effective field : anisotropy
@@ -161,7 +161,7 @@ if UseImplicitSolver
 end
 
 
-Applied_field = [Hfact*HsX(t), Hfact*HsY(t),Hfact*HsZ(t)+0.*t];
+Applied_field = [HsX(t), HsY(t), HsZ(t)+0.*t];
 
 %% Calculate the Eigenvalue
 if CalcEigenvalue

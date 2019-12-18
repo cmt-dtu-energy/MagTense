@@ -6,33 +6,32 @@ NIST_field = 1;
 resolution = [36,9,1];
 
 figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
+mu0 = 4*pi*1e-7;
 
 addpath('../../MEX_files');
 addpath('../util');
 
-tic
-%test the Fortran implementation of the LL-ODE solver
-%get the default problem
+%% Setup the problem for the initial configuration
 %takes the size of the grid as arguments (nx,ny,nz) and a function handle
-%that produces the desired field (if not present zero applied field is
-%inferred)
+%that produces the desired field (if not present zero applied field is inferred)
+tic
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
-%problem.dem_appr = getMicroMagDemagApproximation('fft_thres');
-problem.dem_appr = getMicroMagDemagApproximation('none');
-problem.dem_thres = 0;%1e-2;
-problem = problem.setUseCuda(true);
-problem.alpha = -4.42e-6;
+
+problem.setUseCuda( true );
+
+problem.alpha = 4.42e3;
 problem.gamma = 0;
 
 %initial magnetization
 problem.m0(:) = 1/sqrt(3);
 
 %time grid on which to solve the problem
-problem = problem.setTime( linspace(0,100,200) );
-HystDir = -[1,1,1] ;
+problem = problem.setTime( linspace(0,100e-9,200) );
+problem.setTimeDis = int32(10);
+HystDir = 1/mu0*[1,1,1] ;
 
 %time-dependent applied field
-HextFct = @(t) (1-t)' .* HystDir .* (t<1)';
+HextFct = @(t) (1e-9-t)' .* HystDir .* (t<1e-9)';
 
 problem = problem.setHext( HextFct );
 
@@ -45,22 +44,23 @@ solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
 figure; M_end = squeeze(solution.M(end,:,:)); quiver(solution.pts(:,1),solution.pts(:,2),M_end(:,1),M_end(:,2)); axis equal; title('Starting state - Fortran')
 
 
-%setup problem for the time-dependent solver
+%% Setup problem for the time-dependent solver
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 % problem.gamma = -2.21e5;
 % problem.alpha = -4.42e3/problem.Ms;
-problem.alpha = -4.42e-6 ;
-problem.gamma = -2.21e-4 ;
-problem.dem_thres = 1e-6;
-problem = problem.setTime( linspace(0,1,200) ); %
+problem.alpha = 4.42e3 ;
+problem.gamma = 2.21e5 ;
+problem.dem_thres = 0;%1e-6;
+problem = problem.setTime( linspace(0,1e-9,200) ); %
+problem.setTimeDis = int32(10);
 
 if (NIST_field == 1)
     %field 1
-    HystDir = -[-24.6,4.3,0]/1000 ;
+    HystDir = 1/mu0*[-24.6,4.3,0]/1000 ;
 end
 if (NIST_field == 2)
     %field 2
-    HystDir = -[-35.5,-6.3,0]/1000 ;
+    HystDir = 1/mu0*[-35.5,-6.3,0]/1000 ;
 end
 
 HextFct = @(t) (t>-1)' .*HystDir;
@@ -85,7 +85,7 @@ addpath('..\..\micromagnetism')
 tic
 Matlab_model_params.nGrid = resolution';
 Matlab_model_params.Field_dir = HystDir;
-Script_3D_TestDynamicsStdProbl4(fig1,Matlab_model_params);
+Script_3D_Std_Problem_4(fig1,Matlab_model_params);
 toc
 
 %% Compare with published solutions available from NIST webpage
@@ -98,15 +98,15 @@ fill_ts=[t,fliplr(t)];
 for j=1:3
     std_errors{j}(1:2,:)=[mean_avg(1,:,j)+err(1,:,j);mean_avg(1,:,j)-err(1,:,j)];
     interval = [std_errors{j}(1,:),fliplr(std_errors{j}(2,:))];
-    fill(fig1,fill_ts,interval,weak_colours(j,:),'linestyle','none')
-    plot(fig1,t,mean_avg(1,:,j),'color',colours(j,:))
+    fill(fig1,1e-9*fill_ts,interval,weak_colours(j,:),'linestyle','none')
+    plot(fig1,1e-9*t,mean_avg(1,:,j),'color',colours(j,:))
 end
 
 legend(fig1,'Fortran Mx','Fortran My','Fortran Mz','Matlab Mx','Matlab My','Matlab Mz','NIST \sigma{}(Mx)','NIST <Mx>','NIST \sigma{}(My)','NIST <My>','NIST \sigma{}(Mz)','NIST <Mz>');
-ylabel('<M_i>/M_s')
-xlabel('Time [ns]')
+ylabel(fig1,'<M_i>/M_s')
+xlabel(fig1,'Time [ns]')
 
-xlim(fig1,[0 1])
+xlim(fig1,[0 1e-9])
 figure(figure1)
 
 

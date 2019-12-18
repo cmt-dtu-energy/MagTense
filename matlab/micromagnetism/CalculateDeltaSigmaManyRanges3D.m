@@ -74,17 +74,17 @@ ThisHeffZ2 = +SigmaX.*TheCrossY-SigmaY.*TheCrossX ;
 %% Calculate time-derivative of Sigma
 
 if isequal(class(alpha),'double') % alpha is time-independent
-    dSigmaX = alpha.*ThisHeffX2 + gamma.*TheCrossX ;
-    dSigmaY = alpha.*ThisHeffY2 + gamma.*TheCrossY ;
-    dSigmaZ = alpha.*ThisHeffZ2 + gamma.*TheCrossZ ;
+    dSigmaX = -alpha.*ThisHeffX2 - gamma.*TheCrossX ;
+    dSigmaY = -alpha.*ThisHeffY2 - gamma.*TheCrossY ;
+    dSigmaZ = -alpha.*ThisHeffZ2 - gamma.*TheCrossZ ;
     dSigma = [dSigmaX;dSigmaY;dSigmaZ] ;
-    dSigmaRMS = sqrt(sum((dSigma./alpha).^2)/NN) ;
+    dSigmaRMS = sqrt(sum((dSigma./-alpha).^2)/NN) ;
 else % alpha is time-dependent
-    dSigmaX = alpha(t).*ThisHeffX2 + gamma.*TheCrossX ;
-    dSigmaY = alpha(t).*ThisHeffY2 + gamma.*TheCrossY ;
-    dSigmaZ = alpha(t).*ThisHeffZ2 + gamma.*TheCrossZ ;
+    dSigmaX = -alpha(t).*ThisHeffX2 - gamma.*TheCrossX ;
+    dSigmaY = -alpha(t).*ThisHeffY2 - gamma.*TheCrossY ;
+    dSigmaZ = -alpha(t).*ThisHeffZ2 - gamma.*TheCrossZ ;
     dSigma = [dSigmaX;dSigmaY;dSigmaZ] ;
-    dSigmaRMS = sqrt(sum((dSigma./alpha(t)).^2)/NN) ;
+    dSigmaRMS = sqrt(sum((dSigma./-alpha(t)).^2)/NN) ;
 end
 
 %% Pass data using a globa variable
