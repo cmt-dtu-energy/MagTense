@@ -184,9 +184,9 @@
     
     !Anisotropy term
     call updateAnisotropy(  gb_problem, gb_solution )
-        
-    !Demag. field
-    call updateDemagfield( gb_problem, gb_solution )        
+        !Demag. field
+    call updateDemagfield( gb_problem, gb_solution )
+    
     
     !Effective field
     HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
@@ -309,7 +309,7 @@
     !> @param[in] problem, the struct containing the current problem
     !> @param[inout] solution, struct containing the current solution    
     !>-----------------------------------------
-    subroutine updateExchangeTerms( problem, solution )
+     subroutine updateExchangeTerms( problem, solution )
     type(MicroMagProblem),intent(in) :: problem
     type(MicroMagSolution),intent(inout) :: solution
     
@@ -336,6 +336,7 @@
     stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, beta, solution%HjZ )
     
     end subroutine updateExchangeTerms
+
     
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
@@ -353,7 +354,11 @@
     real :: HextX,HextY,HextZ
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
-        !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
+         !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
+        solution%HhX = -problem%Hext(solution%HextInd,2)
+        solution%HhY = -problem%Hext(solution%HextInd,3)
+        solution%HhZ = -problem%Hext(solution%HextInd,4)
+
         solution%HhX = -problem%Hext(solution%HextInd,2)
         solution%HhY = -problem%Hext(solution%HextInd,3)
         solution%HhZ = -problem%Hext(solution%HextInd,4)
