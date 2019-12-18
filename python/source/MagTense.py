@@ -44,7 +44,7 @@ class Tiles():
                         i = i, grid_x = self.grid_pos[i][0], grid_y = self.grid_pos[i][1], grid_z=self.grid_pos[i][2], \
                         x=self.offset[i][0], y = self.offset[i][1], z=self.offset[i][2])
                 return result
-        
+
         def get_n(self):
                 return self.n
 
@@ -157,6 +157,26 @@ class Tiles():
         def set_oa2_i(self, other_axis, i):
                 self.u_oa2[i] = np.around(other_axis, decimals=9)
         
+        def set_mu_r_ea(self, mu):
+                if isinstance(mu, int) or isinstance(mu, float):
+                        self.mu_r_ea[:] = mu
+                else:
+                        for i,mu_i in enumerate(mu):
+                                self.set_mu_r_ea_i(mu_i,i)
+        
+        def set_mu_r_ea_i(self, mu, i):
+                self.mu_r_ea[i] = mu
+        
+        def set_mu_r_oa(self, mu):
+                if isinstance(mu, int) or isinstance(mu, float):
+                        self.mu_r_oa[:] = mu
+                else:
+                        for i,mu_i in enumerate(mu):
+                                self.mu_r_oa(mu_i,i)
+
+        def set_mu_r_oa_i(self, mu, i):
+                self.mu_r_oa[i] = mu
+        
         def set_remanence(self, M_rem):
                 if isinstance(M_rem, int) or isinstance(M_rem, float):
                         self.M_rem[:] = M_rem
@@ -187,6 +207,9 @@ class Tiles():
                         self.set_oa1_i([math.sin(polar_angle) * math.sin(azimuth), math.sin(polar_angle) * (-math.cos(azimuth)), 0], i)
                         self.set_oa2_i([0.5*math.sin(2*polar_angle) * math.cos(azimuth), 0.5*math.sin(2*polar_angle) * math.sin(azimuth), -math.pow(math.sin(polar_angle),2)], i)
 
+        def set_M(self, M, i):
+                self.M[i] = M
+        
         def get_M(self, i):
                 return self.M[i]
 
@@ -203,6 +226,9 @@ class Tiles():
         def get_color(self, i):
                 return self.color[i]
 
+        def set_mag_type_i(self, mag_type, i):
+                self.magnetic_type[i] = mag_type
+                
 
 class Grid():
         def __init__(self, places, area):
@@ -319,9 +345,14 @@ def setup(places, area, n_tiles=0, filled_positions=None, mag_angles=[], eval_po
         # Assign magnetization angles for tiles
         if tiles is not None:
                 if not mag_angles:
+                        # polar angle [0, pi], azimuth [0, 2*pi]
                         for _ in range(tiles.get_n()):
-                                # polar angle [0, pi], azimuth [0, 2*pi]
-                                mag_angles.append([math.pi * rand.random(), 2*math.pi * rand.random()])       
+                                mag_angles.append([math.pi * rand.random(), 2*math.pi * rand.random()])
+
+                for i in range(tiles.get_n()):        
+                        if not mag_angles[i]:
+                                mag_angles[i] = [math.pi * rand.random(), 2*math.pi * rand.random()]
+
                 tiles.set_remanence(B_rem / (4*math.pi*1e-7))
                 tiles.set_mag_angle(mag_angles)
                 # Setting display color of magnets: red - [1, 0, 0] 

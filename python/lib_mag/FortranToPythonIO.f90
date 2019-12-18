@@ -203,7 +203,7 @@ subroutine IterateTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, 
     real(8),dimension(n_tiles),intent(in) :: Mrel !! the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
     real(8),dimension(n_tiles),intent(out) :: Mrel_out
 
-    real(8) :: maxErr, T
+    real(8),intent(in) :: maxErr, T
     integer(4) :: nIteMax
     type(MagStateFunction),dimension(n_stateFcn) :: stateFcn
     integer(4),intent(in) :: n_stateFcn
@@ -216,6 +216,9 @@ subroutine IterateTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, 
     integer(4),intent(in) :: n_tiles
     integer :: i
 
+    !! default value is zero, i.e. do not resume iteration
+    resumeIteration = 0.
+    
     disp_fct => dispIte_fct
 
     !::initialise MagTile with specified parameters
