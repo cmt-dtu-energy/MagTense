@@ -27,7 +27,7 @@
     contains
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> @param[inout] prob data structure containing the problem to be solved
     !> @param[inout] sol data structure containing the solution    
@@ -52,7 +52,14 @@
     
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
         !Initialize the Cuda arrays and load the demag tensors into the GPU memory
-        call cudaInit( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+        if ( gb_problem%demag_approximation .eq. DemagApproximationThreshold) then
+            !If the matrices are sparse
+            call cudaInit_sparse( gb_problem%K_s )                
+        else
+            !if the matrices are dense
+            call cudaInit( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+        endif
+        
     endif
     allocate( gb_solution%pts(ntot,3) )
     do k=1,gb_problem%grid%nz
@@ -144,7 +151,7 @@
     end subroutine SolveLandauLifshitzEquation
 
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Defines the function that gives the derivative dmdt that is to be integrated
     !> in the Landau-Lifshitz equation. This function only works on a uniform grid
@@ -184,7 +191,7 @@
     
     !Anisotropy term
     call updateAnisotropy(  gb_problem, gb_solution )
-        !Demag. field
+    !Demag. field
     call updateDemagfield( gb_problem, gb_solution )
     
     
@@ -216,7 +223,7 @@
     end subroutine dmdt_fct
     
     !>--------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calulates the alpha-coefficient for the Landau-Lifshitz equation (can be time dependent)
     !> @param[in] t the time at which to evaluate alpha
@@ -238,7 +245,7 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Initializes the solution arrays
     !> @param[in] problem the problem from which the solution is found
@@ -303,7 +310,7 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates and returns the exchange terms
     !> @param[in] problem, the struct containing the current problem
@@ -339,7 +346,7 @@
 
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates and returns the external field
     !> @param[in] problem, the struct containing the current problem
@@ -381,7 +388,7 @@
     end subroutine updateExternalField
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates and returns the effective field from the anisotropy
     !> @param[in] problem, the struct containing the current problem
@@ -412,7 +419,7 @@
     end subroutine updateAnisotropy
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates and returns the effective demag field
     !> @param[in] problem, the struct containing the current problem
@@ -431,7 +438,7 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates and returns the effective demag field on a uniform grid
     !> @param[in] problem, the struct containing the current problem
@@ -446,34 +453,44 @@
     complex(kind=4) :: alpha_c, beta_c
     
      descr%type = SPARSE_MATRIX_TYPE_GENERAL
-        descr%mode = SPARSE_FILL_MODE_FULL
-        descr%diag = SPARSE_DIAG_NON_UNIT
+     descr%mode = SPARSE_FILL_MODE_FULL
+     descr%diag = SPARSE_DIAG_NON_UNIT
     
     if ( problem%demag_approximation .eq. DemagApproximationThreshold ) then
-       
-        !Do the matrix multiplications using sparse matrices 
-        alpha = 1.0
-        beta = 0.
-        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(1)%A, descr, solution%Mx, beta, solution%HmX )
-        beta = 1.0
-        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My, beta, solution%HmX )
-        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz, beta, solution%HmX )
+        if ( problem%useCuda .eq. useCudaFalse ) then
+            !Do the matrix multiplications using sparse matrices 
+            alpha = 1.0
+            beta = 0.
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(1)%A, descr, solution%Mx, beta, solution%HmX )
+            beta = 1.0
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My, beta, solution%HmX )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz, beta, solution%HmX )
         
-        solution%HmX = solution%HmX * (-solution%Mfact )
-        beta = 0.
-        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx, beta, solution%HmY )
-        beta = 1.0
-        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My, beta, solution%HmY )
-        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz, beta, solution%HmY )
+            solution%HmX = solution%HmX * (-solution%Mfact )
+            
+            beta = 0.
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx, beta, solution%HmY )
+            beta = 1.0
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My, beta, solution%HmY )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz, beta, solution%HmY )
         
-        solution%HmY = solution%HmY * (-solution%Mfact )
-        beta = 0.
-        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx, beta, solution%HmZ )
-        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My, alpha, solution%HmZ )
-        stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz, alpha, solution%HmZ )
+            solution%HmY = solution%HmY * (-solution%Mfact )
+          
+            beta = 0.
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx, beta, solution%HmZ )
+            beta = 1.0
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My, beta, solution%HmZ )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz, beta, solution%HmZ )
         
-        solution%HmZ = solution%HmZ * (-solution%Mfact )
+            solution%HmZ = solution%HmZ * (-solution%Mfact )
+        else
+            !Do the sparse matrix multiplication using CUDA
+            pref = sngl(-1 * solution%Mfact)                                
+            call cudaMatrVecMult_sparse( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
+        endif
+        
     elseif ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) then
+        !!No CUDA support for this part yet
         !fourier transform Mx, My and Mz
         ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
                 
@@ -546,6 +563,7 @@
     
         
     else        
+        !Default way of doing the problem
         if ( problem%useCuda .eq. useCudaFalse ) then
         !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
         !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
@@ -564,7 +582,7 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Initializes the interaction matrices
     !> @param[inout] problem struct containing the problem information    
@@ -590,7 +608,7 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Sets up the grid for the model. Only uniform grid is supported currently, but this will change in due time
     !> @param[inout] grid the struct that contains the information about the current grid
@@ -658,7 +676,7 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates and returns the demag field tensor
     !> @param[inout] problem, the struct containing the problem
@@ -807,23 +825,7 @@
         Kzz_c = matmul( matmul( FT, problem%Kzz ), IFT )
         
         
-        open (11, file='ft_Kxx_ift.dat',	&
-			           status='unknown', form='unformatted',	&
-			           access='direct', recl=1*ntot*ntot)
-
-        write(11,rec=1) real(Kxx_c)
-        write(11,rec=2) aimag(Kxx_c)        
-    
-        close(11)
-        
-        open (11, file='ft_Kxx_ift.dat',	&
-			           status='unknown', form='unformatted',	&
-			           access='direct', recl=2*ntot*ntot)
-        
-        write(11,rec=2) problem%Kxx
-        
-        close(11)
-        
+       
         !Apply the thresholding
         thres = cmplx(problem%demag_threshold,0.)
         call ConvertDenseToSparse_c( Kxx_c, problem%K_s_c(1), thres)
@@ -860,7 +862,7 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Converts the dense matrix D (size nx,ny) to a sparse matrix K (size nx,y) )
     !> @params[in] threshold a number specifying the lower limit of values in D that should be considered non-zero
@@ -922,7 +924,7 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Converts the dense matrix D (size nx,ny) to a sparse matrix K (size nx,y) )
     !> With the matrices being of type complex(kind=4)
@@ -986,7 +988,7 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates the exhange term matrix
     !> which means it produces the differential operator d^2/dx^2 + d^2/dy^2 + d^2/dz^2 and returns this in the sparse matrix A
@@ -1003,7 +1005,7 @@
     end subroutine ComputeExchangeTerm3D
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates the exhange term matrix on a uniform grid
     !> which means it produces the differential operator d^2/dx^2 + d^2/dy^2 + d^2/dz^2 and returns this in the sparse matrix A
@@ -1338,7 +1340,7 @@
     end subroutine ComputeExchangeTerm3D_Uniform
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates the anisotropy term sparse matrix assuming the effective field anisotropy is linear in m    
     !> @param[inout] problem the data structure containing the problem
@@ -1355,7 +1357,7 @@
     end subroutine ComputeAnisotropyTerm3D
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates the anisotropy term matrix on a uniform grid  
     !> @param[inout] problem the data structure containing the problem
