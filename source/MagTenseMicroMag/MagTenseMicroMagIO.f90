@@ -9,7 +9,7 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> Loads the data struct problem from Matlab into a Fortran struct
     !> @param[in] prhs pointer to the Matlab data struct
     !> @param[in] problem struct for the internal Fortran represantation of the problem
@@ -163,7 +163,7 @@
     
     
    !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> Returns the solution data struct from Fortran to Matlab
     !> @param[in] solution struct for the internal Fortran represantation of the solution
     !> @param[in] plhs pointer to the Matlab data struct    
@@ -232,7 +232,7 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> Returns an array with the names of the fields expected in the MicroMagProblem struct
     !> @param[inout] fieldnames, array of the names of the fields
     !> @param[inout] nfields the no. of elements in fieldnames
@@ -273,7 +273,7 @@
    
     
      !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> Returns an array with the names of the fields expected in the MicroMagSolution struct
     !> @param[inout] fieldnames, array of the names of the fields
     !> @param[inout] nfields the no. of elements in fieldnames

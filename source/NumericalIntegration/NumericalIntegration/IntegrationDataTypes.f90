@@ -6,7 +6,7 @@
     integer,parameter :: coord_sys_carth=1,coord_sys_cyl=2,coord_sys_cone=3
 
     !---------------------------------------------------------------------------    
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Defines the interface of the function to be integrated.
     !> Should return n values
@@ -24,7 +24,7 @@
     end interface
     
      !---------------------------------------------------------------------------    
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Defines an interface for progress callback to Matlab
     !> Should return n values

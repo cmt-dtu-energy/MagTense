@@ -3,7 +3,7 @@ close all
 
 %--- Use either field 1 or field 2 from the NIST example
 NIST_field = 1;
-resolution = [36,9,1];
+resolution = [4*36,4*9,1];
 
 figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
 mu0 = 4*pi*1e-7;
@@ -17,14 +17,15 @@ addpath('../util');
 tic
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
-problem.setUseCuda( false );
-
+problem = problem.setUseCuda( false );
+problem.dem_appr = getMicroMagDemagApproximation('none');
+%problem.dem_thres = 1e-4;
 problem.alpha = 4.42e3;
 problem.gamma = 0;
 
 %initial magnetization
 problem.m0(:) = 1/sqrt(3);
-
+    
 %time grid on which to solve the problem
 problem = problem.setTime( linspace(0,100e-9,200) );
 problem.setTimeDis = int32(10);
@@ -41,6 +42,7 @@ prob_struct = struct(problem);
 
 
 solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+toc
 figure; M_end = squeeze(solution.M(end,:,:)); quiver(solution.pts(:,1),solution.pts(:,2),M_end(:,1),M_end(:,2)); axis equal; title('Starting state - Fortran')
 
 
@@ -50,11 +52,13 @@ problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 % problem.alpha = -4.42e3/problem.Ms;
 problem.alpha = 4.42e3 ;
 problem.gamma = 2.21e5 ;
-problem.dem_thres = 0;%1e-6;
+problem = problem.setUseCuda( false );
+problem.dem_appr = getMicroMagDemagApproximation('threshold');
+problem.dem_thres = 1e-4;
 problem = problem.setTime( linspace(0,1e-9,200) ); %
 problem.setTimeDis = int32(10);
 
-problem.setUseCuda( false );
+problem.setUseCuda( true );
 
 if (NIST_field == 1)
     %field 1
