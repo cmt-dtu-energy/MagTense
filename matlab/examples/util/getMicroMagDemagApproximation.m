@@ -17,5 +17,8 @@ function val = getMicroMagDemagApproximation( mode )
             %H = IFT ( NP * FT * M )
             %with FT = fft( eye(n,n) ) and IFT = ifft( eye(n,n) )
             val = int32(3);
+        case 'threshold_fraction'
+            %XXX
+            val = int32(4);
     end
 end

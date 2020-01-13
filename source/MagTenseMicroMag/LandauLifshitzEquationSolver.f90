@@ -52,12 +52,15 @@
     
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
         !Initialize the Cuda arrays and load the demag tensors into the GPU memory
-        if ( gb_problem%demag_approximation .eq. DemagApproximationThreshold) then
+        if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction )) then
+           
             !If the matrices are sparse
-            call cudaInit_sparse( gb_problem%K_s )                
+            call cudaInit_sparse( gb_problem%K_s )        
+            
         else
             !if the matrices are dense
             call cudaInit( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+            
         endif
         
     endif
@@ -456,7 +459,7 @@
      descr%mode = SPARSE_FILL_MODE_FULL
      descr%diag = SPARSE_DIAG_NON_UNIT
     
-    if ( problem%demag_approximation .eq. DemagApproximationThreshold ) then
+    if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
         if ( problem%useCuda .eq. useCudaFalse ) then
             !Do the matrix multiplications using sparse matrices 
             alpha = 1.0
@@ -695,6 +698,12 @@
     complex(kind=4),dimension(:,:),allocatable :: Kxx_c, Kxy_c, Kxz_c, Kyy_c, Kyz_c, Kzz_c !> Temporary matrices for storing the complex version of the demag matrices
     complex(kind=4) :: thres
     integer,dimension(3) :: L                                                !> Array specifying the dimensions of the fft
+    real*4 :: threshold_var, f_large, f_small, f_middle
+    integer,dimension(6) :: count_ind
+    real*4,dimension(6) :: f_small_arr
+    integer :: count_middle, n_ele_nonzero  
+    logical,dimension(:,:),allocatable :: mask          !> mask used for finding non-zero values
+    
     
     if ( problem%grid%gridType .eq. gridTypeUniform ) then
         nx = problem%grid%nx
@@ -763,14 +772,85 @@
     
     
     
-   !trial. Make a sparse matrix out of the dense matrices by specifying a threshold
-    if ( problem%demag_approximation .eq. DemagApproximationThreshold ) then
-        call ConvertDenseToSparse( problem%Kxx, problem%K_s(1), problem%demag_threshold)
-        call ConvertDenseToSparse( problem%Kxy, problem%K_s(2), problem%demag_threshold)
-        call ConvertDenseToSparse( problem%Kxz, problem%K_s(3), problem%demag_threshold)
-        call ConvertDenseToSparse( problem%Kyy, problem%K_s(4), problem%demag_threshold)
-        call ConvertDenseToSparse( problem%Kyz, problem%K_s(5), problem%demag_threshold)
-        call ConvertDenseToSparse( problem%Kzz, problem%K_s(6), problem%demag_threshold)
+   !Make a sparse matrix out of the dense matrices by specifying a threshold
+    if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
+        
+        threshold_var =  problem%demag_threshold
+
+        !If a fraction of entries is specified that are to be removed, find the function value for this
+        !The demag tensor is considered as a whole, and the fraction specified concern the number of elements greater than epsilon
+        if ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) then
+            
+            !The total number of nonzero elements in the demag tensor
+            n_ele_nonzero = count( abs(problem%Kxx) .gt. epsilon(threshold_var) )
+            n_ele_nonzero = n_ele_nonzero + count( abs(problem%Kxy) .gt. epsilon(threshold_var) )
+            n_ele_nonzero = n_ele_nonzero + count( abs(problem%Kxz) .gt. epsilon(threshold_var) )
+            n_ele_nonzero = n_ele_nonzero + count( abs(problem%Kyy) .gt. epsilon(threshold_var) )
+            n_ele_nonzero = n_ele_nonzero + count( abs(problem%Kyz) .gt. epsilon(threshold_var) )
+            n_ele_nonzero = n_ele_nonzero + count( abs(problem%Kzz) .gt. epsilon(threshold_var) )
+    
+            f_large = max(maxval(abs(problem%Kxx)), maxval(abs(problem%Kxy)), maxval(abs(problem%Kxz)), maxval(abs(problem%Kyy)), maxval(abs(problem%Kyz)), maxval(abs(problem%Kzz)))
+            
+            !Find the minimum value in the individual demag tensors than is greater than epsilon
+            f_small_arr(1) = minval(abs(pack(problem%Kxx, abs(problem%Kxx) .gt. epsilon(threshold_var))))
+            f_small_arr(2) = minval(abs(pack(problem%Kxy, abs(problem%Kxy) .gt. epsilon(threshold_var))))
+            f_small_arr(3) = minval(abs(pack(problem%Kxz, abs(problem%Kxz) .gt. epsilon(threshold_var))))
+            f_small_arr(4) = minval(abs(pack(problem%Kyy, abs(problem%Kyy) .gt. epsilon(threshold_var))))
+            f_small_arr(5) = minval(abs(pack(problem%Kyz, abs(problem%Kyz) .gt. epsilon(threshold_var))))
+            f_small_arr(6) = minval(abs(pack(problem%Kzz, abs(problem%Kzz) .gt. epsilon(threshold_var))))
+            
+            f_small = minval(f_small_arr)
+
+            allocate(mask(nx,ny))
+            
+            !Bisection algoritm for find the function value for a corresponding fraction
+            do 
+                f_middle = (f_large-f_small)/2+f_small
+                
+                !Count only the elements larger than epsilon in each of the matrices
+                mask = abs(problem%Kxx) .gt. epsilon(threshold_var)
+                count_ind(1) = count( abs(pack(problem%Kxx, abs(problem%Kxx) .gt. epsilon(threshold_var))) .le. f_middle )
+                
+                mask = abs(problem%Kxy) .gt. epsilon(threshold_var)
+                count_ind(2) = count( abs(pack(problem%Kxy, abs(problem%Kxy) .gt. epsilon(threshold_var))) .le. f_middle )
+                
+                mask = abs(problem%Kxz) .gt. epsilon(threshold_var)
+                count_ind(3) = count( abs(pack(problem%Kxz, abs(problem%Kxz) .gt. epsilon(threshold_var))) .le. f_middle )
+                
+                mask = abs(problem%Kyy) .gt. epsilon(threshold_var)
+                count_ind(4) = count( abs(pack(problem%Kyy, abs(problem%Kyy) .gt. epsilon(threshold_var))) .le. f_middle )
+                
+                mask = abs(problem%Kyz) .gt. epsilon(threshold_var)
+                count_ind(5) = count( abs(pack(problem%Kyz, abs(problem%Kyz) .gt. epsilon(threshold_var))) .le. f_middle )
+                
+                mask = abs(problem%Kzz) .gt. epsilon(threshold_var)
+                count_ind(6) = count( abs(pack(problem%Kzz, abs(problem%Kzz) .gt. epsilon(threshold_var))) .le. f_middle )
+                
+                count_middle = sum(count_ind)
+                   
+                if ( count_middle .gt. threshold_var*n_ele_nonzero ) then
+                    f_large = f_middle
+                else
+                    f_small = f_middle
+                endif            
+            
+                !check if we have found the value that defines the threshold
+                if ( ( count_middle .ge. (threshold_var-0.01)*n_ele_nonzero ) .and. ( count_middle .le. (threshold_var+0.01)*n_ele_nonzero ) ) then
+                        threshold_var = f_middle
+                    exit
+                endif
+            
+            enddo     
+        
+        endif
+        
+        call ConvertDenseToSparse( problem%Kxx, problem%K_s(1), threshold_var)
+        call ConvertDenseToSparse( problem%Kxy, problem%K_s(2), threshold_var)
+        call ConvertDenseToSparse( problem%Kxz, problem%K_s(3), threshold_var)
+        call ConvertDenseToSparse( problem%Kyy, problem%K_s(4), threshold_var)
+        call ConvertDenseToSparse( problem%Kyz, problem%K_s(5), threshold_var)
+        call ConvertDenseToSparse( problem%Kzz, problem%K_s(6), threshold_var)
+        
     elseif ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) then
         !Apply the fast fourier transform concept, remove values below a certain threshold and then convert to a sparse matrix
         !for use in the field calculation later on
@@ -852,9 +932,6 @@
         status = DftiCommitDescriptor( problem%desc_hndl_FFT_M_H )
         
         
-        
-        
-        
     endif
     
     
@@ -869,8 +946,8 @@
     !>-----------------------------------------
     subroutine ConvertDenseToSparse( D, K, threshold)
     real(DP),dimension(:,:),intent(in) :: D                 !> Dense input matrix    
-    real*4,intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
-    type(MagTenseSparse),intent(inout) :: K                           !> Sparse matrix allocation
+    real*4,intent(in) :: threshold                          !> Values less than this (in absolute) of D are considered zero
+    type(MagTenseSparse),intent(inout) :: K                 !> Sparse matrix allocation
     
     integer :: nx,ny, nnonzero
     
@@ -883,10 +960,10 @@
     
     allocate(mask(nx,ny))
     
+    !find all entries larger than the threshold
     mask = abs(D) .gt. threshold
-    
     nnonzero = count( mask )
-    
+        
     allocate( K%values(nnonzero),K%cols(nnonzero))
     allocate( K%rows_start(nx), K%rows_end(nx), colInds(ny) )
     
