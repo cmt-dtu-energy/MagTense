@@ -701,8 +701,10 @@
     real*4 :: threshold_var, f_large, f_small, f_middle
     integer,dimension(6) :: count_ind
     real*4,dimension(6) :: f_small_arr
-    integer :: count_middle, n_ele_nonzero  
-    logical,dimension(:,:),allocatable :: mask          !> mask used for finding non-zero values
+    integer :: count_middle, n_ele_nonzero, nx_K, ny_K  
+    logical,dimension(:,:,:),allocatable :: mask          !> mask used for finding non-zero values
+    logical,dimension(:,:),allocatable :: mask_xx, mask_xy, mask_xz          !> mask used for finding non-zero values
+    logical,dimension(:,:),allocatable :: mask_yy, mask_yz, mask_zz          !> mask used for finding non-zero values
     
     
     if ( problem%grid%gridType .eq. gridTypeUniform ) then
@@ -781,50 +783,55 @@
         !The demag tensor is considered as a whole, and the fraction specified concern the number of elements greater than epsilon
         if ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) then
             
+            !Make a mask for each demag tensor with only the elements larger than epsilon
+            !Make the masks only once - this is memory intensive, but computationally efficient
+            nx_K = size(problem%Kxx(:,1))
+            ny_K = size(problem%Kxx(1,:))
+            allocate(mask_xx(nx_K,ny_K))
+            allocate(mask_xy(nx_K,ny_K))
+            allocate(mask_xz(nx_K,ny_K))
+            allocate(mask_yy(nx_K,ny_K))
+            allocate(mask_yz(nx_K,ny_K))
+            allocate(mask_zz(nx_K,ny_K))
+            
+            mask_xx = abs(problem%Kxx) .gt. epsilon(threshold_var)
+            mask_xy = abs(problem%Kxy) .gt. epsilon(threshold_var)
+            mask_xz = abs(problem%Kxz) .gt. epsilon(threshold_var)
+            mask_yy = abs(problem%Kyy) .gt. epsilon(threshold_var)
+            mask_yz = abs(problem%Kyz) .gt. epsilon(threshold_var)
+            mask_zz = abs(problem%Kzz) .gt. epsilon(threshold_var)
+            
             !The total number of nonzero elements in the demag tensor
-            n_ele_nonzero = count( abs(problem%Kxx) .gt. epsilon(threshold_var) )
-            n_ele_nonzero = n_ele_nonzero + count( abs(problem%Kxy) .gt. epsilon(threshold_var) )
-            n_ele_nonzero = n_ele_nonzero + count( abs(problem%Kxz) .gt. epsilon(threshold_var) )
-            n_ele_nonzero = n_ele_nonzero + count( abs(problem%Kyy) .gt. epsilon(threshold_var) )
-            n_ele_nonzero = n_ele_nonzero + count( abs(problem%Kyz) .gt. epsilon(threshold_var) )
-            n_ele_nonzero = n_ele_nonzero + count( abs(problem%Kzz) .gt. epsilon(threshold_var) )
+            n_ele_nonzero = count( mask_xx )
+            n_ele_nonzero = n_ele_nonzero + count( mask_xy )
+            n_ele_nonzero = n_ele_nonzero + count( mask_xz )
+            n_ele_nonzero = n_ele_nonzero + count( mask_yy )
+            n_ele_nonzero = n_ele_nonzero + count( mask_yz )
+            n_ele_nonzero = n_ele_nonzero + count( mask_zz )
     
             f_large = max(maxval(abs(problem%Kxx)), maxval(abs(problem%Kxy)), maxval(abs(problem%Kxz)), maxval(abs(problem%Kyy)), maxval(abs(problem%Kyz)), maxval(abs(problem%Kzz)))
             
             !Find the minimum value in the individual demag tensors than is greater than epsilon
-            f_small_arr(1) = minval(abs(pack(problem%Kxx, abs(problem%Kxx) .gt. epsilon(threshold_var))))
-            f_small_arr(2) = minval(abs(pack(problem%Kxy, abs(problem%Kxy) .gt. epsilon(threshold_var))))
-            f_small_arr(3) = minval(abs(pack(problem%Kxz, abs(problem%Kxz) .gt. epsilon(threshold_var))))
-            f_small_arr(4) = minval(abs(pack(problem%Kyy, abs(problem%Kyy) .gt. epsilon(threshold_var))))
-            f_small_arr(5) = minval(abs(pack(problem%Kyz, abs(problem%Kyz) .gt. epsilon(threshold_var))))
-            f_small_arr(6) = minval(abs(pack(problem%Kzz, abs(problem%Kzz) .gt. epsilon(threshold_var))))
+            f_small_arr(1) = minval(abs(pack(problem%Kxx, mask_xx)))
+            f_small_arr(2) = minval(abs(pack(problem%Kxy, mask_xy)))
+            f_small_arr(3) = minval(abs(pack(problem%Kxz, mask_xz)))
+            f_small_arr(4) = minval(abs(pack(problem%Kyy, mask_yy)))
+            f_small_arr(5) = minval(abs(pack(problem%Kyz, mask_yz)))
+            f_small_arr(6) = minval(abs(pack(problem%Kzz, mask_zz)))
             
             f_small = minval(f_small_arr)
 
-            allocate(mask(nx,ny))
-            
             !Bisection algoritm for find the function value for a corresponding fraction
             do 
                 f_middle = (f_large-f_small)/2+f_small
                 
                 !Count only the elements larger than epsilon in each of the matrices
-                mask = abs(problem%Kxx) .gt. epsilon(threshold_var)
-                count_ind(1) = count( abs(pack(problem%Kxx, abs(problem%Kxx) .gt. epsilon(threshold_var))) .le. f_middle )
-                
-                mask = abs(problem%Kxy) .gt. epsilon(threshold_var)
-                count_ind(2) = count( abs(pack(problem%Kxy, abs(problem%Kxy) .gt. epsilon(threshold_var))) .le. f_middle )
-                
-                mask = abs(problem%Kxz) .gt. epsilon(threshold_var)
-                count_ind(3) = count( abs(pack(problem%Kxz, abs(problem%Kxz) .gt. epsilon(threshold_var))) .le. f_middle )
-                
-                mask = abs(problem%Kyy) .gt. epsilon(threshold_var)
-                count_ind(4) = count( abs(pack(problem%Kyy, abs(problem%Kyy) .gt. epsilon(threshold_var))) .le. f_middle )
-                
-                mask = abs(problem%Kyz) .gt. epsilon(threshold_var)
-                count_ind(5) = count( abs(pack(problem%Kyz, abs(problem%Kyz) .gt. epsilon(threshold_var))) .le. f_middle )
-                
-                mask = abs(problem%Kzz) .gt. epsilon(threshold_var)
-                count_ind(6) = count( abs(pack(problem%Kzz, abs(problem%Kzz) .gt. epsilon(threshold_var))) .le. f_middle )
+                count_ind(1) = count( abs(pack(problem%Kxx, mask_xx)) .le. f_middle )
+                count_ind(2) = count( abs(pack(problem%Kxy, mask_xy)) .le. f_middle )
+                count_ind(3) = count( abs(pack(problem%Kxz, mask_xz)) .le. f_middle )
+                count_ind(4) = count( abs(pack(problem%Kyy, mask_yy)) .le. f_middle )
+                count_ind(5) = count( abs(pack(problem%Kyz, mask_yz)) .le. f_middle )
+                count_ind(6) = count( abs(pack(problem%Kzz, mask_zz)) .le. f_middle )
                 
                 count_middle = sum(count_ind)
                    
@@ -840,8 +847,15 @@
                     exit
                 endif
             
-            enddo     
-        
+            enddo  
+            
+            deallocate(mask_xx)
+            deallocate(mask_xy)
+            deallocate(mask_xz)
+            deallocate(mask_yy)
+            deallocate(mask_yz)
+            deallocate(mask_zz)
+            
         endif
         
         call ConvertDenseToSparse( problem%Kxx, problem%K_s(1), threshold_var)
