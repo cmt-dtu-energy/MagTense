@@ -25,7 +25,7 @@
         mwPointer :: nGridPtr,LGridPtr,dGridPtr,typeGridPtr, ueaProblemPtr, modeProblemPtr,solverProblemPtr
         mwPointer :: A0ProblemPtr,MsProblemPtr,K0ProblemPtr,gammaProblemPtr,alpha0ProblemPtr,MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr,HextProblemPtr,tProblemPtr,useCudaPtr
-        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr,demApproxPtr
+        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr,demApproxPtr, setTimeDisplayProblemPtr
         integer,dimension(3) :: int_arr
         real,dimension(3) :: real_arr
         real*8 :: demag_fac
@@ -155,7 +155,11 @@
         demApproxPtr = mxGetField( prhs, i, problemFields(20) )
         call mxCopyPtrToInteger4(mxGetPr(demApproxPtr), problem%demag_approximation, sx )
         
-        problem%setTimeDisplay = 100
+        
+        !Set how often to display the timestep in Matlab
+        sx = 1
+        setTimeDisplayProblemPtr = mxGetField( prhs, i, problemFields(21) )
+        call mxCopyPtrToInteger4(mxGetPr(setTimeDisplayProblemPtr), problem%setTimeDisplay, sx )
         
         !Clean-up 
         deallocate(problemFields)
@@ -239,7 +243,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=20
+        integer,parameter :: nf=21
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -266,6 +270,7 @@
         fieldnames(18) = 'dem_thres'
         fieldnames(19) = 'useCuda'
         fieldnames(20) = 'dem_appr'
+        fieldnames(21) = 'setTimeDis'
         
         
     end subroutine getProblemFieldnames
