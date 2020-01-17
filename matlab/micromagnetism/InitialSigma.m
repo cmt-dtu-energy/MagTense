@@ -54,9 +54,9 @@ else
                 else % The almost good way
                     [xold,yold,zold,~,~,~] = MakeTheGrid(Nold,Lx,Ly,Lz) ;
                     [Xold,Yold,Zold] = ndgrid(xold,yold,zold) ;
-                    SigmaX = interpn(Xold,Yold,Zold,reshape(SigmaXIN,Nold(1),Nold(2),Nold(3)),X,Y,Z) ;
-                    SigmaY = interpn(Xold,Yold,Zold,reshape(SigmaYIN,Nold(1),Nold(2),Nold(3)),X,Y,Z) ;
-                    SigmaZ = interpn(Xold,Yold,Zold,reshape(SigmaZIN,Nold(1),Nold(2),Nold(3)),X,Y,Z) ;
+                    SigmaX = interpn(Xold,Yold,Zold,reshape(SigmaXIN,Nold(1),Nold(2),Nold(3)),X,Y,Z,'spline') ;
+                    SigmaY = interpn(Xold,Yold,Zold,reshape(SigmaYIN,Nold(1),Nold(2),Nold(3)),X,Y,Z,'spline') ;
+                    SigmaZ = interpn(Xold,Yold,Zold,reshape(SigmaZIN,Nold(1),Nold(2),Nold(3)),X,Y,Z,'spline') ;
                 end
             else
                 SigmaX = SigmaXIN ;

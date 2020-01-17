@@ -1,4 +1,5 @@
 function [SigmaSol,AppliedField,VV,InteractionMatrices] = ComputeTheSolution(MySim)
+tic
 
 %% Setup problem variables
 
@@ -30,27 +31,31 @@ Sigma = InitialSigma(ProblemSetupStruct,InteractionMatrices);
 if ProblemSetupStruct.UseImplicitSolver == 1
     [SigmaSol, AppliedField]  = LandauLifshitzEvolveDirectHaODEinit(ProblemSetupStruct,InteractionMatrices,Sigma);
     if ProblemSetupStruct.SaveTheResult
-        save([PreSetFileName,'solution'],'N','SigmaSol','AppliedField');
+        elapsedTime = toc;
+        save([PreSetFileName,'solution'],'N','SigmaSol','AppliedField','elapsedTime');
     end
     
 elseif ProblemSetupStruct.UseImplicitStepsSolver == 1
     [SigmaSol, AppliedField,ImplicitFailed,VV] = LandauLifshitzEvolveImplicitSteps(ProblemSetupStruct,InteractionMatrices,Sigma);
     if ProblemSetupStruct.SaveTheResult
-        save([PreSetFileName,'solution'],'N','SigmaSol','ImplicitFailed','VV');
+        elapsedTime = toc;
+        save([PreSetFileName,'solution'],'N','SigmaSol','ImplicitFailed','VV','elapsedTime');
     end
     
 elseif ProblemSetupStruct.UseExplicitSolver == 1
     
     [SigmaSol, AppliedField, VV] = LandauLifshitzEvolveStepByStepInit(ProblemSetupStruct,InteractionMatrices,Sigma);
     if ProblemSetupStruct.SaveTheResult
-        save([PreSetFileName,'solution.mat'],'N','SigmaSol','AppliedField','VV');
+        elapsedTime = toc;
+        save([PreSetFileName,'solution.mat'],'N','SigmaSol','AppliedField','VV','elapsedTime');
     end
     
 elseif ProblemSetupStruct.UseDynamicSolver == 1
     
     [SigmaSol] = LandauLifshitzEvolveCombined(ProblemSetupStruct,InteractionMatrices,Sigma) ;
     if ProblemSetupStruct.SaveTheResult
-        save([PreSetFileName,'solution'],'N','SigmaSol');
+        elapsedTime = toc;
+        save([PreSetFileName,'solution'],'N','SigmaSol','elapsedTime');
     end
     
 end
