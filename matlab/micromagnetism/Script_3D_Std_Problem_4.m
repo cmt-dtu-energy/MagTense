@@ -98,7 +98,9 @@ MySim.HeffLimMagn = -21; % The magic number that kinda sorta works
 
 MySim.SimulationName = 'PhysParams_TestDynamicsStdProb4_1st_field' ;
 
+tic
 SigmaSol1 = ComputeTheSolution(MySim);
+toc
 
 for k=1:size(SigmaSol1,1) 
     Sigma = SigmaSol1(k,:).' ;

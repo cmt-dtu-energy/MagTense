@@ -101,5 +101,5 @@ end
 TheData.LastDSigma = dSigma ;
 TheData.dSigmaRMS = dSigmaRMS ;
 
-disp(['Here ',num2str(t)]) ;
+% disp(['Here ',num2str(t)]) ;
 
