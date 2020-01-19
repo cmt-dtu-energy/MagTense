@@ -62,7 +62,75 @@ function InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct)
 %     InteractionMatrices.Kzz = Kzz;
 %     InteractionMatrices.AvrgMatrix = AvrgMatrix;
 %     InteractionMatrices.CopyMatrix = CopyMatrix;
-if ischar(ProblemSetupStruct.DemagTensorFileName) 
-    save(DemagTensorFileName,'InteractionMatrices') ;
-end
+
+    if (ProblemSetupStruct.threshold > 0) 
+        InteractionMatrices.DemagTensor.KglobXX{1,1}(abs(InteractionMatrices.DemagTensor.KglobXX{1,1}) < ProblemSetupStruct.threshold) = 0;
+        InteractionMatrices.DemagTensor.KglobXY{1,1}(abs(InteractionMatrices.DemagTensor.KglobXY{1,1}) < ProblemSetupStruct.threshold) = 0;
+        InteractionMatrices.DemagTensor.KglobXZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobXZ{1,1}) < ProblemSetupStruct.threshold) = 0;
+        InteractionMatrices.DemagTensor.KglobYX{1,1}(abs(InteractionMatrices.DemagTensor.KglobYX{1,1}) < ProblemSetupStruct.threshold) = 0;
+        InteractionMatrices.DemagTensor.KglobYY{1,1}(abs(InteractionMatrices.DemagTensor.KglobYY{1,1}) < ProblemSetupStruct.threshold) = 0;
+        InteractionMatrices.DemagTensor.KglobYZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobYZ{1,1}) < ProblemSetupStruct.threshold) = 0;
+        InteractionMatrices.DemagTensor.KglobZX{1,1}(abs(InteractionMatrices.DemagTensor.KglobZX{1,1}) < ProblemSetupStruct.threshold) = 0;
+        InteractionMatrices.DemagTensor.KglobZY{1,1}(abs(InteractionMatrices.DemagTensor.KglobZY{1,1}) < ProblemSetupStruct.threshold) = 0;
+        InteractionMatrices.DemagTensor.KglobZZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobZZ{1,1}) < ProblemSetupStruct.threshold) = 0;
+        
+        %--- Test if any matrices are zero, and if they are remove them
+        if ~any(any(InteractionMatrices.DemagTensor.KglobXX{1,1}))
+            InteractionMatrices.DemagTensor.KglobXX{1,1} = 0;
+        end
+        if ~any(any(InteractionMatrices.DemagTensor.KglobXY{1,1}))
+            InteractionMatrices.DemagTensor.KglobXY{1,1} = 0;
+        end
+        if ~any(any(InteractionMatrices.DemagTensor.KglobXZ{1,1}))
+            InteractionMatrices.DemagTensor.KglobXZ{1,1} = 0;
+        end
+        if ~any(any(InteractionMatrices.DemagTensor.KglobYX{1,1}))
+            InteractionMatrices.DemagTensor.KglobYX{1,1} = 0;
+        end
+        if ~any(any(InteractionMatrices.DemagTensor.KglobYY{1,1}))
+            InteractionMatrices.DemagTensor.KglobYY{1,1} = 0;
+        end
+        if ~any(any(InteractionMatrices.DemagTensor.KglobYZ{1,1}))
+            InteractionMatrices.DemagTensor.KglobYZ{1,1} = 0;
+        end
+        if ~any(any(InteractionMatrices.DemagTensor.KglobZX{1,1}))
+            InteractionMatrices.DemagTensor.KglobZX{1,1} = 0;
+        end
+        if ~any(any(InteractionMatrices.DemagTensor.KglobZY{1,1}))
+            InteractionMatrices.DemagTensor.KglobZY{1,1} = 0;
+        end
+        if ~any(any(InteractionMatrices.DemagTensor.KglobZZ{1,1}))
+            InteractionMatrices.DemagTensor.KglobZZ{1,1} = 0;
+        end
+    end
+
+    if (ProblemSetupStruct.use_sparse) 
+        InteractionMatrices.DemagTensor.KglobXX{1,1} = sparse(InteractionMatrices.DemagTensor.KglobXX{1,1});
+        InteractionMatrices.DemagTensor.KglobXY{1,1} = sparse(InteractionMatrices.DemagTensor.KglobXY{1,1});
+        InteractionMatrices.DemagTensor.KglobXZ{1,1} = sparse(InteractionMatrices.DemagTensor.KglobXZ{1,1});
+        InteractionMatrices.DemagTensor.KglobYX{1,1} = sparse(InteractionMatrices.DemagTensor.KglobYX{1,1});
+        InteractionMatrices.DemagTensor.KglobYY{1,1} = sparse(InteractionMatrices.DemagTensor.KglobYY{1,1});
+        InteractionMatrices.DemagTensor.KglobYZ{1,1} = sparse(InteractionMatrices.DemagTensor.KglobYZ{1,1});
+        InteractionMatrices.DemagTensor.KglobZX{1,1} = sparse(InteractionMatrices.DemagTensor.KglobZX{1,1});
+        InteractionMatrices.DemagTensor.KglobZY{1,1} = sparse(InteractionMatrices.DemagTensor.KglobZY{1,1});
+        InteractionMatrices.DemagTensor.KglobZZ{1,1} = sparse(InteractionMatrices.DemagTensor.KglobZZ{1,1});
+        InteractionMatrices.A2 = sparse(InteractionMatrices.A2);
+    end
+    if (ProblemSetupStruct.use_gpuArray) 
+        InteractionMatrices.DemagTensor.KglobXX{1,1} = gpuArray(InteractionMatrices.DemagTensor.KglobXX{1,1});
+        InteractionMatrices.DemagTensor.KglobXY{1,1} = gpuArray(InteractionMatrices.DemagTensor.KglobXY{1,1});
+        InteractionMatrices.DemagTensor.KglobXZ{1,1} = gpuArray(InteractionMatrices.DemagTensor.KglobXZ{1,1});
+        InteractionMatrices.DemagTensor.KglobYX{1,1} = gpuArray(InteractionMatrices.DemagTensor.KglobYX{1,1});
+        InteractionMatrices.DemagTensor.KglobYY{1,1} = gpuArray(InteractionMatrices.DemagTensor.KglobYY{1,1});
+        InteractionMatrices.DemagTensor.KglobYZ{1,1} = gpuArray(InteractionMatrices.DemagTensor.KglobYZ{1,1});
+        InteractionMatrices.DemagTensor.KglobZX{1,1} = gpuArray(InteractionMatrices.DemagTensor.KglobZX{1,1});
+        InteractionMatrices.DemagTensor.KglobZY{1,1} = gpuArray(InteractionMatrices.DemagTensor.KglobZY{1,1});
+        InteractionMatrices.DemagTensor.KglobZZ{1,1} = gpuArray(InteractionMatrices.DemagTensor.KglobZZ{1,1});
+        InteractionMatrices.A2 = gpuArray(InteractionMatrices.A2);
+    end
+    
+
+    if ischar(ProblemSetupStruct.DemagTensorFileName) 
+        save(DemagTensorFileName,'InteractionMatrices') ;
+    end
 end

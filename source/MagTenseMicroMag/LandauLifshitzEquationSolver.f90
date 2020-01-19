@@ -580,6 +580,9 @@
         endif 
     endif
     
+    !open(12,file='count_dmdt.txt',status='old',access='append',form='formatted',action='write')    
+    !write(12,*) 1
+    !close(12)
     
     end subroutine updateDemagfield_uniform
     
@@ -794,12 +797,12 @@
             allocate(mask_yz(nx_K,ny_K))
             allocate(mask_zz(nx_K,ny_K))
             
-            mask_xx = abs(problem%Kxx) .gt. epsilon(threshold_var)
-            mask_xy = abs(problem%Kxy) .gt. epsilon(threshold_var)
-            mask_xz = abs(problem%Kxz) .gt. epsilon(threshold_var)
-            mask_yy = abs(problem%Kyy) .gt. epsilon(threshold_var)
-            mask_yz = abs(problem%Kyz) .gt. epsilon(threshold_var)
-            mask_zz = abs(problem%Kzz) .gt. epsilon(threshold_var)
+            mask_xx = abs(problem%Kxx) .gt. 0
+            mask_xy = abs(problem%Kxy) .gt. 0
+            mask_xz = abs(problem%Kxz) .gt. 0
+            mask_yy = abs(problem%Kyy) .gt. 0
+            mask_yz = abs(problem%Kyz) .gt. 0
+            mask_zz = abs(problem%Kzz) .gt. 0
             
             !The total number of nonzero elements in the demag tensor
             n_ele_nonzero = count( mask_xx )

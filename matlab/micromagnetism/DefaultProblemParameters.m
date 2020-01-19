@@ -97,4 +97,8 @@ function DefaultSetupStruct = DefaultProblemParameters()
     DefaultSetupStruct.AlreadyEquilibrium = 0;
     DefaultSetupStruct.SaveTheResult = 1 ;
     DefaultSetupStruct.MaxComputationalTimePerStep = inf ;
+    DefaultSetupStruct.use_sparse = 0;
+    DefaultSetupStruct.use_gpuArray = 0;
+    DefaultSetupStruct.threshold = 0;
+    
 end

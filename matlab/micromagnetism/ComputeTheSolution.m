@@ -20,11 +20,11 @@ else
 end
 N = InteractionMatrices.N;
 
+
 %% The starting guess for the magnetization
 % This is randomized or loaded from a file
 
 Sigma = InitialSigma(ProblemSetupStruct,InteractionMatrices);
-
 
 %% Static, "implicit" equilibrium solution
 
