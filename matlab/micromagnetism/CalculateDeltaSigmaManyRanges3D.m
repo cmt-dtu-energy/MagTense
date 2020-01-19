@@ -87,6 +87,9 @@ else % alpha is time-dependent
     dSigmaRMS = sqrt(sum((dSigma./-alpha(t)).^2)/NN) ;
 end
 
+%--- If we are using gpuArray, bring the magnetization back for ode45
+dSigma = gather(dSigma);
+
 %% Pass data using a globa variable
 global TheData
 LastT = TheData.LastT ;
