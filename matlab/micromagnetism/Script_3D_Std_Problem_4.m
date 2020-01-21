@@ -10,7 +10,11 @@ clearvars -except fig1 MySim
 
 %% Create Preset
 % a = memory
-MySim.SaveTheResult = 0;
+if exist('MySim','var')
+    if ~isfield(MySim,'SaveTheResult')
+        MySim.SaveTheResult = 0;
+    end
+end
 MySim.K0 = 0 ;
 MySim.Kz = 0 ;
 MySim.A0 = 1.3e-11 ;

@@ -16,11 +16,12 @@ for k=2:numel(AvrgMatrix)
     SigmaXC = AvrgMatrix{k}*SigmaX ;
     SigmaYC = AvrgMatrix{k}*SigmaY ;
     SigmaZC = AvrgMatrix{k}*SigmaZ ;
+    
     % calculate demag. field over coarse grid   
-
+    % the demag tensor is symmetric so KglobZX = KglobXZ
     HmXc = DemagTensor.KglobXX{k}*SigmaXC+DemagTensor.KglobXY{k}*SigmaYC+DemagTensor.KglobXZ{k}*SigmaZC ;
-    HmYc = DemagTensor.KglobYX{k}*SigmaXC+DemagTensor.KglobYY{k}*SigmaYC+DemagTensor.KglobYZ{k}*SigmaZC ;
-    HmZc = DemagTensor.KglobZX{k}*SigmaXC+DemagTensor.KglobZY{k}*SigmaYC+DemagTensor.KglobZZ{k}*SigmaZC ;
+    HmYc = DemagTensor.KglobXY{k}*SigmaXC+DemagTensor.KglobYY{k}*SigmaYC+DemagTensor.KglobYZ{k}*SigmaZC ;
+    HmZc = DemagTensor.KglobXZ{k}*SigmaXC+DemagTensor.KglobYZ{k}*SigmaYC+DemagTensor.KglobZZ{k}*SigmaZC ;
     '' ; 
 
     % get demag. field over fine grid (copy)   

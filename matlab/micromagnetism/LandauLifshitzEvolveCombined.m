@@ -44,10 +44,10 @@ AA.HjY = @(Sx,Sy,Sz,t) - (2*Jfact).*(A2*Sy) ;
 AA.HjZ = @(Sx,Sy,Sz,t) - (2*Jfact).*(A2*Sz) ;
 
 % "M" : Effective field : demagnetization (fine grid terms)
-
+% Demag tensor is symmetric, i.e. KglobZX = KglobXZ
 AA.HmX = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXX{1}*Sx+DemagTensor.KglobXY{1}*Sy+DemagTensor.KglobXZ{1}*Sz) ;
-AA.HmY = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobYX{1}*Sx+DemagTensor.KglobYY{1}*Sy+DemagTensor.KglobYZ{1}*Sz) ;
-AA.HmZ = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobZX{1}*Sx+DemagTensor.KglobZY{1}*Sy+DemagTensor.KglobZZ{1}*Sz) ;
+AA.HmY = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXY{1}*Sx+DemagTensor.KglobYY{1}*Sy+DemagTensor.KglobYZ{1}*Sz) ;
+AA.HmZ = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXZ{1}*Sx+DemagTensor.KglobYZ{1}*Sy+DemagTensor.KglobZZ{1}*Sz) ;
 
 % "H" : Effective field : external field
 
@@ -84,31 +84,32 @@ AA.Gk = @(Sx,Sy,Sz,Hx,Hy,Hz) (1/2)*(Sx.'*Hx + Sy.'*Hy + Sz.'*Hz) ;
 
 %% Hessian
 if UseImplicitSolver | CalcEigenvalue
-    NN = size(DemagTensor.KglobXX{1},1) ;
+    NN = size(DemagTensor.KglobXX{1},1) ; 
+    % The demag tensor is symmetric
     HessGXX = - (2*Jfact).*(A2) - (Mfact).*DemagTensor.KglobXX{1} - (Kfact).*(Kxx)*eye(NN) ;
     HessGXY =                   - (Mfact).*DemagTensor.KglobXY{1} - (Kfact).*(Kxy)*eye(NN) ;
     HessGXZ =                   - (Mfact).*DemagTensor.KglobXZ{1} - (Kfact).*(Kxz)*eye(NN) ;
     
-    HessGYX =                   - (Mfact).*DemagTensor.KglobYX{1} - (Kfact).*(Kyx)*eye(NN) ;
+    HessGYX =                   - (Mfact).*DemagTensor.KglobXY{1} - (Kfact).*(Kyx)*eye(NN) ;
     HessGYY = - (2*Jfact).*(A2) - (Mfact).*DemagTensor.KglobYY{1} - (Kfact).*(Kyy)*eye(NN) ;
     HessGYZ =                   - (Mfact).*DemagTensor.KglobYZ{1} - (Kfact).*(Kyz)*eye(NN) ;
     
-    HessGZX =                   - (Mfact).*DemagTensor.KglobZX{1} - (Kfact).*(Kzx)*eye(NN) ;
-    HessGZY =                   - (Mfact).*DemagTensor.KglobZY{1} - (Kfact).*(Kzy)*eye(NN) ;
+    HessGZX =                   - (Mfact).*DemagTensor.KglobXZ{1} - (Kfact).*(Kzx)*eye(NN) ;
+    HessGZY =                   - (Mfact).*DemagTensor.KglobYZ{1} - (Kfact).*(Kzy)*eye(NN) ;
     HessGZZ = - (2*Jfact).*(A2) - (Mfact).*DemagTensor.KglobZZ{1} - (Kfact).*(Kzz)*eye(NN) ;
     
     for k=2:numel(AvrgMatrix)
-        
+        % The demag tensor is symmetric
         HessGXX = HessGXX - Mfact.*(CopyMatrix{k}*DemagTensor.KglobXX{k}*AvrgMatrix{k}) ;
         HessGXY = HessGXY - Mfact.*(CopyMatrix{k}*DemagTensor.KglobXY{k}*AvrgMatrix{k}) ;
         HessGXZ = HessGXZ - Mfact.*(CopyMatrix{k}*DemagTensor.KglobXZ{k}*AvrgMatrix{k}) ;
         
-        HessGYX = HessGYX - Mfact.*(CopyMatrix{k}*DemagTensor.KglobYX{k}*AvrgMatrix{k}) ;
+        HessGYX = HessGYX - Mfact.*(CopyMatrix{k}*DemagTensor.KglobXY{k}*AvrgMatrix{k}) ;
         HessGYY = HessGYY - Mfact.*(CopyMatrix{k}*DemagTensor.KglobYY{k}*AvrgMatrix{k}) ;
         HessGYZ = HessGYZ - Mfact.*(CopyMatrix{k}*DemagTensor.KglobYZ{k}*AvrgMatrix{k}) ;
         
-        HessGZX = HessGZX - Mfact.*(CopyMatrix{k}*DemagTensor.KglobZX{k}*AvrgMatrix{k}) ;
-        HessGZY = HessGZY - Mfact.*(CopyMatrix{k}*DemagTensor.KglobZY{k}*AvrgMatrix{k}) ;
+        HessGZX = HessGZX - Mfact.*(CopyMatrix{k}*DemagTensor.KglobXZ{k}*AvrgMatrix{k}) ;
+        HessGZY = HessGZY - Mfact.*(CopyMatrix{k}*DemagTensor.KglobYZ{k}*AvrgMatrix{k}) ;
         HessGZZ = HessGZZ - Mfact.*(CopyMatrix{k}*DemagTensor.KglobZZ{k}*AvrgMatrix{k}) ;
     end
     

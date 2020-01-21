@@ -100,5 +100,6 @@ function DefaultSetupStruct = DefaultProblemParameters()
     DefaultSetupStruct.use_sparse = 0;
     DefaultSetupStruct.use_gpuArray = 0;
     DefaultSetupStruct.threshold = 0;
+    DefaultSetupStruct.use_single = 0;
     
 end
