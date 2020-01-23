@@ -21,7 +21,10 @@ function InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct)
     %% Demag Tensors (approximate method: "Many Ranges")
     [InteractionMatrices.AvrgMatrix,InteractionMatrices.CopyMatrix,InteractionMatrices.DemagTensor] = CreateManyRangesDemagTensors3D(N,K,nGrid,Nprod,dx,dy,dz) ;
     disp('Demag Done') ;
-
+    %% FFT
+    if ~all(FFTdims==0)
+    [InteractionMatrices] = ConvertTensorToFourier(InteractionMatrices,N,FFTdims) ; 
+    end
     %% Anisotropy Matrix
 
     if Nmax >1 % Remark: more than one "grain" (Voronoi) -- not yet implemented
@@ -63,14 +66,26 @@ function InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct)
 %     InteractionMatrices.AvrgMatrix = AvrgMatrix;
 %     InteractionMatrices.CopyMatrix = CopyMatrix;
 
+    if (ProblemSetupStruct.thresholdFract > 0)
+        if ~all(FFTdims==0)
+        [ProblemSetupStruct.threshold] = GetThreshold(InteractionMatrices.FFT.DemagTensor,ProblemSetupStruct.thresholdFract ) ;        
+        else
+        [ProblemSetupStruct.threshold] = GetThreshold(InteractionMatrices.DemagTensor,ProblemSetupStruct.thresholdFract ) ;
+        end
+    end
+
     if (ProblemSetupStruct.threshold > 0) 
-        InteractionMatrices.DemagTensor.KglobXX{1,1}(abs(InteractionMatrices.DemagTensor.KglobXX{1,1}) < ProblemSetupStruct.threshold) = 0;
-        InteractionMatrices.DemagTensor.KglobXY{1,1}(abs(InteractionMatrices.DemagTensor.KglobXY{1,1}) < ProblemSetupStruct.threshold) = 0;
-        InteractionMatrices.DemagTensor.KglobXZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobXZ{1,1}) < ProblemSetupStruct.threshold) = 0;
-        InteractionMatrices.DemagTensor.KglobYY{1,1}(abs(InteractionMatrices.DemagTensor.KglobYY{1,1}) < ProblemSetupStruct.threshold) = 0;
-        InteractionMatrices.DemagTensor.KglobYZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobYZ{1,1}) < ProblemSetupStruct.threshold) = 0;
-        InteractionMatrices.DemagTensor.KglobZZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobZZ{1,1}) < ProblemSetupStruct.threshold) = 0;
-        
+        if ~all(FFTdims==0)
+            [InteractionMatrices.FFT.DemagTensor] = FilterTensorThreshold(InteractionMatrices.FFT.DemagTensor,ProblemSetupStruct.threshold) ;
+        else
+            [InteractionMatrices.DemagTensor] = FilterTensorThreshold(InteractionMatrices.DemagTensor,ProblemSetupStruct.threshold) ;
+%             InteractionMatrices.DemagTensor.KglobXX{1,1}(abs(InteractionMatrices.DemagTensor.KglobXX{1,1}) < ProblemSetupStruct.threshold) = 0;
+%         InteractionMatrices.DemagTensor.KglobXY{1,1}(abs(InteractionMatrices.DemagTensor.KglobXY{1,1}) < ProblemSetupStruct.threshold) = 0;
+%         InteractionMatrices.DemagTensor.KglobXZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobXZ{1,1}) < ProblemSetupStruct.threshold) = 0;
+%         InteractionMatrices.DemagTensor.KglobYY{1,1}(abs(InteractionMatrices.DemagTensor.KglobYY{1,1}) < ProblemSetupStruct.threshold) = 0;
+%         InteractionMatrices.DemagTensor.KglobYZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobYZ{1,1}) < ProblemSetupStruct.threshold) = 0;
+%         InteractionMatrices.DemagTensor.KglobZZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobZZ{1,1}) < ProblemSetupStruct.threshold) = 0;
+        end
         %--- Test if any matrices are zero, and if they are remove them
         if ~any(any(InteractionMatrices.DemagTensor.KglobXX{1,1}))
             InteractionMatrices.DemagTensor.KglobXX{1,1} = 0;
@@ -106,12 +121,18 @@ function InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct)
         if (ProblemSetupStruct.use_sparse && ProblemSetupStruct.use_single)
             error('A matrix in Matlab cannot be both sparse and single')
         end
-        InteractionMatrices.DemagTensor.KglobXX{1,1} = sparse(InteractionMatrices.DemagTensor.KglobXX{1,1});
-        InteractionMatrices.DemagTensor.KglobXY{1,1} = sparse(InteractionMatrices.DemagTensor.KglobXY{1,1});
-        InteractionMatrices.DemagTensor.KglobXZ{1,1} = sparse(InteractionMatrices.DemagTensor.KglobXZ{1,1});
-        InteractionMatrices.DemagTensor.KglobYY{1,1} = sparse(InteractionMatrices.DemagTensor.KglobYY{1,1});
-        InteractionMatrices.DemagTensor.KglobYZ{1,1} = sparse(InteractionMatrices.DemagTensor.KglobYZ{1,1});
-        InteractionMatrices.DemagTensor.KglobZZ{1,1} = sparse(InteractionMatrices.DemagTensor.KglobZZ{1,1});
+        if ~all(FFTdims==0)
+            [InteractionMatrices.FFT.DemagTensor] = ConvertTensorToSparse(InteractionMatrices.FFT.DemagTensor) ;
+        else
+            [InteractionMatrices.DemagTensor] = ConvertTensorToSparse(InteractionMatrices.DemagTensor) ;            
+        
+%         InteractionMatrices.DemagTensor.KglobXX{1,1} = sparse(InteractionMatrices.DemagTensor.KglobXX{1,1});
+%         InteractionMatrices.DemagTensor.KglobXY{1,1} = sparse(InteractionMatrices.DemagTensor.KglobXY{1,1});
+%         InteractionMatrices.DemagTensor.KglobXZ{1,1} = sparse(InteractionMatrices.DemagTensor.KglobXZ{1,1});
+%         InteractionMatrices.DemagTensor.KglobYY{1,1} = sparse(InteractionMatrices.DemagTensor.KglobYY{1,1});
+%         InteractionMatrices.DemagTensor.KglobYZ{1,1} = sparse(InteractionMatrices.DemagTensor.KglobYZ{1,1});
+%         InteractionMatrices.DemagTensor.KglobZZ{1,1} = sparse(InteractionMatrices.DemagTensor.KglobZZ{1,1});
+        end
         InteractionMatrices.A2 = sparse(InteractionMatrices.A2);
     end
     

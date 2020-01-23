@@ -42,14 +42,25 @@ ThisHhY = AA.HhY(SigmaX,SigmaY,SigmaZ,t) ;
 ThisHhZ = AA.HhZ(SigmaX,SigmaY,SigmaZ,t) ;
 
 %% Demagnetization
-if numel(CopyMatrix)>0
-    ThisHmX = AA.HmX(SigmaX,SigmaY,SigmaZ,t) + HmXcTOT ; % fine + coarser
-    ThisHmY = AA.HmY(SigmaX,SigmaY,SigmaZ,t) + HmYcTOT ; % fine + coarser
-    ThisHmZ = AA.HmZ(SigmaX,SigmaY,SigmaZ,t) + HmZcTOT ; % fine + coarser
+if isfield(AA,'Do3Dfft')
+    FFTSigmaX = AA.Do3Dfft(SigmaX) ;
+    FFTSigmaY = AA.Do3Dfft(SigmaY) ;
+    FFTSigmaZ = AA.Do3Dfft(SigmaZ) ;
+    
+    ThisHmX = AA.FFTHmX(FFTSigmaX,FFTSigmaY,FFTSigmaZ,t) ; % fine
+    ThisHmY = AA.FFTHmY(FFTSigmaX,FFTSigmaY,FFTSigmaZ,t) ; % fine
+    ThisHmZ = AA.FFTHmZ(FFTSigmaX,FFTSigmaY,FFTSigmaZ,t) ; % fine
+    
 else
-    ThisHmX = AA.HmX(SigmaX,SigmaY,SigmaZ,t) ; % fine 
-    ThisHmY = AA.HmY(SigmaX,SigmaY,SigmaZ,t) ; % fine
-    ThisHmZ = AA.HmZ(SigmaX,SigmaY,SigmaZ,t) ; % fine
+    if numel(CopyMatrix)>0
+        ThisHmX = AA.HmX(SigmaX,SigmaY,SigmaZ,t) + HmXcTOT ; % fine + coarser
+        ThisHmY = AA.HmY(SigmaX,SigmaY,SigmaZ,t) + HmYcTOT ; % fine + coarser
+        ThisHmZ = AA.HmZ(SigmaX,SigmaY,SigmaZ,t) + HmZcTOT ; % fine + coarser
+    else
+        ThisHmX = AA.HmX(SigmaX,SigmaY,SigmaZ,t) ; % fine
+        ThisHmY = AA.HmY(SigmaX,SigmaY,SigmaZ,t) ; % fine
+        ThisHmZ = AA.HmZ(SigmaX,SigmaY,SigmaZ,t) ; % fine
+    end
 end
 %% Anisotropy
 ThisHkX = AA.HkX(SigmaX,SigmaY,SigmaZ,t) ;
