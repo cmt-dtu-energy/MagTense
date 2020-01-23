@@ -4,9 +4,21 @@ disp('Running Matlab model')
 if (~exist('fig1','var'))
     figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
 end
+if (~exist('MySim','var'))
+    
+    mu0 = 4*pi*1e-7;
+    HystDir = 1/mu0*[1,1,1] ;
+    MySim.nGrid = [36,9,1]';
+    MySim.Field_dir = HystDir;
+end
 
 %% Calculates dynamic solution to mumag std prob 4
 clearvars -except fig1 MySim
+
+%% addpaths
+addpath('../MEX_files');
+addpath('../examples/util');
+
 
 %% Create Preset
 % a = memory
@@ -21,8 +33,9 @@ MySim.A0 = 1.3e-11 ;
 MySim.Ms = 8.0e5 ;
 % MySim.MaxH = 0.1 ;
 % MySim.MaxHx = MySim.MaxH*sqrt(3) ;  
-% MySim.nHalfTimes = round([20;5;0]*1);
+MySim.nHalfTimes = round([20;5;0]*1);
 % MySim.nGrid = round([36;9;1]);
+MySim.nGrid = round([32;8;1]);
 
 % MySim.DemagTensorFileName = 'DemagStdProb4_x109y26z0' ;
 MySim.DemagTensorFileName = nan;
@@ -53,6 +66,11 @@ MySim.UseImplicitSolver = 0;
 MySim.UseExplicitSolver = 1;
 MySim.UseDynamicSolver = 0;
 
+% FFT 
+%     MySim.FFTdims = [1,0,0] ;
+%     MySim.thresholdFract = 0.9 ; 
+%     MySim.use_sparse = 1 ;
+
 MySim.SimulationName = 'PhysParams_TestDynamicsStdProb4_init' ;
 
 [SigmaInit,~,~,InteractionMatrices] = ComputeTheSolution(MySim);
@@ -79,7 +97,7 @@ MySim.alpha = 4.42e3 ;
 MySim.gamma = 2.21e5 ;
 
     %field 1
-%     MySim.Field_dir = -[-24.6,4.3,0]./1000 ;
+    MySim.Field_dir = -[-24.6,4.3,0]./1000 ;
     %field 2
 %     MySim.Field_dir = -[-35.5,-6.3,0]/1000 ;
 

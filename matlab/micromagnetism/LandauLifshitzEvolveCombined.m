@@ -44,11 +44,19 @@ AA.HjY = @(Sx,Sy,Sz,t) - (2*Jfact).*(A2*Sy) ;
 AA.HjZ = @(Sx,Sy,Sz,t) - (2*Jfact).*(A2*Sz) ;
 
 % "M" : Effective field : demagnetization (fine grid terms)
-% Demag tensor is symmetric, i.e. KglobZX = KglobXZ
-AA.HmX = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXX{1}*Sx+DemagTensor.KglobXY{1}*Sy+DemagTensor.KglobXZ{1}*Sz) ;
-AA.HmY = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXY{1}*Sx+DemagTensor.KglobYY{1}*Sy+DemagTensor.KglobYZ{1}*Sz) ;
-AA.HmZ = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXZ{1}*Sx+DemagTensor.KglobYZ{1}*Sy+DemagTensor.KglobZZ{1}*Sz) ;
-
+if (~all(FFTdims==0)) & isfield(InteractionMatrices,'FFT') % FFT !!!    
+    DemagTensorFFT = InteractionMatrices.FFT.DemagTensor ;
+    AA.FFTHmX = @(FFTSx,FFTSy,FFTSz,t) - Mfact.*real(InteractionMatrices.FFT.Do3Difft( DemagTensorFFT.KglobXX{1}*FFTSx + DemagTensorFFT.KglobXY{1}*FFTSy + DemagTensorFFT.KglobXZ{1}*FFTSz )) ;
+    AA.FFTHmY = @(FFTSx,FFTSy,FFTSz,t) - Mfact.*real(InteractionMatrices.FFT.Do3Difft( DemagTensorFFT.KglobXY{1}*FFTSx + DemagTensorFFT.KglobYY{1}*FFTSy + DemagTensorFFT.KglobYZ{1}*FFTSz )) ;
+    AA.FFTHmZ = @(FFTSx,FFTSy,FFTSz,t) - Mfact.*real(InteractionMatrices.FFT.Do3Difft( DemagTensorFFT.KglobXZ{1}*FFTSx + DemagTensorFFT.KglobYZ{1}*FFTSy + DemagTensorFFT.KglobZZ{1}*FFTSz )) ;
+    AA.Do3Difft = InteractionMatrices.FFT.Do3Difft ;
+    AA.Do3Dfft = InteractionMatrices.FFT.Do3Dfft ;
+else
+    % Demag tensor is symmetric, i.e. KglobZX = KglobXZ
+    AA.HmX = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXX{1}*Sx+DemagTensor.KglobXY{1}*Sy+DemagTensor.KglobXZ{1}*Sz) ;
+    AA.HmY = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXY{1}*Sx+DemagTensor.KglobYY{1}*Sy+DemagTensor.KglobYZ{1}*Sz) ;
+    AA.HmZ = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXZ{1}*Sx+DemagTensor.KglobYZ{1}*Sy+DemagTensor.KglobZZ{1}*Sz) ;
+end
 % "H" : Effective field : external field
 
 if UseExplicitSolver | UseDynamicSolver
