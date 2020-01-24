@@ -1,12 +1,18 @@
 function Script_3D_Std_Problem_4(fig1,MySim)
 disp('Running Matlab model')
+mu0 = 4*pi*1e-7;
 
-if (~exist('fig1','var'))
-    figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
+if (isfield(MySim,'ShowTheResult'))
+    if ~(MySim.ShowTheResult == 0)
+        if (~exist('fig1','var'))
+            figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
+        end
+        if (~isempty(fig1))
+            figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
+        end
+    end
 end
-if (~exist('MySim','var'))
-    
-    mu0 = 4*pi*1e-7;
+if (~exist('MySim','var'))   
     HystDir = 1/mu0*[1,1,1] ;
     MySim.nGrid = [36,9,1]';
     MySim.Field_dir = HystDir;
@@ -33,9 +39,9 @@ MySim.A0 = 1.3e-11 ;
 MySim.Ms = 8.0e5 ;
 % MySim.MaxH = 0.1 ;
 % MySim.MaxHx = MySim.MaxH*sqrt(3) ;  
-MySim.nHalfTimes = round([20;5;0]*1);
+% MySim.nHalfTimes = round([20;5;0]*1);
 % MySim.nGrid = round([36;9;1]);
-MySim.nGrid = round([32;8;1]);
+% MySim.nGrid = round([32;8;1]);
 
 % MySim.DemagTensorFileName = 'DemagStdProb4_x109y26z0' ;
 MySim.DemagTensorFileName = nan;
@@ -90,23 +96,24 @@ for k=1:size(SigmaInit,1)
 end
 % disp(num2str([Mx(end);My(end);Mz(end)],10)) ;
 % figure ; plot(Mx) ; hold on ; plot(My) ; plot(Mz) ;
-figure; quiver(InteractionMatrices.X(:),InteractionMatrices.Y(:),SigmaX,SigmaY); axis equal;  title('Starting state - Matlab')
+if (MySim.ShowTheResult)
+    figure; quiver(InteractionMatrices.X(:),InteractionMatrices.Y(:),SigmaX,SigmaY); axis equal;  title('Starting state - Matlab')
+end
 
 %% Perform dynamic calculation with first field
 MySim.alpha = 4.42e3 ;
 MySim.gamma = 2.21e5 ;
 
-    %field 1
-    MySim.Field_dir = -[-24.6,4.3,0]./1000 ;
-    %field 2
-%     MySim.Field_dir = -[-35.5,-6.3,0]/1000 ;
-
+%--- Field 1
+%    MySim.Field_dir = 1/mu0*[-24.6,4.3,0]/1000 ;
+%--- Field 2
+%     MySim.Field_dir = 1/mu0*[-35.5,-6.3,0]/1000 ;
 
 MySim.HsX = @(t) MySim.Field_dir(1) + 0.*t ;
 MySim.HsY = @(t) MySim.Field_dir(2) + 0.*t ;
 MySim.HsZ = @(t) MySim.Field_dir(3) + 0.*t ;
     
-MySim.t = linspace(0,1e-9,200);    % 1 ns for now, ~3 ns for proper solution
+MySim.t = linspace(0,1e-9,200);    % 1 ns for now
 
 MySim.InitialState = 'OldSol' ;
 MySim.SigmaIN = SigmaInit(end,:) ;
@@ -137,9 +144,11 @@ for k=1:size(SigmaSol1,1)
     Mz(k) = mean(SigmaZ./SigmaN) ;
     Mk(k) = Mx(k)*MySim.HystDir(1) + My(k)*MySim.HystDir(2) + Mz(k)*MySim.HystDir(3) ;
 end
- 
-plot(fig1, MySim.t,Mx,'ro')
-plot(fig1, MySim.t,My,'go')
-plot(fig1, MySim.t,Mz,'bo')
+
+if (MySim.ShowTheResult)
+    plot(fig1, MySim.t,Mx,'ro')
+    plot(fig1, MySim.t,My,'go')
+    plot(fig1, MySim.t,Mz,'bo')
+end
 
 end
