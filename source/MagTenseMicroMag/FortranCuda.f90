@@ -10,7 +10,7 @@
 
 	implicit none
 
-    
+#if USE_CUDA    
     
 	interface
 	
@@ -170,5 +170,5 @@
     call cu_icl_MVMult_GetH( Mx_in, My_in, Mz_in, Hx, Hy, Hz, n, pref )
     end subroutine cudaMatrVecMult
     
-    
+#endif    
     end module FortranCuda

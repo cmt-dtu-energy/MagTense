@@ -50,7 +50,9 @@
     call initializeInteractionMatrices( gb_problem )
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     
+
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
+#if USE_CUDA            
         !Initialize the Cuda arrays and load the demag tensors into the GPU memory
         if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction )) then
            
@@ -62,8 +64,12 @@
             call cudaInit( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
             
         endif
-        
+#else
+        call displayMatlabMessage( 'MagTense not compiled with CUDA - exiting!' )
+        stop
+#endif            
     endif
+
     allocate( gb_solution%pts(ntot,3) )
     do k=1,gb_problem%grid%nz
         do j=1,gb_problem%grid%ny            
@@ -140,10 +146,11 @@
     stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
     
         
-    
+#if USE_CUDA    
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
         call cudaDestroy()
     endif
+#endif
     !Make sure to return the correct state
     sol = gb_solution
     prob = gb_problem
@@ -487,9 +494,11 @@
         
             solution%HmZ = solution%HmZ * (-solution%Mfact )
         else
+#if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
             pref = sngl(-1 * solution%Mfact)                                
             call cudaMatrVecMult_sparse( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
+#endif            
         endif
         
     elseif ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) then
@@ -575,8 +584,9 @@
             solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
         else
             pref = sngl(-1 * solution%Mfact)
-        
+#if USE_CUDA        
             call cudaMatrVecMult( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
+#endif            
         endif 
     endif
     
