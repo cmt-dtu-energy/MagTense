@@ -33,8 +33,8 @@ for j = 1:2
 
         mu0 = 4*pi*1e-7;
 
-        addpath('../MagTense/matlab/MEX_files');
-        addpath('../MagTense/matlab/examples/util');
+        addpath('../../MEX_files');
+        addpath('../../examples/util');
 
         %% Setup the problem for the initial configuration
         tic
@@ -117,7 +117,7 @@ for j = 1:2
         
         %--- Fix MySim.SimulationName 
 %         figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
-        addpath('..\MagTense\matlab\micromagnetism')
+        addpath('..\..\micromagnetism')
         Matlab_model_params.nGrid = resolution';
         Matlab_model_params.Field_dir = HystDir;
         Matlab_model_params.SaveTheResult = 1;
