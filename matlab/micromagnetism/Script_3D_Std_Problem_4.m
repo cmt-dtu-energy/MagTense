@@ -33,6 +33,11 @@ if exist('MySim','var')
         MySim.SaveTheResult = 0;
     end
 end
+if exist('MySim','var')
+    if ~isfield(MySim,'ShowTheResult')
+        MySim.ShowTheResult = 1;
+    end
+end
 MySim.K0 = 0 ;
 MySim.Kz = 0 ;
 MySim.A0 = 1.3e-11 ;
