@@ -51,17 +51,26 @@ include 'blas.f90'
     call initializeInteractionMatrices( gb_problem )
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     
+
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
+#if USE_CUDA            
         !Initialize the Cuda arrays and load the demag tensors into the GPU memory
-        if ( gb_problem%demag_approximation .eq. DemagApproximationThreshold) then
+        if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction )) then
+           
             !If the matrices are sparse
-            call cudaInit_sparse( gb_problem%K_s )                
+            call cudaInit_sparse( gb_problem%K_s )        
+            
         else
             !if the matrices are dense
             call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+            
         endif
-        
+#else
+        call displayMatlabMessage( 'MagTense not compiled with CUDA - exiting!' )
+        stop
+#endif            
     endif
+
     allocate( gb_solution%pts(ntot,3) )
     do k=1,gb_problem%grid%nz
         do j=1,gb_problem%grid%ny            
@@ -138,10 +147,11 @@ include 'blas.f90'
     stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
     
         
-    
+#if USE_CUDA    
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
         call cudaDestroy()
     endif
+#endif
     !Make sure to return the correct state
     sol = gb_solution
     prob = gb_problem
@@ -457,7 +467,7 @@ include 'blas.f90'
      descr%mode = SPARSE_FILL_MODE_FULL
      descr%diag = SPARSE_DIAG_NON_UNIT
     
-    if ( problem%demag_approximation .eq. DemagApproximationThreshold ) then
+    if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
         if ( problem%useCuda .eq. useCudaFalse ) then
             !Do the matrix multiplications using sparse matrices 
             alpha = 1.0
@@ -485,9 +495,11 @@ include 'blas.f90'
         
             solution%HmZ = solution%HmZ * (-solution%Mfact )
         else
+#if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
             pref = sngl(-1 * solution%Mfact)                                
             call cudaMatrVecMult_sparse( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
+#endif            
         endif
         
     elseif ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) then
@@ -609,11 +621,15 @@ include 'blas.f90'
             
         else
             pref = sngl(-1 * solution%Mfact)
-        
+#if USE_CUDA        
             call cudaMatrVecMult( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
+#endif            
         endif 
     endif
     
+    !open(12,file='count_dmdt.txt',status='old',access='append',form='formatted',action='write')    
+    !write(12,*) 1
+    !close(12)
     
     end subroutine updateDemagfield_uniform
     
@@ -732,6 +748,14 @@ include 'blas.f90'
     complex(kind=4),dimension(:,:),allocatable :: Kxx_c, Kxy_c, Kxz_c, Kyy_c, Kyz_c, Kzz_c !> Temporary matrices for storing the complex version of the demag matrices
     complex(kind=4) :: thres
     integer,dimension(3) :: L                                                !> Array specifying the dimensions of the fft
+    real*4 :: threshold_var, f_large, f_small, f_middle
+    integer,dimension(6) :: count_ind
+    real*4,dimension(6) :: f_small_arr
+    integer :: count_middle, n_ele_nonzero, nx_K, ny_K, k_do  
+    logical,dimension(:,:,:),allocatable :: mask          !> mask used for finding non-zero values
+    logical,dimension(:,:),allocatable :: mask_xx, mask_xy, mask_xz          !> mask used for finding non-zero values
+    logical,dimension(:,:),allocatable :: mask_yy, mask_yz, mask_zz          !> mask used for finding non-zero values
+    
     
     if ( problem%grid%gridType .eq. gridTypeUniform ) then
         nx = problem%grid%nx
@@ -806,18 +830,105 @@ include 'blas.f90'
     
     
     
-   !trial. Make a sparse matrix out of the dense matrices by specifying a threshold
-    if ( problem%demag_approximation .eq. DemagApproximationThreshold ) then
-        call ConvertDenseToSparse_s( problem%Kxx, problem%K_s(1), problem%demag_threshold)
-        call ConvertDenseToSparse_s( problem%Kxy, problem%K_s(2), problem%demag_threshold)
-        call ConvertDenseToSparse_s( problem%Kxz, problem%K_s(3), problem%demag_threshold)
-        call ConvertDenseToSparse_s( problem%Kyy, problem%K_s(4), problem%demag_threshold)
-        call ConvertDenseToSparse_s( problem%Kyz, problem%K_s(5), problem%demag_threshold)
-        call ConvertDenseToSparse_s( problem%Kzz, problem%K_s(6), problem%demag_threshold)
+   !Make a sparse matrix out of the dense matrices by specifying a threshold
+    if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
         
+        threshold_var =  problem%demag_threshold
+
+        !If a fraction of entries is specified that are to be removed, find the function value for this
+        !The demag tensor is considered as a whole, and the fraction specified concern the number of elements greater than epsilon
+        if ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) then
+            
+            !Make a mask for each demag tensor with only the elements larger than epsilon
+            !Make the masks only once - this is memory intensive, but computationally efficient
+            nx_K = size(problem%Kxx(:,1))
+            ny_K = size(problem%Kxx(1,:))
+            allocate(mask_xx(nx_K,ny_K))
+            allocate(mask_xy(nx_K,ny_K))
+            allocate(mask_xz(nx_K,ny_K))
+            allocate(mask_yy(nx_K,ny_K))
+            allocate(mask_yz(nx_K,ny_K))
+            allocate(mask_zz(nx_K,ny_K))
+            
+            mask_xx = abs(problem%Kxx) .gt. 0
+            mask_xy = abs(problem%Kxy) .gt. 0
+            mask_xz = abs(problem%Kxz) .gt. 0
+            mask_yy = abs(problem%Kyy) .gt. 0
+            mask_yz = abs(problem%Kyz) .gt. 0
+            mask_zz = abs(problem%Kzz) .gt. 0
+            
+            !The total number of nonzero elements in the demag tensor
+            n_ele_nonzero = count( mask_xx )
+            n_ele_nonzero = n_ele_nonzero + count( mask_xy )
+            n_ele_nonzero = n_ele_nonzero + count( mask_xz )
+            n_ele_nonzero = n_ele_nonzero + count( mask_yy )
+            n_ele_nonzero = n_ele_nonzero + count( mask_yz )
+            n_ele_nonzero = n_ele_nonzero + count( mask_zz )
+    
+            f_large = max(maxval(abs(problem%Kxx)), maxval(abs(problem%Kxy)), maxval(abs(problem%Kxz)), maxval(abs(problem%Kyy)), maxval(abs(problem%Kyz)), maxval(abs(problem%Kzz)))
+            
+            !Find the minimum value in the individual demag tensors than is greater than zero
+            f_small_arr(1) = minval(abs(problem%Kxx), mask_xx)
+            f_small_arr(2) = minval(abs(problem%Kxy), mask_xy)
+            f_small_arr(3) = minval(abs(problem%Kxz), mask_xz)
+            f_small_arr(4) = minval(abs(problem%Kyy), mask_yy)
+            f_small_arr(5) = minval(abs(problem%Kyz), mask_yz)
+            f_small_arr(6) = minval(abs(problem%Kzz), mask_zz)
+            
+            f_small = minval(f_small_arr)
+
+            !Bisection algoritm for find the function value for a corresponding fraction
+            k_do = 1
+            do 
+                f_middle = (f_large-f_small)/2+f_small
+                
+                !Count only the elements larger than epsilon in each of the matrices
+                count_ind(1) = count( mask_xx .and. abs(problem%Kxx) .le. f_middle )
+                count_ind(2) = count( mask_xy .and. abs(problem%Kxy) .le. f_middle )
+                count_ind(3) = count( mask_xz .and. abs(problem%Kxz) .le. f_middle )
+                count_ind(4) = count( mask_yy .and. abs(problem%Kyy) .le. f_middle )
+                count_ind(5) = count( mask_yz .and. abs(problem%Kyz) .le. f_middle )
+                count_ind(6) = count( mask_zz .and. abs(problem%Kzz) .le. f_middle )
+                
+                count_middle = sum(count_ind)
+                   
+                if ( count_middle .gt. threshold_var*n_ele_nonzero ) then
+                    f_large = f_middle
+                else
+                    f_small = f_middle
+                endif            
+            
+                !check if we have found the value that defines the threshold
+                if ( ( count_middle .ge. (threshold_var-0.01)*n_ele_nonzero ) .and. ( count_middle .le. (threshold_var+0.01)*n_ele_nonzero ) ) then
+                        threshold_var = f_middle
+                    exit
+                endif
+            
+                if ( k_do .gt. 500 ) then
+                        call displayMatlabMessage( 'Iterations exceeded in finding threshold value. Continuing.' )
+                        threshold_var = f_middle
+                    exit
+                endif
+                
+                k_do = k_do+1
+            enddo  
+            
+            deallocate(mask_xx)
+            deallocate(mask_xy)
+            deallocate(mask_xz)
+            deallocate(mask_yy)
+            deallocate(mask_yz)
+            deallocate(mask_zz)
+            
+        endif
         
-        !Deallocate the full matrices as they are no longer needed
-        deallocate( problem%Kxx, problem%Kxy, problem%Kxz, problem%Kyy, problem%Kyz, problem%Kzz )
+        call ConvertDenseToSparse_s( problem%Kxx, problem%K_s(1), threshold_var)
+        call ConvertDenseToSparse_s( problem%Kxy, problem%K_s(2), threshold_var)
+        call ConvertDenseToSparse_s( problem%Kxz, problem%K_s(3), threshold_var)
+        call ConvertDenseToSparse_s( problem%Kyy, problem%K_s(4), threshold_var)
+        call ConvertDenseToSparse_s( problem%Kyz, problem%K_s(5), threshold_var)
+        call ConvertDenseToSparse_s( problem%Kzz, problem%K_s(6), threshold_var)
+        
     elseif ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) then
         !Apply the fast fourier transform concept, remove values below a certain threshold and then convert to a sparse matrix
         !for use in the field calculation later on
@@ -899,9 +1010,6 @@ include 'blas.f90'
         status = DftiCommitDescriptor( problem%desc_hndl_FFT_M_H )
         
         
-        
-        
-        
     endif
     
     
@@ -917,8 +1025,8 @@ include 'blas.f90'
     !>-----------------------------------------
     subroutine ConvertDenseToSparse_d( D, K, threshold)
     real(DP),dimension(:,:),intent(in) :: D                 !> Dense input matrix    
-    real*4,intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
-    type(MagTenseSparse),intent(inout) :: K                           !> Sparse matrix allocation
+    real*4,intent(in) :: threshold                          !> Values less than this (in absolute) of D are considered zero
+    type(MagTenseSparse),intent(inout) :: K                 !> Sparse matrix allocation
     
     integer :: nx,ny, nnonzero
     
@@ -931,10 +1039,10 @@ include 'blas.f90'
     
     allocate(mask(nx,ny))
     
+    !find all entries larger than the threshold
     mask = abs(D) .gt. threshold
-    
     nnonzero = count( mask )
-    
+        
     allocate( K%values(nnonzero),K%cols(nnonzero))
     allocate( K%rows_start(nx), K%rows_end(nx), colInds(ny) )
     

@@ -4,6 +4,7 @@ close all
 %--- Use either field 1 or field 2 from the NIST example
 NIST_field = 1;
 resolution = [1*36,1*9,1];
+use_CUDA = true;
 
 figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
 mu0 = 4*pi*1e-7;
@@ -17,8 +18,6 @@ addpath('../util');
 tic
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
-        
-problem = problem.setUseCuda( false );
 problem.dem_appr = getMicroMagDemagApproximation('none');
 %problem.dem_thres = 1e-4;
 problem.alpha = 4.42e3;
@@ -53,8 +52,8 @@ problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 % problem.alpha = -4.42e3/problem.Ms;
 problem.alpha = 4.42e3 ;
 problem.gamma = 2.21e5 ;
-problem = problem.setUseCuda( false );
-problem.dem_appr = getMicroMagDemagApproximation('threshold');
+problem = problem.setUseCuda( use_CUDA );
+problem.dem_appr = getMicroMagDemagApproximation('none');
 problem.dem_thres = 1e-4;
 problem = problem.setTime( linspace(0,1e-9,200) ); %
 problem.setTimeDis = int32(10);
