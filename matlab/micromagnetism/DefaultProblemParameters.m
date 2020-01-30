@@ -96,5 +96,15 @@ function DefaultSetupStruct = DefaultProblemParameters()
     DefaultSetupStruct.CalcEigenvalue = 0;
     DefaultSetupStruct.AlreadyEquilibrium = 0;
     DefaultSetupStruct.SaveTheResult = 1 ;
+    DefaultSetupStruct.ShowTheResult = 1 ;
     DefaultSetupStruct.MaxComputationalTimePerStep = inf ;
+    DefaultSetupStruct.use_sparse = 0;
+    DefaultSetupStruct.use_gpuArray = 0;
+    DefaultSetupStruct.threshold = 0; 
+    DefaultSetupStruct.thresholdFract = 0;
+    DefaultSetupStruct.use_single = 0;
+    % FFT
+    DefaultSetupStruct.FFTdims = [0,0,0] ;
+
+    
 end

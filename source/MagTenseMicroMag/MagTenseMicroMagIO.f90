@@ -25,7 +25,7 @@
         mwPointer :: nGridPtr,LGridPtr,dGridPtr,typeGridPtr, ueaProblemPtr, modeProblemPtr,solverProblemPtr
         mwPointer :: A0ProblemPtr,MsProblemPtr,K0ProblemPtr,gammaProblemPtr,alpha0ProblemPtr,MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr,HextProblemPtr,tProblemPtr,useCudaPtr
-        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr,demApproxPtr
+        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr,demApproxPtr, setTimeDisplayProblemPtr
         mwPointer :: NFileReturnPtr,NReturnPtr, NLoadPtr
         integer,dimension(3) :: int_arr
         real*8,dimension(3) :: real_arr
@@ -174,6 +174,11 @@
         endif
         problem%setTimeDisplay = 100
         
+        !Set how often to display the timestep in Matlab
+        sx = 1
+        setTimeDisplayProblemPtr = mxGetField( prhs, i, problemFields(21) )
+        call mxCopyPtrToInteger4(mxGetPr(setTimeDisplayProblemPtr), problem%setTimeDisplay, sx )
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -255,7 +260,7 @@
     !> @param[inout] nfields the no. of elements in fieldnames
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
-        integer,intent(out) :: nfields
+        integer,intent(out) :: nfields        
         integer,parameter :: nf=23
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
