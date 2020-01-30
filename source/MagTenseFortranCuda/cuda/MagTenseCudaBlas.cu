@@ -453,30 +453,45 @@ cusparseHandle_t sparse_handle = NULL;
  {
 	 if ( d_Kxx != NULL )
 	 {
-		cudaFree( d_Kxx );
+		 cudaFree( d_Kxx );
+		 d_Kxx = NULL;
 		 cudaFree( d_Kxy );
+		 d_Kxy = NULL;
 		 cudaFree( d_Kxz );
+		 d_Kxz = NULL;
 		 cudaFree( d_Kyy );
+		 d_Kyy = NULL;
 		 cudaFree( d_Kyz );
+		 d_Kyz = NULL;
 		 cudaFree( d_Kzz );
+		 d_Kzz = NULL;
 	 }
 	 
 	 if ( d_Hx != NULL )
 	 {	 
 		 cudaFree( d_Hx );
+		 d_Hx = NULL;
 		 cudaFree( d_Hy );
+		 d_Hy = NULL;
 		 cudaFree( d_Hz );
+		 d_Hz = NULL;
 	 }
 	 
 	 if ( d_Mx != NULL )
 	 {
 		 cudaFree( d_Mx );
+		 d_Mx = NULL;
 		 cudaFree( d_My );
+		 d_My = NULL;
 		 cudaFree( d_Mz );
+		 d_Mz = NULL;
 	 }
 	 
 	 if ( handle != NULL )
+	{
 		cublasDestroy(handle);
+		handle = NULL;
+	}
 	
 		
 	freeSparseMatrix( &spKxx );

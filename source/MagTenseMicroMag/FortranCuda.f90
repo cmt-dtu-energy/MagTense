@@ -126,7 +126,8 @@
     !> Kaspar K. Nielsen, kasparkn@gmail.com, DTU / Private, 2019
     !> Called by the main program, converts the 64 bit double's to 32 bit float and
     !> calls the icl wrapper to pass the data to the gpu
-    subroutine cudaInit( Kxx_in, Kxy_in, Kxz_in, Kyy_in, Kyz_in, Kzz_in )
+    !> in double precision
+    subroutine cudaInit_d( Kxx_in, Kxy_in, Kxz_in, Kyy_in, Kyz_in, Kzz_in )
     real*8,dimension(:,:) :: Kxx_in,Kxy_in,Kxz_in,Kyy_in,Kyz_in,Kzz_in
     
     real*4,dimension(:),allocatable :: Kxx, Kxy, Kxz, Kyy, Kyz, Kzz
@@ -156,8 +157,26 @@
     !Clean-up
     deallocate( Kxx, Kxy, Kxz, Kyy, Kyz, Kzz )
     
-    end subroutine cudaInit            
+    end subroutine cudaInit_d
     
+    !> Kaspar K. Nielsen, kasparkn@gmail.com, DTU / Private, 2019
+    !> Called by the main program, converts the 64 bit double's to 32 bit float and
+    !> calls the icl wrapper to pass the data to the gpu in single precision
+    subroutine cudaInit_s( Kxx_in, Kxy_in, Kxz_in, Kyy_in, Kyz_in, Kzz_in )
+    real,dimension(:,:) :: Kxx_in,Kxy_in,Kxz_in,Kyy_in,Kyz_in,Kzz_in
+        
+    integer*4 :: n
+    
+    n = size(Kxx_in(:,1))
+    
+    call cu_icl_initDemagMatrices( Kxx_in, Kxy_in, Kxz_in, Kyy_in, Kyz_in, Kzz_in, n )
+    
+    
+    
+    end subroutine cudaInit_s
+    
+    !> Kaspar K. Nielsen, kasparkn@gmail.com, DTU / Private, 2020
+    !> Called by the main program, does the dense matrix-vector multiplication on the GPU
     subroutine cudaMatrVecMult( Mx_in, My_in, Mz_in, Hx, Hy, Hz, pref )
     real*4,dimension(:),intent(in) :: Mx_in,My_in,Mz_in
     real*4,dimension(:),intent(inout) :: Hx,Hy,Hz

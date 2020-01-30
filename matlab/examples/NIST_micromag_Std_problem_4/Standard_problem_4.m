@@ -17,7 +17,8 @@ addpath('../util');
 tic
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
-problem = problem.setUseCuda( true );
+        
+problem = problem.setUseCuda( false );
 problem.dem_appr = getMicroMagDemagApproximation('none');
 %problem.dem_thres = 1e-4;
 problem.alpha = 4.42e3;

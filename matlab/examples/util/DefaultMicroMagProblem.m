@@ -58,13 +58,12 @@ properties
     % then K = 0
     dem_thres
     
-    %defines whether to attempt using CUDA (will crash if no appropriate
-    %NVIDIA driver is present or if insufficient memory is available. 0 for
-    %do not use cuda, 1 for do use (int32)
-    useCuda
+    
     
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
+    
+   
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -79,6 +78,20 @@ properties (SetAccess=private,GetAccess=public)
     nt
     %should have size (nt,1)
     t
+    
+    %defines whether to attempt using CUDA (will crash if no appropriate
+    %NVIDIA driver is present or if insufficient memory is available. 0 for
+    %do not use cuda, 1 for do use (int32)
+    useCuda
+    
+     %defines if and how to return the N tensor (defined in 
+    N_ret
+    
+    %defines whether the N tensor should be loaded rather than calculated
+    N_load
+    
+    %filename to which N is written to
+    N_file
 end
 
 methods
@@ -151,6 +164,12 @@ methods
         %set the demag approximation to the default, i.e. use no
         %approximation
         obj.dem_appr = getMicroMagDemagApproximation('none');
+        
+        %set the default return N behavior
+        obj = obj.setReturnNMemory(false);
+        obj = obj.setReturnNFileName('t');
+        obj = obj.setLoadN( 'donot' );
+
     end
     
     %%Calculates the applied field as a function of time on the time grid
@@ -183,6 +202,23 @@ methods
        else
            obj.useCuda = int32(0);
        end
+    end
+    
+    function obj = setReturnNMemory( obj, enabled )
+        if enabled
+            obj.N_ret = getMicroMagDemagTensorReturnMode('memory');
+        else
+            obj.N_ret = getMicroMagDemagTensorReturnMode('donot');
+        end
+    end
+    
+    function obj = setLoadN( obj, mode )
+        obj.N_load = getMicroMagDemagTensorReturnMode( mode );
+    end
+    
+    function obj = setReturnNFileName( obj, filename )
+        obj.N_ret = getMicroMagDemagTensorReturnMode( filename );
+        obj.N_file = filename;
     end
     
 end
