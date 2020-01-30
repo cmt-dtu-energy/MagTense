@@ -26,8 +26,9 @@
         mwPointer :: A0ProblemPtr,MsProblemPtr,K0ProblemPtr,gammaProblemPtr,alpha0ProblemPtr,MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr,HextProblemPtr,tProblemPtr,useCudaPtr
         mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr,demApproxPtr
+        mwPointer :: NFileReturnPtr,NReturnPtr, NLoadPtr
         integer,dimension(3) :: int_arr
-        real,dimension(3) :: real_arr
+        real*8,dimension(3) :: real_arr
         real*8 :: demag_fac
         
         !Get the expected names of the fields
@@ -155,6 +156,22 @@
         demApproxPtr = mxGetField( prhs, i, problemFields(20) )
         call mxCopyPtrToInteger4(mxGetPr(demApproxPtr), problem%demag_approximation, sx )
         
+        !flag whether the demag tensor should be returned and if so how
+        sx = 1
+        NReturnPtr = mxGetField( prhs, i, problemFields(21) )
+        call mxCopyPtrToInteger4(mxGetPr(NReturnPtr), problem%demagTensorReturnState, sx )
+        
+        !flag whether the demag tensor should be loaded
+        sx = 1
+        NLoadPtr = mxGetField( prhs, i, problemFields(22) )
+        call mxCopyPtrToInteger4(mxGetPr(NLoadPtr), problem%demagTensorLoadState, sx )
+        
+        !File for returning the demag tensor to a file on disk (has to have length>2)
+        if ( problem%demagTensorReturnState .gt. 2 ) then
+            sx = problem%demagTensorReturnState
+            NFileReturnPtr = mxGetField( prhs, i, problemFields(23) )
+            call mxCopyPtrToCharacter( mxGetPr(NFileReturnPtr), problem%demagTensorFile, sx )
+        endif
         problem%setTimeDisplay = 100
         
         !Clean-up 
@@ -239,7 +256,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=20
+        integer,parameter :: nf=23
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -266,6 +283,10 @@
         fieldnames(18) = 'dem_thres'
         fieldnames(19) = 'useCuda'
         fieldnames(20) = 'dem_appr'
+        fieldnames(21) = 'N_ret'
+        fieldnames(22) = 'N_load'
+        fieldnames(23) = 'N_file'
+        
         
         
     end subroutine getProblemFieldnames
@@ -294,6 +315,76 @@
         
         
     end subroutine getSolutionFieldnames
+    
+    !>----------------------------------------
+    !> Kaspar K. Nielsen, kasparkn@gmail.com, January 2020
+    !> Writes the demag tensors to disk given a filename in problem
+    !> @params[in] problem the struct containing the entire problem
+    !>----------------------------------------    
+    subroutine writeDemagTensorToDisk( problem )
+    type(MicroMagProblem), intent(in) :: problem
+    
+    integer :: n            !> No. of elements in the grid
+    
+    select case( problem%demag_approximation )
+        case ( DemagApproximationNothing )
+        n = problem%grid%nx * problem%grid%ny * problem%grid%nz
+        
+             open (11, file=problem%demagTensorFile,	&
+			           status='unknown', form='unformatted',	&
+			           access='direct', recl=1*n*n)
+
+            write(11,rec=1) problem%Kxx
+            write(11,rec=2) problem%Kxy
+            write(11,rec=3) problem%Kxz
+            write(11,rec=4) problem%Kyy
+            write(11,rec=5) problem%Kyz
+            write(11,rec=6) problem%Kzz
+    
+            close(11)
+        case ( DemagApproximationThreshold )
+            
+        case ( DemagApproximationFFTThreshold )
+        
+    end select
+        
+    
+    end subroutine writeDemagTensorToDisk
+    
+    
+    !>----------------------------------------
+    !> Kaspar K. Nielsen, kasparkn@gmail.com, January 2020
+    !> Loads the demag tensors from disk given a file in problem
+    !> @params[inout] problem the struct containing the entire problem
+    !>----------------------------------------    
+    subroutine loadDemagTensorFromDisk( problem )
+    type( MicroMagProblem ), intent(inout) :: problem
+    integer :: n
+    
+    select case( problem%demag_approximation )
+        case ( DemagApproximationNothing )
+            n = problem%grid%nx * problem%grid%ny * problem%grid%nz
+            
+            
+             open (11, file=problem%demagTensorFile,	&
+			           status='unknown', form='unformatted',	&
+			           access='direct', recl=1*n*n)
+
+            read(11,rec=1) problem%Kxx
+            read(11,rec=2) problem%Kxy
+            read(11,rec=3) problem%Kxz
+            read(11,rec=4) problem%Kyy
+            read(11,rec=5) problem%Kyz
+            read(11,rec=6) problem%Kzz
+    
+            close(11)
+        case ( DemagApproximationThreshold )
+            
+        case ( DemagApproximationFFTThreshold )
+    end select
+    
+    
+    end subroutine loadDemagTensorFromDisk
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>
