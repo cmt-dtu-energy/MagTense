@@ -23,18 +23,18 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Debug|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2019b\extern\include\;C:\Users\emib\Downloads\sundials_4_1\CVODE_instdir\fortran;C:\Users\emib\Downloads\sundials_4_1\CVODE_instdir\fortran\Release;C:\Users\emib\Downloads\sundials_4_1\CVODE_instdir\include" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
-				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="C:\Users\emib\Downloads\sundials_4_1\CVODE_instdir\lib"/>
-				<Tool Name="VFResourceCompilerTool" AdditionalIncludeDirectories="C:\Users\emib\Downloads\sundials_4_1\CVODE_instdir\include"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2019b\extern\include\;C:\Users\emib\Downloads\sundials_4_1\Automated_test_inst_dir\fortran\Release;C:\Users\emib\Downloads\sundials_4_1\Automated_test_inst_dir\include" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="C:\Users\emib\Downloads\sundials_4_1\Automated_test_inst_dir\lib"/>
+				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>
 				<Tool Name="VFPreLinkEventTool"/>
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2019b\extern\include\;C:\Users\emib\Downloads\sundials_4_1\CVODE_instdir\fortran;C:\Users\emib\Downloads\sundials_4_1\CVODE_instdir\fortran\Release;C:\Users\emib\Downloads\sundials_4_1\CVODE_instdir\include" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" UseMkl="mklParallel"/>
-				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="C:\Users\emib\Downloads\sundials_4_1\CVODE_instdir\lib"/>
-				<Tool Name="VFResourceCompilerTool" AdditionalIncludeDirectories="C:\Users\emib\Downloads\sundials_4_1\CVODE_instdir\include"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2019b\extern\include\;C:\Users\emib\Downloads\sundials_4_1\Automated_test_inst_dir\fortran\Release;C:\Users\emib\Downloads\sundials_4_1\Automated_test_inst_dir\include" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" UseMkl="mklParallel"/>
+				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="C:\Users\emib\Downloads\sundials_4_1\Automated_test_inst_dir\lib"/>
+				<Tool Name="VFResourceCompilerTool" AdditionalIncludeDirectories="C:\Users\emib\Downloads\sundials_4_1\Automated_test_inst_dir\include"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>
 				<Tool Name="VFPreLinkEventTool"/>
