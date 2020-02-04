@@ -150,7 +150,7 @@ methods
         obj.useCuda = int32(0);
         %set the demag approximation to the default, i.e. use no
         %approximation
-        obj.dem_appr = getMicroMagDemagApproximation('none');
+%         obj.dem_appr = getMicroMagDemagApproximation('none');
     end
     
     %%Calculates the applied field as a function of time on the time grid
