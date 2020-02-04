@@ -23,7 +23,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Debug|x64" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2019a\extern\include\;..\NumericalIntegration\NumericalIntegration\x64\debug\;c:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019\windows\mkl\include\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2019b\extern\include\;..\NumericalIntegration\NumericalIntegration\x64\debug\;c:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019\windows\mkl\include\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2019a\extern\include\;..\NumericalIntegration\NumericalIntegration\x64\debug\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\NumericalIntegration\x64\debug\;..\DemagField\DemagField\x64\debug\;..\MagTenseFortranCuda\x64\debug\"/>
 				<Tool Name="VFResourceCompilerTool"/>
@@ -33,8 +33,8 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;c:\Program Files\MATLAB\R2019b\extern\include\;d:\work_new\projects\PDJ_MicroMagnetism\CloudStation\GPU\Fortran_Cuda\PG_Fortran_test\" RealKIND="realKIND8" UseMkl="mklParallel"/>
-				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;..\DemagField\DemagField\x64\release\;..\MagTenseFortranCuda\x64\debug\"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;c:\Program Files\MATLAB\R2019b\extern\include\;c:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019\windows\mkl\include\" RealKIND="realKIND8" UseMkl="mklParallel"/>
+				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;..\DemagField\DemagField\x64\release\;..\MagTenseFortranCuda\x64\release\"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>
