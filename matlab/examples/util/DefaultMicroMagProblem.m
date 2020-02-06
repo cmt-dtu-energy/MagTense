@@ -63,7 +63,19 @@ properties
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
     
-   
+    %defines if and how to return the N tensor (1 do not return, 2 return
+     %in memory and >2 return as a file with file length = N_ret
+    N_ret {mustBeGreaterThan(N_ret,0),mustBeInteger(N_ret)}=1;
+    
+    %defines whether the N tensor should be loaded rather than calculated
+    %2 = load from memory, >2 load from file with filename length N_load
+    N_load {mustBeGreaterThan(N_load,0),mustBeInteger(N_load)}=1;
+    
+    %filename to which N is written to
+    N_file_out char = '';
+    
+    %filename from which N is loaded from
+    N_file_in char = '';
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -84,14 +96,20 @@ properties (SetAccess=private,GetAccess=public)
     %do not use cuda, 1 for do use (int32)
     useCuda
     
-     %defines if and how to return the N tensor (defined in 
-    N_ret
     
-    %defines whether the N tensor should be loaded rather than calculated
-    N_load
+end
+
+%defines certain constant parameters for easy use and guarantee of being
+%consistent with the Fortran counter parts
+properties (Constant)
+    %defines the constant for not returning N in any way (default)
+    returnNModeNot = int32(1);            
+    %defines the constant for attempting to return the N tensor directly in
+    %memory
+    returnNModeMemory = int32(2);            
+    %return as a file and the length of the filename is equal to mode (converted to an int32)
+    returnNModeNFile = int32(3);            
     
-    %filename to which N is written to
-    N_file
 end
 
 methods
@@ -166,9 +184,10 @@ methods
         obj.dem_appr = getMicroMagDemagApproximation('none');
         
         %set the default return N behavior
-        obj = obj.setReturnNMemory(false);
-        obj = obj.setReturnNFileName('t');
-        obj = obj.setLoadN( 'donot' );
+
+        obj = obj.setReturnNFilename('t');
+        obj = obj.setLoadNFilename('t');
+
 
     end
     
@@ -204,21 +223,14 @@ methods
        end
     end
     
-    function obj = setReturnNMemory( obj, enabled )
-        if enabled
-            obj.N_ret = getMicroMagDemagTensorReturnMode('memory');
-        else
-            obj.N_ret = getMicroMagDemagTensorReturnMode('donot');
-        end
+    function obj = setLoadNFilename( obj, filename )
+        obj.N_load = int32(length(filename));
+        obj.N_file_in = filename;
     end
     
-    function obj = setLoadN( obj, mode )
-        obj.N_load = getMicroMagDemagTensorReturnMode( mode );
-    end
-    
-    function obj = setReturnNFileName( obj, filename )
-        obj.N_ret = getMicroMagDemagTensorReturnMode( filename );
-        obj.N_file = filename;
+    function obj = setReturnNFilename( obj, filename )
+        obj.N_ret = int32(length(filename));
+        obj.N_file_out = filename;
     end
     
 end

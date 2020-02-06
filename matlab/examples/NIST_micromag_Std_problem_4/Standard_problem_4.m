@@ -19,6 +19,8 @@ tic
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
 problem.dem_appr = getMicroMagDemagApproximation('none');
+%problem = problem.setReturnNFilename( 'N_out_test.dat' );
+problem = problem.setLoadNFilename( 'N_out_test.dat' );
 %problem.dem_thres = 1e-4;
 problem.alpha = 4.42e3;
 problem.gamma = 0;
@@ -28,7 +30,7 @@ problem.m0(:) = 1/sqrt(3);
     
 %time grid on which to solve the problem
 problem = problem.setTime( linspace(0,100e-9,200) );
-problem.setTimeDis = int32(10);
+problem.setTimeDis = int32(100);
 HystDir = 1/mu0*[1,1,1] ;
 
 %time-dependent applied field
