@@ -769,7 +769,7 @@ include 'blas.f90'
         allocate( problem%Kzz(ntot,ntot) )
         
         
-        if ( problem%demagTensorReturnState .gt. DemagTensorReturnMemory ) then
+        if ( problem%demagTensorLoadState .gt. DemagTensorReturnMemory ) then
             call loadDemagTensorFromDisk( problem )
         else
            
@@ -821,7 +821,9 @@ include 'blas.f90'
             enddo
         
             !Write the demag tensors to disk if asked to do so            
-        
+            if ( problem%demagTensorReturnState .gt. DemagTensorReturnMemory ) then
+                call writeDemagTensorToDisk( problem )
+            endif            
             !Clean up
             deallocate(H)
         endif
