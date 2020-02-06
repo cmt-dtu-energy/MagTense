@@ -4,25 +4,25 @@ Basic Geometries
 ========================================
 Prism
 ========================================
-.. image:: ./fig/prism.svg
+.. image:: ./fig/prism.png
 
 ========================================
 Cylindrical Tile
 ========================================
-.. image:: ./fig/cylindrical_tile.svg
+.. image:: ./fig/cylindrical_tile.png
 
 ========================================
 Circpiece
 ========================================
-.. image:: ./fig/circpiece.svg
+.. image:: ./fig/circpiece.png
 
 ========================================
 Inverted Circpiece
 ========================================
-.. image:: ./fig/circpiece_inv.svg
+.. image:: ./fig/circpiece_inv.png
 
 ========================================
 Tetrahedron
 ========================================
-.. image:: ./fig/tetrahedron.svg
+.. image:: ./fig/tetrahedron.png
 
