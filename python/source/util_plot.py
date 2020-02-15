@@ -308,7 +308,11 @@ def zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale=0.1)
             ax.set_ylim([data_ylim[0], data_ylim[0] + data_lim_range])
             ax.set_zlim([data_zlim[0], data_zlim[0] + data_lim_range])
         else:
-            # format_coord function inside site-packages\mpl_toolkits\mplot3d\axes3d.py adjusted
+            # workaround without changes in site-packages\mpl_toolkits\mplot3d\axes3d.py
+            # store the current mousebutton
+            b = ax.button_pressed
+            # set current mousebutton to something unreasonable
+            ax.button_pressed = -1 
             s = ax.format_coord(event.xdata, event.ydata)
             x = float(s[s.find('x')+2:s.find('y')-2])
             y = float(s[s.find('y')+2:s.find('z')-2])
@@ -317,6 +321,7 @@ def zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale=0.1)
                 ax.set_xlim(x - cur_lim_range/2, x + cur_lim_range/2)
                 ax.set_ylim(y - cur_lim_range/2, y + cur_lim_range/2)
                 ax.set_zlim([data_zlim[0], data_zlim[0] + cur_lim_range])
+            ax.button_pressed = b
         plt.draw()  # force re-draw
 
     fig = ax.get_figure()  # get the figure of interest
@@ -327,7 +332,7 @@ def zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale=0.1)
     return (zoom_scroll, zoom_onpress)
 
 
-def create_plot(tiles, eval_points, H, grid=None):
+def create_plot(tiles, eval_points=None, H=None, grid=None):
     fig = plt.figure()
     ax = fig.gca(projection='3d')
     if tiles is not None:
