@@ -1,5 +1,6 @@
 include 'mkl_spblas.f90'
 include "mkl_dfti.f90"    
+
     module MicroMagParameters
     use MKL_SPBLAS
     Use MKL_DFTI   
@@ -71,9 +72,12 @@ include "mkl_dfti.f90"
         
         real*4 :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         
-        integer :: setTimeDisplay
-        integer :: useCuda                          !> Defines whether to attempt using CUDA or not
-        integer :: demag_approximation                  !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
+        integer :: setTimeDisplay                               !> Determines how often the timestep is shown in Matlab
+        integer :: useCuda                                      !> Defines whether to attempt using CUDA or not
+        integer :: demag_approximation                          !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
+        integer :: demagTensorReturnState                       !> Flag describing how or if the demag tensor should be returned
+        integer :: demagTensorLoadState                         !> Flag describing how or if to load the demag tensor (from disk e.g.)
+        character*256 :: demagTensorFileOut, demagTensorFileIn  !> Filename (including path) for output (input) of demag tensor if it is to be returned as a file (demagTensorReturnState >2 and the value is equal to the length of the file including path)
         
         !Below is stuff that is computed when the solver initializes
         
@@ -82,9 +86,9 @@ include "mkl_dfti.f90"
         type(MagTenseSparse),dimension(6) :: K_s         !> Sparse matrices (used if the threshold is >0 )
         type(MagTenseSparse_c),dimension(6) :: K_s_c       !> Sparse matrices (used if the threshold is >0 ), complex version
         
-        real(DP),dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
-        real(DP),dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
-        real(DP),dimension(:,:),allocatable :: Kzz          !> Demag field tensor split out into the nine symmetric components
+        real(SP),dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
+        real(SP),dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
+        real(SP),dimension(:,:),allocatable :: Kzz          !> Demag field tensor split out into the nine symmetric components
         
         real(DP),dimension(:),allocatable :: Axx,Axy,Axz,Ayy,Ayz,Azz    !> Anisotropy vectors assuming local anisotropy only, i.e. no interaction between grains
         
@@ -126,6 +130,7 @@ include "mkl_dfti.f90"
     integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
     integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverImplicit=3
     integer,parameter :: useCudaTrue=1,useCudaFalse=0
-    integer,parameter :: DemagApproximationNothing=1,DemagApproximationThreshold=2,DemagApproximationFFTThreshold=3
+    integer,parameter :: DemagApproximationNothing=1,DemagApproximationThreshold=2,DemagApproximationFFTThreshold=3,DemagApproximationThresholdFraction=4
+    integer,parameter :: DemagTensorReturnNot=1,DemagTensorReturnMemory=2
     
 end module MicroMagParameters    

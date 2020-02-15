@@ -934,7 +934,7 @@ end if
 end subroutine collect_garbage_r1
 
 !---------------------------------------------------------------------------   
-!> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+!> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
 !> @brief Modified by Kaspar K. Nielsen in September 2019 in order for the
 !> subroutine to accept a procedural pointer for the function evaluation
 !---------------------------------------------------------------------------   

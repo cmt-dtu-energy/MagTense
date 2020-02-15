@@ -26,8 +26,8 @@ if ProblemSetupStruct.SaveTheResult
         end
     end
 
-    mkdir([DirectoryFilename]);
-    MySim.FileName = [DirectoryFilename '\' MySim.SimulationName];
+    mkdir([MySim.DirectoryFilename]);
+    MySim.FileName = [MySim.DirectoryFilename '\' MySim.SimulationName];
 
     save(MySim.FileName,'ProblemSetupStruct');
     

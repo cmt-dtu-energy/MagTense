@@ -16,20 +16,21 @@ for k=2:numel(AvrgMatrix)
     SigmaXC = AvrgMatrix{k}*SigmaX ;
     SigmaYC = AvrgMatrix{k}*SigmaY ;
     SigmaZC = AvrgMatrix{k}*SigmaZ ;
-    % calculate demag. field over coarse grid   
-
+    
+    % calculate demag. field over coarse grid
+    % the demag tensor is symmetric so KglobZX = KglobXZ
     HmXc = DemagTensor.KglobXX{k}*SigmaXC+DemagTensor.KglobXY{k}*SigmaYC+DemagTensor.KglobXZ{k}*SigmaZC ;
-    HmYc = DemagTensor.KglobYX{k}*SigmaXC+DemagTensor.KglobYY{k}*SigmaYC+DemagTensor.KglobYZ{k}*SigmaZC ;
-    HmZc = DemagTensor.KglobZX{k}*SigmaXC+DemagTensor.KglobZY{k}*SigmaYC+DemagTensor.KglobZZ{k}*SigmaZC ;
-    '' ; 
-
-    % get demag. field over fine grid (copy)   
+    HmYc = DemagTensor.KglobXY{k}*SigmaXC+DemagTensor.KglobYY{k}*SigmaYC+DemagTensor.KglobYZ{k}*SigmaZC ;
+    HmZc = DemagTensor.KglobXZ{k}*SigmaXC+DemagTensor.KglobYZ{k}*SigmaYC+DemagTensor.KglobZZ{k}*SigmaZC ;
+    '' ;
+    
+    % get demag. field over fine grid (copy)
     HmXcTOT = HmXcTOT - Mfact*CopyMatrix{k}*HmXc ;  % Coarser
     HmYcTOT = HmYcTOT - Mfact*CopyMatrix{k}*HmYc ;  % Coarser
     HmZcTOT = HmZcTOT - Mfact*CopyMatrix{k}*HmZc ;  % Coarser
 end
 
-%%  Exchange 
+%%  Exchange
 ThisHjX = AA.HjX(SigmaX,SigmaY,SigmaZ,t) ;
 ThisHjY = AA.HjY(SigmaX,SigmaY,SigmaZ,t) ;
 ThisHjZ = AA.HjZ(SigmaX,SigmaY,SigmaZ,t) ;
@@ -39,14 +40,25 @@ ThisHhX = AA.HhX(SigmaX,SigmaY,SigmaZ,t) ;
 ThisHhY = AA.HhY(SigmaX,SigmaY,SigmaZ,t) ;
 ThisHhZ = AA.HhZ(SigmaX,SigmaY,SigmaZ,t) ;
 %% Demagnetization
-if numel(CopyMatrix)>0
-    ThisHmX = AA.HmX(SigmaX,SigmaY,SigmaZ,t) + HmXcTOT ; % fine + coarser
-    ThisHmY = AA.HmY(SigmaX,SigmaY,SigmaZ,t) + HmYcTOT ; % fine + coarser
-    ThisHmZ = AA.HmZ(SigmaX,SigmaY,SigmaZ,t) + HmZcTOT ; % fine + coarser
+if isfield(AA,'Do3Dfft')
+    FFTSigmaX = AA.Do3Dfft(SigmaX) ;
+    FFTSigmaY = AA.Do3Dfft(SigmaY) ;
+    FFTSigmaZ = AA.Do3Dfft(SigmaZ) ;
+    
+    ThisHmX = AA.FFTHmX(FFTSigmaX,FFTSigmaY,FFTSigmaZ,t) ; % fine
+    ThisHmY = AA.FFTHmY(FFTSigmaX,FFTSigmaY,FFTSigmaZ,t) ; % fine
+    ThisHmZ = AA.FFTHmZ(FFTSigmaX,FFTSigmaY,FFTSigmaZ,t) ; % fine
+    
 else
-    ThisHmX = AA.HmX(SigmaX,SigmaY,SigmaZ,t) ; % fine 
-    ThisHmY = AA.HmY(SigmaX,SigmaY,SigmaZ,t) ; % fine
-    ThisHmZ = AA.HmZ(SigmaX,SigmaY,SigmaZ,t) ; % fine
+    if numel(CopyMatrix)>0
+        ThisHmX = AA.HmX(SigmaX,SigmaY,SigmaZ,t) + HmXcTOT ; % fine + coarser
+        ThisHmY = AA.HmY(SigmaX,SigmaY,SigmaZ,t) + HmYcTOT ; % fine + coarser
+        ThisHmZ = AA.HmZ(SigmaX,SigmaY,SigmaZ,t) + HmZcTOT ; % fine + coarser
+    else
+        ThisHmX = AA.HmX(SigmaX,SigmaY,SigmaZ,t) ; % fine
+        ThisHmY = AA.HmY(SigmaX,SigmaY,SigmaZ,t) ; % fine
+        ThisHmZ = AA.HmZ(SigmaX,SigmaY,SigmaZ,t) ; % fine
+    end
 end
 %% Anisotropy
 ThisHkX = AA.HkX(SigmaX,SigmaY,SigmaZ,t) ;
