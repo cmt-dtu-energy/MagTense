@@ -69,12 +69,12 @@ cusparseMatDescr_t sparse_descr = NULL;
 //handle to the sparse matrix blas
 cusparseHandle_t sparse_handle = NULL; 
  
- void loadSparseToDevice( float* values, int* colInds, int* rowInds, float* d_values, int* d_colInds, int* d_rowInds, cusparseSpMatDescr_t mat, int nnz_ );
- 
+ void loadSparseToDevice( float* values, int* colInds, int* rowInds, CUSparse* mat, int nnz_ );
+ void freeSparseMatrix( CUSparse* mat );
  /**
  Kaspar K. Nielsen, kasparkn@gmail.com.dk, 2019
  Initializes the sparse matrices for later use in the matrix-vector multiplications
- n is the no. of rows and cols int he matrices
+ n is the no. of rows and cols in the matrices
  nnz is the no. of non-zero elements
  mat_no 1...6 identifies which matrix to load (Kxx = 1, Kxy = 2, Kxz = 3, Kyy = 4, Kyz = 5, Kzz = 6 )
  values float array with the non-zero values of the matrix (length nnz)
@@ -98,20 +98,20 @@ cusparseHandle_t sparse_handle = NULL;
 		spKyy.n = *n;
 		spKyz.n = *n;
 		spKzz.n = *n;
-		
+		cudaError_t err;
 		//allocate memory for the magnetization vectors
-		cudaMalloc((void**) &d_Mx, *n * sizeof(float));
-		cudaMalloc((void**) &d_My, *n * sizeof(float));
-		cudaMalloc((void**) &d_Mz, *n * sizeof(float));
+		err = cudaMalloc((void**) &d_Mx, *n * sizeof(float));
+		err = cudaMalloc((void**) &d_My, *n * sizeof(float));
+		err = cudaMalloc((void**) &d_Mz, *n * sizeof(float));
 		
 		//allocate memory for the magnetic field vectors
-		cudaMalloc((void**) &d_Hx, *n * sizeof(float));
-		cudaMalloc((void**) &d_Hy, *n * sizeof(float));
-		cudaMalloc((void**) &d_Hz, *n * sizeof(float));
+		err = cudaMalloc((void**) &d_Hx, *n * sizeof(float));
+		err = cudaMalloc((void**) &d_Hy, *n * sizeof(float));
+		err = cudaMalloc((void**) &d_Hz, *n * sizeof(float));
 			 
 		status = cusparseCreateMatDescr(&sparse_descr);
-		cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
-		cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
+		cusparseSetMatType(sparse_descr,CUSPARSE_MATRIX_TYPE_GENERAL);
+		cusparseSetMatIndexBase(sparse_descr,CUSPARSE_INDEX_BASE_ONE);
 		
 		/*Kaspar: This code will not work on Windows before the next major release thanks to nvidia
 		//The handle on the device for the magnetization vectors
@@ -132,27 +132,27 @@ cusparseHandle_t sparse_handle = NULL;
 	{
 		case 1:
 			
-			loadSparseToDevice( values, colInds, rowInds, spKxx, *nnz );
+			loadSparseToDevice( values, colInds, rowInds, &spKxx, *nnz );
 								
 			break;
 		case 2:
-			loadSparseToDevice( values, colInds, rowInds, spKxy, *nnz );
+			loadSparseToDevice( values, colInds, rowInds, &spKxy, *nnz );
 			
 			break;
 		case 3:
-			loadSparseToDevice( values, colInds, rowInds, spKxz, *nnz );
+			loadSparseToDevice( values, colInds, rowInds, &spKxz, *nnz );
 			
 			break;
 		case 4:
-			loadSparseToDevice( values, colInds, rowInds, spKyy, *nnz );
+			loadSparseToDevice( values, colInds, rowInds, &spKyy, *nnz );
 			
 			break;
 		case 5:
-			loadSparseToDevice( values, colInds, rowInds, spKyz, *nnz );
+			loadSparseToDevice( values, colInds, rowInds, &spKyz, *nnz );
 			
 			break;
 		case 6:
-			loadSparseToDevice( values, colInds, rowInds, spKzz, *nnz );
+			loadSparseToDevice( values, colInds, rowInds, &spKzz, *nnz );
 			
 			break;
 			
@@ -163,20 +163,22 @@ cusparseHandle_t sparse_handle = NULL;
  }
  
  
- void loadSparseToDevice( float* values, int* colInds, int* rowInds, float* d_values, CUSparse* mat, int nnz_ )
+ void loadSparseToDevice( float* values, int* colInds, int* rowInds, CUSparse* mat, int nnz_ )
  {
-	 
+	cudaError_t err;
+	//set the no. of non-zero entries
+ 	mat->nnz = nnz_;
 	 //allocate the row inds (+1 in size as the last element contains nnz + rowInds(0)
-	cudaMalloc((void**) mat->rows, (mat->n + 1) * sizeof(int));
+	err = cudaMalloc((void**) &(mat->rows), (mat->n + 1) * sizeof(int));
 	//allocate the column inds
-	cudaMalloc((void**) mat->cols, mat->nnz * sizeof(int));
+	err = cudaMalloc((void**) &(mat->cols), mat->nnz * sizeof(int));
 	//allocate the values array
-	cudaMalloc((void**) mat->values, mat->nnz * sizeof(float));
+	err = cudaMalloc((void**) &(mat->values), mat->nnz * sizeof(float));
 	
 	//copy to device
-	cudaMemcpy( mat->rows, rowInds, (mat->n+1) * sizeof(int),cudaMemcpyHostToDevice);
-	cudaMemcpy( mat->cols, colInds, mat->nnz * sizeof(int),cudaMemcpyHostToDevice);
-	cudaMemcpy( mat->values, values, mat->nnz * sizeof(float),cudaMemcpyHostToDevice);
+	err = cudaMemcpy( mat->rows, rowInds, (mat->n+1) * sizeof(int),cudaMemcpyHostToDevice);
+	err = cudaMemcpy( mat->cols, colInds, mat->nnz * sizeof(int),cudaMemcpyHostToDevice);
+	err = cudaMemcpy( mat->values, values, mat->nnz * sizeof(float),cudaMemcpyHostToDevice);
 	
 	
 	
@@ -200,10 +202,10 @@ cusparseHandle_t sparse_handle = NULL;
  void cu_MVMult_GetH_sparse(const float* Mx, const float* My, const float* Mz, float* Hx, float* Hy, float* Hz, const float* pref)
  {	 
 	
-	cusparseStatus_t stat;
+	cusparseStatus_t status;
 	
 	
-	void* dBuffer = NULL;
+	
 	int n = spKxx.n;
 	//Copy Mx, My and Mz to device memory	
 	cudaMemcpy( d_Mx, Mx, n * sizeof(float), cudaMemcpyHostToDevice );
@@ -219,6 +221,53 @@ cusparseHandle_t sparse_handle = NULL;
                            &alpha, sparse_descr, spKxx.values, spKxx.rows, spKxx.cols,
                            d_Mx, &beta, d_Hx);
 	
+	//set beta = 1 so as to keep the previous set values of d_Hx
+	beta = 1.0;
+	//Hx = Kxy * My
+	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKxy.nnz,
+                           &alpha, sparse_descr, spKxy.values, spKxy.rows, spKxy.cols,
+                           d_My, &beta, d_Hx);
+	//Hx = Kxz * Mz
+	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKxz.nnz,
+                           &alpha, sparse_descr, spKxz.values, spKxz.rows, spKxz.cols,
+                           d_Mz, &beta, d_Hx);						   
+						   
+						   
+	//reset beta = 0 such that any previous values of d_Hy are erased
+	beta = 0.;
+	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKxy.nnz,
+                           &alpha, sparse_descr, spKxy.values, spKxy.rows, spKxy.cols,
+                           d_Mx, &beta, d_Hy);
+	
+	//set beta = 1 so as to keep the previous set values of d_Hy
+	beta = 1.0;
+	//Hy = Kyy * My
+	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKyy.nnz,
+                           &alpha, sparse_descr, spKyy.values, spKyy.rows, spKyy.cols,
+                           d_My, &beta, d_Hy);
+	//Hy = Kyz * Mz
+	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKyz.nnz,
+                           &alpha, sparse_descr, spKyz.values, spKyz.rows, spKyz.cols,
+                           d_Mz, &beta, d_Hy);						   
+						   
+						   
+	//reset beta = 0 such that any previous values of d_Hz are erased
+	beta = 0.;
+	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKxz.nnz,
+                           &alpha, sparse_descr, spKxz.values, spKxz.rows, spKxz.cols,
+                           d_Mx, &beta, d_Hz);
+	
+	//set beta = 1 so as to keep the previous set values of d_Hy
+	beta = 1.0;
+	//Hz = Kzy * My
+	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKyz.nnz,
+                           &alpha, sparse_descr, spKyz.values, spKyz.rows, spKyz.cols,
+                           d_My, &beta, d_Hz);
+	//Hz = Kzz * Mz
+	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKzz.nnz,
+                           &alpha, sparse_descr, spKzz.values, spKzz.rows, spKzz.cols,
+                           d_Mz, &beta, d_Hz);									   
+						   
 	//kaspar: All the calls below will not work before the next major release by nvidia
 	
 	//Hx = Kxx * Mx + Kxy * My + Kxz * Mz	
@@ -404,54 +453,80 @@ cusparseHandle_t sparse_handle = NULL;
  {
 	 if ( d_Kxx != NULL )
 	 {
-		cudaFree( d_Kxx );
+		 cudaFree( d_Kxx );
+		 d_Kxx = NULL;
 		 cudaFree( d_Kxy );
+		 d_Kxy = NULL;
 		 cudaFree( d_Kxz );
+		 d_Kxz = NULL;
 		 cudaFree( d_Kyy );
+		 d_Kyy = NULL;
 		 cudaFree( d_Kyz );
+		 d_Kyz = NULL;
 		 cudaFree( d_Kzz );
+		 d_Kzz = NULL;
 	 }
 	 
 	 if ( d_Hx != NULL )
 	 {	 
 		 cudaFree( d_Hx );
+		 d_Hx = NULL;
 		 cudaFree( d_Hy );
+		 d_Hy = NULL;
 		 cudaFree( d_Hz );
+		 d_Hz = NULL;
 	 }
 	 
 	 if ( d_Mx != NULL )
 	 {
 		 cudaFree( d_Mx );
+		 d_Mx = NULL;
 		 cudaFree( d_My );
+		 d_My = NULL;
 		 cudaFree( d_Mz );
+		 d_Mz = NULL;
 	 }
 	 
 	 if ( handle != NULL )
+	{
 		cublasDestroy(handle);
+		handle = NULL;
+	}
 	
+		
+	freeSparseMatrix( &spKxx );
+	freeSparseMatrix( &spKxy );
+	freeSparseMatrix( &spKxz );
+	freeSparseMatrix( &spKyy );
+	freeSparseMatrix( &spKyz );
+	freeSparseMatrix( &spKzz );
+
+	if ( sparse_descr != NULL )
+	{
+		cusparseDestroyMatDescr(sparse_descr);
+		sparse_descr = NULL;
+	}
+
 	if (sparse_handle != NULL )
 	{
 		cusparseDestroy(sparse_handle);
-	    cudaFree( spKxx.values );
-		cudaFree( spKxy.values );
-		cudaFree( spKxz.values );
-		cudaFree( spKyy.values );
-		cudaFree( spKyz.values );
-		cudaFree( spKzz.values );
-		
-		cudaFree( spKxx.cols );
-		cudaFree( spKxy.cols );
-		cudaFree( spKxz.cols );
-		cudaFree( spKyy.cols );
-		cudaFree( spKyz.cols );
-		cudaFree( spKzz.cols );
-		
-		cudaFree( spKxx.rows );
-		cudaFree( spKxy.rows );
-		cudaFree( spKxz.rows );
-		cudaFree( spKyy.rows );
-		cudaFree( spKyz.rows );
-		cudaFree( spKzz.rows );
+		sparse_handle = NULL;
 	}
 
  }
+
+
+
+void freeSparseMatrix( CUSparse* mat )
+{
+	if ( mat->values != NULL )
+	{
+		cudaFree( mat->values );
+		mat->values = NULL;
+		cudaFree( mat->cols );
+		mat->cols = NULL;
+		cudaFree( mat->rows );
+		mat->rows = NULL;
+
+	}
+}

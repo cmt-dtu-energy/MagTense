@@ -1,8 +1,9 @@
 #include <stdio.h>
  
+void cu_initDemagMatrices_sparse( const int* n, const int* nnz, const int* mat_no, float* values, int* colInds, int* rowInds );
 
-void cu_initDemagMatrices_sparse( const int* n, const int* nnz, const int* mat_no, float* values, int* colInds, int* rowInds ); 
-void cu_MVMult_GetH_sparse(const float* Mx, const float* My, const float* Mz, float* Hx, float* Hy, float* Hz, const float* pref) ;
+void cu_MVMult_GetH_sparse(const float* Mx, const float* My, const float* Mz, float* Hx, float* Hy, float* Hz, const float* pref);
+
  
 void cu_initDemagMatrices( const float*, const float*, const float*, const float*, const float*, const float*, int*);
 void cu_MVMult_GetH( const float*, const float*, const float*, float*, float*, float*, int*, float* );
@@ -14,7 +15,7 @@ void cu_test( const float*, int* n);
 	 
 	void icl_initDemagMatrices_sparse( int* n, int* nnz, int* mat_no, float* values, int* colInds, int* rowInds );
 	 
-	void icl_MVMult_GetH_sparse(const float* Mx, const float* My, const float* Mz, float* Hx, float* Hy, float* Hz, const float* pref) ;
+	void icl_MVMult_GetH_sparse(const float* Mx, const float* My, const float* Mz, float* Hx, float* Hy, float* Hz, const int* n, const float* pref) ;
 	 
 	void icl_initDemagMatrices(const float*, const float*, const float*, const float*, const float*, const float*, int*);
 	
@@ -30,7 +31,7 @@ void icl_initDemagMatrices_sparse( int* n, int* nnz, int* mat_no, float* values,
 	cu_initDemagMatrices_sparse( n, nnz, mat_no, values, colInds, rowInds ); 
 }
 
-void icl_MVMult_GetH_sparse(const float* Mx, const float* My, const float* Mz, float* Hx, float* Hy, float* Hz, const float* pref) 
+void icl_MVMult_GetH_sparse(const float* Mx, const float* My, const float* Mz, float* Hx, float* Hy, float* Hz, const int* n, const float* pref) 
 {
 	cu_MVMult_GetH_sparse( Mx, My, Mz, Hx, Hy, Hz, pref) ;
 }

@@ -13,7 +13,7 @@ implicit none
   
     
     !---------------------------------------------------------------------------    
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> General entry point for getting MagTense to solve a set of ODE's
     !> @param[in] fct procedure pointer to the function that gives dy_i/dt for i=1...n
@@ -60,7 +60,7 @@ implicit none
     
         
     !---------------------------------------------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Specific implementation for solving ODE's using the RK suite.
     !> @param[in] fct the function that gives the neq ODE derivatives

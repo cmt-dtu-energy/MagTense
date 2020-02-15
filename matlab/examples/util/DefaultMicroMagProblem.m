@@ -58,13 +58,24 @@ properties
     % then K = 0
     dem_thres
     
-    %defines whether to attempt using CUDA (will crash if no appropriate
-    %NVIDIA driver is present or if insufficient memory is available. 0 for
-    %do not use cuda, 1 for do use (int32)
-    useCuda
+    
     
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
+    
+    %defines if and how to return the N tensor (1 do not return, 2 return
+     %in memory and >2 return as a file with file length = N_ret
+    N_ret {mustBeGreaterThan(N_ret,0),mustBeInteger(N_ret)}=1;
+    
+    %defines whether the N tensor should be loaded rather than calculated
+    %2 = load from memory, >2 load from file with filename length N_load
+    N_load {mustBeGreaterThan(N_load,0),mustBeInteger(N_load)}=1;
+    
+    %filename to which N is written to
+    N_file_out char = '';
+    
+    %filename from which N is loaded from
+    N_file_in char = '';
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -79,6 +90,26 @@ properties (SetAccess=private,GetAccess=public)
     nt
     %should have size (nt,1)
     t
+    
+    %defines whether to attempt using CUDA (will crash if no appropriate
+    %NVIDIA driver is present or if insufficient memory is available. 0 for
+    %do not use cuda, 1 for do use (int32)
+    useCuda
+    
+    
+end
+
+%defines certain constant parameters for easy use and guarantee of being
+%consistent with the Fortran counter parts
+properties (Constant)
+    %defines the constant for not returning N in any way (default)
+    returnNModeNot = int32(1);            
+    %defines the constant for attempting to return the N tensor directly in
+    %memory
+    returnNModeMemory = int32(2);            
+    %return as a file and the length of the filename is equal to mode (converted to an int32)
+    returnNModeNFile = int32(3);            
+    
 end
 
 methods
@@ -151,6 +182,13 @@ methods
         %set the demag approximation to the default, i.e. use no
         %approximation
         obj.dem_appr = getMicroMagDemagApproximation('none');
+        
+        %set the default return N behavior
+
+        obj = obj.setReturnNFilename('t');
+        obj = obj.setLoadNFilename('t');
+
+
     end
     
     %%Calculates the applied field as a function of time on the time grid
@@ -183,6 +221,16 @@ methods
        else
            obj.useCuda = int32(0);
        end
+    end
+    
+    function obj = setLoadNFilename( obj, filename )
+        obj.N_load = int32(length(filename));
+        obj.N_file_in = filename;
+    end
+    
+    function obj = setReturnNFilename( obj, filename )
+        obj.N_ret = int32(length(filename));
+        obj.N_file_out = filename;
     end
     
 end
