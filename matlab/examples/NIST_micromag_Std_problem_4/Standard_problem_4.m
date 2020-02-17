@@ -19,8 +19,12 @@ tic
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
 problem.dem_appr = getMicroMagDemagApproximation('none');
-%problem = problem.setReturnNFilename( 'N_out_test.dat' );
-problem = problem.setLoadNFilename( 'N_out_test.dat' );
+
+loadFile = 'N_out_test.dat';
+if exist(loadFile,'file')
+    problem = problem.setLoadNFilename( loadFile );
+end
+problem = problem.setReturnNFilename( loadFile );
 %problem.dem_thres = 1e-4;
 problem.alpha = 4.42e3;
 problem.gamma = 0;
