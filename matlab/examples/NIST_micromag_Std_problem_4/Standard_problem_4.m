@@ -3,7 +3,7 @@ close all
 
 %--- Use either field 1 or field 2 from the NIST example
 NIST_field = 1;
-resolution = [1*36,1*9,1];
+resolution = [3*36,3*9,1];
 use_CUDA = true;
 
 figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
@@ -21,9 +21,9 @@ problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 problem.dem_appr = getMicroMagDemagApproximation('none');
 
 loadFile = 'N_out_test.dat';
-if exist(loadFile,'file')
-    problem = problem.setLoadNFilename( loadFile );
-end
+%if exist(loadFile,'file')
+%    problem = problem.setLoadNFilename( loadFile );
+%end
 problem = problem.setReturnNFilename( loadFile );
 %problem.dem_thres = 1e-4;
 problem.alpha = 4.42e3;
