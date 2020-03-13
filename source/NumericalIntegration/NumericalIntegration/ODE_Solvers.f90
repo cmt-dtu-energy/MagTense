@@ -98,7 +98,7 @@ implicit none
     allocate(thres(neq))
     
     !tolerance
-    tol = 1e-6
+    tol = 1e-4
     
     !set thres to the low value
     thres(:) = 1e-10
