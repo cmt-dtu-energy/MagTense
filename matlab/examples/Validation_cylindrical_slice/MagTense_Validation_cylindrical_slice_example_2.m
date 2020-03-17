@@ -70,9 +70,9 @@ tile = IterateMagnetization( tile, [], [], 1e-6, 100 );
 % x = -0.2:0.001:1.8;
 % y = -0.8:0.001:1.2;
 % z = -0.2:0.001:1.8;
-data_FEM_x = load('..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_normH_x.txt');
-data_FEM_y = load('..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_normH_y.txt');
-data_FEM_z = load('..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_normH_z.txt');
+data_FEM_x = load('..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_example_2_normH_x.txt');
+data_FEM_y = load('..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_example_2_normH_y.txt');
+data_FEM_z = load('..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_example_2_normH_z.txt');
 x = data_FEM_x(:,1)';
 y = data_FEM_y(:,1)';
 z = data_FEM_z(:,1)';
@@ -89,16 +89,16 @@ N = getNFromTile_mex( tile, pts, int32( length(pts(:,1)) ) );
 %Find the norm of the field
 Hnorm = squeeze( sqrt( sum(H.^2,2) ) );
 
-figure2 = figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto');
-fig2 = axes('Parent',figure2,'Layer','top','FontSize',16);
-hold all
-grid on
-box on
-
-%Plot the solution
-plot(x,N(1:numel(x),1,1),'r.');
-plot(y,N((numel(x)+1):(numel(x)+numel(y)),1,1),'g.');
-plot(z,N((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)),1,1),'b.');
+% figure2 = figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto');
+% fig2 = axes('Parent',figure2,'Layer','top','FontSize',16);
+% hold all
+% grid on
+% box on
+% 
+% %Plot the solution
+% plot(x,N(1:numel(x),1,1),'r.');
+% plot(y,N((numel(x)+1):(numel(x)+numel(y)),1,1),'g.');
+% plot(z,N((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)),1,1),'b.');
 
 
 %Make a figure
@@ -123,7 +123,7 @@ plot(data_FEM_x(:,1),data_FEM_x(:,2),'ro');
 plot(data_FEM_y(:,1),data_FEM_y(:,2),'go');
 plot(data_FEM_z(:,1),data_FEM_z(:,2),'bo');
 
-h_l = legend('MagTense, x for y,z=offset','MagTense, y for x,z=offset','MagTense, z for x,y=offset','FEM, x for y,z=offset','FEM, y for x,z=offset','FEM, z for x,y=offset','Location','West');
+h_l = legend('MagTense, x for y,z=offset','MagTense, y for x,z=offset','MagTense, z for x,y=offset','FEM, x for y,z=offset','FEM, y for x,z=offset','FEM, z for x,y=offset','Location','NorthWest');
 set(h_l,'fontsize',10);
 ylabel('|\mu_0{}H| [T]');
 xlabel('x, y or z [m]');

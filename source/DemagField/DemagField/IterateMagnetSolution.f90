@@ -154,7 +154,11 @@
                     
                     case(tileTypePrism)
                         !! No rotation is needed as the offset of the prism is with respect to the center of the prism
-                        pts = tiles(i)%offset                
+                        pts = tiles(i)%offset      
+                        
+                    case(tileTypeSphere)
+                        !! No rotation is possible, as the tile is a sphere
+                        pts = tiles(i)%offset 
             
                     case(tileTypeCircPiece)
                         !! Find the center point of the circ piece

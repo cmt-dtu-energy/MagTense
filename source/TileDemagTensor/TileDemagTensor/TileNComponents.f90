@@ -54,7 +54,7 @@ module TileNComponents
       end subroutine N_tensor_subroutine
     end interface
     
-    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeEllipsoid=10,tileTypePlanarCoil=101
+    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeSphere=6,tileTypeSpheroid=10,tileTypePlanarCoil=101
     integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2
     integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     
@@ -621,6 +621,7 @@ module TileNComponents
     
     end subroutine getN_circPiece_Inv
     
+    
     !::Calculates N from the analytical expression in 3D
     !::Given the prism tile (prism) and the position vector to it (pos = (x,y,z) )
     !::Returns a (3,3) array N_out
@@ -712,6 +713,57 @@ module TileNComponents
     N_out = -1.* N_out
     
     end subroutine
+    
+    
+    !::Calculates N from the analytical expression in 3D
+    !::Given the prism tile (sphere) and the position vector to it (pos = (x,y,z) )
+    !::Returns a (3,3) array N_out
+    subroutine getN_sphere_3D( tile, pos, N_out )
+    type(MagTile),intent(in) :: tile
+    real,intent(in),dimension(3) :: pos
+    real,intent(inout),dimension(3,3) :: N_out
+    
+    real :: a,x,y,z
+    
+    a = tile%a
+    
+    x = pos(1)
+    y = pos(2)
+    z = pos(3)
+    
+    
+    if ( sqrt(x**2+y**2+z**2) .le. a ) then
+        !:: Inside the sphere
+        N_out(1,1) = -1./3.
+        N_out(1,2) = 0
+        N_out(1,3) = 0
+        N_out(2,1) = 0
+        N_out(2,2) = -1./3.
+        N_out(2,3) = 0
+        N_out(3,1) = 0
+        N_out(3,2) = 0
+        N_out(3,3) = -1./3.
+    else
+        !:: Outside the sphere 
+        N_out(1,1) = x**2-(x**2+y**2+z**2)/3.
+        N_out(1,2) = x*y
+        N_out(1,3) = x*z
+        N_out(2,1) = x*y
+        N_out(2,2) = y**2-(x**2+y**2+z**2)/3.
+        N_out(2,3) = y*z
+        N_out(3,1) = x*z
+        N_out(3,2) = y*z
+        N_out(3,3) = z**2-(x**2+y**2+z**2)/3.
+
+        N_out = 3./(4.*pi*sqrt(x**2+y**2+z**2)**5)*N_out
+        N_out = 4./3.*pi*a**3*N_out;
+    endif  
+    
+    !!Change the sign so that the output tensor follows the same definition as all the other tensors
+    !N_out = -1.* N_out
+    
+    end subroutine
+    
         
     !> Returns the general tetrahedron solution
     subroutine getN_tensor_tetrahedron ( tile, r, N )         

@@ -11,6 +11,10 @@ switch ( tileName )
         type = int32( 4 );
     case 'tetrahedron'
         type = int32( 5 );
+    case 'sphere'
+        type = int32( 6 );
+     case 'spheroid'
+        type = int32( 10 );
     case 'planarcoil'
         type = int32( 101 );
 end
