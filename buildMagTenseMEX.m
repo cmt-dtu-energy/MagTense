@@ -3,7 +3,7 @@
 clear all
    
 USE_CUDA = true;
-DEBUG = true;
+DEBUG = false;
 
 %% MagTenseLandauLifshitzSolver_mex
 if DEBUG
