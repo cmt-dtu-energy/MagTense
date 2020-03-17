@@ -13,6 +13,9 @@ addpath('../../MEX_files/');
 %define the vacuum permeability
 mu0 = 4*pi*1e-7;
 
+mur = 4000;
+Ms = 2.1;
+
 %%Get a default tile from MagTense
 tile = getDefaultMagTile();
     
@@ -57,8 +60,8 @@ tiles(2).magnetType = getMagnetType('soft');
 tiles(2).offset(2) = 2*d;
 tiles(2).Mrem = 0;
 tiles(2).M = [1000,0,0];
-tiles(2).mu_r_ea = 4000;
-tiles(2).mu_r_oa = 4000;
+% tiles(2).mu_r_ea = 4000;
+% tiles(2).mu_r_oa = 4000;
 tiles(2).color = [0,0,1];
 
 tiles(4) = tiles(2);
@@ -72,7 +75,10 @@ tiles(4).offset(2) = 0;
 %%magnetization from one iteration to the next) allowed before convergence
 %%is reached. Finally, 100 reflects the max. no. of allowed iterations
 
-tiles = IterateMagnetization( tiles, [], [], 1e-3, 300 );
+stFcn=MakeMH_Fe_const_mur( mur, Ms );
+tiles = IterateMagnetization( tiles, stFcn, 300, 1e-3, 100 );
+
+% tiles = IterateMagnetization( tiles, [], [], 1e-3, 300 );
 
 figure(figure1);plotTiles(tiles,true);axis equal;alpha 0.3
 %%Now find the field in a set of points
