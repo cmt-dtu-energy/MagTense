@@ -8,7 +8,7 @@ figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fi
 mu0 = 4*pi*1e-7;
 
 addpath('../../MEX_files');
-addpath('../util');
+addpath('../../util');
 
 tic
 %% Run a single hysterhesis curve for standard problem 2

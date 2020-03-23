@@ -5,7 +5,7 @@ NIST_field = 2;
 i_arr = 1:9; 
 
 addpath('../MagTense/matlab/MEX_files');
-addpath('../MagTense/matlab/examples/util');
+addpath('../MagTense/matlab/util');
         
 figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto');
 fig1 = axes('Parent',figure1,'Layer','top','FontSize',10);

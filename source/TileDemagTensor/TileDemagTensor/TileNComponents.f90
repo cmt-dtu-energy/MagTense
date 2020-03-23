@@ -54,7 +54,7 @@ module TileNComponents
       end subroutine N_tensor_subroutine
     end interface
     
-    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeSphere=6,tileTypeSpheroid=10,tileTypePlanarCoil=101
+    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeSphere=6,tileTypeSpheroid=7,tileTypePlanarCoil=101
     integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2
     integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     
@@ -716,7 +716,7 @@ module TileNComponents
     
     
     !::Calculates N from the analytical expression in 3D
-    !::Given the prism tile (sphere) and the position vector to it (pos = (x,y,z) )
+    !::Given the tile (sphere) and the position vector to it (pos = (x,y,z) )
     !::Returns a (3,3) array N_out
     subroutine getN_sphere_3D( tile, pos, N_out )
     type(MagTile),intent(in) :: tile
@@ -759,8 +759,174 @@ module TileNComponents
         N_out = 4./3.*pi*a**3*N_out;
     endif  
     
+    end subroutine
+    
+    
+    !::Calculates N from the analytical expression in 3D
+    !::Given the tile (spheroid) and the position vector to it (pos = (x,y,z) )
+    !::Returns a (3,3) array N_out
+    subroutine getN_spheroid_3D( tile, pos, N_out )
+    type(MagTile),intent(in) :: tile
+    real,intent(in),dimension(3) :: pos
+    real,intent(inout),dimension(3,3) :: N_out
+    integer,dimension(3) :: indx_semi
+    real,dimension(3) :: coor,semi_axis
+    real,dimension(3,3) :: N_demag, N_temp
+    real :: a,b,c,x,y,z
+    real :: a_o,b_o,c_o,x_o,y_o,z_o,f,w,A_c,alpha
+    
+    a = tile%a
+    b = tile%b
+    c = tile%c
+    
+    !:: To let the user decide the order of the a,b,c axis, these have to be ordered
+    !:: so that c becomes the axis of rotational symmetry
+
+    if (a == b) then
+        !do nothing
+    elseif (a == c) then
+        b = tile%c
+        c = tile%b
+    elseif (b == c) then
+        a = tile%b
+        b = tile%c
+        c = tile%a
+    end if
+    
+    x = pos(1)
+    y = pos(2)
+    z = pos(3)
+    
+    semi_axis(1:3) = (/ a, b, c /)
+    coor(1:3) = (/ x, y, z /)
+
+    !--- Manual sort
+    !--- We can have the following cases:
+    !--- a = b > c  %Do nothing
+    !--- a = b < c  %Switch a and c
+    !--- a < b = c  %Switch a and c
+    !--- a > b = c  %Do nothing
+    !--- a > b < c  %Switch b and c
+    !--- a < b > c  %Switch b and a
+
+    indx_semi(1:3) = (/ 1, 2, 3 /)
+
+    !--- a = b < c  %Switch a and c
+    if ((a == b .AND. b < c) .OR. (a < b .AND. b == c)) then
+        indx_semi(1) = 3
+        indx_semi(3) = 1
+    end if
+
+    !--- a > b < c  %Switch b and c
+    if (a > b .AND. b < c) then
+        indx_semi(2) = 3
+        indx_semi(3) = 2
+    end if
+
+    !--- a < b > c  %Switch b and a
+    if (a < b .AND. b > c) then
+        indx_semi(1) = 2
+        indx_semi(2) = 1
+    end if
+
+    a_o = semi_axis(indx_semi(1))
+    b_o = semi_axis(indx_semi(2))
+    c_o = semi_axis(indx_semi(3))
+    
+    x_o = coor(indx_semi(1))
+    y_o = coor(indx_semi(2))
+    z_o = coor(indx_semi(3))
+
+    !--- Internal field
+    !if (x == 0 .AND. y == 0 .AND. z == 0) then
+    if (((x_o/a_o)**2 + (y_o/b_o)**2 + (z_o/c_o)**2) .le. 1) then
+        
+        !--- Oblate
+        if (a_o == b_o) then
+            alpha = c_o/a_o
+        
+            N_demag(3,3) = 1./(1.-alpha**2)*(1.-alpha/(sqrt(1.-alpha**2))*acos(alpha))
+            N_demag(1,1) = (1.-N_demag(3,3))/2.
+            N_demag(2,2) = N_demag(1,1)
+        end if
+    
+        !--- Prolate
+        if (b_o == c_o) then
+            alpha = a_o/c_o;
+        
+            N_demag(1,1) = 1./(alpha**2-1.)*(alpha/(sqrt(alpha**2-1.))*acosh(alpha)-1)
+            N_demag(2,2) = (1.-N_demag(1,1))/2.
+            N_demag(3,3) = N_demag(2,2)
+        end if
+    
+        !--- Sphere
+        if (a_o == b_o .AND. b_o == c_o) then
+            N_demag(1,1) = 1./3.
+            N_demag(2,2) = 1./3.
+            N_demag(3,3) = 1./3.
+        end if
+    
+        N_demag(1,2) = 0
+        N_demag(1,3) = 0
+        N_demag(2,1) = 0
+        N_demag(2,3) = 0
+        N_demag(3,1) = 0
+        N_demag(3,2) = 0
+        
+    !--- External field    
+    else
+    
+        !--- Oblate
+        if (a_o == b_o) then
+            f   = sqrt(a_o**2-c_o**2);
+            A_c = sqrt((x_o**2+y_o**2+z_o**2-f**2)**2+4*z_o**2*f**2);
+            w   = sqrt(1./(2*f**2)*(x_o**2+y_o**2+z_o**2+f**2+A_c));
+
+            N_demag(1,1:3) = (/ -(1./2*(asin(1./w)-sqrt(w**2-1)/w**2)-x_o**2*sqrt(w**2-1)/(w**4*A_c)) , x_o*y_o*sqrt(w**2-1)/(w**4*A_c) , z_o*x_o/(w**2*sqrt(w**2-1)*A_c) /);
+            N_demag(2,1:3) = (/ x_o*y_o*sqrt(w**2-1)/(w**4*A_c) , -(1./2*(asin(1./w)-sqrt(w**2-1)/w**2)-y_o**2*sqrt(w**2-1)/(w**4*A_c)) , z_o*y_o/(w**2*sqrt(w**2-1)*A_c) /);
+            N_demag(3,1:3) = (/ x_o*z_o/(w**2*sqrt(w**2-1)*A_c) , y_o*z_o/(w**2*sqrt(w**2-1)*A_c) , -(1./sqrt(w**2-1)-asin(1./w)-z_o**2./((w**2-1)**(3./2.)*A_c)) /);
+            N_demag = N_demag*c_o*a_o**2*f**(-3) 
+        end if
+
+        !--- Prolate
+        if (b_o == c_o) then
+            f   = sqrt(a_o**2-c_o**2);
+            A_c = sqrt((x_o**2+y_o**2+z_o**2+f**2)**2-4*x_o**2*f**2);
+            w   = sqrt(1./(2*f**2)*(x_o**2+y_o**2+z_o**2+f**2+A_c));
+
+            N_demag(1,1:3) = (/ -(1./2*log((w+1)/(w-1))-1./w-x_o**2./(w**3*A_c)) , y_o*x_o/(w*(w**2-1)*A_c) , z_o*x_o/(w*(w**2-1)*A_c) /)
+            N_demag(2,1:3) = (/x_o*y_o/(w*(w**2-1)*A_c) , -(1./2*(w/(w**2-1)+1./2*log((w-1)/(w+1)))-y_o**2*w/((w**2-1)**2*A_c)) , z_o*y_o*w/((w**2-1)**2*A_c) /)
+            N_demag(3,1:3) = (/x_o*z_o/(w*(w**2-1)*A_c) , z_o*y_o*w/((w**2-1)**2*A_c) , -(1./2*(w/(w**2-1)+1./2*log((w-1)/(w+1)))-z_o**2*w/((w**2-1)**2*A_c)) /)
+            N_demag = N_demag*a_o*c_o**2*f**(-3)
+        end if
+    
+        !--- Sphere
+        if (a_o == b_o .AND. b_o == c_o) then
+            N_demag(1,1:3) = (/ x_o**2-sqrt(x_o**2+y_o**2+z_o**2)**2/3., x_o*y_o, x_o*z_o /)
+            N_demag(2,1:3) = (/ x_o*y_o, y_o**2-sqrt(x_o**2+y_o**2+z_o**2)**2/3., y_o*z_o /)
+            N_demag(3,1:3) = (/ x_o*z_o, y_o*z_o, z_o**2-sqrt(x_o**2+y_o**2+z_o**2)**2/3. /)
+            N_demag = 3./(4.*pi*sqrt(x_o**2+y_o**2+z_o**2)**5)*N_demag
+            N_demag = 4./3.*pi*a**3*N_demag;
+        end if
+    
+        N_demag = -N_demag
+    end if
+
+    !--- Reorder N based on indx_semi
+    !--- Switch rows and columns
+    N_temp = N_demag
+    N_demag(1:3,1) = N_temp(1:3,indx_semi(1));
+    N_demag(1:3,2) = N_temp(1:3,indx_semi(2));
+    N_demag(1:3,3) = N_temp(1:3,indx_semi(3));
+    N_temp = N_demag;
+    N_demag(1,1:3) = N_temp(indx_semi(1),1:3);
+    N_demag(2,1:3) = N_temp(indx_semi(2),1:3);
+    N_demag(3,1:3) = N_temp(indx_semi(3),1:3);
+    
+    N_out = N_demag 
+    
     !!Change the sign so that the output tensor follows the same definition as all the other tensors
-    !N_out = -1.* N_out
+    N_out = -1.* N_out
     
     end subroutine
     

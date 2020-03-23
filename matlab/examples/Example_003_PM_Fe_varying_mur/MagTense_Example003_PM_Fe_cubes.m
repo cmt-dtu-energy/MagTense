@@ -8,7 +8,7 @@ figure4= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fi
 figure5= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig5 = axes('Parent',figure5,'Layer','top','FontSize',16); hold on; grid on; box on
 
 %make sure to source the right path for the generic Matlab routines
-addpath(genpath('../util/'));
+addpath(genpath('../../util/'));
 addpath('../../MEX_files/');
 %define the vacuum permeability
 mu0 = 4*pi*1e-7;

@@ -34,7 +34,7 @@ for j = 1:2
         mu0 = 4*pi*1e-7;
 
         addpath('../../MEX_files');
-        addpath('../../examples/util');
+        addpath('../../util');
 
         %% Setup the problem for the initial configuration
         tic

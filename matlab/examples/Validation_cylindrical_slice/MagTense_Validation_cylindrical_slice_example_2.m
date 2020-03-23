@@ -1,9 +1,9 @@
 
 %%This function compares MagTense to a FEM simulations for a single permanent magnet.
-function [] = MagTense_Validation_cylindrical_slice()
+function [] = MagTense_Validation_cylindrical_slice_example_2()
 
 %make sure to source the right path for the generic Matlab routines
-addpath(genpath('../util/'));
+addpath(genpath('../../util/'));
 addpath('../../MEX_files/');
 %define the vacuum permeability
 mu0 = 4*pi*1e-7;
