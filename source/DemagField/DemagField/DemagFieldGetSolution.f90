@@ -79,6 +79,12 @@
                 else
                     call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_ele )
                 endif
+            case (tileTypeSpheroid)
+                if ( present(Nout) ) then
+                    call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+                else
+                    call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_ele )
+                endif
             case (tileTypeCircPiece )
                  if ( present(Nout) ) then
                     call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
@@ -97,9 +103,6 @@
                 else
                     call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_ele )
                 endif
-                
-            case (tileTypeSpheroid)
-                !!@todo add the existing code for spheroids, and correct Ellipsoids to Spheroids
             case (tileTypePlanarCoil )
                 if ( present(Nout) ) then
                     call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
@@ -198,6 +201,32 @@
         endif
     
     end subroutine getFieldFromSphereTile   
+    
+    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the magnetic field from a sphere
+    !!
+    subroutine getFieldFromSpheroidTile( tile, H, pts, n_ele, N_out, useStoredN )
+        type(MagTile),intent(in) :: tile
+        real,dimension(n_ele,3),intent(inout) :: H
+        real,dimension(n_ele,3) :: pts
+        integer,intent(in) :: n_ele
+        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        logical,intent(in),optional :: useStoredN
+    
+        procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
+    
+        N_tensor => getN_spheroid_3D
+    
+        !! Check to see if we should use symmetry
+        if ( tile%exploitSymmetry .eq. 1 ) then        
+            call getFieldFromTile_symm( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )        
+        else        
+            call getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )       
+        endif
+    
+    end subroutine getFieldFromSpheroidTile   
     
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------

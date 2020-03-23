@@ -160,6 +160,10 @@
                         !! No rotation is possible, as the tile is a sphere
                         pts = tiles(i)%offset 
             
+                    case(tileTypeSpheroid)
+                        !! No rotation is needed
+                        pts = tiles(i)%offset 
+                        
                     case(tileTypeCircPiece)
                         !! Find the center point of the circ piece
                         !! First find the center point of the piece in the reference frame of the piece itself

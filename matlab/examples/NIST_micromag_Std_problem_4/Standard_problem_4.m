@@ -10,7 +10,7 @@ figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fi
 mu0 = 4*pi*1e-7;
 
 addpath('../../MEX_files');
-addpath('../util');
+addpath('../../util');
 
 %% Setup the problem for the initial configuration
 %takes the size of the grid as arguments (nx,ny,nz) and a function handle

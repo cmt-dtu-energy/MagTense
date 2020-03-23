@@ -44,6 +44,15 @@ function tile = getDefaultMagTile()
     %if equal to zero the tile is not included in the iteration. Else it is
     tile.inclIter = int32(1);
     
+    %The rotation axis of a spheroid.
+    %It can be either the axis of symmetry, 'symm', or the c-axis, 'c'.
+    tile.rot_axis = 'symm';
+    
+    %The rotation axis of a spheroid in vector coordinates.
+    %The values given are the theta, phi and psi angles.
+    %The rotAngles are computed from this property in the code.
+    tile.ax = [0 0 1];
+    
     tile.color = [1,0,0];
     %rotation of the magnet
     %tile.theta_off = 0;

@@ -2,10 +2,10 @@
 %%This function shows how to use MagTense for a grid of PM cubes where some
 %%cubes have a large permeability (modeling Fe with a constant relative
 %%permeability)
-function [] = MagTense_Example001_SimpleCube()
+function [] = MagTense_Example002_PM_Fe_const_mur()
 
 %make sure to source the right path for the generic Matlab routines
-addpath(genpath('../util/'));
+addpath(genpath('../../util/'));
 addpath('../../MEX_files/');
 %define the vacuum permeability
 mu0 = 4*pi*1e-7;

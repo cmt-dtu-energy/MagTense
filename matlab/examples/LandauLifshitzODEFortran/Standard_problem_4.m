@@ -4,7 +4,7 @@ close all
 figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
 
 addpath('../../MEX_files');
-addpath('../util');
+addpath('../../util');
 times = zeros(5,2);
 
 res = [1,2,3,4,5,6,7];
