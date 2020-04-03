@@ -14,10 +14,21 @@ tic
 %% Run a single hysterhesis curve for standard problem 2
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
-% solution = struct();
-% prob_struct = struct(problem);  %convert the class obj to a struct so it can be loaded into fortran
-% 
-% solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+%--- Solve the first step
+solution = struct();
+prob_struct = struct(problem);  %convert the class obj to a struct so it can be loaded into fortran
+
+solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+
+
+for i = 1:nT
+    problem.m0(:) = solution.M(end,:,:);
+
+    %convert the class obj to a struct so it can be loaded into fortran
+    prob_struct = struct(problem);
+
+    solution_t = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+end
 % figure; M_end = squeeze(solution.M(end,:,:)); quiver(solution.pts(:,1),solution.pts(:,2),M_end(:,1),M_end(:,2)); axis equal; title('Starting state - Fortran')
 
 
