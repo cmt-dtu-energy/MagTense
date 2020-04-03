@@ -5,21 +5,22 @@ function InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct)
     for i=1:length(names)
         eval([names{i} '=ProblemSetupStruct.' names{i} ';']);
     end
-
+    grid_n = double(grid_n');
+    
     %% All the one-time calculations:
-    Nprod = cumprod(nGrid,2) ;
-    K = size(nGrid,2) ;
+    Nprod = cumprod(grid_n,2) ;
+    K = size(grid_n,2) ;
 
     % N = Nprod(:,end) ;    %--- Remark: Had to change this code
     N = Nprod ;  
 
     %% Space Grid
     % NN = prod(N) ; % total number of tiles
-    [x,y,z,dx,dy,dz] = MakeTheGrid(N,Lx,Ly,Lz) ;
+    [x,y,z,dx,dy,dz] = MakeTheGrid(N,grid_L(1),grid_L(2),grid_L(3)) ;
     [InteractionMatrices.X,InteractionMatrices.Y,InteractionMatrices.Z] = ndgrid(x,y,z) ; % always ndgrid, never meshgrid. Meshgrid varies y before x.
 
     %% Demag Tensors (approximate method: "Many Ranges")
-    [InteractionMatrices.AvrgMatrix,InteractionMatrices.CopyMatrix,InteractionMatrices.DemagTensor] = CreateManyRangesDemagTensors3D(N,K,nGrid,Nprod,dx,dy,dz) ;
+    [InteractionMatrices.AvrgMatrix,InteractionMatrices.CopyMatrix,InteractionMatrices.DemagTensor] = CreateManyRangesDemagTensors3D(N,K,grid_n,Nprod,dx,dy,dz) ;
     disp('Demag Done') ;
     %% FFT
     if ~all(FFTdims==0)
@@ -27,13 +28,17 @@ function InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct)
     end
     %% Anisotropy Matrix
 
-    if Nmax >1 % Remark: more than one "grain" (Voronoi) -- not yet implemented
-        [Kxx,Kxy,Kxz,Kyx,Kyy,Kyz,Kzx,Kzy,Kzz,xPoint,yPoint,Hx,Hy,Hz] = CreateAnisotropyMatrixGrains(X,Y,Nmax,.05,InPlane) ;
-    else % one "grain"
-        [InteractionMatrices.Kxx,InteractionMatrices.Kxy,InteractionMatrices.Kxz,InteractionMatrices.Kyx, ...
+%     if Nmax >1 % Remark: more than one "grain" (Voronoi) -- not yet implemented
+%         [Kxx,Kxy,Kxz,Kyx,Kyy,Kyz,Kzx,Kzy,Kzz,xPoint,yPoint,Hx,Hy,Hz] = CreateAnisotropyMatrixGrains(X,Y,Nmax,.05,InPlane) ;
+%     else % one "grain"
+%         [InteractionMatrices.Kxx,InteractionMatrices.Kxy,InteractionMatrices.Kxz,InteractionMatrices.Kyx, ...
+%          InteractionMatrices.Kyy,InteractionMatrices.Kyz,InteractionMatrices.Kzx,InteractionMatrices.Kzy, ...
+%          InteractionMatrices.Kzz] = CreateAnisotropyMatrixBase(Kx,Ky,Kz) ;
+     [InteractionMatrices.Kxx,InteractionMatrices.Kxy,InteractionMatrices.Kxz,InteractionMatrices.Kyx, ...
          InteractionMatrices.Kyy,InteractionMatrices.Kyz,InteractionMatrices.Kzx,InteractionMatrices.Kzy, ...
-         InteractionMatrices.Kzz] = CreateAnisotropyMatrixBase(Kx,Ky,Kz) ;
-    end
+         InteractionMatrices.Kzz] = CreateAnisotropyMatrixBase(u_ea(1),u_ea(2),u_ea(3)) ;
+     
+%     end
 
     %% Exchange Interaction Matrix
 
@@ -66,15 +71,15 @@ function InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct)
 %     InteractionMatrices.AvrgMatrix = AvrgMatrix;
 %     InteractionMatrices.CopyMatrix = CopyMatrix;
 
-    if (ProblemSetupStruct.thresholdFract > 0)
+    if (ProblemSetupStruct.dem_appr == 4 )  %DemagApproximationThresholdFraction
         if ~all(FFTdims==0)
-        [ProblemSetupStruct.threshold] = GetThreshold(InteractionMatrices.FFT.DemagTensor,ProblemSetupStruct.thresholdFract ) ;        
+            [ProblemSetupStruct.threshold] = GetThreshold(InteractionMatrices.FFT.DemagTensor,ProblemSetupStruct.thresholdFract ) ;        
         else
-        [ProblemSetupStruct.threshold] = GetThreshold(InteractionMatrices.DemagTensor,ProblemSetupStruct.thresholdFract ) ;
+            [ProblemSetupStruct.threshold] = GetThreshold(InteractionMatrices.DemagTensor,ProblemSetupStruct.thresholdFract ) ;
         end
     end
 
-    if (ProblemSetupStruct.threshold > 0) 
+    if (ProblemSetupStruct.dem_appr == 2) %DemagApproximationThreshold
         if ~all(FFTdims==0)
             [InteractionMatrices.FFT.DemagTensor] = FilterTensorThreshold(InteractionMatrices.FFT.DemagTensor,ProblemSetupStruct.threshold) ;
         else
@@ -136,7 +141,7 @@ function InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct)
         InteractionMatrices.A2 = sparse(InteractionMatrices.A2);
     end
     
-    if (ProblemSetupStruct.use_gpuArray) 
+    if (ProblemSetupStruct.useCuda) 
         InteractionMatrices.DemagTensor.KglobXX{1,1} = gpuArray(InteractionMatrices.DemagTensor.KglobXX{1,1});
         InteractionMatrices.DemagTensor.KglobXY{1,1} = gpuArray(InteractionMatrices.DemagTensor.KglobXY{1,1});
         InteractionMatrices.DemagTensor.KglobXZ{1,1} = gpuArray(InteractionMatrices.DemagTensor.KglobXZ{1,1});

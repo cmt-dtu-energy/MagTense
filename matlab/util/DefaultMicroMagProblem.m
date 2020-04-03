@@ -86,16 +86,32 @@ properties (SetAccess=private,GetAccess=public)
     %time axis of the applied field
     t_Hext
     
+    %derivative of the applied field (nt_Hext,3)
+    ddHext
+    
     %solution times
     nt
     %should have size (nt,1)
     t
+    
+    %solution times for the explicit solver
+    t_explicit;
+    %should have size (nt,1)
+    nt_explicit 
     
     %defines whether to attempt using CUDA (will crash if no appropriate
     %NVIDIA driver is present or if insufficient memory is available. 0 for
     %do not use cuda, 1 for do use (int32)
     useCuda
     
+    %defines whether to save the result or not
+    SaveTheResult
+    
+    %defines whether to show the result or not
+    ShowTheResult
+    
+    %defines which solver to use in Matlab
+    SolverType
     
 end
 
@@ -158,13 +174,16 @@ methods
         obj.nt = int32(1000);
         obj.t = linspace(0,1,obj.nt);
         
+        obj.t_explicit  = 0;
+        obj.nt_explicit = 1;
+        
         obj.setTimeDis = int32(10);
 
         if ~exist('HextFct')
             HextFct = @(t) (t>=0)' * [0,0,0];
         end
-        obj = obj.setHextTime( 10 * obj.nt );
-        obj = obj.setHext(HextFct);
+        obj.nt_Hext = 10;
+        obj = obj.setHext(HextFct, obj.nt_Hext);
         
         %initial magnetization (mx = m0(1:n), my = m(n+1:2n), mz = m(2n+1:3n) with
         %n = no. of elements )
@@ -187,16 +206,20 @@ methods
 
         obj = obj.setReturnNFilename('t');
         obj = obj.setLoadNFilename('t');
-
+        
+        
+        obj.SaveTheResult = int32(0);
+        obj.ShowTheResult = int32(1);
 
     end
     
     %%Calculates the applied field as a function of time on the time grid
     %%already specified in this instance (obj) of the class given the
     %%function handle fct
-    function obj = setHext( obj, fct )
+    function obj = setHext( obj, fct, nt_Hext )
+        obj.nt_Hext = nt_Hext;
         
-        obj = obj.setHextTime( 10 * obj.nt );
+        obj = obj.setHextTime( obj.nt_Hext );
         obj.Hext = zeros( obj.nt_Hext, 4 );
         
         obj.Hext(:,1) = obj.t_Hext;
@@ -204,18 +227,32 @@ methods
         obj.Hext(:,2:4) = fct( obj.t_Hext );
     end
     
+    function obj = setddHext( obj, fct )
+        
+        obj = obj.setHextTime( obj.nt_Hext );
+        obj.ddHext = zeros( obj.nt_Hext, 4 );
+        
+        obj.ddHext(:,1) = obj.t_Hext;
+        
+        obj.ddHext(:,2:4) = fct( obj.t_Hext );
+    end
+        
+    function obj = setHextTime( obj, nt )
+        obj.nt_Hext = int32( nt );
+        obj.t_Hext  = linspace( obj.t(1), obj.t(end), obj.nt_Hext );
+    end
+    
     function obj = setTime( obj, t )
-        obj.t = t;
+        obj.t  = t;
         obj.nt = int32(length(t));
     end
     
-    function obj = setHextTime( obj, nt )
-        obj.nt_Hext = int32( nt );
-        obj.t_Hext = linspace( min(obj.t), max(obj.t), obj.nt_Hext );
+    function obj = setTimeExplicit( obj, t_explicit )
+        obj.t_explicit  = t_explicit;
+        obj.nt_explicit = int32( length(t_explicit) );
     end
     
     function obj = setUseCuda( obj, enabled )
-        
        if enabled
            obj.useCuda = int32(1);
        else
@@ -231,6 +268,35 @@ methods
     function obj = setReturnNFilename( obj, filename )
         obj.N_ret = int32(length(filename));
         obj.N_file_out = filename;
+    end
+    
+    function obj = setSaveTheResult( obj, enabled )
+       if enabled
+           obj.SaveTheResult = int32(1);
+       else
+           obj.SaveTheResult = int32(0);
+       end
+    end
+    
+    function obj = setShowTheResult( obj, enabled )
+       if enabled
+           obj.ShowTheResult = int32(1);
+       else
+           obj.ShowTheResult = int32(0);
+       end
+    end
+    
+    function obj = setSolverType( obj, type_var )
+        switch type_var
+            case 'UseImplicitSolver'
+                obj.SolverType = 1;
+            case 'UseImplicitStepsSolver'
+                obj.SolverType = 2;
+            case 'UseExplicitSolver'
+                obj.SolverType = 3;
+            case 'UseDynamicSolver'
+                obj.SolverType = 4;
+        end
     end
     
 end
