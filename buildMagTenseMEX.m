@@ -1,9 +1,15 @@
+function buildMagTenseMEX(USE_CUDA,DEBUG)
+
 %use clear all as this also clears dependencies to the .mex files and thus
 %they can be overwritten
-clear all
+clearvars -except USE_CUDA DEBUG
    
-USE_CUDA = true;
-DEBUG = false;
+if ~exist('USE_CUDA','var')
+    USE_CUDA = true;
+end
+if ~exist('DEBUG','var')
+    DEBUG = false;
+end
 
 %% MagTenseLandauLifshitzSolver_mex
 if DEBUG
@@ -157,4 +163,6 @@ else
         source\MagTenseMEX\MagTenseMEX\getMagForce_mex.f90 COMPFLAGS="$COMPFLAGS /O2 /Qopenmp /extend_source:132 /real_size:64  /fpe:0" -R2018a
 
     movefile getMagForce_mex.mexw64 matlab\MEX_files\getMagForce_mex.mexw64
+end
+
 end

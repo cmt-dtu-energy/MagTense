@@ -14,12 +14,37 @@ tic
 %% Run a single hysterhesis curve for standard problem 2
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
-%--- Solve the first step
+problem.K0 = 0 ;
+problem.A0 = 1.74532925199e-10;
+problem.Ms = 1000e3 ;
+problem.grid_L = [5e-6,1e-6,1e-7];%m
+
+problem.alpha = @(t) 1e3*(10.^(5*min(t,2e-9)/2e-9));
+
+MaxH = 0.1;
+
+%time-dependent applied field
+HystDir = 1/mu0*[1,1,1]/sqrt(3) ;
+HextFct = @(t) HystDir .* t';
+
+%initial magnetization
+problem.m0(:) = 1/sqrt(3);
+
+problem = problem.setSolverType( 'UseExplicitSolver' );
+
+problem = problem.setTime( linspace(MaxH,-MaxH,26) );
+problem = problem.setHext( HextFct, numel(problem.t) );
+problem = problem.setTimeExplicit( linspace(0,1,numel(problem.t)) );
+
+t_explicit = 5e-9 ;
+problem = problem.setTime( linspace(0,t_explicit,2) );
+
+problem.solver = getMicroMagSolver( 'Explicit' );
+
 solution = struct();
 prob_struct = struct(problem);  %convert the class obj to a struct so it can be loaded into fortran
 
 solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
-
 
 for i = 1:nT
     problem.m0(:) = solution.M(end,:,:);
@@ -29,7 +54,7 @@ for i = 1:nT
 
     solution_t = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
 end
-% figure; M_end = squeeze(solution.M(end,:,:)); quiver(solution.pts(:,1),solution.pts(:,2),M_end(:,1),M_end(:,2)); axis equal; title('Starting state - Fortran')
+figure; M_end = squeeze(solution.M(end,:,:)); quiver(solution.pts(:,1),solution.pts(:,2),M_end(:,1),M_end(:,2)); axis equal; title('Starting state - Fortran')
 
 
 %% Run the Matlab version of the micromagnetism code
