@@ -20,7 +20,7 @@ LastP = TheData.p ;
 %     LastP = 0 ;
 % end
 % LastRMS = LastRMS(end) ;
-disp([num2str(t(end)),'  Last P : ',num2str(LastP)])
+% disp([num2str(t(end)),'  Last P : ',num2str(LastP)])
 % disp(['Log10dS ',num2str(log10(LastRMS))]) ;
 if (LastP > 0)
 %     disp('Tolerance reached') ;

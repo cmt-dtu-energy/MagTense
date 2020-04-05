@@ -82,7 +82,7 @@
         
         !!Iteration loop
         do
-            if ( done .eqv. .true. ) then
+            if ( done .eq. .true. ) then
                 exit
             endif
         
@@ -129,7 +129,7 @@
             
             endif        
             
-            H_old = H   !< Teset H array
+            H_old = H   !< Reset H array
             H(:,:) = 0  !< Make sure to reset the H field
         
             !! Get the field at the center at each tile from all other tiles        
@@ -199,10 +199,21 @@
                     !! Tiles with type >100 are special tiles like a coil that are not iterated over
                     if ( tiles(i)%tileType .lt. 100 ) then
                         
+                        !>If the magnet is assumed to have a constant permeability, then its own field is not included in this summation but rather calculated explicitly (see a few lines down)
+                        if ( tiles(i)%magnetType .eq. magnetTypeHard ) then
+                            tiles(i).excludeFromSummation = .true.
+                        endif
+                        
                         call getFieldFromTiles( tiles, H(i,:), pts, n, 1, Nstore(i)%N )     !< Get the field in the i'th tile from all tiles           
                     
-                        !! When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is slowed
+                        
+                        !! When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is dampened
                         H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
+                        
+                        !>Set the flag back to false such that the tile is included in the next round of summation
+                        if ( tiles(i)%magnetType .eq. magnetTypeHard ) then
+                            tiles(i).excludeFromSummation = .false.
+                        endif
                     endif
                 endif            
             enddo
