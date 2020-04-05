@@ -25,6 +25,7 @@ module TileNComponents
         integer :: magnetType !::defines whether the tile is a hard or soft magnet
         integer :: stateFunctionIndex !::index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
         integer :: includeInIteration,exploitSymmetry
+        logical :: excludeFromSummation !::ExcludeFromSummation defines if the given tile should be included or not in the summation over all tiles for getting the applied field
         real,dimension(3) :: symmetryOps !! 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
         real :: Mrel !! the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
         real,dimension(3,4) :: vert !Vertices, used e.g. by a tetrahedron

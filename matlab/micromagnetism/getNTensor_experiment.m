@@ -14,7 +14,8 @@ n = length( pts(:,1) );
 
 %Make the output matrix
 N = zeros( 3*n, 3*m );
-% N2 = zeros( 3*n, 3*m );
+% N = sparse( 3*n, 3*m );
+
 
 %loop over each tile
 for i=1:m

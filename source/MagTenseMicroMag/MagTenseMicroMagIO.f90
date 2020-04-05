@@ -9,7 +9,7 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> Loads the data struct problem from Matlab into a Fortran struct
     !> @param[in] prhs pointer to the Matlab data struct
     !> @param[in] problem struct for the internal Fortran represantation of the problem
@@ -21,14 +21,15 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem,ntot,nt, nt_Hext,useCuda
+        integer :: nFieldsProblem,ntot,nt, nt_Hext,useCuda, status
         mwPointer :: nGridPtr,LGridPtr,dGridPtr,typeGridPtr, ueaProblemPtr, modeProblemPtr,solverProblemPtr
         mwPointer :: A0ProblemPtr,MsProblemPtr,K0ProblemPtr,gammaProblemPtr,alpha0ProblemPtr,MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr,HextProblemPtr,tProblemPtr,useCudaPtr
-        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr, setTimeDisplayProblemPtr
+        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr,demApproxPtr, setTimeDisplayProblemPtr
+        mwPointer :: NFileReturnPtr,NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
         integer,dimension(3) :: int_arr
-        real,dimension(3) :: real_arr
-        
+        real*8,dimension(3) :: real_arr
+        real*8 :: demag_fac
         
         !Get the expected names of the fields
         call getProblemFieldnames( problemFields, nFieldsProblem)
@@ -59,7 +60,7 @@
         call mxCopyPtrToInteger4(mxGetPr(typeGridPtr), problem%grid%gridType, sx )
         
         
-        !Finished loading the grid-----------------------------------------
+        !Finished loading the grid------------------------------------------
         
         !Start loading the problem
         !Allocate memory for the easy axis vectors
@@ -125,21 +126,21 @@
         sx = nt
         call mxCopyPtrToReal8(mxGetPr(tProblemPtr), problem%t, sx )
         
+        
+        
+        
         !Initial magnetization
         allocate( problem%m0(3*ntot) )
-        m0ProblemPtr = mxGetField(prhs,i,problemFields(17) )
+        m0ProblemPtr = mxGetField(prhs,i,problemFields(17))
         sx = ntot * 3
         call mxCopyPtrToReal8(mxGetPr(m0ProblemPtr), problem%m0, sx )
         
         !Demagnetization threshold value        
-        demThresProblemPtr = mxGetField(prhs,i,problemFields(18) )
+        demThresProblemPtr = mxGetField(prhs,i,problemFields(18))
         sx = 1
-        call mxCopyPtrToReal8(mxGetPr(demThresProblemPtr), problem%demag_threshold, sx )
-    
-        !Set how often to display the timestep in Matlab
-        problem%setTimeDisplay = 100 !needs to be updated to proper IO eventually...
-        
-    
+        call mxCopyPtrToReal8(mxGetPr(demThresProblemPtr), demag_fac, sx )
+            
+        problem%demag_threshold = sngl(demag_fac)
         
         sx = 1
         useCudaPtr = mxGetField( prhs, i, problemFields(19) )
@@ -150,13 +151,53 @@
             problem%useCuda = useCudaFalse
         endif
         
+        
+        sx = 1
+        demApproxPtr = mxGetField( prhs, i, problemFields(20) )
+        call mxCopyPtrToInteger4(mxGetPr(demApproxPtr), problem%demag_approximation, sx )
+        
+        !flag whether the demag tensor should be returned and if so how
+        sx = 1
+        NReturnPtr = mxGetField( prhs, i, problemFields(21) )
+        call mxCopyPtrToInteger4(mxGetPr(NReturnPtr), problem%demagTensorReturnState, sx )
+        
+        !File for returning the demag tensor to a file on disk (has to have length>2)
+        if ( problem%demagTensorReturnState .gt. 2 ) then
+            !Length of the file name
+            sx = problem%demagTensorReturnState
+            NFileReturnPtr = mxGetField( prhs, i, problemFields(22) )            
+            status = mxGetString( NFileReturnPtr, problem%demagTensorFileOut, sx )
+        endif
+        
+        !flag whether the demag tensor should be loaded
+        sx = 1
+        NLoadPtr = mxGetField( prhs, i, problemFields(23) )
+        call mxCopyPtrToInteger4(mxGetPr(NLoadPtr), problem%demagTensorLoadState, sx )
+        
+        !File for loading the demag tensor to a file on disk (has to have length>2)
+        if ( problem%demagTensorLoadState .gt. 2 ) then
+            !Length of the file name
+            sx = problem%demagTensorLoadState
+            NFileLoadPtr = mxGetField( prhs, i, problemFields(24) )            
+            status = mxGetString( NFileLoadPtr, problem%demagTensorFileIn, sx )
+        endif
+        
+        
+        
+        problem%setTimeDisplay = 100
+        
+        !Set how often to display the timestep in Matlab
+        sx = 1
+        setTimeDisplayProblemPtr = mxGetField( prhs, i, problemFields(25) )
+        call mxCopyPtrToInteger4(mxGetPr(setTimeDisplayProblemPtr), problem%setTimeDisplay, sx )
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
     
     
    !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> Returns the solution data struct from Fortran to Matlab
     !> @param[in] solution struct for the internal Fortran represantation of the solution
     !> @param[in] plhs pointer to the Matlab data struct    
@@ -225,14 +266,14 @@
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> Returns an array with the names of the fields expected in the MicroMagProblem struct
     !> @param[inout] fieldnames, array of the names of the fields
     !> @param[inout] nfields the no. of elements in fieldnames
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
-        integer,intent(out) :: nfields
-        integer,parameter :: nf=19
+        integer,intent(out) :: nfields        
+        integer,parameter :: nf=25
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -243,7 +284,7 @@
         fieldnames(2) = 'grid_L'
         fieldnames(3) = 'grid_type'
         fieldnames(4) = 'u_ea'
-        fieldnames(5) = 'ProblemMod'
+        fieldnames(5) = 'ProblemMode'
         fieldnames(6) = 'solver'
         fieldnames(7) = 'A0'
         fieldnames(8) = 'Ms'
@@ -258,6 +299,13 @@
         fieldnames(17) = 'm0'
         fieldnames(18) = 'dem_thres'
         fieldnames(19) = 'useCuda'
+        fieldnames(20) = 'dem_appr'        
+        fieldnames(21) = 'N_ret'
+        fieldnames(22) = 'N_file_out'
+        fieldnames(23) = 'N_load'
+        fieldnames(24) = 'N_file_in'
+        fieldnames(25) = 'setTimeDis'
+        
         
         
     end subroutine getProblemFieldnames
@@ -265,7 +313,7 @@
    
     
      !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> Returns an array with the names of the fields expected in the MicroMagSolution struct
     !> @param[inout] fieldnames, array of the names of the fields
     !> @param[inout] nfields the no. of elements in fieldnames
@@ -286,6 +334,65 @@
         
         
     end subroutine getSolutionFieldnames
+    
+    !>----------------------------------------
+    !> Kaspar K. Nielsen, kasparkn@gmail.com, January 2020
+    !> Writes the demag tensors to disk given a filename in problem
+    !> @params[in] problem the struct containing the entire problem
+    !>----------------------------------------    
+    subroutine writeDemagTensorToDisk( problem )
+    type(MicroMagProblem), intent(in) :: problem
+    
+    integer :: n            !> No. of elements in the grid
+    
+    
+    n = problem%grid%nx * problem%grid%ny * problem%grid%nz
+        
+            open (11, file=problem%demagTensorFileOut,	&
+			        status='unknown', form='unformatted',	&
+			        access='direct', recl=1*n*n)
+
+        write(11,rec=1) problem%Kxx
+        write(11,rec=2) problem%Kxy
+        write(11,rec=3) problem%Kxz
+        write(11,rec=4) problem%Kyy
+        write(11,rec=5) problem%Kyz
+        write(11,rec=6) problem%Kzz
+    
+        close(11)
+        
+    
+    end subroutine writeDemagTensorToDisk
+    
+    
+    !>----------------------------------------
+    !> Kaspar K. Nielsen, kasparkn@gmail.com, January 2020
+    !> Loads the demag tensors from disk given a file in problem
+    !> @params[inout] problem the struct containing the entire problem
+    !>----------------------------------------    
+    subroutine loadDemagTensorFromDisk( problem )
+    type( MicroMagProblem ), intent(inout) :: problem
+    integer :: n
+    
+            n = problem%grid%nx * problem%grid%ny * problem%grid%nz
+            
+            
+             open (11, file=problem%demagTensorFileIn,	&
+			           status='unknown', form='unformatted',	&
+			           access='direct', recl=1*n*n)
+
+            read(11,rec=1) problem%Kxx
+            read(11,rec=2) problem%Kxy
+            read(11,rec=3) problem%Kxz
+            read(11,rec=4) problem%Kyy
+            read(11,rec=5) problem%Kyz
+            read(11,rec=6) problem%Kzz
+    
+            close(11)
+    
+    
+    
+    end subroutine loadDemagTensorFromDisk
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>
