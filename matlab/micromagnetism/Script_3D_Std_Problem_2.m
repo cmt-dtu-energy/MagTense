@@ -1,6 +1,4 @@
 function Script_3D_Std_Problem_2(fig1,MySim)
-close all
-
 %Calculates "implicit" solution (circles) and compares with explicit solution (red line, dots)
 disp('Running Matlab model')
 
@@ -56,7 +54,7 @@ for k=1:size(SigmaSol,1)
     Mz(k) = mean(SigmaZ./SigmaN) ;
     Mk(k) = Mx(k)*HystDir(1) + My(k)*HystDir(2) + Mz(k)*HystDir(3) ;
 end
-plot(fig1,mu0*MySim.Hext(:,1),mu0*Mk,'ro') %Minus signs added to correspond to regular hysteresis plots.
+plot(fig1,MySim.Hext(:,1),mu0*Mk,'ro') %Minus signs added to correspond to regular hysteresis plots.
 
 
 %% The explicit solver
@@ -81,6 +79,6 @@ for k=1:size(SigmaSol2,1)
     Mz2(k) = mean(SigmaZ) ;
     Mk2(k) = Mx2(k)*HystDir(1) + My2(k)*HystDir(2) + Mz2(k)*HystDir(3) ;
 end
-plot(fig1,mu0*MySim.Hext(:,1),mu0*Mk2,'r.-')
+plot(fig1,MySim.Hext(:,1),mu0*Mk2,'r.-')
 
 end
