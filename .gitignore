@@ -176,3 +176,7 @@ executable/H_out.txt
 # Images for MagTense TechManual
 !docs/source/fig/*
 !docs/source/images/*
+!docs/_images/*
+!docs/_static/*
+!docs/source/images/*
+docs/.buildinfo
