@@ -7,13 +7,9 @@ Welcome to MagTense!
 ==============================================
 
 The magnetostatic and a micromagnetism calculation framework.
+The TechManual is in current development.
 
 .. toctree::
    :maxdepth: 2
    
    basic_geometries
-..   python
-   git
-   electromagnetism
-   photos
-   restructuredtext
