@@ -57,8 +57,8 @@ tiles(2).magnetType = getMagnetType('hard');
 tiles(2).offset(2) = d;
 tiles(2).Mrem = 0;
 tiles(2).M = [0,0,0];
-tiles(2).mu_r_ea = 100;
-tiles(2).mu_r_oa = 100;
+tiles(2).mu_r_ea = 1000;
+tiles(2).mu_r_oa = 1000;
 tiles(2).color = [0,0,1];
 tiles(2).u_ea = [1,0,0];
 tiles(2).u_oa1 = [0,1,0];
@@ -68,7 +68,7 @@ tiles(4) = tiles(2);
 tiles(4).offset(1) = d;
 tiles(4).offset(2) = 0;
 
-res = struct('nx',20,'ny',20,'nz',1);
+res = struct('nx',10,'ny',10,'nz',1);
 
 tiles = [tiles(1) refineTiles(tiles(4),res)];
 
@@ -89,20 +89,21 @@ end
 col = jet(length(mur));
 for i=1:1%length(mur)
     tiles = IterateMagnetization( tiles, [], [], 1e-3, 10000 );
+%     load('tiles_mur_200.mat')
 %     if i==1
 %         figure(2);
 %         plotTiles(tiles,true);axis equal;
         off=reshape([tiles.offset],[3,length(tiles)]);
         x=off(1,:);y=off(2,:);
-        Mnorm = sqrt(sum(M.^2,1));
         M=reshape([tiles.M],[3,length(tiles)]);
+        Mnorm = sqrt(sum(M.^2,1));
         M=M./Mnorm;
         
-        colIndM = (Mnorm-min(Mnorm))./(max(Mnorm)-min(Mnorm)) * ( length(tiles) - 1 ) + 1;
-        colM = hot( length(colIndM) );
-        for i=1:length(tiles)
-            rectangle('position',[tiles(i).offset(1:2)-tiles(i).abc(1:2)/2 tiles(i).abc(1:2)],'color',colM(colIndM(i),:)); 
-        end
+%         colIndM = round((Mnorm-min(Mnorm))./(max(Mnorm)-min(Mnorm)) * ( length(tiles) - 1 ) + 1);
+%         colM = hot( length(colIndM) );
+%         for j=1:length(tiles)
+%             rectangle('position',[tiles(j).offset(1:2)-tiles(j).abc(1:2)/2 tiles(j).abc(1:2)],'color',colM(colIndM(j),:)); 
+%         end
         
         u=M(1,:);v=M(2,:);
         quiver(x,y,u,v);        
@@ -116,27 +117,27 @@ for i=1:1%length(mur)
     [tiles.mu_r_ea] = mu{:};
     [tiles.mu_r_oa] = mu{:};
 end
-% figure;
-% plotTiles(tiles,true);axis equal;
-% alpha 0.3
-% disp('hej');
-%%Now find the field in a set of points
-%define a range of points spanning the xy plane at z=0
-x = linspace( 0.5*d,2*d, 101);
-y = linspace( -0.25*d,0.25*d, 101);
-z = 0.0;
-
-%use meshgrid to fill out the span
-[X,Y,Z] = ndgrid(x,y,z);
-
-%get the field
-[H,Hnorm] = getHMagTense( tiles, X, Y, Z );
-H = H .* mu0;
-Hnorm = Hnorm .* mu0;
-%figure;
-%quiver(X,Y,H(:,:,1),H(:,:,2));
-%Plot the solution in a contour map
-surf_and_con( X,Y,Hnorm);
+% % figure;
+% % plotTiles(tiles,true);axis equal;
+% % alpha 0.3
+% % disp('hej');
+% %%Now find the field in a set of points
+% %define a range of points spanning the xy plane at z=0
+% x = linspace( 0.5*d,2*d, 101);
+% y = linspace( -0.25*d,0.25*d, 101);
+% z = 0.0;
+% 
+% %use meshgrid to fill out the span
+% [X,Y,Z] = ndgrid(x,y,z);
+% 
+% %get the field
+% [H,Hnorm] = getHMagTense( tiles, X, Y, Z );
+% H = H .* mu0;
+% Hnorm = Hnorm .* mu0;
+% %figure;
+% %quiver(X,Y,H(:,:,1),H(:,:,2));
+% %Plot the solution in a contour map
+% surf_and_con( X,Y,Hnorm);
 % % xlabel('x');
 % % ylabel('y');
 % 
