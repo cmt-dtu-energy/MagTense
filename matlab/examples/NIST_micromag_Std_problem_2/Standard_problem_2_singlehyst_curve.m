@@ -19,7 +19,9 @@ problem.A0 = 1.74532925199e-10;
 problem.Ms = 1000e3 ;
 problem.grid_L = [5e-6,1e-6,1e-7];%m
 
-problem.alpha = @(t) 1e3*(10.^(5*min(t,2e-9)/2e-9));
+% problem.alpha = @(t) 1e3*(10.^(5*min(t,2e-9)/2e-9));
+problem.alpha = 1e3;
+problem.MaxT0 = 2e-9;
 
 MaxH = 0.1;
 
@@ -46,15 +48,27 @@ prob_struct = struct(problem);  %convert the class obj to a struct so it can be 
 
 solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
 
-for i = 1:nT
-    problem.m0(:) = solution.M(end,:,:);
-
-    %convert the class obj to a struct so it can be loaded into fortran
-    prob_struct = struct(problem);
-
-    solution_t = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+for i = 1:problem.nt_Hext 
+    Mx_arr = solution.M(end,:,i,1) ;
+    My_arr = solution.M(end,:,i,2) ;
+    Mz_arr = solution.M(end,:,i,3) ;
+    MN = sqrt(Mx_arr.^2+My_arr.^2+Mz_arr.^2) ;
+    Mx(i) = mean(Mx_arr./MN) ;
+    My(i) = mean(My_arr./MN) ;
+    Mz(i) = mean(Mz_arr./MN) ;
+    Mk(i) = Mx(i)*HystDir(1) + My(i)*HystDir(2) + Mz(i)*HystDir(3) ;
 end
-figure; M_end = squeeze(solution.M(end,:,:)); quiver(solution.pts(:,1),solution.pts(:,2),M_end(:,1),M_end(:,2)); axis equal; title('Starting state - Fortran')
+plot(fig1,problem.Hext(:,1),mu0*Mk,'rp') %Minus signs added to correspond to regular hysteresis plots.
+
+% for i = 1:2
+%     problem.m0(:) = solution.M(end,:,:);
+% 
+%     %convert the class obj to a struct so it can be loaded into fortran
+%     prob_struct = struct(problem);
+% 
+%     solution_t = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+% end
+% figure; M_end = squeeze(solution.M(end,:,:)); quiver(solution.pts(:,1),solution.pts(:,2),M_end(:,1),M_end(:,2)); axis equal; title('Starting state - Fortran')
 
 
 %% Run the Matlab version of the micromagnetism code
@@ -74,7 +88,7 @@ load('OOMMF_Hysteresis3D_dlex30.mat');
 plot(fig1,mu0*H,M,'k^');
 
 % legend(fig1,'Fortran Mx','Fortran My','Fortran Mz','Matlab Mx','Matlab My','Matlab Mz','NIST \sigma{}(Mx)','NIST <Mx>','NIST \sigma{}(My)','NIST <My>','NIST \sigma{}(Mz)','NIST <Mz>');
-legend(fig1,'"Matlab Implicit method"', 'Matlab Explicit method','OOMMF 2D','OOMMF Quasi3D','OOMMF 3D','Location','SouthEast');
+legend(fig1,'"Fortran Explicit method"','"Matlab Implicit method"', 'Matlab Explicit method','OOMMF 2D','OOMMF Quasi3D','OOMMF 3D','Location','SouthEast');
 ylabel(fig1,'<M_i>/M_s')
 xlabel(fig1,'\mu_{0}H_{applied} [T]')
 xlim(fig1,[-0.1 0.1])
