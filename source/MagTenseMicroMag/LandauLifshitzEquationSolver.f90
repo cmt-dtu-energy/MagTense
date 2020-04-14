@@ -36,7 +36,7 @@ include 'blas.f90'
     subroutine SolveLandauLifshitzEquation( prob, sol )    
     type(MicroMagProblem),intent(inout) :: prob     !> The problem data structure
     type(MicroMagSolution),intent(inout) :: sol     !> The solution data structure    
-    integer :: ntot,i,j,k,ind,nt,stat               !> total no. of tiles
+    integer :: ntot,i,j,k,ind,nt,nt_Hext,stat       !> total no. of tiles
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
     real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
@@ -106,14 +106,15 @@ include 'blas.f90'
         !Go through a range of applied fields and find the equilibrium solution for each of them
         !The no. of applied fields to consider
         nt = size( gb_problem%t ) 
+        nt_Hext = size(gb_problem%Hext, 1) 
         
         !has an extra nt results as this is the total time-dependent solution for each applied field
-        allocate(M_out(3*ntot,nt,nt))   
-        allocate(gb_solution%M_out(size(gb_problem%t),ntot,nt,3))
+        allocate(M_out(3*ntot,nt,nt_Hext))   
+        allocate(gb_solution%M_out(size(gb_problem%t),ntot,nt_Hext,3))
         
         
         !loop over the range of applied fields
-        do i=1,nt
+        do i=1,nt_Hext
             !Applied field
             gb_solution%HextInd = i
             
@@ -246,7 +247,8 @@ include 'blas.f90'
     
     if ( problem%MaxT0 .gt. 0 ) then
         !In this case alpha is allowed to increase as a function of time with a cap given by MaxT0 as specified in the problem
-        alpha = problem%alpha0 * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
+        !alpha = problem%alpha0 * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
+        alpha = problem%alpha0 * 10**( 5 * min(t,problem%MaxT0)/problem%MaxT0 )
     else
         alpha = problem%alpha0 ! * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
     endif
@@ -377,9 +379,6 @@ include 'blas.f90'
         solution%HhY = -problem%Hext(solution%HextInd,3)
         solution%HhZ = -problem%Hext(solution%HextInd,4)
 
-        solution%HhX = -problem%Hext(solution%HextInd,2)
-        solution%HhY = -problem%Hext(solution%HextInd,3)
-        solution%HhZ = -problem%Hext(solution%HextInd,4)
     elseif ( problem%solver .eq. MicroMagSolverDynamic ) then
         
         !Interpolate to get the applied field at time t

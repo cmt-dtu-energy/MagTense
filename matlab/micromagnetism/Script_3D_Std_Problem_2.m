@@ -2,6 +2,11 @@ function Script_3D_Std_Problem_2(fig1,MySim)
 %Calculates "implicit" solution (circles) and compares with explicit solution (red line, dots)
 disp('Running Matlab model')
 
+%% addpaths
+addpath('../MEX_files');
+addpath('../util');
+
+
 if (~exist('fig1','var'))
     figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
 end
