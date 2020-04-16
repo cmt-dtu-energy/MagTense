@@ -42,7 +42,7 @@ HystDir = 1/mu0*[1,1,1] ;
 
 %time-dependent applied field
 HextFct = @(t) (1e-9-t)' .* HystDir .* (t<1e-9)';
-problem_ini = problem_ini.setHext( HextFct, 10*numel(problem_ini.t) );
+problem_ini = problem_ini.setHext( HextFct, linspace(0,100e-9,2000) );
 
 solution = struct();
 %convert the class obj to a struct so it can be loaded into fortran
@@ -74,7 +74,7 @@ if (NIST_field == 2)
 end
 
 HextFct = @(t) (t>-1)' .*HystDir;
-problem_dym = problem_dym.setHext( HextFct, 10*numel(problem_dym.t) );
+problem_dym = problem_dym.setHext( HextFct, linspace(0,1e-9,2000) );
 
 problem_dym.m0(:) = solution.M(end,:,:);
 
