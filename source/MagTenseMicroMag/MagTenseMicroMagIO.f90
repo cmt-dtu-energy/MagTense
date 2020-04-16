@@ -21,12 +21,12 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem,ntot,nt, nt_Hext,useCuda, status
-        mwPointer :: nGridPtr,LGridPtr,dGridPtr,typeGridPtr, ueaProblemPtr, modeProblemPtr,solverProblemPtr
-        mwPointer :: A0ProblemPtr,MsProblemPtr,K0ProblemPtr,gammaProblemPtr,alpha0ProblemPtr,MaxT0ProblemPtr
-        mwPointer :: ntProblemPtr, m0ProblemPtr,HextProblemPtr,tProblemPtr,useCudaPtr
-        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr,demApproxPtr, setTimeDisplayProblemPtr
-        mwPointer :: NFileReturnPtr,NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha
+        mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
+        mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
+        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, tProblemPtr, useCudaPtr
+        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr
+        mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
         integer,dimension(3) :: int_arr
         real*8,dimension(3) :: real_arr
         real*8 :: demag_fac
@@ -191,6 +191,21 @@
         setTimeDisplayProblemPtr = mxGetField( prhs, i, problemFields(25) )
         call mxCopyPtrToInteger4(mxGetPr(setTimeDisplayProblemPtr), problem%setTimeDisplay, sx )
         
+        
+        
+        !Load the no. of times in the alpha function
+        sx = 1
+        ntProblemPtr = mxGetField( prhs, i, problemFields(26) )
+        call mxCopyPtrToInteger4(mxGetPr(ntProblemPtr), nt_alpha, sx )
+        
+        !alpha as a function of time evaluated at the timesteps
+        !problem%alpha(:,1) is the time grid while problem%alpha(:,2) are the alpha values
+        sx = nt_alpha * 2
+        allocate( problem%alpha(nt_alpha,2) )
+        HextProblemPtr = mxGetField( prhs, i, problemFields(27) )
+        call mxCopyPtrToReal8(mxGetPr(HextProblemPtr), problem%alpha, sx )
+        
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -273,7 +288,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=25
+        integer,parameter :: nf=27
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -305,7 +320,8 @@
         fieldnames(23) = 'N_load'
         fieldnames(24) = 'N_file_in'
         fieldnames(25) = 'setTimeDis'
-        
+        fieldnames(26) = 'nt_alpha'
+        fieldnames(27) = 'alphat'
         
         
     end subroutine getProblemFieldnames

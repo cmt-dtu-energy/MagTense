@@ -1,8 +1,8 @@
 clearvars
 % close all
 
-run_single_curve = 0;
-run_MrHc = 1;
+run_single_curve = 1;
+run_MrHc = 0;
 
 %--- Use either field 1 or field 2 from the NIST example
 use_CUDA = false;
@@ -46,6 +46,11 @@ problem.solver = getMicroMagSolver( 'Explicit' );
 problem.K0 = 0 ;
 problem.Ms = 1000e3 ;
 problem.A0 = 1.74532925199e-10;
+
+
+AlphaFct = @(t) problem.alpha * 10.^( 5 * min(t,problem.MaxT0)/problem.MaxT0 );
+problem = problem.setAlpha( AlphaFct, linspace(0,t_explicit,100) );
+problem.alpha = 0;
 
 if run_single_curve
     %% Run a single hysterhesis curve for standard problem 2
