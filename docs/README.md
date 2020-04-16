@@ -10,6 +10,7 @@
   
   ```cmd
   conda install sphinx
+  conda install sphinx_rtd_theme
   ```
 
 ### Editing
