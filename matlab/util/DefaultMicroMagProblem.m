@@ -94,6 +94,11 @@ properties (SetAccess=private,GetAccess=public)
     %should have size (nt,1)
     t
     
+    %alpha as function of time, should be (nt_alpha,2)
+    alphat
+    %size of the alpha array
+    nt_alpha
+    
     %solution times for the explicit solver
     t_explicit;
     %should have size (nt,1)
@@ -202,8 +207,15 @@ methods
         %approximation
         obj.dem_appr = getMicroMagDemagApproximation('none');
         
-        %set the default return N behavior
 
+        %--- Set alpha as function of time
+        if ~exist('AlphaFct')
+            AlphaFct = @(t) (t>=0)' * 0;
+        end
+        obj = obj.setAlpha(AlphaFct, 0);
+        
+        
+        %set the default return N behavior
         obj = obj.setReturnNFilename('t');
         obj = obj.setLoadNFilename('t');
         
@@ -250,6 +262,14 @@ methods
     function obj = setTimeExplicit( obj, t_explicit )
         obj.t_explicit  = t_explicit;
         obj.nt_explicit = int32( length(t_explicit) );
+    end
+    
+    function obj = setAlpha( obj, fct, t_alpha )
+        obj.nt_alpha = int32(length(t_alpha));
+       
+        obj.alphat = zeros( obj.nt_alpha, 2 );
+        obj.alphat(:,1) = t_alpha;
+        obj.alphat(:,2) = fct( t_alpha );
     end
     
     function obj = setUseCuda( obj, enabled )

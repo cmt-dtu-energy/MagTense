@@ -66,6 +66,7 @@ include "mkl_dfti.f90"
         real(DP) :: A0,Ms,K0,gamma,alpha0,MaxT0         !> User defined coefficients determining part of the problem.
         
         real(DP),dimension(:,:),allocatable :: Hext     !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
+        real(DP),dimension(:,:),allocatable :: alpha    !> A time dependent dampning parameter, i.e. as a function of time. Size (nt,1).
         
         real(DP),dimension(:),allocatable :: t          !> Time array for the desired output times
         real(DP),dimension(:),allocatable :: m0         !>Initial value of the magnetization
