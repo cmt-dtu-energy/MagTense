@@ -21,6 +21,7 @@ addpath('../../util');
 problem_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
 problem_ini.dem_appr = getMicroMagDemagApproximation('none');
+problem_ini = problem_ini.setUseCuda( use_CUDA );
 
 loadFile = 'N_out_test.dat';
 if exist(loadFile,'file')
