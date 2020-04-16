@@ -20,10 +20,10 @@ The common parameters are:
 ========================================
 Dynamic simulations
 ========================================
-An example of how to run a dynamic simulation is given in matlab/examples/ NIST_micromag_Std_problem_2
+An example of how to run a dynamic simulation is given in matlab/examples/NIST_micromag_Std_problem_2
 
 ========================================
-Hysteresis loop
+Hysteresis loop simulation
 ========================================
 An example of how to run a hysteresis loop simulation is given in matlab/examples/NIST_micromag_Std_problem_4
 
