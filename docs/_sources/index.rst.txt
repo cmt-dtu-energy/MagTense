@@ -13,3 +13,4 @@ The TechManual is in current development.
    :maxdepth: 2
    
    basic_geometries
+   Micromagnetism
