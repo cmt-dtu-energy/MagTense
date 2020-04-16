@@ -32,10 +32,10 @@ MySim = MySim.setTime( linspace(MaxH,-0.159*MaxH,101) );
 %time-dependent applied field
 HystDir = 1/mu0*[1,1,1]/sqrt(3) ;
 HextFct = @(t) HystDir .* t';
-MySim = MySim.setHext( HextFct, numel(MySim.t) );
+MySim = MySim.setHext( HextFct, linspace(MaxH,-0.159*MaxH,101) );
 
 ddHextFct = @(t) HystDir + 0.*t';
-MySim = MySim.setddHext( ddHextFct );
+MySim = MySim.setddHext( ddHextFct, linspace(MaxH,-0.159*MaxH,101) );
 
 t_explicit = 5e-9 ;
 MySim = MySim.setTime( linspace(0,t_explicit,2) );
@@ -66,7 +66,7 @@ plot(fig1,MySim.Hext(:,1),mu0*Mk,'ro') %Minus signs added to correspond to regul
 MySim = MySim.setSolverType( 'UseExplicitSolver' );
 
 MySim = MySim.setTime( linspace(MaxH,-MaxH,26) );
-MySim = MySim.setHext( HextFct, numel(MySim.t) );
+MySim = MySim.setHext( HextFct, linspace(MaxH,-MaxH,26) );
 MySim = MySim.setTimeExplicit( linspace(0,1,numel(MySim.t)) );
 
 MySim = MySim.setTime( linspace(0,t_explicit,2) );

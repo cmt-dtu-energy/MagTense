@@ -83,11 +83,11 @@ properties (SetAccess=private,GetAccess=public)
     Hext
     %no. of time steps in the applied field    
     nt_Hext
-    %time axis of the applied field
-    t_Hext
     
     %derivative of the applied field (nt_Hext,3)
     ddHext
+    %no. of time steps in the derivative of the applied field    
+    nt_ddHext
     
     %solution times
     nt
@@ -228,25 +228,20 @@ methods
     %%Calculates the applied field as a function of time on the time grid
     %%already specified in this instance (obj) of the class given the
     %%function handle fct
-    function obj = setHext( obj, fct, nt_Hext )
-        obj.nt_Hext = nt_Hext;
+    function obj = setHext( obj, fct, t_Hext )
+        obj.nt_Hext = int32(length(t_Hext));
         
-        obj = obj.setHextTime( obj.nt_Hext );
         obj.Hext = zeros( obj.nt_Hext, 4 );
-        
-        obj.Hext(:,1) = obj.t_Hext;
-        
-        obj.Hext(:,2:4) = fct( obj.t_Hext );
+        obj.Hext(:,1) = t_Hext;
+        obj.Hext(:,2:4) = fct( t_Hext );
     end
     
-    function obj = setddHext( obj, fct )
+    function obj = setddHext( obj, fct, t_ddHext )
+        obj.nt_ddHext = int32(length(t_ddHext));
         
-        obj = obj.setHextTime( obj.nt_Hext );
         obj.ddHext = zeros( obj.nt_Hext, 4 );
-        
-        obj.ddHext(:,1) = obj.t_Hext;
-        
-        obj.ddHext(:,2:4) = fct( obj.t_Hext );
+        obj.ddHext(:,1) = t_ddHext;
+        obj.ddHext(:,2:4) = fct( t_ddHext );
     end
         
     function obj = setHextTime( obj, nt )

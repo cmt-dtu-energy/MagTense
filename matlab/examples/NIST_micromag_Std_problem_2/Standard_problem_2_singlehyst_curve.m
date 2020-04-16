@@ -34,8 +34,7 @@ problem.m0(:) = 1/sqrt(3);
 
 problem = problem.setSolverType( 'UseExplicitSolver' );
 
-problem = problem.setTime( linspace(MaxH,-MaxH,26) );
-problem = problem.setHext( HextFct, numel(problem.t) );
+problem = problem.setHext( HextFct, linspace(MaxH,-MaxH,26) );
 problem = problem.setTimeExplicit( linspace(0,1,numel(problem.t)) );
 
 t_explicit = 5e-9 ;
