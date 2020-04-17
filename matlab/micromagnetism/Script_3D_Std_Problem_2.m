@@ -22,7 +22,7 @@ MySim = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 MySim.K0 = 0 ;
 MySim.A0 = 1.74532925199e-10;
 MySim.Ms = 1000e3 ;
-MySim.grid_L = [5e-6,1e-6,1e-7];%m
+MySim.grid_L = 0.5*[5e-6,1e-6,1e-7];%m
 
 MySim.alpha = @(t) 1e3*(10.^(5*min(t,2e-9)/2e-9));
 

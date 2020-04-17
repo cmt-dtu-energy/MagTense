@@ -1,4 +1,4 @@
-function Script_3D_Std_Problem_4(fig1,MySim)
+function Script_3D_Std_Problem_4(fig1,MySim_dym)
 disp('Running Matlab model')
 
 %% Calculates dynamic solution to mumag std prob 4
@@ -14,27 +14,27 @@ if (~exist('MySim','var'))
     NIST_field = 1;
     
     resolution = [1*36,1*9,1];
-    MySim = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
+    MySim_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
-    MySim.dem_appr = getMicroMagDemagApproximation('none');
-    MySim.alpha = 4.42e3;
-    MySim.gamma = 0;
+    MySim_ini.dem_appr = getMicroMagDemagApproximation('none');
+    MySim_ini.alpha = 4.42e3;
+    MySim_ini.gamma = 0;
 
     %initial magnetization
-    MySim.m0(:) = 1/sqrt(3);
+    MySim_ini.m0(:) = 1/sqrt(3);
 
     %time grid on which to solve the problem
-    MySim = MySim.setTime( linspace(0,100e-9,200) );
-    MySim.setTimeDis = int32(100);
+    MySim_ini = MySim_ini.setTime( linspace(0,100e-9,200) );
+    MySim_ini.setTimeDis = int32(100);
     HystDir = 1/mu0*[1,1,1] ;
 
     %time-dependent applied field
     HextFct = @(t) (1e-9-t)' .* HystDir .* (t<1e-9)';
 
-    MySim = MySim.setHext( HextFct, 10*numel(t) );
+    MySim_ini = MySim_ini.setHext( HextFct, linspace(0,100e-9,2000) );
 end
 
-if ~(MySim.ShowTheResult == 0)
+if ~(MySim_ini.ShowTheResult == 0)
     if (~exist('fig1','var'))
         figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
     end
@@ -44,8 +44,8 @@ if ~(MySim.ShowTheResult == 0)
 end
 
 %% Run the simulation
-MySim = MySim.setSolverType( 'UseExplicitSolver' );
-[SigmaInit,~,~,InteractionMatrices] = ComputeTheSolution(MySim);
+MySim_ini = MySim_ini.setSolverType( 'UseExplicitSolver' );
+[SigmaInit,~,InteractionMatrices] = ComputeTheSolution(MySim_ini);
 
 for k=1:size(SigmaInit,1) 
     Sigma = SigmaInit(k,:).' ;
@@ -60,19 +60,19 @@ for k=1:size(SigmaInit,1)
     Mz(k) = mean(SigmaZ./SigmaN) ;
 end
 
-if (MySim.ShowTheResult)
+if (MySim_ini.ShowTheResult)
     figure; quiver(InteractionMatrices.X(:),InteractionMatrices.Y(:),SigmaX,SigmaY); axis equal;  title('Starting state - Matlab')
 end
 
 %% Perform dynamic calculation with first field
-MySim = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
-MySim.alpha = 4.42e3 ;
-MySim.gamma = 2.21e5 ;
-MySim = MySim.setUseCuda( 0 );
-MySim.dem_appr = getMicroMagDemagApproximation('none');
-MySim.dem_thres = 1e-4;
-MySim = MySim.setTime( linspace(0,1e-9,200) );
-MySim.setTimeDis = int32(10);
+MySim_dym = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
+MySim_dym.alpha = 4.42e3 ;
+MySim_dym.gamma = 2.21e5 ;
+MySim_dym = MySim_dym.setUseCuda(MySim_ini.useCuda);
+MySim_dym.dem_appr = MySim_ini.dem_appr;
+MySim_dym.dem_thres = MySim_ini.dem_thres;
+MySim_dym = MySim_dym.setTime( linspace(0,1e-9,200) );
+MySim_dym.setTimeDis = int32(10);
 
 if (NIST_field == 1)
     %field 1
@@ -84,14 +84,14 @@ if (NIST_field == 2)
 end
 
 HextFct = @(t) (t>-1)' .*HystDir;
-MySim = MySim.setHext( HextFct );
+MySim_dym = MySim_dym.setHext( HextFct, linspace(0,1e-9,2000) );
 
-MySim.m0(:) = SigmaInit(end,:);
+MySim_dym.m0(:) = SigmaInit(end,:);
 
-MySim = MySim.setSolverType( 'UseDynamicSolver' );
+MySim_dym = MySim_dym.setSolverType( 'UseDynamicSolver' );
 
 tic
-SigmaSol1 = ComputeTheSolution(MySim);
+SigmaSol1 = ComputeTheSolution(MySim_dym);
 toc
 
 for k=1:size(SigmaSol1,1) 
@@ -107,10 +107,10 @@ for k=1:size(SigmaSol1,1)
     Mz(k) = mean(SigmaZ./SigmaN) ;
 end
 
-if (MySim.ShowTheResult)
-    plot(fig1, MySim.t,Mx,'ro')
-    plot(fig1, MySim.t,My,'go')
-    plot(fig1, MySim.t,Mz,'bo')
+if (MySim_dym.ShowTheResult)
+    plot(fig1, MySim_dym.t,Mx,'ro')
+    plot(fig1, MySim_dym.t,My,'go')
+    plot(fig1, MySim_dym.t,Mz,'bo')
 end
 
 end
