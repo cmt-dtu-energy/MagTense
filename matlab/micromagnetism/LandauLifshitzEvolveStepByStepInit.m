@@ -7,8 +7,8 @@ for i=1:length(names)
     eval([names{i} '=ProblemSetupStruct.' names{i} ';']);
 end
 
-for k=1:numel(t_explicit)
-    disp(['  ',num2str(k),'/',num2str(numel(t_explicit))]) ;
+for k=1:length(ProblemSetupStruct.Hext(:,1))
+    disp(['  ',num2str(k),'/',num2str(length(ProblemSetupStruct.Hext(:,1)))]) ;
     
     ProblemSetupStructExplicit = ProblemSetupStruct ;
     ProblemSetupStructExplicit.Hext(:,1)   = linspace(ProblemSetupStructExplicit.t(1),ProblemSetupStructExplicit.t(end),length(ProblemSetupStruct.Hext(:,2)));

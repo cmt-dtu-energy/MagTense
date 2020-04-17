@@ -245,17 +245,12 @@ include 'blas.f90'
     real(DP),intent(in) :: t
     type(MicroMagProblem),intent(in) :: problem
     
-    !if ( problem%MaxT0 .gt. 0 ) then
     if ( problem%alpha0 .eq. 0 ) then
-        !In this case alpha is allowed to increase as a function of time with a cap given by MaxT0 as specified in the problem
-        !!alpha = problem%alpha0 * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
-        !alpha = problem%alpha0 * 10**( 5 * min(t,problem%MaxT0)/problem%MaxT0 )
-        
         !Interpolate to get the applied field at time t
         call interp1( problem%alpha(:,1), problem%alpha(:,2), t, size(problem%alpha(:,1)), alpha )
         
     else
-        alpha = problem%alpha0 ! * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
+        alpha = problem%alpha0
     endif
     
     end function alpha

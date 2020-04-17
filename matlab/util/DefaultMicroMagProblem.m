@@ -65,17 +65,26 @@ properties
     
     %defines if and how to return the N tensor (1 do not return, 2 return
      %in memory and >2 return as a file with file length = N_ret
-    N_ret {mustBeGreaterThan(N_ret,0),mustBeInteger(N_ret)}=1;
+    N_ret {mustBeGreaterThan(N_ret,0),mustBeInteger(N_ret)}=int32(1);
     
     %defines whether the N tensor should be loaded rather than calculated
     %2 = load from memory, >2 load from file with filename length N_load
-    N_load {mustBeGreaterThan(N_load,0),mustBeInteger(N_load)}=1;
+    N_load {mustBeGreaterThan(N_load,0),mustBeInteger(N_load)}=int32(1);
     
     %filename to which N is written to
     N_file_out char = '';
     
     %filename from which N is loaded from
     N_file_in char = '';
+    
+    %filename for the Matlab save file
+    DirectoryFilename = '';
+    
+    %simulation for the Matlab save file
+    SimulationName = '';
+    
+    %filename for the Matlab save file
+    FileName = '';
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -223,6 +232,7 @@ methods
         obj.SaveTheResult = int32(0);
         obj.ShowTheResult = int32(1);
 
+        obj.DirectoryFilename = '';
     end
     
     %%Calculates the applied field as a function of time on the time grid
