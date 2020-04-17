@@ -7,7 +7,9 @@ Welcome to MagTense!
 ==============================================
 
 The magnetostatic and a micromagnetism calculation framework.
-The TechManual is in current development.
+The TechManual is in development.
+
+The MagTense framework can be downloaded from `Github <http://github.com/cmt-dtu-energy/MagTense>`_ and the webpage of the code is available at `MagTense homepage <http://www.magtense.org>`_
 
 .. toctree::
    :maxdepth: 2
