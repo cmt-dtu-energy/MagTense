@@ -19,6 +19,9 @@ problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
 problem.setUseCuda( true );
 
+% Not actually necessary. CVODE is on by default.
+problem.setUseCVODE( true );
+
 problem.alpha = 4.42e3;
 problem.gamma = 0;
 

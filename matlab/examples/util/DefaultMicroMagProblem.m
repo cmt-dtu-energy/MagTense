@@ -59,9 +59,16 @@ properties
     dem_thres
     
     %defines whether to attempt using CUDA (will crash if no appropriate
-    %NVIDIA driver is present or if insufficient memory is available. 0 for
+    %NVIDIA driver is present or if insufficient memory is available). 0 for
     %do not use cuda, 1 for do use (int32)
     useCuda
+    
+    %defines whether to attempt using CVODE (it is currently uncertain if
+    %the code even compiles in this version without having CVODE installed,
+    %regardless of whether or not CVODE is used). 0 for do not use CVODE, 
+    %1 for do use (int32). Currently implemented alternative is RK_SUITE,
+    %active if CVODE is not used.
+    useCVODE
     
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
@@ -148,6 +155,8 @@ methods
         obj.dem_thres = 0;
         %set use cuda to default not
         obj.useCuda = int32(0);
+        %set use CVODE to default
+        obj.useCVODE = int32(1);
         %set the demag approximation to the default, i.e. use no
         %approximation
 %         obj.dem_appr = getMicroMagDemagApproximation('none');
@@ -182,6 +191,15 @@ methods
            obj.useCuda = int32(1);
        else
            obj.useCuda = int32(0);
+       end
+    end
+    
+    function obj = setUseCVODE( obj, enabled )
+        
+       if enabled
+           obj.useCVODE = int32(1);
+       else
+           obj.useCVODE = int32(0);
        end
     end
     

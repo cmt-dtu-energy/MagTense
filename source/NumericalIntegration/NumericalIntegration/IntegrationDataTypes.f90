@@ -4,6 +4,8 @@
     implicit none
 
     integer,parameter :: coord_sys_carth=1,coord_sys_cyl=2,coord_sys_cone=3
+    !!@todo Do NOT have useCVODETrue/-False variables both here and in MicroMagParameters.
+    integer,parameter :: useCVODETrue=1,useCVODEFalse=0
 
     !---------------------------------------------------------------------------    
     !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
