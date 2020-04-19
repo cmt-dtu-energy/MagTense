@@ -6,7 +6,7 @@ module ODE_Solvers
 implicit none
     
     
-integer,parameter :: ODE_Solver_RKSUITE=1,ODE_Solver_CVODE=2
+!integer,parameter :: ODE_Solver_RKSUITE=1,ODE_Solver_CVODE=2
 
 procedure(dydt_fct), pointer :: MTdmdt                     !>Input function pointer for the function to be integrated
 real,allocatable,dimension(:) :: MTy_out,MTf_vec
@@ -26,10 +26,10 @@ private MTdmdt, MTy_out,MTf_vec
     !> @param[inout] t_out array of size m (pre-allocated) that holds the times where y_i are actually found
     !> @param[inout] y_out array of size [n,m] (pre-allocated) holding the n y_i values at the m times
     !> @param[in] callback function pointer for progress updates to Matlab
-    !> @param[in] solver optional flag for choosing solvers. 
+    !> @param[in] useCVODE optional flag for choosing solvers. 
     !> more parameters to come as we progress in the build-up of this function (error, options such as tolerances etc)
     !---------------------------------------------------------------------------
-    subroutine MagTense_ODE( fct, t, y0, t_out, y_out, callback, callback_display, solver )
+    subroutine MagTense_ODE( fct, t, y0, t_out, y_out, callback, callback_display, useCVODE )
 	use, intrinsic :: iso_c_binding
     procedure(dydt_fct), pointer :: fct                     !>Input function pointer for the function to be integrated
     procedure(callback_fct), pointer :: callback            !> Callback function
@@ -37,7 +37,7 @@ private MTdmdt, MTy_out,MTf_vec
     real,dimension(:),intent(inout) :: t_out                !>actual time values at which the y_i are found, size m
     real,dimension(:,:),intent(inout) :: y_out              !>Function values at the times t_out, size [n,m]
     integer,intent(in) :: callback_display                  !>Sets at what time index values Fortran displays the results in Matlab
-    integer,intent(in),optional :: solver
+    integer,intent(in),optional :: useCVODE
 	integer :: solver_flag
     
     integer :: neq, nt    
@@ -56,18 +56,18 @@ private MTdmdt, MTy_out,MTf_vec
     allocate(yderiv_out(neq,nt))
     yderiv_out(:,:) = 0
     
-    !solver defaults to CVODE. Inelegant but functional.
-	if ( present(solver) ) then
-		solver_flag = solver
+    !useCVODE defaults to true. Inelegant but functional.
+	if ( present(useCVODE) ) then
+		solver_flag = useCVODE
 	else
-		solver_flag = ODE_Solver_CVODE
+		solver_flag = useCVODETrue
 	endif
 	
 	!Call the solver
-    if ( solver_flag .eq. ODE_Solver_RKSUITE ) then
+    if ( solver_flag .eq. useCVODEFalse ) then
     
         call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, callback, callback_display )
-    else if ( solver_flag .eq. ODE_Solver_CVODE ) then
+    else if ( solver_flag .eq. useCVODETrue ) then
         !Do the magic for CVODE
         MTdmdt => fct
         !internal temporary arrays

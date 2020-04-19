@@ -99,7 +99,7 @@
             !Applied field
             gb_solution%HextInd = i
             
-            call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay )
+            call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%useCVODE )
             
             !the initial state of the next solution is the previous solution result
             gb_problem%m0 = M_out(:,nt,i)
@@ -115,7 +115,7 @@
         !Simply do a time evolution as specified in the problem        
         allocate(M_out(3*ntot,size(gb_problem%t),1))    
         allocate(gb_solution%M_out(size(gb_problem%t),ntot,1,3))
-        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay )
+        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay, gb_problem%useCVODE )
     
         gb_solution%M_out(:,:,1,1) = transpose( M_out(1:ntot,:,1) )
         gb_solution%M_out(:,:,1,2) = transpose( M_out((ntot+1):2*ntot,:,1) )

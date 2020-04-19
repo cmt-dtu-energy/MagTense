@@ -67,6 +67,8 @@ include 'mkl_spblas.f90'
         integer :: setTimeDisplay               !> How the time is output, not really used yet.
         
         integer :: useCuda                          !> Defines whether to attempt using CUDA or not
+        
+        integer :: useCVODE                     !> Defines whether to attempt using CVODE or not
         !Below is stuff that is computed when the solver initializes
         
         type(sparse_matrix_t) :: A_exch         !> Exchange term matrix
@@ -113,5 +115,7 @@ include 'mkl_spblas.f90'
     integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
     integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverImplicit=3
     integer,parameter :: useCudaTrue=1,useCudaFalse=0
+    !!@todo Do NOT have useCVODETrue/-False variables both here and in IntegrationDataTypes.
+    integer,parameter :: useCVODETrue=1,useCVODEFalse=0
     
 end module MicroMagParameters    
