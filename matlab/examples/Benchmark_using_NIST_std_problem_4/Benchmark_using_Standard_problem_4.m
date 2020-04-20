@@ -4,10 +4,10 @@ addpath('../NIST_micromag_Std_problem_4');
 
 %--- Use field X from the NIST example
 NIST_field = 2;
-res_arr = 1:9;
+res_arr = 9;
 
 %--- Loop over using the code in both CPU and CUDA mode
-for j = 1:2
+for j = 2%1:2
     if j == 1
         use_CUDA = false;
         j_s = 'no_CUDA';

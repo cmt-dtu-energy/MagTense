@@ -58,15 +58,16 @@ problem.m0(:) = 1/sqrt(3);
 problem = problem.setSolverType( 'UseExplicitSolver' );
 problem.solver = getMicroMagSolver( 'Explicit' );
 
-problem = problem.setHext( HextFct, linspace(MaxH,-MaxH,26) );
-problem = problem.setTime( linspace(0,5e-9,2) );
+problem = problem.setHext( HextFct, linspace(MaxH,-MaxH,40) );
+problem = problem.setTime( linspace(0,10e-9,2) );
     
 problem.K0 = 0 ;
 problem.Ms = 1000e3 ;
 problem.A0 = 1.74532925199e-10;
 
+%time-dependent alpha parameter, to ensure faster convergence
 AlphaFct = @(t) problem.alpha * 10.^( 5 * min(t,2e-9)/2e-9 );
-problem = problem.setAlpha( AlphaFct, linspace(0,5e-9,100) );
+problem = problem.setAlpha( AlphaFct, linspace(0,10e-9,100) );
 problem.alpha = 0;
 
 if run_single_curve
@@ -74,7 +75,7 @@ if run_single_curve
     d_loop = 0.5;
 end
 if run_MrHc
-    d_loop = linspace(0.1,1,20);
+    d_loop = linspace(0.05,0.5,10);
 end
 
 tic

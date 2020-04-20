@@ -225,7 +225,7 @@
         mwSize,dimension(1) :: dims
         mwSize :: s1,s2,sx,ndim
         mwSize,dimension(4) :: dims_4
-        mwPointer :: pt,pm,pp
+        mwPointer :: pt,pm,pp,pdem,pext,pexc,pani
         mwPointer :: mxCreateStructArray, mxCreateDoubleMatrix,mxGetPr,mxCreateNumericMatrix,mxCreateNumericArray
         mwIndex :: ind
         character(len=10),dimension(:),allocatable :: fieldnames    
@@ -274,6 +274,59 @@
         call mxCopyReal8ToPtr( solution%pts, mxGetPr( pp ), sx )
         call mxSetField( plhs, ind, fieldnames(3), pp )
         
+        
+        
+        ndim = 4
+        dims_4(1) = nt
+        dims_4(2) = ntot
+        dims_4(3) = size( solution%H_exc(1,1,:,1) )
+        dims_4(4) = 3
+        classid = mxClassIDFromClassName( 'double' )
+        pexc = mxCreateNumericArray( ndim, dims_4, classid, ComplexFlag)
+        sx = dims_4(1) * dims_4(2) * dims_4(3) * dims_4(4)
+        call mxCopyReal8ToPtr( solution%H_exc, mxGetPr( pexc ), sx )
+        call mxSetField( plhs, ind, fieldnames(4), pexc )
+        
+        
+        
+        ndim = 4
+        dims_4(1) = nt
+        dims_4(2) = ntot
+        dims_4(3) = size( solution%H_ext(1,1,:,1) )
+        dims_4(4) = 3
+        classid = mxClassIDFromClassName( 'double' )
+        pext = mxCreateNumericArray( ndim, dims_4, classid, ComplexFlag)
+        sx = dims_4(1) * dims_4(2) * dims_4(3) * dims_4(4)
+        call mxCopyReal8ToPtr( solution%H_ext, mxGetPr( pext ), sx )
+        call mxSetField( plhs, ind, fieldnames(5), pext )
+        
+        
+        
+        ndim = 4
+        dims_4(1) = nt
+        dims_4(2) = ntot
+        dims_4(3) = size( solution%H_dem(1,1,:,1) )
+        dims_4(4) = 3
+        classid = mxClassIDFromClassName( 'double' )
+        pdem = mxCreateNumericArray( ndim, dims_4, classid, ComplexFlag)
+        sx = dims_4(1) * dims_4(2) * dims_4(3) * dims_4(4)
+        call mxCopyReal8ToPtr( solution%H_dem, mxGetPr( pdem ), sx )
+        call mxSetField( plhs, ind, fieldnames(6), pdem )
+        
+        
+        
+        ndim = 4
+        dims_4(1) = nt
+        dims_4(2) = ntot
+        dims_4(3) = size( solution%H_ani(1,1,:,1) )
+        dims_4(4) = 3
+        classid = mxClassIDFromClassName( 'double' )
+        pani = mxCreateNumericArray( ndim, dims_4, classid, ComplexFlag)
+        sx = dims_4(1) * dims_4(2) * dims_4(3) * dims_4(4)
+        call mxCopyReal8ToPtr( solution%H_ani, mxGetPr( pani ), sx )
+        call mxSetField( plhs, ind, fieldnames(7), pani )
+        
+       
         !Clean up
         deallocate(fieldnames)
     
@@ -336,7 +389,7 @@
     !>-----------------------------------------
     subroutine getSolutionFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=3
+        integer,parameter :: nf=7
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -346,6 +399,10 @@
         fieldnames(1) = 't'
         fieldnames(2) = 'M'
         fieldnames(3) = 'pts'
+        fieldnames(4) = 'H_exc'
+        fieldnames(5) = 'H_ext'
+        fieldnames(6) = 'H_dem'
+        fieldnames(7) = 'H_ani'
         
         
         

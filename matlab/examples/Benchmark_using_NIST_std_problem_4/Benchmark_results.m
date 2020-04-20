@@ -2,7 +2,7 @@ clearvars
 close all
 
 NIST_field = 2;
-i_arr = 1:2; 
+i_arr = 1:8; 
 
 % addpath('../MagTense/matlab/MEX_files');
 % addpath('../MagTense/matlab/util');
@@ -103,6 +103,7 @@ plot(fig3, i_arr,elapsedTime_CPU(:,2)./elapsedTime_CUDA(:,2),'k-d');
 clear abs_res_diff
 for m = 1:2
     for i = 1:length(i_arr)
+        resolution = [i*20,i*5,1];
         switch m 
             case 1
                 load(['Field_' num2str(NIST_field) '\Matlab_simulations_CPU\Matlab_resolution_' num2str(resolution(1)) '_' num2str(resolution(2)) '_' num2str(resolution(3)) '\Matlab_InitialStdProb4solution.mat'])

@@ -1,4 +1,5 @@
 function [SigmaSol,VV,InteractionMatrices] = ComputeTheSolution(MySim)
+VV = [];
 tic
 
 %% Setup problem variables

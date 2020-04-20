@@ -113,7 +113,11 @@ include "mkl_dfti.f90"
         complex(kind=4),dimension(:),allocatable :: HmX_c,HmY_c,HmZ_c      !> Complex version of the demag field, used for the Fourier cut-off approach
         
         real(DP),dimension(:),allocatable :: t_out          !> Output times at which the solution was computed
-        real(DP),dimension(:,:,:,:),allocatable :: M_out        !> The magnetization at each of these times (n,3,nt,nt)
+        real(DP),dimension(:,:,:,:),allocatable :: M_out    !> The magnetization at each of these times (nt,ntot,nt_Hext,3)
+        real(DP),dimension(:,:,:,:),allocatable :: H_exc    !> The exchange field at each of these times (nt,ntot,nt_Hext,3)
+        real(DP),dimension(:,:,:,:),allocatable :: H_ext    !> The external field at each of these times (nt,ntot,nt_Hext,3)
+        real(DP),dimension(:,:,:,:),allocatable :: H_dem    !> The demagnetization field at each of these times (nt,ntot,nt_Hext,3)
+        real(DP),dimension(:,:,:,:),allocatable :: H_ani    !> The anisotropy field at each of these times (nt,ntot,nt_Hext,3)
         
         real(DP),dimension(:,:),allocatable :: pts          !> n,3 array with the points (x,y,z) of the centers of the tiles
         

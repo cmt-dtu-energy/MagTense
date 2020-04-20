@@ -36,7 +36,7 @@ function InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct)
 %          InteractionMatrices.Kzz] = CreateAnisotropyMatrixBase(Kx,Ky,Kz) ;
      [InteractionMatrices.Kxx,InteractionMatrices.Kxy,InteractionMatrices.Kxz,InteractionMatrices.Kyx, ...
          InteractionMatrices.Kyy,InteractionMatrices.Kyz,InteractionMatrices.Kzx,InteractionMatrices.Kzy, ...
-         InteractionMatrices.Kzz] = CreateAnisotropyMatrixBase(u_ea(1),u_ea(2),u_ea(3)) ;
+         InteractionMatrices.Kzz] = CreateAnisotropyMatrixBase(u_ea(:,1),u_ea(:,2),u_ea(:,3)) ;
      
 %     end
 

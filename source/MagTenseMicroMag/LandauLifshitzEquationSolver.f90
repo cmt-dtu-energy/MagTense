@@ -101,17 +101,20 @@ include 'blas.f90'
     fct => dmdt_fct
     cb_fct => displayMatlabProgessMessage
     
-    
+    gb_solution%HextInd = 1;
     if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
         !Go through a range of applied fields and find the equilibrium solution for each of them
         !The no. of applied fields to consider
         nt = size( gb_problem%t ) 
         nt_Hext = size(gb_problem%Hext, 1) 
-        
+
         !has an extra nt results as this is the total time-dependent solution for each applied field
         allocate(M_out(3*ntot,nt,nt_Hext))   
         allocate(gb_solution%M_out(size(gb_problem%t),ntot,nt_Hext,3))
-        
+        allocate(gb_solution%H_exc(size(gb_problem%t),ntot,nt_Hext,3))
+        allocate(gb_solution%H_ext(size(gb_problem%t),ntot,nt_Hext,3))
+        allocate(gb_solution%H_dem(size(gb_problem%t),ntot,nt_Hext,3))
+        allocate(gb_solution%H_ani(size(gb_problem%t),ntot,nt_Hext,3))       
         
         !loop over the range of applied fields
         do i=1,nt_Hext
@@ -127,6 +130,8 @@ include 'blas.f90'
             gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
             gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
             
+            call StoreHeffComponents ( gb_problem, gb_solution )
+            
         enddo
         
         
@@ -134,11 +139,18 @@ include 'blas.f90'
         !Simply do a time evolution as specified in the problem        
         allocate(M_out(3*ntot,size(gb_problem%t),1))    
         allocate(gb_solution%M_out(size(gb_problem%t),ntot,1,3))
+        allocate(gb_solution%H_exc(size(gb_problem%t),ntot,1,3))
+        allocate(gb_solution%H_ext(size(gb_problem%t),ntot,1,3))
+        allocate(gb_solution%H_dem(size(gb_problem%t),ntot,1,3))
+        allocate(gb_solution%H_ani(size(gb_problem%t),ntot,1,3))
+        
         call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay )
     
         gb_solution%M_out(:,:,1,1) = transpose( M_out(1:ntot,:,1) )
         gb_solution%M_out(:,:,1,2) = transpose( M_out((ntot+1):2*ntot,:,1) )
         gb_solution%M_out(:,:,1,3) = transpose( M_out((2*ntot+1):3*ntot,:,1) )
+        
+        call StoreHeffComponents ( gb_problem, gb_solution )
         
     endif
     !Clean up
@@ -258,6 +270,59 @@ include 'blas.f90'
     
     
     !>-----------------------------------------
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
+    !> @brief
+    !> Defines the function that calculates and stores the individual terms
+    !> of the effective magnetic field 
+    !> @param[in] problem the specification of the problem
+    !> @param[in] solution the solution structure where the fields are stored
+    !---------------------------------------------------------------------------    
+    subroutine StoreHeffComponents ( problem, solution )
+    type(MicroMagProblem),intent(in) :: problem
+    type(MicroMagSolution),intent(inout) :: solution
+    integer :: i,j,nt
+    
+    i = gb_solution%HextInd       
+    nt = size( gb_problem%t ) 
+    
+    do j=1,nt
+        !Calculate the effective field for the values where the magnetization is known
+        gb_solution%Mx = gb_solution%M_out(j,:,i,1)
+        gb_solution%My = gb_solution%M_out(j,:,i,2)
+        gb_solution%Mz = gb_solution%M_out(j,:,i,3)
+    
+        !Exchange term    
+        call updateExchangeTerms( gb_problem, gb_solution )
+        !External field
+        call updateExternalField( gb_problem, gb_solution, gb_problem%t(i) )
+        !Anisotropy term
+        call updateAnisotropy(  gb_problem, gb_solution )
+        !Demag. field
+        call updateDemagfield( gb_problem, gb_solution )
+    
+        !Store the components of the effective field
+        gb_solution%H_exc(j,:,i,1) = gb_solution%HjX
+        gb_solution%H_exc(j,:,i,2) = gb_solution%HjY
+        gb_solution%H_exc(j,:,i,3) = gb_solution%HjZ
+        
+        gb_solution%H_ext(j,:,i,1) = gb_solution%HhX
+        gb_solution%H_ext(j,:,i,2) = gb_solution%HhY
+        gb_solution%H_ext(j,:,i,3) = gb_solution%HhZ
+        
+        gb_solution%H_dem(j,:,i,1) = gb_solution%HmX
+        gb_solution%H_dem(j,:,i,2) = gb_solution%HmY
+        gb_solution%H_dem(j,:,i,3) = gb_solution%HmZ
+        
+        gb_solution%H_ani(j,:,i,1) = gb_solution%HkX
+        gb_solution%H_ani(j,:,i,2) = gb_solution%HkY
+        gb_solution%H_ani(j,:,i,3) = gb_solution%HkZ
+    enddo
+    
+    end subroutine StoreHeffComponents
+    
+    
+    
+    !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Initializes the solution arrays
@@ -329,7 +394,7 @@ include 'blas.f90'
     !> @param[in] problem, the struct containing the current problem
     !> @param[inout] solution, struct containing the current solution    
     !>-----------------------------------------
-     subroutine updateExchangeTerms( problem, solution )
+    subroutine updateExchangeTerms( problem, solution )
     type(MicroMagProblem),intent(in) :: problem
     type(MicroMagSolution),intent(inout) :: solution
     
@@ -405,7 +470,7 @@ include 'blas.f90'
     !> @param[inout] solution, struct containing the current solution        
     !>-----------------------------------------
     subroutine updateAnisotropy( problem, solution)
-   type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     
     real :: prefact                                       !> Multiplicative scalar factor

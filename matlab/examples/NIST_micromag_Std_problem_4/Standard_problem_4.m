@@ -1,7 +1,7 @@
 function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( NIST_field, resolution, use_CUDA, ShowTheResult, SaveTheResult )
 
 clearvars -except NIST_field resolution use_CUDA SaveTheResult ShowTheResult
-close all
+% close all
 
 %--- Use either field 1 or field 2 from the NIST example
 if ~exist('NIST_field','var')
