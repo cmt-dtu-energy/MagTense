@@ -85,6 +85,13 @@ properties
     
     %filename for the Matlab save file
     FileName = '';
+    
+    %Relative tolerance for the Fortran ODE solver
+    tol = 1e-4;
+    
+    %Fortran ODE solver, when a solution component Y(L) is less in
+    %magnitude than thres_value its set to zero
+    thres = 1e-6;
 end
 
 properties (SetAccess=private,GetAccess=public)

@@ -18,12 +18,12 @@
     integer,intent(in) :: n
     character(*),intent(in) :: filename
     
-    real(DP),dimension(:,:),allocatable :: x,y      !> The dense matrix to be created
-    real(DP),dimension(:), allocatable :: xx,yy     
+    real(SP),dimension(:,:),allocatable :: x,y      !> The dense matrix to be created
+    real(SP),dimension(:), allocatable :: xx,yy     
     integer,dimension(1) :: shp1D
     integer,dimension(2) :: shp2D
     integer :: i, stat
-    real(DP) :: alpha, beta
+    real(SP) :: alpha, beta
     type(matrix_descr) :: descr 
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
@@ -49,7 +49,7 @@
     beta = 0.
     
     
-    stat = mkl_sparse_d_mm (SPARSE_OPERATION_NON_TRANSPOSE, alpha, A, descr, SPARSE_LAYOUT_COLUMN_MAJOR, xx, n, n, beta, yy, n)
+    stat = mkl_sparse_s_mm (SPARSE_OPERATION_NON_TRANSPOSE, alpha, A, descr, SPARSE_LAYOUT_COLUMN_MAJOR, xx, n, n, beta, yy, n)
     
     shp2D(1) = n
     shp2D(2) = n
