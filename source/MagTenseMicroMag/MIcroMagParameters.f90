@@ -64,6 +64,7 @@ include "mkl_dfti.f90"
         integer :: solver                           !> Determines what type of solver to use
         
         real(DP) :: A0,Ms,K0,gamma,alpha0,MaxT0         !> User defined coefficients determining part of the problem.
+        real(DP) :: tol,thres_value                     !> User defined coefficients for the ODE solver
         
         real(DP),dimension(:,:),allocatable :: Hext     !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
         real(DP),dimension(:,:),allocatable :: alpha    !> A time dependent dampning parameter, i.e. as a function of time. Size (nt,1).

@@ -121,7 +121,7 @@ include 'blas.f90'
             !Applied field
             gb_solution%HextInd = i
             
-            call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay )
+            call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value )
             
             !the initial state of the next solution is the previous solution result
             gb_problem%m0 = M_out(:,nt,i)
@@ -144,7 +144,7 @@ include 'blas.f90'
         allocate(gb_solution%H_dem(size(gb_problem%t),ntot,1,3))
         allocate(gb_solution%H_ani(size(gb_problem%t),ntot,1,3))
         
-        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay )
+        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value )
     
         gb_solution%M_out(:,:,1,1) = transpose( M_out(1:ntot,:,1) )
         gb_solution%M_out(:,:,1,2) = transpose( M_out((ntot+1):2*ntot,:,1) )

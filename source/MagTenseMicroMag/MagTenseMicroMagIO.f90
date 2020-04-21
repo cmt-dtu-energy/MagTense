@@ -27,6 +27,7 @@
         mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, tProblemPtr, useCudaPtr
         mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
+        mwPointer :: tolProblemPtr, thres_valueProblemPtr
         integer,dimension(3) :: int_arr
         real*8,dimension(3) :: real_arr
         real*8 :: demag_fac
@@ -205,6 +206,13 @@
         HextProblemPtr = mxGetField( prhs, i, problemFields(27) )
         call mxCopyPtrToReal8(mxGetPr(HextProblemPtr), problem%alpha, sx )
         
+        sx = 1
+        tolProblemPtr = mxGetField( prhs, i, problemFields(28) )
+        call mxCopyPtrToReal8(mxGetPr(tolProblemPtr), problem%tol, sx )
+        
+        sx = 1
+        thres_valueProblemPtr = mxGetField( prhs, i, problemFields(29) )
+        call mxCopyPtrToReal8(mxGetPr(thres_valueProblemPtr), problem%thres_value, sx )
         
         !Clean-up 
         deallocate(problemFields)
@@ -341,7 +349,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=27
+        integer,parameter :: nf=29
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -375,7 +383,8 @@
         fieldnames(25) = 'setTimeDis'
         fieldnames(26) = 'nt_alpha'
         fieldnames(27) = 'alphat'
-        
+        fieldnames(28) = 'tol'
+        fieldnames(29) = 'thres'
         
     end subroutine getProblemFieldnames
     

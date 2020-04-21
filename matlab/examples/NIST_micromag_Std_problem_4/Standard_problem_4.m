@@ -110,9 +110,9 @@ solution_dym = MagTenseLandauLifshitzSolver_mex( prob_struct, solution_dym );
 elapsedTime_part2 = toc
 
 if (ShowTheResult)
-    plot(fig1,problem_dym.t,mean(solution_dym.M(:,:,1),2),'rx'); 
-    plot(fig1,problem_dym.t,mean(solution_dym.M(:,:,2),2),'gx'); 
-    plot(fig1,problem_dym.t,mean(solution_dym.M(:,:,3),2),'bx'); 
+    plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,1),2),'rx'); 
+    plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,2),2),'gx'); 
+    plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,3),2),'bx'); 
     % figure; hold all; for i=2:4; plot(problem.Hext(:,1),problem.Hext(:,i),'.'); end;
 end
 
