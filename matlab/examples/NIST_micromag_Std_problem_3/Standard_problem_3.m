@@ -1,10 +1,10 @@
-function [elapsedTime,problem,solution] = Standard_problem_3( resolution, use_CUDA, ShowTheResult, SaveTheResult, ShowTheResultDetails, RunMatlab )
+function [elapsedTime,problem,solution,E_arr,L_loop] = Standard_problem_3( resolution, use_CUDA, ShowTheResult, SaveTheResult, ShowTheResultDetails, RunMatlab, L_loop )
 
-clearvars -except resolution use_CUDA SaveTheResult ShowTheResult
+clearvars -except  resolution use_CUDA ShowTheResult SaveTheResult ShowTheResultDetails RunMatlab L_loop 
 close all
 
 if ~exist('resolution','var')
-    resolution = [5,5,5];
+    resolution = [10,10,10];
 end
 if ~exist('use_CUDA','var')
     use_CUDA = true;
@@ -20,6 +20,9 @@ if ~exist('ShowTheResultDetails','var')
 end
 if ~exist('RunMatlab','var')
     RunMatlab = 0;
+end
+if ~exist('L_loop','var')
+    L_loop = linspace(8,9,10);
 end
 
 if use_CUDA
@@ -66,8 +69,6 @@ HextFct = @(t) (t)' .* [0,0,0];
 
 %time-dependent alpha parameter, to ensure faster convergence
 problem.alpha = 1e3;
-
-L_loop = linspace(8,9,10);
 
 tic
 for i = 1:length(L_loop)  
@@ -180,5 +181,7 @@ if (ShowTheResult)
     xlabel(fig10,'L [l_{ex}]')
     ylabel(fig10,'E [-]')
 end
+
+% disp(['Energy intersection: ' num2str(interp1(sum(E_arr(:,:,1),1)-sum(E_arr(:,:,2),1),L_loop,0))]);
 
 end
