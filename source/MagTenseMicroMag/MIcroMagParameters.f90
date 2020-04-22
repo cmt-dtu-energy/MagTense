@@ -81,6 +81,9 @@ include "mkl_dfti.f90"
         integer :: demagTensorLoadState                         !> Flag describing how or if to load the demag tensor (from disk e.g.)
         character*256 :: demagTensorFileOut, demagTensorFileIn  !> Filename (including path) for output (input) of demag tensor if it is to be returned as a file (demagTensorReturnState >2 and the value is equal to the length of the file including path)
         
+        integer :: useCuda                          !> Defines whether to attempt using CUDA or not
+        
+        integer :: useCVODE                     !> Defines whether to attempt using CVODE or not
         !Below is stuff that is computed when the solver initializes
         
         type(sparse_matrix_t) :: A_exch         !> Exchange term matrix
@@ -138,5 +141,7 @@ include "mkl_dfti.f90"
     integer,parameter :: useCudaTrue=1,useCudaFalse=0
     integer,parameter :: DemagApproximationNothing=1,DemagApproximationThreshold=2,DemagApproximationFFTThreshold=3,DemagApproximationThresholdFraction=4
     integer,parameter :: DemagTensorReturnNot=1,DemagTensorReturnMemory=2
+    !!@todo Do NOT have useCVODETrue/-False variables both here and in IntegrationDataTypes.
+    integer,parameter :: useCVODETrue=1,useCVODEFalse=0
     
 end module MicroMagParameters    

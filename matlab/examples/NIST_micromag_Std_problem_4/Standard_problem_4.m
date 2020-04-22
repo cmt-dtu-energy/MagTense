@@ -50,6 +50,7 @@ problem_ini = problem_ini.setUseCuda( use_CUDA );
 %     problem_ini = problem_ini.setLoadNFilename( loadFile );
 % end
 % problem_ini = problem_ini.setReturnNFilename( loadFile );
+problem.setUseCVODE( true );
 
 problem_ini.alpha = 4.42e3;
 problem_ini.gamma = 0;

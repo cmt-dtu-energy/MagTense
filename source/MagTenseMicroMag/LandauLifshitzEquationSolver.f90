@@ -121,7 +121,7 @@ include 'blas.f90'
             !Applied field
             gb_solution%HextInd = i
             
-            call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value )
+            call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE )
             
             !the initial state of the next solution is the previous solution result
             gb_problem%m0 = M_out(:,nt,i)
@@ -144,7 +144,7 @@ include 'blas.f90'
         allocate(gb_solution%H_dem(size(gb_problem%t),ntot,1,3))
         allocate(gb_solution%H_ani(size(gb_problem%t),ntot,1,3))
         
-        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value )
+        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE  )
     
         gb_solution%M_out(:,:,1,1) = transpose( M_out(1:ntot,:,1) )
         gb_solution%M_out(:,:,1,2) = transpose( M_out((ntot+1):2*ntot,:,1) )
@@ -270,7 +270,7 @@ include 'blas.f90'
     
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2020
     !> @brief
     !> Defines the function that calculates and stores the individual terms
     !> of the effective magnetic field 
@@ -447,9 +447,9 @@ include 'blas.f90'
     elseif ( problem%solver .eq. MicroMagSolverDynamic ) then
         
         !Interpolate to get the applied field at time t
-        call interp1( problem%Hext(:,1), problem%Hext(:,2), t, size(problem%Hext(:,1)), HextX )
-        call interp1( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
-        call interp1( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
+        call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,2), t, size(problem%Hext(:,1)), HextX )
+        call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
+        call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
         
         solution%HhX = -HextX
         solution%HhY = -HextY

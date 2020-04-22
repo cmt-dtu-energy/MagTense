@@ -92,6 +92,13 @@ properties
     %Fortran ODE solver, when a solution component Y(L) is less in
     %magnitude than thres_value its set to zero
     thres = 1e-6;
+	
+	%defines whether to attempt using CVODE (it is currently uncertain if
+    %the code even compiles in this version without having CVODE installed,
+    %regardless of whether or not CVODE is used). 0 for do not use CVODE, 
+    %1 for do use (int32). Currently implemented alternative is RK_SUITE,
+    %active if CVODE is not used.
+    useCVODE
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -219,6 +226,8 @@ methods
         obj.dem_thres = 0;
         %set use cuda to default not
         obj.useCuda = int32(0);
+		%set use CVODE to default
+        obj.useCVODE = int32(0);
         %set the demag approximation to the default, i.e. use no
         %approximation
         obj.dem_appr = getMicroMagDemagApproximation('none');

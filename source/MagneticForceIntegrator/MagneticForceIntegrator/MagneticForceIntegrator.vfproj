@@ -32,7 +32,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../TileDemagTensor/TileDemagTensor/x64/release/;../../NumericalIntegration/NumericalIntegration/x64/release/;../../DemagField/DemagField/x64/release/;C:\Program Files\MATLAB\R2019b\extern\include\" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" RuntimeLibrary="rtMultiThreadedDLL"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../TileDemagTensor/TileDemagTensor/x64/release/;../../NumericalIntegration/NumericalIntegration/x64/release/;../../DemagField/DemagField/x64/release/;C:\Program Files\MATLAB\R2019b\extern\include\" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" UseMkl="mklParallel"/>
 				<Tool Name="VFLibrarianTool"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
