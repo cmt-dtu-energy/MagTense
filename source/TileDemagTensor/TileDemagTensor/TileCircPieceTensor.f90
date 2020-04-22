@@ -850,7 +850,7 @@
         
         
     subroutine getParameters_rot_trick( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
-    class(dataCollectionBase), intent(in), target :: dat
+    class(dataCollectionBase), intent(inout), target :: dat
     real,intent(inout) :: x,y,z,R,theta1,theta2,z1,z2, xrot, phi
     
     !radius of the circle piece (distance to the curved face from origo)
@@ -885,7 +885,7 @@
     
     
     subroutine getParameters( dat, x, y, z, R, theta1, theta2, z1, z2, xrot, phi )
-    class(dataCollectionBase), intent(in), target :: dat
+    class(dataCollectionBase), intent(inout), target :: dat
     real,intent(inout) :: x,y,z,R,theta1,theta2,z1,z2, xrot, phi
     
     !radius of the circle piece (distance to the curved face from origo)
