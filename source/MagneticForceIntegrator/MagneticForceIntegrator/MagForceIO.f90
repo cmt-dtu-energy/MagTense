@@ -117,7 +117,7 @@ module MagForceIO
     !::Progess callback to Matlab
     function MagForceProgCallback( dat )
       real :: MagForceProgCallback
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
             
       integer :: mexCallMATLAB, nlhs_cb, nrhs_cb, tmp
       mwPointer plhs_cb(1), prhs_cb(1),mxCreateString

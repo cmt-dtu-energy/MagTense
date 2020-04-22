@@ -75,7 +75,7 @@
           subroutine func_vec ( yy, dat, n, res)
              import dataCollectionBase
              integer,intent(in) :: n
-             real,dimension(n) :: yy
+             real,dimension(n), intent(in) :: yy
              class(dataCollectionBase), intent(inout), target :: dat
              real,dimension(n) :: res
          
@@ -105,7 +105,7 @@
     abstract interface
         subroutine error_handler( dat, abserr )
             import dataCollectionBase
-            class( dataCollectionBase ), intent(in), target :: dat
+            class( dataCollectionBase ), intent(inout), target :: dat
             real, intent(inout),dimension(2) :: abserr
         end subroutine error_handler
     end interface
