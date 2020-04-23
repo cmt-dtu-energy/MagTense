@@ -30,6 +30,7 @@ private MTdmdt, MTy_out,MTf_vec
     !> more parameters to come as we progress in the build-up of this function (error, options such as tolerances etc)
     !---------------------------------------------------------------------------
     subroutine MagTense_ODE( fct, t, y0, t_out, y_out, callback, callback_display, tol, thres_value, useCVODE )
+    use, intrinsic :: iso_c_binding
     procedure(dydt_fct), pointer :: fct                     !>Input function pointer for the function to be integrated
     procedure(callback_fct), pointer :: callback            !> Callback function
     real,dimension(:),intent(in) :: t,y0                    !>requested time (size m) and initial values ofy (size n)
@@ -42,9 +43,9 @@ private MTdmdt, MTy_out,MTf_vec
 	integer :: solver_flag
     
     integer :: neq, nt    
-    real,allocatable,dimension(:,:) :: yderiv_out           !>The derivative of y_i wrt t at each time step
-    real(c_double),dimension(size(t)) :: t_out_double,t_double! = t_out
-    real(c_double),dimension(size(y0),size(t)) :: y_out_double! = y_out
+    real,allocatable,dimension(:,:) :: yderiv_out              !>The derivative of y_i wrt t at each time step
+    real(c_double),dimension(size(t)) :: t_out_double,t_double ! = t_out
+    real(c_double),dimension(size(y0),size(t)) :: y_out_double ! = y_out
     real(c_double) :: t1b,t2b
     real :: t1a,t2a
     
@@ -86,7 +87,7 @@ private MTdmdt, MTy_out,MTf_vec
         t2a = t(2)
         t1b = t_double(1)
         t2b = t_double(2)
-        call MagTense_CVODEsuite( int(neq,c_int), real(t,c_double), int(nt,c_int), real(y0,c_double), t_out_double, y_out_double )
+        call MagTense_CVODEsuite( int(neq,c_int), real(t,c_double), int(nt,c_int), real(y0,c_double), t_out_double, y_out_double, real(tol,c_double) )
         y_out = real(y_out_double)
         
         t_out = real(t_out_double)
@@ -188,26 +189,27 @@ private MTdmdt, MTy_out,MTf_vec
     !> @param[inout] t_out output array with the times at which y_i are found
     !> @param[inout] y_out output array with the y_i values
     !---------------------------------------------------------------------------
-    subroutine MagTense_CVODEsuite( neq, t, nt, ystart,  t_out, y_out )
+#if USE_CVODE
+    subroutine MagTense_CVODEsuite( neq, t, nt, ystart,  t_out, y_out, tol )
 	use, intrinsic :: iso_c_binding
 
-    use fcvode_mod             ! Fortran interface to CVODE
-    use fnvector_serial_mod    ! Fortran interface to serial N_Vector
-    use fsunmatrix_dense_mod      ! Fortran interface to dense SUNMatrix
-    use fsunlinsol_dense_mod   ! Fortran interface to dense SUNLinearSolver
+    use fcvode_mod                   ! Fortran interface to CVODE
+    use fnvector_serial_mod          ! Fortran interface to serial N_Vector
+    use fsunmatrix_dense_mod         ! Fortran interface to dense SUNMatrix
+    use fsunlinsol_dense_mod         ! Fortran interface to dense SUNLinearSolver
     use fsunnonlinsol_fixedpoint_mod ! Fortran interface to fixed-point nonlinear solver
-    !use ode_mod               ! ODE functions
+    !use ode_mod                     ! ODE functions
 
     ! local variables
-    integer(c_int),intent(in) :: neq,nt       ! number of eq. and timesteps
-    real(c_double),dimension(nt),intent(in) :: t     ! initial time
-    real(c_double),dimension(nt),intent(inout) :: t_out       ! output time
-    real(c_double) :: rtol, atol,hlast,dum1,dum2 ! relative and absolute tolerance
+    integer(c_int),intent(in) :: neq,nt                   ! number of eq. and timesteps
+    real(c_double),dimension(nt),intent(in) :: t          ! initial time
+    real(c_double),dimension(nt),intent(inout) :: t_out   ! output time
+    real(c_double) :: rtol,atol,hlast,dum1,dum2,tol       ! relative and absolute tolerance
 
-      integer(c_int) :: ierr, ierr2,ierr3,ierr4,ierr5       ! error flags from C functions
-    integer(c_int) :: nlinconvfails,linconvfails,nsteps     ! debugging variables
+    integer(c_int) :: ierr,ierr2,ierr3,ierr4,ierr5         ! error flags from C functions
+    integer(c_int) :: nlinconvfails,linconvfails,nsteps    ! debugging variables
 
-      integer :: outstep           ! output loop counter
+    integer :: outstep           ! output loop counter
     
     type(c_ptr) :: sunvec_y      ! sundials vector
     type(c_ptr) :: sunmat_A      ! sundials matrix
@@ -270,7 +272,8 @@ private MTdmdt, MTy_out,MTf_vec
     end if
 
     ! set relative and absolute tolerances
-    rtol = 1.0d-6
+    !rtol = 1.0d-6
+    rtol = tol
     atol = 1.0d-10
 
     ierr = FCVodeSStolerances(cvode_mem, rtol, atol)
@@ -349,7 +352,8 @@ private MTdmdt, MTy_out,MTf_vec
     call FSUNMatDestroy_Dense(sunmat_A)
     call FN_VDestroy_Serial(sunvec_y)
 	
-	end subroutine MagTense_CVODEsuite
+    end subroutine MagTense_CVODEsuite
+    
     
     !Wrapper for CVODE to call fct
     integer(c_int) function RhsFn(tn, sunvec_y, sunvec_f, user_data) &
@@ -402,4 +406,22 @@ private MTdmdt, MTy_out,MTf_vec
     return
 
     end function RhsFn
+#else
+    subroutine MagTense_CVODEsuite( neq, t, nt, ystart,  t_out, y_out, tol )
+	use, intrinsic :: iso_c_binding
+
+    ! local variables
+    integer(c_int),intent(in) :: neq,nt                   ! number of eq. and timesteps
+    real(c_double),dimension(nt),intent(in) :: t          ! initial time
+    real(c_double),dimension(nt),intent(inout) :: t_out   ! output time
+    real(c_double) :: rtol,atol,hlast,dum1,dum2,tol       ! relative and absolute tolerance
+
+    ! solution vector, neq is set in the ode_functions module
+    real(c_double),dimension(neq,nt),intent(inout) :: y_out
+    real(c_double),dimension(neq),intent(in) :: ystart
+    
+    call displayMatlabMessage( 'MagTense not compiled with CVODE - exiting!' )
+    stop
+    end subroutine MagTense_CVODEsuite
+#endif
 end module ODE_Solvers

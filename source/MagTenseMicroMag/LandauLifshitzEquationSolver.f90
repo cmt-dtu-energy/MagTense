@@ -259,7 +259,7 @@ include 'blas.f90'
     
     if ( problem%alpha0 .eq. 0 ) then
         !Interpolate to get the applied field at time t
-        call interp1( problem%alpha(:,1), problem%alpha(:,2), t, size(problem%alpha(:,1)), alpha )
+        call interp1_MagTense( problem%alpha(:,1), problem%alpha(:,2), t, size(problem%alpha(:,1)), alpha )
         
     else
         alpha = problem%alpha0
@@ -270,7 +270,7 @@ include 'blas.f90'
     
     
     !>-----------------------------------------
-    !> @author Rasmus Bj�rk, rabj@dtu.dk, DTU, 2020
+    !> @author Rasmus Bjoerk, rabj@dtu.dk, DTU, 2020
     !> @brief
     !> Defines the function that calculates and stores the individual terms
     !> of the effective magnetic field 

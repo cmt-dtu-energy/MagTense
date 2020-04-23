@@ -67,7 +67,7 @@
           function func ( dat )
              import dataCollectionBase
              real :: func
-             class(dataCollectionBase), intent(in), target :: dat
+             class(dataCollectionBase), intent(inout), target :: dat
           end function func
     end interface
 
@@ -76,7 +76,7 @@
              import dataCollectionBase
              integer,intent(in) :: n
              real,dimension(n),intent(in) :: yy
-             class(dataCollectionBase), intent(in), target :: dat
+             class(dataCollectionBase), intent(inout), target :: dat
              real,dimension(n) :: res
          
           end subroutine func_vec
@@ -98,7 +98,7 @@
              integer,intent(in) :: n
              real,intent (in),dimension(n) :: x
              real,dimension(n) :: f_int_dat_vec        
-             class(dataCollectionBase), intent(in), target :: dat
+             class(dataCollectionBase), intent(inout), target :: dat
           end function f_int_dat_vec
     end interface
 
