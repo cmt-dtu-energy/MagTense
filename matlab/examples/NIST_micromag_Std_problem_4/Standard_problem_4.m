@@ -25,6 +25,7 @@ if use_CUDA
 else
     dir_m = 'CPU';
 end
+use_CVODE = false;
 
 if (ShowTheResult)
     figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
@@ -44,13 +45,13 @@ problem_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
 problem_ini.dem_appr = getMicroMagDemagApproximation('none');
 problem_ini = problem_ini.setUseCuda( use_CUDA );
+problem_ini = problem_ini.setUseCVODE( use_CVODE );
 
 % loadFile = 'N_out_test.dat';
 % if exist(loadFile,'file')
 %     problem_ini = problem_ini.setLoadNFilename( loadFile );
 % end
 % problem_ini = problem_ini.setReturnNFilename( loadFile );
-problem.setUseCVODE( true );
 
 problem_ini.alpha = 4.42e3;
 problem_ini.gamma = 0;
@@ -83,6 +84,7 @@ problem_dym = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 problem_dym.alpha = 4.42e3 ;
 problem_dym.gamma = 2.21e5 ;
 problem_dym = problem_dym.setUseCuda( use_CUDA );
+problem_ini = problem_ini.setUseCVODE( use_CVODE );
 problem_dym.dem_appr = getMicroMagDemagApproximation('none');
 problem_dym.dem_thres = 1e-4;
 problem_dym = problem_dym.setTime( linspace(0,1e-9,200) ); %
@@ -130,7 +132,7 @@ problem_ini.DirectoryFilename = ['Field_' num2str(NIST_field)' '\Matlab_simulati
 problem_ini.SimulationName = 'Matlab_InitialStdProb4';
 
 %% Matlab: Setup the problem for the initial configuration
-problem_ini = problem_ini.setSolverType( 'UseExplicitSolver' );
+problem_ini = problem_ini.setSolverType( 'UseDynamicSolver' );
 tic
 [SigmaInit,~,InteractionMatrices] = ComputeTheSolution(problem_ini);
 toc

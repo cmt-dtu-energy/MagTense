@@ -394,7 +394,7 @@
         integer,intent(in) :: n
         real,intent(in),dimension(n) :: yy
         real,dimension(n) :: f_vec
-        class(dataCollectionBase),intent(in), target :: dat
+        class(dataCollectionBase),intent(inout), target :: dat
 
         call dat%f_ptr_vec(yy, dat, n, f_vec )
 
