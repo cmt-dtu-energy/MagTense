@@ -57,8 +57,8 @@ tiles(2).magnetType = getMagnetType('soft_const_mur');
 tiles(2).offset(2) = d;
 tiles(2).Mrem = 0;
 tiles(2).M = [0,0,0];
-tiles(2).mu_r_ea = 1000;
-tiles(2).mu_r_oa = 1000;
+tiles(2).mu_r_ea = 100;
+tiles(2).mu_r_oa = 100;
 tiles(2).color = [0,0,1];
 tiles(2).u_ea = [1,0,0];
 tiles(2).u_oa1 = [0,1,0];
@@ -68,7 +68,7 @@ tiles(4) = tiles(2);
 tiles(4).offset(1) = d;
 tiles(4).offset(2) = 0;
 
-res = struct('nx',10,'ny',10,'nz',1);
+res = struct('nx',30,'ny',30,'nz',1);
 
 tiles = [tiles(1) refineTiles(tiles(4),res)];
 
