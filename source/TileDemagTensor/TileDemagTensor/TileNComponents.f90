@@ -22,7 +22,7 @@ module TileNComponents
         real,dimension(3) :: offset !::the centre coordinates relative to the global coordinate system
         real,dimension(3) :: rotAngles !:: rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
         real,dimension(3) :: color !! color rgb triplet
-        integer :: magnetType !::defines whether the tile is a hard or soft magnet
+        integer :: magnetType !::defines whether the tile is a hard or soft magnet or constant permeability
         integer :: stateFunctionIndex !::index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
         integer :: includeInIteration,exploitSymmetry
         logical :: excludeFromSummation !::ExcludeFromSummation defines if the given tile should be included or not in the summation over all tiles for getting the applied field
@@ -56,7 +56,7 @@ module TileNComponents
     end interface
     
     integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeEllipsoid=10,tileTypePlanarCoil=101
-    integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2
+    integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2,magnetTypeSoftConstPerm=3
     integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     
     contains

@@ -3,7 +3,8 @@
 
     use DemagFieldGetSolution
     use MagParameters
-    use spline
+    use spline
+    
 
     implicit none
 
@@ -50,7 +51,7 @@
         logical :: done
         integer :: i,j,cnt,i_err,lambdaCnt
         real,dimension(3) :: M
-        real,dimension(:,:),allocatable :: H,H_old
+        real,dimension(:,:),allocatable :: H,H_old,Mout
         real,dimension(:),allocatable :: Hnorm,Hnorm_old,err_val,Mnorm,Mnorm_old
         type(NStoreArr),dimension(:),allocatable :: Nstore
         real,dimension(3) :: pts    
@@ -67,6 +68,8 @@
         allocate(H(n,3),H_old(n,3),Hnorm(n),Hnorm_old(n),err_val(n),Mnorm(n),Mnorm_old(n))
         allocate(Nstore(n))
         
+        allocate(Mout(n,3))
+        
         !! Initialization
         H(:,:) = 0
         maxRelDiffArr(:) = 0.
@@ -79,7 +82,7 @@
         lambdaCnt = 0
     
         done = .false.
-        
+        Mout(:,:) = 0.
         !!Iteration loop
         do
             if ( done .eq. .true. ) then
@@ -112,12 +115,20 @@
                 
                         case ( MagnetTypeSoft )
                             call getM_SoftMagnet( T, H(i,:), tiles(i), stateFunction, n_stf)
+                            
+                        case ( MagnetTypeSoftConstPerm )
+                            call getM_SoftConstMur( tiles(i), H(i,:) )
+                            
                         case default
                         end select
             
                         tiles(i)%isIterating = .true.
-                    endif            
-                enddo            
+                    endif           
+                    Mout(i,:) = tiles(i)%M
+                enddo      
+                
+                !call saveMagnetizationDebug( tiles, n, cnt+1 )
+                
                 !! set the Mnorm array
                 do i=1,n
                     Mnorm(i) = sqrt( sum( tiles(i)%M**2 ) )
@@ -200,7 +211,7 @@
                     if ( tiles(i)%tileType .lt. 100 ) then
                         
                         !>If the magnet is assumed to have a constant permeability, then its own field is not included in this summation but rather calculated explicitly (see a few lines down)
-                        if ( tiles(i)%magnetType .eq. magnetTypeHard ) then
+                        if ( tiles(i)%magnetType .eq. magnetTypeSoftConstPerm ) then
                             tiles(i).excludeFromSummation = .true.
                         endif
                         
@@ -211,7 +222,7 @@
                         H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
                         
                         !>Set the flag back to false such that the tile is included in the next round of summation
-                        if ( tiles(i)%magnetType .eq. magnetTypeHard ) then
+                        if ( tiles(i)%magnetType .eq. magnetTypeSoftConstPerm ) then
                             tiles(i).excludeFromSummation = .false.
                         endif
                     endif
@@ -416,6 +427,19 @@
      
     end subroutine getM_SoftMagnet
     
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !< Function called to get the magntization of a soft ferromagnet with constant permeability (isotropic)
+    !! @param tile the tile of which the magnetization is wanted
+    !! @param H the magnetic field at the tile
+    !!
+    subroutine getM_SoftConstMur( tile, H )
+        type(MagTile),intent(inout) :: tile
+        real,dimension(3),intent(in) :: H
+        
+        !Assuming B = mur * mu0 * (H + M) = mur * mu0 * H => M = H(mur-1)
+        
+        tile%M = H * ( tile%mu_r_ea - 1. )
+    end subroutine getM_SoftConstMur
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !< Function called to dump each iteration's magnetization vector for each tile for debugging purposes

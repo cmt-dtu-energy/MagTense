@@ -152,22 +152,23 @@
             
             !norm of applied field
             Happ_nrm = sqrt( H(1,1)**2 + H(1,2)**2 + H(1,3)**2 )
-            !unit vector of applied field
-            Happ_un = H(1,:) / Happ_nrm
-            !demag tensor product
-            NHapp = matmul( N_current_tile, Happ_un )
+            if ( Happ_nrm .ne. 0 ) then
+                !unit vector of applied field
+                Happ_un = H(1,:) / Happ_nrm
+                !demag tensor product
+                NHapp = matmul( N_current_tile, Happ_un )
             
-            !temp vector 1
-            v1 = (mur-1.) * NHapp - Happ_un
-            !temp vector 2
-            v2 = Happ_un
-            Hnorm = -Happ_nrm * dot_product(v1,v2) / ( v1(1)**2 + v1(2)**2 + v1(3)**2 )
+                !temp vector 1
+                v1 = (mur-1.) * NHapp - Happ_un
+                !temp vector 2
+                v2 = Happ_un
+                Hnorm = -Happ_nrm * dot_product(v1,v2) / ( v1(1)**2 + v1(2)**2 + v1(3)**2 )
             
-            !Update the total field with the local demag field
-            H(:,1) = H(:,1) + Happ_un(1) * Hnorm
-            H(:,2) = H(:,2) + Happ_un(2) * Hnorm
-            H(:,3) = H(:,3) + Happ_un(3) * Hnorm
-            
+                !Update the resulting field
+                H(:,1) = Happ_un(1) * Hnorm
+                H(:,2) = Happ_un(2) * Hnorm
+                H(:,3) = Happ_un(3) * Hnorm
+            endif
         endif
         deallocate(H_tmp)
     
