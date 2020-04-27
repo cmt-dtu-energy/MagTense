@@ -21,11 +21,11 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -36,6 +36,7 @@
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Micromagnetism" href="micromagnetism.html" />
     <link rel="prev" title="Welcome to MagTense!" href="index.html" /> 
 </head>
 
@@ -92,6 +93,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#tetrahedron">Tetrahedron</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
 </ul>
 
             
@@ -158,25 +160,32 @@
             
   <div class="section" id="basic-geometries">
 <h1>Basic Geometries<a class="headerlink" href="#basic-geometries" title="Permalink to this headline">¶</a></h1>
+<p>The basic tile geometries supported in MagTense are shown below.</p>
 <div class="section" id="prism">
 <h2>Prism<a class="headerlink" href="#prism" title="Permalink to this headline">¶</a></h2>
 <img alt="_images/prism.png" src="_images/prism.png" />
+<p>The prism is defined by the side lengths <span class="math notranslate nohighlight">\(a, b\)</span> and <span class="math notranslate nohighlight">\(c\)</span> and with a center coordinate <span class="math notranslate nohighlight">\(x_{offset}, y_{offset}\)</span> and <span class="math notranslate nohighlight">\(z_{offset}\)</span>.</p>
+<p>An example of how to compute the magnetic field from a prism is given in matlab/examples/Validation_prism.</p>
 </div>
 <div class="section" id="cylindrical-tile">
 <h2>Cylindrical Tile<a class="headerlink" href="#cylindrical-tile" title="Permalink to this headline">¶</a></h2>
 <img alt="_images/cylindrical_tile.png" src="_images/cylindrical_tile.png" />
+<p>An example of how to compute the magnetic field from a prism is given in matlab/examples/Validation_cylindrical_slice.</p>
 </div>
 <div class="section" id="circpiece">
 <h2>Circpiece<a class="headerlink" href="#circpiece" title="Permalink to this headline">¶</a></h2>
 <img alt="_images/circpiece.png" src="_images/circpiece.png" />
+<p>An example of how to compute the magnetic field from a prism is given in matlab/examples/Validation_cylindrical_slice.</p>
 </div>
 <div class="section" id="inverted-circpiece">
 <h2>Inverted Circpiece<a class="headerlink" href="#inverted-circpiece" title="Permalink to this headline">¶</a></h2>
 <img alt="_images/circpiece_inv.png" src="_images/circpiece_inv.png" />
+<p>An example of how to compute the magnetic field from a prism is given in matlab/examples/Validation_cylindrical_slice.</p>
 </div>
 <div class="section" id="tetrahedron">
 <h2>Tetrahedron<a class="headerlink" href="#tetrahedron" title="Permalink to this headline">¶</a></h2>
 <img alt="_images/tetrahedron.png" src="_images/tetrahedron.png" />
+<p>An example of how to compute the magnetic field from a prism is given in matlab/examples/Validation_tetrahedron.</p>
 </div>
 </div>
 
@@ -187,6 +196,8 @@
           <footer>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="micromagnetism.html" class="btn btn-neutral float-right" title="Micromagnetism" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="index.html" class="btn btn-neutral float-left" title="Welcome to MagTense!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
