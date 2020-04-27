@@ -18,7 +18,10 @@ function val = getMicroMagDemagApproximation( mode )
             %with FT = fft( eye(n,n) ) and IFT = ifft( eye(n,n) )
             val = int32(3);
         case 'threshold_fraction'
-            %XXX
+            %cut-off all values below a certain fraction specified by threshold and make the matrix sparse
             val = int32(4);
+        case 'fft_threshold_fraction'
+            %cut-off all values below a certain fraction specified by threshold and make the matrix sparse
+            val = int32(5);
     end
 end
