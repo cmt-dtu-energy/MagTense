@@ -3,7 +3,7 @@ module SPECIALFUNCTIONS
     contains 
     
     !---------------------------------------------------------------------------    
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Simple sorting function. Code implemented from Stack-overflow: https://stackoverflow.com/questions/54005339/sorting-an-array-from-lowest-to-greatest-fortran
     !> @param[in] arr the array to be sorted (n,1)
@@ -34,7 +34,7 @@ module SPECIALFUNCTIONS
     end subroutine simple_sort
     
      !---------------------------------------------------------------------------    
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates the cross product of a and b and returns it
     !---------------------------------------------------------------------------            

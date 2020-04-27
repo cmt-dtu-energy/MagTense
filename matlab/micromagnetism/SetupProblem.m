@@ -14,7 +14,8 @@ end
 %% Create a directory for the simulation and save the data
 if ProblemSetupStruct.SaveTheResult
     k = 1;
-    if ~isfield(MySim,'DirectoryFilename')
+%     if ~isfield(MySim,'DirectoryFilename')
+    if isempty(MySim.DirectoryFilename)
         DirectoryFilename = ['Simulations\' char(datetime('today','Format','yyyy-MM-dd')) '_' MySim.SimulationName '_' num2str(k,'%04.0f')];
         if exist(DirectoryFilename,'dir')
             DirectoryFilename_temp = DirectoryFilename;
@@ -26,8 +27,8 @@ if ProblemSetupStruct.SaveTheResult
         end
     end
 
-    mkdir([DirectoryFilename]);
-    MySim.FileName = [DirectoryFilename '\' MySim.SimulationName];
+    mkdir([MySim.DirectoryFilename]);
+    MySim.FileName = [MySim.DirectoryFilename '\' MySim.SimulationName];
 
     save(MySim.FileName,'ProblemSetupStruct');
     

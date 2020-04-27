@@ -11,7 +11,7 @@ module TileTriangle
     
     
     !---------------------------------------------------------------------------    
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Returns the local-coordinate system demagnetization tensor field at the point r for a triangle
     !> defined through the vertices in v.
@@ -154,7 +154,7 @@ module TileTriangle
     end subroutine getN_Triangle
 
     !---------------------------------------------------------------------------    
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Nxz component of the local tensor of the right triangle
     !> @param[in] r the point of interest, size 3,1
@@ -190,7 +190,7 @@ module TileTriangle
     end function G_Nxz
 
     !---------------------------------------------------------------------------    
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Nyz component of the local tensor of the right triangle
     !> @param[in] r the point of interest, size 3,1
@@ -224,7 +224,7 @@ module TileTriangle
     end function L_Nyz
 
     !---------------------------------------------------------------------------    
-    !> @author Kaspar K. Nielsen, kaki@dtu.dk, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Nzz component of the local tensor of the right triangle
     !> @param[in] r the point of interest, size 3,1

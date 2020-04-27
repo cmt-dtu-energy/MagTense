@@ -1,4 +1,5 @@
-function [SigmaSol,Applied_field,VV] = LandauLifshitzEvolveCombined(ProblemSetupStruct,InteractionMatrices,Sigma)
+function [SigmaSol,VV] = LandauLifshitzEvolveCombined(ProblemSetupStruct,InteractionMatrices,Sigma)
+mu0 = 4*pi*1e-7;
 
 %--- alpha and gamma are native functions in Matlab and must be initialized as variables
 alpha = 0;
@@ -8,6 +9,22 @@ gamma = 0;
 names = fieldnames(ProblemSetupStruct);
 for i=1:length(names)
     eval([names{i} '=ProblemSetupStruct.' names{i} ';']);
+end
+
+UseImplicitSolver      = 0;
+UseImplicitStepsSolver = 0;
+UseExplicitSolver      = 0;
+UseDynamicSolver       = 0;
+
+switch SolverType
+    case 1
+        UseImplicitSolver = 1;
+    case 2
+        UseImplicitStepsSolver = 1;
+    case 3
+        UseExplicitSolver = 1;
+    case 4
+        UseDynamicSolver = 1;
 end
 
 %% Unfold the struct (NB: *after* unfolding ProblemSetupStruct)
@@ -28,10 +45,10 @@ CopyMatrix = InteractionMatrices.CopyMatrix;
 
 %% Effective field parameter prefactors
 
-Jfact = A0/(MU0*Ms) ;   % "J" : exchange term
-% Hfact = 1/MU0 ;         % "H" : external field term (b.c. user input is in Tesla)
+Jfact = A0/(mu0*Ms) ;   % "J" : exchange term
+% Hfact = 1/mu0 ;         % "H" : external field term (b.c. user input is in Tesla)
 Mfact = Ms ;            % "M" : demagnetization term
-Kfact = K0/(MU0*Ms) ;   % "K" : anisotropy term
+Kfact = K0/(mu0*Ms) ;   % "K" : anisotropy term
 
 %% All Interaction Terms (function handles)
 
@@ -44,29 +61,51 @@ AA.HjY = @(Sx,Sy,Sz,t) - (2*Jfact).*(A2*Sy) ;
 AA.HjZ = @(Sx,Sy,Sz,t) - (2*Jfact).*(A2*Sz) ;
 
 % "M" : Effective field : demagnetization (fine grid terms)
-
-AA.HmX = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXX{1}*Sx+DemagTensor.KglobXY{1}*Sy+DemagTensor.KglobXZ{1}*Sz) ;
-AA.HmY = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobYX{1}*Sx+DemagTensor.KglobYY{1}*Sy+DemagTensor.KglobYZ{1}*Sz) ;
-AA.HmZ = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobZX{1}*Sx+DemagTensor.KglobZY{1}*Sy+DemagTensor.KglobZZ{1}*Sz) ;
-
+if (~all(FFTdims==0)) & isfield(InteractionMatrices,'FFT') % FFT !!!    
+    DemagTensorFFT = InteractionMatrices.FFT.DemagTensor ;
+    AA.FFTHmX = @(FFTSx,FFTSy,FFTSz,t) - Mfact.*real(InteractionMatrices.FFT.Do3Difft( DemagTensorFFT.KglobXX{1}*FFTSx + DemagTensorFFT.KglobXY{1}*FFTSy + DemagTensorFFT.KglobXZ{1}*FFTSz )) ;
+    AA.FFTHmY = @(FFTSx,FFTSy,FFTSz,t) - Mfact.*real(InteractionMatrices.FFT.Do3Difft( DemagTensorFFT.KglobXY{1}*FFTSx + DemagTensorFFT.KglobYY{1}*FFTSy + DemagTensorFFT.KglobYZ{1}*FFTSz )) ;
+    AA.FFTHmZ = @(FFTSx,FFTSy,FFTSz,t) - Mfact.*real(InteractionMatrices.FFT.Do3Difft( DemagTensorFFT.KglobXZ{1}*FFTSx + DemagTensorFFT.KglobYZ{1}*FFTSy + DemagTensorFFT.KglobZZ{1}*FFTSz )) ;
+    AA.Do3Difft = InteractionMatrices.FFT.Do3Difft ;
+    AA.Do3Dfft = InteractionMatrices.FFT.Do3Dfft ;
+else
+    % Demag tensor is symmetric, i.e. KglobZX = KglobXZ
+    AA.HmX = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXX{1}*Sx+DemagTensor.KglobXY{1}*Sy+DemagTensor.KglobXZ{1}*Sz) ;
+    AA.HmY = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXY{1}*Sx+DemagTensor.KglobYY{1}*Sy+DemagTensor.KglobYZ{1}*Sz) ;
+    AA.HmZ = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXZ{1}*Sx+DemagTensor.KglobYZ{1}*Sy+DemagTensor.KglobZZ{1}*Sz) ;
+end
 % "H" : Effective field : external field
 
 if UseExplicitSolver | UseDynamicSolver
-    AA.HhX = @(Sx,Sy,Sz,t) - HsX(t).*O ;
-    AA.HhY = @(Sx,Sy,Sz,t) - HsY(t).*O ;
-    AA.HhZ = @(Sx,Sy,Sz,t) - HsZ(t).*O ;
+%     AA.HhX = @(Sx,Sy,Sz,t) - HsX(t).*O ;
+%     AA.HhY = @(Sx,Sy,Sz,t) - HsY(t).*O ;
+%     AA.HhZ = @(Sx,Sy,Sz,t) - HsZ(t).*O ;
+    
+    AA.HhX = @(Sx,Sy,Sz,t) - interp1( Hext(:,1), Hext(:,2), t).*O ;
+    AA.HhY = @(Sx,Sy,Sz,t) - interp1( Hext(:,1), Hext(:,3), t).*O ;
+    AA.HhZ = @(Sx,Sy,Sz,t) - interp1( Hext(:,1), Hext(:,4), t).*O ;
 end
 
 if UseImplicitSolver
-    AA.HhX = @(Sx,Sy,Sz,t) - ddHsX*(t).*O ;
-    AA.HhY = @(Sx,Sy,Sz,t) - ddHsY*(t).*O ;
-    AA.HhZ = @(Sx,Sy,Sz,t) - ddHsZ*(t).*O ;
+%     AA.HhX = @(Sx,Sy,Sz,t) - ddHsX*(t).*O ;
+%     AA.HhY = @(Sx,Sy,Sz,t) - ddHsY*(t).*O ;
+%     AA.HhZ = @(Sx,Sy,Sz,t) - ddHsZ*(t).*O ;
+% 
+%     %
+%     
+%     AA.ddHhX = @(Sx,Sy,Sz,t) - ddHsX.*O +0.*t ;
+%     AA.ddHhY = @(Sx,Sy,Sz,t) - ddHsY.*O +0.*t ;
+%     AA.ddHhZ = @(Sx,Sy,Sz,t) - ddHsZ.*O +0.*t ;
+%     
+    AA.HhX = @(Sx,Sy,Sz,t) - ddHext(1,2).*t.*O ;
+    AA.HhY = @(Sx,Sy,Sz,t) - ddHext(1,3).*t.*O ;
+    AA.HhZ = @(Sx,Sy,Sz,t) - ddHext(1,4).*t.*O ;
 
     %
     
-    AA.ddHhX = @(Sx,Sy,Sz,t) - ddHsX.*O +0.*t ;
-    AA.ddHhY = @(Sx,Sy,Sz,t) - ddHsY.*O +0.*t ;
-    AA.ddHhZ = @(Sx,Sy,Sz,t) - ddHsZ.*O +0.*t ;
+    AA.ddHhX = @(Sx,Sy,Sz,t) - ddHext(1,2).*O +0.*t ;
+    AA.ddHhY = @(Sx,Sy,Sz,t) - ddHext(1,3).*O +0.*t ;
+    AA.ddHhZ = @(Sx,Sy,Sz,t) - ddHext(1,4).*O +0.*t ;
 end
 
 % "K" : Effective field : anisotropy
@@ -84,31 +123,32 @@ AA.Gk = @(Sx,Sy,Sz,Hx,Hy,Hz) (1/2)*(Sx.'*Hx + Sy.'*Hy + Sz.'*Hz) ;
 
 %% Hessian
 if UseImplicitSolver | CalcEigenvalue
-    NN = size(DemagTensor.KglobXX{1},1) ;
+    NN = size(DemagTensor.KglobXX{1},1) ; 
+    % The demag tensor is symmetric
     HessGXX = - (2*Jfact).*(A2) - (Mfact).*DemagTensor.KglobXX{1} - (Kfact).*(Kxx)*eye(NN) ;
     HessGXY =                   - (Mfact).*DemagTensor.KglobXY{1} - (Kfact).*(Kxy)*eye(NN) ;
     HessGXZ =                   - (Mfact).*DemagTensor.KglobXZ{1} - (Kfact).*(Kxz)*eye(NN) ;
     
-    HessGYX =                   - (Mfact).*DemagTensor.KglobYX{1} - (Kfact).*(Kyx)*eye(NN) ;
+    HessGYX =                   - (Mfact).*DemagTensor.KglobXY{1} - (Kfact).*(Kyx)*eye(NN) ;
     HessGYY = - (2*Jfact).*(A2) - (Mfact).*DemagTensor.KglobYY{1} - (Kfact).*(Kyy)*eye(NN) ;
     HessGYZ =                   - (Mfact).*DemagTensor.KglobYZ{1} - (Kfact).*(Kyz)*eye(NN) ;
     
-    HessGZX =                   - (Mfact).*DemagTensor.KglobZX{1} - (Kfact).*(Kzx)*eye(NN) ;
-    HessGZY =                   - (Mfact).*DemagTensor.KglobZY{1} - (Kfact).*(Kzy)*eye(NN) ;
+    HessGZX =                   - (Mfact).*DemagTensor.KglobXZ{1} - (Kfact).*(Kzx)*eye(NN) ;
+    HessGZY =                   - (Mfact).*DemagTensor.KglobYZ{1} - (Kfact).*(Kzy)*eye(NN) ;
     HessGZZ = - (2*Jfact).*(A2) - (Mfact).*DemagTensor.KglobZZ{1} - (Kfact).*(Kzz)*eye(NN) ;
     
     for k=2:numel(AvrgMatrix)
-        
+        % The demag tensor is symmetric
         HessGXX = HessGXX - Mfact.*(CopyMatrix{k}*DemagTensor.KglobXX{k}*AvrgMatrix{k}) ;
         HessGXY = HessGXY - Mfact.*(CopyMatrix{k}*DemagTensor.KglobXY{k}*AvrgMatrix{k}) ;
         HessGXZ = HessGXZ - Mfact.*(CopyMatrix{k}*DemagTensor.KglobXZ{k}*AvrgMatrix{k}) ;
         
-        HessGYX = HessGYX - Mfact.*(CopyMatrix{k}*DemagTensor.KglobYX{k}*AvrgMatrix{k}) ;
+        HessGYX = HessGYX - Mfact.*(CopyMatrix{k}*DemagTensor.KglobXY{k}*AvrgMatrix{k}) ;
         HessGYY = HessGYY - Mfact.*(CopyMatrix{k}*DemagTensor.KglobYY{k}*AvrgMatrix{k}) ;
         HessGYZ = HessGYZ - Mfact.*(CopyMatrix{k}*DemagTensor.KglobYZ{k}*AvrgMatrix{k}) ;
         
-        HessGZX = HessGZX - Mfact.*(CopyMatrix{k}*DemagTensor.KglobZX{k}*AvrgMatrix{k}) ;
-        HessGZY = HessGZY - Mfact.*(CopyMatrix{k}*DemagTensor.KglobZY{k}*AvrgMatrix{k}) ;
+        HessGZX = HessGZX - Mfact.*(CopyMatrix{k}*DemagTensor.KglobXZ{k}*AvrgMatrix{k}) ;
+        HessGZY = HessGZY - Mfact.*(CopyMatrix{k}*DemagTensor.KglobYZ{k}*AvrgMatrix{k}) ;
         HessGZZ = HessGZZ - Mfact.*(CopyMatrix{k}*DemagTensor.KglobZZ{k}*AvrgMatrix{k}) ;
     end
     
@@ -128,7 +168,7 @@ if UseExplicitSolver | UseDynamicSolver
     dSigma2 = @(t,Sigma) CalculateDeltaSigmaManyRanges3D(t,Sigma,AvrgMatrix,CopyMatrix,Mfact,DemagTensor,alpha,gamma,AA) ;
 
     if ~exist('HeffLimMagn','var') 
-        HeffLimMagn = -inf ;
+        HeffLimMagn = -1 ;
     end
     ThatOutPutFunct = @(t,y,flag) MyOutputFunction(t,y,flag,UseImplicitSolver,HeffLimMagn) ;
 end
@@ -137,7 +177,7 @@ if UseImplicitSolver
     InitialData.p = 0;
     TheData = InitialData;
     
-    dSigma3 = @(t,Sigma) CalculateDeltaSigmaEquilibriumExplicitOut(t,Sigma,HHess,AA,MaxComputationalTimePerStep) ;
+    dSigma3 = @(t,Sigma) CalculateDeltaSigmaEquilibriumExplicitOut(t,Sigma,HHess,AA,inf) ;
     
     ThatOutPutFunct = @(t,y,flag) MyOutputFunction(t,y,flag,UseImplicitSolver) ;
 end
@@ -151,17 +191,14 @@ if UseDynamicSolver
 %         [t,SigmaSol] = ode23(dSigma2,t,Sigma,options);
 end
 if UseExplicitSolver
-    options = odeset('RelTol',1e-12,'OutputFcn',ThatOutPutFunct) ;
-    [t,SigmaSol] = ode45(dSigma2,linspace(0,MaxT,nT),Sigma,options);
+    options = odeset('RelTol',1e-6,'OutputFcn',ThatOutPutFunct);
+    [t,SigmaSol] = ode45(dSigma2,ProblemSetupStruct.t,Sigma,options);
 end
 
 if UseImplicitSolver
     options = odeset('OutputFcn',ThatOutPutFunct,'RelTol',1e-3,'MaxStep',abs(t(1)-t(end))) ; % ,'MaxStep',0.01*abs(t(1)-t(end))) ; % ,'Events',ThatEventFunct) ;
     [t,SigmaSol] = ode45(dSigma3,t,Sigma,options);
 end
-
-
-Applied_field = [HsX(t), HsY(t), HsZ(t)+0.*t];
 
 %% Calculate the Eigenvalue
 if CalcEigenvalue

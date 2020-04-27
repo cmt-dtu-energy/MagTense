@@ -2,7 +2,7 @@ clearvars
 close all
 
 addpath('../../MEX_files');
-addpath('../util');
+addpath('../../util');
 tic
 %test the Fortran implementation of the LL-ODE solver
 %get the default problem
