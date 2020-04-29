@@ -122,7 +122,10 @@
                         end select
             
                         tiles(i)%isIterating = .true.
-                  
+                    endif
+                enddo
+                
+                    
                 !! set the Mnorm array
                 do i=1,n
                     Mnorm(i) = sqrt( sum( tiles(i)%M**2 ) )

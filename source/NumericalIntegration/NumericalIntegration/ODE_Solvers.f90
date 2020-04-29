@@ -3,6 +3,7 @@ module ODE_Solvers
     
     use rksuite_90
     use integrationDataTypes
+    
 implicit none
     
     
@@ -87,7 +88,7 @@ private MTdmdt, MTy_out,MTf_vec
         t2a = t(2)
         t1b = t_double(1)
         t2b = t_double(2)
-        call MagTense_CVODEsuite( int(neq,c_int), real(t,c_double), int(nt,c_int), real(y0,c_double), t_out_double, y_out_double, real(tol,c_double) )
+        call MagTense_CVODEsuite( int(neq,c_int), real(t,c_double), int(nt,c_int), real(y0,c_double), t_out_double, y_out_double, real(tol,c_double), callback )
         y_out = real(y_out_double)
         
         t_out = real(t_out_double)
@@ -407,20 +408,21 @@ private MTdmdt, MTy_out,MTf_vec
 
     end function RhsFn
 #else
-    subroutine MagTense_CVODEsuite( neq, t, nt, ystart,  t_out, y_out, tol )
+    subroutine MagTense_CVODEsuite( neq, t, nt, ystart,  t_out, y_out, tol, callback )
 	use, intrinsic :: iso_c_binding
 
     ! local variables
     integer(c_int),intent(in) :: neq,nt                   ! number of eq. and timesteps
     real(c_double),dimension(nt),intent(in) :: t          ! initial time
     real(c_double),dimension(nt),intent(inout) :: t_out   ! output time
+    procedure(callback_fct), pointer :: callback         !> Callback function
     real(c_double) :: rtol,atol,hlast,dum1,dum2,tol       ! relative and absolute tolerance
 
     ! solution vector, neq is set in the ode_functions module
     real(c_double),dimension(neq,nt),intent(inout) :: y_out
     real(c_double),dimension(neq),intent(in) :: ystart
     
-    call displayMatlabMessage( 'MagTense not compiled with CVODE - exiting!' )
+    call callback( 'MagTense not compiled with CVODE - exiting!', 0 )
     stop
     end subroutine MagTense_CVODEsuite
 #endif

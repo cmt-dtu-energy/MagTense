@@ -30,9 +30,8 @@
     !> @brief
     !> Defines an interface for progress callback to Matlab
     !> Should return n values
-    !> @param[in] t the time at which the derivative is requested
-    !> @param[in] y array size n holding the y_i values corresponding to the time t
-    !> @param[inout] dydt array size n for the derivatives at the time t
+    !> @param[in] mess message to display
+    !> @param[in] prog current progress
     !---------------------------------------------------------------------------    
     abstract interface
           subroutine callback_fct ( mess, prog )  
@@ -41,6 +40,22 @@
          
           end subroutine callback_fct
     end interface
+    
+    
+     !---------------------------------------------------------------------------    
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2020
+    !> @brief
+    !> Defines an interface for message callback to Matlab
+    !> Should return n values
+    !> @param[in] mess message to display
+    !---------------------------------------------------------------------------    
+    abstract interface
+          subroutine callback_mess_fct ( mess )  
+             character(*),intent(in) :: mess
+         
+          end subroutine callback_mess_fct
+    end interface
+    
     
     
     type dataCollectionBase
