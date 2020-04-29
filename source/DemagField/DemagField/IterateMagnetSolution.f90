@@ -51,7 +51,7 @@
         logical :: done
         integer :: i,j,cnt,i_err,lambdaCnt
         real,dimension(3) :: M
-        real,dimension(:,:),allocatable :: H,H_old,Mout
+        real,dimension(:,:),allocatable :: H,H_old
         real,dimension(:),allocatable :: Hnorm,Hnorm_old,err_val,Mnorm,Mnorm_old
         type(NStoreArr),dimension(:),allocatable :: Nstore
         real,dimension(3) :: pts    
@@ -68,8 +68,6 @@
         allocate(H(n,3),H_old(n,3),Hnorm(n),Hnorm_old(n),err_val(n),Mnorm(n),Mnorm_old(n))
         allocate(Nstore(n))
         
-        allocate(Mout(n,3))
-        
         !! Initialization
         H(:,:) = 0
         maxRelDiffArr(:) = 0.
@@ -82,9 +80,10 @@
         lambdaCnt = 0
     
         done = .false.
-        Mout(:,:) = 0.
+        
         !!Iteration loop
         do
+            
             if ( done .eq. .true. ) then
                 exit
             endif
@@ -123,12 +122,7 @@
                         end select
             
                         tiles(i)%isIterating = .true.
-                    endif           
-                    Mout(i,:) = tiles(i)%M
-                enddo      
-                
-                !call saveMagnetizationDebug( tiles, n, cnt+1 )
-                
+                  
                 !! set the Mnorm array
                 do i=1,n
                     Mnorm(i) = sqrt( sum( tiles(i)%M**2 ) )
@@ -139,6 +133,7 @@
                 endif
             
             endif        
+            
             
             H_old = H   !< Reset H array
             H(:,:) = 0  !< Make sure to reset the H field
@@ -165,8 +160,16 @@
                     
                     case(tileTypePrism)
                         !! No rotation is needed as the offset of the prism is with respect to the center of the prism
-                        pts = tiles(i)%offset                
+                        pts = tiles(i)%offset      
+                        
+                    case(tileTypeSphere)
+                        !! No rotation is possible, as the tile is a sphere
+                        pts = tiles(i)%offset 
             
+                    case(tileTypeSpheroid)
+                        !! No rotation is needed
+                        pts = tiles(i)%offset 
+                        
                     case(tileTypeCircPiece)
                         !! Find the center point of the circ piece
                         !! First find the center point of the piece in the reference frame of the piece itself

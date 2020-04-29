@@ -21,12 +21,13 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem,ntot,nt, nt_Hext,useCuda, status
-        mwPointer :: nGridPtr,LGridPtr,dGridPtr,typeGridPtr, ueaProblemPtr, modeProblemPtr,solverProblemPtr
-        mwPointer :: A0ProblemPtr,MsProblemPtr,K0ProblemPtr,gammaProblemPtr,alpha0ProblemPtr,MaxT0ProblemPtr
-        mwPointer :: ntProblemPtr, m0ProblemPtr,HextProblemPtr,tProblemPtr,useCudaPtr
-        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr,demThresProblemPtr,demApproxPtr, setTimeDisplayProblemPtr
-        mwPointer :: NFileReturnPtr,NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha
+        mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
+        mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
+        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, tProblemPtr, useCudaPtr
+        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr
+        mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
+        mwPointer :: tolProblemPtr, thres_valueProblemPtr
         integer,dimension(3) :: int_arr
         real*8,dimension(3) :: real_arr
         real*8 :: demag_fac
@@ -191,6 +192,28 @@
         setTimeDisplayProblemPtr = mxGetField( prhs, i, problemFields(25) )
         call mxCopyPtrToInteger4(mxGetPr(setTimeDisplayProblemPtr), problem%setTimeDisplay, sx )
         
+        
+        
+        !Load the no. of times in the alpha function
+        sx = 1
+        ntProblemPtr = mxGetField( prhs, i, problemFields(26) )
+        call mxCopyPtrToInteger4(mxGetPr(ntProblemPtr), nt_alpha, sx )
+        
+        !alpha as a function of time evaluated at the timesteps
+        !problem%alpha(:,1) is the time grid while problem%alpha(:,2) are the alpha values
+        sx = nt_alpha * 2
+        allocate( problem%alpha(nt_alpha,2) )
+        HextProblemPtr = mxGetField( prhs, i, problemFields(27) )
+        call mxCopyPtrToReal8(mxGetPr(HextProblemPtr), problem%alpha, sx )
+        
+        sx = 1
+        tolProblemPtr = mxGetField( prhs, i, problemFields(28) )
+        call mxCopyPtrToReal8(mxGetPr(tolProblemPtr), problem%tol, sx )
+        
+        sx = 1
+        thres_valueProblemPtr = mxGetField( prhs, i, problemFields(29) )
+        call mxCopyPtrToReal8(mxGetPr(thres_valueProblemPtr), problem%thres_value, sx )
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -210,7 +233,7 @@
         mwSize,dimension(1) :: dims
         mwSize :: s1,s2,sx,ndim
         mwSize,dimension(4) :: dims_4
-        mwPointer :: pt,pm,pp
+        mwPointer :: pt,pm,pp,pdem,pext,pexc,pani
         mwPointer :: mxCreateStructArray, mxCreateDoubleMatrix,mxGetPr,mxCreateNumericMatrix,mxCreateNumericArray
         mwIndex :: ind
         character(len=10),dimension(:),allocatable :: fieldnames    
@@ -259,6 +282,59 @@
         call mxCopyReal8ToPtr( solution%pts, mxGetPr( pp ), sx )
         call mxSetField( plhs, ind, fieldnames(3), pp )
         
+        
+        
+        ndim = 4
+        dims_4(1) = nt
+        dims_4(2) = ntot
+        dims_4(3) = size( solution%H_exc(1,1,:,1) )
+        dims_4(4) = 3
+        classid = mxClassIDFromClassName( 'double' )
+        pexc = mxCreateNumericArray( ndim, dims_4, classid, ComplexFlag)
+        sx = dims_4(1) * dims_4(2) * dims_4(3) * dims_4(4)
+        call mxCopyReal8ToPtr( solution%H_exc, mxGetPr( pexc ), sx )
+        call mxSetField( plhs, ind, fieldnames(4), pexc )
+        
+        
+        
+        ndim = 4
+        dims_4(1) = nt
+        dims_4(2) = ntot
+        dims_4(3) = size( solution%H_ext(1,1,:,1) )
+        dims_4(4) = 3
+        classid = mxClassIDFromClassName( 'double' )
+        pext = mxCreateNumericArray( ndim, dims_4, classid, ComplexFlag)
+        sx = dims_4(1) * dims_4(2) * dims_4(3) * dims_4(4)
+        call mxCopyReal8ToPtr( solution%H_ext, mxGetPr( pext ), sx )
+        call mxSetField( plhs, ind, fieldnames(5), pext )
+        
+        
+        
+        ndim = 4
+        dims_4(1) = nt
+        dims_4(2) = ntot
+        dims_4(3) = size( solution%H_dem(1,1,:,1) )
+        dims_4(4) = 3
+        classid = mxClassIDFromClassName( 'double' )
+        pdem = mxCreateNumericArray( ndim, dims_4, classid, ComplexFlag)
+        sx = dims_4(1) * dims_4(2) * dims_4(3) * dims_4(4)
+        call mxCopyReal8ToPtr( solution%H_dem, mxGetPr( pdem ), sx )
+        call mxSetField( plhs, ind, fieldnames(6), pdem )
+        
+        
+        
+        ndim = 4
+        dims_4(1) = nt
+        dims_4(2) = ntot
+        dims_4(3) = size( solution%H_ani(1,1,:,1) )
+        dims_4(4) = 3
+        classid = mxClassIDFromClassName( 'double' )
+        pani = mxCreateNumericArray( ndim, dims_4, classid, ComplexFlag)
+        sx = dims_4(1) * dims_4(2) * dims_4(3) * dims_4(4)
+        call mxCopyReal8ToPtr( solution%H_ani, mxGetPr( pani ), sx )
+        call mxSetField( plhs, ind, fieldnames(7), pani )
+        
+       
         !Clean up
         deallocate(fieldnames)
     
@@ -273,7 +349,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=25
+        integer,parameter :: nf=29
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -305,8 +381,10 @@
         fieldnames(23) = 'N_load'
         fieldnames(24) = 'N_file_in'
         fieldnames(25) = 'setTimeDis'
-        
-        
+        fieldnames(26) = 'nt_alpha'
+        fieldnames(27) = 'alphat'
+        fieldnames(28) = 'tol'
+        fieldnames(29) = 'thres'
         
     end subroutine getProblemFieldnames
     
@@ -320,7 +398,7 @@
     !>-----------------------------------------
     subroutine getSolutionFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=3
+        integer,parameter :: nf=7
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -330,6 +408,10 @@
         fieldnames(1) = 't'
         fieldnames(2) = 'M'
         fieldnames(3) = 'pts'
+        fieldnames(4) = 'H_exc'
+        fieldnames(5) = 'H_ext'
+        fieldnames(6) = 'H_dem'
+        fieldnames(7) = 'H_ani'
         
         
         

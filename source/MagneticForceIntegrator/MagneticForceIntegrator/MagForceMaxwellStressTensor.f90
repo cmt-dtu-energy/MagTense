@@ -9,7 +9,7 @@ module MagForceMaxwellStressTensor
 
     !::handles how to store the numerical error from the integrator
     subroutine handleError( dat, abserr_tot )      
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       real,intent(inout),dimension(2) :: abserr_tot
       
       if ( dat%abserr_x .lt. abserr_tot(1) ) then
@@ -26,7 +26,7 @@ module MagForceMaxwellStressTensor
       !::The nine tensor components of the Maxwell stress tensor  
       function F_int_12( dat )
       real :: F_int_12
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       real :: jacobi
       real,dimension(3) :: B 
           
@@ -41,7 +41,7 @@ module MagForceMaxwellStressTensor
       end function F_int_12
       
       subroutine F_int_12_vec( yy,dat, n, res )
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       integer,intent(in) :: n
       real,dimension(n),intent(in) :: yy
       real,dimension(n) :: res
@@ -62,7 +62,7 @@ module MagForceMaxwellStressTensor
       
       function F_int_13( dat )
       real :: F_int_13
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       
       real,dimension(3) :: B
       real :: jacobi
@@ -77,7 +77,7 @@ module MagForceMaxwellStressTensor
       end function F_int_13
       
       subroutine F_int_13_vec( yy, dat, n, res )
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       integer,intent(in) :: n
       real,dimension(n),intent(in) :: yy
       real,dimension(n) :: res         
@@ -100,7 +100,7 @@ module MagForceMaxwellStressTensor
       
       function F_int_23( dat )
       real :: F_int_23
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       
       real,dimension(3) :: B
       real :: jacobi
@@ -117,7 +117,7 @@ module MagForceMaxwellStressTensor
       
       
       subroutine F_int_23_vec( yy, dat, n, res )      
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       integer,intent(in) :: n
       real,dimension(n),intent(in) :: yy
       real,dimension(n) :: res      
@@ -140,7 +140,7 @@ module MagForceMaxwellStressTensor
       
       function F_int_21( dat )
       real :: F_int_21
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       
       F_int_21 = F_int_12( dat )
       
@@ -148,7 +148,7 @@ module MagForceMaxwellStressTensor
       
       
       subroutine F_int_21_vec( yy, dat, n, res )      
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       integer,intent(in) :: n
       real,dimension(n),intent(in) :: yy
       real,dimension(n) :: res
@@ -159,7 +159,7 @@ module MagForceMaxwellStressTensor
       
       function F_int_31( dat )
       real :: F_int_31
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       
       F_int_31 = F_int_13( dat )
       
@@ -167,7 +167,7 @@ module MagForceMaxwellStressTensor
       
       
       subroutine F_int_31_vec( yy, dat, n, res )      
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       integer,intent(in) :: n
       real,dimension(n),intent(in) :: yy
       real,dimension(n) :: res
@@ -179,7 +179,7 @@ module MagForceMaxwellStressTensor
       
       function F_int_32( dat )
       real :: F_int_32
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       
       F_int_32 = F_int_23( dat )
       
@@ -187,7 +187,7 @@ module MagForceMaxwellStressTensor
       
       
       subroutine F_int_32_vec( yy, dat, n, res )      
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       integer,intent(in) :: n
       real,dimension(n),intent(in) :: yy
       real,dimension(n) :: res
@@ -198,7 +198,7 @@ module MagForceMaxwellStressTensor
                   
       function F_int_11( dat )
       real :: F_int_11
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       real,dimension(3) :: B
       real :: Bnorm,jacobi
             
@@ -212,7 +212,7 @@ module MagForceMaxwellStressTensor
       end function F_int_11
       
       subroutine F_int_11_vec( yy, dat, n, res )      
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       integer,intent(in) :: n
       real,dimension(n),intent(in) :: yy      
       real,dimension(n):: res
@@ -232,7 +232,7 @@ module MagForceMaxwellStressTensor
       
       function F_int_22( dat )
       real :: F_int_22
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       real,dimension(3) :: B
       real :: Bnorm, jacobi
       
@@ -246,7 +246,7 @@ module MagForceMaxwellStressTensor
       
       
       subroutine  F_int_22_vec( yy, dat, n, res )
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       integer,intent(in) :: n
       real,dimension(n),intent(in) :: yy
       real,dimension(n) :: res
@@ -266,7 +266,7 @@ module MagForceMaxwellStressTensor
       
       function F_int_33( dat )
       real :: F_int_33
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       real,dimension(3) :: B
       real :: Bnorm, jacobi
       
@@ -280,7 +280,7 @@ module MagForceMaxwellStressTensor
       
       
       subroutine F_int_33_vec( yy, dat, n, res )      
-      class( dataCollectionBase ), intent(in), target :: dat
+      class( dataCollectionBase ), intent(inout), target :: dat
       integer,intent(in) :: n
       real,dimension(n),intent(in) :: yy
       real,dimension(n) :: res
