@@ -1,5 +1,4 @@
 function buildMagTenseMEX(USE_RELEASE,USE_CUDA,USE_CVODE)
-end
 %use clear all as this also clears dependencies to the .mex files and thus they can be overwritten
       
 clearvars -except USE_RELEASE USE_CUDA USE_CVODE
