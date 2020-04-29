@@ -2,10 +2,10 @@ clearvars
 close all
 
 NIST_field = 2;
-i_arr = 1:9; 
+i_arr = 1:8; 
 
-addpath('../MagTense/matlab/MEX_files');
-addpath('../MagTense/matlab/examples/util');
+% addpath('../MagTense/matlab/MEX_files');
+% addpath('../MagTense/matlab/util');
         
 figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto');
 fig1 = axes('Parent',figure1,'Layer','top','FontSize',10);
@@ -60,25 +60,26 @@ k = 1;
 
 for m = [1 2]
     for i = 1:length(i_arr)
+        resolution = [i*20,i*5,1];
         switch m
             case 1
-                load(['Field_' num2str(NIST_field) '\CPU\Solution_' num2str(i) '_x_20_5_1_no_CUDA.mat']); 
+                load(['Field_' num2str(NIST_field) '\CPU\Solution_' num2str(resolution(1)) '_' num2str(resolution(2)) '_' num2str(resolution(3)) '_no_CUDA.mat']); 
             case 2
-                load(['Field_' num2str(NIST_field) '\CUDA\Solution_' num2str(i) '_x_20_5_1_with_CUDA.mat']); 
+                load(['Field_' num2str(NIST_field) '\CUDA\Solution_' num2str(resolution(1)) '_' num2str(resolution(2)) '_' num2str(resolution(3)) '_with_CUDA.mat']); 
          end
 
         if ((m == 2) && ((i == 3) || (i == 5) || (i == 7) || (i == 9)))
-            plot(fig6,problem_t.t,mean(solution_t.M(:,:,1),2),'k','Linestyle',linestr{k}); 
-            plot(fig6,problem_t.t,mean(solution_t.M(:,:,2),2),'k','Linestyle',linestr{k}); 
-            plot(fig6,problem_t.t,mean(solution_t.M(:,:,3),2),'k','Linestyle',linestr{k});
-            xlim(fig6,[min(problem_t.t) max(problem_t.t)])
+            plot(fig6,problem_dym.t,mean(solution_dym.M(:,:,1),2),'k','Linestyle',linestr{k}); 
+            plot(fig6,problem_dym.t,mean(solution_dym.M(:,:,2),2),'k','Linestyle',linestr{k}); 
+            plot(fig6,problem_dym.t,mean(solution_dym.M(:,:,3),2),'k','Linestyle',linestr{k});
+            xlim(fig6,[min(problem_dym.t) max(problem_dym.t)])
             k = k+1;
         end
 
         %--- Calculate the difference from the NIST published results
         for j = 1:3
-            NIST_avg_interp = interp1(1e-9*t,mean_avg(1,:,j),problem_t.t);
-            abs_res_diff(i,j) = trapz(problem_t.t,abs(mean(solution_t.M(:,:,j),2)-NIST_avg_interp'));
+            NIST_avg_interp = interp1(1e-9*t,mean_avg(1,:,j),problem_dym.t);
+            abs_res_diff(i,j) = trapz(problem_dym.t,abs(mean(solution_dym.M(:,:,j),2)-NIST_avg_interp'));
         end
 
         elapsedTime(i,:) = [elapsedTime_part1,elapsedTime_part2]; 
@@ -102,13 +103,14 @@ plot(fig3, i_arr,elapsedTime_CPU(:,2)./elapsedTime_CUDA(:,2),'k-d');
 clear abs_res_diff
 for m = 1:2
     for i = 1:length(i_arr)
+        resolution = [i*20,i*5,1];
         switch m 
             case 1
-                load(['Field_' num2str(NIST_field) '\Matlab_simulations_CPU\Matlab_resolution_' num2str(i) '_x_20_5_1\PhysParams_TestDynamicsStdProb4_1st_fieldsolution.mat'])
-                load(['Field_' num2str(NIST_field) '\Matlab_simulations_CPU\Matlab_resolution_' num2str(i) '_x_20_5_1\PhysParams_TestDynamicsStdProb4_1st_field.mat'])
+                load(['Field_' num2str(NIST_field) '\Matlab_simulations_CPU\Matlab_resolution_' num2str(resolution(1)) '_' num2str(resolution(2)) '_' num2str(resolution(3)) '\Matlab_InitialStdProb4solution.mat'])
+                load(['Field_' num2str(NIST_field) '\Matlab_simulations_CPU\Matlab_resolution_' num2str(resolution(1)) '_' num2str(resolution(2)) '_' num2str(resolution(3)) '\Matlab_InitialStdProb4.mat'])
             case 2
-                load(['Field_' num2str(NIST_field) '\Matlab_simulations_GPU\Matlab_resolution_' num2str(i) '_x_20_5_1\PhysParams_TestDynamicsStdProb4_1st_fieldsolution.mat'])
-                load(['Field_' num2str(NIST_field) '\Matlab_simulations_GPU\Matlab_resolution_' num2str(i) '_x_20_5_1\PhysParams_TestDynamicsStdProb4_1st_field.mat'])
+                load(['Field_' num2str(NIST_field) '\Matlab_simulations_GPU\Matlab_resolution_' num2str(resolution(1)) '_' num2str(resolution(2)) '_' num2str(resolution(3)) '\Matlab_DynamicsStdProb4solution.mat'])
+                load(['Field_' num2str(NIST_field) '\Matlab_simulations_GPU\Matlab_resolution_' num2str(resolution(1)) '_' num2str(resolution(2)) '_' num2str(resolution(3)) '\Matlab_DynamicsStdProb4.mat'])
         end
         
         for k=1:size(SigmaSol,1) 
@@ -122,7 +124,6 @@ for m = 1:2
             Mx(k) = mean(SigmaX./SigmaN) ;
             My(k) = mean(SigmaY./SigmaN) ;
             Mz(k) = mean(SigmaZ./SigmaN) ;
-            Mk(k) = Mx(k)*ProblemSetupStruct.HystDir(1) + My(k)*ProblemSetupStruct.HystDir(2) + Mz(k)*ProblemSetupStruct.HystDir(3) ;
         end
         M_matlab = [Mx; My; Mz];
 

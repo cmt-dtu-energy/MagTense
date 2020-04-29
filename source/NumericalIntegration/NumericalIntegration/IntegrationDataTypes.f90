@@ -4,6 +4,8 @@
     implicit none
 
     integer,parameter :: coord_sys_carth=1,coord_sys_cyl=2,coord_sys_cone=3
+    !!@todo Do NOT have useCVODETrue/-False variables both here and in MicroMagParameters.
+    integer,parameter :: useCVODETrue=1,useCVODEFalse=0
 
     !---------------------------------------------------------------------------    
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
@@ -73,7 +75,7 @@
           subroutine func_vec ( yy, dat, n, res)
              import dataCollectionBase
              integer,intent(in) :: n
-             real,dimension(n) :: yy
+             real,dimension(n),intent(in) :: yy
              class(dataCollectionBase), intent(inout), target :: dat
              real,dimension(n) :: res
          
@@ -103,7 +105,7 @@
     abstract interface
         subroutine error_handler( dat, abserr )
             import dataCollectionBase
-            class( dataCollectionBase ), intent(in), target :: dat
+            class( dataCollectionBase ), intent(inout), target :: dat
             real, intent(inout),dimension(2) :: abserr
         end subroutine error_handler
     end interface
