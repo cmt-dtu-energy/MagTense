@@ -1,5 +1,5 @@
 
-FC = /opt/intel/bin/ifort
+FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
 
 
 FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I../../NumericalIntegration/NumericalIntegration/ \
@@ -25,12 +25,21 @@ FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I../../NumericalIntegration/Numer
 	$(FC) -c $(FFLAGS) $<
 
 all: 
-	cd source/NumericalIntegration/NumericalIntegration&& $(MAKE) 
+	cd source/NumericalIntegration/NumericalIntegration && $(MAKE)
 	cd source/TileDemagTensor/TileDemagTensor && $(MAKE)
 	cd source/DemagField/DemagField && $(MAKE) 
 	cd source/MagTense_StandAlone/MagTense_StandAlone && $(MAKE) 
+	cd source/MagneticForceIntegrator/MagneticForceIntegrator && $(MAKE) 
 	cp source/MagTense_StandAlone/MagTense_StandAlone/MagTense.x executable/MagTense.x 
+	cd source/MagTenseMicroMag && $(MAKE)
 
 clean:
-	rm -f *.o *.x *.mod *.a
+	cd source/NumericalIntegration/NumericalIntegration && rm -f *.o *.x *.mod *.a
+	cd source/TileDemagTensor/TileDemagTensor && rm -f *.o *.x *.mod *.a
+	cd source/DemagField/DemagField && rm -f *.o *.x *.mod *.a
+	cd source/MagTense_StandAlone/MagTense_StandAlone && rm -f *.o *.x *.mod *.a
+	cd source/MagneticForceIntegrator/MagneticForceIntegrator && rm -f *.o *.x *.mod *.a
+	cd source/MagTenseMicroMag  && rm -f *.o *.x *.mod *.a
+
+
 
