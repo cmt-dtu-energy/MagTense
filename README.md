@@ -6,9 +6,9 @@ The magnetostatic framework is fully implemented in Fortran and has a Matlab MEX
 
 The micromagnetism model utilizes the magnetostatic framework for calculating the demagnetization tensor.
 
-MagTense supports both Intel MKL, CUDA and CVODE.
+MagTense is directly useable in Matlab by downloading the already compiled MEX-files in matlab\MEX. The files are directly useable with no compilation required, although Matlab 2018a or greater is required. Examples of how to calculate magnetostatic and micromagnetic problems using the Matlab interface can be found in matlab\examples.  
 
-Examples of how to calculate magnetostatic and micromagnetic problems can be found in matlab\examples .
+MagTense supports both Intel MKL, CUDA and CVODE.
 
 The webpage of the code is available at https://www.magtense.org
 The TechManual on the code is available at https://cmt-dtu-energy.github.io/MagTense/index.html
