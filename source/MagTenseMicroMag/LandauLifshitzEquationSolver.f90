@@ -1081,8 +1081,6 @@ include 'blas.f90'
         !The demag tensor is considered as a whole, and the fraction specified concern the number of elements greater than epsilon
         if ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) then
             
-            !call FindThresholdFraction(abs(Kxx_c), abs(Kxy_c), abs(Kxz_c), abs(Kyy_c), abs(Kyz_c), abs(Kzz_c), threshold_var)
-            
             !Make a mask for each demag tensor with only the elements larger than zero
             !Make the masks only once - this is memory intensive, but computationally efficient
             nx_K = size(Kxx_c(:,1))
@@ -1438,27 +1436,27 @@ include 'blas.f90'
             
         !check if we have found the value that defines the threshold
         if ( ( count_middle .ge. (threshold_var-0.01)*n_ele_nonzero ) .and. ( count_middle .le. (threshold_var+0.01)*n_ele_nonzero ) ) then
-                threshold_var = f_middle
+            threshold_var = f_middle
+                
             exit
         endif
             
         if ( k_do .gt. 1000 ) then
-                call displayMatlabMessage( 'Iterations exceeded in finding threshold value. Removing:' )
-                write (prog_str,'(I10.0)') count_middle
-                call displayMatlabMessage( prog_str )
-                call displayMatlabMessage( 'elements out of:' )
-                write (prog_str,'(I10.0)') n_ele_nonzero
-                call displayMatlabMessage( prog_str )
-                call displayMatlabMessage( 'i.e. a fraction of:' )
-                write (prog_str,'(F6.4)') real(count_middle)/real(n_ele_nonzero)
-                call displayMatlabMessage( prog_str )
+            call displayMatlabMessage( 'Iterations exceeded in finding threshold value. Stopping iterations.' )
                 
-                threshold_var = f_middle
+            threshold_var = f_middle
             exit
         endif
                 
         k_do = k_do+1
     enddo  
+    
+    call displayMatlabMessage( 'Using a threshold value of :' )
+    write (prog_str,'(F10.9)') threshold_var
+    call displayMatlabMessage( prog_str )
+    call displayMatlabMessage( 'i.e. a fraction of:' )
+    write (prog_str,'(F6.4)') real(count_middle)/real(n_ele_nonzero)
+    call displayMatlabMessage( prog_str )
     
     end subroutine FindThresholdFraction
     
