@@ -674,7 +674,9 @@ module TileNComponents
     else
         N_out(1,2) = -1./(4.*pi) * log( nom / denom )
     endif
-    if ( abs(denom - nom) < 1d-35 ) then
+    !log(nom/denom) = log(nom/denom-1+1) = log((nom-denom)/denom+1)
+    !Thus if (nom-denom)/denom is about the size of epsilon, the fraction is 1 and log(1) = 0
+    if ( abs((nom - denom) / denom ) < 10.*epsilon(nom) ) then
         N_out(1,2) = 0
     endif
     
@@ -693,7 +695,7 @@ module TileNComponents
     else
         N_out(2,3) = -1./(4.*pi) * log( nom/denom )
     endif
-    if ( abs(denom - nom) < 1d-35 ) then
+    if ( abs((nom - denom) / denom ) < 10.*epsilon(nom) ) then
         N_out(2,3) = 0
     endif
 
@@ -710,7 +712,7 @@ module TileNComponents
     else
         N_out(1,3) = -1./(4.*pi) * log( nom / denom )
     endif
-    if ( abs(denom - nom) < 1d-35 ) then
+    if ( abs((nom - denom) / denom ) < 10.*epsilon(nom) ) then
         N_out(1,3) = 0
     endif
     

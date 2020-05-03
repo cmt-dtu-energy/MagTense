@@ -2,8 +2,11 @@
 FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
 
 
-FFLAGS = -r8 -O3 -fpp -fpe0 -fp-model source -fpic -I../NumericalIntegration/NumericalIntegration/ \
-	-I../DemagField/DemagField/ -I/apps/external/matlab/2019/b/extern/include/
+FFLAGS = -O3 -mkl -fpp -fpe0 -fp-model source -fpic -I../NumericalIntegration/NumericalIntegration/ \
+	-I../DemagField/DemagField/ -I/apps/external/matlab/2019/b/extern/include/ -I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/ \
+	-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/ -I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/intel64/lp64 \
+	-I../TileDemagTensor/TileDemagTensor/
+
 
 
 #FC = /usr/bin/gfortran
@@ -28,7 +31,7 @@ FFLAGS = -r8 -O3 -fpp -fpe0 -fp-model source -fpic -I../NumericalIntegration/Num
 MagTenseMicroMagLib = $(FC) LandauLifshitzEquationSolver.o MagTenseMicroMagIO.o MicroMagParameters.o FortranCuda.o LLODE_Debug.o
 
 MagTenseMicroMagLib.a: $(MagTenseMicroMagLib)
-	ar rc DemagFieldLib.a DemagFieldGetSolution.o MagTenseMicroMagIO.o MicroMagParameters.o FortranCuda.o LLODE_Debug.o
+	ar rc MagTenseMicroMagLib.a LandauLifshitzEquationSolver.o MagTenseMicroMagIO.o MicroMagParameters.o FortranCuda.o LLODE_Debug.o
 
 
 clean:

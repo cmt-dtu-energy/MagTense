@@ -14,108 +14,157 @@ if ~exist('USE_CVODE','var')
 end
 
 %% The different possible cases
-if (USE_RELEASE)
-    Debug_flag = '' ;
-    build_str = 'release';
+if (ispc)
+    compiler_str = '';
+    MagneticForceIntegrator_lib_str = '-lMagneticForceIntegrator';
+    DemagField_lib_str              = '-lDemagField';
+    NumericalIntegration_lib_str    = '-lNumericalIntegration';
+    TileDemagTensor_lib_str         = '-lTileDemagTensor';
+    MagTenseMicroMag_lib_str        = '-lMagTenseMicroMag';
+    MEX_str = 'w';
 else
-    Debug_flag = '-g' ;
-    build_str = 'debug';
+    compiler_str = 'FC=''/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort -fpp -fpic -free''';
+    MagneticForceIntegrator_lib_str = '';
+    DemagField_lib_str              = '';
+    NumericalIntegration_lib_str    = '';
+    TileDemagTensor_lib_str         = '';
+    MagTenseMicroMag_lib_str        = '';
+    MEX_str = 'a';
 end
 
-if (USE_CUDA)
-    CUDA_str  = '''-Lc:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64\'' -lcublas -lcudart -lcuda -lcusparse';
+if (ispc)
     if (USE_RELEASE)
-        build_str_MagTenseMicroMag = 'release';
+        Debug_flag = '' ;
+        build_str = 'x64/release';
     else
-        build_str_MagTenseMicroMag = 'debug';
+        Debug_flag = '-g' ;
+        build_str = 'x64/debug';
     end
 else
-    CUDA_str  = '';
     if (USE_RELEASE)
-        build_str_MagTenseMicroMag = 'Release_no_CUDA';
+        Debug_flag = '' ;
     else
-        build_str_MagTenseMicroMag = 'Debug_no_CUDA';
-    end
+        Debug_flag = '-g' ;
+    end 
+    build_str = '';
 end
 
-if (USE_CVODE)
-    CVODE_str = ['''-Lc:\Program Files (x86)\sundials-4.1.0\instdir\lib'' -lsundials_nvecserial ' ...
-             '''-Lc:\Program Files (x86)\sundials-4.1.0\instdir\lib'' -lsundials_sunmatrixdense ' ...
-             '''-Lc:\Program Files (x86)\sundials-4.1.0\instdir\lib'' -lsundials_sunlinsoldense ' ...
-             '''-Lc:\Program Files (x86)\sundials-4.1.0\instdir\lib'' -lsundials_fnvecserial_mod ' ...
-             '''-Lc:\Program Files (x86)\sundials-4.1.0\instdir\lib'' -lsundials_cvode ' ...
-             '''-Lc:\Program Files (x86)\sundials-4.1.0\instdir\lib'' -lsundials_fsunnonlinsolfixedpoint_mod ' ...
-             '''-Ic:\Program Files (x86)\sundials-4.1.0\instdir\include'''];
-    if (USE_RELEASE)
-        build_str_NumericalIntegration = 'release';
+if (ispc)
+    if (USE_CUDA)
+        CUDA_str  = '''-Lc:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v10.2/lib/x64/'' -lcublas -lcudart -lcuda -lcusparse';
+        if (USE_RELEASE)
+            build_str_MagTenseMicroMag = 'x64/release';
+        else
+            build_str_MagTenseMicroMag = 'x64/debug';
+        end
     else
-        build_str_NumericalIntegration = 'debug';
+        CUDA_str  = '';
+        if (USE_RELEASE)
+            build_str_MagTenseMicroMag = 'x64/Release_no_CUDA';
+        else
+            build_str_MagTenseMicroMag = 'x64/Debug_no_CUDA';
+        end
     end
 else
-    CVODE_str  = '';
-    if (USE_RELEASE)
-        build_str_NumericalIntegration = 'Release_no_CVODE';
+    if (USE_CUDA)
+        CUDA_str  = '';
     else
-        build_str_NumericalIntegration = 'Debug_no_CVODE';
+        CUDA_str  = '';
     end
+    build_str_MagTenseMicroMag = '';
+end
+
+if (ispc)
+    if (USE_CVODE)
+        CVODE_str = ['''-Lc:/Program Files (x86)/sundials-4.1.0/instdir/lib'' -lsundials_nvecserial ' ...
+                 '''-Lc:/Program Files (x86)/sundials-4.1.0/instdir/lib'' -lsundials_sunmatrixdense ' ...
+                 '''-Lc:/Program Files (x86)/sundials-4.1.0/instdir/lib'' -lsundials_sunlinsoldense ' ...
+                 '''-Lc:/Program Files (x86)/sundials-4.1.0/instdir/lib'' -lsundials_fnvecserial_mod ' ...
+                 '''-Lc:/Program Files (x86)/sundials-4.1.0/instdir/lib'' -lsundials_cvode ' ...
+                 '''-Lc:/Program Files (x86)/sundials-4.1.0/instdir/lib'' -lsundials_fsunnonlinsolfixedpoint_mod ' ...
+                 '''-Ic:/Program Files (x86)/sundials-4.1.0/instdir/include'''];
+        if (USE_RELEASE)
+            build_str_NumericalIntegration = 'x64/release';
+        else
+            build_str_NumericalIntegration = 'x64/debug';
+        end
+    else
+        CVODE_str  = '';
+        if (USE_RELEASE)
+            build_str_NumericalIntegration = 'x64/Release_no_CVODE';
+        else
+            build_str_NumericalIntegration = 'x64/Debug_no_CVODE';
+        end
+    end
+else
+    if (USE_CVODE)
+        CVODE_str = [''];
+    else
+        CVODE_str  = '';
+    end
+    build_str_NumericalIntegration = '';
 end
 
 %--- The individual Fortran parts
-MagneticForceIntegrator_str = ['-Lsource\MagneticForceIntegrator\MagneticForceIntegrator\x64\' build_str '\ -lMagneticForceIntegrator -Isource\MagneticForceIntegrator\MagneticForceIntegrator\x64\' build_str '\'];
-DemagField_str              = ['-Lsource\DemagField\DemagField\x64\' build_str '\ -lDemagField -Isource\DemagField\DemagField\x64\' build_str '\'];
-NumericalIntegration_str    = ['-Lsource\NumericalIntegration\NumericalIntegration\x64\' build_str_NumericalIntegration '\ -lNumericalIntegration -Isource\NumericalIntegration\NumericalIntegration\x64\' build_str_NumericalIntegration '\'];
-TileDemagTensor_str         = ['-Lsource\TileDemagTensor\TileDemagTensor\x64\' build_str '\ -lTileDemagTensor -Isource\TileDemagTensor\TileDemagTensor\x64\' build_str '\'];
-MagTenseMicroMag_str        = ['-Lsource\MagTenseMicroMag\x64\' build_str_MagTenseMicroMag '\ -lMagTenseMicroMag -Isource\MagTenseMicroMag\x64\' build_str_MagTenseMicroMag '\'];
+MagneticForceIntegrator_str = ['-Lsource/MagneticForceIntegrator/MagneticForceIntegrator/' build_str '/ ' MagneticForceIntegrator_lib_str ' -Isource/MagneticForceIntegrator/MagneticForceIntegrator/' build_str '/'];
+DemagField_str              = ['-Lsource/DemagField/DemagField/' build_str '/ ' DemagField_lib_str ' -Isource/DemagField/DemagField/' build_str '/'];
+NumericalIntegration_str    = ['-Lsource/NumericalIntegration/NumericalIntegration/' build_str_NumericalIntegration '/ ' NumericalIntegration_lib_str ' -Isource/NumericalIntegration/NumericalIntegration/' build_str_NumericalIntegration '/'];
+TileDemagTensor_str         = ['-Lsource/TileDemagTensor/TileDemagTensor/' build_str '/ ' TileDemagTensor_lib_str ' -Isource/TileDemagTensor/TileDemagTensor/' build_str '/'];
+MagTenseMicroMag_str        = ['-Lsource/MagTenseMicroMag/' build_str_MagTenseMicroMag '/ ' MagTenseMicroMag_lib_str ' -Isource/MagTenseMicroMag/' build_str_MagTenseMicroMag '/'];
 
-Options_str                 = 'COMPFLAGS="$COMPFLAGS /O3 /extend_source:132 /real_size:64 /fpe:0" -R2018a';
-MKL_str                     = '''-Lc:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019\windows\mkl\lib\intel64_win\'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-Ic:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2019\windows\mkl\include\''';
+Options_str                 = 'COMPFLAGS="$COMPFLAGS /O3 /free /real_size:64 /fpe:0" -R2018a';
+if (ispc)
+    MKL_str                 = '''-Lc:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/lib/intel64_win/'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-Ic:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/include/''';
+else
+    MKL_str                 = '''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/''';
+end
 
 %%--------------------------------------------------------------------------------------------------------
 %%----------------------------------------------------- Build the MEX files ------------------------------
 %%------------------------------------------------------------------------- ------------------------------
 %% MagTenseLandauLifshitzSolver_mex
-Source_str = 'source\MagTenseMEX\MagTenseMEX\MagTenseLandauLifshitzSolver_mex.f90';
-mex_str = ['mex ' Debug_flag ' ' NumericalIntegration_str ' ' DemagField_str ' ' TileDemagTensor_str ' ' CUDA_str ' ' CVODE_str ' ' MKL_str ' ' MagTenseMicroMag_str ' ' Source_str ' ' Options_str];
+Source_str = 'source/MagTenseMEX/MagTenseMEX/MagTenseLandauLifshitzSolver_mex.f90';
+mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' NumericalIntegration_str ' ' DemagField_str ' ' TileDemagTensor_str ' ' CUDA_str ' ' CVODE_str ' ' MKL_str ' ' MagTenseMicroMag_str ' ' Source_str ' ' Options_str];
 eval(mex_str) 
 if ~USE_RELEASE
-    movefile MagTenseLandauLifshitzSolver_mex.mexw64.pdb matlab\MEX_files\MagTenseLandauLifshitzSolver_mex.mexw64.pdb
+    movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb']);
 end
-movefile MagTenseLandauLifshitzSolver_mex.mexw64 matlab\MEX_files\MagTenseLandauLifshitzSolver_mex.mexw64
+movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64']);
 
 %% IterateMagnetization_mex
-Source_str = 'source\MagTenseMEX\MagTenseMEX\IterateMagnetization_mex.f90';
-mex_str = ['mex ' Debug_flag ' ' DemagField_str ' ' NumericalIntegration_str ' ' TileDemagTensor_str ' ' Source_str ' ' Options_str];
+Source_str = 'source/MagTenseMEX/MagTenseMEX/IterateMagnetization_mex.f90';
+mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' DemagField_str ' ' NumericalIntegration_str ' ' TileDemagTensor_str ' ' Source_str ' ' Options_str];
 eval(mex_str) 
 if ~USE_RELEASE
-    movefile IterateMagnetization_mex.mexw64.pdb matlab\MEX_files\IterateMagnetization_mex.mexw64.pdb
+    movefile(['IterateMagnetization_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/IterateMagnetization_mex.mex' MEX_str '64.pdb']);
 end
-movefile IterateMagnetization_mex.mexw64 matlab\MEX_files\IterateMagnetization_mex.mexw64
+movefile(['IterateMagnetization_mex.mex' MEX_str '64'],['matlab/MEX_files/IterateMagnetization_mex.mex' MEX_str '64']);
         
 %% getHFromTiles_mex
-Source_str = 'source\MagTenseMEX\MagTenseMEX\getHFromTiles_mex.f90';
-mex_str = ['mex ' Debug_flag ' ' DemagField_str ' ' NumericalIntegration_str ' ' TileDemagTensor_str ' ' Source_str ' ' Options_str];
+Source_str = 'source/MagTenseMEX/MagTenseMEX/getHFromTiles_mex.f90';
+mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' DemagField_str ' ' NumericalIntegration_str ' ' TileDemagTensor_str ' ' Source_str ' ' Options_str];
 eval(mex_str) 
 if ~USE_RELEASE
-    movefile getHFromTiles_mex.mexw64.pdb matlab\MEX_files\getHFromTiles_mex.mexw64.pdb
+    movefile(['getHFromTiles_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/getHFromTiles_mex.mex' MEX_str '64.pdb']);
 end
-movefile getHFromTiles_mex.mexw64 matlab\MEX_files\getHFromTiles_mex.mexw64
+movefile(['getHFromTiles_mex.mex' MEX_str '64'],['matlab/MEX_files/getHFromTiles_mex.mex' MEX_str '64']);
     
 %% getNFromTile_mex
-Source_str = 'source\MagTenseMEX\MagTenseMEX\getNFromTile_mex.f90';
-mex_str = ['mex ' Debug_flag ' ' DemagField_str ' ' NumericalIntegration_str ' ' TileDemagTensor_str ' ' Source_str ' ' Options_str];
+Source_str = 'source/MagTenseMEX/MagTenseMEX/getNFromTile_mex.f90';
+mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' DemagField_str ' ' NumericalIntegration_str ' ' TileDemagTensor_str ' ' Source_str ' ' Options_str];
 eval(mex_str) 
 if ~USE_RELEASE
-    movefile getNFromTile_mex.mexw64.pdb matlab\MEX_files\getNFromTile_mex.mexw64.pdb
+    movefile(['getNFromTile_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/getNFromTile_mex.mex' MEX_str '64.pdb']);
 end
-movefile getNFromTile_mex.mexw64 matlab\MEX_files\getNFromTile_mex.mexw64
+movefile(['getNFromTile_mex.mex' MEX_str '64'],['matlab/MEX_files/getNFromTile_mex.mex' MEX_str '64']);
     
 %% getMagForce_mex
-Source_str = 'source\MagTenseMEX\MagTenseMEX\getMagForce_mex.f90';
-mex_str = ['mex ' Debug_flag ' ' MagneticForceIntegrator_str ' ' DemagField_str ' ' NumericalIntegration_str ' ' TileDemagTensor_str ' ' Source_str ' ' Options_str];
+Source_str = 'source/MagTenseMEX/MagTenseMEX/getMagForce_mex.f90';
+mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' MagneticForceIntegrator_str ' ' DemagField_str ' ' NumericalIntegration_str ' ' TileDemagTensor_str ' ' Source_str ' ' Options_str];
 eval(mex_str) 
 if ~USE_RELEASE
-    movefile getMagForce_mex.mexw64.pdb matlab\MEX_files\getMagForce_mex.mexw64.pdb
+    movefile(['getMagForce_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/getMagForce_mex.mex' MEX_str '64.pdb']);
 end
-movefile getMagForce_mex.mexw64 matlab\MEX_files\getMagForce_mex.mexw64
+movefile(['getMagForce_mex.mex' MEX_str '64'],['matlab/MEX_files/getMagForce_mex.mex' MEX_str '64']);
     
 end
