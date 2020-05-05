@@ -1,9 +1,9 @@
 
-FC = /opt/intel/bin/ifort
+FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
 
 
 FFLAGS = -r8 -O3 -fpp -fpe0 -fp-model source -fpic -I../../NumericalIntegration/NumericalIntegration/ \
-	-I../../TileDemagTensor/TileDemagTensor/
+	-I../../TileDemagTensor/TileDemagTensor/ -I/apps/external/matlab/2019/b/extern/include/
 
 
 #FC = /usr/bin/gfortran

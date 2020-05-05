@@ -1,5 +1,5 @@
 
-FC = /opt/intel/bin/ifort
+FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
 
 NumIntLib = ../../NumericalIntegration/NumericalIntegration/
 TileDemagTensorLib = ../../TileDemagTensor/TileDemagTensor/

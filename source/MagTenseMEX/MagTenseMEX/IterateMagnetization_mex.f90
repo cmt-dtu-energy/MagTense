@@ -34,11 +34,9 @@
       
 !     Check for proper number of arguments. 
       if( nrhs .lt. 6) then
-         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput',
-     +                           'at least six inputs are required.')
+         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput','At least six inputs are required.')
       elseif(nlhs .gt. 1) then
-         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nOutput',
-     +                           'Too many output arguments.')
+         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nOutput','Too many output arguments.')
       endif
 
       max_ite = 100
@@ -96,8 +94,7 @@
       call loadMagStateFunction( prhs(3), stateFunctions, n_statefunctions )
             
       !::do the calculation
-      call iterateMagnetization( cylTile, n_tiles,stateFunctions, n_statefunctions, T, err_max, max_ite, 
-     +     displayIteration_Matlab, resumeIteration )
+      call iterateMagnetization( cylTile, n_tiles,stateFunctions, n_statefunctions, T, err_max, max_ite, displayIteration_Matlab, resumeIteration )
       
       !::Return the updated struct array to matlab
       call returnMagTile( cylTile, n_tiles, plhs(1) )

@@ -666,7 +666,7 @@ module TileNComponents
     !::Off-diagonal elements
     nom = FF_3D(a,b,c,x,y,z)  * FF_3D(-a,-b,c,x,y,z) * FF_3D(a,-b,-c,x,y,z) * FF_3D(-a,b,-c,x,y,z)
     denom = FF_3D(a,-b,c,x,y,z) * FF_3D(-a,b,c,x,y,z)  * FF_3D(a,b,-c,x,y,z)  * FF_3D(-a,-b,-c,x,y,z)
-
+    
     if ( denom .eq. 0 .or. nom .eq. 0 ) then
         !Find the limit
         lim = getF_limit(a,b,c,x,y,z,FF_3D)
@@ -674,8 +674,12 @@ module TileNComponents
     else
         N_out(1,2) = -1./(4.*pi) * log( nom / denom )
     endif
-
-
+    !log(nom/denom) = log(nom/denom-1+1) = log((nom-denom)/denom+1)
+    !Thus if (nom-denom)/denom is about the size of epsilon, the fraction is 1 and log(1) = 0
+    if ( abs((nom - denom) / denom ) < 10.*epsilon(nom) ) then
+        N_out(1,2) = 0
+    endif
+    
     !::the tensor is symmetric
     N_out(2,1) = N_out(1,2)
 
@@ -691,13 +695,15 @@ module TileNComponents
     else
         N_out(2,3) = -1./(4.*pi) * log( nom/denom )
     endif
-
+    if ( abs((nom - denom) / denom ) < 10.*epsilon(nom) ) then
+        N_out(2,3) = 0
+    endif
 
     N_out(3,2) = N_out(2,3)
 
     nom = HH_3D(a,b,c,x,y,z)  * HH_3D(-a,-b,c,x,y,z) * HH_3D(a,-b,-c,x,y,z) * HH_3D(-a,b,-c,x,y,z)
     denom = HH_3D(a,-b,c,x,y,z) * HH_3D(-a,b,c,x,y,z)  * HH_3D(a,b,-c,x,y,z)  * HH_3D(-a,-b,-c,x,y,z)
-
+    
     if ( denom .eq. 0 .or. nom .eq. 0 ) then
     
         lim = getF_limit(a,b,c,x,y,z,HH_3D)           
@@ -706,8 +712,10 @@ module TileNComponents
     else
         N_out(1,3) = -1./(4.*pi) * log( nom / denom )
     endif
-
-
+    if ( abs((nom - denom) / denom ) < 10.*epsilon(nom) ) then
+        N_out(1,3) = 0
+    endif
+    
     N_out(3,1) = N_out(1,3)
     
     !!Change the sign so that the output tensor follows the same definition as all the other tensors

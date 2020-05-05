@@ -810,11 +810,14 @@ include 'blas.f90'
     type(DFTI_DESCRIPTOR), POINTER :: desc_handle                 !> Handle for the FFT MKL stuff
     integer :: status
     complex(kind=4),dimension(:,:),allocatable :: Kxx_c, Kxy_c, Kxz_c, Kyy_c, Kyz_c, Kzz_c !> Temporary matrices for storing the complex version of the demag matrices
+    real(SP),dimension(:),allocatable  :: Kxx_abs, Kxy_abs, Kxz_abs, Kyy_abs, Kyz_abs, Kzz_abs  !> Temporary matrices with absolute values of the demag tensor, for threshold calculations
     complex(kind=4) :: thres
     integer,dimension(3) :: L                                                !> Array specifying the dimensions of the fft
     real*4 :: threshold_var, alpha, beta
     complex(kind=4) :: alpha_c, beta_c
-    
+    integer ::  nx_K, ny_K, k_xx, k_xy, k_xz, k_yy, k_yz, k_zz 
+    logical,dimension(:,:),allocatable :: mask_xx, mask_xy, mask_xz     !> mask used for finding non-zero values
+    logical,dimension(:,:),allocatable :: mask_yy, mask_yz, mask_zz     !> mask used for finding non-zero values
     
     if ( problem%grid%gridType .eq. gridTypeUniform ) then
         nx = problem%grid%nx
@@ -900,7 +903,83 @@ include 'blas.f90'
         !The demag tensor is considered as a whole, and the fraction specified concern the number of elements greater than epsilon
         if ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) then
             
-            call FindThresholdFraction(abs(problem%Kxx), abs(problem%Kxy), abs(problem%Kxz), abs(problem%Kyy), abs(problem%Kyz), abs(problem%Kzz), threshold_var)
+            !Make a mask for each demag tensor with only the elements larger than zero
+            !Make the masks only once - this is memory intensive, but computationally efficient
+            nx_K = size(problem%Kxx(:,1))
+            ny_K = size(problem%Kxx(1,:))
+            allocate(mask_xx(nx_K,ny_K))
+            allocate(mask_xy(nx_K,ny_K))
+            allocate(mask_xz(nx_K,ny_K))
+            allocate(mask_yy(nx_K,ny_K))
+            allocate(mask_yz(nx_K,ny_K))
+            allocate(mask_zz(nx_K,ny_K))
+            
+            mask_xx = problem%Kxx .gt. 0
+            mask_xy = problem%Kxy .gt. 0
+            mask_xz = problem%Kxz .gt. 0
+            mask_yy = problem%Kyy .gt. 0
+            mask_yz = problem%Kyz .gt. 0
+            mask_zz = problem%Kzz .gt. 0
+            
+            !Make a copy (pack) of the tensors for speed so that the mask only has to be applied once
+            allocate(Kxx_abs(count( mask_xx )))
+            allocate(Kxy_abs(count( mask_xy )))
+            allocate(Kxz_abs(count( mask_xz )))
+            allocate(Kyy_abs(count( mask_yy )))
+            allocate(Kyz_abs(count( mask_yz )))
+            allocate(Kzz_abs(count( mask_zz )))
+    
+            !Pack the demag tensors into the temporary arrays. The intrinsic PACK routine overflows the stack, so use do loops
+            k_xx = 1
+            k_xy = 1
+            k_xz = 1
+            k_yy = 1
+            k_yz = 1
+            k_zz = 1
+            do i=1,nx_K
+                do j=1,ny_K
+                    if (mask_xx(i,j) .eq. .true.) then
+                        Kxx_abs(k_xx) = problem%Kxx(i,j) 
+                        k_xx = k_xx + 1
+                    endif
+                    if (mask_xy(i,j) .eq. .true.) then
+                        Kxy_abs(k_xy) = problem%Kxy(i,j) 
+                        k_xy = k_xy + 1
+                    endif
+                    if (mask_xz(i,j) .eq. .true.) then
+                        Kxz_abs(k_xz) = problem%Kxz(i,j) 
+                        k_xz = k_xz + 1
+                    endif
+                    if (mask_yy(i,j) .eq. .true.) then
+                        Kyy_abs(k_yy) = problem%Kyy(i,j) 
+                        k_yy = k_yy + 1
+                    endif
+                    if (mask_yz(i,j) .eq. .true.) then
+                        Kyz_abs(k_yz) = problem%Kyz(i,j) 
+                        k_yz = k_yz + 1
+                    endif
+                    if (mask_zz(i,j) .eq. .true.) then
+                        Kzz_abs(k_zz) = problem%Kzz(i,j) 
+                        k_zz = k_zz + 1
+                    endif
+                enddo
+            enddo
+            
+            call FindThresholdFraction(Kxx_abs, Kxy_abs, Kxz_abs, Kyy_abs, Kyz_abs, Kzz_abs, threshold_var)
+            
+            !cleanup
+            deallocate(mask_xx)
+            deallocate(mask_xy)
+            deallocate(mask_xz)
+            deallocate(mask_yy)
+            deallocate(mask_yz)
+            deallocate(mask_zz)
+            deallocate(Kxx_abs)
+            deallocate(Kxy_abs)
+            deallocate(Kxz_abs)
+            deallocate(Kyy_abs)
+            deallocate(Kyz_abs)
+            deallocate(Kzz_abs)
             
         endif
         
@@ -1002,7 +1081,83 @@ include 'blas.f90'
         !The demag tensor is considered as a whole, and the fraction specified concern the number of elements greater than epsilon
         if ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) then
             
-            call FindThresholdFraction(abs(Kxx_c), abs(Kxy_c), abs(Kxz_c), abs(Kyy_c), abs(Kyz_c), abs(Kzz_c), threshold_var)
+            !Make a mask for each demag tensor with only the elements larger than zero
+            !Make the masks only once - this is memory intensive, but computationally efficient
+            nx_K = size(Kxx_c(:,1))
+            ny_K = size(Kxx_c(1,:))
+            allocate(mask_xx(nx_K,ny_K))
+            allocate(mask_xy(nx_K,ny_K))
+            allocate(mask_xz(nx_K,ny_K))
+            allocate(mask_yy(nx_K,ny_K))
+            allocate(mask_yz(nx_K,ny_K))
+            allocate(mask_zz(nx_K,ny_K))
+            
+            mask_xx = abs(Kxx_c) .gt. 0
+            mask_xy = abs(Kxy_c) .gt. 0
+            mask_xz = abs(Kxz_c) .gt. 0
+            mask_yy = abs(Kyy_c) .gt. 0
+            mask_yz = abs(Kyz_c) .gt. 0
+            mask_zz = abs(Kzz_c) .gt. 0
+            
+            !Make a copy (pack) of the tensors for speed so that the mask only has to be applied once
+            allocate(Kxx_abs(count( mask_xx )))
+            allocate(Kxy_abs(count( mask_xy )))
+            allocate(Kxz_abs(count( mask_xz )))
+            allocate(Kyy_abs(count( mask_yy )))
+            allocate(Kyz_abs(count( mask_yz )))
+            allocate(Kzz_abs(count( mask_zz )))
+    
+            !Pack the demag tensors into the temporary arrays. The intrinsic PACK routine overflows the stack, so use do loops
+            k_xx = 1
+            k_xy = 1
+            k_xz = 1
+            k_yy = 1
+            k_yz = 1
+            k_zz = 1
+            do i=1,nx_K
+                do j=1,ny_K
+                    if (mask_xx(i,j) .eq. .true.) then
+                        Kxx_abs(k_xx) = abs(Kxx_c(i,j)) 
+                        k_xx = k_xx + 1
+                    endif
+                    if (mask_xy(i,j) .eq. .true.) then
+                        Kxy_abs(k_xy) = abs(Kxy_c(i,j))
+                        k_xy = k_xy + 1
+                    endif
+                    if (mask_xz(i,j) .eq. .true.) then
+                        Kxz_abs(k_xz) = abs(Kxz_c(i,j))
+                        k_xz = k_xz + 1
+                    endif
+                    if (mask_yy(i,j) .eq. .true.) then
+                        Kyy_abs(k_yy) = abs(Kyy_c(i,j)) 
+                        k_yy = k_yy + 1
+                    endif
+                    if (mask_yz(i,j) .eq. .true.) then
+                        Kyz_abs(k_yz) = abs(Kyz_c(i,j))
+                        k_yz = k_yz + 1
+                    endif
+                    if (mask_zz(i,j) .eq. .true.) then
+                        Kzz_abs(k_zz) = abs(Kzz_c(i,j)) 
+                        k_zz = k_zz + 1
+                    endif
+                enddo
+            enddo
+            
+            call FindThresholdFraction(Kxx_abs, Kxy_abs, Kxz_abs, Kyy_abs, Kyz_abs, Kzz_abs, threshold_var)
+            
+            !cleanup
+            deallocate(mask_xx)
+            deallocate(mask_xy)
+            deallocate(mask_xz)
+            deallocate(mask_yy)
+            deallocate(mask_yz)
+            deallocate(mask_zz)
+            deallocate(Kxx_abs)
+            deallocate(Kxy_abs)
+            deallocate(Kxz_abs)
+            deallocate(Kyy_abs)
+            deallocate(Kyz_abs)
+            deallocate(Kzz_abs)
             
         endif
        
@@ -1237,67 +1392,39 @@ include 'blas.f90'
     !> @params[in] threshold a faction specifying the fraction of the smallest elements that are to be removed
     !>-----------------------------------------
     subroutine FindThresholdFraction(Kxx, Kxy, Kxz, Kyy, Kyz, Kzz, threshold_var)
-    real(SP),dimension(:,:),intent(in) :: Kxx, Kxy, Kxz, Kyy, Kyz, Kzz               !> The absolute of the demag tensors 
+    real(SP),dimension(:),intent(inout) :: Kxx, Kxy, Kxz, Kyy, Kyz, Kzz                !> The absolute of the demag tensors 
     real*4,intent(inout) :: threshold_var
-    integer :: i,j,k,nx,ny,nz,ntot,ind                                      !> Internal counters and index variables
     real*4 :: f_large, f_small, f_middle
     integer,dimension(6) :: count_ind
-    real*4,dimension(6) :: f_small_arr
-    integer :: count_middle, n_ele_nonzero, nx_K, ny_K, k_do  
-    logical,dimension(:,:,:),allocatable :: mask                        !> mask used for finding non-zero values
-    logical,dimension(:,:),allocatable :: mask_xx, mask_xy, mask_xz     !> mask used for finding non-zero values
-    logical,dimension(:,:),allocatable :: mask_yy, mask_yz, mask_zz     !> mask used for finding non-zero values
+    integer :: count_middle, n_ele_nonzero, k_do  
+    character*(10) :: prog_str
+        
+    call displayMatlabMessage( 'Starting threshold calculation.' )
     
-    !Make a mask for each demag tensor with only the elements larger than epsilon
-    !Make the masks only once - this is memory intensive, but computationally efficient
-    nx_K = size(Kxx(:,1))
-    ny_K = size(Kxx(1,:))
-    allocate(mask_xx(nx_K,ny_K))
-    allocate(mask_xy(nx_K,ny_K))
-    allocate(mask_xz(nx_K,ny_K))
-    allocate(mask_yy(nx_K,ny_K))
-    allocate(mask_yz(nx_K,ny_K))
-    allocate(mask_zz(nx_K,ny_K))
-            
-    mask_xx = Kxx .gt. 0
-    mask_xy = Kxy .gt. 0
-    mask_xz = Kxz .gt. 0
-    mask_yy = Kyy .gt. 0
-    mask_yz = Kyz .gt. 0
-    mask_zz = Kzz .gt. 0
-            
     !The total number of nonzero elements in the demag tensor
-    n_ele_nonzero = count( mask_xx )
-    n_ele_nonzero = n_ele_nonzero + count( mask_xy )
-    n_ele_nonzero = n_ele_nonzero + count( mask_xz )
-    n_ele_nonzero = n_ele_nonzero + count( mask_yy )
-    n_ele_nonzero = n_ele_nonzero + count( mask_yz )
-    n_ele_nonzero = n_ele_nonzero + count( mask_zz )
+    n_ele_nonzero = size( Kxx )
+    n_ele_nonzero = n_ele_nonzero + size( Kxy )
+    n_ele_nonzero = n_ele_nonzero + size( Kxz )
+    n_ele_nonzero = n_ele_nonzero + size( Kyy )
+    n_ele_nonzero = n_ele_nonzero + size( Kyz )
+    n_ele_nonzero = n_ele_nonzero + size( Kzz )
     
-    f_large = max(maxval(Kxx), maxval(Kxy), maxval(Kxz), maxval(Kyy), maxval(Kyz), maxval(Kzz))
-            
-    !Find the minimum value in the individual demag tensors than is greater than zero
-    f_small_arr(1) = minval(Kxx, mask_xx)
-    f_small_arr(2) = minval(Kxy, mask_xy)
-    f_small_arr(3) = minval(Kxz, mask_xz)
-    f_small_arr(4) = minval(Kyy, mask_yy)
-    f_small_arr(5) = minval(Kyz, mask_yz)
-    f_small_arr(6) = minval(Kzz, mask_zz)
-            
-    f_small = minval(f_small_arr)
-
+    !Find the maximum and minimum value in the individual demag tensors than is greater than zero
+    f_large = max(maxval(Kxx), maxval(Kxy), maxval(Kxz), maxval(Kyy), maxval(Kyz), maxval(Kzz))    
+    f_small = min(minval(Kxx), minval(Kxy), minval(Kxz), minval(Kyy), minval(Kyz), minval(Kzz))
+    
     !Bisection algoritm for find the function value for a corresponding fraction
     k_do = 1
     do 
         f_middle = (f_large-f_small)/2+f_small
                 
         !Count only the elements larger than epsilon in each of the matrices
-        count_ind(1) = count( mask_xx .and. Kxx .le. f_middle )
-        count_ind(2) = count( mask_xy .and. Kxy .le. f_middle )
-        count_ind(3) = count( mask_xz .and. Kxz .le. f_middle )
-        count_ind(4) = count( mask_yy .and. Kyy .le. f_middle )
-        count_ind(5) = count( mask_yz .and. Kyz .le. f_middle )
-        count_ind(6) = count( mask_zz .and. Kzz .le. f_middle )
+        count_ind(1) = count( Kxx .le. f_middle )
+        count_ind(2) = count( Kxy .le. f_middle )
+        count_ind(3) = count( Kxz .le. f_middle )
+        count_ind(4) = count( Kyy .le. f_middle )
+        count_ind(5) = count( Kyz .le. f_middle )
+        count_ind(6) = count( Kzz .le. f_middle )
                 
         count_middle = sum(count_ind)
                    
@@ -1309,26 +1436,27 @@ include 'blas.f90'
             
         !check if we have found the value that defines the threshold
         if ( ( count_middle .ge. (threshold_var-0.01)*n_ele_nonzero ) .and. ( count_middle .le. (threshold_var+0.01)*n_ele_nonzero ) ) then
-                threshold_var = f_middle
+            threshold_var = f_middle
+                
             exit
         endif
             
-        if ( k_do .gt. 500 ) then
-                call displayMatlabMessage( 'Iterations exceeded in finding threshold value. Continuing.' )
-                threshold_var = f_middle
+        if ( k_do .gt. 1000 ) then
+            call displayMatlabMessage( 'Iterations exceeded in finding threshold value. Stopping iterations.' )
+                
+            threshold_var = f_middle
             exit
         endif
                 
         k_do = k_do+1
     enddo  
-         
-    !cleanup
-    deallocate(mask_xx)
-    deallocate(mask_xy)
-    deallocate(mask_xz)
-    deallocate(mask_yy)
-    deallocate(mask_yz)
-    deallocate(mask_zz)
+    
+    call displayMatlabMessage( 'Using a threshold value of :' )
+    write (prog_str,'(F10.9)') threshold_var
+    call displayMatlabMessage( prog_str )
+    call displayMatlabMessage( 'i.e. a fraction of:' )
+    write (prog_str,'(F6.4)') real(count_middle)/real(n_ele_nonzero)
+    call displayMatlabMessage( prog_str )
     
     end subroutine FindThresholdFraction
     
@@ -1348,6 +1476,9 @@ include 'blas.f90'
         call ComputeExchangeTerm3D_Uniform( grid, A )
     endif
     
+    !if xchange matrix passed from Matlab
+    ! stat = mkl_sparse_s_create_csr ( d2dz2%A_exch, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, problem%rows_start, problem%rows_end, problem%cols, problem%values)
+    !end
     
     end subroutine ComputeExchangeTerm3D
     
