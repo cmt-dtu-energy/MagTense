@@ -71,4 +71,10 @@ function tile = getDefaultMagTile()
     %vertices used when the tile is a tetrahedron (and later, when it can
     %be a general surface made of triangular elements)
     tile.vertices = zeros(3,4);
+    
+    %boundary conditions represented as a list of properties (a struct
+    %array)
+    %refer to MagTenseTransientGeometry for the definitions of the various
+    %fields in this struct array
+    tile.bdryCdts(1) = struct( 'Type', -1, 'l', 0, 'A', 0, 'n_ind', 0 );
 end
