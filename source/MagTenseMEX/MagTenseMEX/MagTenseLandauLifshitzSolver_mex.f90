@@ -33,11 +33,9 @@
     
       !Check the input parameters
       if ( nrhs .ne. 2 ) then
-        call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nInput',
-     +                           'Two inputs are required.')
+        call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nInput','Two inputs are required.')
       elseif ( nlhs .ne. 1 ) then
-          call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nOutput',
-     +                           'One output is required.')
+          call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nOutput','One output is required.')
       endif
       
       

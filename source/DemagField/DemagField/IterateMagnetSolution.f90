@@ -3,7 +3,8 @@
 
     use DemagFieldGetSolution
     use MagParameters
-    use spline
+    use spline
+
     
 
     implicit none
