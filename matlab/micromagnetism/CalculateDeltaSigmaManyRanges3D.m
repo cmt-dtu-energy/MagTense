@@ -6,7 +6,7 @@ NN = round(numel(Sigma)/3) ;
 SigmaX = Sigma(0*NN+[1:NN]) ;
 SigmaY = Sigma(1*NN+[1:NN]) ;
 SigmaZ = Sigma(2*NN+[1:NN]) ;
-
+% disp([ 'n = ',num2str(max(sqrt(SigmaX.^2+SigmaY.^2+SigmaZ.^2)))])
 %% Demagnetization: Long range (coarse grids)
 
 HmXcTOT = zeros(NN,1) ;
@@ -82,7 +82,9 @@ TheCrossZ = -(SigmaX.*ThisHeffY - SigmaY.*ThisHeffX) ;
 ThisHeffX2 = +SigmaY.*TheCrossZ-SigmaZ.*TheCrossY ;
 ThisHeffY2 = +SigmaZ.*TheCrossX-SigmaX.*TheCrossZ ;
 ThisHeffZ2 = +SigmaX.*TheCrossY-SigmaY.*TheCrossX ;
-
+if~all(isfinite(ThisHeffX2(:))) ;
+   '' ; 
+end
 %% Calculate time-derivative of Sigma
 
 if isequal(class(alpha),'double') % alpha is time-independent
@@ -98,12 +100,14 @@ else % alpha is time-dependent
     dSigma = [dSigmaX;dSigmaY;dSigmaZ] ;
     dSigmaRMS = sqrt(sum((dSigma./-alpha(t)).^2)/NN) ;
 end
-
+dSigmaDot = dSigmaX.*SigmaX + dSigmaY.*SigmaY + dSigmaZ.*SigmaZ ;
+% disp(['dn : ',num2str(max(dSigmaDot))])
 %--- If we are using gpuArray, bring the magnetization back for ode45
 dSigma = gather(dSigma);
 
 %% Pass data using a globa variable
 global TheData
+TheData.NfunEval = TheData.NfunEval + 1 ;
 LastT = TheData.LastT ;
 LastPlottedT = TheData.LastPlottedT ;
 TheData.LastT = t ;
@@ -116,5 +120,5 @@ end
 TheData.LastDSigma = dSigma ;
 TheData.dSigmaRMS = dSigmaRMS ;
 
-% disp(['Here ',num2str(t)]) ;
+% disp(['Here ',num2str(t)]) ;  
 

@@ -80,10 +80,18 @@ if UseExplicitSolver | UseDynamicSolver
 %     AA.HhX = @(Sx,Sy,Sz,t) - HsX(t).*O ;
 %     AA.HhY = @(Sx,Sy,Sz,t) - HsY(t).*O ;
 %     AA.HhZ = @(Sx,Sy,Sz,t) - HsZ(t).*O ;
-    
+    if isempty(HextFct)
     AA.HhX = @(Sx,Sy,Sz,t) - interp1( Hext(:,1), Hext(:,2), t).*O ;
     AA.HhY = @(Sx,Sy,Sz,t) - interp1( Hext(:,1), Hext(:,3), t).*O ;
     AA.HhZ = @(Sx,Sy,Sz,t) - interp1( Hext(:,1), Hext(:,4), t).*O ;
+    else
+ 
+        
+            AA.HhX = @(Sx,Sy,Sz,t) - HextFct{1}(t);
+            AA.HhY = @(Sx,Sy,Sz,t) - HextFct{2}(t) ;
+            AA.HhZ = @(Sx,Sy,Sz,t) - HextFct{3}(t) ;
+       '' ; 
+    end
 end
 
 if UseImplicitSolver
@@ -160,7 +168,7 @@ end
 global TheData
 InitialData.LastT = 0;
 TheData = InitialData;
-
+TheData.NfunEval = 0 ;
 %% Define time-derivative function
 if UseExplicitSolver | UseDynamicSolver
     TheData.dSigmaRMS = inf;    
@@ -186,7 +194,7 @@ end
 %% ODE
 disp('Integrating Equation of Motion')
 if UseDynamicSolver
-    options = odeset('RelTol',1e-12) ;
+    options = odeset('RelTol',1e-12,'AbsTol',1e-9) ;
     [t,SigmaSol] = ode45(dSigma2,t,Sigma,options);
 %         [t,SigmaSol] = ode23(dSigma2,t,Sigma,options);
 end
@@ -199,7 +207,7 @@ if UseImplicitSolver
     options = odeset('OutputFcn',ThatOutPutFunct,'RelTol',1e-3,'MaxStep',abs(t(1)-t(end))) ; % ,'MaxStep',0.01*abs(t(1)-t(end))) ; % ,'Events',ThatEventFunct) ;
     [t,SigmaSol] = ode45(dSigma3,t,Sigma,options);
 end
-
+disp(num2str(TheData.NfunEval)) ;
 %% Calculate the Eigenvalue
 if CalcEigenvalue
     ThisHHess5 = HHess(t(end),SigmaSol(end,:)') ;
