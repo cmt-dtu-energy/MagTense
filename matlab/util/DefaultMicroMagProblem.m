@@ -92,6 +92,24 @@ properties
     %Fortran ODE solver, when a solution component Y(L) is less in
     %magnitude than thres_value its set to zero
     thres = 1e-6;
+    
+    %defines whether to recompute the Interaction Matrices or not
+    RecomputeInteractionMatrices = 0 ;
+    
+    %defines whether to use an External Mesh or not
+    ExternalMesh = 0 ; 
+    
+    %type of external mesh (Voronoi/Tetra)
+    MeshType = '' ;
+    
+    % filename of external mesh
+    ExternalMeshFileName = '' ;
+    
+    % filename of Interaction matrices (demag tensor)
+    DemagTensorFileName = 0;
+   
+    % function handle for external field
+    HextFct = [] ;
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -140,6 +158,7 @@ properties (SetAccess=private,GetAccess=public)
     
     %defines which solver to use in Matlab
     SolverType
+    
     
 end
 
@@ -249,6 +268,11 @@ methods
         obj.ShowTheResult = int32(1);
 
         obj.DirectoryFilename = '';
+        obj.RecomputeInteractionMatrices = int32(0) ;
+        obj.ExternalMesh = int32(0) ;
+        obj.MeshType = '' ;
+        obj.ExternalMeshFileName = '' ;
+        obj.DemagTensorFileName = 0 ;
     end
     
     %%Calculates the applied field as a function of time on the time grid
