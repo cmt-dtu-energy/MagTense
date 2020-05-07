@@ -18,14 +18,14 @@ tiles(1).bdryCdts(1) = struct( 'Type', MagTenseTransientGeometry.FC_INTERNAL, 'l
 tiles(2) = tiles(1);
 tiles(2).offset = [d,0,0];
 tiles(2).bdryCdts(1) = struct( 'Type', MagTenseTransientGeometry.FC_INTERNAL, 'l', d/2, 'A', d*d, 'n_ind', 1 );
-tiles(1).bdryCdts(2) = struct( 'Type', MagTenseTransientGeometry.FC_INTERNAL, 'l', d/2, 'A', d*d, 'n_ind', 3 );
+tiles(2).bdryCdts(2) = struct( 'Type', MagTenseTransientGeometry.FC_INTERNAL, 'l', d/2, 'A', d*d, 'n_ind', 3 );
 
 tiles(3) = tiles(1);
 tiles(3).offset = [2*d,0,0];
 tiles(3).bdryCdts(1) = struct( 'Type', MagTenseTransientGeometry.FC_INTERNAL, 'l', d/2, 'A', d*d, 'n_ind', 2 );
 
 %set external condition
-tiles(3).bdryCdts(1) = struct( 'Type', MagTenseTransientGeometry.FC_DIRICHLET, 'l', d/2, 'A', d*d, 'n_ind', -1 ); 
+tiles(3).bdryCdts(2) = struct( 'Type', MagTenseTransientGeometry.FC_DIRICHLET, 'l', d/2, 'A', d*d, 'n_ind', -1 ); 
 
 debug = false;
 
@@ -36,9 +36,9 @@ k = @(T,H,p) ones(size(T)) .* 8;%W/m*K
 rho = @(T,H,p) ones(size(T)) .* 7200;%kg/m^3
 
 setts = MagTenseTransientSettings( c, k, rho );
-setts.t_tot = 10;%seconds
+setts.t_tot = 50;%seconds
 %fixed timestep
-setts.dt = 0.001;%s
+setts.dt = 0.01;%s
 %starting time
 setts.t = 0;
 

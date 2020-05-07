@@ -19,7 +19,7 @@ while setts.t < setts.t_tot
         if cnt==100
             plot( setts.t, solution.T(1), '.k');
             plot( setts.t, solution.T(2), 'vr');
-            plot( setts.t, solution.T(2), 'squareb');
+            plot( setts.t, solution.T(3), 'squareb');
             drawnow;
             cnt = 0;
         end

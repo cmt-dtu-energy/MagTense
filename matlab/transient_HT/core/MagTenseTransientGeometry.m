@@ -5,8 +5,8 @@ classdef MagTenseTransientGeometry
     properties
        dV %volume array containing the volume of each cell. Should be a single column vector of length n
        
-       R_geom %sparse matrix of dimensions (n,n) that contains the geometrical part of the thermal resistance from the center of i'th cell to the center of the boundary between the i'th cell and the j'th cell
-        
+       R_geom_inv %sparse matrix of dimensions (n,n) that contains the inverse of the geometrical part of the thermal resistance from the center of i'th cell to the center of the boundary between the i'th cell and the j'th cell
+       
        FaceConditions %is an array with n rows and m columns where m is the largest no. of face-conditions (boundary conditions) a single primitive in the given problem has
        FaceConditionsBoundaryStatic % static part of boundary condition values, size n x m (sparse)
        FaceConditionsBoundaryDynamic %dynamic (changes potentially at each time step) part of the boundary conditions, sparse n x m
@@ -48,7 +48,7 @@ classdef MagTenseTransientGeometry
             
             %thermal resistance, i.e. internal boundary condition due to
             %finite heat transfer
-            obj.R_geom = sparse(n,n);
+            obj.R_geom_inv = sparse(n,n);
             
            %setup the static part of the boundary conditions
            for i=1:n
@@ -69,11 +69,12 @@ classdef MagTenseTransientGeometry
                           %the boundary
                       case MagTenseTransientGeometry.FC_INTERNAL
                           obj.FaceConditions(i,j) = MagTenseTransientGeometry.FC_INTERNAL;
-                          obj.R_geom(i,bdry.n_ind) = bdry.l/bdry.A;
+                          obj.R_geom_inv(i,bdry.n_ind) = bdry.A/bdry.l;
                   end
                   
                end
            end
+           
         end
         
         %should be called once per time step (at the beginning) in order to
