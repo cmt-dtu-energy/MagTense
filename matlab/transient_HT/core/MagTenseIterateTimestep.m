@@ -28,7 +28,9 @@ maxIte = setts.maxIte;
 dt = setts.dt;
 
 %the geometrical part of the thermal resistance.
-R_geom = geom.R_geom;
+R_geom_inv = geom.R_geom_inv;
+R_geom_inv_tr = R_geom_inv';
+
 dV = geom.dV;
 
 %no. of cells or finite volumes
@@ -64,27 +66,23 @@ while err>maxErr && nIte<maxIte
     
     %thermal resistance matrix (each element R_ij = dl_i/(A_ij * k_i ) for
     %the i'th tile and it's surface area, A_ij, with the j'th cell)
-    R = R_geom ./ repmat( k, 1, n );
-    
     %setup matrix for inversion (A in A*T = b )
     %first find all thermal resistance terms that apply to all but the
     %diagonal. Note the minus sign as this is the part of the expression
     %multiplied onto the off-diagonal tile
-    A = -1.*( 1./R + 1./R');
-    A(~isfinite(A)) = 0.;
+    A = -1.*(R_geom_inv .* repmat( k, 1, n ) + R_geom_inv_tr .* repmat( k, 1, n )');
+   
     %find the diagonal terms as minus the sum of the other terms
-    A(1:n+1:end) = -sum(A,2);
+    A = A - sparse(1:n,1:n, sum(A,2) );
     %find the capacity term
     cap = dV .* rho .* c ./ dt;
-    
-    A(1:n+1:end) = A(1:n+1:end) + cap';
     
     %setup result-vector b (right-hand side in A*T = b)
     b = cap .* T_old;
     %add the boundary conditions here
     [lhs_bdry,rhs_bdry] = geom.getBoundaryConditions(  k );
     
-    A(1:n+1:end) = A(1:n+1:end) + lhs_bdry';
+    A = A + sparse( 1:n,1:n, cap + lhs_bdry );
     b = b + rhs_bdry;
     
     %solve the equation system using \
@@ -109,6 +107,7 @@ while err>maxErr && nIte<maxIte
         disp( ['Iteration no. ' num2str(nIte)] );
     end
     
+    T_old = T_new;
     nIte = nIte + 1;
 end
 
