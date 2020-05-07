@@ -9,14 +9,19 @@ tic
 
 %% Calculate or load the matrices that only needs to be calculated once
 
-if ischar(ProblemSetupStruct.DemagTensorFileName)
+if ischar(ProblemSetupStruct.DemagTensorFileName) & (~ProblemSetupStruct.RecomputeInteractionMatrices)
     if exist([ProblemSetupStruct.DemagTensorFileName,'.mat'],'file') || exist(ProblemSetupStruct.DemagTensorFileName,'file')
         %--- Remark: We should settle on the structure of how it is saved...
         load(ProblemSetupStruct.DemagTensorFileName,'InteractionMatrices') ;
+        MatricesHaveBeenLoaded = 1 ;
     else
-        InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct);
+        MatricesHaveBeenLoaded = 0 ;
     end
 else
+   MatricesHaveBeenLoaded = 0 ; 
+end
+
+if ~MatricesHaveBeenLoaded % ComputeThem
     InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct);
 end
 N = InteractionMatrices.N;

@@ -31,7 +31,7 @@ if (~exist('MySim','var'))
     %time-dependent applied field
     HextFct = @(t) (1e-9-t)' .* HystDir .* (t<1e-9)';
 
-    MySim_ini = MySim_ini.setHext( HextFct, linspace(0,100e-9,2000) );
+    MySim_ini = MySim_ini.setHext( HextFct, linspace(0,100e-9,20) );
 end
 
 if ~(MySim_ini.ShowTheResult == 0)
@@ -112,5 +112,5 @@ if (MySim_dym.ShowTheResult)
     plot(fig1, MySim_dym.t,My,'go')
     plot(fig1, MySim_dym.t,Mz,'bo')
 end
-
+figure(figure1) ;
 end
