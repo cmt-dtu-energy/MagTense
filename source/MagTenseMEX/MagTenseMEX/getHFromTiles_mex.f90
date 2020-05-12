@@ -25,16 +25,16 @@
 
 !     Pointers to input/output mxArrays:
       real*8,dimension(:,:),allocatable :: pts,H            
-      type(MagTile),allocatable,dimension(:) :: cylTile      
+      type(MagTile),allocatable,dimension(:) :: tile      
       integer*4 :: n_ele,n_tiles
       mwSize,dimension(3) :: dims
       mwIndex :: i
       
 !     Check for proper number of arguments. 
       if( nrhs .ne. 4) then
-         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput','Four inputs are required.')
+         call mexErrMsgIdAndTxt ('MATLAB:MagTense_mex:nInput','Four inputs are required.')
       elseif(nlhs .gt. 1) then
-         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nOutput','Too many output arguments.')
+         call mexErrMsgIdAndTxt ('MATLAB:MagTense_mex:nOutput','Too many output arguments.')
       endif
 
 !Check the type of the inputs      
@@ -52,9 +52,9 @@
       call mxCopyPtrToInteger4(mxGetPr(prhs(3)), n_tiles,1)
       
       !::allocate the tiles
-      allocate( cylTile(n_tiles) )
+      allocate( tile(n_tiles) )
       !::Copy the input parameters      
-      call loadMagTile( prhs(1), cylTile, n_tiles )
+      call loadMagTile( prhs(1), tile, n_tiles )
       
       !::Copy the points at which the solution is required
       
@@ -65,7 +65,7 @@
       
       !::do the calculation
       H(:,:) = 0
-      call getFieldFromTiles( cylTile, H, pts, n_tiles, n_ele )
+      call getFieldFromTiles( tile, H, pts, n_tiles, n_ele )
       
       !::Load the result back to Matlab      
       ComplexFlag = 0
@@ -79,7 +79,7 @@
       plhs(1) = mxCreateNumericArray( 2, dims, classid, ComplexFlag )
       call mxCopyReal8ToPtr( H, mxGetPr( plhs(1) ), sx )
       
-      deallocate(cylTile,pts,H)
+      deallocate(tile,pts,H)
             
       end subroutine
       
