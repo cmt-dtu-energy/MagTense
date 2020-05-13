@@ -29,6 +29,53 @@ def plot_cube(axes, size, offset, rotation, M, color):
     # Plot vector of magnetization in the center of the cube
     ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(size)/4, pivot='middle', normalize=True)
 
+
+def plot_sphere(ax, r, offset, M, color):
+    # Create meash of surface points
+    theta, phi = np.mgrid[0:np.pi:20j, 0:2*np.pi:20j]
+    x = r*np.cos(phi)*np.sin(theta) + offset[0]
+    y = r*np.sin(phi)*np.sin(theta) + offset[1]
+    z = r*np.cos(theta) + offset[2]
+
+    # Plot spherical surface
+    ax.plot_surface(x, y, z, rstride=1, cstride=1, color=color, alpha=.25, linewidth=0)
+
+    # Plot vector of magnetization in the center of the cube
+    ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2], color=color, length=r/3, pivot='middle', normalize=True)
+
+def plot_spheroid(ax, size, offset, rotation, M, color):
+    # Create meash of surface points
+    theta, phi = np.mgrid[0:np.pi:20j, 0:2*np.pi:20j]    
+    
+    # Check which size belongs to c-axis
+    if size[0] == size[1]:
+        x = size[0]*np.cos(phi)*np.sin(theta)
+        y = size[0]*np.sin(phi)*np.sin(theta)
+        z = size[2]*np.cos(theta)
+    elif size[0] == size[2]:
+        x = size[0]*np.cos(phi)*np.sin(theta)
+        y = size[1]*np.cos(theta)
+        z = size[0]*np.sin(phi)*np.sin(theta)
+    elif size[1] == size[2]:
+        x = size[0]*np.cos(theta)
+        y = size[1]*np.cos(phi)*np.sin(theta)
+        z = size[1]*np.sin(phi)*np.sin(theta)
+
+    R = get_rotmat(rotation)
+
+    # Add rotation and offset to spheroid
+    for i in range(x.shape[0]):
+        for j in range(x.shape[1]):
+            v = np.array([x[j,i], y[j,i], z[j,i]])
+            x[j,i], y[j,i], z[j,i] = (np.dot(R, v.T)).T + offset
+
+    # Plot spherical surface
+    ax.plot_surface(x, y, z, rstride=1, cstride=1, color=color, alpha=.25, linewidth=0)
+
+    # Plot vector of magnetization in the center of the cube
+    ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(size)/4, pivot='middle', normalize=True)
+
+
 def plot_tetrahedron(axes, vertices, M, color):
     ax = axes
     vert = np.transpose(vertices)
@@ -124,6 +171,7 @@ def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color):
     # Plot vector of magnetization in the center of the cube
     ax.quiver(offset[0] + center[0], offset[1] + center[1], offset[2] + center[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(dr)/2, pivot='middle', normalize=True)
 
+
 def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv=False):
     ax = axes
     resolution = 100
@@ -215,14 +263,20 @@ def get_rotmat(rot):
     rot_x = [1, 0, 0], [0, math.cos(rot[0]), -math.sin(rot[0])], [0, math.sin(rot[0]), math.cos(rot[0])]
     rot_y = [math.cos(rot[1]), 0, math.sin(rot[1])], [0, 1, 0], [-math.sin(rot[1]), 0, math.cos(rot[1])]
     rot_z = [math.cos(rot[2]), -math.sin(rot[2]), 0], [math.sin(rot[2]), math.cos(rot[2]), 0], [0, 0, 1]
-    R = np.matmul(np.matmul(rot_z, rot_y), rot_x)
+    # TODO: Check rotation from local to global: (1) Rot_Z, (2) Rot_Y, (3) Rot_X
+    # G to L: 
+    # R = np.asarray(rot_x) @ np.asarray(rot_y) @ np.asarray(rot_z)
+    # TODO: Check validations with COMSOL
+    # Old implementation
+    R = np.asarray(rot_z) @ np.asarray(rot_y) @ np.asarray(rot_x)
+    # Faster implementation:
     # cx,cy,cz = np.cos(theta) 
     # sx,sy,sz = np.sin(theta)
     # R = np.zeros((3,3))
     # R.flat = (cx*cz - sx*cy*sz, cx*sz + sx*cy*cz, sx*sy,
     #     -sx*cz - cx*cy*sz, -sx*sz + cx*cy*cz, 
     #     cx*sy, sy*sz, -sy*cz, cy)
-    return R 
+    return R
 
 def plot_field(axes, points, H):
     ax = axes
@@ -237,7 +291,7 @@ def plot_field(axes, points, H):
     elif len(points) > 100:
         len_arrow = 0.05
     else:
-        len_arrow = 0.075
+        len_arrow = 0.125
     for i, point in enumerate(points):
         ax.quiver(point[0], point[1], point[2], H[i][0], H[i][1], H[i][2], colors=cmap(norm(np.linalg.norm(H[i]))),
         pivot='middle', length=len_arrow, normalize=True)
@@ -344,17 +398,33 @@ def create_plot(tiles, eval_points=None, H=None, grid=None):
         # Plotting for MagTense
         else:
             for i in range(tiles.get_n()):
-                # 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 5 = tetrahedron, 10 = ellipsoid
+                # 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 5 = tetrahedron,
+                # 6 = sphere, 7 = spheroid, 10 = ellipsoid
                 if (tiles.get_tile_type(i) == 1):
-                    plot_cylindrical(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
+                    plot_cylindrical(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), \
+                        tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
+
                 elif (tiles.get_tile_type(i) == 2):
-                    plot_cube(ax, tiles.get_size(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))   
+                    plot_cube(ax, tiles.get_size(i), tiles.get_offset(i), tiles.get_rotation(i), \
+                        tiles.get_M(i), tiles.get_color(i))
+
                 elif (tiles.get_tile_type(i) == 3):
-                    plot_circpiece(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
+                    plot_circpiece(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), \
+                        tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
+
                 elif (tiles.get_tile_type(i) == 4):
-                    plot_circpiece(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i), inv=True)
+                    plot_circpiece(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), \
+                        tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i), inv=True)
+
                 elif (tiles.get_tile_type(i) == 5):
                     plot_tetrahedron(ax, tiles.get_vertices(i), tiles.get_M(i), tiles.get_color(i))
+
+                elif (tiles.get_tile_type(i) == 6):
+                    plot_sphere(ax, tiles.get_size(i)[0], tiles.get_offset(i), tiles.get_M(i), tiles.get_color(i))
+
+                elif (tiles.get_tile_type(i) == 7):
+                    plot_spheroid(ax, tiles.get_size(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
+
                 elif (tiles.get_tile_type(i) == 10):
                     # TODO plot_ellipsoid()
                     pass
