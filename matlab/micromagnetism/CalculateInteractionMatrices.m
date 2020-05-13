@@ -61,20 +61,30 @@ else % Voronoi & Tetra
         InteractionMatrices.Z = GridInfo.Zel ;
 
         InteractionMatrices.model = model ; %  REMOVE THIS ??
-        N = [numel(GridInfo.Xel),1,1] ;
+        N = numel(GridInfo.Xel) ;
         
         dx = (GridInfo.Volumes).^(1/3) ;
         dy = dx ;
         dz = dx ;
-        N_tensor = zeros(3*N(1),3*N(2)) ;
+        N_tensor = zeros(3*N,3*N) ;
+        
+        tile = getDefaultMagTile();
+        tile.magnetType = getMagnetType('hard');
+        tile.tileType = getMagTileType('tetrahedron');
         for n1=1:N
             TheseIj = model.Mesh.Elements(1:4,n1) ;
             v = model.Mesh.Nodes(:,TheseIj) ;
-            for n2 =1:N
-                r = [InteractionMatrices.X(n2);InteractionMatrices.Y(n2);InteractionMatrices.Z(n2)] ;
-                [N_tensor(((n2-1)*3+1):(n2*3),((n1-1)*3+1):(n1*3))] = getNTetrahedron_Matlab( r, v ) ;
-                '' ;
-            end
+%             for n2 =1:N
+%                 r = [InteractionMatrices.X(n2);InteractionMatrices.Y(n2);InteractionMatrices.Z(n2)] ;
+%                 [N_tensor(((n2-1)*3+1):(n2*3),((n1-1)*3+1):(n1*3))] = getNTetrahedron_Matlab( r, v ) ;
+%                 '' ;
+%             end
+            
+            %Calculate the demag tensor directly from Fortran
+            tile.vertices = v;
+            sjask = [InteractionMatrices.X(:),InteractionMatrices.Y(:),InteractionMatrices.Z(:)];
+            N_fortran_temp = getNFromTile_mex( tile, sjask, int32( length( sjask(:,1) )) );
+            N_tensor(:,((n1-1)*3+1):(n1*3)) = reshape(shiftdim(N_fortran_temp,2),[3*N,3]);
         end
         
     end

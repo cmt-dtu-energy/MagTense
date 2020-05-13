@@ -10,8 +10,9 @@ grid on
 box on
 
 %make sure to source the right path for the generic Matlab routines
-addpath(genpath('../../util/'));
+addpath('../../util/');
 addpath('../../MEX_files/');
+
 %define the vacuum permeability
 mu0 = 4*pi*1e-7;
 
@@ -44,8 +45,8 @@ tile.mu_r_oa = 1.00;
 
 %%Now find the field in a set of points
 x = -10:0.01:10;
-y = -10:0.01:10;
-z = -10:0.01:10;
+y = x;
+z = x;
 
 offset = [3,3,2.5];
 
