@@ -17,7 +17,7 @@ FILENAME_INPUT_TILES = 'test_tiles.txt'
 FILENAME_INPUT_POINTS = 'std_alone_points.txt'
 # Output file for iterated magnetic tiles: tiles_out.txt
 FILENAME_OUTPUT_TILES = 'tiles_out.txt'
-# Output file for calculated magentic field in the specified points: H_out.txt
+# Output file for calculated magnetic field in the specified points: H_out.txt
 FILENAME_OUTPUT_FIELD = 'H_out.txt'
 
 def create_io():
