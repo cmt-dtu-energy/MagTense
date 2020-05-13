@@ -85,7 +85,7 @@
         !!Iteration loop
         do
             
-            if ( done .eq. .true. ) then
+            if ( done .eqv. .true. ) then
                 exit
             endif
         
@@ -219,7 +219,7 @@
                         
                         !>If the magnet is assumed to have a constant permeability, then its own field is not included in this summation but rather calculated explicitly (see a few lines down)
                         if ( tiles(i)%magnetType .eq. magnetTypeSoftConstPerm ) then
-                            tiles(i).excludeFromSummation = .true.
+                            tiles(i)%excludeFromSummation = .true.
                         endif
                         
                         call getFieldFromTiles( tiles, H(i,:), pts, n, 1, Nstore(i)%N )     !< Get the field in the i'th tile from all tiles           
@@ -230,7 +230,7 @@
                         
                         !>Set the flag back to false such that the tile is included in the next round of summation
                         if ( tiles(i)%magnetType .eq. magnetTypeSoftConstPerm ) then
-                            tiles(i).excludeFromSummation = .false.
+                            tiles(i)%excludeFromSummation = .false.
                         endif
                     endif
                 endif            
@@ -480,14 +480,27 @@
     
     end subroutine saveMagnetizationDebug
 
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !< Function to load tiles from python module to the corresponding one fortran
+    !! @param tileType - defines whether the tile is cylindrical, a prism, an ellipsoid and so on
+    !! @param offset - the centre coordinates relative to the global coordinate system
+    !! @param rotAngles - rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
+    !! @param color - color rgb triplet
+    !! @param magnetType - defines whether the tile is a hard or soft magnet
+    !! @param stateFunctionIndex - index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+    !! @param symmetryOps - 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
+    !! @param Mrel - the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
+    !!
+    subroutine loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+        mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+        includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles)
 
-    subroutine loadTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles)
         !::Specific for a cylindrical tile piece
         real(8),dimension(n_tiles,3),intent(in) :: centerPos
         real(8),dimension(n_tiles,3),intent(in) :: dev_center
             
         !::Specific for a rectangular prism
-        real(8),dimension(n_tiles,3),intent(in) :: rect_size
+        real(8),dimension(n_tiles,3),intent(in) :: tile_size
 
         !::Specific for a tetrahedron
         real(8),dimension(n_tiles,3,4),intent(in) :: vertices
@@ -496,15 +509,15 @@
         real(8),dimension(n_tiles,3),intent(in) :: Mag
         real(8),dimension(n_tiles,3),intent(in) :: u_ea,u_oa1,u_oa2    
         real(8),dimension(n_tiles),intent(in) :: mu_r_ea,mu_r_oa,Mrem
-        integer(4),dimension(n_tiles),intent(in) :: tileType        !::defines whether the tile is cylindrical, a prism, an ellipsoid and so on
-        real(8),dimension(n_tiles,3),intent(in) :: offset !::the centre coordinates relative to the global coordinate system
-        real(8),dimension(n_tiles,3),intent(in) :: rotAngles !:: rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
-        real(8),dimension(n_tiles,3),intent(in) :: color !! color rgb triplet
-        integer(4),dimension(n_tiles),intent(in) :: magnetType !::defines whether the tile is a hard or soft magnet
-        integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex !::index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+        integer(4),dimension(n_tiles),intent(in) :: tileType
+        real(8),dimension(n_tiles,3),intent(in) :: offset
+        real(8),dimension(n_tiles,3),intent(in) :: rotAngles
+        real(8),dimension(n_tiles,3),intent(in) :: color
+        integer(4),dimension(n_tiles),intent(in) :: magnetType
+        integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex
         integer(4),dimension(n_tiles),intent(in) :: includeInIteration,exploitSymmetry
-        real(8),dimension(n_tiles,3),intent(in) :: symmetryOps !! 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
-        real(8),dimension(n_tiles),intent(in) :: Mrel !! the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
+        real(8),dimension(n_tiles,3),intent(in) :: symmetryOps
+        real(8),dimension(n_tiles),intent(in) :: Mrel
 
         type(MagTile),dimension(n_tiles),intent(inout) :: tiles
         integer(4),intent(in) :: n_tiles
@@ -517,9 +530,9 @@
             tiles(i)%dr = dev_center(i,1)
             tiles(i)%dtheta = dev_center(i,2)
             tiles(i)%dz = dev_center(i,3)
-            tiles(i)%a = rect_size(i,1)
-            tiles(i)%b = rect_size(i,2)
-            tiles(i)%c = rect_size(i,3)
+            tiles(i)%a = tile_size(i,1)
+            tiles(i)%b = tile_size(i,2)
+            tiles(i)%c = tile_size(i,3)
             tiles(i)%vert(:,1) = vertices(i,:,1)
             tiles(i)%vert(:,2) = vertices(i,:,2)
             tiles(i)%vert(:,3) = vertices(i,:,3)
@@ -550,7 +563,9 @@
 
     end subroutine loadTiles
 
-    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !< Function to load the state function for each tile from python to fortran
+    !!
     subroutine loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
         
         integer,intent(in) :: nT,nH

@@ -121,13 +121,13 @@
             
             end select
         
-            if ( tiles(i)%excludeFromSummation .eq. .false. ) then
+            if ( tiles(i)%excludeFromSummation .eqv. .false. ) then
                 H = H + H_tmp
             else
                 !this happens if the local tile is made of soft ferromagnetic material and should be treated specially
                 localFieldSoft = .true.
                 !then also store the demag tensor for later use
-                if ( useStoredN .eq. .true. ) then
+                if ( useStoredN .eqv. .true. ) then
                     N_current_tile = Nout(i,1,:,:)
                     mur(1) = tiles(i)%mu_r_ea
                     mur(2) = tiles(i)%mu_r_oa
@@ -155,7 +155,7 @@
         !v2 = Happ_un
     
         !Note that N is likely negative as we by convention absorb the sign into the demag tensor
-        if ( localFieldSoft .eq. .true. )  then
+        if ( localFieldSoft .eqv. .true. )  then
             
             
             !norm of applied field
