@@ -33,7 +33,7 @@ module TileTriangle
     real,dimension(3),intent(in) :: r           !> evaluation point
     real,dimension(3,3),intent(inout) :: N,P    !> output tensor and change-of-basis matrix
     
-    real,parameter :: numErr = 1e-15,threshold = 1e-7 !> Numerical tolerance error and threshold for defining if the point of interest is too close to x,y or z = 0     
+    real,parameter :: numErr = 1e-20,threshold = 1e-20 !> Numerical tolerance error and threshold for defining if the point of interest is too close to x,y or z = 0     
     real :: d1,d2    
     real,dimension(3) :: angles, angles_srt,tmp !> Angles of the triangle at each vertex
     integer,dimension(3) :: srt_ind             !> Indices of the sorted array
@@ -165,6 +165,8 @@ module TileTriangle
     real :: Nxz
     real,dimension(3),intent(in) :: r
     real,intent(in) :: l,h
+
+    
     ! Returns the Nxz tensor component in the local coordinate system
         Nxz = -1./(4.*pi) * ( F_Nxz(r,h,l,h) - F_Nxz(r,0.,l,h) - ( G_Nxz(r,h) - G_Nxz(r,0.) ) )
         
