@@ -4,7 +4,7 @@ addpath('../NIST_micromag_Std_problem_4');
 
 %--- Use field X from the NIST example
 NIST_field = 2;
-res_arr = 9;
+res_arr = 1:8;
 
 %--- Loop over using the code in both CPU and CUDA mode
 for j = 2%1:2
