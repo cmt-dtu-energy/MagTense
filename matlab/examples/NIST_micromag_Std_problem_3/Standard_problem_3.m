@@ -76,14 +76,14 @@ for i = 1:length(L_loop)
     for j = 1:2
         switch j
             %initial magnetization
-            case 2
+            case 1
                 disp('Flower state') ;
                 problem.m0(:) = 0;
                 problem.m0(:,3) = 1 ;
                 
                 t_end = 10e-9;  
                 
-            case 1
+            case 2
                 disp('Vortex state') ;
                 [x,y,z]=ndgrid(linspace(-1,1,resolution(1)),linspace(-1,1,resolution(2)),linspace(-1,1,resolution(3)));
                 xvec =  sin(atan2(z,x));
@@ -108,33 +108,33 @@ for i = 1:length(L_loop)
         solution = struct();
         prob_struct = struct(problem);  %convert the class obj to a struct so it can be loaded into fortran
 
-%         solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
-% 
-%         if (ShowTheResultDetails)
-%             M_1 = squeeze(solution.M(1,:,:)); figure(figure3); subplot(2,2,1); quiver3(solution.pts(:,1),solution.pts(:,2),solution.pts(:,3),M_1(:,1),M_1(:,2),M_1(:,3)); axis equal; title('Fortran starting magnetization')
-%             M_end = squeeze(solution.M(end,:,:)); figure(figure3); subplot(2,2,3); quiver3(solution.pts(:,1),solution.pts(:,2),solution.pts(:,3),M_end(:,1),M_end(:,2),M_end(:,3)); axis equal; title('Fortran ending magnetization')
-% 
-%             plot(fig1,solution.t,mean(solution.M(:,:,1),2),'rx'); 
-%             plot(fig1,solution.t,mean(solution.M(:,:,2),2),'gx'); 
-%             plot(fig1,solution.t,mean(solution.M(:,:,3),2),'bx'); 
-%         end
-%         
-%         %--- Calculate the energy terms
-%         E_exc = sum((1/2)*(solution.M(:,:,1).*solution.H_exc(:,:,1) + solution.M(:,:,2).*solution.H_exc(:,:,2) + solution.M(:,:,3).*solution.H_exc(:,:,3)),2) ;        
-%         E_ext = sum(      (solution.M(:,:,1).*solution.H_ext(:,:,1) + solution.M(:,:,2).*solution.H_ext(:,:,2) + solution.M(:,:,3).*solution.H_ext(:,:,3)),2) ;
-%         E_dem = sum((1/2)*(solution.M(:,:,1).*solution.H_dem(:,:,1) + solution.M(:,:,2).*solution.H_dem(:,:,2) + solution.M(:,:,3).*solution.H_dem(:,:,3)),2) ;
-%         E_ani = sum((1/2)*(solution.M(:,:,1).*solution.H_ani(:,:,1) + solution.M(:,:,2).*solution.H_ani(:,:,2) + solution.M(:,:,3).*solution.H_ani(:,:,3)),2) ;
-%         E_arr(:,i,j) = mu0*[E_exc(end) E_ext(end) E_dem(end) E_ani(end)];
-% 
-%         if (ShowTheResultDetails)
-%             plot(fig2,solution.t,mu0*E_exc-mu0*E_exc(1),'.')
-%             plot(fig2,solution.t,mu0*E_ext-mu0*E_ext(1),'.')
-%             plot(fig2,solution.t,mu0*E_dem-mu0*E_dem(1),'.')
-%             plot(fig2,solution.t,mu0*E_ani-mu0*E_ani(1),'.')
-%             xlabel(fig2,'Time [s]')
-%             ylabel(fig2,'Energy [-]')
-%             legend(fig2,{'E_{exc}','E_{ext}','E_{dem}','E_{ani}'},'Location','East');
-%         end
+        solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+
+        if (ShowTheResultDetails)
+            M_1 = squeeze(solution.M(1,:,:)); figure(figure3); subplot(2,2,1); quiver3(solution.pts(:,1),solution.pts(:,2),solution.pts(:,3),M_1(:,1),M_1(:,2),M_1(:,3)); axis equal; title('Fortran starting magnetization')
+            M_end = squeeze(solution.M(end,:,:)); figure(figure3); subplot(2,2,3); quiver3(solution.pts(:,1),solution.pts(:,2),solution.pts(:,3),M_end(:,1),M_end(:,2),M_end(:,3)); axis equal; title('Fortran ending magnetization')
+
+            plot(fig1,solution.t,mean(solution.M(:,:,1),2),'rx'); 
+            plot(fig1,solution.t,mean(solution.M(:,:,2),2),'gx'); 
+            plot(fig1,solution.t,mean(solution.M(:,:,3),2),'bx'); 
+        end
+        
+        %--- Calculate the energy terms
+        E_exc = sum((1/2)*(solution.M(:,:,1).*solution.H_exc(:,:,1) + solution.M(:,:,2).*solution.H_exc(:,:,2) + solution.M(:,:,3).*solution.H_exc(:,:,3)),2) ;        
+        E_ext = sum(      (solution.M(:,:,1).*solution.H_ext(:,:,1) + solution.M(:,:,2).*solution.H_ext(:,:,2) + solution.M(:,:,3).*solution.H_ext(:,:,3)),2) ;
+        E_dem = sum((1/2)*(solution.M(:,:,1).*solution.H_dem(:,:,1) + solution.M(:,:,2).*solution.H_dem(:,:,2) + solution.M(:,:,3).*solution.H_dem(:,:,3)),2) ;
+        E_ani = sum((1/2)*(solution.M(:,:,1).*solution.H_ani(:,:,1) + solution.M(:,:,2).*solution.H_ani(:,:,2) + solution.M(:,:,3).*solution.H_ani(:,:,3)),2) ;
+        E_arr(:,i,j) = mu0*[E_exc(end) E_ext(end) E_dem(end) E_ani(end)];
+
+        if (ShowTheResultDetails)
+            plot(fig2,solution.t,mu0*E_exc-mu0*E_exc(1),'.')
+            plot(fig2,solution.t,mu0*E_ext-mu0*E_ext(1),'.')
+            plot(fig2,solution.t,mu0*E_dem-mu0*E_dem(1),'.')
+            plot(fig2,solution.t,mu0*E_ani-mu0*E_ani(1),'.')
+            xlabel(fig2,'Time [s]')
+            ylabel(fig2,'Energy [-]')
+            legend(fig2,{'E_{exc}','E_{ext}','E_{dem}','E_{ani}'},'Location','East');
+        end
         
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% -------------------------------------------------------------------- MATLAB ----------------------------------------------------------

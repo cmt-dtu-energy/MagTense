@@ -32,6 +32,7 @@ save(TetraMeshFileName,'model') ;
     MySim_ini.dem_appr = getMicroMagDemagApproximation('none');
     MySim_ini.alpha = 4.42e3;
     MySim_ini.gamma = 0;
+    MySim_ini = MySim_ini.setUseCuda( true );
 
     %initial magnetization
     MySim_ini.m0(:) = 1/sqrt(3);
@@ -49,6 +50,17 @@ save(TetraMeshFileName,'model') ;
 
 %% Run the simulation
 MySim_ini = MySim_ini.setSolverType( 'UseExplicitSolver' );
+
+%time grid on which to solve the problem
+MySim_ini = MySim_ini.setSolverType( 'UseDynamicSolver' );
+MySim_ini = MySim_ini.setTime( linspace(0,100e-9,200) );
+MySim_ini.setTimeDis = int32(100);
+HystDir = 1/mu0*[1,1,1] ;
+
+%time-dependent applied field
+HextFct = @(t) (1e-9-t)' .* HystDir .* (t<1e-9)';
+MySim_ini = MySim_ini.setHext( HextFct, linspace(0,100e-9,2000) );
+
 [SigmaInit,~,InteractionMatrices] = ComputeTheSolution(MySim_ini);
 % figure; quiver3(InteractionMatrices.X(:),InteractionMatrices.Y(:),InteractionMatrices.Z(:),MySim_ini.m0(:,1),MySim_ini.m0(:,2),MySim_ini.m0(:,3)); axis equal;  title('Starting state - Matlab')
 [Mx,My,Mz] = ComputeMagneticMomentGeneralMesh(SigmaInit,InteractionMatrices.GridInfo.Volumes) ;
@@ -58,4 +70,12 @@ plot([MySim_ini.m0(1),Mx],'ro-') ;
 plot([MySim_ini.m0(2),My],'go-')
 plot([MySim_ini.m0(3),Mz],'bo-')
 set(gca,'ylim',[-.1,1.1]) ; grid on
+
+Sigma = SigmaInit(end,:).' ;
+NN = round(numel(Sigma)/3) ;
+
+SigmaX = Sigma(0*NN+[1:NN]) ;
+SigmaY = Sigma(1*NN+[1:NN]) ;
+SigmaZ = Sigma(2*NN+[1:NN]) ;
+figure; quiver3(InteractionMatrices.X(:),InteractionMatrices.Y(:),InteractionMatrices.Z(:),SigmaX,SigmaY,SigmaZ); axis equal;
 end

@@ -34,10 +34,19 @@ mu0 = 4*pi*1e-7;
 
 addpath('../../MEX_files');
 addpath('../../util');
+addpath('../../micromagnetism');
 
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% ------------------------------------------------------------------- MAGTENSE ---------------------------------------------------------
 %% --------------------------------------------------------------------------------------------------------------------------------------
+% thisGridL = [125e-9,125e-9/2,125e-9/4] ;
+thisGridL = [500e-9,125e-9,3e-9];%m
+model = CreateTetraMesh(thisGridL,80e-9) ;
+figure ; pdeplot3D(model,'FaceAlpha',0.1) ;
+TetraMeshFileName = 'TestTetraMesh01.mat' ;
+save(TetraMeshFileName,'model') ;
+resolution = [size(model.Mesh.Elements,2),1,1];
+
 %% Setup the problem for the initial configuration
 %takes the size of the grid as arguments (nx,ny,nz) and a function handle
 %that produces the desired field (if not present zero applied field is inferred)
@@ -46,12 +55,6 @@ problem_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 problem_ini.dem_appr = getMicroMagDemagApproximation('none');
 problem_ini = problem_ini.setUseCuda( use_CUDA );
 problem_ini = problem_ini.setUseCVODE( use_CVODE );
-
-% loadFile = 'N_out_test.dat';
-% if exist(loadFile,'file')
-%     problem_ini = problem_ini.setLoadNFilename( loadFile );
-% end
-% problem_ini = problem_ini.setReturnNFilename( loadFile );
 
 problem_ini.alpha = 4.42e3;
 problem_ini.gamma = 0;
@@ -68,16 +71,24 @@ HystDir = 1/mu0*[1,1,1] ;
 HextFct = @(t) (1e-9-t)' .* HystDir .* (t<1e-9)';
 problem_ini = problem_ini.setHext( HextFct, linspace(0,100e-9,2000) );
 
-solution_ini = struct();
-%convert the class obj to a struct so it can be loaded into fortran
-prob_struct = struct(problem_ini);
 
-tic
-solution_ini = MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
-elapsedTime_part1 = toc
-if (ShowTheResult)
-    figure; M_end = squeeze(solution_ini.M(end,:,:)); quiver(solution_ini.pts(:,1),solution_ini.pts(:,2),M_end(:,1),M_end(:,2)); axis equal; title('Starting state - Fortran')
-end
+%% Create Preset
+problem_ini.grid_L = thisGridL;% NOT STANDARD
+problem_ini.RecomputeInteractionMatrices = 1 ;
+problem_ini.ExternalMesh = 1 ;
+problem_ini.MeshType = 'Tetra' ;
+problem_ini.ExternalMeshFileName = TetraMeshFileName ;
+
+% solution_ini = struct();
+% %convert the class obj to a struct so it can be loaded into fortran
+% prob_struct = struct(problem_ini);
+% 
+% tic
+% solution_ini = MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
+% elapsedTime_part1 = toc
+% if (ShowTheResult)
+%     figure; M_end = squeeze(solution_ini.M(end,:,:)); quiver(solution_ini.pts(:,1),solution_ini.pts(:,2),M_end(:,1),M_end(:,2)); axis equal; title('Starting state - Fortran')
+% end
 
 %% Setup problem for the time-dependent solver
 problem_dym = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
@@ -102,22 +113,22 @@ end
 HextFct = @(t) (t>-1)' .*HystDir;
 problem_dym = problem_dym.setHext( HextFct, linspace(0,1e-9,2000) );
 
-problem_dym.m0(:) = solution_ini.M(end,:,:);
+% problem_dym.m0(:) = solution_ini.M(end,:,:);
 
 %convert the class obj to a struct so it can be loaded into fortran
-solution_dym = struct();
-prob_struct = struct(problem_dym);
-
-tic
-solution_dym = MagTenseLandauLifshitzSolver_mex( prob_struct, solution_dym );
-elapsedTime_part2 = toc
-
-if (ShowTheResult)
-    plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,1),2),'rx'); 
-    plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,2),2),'gx'); 
-    plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,3),2),'bx'); 
-    % figure; hold all; for i=2:4; plot(problem.Hext(:,1),problem.Hext(:,i),'.'); end;
-end
+% solution_dym = struct();
+% prob_struct = struct(problem_dym);
+% 
+% tic
+% solution_dym = MagTenseLandauLifshitzSolver_mex( prob_struct, solution_dym );
+% elapsedTime_part2 = toc
+% 
+% if (ShowTheResult)
+%     plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,1),2),'rx'); 
+%     plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,2),2),'gx'); 
+%     plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,3),2),'bx'); 
+%     % figure; hold all; for i=2:4; plot(problem.Hext(:,1),problem.Hext(:,i),'.'); end;
+% end
 
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% -------------------------------------------------------------------- MATLAB ----------------------------------------------------------
@@ -130,24 +141,20 @@ problem_ini = problem_ini.setShowTheResult(ShowTheResult);
 problem_ini = problem_ini.setSaveTheResult(SaveTheResult);      
 problem_ini.DirectoryFilename = ['Field_' num2str(NIST_field)' '\Matlab_simulations_' dir_m '\Matlab_resolution_' num2str(resolution(1)) '_' num2str(resolution(2)) '_' num2str(resolution(3)) ];
 problem_ini.SimulationName = 'Matlab_InitialStdProb4';
+problem_ini = problem_ini.setSolverType( 'UseDynamicSolver' );
 
 %% Matlab: Setup the problem for the initial configuration
-problem_ini = problem_ini.setSolverType( 'UseDynamicSolver' );
 tic
 [SigmaInit,~,InteractionMatrices] = ComputeTheSolution(problem_ini);
 toc
 
-for k=1:size(SigmaInit,1) 
-    Sigma = SigmaInit(k,:).' ;
-    NN = round(numel(Sigma)/3) ;
+Sigma = SigmaInit(end,:).' ;
+NN = round(numel(Sigma)/3) ;
 
-    SigmaX = Sigma(0*NN+[1:NN]) ;
-    SigmaY = Sigma(1*NN+[1:NN]) ;
-    SigmaZ = Sigma(2*NN+[1:NN]) ;
-end
-if (ShowTheResult)
-    figure; quiver(InteractionMatrices.X(:),InteractionMatrices.Y(:),SigmaX,SigmaY); axis equal;  title('Starting state - Matlab')
-end
+SigmaX = Sigma(0*NN+[1:NN]) ;
+SigmaY = Sigma(1*NN+[1:NN]) ;
+SigmaZ = Sigma(2*NN+[1:NN]) ;
+figure; quiver3(InteractionMatrices.X(:),InteractionMatrices.Y(:),InteractionMatrices.Z(:),SigmaX,SigmaY,SigmaZ); axis equal;
 
 %% Matlab: Setup problem for the time-dependent solver
 problem_dym = problem_dym.setSolverType( 'UseDynamicSolver' );
@@ -162,18 +169,13 @@ tic
 SigmaSol1 = ComputeTheSolution(problem_dym);
 toc
 
-for k=1:size(SigmaSol1,1) 
-    Sigma = SigmaSol1(k,:).' ;
-    NN = round(numel(Sigma)/3) ;
-
-    SigmaX = Sigma(0*NN+[1:NN]) ;
-    SigmaY = Sigma(1*NN+[1:NN]) ;
-    SigmaZ = Sigma(2*NN+[1:NN]) ;
-    SigmaN = sqrt(SigmaX.^2+SigmaY.^2+SigmaZ.^2) ;
-    Mx(k) = mean(SigmaX./SigmaN) ;
-    My(k) = mean(SigmaY./SigmaN) ;
-    Mz(k) = mean(SigmaZ./SigmaN) ;
-end
+[Mx,My,Mz] = ComputeMagneticMomentGeneralMesh(SigmaSol1,InteractionMatrices.GridInfo.Volumes) ;
+% figure ; hold on
+% title('TETRA A') ;
+% plot([MySim_ini.m0(1),Mx],'ro-') ;
+% plot([MySim_ini.m0(2),My],'go-')
+% plot([MySim_ini.m0(3),Mz],'bo-')
+% set(gca,'ylim',[-.1,1.1]) ; grid on
 
 if (ShowTheResult)
     plot(fig1, problem_dym.t,Mx,'ro')
