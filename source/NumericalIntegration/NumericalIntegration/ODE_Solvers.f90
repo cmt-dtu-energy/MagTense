@@ -191,7 +191,7 @@ private MTdmdt, MTy_out,MTf_vec
     !> @param[inout] y_out output array with the y_i values
     !---------------------------------------------------------------------------
 #if USE_CVODE
-    subroutine MagTense_CVODEsuite( neq, t, nt, ystart,  t_out, y_out, tol )
+    subroutine MagTense_CVODEsuite( neq, t, nt, ystart,  t_out, y_out, tol, callback )
 	use, intrinsic :: iso_c_binding
 
     use fcvode_mod                   ! Fortran interface to CVODE
@@ -205,6 +205,7 @@ private MTdmdt, MTy_out,MTf_vec
     integer(c_int),intent(in) :: neq,nt                   ! number of eq. and timesteps
     real(c_double),dimension(nt),intent(in) :: t          ! initial time
     real(c_double),dimension(nt),intent(inout) :: t_out   ! output time
+    procedure(callback_fct), pointer :: callback         !> Callback function
     real(c_double) :: rtol,atol,hlast,dum1,dum2,tol       ! relative and absolute tolerance
 
     integer(c_int) :: ierr,ierr2,ierr3,ierr4,ierr5         ! error flags from C functions
