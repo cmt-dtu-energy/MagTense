@@ -21,13 +21,15 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
-        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, tProblemPtr, useCudaPtr
-        mwPointer :: mxGetField, mxGetPr, ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr
+        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr
+        mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
+        mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
         mwPointer :: tolProblemPtr, thres_valueProblemPtr
+        mwPointer :: exch_matProblemPtr, irPtr, jcPtr
         integer,dimension(3) :: int_arr
         real*8,dimension(3) :: real_arr
         real*8 :: demag_fac
@@ -213,6 +215,41 @@
         sx = 1
         thres_valueProblemPtr = mxGetField( prhs, i, problemFields(29) )
         call mxCopyPtrToReal8(mxGetPr(thres_valueProblemPtr), problem%thres_value, sx )
+
+        sx = 1
+        useCVODEPtr = mxGetField( prhs, i, problemFields(30) )
+        call mxCopyPtrToInteger4(mxGetPr(useCVODEPtr), useCVODE, sx )
+        if ( useCVODE .eq. 1 ) then
+            problem%useCVODE = useCVODETrue
+        else
+            problem%useCVODE = useCVODEFalse
+        endif
+        
+        !File for loading the sparse exchange tensor from Matlab (for non-uniform grids)
+        if ( problem%grid%gridType .eq. gridTypeNonUniform ) then
+            ! Number of non-zero entries in sparse matrix
+            exch_matProblemPtr = mxGetField( prhs, i, problemFields(31) )
+            problem%grid%nu_exch_mat%length = mxGetNzmax(exch_matProblemPtr)
+            
+            problem%grid%nu_exch_mat%cols = mxGetN(exch_matProblemPtr)
+            problem%grid%nu_exch_mat%rows = mxGetM(exch_matProblemPtr)
+            
+            ! Row indices for elements
+            sx = problem%grid%nu_exch_mat%length
+            allocate( problem%grid%nu_exch_mat%ir( problem%grid%nu_exch_mat%length ) )
+            irPtr = mxGetIr(exch_matProblemPtr)
+            call mxCopyPtrToInteger4(mxGetPr(irPtr), problem%grid%nu_exch_mat%ir, sx)
+            
+            ! Column index information
+            sx = problem%grid%nu_exch_mat%cols + 1
+            allocate( problem%grid%nu_exch_mat%jc( sx ) )
+            jcPtr = mxGetJc(exch_matProblemPtr)
+            call mxCopyPtrToInteger4(mxGetPr(jcPtr), problem%grid%nu_exch_mat%jc, sx)
+            
+            sx = problem%grid%nu_exch_mat%length
+            allocate( problem%grid%nu_exch_mat%values( problem%grid%nu_exch_mat%length ) )
+            call mxCopyPtrToReal8(mxGetPr(exch_matProblemPtr), problem%grid%nu_exch_mat%values, sx )
+        endif
         
         !Clean-up 
         deallocate(problemFields)
@@ -385,6 +422,8 @@
         fieldnames(27) = 'alphat'
         fieldnames(28) = 'tol'
         fieldnames(29) = 'thres'
+        fieldnames(30) = 'useCVODE'
+        fieldnames(31) = 'exch_mat'
         
     end subroutine getProblemFieldnames
     
@@ -509,7 +548,7 @@
     
     end subroutine displayMatlabMessage
     
-    subroutine displayMatlabProgessMessage( mess, prog )
+    subroutine displayMatlabProgressMessage( mess, prog )
         character(*),intent(in) :: mess
         integer,intent(in) :: prog
         character*(4) :: prog_str   
@@ -522,7 +561,7 @@
         call displayMatlabMessage( mess )
         call displayMatlabMessage( prog_str )
         
-    end subroutine displayMatlabProgessMessage
+    end subroutine displayMatlabProgressMessage
     
     subroutine displayMatlabProgessTime( mess, time  )
         character(*),intent(in) :: mess

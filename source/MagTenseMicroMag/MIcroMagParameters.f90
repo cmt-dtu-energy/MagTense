@@ -10,6 +10,12 @@ include "mkl_dfti.f90"
     !>------------------
     !> Custom types
     !>------------------
+    type SparseMatlabMat
+        integer :: length !> Number of non-zero values
+        integer :: rows, cols !> Number of rows, cols
+        integer,dimension(:),allocatable :: ir, jc !> Row- and column index information
+        real(DP),dimension(:),allocatable :: values
+    end type
     
     type MicroMagGrid
         integer :: nx, ny, nz
@@ -20,6 +26,7 @@ include "mkl_dfti.f90"
         
         real(DP),dimension(:,:),allocatable :: pts  !> Array with the x,y,z points on list form, i.e. pts(i,:) is the x,y,z components of the i'th point
         integer :: gridType
+        type(SparseMatlabMat) :: nu_exch_mat !> Sparse exchange matrix for non-uniform grids (generated in Matlab). Consider moving to problem.
     end type MicroMagGrid
     
     !> Stores a table in one variable
@@ -134,7 +141,7 @@ include "mkl_dfti.f90"
     !> Parameters
     !>------------
     
-    integer,parameter :: gridTypeUniform=1
+    integer,parameter :: gridTypeUniform=1,gridTypeNonUniform=2
     integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
     integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverImplicit=3
     integer,parameter :: useCudaTrue=1,useCudaFalse=0
