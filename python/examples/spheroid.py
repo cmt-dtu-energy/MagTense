@@ -16,12 +16,12 @@ def main():
 
     # Defines second tile as oblate spheroid
     spheroids.set_tile_type_i(7, 1)
-    spheroids.set_size_i([0.5, 0.5, 0.1], 1)
+    spheroids.set_size_i([0.1, 0.5, 0.5], 1)
     spheroids.set_offset_i([1, 2.5, 1], 1)
     spheroids.set_remanence_i(1 / (4*np.pi*1e-7), 1)
     spheroids.set_easy_axis_i([-1, 1, 0], 1)
     spheroids.set_rot_axis_i([-1, 1, -3], 'c', 1)
-    spheroids.set_color_i([0, 1, 0], 1)
+    spheroids.set_color_i([1, 0, 1], 1)
 
     # Defines thrid tile as prolate spheroid
     spheroids.set_tile_type_i(7, 2)

@@ -34,11 +34,7 @@ class Tiles():
         self.use_sym = np.zeros(shape=(n), dtype=np.int32, order='F') # whether to exploit symmetry
         self.sym_op = np.ones(shape=(n,3), dtype=np.float64, order='F') # 1 for symmetry and -1 for anti-symmetry respectively to the planes
         self.M_rel = np.zeros(shape=(n), dtype=np.float64, order='F')
-
-        # New attributes for spheroids
-        self.ax = np.zeros(shape=(n,3), dtype=np.float64, order='F')
-        self.rot_axis = ['c' for _ in range(n)] # 'c' = c-axis of spheroid, 's' = symmetry axis (a or b)
-        
+ 
         # Internal parameters for python to prepare configuration
         self.grid_pos = np.zeros(shape=(n), dtype=np.float64, order='F') # positions in the grid
         self.n = n
@@ -145,13 +141,18 @@ class Tiles():
         return self.offset[i]
     
     def set_rotation_i(self, rotation, i):
-        self.rot[i] = rotation
+        if self.tile_type == 7:
+            print('For spheroids the rotation axis has to be set rather than the specific Euler angles!')
+        else:
+            self.rot[i] = rotation
 
     def get_rotation(self, i):
         return self.rot[i]
     
     def set_easy_axis(self, easy_axis):
         for i,ea in enumerate(easy_axis):
+            # Bring axis to unit length
+            ea = ea / np.linalg.norm(ea)
             self.u_ea[i] = np.around(ea, decimals=9)
             self.M[i] = self.M_rem[i] * self.u_ea[i]
             oa_1 = np.array([easy_axis[i][1], -easy_axis[i][0], 0])
@@ -160,8 +161,10 @@ class Tiles():
             oa_2 = np.cross(self.u_ea[i], self.u_oa1)
             self.u_oa2[i] = np.around(oa_2, decimals=9)
 
-    def set_easy_axis_i(self, easy_axis, i):
-        self.u_ea[i] = np.around(easy_axis, decimals=9)
+    def set_easy_axis_i(self, ea, i):
+        # Bring axis to unit length
+        ea = ea / np.linalg.norm(ea)
+        self.u_ea[i] = np.around(ea, decimals=9)
         self.M[i] = self.M_rem[i] * self.u_ea[i]
     
     def set_oa1_i(self, other_axis, i):
@@ -242,54 +245,36 @@ class Tiles():
     def set_mag_type_i(self, mag_type, i):
         self.magnetic_type[i] = mag_type
 
-    def set_rot_axis_i(self, ax, rot_axis, i):
-        self.ax[i] = ax
-        self.rot_axis[i] = rot_axis
+    def set_rot_axis_i(self, ax, i):
+        # Check if size was specified beforehand:
+        if self.size[i][0] == 0 and self.size[i][1] == 0 and self.size[i][2] == 0:
+            print('Size of spheroid has to be defined beforehand!')
+            exit()
+        # Check if rotation axis was specified beforehand:
+        if ax[0] == 0 and ax[1] == 0 and ax[2] == 0:
+            print('Rotation axis has to be defined as non-zero vector!')
+            exit()
 
-        # Calculating rotation angles from given rotation axis
-        if self.rot[i][0] == 0 and self.rot[i][1] == 0 and self.rot[i][2] == 0:
-            # Check for if rotation axis is defined correctly
-            if self.rot_axis[i] != 'c' and self.rot_axis[i] != 's':
-                print("rot_axis has to be 'c' or 's'")
-                exit()
-            # Check if size was specified beforehand:
-            if self.size[i][0] == 0 and self.size[i][1] == 0 and self.size[i][2] == 0:
-                print('Size of spheroid has to be defined beforehand!')
-                exit()
-            # Check if rotation axis was specified beforehand:
-            if ax[0] == 0 and ax[1] == 0 and ax[2] == 0:
-                print('Rotation axis has to be defined as non-zero vector!')
-                exit()
+        # Rotation in MagTense performed in local coordinate system:
+        # (1) Rot_X_L, (2) Rot_Y_L', (3) Rot_Z_L''
 
-            # Calculate the spherical coordinates: yaw and pitch
-            # Rotates z-axis of local coordinate system to given rotation axis
-            rot = np.zeros(3)
-            rot[0] = 0
-            rot[1] = math.acos(ax[2] / math.sqrt(ax[0]**2 + ax[1]**2 + ax[2]**2))
-            rot[2] = math.atan2(ax[1],ax[0])
+        # symm-axis of geometry points in the direction of z-axis of L
+        # Rotates given rotation axis with pi/2 around y_L''
+        # Moves x-axis of L'' to z-axis
+        # ax[0] = ax[2], ax[1] = ax[1], ax[2] = -ax[0]
+        R_y = [math.cos(math.pi/2), 0, math.sin(math.pi/2)], [0, 1, 0], [-math.sin(math.pi/2), 0, math.cos(math.pi/2)]
+        ax = np.dot(np.asarray(R_y), np.asarray(ax).T)
 
-            # c-axis on z-axis
-            if self.size[i][0] == self.size[i][1]:
-                # Rotate x-axis to z-axis
-                if rot_axis == 's':
-                    rot[1] = rot[1] - math.pi/2
-            # c-axis on x-axis
-            elif self.size[i][1] == self.size[i][2]:
-                # Rotate c-axis to z-axis
-                if rot_axis == 'c':
-                    rot[1] = rot[1] - math.pi/2
-            # c-axis on y-axis
-            elif self.size[i][0] == self.size[i][2]:
-                # Rotate c-axis to z-axis
-                if rot_axis == 'c':
-                    rot[0] = math.pi/2
-                # Rotate x-axis to z-axis
-                elif rot_axis == 's':
-                    rot[0] = math.pi/2
-                    rot[1] = rot[1] - math.pi/2
-            self.rot[i] = rot
-        else:
-            print('Rotation already defined by Euler angles!')
+        # Calculate the spherical coordinates: yaw and pitch
+        # x_L'' has to match ax
+        # Perform negative yaw around x_L and pitch around y_L'
+        # The azimuthal angle is offset by pi/2 (zero position of x_L'')
+        rot = np.zeros(3)
+        rot[0] = -math.atan2(ax[1],ax[0]) 
+        rot[1] = math.acos(ax[2] / math.sqrt(ax[0]**2 + ax[1]**2 + ax[2]**2)) - math.pi/2
+        rot[2] = 0
+
+        self.rot[i] = rot
     
     def get_rot_axis(self, i):
         return self.ax[i], self.rot_ax[i]

@@ -40,26 +40,54 @@ def plot_sphere(ax, r, offset, M, color):
     # Plot spherical surface
     ax.plot_surface(x, y, z, rstride=1, cstride=1, color=color, alpha=.25, linewidth=0)
 
+    # Plot two circular edges
+    psi = np.linspace(0, 2*np.pi, 50)
+    s_psi = r * np.sin(psi)
+    c_psi = r * np.cos(psi)
+    zeros = np.zeros(shape=psi.shape)
+    # a-axis 
+    ax.plot(zeros + offset[0], s_psi + offset[1], c_psi + offset[2], color=color, alpha=.75, linewidth=1)
+    # b-axis 
+    ax.plot(s_psi + offset[0], zeros + offset[1], c_psi + offset[2], color=color, alpha=.75, linewidth=1)
+    # c-axis
+    ax.plot(s_psi + offset[0], c_psi + offset[1], zeros + offset[2], color=color, alpha=.75, linewidth=1)
+
     # Plot vector of magnetization in the center of the cube
     ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2], color=color, length=r/3, pivot='middle', normalize=True)
 
 def plot_spheroid(ax, size, offset, rotation, M, color):
     # Create meash of surface points
     theta, phi = np.mgrid[0:np.pi:20j, 0:2*np.pi:20j]    
-    
-    # Check which size belongs to c-axis
+    psi = np.linspace(0, 2*np.pi, 50)
+    s_psi = np.sin(psi)
+    c_psi = np.cos(psi)
+
+    # Size values are ordered: size[2] = c-axis
     if size[0] == size[1]:
-        x = size[0]*np.cos(phi)*np.sin(theta)
-        y = size[0]*np.sin(phi)*np.sin(theta)
-        z = size[2]*np.cos(theta)
+        pass
     elif size[0] == size[2]:
-        x = size[0]*np.cos(phi)*np.sin(theta)
-        y = size[1]*np.cos(theta)
-        z = size[0]*np.sin(phi)*np.sin(theta)
+        size[2] = size[1]
+        size[1] = size[0]
     elif size[1] == size[2]:
-        x = size[0]*np.cos(theta)
-        y = size[1]*np.cos(phi)*np.sin(theta)
-        z = size[1]*np.sin(phi)*np.sin(theta)
+        size[2] = size[0]
+        size[0] = size[1]
+
+    # c-axis on z-axis
+    x = size[0]*np.cos(phi)*np.sin(theta)
+    y = size[0]*np.sin(phi)*np.sin(theta)
+    z = size[2]*np.cos(theta)
+    # circular a-axis 
+    x_circ = size[0] * s_psi
+    y_circ = size[0] * c_psi
+    z_circ = 0 * c_psi
+    # ellipsoidal c-axis
+    x_ellip = 0 * s_psi
+    y_ellip = size[0] * s_psi
+    z_ellip = size[2] * c_psi
+    # third axis
+    x_third = size[0] * s_psi
+    y_third = 0 * c_psi
+    z_third = size[2] * c_psi
 
     R = get_rotmat(rotation)
 
@@ -69,8 +97,22 @@ def plot_spheroid(ax, size, offset, rotation, M, color):
             v = np.array([x[j,i], y[j,i], z[j,i]])
             x[j,i], y[j,i], z[j,i] = (np.dot(R, v.T)).T + offset
 
+    # Rotate edges
+    for k in range(psi.shape[0]):
+        v_circ = np.array([x_circ[k], y_circ[k], z_circ[k]])
+        x_circ[k], y_circ[k], z_circ[k] = (np.dot(R, v_circ.T)).T + offset
+        v_ellip = np.array([x_ellip[k], y_ellip[k], z_ellip[k]])
+        x_ellip[k], y_ellip[k], z_ellip[k] = (np.dot(R, v_ellip.T)).T + offset
+        v_third = np.array([x_third[k], y_third[k], z_third[k]])
+        x_third[k], y_third[k], z_third[k] = (np.dot(R, v_third.T)).T + offset
+
     # Plot spherical surface
     ax.plot_surface(x, y, z, rstride=1, cstride=1, color=color, alpha=.25, linewidth=0)
+
+    # Plot three edges
+    ax.plot(x_circ, y_circ, z_circ, color=color, alpha=.75, linewidth=1)
+    ax.plot(x_ellip, y_ellip, z_ellip, color=color, alpha=.75, linewidth=1)
+    ax.plot(x_third, y_third, z_third, color=color, alpha=.75, linewidth=1)
 
     # Plot vector of magnetization in the center of the cube
     ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(size)/4, pivot='middle', normalize=True)
@@ -263,19 +305,10 @@ def get_rotmat(rot):
     rot_x = [1, 0, 0], [0, math.cos(rot[0]), -math.sin(rot[0])], [0, math.sin(rot[0]), math.cos(rot[0])]
     rot_y = [math.cos(rot[1]), 0, math.sin(rot[1])], [0, 1, 0], [-math.sin(rot[1]), 0, math.cos(rot[1])]
     rot_z = [math.cos(rot[2]), -math.sin(rot[2]), 0], [math.sin(rot[2]), math.cos(rot[2]), 0], [0, 0, 1]
-    # TODO: Check rotation from local to global: (1) Rot_Z, (2) Rot_Y, (3) Rot_X
-    # G to L: 
-    # R = np.asarray(rot_x) @ np.asarray(rot_y) @ np.asarray(rot_z)
-    # TODO: Check validations with COMSOL
-    # Old implementation
-    R = np.asarray(rot_z) @ np.asarray(rot_y) @ np.asarray(rot_x)
-    # Faster implementation:
-    # cx,cy,cz = np.cos(theta) 
-    # sx,sy,sz = np.sin(theta)
-    # R = np.zeros((3,3))
-    # R.flat = (cx*cz - sx*cy*sz, cx*sz + sx*cy*cz, sx*sy,
-    #     -sx*cz - cx*cy*sz, -sx*sz + cx*cy*cz, 
-    #     cx*sy, sy*sz, -sy*cz, cy)
+    # TODO: Check rotation from local to global: (1) Rot_X, (2) Rot_Y, (3) Rot_Z
+    # G to L in local coordinate system: 
+    R = np.asarray(rot_x) @ np.asarray(rot_y) @ np.asarray(rot_z)
+
     return R
 
 def plot_field(axes, points, H):

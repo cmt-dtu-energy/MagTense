@@ -2,7 +2,7 @@ import os
 import numpy as np
 
 # Load reference points from COMSOL calculation
-def load_COMSOL_eval(file_name, eval_offset, COMSOL_eval_path, pts_special=None):
+def load_COMSOL_eval(file_name, eval_offset, COMSOL_eval_path, model_offset=[0,0,0], pts_special=None, unit='A/m'):
     with open(os.path.join(COMSOL_eval_path, file_name), "r") as file:
                 T = file.readlines()[8:]
 
@@ -16,11 +16,14 @@ def load_COMSOL_eval(file_name, eval_offset, COMSOL_eval_path, pts_special=None)
         pts_coor = pts_special
     struc = np.ones(len(pts_coor))
     if file_name[-5] == 'x':
-        pts = np.c_[pts_coor, struc*eval_offset[1], struc*eval_offset[2]]
+        pts = np.c_[pts_coor-model_offset[0], struc*eval_offset[1], struc*eval_offset[2]]
     elif file_name[-5] == 'y':
-        pts = np.c_[struc*eval_offset[0], pts_coor, struc*eval_offset[2]]
+        pts = np.c_[struc*eval_offset[0], pts_coor-model_offset[1], struc*eval_offset[2]]
     elif file_name[-5] == 'z':
-        pts = np.c_[struc*eval_offset[0], struc*eval_offset[1], pts_coor]
+        pts = np.c_[struc*eval_offset[0], struc*eval_offset[1], pts_coor-model_offset[2]]
+
+    if unit == 'T':
+        H_norm_COMSOL = H_norm_COMSOL*(4*np.pi*1e-7)
 
     return (pts, H_norm_COMSOL)
 
