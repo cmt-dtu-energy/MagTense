@@ -25,7 +25,7 @@
       real,dimension(:),allocatable :: t,y0     !>Time and y0 arrays
       real,dimension(:),allocatable :: t_out    !>Time out array
       real,dimension(:,:),allocatable :: y_out  !>y output array
-      mwSize :: sx                              !>MEX integer for keeping the size correct
+      mwSize :: sx, sizevars                    !>MEX integer for keeping the size correct
       mwSize,dimension(3) :: dims               !>Used for copying back to ML
       integer*4 ComplexFlag,classid             !>Flags for communicating with ML
       integer*4 mxIsDouble, mxIsInt32, mxIsStruct, mxClassIDFromClassName  !>Various MEX functions
@@ -49,8 +49,9 @@
       
       
       !Load the neq and nt
-      call mxCopyPtrToInteger4(mxGetPr(prhs(3)), nt, 1 )
-      call mxCopyPtrToInteger4(mxGetPr(prhs(4)), neq, 1 )
+      sizevars = 1
+      call mxCopyPtrToInteger4(mxGetPr(prhs(3)), nt, sizevars )
+      call mxCopyPtrToInteger4(mxGetPr(prhs(4)), neq, sizevars )
     
       !Allocate the t and y0 arrays
       allocate(t(nt),y0(neq))

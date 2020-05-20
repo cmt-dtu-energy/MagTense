@@ -24,9 +24,10 @@
       integer*4 mxIsStruct      
     
       mwPointer mxGetPr
-    
+      mwSize sizevars
+
 !     Pointers to input/output mxArrays:      
-      type(MagTile),allocatable,dimension(:) :: tile  
+      type(MagTile),allocatable,dimension(:) :: cylTile  
       type(MagStateFunction),allocatable,dimension(:) :: stateFunctions
       
       integer*4 :: n_tiles,n_statefunctions,max_ite
@@ -34,15 +35,15 @@
       
 !     Check for proper number of arguments. 
       if( nrhs .lt. 6) then
-         call mexErrMsgIdAndTxt ('MATLAB:MagTense_mex:nInput','At least six inputs are required.')
+         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput','At least six inputs are required.')
       elseif(nlhs .gt. 1) then
-         call mexErrMsgIdAndTxt ('MATLAB:MagTense_mex:nOutput','Too many output arguments.')
+         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nOutput','Too many output arguments.')
       endif
 
       max_ite = 100
       !! default value is zero, i.e. do not resume iteration
       resumeIteration = 0.
-      
+
 !Check the type of the inputs      
       if ( .NOT. mxIsStruct(prhs(1)) ) then
           call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input one should be a struct')      
@@ -60,46 +61,51 @@
            if ( .NOT. mxIsInt32(prhs(7)) ) then
                 call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input seven (optional) should be an integer')                      
            else
-               call mxCopyPtrToInteger4(mxGetPr(prhs(7)), max_ite,1)
+                sizevars = 1
+                call mxCopyPtrToInteger4(mxGetPr(prhs(7)), max_ite,sizevars )
            endif            
            if ( nrhs .gt. 7 ) then          
                if ( .NOT. mxIsDouble(prhs(8)) ) then
                      call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input eight (optional) should be a real')                      
                  else
+                     sizevars = 1
                      call mxCopyPtrToReal8(mxGetPr(prhs(8)), resumeIteration,1)
                  endif            
            endif          
       endif                  
-      
-      
+
       !::Copy the number of tiles
-      call mxCopyPtrToInteger4(mxGetPr(prhs(2)), n_tiles,1)
+      sizevars = 1
+      call mxCopyPtrToInteger4(mxGetPr(prhs(2)), n_tiles,sizevars )
       
       !::Copy the number of statefunctions
-      call mxCopyPtrToInteger4(mxGetPr(prhs(4)), n_statefunctions,1)
+      sizevars = 1
+      call mxCopyPtrToInteger4(mxGetPr(prhs(4)), n_statefunctions,sizevars )
 
       !::Copy the temperature
-      call mxCopyPtrToReal8(mxGetPr(prhs(5)), T, 1 )
+      sizevars = 1
+      call mxCopyPtrToReal8(mxGetPr(prhs(5)), T, sizevars  )
       
       !::Copy the max error
-      call mxCopyPtrToReal8(mxGetPr(prhs(6)), err_max, 1 )
+      sizevars = 1
+      call mxCopyPtrToReal8(mxGetPr(prhs(6)), err_max, sizevars )
       
       !::allocate the tiles
-      allocate( tile(n_tiles) )
+      allocate( cylTile(n_tiles) )
       !::allocate the state functions
       allocate( stateFunctions(n_stateFunctions) )
       !::Copy the input parameters      
-      call loadMagTile( prhs(1), tile, n_tiles )
+      call loadMagTile( prhs(1), cylTile, n_tiles )
       !::copy the state functions
       call loadMagStateFunction( prhs(3), stateFunctions, n_statefunctions )
             
       !::do the calculation
-      call iterateMagnetization( tile, n_tiles,stateFunctions, n_statefunctions, T, err_max, max_ite, displayIteration_Matlab, resumeIteration )
+      call iterateMagnetization( cylTile, n_tiles,stateFunctions, n_statefunctions, T, err_max, max_ite, displayIteration_Matlab, resumeIteration )
       
       !::Return the updated struct array to matlab
-      call returnMagTile( tile, n_tiles, plhs(1) )
+      call returnMagTile( cylTile, n_tiles, plhs(1) )
       
-      deallocate(tile,stateFunctions)
+      deallocate(cylTile,stateFunctions)
             
       end subroutine
       

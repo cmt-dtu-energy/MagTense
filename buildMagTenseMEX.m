@@ -23,12 +23,18 @@ if (ispc)
     MagTenseMicroMag_lib_str        = '-lMagTenseMicroMag';
     MEX_str = 'w';
 else
-    compiler_str = 'FC=''/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort -fpp -fpic -free''';
-    MagneticForceIntegrator_lib_str = '';
-    DemagField_lib_str              = '';
-    NumericalIntegration_lib_str    = '';
-    TileDemagTensor_lib_str         = '';
-    MagTenseMicroMag_lib_str        = '';
+    %compiler_str = 'FC=''/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort -fpp -fpic -free -Wl,--no-as-needed -mkl -lmkl_intel_lp64 -lmkl_lapack95_lp64 -lmkl_blas95_lp64 -static-intel ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_lapack95_lp64.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_lp64.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_thread.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_core.a'' -liomp5 -lpthread -lm -ldl ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/intel64/lp64/'' ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include''''';
+    
+
+    compiler_str = 'FC=''/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort -fpp -fpic -free -mkl -static-intel -I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/intel64/lp64 -I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include''' 
+    %compiler_str = 'FC=''/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort -fpp -fpic -free -mkl /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a  -liomp5 -lpthread -lm -ldl''';    
+    %compiler_str = 'FC=''/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort -fpp -fpic -free -mkl -lmkl_intel_lp64 -lmkl_lapack95_lp64 -lmkl_blas95_lp64 -static-intel -libs:static -I../NumericalIntegration/NumericalIntegration/ -I../DemagField/DemagField/ -I/apps/external/matlab/2019/b/extern/include/ -I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/ -I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/ -I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/intel64/lp64 -I../TileDemagTensor/TileDemagTensor/ -Wl, --start-group /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_lp64.a /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_lapack95_lp64.a /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_thread.a /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl''';
+    %compiler_str = 'FC=''/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort -fpp -fpic -free -mkl -static-intel Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_lapack95_lp64 -lmkl_blas95_lp64  -Wl, --start-group /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_lp64.a /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_lapack95_lp64.a /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_thread.a /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl''';
+    MagneticForceIntegrator_lib_str = '-lMagneticForceIntegrator ''-Lsource/MagneticForceIntegrator/MagneticForceIntegrator/MagneticForceIntegratorLib.a''';
+    DemagField_lib_str              = '-lDemagField ''-Lsource/DemagField/DemagField/DemagFieldLib.a''';
+    NumericalIntegration_lib_str    = '-lNumericalIntegration ''-Lsource/NumericalIntegration/NumericalIntegration/NumericalIntegrationLib.a''';
+    TileDemagTensor_lib_str         = '-lTileDemagTensor ''-Lsource/TileDemagTensor/TileDemagTensor/TileDemagTensorLib.a''';
+    MagTenseMicroMag_lib_str        = '-lMagTenseMicroMag ''-Lsource/MagTenseMicroMag/MagTenseMicroMagLib.a''';
     MEX_str = 'a';
 end
 
@@ -42,7 +48,7 @@ if (ispc)
     end
 else
     if (USE_RELEASE)
-        Debug_flag = '' ;
+        Debug_flag = '-g' ;
     else
         Debug_flag = '-g' ;
     end 
@@ -116,7 +122,8 @@ Options_str                 = 'COMPFLAGS="$COMPFLAGS /O3 /free /real_size:64 /fp
 if (ispc)
     MKL_str                 = '''-Lc:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/lib/intel64_win/'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-Ic:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/include/''';
 else
-    MKL_str                 = '''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/''';
+    %MKL_str                 = '''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/''';
+    MKL_str                 = '/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a  -liomp5 -lpthread -lm -ldl';%'''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/'' ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/'' ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/intel64/lp64''  ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_lp64.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_thread.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_core.a''';
 end
 
 %%--------------------------------------------------------------------------------------------------------
@@ -124,7 +131,7 @@ end
 %%------------------------------------------------------------------------- ------------------------------
 %% MagTenseLandauLifshitzSolver_mex
 Source_str = 'source/MagTenseMEX/MagTenseMEX/MagTenseLandauLifshitzSolver_mex.f90';
-mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' NumericalIntegration_str ' ' DemagField_str ' ' TileDemagTensor_str ' ' CUDA_str ' ' CVODE_str ' ' MKL_str ' ' MagTenseMicroMag_str ' ' Source_str ' ' Options_str];
+mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' MagTenseMicroMag_str ' ' DemagField_str ' ' TileDemagTensor_str ' ' NumericalIntegration_str ' ' CUDA_str ' ' CVODE_str ' ' MKL_str ' ' Source_str ' ' Options_str];
 eval(mex_str) 
 if ~USE_RELEASE
     movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb']);
@@ -133,7 +140,7 @@ movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_file
 
 %% IterateMagnetization_mex
 Source_str = 'source/MagTenseMEX/MagTenseMEX/IterateMagnetization_mex.f90';
-mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' DemagField_str ' ' NumericalIntegration_str ' ' TileDemagTensor_str ' ' Source_str ' ' Options_str];
+mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' DemagField_str ' ' TileDemagTensor_str ' ' NumericalIntegration_str ' ' Source_str ' ' Options_str];
 eval(mex_str) 
 if ~USE_RELEASE
     movefile(['IterateMagnetization_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/IterateMagnetization_mex.mex' MEX_str '64.pdb']);
@@ -142,7 +149,7 @@ movefile(['IterateMagnetization_mex.mex' MEX_str '64'],['matlab/MEX_files/Iterat
         
 %% getHFromTiles_mex
 Source_str = 'source/MagTenseMEX/MagTenseMEX/getHFromTiles_mex.f90';
-mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' DemagField_str ' ' NumericalIntegration_str ' ' TileDemagTensor_str ' ' Source_str ' ' Options_str];
+mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' DemagField_str ' ' TileDemagTensor_str ' ' NumericalIntegration_str ' ' Source_str ' ' Options_str];
 eval(mex_str) 
 if ~USE_RELEASE
     movefile(['getHFromTiles_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/getHFromTiles_mex.mex' MEX_str '64.pdb']);
