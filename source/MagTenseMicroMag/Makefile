@@ -2,10 +2,15 @@
 FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
 
 
-FFLAGS = -O3 -mkl -fpp -fpe0 -fp-model source -fpic -I../NumericalIntegration/NumericalIntegration/ \
+FFLAGS = -O3 -mkl -fpp -fpe0 -fp-model source -fpic -static-intel -libs:static -lmkl_intel_lp64 -lmkl_lapack95_lp64 -lmkl_blas95_lp64 -I../NumericalIntegration/NumericalIntegration/ \
 	-I../DemagField/DemagField/ -I/apps/external/matlab/2019/b/extern/include/ -I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/ \
 	-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/ -I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/intel64/lp64 \
-	-I../TileDemagTensor/TileDemagTensor/
+	-I../TileDemagTensor/TileDemagTensor/  \
+	-Wl, --start-group /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_lp64.a \
+	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a \
+	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_lapack95_lp64.a \
+	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_thread.a \
+	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl
 
 
 
@@ -30,8 +35,8 @@ FFLAGS = -O3 -mkl -fpp -fpe0 -fp-model source -fpic -I../NumericalIntegration/Nu
 
 MagTenseMicroMagLib = $(FC) LandauLifshitzEquationSolver.o MagTenseMicroMagIO.o MicroMagParameters.o FortranCuda.o LLODE_Debug.o
 
-MagTenseMicroMagLib.a: $(MagTenseMicroMagLib)
-	ar rc MagTenseMicroMagLib.a LandauLifshitzEquationSolver.o MagTenseMicroMagIO.o MicroMagParameters.o FortranCuda.o LLODE_Debug.o
+libMagTenseMicroMag.a: $(MagTenseMicroMagLib)
+	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/xiar rc libMagTenseMicroMag.a LandauLifshitzEquationSolver.o MagTenseMicroMagIO.o MicroMagParameters.o FortranCuda.o LLODE_Debug.o
 
 
 clean:

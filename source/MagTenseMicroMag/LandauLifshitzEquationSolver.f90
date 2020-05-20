@@ -3,7 +3,7 @@ include 'blas.f90'
     use ODE_Solvers
     use integrationDataTypes
     use MKL_SPBLAS
-    Use MKL_DFTI
+    use MKL_DFTI
     use BLAS95
     use MicroMagParameters
     use MagTenseMicroMagIO

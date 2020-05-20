@@ -79,18 +79,24 @@ grid on
 box on
 
 %Plot the solution
-plot(x,4*pi*1e-7*Hnorm(1:numel(x)),'r.');
-plot(y,4*pi*1e-7*Hnorm((numel(x)+1):(numel(x)+numel(y))),'g.');
-plot(z,4*pi*1e-7*Hnorm((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z))),'b.');
+Hnorm_along_x = 4*pi*1e-7*Hnorm(1:numel(x));
+Hnorm_along_y = 4*pi*1e-7*Hnorm((numel(x)+1):(numel(x)+numel(y)));
+Hnorm_along_z = 4*pi*1e-7*Hnorm((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)));
+plot(x,Hnorm_along_x,'r.');
+plot(y,Hnorm_along_y,'g.');
+plot(z,Hnorm_along_z,'b.');
 
 %Load comparison data from FEM simulation
-data_FEM_x = load('..\..\..\documentation\examples_FEM_validation\Validation_prism\Validation_prism_normH_x.txt');
-data_FEM_y = load('..\..\..\documentation\examples_FEM_validation\Validation_prism\Validation_prism_normH_y.txt');
-data_FEM_z = load('..\..\..\documentation\examples_FEM_validation\Validation_prism\Validation_prism_normH_z.txt');
+data_FEM_x = load('../../../documentation/examples_FEM_validation/Validation_prism/Validation_prism_normH_x.txt');
+data_FEM_y = load('../../../documentation/examples_FEM_validation/Validation_prism/Validation_prism_normH_y.txt');
+data_FEM_z = load('../../../documentation/examples_FEM_validation/Validation_prism/Validation_prism_normH_z.txt');
 
 plot(data_FEM_x(:,1),data_FEM_x(:,2),'ro');
 plot(data_FEM_y(:,1),data_FEM_y(:,2),'go');
 plot(data_FEM_z(:,1),data_FEM_z(:,2),'bo');
+
+error = [abs(interp1(data_FEM_x(:,1),data_FEM_x(:,2),x,'linear','extrap')'-Hnorm_along_x); abs(interp1(data_FEM_y(:,1),data_FEM_y(:,2),y,'linear','extrap')'-Hnorm_along_y); abs(interp1(data_FEM_z(:,1),data_FEM_z(:,2),z,'linear','extrap')'-Hnorm_along_z)];
+disp(['Mean error between MagTense and FEM = ' num2str(mean(error)) '+/-' num2str(std(error))])
 
 h_l = legend('MagTense, x for y,z=offset','MagTense, y for x,z=offset','MagTense, z for x,y=offset','FEM, x for y,z=offset','FEM, y for x,z=offset','FEM, z for x,y=offset','Location','West');
 set(h_l,'fontsize',10);

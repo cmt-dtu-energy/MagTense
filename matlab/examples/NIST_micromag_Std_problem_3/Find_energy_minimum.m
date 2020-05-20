@@ -1,18 +1,15 @@
 function Find_energy_minimum
     clearvars
-    
+    options = optimset('TolFun',1e-3,'TolX',1e-3);
     k = 1;
-    for i = 5:15
-        try
-            tic
-            [x,~,~,~] = fminsearchbnd(@Find_energy_cross,[8.5 i],[8 i],[9 i]);
-            E_time = toc;
-            
-            L_arr(k,:) = [x toc];
-            k = k+1;
-        catch
-            1
-        end
+    for i = 5:20
+        tic
+        [x,~,~,~] = fminsearchbnd(@Find_energy_cross,[8.5 i],[8 i],[9 i],options);
+        E_time = toc;
+
+        L_arr(k,:) = [i x E_time];
+        k = k+1;
+        save('Standard_problem_3_E_cross.mat','L_arr')
     end
 end
 
