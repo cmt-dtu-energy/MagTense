@@ -1,12 +1,6 @@
-import os
-import sys
 import numpy as np
-import math
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + '/../source')
 import MagTense
-import MagTenseStandalone
-import util_plot
 
 def main():
     # Defining grid

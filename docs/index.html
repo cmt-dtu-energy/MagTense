@@ -13,6 +13,8 @@
 
   
   
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+  
   
   
 
@@ -32,11 +34,12 @@
     
 
   
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/techmanual.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="author" title="About these documents" href="about.html" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Basic Geometries" href="basic_geometries.html" /> 
+    <link rel="next" title="About" href="about.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -46,11 +49,11 @@
     
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
-        <div class="wy-side-nav-search" >
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
           
 
           
-            <a href="#" class="icon icon-home"> MagTense TechManual
+            <a href="#">
           
 
           
@@ -84,8 +87,14 @@
             
             
               <ul>
-<li class="toctree-l1"><a class="reference internal" href="basic_geometries.html">Basic Geometries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
 </ul>
 
             
@@ -109,60 +118,41 @@
         
         <div class="rst-content">
         
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
-  <ul class="wy-breadcrumbs">
-    
-      <li><a href="#">Docs</a> &raquo;</li>
-        
-      <li>Welcome to MagTense!</li>
-    
-    
-      <li class="wy-breadcrumbs-aside">
-        
-            
-            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
-          
-        
-      </li>
-    
-  </ul>
-
-  
-  <hr/>
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTensee>github</a>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
   <div class="section" id="welcome-to-magtense">
 <h1>Welcome to MagTense!<a class="headerlink" href="#welcome-to-magtense" title="Permalink to this headline">¶</a></h1>
-<p>The magnetostatic and a micromagnetism calculation framework.
-The TechManual is in development.</p>
-<p>The MagTense framework can be downloaded from <a class="reference external" href="http://github.com/cmt-dtu-energy/MagTense">Github</a> and the webpage of the code is available at <a class="reference external" href="http://www.magtense.org">MagTense homepage</a></p>
+<p>The magnetostatic and a micromagnetism calculation framework.</p>
+<p>The magnetostatic framework is fully implemented in Fortran
+and has a Matlab MEX interface, as well as python interface.</p>
+<p>The micromagnetism model utilizes the magnetostatic framework
+for calculating the demagnetization tensor.</p>
+<p>MagTense supports both Intel MKL, CUDA and CVODE.</p>
+<div class="line-block">
+<div class="line">Github: <a class="reference external" href="http://github.com/cmt-dtu-energy/MagTense">http://github.com/cmt-dtu-energy/MagTense</a></div>
+<div class="line">Webpage: <a class="reference external" href="http://www.magtense.org">http://www.magtense.org</a></div>
+</div>
+<div class="section" id="content">
+<h2>Content<a class="headerlink" href="#content" title="Permalink to this headline">¶</a></h2>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="basic_geometries.html">Basic Geometries</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="basic_geometries.html#prism">Prism</a></li>
-<li class="toctree-l2"><a class="reference internal" href="basic_geometries.html#cylindrical-tile">Cylindrical Tile</a></li>
-<li class="toctree-l2"><a class="reference internal" href="basic_geometries.html#circpiece">Circpiece</a></li>
-<li class="toctree-l2"><a class="reference internal" href="basic_geometries.html#inverted-circpiece">Inverted Circpiece</a></li>
-<li class="toctree-l2"><a class="reference internal" href="basic_geometries.html#tetrahedron">Tetrahedron</a></li>
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#matlab">Matlab</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#python">Python</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#standalone">Standalone</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="calculations.html#magtile">MagTile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calculations.html#evaluation-points">Evaluation points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calculations.html#state-function">State function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calculations.html#h-field">H-field</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a><ul>
@@ -171,7 +161,23 @@ The TechManual is in development.</p>
 <li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#hysteresis-loop-simulation">Hysteresis loop simulation</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#python">Python</a></li>
 </ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="theory.html#tiles">Tiles</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="gallery.html#basic-geometries">Basic Geometries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gallery.html#evaluation-points-and-h-vector">Evaluation points and H-vector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gallery.html#magnetic-field">Magnetic field</a></li>
+</ul>
+</li>
+</ul>
+</div>
 </div>
 </div>
 
@@ -183,7 +189,7 @@ The TechManual is in development.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="basic_geometries.html" class="btn btn-neutral float-right" title="Basic Geometries" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="about.html" class="btn btn-neutral float-right" title="About" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
     </div>
@@ -193,7 +199,7 @@ The TechManual is in development.</p>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2019, Stefan Pollok
+        &copy; Copyright 2020, MagTense Developers
 
     </p>
   </div>
@@ -212,14 +218,26 @@ The TechManual is in development.</p>
 
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
+          SphinxRtdTheme.Navigation.enable(false);
       });
   </script>
 
   
   
     
-   
+    
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
 
 </body>
 </html>

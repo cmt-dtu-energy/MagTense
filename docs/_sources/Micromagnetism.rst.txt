@@ -9,12 +9,13 @@ The matlab file *DefaultMicroMagProblem.m* contains an updated list of all param
 For now, the micromagnetic model automatically generates a rectangular grid.
 
 The common parameters are:
+
 * Grid resolution
 * Gird size
 * Exchange term constant
 * Saturation magnetization
 * Anisotropy constant
-* Dampning constant, :math:`\alpha`
+* Damping constant, :math:`\alpha`
 * Precession constant, :math:`\gamma`
   
 ========================================
