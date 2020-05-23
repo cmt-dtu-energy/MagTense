@@ -1,0 +1,306 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Magnetization &mdash; MagTense TechManual  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/techmanual.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Other parameters" href="other_parameters.html" />
+    <link rel="prev" title="Geometry" href="geometry.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+          
+
+          
+            <a href="index.html">
+          
+
+          
+            
+            <img src="_static/MagTense_logo.PNG" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="calculations.html">Calculations</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="calculations.html#magtile">MagTile</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="geometry.html">Geometry</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Magnetization</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#magnet-type">Magnet Type</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#easy-axis-and-other-axes">Easy axis and other axes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#remanent-magnetization-m-rem">Remanent Magnetization <span class="math notranslate nohighlight">\(M_{rem}\)</span></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#magnetization-m">Magnetization <span class="math notranslate nohighlight">\(M\)</span></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#state-function-index">State function index</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="other_parameters.html">Other parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="calculations.html#evaluation-points">Evaluation points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calculations.html#state-function">State function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calculations.html#h-field">H-field</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTensee>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="magnetization">
+<h1>Magnetization<a class="headerlink" href="#magnetization" title="Permalink to this headline">¶</a></h1>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">integer</span> <span class="p">::</span> <span class="n">magnetType</span>
+<span class="n">real</span><span class="p">,</span><span class="n">dimension</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="p">::</span> <span class="n">u_ea</span><span class="p">,</span> <span class="n">u_oa1</span><span class="p">,</span> <span class="n">u_oa2</span>
+<span class="n">real</span> <span class="p">::</span> <span class="n">mu_r_ea</span><span class="p">,</span> <span class="n">mu_r_oa</span>
+<span class="n">real</span> <span class="p">::</span> <span class="n">Mrem</span>
+<span class="n">real</span><span class="p">,</span><span class="n">dimension</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="p">::</span> <span class="n">M</span>
+<span class="n">integer</span> <span class="p">::</span> <span class="n">stateFunctionIndex</span>
+</pre></div>
+</div>
+<div class="section" id="magnet-type">
+<h2>Magnet Type<a class="headerlink" href="#magnet-type" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>1 = hard magnet</p></li>
+<li><p>2 = soft magnet with state function</p></li>
+<li><p>3 = soft magnet with constant permeability</p></li>
+</ul>
+<p>The tile can have different magnetic properties.
+It can be a hard magnet, which has a constant magnetization during the simulation.
+Soft magnets can be defined either with a state function (hysteresis loop),
+which relates the magnetization of the tile to the currently H-field.
+The third option describes a softmagnet with a constant permeability
+<span class="math notranslate nohighlight">\(\mu \equiv \mu_0 ( 1 + \chi_m)\)</span> and therefore a linear relationship
+for the magnetization with the H-field: <span class="math notranslate nohighlight">\(M = \chi_m H\)</span></p>
+</div>
+<div class="section" id="easy-axis-and-other-axes">
+<h2>Easy axis and other axes<a class="headerlink" href="#easy-axis-and-other-axes" title="Permalink to this headline">¶</a></h2>
+<p>The easy axis defines the direction of preferred magnetization in the magnetic tile.
+With the other axes a orthonormal set is formed.
+In the Matlab and python interfaces, the easy axis of the magnetization of
+is de fined according to the global three-dimensional global coordinate
+system with two angles: polar angle <span class="math notranslate nohighlight">\(\theta\)</span>, and azimuth <span class="math notranslate nohighlight">\(\phi\)</span>, where
+<span class="math notranslate nohighlight">\(\theta \in [0, \pi]\)</span> and <span class="math notranslate nohighlight">\(\phi \in [0, 2 \pi]\)</span> .</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{pmatrix}
+u\_ea_x \\
+u\_ea_y \\
+u\_ea_z
+\end{pmatrix}
+=
+\begin{pmatrix}
+sin(\theta) cos(\phi)\\
+sin(\theta) sin(\phi) \\
+cos(\theta)
+\end{pmatrix}\end{split}\]</div>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{pmatrix}
+u\_oa1_x \\
+u\_oa1_y \\
+u\_oa1_z
+\end{pmatrix}
+=
+\begin{pmatrix}
+sin(\theta) sin(\phi)\\
+-sin(\theta) cos(\phi) \\
+0
+\end{pmatrix}\end{split}\]</div>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{pmatrix}
+u\_oa2_x \\
+u\_oa2_y \\
+u\_oa2_z
+\end{pmatrix}
+=
+\begin{pmatrix}
+\frac{1}{2}sin(2\theta) cos(\phi)\\
+\frac{1}{2}sin(2\theta) sin(\phi) \\
+-\sin^{2}(\theta)
+\end{pmatrix}\end{split}\]</div>
+<p>The permeability of the easy axis <span class="math notranslate nohighlight">\(\mu_{r\_ea}\)</span>
+and the permeability of the other axes <span class="math notranslate nohighlight">\(\mu_{r\_oa}\)</span>
+can be specified individually.
+.. note:: Its default value is 1.</p>
+</div>
+<div class="section" id="remanent-magnetization-m-rem">
+<h2>Remanent Magnetization <span class="math notranslate nohighlight">\(M_{rem}\)</span><a class="headerlink" href="#remanent-magnetization-m-rem" title="Permalink to this headline">¶</a></h2>
+<p>The value of <span class="math notranslate nohighlight">\(M_{rem}\)</span> specifies magnetization, which is
+remanent in the direction of the easy axis of the magnetic tile.
+.. note:: Its unit is measured in <span class="math notranslate nohighlight">\(A/m\)</span> in MagTense.</p>
+</div>
+<div class="section" id="magnetization-m">
+<h2>Magnetization <span class="math notranslate nohighlight">\(M\)</span><a class="headerlink" href="#magnetization-m" title="Permalink to this headline">¶</a></h2>
+<p>The magnetization of the tile in the global three-dimensional
+global coordinate system.
+Its quantity is calculated in MagTense and the effect on the
+other existing tiles in the model is done through iterations.
+For a hard (permanent) magnet with <span class="math notranslate nohighlight">\(\mu_{r\_ea} = \mu_{r\_oa} = 1\)</span>,
+the magnetization of the considered tile <span class="math notranslate nohighlight">\(M = M_{rem} * u\_ea\)</span>.</p>
+</div>
+<div class="section" id="state-function-index">
+<h2>State function index<a class="headerlink" href="#state-function-index" title="Permalink to this headline">¶</a></h2>
+<p>For a soft magnet, whose magnetization is dependent on the H-field
+in the form of a hysteresis loop, a ‘state function’_ has to be delivered
+to MagTense. The state function index determines, which function of
+the possibly multiple given state functions belongs to that specific tile.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="other_parameters.html" class="btn btn-neutral float-right" title="Other parameters" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="geometry.html" class="btn btn-neutral float-left" title="Geometry" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2020, MagTense Developers
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>
+
+  
+  
+    
+    
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>
