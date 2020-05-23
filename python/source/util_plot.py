@@ -263,7 +263,7 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
     ver_cyl = ver_cyl + offset
 
     # Corner points
-    ax.plot(ver_cyl[:,0], ver_cyl[:,1], ver_cyl[:,2], 'ro')
+    ax.plot(ver_cyl[:,0], ver_cyl[:,1], ver_cyl[:,2], 'o', color=color)
     
     # Define the faces of the cylinder
     fac = np.array([[0, 5, 4, 2], [1, 5, 4, 3]])

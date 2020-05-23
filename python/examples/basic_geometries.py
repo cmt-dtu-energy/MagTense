@@ -1,33 +1,38 @@
 import numpy as np
 
 import MagTense
+from util_plot import create_plot
 
 def main():
     # Define all tiles
     all_tiles = MagTense.Tiles(5)
     all_tiles.set_remanence(1.2 / (4*np.pi*1e-7))
-    all_tiles.set_color([1, 0, 0])
     all_tiles.set_tile_type([2, 1, 3, 4, 5])
     all_tiles.set_mag_angle_rand()
 
     # 0: Prism
     all_tiles.set_size_i([0.1, 0.3, 0.2], 0) 
-    all_tiles.set_offset_i([0.1, 0.5, 0.1], 0)
+    all_tiles.set_offset_i([0.1, 0.2, 0.1], 0)
+    all_tiles.set_color_i([1, 0, 0], 0)
 
     # 1: Cylindrical Tiles
-    all_tiles.set_center_pos_i([0.7, np.pi/8, 0.6], 1) 
+    all_tiles.set_center_pos_i([0.7, np.pi/8, 0.3], 1) 
     all_tiles.set_dev_center_i([0.15, np.pi/8, 0.4], 1)
+    all_tiles.set_color_i([0, 0, 1], 1)
 
     # 2: Circpiece
     all_tiles.set_center_pos_i([0.7, np.pi/3, 0.75], 2) 
     all_tiles.set_dev_center_i([0.15, np.pi/6, 0.3], 2)
+    all_tiles.set_color_i([1, 0.5, 0], 2)
 
     # 3: Inverted Circpiece
-    all_tiles.set_center_pos_i([0.2, np.pi/6, 0.5], 3) 
+    all_tiles.set_center_pos_i([0.2, np.pi/6, 0.6], 3) 
     all_tiles.set_dev_center_i([0.05, np.pi/4, 0.25], 3)
+    all_tiles.set_color_i([0.3, 0.8, 0.2], 3)
 
     # 4: Tetrahedron
-    all_tiles.set_vertices_i(np.array([[0.6,0.9,0.5],[0.7,0.8,0.7],[0.55,0.6,0.1],[0.9,0.9,0.15]]), 4)
+    all_tiles.set_vertices_i(np.array([[0.55,0.9,0.5],[0.8,0.9,0.7],[0.75,0.6,0.25],[0.9,0.9,0.15]]), 4)
+    all_tiles.set_color_i([0, 0, 0], 4)
 
     area = [1, 1, 1]
     n_points = [5, 5, 5]
@@ -37,7 +42,10 @@ def main():
     points = np.asarray(points, dtype=np.float64, order='F')
 
     # Simulation
-    (updated_tiles, H) = MagTense.run_simulation(all_tiles, points, plot=True)
+    (updated_tiles, H) = MagTense.run_simulation(all_tiles, points, plot=False)
 
-if __name__ == '__main__'
+    # Plotting
+    create_plot(updated_tiles)
+
+if __name__ == '__main__':
     main()

@@ -1,6 +1,7 @@
 import numpy as np
 
 import MagTense
+from util_plot import create_plot
 
 def main():
     # Define spherical tiles
@@ -20,7 +21,7 @@ def main():
     spheroids.set_offset_i([1, 2.5, 1], 1)
     spheroids.set_remanence_i(1 / (4*np.pi*1e-7), 1)
     spheroids.set_easy_axis_i([-1, 1, 0], 1)
-    spheroids.set_rot_axis_i([-1, 1, -3], 'c', 1)
+    spheroids.set_rot_axis_i([-1, 1, -3], 1)
     spheroids.set_color_i([1, 0, 1], 1)
 
     # Defines thrid tile as prolate spheroid
@@ -29,7 +30,7 @@ def main():
     spheroids.set_offset_i([2, 1, 1.5], 2)
     spheroids.set_remanence_i(1 / (4*np.pi*1e-7), 2)
     spheroids.set_easy_axis_i([1, 1, 1], 2)
-    spheroids.set_rot_axis_i([1, 1, 1], 's', 2)
+    spheroids.set_rot_axis_i([1, 1, 1], 2)
     spheroids.set_color_i([0, 0, 1], 2)
 
     # Defining the points, where the field is evaluated (output)
@@ -41,7 +42,10 @@ def main():
     points = np.asarray(points, dtype=np.float64, order='F')
 
     # Standard parameters in settings: max_error=0.00001, max_it=500
-    (updated_tiles, H) = MagTense.run_simulation(spheroids, points, plot=True)
+    (updated_tiles, H) = MagTense.run_simulation(spheroids, points, plot=False)
+
+    # Plotting
+    create_plot(updated_tiles)
 
     print("Average magnetic field: " + str(MagTense.get_average_magnetic_flux(H)))
     print("Peak to peak: " + str(MagTense.get_p2p(H)))

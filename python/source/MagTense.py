@@ -36,7 +36,7 @@ class Tiles():
         self.M_rel = np.zeros(shape=(n), dtype=np.float64, order='F')
  
         # Internal parameters for python to prepare configuration
-        self.grid_pos = np.zeros(shape=(n), dtype=np.float64, order='F') # positions in the grid
+        self.grid_pos = np.zeros(shape=(n,3), dtype=np.float64, order='F') # positions in the grid
         self.n = n
 
     def __str__(self):

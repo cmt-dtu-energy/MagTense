@@ -13,6 +13,8 @@
 
   
   
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+  
   
   
 
@@ -32,11 +34,13 @@
     
 
   
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/techmanual.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="author" title="About these documents" href="about.html" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Basic Geometries" href="basic_geometries.html" /> 
+    <link rel="next" title="Documentation" href="documentation.html" />
+    <link rel="prev" title="Other parameters" href="other_parameters.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -46,11 +50,11 @@
     
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
-        <div class="wy-side-nav-search" >
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
           
 
           
-            <a href="index.html" class="icon icon-home"> MagTense TechManual
+            <a href="index.html">
           
 
           
@@ -84,13 +88,19 @@
             
             
               <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="basic_geometries.html">Basic Geometries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Micromagnetism</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#basic-input">Basic input</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#dynamic-simulations">Dynamic simulations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#hysteresis-loop-simulation">Hysteresis loop simulation</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
 </ul>
 
             
@@ -114,43 +124,9 @@
         
         <div class="rst-content">
         
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
-  <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html">Docs</a> &raquo;</li>
-        
-      <li>Micromagnetism</li>
-    
-    
-      <li class="wy-breadcrumbs-aside">
-        
-            
-            <a href="_sources/micromagnetism.rst.txt" rel="nofollow"> View page source</a>
-          
-        
-      </li>
-    
-  </ul>
-
-  
-  <hr/>
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTensee>github</a>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
@@ -161,14 +137,16 @@
 <h2>Basic input<a class="headerlink" href="#basic-input" title="Permalink to this headline">¶</a></h2>
 <p>The matlab file <em>DefaultMicroMagProblem.m</em> contains an updated list of all parameters that can be specified in a micromagnetic problem.</p>
 <p>For now, the micromagnetic model automatically generates a rectangular grid.</p>
-<p>The common parameters are:
-* Grid resolution
-* Gird size
-* Exchange term constant
-* Saturation magnetization
-* Anisotropy constant
-* Dampning constant, <span class="math notranslate nohighlight">\(\alpha\)</span>
-* Precession constant, <span class="math notranslate nohighlight">\(\gamma\)</span></p>
+<p>The common parameters are:</p>
+<ul class="simple">
+<li><p>Grid resolution</p></li>
+<li><p>Gird size</p></li>
+<li><p>Exchange term constant</p></li>
+<li><p>Saturation magnetization</p></li>
+<li><p>Anisotropy constant</p></li>
+<li><p>Damping constant, <span class="math notranslate nohighlight">\(\alpha\)</span></p></li>
+<li><p>Precession constant, <span class="math notranslate nohighlight">\(\gamma\)</span></p></li>
+</ul>
 </div>
 <div class="section" id="dynamic-simulations">
 <h2>Dynamic simulations<a class="headerlink" href="#dynamic-simulations" title="Permalink to this headline">¶</a></h2>
@@ -188,8 +166,10 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
+        <a href="documentation.html" class="btn btn-neutral float-right" title="Documentation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
-        <a href="basic_geometries.html" class="btn btn-neutral float-left" title="Basic Geometries" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+        <a href="other_parameters.html" class="btn btn-neutral float-left" title="Other parameters" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -198,7 +178,7 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2019, Stefan Pollok
+        &copy; Copyright 2020, MagTense Developers
 
     </p>
   </div>
@@ -217,14 +197,26 @@
 
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
+          SphinxRtdTheme.Navigation.enable(false);
       });
   </script>
 
   
   
     
-   
+    
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
 
 </body>
 </html>

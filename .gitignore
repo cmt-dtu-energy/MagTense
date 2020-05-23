@@ -173,10 +173,12 @@ executable/tiles_out.txt
 executable/std_alone_points.txt
 executable/H_out.txt
 
-# Images for MagTense TechManual
+# MagTense TechManual
 !docs/source/fig/*
-!docs/source/images/*
+!docs/source/static/*
+!docs/source/templates/*
 !docs/_images/*
 !docs/_static/*
 !docs/source/images/*
 docs/.buildinfo
+docs/source/_build
