@@ -27,7 +27,7 @@ else % Voronoi & Tetra
     
     
     if isequal(MeshType,'Voronoi')
-        load('CompareInteractionMatrices.mat') ; InteractionMatricesCompare =  InteractionMatrices ;
+%         load('CompareInteractionMatrices.mat') ; InteractionMatricesCompare =  InteractionMatrices ;
         load(ExternalMeshFileName,'voronoi_map') ; % Voronoi & Tetra
             N = [size(voronoi_map.pos,1),1,1] ;
         InteractionMatrices.X = voronoi_map.pos(:,1) ; % Voronoi & Tetra
