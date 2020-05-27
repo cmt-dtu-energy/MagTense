@@ -35,9 +35,9 @@
       
 !     Check for proper number of arguments. 
       if( nrhs .ne. 3 ) then
-         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput','Three inputs are required.')
+         call mexErrMsgIdAndTxt ('MATLAB:MagTense_mex:nInput','Three inputs are required.')
       elseif(nlhs .gt. 3) then
-         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nOutput','Too many output arguments.')
+         call mexErrMsgIdAndTxt ('MATLAB:MagTense_mex:nOutput','Too many output arguments.')
       endif
 
 !Check the type of the inputs      

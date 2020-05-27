@@ -27,7 +27,7 @@
       mwSize sizevars
 
 !     Pointers to input/output mxArrays:      
-      type(MagTile),allocatable,dimension(:) :: cylTile  
+      type(MagTile),allocatable,dimension(:) :: tile  
       type(MagStateFunction),allocatable,dimension(:) :: stateFunctions
       
       integer*4 :: n_tiles,n_statefunctions,max_ite
@@ -35,9 +35,9 @@
       
 !     Check for proper number of arguments. 
       if( nrhs .lt. 6) then
-         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput','At least six inputs are required.')
+         call mexErrMsgIdAndTxt ('MATLAB:MagTense_mex:nInput','At least six inputs are required.')
       elseif(nlhs .gt. 1) then
-         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nOutput','Too many output arguments.')
+         call mexErrMsgIdAndTxt ('MATLAB:MagTense_mex:nOutput','Too many output arguments.')
       endif
 
       max_ite = 100
@@ -91,21 +91,21 @@
       call mxCopyPtrToReal8(mxGetPr(prhs(6)), err_max, sizevars )
       
       !::allocate the tiles
-      allocate( cylTile(n_tiles) )
+      allocate( tile(n_tiles) )
       !::allocate the state functions
       allocate( stateFunctions(n_stateFunctions) )
       !::Copy the input parameters      
-      call loadMagTile( prhs(1), cylTile, n_tiles )
+      call loadMagTile( prhs(1), tile, n_tiles )
       !::copy the state functions
       call loadMagStateFunction( prhs(3), stateFunctions, n_statefunctions )
             
       !::do the calculation
-      call iterateMagnetization( cylTile, n_tiles,stateFunctions, n_statefunctions, T, err_max, max_ite, displayIteration_Matlab, resumeIteration )
+      call iterateMagnetization( tile, n_tiles,stateFunctions, n_statefunctions, T, err_max, max_ite, displayIteration_Matlab, resumeIteration )
       
       !::Return the updated struct array to matlab
-      call returnMagTile( cylTile, n_tiles, plhs(1) )
+      call returnMagTile( tile, n_tiles, plhs(1) )
       
-      deallocate(cylTile,stateFunctions)
+      deallocate(tile,stateFunctions)
             
       end subroutine
       
