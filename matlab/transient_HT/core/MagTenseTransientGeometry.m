@@ -10,6 +10,7 @@ classdef MagTenseTransientGeometry
        FaceConditions %is an array with n rows and m columns where m is the largest no. of face-conditions (boundary conditions) a single primitive in the given problem has
        FaceConditionsBoundaryStatic % static part of boundary condition values, size n x m (sparse)
        FaceConditionsBoundaryDynamic %dynamic (changes potentially at each time step) part of the boundary conditions, sparse n x m
+       FaceConditionsBoundaryFunctions %cell array of function handles that apply dynamic boundary conditions
     end
     
     properties (Constant)
@@ -35,6 +36,8 @@ classdef MagTenseTransientGeometry
             %no. of tiles
             n = length(tiles);
             
+           
+            
             %assuming no more than 100 interactions through the boundaries
             %of a single tile we make space for the sparse matrices
             %containing the internal and external boundary conditions
@@ -42,6 +45,7 @@ classdef MagTenseTransientGeometry
             obj.FaceConditions = sparse(n,100);
             obj.FaceConditionsBoundaryStatic = obj.FaceConditions;
             obj.FaceConditionsBoundaryDynamic = obj.FaceConditions;
+            obj.FaceConditionsBoundaryFunctions = cell(n,100);
             
             %volume of each tile, should be n x 1
             obj.dV = MagTenseTilesUtil.getVolume( tiles );
@@ -62,6 +66,7 @@ classdef MagTenseTransientGeometry
                           %represents the thermal resistance to the face of
                           %the given boundary condition
                           obj.FaceConditionsBoundaryStatic(i,j) = bdry.A/bdry.l;
+                          obj.FaceConditionsBoundaryFunctions{i,j} = bdry.bdryFun;
                       case MagTenseTransientGeometry.FC_NEUMANN
                           %add a von Neumann condition
                           obj.FaceConditions(i,j) = MagTenseTransientGeometry.FC_NEUMANN;
@@ -82,7 +87,9 @@ classdef MagTenseTransientGeometry
         function obj = updateBoundaryConditions( obj, t )
             %find all Dirichlet conditions
             [indx,indy] = find ( obj.FaceConditions == MagTenseTransientGeometry.FC_DIRICHLET );
-            obj.FaceConditionsBoundaryDynamic(indx,indy) = 290;
+            for i=1:length(indx)
+                obj.FaceConditionsBoundaryDynamic(indx(i),indy(i)) = obj.FaceConditionsBoundaryFunctions{indx(i),indy(i)}(t);
+            end
         end
         
         %returns the boundary conditions in a part that goes to the
@@ -95,17 +102,21 @@ classdef MagTenseTransientGeometry
             lhs_bdry = zeros(n,1);
             rhs_bdry = zeros(n,1);
             
-            %find all Dirichlet conditions
-            [indx,indy] = find ( obj.FaceConditions == MagTenseTransientGeometry.FC_DIRICHLET );
-            
-            %implementation of the Dirichlet condition where a fixed
-            %temperature is imposed on a boundary. This becomes a flux on
-            %the right-hand side of the unsteady equation: dV*rho*c*dT/dt =
-            %...-(T-T_bdry) * A * k / l
-            %FaceConditionsBoundaryDynamic is supposed to contain the
-            %boundary temperature in this case
-            lhs_bdry(indx) = k(indx) .* sum( obj.FaceConditionsBoundaryStatic(indx,indy), 2 );
-            rhs_bdry(indx) = lhs_bdry(indx) .* sum( obj.FaceConditionsBoundaryDynamic(indx,indy), 2 ) ;
+            for i=1:n
+                %find all Dirichlet conditions
+                ind = find ( obj.FaceConditions(i,:) == MagTenseTransientGeometry.FC_DIRICHLET );
+
+                %implementation of the Dirichlet condition where a fixed
+                %temperature is imposed on a boundary. This becomes a flux on
+                %the right-hand side of the unsteady equation: dV*rho*c*dT/dt =
+                %...-(T-T_bdry) * A * k / l
+                %FaceConditionsBoundaryDynamic is supposed to contain the
+                %boundary temperature in this case
+                if ~isempty(ind)
+                    lhs_bdry(i) = k(i) .* sum( obj.FaceConditionsBoundaryStatic(i,ind), 2 );
+                    rhs_bdry(i) = lhs_bdry(i) .* sum( obj.FaceConditionsBoundaryDynamic(i,ind), 2 ) ;
+                end
+             end
         end
     end
     

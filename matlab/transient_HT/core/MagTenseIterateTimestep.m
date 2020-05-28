@@ -53,7 +53,8 @@ c_new = c_old;
 k_new = k_old;
 rho_new = rho_old;
 
-
+%First guess at temperature at the new time step t+dt
+T_prev = T_old;
 %while loop that exits after a max. no. of iteration or when the solution
 %has converged
 while err>maxErr && nIte<maxIte
@@ -100,14 +101,14 @@ while err>maxErr && nIte<maxIte
     rho_new = setts.rho(T_new,H_new,p_new);
     
     %find the relative error
-    err = max ( abs ( (T_new - T_old)./T_old ) );
+    err = max ( abs ( (T_new - T_prev)./T_prev ) );
     
     if debug
         disp( ['err = ' num2str(err,'%7.5f')] );
         disp( ['Iteration no. ' num2str(nIte)] );
     end
     
-    T_old = T_new;
+    T_prev = T_new;
     nIte = nIte + 1;
 end
 

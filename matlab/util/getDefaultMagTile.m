@@ -76,5 +76,5 @@ function tile = getDefaultMagTile()
     %array)
     %refer to MagTenseTransientGeometry for the definitions of the various
     %fields in this struct array
-    tile.bdryCdts(1) = struct( 'Type', -1, 'l', 0, 'A', 0, 'n_ind', 0 );
+    tile.bdryCdts = struct( 'Type', -1, 'l', 0, 'A', 0, 'n_ind', 0, 'FaceID', -1, 'bdryFun', @dummyfun );
 end
