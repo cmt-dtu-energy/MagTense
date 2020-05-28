@@ -4,9 +4,6 @@
 %HT-field-structural mechanics solver.
 function [solution, geom, setts] = MagTenseTransientSolver( solution, geom, setts, debug )
 
-setts.dt = 0.001;
-%figure;
-%hold on;
 cnt = 0;
 while setts.t < setts.t_tot
     
@@ -17,11 +14,9 @@ while setts.t < setts.t_tot
     if outFlag == 1
         setts.t = setts.t + setts.dt;
         if cnt==100
-            plot( setts.t, solution.T(1), '.k');
-            plot( setts.t, solution.T(2), 'vr');
-            plot( setts.t, solution.T(3), 'squareb');
-            drawnow;
+            solution = solution.StoreSolution( setts.t );
             cnt = 0;
+            disp(['Storing... t = ' num2str(setts.t) ', t_tot = ' num2str(setts.t_tot)]);
         end
         cnt = cnt + 1;
     else
