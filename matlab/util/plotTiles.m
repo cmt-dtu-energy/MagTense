@@ -18,6 +18,8 @@ for i=1:length(tiles)
             plotCircPiece( tiles(i) );
         case getMagTileType( 'circpieceinv' )
             plotCircPieceInv( tiles(i) );
+        case getMagTileType('tetrahedron')
+            plotTetrahedron(tiles(i));
     end
 end
 

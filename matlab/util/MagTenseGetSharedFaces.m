@@ -20,9 +20,105 @@ if tileA.tileType==getMagTileType('prism')
        case getMagTileType('tetrahedron')
            face = getSharedFacePrismTetrahedron( tileA, tileB );
    end
+elseif tileA.tileType==getMagTileType('tetrahedron')
+    switch tileB.tileType
+        case getMagTileType('prism')
+            face = getSharedFacePrismTetrahedron( tileB, tileA );
+        case getMagTileType('tetrahedron')
+            face = getSharedFaceTetraTetra( tileA, tileB );
+            
+    end
 end
 
 end
+
+%Implements the face-finder for the case where tileA is a prism and tileB
+%is a tetrahedron
+function face = getSharedFacePrismTetrahedron( tileA, tileB )
+
+face = [];
+
+%wiggle room for the comparison
+delta = 1e-10;
+
+%permutations for getting the triangular faces of the tetrahedron
+perm = [[1,2,3];[1,2,4];[1,3,4];[2,3,4]];
+
+%all eight vertices for the prism
+pv = zeros( 8, 3);
+
+%pos x
+pv(1:4,1) = tileA.offset(1) + tileA.abc(1)/2;
+%neg x
+pv(5:8,1) = tileA.offset(1) - tileA.abc(1)/2;
+
+%pos y
+pv([1,4,5,8],2) = tileA.offset(2) + tileA.abc(2)/2;
+%neg y
+pv([2,3,6,7],2) = tileA.offset(2) - tileA.abc(2)/2;
+
+%pos z
+pv([1,2,5,6],3) = tileA.offset(3) + tileA.abc(3)/2;
+%neg z
+pv([3,4,7,8],3) = tileA.offset(3) - tileA.abc(3)/2;
+
+%indices of the vertices for each face
+faceInds = [ [1,2,3,4];[5,6,7,8];[1,4,5,8];[2,3,6,7];[1,2,5,6];[3,4,7,8]; ];
+
+inds = [1,1,2,2,3,3];
+
+p_inds = [[2,3];[1,3];[1,2]];
+
+%go through all six faces of the prism (tileA) and all four faces of the
+%tetrahedron (tileB)
+for i=1:6
+    %current face vertices
+    pvc = pv( faceInds(i,:), : );
+    
+    %index defining the coordinate in the current plane
+    ind = inds(i);
+    
+    %get the value of this coordinate
+    p = pvc(1,ind);
+    
+    for j=1:4
+        %get the vertices for this particular triangle
+       tv = tileB.vertices(:,perm(j,:));
+       %get the coordinate comparable to the one for the prism
+       q = tv(ind,:);
+       if max(abs(p-q)) <= delta
+           
+           %find the clipping polygon
+           cp = sutherlandHodgman( pvc(:,p_inds(ind,:)), tv(p_inds(ind,:),:)' );
+           if ~isempty(cp)
+               %get the area of the clipping polygon
+               pa = polyarea(cp(:,1),cp(:,2));
+               if pa>1e-10
+
+                   %center of polygon
+                   pc = zeros(3,1);
+                   pc(ind) = p;
+                   pc(p_inds(ind,1)) = mean(cp(:,1));
+                   pc(p_inds(ind,2)) = mean(cp(:,2));
+
+                   %center of tetrahedron
+                   tc = mean( tileB.vertices, 2 );
+
+                   face = struct('A',pa,'lA',sqrt(sum((pc'-tileA.offset).^2)),'lB',sqrt(sum((pc-tc).^2)), 'ID_A',i, 'ID_B',j);
+               end
+               break;
+           end
+       end
+    end
+end
+end
+
+%implements the face-finder for the case where tileA and tileB both are
+%tetrahedra
+function face = getSharedFaceTetraTetra( tileA, tileB )
+face = [];
+end
+
 %Implements the face-finder for the case of two prisms
 function face = getSharedFacePrismPrism( tileA, tileB )
 %no rotation is supported yet!

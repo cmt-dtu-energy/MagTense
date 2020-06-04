@@ -9,8 +9,11 @@ while setts.t < setts.t_tot
     
     %update dynamic boundary conditions
     geom = geom.updateBoundaryConditions( setts.t );
+    %update the state (hysteresis)
     
+    %run the time step
     [solution, outFlag] = MagTenseIterateTimestep( solution, geom, setts, debug );
+    %save data from the time step
     if outFlag == 1
         setts.t = setts.t + setts.dt;
         if cnt==100
