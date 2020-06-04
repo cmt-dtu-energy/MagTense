@@ -34,9 +34,9 @@ k = @(T,H,p) ones(size(T)) .* 8;%W/m*K
 rho = @(T,H,p) ones(size(T)) .* 7200;%kg/m^3
 
 setts = MagTenseTransientSettings( c, k, rho );
-setts.t_tot = 1;%seconds
+setts.t_tot = 0.003;%seconds
 %fixed timestep
-setts.dt = 0.001;%s
+setts.dt = 0.000001;%s
 %starting time
 setts.t = 0;
 

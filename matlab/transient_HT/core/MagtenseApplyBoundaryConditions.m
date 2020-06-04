@@ -17,18 +17,33 @@
 function tiles = MagtenseApplyBoundaryConditions( tiles )
 
 n = length(tiles);
+CircSph(1) = struct('R',0,'C',[0,0,0]);
+CircSph(n) = CircSph(1);
 %loop over each tile
 for i=1:n
+    if i==1
+        %get the circumventing sphere of the first tile
+        CircSph(1) = getCircumventingSphere( tiles(1) );
+    end
     %loop over all the remaining tiles
     for j=i+1:n
-        %get the shared faces between the two tiles if any exist
-        face = MagTenseGetSharedFaces(tiles(i),tiles(j));
-        if ~isempty(face)
-           
-           tiles(i).bdryCdts(length(tiles(i).bdryCdts)+1) = struct( 'Type', MagTenseTransientGeometry.FC_INTERNAL, 'l', face.lA, 'A', face.A, 'n_ind', j, 'FaceID', face.ID_A, 'bdryFun', @dummyfun );
-           
-           tiles(j).bdryCdts(length(tiles(j).bdryCdts)+1) = struct( 'Type', MagTenseTransientGeometry.FC_INTERNAL, 'l', face.lB, 'A', face.A, 'n_ind', i, 'FaceID', face.ID_B, 'bdryFun', @dummyfun );
-           
+        if i==1
+           %get the circumventing sphere of all tiles such that we may compare tiles i and j and see if they can possibly be sharing faces
+           CircSph(j) = getCircumventingSphere( tiles(j) );
+        end
+        
+        %test if the two current tiles are within each other's sphere
+        if sqrt(sum( CircSph(i).C - CircSph(j).C ) ) <= CircSph(i).R+CircSph(j).R
+
+            %get the shared faces between the two tiles if any exist
+            face = MagTenseGetSharedFaces(tiles(i),tiles(j));
+            if ~isempty(face)
+
+               tiles(i).bdryCdts(length(tiles(i).bdryCdts)+1) = struct( 'Type', MagTenseTransientGeometry.FC_INTERNAL, 'l', face.lA, 'A', face.A, 'n_ind', j, 'FaceID', face.ID_A, 'bdryFun', @dummyfun );
+
+               tiles(j).bdryCdts(length(tiles(j).bdryCdts)+1) = struct( 'Type', MagTenseTransientGeometry.FC_INTERNAL, 'l', face.lB, 'A', face.A, 'n_ind', i, 'FaceID', face.ID_B, 'bdryFun', @dummyfun );
+
+            end
         end
     end
 end
