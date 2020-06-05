@@ -117,6 +117,76 @@ end
 %tetrahedra
 function face = getSharedFaceTetraTetra( tileA, tileB )
 face = [];
+
+%error allowed for when checking whether the faces are in the same plane
+delta = 1e-10;
+
+%indices for the vertices in each face
+inds = [[1,2,3];[1,3,4];[1,2,4];[2,3,4]];
+
+%loop over each face in tile A
+for i=1:4
+    
+    %find the orthonormal basis this face
+    vA = tileA.vertices(:,inds(i,:));
+    
+    %find the unit vector denoted (1,0,0) in the face's local system
+    un_A_1 = (vA(:,2)-vA(:,1))./sqrt(sum((vA(:,2)-vA(:,1)).^2));
+    %and the unit vector denoted (0,0,1) in the local system    
+    un_A_3 = cross( vA(:,2)-vA(:,1), vA(:,3)-vA(:,1) );
+    un_A_3 = un_A_3 / sqrt(sum(un_A_3.^2));
+    %and the unit vector denoted (0,1,0) in the local system
+    un_A_2 = cross( un_A_3, un_A_1 );
+    
+    %find the vertices of the face from tile A in the local system
+    %basis-change matrix from global to local is the unit vectors of the
+    %local system written with respect to the global as column vectors and
+    %then that matrix transposed (P = (un1,un2,un3), P^-1 = transp(P) since
+    %P is orthonormal)
+    Pinv = [un_A_1';un_A_2';un_A_3'];
+    
+    vA_loc = Pinv * vA;
+    
+    %and over each face in tile B
+    for j=1:4
+        
+        %vertices of the current face
+        vB = tileB.vertices(:,inds(j,:));
+        
+        %change coordinates of the vertices to the local system of the face
+        %from til A
+        vB_loc_A = Pinv * vB;
+        
+        %if the z-coordinates of the two faces' vertices are identical (in
+        %the local system) then the faces must be coplanar and we should
+        %try to find their intersection
+        
+        if sum( abs(vA_loc(3,:)-vB_loc_A(3,:)) ) < delta
+           %find intersecting polygon
+           cp = sutherlandHodgman( vA_loc(1:2,:)', vB_loc_A(1:2,:)' );
+           if ~isempty(cp)
+               %get the area of the clipping polygon
+               pa = polyarea(cp(:,1),cp(:,2));
+               if pa>1e-10
+
+                   %center of polygon
+                   pc = zeros(3,1);
+                   pc(3) = vA_loc(3,1);
+                   pc(1) = mean(cp(:,1));
+                   pc(2) = mean(cp(:,2));
+
+                   %center of tetrahedron A
+                   tcA = mean( Pinv * tileA.vertices, 2 );
+                   %center of tetrahedron B
+                   tcB = mean( Pinv * tileB.vertices, 2 );
+
+                   face = struct('A',pa,'lA',sqrt(sum((pc-tcA).^2)),'lB',sqrt(sum((pc-tcB).^2)), 'ID_A',i, 'ID_B',j);
+                   break;
+               end
+           end
+        end
+    end
+end
 end
 
 %Implements the face-finder for the case of two prisms
