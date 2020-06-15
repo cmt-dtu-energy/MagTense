@@ -23,8 +23,8 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Debug|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/;c:\Program Files\MATLAB\R2017a\extern\include\" WarnInterfaces="true" RealKIND="realKIND8" FloatingPointExceptionHandling="fpe0" FloatingPointModel="strict" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
-				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="../../../NumericalIntegrationLib/Numericalintegration/NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../NumericalIntegration/NumericalIntegration/x64/Debug/;C:\Program Files\MATLAB\R2019b\extern\include\" WarnInterfaces="true" RealKIND="realKIND8" FloatingPointExceptionHandling="fpe0" FloatingPointModel="strict" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+				<Tool Name="VFLibrarianTool"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>
@@ -32,8 +32,26 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" AdditionalIncludeDirectories="../../../NumericalIntegration/NumericalIntegration/x64/release/;" OpenMPConditionalCompilation="false" EnableEnhancedInstructionSet="codeArchSSE3" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" FloatingPointModel="precise"/>
-				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="../../Numericalintegration/NumericalIntegration/x64/release/;"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" AdditionalIncludeDirectories="../../NumericalIntegration/NumericalIntegration/x64/release/;" OpenMPConditionalCompilation="false" EnableEnhancedInstructionSet="codeArchSSE3" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" FloatingPointModel="precise"/>
+				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="../../NumericalIntegration/NumericalIntegration/x64/release/;"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/></Configuration>
+		<Configuration Name="Debug_nocuda|Win32" ConfigurationType="typeStaticLibrary">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" AdditionalIncludeDirectories="../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/x64/release/" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
+				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/></Configuration>
+		<Configuration Name="Debug_nocuda|x64" ConfigurationType="typeStaticLibrary">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/;c:\Program Files\MATLAB\R2017a\extern\include\" WarnInterfaces="true" RealKIND="realKIND8" FloatingPointExceptionHandling="fpe0" FloatingPointModel="strict" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="../../../NumericalIntegrationLib/Numericalintegration/NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>

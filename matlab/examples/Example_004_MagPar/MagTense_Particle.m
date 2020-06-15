@@ -8,7 +8,7 @@
 %%viscous fluid.
 function [] = MagTense_Particle()
 close all
-addpath('../util/');
+addpath('../../util/');
 addpath('../../Mex_files/');
 
 %Define magnet geometry using MagTense. The magnet considered is a

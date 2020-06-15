@@ -22,9 +22,10 @@ module TileNComponents
         real,dimension(3) :: offset !::the centre coordinates relative to the global coordinate system
         real,dimension(3) :: rotAngles !:: rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
         real,dimension(3) :: color !! color rgb triplet
-        integer :: magnetType !::defines whether the tile is a hard or soft magnet
+        integer :: magnetType !::defines whether the tile is a hard or soft magnet or constant permeability
         integer :: stateFunctionIndex !::index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
         integer :: includeInIteration,exploitSymmetry
+        logical :: excludeFromSummation !::ExcludeFromSummation defines if the given tile should be included or not in the summation over all tiles for getting the applied field
         real,dimension(3) :: symmetryOps !! 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
         real :: Mrel !! the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
         real,dimension(3,4) :: vert !Vertices, used e.g. by a tetrahedron
@@ -54,8 +55,8 @@ module TileNComponents
       end subroutine N_tensor_subroutine
     end interface
     
-    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeEllipsoid=10,tileTypePlanarCoil=101
-    integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2
+    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeSphere=6,tileTypeSpheroid=7,tileTypePlanarCoil=101
+    integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2,magnetTypeSoftConstPerm=3
     integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     
     contains
@@ -621,6 +622,7 @@ module TileNComponents
     
     end subroutine getN_circPiece_Inv
     
+    
     !::Calculates N from the analytical expression in 3D
     !::Given the prism tile (prism) and the position vector to it (pos = (x,y,z) )
     !::Returns a (3,3) array N_out
@@ -664,7 +666,7 @@ module TileNComponents
     !::Off-diagonal elements
     nom = FF_3D(a,b,c,x,y,z)  * FF_3D(-a,-b,c,x,y,z) * FF_3D(a,-b,-c,x,y,z) * FF_3D(-a,b,-c,x,y,z)
     denom = FF_3D(a,-b,c,x,y,z) * FF_3D(-a,b,c,x,y,z)  * FF_3D(a,b,-c,x,y,z)  * FF_3D(-a,-b,-c,x,y,z)
-
+    
     if ( denom .eq. 0 .or. nom .eq. 0 ) then
         !Find the limit
         lim = getF_limit(a,b,c,x,y,z,FF_3D)
@@ -672,8 +674,12 @@ module TileNComponents
     else
         N_out(1,2) = -1./(4.*pi) * log( nom / denom )
     endif
-
-
+    !log(nom/denom) = log(nom/denom-1+1) = log((nom-denom)/denom+1)
+    !Thus if (nom-denom)/denom is about the size of epsilon, the fraction is 1 and log(1) = 0
+    if ( abs((nom - denom) / denom ) < 10.*epsilon(nom) ) then
+        N_out(1,2) = 0
+    endif
+    
     !::the tensor is symmetric
     N_out(2,1) = N_out(1,2)
 
@@ -689,13 +695,15 @@ module TileNComponents
     else
         N_out(2,3) = -1./(4.*pi) * log( nom/denom )
     endif
-
+    if ( abs((nom - denom) / denom ) < 10.*epsilon(nom) ) then
+        N_out(2,3) = 0
+    endif
 
     N_out(3,2) = N_out(2,3)
 
     nom = HH_3D(a,b,c,x,y,z)  * HH_3D(-a,-b,c,x,y,z) * HH_3D(a,-b,-c,x,y,z) * HH_3D(-a,b,-c,x,y,z)
     denom = HH_3D(a,-b,c,x,y,z) * HH_3D(-a,b,c,x,y,z)  * HH_3D(a,b,-c,x,y,z)  * HH_3D(-a,-b,-c,x,y,z)
-
+    
     if ( denom .eq. 0 .or. nom .eq. 0 ) then
     
         lim = getF_limit(a,b,c,x,y,z,HH_3D)           
@@ -704,14 +712,233 @@ module TileNComponents
     else
         N_out(1,3) = -1./(4.*pi) * log( nom / denom )
     endif
-
-
+    if ( abs((nom - denom) / denom ) < 10.*epsilon(nom) ) then
+        N_out(1,3) = 0
+    endif
+    
     N_out(3,1) = N_out(1,3)
     
     !!Change the sign so that the output tensor follows the same definition as all the other tensors
     N_out = -1.* N_out
     
     end subroutine
+    
+    
+    !::Calculates N from the analytical expression in 3D
+    !::Given the tile (sphere) and the position vector to it (pos = (x,y,z) )
+    !::Returns a (3,3) array N_out
+    subroutine getN_sphere_3D( tile, pos, N_out )
+    type(MagTile),intent(in) :: tile
+    real,intent(in),dimension(3) :: pos
+    real,intent(inout),dimension(3,3) :: N_out
+    
+    real :: a,x,y,z
+    
+    a = tile%a
+    
+    x = pos(1)
+    y = pos(2)
+    z = pos(3)
+    
+    
+    if ( sqrt(x**2+y**2+z**2) .le. a ) then
+        !:: Inside the sphere
+        N_out(1,1) = -1./3.
+        N_out(1,2) = 0
+        N_out(1,3) = 0
+        N_out(2,1) = 0
+        N_out(2,2) = -1./3.
+        N_out(2,3) = 0
+        N_out(3,1) = 0
+        N_out(3,2) = 0
+        N_out(3,3) = -1./3.
+    else
+        !:: Outside the sphere 
+        N_out(1,1) = x**2-(x**2+y**2+z**2)/3.
+        N_out(1,2) = x*y
+        N_out(1,3) = x*z
+        N_out(2,1) = x*y
+        N_out(2,2) = y**2-(x**2+y**2+z**2)/3.
+        N_out(2,3) = y*z
+        N_out(3,1) = x*z
+        N_out(3,2) = y*z
+        N_out(3,3) = z**2-(x**2+y**2+z**2)/3.
+
+        N_out = 3./(4.*pi*sqrt(x**2+y**2+z**2)**5)*N_out
+        N_out = 4./3.*pi*a**3*N_out;
+    endif  
+    
+    end subroutine
+    
+    
+    !::Calculates N from the analytical expression in 3D
+    !::Given the tile (spheroid) and the position vector to it (pos = (x,y,z) )
+    !::Returns a (3,3) array N_out
+    subroutine getN_spheroid_3D( tile, pos, N_out )
+    type(MagTile),intent(in) :: tile
+    real,intent(in),dimension(3) :: pos
+    real,intent(inout),dimension(3,3) :: N_out
+    integer,dimension(3) :: indx_semi
+    real,dimension(3) :: coor,semi_axis
+    real,dimension(3,3) :: N_demag, N_temp
+    real :: a,b,c,x,y,z
+    real :: a_o,b_o,c_o,x_o,y_o,z_o,f,w,A_c,alpha
+    
+    a = tile%a
+    b = tile%b
+    c = tile%c
+    
+    !:: To let the user decide the order of the a,b,c axis, these have to be ordered
+    !:: so that c becomes the axis of rotational symmetry
+
+    if (a == b) then
+        !do nothing
+    elseif (a == c) then
+        b = tile%c
+        c = tile%b
+    elseif (b == c) then
+        a = tile%b
+        b = tile%c
+        c = tile%a
+    end if
+    
+    x = pos(1)
+    y = pos(2)
+    z = pos(3)
+    
+    semi_axis(1:3) = (/ a, b, c /)
+    coor(1:3) = (/ x, y, z /)
+
+    !--- Manual sort
+    !--- We can have the following cases:
+    !--- a = b > c  %Do nothing
+    !--- a = b < c  %Switch a and c
+    !--- a < b = c  %Switch a and c
+    !--- a > b = c  %Do nothing
+    !--- a > b < c  %Switch b and c
+    !--- a < b > c  %Switch b and a
+
+    indx_semi(1:3) = (/ 1, 2, 3 /)
+
+    !--- a = b < c  %Switch a and c
+    if ((a == b .AND. b < c) .OR. (a < b .AND. b == c)) then
+        indx_semi(1) = 3
+        indx_semi(3) = 1
+    end if
+
+    !--- a > b < c  %Switch b and c
+    if (a > b .AND. b < c) then
+        indx_semi(2) = 3
+        indx_semi(3) = 2
+    end if
+
+    !--- a < b > c  %Switch b and a
+    if (a < b .AND. b > c) then
+        indx_semi(1) = 2
+        indx_semi(2) = 1
+    end if
+
+    a_o = semi_axis(indx_semi(1))
+    b_o = semi_axis(indx_semi(2))
+    c_o = semi_axis(indx_semi(3))
+    
+    x_o = coor(indx_semi(1))
+    y_o = coor(indx_semi(2))
+    z_o = coor(indx_semi(3))
+
+    !--- Internal field
+    !if (x == 0 .AND. y == 0 .AND. z == 0) then
+    if (((x_o/a_o)**2 + (y_o/b_o)**2 + (z_o/c_o)**2) .le. 1) then
+        
+        !--- Oblate
+        if (a_o == b_o) then
+            alpha = c_o/a_o
+        
+            N_demag(3,3) = 1./(1.-alpha**2)*(1.-alpha/(sqrt(1.-alpha**2))*acos(alpha))
+            N_demag(1,1) = (1.-N_demag(3,3))/2.
+            N_demag(2,2) = N_demag(1,1)
+        end if
+    
+        !--- Prolate
+        if (b_o == c_o) then
+            alpha = a_o/c_o;
+        
+            N_demag(1,1) = 1./(alpha**2-1.)*(alpha/(sqrt(alpha**2-1.))*acosh(alpha)-1)
+            N_demag(2,2) = (1.-N_demag(1,1))/2.
+            N_demag(3,3) = N_demag(2,2)
+        end if
+    
+        !--- Sphere
+        if (a_o == b_o .AND. b_o == c_o) then
+            N_demag(1,1) = 1./3.
+            N_demag(2,2) = 1./3.
+            N_demag(3,3) = 1./3.
+        end if
+    
+        N_demag(1,2) = 0
+        N_demag(1,3) = 0
+        N_demag(2,1) = 0
+        N_demag(2,3) = 0
+        N_demag(3,1) = 0
+        N_demag(3,2) = 0
+        
+    !--- External field    
+    else
+    
+        !--- Oblate
+        if (a_o == b_o) then
+            f   = sqrt(a_o**2-c_o**2);
+            A_c = sqrt((x_o**2+y_o**2+z_o**2-f**2)**2+4*z_o**2*f**2);
+            w   = sqrt(1./(2*f**2)*(x_o**2+y_o**2+z_o**2+f**2+A_c));
+
+            N_demag(1,1:3) = (/ -(1./2*(asin(1./w)-sqrt(w**2-1)/w**2)-x_o**2*sqrt(w**2-1)/(w**4*A_c)) , x_o*y_o*sqrt(w**2-1)/(w**4*A_c) , z_o*x_o/(w**2*sqrt(w**2-1)*A_c) /);
+            N_demag(2,1:3) = (/ x_o*y_o*sqrt(w**2-1)/(w**4*A_c) , -(1./2*(asin(1./w)-sqrt(w**2-1)/w**2)-y_o**2*sqrt(w**2-1)/(w**4*A_c)) , z_o*y_o/(w**2*sqrt(w**2-1)*A_c) /);
+            N_demag(3,1:3) = (/ x_o*z_o/(w**2*sqrt(w**2-1)*A_c) , y_o*z_o/(w**2*sqrt(w**2-1)*A_c) , -(1./sqrt(w**2-1)-asin(1./w)-z_o**2./((w**2-1)**(3./2.)*A_c)) /);
+            N_demag = N_demag*c_o*a_o**2*f**(-3) 
+        end if
+
+        !--- Prolate
+        if (b_o == c_o) then
+            f   = sqrt(a_o**2-c_o**2);
+            A_c = sqrt((x_o**2+y_o**2+z_o**2+f**2)**2-4*x_o**2*f**2);
+            w   = sqrt(1./(2*f**2)*(x_o**2+y_o**2+z_o**2+f**2+A_c));
+
+            N_demag(1,1:3) = (/ -(1./2*log((w+1)/(w-1))-1./w-x_o**2./(w**3*A_c)) , y_o*x_o/(w*(w**2-1)*A_c) , z_o*x_o/(w*(w**2-1)*A_c) /)
+            N_demag(2,1:3) = (/x_o*y_o/(w*(w**2-1)*A_c) , -(1./2*(w/(w**2-1)+1./2*log((w-1)/(w+1)))-y_o**2*w/((w**2-1)**2*A_c)) , z_o*y_o*w/((w**2-1)**2*A_c) /)
+            N_demag(3,1:3) = (/x_o*z_o/(w*(w**2-1)*A_c) , z_o*y_o*w/((w**2-1)**2*A_c) , -(1./2*(w/(w**2-1)+1./2*log((w-1)/(w+1)))-z_o**2*w/((w**2-1)**2*A_c)) /)
+            N_demag = N_demag*a_o*c_o**2*f**(-3)
+        end if
+    
+        !--- Sphere
+        if (a_o == b_o .AND. b_o == c_o) then
+            N_demag(1,1:3) = (/ x_o**2-sqrt(x_o**2+y_o**2+z_o**2)**2/3., x_o*y_o, x_o*z_o /)
+            N_demag(2,1:3) = (/ x_o*y_o, y_o**2-sqrt(x_o**2+y_o**2+z_o**2)**2/3., y_o*z_o /)
+            N_demag(3,1:3) = (/ x_o*z_o, y_o*z_o, z_o**2-sqrt(x_o**2+y_o**2+z_o**2)**2/3. /)
+            N_demag = 3./(4.*pi*sqrt(x_o**2+y_o**2+z_o**2)**5)*N_demag
+            N_demag = 4./3.*pi*a**3*N_demag;
+        end if
+    
+        N_demag = -N_demag
+    end if
+
+    !--- Reorder N based on indx_semi
+    !--- Switch rows and columns
+    N_temp = N_demag
+    N_demag(1:3,1) = N_temp(1:3,indx_semi(1));
+    N_demag(1:3,2) = N_temp(1:3,indx_semi(2));
+    N_demag(1:3,3) = N_temp(1:3,indx_semi(3));
+    N_temp = N_demag;
+    N_demag(1,1:3) = N_temp(indx_semi(1),1:3);
+    N_demag(2,1:3) = N_temp(indx_semi(2),1:3);
+    N_demag(3,1:3) = N_temp(indx_semi(3),1:3);
+    
+    N_out = N_demag 
+    
+    !!Change the sign so that the output tensor follows the same definition as all the other tensors
+    N_out = -1.* N_out
+    
+    end subroutine
+    
         
     !> Returns the general tetrahedron solution
     subroutine getN_tensor_tetrahedron ( tile, r, N )         

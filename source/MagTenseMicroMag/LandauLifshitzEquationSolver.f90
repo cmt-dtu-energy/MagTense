@@ -3,7 +3,7 @@ include 'blas.f90'
     use ODE_Solvers
     use integrationDataTypes
     use MKL_SPBLAS
-    Use MKL_DFTI
+    use MKL_DFTI
     use BLAS95
     use MicroMagParameters
     use MagTenseMicroMagIO
@@ -36,7 +36,7 @@ include 'blas.f90'
     subroutine SolveLandauLifshitzEquation( prob, sol )    
     type(MicroMagProblem),intent(inout) :: prob     !> The problem data structure
     type(MicroMagSolution),intent(inout) :: sol     !> The solution data structure    
-    integer :: ntot,i,j,k,ind,nt,stat               !> total no. of tiles
+    integer :: ntot,i,j,k,ind,nt,nt_Hext,stat       !> total no. of tiles
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
     real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
@@ -55,7 +55,7 @@ include 'blas.f90'
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
 #if USE_CUDA            
         !Initialize the Cuda arrays and load the demag tensors into the GPU memory
-        if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction )) then
+        if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
            
             !If the matrices are sparse
             call cudaInit_sparse( gb_problem%K_s )        
@@ -99,25 +99,29 @@ include 'blas.f90'
     call displayMatlabMessage( 'Running solution' )
     !Do the solution
     fct => dmdt_fct
-    cb_fct => displayMatlabProgessMessage
+    cb_fct => displayMatlabProgressMessage
     
-    
+    gb_solution%HextInd = 1;
     if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
         !Go through a range of applied fields and find the equilibrium solution for each of them
         !The no. of applied fields to consider
         nt = size( gb_problem%t ) 
-        
+        nt_Hext = size(gb_problem%Hext, 1) 
+
         !has an extra nt results as this is the total time-dependent solution for each applied field
-        allocate(M_out(3*ntot,nt,nt))   
-        allocate(gb_solution%M_out(size(gb_problem%t),ntot,nt,3))
-        
+        allocate(M_out(3*ntot,nt,nt_Hext))   
+        allocate(gb_solution%M_out(size(gb_problem%t),ntot,nt_Hext,3))
+        allocate(gb_solution%H_exc(size(gb_problem%t),ntot,nt_Hext,3))
+        allocate(gb_solution%H_ext(size(gb_problem%t),ntot,nt_Hext,3))
+        allocate(gb_solution%H_dem(size(gb_problem%t),ntot,nt_Hext,3))
+        allocate(gb_solution%H_ani(size(gb_problem%t),ntot,nt_Hext,3))       
         
         !loop over the range of applied fields
-        do i=1,nt
+        do i=1,nt_Hext
             !Applied field
             gb_solution%HextInd = i
             
-            call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay )
+            call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE )
             
             !the initial state of the next solution is the previous solution result
             gb_problem%m0 = M_out(:,nt,i)
@@ -126,6 +130,8 @@ include 'blas.f90'
             gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
             gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
             
+            call StoreHeffComponents ( gb_problem, gb_solution )
+            
         enddo
         
         
@@ -133,11 +139,18 @@ include 'blas.f90'
         !Simply do a time evolution as specified in the problem        
         allocate(M_out(3*ntot,size(gb_problem%t),1))    
         allocate(gb_solution%M_out(size(gb_problem%t),ntot,1,3))
-        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay )
+        allocate(gb_solution%H_exc(size(gb_problem%t),ntot,1,3))
+        allocate(gb_solution%H_ext(size(gb_problem%t),ntot,1,3))
+        allocate(gb_solution%H_dem(size(gb_problem%t),ntot,1,3))
+        allocate(gb_solution%H_ani(size(gb_problem%t),ntot,1,3))
+        
+        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE  )
     
         gb_solution%M_out(:,:,1,1) = transpose( M_out(1:ntot,:,1) )
         gb_solution%M_out(:,:,1,2) = transpose( M_out((ntot+1):2*ntot,:,1) )
         gb_solution%M_out(:,:,1,3) = transpose( M_out((2*ntot+1):3*ntot,:,1) )
+        
+        call StoreHeffComponents ( gb_problem, gb_solution )
         
     endif
     !Clean up
@@ -244,14 +257,68 @@ include 'blas.f90'
     real(DP),intent(in) :: t
     type(MicroMagProblem),intent(in) :: problem
     
-    if ( problem%MaxT0 .gt. 0 ) then
-        !In this case alpha is allowed to increase as a function of time with a cap given by MaxT0 as specified in the problem
-        alpha = problem%alpha0 * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
+    if ( problem%alpha0 .eq. 0 ) then
+        !Interpolate to get the applied field at time t
+        call interp1_MagTense( problem%alpha(:,1), problem%alpha(:,2), t, size(problem%alpha(:,1)), alpha )
+        
     else
-        alpha = problem%alpha0 ! * 10**( 7 * min(t,problem%MaxT0)/problem%MaxT0 )
+        alpha = problem%alpha0
     endif
     
     end function alpha
+    
+    
+    
+    !>-----------------------------------------
+    !> @author Rasmus Bjoerk, rabj@dtu.dk, DTU, 2020
+    !> @brief
+    !> Defines the function that calculates and stores the individual terms
+    !> of the effective magnetic field 
+    !> @param[in] problem the specification of the problem
+    !> @param[in] solution the solution structure where the fields are stored
+    !---------------------------------------------------------------------------    
+    subroutine StoreHeffComponents ( problem, solution )
+    type(MicroMagProblem),intent(in) :: problem
+    type(MicroMagSolution),intent(inout) :: solution
+    integer :: i,j,nt
+    
+    i = gb_solution%HextInd       
+    nt = size( gb_problem%t ) 
+    
+    do j=1,nt
+        !Calculate the effective field for the values where the magnetization is known
+        gb_solution%Mx = gb_solution%M_out(j,:,i,1)
+        gb_solution%My = gb_solution%M_out(j,:,i,2)
+        gb_solution%Mz = gb_solution%M_out(j,:,i,3)
+    
+        !Exchange term    
+        call updateExchangeTerms( gb_problem, gb_solution )
+        !External field
+        call updateExternalField( gb_problem, gb_solution, gb_problem%t(i) )
+        !Anisotropy term
+        call updateAnisotropy(  gb_problem, gb_solution )
+        !Demag. field
+        call updateDemagfield( gb_problem, gb_solution )
+    
+        !Store the components of the effective field
+        gb_solution%H_exc(j,:,i,1) = gb_solution%HjX
+        gb_solution%H_exc(j,:,i,2) = gb_solution%HjY
+        gb_solution%H_exc(j,:,i,3) = gb_solution%HjZ
+        
+        gb_solution%H_ext(j,:,i,1) = gb_solution%HhX
+        gb_solution%H_ext(j,:,i,2) = gb_solution%HhY
+        gb_solution%H_ext(j,:,i,3) = gb_solution%HhZ
+        
+        gb_solution%H_dem(j,:,i,1) = gb_solution%HmX
+        gb_solution%H_dem(j,:,i,2) = gb_solution%HmY
+        gb_solution%H_dem(j,:,i,3) = gb_solution%HmZ
+        
+        gb_solution%H_ani(j,:,i,1) = gb_solution%HkX
+        gb_solution%H_ani(j,:,i,2) = gb_solution%HkY
+        gb_solution%H_ani(j,:,i,3) = gb_solution%HkZ
+    enddo
+    
+    end subroutine StoreHeffComponents
     
     
     
@@ -299,7 +366,7 @@ include 'blas.f90'
         solution%HmY(:) = 0.
         solution%HmZ(:) = 0.
         
-        if ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) then
+        if ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
             !allocate the Fourier Transform of the magnetization
             allocate( solution%Mx_FT(ntot), solution%My_FT(ntot), solution%Mz_FT(ntot) )
             allocate( solution%HmX_c(ntot), solution%HmY_c(ntot), solution%HmZ_c(ntot) )
@@ -327,7 +394,7 @@ include 'blas.f90'
     !> @param[in] problem, the struct containing the current problem
     !> @param[inout] solution, struct containing the current solution    
     !>-----------------------------------------
-     subroutine updateExchangeTerms( problem, solution )
+    subroutine updateExchangeTerms( problem, solution )
     type(MicroMagProblem),intent(in) :: problem
     type(MicroMagSolution),intent(inout) :: solution
     
@@ -377,15 +444,12 @@ include 'blas.f90'
         solution%HhY = -problem%Hext(solution%HextInd,3)
         solution%HhZ = -problem%Hext(solution%HextInd,4)
 
-        solution%HhX = -problem%Hext(solution%HextInd,2)
-        solution%HhY = -problem%Hext(solution%HextInd,3)
-        solution%HhZ = -problem%Hext(solution%HextInd,4)
     elseif ( problem%solver .eq. MicroMagSolverDynamic ) then
         
         !Interpolate to get the applied field at time t
-        call interp1( problem%Hext(:,1), problem%Hext(:,2), t, size(problem%Hext(:,1)), HextX )
-        call interp1( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
-        call interp1( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
+        call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,2), t, size(problem%Hext(:,1)), HextX )
+        call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
+        call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
         
         solution%HhX = -HextX
         solution%HhY = -HextY
@@ -406,7 +470,7 @@ include 'blas.f90'
     !> @param[inout] solution, struct containing the current solution        
     !>-----------------------------------------
     subroutine updateAnisotropy( problem, solution)
-   type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     
     real :: prefact                                       !> Multiplicative scalar factor
@@ -463,9 +527,9 @@ include 'blas.f90'
     real*4 :: pref,alpha,beta
     complex(kind=4) :: alpha_c, beta_c
     
-     descr%type = SPARSE_MATRIX_TYPE_GENERAL
-     descr%mode = SPARSE_FILL_MODE_FULL
-     descr%diag = SPARSE_DIAG_NON_UNIT
+    descr%type = SPARSE_MATRIX_TYPE_GENERAL
+    descr%mode = SPARSE_FILL_MODE_FULL
+    descr%diag = SPARSE_DIAG_NON_UNIT
     
     if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
         if ( problem%useCuda .eq. useCudaFalse ) then
@@ -502,7 +566,7 @@ include 'blas.f90'
 #endif            
         endif
         
-    elseif ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) then
+    elseif ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
         !!No CUDA support for this part yet
         !fourier transform Mx, My and Mz
         ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
@@ -736,26 +800,24 @@ include 'blas.f90'
     
     !>-----------------------------------------
     subroutine ComputeDemagfieldTensor( problem )
-    type(MicroMagProblem),intent(inout) :: problem               !> Grid data structure    
+    type(MicroMagProblem),intent(inout) :: problem                !> Grid data structure    
     
-    type(MagTile),dimension(1) :: tile                           !> Tile representing the current tile under consideration
-    real(DP),dimension(:,:),allocatable :: H                     !> The field and the corresponding evaluation point arrays
-    integer :: i,j,k,nx,ny,nz,ntot,ind                           !> Internal counters and index variables
-    real(DP),dimension(:,:,:,:),allocatable :: Nout              !> Temporary storage for the demag tensor            
-    complex(kind=4),dimension(:,:),allocatable :: eye,FT,IFT     !> Identity matrix, the indentity matrix' fourier transform and its inverse fourier transform
-    type(DFTI_DESCRIPTOR), POINTER :: desc_handle                !> Handle for the FFT MKL stuff
+    type(MagTile),dimension(1) :: tile                            !> Tile representing the current tile under consideration
+    real(DP),dimension(:,:),allocatable :: H                      !> The field and the corresponding evaluation point arrays
+    integer :: i,j,k,nx,ny,nz,ntot,ind                            !> Internal counters and index variables
+    real(DP),dimension(:,:,:,:),allocatable :: Nout               !> Temporary storage for the demag tensor            
+    complex(kind=4),dimension(:,:),allocatable :: eye,FT,IFT,temp !> Identity matrix, the indentity matrix' fourier transform and its inverse fourier transform
+    type(DFTI_DESCRIPTOR), POINTER :: desc_handle                 !> Handle for the FFT MKL stuff
     integer :: status
     complex(kind=4),dimension(:,:),allocatable :: Kxx_c, Kxy_c, Kxz_c, Kyy_c, Kyz_c, Kzz_c !> Temporary matrices for storing the complex version of the demag matrices
+    real(SP),dimension(:),allocatable  :: Kxx_abs, Kxy_abs, Kxz_abs, Kyy_abs, Kyz_abs, Kzz_abs  !> Temporary matrices with absolute values of the demag tensor, for threshold calculations
     complex(kind=4) :: thres
     integer,dimension(3) :: L                                                !> Array specifying the dimensions of the fft
-    real*4 :: threshold_var, f_large, f_small, f_middle
-    integer,dimension(6) :: count_ind
-    real*4,dimension(6) :: f_small_arr
-    integer :: count_middle, n_ele_nonzero, nx_K, ny_K, k_do  
-    logical,dimension(:,:,:),allocatable :: mask          !> mask used for finding non-zero values
-    logical,dimension(:,:),allocatable :: mask_xx, mask_xy, mask_xz          !> mask used for finding non-zero values
-    logical,dimension(:,:),allocatable :: mask_yy, mask_yz, mask_zz          !> mask used for finding non-zero values
-    
+    real*4 :: threshold_var, alpha, beta
+    complex(kind=4) :: alpha_c, beta_c
+    integer ::  nx_K, ny_K, k_xx, k_xy, k_xz, k_yy, k_yz, k_zz 
+    logical,dimension(:,:),allocatable :: mask_xx, mask_xy, mask_xz     !> mask used for finding non-zero values
+    logical,dimension(:,:),allocatable :: mask_yy, mask_yz, mask_zz     !> mask used for finding non-zero values
     
     if ( problem%grid%gridType .eq. gridTypeUniform ) then
         nx = problem%grid%nx
@@ -841,7 +903,7 @@ include 'blas.f90'
         !The demag tensor is considered as a whole, and the fraction specified concern the number of elements greater than epsilon
         if ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) then
             
-            !Make a mask for each demag tensor with only the elements larger than epsilon
+            !Make a mask for each demag tensor with only the elements larger than zero
             !Make the masks only once - this is memory intensive, but computationally efficient
             nx_K = size(problem%Kxx(:,1))
             ny_K = size(problem%Kxx(1,:))
@@ -852,75 +914,72 @@ include 'blas.f90'
             allocate(mask_yz(nx_K,ny_K))
             allocate(mask_zz(nx_K,ny_K))
             
-            mask_xx = abs(problem%Kxx) .gt. 0
-            mask_xy = abs(problem%Kxy) .gt. 0
-            mask_xz = abs(problem%Kxz) .gt. 0
-            mask_yy = abs(problem%Kyy) .gt. 0
-            mask_yz = abs(problem%Kyz) .gt. 0
-            mask_zz = abs(problem%Kzz) .gt. 0
+            mask_xx = problem%Kxx .gt. 0
+            mask_xy = problem%Kxy .gt. 0
+            mask_xz = problem%Kxz .gt. 0
+            mask_yy = problem%Kyy .gt. 0
+            mask_yz = problem%Kyz .gt. 0
+            mask_zz = problem%Kzz .gt. 0
             
-            !The total number of nonzero elements in the demag tensor
-            n_ele_nonzero = count( mask_xx )
-            n_ele_nonzero = n_ele_nonzero + count( mask_xy )
-            n_ele_nonzero = n_ele_nonzero + count( mask_xz )
-            n_ele_nonzero = n_ele_nonzero + count( mask_yy )
-            n_ele_nonzero = n_ele_nonzero + count( mask_yz )
-            n_ele_nonzero = n_ele_nonzero + count( mask_zz )
+            !Make a copy (pack) of the tensors for speed so that the mask only has to be applied once
+            allocate(Kxx_abs(count( mask_xx )))
+            allocate(Kxy_abs(count( mask_xy )))
+            allocate(Kxz_abs(count( mask_xz )))
+            allocate(Kyy_abs(count( mask_yy )))
+            allocate(Kyz_abs(count( mask_yz )))
+            allocate(Kzz_abs(count( mask_zz )))
     
-            f_large = max(maxval(abs(problem%Kxx)), maxval(abs(problem%Kxy)), maxval(abs(problem%Kxz)), maxval(abs(problem%Kyy)), maxval(abs(problem%Kyz)), maxval(abs(problem%Kzz)))
+            !Pack the demag tensors into the temporary arrays. The intrinsic PACK routine overflows the stack, so use do loops
+            k_xx = 1
+            k_xy = 1
+            k_xz = 1
+            k_yy = 1
+            k_yz = 1
+            k_zz = 1
+            do i=1,nx_K
+                do j=1,ny_K
+                    if (mask_xx(i,j) .eq. .true.) then
+                        Kxx_abs(k_xx) = problem%Kxx(i,j) 
+                        k_xx = k_xx + 1
+                    endif
+                    if (mask_xy(i,j) .eq. .true.) then
+                        Kxy_abs(k_xy) = problem%Kxy(i,j) 
+                        k_xy = k_xy + 1
+                    endif
+                    if (mask_xz(i,j) .eq. .true.) then
+                        Kxz_abs(k_xz) = problem%Kxz(i,j) 
+                        k_xz = k_xz + 1
+                    endif
+                    if (mask_yy(i,j) .eq. .true.) then
+                        Kyy_abs(k_yy) = problem%Kyy(i,j) 
+                        k_yy = k_yy + 1
+                    endif
+                    if (mask_yz(i,j) .eq. .true.) then
+                        Kyz_abs(k_yz) = problem%Kyz(i,j) 
+                        k_yz = k_yz + 1
+                    endif
+                    if (mask_zz(i,j) .eq. .true.) then
+                        Kzz_abs(k_zz) = problem%Kzz(i,j) 
+                        k_zz = k_zz + 1
+                    endif
+                enddo
+            enddo
             
-            !Find the minimum value in the individual demag tensors than is greater than zero
-            f_small_arr(1) = minval(abs(problem%Kxx), mask_xx)
-            f_small_arr(2) = minval(abs(problem%Kxy), mask_xy)
-            f_small_arr(3) = minval(abs(problem%Kxz), mask_xz)
-            f_small_arr(4) = minval(abs(problem%Kyy), mask_yy)
-            f_small_arr(5) = minval(abs(problem%Kyz), mask_yz)
-            f_small_arr(6) = minval(abs(problem%Kzz), mask_zz)
+            call FindThresholdFraction(Kxx_abs, Kxy_abs, Kxz_abs, Kyy_abs, Kyz_abs, Kzz_abs, threshold_var)
             
-            f_small = minval(f_small_arr)
-
-            !Bisection algoritm for find the function value for a corresponding fraction
-            k_do = 1
-            do 
-                f_middle = (f_large-f_small)/2+f_small
-                
-                !Count only the elements larger than epsilon in each of the matrices
-                count_ind(1) = count( mask_xx .and. abs(problem%Kxx) .le. f_middle )
-                count_ind(2) = count( mask_xy .and. abs(problem%Kxy) .le. f_middle )
-                count_ind(3) = count( mask_xz .and. abs(problem%Kxz) .le. f_middle )
-                count_ind(4) = count( mask_yy .and. abs(problem%Kyy) .le. f_middle )
-                count_ind(5) = count( mask_yz .and. abs(problem%Kyz) .le. f_middle )
-                count_ind(6) = count( mask_zz .and. abs(problem%Kzz) .le. f_middle )
-                
-                count_middle = sum(count_ind)
-                   
-                if ( count_middle .gt. threshold_var*n_ele_nonzero ) then
-                    f_large = f_middle
-                else
-                    f_small = f_middle
-                endif            
-            
-                !check if we have found the value that defines the threshold
-                if ( ( count_middle .ge. (threshold_var-0.01)*n_ele_nonzero ) .and. ( count_middle .le. (threshold_var+0.01)*n_ele_nonzero ) ) then
-                        threshold_var = f_middle
-                    exit
-                endif
-            
-                if ( k_do .gt. 500 ) then
-                        call displayMatlabMessage( 'Iterations exceeded in finding threshold value. Continuing.' )
-                        threshold_var = f_middle
-                    exit
-                endif
-                
-                k_do = k_do+1
-            enddo  
-            
+            !cleanup
             deallocate(mask_xx)
             deallocate(mask_xy)
             deallocate(mask_xz)
             deallocate(mask_yy)
             deallocate(mask_yz)
             deallocate(mask_zz)
+            deallocate(Kxx_abs)
+            deallocate(Kxy_abs)
+            deallocate(Kxz_abs)
+            deallocate(Kyy_abs)
+            deallocate(Kyz_abs)
+            deallocate(Kzz_abs)
             
         endif
         
@@ -931,7 +990,7 @@ include 'blas.f90'
         call ConvertDenseToSparse_s( problem%Kyz, problem%K_s(5), threshold_var)
         call ConvertDenseToSparse_s( problem%Kzz, problem%K_s(6), threshold_var)
         
-    elseif ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) then
+    elseif ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
         !Apply the fast fourier transform concept, remove values below a certain threshold and then convert to a sparse matrix
         !for use in the field calculation later on
         
@@ -943,7 +1002,7 @@ include 'blas.f90'
         ! through N'(N'<demag_threshold) = 0 and then N' = sparse(N')
         
         !create the FT and IFT matrices
-        allocate(eye(ntot,ntot),FT(ntot,ntot),IFT(ntot,ntot) )
+        allocate(eye(ntot,ntot),FT(ntot,ntot),IFT(ntot,ntot))
         
         
         !make the identity matrix
@@ -968,7 +1027,9 @@ include 'blas.f90'
         
         !Find the inverse of the fourier transform
         !We need to check if we should divide by the no of elements
-        IFT = transpose(conjg(FT)) / ntot
+        allocate(temp(ntot,ntot) )
+        temp = conjg(FT)
+        IFT = transpose(temp) / ntot
         
         
         !do the change of basis of each of the demag tensor matrices
@@ -976,18 +1037,132 @@ include 'blas.f90'
         allocate( Kxx_c(ntot,ntot), Kxy_c(ntot,ntot), Kxz_c(ntot,ntot) )
         allocate( Kyy_c(ntot,ntot), Kyz_c(ntot,ntot), Kzz_c(ntot,ntot) )
         
+        alpha_c = cmplx(1.0,0.0)
+        beta_c  = cmplx(0.0,0.0)
+        Kxx_c = FT
+        temp = cmplx(problem%Kxx)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kxx_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kxx_c, ntot, IFT , ntot, beta_c, Kxx_c, ntot)
+       
+        Kxy_c = FT
+        temp = cmplx(problem%Kxy)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kxy_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kxy_c, ntot, IFT , ntot, beta_c, Kxy_c, ntot)
         
-        Kxx_c = matmul( matmul( FT, problem%Kxx ), IFT )
-        Kxy_c = matmul( matmul( FT, problem%Kxy ), IFT )
-        Kxz_c = matmul( matmul( FT, problem%Kxz ), IFT )
-        Kyy_c = matmul( matmul( FT, problem%Kyy ), IFT )
-        Kyz_c = matmul( matmul( FT, problem%Kyz ), IFT )
-        Kzz_c = matmul( matmul( FT, problem%Kzz ), IFT )
+        Kxz_c = FT
+        temp = cmplx(problem%Kxz)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kxz_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kxz_c, ntot, IFT , ntot, beta_c, Kxz_c, ntot)
         
+        Kyy_c = FT
+        temp = cmplx(problem%Kyy)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kyy_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kyy_c, ntot, IFT , ntot, beta_c, Kyy_c, ntot)
         
+        Kyz_c = FT
+        temp = cmplx(problem%Kyz)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kyz_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kyz_c, ntot, IFT , ntot, beta_c, Kyz_c, ntot)
+        
+        Kzz_c = FT
+        temp = cmplx(problem%Kzz)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kzz_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kzz_c, ntot, IFT , ntot, beta_c, Kzz_c, ntot)
+        !Kxx_c = matmul( matmul( FT, problem%Kxx ), IFT )
+        !Kxy_c = matmul( matmul( FT, problem%Kxy ), IFT )
+        !Kxz_c = matmul( matmul( FT, problem%Kxz ), IFT )
+        !Kyy_c = matmul( matmul( FT, problem%Kyy ), IFT )
+        !Kyz_c = matmul( matmul( FT, problem%Kyz ), IFT )
+        !Kzz_c = matmul( matmul( FT, problem%Kzz ), IFT )
+        deallocate(temp)
+        
+        threshold_var = problem%demag_threshold
+        !If a fraction of entries is specified that are to be removed, find the function value for this
+        !The demag tensor is considered as a whole, and the fraction specified concern the number of elements greater than epsilon
+        if ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) then
+            
+            !Make a mask for each demag tensor with only the elements larger than zero
+            !Make the masks only once - this is memory intensive, but computationally efficient
+            nx_K = size(Kxx_c(:,1))
+            ny_K = size(Kxx_c(1,:))
+            allocate(mask_xx(nx_K,ny_K))
+            allocate(mask_xy(nx_K,ny_K))
+            allocate(mask_xz(nx_K,ny_K))
+            allocate(mask_yy(nx_K,ny_K))
+            allocate(mask_yz(nx_K,ny_K))
+            allocate(mask_zz(nx_K,ny_K))
+            
+            mask_xx = abs(Kxx_c) .gt. 0
+            mask_xy = abs(Kxy_c) .gt. 0
+            mask_xz = abs(Kxz_c) .gt. 0
+            mask_yy = abs(Kyy_c) .gt. 0
+            mask_yz = abs(Kyz_c) .gt. 0
+            mask_zz = abs(Kzz_c) .gt. 0
+            
+            !Make a copy (pack) of the tensors for speed so that the mask only has to be applied once
+            allocate(Kxx_abs(count( mask_xx )))
+            allocate(Kxy_abs(count( mask_xy )))
+            allocate(Kxz_abs(count( mask_xz )))
+            allocate(Kyy_abs(count( mask_yy )))
+            allocate(Kyz_abs(count( mask_yz )))
+            allocate(Kzz_abs(count( mask_zz )))
+    
+            !Pack the demag tensors into the temporary arrays. The intrinsic PACK routine overflows the stack, so use do loops
+            k_xx = 1
+            k_xy = 1
+            k_xz = 1
+            k_yy = 1
+            k_yz = 1
+            k_zz = 1
+            do i=1,nx_K
+                do j=1,ny_K
+                    if (mask_xx(i,j) .eq. .true.) then
+                        Kxx_abs(k_xx) = abs(Kxx_c(i,j)) 
+                        k_xx = k_xx + 1
+                    endif
+                    if (mask_xy(i,j) .eq. .true.) then
+                        Kxy_abs(k_xy) = abs(Kxy_c(i,j))
+                        k_xy = k_xy + 1
+                    endif
+                    if (mask_xz(i,j) .eq. .true.) then
+                        Kxz_abs(k_xz) = abs(Kxz_c(i,j))
+                        k_xz = k_xz + 1
+                    endif
+                    if (mask_yy(i,j) .eq. .true.) then
+                        Kyy_abs(k_yy) = abs(Kyy_c(i,j)) 
+                        k_yy = k_yy + 1
+                    endif
+                    if (mask_yz(i,j) .eq. .true.) then
+                        Kyz_abs(k_yz) = abs(Kyz_c(i,j))
+                        k_yz = k_yz + 1
+                    endif
+                    if (mask_zz(i,j) .eq. .true.) then
+                        Kzz_abs(k_zz) = abs(Kzz_c(i,j)) 
+                        k_zz = k_zz + 1
+                    endif
+                enddo
+            enddo
+            
+            call FindThresholdFraction(Kxx_abs, Kxy_abs, Kxz_abs, Kyy_abs, Kyz_abs, Kzz_abs, threshold_var)
+            
+            !cleanup
+            deallocate(mask_xx)
+            deallocate(mask_xy)
+            deallocate(mask_xz)
+            deallocate(mask_yy)
+            deallocate(mask_yz)
+            deallocate(mask_zz)
+            deallocate(Kxx_abs)
+            deallocate(Kxy_abs)
+            deallocate(Kxz_abs)
+            deallocate(Kyy_abs)
+            deallocate(Kyz_abs)
+            deallocate(Kzz_abs)
+            
+        endif
        
         !Apply the thresholding
-        thres = cmplx(problem%demag_threshold,0.)
+        thres = cmplx(threshold_var,0.)
         call ConvertDenseToSparse_c( Kxx_c, problem%K_s_c(1), thres)
         call ConvertDenseToSparse_c( Kxy_c, problem%K_s_c(2), thres)
         call ConvertDenseToSparse_c( Kxz_c, problem%K_s_c(3), thres)
@@ -1209,6 +1384,85 @@ include 'blas.f90'
     
     
     !>-----------------------------------------
+    !> @author Rasmus Bjoerk, rabj@dtu.dk, DTU, 2020
+    !> @brief
+    !> Find the threshold value that corresponds to a certain fraction of the non-zero elements in the demag tensor
+    !> Its assumed that the absolute value of the matrix is passed. This means that the subroutine will work for both single and complex tensors 
+    !> Do this using bisection algorithm
+    !> @params[in] threshold a faction specifying the fraction of the smallest elements that are to be removed
+    !>-----------------------------------------
+    subroutine FindThresholdFraction(Kxx, Kxy, Kxz, Kyy, Kyz, Kzz, threshold_var)
+    real(SP),dimension(:),intent(inout) :: Kxx, Kxy, Kxz, Kyy, Kyz, Kzz                !> The absolute of the demag tensors 
+    real*4,intent(inout) :: threshold_var
+    real*4 :: f_large, f_small, f_middle
+    integer,dimension(6) :: count_ind
+    integer :: count_middle, n_ele_nonzero, k_do  
+    character*(10) :: prog_str
+        
+    call displayMatlabMessage( 'Starting threshold calculation.' )
+    
+    !The total number of nonzero elements in the demag tensor
+    n_ele_nonzero = size( Kxx )
+    n_ele_nonzero = n_ele_nonzero + size( Kxy )
+    n_ele_nonzero = n_ele_nonzero + size( Kxz )
+    n_ele_nonzero = n_ele_nonzero + size( Kyy )
+    n_ele_nonzero = n_ele_nonzero + size( Kyz )
+    n_ele_nonzero = n_ele_nonzero + size( Kzz )
+    
+    !Find the maximum and minimum value in the individual demag tensors than is greater than zero
+    f_large = max(maxval(Kxx), maxval(Kxy), maxval(Kxz), maxval(Kyy), maxval(Kyz), maxval(Kzz))    
+    f_small = min(minval(Kxx), minval(Kxy), minval(Kxz), minval(Kyy), minval(Kyz), minval(Kzz))
+    
+    !Bisection algoritm for find the function value for a corresponding fraction
+    k_do = 1
+    do 
+        f_middle = (f_large-f_small)/2+f_small
+                
+        !Count only the elements larger than epsilon in each of the matrices
+        count_ind(1) = count( Kxx .le. f_middle )
+        count_ind(2) = count( Kxy .le. f_middle )
+        count_ind(3) = count( Kxz .le. f_middle )
+        count_ind(4) = count( Kyy .le. f_middle )
+        count_ind(5) = count( Kyz .le. f_middle )
+        count_ind(6) = count( Kzz .le. f_middle )
+                
+        count_middle = sum(count_ind)
+                   
+        if ( count_middle .gt. threshold_var*n_ele_nonzero ) then
+            f_large = f_middle
+        else
+            f_small = f_middle
+        endif            
+            
+        !check if we have found the value that defines the threshold
+        if ( ( count_middle .ge. (threshold_var-0.01)*n_ele_nonzero ) .and. ( count_middle .le. (threshold_var+0.01)*n_ele_nonzero ) ) then
+            threshold_var = f_middle
+                
+            exit
+        endif
+            
+        if ( k_do .gt. 1000 ) then
+            call displayMatlabMessage( 'Iterations exceeded in finding threshold value. Stopping iterations.' )
+                
+            threshold_var = f_middle
+            exit
+        endif
+                
+        k_do = k_do+1
+    enddo  
+    
+    call displayMatlabMessage( 'Using a threshold value of :' )
+    write (prog_str,'(F10.9)') threshold_var
+    call displayMatlabMessage( prog_str )
+    call displayMatlabMessage( 'i.e. a fraction of:' )
+    write (prog_str,'(F6.4)') real(count_middle)/real(n_ele_nonzero)
+    call displayMatlabMessage( prog_str )
+    
+    end subroutine FindThresholdFraction
+    
+    
+    
+    !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates the exhange term matrix
@@ -1220,8 +1474,13 @@ include 'blas.f90'
     
     if ( grid%gridType .eq. gridTypeUniform ) then
         call ComputeExchangeTerm3D_Uniform( grid, A )
+    elseif (grid%gridType .eq. gridTypeNonUniform ) then
+        call ConvertExchangeTerm3D_NonUniform( grid, A )
     endif
     
+    !if xchange matrix passed from Matlab
+    ! stat = mkl_sparse_s_create_csr ( d2dz2%A_exch, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, problem%rows_start, problem%rows_end, problem%cols, problem%values)
+    !end
     
     end subroutine ComputeExchangeTerm3D
     
@@ -1559,6 +1818,35 @@ include 'blas.f90'
     !call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_exch.dat' )
     
     end subroutine ComputeExchangeTerm3D_Uniform
+    
+    !>-----------------------------------------
+    !> @author Emil B. Poulsen, emib@gmail.com, DTU, 2020
+    !> @brief
+    !> Converts a given non-uniform grid exchange matrix from matlab sparse format
+    !> (csc) to MagTense (csr) and return in sparse matrix A
+    !!! May or may not end up with index base zero csr matrix. Should probably be index base one.
+    !---------------------------------------------------------------------------   
+    subroutine ConvertExchangeTerm3D_NonUniform(grid, Aout)
+    type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
+    type(sparse_matrix_t),intent(out) :: Aout          !> The returned matrix from the sparse matrix creator
+    type(SparseMatlabMat) :: Ain
+            
+    integer :: stat                                   !> Status value for the various sparse matrix operations        
+    !type(MagTenseSparse) :: d2dx2, d2dy2, d2dz2      !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
+    type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
+    integer :: ind, ntot,colInd,rowInd                !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
+    integer :: i,j,k,nx,ny,nz                         !> For-loop counters
+    type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
+    real*4 :: const
+    
+    Ain = grid%nu_exch_mat
+    !stat = mkl_sparse_s_create_csr ( Aout, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
+    stat = mkl_sparse_d_create_csc(tmp, SPARSE_INDEX_BASE_ZERO, Ain%rows, Ain%cols, Ain%jc(1:Ain%cols), Ain%jc(2:Ain%cols+1), Ain%ir, Ain%values )
+    !!stat = mkl_sparse_d_create_csc (A, indexing, rows, cols, cols_start, cols_end, row_indx, values)
+    stat = mkl_sparse_convert_csr(tmp, SPARSE_OPERATION_NON_TRANSPOSE, Aout)
+    
+    
+    end subroutine ConvertExchangeTerm3D_NonUniform
     
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019

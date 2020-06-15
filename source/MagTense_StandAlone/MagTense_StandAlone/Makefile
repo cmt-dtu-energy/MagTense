@@ -1,5 +1,5 @@
 
-FC = /opt/intel/bin/ifort
+FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
 
 NumIntLib = ../../NumericalIntegration/NumericalIntegration/
 TileDemagTensorLib = ../../TileDemagTensor/TileDemagTensor/
@@ -31,8 +31,8 @@ FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I$(NumIntLib) -I$(TileDemagTensor
 MagTense.x = StandAloneIO.o MagTense_StandAlone.o
 
 MagTense.x: $(MagTense.x)
-	$(FC) $(FFLAGS) $(MagTense.x) -Wl,--start-group $(NumIntLib)NumericalIntegrationlib.a \
-	$(TileDemagTensorLib)TileDemagTensorlib.a $(DemagFieldLib)DemagFieldLib.a \
+	$(FC) $(FFLAGS) $(MagTense.x) -Wl,--start-group $(NumIntLib)libNumericalIntegration.a \
+	$(TileDemagTensorLib)libTileDemagTensor.a $(DemagFieldLib)libDemagField.a \
 	 -Wl,--end-group -o MagTense.x
 
 

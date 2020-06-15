@@ -31,14 +31,13 @@
       real*8,dimension(3) :: Fout
       mwSize,dimension(3) :: dims
       mwIndex :: i
+      mwSize sizevars
       
 !     Check for proper number of arguments. 
       if( nrhs .ne. 3 ) then
-         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput',
-     +                           'three inputs are required.')
+         call mexErrMsgIdAndTxt ('MATLAB:MagTense_mex:nInput','Three inputs are required.')
       elseif(nlhs .gt. 3) then
-         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nOutput',
-     +                           'Too many output arguments.')
+         call mexErrMsgIdAndTxt ('MATLAB:MagTense_mex:nOutput','Too many output arguments.')
       endif
 
 !Check the type of the inputs      
@@ -56,7 +55,8 @@
       !::allocate the magstatmodel
       allocate(magModel)
       !::Copy the number of tiles
-      call mxCopyPtrToInteger4(mxGetPr(prhs(2)), magModel%n_tiles,1)
+      sizevars = 1
+      call mxCopyPtrToInteger4(mxGetPr(prhs(2)), magModel%n_tiles, sizevars )
       
       !::allocate the tiles
       allocate( magModel%tiles(magModel%n_tiles) )

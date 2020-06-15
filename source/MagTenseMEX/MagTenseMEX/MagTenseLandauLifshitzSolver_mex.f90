@@ -10,7 +10,7 @@
     !> @param[in] nrhs no. of input arguments. Should be 2 (the input problem and starting solution)
     !> @param[in] prhs pointer array to the input arguments. 
     !> Prhs(1) is the problem struct while prhs(2) is the initial solution struct
-    !> Plhs(1) is the output solution struct
+    !> Plhs(1) is the output solution struct 
     !-----------------------------------
       subroutine mexFunction(nlhs, plhs, nrhs, prhs)
       use LandauLifshitzSolution
@@ -33,11 +33,9 @@
     
       !Check the input parameters
       if ( nrhs .ne. 2 ) then
-        call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nInput',
-     +                           'Two inputs are required.')
+        call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nInput','Two inputs are required.')
       elseif ( nlhs .ne. 1 ) then
-          call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nOutput',
-     +                           'One output is required.')
+          call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nOutput','One output is required.')
       endif
       
       

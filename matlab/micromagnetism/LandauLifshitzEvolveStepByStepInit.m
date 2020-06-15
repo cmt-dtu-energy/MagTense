@@ -1,4 +1,5 @@
-function [SigmaSol, AppliedField, AllVV] = LandauLifshitzEvolveStepByStepInit(ProblemSetupStruct,InteractionMatrices,Sigma)
+function [SigmaSol, AllVV] = LandauLifshitzEvolveStepByStepInit(ProblemSetupStruct,InteractionMatrices,Sigma)
+mu0 = 4*pi*1e-7;
 
 %--- Evaluate all variables in the ProblemSetupStruct
 names = fieldnames(ProblemSetupStruct);
@@ -6,20 +7,17 @@ for i=1:length(names)
     eval([names{i} '=ProblemSetupStruct.' names{i} ';']);
 end
 
-originalHsX = HsX ;
-originalHsY = HsY ;
-originalHsZ = HsZ ;
-
-for k=1:numel(tt)
-    disp(['  ',num2str(k),'/',num2str(numel(tt))]) ;
-    ProblemSetupStruct.HsX = @(t) 0.*t + originalHsX(tt(k)) ;
-    ProblemSetupStruct.HsY = @(t) 0.*t + originalHsY(tt(k)) ;
-    ProblemSetupStruct.HsZ = @(t) 0.*t + originalHsZ(tt(k)) ;
-
+for k=1:length(ProblemSetupStruct.Hext(:,1))
+    disp(['  ',num2str(k),'/',num2str(length(ProblemSetupStruct.Hext(:,1)))]) ;
+    
+    ProblemSetupStructExplicit = ProblemSetupStruct ;
+    ProblemSetupStructExplicit.Hext(:,1)   = linspace(ProblemSetupStructExplicit.t(1),ProblemSetupStructExplicit.t(end),length(ProblemSetupStruct.Hext(:,2)));
+    ProblemSetupStructExplicit.Hext(:,2:4) = ProblemSetupStruct.Hext(k,2:4).*ones(length(ProblemSetupStruct.Hext(:,2)),1);
+    
     if k==1
-        [SigmaSol,~,VV] = LandauLifshitzEvolveCombined(ProblemSetupStruct,InteractionMatrices,Sigma) ;
+        [SigmaSol,VV] = LandauLifshitzEvolveCombined(ProblemSetupStructExplicit,InteractionMatrices,Sigma) ;
     else
-        [SigmaSol,~,VV] = LandauLifshitzEvolveCombined(ProblemSetupStruct,InteractionMatrices,AllSigmas(k-1,:)) ;
+        [SigmaSol,VV] = LandauLifshitzEvolveCombined(ProblemSetupStructExplicit,InteractionMatrices,AllSigmas(k-1,:)) ;
     end
 
     AllSigmas(k,:) = SigmaSol(end,:) ;
@@ -30,7 +28,5 @@ for k=1:numel(tt)
     end
 end
 
-Hfact = 1/MU0 ; % AppliedField is provided in T
-AppliedField = [Hfact*originalHsX(tt), Hfact*originalHsY(tt),Hfact*originalHsZ(tt)+0.*tt] ;
 SigmaSol = AllSigmas ;
 end

@@ -1,0 +1,308 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Theoretical aspects &mdash; MagTense TechManual  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/techmanual.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Publications" href="publications.html" />
+    <link rel="prev" title="Documentation" href="documentation.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+          
+
+          
+            <a href="index.html">
+          
+
+          
+            
+            <img src="_static/MagTense_logo.PNG" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Theoretical aspects</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#tiles">Tiles</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#rotations">Rotations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#implementation">Implementation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTense>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="theoretical-aspects">
+<h1>Theoretical aspects<a class="headerlink" href="#theoretical-aspects" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="tiles">
+<h2>Tiles<a class="headerlink" href="#tiles" title="Permalink to this headline">¶</a></h2>
+<p>The goal of this section is to describe how the tiles behave
+geometrically through specifying their Origin, dimensions and
+Euler angles.</p>
+<p>In general, the demagnetization tensor for each tile type is found
+with respect to the local Origin of the tile and assuming the tile
+not to be rotated. The tile’s local Origin is defined through the
+vector <span class="math notranslate nohighlight">\(r'\)</span> with respect to the global Origin. The  field is
+found at the position <span class="math notranslate nohighlight">\(r\)</span> with respect to the global
+coordinate system (G).</p>
+<p>We let <strong>P</strong> denote the matrix representing the mapping from the local (L)
+to the global coordinate system (G). As the demagnetization tensor is
+always found with respect to L and it takes the relative distance as
+input, we get the geometrical part of the  field (not including magnetization)
+to be:</p>
+<div class="math notranslate nohighlight">
+\[K(r) = \text{P} N (\text{P}^{-1}(r - r')).\]</div>
+<p>The magnetization with respect to the global coordinate system is given by
+(for a hard magnet characterized by an anisotropic permeability tensor):</p>
+<div class="math notranslate nohighlight">
+\[[M]_G = (\text{P}[\mu]_L) H + M_{rem}[\hat{u}_{ea}]_G,\]</div>
+<p>where the magnetic  field in the global system is denoted <span class="math notranslate nohighlight">\(H\)</span>,
+the magnitude of the remanence is <span class="math notranslate nohighlight">\(M_{rem}\)</span> and the unit vector
+defining the easy-axis of the permanent magnet in the global system is
+<span class="math notranslate nohighlight">\([\hat{u}_{ea}]_G = \text{P} [\hat{u}_{ea}]_L\)</span>. As an example,
+consider e.g. a prism magnetized along the prism’s x-direction. Then
+<span class="math notranslate nohighlight">\([\hat{u}_{ea}]_L = (1, 0, 0)\)</span>.</p>
+<p>The field in the global system then becomes:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}H &amp;= K(r)[M]_L = K(r) \text{P}^{-1} [M]_G \\
+&amp; = \text{P} N (\text{P}^{-1}(r - r')) (\text{P}[\mu]_L) H + \text{P} (M_{rem}[\hat{u}_{ea}]_L)\end{split}\]</div>
+<p>Now,  finding the <strong>P</strong> matrix and its inverse needs to be done.
+This is described in the section <a class="reference internal" href="#rotations">rotations</a>.</p>
+<div class="section" id="rotations">
+<h3>Rotations<a class="headerlink" href="#rotations" title="Permalink to this headline">¶</a></h3>
+<p>So far, we only consider this transformation to consist of three rotations;
+about the <span class="math notranslate nohighlight">\(x\)</span>, <span class="math notranslate nohighlight">\(y\)</span> and <span class="math notranslate nohighlight">\(z\)</span> axes in that order with the angles
+<span class="math notranslate nohighlight">\(\phi\)</span> (roll), <span class="math notranslate nohighlight">\(\theta\)</span> (pitch) and <span class="math notranslate nohighlight">\(\psi\)</span> (yaw).
+Since the global coordinate system coincides with the canonical xyz-system,
+<strong>P</strong> simply consists of the three (column) vectors defining the orthonormal
+basis of the <em>local</em> system, expressed with respect to the global system:</p>
+<div class="math notranslate nohighlight">
+\[\text{P} = \{ [\hat{e_x}]^T_G, [\hat{e_y}]^T_G, [\hat{e_z}]^T_G \}\]</div>
+<p>These unit vectors may be found through applying the rotation matrices in
+the correct order (intrinsic rotation with sequence <span class="math notranslate nohighlight">\(x_L-y_L'-z_L''\)</span>
+or extrinsic rotations with <span class="math notranslate nohighlight">\(z_G-y_G-x_G\)</span>):</p>
+<div class="math notranslate nohighlight">
+\[\text{P} = Rot_x(\phi) Rot_y(\theta) Rot_z(\psi).\]</div>
+<p>Finally, as <strong>P</strong> is orthogonal, we have that</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\text{P}^{-1} &amp;= Rot_z(\psi)^{-1} Rot_y(\theta)^{-1} Rot_x(\phi)^{-1} \\
+&amp; = Rot_z(\psi)^T Rot_y(\theta)^T Rot_x(\phi)^T\end{split}\]</div>
+<div class="section" id="implementation">
+<h4>Implementation<a class="headerlink" href="#implementation" title="Permalink to this headline">¶</a></h4>
+<p>In the <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/source/DemagField/DemagField/DemagFieldGetSolution.f90#L911">code</a>,
+the rotation matrix <strong>rotMat</strong> and its inverse <strong>rotMatInv</strong> are calculated.
+They are applied in the subroutine <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/a83ce2650b39781b1e0031ceb51de6e1eb5d6f1e/source/DemagField/DemagField/DemagFieldGetSolution.f90#L671">getFieldFromTile</a>.
+Hereby, the evaluation points, which are defined with respect to the global
+coordinate system, are rotated with <strong>rotMat</strong> into the <em>local</em> system of
+the considered tile.</p>
+<p>The three <a class="reference internal" href="geometry.html#rotation-angles"><span class="std std-ref">rotation angles</span></a> (<span class="math notranslate nohighlight">\(\phi, \theta, \psi\)</span>) rotate the given tile
+intrinsically about the orthonormal basis of the <em>local</em> system in the order
+<span class="math notranslate nohighlight">\(x_L-y_L'-z_L''\)</span>.
+This corresponds to a extrinsic rotation with sequence <span class="math notranslate nohighlight">\(z_G-y_G-x_G\)</span> in the global
+system.</p>
+<p>To bring the evaluation points into the <em>local</em> system of the considered tile, the
+negative rotation angles have to be applied in opposite order.</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}Rot_x(-\phi) =
+\begin{bmatrix}
+1 &amp; 0 &amp; 0\\
+0 &amp; cos(-\phi) &amp; -sin(-\phi)\\
+0 &amp; sin(-\phi) &amp; cos(-\phi)
+\end{bmatrix}
+=
+\begin{bmatrix}
+1 &amp; 0 &amp; 0\\
+0 &amp; cos(\phi) &amp; sin(\phi)\\
+0 &amp; -sin(\phi) &amp; cos(\phi)
+\end{bmatrix}
+=
+Rot_x(\phi)^T.\end{split}\]</div>
+<p>Similarly, <span class="math notranslate nohighlight">\(Rot_y(-\theta) = Rot_y(\theta)^T\)</span> and <span class="math notranslate nohighlight">\(Rot_z(-\psi) = Rot_z(\psi)^T\)</span>.</p>
+<p><strong>rotMat</strong> and <strong>rotMatInv</strong> are defined as follows:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\text{rotMat} &amp;= Rot_z(-\psi) Rot_y(-\theta) Rot_x(-\phi) \\
+&amp; = Rot_z(\phi)^T Rot_y(\theta)^T Rot_x(\psi)^T\end{split}\]</div>
+<div class="math notranslate nohighlight">
+\[\begin{split}\text{rotMatInv} &amp;= Rot_x(-\phi)^T Rot_y(-\theta)^T Rot_z(-\psi)^T \\
+&amp; = Rot_x(\phi) Rot_y(\theta) Rot_z(\psi)\end{split}\]</div>
+<p><strong>rotMatInv</strong> is the mapping from the <em>local</em> system of the given tile to the global coordinate system
+and corresponds to our <strong>P</strong> in the theoretical part. As we are performing a rotation in the
+<em>local</em> system (intrinsically), post-multiplication applies for the rotation matrices.</p>
+<div class="figure align-default" id="id1">
+<a class="reference internal image-reference" href="_images/local_rotations.png"><img alt="Local rotations" src="_images/local_rotations.png" style="width: 400px;" /></a>
+<p class="caption"><span class="caption-text">Rotations of a tile are performed in its local coordinate system.
+Firstly, the tile is rotated with <span class="math notranslate nohighlight">\(\phi\)</span> around its local x-axis.
+Secondly, the local y-axis is rotated by <span class="math notranslate nohighlight">\(\theta\)</span>.
+Eventually, the angle <span class="math notranslate nohighlight">\(\psi\)</span> is performed around the local z-axis.
+<span class="math notranslate nohighlight">\(\{ X^T, Y^T, Z^T\}  \hat{=} \{ [\hat{e_x}]^T_G, [\hat{e_y}]^T_G, [\hat{e_z}]^T_G \}\)</span>.</span><a class="headerlink" href="#id1" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="publications.html" class="btn btn-neutral float-right" title="Publications" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="documentation.html" class="btn btn-neutral float-left" title="Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2020, MagTense Developers
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>
+
+  
+  
+    
+    
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>

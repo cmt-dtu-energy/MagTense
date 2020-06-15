@@ -59,6 +59,9 @@ ipch/
 *.vsp
 *.vspx
 
+# Visual Studio code
+.vscode
+
 # Guidance Automation Toolkit
 *.gpState
 
@@ -169,3 +172,8 @@ executable/test_tiles.txt
 executable/tiles_out.txt
 executable/std_alone_points.txt
 executable/H_out.txt
+
+# MagTense TechManual
+!docs/*
+docs/.buildinfo
+docs/source/_build

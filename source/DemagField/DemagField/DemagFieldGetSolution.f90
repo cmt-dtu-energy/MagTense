@@ -29,8 +29,15 @@
         integer :: i,prgCnt,tid,prog,OMP_GET_THREAD_NUM
         real,dimension(:,:),allocatable :: H_tmp
         integer,parameter :: cbCnt = 10
-        logical :: useStoredN
-    
+        logical :: useStoredN,localFieldSoft    !>Indicates whether the local field of the tile should be found as if the tile is made of a soft ferromagnetic material
+        real,dimension(3,3) :: N_current_tile   !>The tensor for the current tile where the field has to be handled differently (see below)
+        real,dimension(3) :: mur                !>The permeability tensor
+        real :: Happ_nrm,Hnorm
+        real,dimension(3) :: Happ_un,NHapp,v1,v2
+            
+        !set to false by default and update later
+        localFieldSoft = .false.
+        
         !!If Nout is provided, the function uses this for calculations
         if ( present( Nout ) ) then 
             if ( .NOT. allocated(Nout) ) then
@@ -67,12 +74,23 @@
                 else
                     call getFieldFromCylTile( tiles(i), H_tmp, pts, n_ele )
                 endif
-            
             case (tileTypePrism)
                 if ( present(Nout) ) then
                     call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
                 else
                     call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele )
+                endif
+            case (tileTypeSphere)
+                if ( present(Nout) ) then
+                    call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+                else
+                    call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_ele )
+                endif
+            case (tileTypeSpheroid)
+                if ( present(Nout) ) then
+                    call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+                else
+                    call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_ele )
                 endif
             case (tileTypeCircPiece )
                  if ( present(Nout) ) then
@@ -92,9 +110,6 @@
                 else
                     call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_ele )
                 endif
-                
-            case (tileTypeEllipsoid)
-                !!@todo add the existing code for spheroids, and correct Ellipsoids to Spheroids
             case (tileTypePlanarCoil )
                 if ( present(Nout) ) then
                     call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
@@ -106,25 +121,63 @@
             
             end select
         
-            !!@todo Can this code be removed as well as the variables prgCnt and prog?
-            ! $OMP CRITICAL
-            H = H + H_tmp
-            !prgCnt = prgCnt + 1
-            !tid = omp_get_thread_num()
-            !if ( tid .eq. 0 ) then
-            !    if ( floor( 100. * prgCnt / (1.*n_tiles) ) .ge. cbCnt ) then
-            !        prgCnt = 0
-            !        prog = prog + 10                
-            !        call displayProgress( prog )
-            !    endif
-            !endif        
-           ! $OMP END CRITICAL
-       
+            if ( tiles(i)%excludeFromSummation .eqv. .false. ) then
+                H = H + H_tmp
+            else
+                !this happens if the local tile is made of soft ferromagnetic material and should be treated specially
+                localFieldSoft = .true.
+                !then also store the demag tensor for later use
+                if ( useStoredN .eqv. .true. ) then
+                    N_current_tile = Nout(i,1,:,:)
+                    mur(1) = tiles(i)%mu_r_ea
+                    mur(2) = tiles(i)%mu_r_oa
+                    mur(3) = tiles(i)%mu_r_oa
+               endif
+            endif
         
         
         enddo
         ! $OMP END PARALLEL DO
     
+        !Finally include the field of the tile itself (if assuming constant permeability)
+        !B = mu0 * (H + M) = mu0 * mur * H => M = H * (mur - 1) =>
+        !H = Happ + N * M = Happ + N * H * (mur-1) =>
+        !note that this is a vector equation that is not trivial to solve for the vector H
+        !We assume the local field to be parallel to the applied field (as the tile is soft), i.e. H = Hnorm * Happ_un (Happ_un = unit vector of applied field)
+        !The applied field is the vector sum of the fields from all other tiles
+        !We then get: 
+        !Hnorm * Happ_un = Happ_norm * Happ_un + Hnorm*(mur-1) * N * Happ_un =>
+        !0 = (Happ_norm - Hnorm) * Happ_un + Hnorm*(mur-1) * N * Happ_un = K
+        !We then wish to solve this equation (finding that K-vector = zero-vector) and do this by finding the square-norm of K:
+        !||K||^2 = ( ( Happ_norm - Hnorm ) * Happ_un(1) + Hnorm(mur-1) (N*Happ_un)(1) )^2 + ( ( Happ_norm - Hnorm ) * Happ_un(2) + Hnorm(mur-1) (N*Happ_un)(2) )^2 + ( ( Happ_norm - Hnorm ) * Happ_un(3) + Hnorm(mur-1) (N*Happ_un)(3) )^2
+        ! Finding the minimum: d( ||K||^2 ) / dHnorm = 0 => Hnorm_min = -Happ_norm * (v1 dot v2 ) / ||v1||^2 with
+        !v1 = ((mur-1) * N*Happ) - Happ_un
+        !v2 = Happ_un
+    
+        !Note that N is likely negative as we by convention absorb the sign into the demag tensor
+        if ( localFieldSoft .eqv. .true. )  then
+            
+            
+            !norm of applied field
+            Happ_nrm = sqrt( H(1,1)**2 + H(1,2)**2 + H(1,3)**2 )
+            if ( Happ_nrm .ne. 0 ) then
+                !unit vector of applied field
+                Happ_un = H(1,:) / Happ_nrm
+                !demag tensor product
+                NHapp = matmul( N_current_tile, Happ_un )
+            
+                !temp vector 1
+                v1 = (mur-1.) * NHapp - Happ_un
+                !temp vector 2
+                v2 = Happ_un
+                Hnorm = -Happ_nrm * dot_product(v1,v2) / ( v1(1)**2 + v1(2)**2 + v1(3)**2 )
+            
+                !Update the resulting field
+                H(:,1) = Happ_un(1) * Hnorm
+                H(:,2) = Happ_un(2) * Hnorm
+                H(:,3) = Happ_un(3) * Hnorm
+            endif
+        endif
         deallocate(H_tmp)
     
         !!Subtract M of a tile in points that are inside that tile in order to actually get H (only for CylindricalTiles as these actually calculate the B-field (divided by mu0)
@@ -169,6 +222,57 @@
     
     end subroutine getFieldFromRectangularPrismTile      
         
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the magnetic field from a sphere
+    !!
+    subroutine getFieldFromSphereTile( tile, H, pts, n_ele, N_out, useStoredN )
+        type(MagTile),intent(in) :: tile
+        real,dimension(n_ele,3),intent(inout) :: H
+        real,dimension(n_ele,3) :: pts
+        integer,intent(in) :: n_ele
+        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        logical,intent(in),optional :: useStoredN
+    
+        procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
+    
+        N_tensor => getN_sphere_3D
+    
+        !! Check to see if we should use symmetry
+        if ( tile%exploitSymmetry .eq. 1 ) then        
+            call getFieldFromTile_symm( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )        
+        else        
+            call getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )       
+        endif
+    
+    end subroutine getFieldFromSphereTile   
+    
+    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the magnetic field from a sphere
+    !!
+    subroutine getFieldFromSpheroidTile( tile, H, pts, n_ele, N_out, useStoredN )
+        type(MagTile),intent(in) :: tile
+        real,dimension(n_ele,3),intent(inout) :: H
+        real,dimension(n_ele,3) :: pts
+        integer,intent(in) :: n_ele
+        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        logical,intent(in),optional :: useStoredN
+    
+        procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
+    
+        N_tensor => getN_spheroid_3D
+    
+        !! Check to see if we should use symmetry
+        if ( tile%exploitSymmetry .eq. 1 ) then        
+            call getFieldFromTile_symm( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )        
+        else        
+            call getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )       
+        endif
+    
+    end subroutine getFieldFromSpheroidTile   
+    
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>

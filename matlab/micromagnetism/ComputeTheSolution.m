@@ -1,4 +1,5 @@
-function [SigmaSol,AppliedField,VV,InteractionMatrices] = ComputeTheSolution(MySim)
+function [SigmaSol,VV,InteractionMatrices] = ComputeTheSolution(MySim)
+VV = [];
 tic
 
 %% Setup problem variables
@@ -8,14 +9,19 @@ tic
 
 %% Calculate or load the matrices that only needs to be calculated once
 
-if ischar(ProblemSetupStruct.DemagTensorFileName)
+if ischar(ProblemSetupStruct.DemagTensorFileName) & (~ProblemSetupStruct.RecomputeInteractionMatrices)
     if exist([ProblemSetupStruct.DemagTensorFileName,'.mat'],'file') || exist(ProblemSetupStruct.DemagTensorFileName,'file')
         %--- Remark: We should settle on the structure of how it is saved...
         load(ProblemSetupStruct.DemagTensorFileName,'InteractionMatrices') ;
+        MatricesHaveBeenLoaded = 1 ;
     else
-        InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct);
+        MatricesHaveBeenLoaded = 0 ;
     end
 else
+   MatricesHaveBeenLoaded = 0 ; 
+end
+
+if ~MatricesHaveBeenLoaded % ComputeThem
     InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct);
 end
 N = InteractionMatrices.N;
@@ -23,34 +29,40 @@ N = InteractionMatrices.N;
 
 %% The starting guess for the magnetization
 % This is randomized or loaded from a file
-
-Sigma = InitialSigma(ProblemSetupStruct,InteractionMatrices);
+Sigma = MySim.m0(:);
+% Sigma = InitialSigma(ProblemSetupStruct,InteractionMatrices);
 
 %% Static, "implicit" equilibrium solution
 
-if ProblemSetupStruct.UseImplicitSolver == 1
-    [SigmaSol, AppliedField]  = LandauLifshitzEvolveDirectHaODEinit(ProblemSetupStruct,InteractionMatrices,Sigma);
+%UseImplicitSolver
+if ProblemSetupStruct.SolverType == 1
+    
+    [SigmaSol]  = LandauLifshitzEvolveDirectHaODEinit(ProblemSetupStruct,InteractionMatrices,Sigma);
     if ProblemSetupStruct.SaveTheResult
         elapsedTime = toc;
-        save([PreSetFileName,'solution'],'N','SigmaSol','AppliedField','elapsedTime');
+        save([PreSetFileName,'solution'],'N','SigmaSol','elapsedTime');
     end
     
-elseif ProblemSetupStruct.UseImplicitStepsSolver == 1
-    [SigmaSol, AppliedField,ImplicitFailed,VV] = LandauLifshitzEvolveImplicitSteps(ProblemSetupStruct,InteractionMatrices,Sigma);
+%UseImplicitStepsSolver
+elseif ProblemSetupStruct.SolverType == 2
+    
+    [SigmaSol,ImplicitFailed,VV] = LandauLifshitzEvolveImplicitSteps(ProblemSetupStruct,InteractionMatrices,Sigma);
     if ProblemSetupStruct.SaveTheResult
         elapsedTime = toc;
         save([PreSetFileName,'solution'],'N','SigmaSol','ImplicitFailed','VV','elapsedTime');
     end
     
-elseif ProblemSetupStruct.UseExplicitSolver == 1
+%UseExplicitSolver
+elseif ProblemSetupStruct.SolverType == 3
     
-    [SigmaSol, AppliedField, VV] = LandauLifshitzEvolveStepByStepInit(ProblemSetupStruct,InteractionMatrices,Sigma);
+    [SigmaSol, VV] = LandauLifshitzEvolveStepByStepInit(ProblemSetupStruct,InteractionMatrices,Sigma);
     if ProblemSetupStruct.SaveTheResult
         elapsedTime = toc;
-        save([PreSetFileName,'solution.mat'],'N','SigmaSol','AppliedField','VV','elapsedTime');
+        save([PreSetFileName,'solution.mat'],'N','SigmaSol','VV','elapsedTime');
     end
     
-elseif ProblemSetupStruct.UseDynamicSolver == 1
+%UseDynamicSolver
+elseif ProblemSetupStruct.SolverType == 4
     
     [SigmaSol] = LandauLifshitzEvolveCombined(ProblemSetupStruct,InteractionMatrices,Sigma) ;
     if ProblemSetupStruct.SaveTheResult

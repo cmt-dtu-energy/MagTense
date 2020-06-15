@@ -1,9 +1,9 @@
 
-FC = /opt/intel/bin/ifort
+FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
 
 
-FFLAGS = -r8 -O3 -fpe0 -fpp -fp-model source -fpic -I../../NumericalIntegration/NumericalIntegration/ \
-	-I../../TileDemagTensor/TileDemagTensor/ -I../../DemagField/DemagField/
+FFLAGS = -r8 -O3 -fpe0 -fpp -fp-model source -fpic -static-intel -libs:static -I../../NumericalIntegration/NumericalIntegration/ \
+	-I../../TileDemagTensor/TileDemagTensor/ -I../../DemagField/DemagField/  -I/apps/external/matlab/2019/b/extern/include/ 
 
 
 
@@ -29,8 +29,8 @@ FFLAGS = -r8 -O3 -fpe0 -fpp -fp-model source -fpic -I../../NumericalIntegration/
 
 MagneticForceIntegratorLib = $(FC) MagForceIO.o MagForceMaxwellStressTensor.o MagneticForce.o
 
-MagneticForceIntegratorLib.a: $(MagneticForceIntegratorLib)
-	ar rc MagneticForceIntegratorLib.a MagForceIO.o MagForceMaxwellStressTensor.o MagneticForce.o
+libMagneticForceIntegrator.a: $(MagneticForceIntegratorLib)
+	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/xiar rc libMagneticForceIntegrator.a MagForceIO.o MagForceMaxwellStressTensor.o MagneticForce.o
 
 
 clean:

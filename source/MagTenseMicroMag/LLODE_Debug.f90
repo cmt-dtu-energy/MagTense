@@ -14,17 +14,19 @@
     !> @params[in] n the no. of rows and columns in A (assumed to be square)
     !>-------------------------------------------
     subroutine writeSparseMatrixToDisk( A, n, filename )
+    use, intrinsic :: iso_c_binding
     type(sparse_matrix_t),intent(in) :: A
     integer,intent(in) :: n
     character(*),intent(in) :: filename
     
-    real(DP),dimension(:,:),allocatable :: x,y      !> The dense matrix to be created
-    real(DP),dimension(:), allocatable :: xx,yy     
+    real(SP),dimension(:,:),allocatable :: x,y      !> The dense matrix to be created
+    real(c_float),dimension(:), allocatable :: xx,yy     
     integer,dimension(1) :: shp1D
     integer,dimension(2) :: shp2D
     integer :: i, stat
-    real(DP) :: alpha, beta
     type(matrix_descr) :: descr 
+    real(c_float), parameter :: alpha_c = 1.
+    real(c_float), parameter :: beta_c = 0. 
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -45,11 +47,7 @@
     
     xx = reshape( x, shp1D )
     
-    alpha = 1.
-    beta = 0.
-    
-    
-    stat = mkl_sparse_d_mm (SPARSE_OPERATION_NON_TRANSPOSE, alpha, A, descr, SPARSE_LAYOUT_COLUMN_MAJOR, xx, n, n, beta, yy, n)
+    stat = mkl_sparse_s_mm (SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, A, descr, SPARSE_LAYOUT_COLUMN_MAJOR, xx, n, n, beta_c, yy, n)
     
     shp2D(1) = n
     shp2D(2) = n
@@ -74,17 +72,20 @@
     !> @params[in] n the no. of rows and columns in A (assumed to be square)
     !>-------------------------------------------
     subroutine writeSparseMatrixToDisk_c( A, n, filename )
+    use, intrinsic :: iso_c_binding
     type(sparse_matrix_t),intent(in) :: A
     integer,intent(in) :: n
     character(*),intent(in) :: filename
     
     complex(kind=4),dimension(:,:),allocatable :: x,y      !> The dense matrix to be created
-    complex(kind=4),dimension(:), allocatable :: xx,yy     
+    complex(c_float_complex),dimension(:), allocatable :: xx,yy     
     integer,dimension(1) :: shp1D
     integer,dimension(2) :: shp2D
     integer :: i, stat
-    complex(kind=4) :: alpha, beta
     type(matrix_descr) :: descr 
+    complex(c_float_complex), parameter :: alpha_c = cmplx(1.,0.)
+    complex(c_float_complex), parameter :: beta_c = cmplx(0.,0.)
+    
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -105,11 +106,7 @@
     
     xx = reshape( x, shp1D )
     
-    alpha = cmplx(1.,0.)
-    beta = cmplx(0.,0.)
-    
-    
-    stat = mkl_sparse_c_mm (SPARSE_OPERATION_NON_TRANSPOSE, alpha, A, descr, SPARSE_LAYOUT_COLUMN_MAJOR, xx, n, n, beta, yy, n)
+    stat = mkl_sparse_c_mm (SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, A, descr, SPARSE_LAYOUT_COLUMN_MAJOR, xx, n, n, beta_c, yy, n)
     
     shp2D(1) = n
     shp2D(2) = n

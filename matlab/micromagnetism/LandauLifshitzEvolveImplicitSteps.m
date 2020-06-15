@@ -1,4 +1,4 @@
-function [SigmaSol, AppliedField, ImplicitFailed, AllVV] = LandauLifshitzEvolveImplicitSteps(ProblemSetupStruct,InteractionMatrices,Sigma)
+function [SigmaSol, ImplicitFailed, AllVV] = LandauLifshitzEvolveImplicitSteps(ProblemSetupStruct,InteractionMatrices,Sigma)
 
 %--- Evaluate all variables in the ProblemSetupStruct
 names = fieldnames(ProblemSetupStruct);
@@ -61,7 +61,5 @@ for k=1:numel(tt)
     end
 end
 
-Hfact = 1/MU0 ; % AppliedField is provided in T
-AppliedField = [Hfact*originalHsX(tt), Hfact*originalHsY(tt),Hfact*originalHsZ(tt)+0.*tt] ;
 SigmaSol = AllSigmas ;
 end

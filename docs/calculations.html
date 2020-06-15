@@ -1,0 +1,285 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Calculations &mdash; MagTense TechManual  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/techmanual.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Geometry" href="geometry.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+          
+
+          
+            <a href="index.html">
+          
+
+          
+            
+            <img src="_static/MagTense_logo.PNG" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Calculations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#magtile">MagTile</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html">Geometry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="magnetization.html">Magnetization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="other_parameters.html">Other parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#evaluation-points">Evaluation points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#state-function">State function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#h-field">H-field</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTense>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="calculations">
+<h1>Calculations<a class="headerlink" href="#calculations" title="Permalink to this headline">¶</a></h1>
+<p>In MagTense, a magnetostatic and a <a class="reference internal" href="micromagnetism.html#micromagnetism"><span class="std std-ref">micromagnetism</span></a> calculation
+framework is available. The basic pipeline for a magnetostatic
+calculation consists of three parts:</p>
+<ul class="simple">
+<li><p>MagTiles</p></li>
+<li><p>Evaluation points</p></li>
+<li><p>State function</p></li>
+</ul>
+<p>As result, the three-dimensional H-field vector in
+the evaluation points is returned.</p>
+<p>Examples of how to calculate magnetostatic and micromagnetic
+problems can be found for <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples">Matlab</a>
+and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/python/examples">python</a>.</p>
+<div class="section" id="magtile">
+<h2>MagTile<a class="headerlink" href="#magtile" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nb">type</span><span class="p">(</span><span class="n">MagTile</span><span class="p">),</span><span class="n">dimension</span><span class="p">(</span><span class="n">n_tiles</span><span class="p">)</span> <span class="p">::</span> <span class="n">tiles</span>
+</pre></div>
+</div>
+<p>MagTiles are the basic structure of MagTense, where <strong>n_tiles</strong>
+is the number of given magnetic tiles.
+They can be specified with several parameters corresponding
+to the following properties:</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="geometry.html">Geometry</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#magtense-parameters">MagTense Parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#cylindrical-tile">Cylindrical Tile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#prism">Prism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#circular-piece">Circular Piece</a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#inverted-circular-piece">Inverted Circular Piece</a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#tetrahedron">Tetrahedron</a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#sphere">Sphere</a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#spheroid">Spheroid</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="magnetization.html">Magnetization</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="magnetization.html#magnet-type">Magnet Type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="magnetization.html#easy-axis-and-other-axes">Easy axis and other axes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="magnetization.html#remanent-magnetization-m-rem">Remanent Magnetization <span class="math notranslate nohighlight">\(M_{rem}\)</span></a></li>
+<li class="toctree-l2"><a class="reference internal" href="magnetization.html#magnetization-m">Magnetization <span class="math notranslate nohighlight">\(M\)</span></a></li>
+<li class="toctree-l2"><a class="reference internal" href="magnetization.html#state-function-index">State function index</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="other_parameters.html">Other parameters</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="other_parameters.html#symmetry-options">Symmetry Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="other_parameters.html#include-in-iteration">Include in Iteration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="other_parameters.html#exclude-from-summation">Exclude from summation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="other_parameters.html#color">Color</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="evaluation-points">
+<h2>Evaluation points<a class="headerlink" href="#evaluation-points" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">real</span><span class="p">,</span><span class="n">dimension</span><span class="p">(</span><span class="n">n_ele</span><span class="p">,</span><span class="mi">3</span><span class="p">)</span> <span class="p">::</span> <span class="n">pts</span>
+</pre></div>
+</div>
+<p>The three-dimensional evaluation points are defined with respect
+to the global coordinate system, where <strong>n_ele</strong> is the number
+of given points.</p>
+</div>
+<div class="section" id="state-function">
+<h2>State function<a class="headerlink" href="#state-function" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nb">type</span><span class="p">(</span><span class="n">MagStateFunction</span><span class="p">),</span><span class="n">dimension</span><span class="p">(</span><span class="n">n_stf</span><span class="p">)</span> <span class="p">::</span> <span class="n">stateFunction</span>
+</pre></div>
+</div>
+<p>The state functions (hysteresis loops) for different materials
+and temperatures can be given and used if the given MagTile
+is representing a soft magnet, where <strong>n_stf</strong> is the number of
+given state functions.</p>
+</div>
+<div class="section" id="h-field">
+<h2>H-field<a class="headerlink" href="#h-field" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">real</span><span class="p">,</span><span class="n">dimension</span><span class="p">(</span><span class="n">n_ele</span><span class="p">,</span><span class="mi">3</span><span class="p">)</span> <span class="p">::</span> <span class="n">H</span>
+</pre></div>
+</div>
+<p>The three-dimensional H-field is returned in the unit <span class="math notranslate nohighlight">\([A/m]\)</span>
+and its vector is given with respect to the global coordinate system.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="geometry.html" class="btn btn-neutral float-right" title="Geometry" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2020, MagTense Developers
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>
+
+  
+  
+    
+    
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>

@@ -12,7 +12,7 @@
       use MagTileIO
       use DemagFieldGetSolution
       implicit none
-      
+
 !     mexFunction arguments:
       mwPointer :: plhs(*), prhs(*)
       integer*4 :: nlhs, nrhs
@@ -25,19 +25,19 @@
 
 !     Pointers to input/output mxArrays:
       real*8,dimension(:,:),allocatable :: pts,H            
-      type(MagTile),allocatable,dimension(:) :: cylTile      
+      type(MagTile),allocatable,dimension(:) :: tile      
       integer*4 :: n_ele,n_tiles
       mwSize,dimension(3) :: dims
       mwIndex :: i
+      mwSize sizevars
       
 !     Check for proper number of arguments. 
       if( nrhs .ne. 4) then
-         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nInput',
-     +                           'four inputs are required.')
+         call mexErrMsgIdAndTxt ('MATLAB:MagTense_mex:nInput','Four inputs are required.')
       elseif(nlhs .gt. 1) then
-         call mexErrMsgIdAndTxt ('MATLAB:magStat_mex:nOutput',
-     +                           'Too many output arguments.')
+         call mexErrMsgIdAndTxt ('MATLAB:MagTense_mex:nOutput','Too many output arguments.')
       endif
+
 
 !Check the type of the inputs      
       if ( .NOT. mxIsStruct(prhs(1)) ) then
@@ -51,23 +51,24 @@
       endif                  
       
       !::Copy the number of tiles
-      call mxCopyPtrToInteger4(mxGetPr(prhs(3)), n_tiles,1)
+      sizevars = 1
+      call mxCopyPtrToInteger4(mxGetPr(prhs(3)), n_tiles,sizevars )
       
       !::allocate the tiles
-      allocate( cylTile(n_tiles) )
+      allocate( tile(n_tiles) )
       !::Copy the input parameters      
-      call loadMagTile( prhs(1), cylTile, n_tiles )
+      call loadMagTile( prhs(1), tile, n_tiles )
       
       !::Copy the points at which the solution is required
-      
-      call mxCopyPtrToInteger4(mxGetPr(prhs(4)), n_ele, 1 )
+      sizevars = 1
+      call mxCopyPtrToInteger4(mxGetPr(prhs(4)), n_ele, sizevars )
       allocate(pts(n_ele,3),H(n_ele,3))      
       sx = n_ele * 3
       call mxCopyPtrToReal8(mxGetPr(prhs(2)), pts, sx )
       
       !::do the calculation
       H(:,:) = 0
-      call getFieldFromTiles( cylTile, H, pts, n_tiles, n_ele )
+      call getFieldFromTiles( tile, H, pts, n_tiles, n_ele )
       
       !::Load the result back to Matlab      
       ComplexFlag = 0
@@ -75,13 +76,14 @@
       dims(1) = n_ele
       dims(2) = 3      
       classid = mxClassIDFromClassName('double')
-      
+
       !Return the H field
       sx = 3 * n_ele
-      plhs(1) = mxCreateNumericArray( 2, dims, classid, ComplexFlag )
+      sizevars = 2
+      plhs(1) = mxCreateNumericArray( sizevars , dims, classid, ComplexFlag )
       call mxCopyReal8ToPtr( H, mxGetPr( plhs(1) ), sx )
       
-      deallocate(cylTile,pts,H)
+      deallocate(tile,pts,H)
             
       end subroutine
       
