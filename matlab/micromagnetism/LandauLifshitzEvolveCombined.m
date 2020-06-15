@@ -1,4 +1,5 @@
-function [SigmaSol,Applied_field,VV] = LandauLifshitzEvolveCombined(ProblemSetupStruct,InteractionMatrices,Sigma)
+function [SigmaSol,VV] = LandauLifshitzEvolveCombined(ProblemSetupStruct,InteractionMatrices,Sigma)
+mu0 = 4*pi*1e-7;
 
 %--- alpha and gamma are native functions in Matlab and must be initialized as variables
 alpha = 0;
@@ -8,6 +9,22 @@ gamma = 0;
 names = fieldnames(ProblemSetupStruct);
 for i=1:length(names)
     eval([names{i} '=ProblemSetupStruct.' names{i} ';']);
+end
+
+UseImplicitSolver      = 0;
+UseImplicitStepsSolver = 0;
+UseExplicitSolver      = 0;
+UseDynamicSolver       = 0;
+
+switch SolverType
+    case 1
+        UseImplicitSolver = 1;
+    case 2
+        UseImplicitStepsSolver = 1;
+    case 3
+        UseExplicitSolver = 1;
+    case 4
+        UseDynamicSolver = 1;
 end
 
 %% Unfold the struct (NB: *after* unfolding ProblemSetupStruct)
@@ -28,10 +45,10 @@ CopyMatrix = InteractionMatrices.CopyMatrix;
 
 %% Effective field parameter prefactors
 
-Jfact = A0/(MU0*Ms) ;   % "J" : exchange term
-% Hfact = 1/MU0 ;         % "H" : external field term (b.c. user input is in Tesla)
+Jfact = A0/(mu0*Ms) ;   % "J" : exchange term
+% Hfact = 1/mu0 ;         % "H" : external field term (b.c. user input is in Tesla)
 Mfact = Ms ;            % "M" : demagnetization term
-Kfact = K0/(MU0*Ms) ;   % "K" : anisotropy term
+Kfact = K0/(mu0*Ms) ;   % "K" : anisotropy term
 
 %% All Interaction Terms (function handles)
 
@@ -60,21 +77,43 @@ end
 % "H" : Effective field : external field
 
 if UseExplicitSolver | UseDynamicSolver
-    AA.HhX = @(Sx,Sy,Sz,t) - HsX(t).*O ;
-    AA.HhY = @(Sx,Sy,Sz,t) - HsY(t).*O ;
-    AA.HhZ = @(Sx,Sy,Sz,t) - HsZ(t).*O ;
+%     AA.HhX = @(Sx,Sy,Sz,t) - HsX(t).*O ;
+%     AA.HhY = @(Sx,Sy,Sz,t) - HsY(t).*O ;
+%     AA.HhZ = @(Sx,Sy,Sz,t) - HsZ(t).*O ;
+    if isempty(HextFct)
+    AA.HhX = @(Sx,Sy,Sz,t) - interp1( Hext(:,1), Hext(:,2), t).*O ;
+    AA.HhY = @(Sx,Sy,Sz,t) - interp1( Hext(:,1), Hext(:,3), t).*O ;
+    AA.HhZ = @(Sx,Sy,Sz,t) - interp1( Hext(:,1), Hext(:,4), t).*O ;
+    else
+ 
+        
+            AA.HhX = @(Sx,Sy,Sz,t) - HextFct{1}(t);
+            AA.HhY = @(Sx,Sy,Sz,t) - HextFct{2}(t) ;
+            AA.HhZ = @(Sx,Sy,Sz,t) - HextFct{3}(t) ;
+       '' ; 
+    end
 end
 
 if UseImplicitSolver
-    AA.HhX = @(Sx,Sy,Sz,t) - ddHsX*(t).*O ;
-    AA.HhY = @(Sx,Sy,Sz,t) - ddHsY*(t).*O ;
-    AA.HhZ = @(Sx,Sy,Sz,t) - ddHsZ*(t).*O ;
+%     AA.HhX = @(Sx,Sy,Sz,t) - ddHsX*(t).*O ;
+%     AA.HhY = @(Sx,Sy,Sz,t) - ddHsY*(t).*O ;
+%     AA.HhZ = @(Sx,Sy,Sz,t) - ddHsZ*(t).*O ;
+% 
+%     %
+%     
+%     AA.ddHhX = @(Sx,Sy,Sz,t) - ddHsX.*O +0.*t ;
+%     AA.ddHhY = @(Sx,Sy,Sz,t) - ddHsY.*O +0.*t ;
+%     AA.ddHhZ = @(Sx,Sy,Sz,t) - ddHsZ.*O +0.*t ;
+%     
+    AA.HhX = @(Sx,Sy,Sz,t) - ddHext(1,2).*t.*O ;
+    AA.HhY = @(Sx,Sy,Sz,t) - ddHext(1,3).*t.*O ;
+    AA.HhZ = @(Sx,Sy,Sz,t) - ddHext(1,4).*t.*O ;
 
     %
     
-    AA.ddHhX = @(Sx,Sy,Sz,t) - ddHsX.*O +0.*t ;
-    AA.ddHhY = @(Sx,Sy,Sz,t) - ddHsY.*O +0.*t ;
-    AA.ddHhZ = @(Sx,Sy,Sz,t) - ddHsZ.*O +0.*t ;
+    AA.ddHhX = @(Sx,Sy,Sz,t) - ddHext(1,2).*O +0.*t ;
+    AA.ddHhY = @(Sx,Sy,Sz,t) - ddHext(1,3).*O +0.*t ;
+    AA.ddHhZ = @(Sx,Sy,Sz,t) - ddHext(1,4).*O +0.*t ;
 end
 
 % "K" : Effective field : anisotropy
@@ -129,7 +168,7 @@ end
 global TheData
 InitialData.LastT = 0;
 TheData = InitialData;
-
+TheData.NfunEval = 0 ;
 %% Define time-derivative function
 if UseExplicitSolver | UseDynamicSolver
     TheData.dSigmaRMS = inf;    
@@ -137,7 +176,7 @@ if UseExplicitSolver | UseDynamicSolver
     dSigma2 = @(t,Sigma) CalculateDeltaSigmaManyRanges3D(t,Sigma,AvrgMatrix,CopyMatrix,Mfact,DemagTensor,alpha,gamma,AA) ;
 
     if ~exist('HeffLimMagn','var') 
-        HeffLimMagn = -inf ;
+        HeffLimMagn = -1 ;
     end
     ThatOutPutFunct = @(t,y,flag) MyOutputFunction(t,y,flag,UseImplicitSolver,HeffLimMagn) ;
 end
@@ -146,7 +185,7 @@ if UseImplicitSolver
     InitialData.p = 0;
     TheData = InitialData;
     
-    dSigma3 = @(t,Sigma) CalculateDeltaSigmaEquilibriumExplicitOut(t,Sigma,HHess,AA,MaxComputationalTimePerStep) ;
+    dSigma3 = @(t,Sigma) CalculateDeltaSigmaEquilibriumExplicitOut(t,Sigma,HHess,AA,inf) ;
     
     ThatOutPutFunct = @(t,y,flag) MyOutputFunction(t,y,flag,UseImplicitSolver) ;
 end
@@ -155,23 +194,20 @@ end
 %% ODE
 disp('Integrating Equation of Motion')
 if UseDynamicSolver
-    options = odeset('RelTol',1e-12) ;
+    options = odeset('RelTol',1e-12,'AbsTol',1e-9) ;
     [t,SigmaSol] = ode45(dSigma2,t,Sigma,options);
 %         [t,SigmaSol] = ode23(dSigma2,t,Sigma,options);
 end
 if UseExplicitSolver
-    options = odeset('RelTol',1e-12,'OutputFcn',ThatOutPutFunct) ;
-    [t,SigmaSol] = ode45(dSigma2,linspace(0,MaxT,nT),Sigma,options);
+    options = odeset('RelTol',1e-6,'OutputFcn',ThatOutPutFunct);
+    [t,SigmaSol] = ode45(dSigma2,ProblemSetupStruct.t,Sigma,options);
 end
 
 if UseImplicitSolver
     options = odeset('OutputFcn',ThatOutPutFunct,'RelTol',1e-3,'MaxStep',abs(t(1)-t(end))) ; % ,'MaxStep',0.01*abs(t(1)-t(end))) ; % ,'Events',ThatEventFunct) ;
     [t,SigmaSol] = ode45(dSigma3,t,Sigma,options);
 end
-
-
-Applied_field = [HsX(t), HsY(t), HsZ(t)+0.*t];
-
+disp(num2str(TheData.NfunEval)) ;
 %% Calculate the Eigenvalue
 if CalcEigenvalue
     ThisHHess5 = HHess(t(end),SigmaSol(end,:)') ;

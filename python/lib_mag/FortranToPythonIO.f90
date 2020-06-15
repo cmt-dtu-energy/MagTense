@@ -7,10 +7,10 @@ implicit none
 contains
 
 !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-!>
 !> function for displaying output (to the terminal)
 !! @param err the current relative error
 !! @param err_max the current maximum allowed error
+!!
 function dispIte_fct( err, err_max )
     real,intent(in) :: err,err_max
     integer :: dispIte_fct
@@ -21,15 +21,26 @@ function dispIte_fct( err, err_max )
     
 end function dispIte_fct
 
-
-subroutine getNFromTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+!--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+!< Function getNFromTiles
+!! @param tileType - defines whether the tile is cylindrical, a prism, an ellipsoid and so on
+!! @param offset - the centre coordinates relative to the global coordinate system
+!! @param rotAngles - rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
+!! @param color - color rgb triplet
+!! @param magnetType - defines whether the tile is a hard or soft magnet
+!! @param stateFunctionIndex - index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+!! @param symmetryOps - 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
+!! @param Mrel - the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
+!!
+subroutine getNFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+    mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, N )
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
     real(8),dimension(n_tiles,3),intent(in) :: dev_center
         
     !::Specific for a rectangular prism
-    real(8),dimension(n_tiles,3),intent(in) :: rect_size
+    real(8),dimension(n_tiles,3),intent(in) :: tile_size
 
     !::Specific for a tetrahedron
     real(8),dimension(n_tiles,3,4),intent(in) :: vertices
@@ -38,16 +49,15 @@ subroutine getNFromTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea,
     real(8),dimension(n_tiles,3),intent(in) :: Mag
     real(8),dimension(n_tiles,3),intent(in) :: u_ea,u_oa1,u_oa2    
     real(8),dimension(n_tiles),intent(in) :: mu_r_ea,mu_r_oa,Mrem
-    integer(4),dimension(n_tiles),intent(in) :: tileType        !::defines whether the tile is cylindrical, a prism, an ellipsoid and so on
-    real(8),dimension(n_tiles,3),intent(in) :: offset !::the centre coordinates relative to the global coordinate system
-    real(8),dimension(n_tiles,3),intent(in) :: rotAngles !:: rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
-    real(8),dimension(n_tiles,3),intent(in) :: color !! color rgb triplet
-    integer(4),dimension(n_tiles),intent(in) :: magnetType !::defines whether the tile is a hard or soft magnet
-    integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex !::index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+    integer(4),dimension(n_tiles),intent(in) :: tileType
+    real(8),dimension(n_tiles,3),intent(in) :: offset
+    real(8),dimension(n_tiles,3),intent(in) :: rotAngles
+    real(8),dimension(n_tiles,3),intent(in) :: color
+    integer(4),dimension(n_tiles),intent(in) :: magnetType
+    integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex
     integer(4),dimension(n_tiles),intent(in) :: includeInIteration,exploitSymmetry
-    real(8),dimension(n_tiles,3),intent(in) :: symmetryOps !! 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
-    real(8),dimension(n_tiles),intent(in) :: Mrel !! the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
-
+    real(8),dimension(n_tiles,3),intent(in) :: symmetryOps
+    real(8),dimension(n_tiles),intent(in) :: Mrel
 
     real(8),dimension(n_pts,3),intent(in) :: pts
     real(8),dimension(n_pts,3) :: H    
@@ -58,7 +68,8 @@ subroutine getNFromTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea,
     integer :: i
 
     !::initialise MagTile with specified parameters
-    call loadTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    call loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+        mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
 
     !::do the calculation
@@ -67,28 +78,50 @@ subroutine getNFromTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea,
     do i=1,n_tiles
         if ( tiles(i)%tileType .eq. tileTypeCylPiece ) then
             call getFieldFromCylTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+
         else if (tiles(i)%tileType .eq. tileTypeCircPiece ) then          
             call getFieldFromCircPieceTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+
         else if (tiles(i)%tileType .eq. tileTypeCircPieceInverted ) then          
             call getFieldFromCircPieceInvertedTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+
         else if (tiles(i)%tileType .eq. tileTypePrism ) then    
             call getFieldFromRectangularPrismTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+
         else if (tiles(i)%tileType .eq. tileTypeTetrahedron ) then    
             call getFieldFromTetrahedronTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+        
+        else if (tiles(i)%tileType .eq. tileTypeSphere ) then
+            call getFieldFromSphereTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+                
+        else if (tiles(i)%tileType .eq. tileTypeSpheroid ) then
+            call getFieldFromSpheroidTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
         endif
     enddo
 
 end subroutine getNFromTiles
 
-
-subroutine getHFromTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
-    includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, N, useProvidedN )
+!--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+!< Function getHFromTiles
+!! @param tileType - defines whether the tile is cylindrical, a prism, an ellipsoid and so on
+!! @param offset - the centre coordinates relative to the global coordinate system
+!! @param rotAngles - rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
+!! @param color - color rgb triplet
+!! @param magnetType - defines whether the tile is a hard or soft magnet
+!! @param stateFunctionIndex - index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+!! @param symmetryOps - 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
+!! @param Mrel - the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
+!!
+subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+    mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, N, useStoredN )
+    
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
     real(8),dimension(n_tiles,3),intent(in) :: dev_center
         
     !::Specific for a rectangular prism
-    real(8),dimension(n_tiles,3),intent(in) :: rect_size
+    real(8),dimension(n_tiles,3),intent(in) :: tile_size
 
     !::Specific for a tetrahedron
     real(8),dimension(n_tiles,3,4),intent(in) :: vertices
@@ -97,23 +130,22 @@ subroutine getHFromTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea,
     real(8),dimension(n_tiles,3),intent(in) :: Mag
     real(8),dimension(n_tiles,3),intent(in) :: u_ea,u_oa1,u_oa2    
     real(8),dimension(n_tiles),intent(in) :: mu_r_ea,mu_r_oa,Mrem
-    integer(4),dimension(n_tiles),intent(in) :: tileType        !::defines whether the tile is cylindrical, a prism, an ellipsoid and so on
-    real(8),dimension(n_tiles,3),intent(in) :: offset !::the centre coordinates relative to the global coordinate system
-    real(8),dimension(n_tiles,3),intent(in) :: rotAngles !:: rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
-    real(8),dimension(n_tiles,3),intent(in) :: color !! color rgb triplet
-    integer(4),dimension(n_tiles),intent(in) :: magnetType !::defines whether the tile is a hard or soft magnet
-    integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex !::index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+    integer(4),dimension(n_tiles),intent(in) :: tileType
+    real(8),dimension(n_tiles,3),intent(in) :: offset
+    real(8),dimension(n_tiles,3),intent(in) :: rotAngles
+    real(8),dimension(n_tiles,3),intent(in) :: color
+    integer(4),dimension(n_tiles),intent(in) :: magnetType
+    integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex
     integer(4),dimension(n_tiles),intent(in) :: includeInIteration,exploitSymmetry
-    real(8),dimension(n_tiles,3),intent(in) :: symmetryOps !! 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
-    real(8),dimension(n_tiles),intent(in) :: Mrel !! the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
-
+    real(8),dimension(n_tiles,3),intent(in) :: symmetryOps
+    real(8),dimension(n_tiles),intent(in) :: Mrel
 
     real(8),dimension(n_pts,3),intent(in) :: pts
     real(8),dimension(n_pts,3),intent(out) :: H
     real(8),dimension(n_pts,3) :: H_tmp
     real(8),dimension(n_tiles,n_pts,3,3),intent(in) :: N
-    real(8),dimension(n_tiles,n_pts,3,3) :: N_tmp
-    logical,intent(in) :: useProvidedN
+    real(8),dimension(n_tiles,n_pts,3,3) :: N_out
+    logical,intent(in) :: useStoredN
 
     type(MagTile),dimension(n_tiles) :: tiles
     integer(4),intent(in) :: n_tiles
@@ -121,13 +153,14 @@ subroutine getHFromTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea,
     integer :: i
 
     !::initialise MagTile with specified parameters
-    call loadTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    call loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+        mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
 
-    if ( useProvidedN .eqv. .true. ) then
+    if ( useStoredN .eqv. .true. ) then
         write(*,*) 'Finding solution at requested points with precalculated N'
 
-        N_tmp = N
+        N_out = N
         H(:,:) = 0.
     
         do i=1,n_tiles
@@ -137,25 +170,28 @@ subroutine getHFromTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea,
             select case ( tiles(i)%tileType )
 
             case ( tileTypeCylPiece )
-                call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
+                call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
 
             case ( tileTypePrism )
-                call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
+                call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
 
             case ( tileTypeCircPiece )
-                 call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
+                 call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
 
             case ( tileTypeCircPieceInverted )
-                 call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
+                 call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
 
             case ( tileTypeTetrahedron )
-                 call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
+                 call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
 
-            case ( tileTypeEllipsoid )
-                !!@todo add the existing code for spheroids, and correct Ellipsoids to Spheroids
+            case (tileTypeSphere)
+                call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+
+            case (tileTypeSpheroid)
+                call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
 
             case ( tileTypePlanarCoil )
-                call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts, N_tmp(i,:,:,:), useProvidedN )
+                call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
             
             case default        
             
@@ -174,15 +210,28 @@ subroutine getHFromTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea,
 
 end subroutine getHFromTiles
 
-
-subroutine IterateTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
-    includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, nT, nH, n_stateFcn, data_stateFcn, T, maxErr, nIteMax, Mag_out, Mrel_out )
+!--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+!< Function IterateTiles
+!! @param tileType - defines whether the tile is cylindrical, a prism, an ellipsoid and so on
+!! @param offset - the centre coordinates relative to the global coordinate system
+!! @param rotAngles - rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
+!! @param color - color rgb triplet
+!! @param magnetType - defines whether the tile is a hard or soft magnet
+!! @param stateFunctionIndex - index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+!! @param symmetryOps - 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
+!! @param Mrel - the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
+!!
+subroutine IterateTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+    mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, nT, nH, n_stateFcn, &
+    data_stateFcn, T, maxErr, nIteMax, Mag_out, Mrel_out )
+    
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
     real(8),dimension(n_tiles,3),intent(in) :: dev_center
         
     !::Specific for a rectangular prism
-    real(8),dimension(n_tiles,3),intent(in) :: rect_size
+    real(8),dimension(n_tiles,3),intent(in) :: tile_size
     
     !::Specific for a tetrahedron
     real(8),dimension(n_tiles,3,4),intent(in) :: vertices
@@ -192,15 +241,15 @@ subroutine IterateTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, 
     real(8),dimension(n_tiles,3),intent(out) :: Mag_out
     real(8),dimension(n_tiles,3),intent(in) :: u_ea,u_oa1,u_oa2    
     real(8),dimension(n_tiles),intent(in) :: mu_r_ea,mu_r_oa,Mrem
-    integer(4),dimension(n_tiles),intent(in) :: tileType        !::defines whether the tile is cylindrical, a prism, an ellipsoid and so on
-    real(8),dimension(n_tiles,3),intent(in) :: offset !::the centre coordinates relative to the global coordinate system
-    real(8),dimension(n_tiles,3),intent(in) :: rotAngles !:: rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
-    real(8),dimension(n_tiles,3),intent(in) :: color !! color rgb triplet
-    integer(4),dimension(n_tiles),intent(in) :: magnetType !::defines whether the tile is a hard or soft magnet
-    integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex !::index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+    integer(4),dimension(n_tiles),intent(in) :: tileType
+    real(8),dimension(n_tiles,3),intent(in) :: offset
+    real(8),dimension(n_tiles,3),intent(in) :: rotAngles
+    real(8),dimension(n_tiles,3),intent(in) :: color
+    integer(4),dimension(n_tiles),intent(in) :: magnetType
+    integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex
     integer(4),dimension(n_tiles),intent(in) :: includeInIteration,exploitSymmetry
-    real(8),dimension(n_tiles,3),intent(in) :: symmetryOps !! 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
-    real(8),dimension(n_tiles),intent(in) :: Mrel !! the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
+    real(8),dimension(n_tiles,3),intent(in) :: symmetryOps
+    real(8),dimension(n_tiles),intent(in) :: Mrel
     real(8),dimension(n_tiles),intent(out) :: Mrel_out
 
     real(8),intent(in) :: maxErr, T
@@ -222,7 +271,8 @@ subroutine IterateTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, 
     disp_fct => dispIte_fct
 
     !::initialise MagTile with specified parameters
-    call loadTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    call loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+        mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
     
     !::load state function from table
@@ -238,15 +288,28 @@ subroutine IterateTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, 
 
 end subroutine IterateTiles
 
-
-subroutine runSimulation( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
-    includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, n_stateFcn, nT, nH, data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out )
+!--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+!< Function runSimulation
+!! @param tileType - defines whether the tile is cylindrical, a prism, an ellipsoid and so on
+!! @param offset - the centre coordinates relative to the global coordinate system
+!! @param rotAngles - rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
+!! @param color - color rgb triplet
+!! @param magnetType - defines whether the tile is a hard or soft magnet
+!! @param stateFunctionIndex - index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+!! @param symmetryOps - 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
+!! @param Mrel - the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
+!!
+subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+    mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, n_stateFcn, nT, nH, &
+    data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out )
+    
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
     real(8),dimension(n_tiles,3),intent(in) :: dev_center
         
     !::Specific for a rectangular prism
-    real(8),dimension(n_tiles,3),intent(in) :: rect_size
+    real(8),dimension(n_tiles,3),intent(in) :: tile_size
 
     !::Specific for a tetrahedron
     real(8),dimension(n_tiles,3,4),intent(in) :: vertices
@@ -257,15 +320,15 @@ subroutine runSimulation( centerPos, dev_center, rect_size, vertices, Mag, u_ea,
     real(8),dimension(n_tiles,3),intent(in) :: u_ea,u_oa1,u_oa2
     !! real(8),dimension(n_tiles,3),intent(out) :: u_ea_out,u_oa1_out,u_oa2_out 
     real(8),dimension(n_tiles),intent(in) :: mu_r_ea,mu_r_oa,Mrem
-    integer(4),dimension(n_tiles),intent(in) :: tileType        !::defines whether the tile is cylindrical, a prism, an ellipsoid and so on
-    real(8),dimension(n_tiles,3),intent(in) :: offset !::the centre coordinates relative to the global coordinate system
-    real(8),dimension(n_tiles,3),intent(in) :: rotAngles !:: rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
-    real(8),dimension(n_tiles,3),intent(in) :: color !! color rgb triplet
-    integer(4),dimension(n_tiles),intent(in) :: magnetType !::defines whether the tile is a hard or soft magnet
-    integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex !::index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+    integer(4),dimension(n_tiles),intent(in) :: tileType
+    real(8),dimension(n_tiles,3),intent(in) :: offset
+    real(8),dimension(n_tiles,3),intent(in) :: rotAngles
+    real(8),dimension(n_tiles,3),intent(in) :: color
+    integer(4),dimension(n_tiles),intent(in) :: magnetType
+    integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex
     integer(4),dimension(n_tiles),intent(in) :: includeInIteration,exploitSymmetry
-    real(8),dimension(n_tiles,3),intent(in) :: symmetryOps !! 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
-    real(8),dimension(n_tiles),intent(in) :: Mrel !! the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
+    real(8),dimension(n_tiles,3),intent(in) :: symmetryOps
+    real(8),dimension(n_tiles),intent(in) :: Mrel
     real(8),dimension(n_tiles),intent(out) :: Mrel_out
 
     real(8) :: maxErr, T
@@ -293,7 +356,8 @@ subroutine runSimulation( centerPos, dev_center, rect_size, vertices, Mag, u_ea,
     resumeIteration = 0
 
     !::initialise MagTile with specified parameters
-    call loadTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    call loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+        mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
 
     !::load state function from table
@@ -310,9 +374,9 @@ subroutine runSimulation( centerPos, dev_center, rect_size, vertices, Mag, u_ea,
             ! dev_center(i,1) = tiles(i)%dr
             ! dev_center(i,2) = tiles(i)%dtheta
             ! dev_center(i,3) = tiles(i)%dz
-            ! rect_size(i,1) = tiles(i)%a
-            ! rect_size(i,2) = tiles(i)%b
-            ! rect_size(i,3) = tiles(i)%c
+            ! tile_size(i,1) = tiles(i)%a
+            ! tile_size(i,2) = tiles(i)%b
+            ! tile_size(i,3) = tiles(i)%c
             Mag_out(i,:) = tiles(i)%M
             ! u_ea_out(i,:) = tiles(i)%u_ea
             ! u_oa1_out(i,:) = tiles(i)%u_oa1

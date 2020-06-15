@@ -1,0 +1,360 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Geometry &mdash; MagTense TechManual  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/techmanual.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Magnetization" href="magnetization.html" />
+    <link rel="prev" title="Calculations" href="calculations.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+          
+
+          
+            <a href="index.html">
+          
+
+          
+            
+            <img src="_static/MagTense_logo.PNG" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="calculations.html">Calculations</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="calculations.html#magtile">MagTile</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Geometry</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#magtense-parameters">MagTense Parameters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cylindrical-tile">Cylindrical Tile</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#prism">Prism</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#circular-piece">Circular Piece</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#inverted-circular-piece">Inverted Circular Piece</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#tetrahedron">Tetrahedron</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sphere">Sphere</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#spheroid">Spheroid</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="magnetization.html">Magnetization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="other_parameters.html">Other parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="calculations.html#evaluation-points">Evaluation points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calculations.html#state-function">State function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calculations.html#h-field">H-field</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTense>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="geometry">
+<h1>Geometry<a class="headerlink" href="#geometry" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="magtense-parameters">
+<h2>MagTense Parameters<a class="headerlink" href="#magtense-parameters" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">integer</span> <span class="p">::</span> <span class="n">tileType</span>
+<span class="n">real</span> <span class="p">::</span> <span class="n">r0</span><span class="p">,</span> <span class="n">theta0</span><span class="p">,</span> <span class="n">z0</span><span class="p">,</span> <span class="n">dr</span><span class="p">,</span> <span class="n">dtheta</span><span class="p">,</span> <span class="n">dz</span>
+<span class="n">real</span> <span class="p">::</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span>
+<span class="n">real</span><span class="p">,</span><span class="n">dimension</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">)</span> <span class="p">::</span> <span class="n">vert</span>
+
+<span class="n">real</span><span class="p">,</span><span class="n">dimension</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="p">::</span> <span class="n">offset</span>
+<span class="n">real</span><span class="p">,</span><span class="n">dimension</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="p">::</span> <span class="n">rotAngles</span>
+</pre></div>
+</div>
+<p>With the mentioned parameters a tile can be arbitrarily defined in the
+global coordinate system.
+For each tile an individual local coordinate system is created.</p>
+<div class="section" id="tile-types">
+<h3>Tile Types<a class="headerlink" href="#tile-types" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>1 = cylindrical tile</p></li>
+<li><p>2 = prism</p></li>
+<li><p>3 = circular piece</p></li>
+<li><p>4 = inverted circular piece</p></li>
+<li><p>5 = tetrahedron</p></li>
+<li><p>6 = sphere</p></li>
+<li><p>7 = spheroid</p></li>
+</ul>
+</div>
+<div class="section" id="offset">
+<h3>Offset<a class="headerlink" href="#offset" title="Permalink to this headline">¶</a></h3>
+<p>The offset is a three-dimensional vector, which determines the difference
+between the origin of the global coordinate system to the local coordinate system.</p>
+</div>
+<div class="section" id="rotation-angles">
+<h3>Rotation Angles<a class="headerlink" href="#rotation-angles" title="Permalink to this headline">¶</a></h3>
+<p>The rotation angles [radians] define the rotation of a tile in its local
+coordinate system. A tile can be rotated around its local axis with yaw
+(rotation around local z-axis, <span class="math notranslate nohighlight">\(\psi\)</span>), pitch (rotation around local
+y-axis, <span class="math notranslate nohighlight">\(\theta\)</span>) and roll (rotation around local x-axis, <span class="math notranslate nohighlight">\(\phi\)</span>).</p>
+<div class="figure align-default" id="id11">
+<a class="reference internal image-reference" href="_images/local_rotations.png"><img alt="Local rotations" src="_images/local_rotations.png" style="width: 400px;" /></a>
+<p class="caption"><span class="caption-text">Rotations of a tile are performed in its local coordinate system.
+Firstly, the tile is rotated with <span class="math notranslate nohighlight">\(\phi\)</span> around its local x-axis.
+Secondly, the local y-axis is rotated by <span class="math notranslate nohighlight">\(\theta\)</span>.
+Eventually, the angle <span class="math notranslate nohighlight">\(\psi\)</span> is performed around the local z-axis.</span><a class="headerlink" href="#id11" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+<div class="section" id="set-geometric-dimensions">
+<h3>Set geometric dimensions<a class="headerlink" href="#set-geometric-dimensions" title="Permalink to this headline">¶</a></h3>
+</div>
+</div>
+<div class="section" id="cylindrical-tile">
+<h2>Cylindrical Tile<a class="headerlink" href="#cylindrical-tile" title="Permalink to this headline">¶</a></h2>
+<div class="figure align-default" id="id12">
+<a class="reference internal image-reference" href="_images/cylindrical_tile.png"><img alt="Cylindrical Tile" src="_images/cylindrical_tile.png" style="width: 400px;" /></a>
+<p class="caption"><span class="caption-text">The cylindrical tile is defined in cylindrical coordinates with respect
+to its local coordinate system.
+The center point is located at <span class="math notranslate nohighlight">\((r_0, \theta_0, z_0)\)</span>.
+The extensions in each direction are given with <span class="math notranslate nohighlight">\(dr, d\theta\)</span>
+and <span class="math notranslate nohighlight">\(dz\)</span>, respectively.</span><a class="headerlink" href="#id12" title="Permalink to this image">¶</a></p>
+</div>
+<p>Examples of how to compute the magnetic field from such a tile are given in <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_cylindrical_slice">Matlab</a>
+and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_cylinder.py">python</a>.</p>
+</div>
+<div class="section" id="prism">
+<h2>Prism<a class="headerlink" href="#prism" title="Permalink to this headline">¶</a></h2>
+<div class="figure align-default" id="id13">
+<a class="reference internal image-reference" href="_images/prism.png"><img alt="Prism" src="_images/prism.png" style="width: 400px;" /></a>
+<p class="caption"><span class="caption-text">The prism is defined by the side lengths <span class="math notranslate nohighlight">\(a, b\)</span> and <span class="math notranslate nohighlight">\(c\)</span>.
+Its center coordinate is <span class="math notranslate nohighlight">\((x_{off}, y_{off}, z_{off})\)</span> in the
+global coordinate system.</span><a class="headerlink" href="#id13" title="Permalink to this image">¶</a></p>
+</div>
+<p>Examples of how to compute the magnetic field from such a tile are given in <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_prism">Matlab</a>
+and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_prism.py">python</a>.</p>
+</div>
+<div class="section" id="circular-piece">
+<h2>Circular Piece<a class="headerlink" href="#circular-piece" title="Permalink to this headline">¶</a></h2>
+<div class="figure align-default" id="id14">
+<a class="reference internal image-reference" href="_images/circpiece.png"><img alt="Circular Piece" src="_images/circpiece.png" style="width: 400px;" /></a>
+<p class="caption"><span class="caption-text">The circular piece is defined by its center point (<span class="math notranslate nohighlight">\(r_0, \theta_0, z_0\)</span>)
+in the local coordinate system.
+The midpoint of the outer circular edge is given with a translation of
+<span class="math notranslate nohighlight">\(\frac{dr}{2}\)</span> from the center point.
+The extensions in the others directions are given with <span class="math notranslate nohighlight">\(d\theta\)</span> and <span class="math notranslate nohighlight">\(dz\)</span>.
+In contrast to the cylindrial tile, the inner edges are parallel to the local x-axis and y-axis and from a right angle.</span><a class="headerlink" href="#id14" title="Permalink to this image">¶</a></p>
+</div>
+<p>Examples of how to compute the magnetic field from such a tile are given in
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_circpiece.py">python</a>.</p>
+</div>
+<div class="section" id="inverted-circular-piece">
+<h2>Inverted Circular Piece<a class="headerlink" href="#inverted-circular-piece" title="Permalink to this headline">¶</a></h2>
+<div class="figure align-default" id="id15">
+<a class="reference internal image-reference" href="_images/circpiece_inv.png"><img alt="Inverted Circular Piece" src="_images/circpiece_inv.png" style="width: 400px;" /></a>
+<p class="caption"><span class="caption-text">The midpoint of the inner circular edge is located at
+(<span class="math notranslate nohighlight">\(r_0 + \frac{dr}{2}, \theta_0, z_0\)</span>) in the local coordinate system.
+The angular extension in each direction is <span class="math notranslate nohighlight">\(\frac{d\theta}{2}\)</span>
+extensions and the height of such a tile is <span class="math notranslate nohighlight">\(dz\)</span>.
+The outer edges are parallel to the local x-axis and y-axis and
+from a right angle. Therefore, its naming is “inverted circular piece”.</span><a class="headerlink" href="#id15" title="Permalink to this image">¶</a></p>
+</div>
+<p>Examples of how to compute the magnetic field from such a tile are given in
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_circpiece_inv.py">python</a>.</p>
+</div>
+<div class="section" id="tetrahedron">
+<h2>Tetrahedron<a class="headerlink" href="#tetrahedron" title="Permalink to this headline">¶</a></h2>
+<div class="figure align-default" id="id16">
+<a class="reference internal image-reference" href="_images/tetrahedron.png"><img alt="Tetrahedron" src="_images/tetrahedron.png" style="width: 400px;" /></a>
+<p class="caption"><span class="caption-text">A tetrahedron is specified by its four vertices in the global coordinate system.</span><a class="headerlink" href="#id16" title="Permalink to this image">¶</a></p>
+</div>
+<p>Examples of how to compute the magnetic field from such a tile are given in <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_tetrahedron">Matlab</a>
+and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_tetrahedron.py">python</a>.</p>
+</div>
+<div class="section" id="sphere">
+<h2>Sphere<a class="headerlink" href="#sphere" title="Permalink to this headline">¶</a></h2>
+<div class="figure align-default" id="id17">
+<a class="reference internal image-reference" href="_images/sphere.png"><img alt="Sphere" src="_images/sphere.png" style="width: 400px;" /></a>
+<p class="caption"><span class="caption-text">A sphere is fully defined by its radius <span class="math notranslate nohighlight">\(a\)</span>.
+Its center coordinate is <span class="math notranslate nohighlight">\((x_{off}, y_{off}, z_{off})\)</span> in the
+global coordinate system.</span><a class="headerlink" href="#id17" title="Permalink to this image">¶</a></p>
+</div>
+<p>Examples of how to compute the magnetic field from such a tile are given in <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_sphere">Matlab</a>
+and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_sphere.py">python</a>.</p>
+</div>
+<div class="section" id="spheroid">
+<h2>Spheroid<a class="headerlink" href="#spheroid" title="Permalink to this headline">¶</a></h2>
+<div class="figure align-default" id="id18">
+<a class="reference internal image-reference" href="_images/spheroid_oblate.png"><img alt="Oblate Spheroid" src="_images/spheroid_oblate.png" style="width: 400px;" /></a>
+<p class="caption"><span class="caption-text">Its center coordinate is <span class="math notranslate nohighlight">\((x_{off}, y_{off}, z_{off})\)</span> in the
+global coordinate system.
+The axial radii can be specified with <span class="math notranslate nohighlight">\(a, b\)</span> and <span class="math notranslate nohighlight">\(c\)</span>,
+whereas two radii must have the same length.
+<span class="raw-html"><br /></span>
+If <span class="math notranslate nohighlight">\(b &lt; a\)</span>, then we have a oblate spheroid.
+<span class="raw-html"><br /></span>
+If <span class="math notranslate nohighlight">\(b &gt; a\)</span>, then a prolate spheroid is constructed.
+<span class="raw-html"><br /></span>
+In praxis, any of the axial radii can be chosen to differ from the others.</span><a class="headerlink" href="#id18" title="Permalink to this image">¶</a></p>
+</div>
+<p>As a specialty of this geometry, rotation may be also defined as a rotation
+axis pointing in a given direction.
+One can either choose the symmetry axis (axis with a radius different to the
+other ones) or the c-axis.
+The arguments are defined in the interfaces and are translated to the
+corresponding rotation angles in the local coordinate system.</p>
+<p>Examples of how to compute the magnetic field from such a tile are given in <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_spheroid">Matlab</a>
+and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_spheroid.py">python</a>.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="magnetization.html" class="btn btn-neutral float-right" title="Magnetization" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="calculations.html" class="btn btn-neutral float-left" title="Calculations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2020, MagTense Developers
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>
+
+  
+  
+    
+    
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>

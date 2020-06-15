@@ -30,7 +30,7 @@ conda env create --prefix ./envs -f ./documentation/environment.yml
     Returns the demagnetization tensor N of the given tiles and the specified evaluation points.
 
 - **get_H_field**(tiles, points, N=None):  
-    Returns the magentic field H at the specified evaluation points of the given tiles.  
+    Returns the magnetic field H at the specified evaluation points of the given tiles.  
     Optionally, a precalculated demagnization tensor N can be handed over in order to prevent unnecessary and expensive recalculation of N if geometry of the setup does not change.
 
 - **create_plot**(iterated_tiles, points, H, grid=None):  

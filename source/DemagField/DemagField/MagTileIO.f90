@@ -171,6 +171,9 @@
                 call setupEvaluationPoints( cylTile(i) )
             endif
             
+            !> Set the default behavior to false such that the tile by default is included in the calculation
+            cylTile(i)%excludeFromSummation = .false.
+            
         enddo        
         deallocate(fieldnames)
     end subroutine loadMagTile

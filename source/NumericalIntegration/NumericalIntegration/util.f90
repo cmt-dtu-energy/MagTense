@@ -35,7 +35,7 @@ real :: x_lin,y_lin
 end subroutine getBilinInterp
 
 
-subroutine interp1( x, y, xval, n, yval)
+subroutine interp1_MagTense( x, y, xval, n, yval)
 real,dimension(n),intent(in) :: x,y
 real,intent(in) :: xval
 integer,intent(in) :: n
@@ -53,6 +53,6 @@ real :: x_lin
     
     yval = ( 1 - x_lin ) * y(ind_x) + x_lin * y(ind_x+1)
     
-end subroutine interp1
+end subroutine interp1_MagTense
 
 end module UTIL_CALL

@@ -1,12 +1,6 @@
-import os
-import sys
 import numpy as np
-import math
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + '/../source')
 import MagTense
-import MagTenseStandalone
-import util_plot
 
 def main():
     # Defining grid
@@ -22,7 +16,7 @@ def main():
     # Standard parameters in settings: max_error=0.00001, max_it=500
     (updated_tiles, H) = MagTense.run_simulation(tiles, points, grid=grid, plot=True)
 
-    print("Average magentic field: " + str(MagTense.get_average_magnetic_flux(H)))
+    print("Average magnetic field: " + str(MagTense.get_average_magnetic_flux(H)))
     print("Peak to peak: " + str(MagTense.get_p2p(H)))
 
 main()

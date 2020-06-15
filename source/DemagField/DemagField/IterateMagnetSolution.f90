@@ -5,6 +5,8 @@
     use MagParameters
     use spline
 
+    
+
     implicit none
 
      INTERFACE
@@ -82,6 +84,7 @@
         
         !!Iteration loop
         do
+            
             if ( done .eqv. .true. ) then
                 exit
             endif
@@ -112,12 +115,18 @@
                 
                         case ( MagnetTypeSoft )
                             call getM_SoftMagnet( T, H(i,:), tiles(i), stateFunction, n_stf)
+                            
+                        case ( MagnetTypeSoftConstPerm )
+                            call getM_SoftConstMur( tiles(i), H(i,:) )
+                            
                         case default
                         end select
             
                         tiles(i)%isIterating = .true.
-                    endif            
-                enddo            
+                    endif
+                enddo
+                
+                    
                 !! set the Mnorm array
                 do i=1,n
                     Mnorm(i) = sqrt( sum( tiles(i)%M**2 ) )
@@ -129,7 +138,8 @@
             
             endif        
             
-            H_old = H   !< Teset H array
+            
+            H_old = H   !< Reset H array
             H(:,:) = 0  !< Make sure to reset the H field
         
             !! Get the field at the center at each tile from all other tiles        
@@ -154,8 +164,16 @@
                     
                     case(tileTypePrism)
                         !! No rotation is needed as the offset of the prism is with respect to the center of the prism
-                        pts = tiles(i)%offset                
+                        pts = tiles(i)%offset      
+                        
+                    case(tileTypeSphere)
+                        !! No rotation is possible, as the tile is a sphere
+                        pts = tiles(i)%offset 
             
+                    case(tileTypeSpheroid)
+                        !! No rotation is needed
+                        pts = tiles(i)%offset 
+                        
                     case(tileTypeCircPiece)
                         !! Find the center point of the circ piece
                         !! First find the center point of the piece in the reference frame of the piece itself
@@ -199,10 +217,21 @@
                     !! Tiles with type >100 are special tiles like a coil that are not iterated over
                     if ( tiles(i)%tileType .lt. 100 ) then
                         
+                        !>If the magnet is assumed to have a constant permeability, then its own field is not included in this summation but rather calculated explicitly (see a few lines down)
+                        if ( tiles(i)%magnetType .eq. magnetTypeSoftConstPerm ) then
+                            tiles(i)%excludeFromSummation = .true.
+                        endif
+                        
                         call getFieldFromTiles( tiles, H(i,:), pts, n, 1, Nstore(i)%N )     !< Get the field in the i'th tile from all tiles           
                     
-                        !! When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is slowed
+                        
+                        !! When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is dampened
                         H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
+                        
+                        !>Set the flag back to false such that the tile is included in the next round of summation
+                        if ( tiles(i)%magnetType .eq. magnetTypeSoftConstPerm ) then
+                            tiles(i)%excludeFromSummation = .false.
+                        endif
                     endif
                 endif            
             enddo
@@ -405,6 +434,19 @@
      
     end subroutine getM_SoftMagnet
     
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !< Function called to get the magntization of a soft ferromagnet with constant permeability (isotropic)
+    !! @param tile the tile of which the magnetization is wanted
+    !! @param H the magnetic field at the tile
+    !!
+    subroutine getM_SoftConstMur( tile, H )
+        type(MagTile),intent(inout) :: tile
+        real,dimension(3),intent(in) :: H
+        
+        !Assuming B = mur * mu0 * (H + M) = mur * mu0 * H => M = H(mur-1)
+        
+        tile%M = H * ( tile%mu_r_ea - 1. )
+    end subroutine getM_SoftConstMur
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !< Function called to dump each iteration's magnetization vector for each tile for debugging purposes
@@ -438,14 +480,27 @@
     
     end subroutine saveMagnetizationDebug
 
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !< Function to load tiles from python module to the corresponding one fortran
+    !! @param tileType - defines whether the tile is cylindrical, a prism, an ellipsoid and so on
+    !! @param offset - the centre coordinates relative to the global coordinate system
+    !! @param rotAngles - rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
+    !! @param color - color rgb triplet
+    !! @param magnetType - defines whether the tile is a hard or soft magnet
+    !! @param stateFunctionIndex - index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+    !! @param symmetryOps - 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
+    !! @param Mrel - the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
+    !!
+    subroutine loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+        mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+        includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles)
 
-    subroutine loadTiles( centerPos, dev_center, rect_size, vertices, Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles)
         !::Specific for a cylindrical tile piece
         real(8),dimension(n_tiles,3),intent(in) :: centerPos
         real(8),dimension(n_tiles,3),intent(in) :: dev_center
             
         !::Specific for a rectangular prism
-        real(8),dimension(n_tiles,3),intent(in) :: rect_size
+        real(8),dimension(n_tiles,3),intent(in) :: tile_size
 
         !::Specific for a tetrahedron
         real(8),dimension(n_tiles,3,4),intent(in) :: vertices
@@ -454,15 +509,15 @@
         real(8),dimension(n_tiles,3),intent(in) :: Mag
         real(8),dimension(n_tiles,3),intent(in) :: u_ea,u_oa1,u_oa2    
         real(8),dimension(n_tiles),intent(in) :: mu_r_ea,mu_r_oa,Mrem
-        integer(4),dimension(n_tiles),intent(in) :: tileType        !::defines whether the tile is cylindrical, a prism, an ellipsoid and so on
-        real(8),dimension(n_tiles,3),intent(in) :: offset !::the centre coordinates relative to the global coordinate system
-        real(8),dimension(n_tiles,3),intent(in) :: rotAngles !:: rotation angles (phi_x, phi_y, phi_z) about the principle axes of the tile with respect to the centre of the tile
-        real(8),dimension(n_tiles,3),intent(in) :: color !! color rgb triplet
-        integer(4),dimension(n_tiles),intent(in) :: magnetType !::defines whether the tile is a hard or soft magnet
-        integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex !::index matching an entry into an array of type MagStateFunction. Used by soft ferromagnets (when interpolation on an M vs H curve is necessary)
+        integer(4),dimension(n_tiles),intent(in) :: tileType
+        real(8),dimension(n_tiles,3),intent(in) :: offset
+        real(8),dimension(n_tiles,3),intent(in) :: rotAngles
+        real(8),dimension(n_tiles,3),intent(in) :: color
+        integer(4),dimension(n_tiles),intent(in) :: magnetType
+        integer(4),dimension(n_tiles),intent(in) :: stateFunctionIndex
         integer(4),dimension(n_tiles),intent(in) :: includeInIteration,exploitSymmetry
-        real(8),dimension(n_tiles,3),intent(in) :: symmetryOps !! 1 for symmetry, -1 for anti-symmetry ((1) for about xy plane, (2) for about (xz) plane and (3) for about yz plane)
-        real(8),dimension(n_tiles),intent(in) :: Mrel !! the current relative change of the magnetization (i.e. abs((M1-M2)/M2 ) where M1 is the latest magnetization norm and M2 is the previous one
+        real(8),dimension(n_tiles,3),intent(in) :: symmetryOps
+        real(8),dimension(n_tiles),intent(in) :: Mrel
 
         type(MagTile),dimension(n_tiles),intent(inout) :: tiles
         integer(4),intent(in) :: n_tiles
@@ -475,9 +530,9 @@
             tiles(i)%dr = dev_center(i,1)
             tiles(i)%dtheta = dev_center(i,2)
             tiles(i)%dz = dev_center(i,3)
-            tiles(i)%a = rect_size(i,1)
-            tiles(i)%b = rect_size(i,2)
-            tiles(i)%c = rect_size(i,3)
+            tiles(i)%a = tile_size(i,1)
+            tiles(i)%b = tile_size(i,2)
+            tiles(i)%c = tile_size(i,3)
             tiles(i)%vert(:,1) = vertices(i,:,1)
             tiles(i)%vert(:,2) = vertices(i,:,2)
             tiles(i)%vert(:,3) = vertices(i,:,3)
@@ -508,7 +563,9 @@
 
     end subroutine loadTiles
 
-    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !< Function to load the state function for each tile from python to fortran
+    !!
     subroutine loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
         
         integer,intent(in) :: nT,nH
