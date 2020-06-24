@@ -1,7 +1,7 @@
 function [elapsedTime,problem,solution,results] = Standard_problem_2(resolution, use_CUDA, ShowTheResult, SaveTheResult, run_single_curve, run_MrHc )
 
 clearvars -except resolution use_CUDA SaveTheResult ShowTheResult run_single_curve run_MrHc
-close all
+% close all
 
 if ~exist('resolution','var')
     resolution = [20,4,1];
@@ -45,6 +45,7 @@ problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 problem.dem_appr = getMicroMagDemagApproximation('none');
 problem = problem.setUseCuda( use_CUDA );
 problem.alpha = 1e3;
+% problem.gamma = 2.21e5;
 
 MaxH = 0.1;
 
@@ -59,7 +60,9 @@ problem = problem.setSolverType( 'UseExplicitSolver' );
 problem.solver = getMicroMagSolver( 'Explicit' );
 
 problem = problem.setHext( HextFct, linspace(MaxH,-MaxH,40) );
-problem = problem.setTime( linspace(0,10e-9,2) );
+problem = problem.setTime( linspace(0,40e-9,2) );
+problem = problem.setConvergenceCheckTime( linspace(0,40e-9,2) );
+problem.conv_tol = 1e-6;
     
 problem.K0 = 0 ;
 problem.Ms = 1000e3 ;
@@ -87,6 +90,8 @@ for i = 1:length(d_loop)
     solution = struct();
     prob_struct = struct(problem);  %convert the class obj to a struct so it can be loaded into fortran
 
+    disp(['Running d/l_ex = ' num2str(results.dlex(i)) ', i.e. ' num2str(i) '/' num2str(length(d_loop))])
+    
     solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
 
     for j = 1:problem.nt_Hext 
@@ -98,15 +103,14 @@ for i = 1:length(d_loop)
         My(j) = mean(My_arr./MN) ;
         Mz(j) = mean(Mz_arr./MN) ;
         M(j) = Mx(j) + My(j) + Mz(j) ;
-        Mk(j) = Mx(j)*HystDir(1) + My(j)*HystDir(2) + Mz(j)*HystDir(3) ;
     end
     if (ShowTheResult)
-        plot(fig1,problem.Hext(:,1),mu0*Mk,'rp') %Minus signs added to correspond to regular hysteresis plots.
+        plot(fig1,sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,M,'rp') %Minus signs added to correspond to regular hysteresis plots.
     end
     
-    results.Mxr(i) = interp1(problem.Hext(:,1),Mx,0);
-    results.Myr(i) = interp1(problem.Hext(:,1),My,0);
-    results.Hc(i)  = interp1(M,problem.Hext(:,1),0);
+    results.Mxr(i) = interp1(sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,Mx,0);
+    results.Myr(i) = interp1(sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,My,0);
+    results.Hc(i)  = interp1(M,sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,0);
 end
 elapsedTime = toc
 

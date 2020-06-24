@@ -18,7 +18,6 @@ properties
     %defines the grid type which currently only supports "uniform"
     grid_type
 
-
     %easy axes of each cell
     u_ea
     %new or old problem
@@ -26,9 +25,9 @@ properties
     %solver type ('Explicit', 'Implicit' or 'Dynamic')
     solver
 
-    % Exchange term constant
+    %Exchange term constant
     A0
-    % demag magnetization constant
+    %demag magnetization constant
     Ms
     %Anisotropy constant
     K0
@@ -58,13 +57,11 @@ properties
     % then K = 0
     dem_thres
     
-    
-    
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
     
     %defines if and how to return the N tensor (1 do not return, 2 return
-     %in memory and >2 return as a file with file length = N_ret
+    %in memory and >2 return as a file with file length = N_ret
     N_ret {mustBeGreaterThan(N_ret,0),mustBeInteger(N_ret)}=int32(1);
     
     %defines whether the N tensor should be loaded rather than calculated
@@ -86,12 +83,16 @@ properties
     %filename for the Matlab save file
     FileName = '';
     
-    %Relative tolerance for the Fortran ODE solver
+    %relative tolerance for the Fortran ODE solver
     tol = 1e-4;
     
     %Fortran ODE solver, when a solution component Y(L) is less in
     %magnitude than thres_value its set to zero
     thres = 1e-6;
+    
+    %the convergence tolerence, which is the maximum change in 
+    %magnetization between two timesteps
+    conv_tol = 1e-4;
     
     %defines whether to recompute the Interaction Matrices or not
     RecomputeInteractionMatrices = 0 ;
@@ -127,6 +128,11 @@ properties (SetAccess=private,GetAccess=public)
     nt
     %should have size (nt,1)
     t
+    
+    %check for convergence times
+    nt_conv
+    %should have size (nt_conv,1)
+    t_conv
     
     %alpha as function of time, should be (nt_alpha,2)
     alphat
@@ -221,8 +227,11 @@ methods
         obj.nt = int32(1000);
         obj.t = linspace(0,1,obj.nt);
         
+        obj.nt_explicit = int32(1);
         obj.t_explicit  = 0;
-        obj.nt_explicit = 1;
+                
+        obj.nt_conv = int32(1);
+        obj.t_conv = 0;
         
         obj.setTimeDis = int32(10);
 
@@ -302,6 +311,11 @@ methods
     function obj = setTime( obj, t )
         obj.t  = t;
         obj.nt = int32(length(t));
+    end
+    
+    function obj = setConvergenceCheckTime( obj, t_conv )
+        obj.t_conv  = t_conv;
+        obj.nt_conv = int32(length(t_conv));
     end
     
     function obj = setTimeExplicit( obj, t_explicit )

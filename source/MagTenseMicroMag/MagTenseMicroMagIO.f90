@@ -21,7 +21,7 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr
@@ -30,6 +30,7 @@
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
         mwPointer :: tolProblemPtr, thres_valueProblemPtr
         mwPointer :: exch_matProblemPtr, irPtr, jcPtr
+        mwPointer :: genericProblemPtr
         integer,dimension(3) :: int_arr
         real*8,dimension(3) :: real_arr
         real*8 :: demag_fac
@@ -250,7 +251,21 @@
             allocate( problem%grid%nu_exch_mat%values( problem%grid%nu_exch_mat%length ) )
             call mxCopyPtrToReal8(mxGetPr(exch_matProblemPtr), problem%grid%nu_exch_mat%values, sx )
         endif
+          
+        !Load the no. of time steps in the time convergence array
+        sx = 1
+        ntProblemPtr = mxGetField( prhs, i, problemFields(32) )
+        call mxCopyPtrToInteger4(mxGetPr(ntProblemPtr), nt_conv, sx )
         
+        allocate( problem%t_conv(nt_conv) )
+        genericProblemPtr = mxGetField(prhs,i,problemFields(33) )
+        sx = nt_conv
+        call mxCopyPtrToReal8(mxGetPr(genericProblemPtr), problem%t_conv, sx )
+        
+        sx = 1
+        genericProblemPtr = mxGetField( prhs, i, problemFields(34) )
+        call mxCopyPtrToReal8(mxGetPr(genericProblemPtr), problem%conv_tol, sx )
+
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -386,7 +401,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=29
+        integer,parameter :: nf=34
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -424,6 +439,9 @@
         fieldnames(29) = 'thres'
         fieldnames(30) = 'useCVODE'
         fieldnames(31) = 'exch_mat'
+        fieldnames(32) = 'nt_conv'
+        fieldnames(33) = 't_conv'
+        fieldnames(34) = 'conv_tol'
         
     end subroutine getProblemFieldnames
     

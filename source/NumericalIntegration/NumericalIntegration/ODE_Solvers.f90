@@ -3,6 +3,7 @@ module ODE_Solvers
     
     use rksuite_90
     use integrationDataTypes
+    use SPECIALFUNCTIONS
     
 implicit none
     
@@ -30,20 +31,22 @@ private MTdmdt, MTy_out,MTf_vec
     !> @param[in] useCVODE optional flag for choosing solvers. 
     !> more parameters to come as we progress in the build-up of this function (error, options such as tolerances etc)
     !---------------------------------------------------------------------------
-    subroutine MagTense_ODE( fct, t, y0, t_out, y_out, callback, callback_display, tol, thres_value, useCVODE )
+    subroutine MagTense_ODE( fct, t, y0, t_out, y_out, callback, callback_display, tol, thres_value, useCVODE, t_conv, conv_tol )
     use, intrinsic :: iso_c_binding
     procedure(dydt_fct), pointer :: fct                     !>Input function pointer for the function to be integrated
-    procedure(callback_fct), pointer :: callback            !> Callback function
-    real,dimension(:),intent(in) :: t,y0                    !>requested time (size m) and initial values ofy (size n)
-    real,dimension(:),intent(inout) :: t_out                !>actual time values at which the y_i are found, size m
+    procedure(callback_fct), pointer :: callback            !>Callback function
+    real,dimension(:),intent(in) :: t,y0                    !>Requested time (size m) and initial values ofy (size n)
+    real,dimension(:),intent(inout) :: t_out                !>Actual time values at which the y_i are found, size m
     real,dimension(:,:),intent(inout) :: y_out              !>Function values at the times t_out, size [n,m]
     integer,intent(in) :: callback_display                  !>Sets at what time index values Fortran displays the results in Matlab
     real,intent(in) :: tol                                  !>Relative tolerance
     real,intent(in) :: thres_value                          !>When a solution component Y(L) is less in magnitude than thres_value its set to zero
-    integer,intent(in),optional :: useCVODE
+    integer,intent(in),optional :: useCVODE                 !>Flag that determines if the CVODE solver is to be used or not
+    real,dimension(:),intent(in) :: t_conv                 !>Array for the time values where the solution will be checked for convergence
+    real,intent(in) :: conv_tol                             !>Converge criteria on difference between magnetization at different timesteps
 	integer :: solver_flag
     
-    integer :: neq, nt    
+    integer :: neq, nt, nt_conv
     real,allocatable,dimension(:,:) :: yderiv_out              !>The derivative of y_i wrt t at each time step
     real(c_double),dimension(size(t)) :: t_out_double,t_double ! = t_out
     real(c_double),dimension(size(y0),size(t)) :: y_out_double ! = y_out
@@ -54,6 +57,7 @@ private MTdmdt, MTy_out,MTf_vec
     !find the no. of equations and the no. of requested timesteps
     neq = size(y0)
     nt = size(t)
+    nt_conv = size(t_conv)
     
     !Allocate the derivative output array
     allocate(yderiv_out(neq,nt))
@@ -70,7 +74,7 @@ private MTdmdt, MTy_out,MTf_vec
     if ( solver_flag .eq. useCVODEFalse ) then
     
         !Call the solver
-        call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value )
+        call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol )
         
     else if ( solver_flag .eq. useCVODETrue ) then
         !Do the magic for CVODE
@@ -119,9 +123,9 @@ private MTdmdt, MTy_out,MTf_vec
     !> @param[inut] yderiv_out output array with dy_i/dt at each time
     !> @param[in] callback procedure pointer to callback to Matlab for progress updates
     !---------------------------------------------------------------------------
-    subroutine MagTense_ODE_RKSuite( fct, neq, t, nt, ystart,  t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value )
+    subroutine MagTense_ODE_RKSuite( fct, neq, t, nt, ystart,  t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol )
     procedure(dydt_fct), pointer :: fct                  !>Input function pointer for the function to be integrated
-    integer,intent(in) :: neq,nt                         !>Input no. of equations and no. of time steps
+    integer,intent(in) :: neq, nt, nt_conv               !>Input no. of equations, no. of time steps and no. of time steps in the check for convergence array
     real,dimension(nt),intent(in) :: t                   !>Input time array, size nt
     real,dimension(neq),intent(in) :: ystart             !>Input initial conditions (y at t=0), size neq
     real,dimension(nt),intent(inout) :: t_out            !>Array for the actual time values where the solution was found
@@ -131,15 +135,26 @@ private MTdmdt, MTy_out,MTf_vec
     integer,intent(in) :: callback_display               !>Sets at what time index values Fortran displays the results in Matlab
     real,intent(in) :: tol                               !>Relative tolerance
     real,intent(in) :: thres_value                       !>When a solution component Y(L) is less in magnitude than thres_value its set to zero
+    real,dimension(nt_conv),intent(in) :: t_conv         !>Array for the time values where the solution will be checked for convergence
+    real,intent(in) :: conv_tol                          !>Converge criteria on difference between magnetization at different timesteps
     
-    real,dimension(:),allocatable :: thres      !>arrays used by the initiater     
+    real,dimension(:),allocatable :: thres          !>arrays used by the initiater     
+    real,dimension(neq) :: y_last                   !>Array containing the solution in the last returned convergence timestep
+    real,dimension(neq) :: y_step                   !>Array containing the solution in the current timestep
+    real,dimension(neq) :: yderiv_step              !>Array containing dy/dt in the current timestep
+    real,dimension(nt+nt_conv) :: t_comb            !>The concatenated time array of the output times and the convergence times
+    real,dimension(nt+nt_conv) :: t_comb_out        !>The concatenated time array of the output times and the convergence times
+    real,dimension(:),allocatable :: t_comb_unique  !>The concatenated time array of the output times and the convergence times, only unique values
+    integer,dimension(:),allocatable :: ind         !>The indices for sort
     
     character(len=1) :: task,method             !>Which version of the solver to use. = 'u' or 'U' for normal and 'C' or 'c' for complicated, Which RK method to use. 1 = RK23, 2 = RK45 and 3 = RK78
     logical :: errass,message                   !>whether to assess the true error or not, give message on errors
     real :: hstart                              !>Whether the code should choose the size of the first step. Set to 0.0d if so (recommended)    
+    real :: t_step                              !>The current time at the end of a time step
+    real :: conv_error                          !>The maximum error in the current time step
     type(rk_comm_real_1d) :: setup_comm         !>Stores all the stuff used by setup
     integer :: flag                             !>Flag indicating how the integration went
-    integer :: i                                !>Counter variable
+    integer :: i, k                             !>Counter variable
     !integer,parameter :: n_write=100
     !Perform allocations. 
     allocate(thres(neq))
@@ -162,15 +177,57 @@ private MTdmdt, MTy_out,MTf_vec
     !Call the setup function in order to initiate the solver    
     call setup(  setup_comm, t(1), ystart, t(nt), tol, thres, method,task,errass, hstart,message)
 
+    !Calculate the magnetization to use for the first convergence calculation
+    y_last = ystart
+    
+    !Concertinate the t_out and t_conv arrays
+    t_comb(1:size(t)) = t
+    t_comb((size(t)+1):(nt+nt_conv)) = t_conv
+    
+    !Remove the duplicate elements, if any from the t_comb array
+    k = 1
+    call simple_unique( t_comb, t_comb_out, k)
+    
+    !Sort the array
+    allocate(t_comb_unique(k))
+    allocate(ind(k))
+    call simple_sort( t_comb_out(1:k), t_comb_unique, ind )
+    
     !First time is the same as the input
     t_out(1) = t(1)
     y_out(:,1) = ystart
+    
+    k = 2
     !Call the integrator
-    do i=2,nt                
-        call range_integrate( setup_comm, fct, t(i), t_out(i), y_out(:,i), yderiv_out(:,i), flag )
+    do i=2,size(t_comb_unique)                
+        call range_integrate( setup_comm, fct, t_comb_unique(i), t_step, y_step, yderiv_step, flag )
         
         if ( mod(i,callback_display) .eq. 0 ) then
             call callback( 'Time', i )
+        endif
+        
+        !Check if the time which the solution is returned is part of the array that checks for converge or if it part of the times where the simulation is to be saved
+        ind = findloc(t_conv,t_comb_unique(i))
+        if (maxval(ind) .gt. 0) then !If the time is part of the converge array, we check for converge
+            conv_error = maxval(abs(y_step-y_last))
+            if (conv_error < conv_tol) then
+                !Save the current state before exiting
+                y_out(:,k) = y_step
+                yderiv_out(:,k) = yderiv_step
+                t_out(k) = t_step
+                exit
+            endif
+            !Save the new magnetization to use for the next converge calculation
+            y_last = y_step
+        endif
+        
+        !Check if we should save the result in the array to be returned
+        ind = findloc(t,t_comb_unique(i))
+        if (maxval(ind) .gt. 0) then !If the time is part of the save array
+            y_out(:,k) = y_step
+            yderiv_out(:,k) = yderiv_step
+            t_out(k) = t_step
+            k = k+1
         endif
     enddo
     

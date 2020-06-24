@@ -104,5 +104,6 @@
 		<File RelativePath=".\ODE_Solvers.f90"/>
 		<File RelativePath=".\quadpack.f90"/>
 		<File RelativePath=".\RKSuitef90.f90"/>
+		<File RelativePath=".\SpecialFunctions.f90"/>
 		<File RelativePath=".\util.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>
