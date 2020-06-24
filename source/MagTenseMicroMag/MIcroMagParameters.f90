@@ -77,7 +77,10 @@ include "mkl_dfti.f90"
         real(DP),dimension(:,:),allocatable :: alpha    !> A time dependent dampning parameter, i.e. as a function of time. Size (nt,1).
         
         real(DP),dimension(:),allocatable :: t          !> Time array for the desired output times
-        real(DP),dimension(:),allocatable :: m0         !>Initial value of the magnetization
+        real(DP),dimension(:),allocatable :: m0         !> Initial value of the magnetization
+        
+        real(DP),dimension(:),allocatable :: t_conv     !> Time array with the time values where the solution will be checked for convergence compared to the last timestep
+        real(DP) :: conv_tol                            !> Converge criteria on difference between magnetization at different timesteps
         
         real*4 :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         

@@ -67,9 +67,9 @@ ThisHkX = AA.HkX(SigmaX,SigmaY,SigmaZ,t) ;
 ThisHkY = AA.HkY(SigmaX,SigmaY,SigmaZ,t) ;
 ThisHkZ = AA.HkZ(SigmaX,SigmaY,SigmaZ,t) ;
 
-ThisHeffX = ThisHjX + ThisHhX + ThisHmX + ThisHkX ;
-ThisHeffY = ThisHjY + ThisHhY + ThisHmY + ThisHkY ;
-ThisHeffZ = ThisHjZ + ThisHhZ + ThisHmZ + ThisHkZ ;
+ThisHeffX = ThisHjX + ThisHhX + ThisHmX + ThisHkX;
+ThisHeffY = ThisHjY + ThisHhY + ThisHmY + ThisHkY;
+ThisHeffZ = ThisHjZ + ThisHhZ + ThisHmZ + ThisHkZ;
 
 %% Calculate Precession and Damping terms from Heff
 
