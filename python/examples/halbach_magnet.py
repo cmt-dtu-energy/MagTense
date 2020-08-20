@@ -25,6 +25,15 @@ def main():
     # Optional parameters for setup: n_magnets, filled_positions, mag_angles, eval_points, eval_mode, B_rem
     (tiles, points, grid) = MagTense.setup(places, area, filled_positions=filled_positions)
 
+    # Optimal angle - https://orbit.dtu.dk/ws/files/100219185/Analysis_of_the_magnetic_field_force_and_torque_for_two_dimensional_Halbach_cylinders.pdf
+    for i in range(tiles.n):
+        # Calculate angle of tile center to x-axis
+        d = tiles.get_offset(i) - np.array([0.5, 0.5, 0.05])
+        # r_comp = math.sqrt(math.pow(d[0],2), math.pow(d[1],2))
+        angle_comp = math.atan2(d[1], d[0])
+        azimuth_opt = 2 * angle_comp
+        tiles.set_mag_angle_i([math.pi/2, azimuth_opt], i)
+
     # Standard parameters in settings: max_error=0.00001, max_it=500
     (updated_tiles, H) = MagTense.run_simulation(tiles, points, grid=grid, plot=True)
 

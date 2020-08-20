@@ -42,10 +42,7 @@ def main():
     points = np.asarray(points, dtype=np.float64, order='F')
 
     # Standard parameters in settings: max_error=0.00001, max_it=500
-    (updated_tiles, H) = MagTense.run_simulation(spheroids, points, plot=False)
-
-    # Plotting
-    create_plot(updated_tiles)
+    (updated_tiles, H) = MagTense.run_simulation(spheroids, points, plot=True)
 
     print("Average magnetic field: " + str(MagTense.get_average_magnetic_flux(H)))
     print("Peak to peak: " + str(MagTense.get_p2p(H)))
