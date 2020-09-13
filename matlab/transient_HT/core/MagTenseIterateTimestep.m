@@ -38,12 +38,20 @@ n = length(dV);
 
 %the solution at time t
 T_old = solution.T;
+H_old = solution.H;
+p_old = solution.p;
+Happ_old = solution.Happ_old;
+M_old = solution.M;
 c_old = solution.c;
 k_old = solution.k;
 rho_old = solution.rho;
 
+%the applied field at the new time, t+dt
+Happ_new = solution.Happ_new;
+
 %initialization of parameters
-err = 10 * maxErr;
+err_T = 10 * maxErr;
+err_H = err_T;
 nIte = 0;
 
 %the temperature at the new tims, t+dt, is denoted T_new
@@ -55,9 +63,15 @@ rho_new = rho_old;
 
 %First guess at temperature at the new time step t+dt
 T_prev = T_old;
+%and first guess of the field at the new time step t+dt
+H_prev = H_old;
+%and first guess of the magnetization
+M_prev = M_old;
+%and the pressure
+p_prev = p_old;
 %while loop that exits after a max. no. of iteration or when the solution
 %has converged
-while err>maxErr && nIte<maxIte
+while err_T>maxErr && err_H>maxErr && nIte<maxIte
    
     %find resulting thermal properties (average over the timestep)
     %these all have to be single-column vectors (length n)
@@ -89,11 +103,12 @@ while err>maxErr && nIte<maxIte
     %solve the equation system using \
     T_new = A \ b;
    
-    %find the magnetic field at t+dt
-    H_new = zeros(size(T_new));
-    
     %find the pressure at t+dt
-    p_new = zeros(size(T_new));
+    %p_new = zeros(size(T_new));
+     p_new = p_old;   
+    %find the magnetic field at t+dt
+    [H_new,M_new] = MagTenseIterateMagneticField( Happ_new, M_prev, T_new, p_new, solution.hyst, geom, setts );
+    
     
     %find thermal properties at the new temperature
     c_new = setts.c(T_new,H_new,p_new);
@@ -101,19 +116,23 @@ while err>maxErr && nIte<maxIte
     rho_new = setts.rho(T_new,H_new,p_new);
     
     %find the relative error
-    err = max ( abs ( (T_new - T_prev)./T_prev ) );
+    err_T = max ( abs ( (T_new - T_prev)./T_prev ) );
+    err_H = max ( abs ( sqrt(sum(H_new,2).^2) - sqrt(sum(H_prev.^2,2)) ) ./ sqrt(sum(H_prev.^2,2)) );
+    
     
     if debug
-        disp( ['err = ' num2str(err,'%7.5f')] );
+        disp( ['err (T, H) = (' num2str(err_T,'%7.5f') ', ' num2str(err_H,'%7.5f') ')'] );
         disp( ['Iteration no. ' num2str(nIte)] );
     end
     
     T_prev = T_new;
+    H_prev = H_new;
+    M_prev = M_new;
     nIte = nIte + 1;
 end
 
 %set output flag
-if err<=maxErr
+if err_T<=maxErr
     outFlag = 1;
     %update the solution
     solution.T = T_new;

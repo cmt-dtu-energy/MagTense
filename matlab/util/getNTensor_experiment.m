@@ -16,14 +16,13 @@ n = length( pts(:,1) );
 N = zeros( 3*n, 3*m );
 
 
-
 %loop over each tile
 for i=1:m
-    
     N_ = getNFromTile_mex( tiles(i), pts, int32(n) );
-    for j=1:n
-        N( (j-1)*3+1:j*3, (i-1)*3+1:i*3 ) = squeeze( N_(j,:,:) );
-    end
+%     for j=1:n
+%         N( (j-1)*3+1:j*3, (i-1)*3+1:i*3 ) = squeeze( N_(j,:,:) );
+%     end
+    N( :, (i-1)*3+1:i*3 ) = reshape(permute(N_,[3 1 2]),n*3,3);
 end
 
 end

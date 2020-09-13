@@ -26,6 +26,22 @@ classdef MagTenseTilesUtil
            end
        end
        
+       %finds and returns the center position of each tile given the tile
+       %type
+       function C = getCenter( tiles )
+           n = length(tiles);
+           C = zeros(n,3);
+           
+           for i=1:n
+               switch tiles(i).tileType
+                   case getMagTileType('prism')
+                       C(i,:) = tiles(i).offset;
+                   case getMagTileType('tetrahedron')
+                       C(i,:) = mean( tiles(i).vertices, 2 );
+               end
+           end
+       end
+       
        
    end
     
