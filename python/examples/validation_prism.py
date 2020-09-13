@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + '/../source')
 import MagTense
-import MagTenseStandalone
 import util_plot
 import util_eval
 
@@ -20,15 +19,8 @@ def main():
     tile_val.set_rotation_i([math.pi/2, -math.pi/3, math.pi/4],0)
     tile_val.set_tile_type(2)
     tile_val.set_remanence(1.2 / (4*math.pi*1e-7))
-    tile_val.set_mag_angle([[math.pi/3, math.pi/4]])
+    tile_val.set_easy_axis([[0.35355339, 0.61237244, 0.70710678]])
     tile_val.set_color([[1, 0, 0]])
-
-    tile_standalone = MagTenseStandalone.Tile()
-    tile_standalone.set_size([0.6, 0.1, 0.3]) 
-    tile_standalone.set_offset(eval_offset)
-    tile_standalone.set_rotation([math.pi/2, -math.pi/3, math.pi/4])
-    tile_standalone.set_remanence(1.2 / (4*math.pi*1e-7))
-    tile_standalone.set_mag_angle([math.pi/3, math.pi/4])
 
     # Load reference points from COMSOL calculation
     COMSOL_eval_path = os.path.dirname(os.path.abspath(__file__)) + '/../../documentation/examples_FEM_validation/Validation_prism/'
@@ -38,21 +30,15 @@ def main():
     (eval_points_z, H_norm_z_COMSOL) = util_eval.load_COMSOL_eval('Validation_prism_normH_z.txt', eval_offset, COMSOL_eval_path)
     
     # x-axis
-    (updated_tiles_x, H_dict_x) = MagTenseStandalone.run_simulation([tile_standalone], eval_points_x)
-    H_x = np.array(list(H_dict_x.field.values()))
-    # (updated_tiles_x, H_x) = MagTense.run_simulation(tile_val, eval_points_x)
+    (updated_tiles_x, H_x) = MagTense.run_simulation(tile_val, eval_points_x)
     H_norm_x_MagTense  = MagTense.get_norm_magnetic_flux(H_x)
     
     # y-axis
-    (updated_tiles_y, H_dict_y) = MagTenseStandalone.run_simulation([tile_standalone], eval_points_y)
-    H_y = np.array(list(H_dict_y.field.values()))
-    # (updated_tiles_y, H_y) = MagTense.run_simulation(tile_val, eval_points_y)
+    (updated_tiles_y, H_y) = MagTense.run_simulation(tile_val, eval_points_y)
     H_norm_y_MagTense  = MagTense.get_norm_magnetic_flux(H_y)
 
     # z-axis
-    (updated_tiles_z, H_dict_z) = MagTenseStandalone.run_simulation([tile_standalone], eval_points_z)
-    H_z = np.array(list(H_dict_z.field.values()))
-    # (updated_tiles_z, H_z) = MagTense.run_simulation(tile_val, eval_points_z)
+    (updated_tiles_z, H_z) = MagTense.run_simulation(tile_val, eval_points_z)
     H_norm_z_MagTense  = MagTense.get_norm_magnetic_flux(H_z)
 
     fig, ax = plt.subplots(1,3)

@@ -19,7 +19,7 @@ def main():
     tile_val.set_rotation_i([0, 0, 0],0)
     tile_val.set_tile_type(3)
     tile_val.set_remanence(1.2 / (4*math.pi*1e-7))
-    tile_val.set_mag_angle([[math.pi/5, -math.pi/8]])
+    tile_val.set_easy_axis([[-0.3095974 , -0.22493568,  0.92387953]])
     tile_val.set_color([[1, 0, 0]])
 
     eval_offset = [0.406328622087633, 0.8631363102808783, 0.55] 

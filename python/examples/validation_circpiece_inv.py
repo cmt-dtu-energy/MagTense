@@ -16,11 +16,10 @@ def main():
     tile_val.set_center_pos([[0.3, math.pi/0.55, 0.6]])
     tile_val.set_dev_center([0.15, math.pi/6, 0.4])
     tile_val.set_offset_i([0.3, 0.5, 0.1],0)
-    # tile_val.set_rotation_i([-math.pi/6, math.pi/5, math.pi/2],0)
     tile_val.set_rotation_i([0, 0, 0],0)
     tile_val.set_tile_type(4)
     tile_val.set_remanence(1.2 / (4*math.pi*1e-7))
-    tile_val.set_mag_angle([[math.pi/4, math.pi/5]])
+    tile_val.set_easy_axis([[0.41562694, 0.41562694, 0.80901699]])
     tile_val.set_color([[1, 0, 0]])
 
     eval_offset = [0.6271937452259475, 0.27251823835641853, 0.7]

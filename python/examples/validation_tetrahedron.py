@@ -16,7 +16,7 @@ def main():
     vert = np.array([[2.5,3,1],[2,1,4],[1.5,4,3],[4.5,5,2]])
     tile_val.set_vertices(vert.transpose())
     tile_val.set_tile_type(5)
-    tile_val.set_remanence(1 / (4*math.pi*1e-7))
+    tile_val.set_remanence(1.2 / (4*math.pi*1e-7))
     tile_val.set_easy_axis([[0.324264068, 0.734846928, 0.891545179]])
     tile_val.set_color([[1, 0, 0]])
 

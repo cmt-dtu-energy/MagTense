@@ -133,17 +133,17 @@ AA.Gk = @(Sx,Sy,Sz,Hx,Hy,Hz) (1/2)*(Sx.'*Hx + Sy.'*Hy + Sz.'*Hz) ;
 if UseImplicitSolver | CalcEigenvalue
     NN = size(DemagTensor.KglobXX{1},1) ; 
     % The demag tensor is symmetric
-    HessGXX = - (2*Jfact).*(A2) - (Mfact).*DemagTensor.KglobXX{1} - (Kfact).*(Kxx)*eye(NN) ;
-    HessGXY =                   - (Mfact).*DemagTensor.KglobXY{1} - (Kfact).*(Kxy)*eye(NN) ;
-    HessGXZ =                   - (Mfact).*DemagTensor.KglobXZ{1} - (Kfact).*(Kxz)*eye(NN) ;
+    HessGXX = - (2*Jfact).*(A2) - (Mfact).*DemagTensor.KglobXX{1} - (Kfact).*(Kxx')*eye(NN) ;
+    HessGXY =                   - (Mfact).*DemagTensor.KglobXY{1} - (Kfact).*(Kxy')*eye(NN) ;
+    HessGXZ =                   - (Mfact).*DemagTensor.KglobXZ{1} - (Kfact).*(Kxz')*eye(NN) ;
     
-    HessGYX =                   - (Mfact).*DemagTensor.KglobXY{1} - (Kfact).*(Kyx)*eye(NN) ;
-    HessGYY = - (2*Jfact).*(A2) - (Mfact).*DemagTensor.KglobYY{1} - (Kfact).*(Kyy)*eye(NN) ;
-    HessGYZ =                   - (Mfact).*DemagTensor.KglobYZ{1} - (Kfact).*(Kyz)*eye(NN) ;
+    HessGYX =                   - (Mfact).*DemagTensor.KglobXY{1} - (Kfact).*(Kyx')*eye(NN) ;
+    HessGYY = - (2*Jfact).*(A2) - (Mfact).*DemagTensor.KglobYY{1} - (Kfact).*(Kyy')*eye(NN) ;
+    HessGYZ =                   - (Mfact).*DemagTensor.KglobYZ{1} - (Kfact).*(Kyz')*eye(NN) ;
     
-    HessGZX =                   - (Mfact).*DemagTensor.KglobXZ{1} - (Kfact).*(Kzx)*eye(NN) ;
-    HessGZY =                   - (Mfact).*DemagTensor.KglobYZ{1} - (Kfact).*(Kzy)*eye(NN) ;
-    HessGZZ = - (2*Jfact).*(A2) - (Mfact).*DemagTensor.KglobZZ{1} - (Kfact).*(Kzz)*eye(NN) ;
+    HessGZX =                   - (Mfact).*DemagTensor.KglobXZ{1} - (Kfact).*(Kzx')*eye(NN) ;
+    HessGZY =                   - (Mfact).*DemagTensor.KglobYZ{1} - (Kfact).*(Kzy')*eye(NN) ;
+    HessGZZ = - (2*Jfact).*(A2) - (Mfact).*DemagTensor.KglobZZ{1} - (Kfact).*(Kzz')*eye(NN) ;
     
     for k=2:numel(AvrgMatrix)
         % The demag tensor is symmetric
@@ -207,7 +207,7 @@ if UseImplicitSolver
     options = odeset('OutputFcn',ThatOutPutFunct,'RelTol',1e-3,'MaxStep',abs(t(1)-t(end))) ; % ,'MaxStep',0.01*abs(t(1)-t(end))) ; % ,'Events',ThatEventFunct) ;
     [t,SigmaSol] = ode45(dSigma3,t,Sigma,options);
 end
-disp(num2str(TheData.NfunEval)) ;
+% disp(num2str(TheData.NfunEval)) ;
 %% Calculate the Eigenvalue
 if CalcEigenvalue
     ThisHHess5 = HHess(t(end),SigmaSol(end,:)') ;

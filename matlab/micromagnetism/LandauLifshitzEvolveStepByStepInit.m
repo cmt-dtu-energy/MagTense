@@ -17,7 +17,21 @@ for k=1:length(ProblemSetupStruct.Hext(:,1))
     if k==1
         [SigmaSol,VV] = LandauLifshitzEvolveCombined(ProblemSetupStructExplicit,InteractionMatrices,Sigma) ;
     else
-        [SigmaSol,VV] = LandauLifshitzEvolveCombined(ProblemSetupStructExplicit,InteractionMatrices,AllSigmas(k-1,:)) ;
+        Sigmastart = AllSigmas(k-1,:);        
+        Sigmastart = Sigmastart+randn(size(Sigmastart))*1;
+        
+        NN = round(numel(Sigmastart)/3) ;
+        SigmaXorg = Sigmastart(0*NN+[1:NN]) ;
+        SigmaYorg = Sigmastart(1*NN+[1:NN]) ;
+        SigmaZorg = Sigmastart(2*NN+[1:NN]) ;
+        
+        SigmaX = SigmaXorg./sqrt(SigmaXorg.^2+SigmaYorg.^2+SigmaZorg.^2);
+        SigmaY = SigmaYorg./sqrt(SigmaXorg.^2+SigmaYorg.^2+SigmaZorg.^2);
+        SigmaZ = SigmaZorg./sqrt(SigmaXorg.^2+SigmaYorg.^2+SigmaZorg.^2);
+        
+        Sigmastart = [SigmaX SigmaY SigmaZ];
+        
+        [SigmaSol,VV] = LandauLifshitzEvolveCombined(ProblemSetupStructExplicit,InteractionMatrices,Sigmastart) ;
     end
 
     AllSigmas(k,:) = SigmaSol(end,:) ;

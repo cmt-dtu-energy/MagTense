@@ -115,3 +115,6 @@ lib_mag/*.mod
 lib_mag/libsrc.a
 lib_mag/Release/
 lib_mag/src.win-amd64-3.7/
+
+# Plots of python examples
+!documentation/fig/*
