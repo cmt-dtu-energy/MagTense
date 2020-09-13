@@ -33,7 +33,38 @@ module SPECIALFUNCTIONS
     
     end subroutine simple_sort
     
-     !---------------------------------------------------------------------------    
+    
+    !---------------------------------------------------------------------------    
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
+    !> @brief
+    !> Simple function to find the unique elements in an array. Code implemented from Rosettacode: https://rosettacode.org/wiki/Remove_duplicate_elements#Fortran
+    !> @param[in] arr the array to be sorted (n,1)
+    !> @param[inout] arr_out sorted array (ascending order)
+    !> @param[inout] ind indices such that arr_out = arr(ind)
+    !---------------------------------------------------------------------------            
+    subroutine simple_unique( arr, arr_out, k)
+    
+    real,dimension(:),intent(in) :: arr
+    real,dimension(:),intent(inout) :: arr_out
+    integer,intent(inout) :: k
+    
+    integer :: i
+    
+    arr_out(:) = 0;
+    
+    k = 1
+    arr_out(1) = arr(1)
+    do i=2,size(arr)
+        ! if the number already exist in res check next
+        if (any( arr_out == arr(i) )) cycle
+        ! No match found so add it to the output
+        k = k + 1
+        arr_out(k) = arr(i)
+    end do
+    
+    end subroutine simple_unique
+    
+    !---------------------------------------------------------------------------    
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Calculates the cross product of a and b and returns it
