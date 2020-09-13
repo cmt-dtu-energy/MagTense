@@ -31,6 +31,7 @@ for i=1:length(F(:,1))
           L2 = sqrt(sum( ( P(1,:)-P(3,:) ).^2 ) );
           L3 = sqrt(sum( ( P(2,:)-P(3,:) ).^2 ) );
           h = (L1+L2+L3)/2;
+          %area (Heron's formula) should be checked and verified
           areas(i) = sqrt( h*(h-L1)*(h-L2)*(h-L3) );
           centers(i,:) = mean(P);
           break;

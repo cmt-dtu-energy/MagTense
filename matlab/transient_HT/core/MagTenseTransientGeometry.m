@@ -11,6 +11,10 @@ classdef MagTenseTransientGeometry
        FaceConditionsBoundaryStatic % static part of boundary condition values, size n x m (sparse)
        FaceConditionsBoundaryDynamic %dynamic (changes potentially at each time step) part of the boundary conditions, sparse n x m
        FaceConditionsBoundaryFunctions %cell array of function handles that apply dynamic boundary conditions
+       
+       N %cell array with six elements each of size (n,n) containing Nxx, Nyy, Nzz, Nxy, Nxz and Nyz (note that the demagnetization tensor is symmetric)
+       
+       tiles %array with the primitives (tiles) of the problem.
     end
     
     properties (Constant)
@@ -36,7 +40,8 @@ classdef MagTenseTransientGeometry
             %no. of tiles
             n = length(tiles);
             
-           
+            %save the tiles
+            obj.tiles = tiles;
             
             %assuming no more than 100 interactions through the boundaries
             %of a single tile we make space for the sparse matrices

@@ -14,14 +14,11 @@ n = length( pts(:,1) );
 
 %Make the output matrix
 N = zeros( 3*n, 3*m );
-% N = sparse( 3*n, 3*m );
 
 
 %loop over each tile
 for i=1:m
-    %remember to multiply by -1 as the demag tensor for prisms is
-    %defined as H = - N*M in the code
-    N_ = 1.*getNFromTile_mex( tiles(i), pts, int32(n) );
+    N_ = getNFromTile_mex( tiles(i), pts, int32(n) );
 %     for j=1:n
 %         N( (j-1)*3+1:j*3, (i-1)*3+1:i*3 ) = squeeze( N_(j,:,:) );
 %     end
