@@ -47,23 +47,43 @@ module MagneticForce
        select case ( surf%coord )
         case ( coord_sys_cone )
         !x-component
-        dat_arr(1)%dat%f_ptr => F_int_11 !theta-z surface, x part of diff. area
-        dat_arr(2)%dat%f_ptr => F_int_12 !theta-z surface, y part of diff. area
-        dat_arr(3)%dat%f_ptr => F_int_13 !theta-z surface, z part of diff. area
-        dat_arr(4)%dat%f_ptr => F_int_13 !r-theta surface, bottom
-        dat_arr(5)%dat%f_ptr => F_int_13 !r-theta surface, top
+        dat_arr(1)%dat%f_ptr => F_int_11  !theta-z surface, x part of diff. area
+        dat_arr(2)%dat%f_ptr => F_int_12  !theta-z surface, y part of diff. area
+        dat_arr(3)%dat%f_ptr => F_int_13  !theta-z surface, z part of diff. area
+        dat_arr(4)%dat%f_ptr => F_int_13  !r-theta surface, bottom
+        dat_arr(5)%dat%f_ptr => F_int_13  !r-theta surface, top
         !y-component
-        dat_arr(6)%dat%f_ptr => F_int_21 !theta-z surface, x part of diff. area
-        dat_arr(7)%dat%f_ptr => F_int_22 !theta-z surface, y part of diff. area
-        dat_arr(8)%dat%f_ptr => F_int_23 !theta-z surface, z part of diff. area
-        dat_arr(9)%dat%f_ptr => F_int_23 !r-theta surface, bottom
+        dat_arr(6)%dat%f_ptr => F_int_21  !theta-z surface, x part of diff. area
+        dat_arr(7)%dat%f_ptr => F_int_22  !theta-z surface, y part of diff. area
+        dat_arr(8)%dat%f_ptr => F_int_23  !theta-z surface, z part of diff. area
+        dat_arr(9)%dat%f_ptr => F_int_23  !r-theta surface, bottom
         dat_arr(10)%dat%f_ptr => F_int_23 !r-theta surface, top
         !z-component
         dat_arr(11)%dat%f_ptr => F_int_31 !theta-z surface, x part of diff. area
         dat_arr(12)%dat%f_ptr => F_int_32 !theta-z surface, y part of diff. area
         dat_arr(13)%dat%f_ptr => F_int_33 !theta-z surface, z part of diff. area
         dat_arr(14)%dat%f_ptr => F_int_33 !r-theta surface, bottom
-        dat_arr(15)%dat%f_ptr => F_int_33!r-theta surface, top
+        dat_arr(15)%dat%f_ptr => F_int_33 !r-theta surface, top
+        
+        !x-component
+        dat_arr(1)%dat%f_ptr_vec => F_int_11_vec
+        dat_arr(2)%dat%f_ptr_vec => F_int_12_vec
+        dat_arr(3)%dat%f_ptr_vec => F_int_13_vec
+        dat_arr(4)%dat%f_ptr_vec => F_int_13_vec
+        dat_arr(5)%dat%f_ptr_vec => F_int_13_vec
+        !y-component
+        dat_arr(6)%dat%f_ptr_vec => F_int_21_vec
+        dat_arr(7)%dat%f_ptr_vec => F_int_22_vec
+        dat_arr(8)%dat%f_ptr_vec => F_int_23_vec
+        dat_arr(9)%dat%f_ptr_vec => F_int_23_vec
+        dat_arr(10)%dat%f_ptr_vec => F_int_23_vec
+        !z-component
+        dat_arr(11)%dat%f_ptr_vec => F_int_31_vec
+        dat_arr(12)%dat%f_ptr_vec => F_int_32_vec
+        dat_arr(13)%dat%f_ptr_vec => F_int_33_vec
+        dat_arr(14)%dat%f_ptr_vec => F_int_33_vec
+        dat_arr(15)%dat%f_ptr_vec => F_int_33_vec
+          
         call surface_integral_cone( surf, dat_arr(1:15), handleError, F, ier(1:15,:), neval(1:15,:) )
        case ( coord_sys_cyl )
            !x-component

@@ -169,7 +169,7 @@
         real,dimension(n),intent(in) :: vecSign
         real,dimension(n,3),intent(in) :: n_vec
         real,dimension(3),intent(inout) :: vOut
-        integer,intent(inout),dimension(n,2) :: ier,neval        
+        integer,intent(inout),dimension(n*3,2) :: ier,neval        
         real,dimension(n,2) :: xp,yp
         real,dimension(n) :: zp
         integer :: i, j, ind
