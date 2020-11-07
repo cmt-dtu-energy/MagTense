@@ -330,7 +330,7 @@ module MagForceMaxwellStressTensor
         elseif (dat%coord_sys .eq. coord_sys_cyl ) then
             call getB_field_cyl_vec( yy, dat, B, jacobi, n )     
         elseif ( dat%coord_sys .eq. coord_sys_cone ) then
-            !call getB_field_cone_vec( dat, B, jacobi )
+            call getB_field_cone_vec( yy, dat, B, jacobi, n )
         endif
               
         end subroutine getB_field_vec
@@ -571,6 +571,80 @@ module MagForceMaxwellStressTensor
         B = mu0 * Hsol
      
         end subroutine getB_field_cone
+        
+        
+        !::Get the field from the model solution on the surface of a cone
+        !::Vectorized
+        subroutine getB_field_cone_vec( yy, dat, B, jacobi, n )
+        class( dataCollectionBase ), intent(in), target :: dat
+        class( magStatModel ), pointer :: model
+        integer,intent(in) :: n
+        real,dimension(n),intent(in) :: yy
+        real,dimension(n,3),intent(inout) :: B
+        real,dimension(n),intent(inout) :: jacobi        
+        real,dimension(:,:),allocatable :: Hsol, solPts 
+        real,dimension(:),allocatable :: x,y,z,theta,normMult
+        real :: r
+        
+        allocate(Hsol(n,3),solPts(n,3),x(n),y(n),z(n),theta(n),normMult(n))
+
+        
+        !::Make the down cast to get the actual data model set
+        call getDataModel( dat%model, model )
+        
+        !::Make sure the coordinate indices are mapped according to the normal vector
+        if ( abs(dat%n_vec(1,1)) .eq. 1 ) then
+            !theta-z plane
+            !::dat%x represents theta, dat%y represents z and dat%z0 represents R, the constant radius of the
+            !::cylinder surface            
+            theta = dat%x            
+            !z = dat%y      
+            z = yy
+            !r = (z - dat%cone_z0) * tan( dat%cone_angle )
+            r = (dat%z0 - dat%cone_z0) * tan( dat%cone_angle )
+            !::part of the normal vector in the x-direction
+            normMult = cos(theta) * cos( dat%cone_angle )
+        elseif ( abs(dat%n_vec(1,2)) .eq. 1 ) then
+            !theta-z plane, y-component
+            !::dat%x represents theta, dat%y represents z and dat%z0 represents R, the constant radius of the
+            !::cylinder surface            
+            theta = dat%x            
+            !z = dat%y         
+            z = yy
+            !r = (z - dat%cone_z0) * tan( dat%cone_angle )
+            r = (dat%z0 - dat%cone_z0) * tan( dat%cone_angle )
+            !::part of the normal vector in the y-direction
+            normMult = sin(theta) * cos( dat%cone_angle )
+        elseif ( abs(dat%n_vec(1,3)) .eq. 1 ) then
+            !r-theta plane
+            !::dat%x represents r, dat%y represents theta and dat%z0 represents z
+            r = dat%x
+            !theta = dat%y            
+            theta = yy
+            z = dat%z0
+            normMult = 1
+        endif
+        
+        jacobi = r * normMult
+        
+        x = r * cos( theta )
+        y = r * sin( theta )
+        
+        !::Reset the solution array
+        Hsol(:,:) = 0        
+        
+        solPts(:,1) = x
+        solPts(:,2) = y
+        solPts(:,3) = z
+    
+        !::Get the solution from the MagStatVersion2 library
+        call getFieldFromTiles( model%tiles, Hsol, solPts, model%n_tiles, n )
+	
+        B = mu0 * Hsol
+        
+        deallocate(Hsol,solPts,x,y,z,theta,normMult)
+     
+        end subroutine getB_field_cone_vec
         
         
         !::Make the down cast
