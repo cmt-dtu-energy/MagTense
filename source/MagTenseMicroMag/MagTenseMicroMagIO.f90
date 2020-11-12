@@ -21,7 +21,7 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr
@@ -31,6 +31,7 @@
         mwPointer :: tolProblemPtr, thres_valueProblemPtr
         mwPointer :: exch_matProblemPtr, irPtr, jcPtr
         mwPointer :: genericProblemPtr
+        mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
         integer,dimension(3) :: int_arr
         real*8,dimension(3) :: real_arr
         real*8 :: demag_fac
@@ -63,6 +64,41 @@
         typeGridPtr = mxGetField( prhs, i, problemFields(3) )
         call mxCopyPtrToInteger4(mxGetPr(typeGridPtr), problem%grid%gridType, sx )
         
+        !Load additional things for a tetrahedron grid
+        if ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
+            !The center points of all the tetrahedron elements
+            !ntot = problem%grid%nx
+            
+            allocate( problem%grid%pts(ntot,3) )
+            sx = ntot * 3
+            ptsGridPtr = mxGetField( prhs, i, problemFields(35) )
+            call mxCopyPtrToReal8(mxGetPr(ptsGridPtr), problem%grid%pts, sx )
+            
+            !The elements of all the tetrahedron elements
+            allocate( problem%grid%elements(4,ntot) )
+            sx = ntot * 4
+            nodesGridPtr = mxGetField( prhs, i, problemFields(36) )
+            call mxCopyPtrToInteger4(mxGetPr(nodesGridPtr), problem%grid%elements, sx )
+            
+            !The number of nodes in the tetrahedron mesh
+            sx = 1
+            nnodesGridPtr = mxGetField( prhs, i, problemFields(38) )
+            call mxCopyPtrToInteger4(mxGetPr(nnodesGridPtr), problem%grid%nnodes, sx )
+            
+            !The nodes of all the tetrahedron elements
+            nnodes = problem%grid%nnodes
+            allocate( problem%grid%nodes(3,nnodes) )
+            sx = nnodes * 3
+            nodesGridPtr = mxGetField( prhs, i, problemFields(37) )
+            call mxCopyPtrToReal8(mxGetPr(nodesGridPtr), problem%grid%nodes, sx )
+            
+            !the number of nodes in the tetrahedron mesh
+            sx = 1
+            nnodesGridPtr = mxGetField( prhs, i, problemFields(38) )
+            call mxCopyPtrToInteger4(mxGetPr(nnodesGridPtr), problem%grid%nnodes, sx )
+        
+            !ntot = problem%grid%nx
+        endif
         
         !Finished loading the grid------------------------------------------
         
@@ -227,7 +263,7 @@
         endif
         
         !File for loading the sparse exchange tensor from Matlab (for non-uniform grids)
-        if ( problem%grid%gridType .eq. gridTypeNonUniform ) then
+        if ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
             ! Number of non-zero entries in sparse matrix
             exch_matProblemPtr = mxGetField( prhs, i, problemFields(31) )
             problem%grid%nu_exch_mat%length = mxGetNzmax(exch_matProblemPtr)
@@ -239,13 +275,15 @@
             sx = problem%grid%nu_exch_mat%length
             allocate( problem%grid%nu_exch_mat%ir( problem%grid%nu_exch_mat%length ) )
             irPtr = mxGetIr(exch_matProblemPtr)
-            call mxCopyPtrToInteger4(mxGetPr(irPtr), problem%grid%nu_exch_mat%ir, sx)
+            call mxCopyPtrToInteger4(irPtr, problem%grid%nu_exch_mat%ir, sx)
+            
+            sx = 1
             
             ! Column index information
             sx = problem%grid%nu_exch_mat%cols + 1
             allocate( problem%grid%nu_exch_mat%jc( sx ) )
             jcPtr = mxGetJc(exch_matProblemPtr)
-            call mxCopyPtrToInteger4(mxGetPr(jcPtr), problem%grid%nu_exch_mat%jc, sx)
+            call mxCopyPtrToInteger4(jcPtr, problem%grid%nu_exch_mat%jc, sx)
             
             sx = problem%grid%nu_exch_mat%length
             allocate( problem%grid%nu_exch_mat%values( problem%grid%nu_exch_mat%length ) )
@@ -401,7 +439,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=34
+        integer,parameter :: nf=38
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -442,6 +480,10 @@
         fieldnames(32) = 'nt_conv'
         fieldnames(33) = 't_conv'
         fieldnames(34) = 'conv_tol'
+        fieldnames(35) = 'grid_pts'
+        fieldnames(36) = 'grid_ele'
+        fieldnames(37) = 'grid_nod'
+        fieldnames(38) = 'grid_nnod'
         
     end subroutine getProblemFieldnames
     

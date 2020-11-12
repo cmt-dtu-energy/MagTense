@@ -23,10 +23,12 @@ include "mkl_dfti.f90"
         real(DP) :: dx,dy,dz
         real(DP),dimension(:,:,:),allocatable :: x,y,z
         real(DP),dimension(:), allocatable :: dV
-        
-        real(DP),dimension(:,:),allocatable :: pts  !> Array with the x,y,z points on list form, i.e. pts(i,:) is the x,y,z components of the i'th point
+        real(DP),dimension(:,:), allocatable :: nodes       !> Arrys with the nodes for a tetrahedron grid
+        integer,dimension(:,:), allocatable :: elements     !> Arrys with the elements for a tetrahedron grid, i.e. which nodes belong to which element
+        real(DP),dimension(:,:),allocatable :: pts          !> Array with the x,y,z points on list form, i.e. pts(i,:) is the x,y,z components of the i'th point
         integer :: gridType
-        type(SparseMatlabMat) :: nu_exch_mat !> Sparse exchange matrix for non-uniform grids (generated in Matlab). Consider moving to problem.
+        integer :: nnodes                                   !> The number of nodes in a tetrahedral grid
+        type(SparseMatlabMat) :: nu_exch_mat                !> Sparse exchange matrix for non-uniform grids (generated in Matlab). Consider moving to problem.
     end type MicroMagGrid
     
     !> Stores a table in one variable
@@ -144,7 +146,7 @@ include "mkl_dfti.f90"
     !> Parameters
     !>------------
     
-    integer,parameter :: gridTypeUniform=1,gridTypeNonUniform=2
+    integer,parameter :: gridTypeUniform=1,gridTypeTetrahedron=2
     integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
     integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverImplicit=3
     integer,parameter :: useCudaTrue=1,useCudaFalse=0

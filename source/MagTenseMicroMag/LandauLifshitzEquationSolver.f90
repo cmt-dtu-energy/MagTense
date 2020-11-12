@@ -49,10 +49,11 @@ include 'blas.f90'
     call displayMatlabMessage( 'Initializing matrices' )
     !Calculate the interaction matrices
     call initializeInteractionMatrices( gb_problem )
-    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+    
     
 
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
+        call displayMatlabMessage( 'Copying to CUDA' )
 #if USE_CUDA            
         !Initialize the Cuda arrays and load the demag tensors into the GPU memory
         if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
@@ -71,18 +72,28 @@ include 'blas.f90'
 #endif            
     endif
 
+    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     allocate( gb_solution%pts(ntot,3) )
-    do k=1,gb_problem%grid%nz
-        do j=1,gb_problem%grid%ny            
-            do i=1,gb_problem%grid%nx
-                ind = i + (j-1) * gb_problem%grid%nx + (k-1) * gb_problem%grid%nx * gb_problem%grid%ny
-                gb_solution%pts(ind,1) = gb_problem%grid%x(i,j,k)
-                gb_solution%pts(ind,2) = gb_problem%grid%y(i,j,k)
-                gb_solution%pts(ind,3) = gb_problem%grid%z(i,j,k)
+    if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then   
+        do k=1,gb_problem%grid%nz
+            do j=1,gb_problem%grid%ny            
+                do i=1,gb_problem%grid%nx
+                    ind = i + (j-1) * gb_problem%grid%nx + (k-1) * gb_problem%grid%nx * gb_problem%grid%ny
+                    gb_solution%pts(ind,1) = gb_problem%grid%x(i,j,k)
+                    gb_solution%pts(ind,2) = gb_problem%grid%y(i,j,k)
+                    gb_solution%pts(ind,3) = gb_problem%grid%z(i,j,k)
+                enddo
             enddo
         enddo
-    enddo
-        
+    endif
+    
+    if ( gb_problem%grid%gridType .eq. gridTypeTetrahedron ) then
+        do i=1,gb_problem%grid%nx
+            gb_solution%pts( i, 1 ) = gb_problem%grid%pts( i, 1 )
+            gb_solution%pts( i, 2 ) = gb_problem%grid%pts( i, 2 )
+            gb_solution%pts( i, 3 ) = gb_problem%grid%pts( i, 3 )
+        enddo
+    endif    
     
 
     
@@ -191,35 +202,29 @@ include 'blas.f90'
     real(DP),dimension(:),intent(inout) :: dmdt
     integer :: ntot
     
-
-    
-    
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     if ( .not. allocated(crossX) ) then
         allocate( crossX(ntot), crossY(ntot), crossZ(ntot) )
         allocate( HeffX(ntot), HeffY(ntot), HeffZ(ntot) )
         allocate( HeffX2(ntot), HeffY2(ntot), HeffZ2(ntot) )
     endif
-    
-    
+        
     !Update the magnetization
     gb_solution%Mx = m(1:ntot)
     gb_solution%My = m(ntot+1:2*ntot)
     gb_solution%Mz = m(2*ntot+1:3*ntot)
-    
-    
+        
     !Exchange term    
     call updateExchangeTerms( gb_problem, gb_solution )
-    
     
     !External field
     call updateExternalField( gb_problem, gb_solution, t )
     
     !Anisotropy term
     call updateAnisotropy(  gb_problem, gb_solution )
+    
     !Demag. field
     call updateDemagfield( gb_problem, gb_solution )
-    
     
     !Effective field
     HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
@@ -776,20 +781,19 @@ include 'blas.f90'
             grid%z(:,:,:) = 0.
             grid%dz = grid%Lz
         endif
-    endif
-    
-    grid%dV(:) = grid%dx * grid%dy * grid%dz
-    do k=1,grid%nz
-        do j=1,grid%ny
-            do i=1,grid%nx
-                ind  = i + (j-1) * grid%nx + (k-1) * grid%ny * grid%nx
-                grid%pts( ind, 1 ) = grid%x(i,j,k)
-                grid%pts( ind, 2 ) = grid%y(i,j,k)
-                grid%pts( ind, 3 ) = grid%z(i,j,k)
+
+        grid%dV(:) = grid%dx * grid%dy * grid%dz
+        do k=1,grid%nz
+            do j=1,grid%ny
+                do i=1,grid%nx
+                    ind  = i + (j-1) * grid%nx + (k-1) * grid%ny * grid%nx
+                    grid%pts( ind, 1 ) = grid%x(i,j,k)
+                    grid%pts( ind, 2 ) = grid%y(i,j,k)
+                    grid%pts( ind, 3 ) = grid%z(i,j,k)
+                enddo
             enddo
         enddo
-    enddo
-    
+    endif
     
     end subroutine setupGrid
     
@@ -820,25 +824,26 @@ include 'blas.f90'
     integer ::  nx_K, ny_K, k_xx, k_xy, k_xz, k_yy, k_yz, k_zz 
     logical,dimension(:,:),allocatable :: mask_xx, mask_xy, mask_xz     !> mask used for finding non-zero values
     logical,dimension(:,:),allocatable :: mask_yy, mask_yz, mask_zz     !> mask used for finding non-zero values
+    integer,dimension(4) :: indx_ele
     
-    if ( problem%grid%gridType .eq. gridTypeUniform ) then
-        nx = problem%grid%nx
-        ny = problem%grid%ny
-        nz = problem%grid%nz
-        ntot = nx * ny * nz
+    nx = problem%grid%nx
+    ny = problem%grid%ny
+    nz = problem%grid%nz
+    ntot = nx * ny * nz
+    
+    !Demag tensor components
+    allocate( problem%Kxx(ntot,ntot), problem%Kxy(ntot,ntot), problem%Kxz(ntot,ntot) )
+    allocate( problem%Kyy(ntot,ntot), problem%Kyz(ntot,ntot) )
+    allocate( problem%Kzz(ntot,ntot) )
         
-         !Demag tensor components
-        allocate( problem%Kxx(ntot,ntot), problem%Kxy(ntot,ntot), problem%Kxz(ntot,ntot) )
-        allocate( problem%Kyy(ntot,ntot), problem%Kyz(ntot,ntot) )
-        allocate( problem%Kzz(ntot,ntot) )
         
-        
-        if ( problem%demagTensorLoadState .gt. DemagTensorReturnMemory ) then
-            call loadDemagTensorFromDisk( problem )
-        else
+    if ( problem%demagTensorLoadState .gt. DemagTensorReturnMemory ) then
+        call loadDemagTensorFromDisk( problem )
+    else
            
-            allocate(H(ntot,3))
+        allocate(H(ntot,3))
         
+        if ( problem%grid%gridType .eq. gridTypeUniform ) then
             !Setup template tile
             tile(1)%tileType = 2 !(for prism)
             !dimensions of the tile
@@ -883,17 +888,50 @@ include 'blas.f90'
                     enddo
                 enddo
             enddo
+            
+        elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
+            !Setup template tile
+            tile(1)%tileType = 5 !(for tetrahedron)
+            tile(1)%M(:) = 0.
         
-            !Write the demag tensors to disk if asked to do so            
-            if ( problem%demagTensorReturnState .gt. DemagTensorReturnMemory ) then
-                call writeDemagTensorToDisk( problem )
-            endif            
-            !Clean up
-            deallocate(H)
+            !for each element find the tensor for all evaluation points (i.e. all elements)
+            do i=1,nx
+                indx_ele = problem%grid%elements(:,i)
+                tile(1)%vert(:,:) = problem%grid%nodes(:,indx_ele)     
+                
+                !Nout will be allocated by the subroutine. Should be de-allocated afterwards for consistency
+                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout )
+                    
+                !Copy Nout into the proper structure used by the micro mag model
+                ind = i
+                    
+                problem%Kxx(:,ind) = sngl(Nout(1,:,1,1))
+                problem%Kxy(:,ind) = sngl(Nout(1,:,1,2))
+                problem%Kxz(:,ind) = sngl(Nout(1,:,1,3))
+                    
+                !Not stored due to symmetry  (Kxy = Kyx)
+                !Kyx(ind,:) = Nout(1,:,2,1)
+                problem%Kyy(:,ind) = sngl(Nout(1,:,2,2))
+                problem%Kyz(:,ind) = sngl(Nout(1,:,2,3))
+                    
+                !Not stored due to symmetry (Kxz = Kzx)
+                !Kzx(ind,:) = Nout(1,:,3,1)
+                !Not stored due to symmetry (Kyz = Kzy)
+                !Kzy(ind,:) = Nout(1,:,3,2)
+                problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
+                
+                deallocate(Nout)
+            enddo
         endif
         
-    endif
+        !Write the demag tensors to disk if asked to do so            
+        if ( problem%demagTensorReturnState .gt. DemagTensorReturnMemory ) then
+            call writeDemagTensorToDisk( problem )
+        endif            
+        !Clean up
+        deallocate(H)
     
+    endif
     
     
    !Make a sparse matrix out of the dense matrices by specifying a threshold
@@ -1476,7 +1514,7 @@ include 'blas.f90'
     
     if ( grid%gridType .eq. gridTypeUniform ) then
         call ComputeExchangeTerm3D_Uniform( grid, A )
-    elseif (grid%gridType .eq. gridTypeNonUniform ) then
+    elseif (grid%gridType .eq. gridTypeTetrahedron ) then
         call ConvertExchangeTerm3D_NonUniform( grid, A )
     endif
     
@@ -1851,7 +1889,7 @@ include 'blas.f90'
     end subroutine ConvertExchangeTerm3D_NonUniform
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
     !> @brief
     !> Calculates the anisotropy term sparse matrix assuming the effective field anisotropy is linear in m    
     !> @param[inout] problem the data structure containing the problem
@@ -1859,21 +1897,17 @@ include 'blas.f90'
     subroutine ComputeAnisotropyTerm3D( problem )
     type(MicroMagProblem),intent(inout) :: problem       !> Struct containing the problem
     
-    
-    if ( problem%grid%gridType .eq. gridTypeUniform ) then
-        call ComputeAnisotropyTerm3D_Uniform( problem )
-    endif
-    
+    call ComputeAnisotropyTerm3D_General( problem )
     
     end subroutine ComputeAnisotropyTerm3D
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
     !> @brief
-    !> Calculates the anisotropy term matrix on a uniform grid  
+    !> Calculates the anisotropy term matrix on any grid  
     !> @param[inout] problem the data structure containing the problem
     !---------------------------------------------------------------------------   
-    subroutine ComputeAnisotropyTerm3D_Uniform( problem )
+    subroutine ComputeAnisotropyTerm3D_General( problem )
     type(MicroMagProblem),intent(inout) :: problem             !> Struct containing the problem
     
     
@@ -1894,7 +1928,8 @@ include 'blas.f90'
         problem%Ayz = problem%u_ea(:,2) * problem%u_ea(:,3)
         problem%Azz = problem%u_ea(:,3) * problem%u_ea(:,3)
     
-    end subroutine ComputeAnisotropyTerm3D_Uniform
+    end subroutine ComputeAnisotropyTerm3D_General
+
     
 end module LandauLifshitzSolution
     
