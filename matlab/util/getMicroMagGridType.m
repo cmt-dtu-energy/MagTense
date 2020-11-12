@@ -7,5 +7,7 @@ type = int32(-1);
 switch ( nm )
     case 'uniform' 
         type = int32(1);
+    case 'tetrahedron' 
+        type = int32(2);
 end
 end

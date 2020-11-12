@@ -15,6 +15,18 @@ properties
     %size of the (rectangular) domain in each direction
     grid_L
 
+    %the pts for a tetrahedron grid, i.e. the center of the elements
+    grid_pts
+    %the elements for a tetrahedron grid
+    grid_ele
+    %the nodes for a tetrahedron grid
+    grid_nod
+    %the number of nodes in the tetrahedron grid
+    grid_nnod
+    
+    %the exchange operator matrix
+    exch_mat
+    
     %defines the grid type which currently only supports "uniform"
     grid_type
 
@@ -193,6 +205,12 @@ methods
         %size of the (rectangular) domain in each direction
         obj.grid_L = [500e-9,125e-9,3e-9];%m
 
+        %these are set to zero for a non-tetrahedron grid
+        obj.grid_pts = 0;
+        obj.grid_ele = int32(0);
+        obj.grid_nod = 0;
+        obj.grid_nnod = int32(0);
+        
         %defines the grid type which currently only supports "uniform"
         obj.grid_type = getMicroMagGridType('uniform');
 
