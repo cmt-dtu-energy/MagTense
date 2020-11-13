@@ -27,6 +27,13 @@ properties
     %the exchange operator matrix
     exch_mat
     
+    exch_nval
+    exch_nrow
+    exch_val
+    exch_rows
+    exch_rowe
+    exch_col
+    
     %defines the grid type which currently only supports "uniform"
     grid_type
 

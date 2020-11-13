@@ -66,7 +66,15 @@ problem.grid_ele = int32(model.Mesh.Elements(:,:)) ;
 problem.grid_nod = model.Mesh.Nodes(:,:) ;      
 problem.grid_n = [int32(length(problem.grid_ele)) int32(1) int32(1)];
 problem.grid_nnod = int32(length(problem.grid_nod));
-problem.exch_mat = InteractionMatrices.A2;
+% InteractionMatrices.A2 = 0*InteractionMatrices.A2;
+% problem.exch_mat = InteractionMatrices.A2;
+[v,c,rs,re] = ConvertToCSR(InteractionMatrices.A2);
+problem.exch_nval = int32(numel(v));
+problem.exch_nrow = int32(numel(rs));
+problem.exch_val  = v;
+problem.exch_rows = int32(rs);
+problem.exch_rowe = int32(re);
+problem.exch_col  = int32(c);
 
 problem.gamma = 0;
 problem.Ms = 1000e3 ;

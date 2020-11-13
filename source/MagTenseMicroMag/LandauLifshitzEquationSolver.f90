@@ -1535,7 +1535,7 @@ include 'blas.f90'
     type(sparse_matrix_t),intent(inout) :: A           !> The returned matrix from the sparse matrix creator
         
     integer :: stat                                   !> Status value for the various sparse matrix operations        
-    type(MagTenseSparse) :: d2dx2, d2dy2, d2dz2      !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
+    type(MagTenseSparse) :: d2dx2, d2dy2, d2dz2       !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
     type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
     integer :: ind, ntot,colInd,rowInd                !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
     integer :: i,j,k,nx,ny,nz                         !> For-loop counters
@@ -1859,34 +1859,67 @@ include 'blas.f90'
     
     end subroutine ComputeExchangeTerm3D_Uniform
     
+    !!>-----------------------------------------
+    !!> @author Emil B. Poulsen, emib@gmail.com, DTU, 2020
+    !!> @brief
+    !!> Converts a given non-uniform grid exchange matrix from matlab sparse format
+    !!> (csc) to MagTense (csr) and return in sparse matrix A
+    !!!! May or may not end up with index base zero csr matrix. Should probably be index base one.
+    !!---------------------------------------------------------------------------   
+    !subroutine ConvertExchangeTerm3D_NonUniform(grid, Aout)
+    !type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
+    !type(sparse_matrix_t),intent(out) :: Aout          !> The returned matrix from the sparse matrix creator
+    !type(SparseMatlabMat) :: Ain
+    !        
+    !integer :: stat                                   !> Status value for the various sparse matrix operations        
+    !!type(MagTenseSparse) :: d2dx2, d2dy2, d2dz2      !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
+    !type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
+    !integer :: ind, ntot,colInd,rowInd                !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
+    !integer :: i,j,k,nx,ny,nz                         !> For-loop counters
+    !type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
+    !real*4 :: const
+    !
+    !!Ain = grid%nu_exch_mat
+    !!!stat = mkl_sparse_s_create_csr ( Aout, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
+    !!stat = mkl_sparse_d_create_csc(tmp, SPARSE_INDEX_BASE_ZERO, Ain%rows, Ain%cols, Ain%jc(1:Ain%cols), Ain%jc(2:Ain%cols+1), Ain%ir, Ain%values )
+    !!!!stat = mkl_sparse_d_create_csc (A, indexing, rows, cols, cols_start, cols_end, row_indx, values)
+    !!stat = mkl_sparse_convert_csr(tmp, SPARSE_OPERATION_NON_TRANSPOSE, Aout)
+    !
+    !stat = mkl_sparse_d_create_csc(tmp, SPARSE_INDEX_BASE_ONE, Ain%rows, Ain%cols, Ain%jc(1:Ain%cols), Ain%jc(2:Ain%cols+1), Ain%ir, Ain%values )
+    !stat = mkl_sparse_convert_csr(tmp, SPARSE_OPERATION_NON_TRANSPOSE, Aout)
+    !
+    !end subroutine ConvertExchangeTerm3D_NonUniform
+    
     !>-----------------------------------------
-    !> @author Emil B. Poulsen, emib@gmail.com, DTU, 2020
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
     !> @brief
-    !> Converts a given non-uniform grid exchange matrix from matlab sparse format
-    !> (csc) to MagTense (csr) and return in sparse matrix A
-    !!! May or may not end up with index base zero csr matrix. Should probably be index base one.
+    !> Converts the loaded information from Matlab in CSR 
+    !> format to a CSR MKL type
     !---------------------------------------------------------------------------   
-    subroutine ConvertExchangeTerm3D_NonUniform(grid, Aout)
+    subroutine ConvertExchangeTerm3D_NonUniform(grid, A)
     type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
-    type(sparse_matrix_t),intent(out) :: Aout          !> The returned matrix from the sparse matrix creator
-    type(SparseMatlabMat) :: Ain
-            
+    type(sparse_matrix_t),intent(out) :: A            !> The returned matrix from the sparse matrix creator
+                
     integer :: stat                                   !> Status value for the various sparse matrix operations        
-    !type(MagTenseSparse) :: d2dx2, d2dy2, d2dz2      !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
     type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
-    integer :: ind, ntot,colInd,rowInd                !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
-    integer :: i,j,k,nx,ny,nz                         !> For-loop counters
-    type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
-    real*4 :: const
+    integer :: nx,ny,nz                               !> Dimensions
+    type(matrix_descr) :: descr                       !> Describes a sparse matrix operation
     
-    Ain = grid%nu_exch_mat
-    !stat = mkl_sparse_s_create_csr ( Aout, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
-    stat = mkl_sparse_d_create_csc(tmp, SPARSE_INDEX_BASE_ZERO, Ain%rows, Ain%cols, Ain%jc(1:Ain%cols), Ain%jc(2:Ain%cols+1), Ain%ir, Ain%values )
-    !!stat = mkl_sparse_d_create_csc (A, indexing, rows, cols, cols_start, cols_end, row_indx, values)
-    stat = mkl_sparse_convert_csr(tmp, SPARSE_OPERATION_NON_TRANSPOSE, Aout)
+    nx = grid%nx
+    ny = grid%ny
+    nz = grid%nz
     
+    stat = mkl_sparse_s_create_csr ( tmp, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, grid%A_exch_load%rows_start, grid%A_exch_load%rows_end, grid%A_exch_load%cols, grid%A_exch_load%values)
+    descr%type = SPARSE_MATRIX_TYPE_GENERAL
+    descr%mode = SPARSE_FILL_MODE_FULL
+    descr%diag = SPARSE_DIAG_NON_UNIT
+    stat = mkl_sparse_copy ( tmp, descr, A )
     
+    stat = mkl_sparse_destroy (tmp)
+    
+        
     end subroutine ConvertExchangeTerm3D_NonUniform
+    
     
     !>-----------------------------------------
     !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
