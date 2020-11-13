@@ -892,6 +892,8 @@ include 'blas.f90'
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
             !Setup template tile
             tile(1)%tileType = 5 !(for tetrahedron)
+            tile(1)%exploitSymmetry = 0 !0 for no and this is important
+            tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
             tile(1)%M(:) = 0.
         
             !for each element find the tensor for all evaluation points (i.e. all elements)
@@ -1904,6 +1906,18 @@ include 'blas.f90'
     type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
     integer :: nx,ny,nz                               !> Dimensions
     type(matrix_descr) :: descr                       !> Describes a sparse matrix operation
+    !integer, dimension(:), allocatable :: rs, re, c
+    !real(DP), dimension(:), allocatable :: v
+    !integer :: nvalues, nrows
+    
+    !nvalues = grid%A_exch_load%nvalues
+    !nrows = grid%A_exch_load%nrows
+    !allocate( v(nvalues), rs(nrows) , re(nrows) , c(nvalues) )
+    !v = grid%A_exch_load%values
+    !rs = grid%A_exch_load%rows_start
+    !re = grid%A_exch_load%rows_end
+    !c = grid%A_exch_load%cols
+                    
     
     nx = grid%nx
     ny = grid%ny
