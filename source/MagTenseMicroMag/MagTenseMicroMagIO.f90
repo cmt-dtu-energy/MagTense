@@ -21,7 +21,7 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr
@@ -32,6 +32,7 @@
         mwPointer :: exch_matProblemPtr, irPtr, jcPtr
         mwPointer :: genericProblemPtr
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
+        mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr
         integer,dimension(3) :: int_arr
         real*8,dimension(3) :: real_arr
         real*8 :: demag_fac
@@ -264,30 +265,60 @@
         
         !File for loading the sparse exchange tensor from Matlab (for non-uniform grids)
         if ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
-            ! Number of non-zero entries in sparse matrix
-            exch_matProblemPtr = mxGetField( prhs, i, problemFields(31) )
-            problem%grid%nu_exch_mat%length = mxGetNzmax(exch_matProblemPtr)
+            !! Number of non-zero entries in sparse matrix
+            !exch_matProblemPtr = mxGetField( prhs, i, problemFields(31) )
+            !problem%grid%nu_exch_mat%length = mxGetNzmax(exch_matProblemPtr)
+            !
+            !problem%grid%nu_exch_mat%cols = mxGetN(exch_matProblemPtr)
+            !problem%grid%nu_exch_mat%rows = mxGetM(exch_matProblemPtr)
+            !
+            !! Row indices for elements
+            !sx = problem%grid%nu_exch_mat%length
+            !allocate( problem%grid%nu_exch_mat%ir( problem%grid%nu_exch_mat%length ) )
+            !irPtr = mxGetIr(exch_matProblemPtr)
+            !call mxCopyPtrToInteger4(irPtr, problem%grid%nu_exch_mat%ir, sx)
+            !
+            !sx = 1
+            !
+            !! Column index information
+            !sx = problem%grid%nu_exch_mat%cols + 1
+            !allocate( problem%grid%nu_exch_mat%jc( sx ) )
+            !jcPtr = mxGetJc(exch_matProblemPtr)
+            !call mxCopyPtrToInteger4(jcPtr, problem%grid%nu_exch_mat%jc, sx)
+            !
+            !sx = problem%grid%nu_exch_mat%length
+            !allocate( problem%grid%nu_exch_mat%values( problem%grid%nu_exch_mat%length ) )
+            !call mxCopyPtrToReal8(mxGetPr(exch_matProblemPtr), problem%grid%nu_exch_mat%values, sx )
             
-            problem%grid%nu_exch_mat%cols = mxGetN(exch_matProblemPtr)
-            problem%grid%nu_exch_mat%rows = mxGetM(exch_matProblemPtr)
             
-            ! Row indices for elements
-            sx = problem%grid%nu_exch_mat%length
-            allocate( problem%grid%nu_exch_mat%ir( problem%grid%nu_exch_mat%length ) )
-            irPtr = mxGetIr(exch_matProblemPtr)
-            call mxCopyPtrToInteger4(irPtr, problem%grid%nu_exch_mat%ir, sx)
+            ! Load the CSR sparse information
+            sx = 1
+            nValuesSparsePtr = mxGetField( prhs, i, problemFields(39) )
+            call mxCopyPtrToInteger4(mxGetPr(nValuesSparsePtr), problem%grid%A_exch_load%nvalues, sx )
             
             sx = 1
+            nRowsSparsePtr = mxGetField( prhs, i, problemFields(40) )
+            call mxCopyPtrToInteger4(mxGetPr(nRowsSparsePtr), problem%grid%A_exch_load%nrows, sx )
             
-            ! Column index information
-            sx = problem%grid%nu_exch_mat%cols + 1
-            allocate( problem%grid%nu_exch_mat%jc( sx ) )
-            jcPtr = mxGetJc(exch_matProblemPtr)
-            call mxCopyPtrToInteger4(jcPtr, problem%grid%nu_exch_mat%jc, sx)
+            nvalues = problem%grid%A_exch_load%nvalues
+            nrows = problem%grid%A_exch_load%nvalues
+            allocate( problem%grid%A_exch_load%values(nvalues), problem%grid%A_exch_load%rows_start(nrows) , problem%grid%A_exch_load%rows_end(nrows) , problem%grid%A_exch_load%cols(nvalues) )
             
-            sx = problem%grid%nu_exch_mat%length
-            allocate( problem%grid%nu_exch_mat%values( problem%grid%nu_exch_mat%length ) )
-            call mxCopyPtrToReal8(mxGetPr(exch_matProblemPtr), problem%grid%nu_exch_mat%values, sx )
+            sx = nvalues
+            valuesPtr = mxGetField( prhs, i, problemFields(41) )
+            call mxCopyPtrToReal8(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
+            
+            sx = nrows
+            rows_startPtr = mxGetField( prhs, i, problemFields(42) )
+            call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), problem%grid%A_exch_load%rows_start, sx )
+            
+            sx = nrows
+            rows_endPtr = mxGetField( prhs, i, problemFields(43) )
+            call mxCopyPtrToInteger4(mxGetPr(rows_endPtr), problem%grid%A_exch_load%rows_end, sx )
+            
+            sx = nvalues
+            colsPtr = mxGetField( prhs, i, problemFields(44) )
+            call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )
         endif
           
         !Load the no. of time steps in the time convergence array
@@ -439,7 +470,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=38
+        integer,parameter :: nf=44
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -484,6 +515,12 @@
         fieldnames(36) = 'grid_ele'
         fieldnames(37) = 'grid_nod'
         fieldnames(38) = 'grid_nnod'
+        fieldnames(39) = 'exch_nval'
+        fieldnames(40) = 'exch_nrow'
+        fieldnames(41) = 'exch_val'
+        fieldnames(42) = 'exch_rows'
+        fieldnames(43) = 'exch_rowe'
+        fieldnames(44) = 'exch_col'
         
     end subroutine getProblemFieldnames
     
