@@ -53,13 +53,14 @@ addpath('../../micromagnetism');
 %% Setup the problem for the initial configuration
 %takes the size of the grid as arguments (nx,ny,nz) and a function handle
 %that produces the desired field (if not present zero applied field is inferred)
-problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
+load('InteractionMatrices_test.mat') ; % Voronoi & Tetra
+resolution = [length(model.Mesh.Elements(:,:)) 1 1];
 
+problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 problem.dem_appr = getMicroMagDemagApproximation('none');
 problem = problem.setUseCuda( use_CUDA );
-
 problem.grid_type = getMicroMagGridType('tetrahedron');
-load('InteractionMatrices_test.mat') ; % Voronoi & Tetra
+
 GridInfo = TetrahedralMeshAnalysis(model) ;
 problem.grid_pts = [GridInfo.Xel, GridInfo.Yel, GridInfo.Zel] ;
 problem.grid_ele = int32(model.Mesh.Elements(:,:)) ;
@@ -71,7 +72,7 @@ problem.grid_nnod = int32(length(problem.grid_nod));
 [v,c,rs,re] = ConvertToCSR(InteractionMatrices.A2);
 problem.exch_nval = int32(numel(v));
 problem.exch_nrow = int32(numel(rs));
-problem.exch_val  = v;
+problem.exch_val  = single(v);
 problem.exch_rows = int32(rs);
 problem.exch_rowe = int32(re);
 problem.exch_col  = int32(c);
@@ -80,7 +81,7 @@ problem.gamma = 0;
 problem.Ms = 1000e3 ;
 problem.K0 = 0.1*1/2*mu0*problem.Ms^2 ;
 problem.A0 = 1.74532925199e-10;
-problem.u_ea = zeros( prod(resolution), 3 );
+problem.u_ea = zeros( prod(problem.grid_n), 3 );
 problem.u_ea(:,3) = 1;
 lex = sqrt(problem.A0/(1/2*mu0*problem.Ms^2));
 problem.setTimeDis = int32(10);
@@ -133,9 +134,9 @@ for i = 1:length(L_loop)
             M_1 = squeeze(solution.M(1,:,:)); figure(figure3); subplot(2,2,2); quiver3(solution.pts(:,1),solution.pts(:,2),solution.pts(:,3),M_1(:,1),M_1(:,2),M_1(:,3)); axis equal; title('Fortran starting magnetization')
             M_end = squeeze(solution.M(end,:,:)); figure(figure3); subplot(2,2,4); quiver3(solution.pts(:,1),solution.pts(:,2),solution.pts(:,3),M_end(:,1),M_end(:,2),M_end(:,3)); axis equal; title('Fortran ending magnetization')
 
-            plot(fig1,solution.t,mean(solution.M(:,:,1),2),'rx'); 
-            plot(fig1,solution.t,mean(solution.M(:,:,2),2),'gx'); 
-            plot(fig1,solution.t,mean(solution.M(:,:,3),2),'bx'); 
+            plot(fig1,solution.t,mean(solution.M(:,:,1),2),'rd'); 
+            plot(fig1,solution.t,mean(solution.M(:,:,2),2),'gd'); 
+            plot(fig1,solution.t,mean(solution.M(:,:,3),2),'bd'); 
         end
         
         %--- Calculate the energy terms
@@ -178,6 +179,7 @@ for i = 1:length(L_loop)
             problem_tetra.K0 = problem.K0;
             problem_tetra.A0 = problem.A0;
             problem_tetra.alpha = problem.alpha;
+            problem_tetra.m0 = problem.m0;
 
             problem_tetra.u_ea = problem.u_ea;
             problem_tetra = problem_tetra.setTime( linspace(0,t_end,50) );

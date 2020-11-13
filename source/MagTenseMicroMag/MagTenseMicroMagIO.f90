@@ -36,7 +36,9 @@
         integer,dimension(3) :: int_arr
         real*8,dimension(3) :: real_arr
         real*8 :: demag_fac
-        
+        integer, dimension(:), allocatable :: rs, re, c
+        real*4, dimension(:), allocatable :: v
+    
         !Get the expected names of the fields
         call getProblemFieldnames( problemFields, nFieldsProblem)
                    
@@ -295,30 +297,39 @@
             sx = 1
             nValuesSparsePtr = mxGetField( prhs, i, problemFields(39) )
             call mxCopyPtrToInteger4(mxGetPr(nValuesSparsePtr), problem%grid%A_exch_load%nvalues, sx )
-            
+       
             sx = 1
             nRowsSparsePtr = mxGetField( prhs, i, problemFields(40) )
             call mxCopyPtrToInteger4(mxGetPr(nRowsSparsePtr), problem%grid%A_exch_load%nrows, sx )
             
             nvalues = problem%grid%A_exch_load%nvalues
-            nrows = problem%grid%A_exch_load%nvalues
+            nrows = problem%grid%A_exch_load%nrows
             allocate( problem%grid%A_exch_load%values(nvalues), problem%grid%A_exch_load%rows_start(nrows) , problem%grid%A_exch_load%rows_end(nrows) , problem%grid%A_exch_load%cols(nvalues) )
-            
+            allocate( v(nvalues), rs(nrows) , re(nrows) , c(nvalues) )
+             
             sx = nvalues
             valuesPtr = mxGetField( prhs, i, problemFields(41) )
-            call mxCopyPtrToReal8(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
+            !call mxCopyPtrToReal4(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
+            call mxCopyPtrToReal4(mxGetPr(valuesPtr), v, sx )
+            problem%grid%A_exch_load%values = v
             
             sx = nrows
             rows_startPtr = mxGetField( prhs, i, problemFields(42) )
-            call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), problem%grid%A_exch_load%rows_start, sx )
-            
+            !call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), problem%grid%A_exch_load%rows_start, sx )
+            call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), rs, sx )
+            problem%grid%A_exch_load%rows_start =  rs
+        
             sx = nrows
             rows_endPtr = mxGetField( prhs, i, problemFields(43) )
-            call mxCopyPtrToInteger4(mxGetPr(rows_endPtr), problem%grid%A_exch_load%rows_end, sx )
-            
+            !call mxCopyPtrToInteger4(mxGetPr(rows_endPtr), problem%grid%A_exch_load%rows_end, sx )
+            call mxCopyPtrToInteger4(mxGetPr(rows_endPtr), re, sx )
+            problem%grid%A_exch_load%rows_end = re
+        
             sx = nvalues
             colsPtr = mxGetField( prhs, i, problemFields(44) )
-            call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )
+            !call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )
+            call mxCopyPtrToInteger4(mxGetPr(colsPtr), c, sx )
+            problem%grid%A_exch_load%cols = c
         endif
           
         !Load the no. of time steps in the time convergence array
