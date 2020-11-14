@@ -53,8 +53,16 @@ addpath('../../micromagnetism');
 %% Setup the problem for the initial configuration
 %takes the size of the grid as arguments (nx,ny,nz) and a function handle
 %that produces the desired field (if not present zero applied field is inferred)
-load('InteractionMatrices_test.mat') ; % Voronoi & Tetra
-resolution = [length(model.Mesh.Elements(:,:)) 1 1];
+%load('InteractionMatrices_test.mat') ; % Voronoi & Tetra
+problem.gamma = 0;
+problem.Ms = 1000e3 ;
+problem.K0 = 0.1*1/2*mu0*problem.Ms^2 ;
+problem.A0 = 1.74532925199e-10;
+lex = sqrt(problem.A0/(1/2*mu0*problem.Ms^2));
+thisGridL = [lex,lex,lex]*L_loop;%m
+model = CreateTetraMesh(thisGridL,lex*L_loop/3) ;
+figure ; pdeplot3D(model,'FaceAlpha',0.1) ;
+resolution = [size(model.Mesh.Elements,2),1,1];
 
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 problem.dem_appr = getMicroMagDemagApproximation('none');
@@ -62,6 +70,18 @@ problem = problem.setUseCuda( use_CUDA );
 problem.grid_type = getMicroMagGridType('tetrahedron');
 
 GridInfo = TetrahedralMeshAnalysis(model) ;
+
+problem = problem.setUseCuda( false );
+problem.MeshType = 'Tetra' ;
+problem.ExternalMesh = 1 ;
+TetraMeshFileName = 'TestTetraMesh01.mat' ;
+save(TetraMeshFileName,'model') ;
+problem.ExternalMeshFileName = TetraMeshFileName ;
+ProblemSetupStruct = SetupProblem(problem);
+InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct);
+save(TetraMeshFileName,'model','InteractionMatrices') ;
+
+problem = problem.setUseCuda( use_CUDA );
 problem.grid_pts = [GridInfo.Xel, GridInfo.Yel, GridInfo.Zel] ;
 problem.grid_ele = int32(model.Mesh.Elements(:,:)) ;
 problem.grid_nod = model.Mesh.Nodes(:,:) ;      
@@ -139,12 +159,12 @@ for i = 1:length(L_loop)
             plot(fig1,solution.t,mean(solution.M(:,:,3),2),'bd'); 
         end
         
-        %--- Calculate the energy terms
-        E_exc = sum((1/2)*(solution.M(:,:,1).*solution.H_exc(:,:,1) + solution.M(:,:,2).*solution.H_exc(:,:,2) + solution.M(:,:,3).*solution.H_exc(:,:,3)),2) ;        
-        E_ext = sum(      (solution.M(:,:,1).*solution.H_ext(:,:,1) + solution.M(:,:,2).*solution.H_ext(:,:,2) + solution.M(:,:,3).*solution.H_ext(:,:,3)),2) ;
-        E_dem = sum((1/2)*(solution.M(:,:,1).*solution.H_dem(:,:,1) + solution.M(:,:,2).*solution.H_dem(:,:,2) + solution.M(:,:,3).*solution.H_dem(:,:,3)),2) ;
-        E_ani = sum((1/2)*(solution.M(:,:,1).*solution.H_ani(:,:,1) + solution.M(:,:,2).*solution.H_ani(:,:,2) + solution.M(:,:,3).*solution.H_ani(:,:,3)),2) ;
-        E_arr(:,i,j) = mu0*[E_exc(end) E_ext(end) E_dem(end) E_ani(end)];
+%         %--- Calculate the energy terms
+%         E_exc = sum((1/2)*(solution.M(:,:,1).*solution.H_exc(:,:,1) + solution.M(:,:,2).*solution.H_exc(:,:,2) + solution.M(:,:,3).*solution.H_exc(:,:,3)),2) ;        
+%         E_ext = sum(      (solution.M(:,:,1).*solution.H_ext(:,:,1) + solution.M(:,:,2).*solution.H_ext(:,:,2) + solution.M(:,:,3).*solution.H_ext(:,:,3)),2) ;
+%         E_dem = sum((1/2)*(solution.M(:,:,1).*solution.H_dem(:,:,1) + solution.M(:,:,2).*solution.H_dem(:,:,2) + solution.M(:,:,3).*solution.H_dem(:,:,3)),2) ;
+%         E_ani = sum((1/2)*(solution.M(:,:,1).*solution.H_ani(:,:,1) + solution.M(:,:,2).*solution.H_ani(:,:,2) + solution.M(:,:,3).*solution.H_ani(:,:,3)),2) ;
+%         E_arr(:,i,j) = mu0*[E_exc(end) E_ext(end) E_dem(end) E_ani(end)];
         
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% -------------------------------------------------------------------- MATLAB ----------------------------------------------------------
@@ -163,25 +183,9 @@ for i = 1:length(L_loop)
             %% Setup the problem for the initial configuration
             %takes the size of the grid as arguments (nx,ny,nz) and a function handle
             %that produces the desired field (if not present zero applied field is inferred)
-            problem_tetra = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
-            problem_tetra.grid_L = thisGridL;% NOT STANDARD
-            problem_tetra.RecomputeInteractionMatrices = 1 ;
-            problem_tetra.ExternalMesh = 1 ;
-            problem_tetra.MeshType = 'Tetra' ;
-            problem_tetra.ExternalMeshFileName = 'InteractionMatrices_test.mat' ;
-
-            problem_tetra.dem_appr = problem.dem_appr;
-            problem_tetra = problem_tetra.setUseCuda( false );
-            problem_tetra.setTimeDis = int32(10);
-
-            problem_tetra.gamma = problem.gamma;
-            problem_tetra.Ms = problem.Ms;
-            problem_tetra.K0 = problem.K0;
-            problem_tetra.A0 = problem.A0;
-            problem_tetra.alpha = problem.alpha;
-            problem_tetra.m0 = problem.m0;
-
-            problem_tetra.u_ea = problem.u_ea;
+            problem_tetra = problem;
+            problem_tetra.RecomputeInteractionMatrices = 0 ;
+            problem_tetra.DemagTensorFileName = 'TestTetraMesh01.mat';
             problem_tetra = problem_tetra.setTime( linspace(0,t_end,50) );
 
             %time-dependent applied field
@@ -190,7 +194,7 @@ for i = 1:length(L_loop)
             problem_tetra.DirectoryFilename = [''];
             problem_tetra.SimulationName = 'Matlab_DynamicsStdProb3';
             disp(['Tetra N_grid = ' num2str(prod(resolution))])
-            [SigmaSol1,~,InteractionMatrices] = ComputeTheSolution(problem_tetra);
+            [SigmaSol1,~,~] = ComputeTheSolution(problem_tetra);
             [Mx,My,Mz] = ComputeMagneticMomentGeneralMesh(SigmaSol1,InteractionMatrices.GridInfo.Volumes) ;
 
             plot(fig1, problem_tetra.t,Mx,'rx')
