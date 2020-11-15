@@ -233,7 +233,7 @@ include 'blas.f90'
     
     !Compute m x heff (Precession term)    
     crossX = -1. * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
-    crossY = -1. * ( gb_solution%Mz * Heffx - gb_solution%Mx * HeffZ )
+    crossY = -1. * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
     crossZ = -1. * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
     
     !Compute m x m x heff (Damping term)
@@ -511,9 +511,9 @@ include 'blas.f90'
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     
-    if ( problem%grid%gridType .eq. GridTypeUniform ) then
-        call updateDemagfield_uniform( problem, solution)
-    endif
+    !if ( problem%grid%gridType .eq. GridTypeUniform ) then
+        call updateDemagfield_general( problem, solution)
+    !endif
     
     
     end subroutine updateDemagfield
@@ -526,7 +526,7 @@ include 'blas.f90'
     !> @param[in] problem, the struct containing the current problem
     !> @param[inout] solution, struct containing the current solution        
     !>-----------------------------------------
-    subroutine updateDemagfield_uniform( problem, solution)
+    subroutine updateDemagfield_general( problem, solution)
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     integer :: stat,ntot,i
@@ -702,7 +702,7 @@ include 'blas.f90'
     !write(12,*) 1
     !close(12)
     
-    end subroutine updateDemagfield_uniform
+    end subroutine updateDemagfield_general
     
     
     !>-----------------------------------------

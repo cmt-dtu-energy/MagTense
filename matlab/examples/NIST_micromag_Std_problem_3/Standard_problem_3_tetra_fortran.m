@@ -68,6 +68,13 @@ problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 problem.dem_appr = getMicroMagDemagApproximation('none');
 problem = problem.setUseCuda( use_CUDA );
 problem.grid_type = getMicroMagGridType('tetrahedron');
+problem.gamma = 0;
+problem.Ms = 1000e3 ;
+problem.K0 = 0.1*1/2*mu0*problem.Ms^2 ;
+problem.A0 = 1.74532925199e-10;
+problem.u_ea = zeros( prod(problem.grid_n), 3 );
+problem.u_ea(:,3) = 1;
+lex = sqrt(problem.A0/(1/2*mu0*problem.Ms^2));
 
 GridInfo = TetrahedralMeshAnalysis(model) ;
 
@@ -97,13 +104,7 @@ problem.exch_rows = int32(rs);
 problem.exch_rowe = int32(re);
 problem.exch_col  = int32(c);
 
-problem.gamma = 0;
-problem.Ms = 1000e3 ;
-problem.K0 = 0.1*1/2*mu0*problem.Ms^2 ;
-problem.A0 = 1.74532925199e-10;
-problem.u_ea = zeros( prod(problem.grid_n), 3 );
-problem.u_ea(:,3) = 1;
-lex = sqrt(problem.A0/(1/2*mu0*problem.Ms^2));
+
 problem.setTimeDis = int32(10);
 HextFct = @(t) (t)' .* [0,0,0];
 
