@@ -500,6 +500,7 @@ include 'blas.f90'
     
     end subroutine updateAnisotropy
     
+
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
@@ -508,25 +509,6 @@ include 'blas.f90'
     !> @param[inout] solution, struct containing the current solution        
     !>-----------------------------------------
     subroutine updateDemagfield( problem, solution)
-    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
-    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
-    
-    !if ( problem%grid%gridType .eq. GridTypeUniform ) then
-        call updateDemagfield_general( problem, solution)
-    !endif
-    
-    
-    end subroutine updateDemagfield
-    
-    
-    !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
-    !> @brief
-    !> Calculates and returns the effective demag field on a uniform grid
-    !> @param[in] problem, the struct containing the current problem
-    !> @param[inout] solution, struct containing the current solution        
-    !>-----------------------------------------
-    subroutine updateDemagfield_general( problem, solution)
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     integer :: stat,ntot,i
@@ -702,7 +684,7 @@ include 'blas.f90'
     !write(12,*) 1
     !close(12)
     
-    end subroutine updateDemagfield_general
+    end subroutine updateDemagfield
     
     
     !>-----------------------------------------
@@ -1519,10 +1501,7 @@ include 'blas.f90'
     elseif (grid%gridType .eq. gridTypeTetrahedron ) then
         call ConvertExchangeTerm3D_NonUniform( grid, A )
     endif
-    
-    !if xchange matrix passed from Matlab
-    ! stat = mkl_sparse_s_create_csr ( d2dz2%A_exch, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, problem%rows_start, problem%rows_end, problem%cols, problem%values)
-    !end
+
     
     end subroutine ComputeExchangeTerm3D
     
@@ -1846,6 +1825,7 @@ include 'blas.f90'
         descr%mode = SPARSE_FILL_MODE_FULL
         descr%diag = SPARSE_DIAG_NON_UNIT
         stat = mkl_sparse_copy ( tmp, descr, A )
+        stat = mkl_sparse_destroy (tmp)
     endif
     
     !call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_total.dat' )
@@ -1860,38 +1840,7 @@ include 'blas.f90'
     !call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_exch.dat' )
     
     end subroutine ComputeExchangeTerm3D_Uniform
-    
-    !!>-----------------------------------------
-    !!> @author Emil B. Poulsen, emib@gmail.com, DTU, 2020
-    !!> @brief
-    !!> Converts a given non-uniform grid exchange matrix from matlab sparse format
-    !!> (csc) to MagTense (csr) and return in sparse matrix A
-    !!!! May or may not end up with index base zero csr matrix. Should probably be index base one.
-    !!---------------------------------------------------------------------------   
-    !subroutine ConvertExchangeTerm3D_NonUniform(grid, Aout)
-    !type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
-    !type(sparse_matrix_t),intent(out) :: Aout          !> The returned matrix from the sparse matrix creator
-    !type(SparseMatlabMat) :: Ain
-    !        
-    !integer :: stat                                   !> Status value for the various sparse matrix operations        
-    !!type(MagTenseSparse) :: d2dx2, d2dy2, d2dz2      !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
-    !type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
-    !integer :: ind, ntot,colInd,rowInd                !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
-    !integer :: i,j,k,nx,ny,nz                         !> For-loop counters
-    !type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
-    !real*4 :: const
-    !
-    !!Ain = grid%nu_exch_mat
-    !!!stat = mkl_sparse_s_create_csr ( Aout, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
-    !!stat = mkl_sparse_d_create_csc(tmp, SPARSE_INDEX_BASE_ZERO, Ain%rows, Ain%cols, Ain%jc(1:Ain%cols), Ain%jc(2:Ain%cols+1), Ain%ir, Ain%values )
-    !!!!stat = mkl_sparse_d_create_csc (A, indexing, rows, cols, cols_start, cols_end, row_indx, values)
-    !!stat = mkl_sparse_convert_csr(tmp, SPARSE_OPERATION_NON_TRANSPOSE, Aout)
-    !
-    !stat = mkl_sparse_d_create_csc(tmp, SPARSE_INDEX_BASE_ONE, Ain%rows, Ain%cols, Ain%jc(1:Ain%cols), Ain%jc(2:Ain%cols+1), Ain%ir, Ain%values )
-    !stat = mkl_sparse_convert_csr(tmp, SPARSE_OPERATION_NON_TRANSPOSE, Aout)
-    !
-    !end subroutine ConvertExchangeTerm3D_NonUniform
-    
+       
     !>-----------------------------------------
     !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
     !> @brief
@@ -1906,18 +1855,6 @@ include 'blas.f90'
     type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
     integer :: nx,ny,nz                               !> Dimensions
     type(matrix_descr) :: descr                       !> Describes a sparse matrix operation
-    !integer, dimension(:), allocatable :: rs, re, c
-    !real(DP), dimension(:), allocatable :: v
-    !integer :: nvalues, nrows
-    
-    !nvalues = grid%A_exch_load%nvalues
-    !nrows = grid%A_exch_load%nrows
-    !allocate( v(nvalues), rs(nrows) , re(nrows) , c(nvalues) )
-    !v = grid%A_exch_load%values
-    !rs = grid%A_exch_load%rows_start
-    !re = grid%A_exch_load%rows_end
-    !c = grid%A_exch_load%cols
-                    
     
     nx = grid%nx
     ny = grid%ny
@@ -1930,7 +1867,6 @@ include 'blas.f90'
     stat = mkl_sparse_copy ( tmp, descr, A )
     
     stat = mkl_sparse_destroy (tmp)
-    
         
     end subroutine ConvertExchangeTerm3D_NonUniform
     
