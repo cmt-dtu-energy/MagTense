@@ -36,8 +36,6 @@
         integer,dimension(3) :: int_arr
         real*8,dimension(3) :: real_arr
         real*8 :: demag_fac
-        integer, dimension(:), allocatable :: rs, re, c
-        real*4, dimension(:), allocatable :: v
     
         !Get the expected names of the fields
         call getProblemFieldnames( problemFields, nFieldsProblem)
@@ -69,9 +67,7 @@
         
         !Load additional things for a tetrahedron grid
         if ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
-            !The center points of all the tetrahedron elements
-            !ntot = problem%grid%nx
-            
+            !The center points of all the tetrahedron elements           
             allocate( problem%grid%pts(ntot,3) )
             sx = ntot * 3
             ptsGridPtr = mxGetField( prhs, i, problemFields(35) )
@@ -99,8 +95,6 @@
             sx = 1
             nnodesGridPtr = mxGetField( prhs, i, problemFields(38) )
             call mxCopyPtrToInteger4(mxGetPr(nnodesGridPtr), problem%grid%nnodes, sx )
-        
-            !ntot = problem%grid%nx
         endif
         
         !Finished loading the grid------------------------------------------
@@ -149,16 +143,13 @@
         ntHextProblemPtr = mxGetField( prhs, i, problemFields(13) )
         call mxCopyPtrToInteger4(mxGetPr(ntHextProblemPtr), nt_Hext, sx )
         
-        
-
         !Applied field as a function of time evaluated at the timesteps specified in nt_Hext
         !problem%Hext(:,1) is the time grid while problem%Hext(:,2:4) are the x-,y- and z-components of the applied field
         sx = nt_Hext * 4
         allocate( problem%Hext(nt_Hext,4) )
         HextProblemPtr = mxGetField( prhs, i, problemFields(14) )
         call mxCopyPtrToReal8(mxGetPr(HextProblemPtr), problem%Hext, sx )
-        
-        
+                
         !Load the no. of time steps required
         sx = 1
         ntProblemPtr = mxGetField( prhs, i, problemFields(15) )
@@ -168,9 +159,6 @@
         tProblemPtr = mxGetField(prhs,i,problemFields(16) )
         sx = nt
         call mxCopyPtrToReal8(mxGetPr(tProblemPtr), problem%t, sx )
-        
-        
-        
         
         !Initial magnetization
         allocate( problem%m0(3*ntot) )
@@ -193,8 +181,7 @@
         else
             problem%useCuda = useCudaFalse
         endif
-        
-        
+                
         sx = 1
         demApproxPtr = mxGetField( prhs, i, problemFields(20) )
         call mxCopyPtrToInteger4(mxGetPr(demApproxPtr), problem%demag_approximation, sx )
@@ -226,15 +213,12 @@
         endif
         
         
-        
         problem%setTimeDisplay = 100
         
         !Set how often to display the timestep in Matlab
         sx = 1
         setTimeDisplayProblemPtr = mxGetField( prhs, i, problemFields(25) )
         call mxCopyPtrToInteger4(mxGetPr(setTimeDisplayProblemPtr), problem%setTimeDisplay, sx )
-        
-        
         
         !Load the no. of times in the alpha function
         sx = 1
@@ -267,33 +251,7 @@
         
         !File for loading the sparse exchange tensor from Matlab (for non-uniform grids)
         if ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
-            !! Number of non-zero entries in sparse matrix
-            !exch_matProblemPtr = mxGetField( prhs, i, problemFields(31) )
-            !problem%grid%nu_exch_mat%length = mxGetNzmax(exch_matProblemPtr)
-            !
-            !problem%grid%nu_exch_mat%cols = mxGetN(exch_matProblemPtr)
-            !problem%grid%nu_exch_mat%rows = mxGetM(exch_matProblemPtr)
-            !
-            !! Row indices for elements
-            !sx = problem%grid%nu_exch_mat%length
-            !allocate( problem%grid%nu_exch_mat%ir( problem%grid%nu_exch_mat%length ) )
-            !irPtr = mxGetIr(exch_matProblemPtr)
-            !call mxCopyPtrToInteger4(irPtr, problem%grid%nu_exch_mat%ir, sx)
-            !
-            !sx = 1
-            !
-            !! Column index information
-            !sx = problem%grid%nu_exch_mat%cols + 1
-            !allocate( problem%grid%nu_exch_mat%jc( sx ) )
-            !jcPtr = mxGetJc(exch_matProblemPtr)
-            !call mxCopyPtrToInteger4(jcPtr, problem%grid%nu_exch_mat%jc, sx)
-            !
-            !sx = problem%grid%nu_exch_mat%length
-            !allocate( problem%grid%nu_exch_mat%values( problem%grid%nu_exch_mat%length ) )
-            !call mxCopyPtrToReal8(mxGetPr(exch_matProblemPtr), problem%grid%nu_exch_mat%values, sx )
-            
-            
-            ! Load the CSR sparse information
+            ! Load the CSR sparse information from Matlab
             sx = 1
             nValuesSparsePtr = mxGetField( prhs, i, problemFields(39) )
             call mxCopyPtrToInteger4(mxGetPr(nValuesSparsePtr), problem%grid%A_exch_load%nvalues, sx )
@@ -305,31 +263,22 @@
             nvalues = problem%grid%A_exch_load%nvalues
             nrows = problem%grid%A_exch_load%nrows
             allocate( problem%grid%A_exch_load%values(nvalues), problem%grid%A_exch_load%rows_start(nrows) , problem%grid%A_exch_load%rows_end(nrows) , problem%grid%A_exch_load%cols(nvalues) )
-            allocate( v(nvalues), rs(nrows) , re(nrows) , c(nvalues) )
              
             sx = nvalues
             valuesPtr = mxGetField( prhs, i, problemFields(41) )
-            !call mxCopyPtrToReal4(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
-            call mxCopyPtrToReal4(mxGetPr(valuesPtr), v, sx )
-            problem%grid%A_exch_load%values = v
+            call mxCopyPtrToReal4(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
             
             sx = nrows
             rows_startPtr = mxGetField( prhs, i, problemFields(42) )
-            !call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), problem%grid%A_exch_load%rows_start, sx )
-            call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), rs, sx )
-            problem%grid%A_exch_load%rows_start =  rs
+            call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), problem%grid%A_exch_load%rows_start, sx )
         
             sx = nrows
             rows_endPtr = mxGetField( prhs, i, problemFields(43) )
-            !call mxCopyPtrToInteger4(mxGetPr(rows_endPtr), problem%grid%A_exch_load%rows_end, sx )
-            call mxCopyPtrToInteger4(mxGetPr(rows_endPtr), re, sx )
-            problem%grid%A_exch_load%rows_end = re
+            call mxCopyPtrToInteger4(mxGetPr(rows_endPtr), problem%grid%A_exch_load%rows_end, sx )
         
             sx = nvalues
             colsPtr = mxGetField( prhs, i, problemFields(44) )
-            !call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )
-            call mxCopyPtrToInteger4(mxGetPr(colsPtr), c, sx )
-            problem%grid%A_exch_load%cols = c
+            call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )
         endif
           
         !Load the no. of time steps in the time convergence array
