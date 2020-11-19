@@ -1,4 +1,4 @@
-function [elapsedTime,problem,solution,E_arr,L_loop] = Standard_problem_3_tetra_fortran( use_CUDA, ShowTheResult, SaveTheResult, ShowTheResultDetails, RunMatlab, L_loop )
+function [elapsedTime,problem,solution,E_arr,L_loop] = Standard_problem_3_tetra_fortran( use_CUDA, ShowTheResult, SaveTheResult, ShowTheResultDetails, RunMatlab, L_loop, exch_meth, exch_weight )
 
 clearvars -except  resolution use_CUDA ShowTheResult SaveTheResult ShowTheResultDetails RunMatlab L_loop 
 close all
@@ -20,6 +20,14 @@ if ~exist('RunMatlab','var')
 end
 if ~exist('L_loop','var')
     L_loop = 8.5;%linspace(8,9,10);
+end
+
+if ~exist('exch_meth','var')
+    exch_method = "DirectLaplacian";
+end
+
+if ~exist('exch_weight','var')
+    exch_weight = 4;
 end
 
 if use_CUDA
@@ -95,9 +103,21 @@ InteractionMatrices.GridInfo = GridInfo;
 InteractionMatrices.X = GridInfo.Xel ;
 InteractionMatrices.Y = GridInfo.Yel ;
 InteractionMatrices.Z = GridInfo.Zel ;
-[DX,DY,DZ] = ComputeDifferentialOperatorsFromMesh03_IDW(GridInfo.fNormX,GridInfo.fNormY,GridInfo.fNormZ,GridInfo.AreaFaces,GridInfo.Volumes,GridInfo.TheSigns,GridInfo.Xel,GridInfo.Yel,GridInfo.Zel,GridInfo.Xf,GridInfo.Yf,GridInfo.Zf,GridInfo.TheTs,abs(GridInfo.TheSigns.')) ;
-InteractionMatrices.A2 = DX*DX + DY*DY+ DZ*DZ ;
-InteractionMatrices.A2 = (InteractionMatrices.A2)-diag(diag((InteractionMatrices.A2))) ;
+interpn = 'extended' ; % Use extended neighbours to calculate exchange matrix
+if exch_method=="DirectLaplacian"
+    [D2X,D2Y,D2Z] = ComputeDifferentialOperatorsFromMesh03_GGDirLap(GridInfo.fNormX,GridInfo.fNormY,GridInfo.fNormZ,GridInfo.AreaFaces,GridInfo.Volumes,GridInfo.TheSigns,GridInfo.Xel,GridInfo.Yel,GridInfo.Zel,GridInfo.Xf,GridInfo.Yf,GridInfo.Zf,GridInfo.TheTs,interpn,exch_weight,exch_method);
+    InteractionMatrices.A2 = D2X + D2Y + D2Z ;
+elseif exch_method=="GG"
+    warning('Green-Gauss method is in development.')
+    [DX,DY,DZ] = ComputeDifferentialOperatorsFromMesh03_GGDirLap(GridInfo.fNormX,GridInfo.fNormY,GridInfo.fNormZ,GridInfo.AreaFaces,GridInfo.Volumes,GridInfo.TheSigns,GridInfo.Xel,GridInfo.Yel,GridInfo.Zel,GridInfo.Xf,GridInfo.Yf,GridInfo.Zf,GridInfo.TheTs,interpn,exch_weight,exch_method);
+    InteractionMatrices.A2 = DX*DX + DY*DY+ DZ*DZ ;
+else % 
+    [DX,DY,DZ] = ComputeDifferentialOperatorsFromMesh03_LSQRgrad6(GridInfo.fNormX,GridInfo.fNormY,GridInfo.fNormZ,GridInfo.AreaFaces,GridInfo.Volumes,GridInfo.TheSigns,GridInfo.Xel,GridInfo.Yel,GridInfo.Zel,GridInfo.Xf,GridInfo.Yf,GridInfo.Zf,GridInfo.TheTs,interpn,num2str(exch_weight),exch_method);
+    InteractionMatrices.A2 = DX*DX + DY*DY+ DZ*DZ ;
+end
+% [DX,DY,DZ] = ComputeDifferentialOperatorsFromMesh03_IDW(GridInfo.fNormX,GridInfo.fNormY,GridInfo.fNormZ,GridInfo.AreaFaces,GridInfo.Volumes,GridInfo.TheSigns,GridInfo.Xel,GridInfo.Yel,GridInfo.Zel,GridInfo.Xf,GridInfo.Yf,GridInfo.Zf,GridInfo.TheTs,abs(GridInfo.TheSigns.')) ;
+% InteractionMatrices.A2 = DX*DX + DY*DY+ DZ*DZ ;
+% InteractionMatrices.A2 = (InteractionMatrices.A2)-diag(diag((InteractionMatrices.A2))) ;
 
 %--- Convert the exchange matrix to sparse
 [v,c,rs,re] = convertToCSR(InteractionMatrices.A2);
