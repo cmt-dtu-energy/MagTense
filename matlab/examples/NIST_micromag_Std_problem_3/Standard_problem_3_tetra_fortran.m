@@ -57,9 +57,10 @@ K0 = 0.1*1/2*mu0*Ms^2 ;
 A0 = 1.74532925199e-10;
 lex = sqrt(A0/(1/2*mu0*Ms^2));
 thisGridL = [lex,lex,lex]*L_loop;%m
+mesh_res = lex*L_loop/2;
 
 %--- Create tetrahedron mesh directly in Matlab
-model = CreateTetraMesh(thisGridL,lex*L_loop/2) ;
+model = CreateTetraMesh(thisGridL,mesh_res) ;
 figure ; pdeplot3D(model,'FaceAlpha',0.1) ;
 %--- Save the mesh for use with the Matlab model run after the Fortran model
 TetraMeshFileName = 'TestTetraMesh01.mat' ;
@@ -99,7 +100,7 @@ InteractionMatrices.A2 = DX*DX + DY*DY+ DZ*DZ ;
 InteractionMatrices.A2 = (InteractionMatrices.A2)-diag(diag((InteractionMatrices.A2))) ;
 
 %--- Convert the exchange matrix to sparse
-[v,c,rs,re] = ConvertToCSR(InteractionMatrices.A2);
+[v,c,rs,re] = convertToCSR(InteractionMatrices.A2);
 problem.exch_nval = int32(numel(v));
 problem.exch_nrow = int32(numel(rs));
 problem.exch_val  = single(v);
@@ -149,14 +150,15 @@ for i = 1:length(L_loop)
         prob_struct = struct(problem);  %convert the class obj to a struct so it can be loaded into fortran
 
         solution = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+        [Mx,My,Mz] = ComputeMagneticMomentGeneralMesh(solution.M,GridInfo.Volumes) ;
 
         if (ShowTheResultDetails)
             M_1 = squeeze(solution.M(1,:,:)); figure(figure3); subplot(2,2,2); quiver3(solution.pts(:,1),solution.pts(:,2),solution.pts(:,3),M_1(:,1),M_1(:,2),M_1(:,3)); axis equal; title('Fortran starting magnetization')
             M_end = squeeze(solution.M(end,:,:)); figure(figure3); subplot(2,2,4); quiver3(solution.pts(:,1),solution.pts(:,2),solution.pts(:,3),M_end(:,1),M_end(:,2),M_end(:,3)); axis equal; title('Fortran ending magnetization')
 
-            plot(fig1,solution.t,mean(solution.M(:,:,1),2),'rd'); 
-            plot(fig1,solution.t,mean(solution.M(:,:,2),2),'gd'); 
-            plot(fig1,solution.t,mean(solution.M(:,:,3),2),'bd'); 
+            plot(fig1,solution.t,Mx,'rd'); 
+            plot(fig1,solution.t,My,'gd'); 
+            plot(fig1,solution.t,Mz,'bd'); 
         end
         
         toc
@@ -180,6 +182,7 @@ tic
                 problem = problem.setUseCuda( use_CUDA );
             catch
                 problem = problem.setUseCuda( false );
+                disp('Cannot use GPU in Matlab')
             end
             problem = problem.setSolverType( 'UseDynamicSolver' );
             problem.DirectoryFilename = [''];
