@@ -1,4 +1,4 @@
-function [v,c,rs,re] = ConvertToCSR(B)
+function [v,c,rs,re] = convertToCSR(B)
 
 % B = sparse(5,5);
 % B(1,1) = 1;
