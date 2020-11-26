@@ -52,6 +52,7 @@ include "mkl_dfti.f90"
         real(DP),dimension(:,:), allocatable :: nodes       !> Arrys with the nodes for a tetrahedron grid
         integer,dimension(:,:), allocatable :: elements     !> Arrys with the elements for a tetrahedron grid, i.e. which nodes belong to which element
         real(DP),dimension(:,:),allocatable :: pts          !> Array with the x,y,z points on list form, i.e. pts(i,:) is the x,y,z components of the i'th point
+        real(DP),dimension(:,:),allocatable :: abc          !> Array with the side lengths a,b,c in list form
         integer :: gridType
         integer :: nnodes                                   !> The number of nodes in a tetrahedral grid
         type(MagTenseSparse) :: A_exch_load                 !> The exchange matrix as read from Matlab
@@ -145,7 +146,7 @@ include "mkl_dfti.f90"
     !> Parameters
     !>------------
     
-    integer,parameter :: gridTypeUniform=1,gridTypeTetrahedron=2
+    integer,parameter :: gridTypeUniform=1,gridTypeTetrahedron=2,gridTypeUnstructuredPrisms=3
     integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
     integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverImplicit=3
     integer,parameter :: useCudaTrue=1,useCudaFalse=0

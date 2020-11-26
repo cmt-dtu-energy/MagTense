@@ -87,7 +87,7 @@ include 'blas.f90'
         enddo
     endif
     
-    if ( gb_problem%grid%gridType .eq. gridTypeTetrahedron ) then
+    if (( gb_problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
         do i=1,gb_problem%grid%nx
             gb_solution%pts( i, 1 ) = gb_problem%grid%pts( i, 1 )
             gb_solution%pts( i, 2 ) = gb_problem%grid%pts( i, 2 )
@@ -906,6 +906,50 @@ include 'blas.f90'
                 
                 deallocate(Nout)
             enddo
+        
+        elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
+            !Setup template tile
+            tile(1)%tileType = 2 !(for prism)
+            tile(1)%exploitSymmetry = 0 !0 for no and this is important
+            tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+            tile(1)%M(:) = 0.
+            
+            !for each element find the tensor for all evaluation points (i.e. all elements)
+            do i=1,nx
+                !dimensions of the tile
+                tile(1)%a = problem%grid%abc(i,1)
+                tile(1)%b = problem%grid%abc(i,2)
+                tile(1)%c = problem%grid%abc(i,3)
+                
+                !Set the center of the tile to be the current point
+                tile(1)%offset(1) = problem%grid%pts(i,1)
+                tile(1)%offset(2) = problem%grid%pts(i,2)
+                tile(1)%offset(3) = problem%grid%pts(i,3)
+                
+                !Nout will be allocated by the subroutine. Should be de-allocated afterwards for consistency
+                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout )
+                    
+                !Copy Nout into the proper structure used by the micro mag model
+                ind = i
+                    
+                problem%Kxx(:,ind) = sngl(Nout(1,:,1,1))
+                problem%Kxy(:,ind) = sngl(Nout(1,:,1,2))
+                problem%Kxz(:,ind) = sngl(Nout(1,:,1,3))
+                    
+                !Not stored due to symmetry  (Kxy = Kyx)
+                !Kyx(ind,:) = Nout(1,:,2,1)
+                problem%Kyy(:,ind) = sngl(Nout(1,:,2,2))
+                problem%Kyz(:,ind) = sngl(Nout(1,:,2,3))
+                    
+                !Not stored due to symmetry (Kxz = Kzx)
+                !Kzx(ind,:) = Nout(1,:,3,1)
+                !Not stored due to symmetry (Kyz = Kzy)
+                !Kzy(ind,:) = Nout(1,:,3,2)
+                problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
+                
+                deallocate(Nout)
+            enddo
+        
         endif
         
         !Write the demag tensors to disk if asked to do so            
@@ -1498,7 +1542,7 @@ include 'blas.f90'
     
     if ( grid%gridType .eq. gridTypeUniform ) then
         call ComputeExchangeTerm3D_Uniform( grid, A )
-    elseif (grid%gridType .eq. gridTypeTetrahedron ) then
+    elseif (( grid%gridType .eq. gridTypeTetrahedron ) .or. (grid%gridType .eq. gridTypeUnstructuredPrisms)) then
         call ConvertExchangeTerm3D_NonUniform( grid, A )
     endif
 

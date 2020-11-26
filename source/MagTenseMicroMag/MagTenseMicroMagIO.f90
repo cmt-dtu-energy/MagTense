@@ -97,6 +97,23 @@
             call mxCopyPtrToInteger4(mxGetPr(nnodesGridPtr), problem%grid%nnodes, sx )
         endif
         
+        !Load additional things for a grid of unstructured prisms
+        if ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
+            !The center points of all the prisms elements           
+            allocate( problem%grid%pts(ntot,3) )
+            sx = ntot * 3
+            ptsGridPtr = mxGetField( prhs, i, problemFields(35) )
+            call mxCopyPtrToReal8(mxGetPr(ptsGridPtr), problem%grid%pts, sx )
+            
+            
+            !The side lengths of all the prisms
+            allocate( problem%grid%abc(ntot,3) )
+            sx = ntot * 3
+            nodesGridPtr = mxGetField( prhs, i, problemFields(45) )
+            call mxCopyPtrToReal8(mxGetPr(nodesGridPtr), problem%grid%abc, sx )
+            
+        endif
+                
         !Finished loading the grid------------------------------------------
         
         !Start loading the problem
@@ -250,7 +267,7 @@
         endif
         
         !File for loading the sparse exchange tensor from Matlab (for non-uniform grids)
-        if ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
+        if (( problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
             ! Load the CSR sparse information from Matlab
             sx = 1
             nValuesSparsePtr = mxGetField( prhs, i, problemFields(39) )
@@ -430,7 +447,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=44
+        integer,parameter :: nf=45
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -481,6 +498,7 @@
         fieldnames(42) = 'exch_rows'
         fieldnames(43) = 'exch_rowe'
         fieldnames(44) = 'exch_col'
+        fieldnames(45) = 'grid_abc'
         
     end subroutine getProblemFieldnames
     

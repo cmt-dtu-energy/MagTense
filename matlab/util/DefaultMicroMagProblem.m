@@ -24,6 +24,9 @@ properties
     %the number of nodes in the tetrahedron grid
     grid_nnod
     
+    %the dimensions (abc) on the unstructured prisms
+    grid_abc
+    
     %the exchange operator matrix
     exch_mat
     
@@ -217,6 +220,8 @@ methods
         obj.grid_ele = int32(0);
         obj.grid_nod = 0;
         obj.grid_nnod = int32(0);
+        obj.grid_abc = 0;
+        
         
         %defines the grid type which currently only supports "uniform"
         obj.grid_type = getMicroMagGridType('uniform');

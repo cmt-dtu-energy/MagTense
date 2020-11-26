@@ -1,4 +1,4 @@
-function [Mx,My,Mz] = ComputeMagneticMomentGeneralMesh(SigmaAll,Vols)
+function [Mx,My,Mz,mx,my,mz] = ComputeMagneticMomentGeneralMesh(SigmaAll,Vols)
 % Vols = prod(dims,2) ;
 sumVol = sum(Vols) ;
 for k=1:size(SigmaAll,1) 
@@ -12,4 +12,8 @@ for k=1:size(SigmaAll,1)
     Mx(k) = sum(Vols.*SigmaX)./sumVol ;
     My(k) = sum(Vols.*SigmaY)./sumVol ;
     Mz(k) = sum(Vols.*SigmaZ)./sumVol ;
+    
+    mx(k,:) = (Vols.*SigmaX)./sumVol ;
+    my(k,:) = (Vols.*SigmaY)./sumVol ;
+    mz(k,:) = (Vols.*SigmaZ)./sumVol ;
 end
