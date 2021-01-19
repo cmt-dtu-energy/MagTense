@@ -1568,7 +1568,7 @@ include 'blas.f90'
     type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
     real*4 :: const
     integer :: edgeIndInc                             !> Decides whether or not to use next-nearest neighbour stencils on the edges
-    real*8 :: edgeVal, neighbourEdgeVal,nneighbourEdgeVal  !> Values for the edge of the grid
+    real*4 :: edgeVal, neighbourEdgeVal,nneighbourEdgeVal  !> Values for the edge of the grid
     
     !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
@@ -1580,18 +1580,18 @@ include 'blas.f90'
     !----------------------------------d^2dx^2 begins -----------------------------!
     if ( nx .ge. 2 ) then
         if ( nx .gt. 2 ) then
-            !Make the d^2/dx^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - ny * nz
-            ntot = nz * ( ny * 2 + ny * (nx-1)*3 )
-            edgeVal = 1 
-            neighbourEdgeVal = -2
-            nneighbourEdgeVal = 1
+            !Make the d^2/dx^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz
+            ntot = 3 * nx * ny * nz
+            edgeVal = 1.
+            neighbourEdgeVal = -2.
+            nneighbourEdgeVal = 1.
             edgeIndInc = 1
         else
             !Make the d^2/dx^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz
             ntot = nz * ( ny * 4 + ny * (nx-2)*3 )
-            edgeVal = -1
-            neighbourEdgeVal = 1
-            nneighbourEdgeVal = 1 ! The same as neighbourEdgeVal, so it overwrites with the same value due to edgeIndInc
+            edgeVal = -1.
+            neighbourEdgeVal = 1.
+            nneighbourEdgeVal = 1. ! The same as neighbourEdgeVal, so it overwrites with the same value due to edgeIndInc
             edgeIndInc = 0
         endif
     allocate(d2dx2%values(ntot),d2dx2%cols(ntot),d2dx2%rows_start(nx*ny*nz),d2dx2%rows_end(nx*ny*nz))
@@ -1685,18 +1685,18 @@ include 'blas.f90'
     !----------------------------------d^2dy^2 begins ----------------------------!
     if ( ny .ge. 2 ) then
         if ( ny .gt. 2 ) then
-            !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - nx * nz
-            ntot = nz * ( nx + ny * (nx-1)*3 + nx )
-            edgeVal = 1 
-            neighbourEdgeVal = -2
-            nneighbourEdgeVal = 1
+            !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz
+            ntot = 3 * nx * ny * nz
+            edgeVal = 1.
+            neighbourEdgeVal = -2.
+            nneighbourEdgeVal = 1.
             edgeIndInc = 1
         else
             !Make the d^2/dx^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * nx * nz
             ntot = nz * ( nx * 2 + ny * (nx-2)*3 + nx * 2 )
-            edgeVal = -1
-            neighbourEdgeVal = 1
-            nneighbourEdgeVal = 1 ! The same as neighbourEdgeVal, so it overwrites with the same value due to edgeIndInc
+            edgeVal = -1.
+            neighbourEdgeVal = 1.
+            nneighbourEdgeVal = 1. ! The same as neighbourEdgeVal, so it overwrites with the same value due to edgeIndInc
             edgeIndInc = 0
         endif
     allocate(d2dy2%values(ntot),d2dy2%cols(ntot),d2dy2%rows_start(nx*ny*nz),d2dy2%rows_end(nx*ny*nz))
@@ -1812,18 +1812,18 @@ include 'blas.f90'
     !----------------------------------d^2dz^2 begins ----------------------------!
     if ( nz .gt. 1 ) then
         if ( nz .gt. 2 ) then
-            !Make the d^2/dz^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - nx * ny
-            ntot = 2 * nx * ny + 3 * (nz-1) * nx * ny
-            edgeVal = 1 
-            neighbourEdgeVal = -2
-            nneighbourEdgeVal = 1
+            !Make the d^2/dz^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz
+            ntot = 3 * nx * ny * nz
+            edgeVal = 1.
+            neighbourEdgeVal = -2.
+            nneighbourEdgeVal = 1.
             edgeIndInc = 1
         else
             !Make the d^2/dz^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * nx * ny
             ntot = 2 * 2 * nx * ny + 3 * (nz-1) * nx * ny
-            edgeVal = -1
-            neighbourEdgeVal = 1
-            nneighbourEdgeVal = 1 ! The same as neighbourEdgeVal, so it overwrites with the same value due to edgeIndInc
+            edgeVal = -1.
+            neighbourEdgeVal = 1.
+            nneighbourEdgeVal = 1. ! The same as neighbourEdgeVal, so it overwrites with the same value due to edgeIndInc
             edgeIndInc = 0
         endif
         
