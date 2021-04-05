@@ -68,6 +68,7 @@ HystDir = 1/mu0*[1,1,1] ;
 HextFct = @(t) (1e-9-t)' .* HystDir .* (t<1e-9)';
 problem_ini = problem_ini.setHext( HextFct, linspace(0,100e-9,2000) );
 
+%% Create Preset
 solution_ini = struct();
 %convert the class obj to a struct so it can be loaded into fortran
 prob_struct = struct(problem_ini);
@@ -86,8 +87,7 @@ problem_dym.gamma = 2.21e5 ;
 problem_dym = problem_dym.setUseCuda( use_CUDA );
 problem_dym = problem_dym.setUseCVODE( use_CVODE );
 problem_dym.dem_appr = getMicroMagDemagApproximation('none');
-problem_dym.dem_thres = 1e-4;
-problem_dym = problem_dym.setTime( linspace(0,1e-9,200) ); %
+problem_dym = problem_dym.setTime( linspace(0,1e-9,200) );
 problem_dym.setTimeDis = int32(10);
 
 if (NIST_field == 1)
