@@ -40,6 +40,8 @@ addpath('../../micromagnetism');
 %% ------------------------------------------------------------------- MAGTENSE ---------------------------------------------------------
 %% --------------------------------------------------------------------------------------------------------------------------------------
 load('Std_prob_4_unstructured_mesh_grains_6_res_80_20_ref_2.mat');
+% load('Std_prob_4_unstructured_mesh_grains_6_res_100_25_ref_3.mat');
+cartesianUnstructuredMeshPlot(mesh.pos_out,mesh.dims_out,GridInfo,mesh.iIn);
 
 %--- Setup the problem
 resolution = [length(mesh.pos_out) 1 1];
