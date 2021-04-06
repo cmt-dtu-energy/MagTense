@@ -84,7 +84,7 @@ Zf = GridInfo.Zf;
 T = GridInfo.TheDs;
 
 %% Determine dimensionality
-if numel(unique(GridInfo.Zel))
+if (numel(unique(GridInfo.Zel)) == 1)
     dims = 2;
 else
     dims = 3;
