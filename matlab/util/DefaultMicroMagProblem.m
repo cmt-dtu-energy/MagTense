@@ -170,6 +170,7 @@ properties (SetAccess=private,GetAccess=public)
     %NVIDIA driver is present or if insufficient memory is available. 0 for
     %do not use cuda, 1 for do use (int32)
     useCuda
+    MagTenseLandauLifshitzSolver_mex
     
     %defines whether to attempt using CVODE (it is currently uncertain if
     %the code even compiles in this version without having CVODE installed,
@@ -364,8 +365,10 @@ methods
     function obj = setUseCuda( obj, enabled )
        if enabled
            obj.useCuda = int32(1);
+           obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolver_mex;
        else
            obj.useCuda = int32(0);
+           obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolverNoCUDA_mex;
        end
     end
     
