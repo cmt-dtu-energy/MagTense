@@ -33,7 +33,7 @@ module TileTriangle
     real,dimension(3),intent(in) :: r           !> evaluation point
     real,dimension(3,3),intent(inout) :: N,P    !> output tensor and change-of-basis matrix
     
-    real,parameter :: numErr = 1e-20,threshold = 1e-20 !> Numerical tolerance error and threshold for defining if the point of interest is too close to x,y or z = 0     
+    real,parameter :: numErr = 1e-20,threshold = 1e-15 !> Numerical tolerance error and threshold for defining if the point of interest is too close to x,y or z = 0     
     real :: d1,d2    
     real,dimension(3) :: angles, angles_srt,tmp !> Angles of the triangle at each vertex
     integer,dimension(3) :: srt_ind             !> Indices of the sorted array

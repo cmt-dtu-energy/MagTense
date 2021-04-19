@@ -60,8 +60,10 @@ if (ispc)
         CUDA_str  = '''-Lc:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v10.2/lib/x64/'' -lcublas -lcudart -lcuda -lcusparse';
         if (USE_RELEASE)
             build_str_MagTenseMicroMag = 'x64/release';
+            build_str_NO_CUDA_MagTenseMicroMag = 'x64/Release_no_CUDA';
         else
             build_str_MagTenseMicroMag = 'x64/debug';
+            build_str_NO_CUDA_MagTenseMicroMag = 'x64/Debug_no_CUDA';
         end
     else
         CUDA_str  = '';
@@ -120,7 +122,7 @@ MagTenseMicroMag_str        = ['-Lsource/MagTenseMicroMag/' build_str_MagTenseMi
 
 Options_str                 = 'COMPFLAGS="$COMPFLAGS /O3 /free /real_size:64 /fpe:0" -R2018a';
 if (ispc)
-    MKL_str                 = '''-Lc:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/lib/intel64_win/'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-Ic:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/include/''';
+    MKL_str                 = '''-LC:/Program Files (x86)/Intel/oneAPI/mkl/latest/lib/intel64'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-Ic:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/include/''';
 else
     %MKL_str                 = '''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/''';
     MKL_str                 = '/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a  -liomp5 -lpthread -lm -ldl';%'''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/'' ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/'' ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/intel64/lp64''  ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_lp64.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_thread.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_core.a''';
@@ -137,6 +139,21 @@ if ~USE_RELEASE
     movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb']);
 end
 movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64']);
+
+%% No CUDA version of MagTenseLandauLifshitzSolver_mex
+if (USE_CUDA)
+    if (USE_RELEASE)
+        MagTenseMicroMag_str        = ['-Lsource/MagTenseMicroMag/' build_str_NO_CUDA_MagTenseMicroMag '/ ' MagTenseMicroMag_lib_str ' -Isource/MagTenseMicroMag/' build_str_MagTenseMicroMag '/'];
+        Source_str = 'source/MagTenseMEX/MagTenseMEX/MagTenseLandauLifshitzSolver_mex.f90';
+        mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' MagTenseMicroMag_str ' ' DemagField_str ' ' TileDemagTensor_str ' ' NumericalIntegration_str ' ' CVODE_str ' ' MKL_str ' ' Source_str ' ' Options_str];
+        eval(mex_str) 
+    end
+    if ~USE_RELEASE
+    movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/MagTenseLandauLifshitzSolverNoCUDA_mex.mex' MEX_str '64.pdb']);
+end
+movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_files/MagTenseLandauLifshitzSolverNoCUDA_mex.mex' MEX_str '64']);
+
+end
 
 %% IterateMagnetization_mex
 Source_str = 'source/MagTenseMEX/MagTenseMEX/IterateMagnetization_mex.f90';
