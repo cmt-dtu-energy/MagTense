@@ -60,8 +60,10 @@ if (ispc)
         CUDA_str  = '''-Lc:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v10.2/lib/x64/'' -lcublas -lcudart -lcuda -lcusparse';
         if (USE_RELEASE)
             build_str_MagTenseMicroMag = 'x64/release';
+            build_str_NO_CUDA_MagTenseMicroMag = 'x64/Release_no_CUDA';
         else
             build_str_MagTenseMicroMag = 'x64/debug';
+            build_str_NO_CUDA_MagTenseMicroMag = 'x64/Debug_no_CUDA';
         end
     else
         CUDA_str  = '';
@@ -137,6 +139,21 @@ if ~USE_RELEASE
     movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb']);
 end
 movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64']);
+
+%% No CUDA version of MagTenseLandauLifshitzSolver_mex
+if (USE_CUDA)
+    if (USE_RELEASE)
+        MagTenseMicroMag_str        = ['-Lsource/MagTenseMicroMag/' build_str_NO_CUDA_MagTenseMicroMag '/ ' MagTenseMicroMag_lib_str ' -Isource/MagTenseMicroMag/' build_str_MagTenseMicroMag '/'];
+        Source_str = 'source/MagTenseMEX/MagTenseMEX/MagTenseLandauLifshitzSolver_mex.f90';
+        mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' MagTenseMicroMag_str ' ' DemagField_str ' ' TileDemagTensor_str ' ' NumericalIntegration_str ' ' CVODE_str ' ' MKL_str ' ' Source_str ' ' Options_str];
+        eval(mex_str) 
+    end
+    if ~USE_RELEASE
+    movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/MagTenseLandauLifshitzSolverNoCUDA_mex.mex' MEX_str '64.pdb']);
+end
+movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_files/MagTenseLandauLifshitzSolverNoCUDA_mex.mex' MEX_str '64']);
+
+end
 
 %% IterateMagnetization_mex
 Source_str = 'source/MagTenseMEX/MagTenseMEX/IterateMagnetization_mex.f90';

@@ -34,7 +34,7 @@
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;c:\Program Files\MATLAB\R2019b\extern\include\;" PreprocessorDefinitions="USE_CUDA" UseMkl="mklParallel"/>
-				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;..\DemagField\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64\;..\MagTenseFortranCuda\cuda\" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
+				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;..\DemagField\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64\;..\MagTenseFortranCuda\cuda\" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>
