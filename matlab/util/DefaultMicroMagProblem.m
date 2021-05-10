@@ -82,6 +82,9 @@ properties
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
     
+    %Matlab_parameter only, specifying the use of FFT
+    FFTdims
+    
     %defines if and how to return the N tensor (1 do not return, 2 return
     %in memory and >2 return as a file with file length = N_ret
     N_ret {mustBeGreaterThan(N_ret,0),mustBeInteger(N_ret)}=int32(1);

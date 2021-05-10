@@ -11,6 +11,11 @@ for i=1:numel(user_defined_vars)
     ProblemSetupStruct.(user_defined_vars{i}) = MySim.(user_defined_vars{i}) ;
 end
 
+%% Set the FFT to true for certain threshold conditions
+if (ProblemSetupStruct.dem_appr == 3 || ProblemSetupStruct.dem_appr == 5)
+    ProblemSetupStruct.FFTdims = [1,1,1];
+end
+
 %% Create a directory for the simulation and save the data
 if ProblemSetupStruct.SaveTheResult
     k = 1;
