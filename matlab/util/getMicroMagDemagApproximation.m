@@ -23,5 +23,7 @@ function val = getMicroMagDemagApproximation( mode )
         case 'fft_threshold_fraction'
             %cut-off all values below a certain fraction specified by threshold and make the matrix sparse
             val = int32(5);
+        otherwise
+            error('Chosen demag-approximation does not exist');
     end
 end

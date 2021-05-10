@@ -9,7 +9,9 @@
 # Build results
 
 [Dd]ebug/
+[Dd]ebug_no_CUDA/
 [Rr]elease/
+[Rr]elease_no_CUDA/
 x64/
 build/
 [Bb]in/

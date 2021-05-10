@@ -172,44 +172,44 @@ InteractionMatrices.dz = dz;
 %     InteractionMatrices.CopyMatrix = CopyMatrix;
 
 if (ProblemSetupStruct.dem_appr == 4 )  %DemagApproximationThresholdFraction
-    if ~all(FFTdims==0)
-        [ProblemSetupStruct.threshold] = GetThreshold(InteractionMatrices.FFT.DemagTensor,ProblemSetupStruct.thresholdFract ) ;
-    else
-        [ProblemSetupStruct.threshold] = GetThreshold(InteractionMatrices.DemagTensor,ProblemSetupStruct.thresholdFract ) ;
-    end
+    [ProblemSetupStruct.dem_thres] = GetThreshold(InteractionMatrices.DemagTensor,ProblemSetupStruct.dem_thres ) ;
+end
+if (ProblemSetupStruct.dem_appr == 5 )  %DemagApproximationThresholdFractionFFT
+    [ProblemSetupStruct.dem_thres] = GetThreshold(InteractionMatrices.FFT.DemagTensor,ProblemSetupStruct.dem_thres ) ;
 end
 
-if (ProblemSetupStruct.dem_appr == 2) %DemagApproximationThreshold
-    if ~all(FFTdims==0)
-        [InteractionMatrices.FFT.DemagTensor] = FilterTensorThreshold(InteractionMatrices.FFT.DemagTensor,ProblemSetupStruct.threshold) ;
-    else
-        [InteractionMatrices.DemagTensor] = FilterTensorThreshold(InteractionMatrices.DemagTensor,ProblemSetupStruct.threshold) ;
-        %             InteractionMatrices.DemagTensor.KglobXX{1,1}(abs(InteractionMatrices.DemagTensor.KglobXX{1,1}) < ProblemSetupStruct.threshold) = 0;
-        %         InteractionMatrices.DemagTensor.KglobXY{1,1}(abs(InteractionMatrices.DemagTensor.KglobXY{1,1}) < ProblemSetupStruct.threshold) = 0;
-        %         InteractionMatrices.DemagTensor.KglobXZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobXZ{1,1}) < ProblemSetupStruct.threshold) = 0;
-        %         InteractionMatrices.DemagTensor.KglobYY{1,1}(abs(InteractionMatrices.DemagTensor.KglobYY{1,1}) < ProblemSetupStruct.threshold) = 0;
-        %         InteractionMatrices.DemagTensor.KglobYZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobYZ{1,1}) < ProblemSetupStruct.threshold) = 0;
-        %         InteractionMatrices.DemagTensor.KglobZZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobZZ{1,1}) < ProblemSetupStruct.threshold) = 0;
-    end
-    %--- Test if any matrices are zero, and if they are remove them
-    if ~any(any(InteractionMatrices.DemagTensor.KglobXX{1,1}))
-        InteractionMatrices.DemagTensor.KglobXX{1,1} = 0;
-    end
-    if ~any(any(InteractionMatrices.DemagTensor.KglobXY{1,1}))
-        InteractionMatrices.DemagTensor.KglobXY{1,1} = 0;
-    end
-    if ~any(any(InteractionMatrices.DemagTensor.KglobXZ{1,1}))
-        InteractionMatrices.DemagTensor.KglobXZ{1,1} = 0;
-    end
-    if ~any(any(InteractionMatrices.DemagTensor.KglobYY{1,1}))
-        InteractionMatrices.DemagTensor.KglobYY{1,1} = 0;
-    end
-    if ~any(any(InteractionMatrices.DemagTensor.KglobYZ{1,1}))
-        InteractionMatrices.DemagTensor.KglobYZ{1,1} = 0;
-    end
-    if ~any(any(InteractionMatrices.DemagTensor.KglobZZ{1,1}))
-        InteractionMatrices.DemagTensor.KglobZZ{1,1} = 0;
-    end
+if (ProblemSetupStruct.dem_appr == 2 || ProblemSetupStruct.dem_appr == 4) %DemagApproximationThreshold
+    [InteractionMatrices.DemagTensor] = FilterTensorThreshold(InteractionMatrices.DemagTensor,ProblemSetupStruct.dem_thres) ;
+    %         InteractionMatrices.DemagTensor.KglobXX{1,1}(abs(InteractionMatrices.DemagTensor.KglobXX{1,1}) < ProblemSetupStruct.threshold) = 0;
+    %         InteractionMatrices.DemagTensor.KglobXY{1,1}(abs(InteractionMatrices.DemagTensor.KglobXY{1,1}) < ProblemSetupStruct.threshold) = 0;
+    %         InteractionMatrices.DemagTensor.KglobXZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobXZ{1,1}) < ProblemSetupStruct.threshold) = 0;
+    %         InteractionMatrices.DemagTensor.KglobYY{1,1}(abs(InteractionMatrices.DemagTensor.KglobYY{1,1}) < ProblemSetupStruct.threshold) = 0;
+    %         InteractionMatrices.DemagTensor.KglobYZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobYZ{1,1}) < ProblemSetupStruct.threshold) = 0;
+    %         InteractionMatrices.DemagTensor.KglobZZ{1,1}(abs(InteractionMatrices.DemagTensor.KglobZZ{1,1}) < ProblemSetupStruct.threshold) = 0;
+end
+
+if (ProblemSetupStruct.dem_appr == 3 || ProblemSetupStruct.dem_appr == 5) %DemagApproximationThreshold
+    [InteractionMatrices.FFT.DemagTensor] = FilterTensorThreshold(InteractionMatrices.FFT.DemagTensor,ProblemSetupStruct.dem_thres) ;
+end
+
+ %--- Test if any matrices are zero, and if they are remove them
+if ~any(any(InteractionMatrices.DemagTensor.KglobXX{1,1}))
+    InteractionMatrices.DemagTensor.KglobXX{1,1} = 0;
+end
+if ~any(any(InteractionMatrices.DemagTensor.KglobXY{1,1}))
+    InteractionMatrices.DemagTensor.KglobXY{1,1} = 0;
+end
+if ~any(any(InteractionMatrices.DemagTensor.KglobXZ{1,1}))
+    InteractionMatrices.DemagTensor.KglobXZ{1,1} = 0;
+end
+if ~any(any(InteractionMatrices.DemagTensor.KglobYY{1,1}))
+    InteractionMatrices.DemagTensor.KglobYY{1,1} = 0;
+end
+if ~any(any(InteractionMatrices.DemagTensor.KglobYZ{1,1}))
+    InteractionMatrices.DemagTensor.KglobYZ{1,1} = 0;
+end
+if ~any(any(InteractionMatrices.DemagTensor.KglobZZ{1,1}))
+    InteractionMatrices.DemagTensor.KglobZZ{1,1} = 0;
 end
 
 if (ProblemSetupStruct.use_single)

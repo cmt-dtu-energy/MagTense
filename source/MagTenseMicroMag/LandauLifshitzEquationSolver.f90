@@ -556,77 +556,82 @@ include 'blas.f90'
         endif
         
     elseif ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
-        !!No CUDA support for this part yet
-        !fourier transform Mx, My and Mz
-        ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
-                
-        !Convert to complex format
-        do i=1,ntot
-            solution%Mx_FT(i) = cmplx( solution%Mx(i), 0. )
-            solution%My_FT(i) = cmplx( solution%My(i), 0. )
-            solution%Mz_FT(i) = cmplx( solution%Mz(i), 0. )
-        enddo
         
-        stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mx_FT )
-        !normalization
-        solution%Mx_FT = solution%Mx_FT / ntot
+        if ( problem%useCuda .eq. useCudaFalse ) then
+            !fourier transform Mx, My and Mz
+            ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
                 
-        stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%My_FT )
-        !normalization
-        solution%My_FT = solution%My_FT / ntot
+            !Convert to complex format
+            do i=1,ntot
+                solution%Mx_FT(i) = cmplx( solution%Mx(i), 0. )
+                solution%My_FT(i) = cmplx( solution%My(i), 0. )
+                solution%Mz_FT(i) = cmplx( solution%Mz(i), 0. )
+            enddo
         
-        stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mz_FT )
-        !normalization
-        solution%Mz_FT = solution%Mz_FT / ntot
+            stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mx_FT )
+            !normalization
+            solution%Mx_FT = solution%Mx_FT / ntot
+                
+            stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%My_FT )
+            !normalization
+            solution%My_FT = solution%My_FT / ntot
+        
+            stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mz_FT )
+            !normalization
+            solution%Mz_FT = solution%Mz_FT / ntot
             
-        !sparse matrix multiplication with the demag matrices in fourier space...                
-        ! use problem%K_s(1..6) with cuda or MKL to do the sparse matrix-vector product with the FFT(M) and subsequently the IFT on the whole thing to get H
+            !sparse matrix multiplication with the demag matrices in fourier space...                
+            ! use problem%K_s(1..6) with cuda or MKL to do the sparse matrix-vector product with the FFT(M) and subsequently the IFT on the whole thing to get H
         
-        !First Hx = Kxx * Mx + Kxy * My + Kxz * Mz
+            !First Hx = Kxx * Mx + Kxy * My + Kxz * Mz
         
-        alpha_c = cmplx(1.,0)
-        beta_c = cmplx(0.,0.)
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(1)%A, descr, solution%Mx_FT, beta_c, solution%HmX_c )
-        beta_c = cmplx(1.0,0.)
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%My_FT, beta_c, solution%HmX_c )
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(3)%A, descr, solution%Mz_FT, beta_c, solution%HmX_c )
-        
-        
-        !Fourier transform backwards to get the field
-        stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmX_C )
-        
-        !Get the field
-        solution%HmX = -solution%Mfact * real(solution%HmX_c)
+            alpha_c = cmplx(1.,0)
+            beta_c = cmplx(0.,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(1)%A, descr, solution%Mx_FT, beta_c, solution%HmX_c )
+            beta_c = cmplx(1.0,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%My_FT, beta_c, solution%HmX_c )
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(3)%A, descr, solution%Mz_FT, beta_c, solution%HmX_c )
         
         
-        !Second Hy = Kyx * Mx + Kyy * My + Kyz * Mz        
-        beta_c = cmplx(0.,0.)
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%Mx_FT, beta_c, solution%HmY_c )
-        beta_c = cmplx(1.0,0.)
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(4)%A, descr, solution%My_FT, beta_c, solution%HmY_c )
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(5)%A, descr, solution%Mz_FT, beta_c, solution%HmY_c )
+            !Fourier transform backwards to get the field
+            stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmX_C )
         
-        !Fourier transform backwards to get the field
-        stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmY_c )
-        
-        !Get the field        
-        solution%HmY = -solution%Mfact * real(solution%HmY_c)
+            !Get the field
+            solution%HmX = -solution%Mfact * real(solution%HmX_c)
         
         
+            !Second Hy = Kyx * Mx + Kyy * My + Kyz * Mz        
+            beta_c = cmplx(0.,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%Mx_FT, beta_c, solution%HmY_c )
+            beta_c = cmplx(1.0,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(4)%A, descr, solution%My_FT, beta_c, solution%HmY_c )
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(5)%A, descr, solution%Mz_FT, beta_c, solution%HmY_c )
         
-        !Third Hz = Kzx * Mx + Kzy * My + Kzz * Mz        
-        beta_c = cmplx(0.,0.)
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(3)%A, descr, solution%Mx_FT, beta_c, solution%HmZ_c )
-        beta_c = cmplx(1.0,0.)
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(5)%A, descr, solution%My_FT, beta_c, solution%HmZ_c )
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(6)%A, descr, solution%Mz_FT, beta_c, solution%HmZ_c )
+            !Fourier transform backwards to get the field
+            stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmY_c )
         
-        !Fourier transform backwards to get the field
-        stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmZ_c )
-        !finally, get the field out        
-        solution%HmZ = -solution%Mfact * real(solution%HmZ_c)
+            !Get the field        
+            solution%HmY = -solution%Mfact * real(solution%HmY_c)
         
-    
+        
+        
+            !Third Hz = Kzx * Mx + Kzy * My + Kzz * Mz        
+            beta_c = cmplx(0.,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(3)%A, descr, solution%Mx_FT, beta_c, solution%HmZ_c )
+            beta_c = cmplx(1.0,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(5)%A, descr, solution%My_FT, beta_c, solution%HmZ_c )
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(6)%A, descr, solution%Mz_FT, beta_c, solution%HmZ_c )
+        
+            !Fourier transform backwards to get the field
+            stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmZ_c )
+            !finally, get the field out        
+            solution%HmZ = -solution%Mfact * real(solution%HmZ_c)
+        
+        else
+            !!No CUDA support for this part yet
+            call displayMatlabMessage( 'CUDA not currently supported with FFT - exiting!' )
+            stop
+        endif
         
     else        
         !Default way of doing the problem
@@ -794,7 +799,7 @@ include 'blas.f90'
     real(DP),dimension(:,:),allocatable :: H                      !> The field and the corresponding evaluation point arrays
     integer :: i,j,k,nx,ny,nz,ntot,ind                            !> Internal counters and index variables
     real(DP),dimension(:,:,:,:),allocatable :: Nout               !> Temporary storage for the demag tensor            
-    complex(kind=4),dimension(:,:),allocatable :: eye,FT,IFT,temp !> Identity matrix, the indentity matrix' fourier transform and its inverse fourier transform
+    complex(kind=4),dimension(:,:),allocatable :: eye,FT,IFT,temp,temp2 !> Identity matrix, the indentity matrix' fourier transform and its inverse fourier transform
     type(DFTI_DESCRIPTOR), POINTER :: desc_handle                 !> Handle for the FFT MKL stuff
     integer :: status
     complex(kind=4),dimension(:,:),allocatable :: Kxx_c, Kxy_c, Kxz_c, Kyy_c, Kyz_c, Kzz_c !> Temporary matrices for storing the complex version of the demag matrices
@@ -1072,7 +1077,6 @@ include 'blas.f90'
         !create the FT and IFT matrices
         allocate(eye(ntot,ntot),FT(ntot,ntot),IFT(ntot,ntot))
         
-        
         !make the identity matrix
         eye(:,:) = 0
         do i=1,ntot
@@ -1094,11 +1098,9 @@ include 'blas.f90'
         enddo
         
         !Find the inverse of the fourier transform
-        !We need to check if we should divide by the no of elements
         allocate(temp(ntot,ntot) )
         temp = conjg(FT)
         IFT = transpose(temp) / ntot
-        
         
         !do the change of basis of each of the demag tensor matrices
         !And make room for the very temporary complex output matrices
@@ -1109,33 +1111,37 @@ include 'blas.f90'
         beta_c  = cmplx(0.0,0.0)
         Kxx_c = FT
         temp = cmplx(problem%Kxx)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kxx_c, ntot)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kxx_c, ntot, IFT , ntot, beta_c, Kxx_c, ntot)
+        
+        !temporary array to hold the results of the first calculation
+        allocate(temp2(ntot,ntot) )
+
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, temp2, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, temp2, ntot, IFT , ntot, beta_c, Kxx_c, ntot)
        
         Kxy_c = FT
         temp = cmplx(problem%Kxy)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kxy_c, ntot)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kxy_c, ntot, IFT , ntot, beta_c, Kxy_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, temp2, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, temp2, ntot, IFT , ntot, beta_c, Kxy_c, ntot)
         
         Kxz_c = FT
         temp = cmplx(problem%Kxz)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kxz_c, ntot)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kxz_c, ntot, IFT , ntot, beta_c, Kxz_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, temp2, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, temp2, ntot, IFT , ntot, beta_c, Kxz_c, ntot)
         
         Kyy_c = FT
         temp = cmplx(problem%Kyy)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kyy_c, ntot)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kyy_c, ntot, IFT , ntot, beta_c, Kyy_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, temp2, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, temp2, ntot, IFT , ntot, beta_c, Kyy_c, ntot)
         
         Kyz_c = FT
         temp = cmplx(problem%Kyz)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kyz_c, ntot)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kyz_c, ntot, IFT , ntot, beta_c, Kyz_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, temp2, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, temp2, ntot, IFT , ntot, beta_c, Kyz_c, ntot)
         
         Kzz_c = FT
         temp = cmplx(problem%Kzz)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kzz_c, ntot)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kzz_c, ntot, IFT , ntot, beta_c, Kzz_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, temp2, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, temp2, ntot, IFT , ntot, beta_c, Kzz_c, ntot)
         !Kxx_c = matmul( matmul( FT, problem%Kxx ), IFT )
         !Kxy_c = matmul( matmul( FT, problem%Kxy ), IFT )
         !Kxz_c = matmul( matmul( FT, problem%Kxz ), IFT )
@@ -1143,6 +1149,7 @@ include 'blas.f90'
         !Kyz_c = matmul( matmul( FT, problem%Kyz ), IFT )
         !Kzz_c = matmul( matmul( FT, problem%Kzz ), IFT )
         deallocate(temp)
+        deallocate(temp2)
         
         threshold_var = problem%demag_threshold
         !If a fraction of entries is specified that are to be removed, find the function value for this
