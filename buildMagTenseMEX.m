@@ -138,6 +138,7 @@ eval(mex_str)
 if ~USE_RELEASE
     movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb']);
 end
+pause(5)
 movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64']);
 
 %% No CUDA version of MagTenseLandauLifshitzSolver_mex
@@ -152,6 +153,7 @@ if (USE_CUDA)
         movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/MagTenseLandauLifshitzSolverNoCUDA_mex.mex' MEX_str '64.pdb']);
     end
 end
+pause(5)
 movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_files/MagTenseLandauLifshitzSolverNoCUDA_mex.mex' MEX_str '64']);
 
 %% IterateMagnetization_mex
@@ -161,6 +163,7 @@ eval(mex_str)
 if ~USE_RELEASE
     movefile(['IterateMagnetization_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/IterateMagnetization_mex.mex' MEX_str '64.pdb']);
 end
+pause(5)
 movefile(['IterateMagnetization_mex.mex' MEX_str '64'],['matlab/MEX_files/IterateMagnetization_mex.mex' MEX_str '64']);
         
 %% getHFromTiles_mex
@@ -170,6 +173,7 @@ eval(mex_str)
 if ~USE_RELEASE
     movefile(['getHFromTiles_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/getHFromTiles_mex.mex' MEX_str '64.pdb']);
 end
+pause(5)
 movefile(['getHFromTiles_mex.mex' MEX_str '64'],['matlab/MEX_files/getHFromTiles_mex.mex' MEX_str '64']);
     
 %% getNFromTile_mex
@@ -179,6 +183,7 @@ eval(mex_str)
 if ~USE_RELEASE
     movefile(['getNFromTile_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/getNFromTile_mex.mex' MEX_str '64.pdb']);
 end
+pause(5)
 movefile(['getNFromTile_mex.mex' MEX_str '64'],['matlab/MEX_files/getNFromTile_mex.mex' MEX_str '64']);
     
 %% getMagForce_mex
@@ -188,6 +193,7 @@ eval(mex_str)
 if ~USE_RELEASE
     movefile(['getMagForce_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/getMagForce_mex.mex' MEX_str '64.pdb']);
 end
+pause(5)
 movefile(['getMagForce_mex.mex' MEX_str '64'],['matlab/MEX_files/getMagForce_mex.mex' MEX_str '64']);
     
 end
