@@ -1,6 +1,6 @@
-function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4_unstructured_cart( NIST_field )
+function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,mesh,GridInfo] = Standard_problem_4_unstructured_cart( NIST_field, n, L, mesh_scale )
 
-clearvars -except NIST_field resolution use_CUDA SaveTheResult ShowTheResult weight_direct
+clearvars -except NIST_field resolution use_CUDA SaveTheResult ShowTheResult weight_direct n L mesh_scale
 % close all
 
 %--- Use either field 1 or field 2 from the NIST example
@@ -59,7 +59,7 @@ InteractionMatrices.X = GridInfo.Xel ;
 InteractionMatrices.Y = GridInfo.Yel ;
 InteractionMatrices.Z = GridInfo.Zel ;
 
-[D2X,D2Y] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',6,"DirectLaplacianNeumann");
+[D2X,D2Y] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann");
 InteractionMatrices.A2 = D2X + D2Y ;
 
 %--- Convert the exchange matrix to sparse
