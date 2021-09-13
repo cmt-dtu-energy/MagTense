@@ -22,6 +22,8 @@ if (ispc)
     TileDemagTensor_lib_str         = '-lTileDemagTensor';
     MagTenseMicroMag_lib_str        = '-lMagTenseMicroMag';
     MEX_str = 'w';
+    % Necessary for Matlab to recognize oneAPI
+    setenv('IFORT_COMPILER19','C:\Program Files (x86)\Intel\oneAPI\compiler\latest\windows');
 else
     %compiler_str = 'FC=''/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort -fpp -fpic -free -Wl,--no-as-needed -mkl -lmkl_intel_lp64 -lmkl_lapack95_lp64 -lmkl_blas95_lp64 -static-intel ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_lapack95_lp64.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_lp64.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_thread.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_core.a'' -liomp5 -lpthread -lm -ldl ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/intel64/lp64/'' ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include''''';
     
@@ -57,7 +59,7 @@ end
 
 if (ispc)
     if (USE_CUDA)
-        CUDA_str  = '''-Lc:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v10.2/lib/x64/'' -lcublas -lcudart -lcuda -lcusparse';
+        CUDA_str  = '''-Lc:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.4/lib/x64/'' -lcublas -lcudart -lcuda -lcusparse';
         if (USE_RELEASE)
             build_str_MagTenseMicroMag = 'x64/release';
             build_str_NO_CUDA_MagTenseMicroMag = 'x64/Release_no_CUDA';
@@ -122,7 +124,7 @@ MagTenseMicroMag_str        = ['-Lsource/MagTenseMicroMag/' build_str_MagTenseMi
 
 Options_str                 = 'COMPFLAGS="$COMPFLAGS /O3 /free /real_size:64 /fpe:0" -R2018a';
 if (ispc)
-    MKL_str                 = '''-LC:/Program Files (x86)/Intel/oneAPI/mkl/latest/lib/intel64'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-Ic:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/include/''';
+    MKL_str                 = '''-LC:/Program Files (x86)/Intel/oneAPI/mkl/latest/lib/intel64'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-IC:\Program Files (x86)\Intel\oneAPI\mkl\latest\include''';%''-Ic:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/include/''';
 else
     %MKL_str                 = '''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/''';
     MKL_str                 = '/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a  -liomp5 -lpthread -lm -ldl';%'''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/'' ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/'' ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/intel64/lp64''  ''-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_lp64.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_thread.a'' ''-L/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_core.a''';
@@ -132,6 +134,7 @@ end
 %%----------------------------------------------------- Build the MEX files ------------------------------
 %%------------------------------------------------------------------------- ------------------------------
 %% MagTenseLandauLifshitzSolver_mex
+
 Source_str = 'source/MagTenseMEX/MagTenseMEX/MagTenseLandauLifshitzSolver_mex.f90';
 mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' MagTenseMicroMag_str ' ' DemagField_str ' ' TileDemagTensor_str ' ' NumericalIntegration_str ' ' CUDA_str ' ' CVODE_str ' ' MKL_str ' ' Source_str ' ' Options_str];
 eval(mex_str) 
