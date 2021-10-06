@@ -77,6 +77,7 @@ private MTdmdt, MTy_out,MTf_vec
         call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol )
         
     else if ( solver_flag .eq. useCVODETrue ) then
+#if USE_CVODE
         !Do the magic for CVODE
         MTdmdt => fct
         !internal temporary arrays
@@ -92,12 +93,16 @@ private MTdmdt, MTy_out,MTf_vec
         t2a = t(2)
         t1b = t_double(1)
         t2b = t_double(2)
-        call MagTense_CVODEsuite( int(neq,c_int), real(t,c_double), int(nt,c_int), real(y0,c_double), t_out_double, y_out_double, real(tol,c_double), callback )
+        call MagTense_CVODEsuite( int(neq,c_int), real(t,c_double), int(nt,c_int), real(y0,c_double), t_out_double, y_out_double, real(tol,c_double), callback, callback_display )
         y_out = real(y_out_double)
         
         t_out = real(t_out_double)
         !clean-up
         deallocate(MTy_out,MTf_vec)
+#else
+        call callback( 'MagTense not compiled with CVODE - exiting!', 0 )
+        stop
+#endif    
     endif
     
     !clean-up
@@ -236,6 +241,7 @@ private MTdmdt, MTy_out,MTf_vec
     
     end subroutine MagTense_ODE_RKSuite
     
+#if USE_CVODE    
     !---------------------------------------------------------------------------
     !> @author Emil B. Poulsen, emib@dtu.dk, DTU, 2019
     !> @brief
@@ -247,34 +253,32 @@ private MTdmdt, MTy_out,MTf_vec
     !> @param[inout] t_out output array with the times at which y_i are found
     !> @param[inout] y_out output array with the y_i values
     !---------------------------------------------------------------------------
-#if USE_CVODE
-    subroutine MagTense_CVODEsuite( neq, t, nt, ystart,  t_out, y_out, tol, callback )
+    subroutine MagTense_CVODEsuite( neq, t, nt, ystart,  t_out, y_out, tol, callback,callback_display )
 	use, intrinsic :: iso_c_binding
 
     use fcvode_mod                   ! Fortran interface to CVODE
     use fnvector_serial_mod          ! Fortran interface to serial N_Vector
     use fsunmatrix_dense_mod         ! Fortran interface to dense SUNMatrix
-    use fsunlinsol_dense_mod         ! Fortran interface to dense SUNLinearSolver
-    use fsunnonlinsol_fixedpoint_mod ! Fortran interface to fixed-point nonlinear solver
-    !use ode_mod                     ! ODE functions
+    use fsunlinsol_spgmr_mod         ! Fortran interface to Generalised minimum residual solver
 
     ! local variables
     integer(c_int),intent(in) :: neq,nt                   ! number of eq. and timesteps
     real(c_double),dimension(nt),intent(in) :: t          ! initial time
     real(c_double),dimension(nt),intent(inout) :: t_out   ! output time
     procedure(callback_fct), pointer :: callback          !> Callback function
-    real(c_double) :: rtol,atol,hlast,dum1,dum2,tol       ! relative and absolute tolerance
+    real(c_double) :: rtol,atol,hlast,dum1,tol            ! relative and absolute tolerance
+    character(100) :: err_str                             ! error string for diagnostics
 
-    integer(c_int) :: ierr,ierr2,ierr3,ierr4,ierr5         ! error flags from C functions
-    integer(c_int) :: nlinconvfails,linconvfails,nsteps    ! debugging variables
+    integer(c_int) :: ierr,ierr2,ierr3,ierr4,ierr5        ! error flags from C functions
+    integer(c_int) :: nlinconvfails,linconvfails,nsteps   ! debugging variables
 
     integer :: outstep           ! output loop counter
+    integer,intent(in) :: callback_display                !>Sets at what time index values Fortran displays the results in Matlab
     
     type(c_ptr) :: sunvec_y      ! sundials vector
     type(c_ptr) :: sunmat_A      ! sundials matrix
     type(c_ptr) :: sunlinsol_LS  ! sundials linear solver
     type(c_ptr) :: cvode_mem     ! CVODE memory
-    type(c_ptr) :: NLS  	     ! nonlinear solver
     type(c_ptr) :: user_data     ! Data for the RhsFn function
 
     ! solution vector, neq is set in the ode_functions module
@@ -283,51 +287,41 @@ private MTdmdt, MTy_out,MTf_vec
     real(c_double),dimension(neq) :: y_cur
 
     !======= Internals ============
-    dum1=t(1)
-    dum2=t(2)
     ! initialize solution vector
     y_cur = ystart
-
+    
     ! create a serial vector
     sunvec_y = FN_VMake_Serial(neq, y_cur)
     if (.not. c_associated(sunvec_y)) print *,'ERROR: sunvec = NULL'
-
+    
     ! create a dense matrix
     sunmat_A = FSUNDenseMatrix(neq, neq);
     if (.not. c_associated(sunmat_A)) print *,'ERROR: sunmat = NULL'
 
-    ! create a dense linear solver
-    sunlinsol_LS = FSUNDenseLinearSolver(sunvec_y, sunmat_A);
+    ! create a dense linear solver. 0 -- no preconditioning, lmin set to 300 according to
+    ! D. Suess -- Time resolved micromagnetics using a preconditioned time integration method
+    ! https://doi.org/10.1016/S0304-8853(02)00341-4
+    sunlinsol_LS = FSUNLinSol_SPGMR(sunvec_y, 0, 300);
+
     if (.not. c_associated(sunlinsol_LS)) print *,'ERROR: sunlinsol = NULL'
     
     ! create CVode memory. CV_BDF recommended for stiff problems (along with default newton iteration)
-    cvode_mem = FCVodeCreate(CV_ADAMS) ! CV_ADAMS recommended for nonstiff problems (along with fixed point solver)
+    cvode_mem = FCVodeCreate(CV_BDF) ! CV_ADAMS recommended for nonstiff problems (along with fixed point solver)
     if (.not. c_associated(cvode_mem)) print *,'ERROR: cvode_mem = NULL'
 
     ! initiate user data. Just neq for now
     user_data = transfer(neq,user_data)
     ierr = FCVodeSetUserData(cvode_mem, user_data);
     if (ierr /= 0) then
-        write(*,*) 'Error in FCVodeSetUserData, ierr = ', ierr, '; halting'
+		call CVODE_error( 'Error in FCVodeSetUserData, ierr = ', ierr,callback )
 	    stop
     end if
   
     ! initialize CVode
     ierr = FCVodeInit(cvode_mem, c_funloc(RhsFn), t(1), sunvec_y)
     if (ierr /= 0) then
-	    write(*,*) 'Error in FCVodeInit, ierr = ', ierr, '; halting'
+	    call CVODE_error('Error in FCVodeInit, ierr = ', ierr,callback )
 	    stop
-    end if
-    
-    ! create fixed point nonlinear solver object
-    NLS = FSUNNonlinSol_FixedPoint(sunvec_y, 0)
-    if (.not. c_associated(NLS)) print *,'ERROR: sunnls = NULL'
-
-    ! attache nonlinear solver object to CVode
-    ierr = FCVodeSetNonlinearSolver(cvode_mem, NLS)
-    if (ierr /= 0) then
-        write(*,*) 'Error in FCVodeSetNonlinearSolver, ierr = ', ierr, '; halting'
-        stop
     end if
 
     ! set relative and absolute tolerances
@@ -337,67 +331,95 @@ private MTdmdt, MTy_out,MTf_vec
 
     ierr = FCVodeSStolerances(cvode_mem, rtol, atol)
     if (ierr /= 0) then
-	    write(*,*) 'Error in FCVodeSStolerances, ierr = ', ierr, '; halting'
+	    call CVODE_error('Error in FCVodeSStolerances, ierr = ', ierr,callback ) 
 	    stop
     end if
     
     ! set maximum amount of convergence fails (default: 10)
     ierr = FCVodeSetMaxConvFails(cvode_mem, 100)
     if (ierr /= 0) then
-	    write(*,*) 'Error in FCVodeSetMaxConvFails, ierr = ', ierr, '; halting'
+	    call CVODE_error('Error in FCVodeSetMaxConvFails, ierr = ', ierr,callback ) 
 	    stop
     end if
     
-    ierr = FCVodeSetMaxNumSteps(cvode_mem, 10000)
+    ! set maximum number of steps (default: 500)
+    ierr = FCVodeSetMaxNumSteps(cvode_mem, 5000)
     if (ierr /= 0) then
-	    write(*,*) 'Error in FCVodeSetMaxNumSteps, ierr = ', ierr, '; halting'
-	    stop
+	    call CVODE_error('Error in FCVodeSetMaxNumSteps, ierr = ', ierr,callback ) 
+		stop
     end if
     
-    ierr = FCVodeSetInitStep(cvode_mem, (t(2)-t(1))/2)
+    ! set maximum order of BDF method (default: 5)
+    ierr = FCVodeSetMaxOrd(cvode_mem, 2)
     if (ierr /= 0) then
-        write(*,*) 'Error in FCVodeSetInitStep, ierr = ', ierr, '; halting'
-        stop
+	    call CVODE_error('Error in FCVodeSetMaxOrd, ierr = ', ierr,callback ) 
+		stop
+    end if
+    
+    ! Input because otherwise we get error that in- and output times are too close
+    dum1 = (t(2)-t(1))/2
+    ierr = FCVodeSetInitStep(cvode_mem, dum1)
+    if (ierr /= 0) then
+        call CVODE_error('Error in FCVodeSetInitStep, ierr = ', ierr,callback ) 
+		stop
     end if
 
     ! attach linear solver
     ierr = FCVodeSetLinearSolver(cvode_mem, sunlinsol_LS, sunmat_A);
     if (ierr /= 0) then
-	    write(*,*) 'Error in FCVodeSetLinearSolver, ierr = ', ierr, '; halting'
+	    call CVODE_error('Error in FCVodeSetLinearSolver, ierr = ',ierr,callback ) 
 	    stop
     end if
+    
+    ! ensure FCVode doesn't overstep on the last evolution
+    !ierr = FCVodeSetStopTime(cvode_mem, t(nt))
+    !if (ierr /= 0) then
+    !    call CVODE_error( 'Error in FCVodeSetStopTime, ierr = ', ierr,callback  )
+    !    write(err_str,'(A22,G10.5)') 'Attempted stop time: ',t(nt)
+    !    call CVODE_error(trim(err_str), nt,callback ) 
+    !    stop
+    !end if
 
     ! start time stepping
-    print *, '   '
-    print *, 'Finished initialization, starting time steps'
+    call callback('Finished initialization, starting time steps', 0 )
 
-    do outstep = 1,(nt-1+1)
+    do outstep = 1,nt
 	    ! call CVode
-        if (outstep == nt) then
-            write(*,*) 'break'
-            ! ensure FCVode doesn't overstep on the last evolution
-            ierr = FCVodeSetStopTime(cvode_mem, t(nt))
-            if (ierr /= 0) then
-                write(*,*) 'Error in FCVodeSetStopTime, ierr = ', ierr, '; halting'
-                stop
-            end if
-
+        if ( mod(outstep,callback_display) .eq. 0 ) then
+            call callback( 'Time', outstep )
         endif
         
 	    ierr = FCVode(cvode_mem, t(outstep), sunvec_y, t_out(outstep), CV_NORMAL)
         ! http://sundials.wikidot.com/return-time
         !ierr = FCVode(cvode_mem, t(outstep), sunvec_y, t_out(outstep), CV_NORMAL_TSTOP)
 	    if (ierr /= 0) then
-            rtol=t_out(1)
-            atol=t_out(2)
-            dum1=t(1)
-            dum2=t(2)
-        ierr2 = FCVodeGetLastStep(cvode_mem, hlast)
-        ierr3 = FCVodeGetNumNonlinSolvConvFails(cvode_mem, nlinconvfails)
-        ierr4 = FCVodeGetNumLinConvFails(cvode_mem, linconvfails)
-        ierr5 = FCVodeGetNumSteps(cvode_mem, nsteps)
-		write(*,*) 'Error in FCVODE, ierr = ', ierr, '; halting'
-		stop
+            call CVODE_error('Error in FCVODE, ierr = ', ierr,callback ) 
+            ierr = FCVodeGetLastStep(cvode_mem, hlast)
+            if (ierr .eq. 0) then
+                write(err_str,'(A30,G10.5)') 'Last stepsize, hlast = ',hlast
+                call CVODE_error(err_str, 0,callback ) 
+            else
+                call CVODE_error('Error in FCVodeGetLastStep, ierr = ', ierr,callback )
+            endif
+            ierr = FCVodeGetNumNonlinSolvConvFails(cvode_mem, nlinconvfails)
+            if (ierr .eq. 0) then
+                call CVODE_error('Nonlinear solver fails: ', nlinconvfails,callback )
+            else
+                call CVODE_error('Error in FCVodeGetNumNonlinSolvConvFails, ierr = ', ierr,callback )
+            endif
+            ierr = FCVodeGetNumLinConvFails(cvode_mem, linconvfails)
+            if (ierr .eq. 0) then
+              call CVODE_error('Linear solver fails: ', linconvfails,callback )
+            else
+                call CVODE_error('Error in FCVodeGetNumLinConvFails, ierr = ', ierr,callback )
+            endif
+            ierr = FCVodeGetNumSteps(cvode_mem, nsteps)
+            if (ierr .eq. 0) then
+                call CVODE_error('Number of steps taken: ', nsteps,callback ) 
+            else
+                call CVODE_error('Error in FCVodeGetNumSteps, ierr = ', ierr,callback )
+            endif
+		exit
 	    endif
 	    y_out(:,outstep) = y_cur    ! Todo: Find a way to write directly to y_out
     enddo
@@ -407,7 +429,9 @@ private MTdmdt, MTy_out,MTf_vec
 
     ! clean up
     call FCVodeFree(cvode_mem)
-    call FSUNLinSolFree_Dense(sunlinsol_LS)
+    call CVODE_error('Before sunlinsol free', 0,callback ) 
+    call FSUNLinSolFree_SPGMR(sunlinsol_LS)
+    call CVODE_error('After sunlinsol free', 0,callback ) 
     call FSUNMatDestroy_Dense(sunmat_A)
     call FN_VDestroy_Serial(sunvec_y)
 	
@@ -465,23 +489,26 @@ private MTdmdt, MTy_out,MTf_vec
     return
 
     end function RhsFn
-#else
-    subroutine MagTense_CVODEsuite( neq, t, nt, ystart,  t_out, y_out, tol, callback )
-	use, intrinsic :: iso_c_binding
-
-    ! local variables
-    integer(c_int),intent(in) :: neq,nt                   ! number of eq. and timesteps
-    real(c_double),dimension(nt),intent(in) :: t          ! initial time
-    real(c_double),dimension(nt),intent(inout) :: t_out   ! output time
-    procedure(callback_fct), pointer :: callback         !> Callback function
-    real(c_double) :: rtol,atol,hlast,dum1,dum2,tol       ! relative and absolute tolerance
-
-    ! solution vector, neq is set in the ode_functions module
-    real(c_double),dimension(neq,nt),intent(inout) :: y_out
-    real(c_double),dimension(neq),intent(in) :: ystart
-    
-    call callback( 'MagTense not compiled with CVODE - exiting!', 0 )
-    stop
-    end subroutine MagTense_CVODEsuite
-#endif
+	
+	subroutine CVODE_error( msg, ierr,callback )
+        use, intrinsic :: iso_c_binding
+		integer(c_int), intent(in) :: ierr
+		character(*), intent(in) :: msg
+        logical :: exist
+        procedure(callback_fct), pointer :: callback         !> Callback function
+		
+        !FILE *fp;
+        
+        call callback(msg,ierr)
+        inquire(file="error.txt", exist=exist)
+        if(exist) then
+            open(12,file='error.txt',status='old',access='append',form='formatted',action='write')    
+        else
+            open(12,file='error.txt',status='new',form='formatted',action='write')
+        end if
+        write(12,*) msg
+        write(12,*) ierr
+        close(12)
+    end subroutine CVODE_error
+#endif    
 end module ODE_Solvers

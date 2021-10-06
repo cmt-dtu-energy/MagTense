@@ -239,10 +239,10 @@ for kk=1:K
         e=ones(2*lind,1);
         if (dims == 2)
             nns=[NX(kk),NY(kk)];
-            extra=[dxk,dyk]-2*nns.*(sum([dxk,dyk],2)/sum(nns)); % mirror reflection on face plane
+            extra=[dxk,dyk]-2*nns.*([dxk,dyk]*nns'); % mirror reflection on face plane
         else
             nns=[NX(kk),NY(kk),NZ(kk)];
-            extra=[dxk,dyk,dzk]-2*nns.*(sum([dxk,dyk,dzk],2)/sum(nns)); % mirror reflection on face plane
+            extra=[dxk,dyk,dzk]-2*nns.*([dxk,dyk,dzk]*nns'); % mirror reflection on face plane
         end
         dxk=[dxk;extra(:,1)];
         dyk=[dyk;extra(:,2)];
