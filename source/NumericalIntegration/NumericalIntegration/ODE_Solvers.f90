@@ -372,18 +372,24 @@ private MTdmdt, MTy_out,MTf_vec
     end if
     
     ! ensure FCVode doesn't overstep on the last evolution
-    !ierr = FCVodeSetStopTime(cvode_mem, t(nt))
-    !if (ierr /= 0) then
-    !    call CVODE_error( 'Error in FCVodeSetStopTime, ierr = ', ierr,callback  )
-    !    write(err_str,'(A22,G10.5)') 'Attempted stop time: ',t(nt)
-    !    call CVODE_error(trim(err_str), nt,callback ) 
-    !    stop
-    !end if
-
+    dum1 = t(nt)
+    ierr = FCVodeSetStopTime(cvode_mem, dum1)
+    if (ierr /= 0) then
+        call CVODE_error( 'Error in FCVodeSetStopTime, ierr = ', ierr,callback  )
+        write(err_str,'(A22,G10.5)') 'Attempted stop time: ',dum1
+        call CVODE_error(trim(err_str), nt,callback ) 
+        stop
+    end if
+    write(err_str,'(A22,G10.5)') 'Attempted stop time: ',dum1
+    call CVODE_error(trim(err_str), nt,callback ) 
+    write(err_str,'(A30,G10.5)') 'Attempted start time: ',t(1)
+    call CVODE_error(trim(err_str), 1,callback ) 
     ! start time stepping
     call callback('Finished initialization, starting time steps', 0 )
-
-    do outstep = 1,nt
+    
+    t_out(1)=t(1)
+    y_out(:,1)=y_cur
+    do outstep = 2,nt
 	    ! call CVode
         if ( mod(outstep,callback_display) .eq. 0 ) then
             call callback( 'Time', outstep )
@@ -392,7 +398,7 @@ private MTdmdt, MTy_out,MTf_vec
 	    ierr = FCVode(cvode_mem, t(outstep), sunvec_y, t_out(outstep), CV_NORMAL)
         ! http://sundials.wikidot.com/return-time
         !ierr = FCVode(cvode_mem, t(outstep), sunvec_y, t_out(outstep), CV_NORMAL_TSTOP)
-	    if (ierr /= 0) then
+	    if (ierr .lt. 0) then
             call CVODE_error('Error in FCVODE, ierr = ', ierr,callback ) 
             ierr = FCVodeGetLastStep(cvode_mem, hlast)
             if (ierr .eq. 0) then
@@ -400,6 +406,13 @@ private MTdmdt, MTy_out,MTf_vec
                 call CVODE_error(err_str, 0,callback ) 
             else
                 call CVODE_error('Error in FCVodeGetLastStep, ierr = ', ierr,callback )
+            endif
+            ierr = FCVodeGetCurrentTime(cvode_mem, dum1);
+            if (ierr .eq. 0) then
+                write(err_str,'(A30,G10.5)') 'Last time, t = ',dum1
+                call CVODE_error(err_str, 0,callback ) 
+            else
+                call CVODE_error('Error in FCVodeGetCurrentTime, ierr = ', ierr,callback )
             endif
             ierr = FCVodeGetNumNonlinSolvConvFails(cvode_mem, nlinconvfails)
             if (ierr .eq. 0) then
