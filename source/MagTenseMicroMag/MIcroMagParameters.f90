@@ -1,9 +1,9 @@
 include 'mkl_spblas.f90'
-include "mkl_dfti.f90"    
+include "mkl_dfti.f90"
 
     module MicroMagParameters
     use MKL_SPBLAS
-    Use MKL_DFTI   
+    Use MKL_DFTI
     INTEGER, PARAMETER :: SP = KIND(1.0E0)
     INTEGER, PARAMETER :: DP = KIND(1.0D0)
     
@@ -23,7 +23,7 @@ include "mkl_dfti.f90"
     !> matrix handle    
     type MagTenseSparse
         type(sparse_matrix_t) :: A                                      !> Sparse matrix handle to MKL
-        real*4,dimension(:),allocatable :: values                       !> the non-zero values
+        real(SP),dimension(:),allocatable :: values                       !> the non-zero values
         integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
         integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
         integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
@@ -72,7 +72,7 @@ include "mkl_dfti.f90"
         
         integer :: solver                           !> Determines what type of solver to use
         
-        real(DP) :: A0,Ms,K0,gamma,alpha0,MaxT0         !> User defined coefficients determining part of the problem.
+        real(DP) :: A0,gamma,alpha0,MaxT0         !> User defined coefficients determining part of the problem.
         real(DP) :: tol,thres_value                     !> User defined coefficients for the ODE solver
         
         real(DP),dimension(:,:),allocatable :: Hext     !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
@@ -80,11 +80,12 @@ include "mkl_dfti.f90"
         
         real(DP),dimension(:),allocatable :: t          !> Time array for the desired output times
         real(DP),dimension(:),allocatable :: m0         !> Initial value of the magnetization
+        real(DP),dimension(:),allocatable :: Ms,K0      !> User defined coefficients determining part of the problem.
         
         real(DP),dimension(:),allocatable :: t_conv     !> Time array with the time values where the solution will be checked for convergence compared to the last timestep
         real(DP) :: conv_tol                            !> Converge criteria on difference between magnetization at different timesteps
         
-        real*4 :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
+        real(SP) :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         
         integer :: setTimeDisplay                               !> Determines how often the timestep is shown in Matlab
         integer :: useCuda                                      !> Defines whether to attempt using CUDA or not
@@ -119,11 +120,11 @@ include "mkl_dfti.f90"
     !> The design intention is such that a problem may be restarted given the information stored in this struct
     !>-----------------
     type MicroMagSolution
-        real*4,dimension(:),allocatable :: HjX,HjY,HjZ                     !> Effective fields for the exchange term (X,Y and Z-directions, respectively)
+        real(SP),dimension(:),allocatable :: HjX,HjY,HjZ                     !> Effective fields for the exchange term (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: HhX,HhY,HhZ                   !> Effective fields for the external field (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: HkX,HkY,HkZ                   !> Effective fields for the anisotropy energy term (X,Y and Z-directions, respectively)        
-        real*4,dimension(:),allocatable :: HmX,HmY,HmZ                     !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
-        real*4,dimension(:),allocatable :: Mx,My,Mz                        !> The magnetization components used internally as the solution progresses
+        real(SP),dimension(:),allocatable :: HmX,HmY,HmZ                     !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
+        real(SP),dimension(:),allocatable :: Mx,My,Mz                        !> The magnetization components used internally as the solution progresses
         complex(kind=4),dimension(:),allocatable :: Mx_FT, My_FT, Mz_FT    !> Fourier transform of Mx, My and Mz (complex)
         complex(kind=4),dimension(:),allocatable :: HmX_c,HmY_c,HmZ_c      !> Complex version of the demag field, used for the Fourier cut-off approach
         
@@ -136,7 +137,7 @@ include "mkl_dfti.f90"
         
         real(DP),dimension(:,:),allocatable :: pts          !> n,3 array with the points (x,y,z) of the centers of the tiles
         
-        real(DP) :: Jfact,Mfact,Kfact
+        real(DP),dimension(:),allocatable :: Jfact,Mfact,Kfact
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
     end type MicroMagSolution

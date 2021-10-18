@@ -238,9 +238,9 @@ methods
         % Exchange term constant
         obj.A0 = 1.3e-11;
         % demag magnetization constant
-        obj.Ms = 8e5; %A/m
+        obj.Ms = 8e5*ones(obj.ntot,1); %A/m
         %Anisotropy constant
-        obj.K0 = 0; 
+        obj.K0 = zeros(obj.ntot,1); 
 
         %precession constant
         obj.gamma = 0; %m/A*s
@@ -417,6 +417,29 @@ methods
             case 'UseDynamicSolver'
                 obj.SolverType = 4;
         end
+    end
+    
+    %Override struct function for a final check before handing to Fortran
+    function obj2 = struct(obj)
+        if length(obj.Ms)==1 % Check if Ms is vectorized
+            obj.Ms=obj.Ms*ones(obj.ntot,1);
+        end
+        if length(obj.K0)==1 % Check if K0 is vectorized
+            obj.K0=obj.K0*ones(obj.ntot,1);
+        end
+        mnorm=vecnorm(obj.m0,2,2); % Check if input array is normalized
+        normcondfail=abs(mnorm-ones(obj.ntot,1)) >= obj.tol;
+        if any(normcondfail)
+            if all(mnorm(normcondfail)==0*mnorm(normcondfail))
+                warning('Zero magnetization in initial array')
+            else
+                warning('Initial array not normalized -- Normalizing')
+                obj.m0=obj.m0./mnorm;
+            end
+        end
+        warning('off','MATLAB:structOnObject')
+        obj2=builtin('struct',obj); % Actual struct conversion
+        warning('on','MATLAB:structOnObject')
     end
     
 end
