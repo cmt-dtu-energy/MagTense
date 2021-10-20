@@ -559,6 +559,9 @@
                 call setupEvaluationPoints( tiles(i) )
             endif
 
+            !> Set the default behavior to false such that the tile by default is included in the calculation
+            tiles(i)%excludeFromSummation = .false.
+
         enddo
 
     end subroutine loadTiles
