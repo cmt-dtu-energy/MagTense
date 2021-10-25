@@ -179,7 +179,7 @@ if (ProblemSetupStruct.dem_appr == 4 )  %DemagApproximationThresholdFraction
     end
 end
 
-if (ProblemSetupStruct.dem_appr == 2) %DemagApproximationThreshold
+if (ProblemSetupStruct.dem_appr == 2 || ProblemSetupStruct.dem_appr == 4) %DemagApproximationThreshold
     if ~all(FFTdims==0)
         [InteractionMatrices.FFT.DemagTensor] = FilterTensorThreshold(InteractionMatrices.FFT.DemagTensor,ProblemSetupStruct.threshold) ;
     else

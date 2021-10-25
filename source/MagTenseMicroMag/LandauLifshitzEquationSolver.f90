@@ -526,50 +526,57 @@ include 'blas.f90'
     type(matrix_descr) :: descr
     real(SP) :: pref,alpha,beta
     complex(kind=4) :: alpha_c, beta_c
+    real(SP), dimension(:), allocatable :: temp
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
     
+    ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+    allocate(temp(ntot))
+            
     if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
         if ( problem%useCuda .eq. useCudaFalse ) then
-            !Do the matrix multiplications using sparse matrices 
-            alpha = 1.0
+            !Do the matrix multiplications using sparse matrices
+            alpha = -1.0
             beta = 0.
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(1)%A, descr, solution%Mx, beta, solution%HmX )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(1)%A, descr, solution%Mx, beta, temp )
             beta = 1.0
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My, beta, solution%HmX )
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz, beta, solution%HmX )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz, beta, temp )
         
-            solution%HmX = solution%HmX * (-solution%Mfact )
+            solution%HmX = temp * ( solution%Mfact )
             !ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
             !call vsmul( ntot, solution%HmX, -solution%Mfact, solution%HmX )
             
             beta = 0.
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx, beta, solution%HmY )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx, beta, temp )
             beta = 1.0
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My, beta, solution%HmY )
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz, beta, solution%HmY )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz, beta, temp )
         
-            solution%HmY = solution%HmY * (-solution%Mfact )
+            solution%HmY = temp * ( solution%Mfact )
             !call vsmul( ntot, solution%HmY, -solution%Mfact, solution%HmY )
           
             beta = 0.
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx, beta, solution%HmZ )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx, beta, temp )
             beta = 1.0
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My, beta, solution%HmZ )
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz, beta, solution%HmZ )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz, beta, temp )
         
-            solution%HmZ = solution%HmZ * (-solution%Mfact )
+            solution%HmZ = temp * ( solution%Mfact )
             !call vsmul( ntot, solution%HmZ, -solution%Mfact, solution%HmZ )
         else
 #if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
             pref = sngl(-1 )!* solution%Mfact)                                
             call cudaMatrVecMult_sparse( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
-            solution%HmX = solution%HmX * solution%Mfact
-            solution%HmY = solution%HmY * solution%Mfact
-            solution%HmZ = solution%HmZ * solution%Mfact
+            temp = solution%HmX * solution%Mfact
+            solution%HmX = temp
+            temp = solution%HmY * solution%Mfact
+            solution%HmY = temp
+            temp = solution%HmZ * solution%Mfact
+            solution%HmZ = temp
 #endif            
         endif
         
@@ -660,56 +667,62 @@ include 'blas.f90'
             alpha = -1.! * solution%Mfact
             beta = 0.0
             !Hmx = Kxx * Mx
-            call gemv( problem%Kxx, solution%Mx, solution%HmX, alpha, beta )
+            call gemv( problem%Kxx, solution%Mx, temp, alpha, beta )
             
             beta = 1.0
             !Hmx = Hmx + Kxy * My
-            call gemv( problem%Kxy, solution%My, solution%HmX, alpha, beta )
+            call gemv( problem%Kxy, solution%My, temp, alpha, beta )
             
             !Hmx = Hmx + Kxz * Mz
-            call gemv( problem%Kxz, solution%Mz, solution%HmX, alpha, beta )
+            call gemv( problem%Kxz, solution%Mz, temp, alpha, beta )
             !Scale with Mfact in case it varies
             !ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
             !call vsmul( ntot, solution%HmX, solution%Mfact, solution%HmX )
-            solution%HmX = solution%HmX * solution%Mfact
+            temp = solution%HmX * solution%Mfact
+            solution%HmX = temp
             
             
             beta = 0.0
             !HmY = Kyx * Mx
-            call gemv( problem%Kxy, solution%Mx, solution%HmY, alpha, beta )
+            call gemv( problem%Kxy, solution%Mx, temp, alpha, beta )
             
             beta = 1.0
             !HmY = HmY + Kyy * My
-            call gemv( problem%Kyy, solution%My, solution%HmY, alpha, beta )
+            call gemv( problem%Kyy, solution%My, temp, alpha, beta )
             
             !Hmy = Hmy + Kyz * Mz
-            call gemv( problem%Kyz, solution%Mz, solution%HmY, alpha, beta )
+            call gemv( problem%Kyz, solution%Mz, temp, alpha, beta )
             !Scale with Mfact in case it varies
             !call vsmul( ntot, solution%HmY, solution%Mfact, solution%HmY )
-            solution%HmY = solution%HmY * solution%Mfact
+            temp = solution%HmY * solution%Mfact
+            solution%HmY = temp
             
             
             beta = 0.0
             !HmZ = Kzx * Mx
-            call gemv( problem%Kxz, solution%Mx, solution%HmZ, alpha, beta )
+            call gemv( problem%Kxz, solution%Mx, temp, alpha, beta )
             
             beta = 1.0
             !HmZ = HmZ + Kzy * My
-            call gemv( problem%Kyz, solution%My, solution%HmZ, alpha, beta )
+            call gemv( problem%Kyz, solution%My, temp, alpha, beta )
             
             !HmZ = HmZ + Kzz * Mz
-            call gemv( problem%Kzz, solution%Mz, solution%HmZ, alpha, beta )
+            call gemv( problem%Kzz, solution%Mz, temp, alpha, beta )
             !Scale with Mfact in case it varies
             !call vsmul( ntot, solution%HmZ, solution%Mfact, solution%HmZ )
-            solution%HmZ = solution%HmZ * solution%Mfact
+            temp = solution%HmZ * solution%Mfact
+            solution%HmZ = temp
             
         else
             pref = sngl(-1)! * solution%Mfact)
 #if USE_CUDA        
             call cudaMatrVecMult( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
-            solution%HmX = solution%HmX * solution%Mfact
-            solution%HmY = solution%HmY * solution%Mfact
-            solution%HmZ = solution%HmZ * solution%Mfact
+            temp = solution%HmX * solution%Mfact
+            solution%HmX = temp
+            temp = solution%HmY * solution%Mfact
+            solution%HmY = temp
+            temp = solution%HmZ * solution%Mfact
+            solution%HmZ = temp
 #endif            
         endif 
     endif
@@ -717,6 +730,7 @@ include 'blas.f90'
     !open(12,file='count_dmdt.txt',status='old',access='append',form='formatted',action='write')    
     !write(12,*) 1
     !close(12)
+    deallocate(temp)
     
     end subroutine updateDemagfield
     

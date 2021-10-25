@@ -27,7 +27,10 @@ AllEntries(AllEntries(:) == 0) =  [] ;
 x = [1:numel(AllEntries)]./numel(AllEntries) ;
 
 imax = round(FractionOfEntries*numel(AllEntries)) ;
-if imax > 0
+if imax > numel(AllEntries)
+    disp('Threshold fraction >= 1 selected. Turning off demagnetization.')
+    TheThreshold = inf;
+elseif imax > 0
     TheThreshold = AllEntries(imax) ;
 else
     TheThreshold = 0 ;
