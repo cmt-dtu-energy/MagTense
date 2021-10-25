@@ -380,10 +380,10 @@ private MTdmdt, MTy_out,MTf_vec
         call CVODE_error(trim(err_str), nt,callback ) 
         stop
     end if
-    write(err_str,'(A22,G10.5)') 'Attempted stop time: ',dum1
-    call CVODE_error(trim(err_str), nt,callback ) 
-    write(err_str,'(A30,G10.5)') 'Attempted start time: ',t(1)
-    call CVODE_error(trim(err_str), 1,callback ) 
+    !write(err_str,'(A22,G10.5)') 'Attempted stop time: ',dum1
+    !call CVODE_error(trim(err_str), nt,callback ) 
+    !write(err_str,'(A30,G10.5)') 'Attempted start time: ',t(1)
+    !call CVODE_error(trim(err_str), 1,callback ) 
     ! start time stepping
     call callback('Finished initialization, starting time steps', 0 )
     

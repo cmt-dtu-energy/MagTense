@@ -45,10 +45,10 @@ CopyMatrix = InteractionMatrices.CopyMatrix;
 
 %% Effective field parameter prefactors
 
-Jfact = A0/(mu0*Ms) ;   % "J" : exchange term
+Jfact = A0./(mu0*Ms) ;   % "J" : exchange term
 % Hfact = 1/mu0 ;         % "H" : external field term (b.c. user input is in Tesla)
 Mfact = Ms ;            % "M" : demagnetization term
-Kfact = K0/(mu0*Ms) ;   % "K" : anisotropy term
+Kfact = K0./(mu0*Ms) ;   % "K" : anisotropy term
 
 %% All Interaction Terms (function handles)
 

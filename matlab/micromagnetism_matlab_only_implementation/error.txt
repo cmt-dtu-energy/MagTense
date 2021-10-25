@@ -1,0 +1,8 @@
+  Attempted stop time: .10000E-06
+         401
+         Attempted start time: 0.0000
+           1
+ Before sunlinsol free
+           0
+ After sunlinsol free
+           0

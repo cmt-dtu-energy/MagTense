@@ -26,9 +26,9 @@ for k=2:numel(AvrgMatrix)
     HmZc = DemagTensor.KglobXZ{k}*SigmaXC+DemagTensor.KglobYZ{k}*SigmaYC+DemagTensor.KglobZZ{k}*SigmaZC ;
 
     % get demag. field over fine grid (copy)   
-    HmXcTOT = HmXcTOT - Mfact*CopyMatrix{k}*HmXc ;  % Coarser
-    HmYcTOT = HmYcTOT - Mfact*CopyMatrix{k}*HmYc ;  % Coarser
-    HmZcTOT = HmZcTOT - Mfact*CopyMatrix{k}*HmZc ;  % Coarser
+    HmXcTOT = HmXcTOT - Mfact.*CopyMatrix{k}*HmXc ;  % Coarser
+    HmYcTOT = HmYcTOT - Mfact.*CopyMatrix{k}*HmYc ;  % Coarser
+    HmZcTOT = HmZcTOT - Mfact.*CopyMatrix{k}*HmZc ;  % Coarser
 end
 
 %%  Exchange 
