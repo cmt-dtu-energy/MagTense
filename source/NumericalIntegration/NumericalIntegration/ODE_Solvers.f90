@@ -163,7 +163,7 @@ private MTdmdt, MTy_out,MTf_vec
     thres(:) = thres_value
     
     !Set the method to RK45 as default (will be parameterized later as the code evolves)
-    !L or l for 23, M or m for 45 and H o h for 67
+    !L or l for 23, M or m for 45 and H or h for 67
     method = 'M'
     !Set default solver to normal (R or r) or complex (S or s)
     task = 'R'
