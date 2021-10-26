@@ -47,7 +47,7 @@ endif
 # PROJECT CONFIG, do not put spaced behind the variables
 # ======================================================================
 # Python module name
-PYTHON_MODN = MagTenseSource
+PYTHON_MODN = magtensesource
 
 #=======================================================================
 #       List all source files required for the project

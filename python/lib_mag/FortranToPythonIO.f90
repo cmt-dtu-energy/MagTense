@@ -12,14 +12,23 @@ contains
 !! @param err_max the current maximum allowed error
 !!
 function dispIte_fct( err, err_max )
-    real,intent(in) :: err,err_max
-    integer :: dispIte_fct
+    real(8),intent(in) :: err,err_max
+    integer(4) :: dispIte_fct
    
     write(*,*) err,err_max
   
     dispIte_fct = 0
     
 end function dispIte_fct
+
+function dispIte_fct_no_output( err, err_max )
+    real(8),intent(in) :: err,err_max
+    integer(4) :: dispIte_fct_no_output
+  
+    dispIte_fct_no_output = 0
+    
+end function dispIte_fct_no_output
+
 
 !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 !< Function getNFromTiles
@@ -75,29 +84,29 @@ subroutine getNFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     !::do the calculation
     N(:,:,:,:) = 0
     H(:,:) = 0
+    ! $OMP PARALLEL DO PRIVATE(i)
     do i=1,n_tiles
-        if ( tiles(i)%tileType .eq. tileTypeCylPiece ) then
+        select case ( tiles(i)%tileType )
+        case ( tileTypeCylPiece )
             call getFieldFromCylTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
-
-        else if (tiles(i)%tileType .eq. tileTypeCircPiece ) then          
-            call getFieldFromCircPieceTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
-
-        else if (tiles(i)%tileType .eq. tileTypeCircPieceInverted ) then          
-            call getFieldFromCircPieceInvertedTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
-
-        else if (tiles(i)%tileType .eq. tileTypePrism ) then    
+        case ( tileTypePrism )
             call getFieldFromRectangularPrismTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
-
-        else if (tiles(i)%tileType .eq. tileTypeTetrahedron ) then    
-            call getFieldFromTetrahedronTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
-        
-        else if (tiles(i)%tileType .eq. tileTypeSphere ) then
+        case ( tileTypeSphere )
             call getFieldFromSphereTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
-                
-        else if (tiles(i)%tileType .eq. tileTypeSpheroid ) then
+        case ( tileTypeSpheroid )
             call getFieldFromSpheroidTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
-        endif
+        case ( tileTypeCircPiece )
+            call getFieldFromCircPieceTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+        case ( tileTypeCircPieceInverted )
+            call getFieldFromCircPieceInvertedTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+        case ( tileTypeTetrahedron )
+            call getFieldFromTetrahedronTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+        case (tileTypePlanarCoil )
+            call getFieldFromPlanarCoilTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+        case default
+        end select
     enddo
+    ! $OMP END PARALLEL DO
 
 end subroutine getNFromTiles
 
@@ -157,56 +166,79 @@ subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
 
-    if ( useStoredN .eqv. .true. ) then
-        write(*,*) 'Finding solution at requested points with precalculated N'
+    N_out = N
+    H(:,:) = 0.
 
-        N_out = N
-        H(:,:) = 0.
-    
-        do i=1,n_tiles
-        
-            H_tmp(:,:) = 0.        
+    ! $OMP PARALLEL DO PRIVATE(i,H_tmp)    
+    do i=1,n_tiles
 
-            select case ( tiles(i)%tileType )
+        !Make sure to allocate H_tmp on the heap and for each thread
+        ! $OMP CRITICAL
+        H_tmp(:,:) = 0.
 
-            case ( tileTypeCylPiece )
-                call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
-
-            case ( tileTypePrism )
+        ! $OMP END CRITICAL
+        !! Here a selection of which subroutine to use should be done, i.e. whether the tile
+        !! is cylindrical, a prism or an ellipsoid or another geometry
+        select case ( tiles(i)%tileType )
+        case ( tileTypeCylPiece )
+            if ( useStoredN .eqv. .true. ) then
+                call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )    
+            else
+                call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts )
+            endif
+        case ( tileTypePrism )
+            if ( useStoredN .eqv. .true. ) then
                 call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
-
-            case ( tileTypeCircPiece )
-                 call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
-
-            case ( tileTypeCircPieceInverted )
-                 call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
-
-            case ( tileTypeTetrahedron )
-                 call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
-
-            case (tileTypeSphere)
+            else
+                call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts )
+            endif
+        case ( tileTypeSphere )
+            if ( useStoredN .eqv. .true. ) then
                 call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
-
-            case (tileTypeSpheroid)
+            else
+                call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts )
+            endif
+        case ( tileTypeSpheroid )
+            if ( useStoredN .eqv. .true. ) then
                 call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
-
-            case ( tileTypePlanarCoil )
+            else
+                call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts )
+            endif
+        case ( tileTypeCircPiece )
+            if ( useStoredN .eqv. .true. ) then
+                call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+            else
+                call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts )
+            endif
+        case ( tileTypeCircPieceInverted )
+            if ( useStoredN .eqv. .true. ) then
+                call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+            else
+                call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts )
+            endif
+        case ( tileTypeTetrahedron )
+            if ( useStoredN .eqv. .true. ) then
+                call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+            else
+                call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts )
+            endif
+        case ( tileTypePlanarCoil )
+            if ( useStoredN .eqv. .true. ) then
                 call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
-            
-            case default        
-            
-            end select
-        
-            H = H + H_tmp
+            else
+                call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts )            
+            endif
 
-        enddo
-    
-        call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_pts )
+        case default
 
-    else
-        write(*,*) 'Finding solution at requested points'
-        call getFieldFromTiles( tiles, H, pts, n_tiles, n_pts )
-    endif
+        end select
+
+        H = H + H_tmp
+
+    enddo
+    ! $OMP END PARALLEL DO
+
+    call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_pts )
 
 end subroutine getHFromTiles
 
@@ -268,7 +300,7 @@ subroutine IterateTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, 
     !! default value is zero, i.e. do not resume iteration
     resumeIteration = 0.
     
-    disp_fct => dispIte_fct
+    disp_fct => dispIte_fct_no_output
 
     !::initialise MagTile with specified parameters
     call loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
@@ -277,8 +309,6 @@ subroutine IterateTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, 
     
     !::load state function from table
     call loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn)
-    
-    write(*,*) 'Doing iteration'
     call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, disp_fct, resumeIteration )
 
     do i=1,n_tiles
@@ -302,7 +332,7 @@ end subroutine IterateTiles
 subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
     mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, n_stateFcn, nT, nH, &
-    data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out )
+    data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out, console )
     
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
@@ -340,9 +370,11 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     real(8),dimension(nH,nT),intent(in) :: data_stateFcn
     real(8) :: start,finish,resumeIteration
     procedure(displayIteration_fct),pointer :: disp_fct => null()
+    logical, intent(in) :: console
 
     real(8),dimension(n_pts,3),intent(in) :: pts
     real(8),dimension(n_pts,3),intent(out) :: H
+    real(8),dimension(n_pts,3) :: H_tmp
     type(MagTile),dimension(n_tiles) :: tiles
     integer(4),intent(in) :: n_tiles
     integer(4),intent(in) :: n_pts
@@ -350,7 +382,11 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
 
     call cpu_time(start)
 
-    disp_fct => dispIte_fct
+    if (console) then
+        disp_fct => dispIte_fct
+    else
+        disp_fct => dispIte_fct_no_output
+    endif
     
     !!@todo no support for resuming iterations at the moment
     resumeIteration = 0
@@ -364,7 +400,9 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     call loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
     
     if ( iterateSolution .eqv. .true. ) then
-        write(*,*) 'Doing iteration'
+        if (console) then
+            write(*,*) 'Doing iteration'
+        endif
         call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, disp_fct, resumeIteration )
 
         do i=1,n_tiles
@@ -398,13 +436,55 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     endif
     
     if ( returnSolution .eqv. .true. ) then
-        write(*,*) 'Finding solution at requested points'
-        call getFieldFromTiles( tiles, H, pts, n_tiles, n_pts )
+        if (console) then
+            write(*,*) 'Finding solution at requested points'
+        endif
+
+        H(:,:) = 0.
+    
+        ! $OMP PARALLEL DO PRIVATE(i,H_tmp)    
+        do i=1,n_tiles
+    
+            !Make sure to allocate H_tmp on the heap and for each thread
+            ! $OMP CRITICAL
+            H_tmp(:,:) = 0.
+    
+            ! $OMP END CRITICAL
+            !! Here a selection of which subroutine to use should be done, i.e. whether the tile
+            !! is cylindrical, a prism or an ellipsoid or another geometry
+            select case (tiles(i)%tileType )
+            case (tileTypeCylPiece)
+                call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts )
+            case (tileTypePrism)
+                call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts )
+            case (tileTypeSphere)
+                call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts )
+            case (tileTypeSpheroid)
+                call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts )
+            case (tileTypeCircPiece )
+                call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts )
+            case (tileTypeCircPieceInverted )
+                call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts )
+            case (tileTypeTetrahedron )
+                call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts )
+            case (tileTypePlanarCoil )
+                call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts )
+            case default
+            end select
+    
+            H = H + H_tmp
+    
+        enddo
+        ! $OMP END PARALLEL DO
+    
+        call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_pts )
     endif
 
     call cpu_time(finish)
     
-    write(*,*) 'Elapsed time', finish-start
+    if (console) then
+        write(*,*) 'Elapsed time', finish-start
+    endif
 
 end subroutine runSimulation
 
