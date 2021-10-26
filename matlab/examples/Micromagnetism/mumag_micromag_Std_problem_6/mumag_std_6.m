@@ -157,7 +157,11 @@ HystDir = normalize([easyX,easyY,easyZ],'norm') ;
 
 %time-dependent applied field
 HextFct = @(t) 2e7*HystDir/mu0 .* t';
-problem = problem.setHext( HextFct, linspace(0,100e-9,2001) );
+problem = problem.setHext( HextFct, linspace(0,100e-9,2) );
+
+problem.HextFct{1} = @(t) 2e7*HystDir(1)/mu0 .* t';
+problem.HextFct{2} = @(t) 2e7*HystDir(2)/mu0 .* t';
+problem.HextFct{3} = @(t) 2e7*HystDir(3)/mu0 .* t';
 
 % Initial State
 init_stat=[-1,0.3,0];
