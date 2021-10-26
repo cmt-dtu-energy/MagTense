@@ -1,10 +1,11 @@
 import os
-import numpy as np
 import math
-import random as rand
+import random
+import numpy as np
 
-import MagTenseSource
-from util_plot import create_plot
+import magtensesource
+from util_plot import create_plot, get_rotmat
+
 
 class Tiles():
     def __init__(self, n):
@@ -28,7 +29,7 @@ class Tiles():
         self.offset = np.zeros(shape=(n,3), dtype=np.float64, order='F') # offset of global coordinates
         self.rot = np.zeros(shape=(n,3), dtype=np.float64, order='F')
         self.color = np.zeros(shape=(n,3), dtype=np.float64, order='F')
-        self.magnetic_type = np.ones(n, dtype=np.int32, order='F') # 1 = hard magnet, 2 = soft magnet
+        self.magnettype = np.ones(n, dtype=np.int32, order='F') # 1 = hard magnet, 2 = soft magnet, 3 = soft + constant mu_r
         self.stfcn_index = np.ones(shape=(n), dtype=np.int32, order='F') # default index into the state function
         self.incl_it = np.ones(shape=(n), dtype=np.int32, order='F') # if equal to zero the tile is not included in the iteration
         self.use_sym = np.zeros(shape=(n), dtype=np.int32, order='F') # whether to exploit symmetry
@@ -71,8 +72,11 @@ class Tiles():
         return self.size[i]
     
     def set_center_pos(self, center_positions):
-        for i,center_pos in enumerate(center_positions):
-            self.set_center_pos_i(center_pos,i)
+        if isinstance(center_positions[0], int) or isinstance(center_positions[0], float):
+            self.center_pos[:] = center_positions
+        else:
+            for i,center_pos in enumerate(center_positions):
+                self.set_center_pos_i(center_pos,i)
 
     def set_center_pos_i(self, center_pos, i):
         self.center_pos[i] = center_pos
@@ -110,7 +114,6 @@ class Tiles():
         else:
             print("Four 3-dimensional vertices have to be defined!")
             
-    
     def get_vertices(self, i):
         return self.vertices[i]
     
@@ -131,8 +134,8 @@ class Tiles():
         if isinstance(offset[0], int) or isinstance(offset[0], float):
             self.offset[:] = offset
         else:
-            for i,offset in enumerate(offset):
-                self.set_offset_i(offset,i)
+            for i,off in enumerate(offset):
+                self.set_offset_i(off,i)
 
     def set_offset_i(self, offset, i):
         self.offset[i] = offset
@@ -141,10 +144,10 @@ class Tiles():
         return self.offset[i]
     
     def set_rotation_i(self, rotation, i):
-        if self.tile_type == 7:
+        if self.tile_type[i] == 7:
             print('For spheroids the rotation axis has to be set rather than the specific Euler angles!')
         else:
-            self.rot[i] = rotation
+            self.rot[i] = np.array(rotation)
 
     def get_rotation(self, i):
         return self.rot[i]
@@ -188,7 +191,7 @@ class Tiles():
             self.mu_r_oa[:] = mu
         else:
             for i,mu_i in enumerate(mu):
-                self.mu_r_oa(mu_i,i)
+                self.set_mu_r_oa_i(mu_i,i)
 
     def set_mu_r_oa_i(self, mu, i):
         self.mu_r_oa[i] = mu
@@ -204,17 +207,21 @@ class Tiles():
         self.M_rem[i] = M_rem
     
     def set_mag_angle(self, mag_angles):
-        for i,mag_angle in enumerate(mag_angles):
-            self.set_mag_angle_i(mag_angle,i)
+        if isinstance(mag_angles[0], int) or isinstance(mag_angles[0], float):
+            for i in range(self.n):
+                self.set_mag_angle_i(mag_angles,i)
+        else:
+            for i,mag_angle in enumerate(mag_angles):
+                self.set_mag_angle_i(mag_angle,i)
 
     def set_mag_angle_rand(self):
         for i in range(self.n):
-            self.set_mag_angle_i([math.pi * rand.random(), 2*math.pi * rand.random()], i)                      
+            self.set_mag_angle_i([math.pi * random.random(), 2*math.pi * random.random()], i)
 
     def set_mag_angle_i(self, spherical_angles, i):
         # polar angle [0, pi], azimuth [0, 2*pi]
         if isinstance(spherical_angles, int) or isinstance(spherical_angles, float):
-            print("Azimuth and polar angle have to be set!\nExiting!")
+            print("Azimuth and polar angle have to be set, exiting...")
             exit()
         else:
             polar_angle = spherical_angles[0]
@@ -229,12 +236,15 @@ class Tiles():
     def get_M(self, i):
         return self.M[i]
 
+    def get_mur(self, i):
+        return self.mu_r_ea[i]
+
     def set_color(self, color):
         if isinstance(color[0], int) or isinstance(color[0], float):
             self.color[:] = color
         else:
             for i,color_i in enumerate(color):
-                    self.set_color_i(color_i,i)
+                self.set_color_i(color_i,i)
     
     def set_color_i(self, color, i):
         self.color[i] = color
@@ -243,7 +253,10 @@ class Tiles():
         return self.color[i]
 
     def set_mag_type_i(self, mag_type, i):
-        self.magnetic_type[i] = mag_type
+        self.magnettype[i] = mag_type
+
+    def set_incl_it_i(self, incl_it, i):
+        self.incl_it[i] = incl_it
 
     def set_rot_axis_i(self, ax, i):
         # Check if size was specified beforehand:
@@ -277,7 +290,75 @@ class Tiles():
         self.rot[i] = rot
     
     def get_rot_axis(self, i):
-        return self.ax[i], self.rot_ax[i]
+        return self.rot[i]
+
+
+    def add_tiles(self, n):
+        self.center_pos = np.append(self.center_pos, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0) # r0, theta0, z0
+        self.dev_center = np.append(self.dev_center, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0) # dr, dtheta, dz
+        self.size = np.append(self.size, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0) # a, b, c
+        self.vertices = np.append(self.vertices, np.zeros(shape=(n,3,4), dtype=np.float64, order='F'), axis = 0) # v1, v2, v3, v4 as column vectors
+        self.M = np.append(self.M, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0) # Mx, My, Mz
+        self.u_ea = np.append(self.u_ea, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0) # Easy axis
+        self.u_oa1 = np.append(self.u_oa1, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0)
+        self.u_oa2 = np.append(self.u_oa2, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0)
+        self.mu_r_ea = np.append(self.mu_r_ea, np.ones(shape=(n), dtype=np.float64, order='F'), axis = 0)
+        self.mu_r_oa = np.append(self.mu_r_oa, np.ones(shape=(n), dtype=np.float64, order='F'), axis = 0)
+        self.M_rem = np.append(self.M_rem, np.zeros(shape=(n), dtype=np.float64, order='F'), axis = 0)
+        self.tile_type = np.append(self.tile_type, np.ones(n, dtype=np.int32, order='F'), axis = 0) # 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 5 = tetrahedron, 10 = ellipsoid
+        self.offset = np.append(self.offset, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0) # offset of global coordinates
+        self.rot = np.append(self.rot, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0)
+        self.color = np.append(self.color, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0)
+        self.magnettype = np.append(self.magnettype, np.ones(n, dtype=np.int32, order='F'), axis = 0) # 1 = hard magnet, 2 = soft magnet
+        self.stfcn_index = np.append(self.stfcn_index, np.ones(shape=(n), dtype=np.int32, order='F'), axis = 0) # default index into the state function
+        self.incl_it = np.append(self.incl_it, np.ones(shape=(n), dtype=np.int32, order='F'), axis = 0) # if equal to zero the tile is not included in the iteration
+        self.use_sym = np.append(self.use_sym, np.zeros(shape=(n), dtype=np.int32, order='F'), axis = 0) # whether to exploit symmetry
+        self.sym_op = np.append(self.sym_op, np.ones(shape=(n,3), dtype=np.float64, order='F'), axis = 0) # 1 for symmetry and -1 for anti-symmetry respectively to the planes
+        self.M_rel = np.append(self.M_rel, np.zeros(shape=(n), dtype=np.float64, order='F'), axis = 0)                             
+        self.grid_pos = np.append(self.grid_pos, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0) # positions in the grid
+        self.n = self.n + n
+
+
+    def refinement_prism(self, idx, mat):
+        if isinstance(idx, int) or isinstance(idx, float):
+            self.refinement_prism_i(idx, mat)
+        else:
+            for i in idx:
+                self.refinement_prism_i(i, mat)
+
+
+    def refinement_prism_i(self, i, mat=(10,10,1)):
+        n = self.n
+        self.add_tiles(mat[0] * mat[1] * mat[2] - 1)
+        R = get_rotmat(self.rot[i])
+
+        x_off, y_off, z_off = self.size[i] / mat
+        center_0  = - self.size[i] / 2 + ( self.size[i] / mat ) / 2
+        center_pts = [center_0 + [x_off * j, y_off * k, z_off * l] for j in range(mat[0]) for k in range(mat[1]) for l in range(mat[2])]
+        ver_cube = (np.dot(R, np.array(center_pts).T)).T + self.offset[i]
+        
+        for j in range(mat[0]):
+            for k in range(mat[1]):
+                for l in range(mat[2]):
+                    idx = n + j * mat[1] * mat[2]  + k * mat[2] + l
+                    if idx == self.n:
+                        self.offset[i] = ver_cube[j * mat[1] * mat[2]  + k * mat[2] + l]
+                        self.size[i] = self.size[i] / mat
+                    else:
+                        self.size[idx] = self.size[i] / mat
+                        self.M[idx] = self.M[i]
+                        self.M_rel[idx] = self.M_rel[i]
+                        self.color[idx] = self.color[i]
+                        self.magnettype[idx] = self.magnettype[i]
+                        self.mu_r_ea[idx] = self.mu_r_ea[i]
+                        self.mu_r_oa[idx] = self.mu_r_oa[i]
+                        self.rot[idx] = self.rot[i]
+                        self.tile_type[idx] = self.tile_type[i]
+                        self.u_ea[idx] = self.u_ea[i]
+                        self.u_oa1[idx] = self.u_oa1[i]
+                        self.u_oa2[idx] = self.u_oa2[i]
+                        self.offset[idx] = ver_cube[j * mat[1] * mat[2]  + k * mat[2] + l]
+                        self.incl_it[idx] = self.incl_it[i]
 
 
 class Grid():
@@ -292,13 +373,13 @@ class Grid():
         # Fill grid randomly
         if not grid_positions:
             if n_tiles is None:
-                n_tiles = rand.randrange(np.prod(self.places))
+                n_tiles = random.randrange(np.prod(self.places))
             else:
                 n_tiles = n_tiles
             grid_positions = []
             
             while n_tiles > 0:
-                new_pos = [rand.randrange(self.places[0]), rand.randrange(self.places[1]), rand.randrange(self.places[2])]
+                new_pos = [random.randrange(self.places[0]), random.randrange(self.places[1]), random.randrange(self.places[2])]
                 if new_pos in grid_positions:
                     continue
                 else:
@@ -306,7 +387,7 @@ class Grid():
                     n_tiles = n_tiles - 1
         
         if len(grid_positions) == 0:
-                tiles = None
+            tiles = None
         else:
             tiles = Tiles(len(grid_positions))
             # Set grid position of tile
@@ -341,30 +422,49 @@ class Grid():
             points = [[i*seg, j*seg_angle, k*seg_layer] for i in range(0,n_points[0]) \
                 for j in range(0, n_points[1]) for k in range(0, n_points[2])]
         elif mode == "costumized":
-                pass
+            pass
         else:
             print("Please specify a valid area of interest!")
             exit()
         points = np.asarray(points, dtype=np.float64, order='F')
+
         return points
 
     def clear_grid(self):
-            self.grid = np.zeros(self.places.tolist())
+        self.grid = np.zeros(self.places.tolist())
+
 
 def get_average_magnetic_flux(H):
     norm = get_norm_magnetic_flux(H)
-    average = sum(norm)/len(norm)
+    average = sum(norm) / len(norm)
+    
     return average
+
+
+def get_average_magnetic_flux_x(H):
+    H_x = H[:,0]
+    average = (sum(H_x) / len(H_x)) * 4 * math.pi * 1e-7
+    
+    return average
+
 
 def get_p2p(H):
     norm = get_norm_magnetic_flux(H)
-    return max(norm)-min(norm)
+
+    return max(norm) - min(norm)
+
 
 def get_norm_magnetic_flux(H):
     norm = np.zeros(shape=len(H))
     mu0 = 4*math.pi*1e-7 # vacuum permeability
     norm = [np.linalg.norm(H_point)*mu0 for H_point in H]
+
     return norm
+
+
+def get_norm_magnetic_field(H):
+    return [np.linalg.norm(H_point) for H_point in H]
+
 
 def setup(places, area, n_tiles=0, filled_positions=None, mag_angles=[], eval_points=[20, 20, 1], eval_mode="uniform", B_rem=1.2):
     # Check format of input parameters
@@ -390,34 +490,29 @@ def setup(places, area, n_tiles=0, filled_positions=None, mag_angles=[], eval_po
         if not mag_angles:
             # polar angle [0, pi], azimuth [0, 2*pi]
             for _ in range(tiles.get_n()):
-                mag_angles.append([math.pi * rand.random(), 2*math.pi * rand.random()])
+                mag_angles.append([math.pi * random.random(), 2*math.pi * random.random()])
 
         for i in range(tiles.get_n()):        
             if not mag_angles[i]:
-                mag_angles[i] = [math.pi * rand.random(), 2*math.pi * rand.random()]
+                mag_angles[i] = [math.pi * random.random(), 2*math.pi * random.random()]
 
         tiles.set_remanence(B_rem / (4*math.pi*1e-7))
         tiles.set_mag_angle(mag_angles)
-        # Setting display color of magnets: red - [1, 0, 0] 
-        tiles.set_color([1, 0, 0])     
+        # Setting display color of magnets: red - [1, 0, 0]
+        tiles.set_color([1, 0, 0])
     return tiles, points, meshgrid
 
 # Function for running MagTense with the Fortran source code as Python module
-def run_simulation(tiles, points, grid=None, plot=False, max_error=0.00001, max_it=500, iterate_solution=True, return_field=True, T = 300.):
-    max_error = max_error # max relative error
-    max_it = max_it # max number of iterations 
-    iterate_solution = iterate_solution
-    return_field = return_field
-    T = T # temperature for the state function of iron (arbitrary here as we ignore temperature variation in the iron)
+def run_simulation(tiles, points, grid=None, plot=False, max_error=0.00001, max_it=500, iterate_solution=True, return_field=True, T = 300., console=True):
     data_stateFcn = np.genfromtxt(os.path.dirname(os.path.abspath(__file__)) + '/../util/data_stateFcn.csv', delimiter=';', dtype=np.float64)
 
     H, M_out, Mrel_out = \
-        MagTenseSource.fortrantopythonio.runsimulation( centerpos=tiles.center_pos, dev_center=tiles.dev_center, \
+        magtensesource.fortrantopythonio.runsimulation( centerpos=tiles.center_pos, dev_center=tiles.dev_center, \
         tile_size=tiles.size, vertices=tiles.vertices, mag=tiles.M, u_ea=tiles.u_ea, u_oa1=tiles.u_oa1, u_oa2=tiles.u_oa2, mu_r_ea=tiles.mu_r_ea, \
         mu_r_oa=tiles.mu_r_oa, mrem=tiles.M_rem, tiletype=tiles.tile_type, offset=tiles.offset, rotangles=tiles.rot, \
-        color=tiles.color, magnettype=tiles.magnetic_type, statefunctionindex=tiles.stfcn_index, includeiniteration=tiles.incl_it, \
+        color=tiles.color, magnettype=tiles.magnettype, statefunctionindex=tiles.stfcn_index, includeiniteration=tiles.incl_it, \
         exploitsymmetry=tiles.use_sym, symmetryops=tiles.sym_op, mrel=tiles.M_rel, pts=points, data_statefcn=data_stateFcn, \
-        n_statefcn=1, t=T, maxerr=max_error, nitemax=max_it, iteratesolution=iterate_solution, returnsolution=return_field  )
+        n_statefcn=1, t=T, maxerr=max_error, nitemax=max_it, iteratesolution=iterate_solution, returnsolution=return_field, console=console )
 
     updated_tiles = tiles
     
@@ -428,7 +523,7 @@ def run_simulation(tiles, points, grid=None, plot=False, max_error=0.00001, max_
         # updated_tiles.u_oa2 = u_oa2_out
         updated_tiles.M_rel = Mrel_out
     
-    solution = H if return_field is True else None
+    solution = H if return_field else None
 
     if plot == True:
         if grid is None:
@@ -438,16 +533,14 @@ def run_simulation(tiles, points, grid=None, plot=False, max_error=0.00001, max_
     
     return updated_tiles, solution
 
-def iterate_magnetization(tiles, max_error=0.00001, max_it=500, T=300.):
-    max_error = max_error # max relative error
-    max_it = max_it # max number of iterations
-    T = T # temperature for the state function of iron (arbitrary here as we ignore temperature variation in the iron)
-    data_stateFcn = np.genfromtxt(os.path.dirname(os.path.abspath(__file__)) + '/../util/data_stateFcn.csv', delimiter=';', dtype=np.float64)
 
-    M_out, Mrel_out = MagTenseSource.fortrantopythonio.iteratetiles( centerpos=tiles.center_pos, dev_center=tiles.dev_center, \
+def iterate_magnetization(tiles, max_error=0.00001, max_it=500, T=300., mu_r=20):
+    data_stateFcn = np.genfromtxt(os.path.dirname(os.path.abspath(__file__)) + f'/../util/Fe_mur_{mu_r}_Ms_2_1.csv', delimiter=';', dtype=np.float64)
+
+    M_out, Mrel_out = magtensesource.fortrantopythonio.iteratetiles( centerpos=tiles.center_pos, dev_center=tiles.dev_center, \
         tile_size=tiles.size, vertices=tiles.vertices, mag=tiles.M, u_ea=tiles.u_ea, u_oa1=tiles.u_oa1, u_oa2=tiles.u_oa2, mu_r_ea=tiles.mu_r_ea, \
         mu_r_oa=tiles.mu_r_oa, mrem=tiles.M_rem, tiletype=tiles.tile_type, offset=tiles.offset, rotangles=tiles.rot, color=tiles.color, \
-        magnettype=tiles.magnetic_type, statefunctionindex=tiles.stfcn_index, includeiniteration=tiles.incl_it, exploitsymmetry=tiles.use_sym, \
+        magnettype=tiles.magnettype, statefunctionindex=tiles.stfcn_index, includeiniteration=tiles.incl_it, exploitsymmetry=tiles.use_sym, \
         symmetryops=tiles.sym_op, mrel=tiles.M_rel, data_statefcn=data_stateFcn, n_statefcn=1, t=T, maxerr=max_error, nitemax=max_it )
 
     updated_tiles = tiles
@@ -456,26 +549,28 @@ def iterate_magnetization(tiles, max_error=0.00001, max_it=500, T=300.):
 
     return updated_tiles
 
+
 def get_N_tensor(tiles, points):
-    N = MagTenseSource.fortrantopythonio.getnfromtiles( centerpos=tiles.center_pos, dev_center=tiles.dev_center, \
+    N = magtensesource.fortrantopythonio.getnfromtiles( centerpos=tiles.center_pos, dev_center=tiles.dev_center, \
         tile_size=tiles.size, vertices=tiles.vertices, mag=tiles.M, u_ea=tiles.u_ea, u_oa1=tiles.u_oa1, u_oa2=tiles.u_oa2, mu_r_ea=tiles.mu_r_ea, \
         mu_r_oa=tiles.mu_r_oa, mrem=tiles.M_rem, tiletype=tiles.tile_type, offset=tiles.offset, rotangles=tiles.rot, color=tiles.color, \
-        magnettype=tiles.magnetic_type, statefunctionindex=tiles.stfcn_index, includeiniteration=tiles.incl_it, exploitsymmetry=tiles.use_sym, \
-        symmetryops=tiles.sym_op, mrel=tiles.M_rel, pts=points )                   
+        magnettype=tiles.magnettype, statefunctionindex=tiles.stfcn_index, includeiniteration=tiles.incl_it, exploitsymmetry=tiles.use_sym, \
+        symmetryops=tiles.sym_op, mrel=tiles.M_rel, pts=points )
 
     return N
 
+
 def get_H_field(tiles, points, N=None):
-    if N is None:
+    if N is not None:
+        useN = True
+    else:
         N = np.zeros(shape=(tiles.get_n(),len(points),3,3), dtype=np.float64, order='F')
         useN = False
-    else:
-        useN = True
 
-    H = MagTenseSource.fortrantopythonio.gethfromtiles( centerpos=tiles.center_pos, dev_center=tiles.dev_center, \
+    H = magtensesource.fortrantopythonio.gethfromtiles( centerpos=tiles.center_pos, dev_center=tiles.dev_center, \
         tile_size=tiles.size, vertices=tiles.vertices, mag=tiles.M, u_ea=tiles.u_ea, u_oa1=tiles.u_oa1, u_oa2=tiles.u_oa2, mu_r_ea=tiles.mu_r_ea, \
         mu_r_oa=tiles.mu_r_oa, mrem=tiles.M_rem, tiletype=tiles.tile_type, offset=tiles.offset, rotangles=tiles.rot, color=tiles.color, \
-        magnettype=tiles.magnetic_type, statefunctionindex=tiles.stfcn_index, includeiniteration=tiles.incl_it, exploitsymmetry=tiles.use_sym, \
+        magnettype=tiles.magnettype, statefunctionindex=tiles.stfcn_index, includeiniteration=tiles.incl_it, exploitsymmetry=tiles.use_sym, \
         symmetryops=tiles.sym_op, mrel=tiles.M_rel, pts=points, n=N, usestoredn=useN )                 
 
     return H
