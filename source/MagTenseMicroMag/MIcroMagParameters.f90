@@ -23,13 +23,24 @@ include "mkl_dfti.f90"
     !> matrix handle    
     type MagTenseSparse
         type(sparse_matrix_t) :: A                                      !> Sparse matrix handle to MKL
-        real(SP),dimension(:),allocatable :: values                       !> the non-zero values
+        real(SP),dimension(:),allocatable :: values                     !> the non-zero values
         integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
         integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
         integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
         integer :: nvalues                                              !> the number of elements in values
         integer :: nrows                                                !> the number of elements in the row arrays
     end type MagTenseSparse
+    
+    !Double version
+    type MagTenseSparse_d
+        type(sparse_matrix_t) :: A                                      !> Sparse matrix handle to MKL
+        real(DP),dimension(:),allocatable :: values                     !> the non-zero values
+        integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
+        integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
+        integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
+        integer :: nvalues                                              !> the number of elements in values
+        integer :: nrows                                                !> the number of elements in the row arrays
+    end type MagTenseSparse_d
     
     !Complex version
     type MagTenseSparse_c
@@ -55,7 +66,7 @@ include "mkl_dfti.f90"
         real(DP),dimension(:,:),allocatable :: abc          !> Array with the side lengths a,b,c in list form
         integer :: gridType
         integer :: nnodes                                   !> The number of nodes in a tetrahedral grid
-        type(MagTenseSparse) :: A_exch_load                 !> The exchange matrix as read from Matlab
+        type(MagTenseSparse_d) :: A_exch_load                 !> The exchange matrix as read from Matlab
      end type MicroMagGrid
      
     !>-----------------
@@ -90,6 +101,7 @@ include "mkl_dfti.f90"
         integer :: setTimeDisplay                               !> Determines how often the timestep is shown in Matlab
         integer :: useCuda                                      !> Defines whether to attempt using CUDA or not
         integer :: useCVODE                                     !> Defines whether to attempt using CVODE or not
+        integer :: usePrecision                                 !> Defines whether to use single (false) or double precision (true)
         integer :: demag_approximation                          !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         integer :: demagTensorReturnState                       !> Flag describing how or if the demag tensor should be returned
         integer :: demagTensorLoadState                         !> Flag describing how or if to load the demag tensor (from disk e.g.)
@@ -120,11 +132,12 @@ include "mkl_dfti.f90"
     !> The design intention is such that a problem may be restarted given the information stored in this struct
     !>-----------------
     type MicroMagSolution
-        real(SP),dimension(:),allocatable :: HjX,HjY,HjZ                     !> Effective fields for the exchange term (X,Y and Z-directions, respectively)
+        real(DP),dimension(:),allocatable :: HjX,HjY,HjZ                   !> Effective fields for the exchange term (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: HhX,HhY,HhZ                   !> Effective fields for the external field (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: HkX,HkY,HkZ                   !> Effective fields for the anisotropy energy term (X,Y and Z-directions, respectively)        
-        real(SP),dimension(:),allocatable :: HmX,HmY,HmZ                     !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
-        real(SP),dimension(:),allocatable :: Mx,My,Mz                        !> The magnetization components used internally as the solution progresses
+        real(SP),dimension(:),allocatable :: HmX,HmY,HmZ                   !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
+        real(DP),dimension(:),allocatable :: Mx,My,Mz                      !> The magnetization components used internally as the solution progresses
+        real(SP),dimension(:),allocatable :: Mx_s,My_s,Mz_s                !> The magnetization components used internally as the solution progresses in single precision
         complex(kind=4),dimension(:),allocatable :: Mx_FT, My_FT, Mz_FT    !> Fourier transform of Mx, My and Mz (complex)
         complex(kind=4),dimension(:),allocatable :: HmX_c,HmY_c,HmZ_c      !> Complex version of the demag field, used for the Fourier cut-off approach
         
@@ -155,5 +168,7 @@ include "mkl_dfti.f90"
     integer,parameter :: DemagTensorReturnNot=1,DemagTensorReturnMemory=2
     !!@todo Do NOT have useCVODETrue/-False variables both here and in IntegrationDataTypes.
     integer,parameter :: useCVODETrue=1,useCVODEFalse=0
+    integer,parameter :: usePrecisionTrue=1,usePrecisionFalse=0
+    
     
 end module MicroMagParameters    

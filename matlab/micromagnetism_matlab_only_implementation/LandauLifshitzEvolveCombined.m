@@ -202,7 +202,7 @@ end
 disp('Integrating Equation of Motion')
 if UseDynamicSolver
     options = odeset('RelTol',1e-12,'AbsTol',1e-9) ;
-    [t,SigmaSol] = ode45(dSigma2,t,Sigma,options);
+    [t,SigmaSol] = ode23s(dSigma2,t,Sigma,options);
 %         [t,SigmaSol] = ode23(dSigma2,t,Sigma,options);
 end
 if UseExplicitSolver

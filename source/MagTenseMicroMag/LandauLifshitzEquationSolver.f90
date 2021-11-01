@@ -53,7 +53,7 @@ include 'blas.f90'
     call initializeInteractionMatrices( gb_problem )
     
     
-
+    !Copy the demag tensor to CUDA
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
         call displayMatlabMessage( 'Copying to CUDA' )
 #if USE_CUDA            
@@ -352,6 +352,13 @@ include 'blas.f90'
         solution%Mx(:) = 0.
         solution%My(:) = 0.
         solution%Mz(:) = 0.
+        
+        !Magnetization in single variables
+        allocate( solution%Mx_s(ntot), solution%My_s(ntot), solution%Mz_s(ntot) )
+        solution%Mx_s(:) = 0.
+        solution%My_s(:) = 0.
+        solution%Mz_s(:) = 0.
+        
         !Exchange effective field
         allocate( solution%HjX(ntot), solution%HjY(ntot), solution%HjZ(ntot) )
         solution%HjX(:) = 0.
@@ -412,27 +419,26 @@ include 'blas.f90'
     
     integer :: stat
     type(MATRIX_DESCR) :: descr
-    real(SP) :: alpha, beta
+    real(DP) :: alpha, beta
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
-    
     
     alpha = -2.! * solution%Jfact
     beta = 0.
     
     !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
     !y = alpha * (A_exch * Mx )
-    stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, beta, solution%HjX )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, beta, solution%HjX )
     solution%HjX = solution%HjX * solution%Jfact
     
     !Effective field in the Y-direction
-    stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, beta, solution%HjY )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, beta, solution%HjY )
     solution%HjY = solution%HjY * solution%Jfact
     
     !Effective field in the Z-direction
-    stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, beta, solution%HjZ )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, beta, solution%HjZ )
     solution%HjZ = solution%HjZ * solution%Jfact
     
     end subroutine updateExchangeTerms
@@ -534,35 +540,41 @@ include 'blas.f90'
     
     ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
     allocate(temp(ntot))
-            
+    
+    ! Convert the magnetization to single before the demag calculation
+    solution%Mx_s = real(solution%Mx, SP)
+    solution%My_s = real(solution%My, SP)
+    solution%Mz_s = real(solution%Mz, SP)
+
+    
     if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
         if ( problem%useCuda .eq. useCudaFalse ) then
             !Do the matrix multiplications using sparse matrices
             alpha = -1.0
             beta = 0.
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(1)%A, descr, solution%Mx, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(1)%A, descr, solution%Mx_s, beta, temp )
             beta = 1.0
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My, beta, temp )
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My_s, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz_s, beta, temp )
         
             solution%HmX = temp * ( solution%Mfact )
             !ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
             !call vsmul( ntot, solution%HmX, -solution%Mfact, solution%HmX )
             
             beta = 0.
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx_s, beta, temp )
             beta = 1.0
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My, beta, temp )
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My_s, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz_s, beta, temp )
         
             solution%HmY = temp * ( solution%Mfact )
             !call vsmul( ntot, solution%HmY, -solution%Mfact, solution%HmY )
           
             beta = 0.
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx_s, beta, temp )
             beta = 1.0
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My, beta, temp )
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My_s, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz_s, beta, temp )
         
             solution%HmZ = temp * ( solution%Mfact )
             !call vsmul( ntot, solution%HmZ, -solution%Mfact, solution%HmZ )
@@ -570,7 +582,7 @@ include 'blas.f90'
 #if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
             pref = sngl(-1 )!* solution%Mfact)                                
-            call cudaMatrVecMult_sparse( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
+            call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
             temp = solution%HmX * solution%Mfact
             solution%HmX = temp
             temp = solution%HmY * solution%Mfact
@@ -587,9 +599,9 @@ include 'blas.f90'
                 
         !Convert to complex format
         do i=1,ntot
-            solution%Mx_FT(i) = cmplx( solution%Mx(i), 0. )
-            solution%My_FT(i) = cmplx( solution%My(i), 0. )
-            solution%Mz_FT(i) = cmplx( solution%Mz(i), 0. )
+            solution%Mx_FT(i) = cmplx( solution%Mx_s(i), 0. )
+            solution%My_FT(i) = cmplx( solution%My_s(i), 0. )
+            solution%Mz_FT(i) = cmplx( solution%Mz_s(i), 0. )
         enddo
         
         stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mx_FT )
@@ -667,14 +679,14 @@ include 'blas.f90'
             alpha = -1.! * solution%Mfact
             beta = 0.0
             !Hmx = Kxx * Mx
-            call gemv( problem%Kxx, solution%Mx, temp, alpha, beta )
+            call gemv( problem%Kxx, solution%Mx_s, temp, alpha, beta )
             
             beta = 1.0
             !Hmx = Hmx + Kxy * My
-            call gemv( problem%Kxy, solution%My, temp, alpha, beta )
+            call gemv( problem%Kxy, solution%My_s, temp, alpha, beta )
             
             !Hmx = Hmx + Kxz * Mz
-            call gemv( problem%Kxz, solution%Mz, temp, alpha, beta )
+            call gemv( problem%Kxz, solution%Mz_s, temp, alpha, beta )
             !Scale with Mfact in case it varies
             !ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
             !call vsmul( ntot, solution%HmX, solution%Mfact, solution%HmX )
@@ -684,14 +696,14 @@ include 'blas.f90'
             
             beta = 0.0
             !HmY = Kyx * Mx
-            call gemv( problem%Kxy, solution%Mx, temp, alpha, beta )
+            call gemv( problem%Kxy, solution%Mx_s, temp, alpha, beta )
             
             beta = 1.0
             !HmY = HmY + Kyy * My
-            call gemv( problem%Kyy, solution%My, temp, alpha, beta )
+            call gemv( problem%Kyy, solution%My_s, temp, alpha, beta )
             
             !Hmy = Hmy + Kyz * Mz
-            call gemv( problem%Kyz, solution%Mz, temp, alpha, beta )
+            call gemv( problem%Kyz, solution%Mz_s, temp, alpha, beta )
             !Scale with Mfact in case it varies
             !call vsmul( ntot, solution%HmY, solution%Mfact, solution%HmY )
             temp = solution%HmY * solution%Mfact
@@ -700,14 +712,14 @@ include 'blas.f90'
             
             beta = 0.0
             !HmZ = Kzx * Mx
-            call gemv( problem%Kxz, solution%Mx, temp, alpha, beta )
+            call gemv( problem%Kxz, solution%Mx_s, temp, alpha, beta )
             
             beta = 1.0
             !HmZ = HmZ + Kzy * My
-            call gemv( problem%Kyz, solution%My, temp, alpha, beta )
+            call gemv( problem%Kyz, solution%My_S, temp, alpha, beta )
             
             !HmZ = HmZ + Kzz * Mz
-            call gemv( problem%Kzz, solution%Mz, temp, alpha, beta )
+            call gemv( problem%Kzz, solution%Mz_s, temp, alpha, beta )
             !Scale with Mfact in case it varies
             !call vsmul( ntot, solution%HmZ, solution%Mfact, solution%HmZ )
             temp = solution%HmZ * solution%Mfact
@@ -716,7 +728,7 @@ include 'blas.f90'
         else
             pref = sngl(-1)! * solution%Mfact)
 #if USE_CUDA        
-            call cudaMatrVecMult( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
+            call cudaMatrVecMult( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
             temp = solution%HmX * solution%Mfact
             solution%HmX = temp
             temp = solution%HmY * solution%Mfact
@@ -726,7 +738,7 @@ include 'blas.f90'
 #endif            
         endif 
     endif
-    
+       
     !open(12,file='count_dmdt.txt',status='old',access='append',form='formatted',action='write')    
     !write(12,*) 1
     !close(12)
@@ -1621,12 +1633,12 @@ include 'blas.f90'
     type(sparse_matrix_t),intent(inout) :: A           !> The returned matrix from the sparse matrix creator
         
     integer :: stat                                   !> Status value for the various sparse matrix operations        
-    type(MagTenseSparse) :: d2dx2, d2dy2, d2dz2       !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
+    type(MagTenseSparse_d) :: d2dx2, d2dy2, d2dz2       !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
     type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
     integer :: ind, ntot,colInd,rowInd                !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
     integer :: i,j,k,nx,ny,nz                         !> For-loop counters
     type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
-    real(SP) :: const
+    real(DP) :: const
     
     !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
@@ -1707,7 +1719,7 @@ include 'blas.f90'
     
     
     !Create the sparse matrix for the d^2dx^2
-    stat = mkl_sparse_s_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
+    stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
     
     
     !----------------------------------d^2dx^2 ends -----------------------------!
@@ -1802,7 +1814,7 @@ include 'blas.f90'
     d2dy2%values = d2dy2%values * 1./grid%dy**2
         
     !Create the sparse matrix for the d^2dy^2
-    stat = mkl_sparse_s_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
+    stat = mkl_sparse_d_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
     
     !----------------------------------d^2dy^2 ends ----------------------------!
     
@@ -1903,7 +1915,7 @@ include 'blas.f90'
         d2dz2%values = d2dz2%values * 1./grid%dz**2
         
         !Create the sparse matrix for the d^2dz^2
-        stat = mkl_sparse_s_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
+        stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
     endif
     
     !----------------------------------d^2dz^2 ends ----------------------------!
@@ -1916,12 +1928,12 @@ include 'blas.f90'
     !call writeSparseMatrixToDisk( d2dy2%A, nx*ny*nz, 'd2dy2.dat' )
     
     const = 1.
-    stat = mkl_sparse_s_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dy2%A, tmp)    
+    stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dy2%A, tmp)    
     
     !call writeSparseMatrixToDisk( tmp, nx*ny*nz, 'A_exch.dat' )
     
     if ( nz .gt. 1 ) then    
-        stat = mkl_sparse_s_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, const, tmp, A)
+        stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, const, tmp, A)
         !clean up        
         deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
         stat = mkl_sparse_destroy (d2dz2%A)
@@ -1965,7 +1977,7 @@ include 'blas.f90'
     ny = grid%ny
     nz = grid%nz
     
-    stat = mkl_sparse_s_create_csr ( tmp, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, grid%A_exch_load%rows_start, grid%A_exch_load%rows_end, grid%A_exch_load%cols, grid%A_exch_load%values)
+    stat = mkl_sparse_d_create_csr ( tmp, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, grid%A_exch_load%rows_start, grid%A_exch_load%rows_end, grid%A_exch_load%cols, grid%A_exch_load%values)
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT

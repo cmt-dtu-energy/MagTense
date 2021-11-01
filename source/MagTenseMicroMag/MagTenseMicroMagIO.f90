@@ -21,7 +21,7 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr
@@ -33,6 +33,7 @@
         mwPointer :: genericProblemPtr
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
         mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr
+        mwPointer :: usePrecisionPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
         real(DP) :: demag_fac
@@ -285,7 +286,7 @@
              
             sx = nvalues
             valuesPtr = mxGetField( prhs, i, problemFields(41) )
-            call mxCopyPtrToReal4(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
+            call mxCopyPtrToReal8(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
             
             sx = nrows
             rows_startPtr = mxGetField( prhs, i, problemFields(42) )
@@ -314,6 +315,15 @@
         genericProblemPtr = mxGetField( prhs, i, problemFields(34) )
         call mxCopyPtrToReal8(mxGetPr(genericProblemPtr), problem%conv_tol, sx )
 
+        sx = 1
+        usePrecisionPtr = mxGetField( prhs, i, problemFields(46) )
+        call mxCopyPtrToInteger4(mxGetPr(usePrecisionPtr), usePrecision, sx )
+        if ( usePrecision .eq. 1 ) then
+            problem%usePrecision = usePrecisionTrue
+        else
+            problem%usePrecision = usePrecisionFalse
+        endif
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -449,7 +459,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=45
+        integer,parameter :: nf=46
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -501,6 +511,7 @@
         fieldnames(43) = 'exch_rowe'
         fieldnames(44) = 'exch_col'
         fieldnames(45) = 'grid_abc'
+        fieldnames(46) = 'usePres'
         
     end subroutine getProblemFieldnames
     
