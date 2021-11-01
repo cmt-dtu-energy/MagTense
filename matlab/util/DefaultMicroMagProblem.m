@@ -178,6 +178,10 @@ properties (SetAccess=private,GetAccess=public)
     %1 for do use (int32). Currently implemented alternative is RK_SUITE,
     %active if CVODE is not used.
     useCVODE
+
+    %defines what precision is used for the demag tensor. Right now only
+    %single is supported. All other varibales are double.
+    usePres
     
     %defines whether to save the result or not
     SaveTheResult
@@ -287,6 +291,8 @@ methods
         obj.useCuda = int32(0);
 		%set use CVODE to default
         obj.useCVODE = int32(0);
+        %set use CVODE to default
+        obj.usePres = int32(0);
         %set the demag approximation to the default, i.e. use no
         %approximation
         obj.dem_appr = getMicroMagDemagApproximation('none');
