@@ -16,24 +16,25 @@ conda install -y numpy matplotlib
 
 GFortran compiler and Make utility (Windows + MacOS only)
 
-Installation in conda environment
+- Windows
 
-```bash
-conda install -y -c msys m2w64-gcc-fortran
-```
+  - Installation in conda environment
 
-#### or
+    ```bash
+    conda install -y -c msys m2w64-gcc-fortran
+    ```
 
-Installation in your system
+  - Installation from binary | [MinGW](https://gcc.gnu.org/wiki/GFortranBinaries#Windows)
 
-- Windows: [MinGW](https://gcc.gnu.org/wiki/GFortranBinaries#Windows)
-- MacOS: [HPC Mac OS X](http://hpc.sourceforge.net/) or with [Homebrew](https://brew.sh/) ( **brew install gcc** )
+- MacOS:
+  - Installation from binary | [HPC Mac OS X](http://hpc.sourceforge.net/)
+  - Installation with [Homebrew](https://brew.sh/) ( **brew install gcc** )
 
 ### Step 3
 
-Creating an importable Python module from Fortran source code
+Creation of an importable Python module from Fortran source code
 
-Navigate to folder **MagTense/python/lib_mag/**, run **make**, and add path to your PYTHONPATH
+Navigate to folder **MagTense/python/lib_mag/**, run **make**, and add the path to your PYTHONPATH
 
 ```bash
 cd /path/to/repo/python/lib_mag/
