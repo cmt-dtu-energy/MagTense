@@ -420,6 +420,10 @@ def zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale=0.1)
 
 
 def create_plot(tiles, eval_points=None, H=None, grid=None):
+    '''
+    Creates a plot with the iterated tiles and the calculated magnetic field H at the evaluation points as quiver plot.  
+    Additionally, an optional grid can be displayed.
+    '''
     fig = plt.figure()
     ax = fig.gca(projection='3d')
     if tiles is not None:

@@ -9,35 +9,57 @@ from util_plot import create_plot, get_rotmat
 
 class Tiles():
     def __init__(self, n):
-        # Initialization of arrays for specific tile parameters
-        # Input to Fortran derived type MagTile     
-        self.center_pos = np.zeros(shape=(n,3), dtype=np.float64, order='F') # r0, theta0, z0
-        self.dev_center = np.zeros(shape=(n,3), dtype=np.float64, order='F') # dr, dtheta, dz
-        self.size = np.zeros(shape=(n,3), dtype=np.float64, order='F') # a, b, c
-        self.vertices = np.zeros(shape=(n,3,4), dtype=np.float64, order='F') # v1, v2, v3, v4 as column vectors
-        self.M = np.zeros(shape=(n,3), dtype=np.float64, order='F') # Mx, My, Mz
-        self.u_ea = np.zeros(shape=(n,3), dtype=np.float64, order='F') # Easy axis
+        '''
+        Input to Fortran derived type MagTile
+
+        Initialization of arrays for specific tile parameters:
+            center_pos: r0, theta0, z0
+            dev_center: dr, dtheta, dz
+            size: a, b, c
+            vertices: v1, v2, v3, v4 as column vectors
+            M: Mx, My, Mz
+            u_ea: Easy axis
+            u_oa: Other axis
+            mu_r_ea: Relative permeability in easy axis
+            mu_r_oa: Relative permeability in other axis
+            M_rem: Remanent magnetization
+            tile_type: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
+                       5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
+            offset: Offset of global coordinates
+            rot: Rotation in local coordinate system
+            color: Color in visualization
+            magnettype: 1 = hard magnet, 2 = soft magnet, 3 = soft + constant mu_r
+            stfcn_index: default index into the state function
+            incl_it: If equal to zero the tile is not included in the iteration
+            use_sym: Whether to exploit symmetry
+            sym_op: 1 for symmetry and -1 for anti-symmetry respectively to the planes
+            M_rel: Change in magnetization during last iteration of iterate_magnetization()
+            grid_pos: Position in grid if a 3-D grid is used to place tiles
+            n: Number of tiles in the simulation
+        '''  
+        self.center_pos = np.zeros(shape=(n,3), dtype=np.float64, order='F')
+        self.dev_center = np.zeros(shape=(n,3), dtype=np.float64, order='F')
+        self.size = np.zeros(shape=(n,3), dtype=np.float64, order='F')
+        self.vertices = np.zeros(shape=(n,3,4), dtype=np.float64, order='F')
+        self.M = np.zeros(shape=(n,3), dtype=np.float64, order='F')
+        self.u_ea = np.zeros(shape=(n,3), dtype=np.float64, order='F')
         self.u_oa1 = np.zeros(shape=(n,3), dtype=np.float64, order='F')
         self.u_oa2 = np.zeros(shape=(n,3), dtype=np.float64, order='F')
         self.mu_r_ea = np.ones(shape=(n), dtype=np.float64, order='F')
         self.mu_r_oa = np.ones(shape=(n), dtype=np.float64, order='F')
         self.M_rem = np.zeros(shape=(n), dtype=np.float64, order='F')
-        # Implemented tile types: 
-        # 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
-        # 5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
         self.tile_type = np.ones(n, dtype=np.int32, order='F')
-        self.offset = np.zeros(shape=(n,3), dtype=np.float64, order='F') # offset of global coordinates
+        self.offset = np.zeros(shape=(n,3), dtype=np.float64, order='F')
         self.rot = np.zeros(shape=(n,3), dtype=np.float64, order='F')
         self.color = np.zeros(shape=(n,3), dtype=np.float64, order='F')
-        self.magnettype = np.ones(n, dtype=np.int32, order='F') # 1 = hard magnet, 2 = soft magnet, 3 = soft + constant mu_r
-        self.stfcn_index = np.ones(shape=(n), dtype=np.int32, order='F') # default index into the state function
-        self.incl_it = np.ones(shape=(n), dtype=np.int32, order='F') # if equal to zero the tile is not included in the iteration
-        self.use_sym = np.zeros(shape=(n), dtype=np.int32, order='F') # whether to exploit symmetry
-        self.sym_op = np.ones(shape=(n,3), dtype=np.float64, order='F') # 1 for symmetry and -1 for anti-symmetry respectively to the planes
+        self.magnettype = np.ones(n, dtype=np.int32, order='F')
+        self.stfcn_index = np.ones(shape=(n), dtype=np.int32, order='F')
+        self.incl_it = np.ones(shape=(n), dtype=np.int32, order='F')
+        self.use_sym = np.zeros(shape=(n), dtype=np.int32, order='F')
+        self.sym_op = np.ones(shape=(n,3), dtype=np.float64, order='F')
         self.M_rel = np.zeros(shape=(n), dtype=np.float64, order='F')
- 
-        # Internal parameters for python to prepare configuration
-        self.grid_pos = np.zeros(shape=(n,3), dtype=np.float64, order='F') # positions in the grid
+        
+        self.grid_pos = np.zeros(shape=(n,3), dtype=np.float64, order='F')
         self.n = n
 
     def __str__(self):
@@ -502,8 +524,20 @@ def setup(places, area, n_tiles=0, filled_positions=None, mag_angles=[], eval_po
         tiles.set_color([1, 0, 0])
     return tiles, points, meshgrid
 
-# Function for running MagTense with the Fortran source code as Python module
+
 def run_simulation(tiles, points, grid=None, plot=False, max_error=0.00001, max_it=500, iterate_solution=True, return_field=True, T = 300., console=True):
+    '''
+    Function for running MagTense with the Fortran source code as Python module
+
+    Args:
+        plot: Boolean if results shall be plotted
+        grid: Optional grid can be displayed
+        max_error: Iteration stops if magnetization change of tiles is below this value
+        max_it: Maximum number of performed iterations
+        T: Temperature for the state function if required
+        iterate_solution: Boolean if the magnetization of the tiles shall be iterated
+        return_field: Boolean if magnetic field shall be calculated
+    '''
     data_stateFcn = np.genfromtxt(os.path.dirname(os.path.abspath(__file__)) + '/../util/data_stateFcn.csv', delimiter=';', dtype=np.float64)
 
     H, M_out, Mrel_out = \
@@ -535,6 +569,16 @@ def run_simulation(tiles, points, grid=None, plot=False, max_error=0.00001, max_
 
 
 def iterate_magnetization(tiles, max_error=0.00001, max_it=500, T=300., mu_r=20):
+    '''
+    Iterates through the given tiles to determine their influence on each other.  
+    Updated tiles are returned.
+
+    Args:
+        max_error: Iteration stops if magnetization change of tiles is below this value
+        max_it: Maximum number of performed iterations
+        T: Temperature for the state function if required
+        mu_r: Relative permeabilty of soft tiles to select the corresponding non-linear M-H-curve
+    '''
     data_stateFcn = np.genfromtxt(os.path.dirname(os.path.abspath(__file__)) + f'/../util/Fe_mur_{mu_r}_Ms_2_1.csv', delimiter=';', dtype=np.float64)
 
     M_out, Mrel_out = magtensesource.fortrantopythonio.iteratetiles( centerpos=tiles.center_pos, dev_center=tiles.dev_center, \
@@ -551,6 +595,9 @@ def iterate_magnetization(tiles, max_error=0.00001, max_it=500, T=300., mu_r=20)
 
 
 def get_N_tensor(tiles, points):
+    '''
+    Returns the demagnetization tensor N of the given tiles and the specified evaluation points.
+    '''
     N = magtensesource.fortrantopythonio.getnfromtiles( centerpos=tiles.center_pos, dev_center=tiles.dev_center, \
         tile_size=tiles.size, vertices=tiles.vertices, mag=tiles.M, u_ea=tiles.u_ea, u_oa1=tiles.u_oa1, u_oa2=tiles.u_oa2, mu_r_ea=tiles.mu_r_ea, \
         mu_r_oa=tiles.mu_r_oa, mrem=tiles.M_rem, tiletype=tiles.tile_type, offset=tiles.offset, rotangles=tiles.rot, color=tiles.color, \
@@ -561,6 +608,11 @@ def get_N_tensor(tiles, points):
 
 
 def get_H_field(tiles, points, N=None):
+    '''
+    Returns the magnetic field H at the specified evaluation points of the given tiles.  
+    Optionally, a precalculated demagnetization tensor N can be handed over.
+    This prevents unnecessary and expensive recalculation of N if the geometry of the setup does not change.
+    '''
     if N is not None:
         useN = True
     else:
