@@ -2,9 +2,11 @@ import os
 import math
 import random
 import numpy as np
+#import sys
 
-import magtensesource
-from util_plot import create_plot, get_rotmat
+#sys.path.append("../lib_mag")
+from .lib_mag import magtensesource
+from .util_plot import create_plot, get_rotmat
 
 
 class Tiles():
@@ -27,7 +29,7 @@ class Tiles():
         # 5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
         self.tile_type = np.ones(n, dtype=np.int32, order='F')
         self.offset = np.zeros(shape=(n,3), dtype=np.float64, order='F') # offset of global coordinates
-        self.rot = np.zeros(shape=(n,3), dtype=np.float64, order='F')
+        self.rot = np.zeros(shape=(n,3), dtype=np.float64, order='F') # rot angle in x,y,z
         self.color = np.zeros(shape=(n,3), dtype=np.float64, order='F')
         self.magnettype = np.ones(n, dtype=np.int32, order='F') # 1 = hard magnet, 2 = soft magnet, 3 = soft + constant mu_r
         self.stfcn_index = np.ones(shape=(n), dtype=np.int32, order='F') # default index into the state function
@@ -504,7 +506,11 @@ def setup(places, area, n_tiles=0, filled_positions=None, mag_angles=[], eval_po
 
 # Function for running MagTense with the Fortran source code as Python module
 def run_simulation(tiles, points, grid=None, plot=False, max_error=0.00001, max_it=500, iterate_solution=True, return_field=True, T = 300., console=True):
-    data_stateFcn = np.genfromtxt(os.path.dirname(os.path.abspath(__file__)) + '/../util/data_stateFcn.csv', delimiter=';', dtype=np.float64)
+    import pkg_resources
+
+    DATA_PATH = pkg_resources.resource_filename('magtense', '../util')
+    #data_stateFcn = np.genfromtxt(os.path.dirname(os.path.abspath(__file__)) + '/../util/data_stateFcn.csv', delimiter=';', dtype=np.float64)
+    data_stateFcn = np.genfromtxt(DATA_PATH + '/data_stateFcn.csv', delimiter=';', dtype=np.float64)
 
     H, M_out, Mrel_out = \
         magtensesource.fortrantopythonio.runsimulation( centerpos=tiles.center_pos, dev_center=tiles.dev_center, \
@@ -535,7 +541,11 @@ def run_simulation(tiles, points, grid=None, plot=False, max_error=0.00001, max_
 
 
 def iterate_magnetization(tiles, max_error=0.00001, max_it=500, T=300., mu_r=20):
-    data_stateFcn = np.genfromtxt(os.path.dirname(os.path.abspath(__file__)) + f'/../util/Fe_mur_{mu_r}_Ms_2_1.csv', delimiter=';', dtype=np.float64)
+    import pkg_resources
+
+    DATA_PATH = pkg_resources.resource_filename('magtense', '../util')
+    data_stateFcn = np.genfromtxt(DATA_PATH + f'/Fe_mur_{mu_r}_Ms_2_1.csv', delimiter=';', dtype=np.float64)
+    # data_stateFcn = np.genfromtxt(os.path.dirname(os.path.abspath(__file__)) + f'/../util/Fe_mur_{mu_r}_Ms_2_1.csv', delimiter=';', dtype=np.float64)
 
     M_out, Mrel_out = magtensesource.fortrantopythonio.iteratetiles( centerpos=tiles.center_pos, dev_center=tiles.dev_center, \
         tile_size=tiles.size, vertices=tiles.vertices, mag=tiles.M, u_ea=tiles.u_ea, u_oa1=tiles.u_oa1, u_oa2=tiles.u_oa2, mu_r_ea=tiles.mu_r_ea, \

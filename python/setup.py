@@ -21,9 +21,9 @@ elif compiler == "intel" or compiler == "intelvem":
 ext = Extension(
     name="magtensesource",
     sources=[
-        "lib_mag/FortranToPythonIO.f90"
+        "magtense/lib_mag/FortranToPythonIO.f90"
     ],
-    library_dirs=["lib_mag/"],
+    library_dirs=["magtense/lib_mag/"],
     extra_f90_compile_args=f90flags,
     #extra_objects=["lib_mag/"],
     extra_link_args=["-lsrc"],
@@ -32,7 +32,7 @@ ext = Extension(
 setup(
     name="magtense",
     version=__version__,
-    description="test",
+    description="MagTense - a micromagnetism and magnetostatic framework",
     long_description=long_description,
     long_description_content_type="text/markdown",
     classifiers=[
@@ -41,11 +41,11 @@ setup(
         "Programming Language :: Python :: 3",
         "Topic :: Scientific/Engineering",
     ],
-    url="https://github.com/zhucaoxiang/CoilPy",
-    author="Caoxiang Zhu",
-    author_email="caoxiangzhu@gmail.com",
-    license="GNU 3.0",
-    packages=setuptools.find_packages(),
+    url="www.magtense.org",
+    author="cmt-dtu-energy",
+    license="GPL 3.0",
+    packages=['magtense'],
+    # package_dir={'magtense': 'magtense'},
     package_data={'magtense': ['../util/*']},
     ext_modules=[ext],
 )
