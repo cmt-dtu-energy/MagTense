@@ -34,10 +34,19 @@ GFortran compiler and Make utility (Windows + MacOS only)
 
 Creation of an importable Python module from Fortran source code
 
-Navigate to folder **MagTense/python/lib_mag/**, run **make**, and add the path to your PYTHONPATH
+Navigate to folder **MagTense/python/magtense/lib_mag/**, run **make**, and add the path to your PYTHONPATH (or install the package)
 
 ```bash
-cd /path/to/repo/python/lib_mag/
+cd /path/to/repo/python/magtense/lib_mag/
 make
-conda develop /path/to/repo/python/lib_mag/
+conda develop /path/to/repo/python/magtense/lib_mag/
+```
+
+OR
+
+```bash
+cd /path/to/repo/python/magtense/lib_mag/
+make
+cd /path/to/repo/python/
+pip install -e .
 ```
