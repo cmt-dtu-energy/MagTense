@@ -21,9 +21,9 @@ ifeq ($(F90),ifort)
     FCOMP = intelvem # for f2py
 endif
 
-VPATH = ../../source/NumericalIntegration/NumericalIntegration:\
-../../source/TileDemagTensor/TileDemagTensor:\
-../../source/DemagField/DemagField
+VPATH = ../../../source/NumericalIntegration/NumericalIntegration:\
+../../../source/TileDemagTensor/TileDemagTensor:\
+../../../source/DemagField/DemagField
 FPP = gfortran -E # gfortran f90wrap temp files only, not compilation
 FPP_F90FLAGS = -x f95-cpp-input -fPIC
 CC = gcc

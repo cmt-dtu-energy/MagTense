@@ -1,0 +1,8 @@
+*.o
+*.mod
+*.o.d
+__pychae__
+libsrc.a
+fortranobject.c
+fortranobject.h
+magtensesource*
