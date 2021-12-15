@@ -1,6 +1,17 @@
 import os
 import numpy as np
 
+def get_average_magnetic_flux(H):
+    norm = get_norm_magnetic_flux(H)
+    return sum(norm) / len(norm)
+
+def get_p2p(H):
+    norm = get_norm_magnetic_flux(H)
+    return max(norm) - min(norm)
+
+def get_norm_magnetic_flux(H):
+    return [np.linalg.norm(H_point) * 4 * np.pi * 1e-7 for H_point in H]
+
 # Load reference points from COMSOL calculation
 def load_COMSOL_eval(file_name, eval_offset, COMSOL_eval_path, model_offset=[0,0,0], pts_special=None, unit='A/m'):
     with open(os.path.join(COMSOL_eval_path, file_name), "r") as file:

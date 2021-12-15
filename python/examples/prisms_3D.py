@@ -1,7 +1,9 @@
 import numpy as np
 
-import magtense
-from util_plot import create_plot
+from magtense import magtense
+from magtense.utils.eval import get_p2p, get_average_magnetic_flux
+from magtense.utils.plot import create_plot
+
 
 def prism_grid():
     # Defining grid
@@ -17,8 +19,8 @@ def prism_grid():
     # Standard parameters in settings: max_error=0.00001, max_it=500
     (updated_tiles, H) = magtense.run_simulation(tiles, points, grid=grid, plot=True)
 
-    print("Average magnetic field: " + str(magtense.get_average_magnetic_flux(H)))
-    print("Peak to peak: " + str(magtense.get_p2p(H)))
+    print("Average magnetic field: " + str(get_average_magnetic_flux(H)))
+    print("Peak to peak: " + str(get_p2p(H)))
 
 
 def prism_multiple(n_mag=1, soft=None, res=16, x_max=1, y_max=1, z_max=1):

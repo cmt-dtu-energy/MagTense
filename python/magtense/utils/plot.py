@@ -1,11 +1,10 @@
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
-
-import numpy as np
 import math
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cm
+
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 
 
 def plot_cube(axes, size, offset, rotation, M, color):

@@ -1,0 +1,1 @@
+recursive-include magtense/lib *.pyd *.so
