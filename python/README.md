@@ -1,6 +1,6 @@
 # Python Interface
 
-The Fortran code is compiled and wrapped to a module that can be directly called from Python. The tool **f2py** of the NumPy package is used to wrap the interface file **lib_mag/FortranToPythonIO.f90**.
+The Fortran code is compiled and wrapped to a module that can be directly called from Python. The tool **f2py** of the NumPy package is used to wrap the interface file **lib/FortranToPythonIO.f90**.
 
 ## Deployment with Conda
 
@@ -21,6 +21,7 @@ GFortran compiler and Make utility (Windows + MacOS only)
   - Installation in conda environment
 
     ```bash
+    conda install -y make
     conda install -y -c msys m2w64-gcc-fortran
     ```
 
@@ -34,18 +35,10 @@ GFortran compiler and Make utility (Windows + MacOS only)
 
 Creation of an importable Python module from Fortran source code
 
-Navigate to folder **MagTense/python/magtense/lib_mag/**, run **make**, and add the path to your PYTHONPATH (or install the package)
+Navigate to folder **MagTense/python/magtense/lib/**, run **make**, and install the package
 
 ```bash
-cd /path/to/repo/python/magtense/lib_mag/
-make
-conda develop /path/to/repo/python/magtense/lib_mag/
-```
-
-OR
-
-```bash
-cd /path/to/repo/python/magtense/lib_mag/
+cd /path/to/repo/python/magtense/lib/
 make
 cd /path/to/repo/python/
 pip install -e .

@@ -32,7 +32,8 @@ CFLAGS = -fPIC # ==> universal for ifort, gfortran, pgi
 ifeq ($(OS),Windows_NT)
 	LIBTOOL = ar src
 	CLEAN_FILES = -del libsrc.a *.o *.mod *.pyd
-	CLEAN_FOLDER = -rmdir Release src.win-amd64-3.7 /s /Q
+	CLEAN_FOLDER = -rmdir /s /q Release 2>NUL || VER>NUL
+	CLEAN_FOLDER_WIN = -for /f %%i in ('dir /a:d /b src.win-*') do rd /s /q %%i
 else
 	ifeq (${UNAME}, Darwin)
   		LIBTOOL = libtool -static -o
@@ -41,6 +42,7 @@ else
 	endif
 	CLEAN_FILES = -rm libsrc.a *.o *.mod *.so 
 	CLEAN_FOLDER = -rm -r src.*
+	CLEAN_FOLDER_WIN = -true
 endif
 
 # ======================================================================
@@ -87,6 +89,7 @@ all: _${PYTHON_MODN}.so
 clean:
 	${CLEAN_FILES}
 	${CLEAN_FOLDER}
+	${CLEAN_FOLDER_WIN}
 
 .f90.o:
 	${F90} ${F90FLAGS} -c $< -o $@

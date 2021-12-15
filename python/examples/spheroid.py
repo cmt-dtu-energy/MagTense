@@ -1,6 +1,8 @@
 import numpy as np
 
-import magtense
+from magtense import magtense
+from magtense.utils.eval import get_p2p, get_average_magnetic_flux
+
 
 def spheroid():
     # Define spherical tiles
@@ -35,16 +37,21 @@ def spheroid():
     # Defining the points, where the field is evaluated (output)
     area = [3, 3, 3]
     n_points = [7, 7, 7]
-    seg = area/np.asarray(n_points)
-    points = [[i*seg[0]+seg[0]/2, j*seg[1]+seg[1]/2, k*seg[2]+seg[2]/2] for i in range(0,n_points[0]) \
-        for j in range(0, n_points[1]) for k in range(0, n_points[2])]
+    seg = area / np.asarray(n_points)
+    points = [[i * seg[0] + seg[0]/2,
+               j * seg[1] + seg[1]/2,
+               k * seg[2] + seg[2]/2]
+               for i in range(0,n_points[0])
+               for j in range(0, n_points[1])
+               for k in range(0, n_points[2])]
     points = np.asarray(points, dtype=np.float64, order='F')
 
     # Standard parameters in settings: max_error=0.00001, max_it=500
     (updated_tiles, H) = magtense.run_simulation(spheroids, points, plot=True)
 
-    print("Average magnetic field: " + str(magtense.get_average_magnetic_flux(H)))
-    print("Peak to peak: " + str(magtense.get_p2p(H)))
+    print("Average magnetic field: " + str(get_average_magnetic_flux(H)))
+    print("Peak to peak: " + str(get_p2p(H)))
+
 
 if __name__ == '__main__':
     spheroid()

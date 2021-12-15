@@ -1,7 +1,8 @@
 import math
 
-import magtense
-from util_plot import create_plot
+from magtense import magtense
+from magtense.utils.plot import create_plot
+
 
 def cylinder():
     B_rem = 1.2

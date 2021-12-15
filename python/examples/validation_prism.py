@@ -2,8 +2,8 @@ import os
 import math
 import matplotlib.pyplot as plt
 
-import magtense
-from util_eval import load_COMSOL_eval, add_subplot
+from magtense import magtense
+from magtense.utils.eval import get_norm_magnetic_flux, load_COMSOL_eval, add_subplot
 
 
 def valid_prism():
@@ -28,15 +28,15 @@ def valid_prism():
     
     # x-axis
     (updated_tiles_x, H_x) = magtense.run_simulation(tile_val, eval_points_x)
-    H_norm_x_MagTense  = magtense.get_norm_magnetic_flux(H_x)
+    H_norm_x_MagTense  = get_norm_magnetic_flux(H_x)
     
     # y-axis
     (updated_tiles_y, H_y) = magtense.run_simulation(tile_val, eval_points_y)
-    H_norm_y_MagTense  = magtense.get_norm_magnetic_flux(H_y)
+    H_norm_y_MagTense  = get_norm_magnetic_flux(H_y)
 
     # z-axis
     (updated_tiles_z, H_z) = magtense.run_simulation(tile_val, eval_points_z)
-    H_norm_z_MagTense  = magtense.get_norm_magnetic_flux(H_z)
+    H_norm_z_MagTense  = get_norm_magnetic_flux(H_z)
 
     fig, ax = plt.subplots(1,3)
     fig.suptitle("PRISM - MagTensePython vs. COMSOL")
