@@ -21,7 +21,7 @@ class Tiles():
         mu_r_oa: Relative permeability in other axis
         M_rem: Remanent magnetization
         tile_type: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
-                    5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
+                   5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
         offset: Offset of global coordinates
         rot: Rotation in local coordinate system
         color: Color in visualization
@@ -718,3 +718,57 @@ def get_H_field(tiles, points, N=None):
     )                 
 
     return H
+
+
+def run_micromag_simulation(problem):
+
+    t, M, pts, H_exc, H_ext, H_dem, H_ani = magtensesource.fortrantopythonio.runsimulation( 
+        ntot=problem.ntot,
+        grid_n=problem.grid_n,
+        grid_L=problem.grid_L,
+        grid_type=problem.grid_type,
+        u_ea=problem.u_ea,
+        ProblemMode=problem.prob_mode,
+        solver=problem.solver,
+        A0=problem.A0,
+        Ms=problem.Ms,
+        K0=problem.K0,
+        gamma=problem.gamma,
+        alpha=problem.alpha,
+        MaxT0=problem.MaxT0,
+        nt_Hext=problem.nt_Hext,
+        Hext=problem.Hext,
+        nt=problem.nt,
+        t=problem.t,
+        m0=problem.m0,
+        dem_thres=problem.dem_thres,
+        useCuda=problem.use_Cuda,
+        dem_appr=problem.dem_appr,
+        N_ret=problem.N_ret,
+        N_file_out=problem.N_file_out,
+        N_load=problem.N_load,
+        N_file_in=problem.N_file_in,
+        setTimeDis=problem.setTimeDis,
+        nt_alpha=problem.nt_alpha,
+        alphat=problem.alphat,
+        tol=problem.tol,
+        thres=problem.thres,
+        useCVODE=problem.use_CVODE,
+        nt_conv=problem.nt_conv,
+        t_conv=problem.t_conv,
+        conv_tol=problem.conv_tol,
+        grid_pts=problem.grid_pts,
+        grid_ele=problem.grid_ele,
+        grid_nod=problem.nod,
+        grid_nnod=problem.nnod,
+        exch_nval,
+        exch_nrow,
+        exch_val,
+        exch_rows,
+        exch_rowe,
+        exch_col,
+        grid_abc=problem.grid_abc
+    )
+
+    return t, M, pts, H_exc, H_ext, H_dem, H_ani
+
