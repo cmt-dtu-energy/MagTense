@@ -2,6 +2,9 @@ module FortranToPythonIO
 
 use DemagFieldGetSolution
 use IterateMagnetSolution
+use LandauLifshitzSolution
+use IntegrationDataTypes
+use MagTenseMicroMagIO
 implicit none
 
 contains
@@ -406,31 +409,7 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
         call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, disp_fct, resumeIteration )
 
         do i=1,n_tiles
-            ! centerPos(i,1) = tiles(i)%r0
-            ! centerPos(i,2) = tiles(i)%theta0
-            ! centerPos(i,3) = tiles(i)%z0
-            ! dev_center(i,1) = tiles(i)%dr
-            ! dev_center(i,2) = tiles(i)%dtheta
-            ! dev_center(i,3) = tiles(i)%dz
-            ! tile_size(i,1) = tiles(i)%a
-            ! tile_size(i,2) = tiles(i)%b
-            ! tile_size(i,3) = tiles(i)%c
             Mag_out(i,:) = tiles(i)%M
-            ! u_ea_out(i,:) = tiles(i)%u_ea
-            ! u_oa1_out(i,:) = tiles(i)%u_oa1
-            ! u_oa2_out(i,:) = tiles(i)%u_oa2
-            ! mu_r_ea(i) = tiles(i)%mu_r_ea
-            ! mu_r_oa(i) = tiles(i)%mu_r_oa
-            ! Mrem(i) = tiles(i)%Mrem
-            ! tileType(i) = tiles(i)%tileType
-            ! offset(i,:) = tiles(i)%offset
-            ! rotAngles(i,:) = tiles(i)%rotAngles
-            ! color(i,:) = tiles(i)%color
-            ! magnetType(i) = tiles(i)%magnetType
-            ! stateFunctionIndex(i) = tiles(i)%stateFunctionIndex
-            ! includeInIteration(i) = tiles(i)%includeInIteration
-            ! exploitSymmetry(i) = tiles(i)%exploitSymmetry
-            ! symmetryOps(i,:) = tiles(i)%symmetryOps
             Mrel_out(i) = tiles(i)%Mrel
         enddo
     endif
@@ -487,6 +466,33 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     endif
 
 end subroutine runSimulation
+
+
+subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
+    gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+    N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
+    conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
+    exch_rowe, exch_col, grid_abc )
+
+    type(MicroMagProblem) :: problem
+    type(MicroMagSolution) :: solution
+    real(8),dimension(nt),intent(out) :: t
+    real(8),dimension(nt,ntot,ndim,3),intent(out) :: M
+
+    real(8),dimension(n_pts,3),intent(out) :: pts, H_exc, H_ext, H_dem, H_ani
+
+
+    call loadMicroMagProblemPy( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
+        gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+        N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
+        conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
+        exch_rowe, exch_col, grid_abc, problem )
+
+    call SolveLandauLifshitzEquation( problem, solution )
+
+    call returnMicroMagSolutionPy( solution, nt, ntot, ndim, t, M, pts, H_exc, H_ext, H_dem, H_ani )
+
+end subroutine RunMicroMagSimulation
 
 
 end module FortranToPythonIO
