@@ -63,13 +63,7 @@ InteractionMatrices.Z = GridInfo.Zel ;
 InteractionMatrices.A2 = D2X + D2Y ;
 
 %--- Convert the exchange matrix to sparse
-[v,c,rs,re] = convertToCSR(InteractionMatrices.A2);
-problem_ini.exch_nval = int32(numel(v));
-problem_ini.exch_nrow = int32(numel(rs));
-problem_ini.exch_val  = double(v);
-problem_ini.exch_rows = int32(rs);
-problem_ini.exch_rowe = int32(re);
-problem_ini.exch_col  = int32(c);
+problem_ini = problem_ini.setExchangeMatrixSparse( InteractionMatrices.A2 );
 
 %% Setup the problem for the initial configuration
 problem_ini.dem_appr = getMicroMagDemagApproximation('none');
