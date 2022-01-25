@@ -424,6 +424,17 @@ methods
                 obj.SolverType = 4;
         end
     end
+
+    function obj = setExchangeMatrixSparse( obj, ExchangeMatrix )
+    % Convert the Exchange matrix to CSR and store it in the problem statement
+        [v,c,rs,re]   = convertToCSR(ExchangeMatrix);
+        obj.exch_nval = int32(numel(v));
+        obj.exch_nrow = int32(numel(rs));
+        obj.exch_val  = double(v);
+        obj.exch_rows = int32(rs);
+        obj.exch_rowe = int32(re);
+        obj.exch_col  = int32(c);
+    end
     
     %Override struct function for a final check before handing to Fortran
     function obj2 = struct(obj)
