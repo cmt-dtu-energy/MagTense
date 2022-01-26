@@ -394,7 +394,6 @@ include 'blas.f90'
 
     !"J" : exchange term
     solution%Jfact = problem%A0 / ( mu0 * problem%Ms )
-    write(prog_str,'(A30,G10.5)') 'First entry Jfact: ',solution%Jfact(1)
     call displayMatlabMessage( trim(prog_str) )
     !"H" : external field term (b.c. user input is in Tesla)
     !solution%Hfact = 1./mu0
@@ -417,7 +416,7 @@ include 'blas.f90'
     type(MicroMagProblem),intent(in) :: problem
     type(MicroMagSolution),intent(inout) :: solution
     
-    integer :: stat
+    integer :: stat, ntot
     type(MATRIX_DESCR) :: descr
     real(DP) :: alpha, beta
     
@@ -428,6 +427,8 @@ include 'blas.f90'
     alpha = -2.! * solution%Jfact
     beta = 0.
     
+    ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+    allocate(temp(ntot))
     !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
     !y = alpha * (A_exch * Mx )
     stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, beta, solution%HjX )
@@ -440,6 +441,8 @@ include 'blas.f90'
     !Effective field in the Z-direction
     stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, beta, solution%HjZ )
     solution%HjZ = solution%HjZ * solution%Jfact
+    
+    deallocate(temp)
     
     end subroutine updateExchangeTerms
 
@@ -1959,7 +1962,7 @@ include 'blas.f90'
     end subroutine ComputeExchangeTerm3D_Uniform
        
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2020
     !> @brief
     !> Converts the loaded information from Matlab in CSR 
     !> format to a CSR MKL type
@@ -1989,7 +1992,7 @@ include 'blas.f90'
     
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2020
     !> @brief
     !> Calculates the anisotropy term sparse matrix assuming the effective field anisotropy is linear in m    
     !> @param[inout] problem the data structure containing the problem
@@ -2002,7 +2005,7 @@ include 'blas.f90'
     end subroutine ComputeAnisotropyTerm3D
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2020
     !> @brief
     !> Calculates the anisotropy term matrix on any grid  
     !> @param[inout] problem the data structure containing the problem
