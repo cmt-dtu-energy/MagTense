@@ -177,4 +177,3 @@ executable/H_out.txt
 !docs/*
 docs/.buildinfo
 docs/source/_build
-source/MagTenseFortranCuda/cuda/MagTenseCudaFFT.cu

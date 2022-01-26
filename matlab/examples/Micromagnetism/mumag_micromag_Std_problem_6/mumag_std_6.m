@@ -6,9 +6,9 @@ addpath('../../../../../MagTense/matlab/util');
 
 fnameSave = 'mumag_std_6_prismal' ;
 extra='';
-useFinDif = true;
-runFortranPart = ~true;
-runMatlabPart = ~false;
+useFinDif = ~true;
+runFortranPart = true;
+runMatlabPart = false;
 HPs=containers.Map({'akj','ak','aj','a','kj','k','j',''},[1.568,1.089,1.206,0.838,1.005,0.565,0,0]);
 
 if ~exist('settings','var')
@@ -71,10 +71,11 @@ VoronoiStruct = GenerateVoronoiCells(X,Y,Z,x_gen,y_gen,z_gen,offSetD,fname);
 
 %NNs = [80,7,1] ; %--- NNs is a 3-elements array corresponding to the desired grid resolution (before refinment).
 % NNs = [80,2,2] ; %--- NNs is a 3-elements array corresponding to the desired grid resolution (before refinment).
-NNs = [320,1,1] ; %--- NNs is a 3-elements array corresponding to the desired grid resolution (before refinment).
+NNs = [80,1,1] ; %--- NNs is a 3-elements array corresponding to the desired grid resolution (before refinment).
 
 ress=3 ;
 mesh_cart = refineRectGrid_v6( [X(1),X(end)],[Y(1),Y(end)],[Z(1),Z(end)],[],[],[],NNs,ress,VoronoiStruct);
+% mesh_cart = refineRectGrid_v6( [X(1),X(end)],[Y(1),Y(end)],[Z(1),Z(end)],x_gen,y_gen,z_gen,NNs,ress,VoronoiStruct);
 
 %--- Analyze and plot Cartesian Unstructured Mesh
 mesh_cart = GetDomainsFromMeshHull(mesh_cart,VoronoiStruct) ;
@@ -103,7 +104,7 @@ problem.alpha = alpha;
 problem.gamma = gamma;
 problem.Ms = Ms*ones(prod(resolution),1);
 problem.K0 = K0*ones(prod(resolution),1);
-problem.A0 = A0;
+problem.A0 = A0;%*ones(prod(resolution),1);
 
 %% Grain anisotropies
 easyX = 1 ;
@@ -132,15 +133,19 @@ Aexch=ones(numel(GridInfo.Xel),1);
 if contains(settings,'a')
     for i=1:nGrains/2
         Aexch(mesh_cart.iIn{i})= A0_soft/A0 ;
+        %problem.A0(mesh_cart.iIn{i},:)=A0_soft;
     end
 end
 if ~useFinDif
 if numel(unique(GridInfo.Zel))-1
-    [D2X,D2Y,D2Z] = ComputeDifferentialOperatorsFromMesh_Neumann02_GGDirLap(GridInfo,'extended',8,"Multimaterial",Aexch);
+    [D2X,D2Y,D2Z] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,'extended',8,"Multimaterial",Aexch);
     InteractionMatrices.A2 = D2X + D2Y + D2Z ;
-else
-    [D2X,D2Y] = ComputeDifferentialOperatorsFromMesh_Neumann02_GGDirLap(GridInfo,'extended',8,"Multimaterial",Aexch);
+elseif numel(unique(GridInfo.Yel))-1
+    [D2X,D2Y] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,'extended',8,"Multimaterial",Aexch);
     InteractionMatrices.A2 = D2X + D2Y ;
+else
+    [D2X] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,'extended',8,"Multimaterial",Aexch);
+    InteractionMatrices.A2 = D2X ;
 end
 
 %--- Convert the exchange matrix to sparse
@@ -151,13 +156,20 @@ else
     D2A = ComputeDifferentialOperatorsFromMesh_Neumann_FiniteDifference(GridInfo,Aexch);
     problem = PrepareExchangeMatrix(D2A,problem) ;
 end
+
 %% Applied Field
 
 HystDir = normalize([easyX,easyY,easyZ],'norm') ;
 
 %time-dependent applied field
-HextFct = @(t) 2e7*HystDir/mu0 .* t';
-problem = problem.setHext( HextFct, linspace(0,100e-9,2001) );
+Hext0= 2e7*HystDir/mu0 .* 20e-9;
+HextFct = @(t) 2e7*HystDir/mu0 .* t' + Hext0;
+%problem = problem.setHext( HextFct, linspace(0,100e-9,2001) );
+problem = problem.setHext( HextFct, linspace(0,100e-9,2) );
+
+problem.HextFct{1} = @(t) 2e7*HystDir(1)/mu0 .* t' + Hext0;
+problem.HextFct{2} = @(t) 2e7*HystDir(2)/mu0 .* t' + Hext0;
+problem.HextFct{3} = @(t) 2e7*HystDir(3)/mu0 .* t' + Hext0;
 
 % Initial State
 init_stat=[-1,0.3,0];
@@ -182,6 +194,7 @@ problem.setTimeDis = int32(10);
 % problem = problem.setConvergenceCheckTime( linspace(0,40e-9,2) );
 
 % problem.conv_tol = 1e-6;
+% problem.tol = 5e-7;
 % problem.tol = 1e-5;
 % fnameSave=['_inc_tol_1e5_',fnameSave];
 % solver=['_inc_tol_1e5_',solver];
@@ -235,6 +248,7 @@ if runMatlabPart
     %% Matlab
     problem = problem.setSolverType( 'UseDynamicSolver' );
     %problem.m0(:) = SigmaInit(end,:);
+    %problem.m0 = single(problem.m0);
 
     problem = problem.setShowTheResult(true);
     problem = problem.setSaveTheResult(false);
@@ -242,17 +256,19 @@ if runMatlabPart
     problem.SimulationName = [fnameSave,'MATLAB_ode45',extra,'SolSetting',settings,'_',num2str(tsteps),'_tsteps'];
 
     oldPath = cd('../../../../../MagTense/matlab/micromagnetism_matlab_only_implementation');
-
+    
     problem.DemagTensorFileName= [oldPath,'/',problem.DirectoryFilename,problem.SimulationName,'_demag.mat'];
     prob_struct=struct(problem);
-    if ~exist(problem.DemagTensorFileName,'file')
+    %if ~exist(problem.DemagTensorFileName,'file')
         [ProblemSetupStruct, ~] = SetupProblem(prob_struct);
         ProblemSetupStruct.thresholdFract=dem_thres;
         ProblemSetupStruct.FFTdims=[];
+        %ProblemSetupStruct.use_single=true;
+        %ProblemSetupStruct.use_sparse=false;
         InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct);
         InteractionMatrices.A2=D2A;
         save(ProblemSetupStruct.DemagTensorFileName,'InteractionMatrices') ;
-    end
+    %end
     tic
     SigmaSol1 = ComputeTheSolution(prob_struct);
     toc
@@ -277,7 +293,7 @@ if runMatlabPart
     title_str=['"',settings,'" -- MATLAB Ode45, ', num2str(tsteps),' steps, theoretical pinning field: ',num2str(T_HP),' T'];
 	title(title_str)
     fnameSave='mumag_std_6_prismalMATLAB_ode45FinDifAexch';
-    solver=[solver,'MATLAB'];
+    solver='MATLAB_ODE45';
     Hp = mu0*HextFct(min(problem.t(Mx>1-1e-3)));
     Hp = Hp(:,1);
     save(['Std_prob_6\',fnameSave,'SolutionSetting',settings,'_',num2str(tsteps),'_tsteps_large_Hext.mat'],'problem','Hp','SigmaSol1') ;
