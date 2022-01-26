@@ -70,9 +70,16 @@ if (~all(FFTdims==0)) & isfield(InteractionMatrices,'FFT') % FFT !!!
     AA.Do3Dfft = InteractionMatrices.FFT.Do3Dfft ;
 else
     % Demag tensor is symmetric, i.e. KglobZX = KglobXZ
-    AA.HmX = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXX{1}*Sx+DemagTensor.KglobXY{1}*Sy+DemagTensor.KglobXZ{1}*Sz) ;
-    AA.HmY = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXY{1}*Sx+DemagTensor.KglobYY{1}*Sy+DemagTensor.KglobYZ{1}*Sz) ;
-    AA.HmZ = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXZ{1}*Sx+DemagTensor.KglobYZ{1}*Sy+DemagTensor.KglobZZ{1}*Sz) ;
+    if (ProblemSetupStruct.dem_thres > 1)
+        %Demag turned off
+        AA.HmX = @(Sx,Sy,Sz,t) 0;
+        AA.HmY = @(Sx,Sy,Sz,t) 0;
+        AA.HmZ = @(Sx,Sy,Sz,t) 0;
+    else
+        AA.HmX = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXX{1}*Sx+DemagTensor.KglobXY{1}*Sy+DemagTensor.KglobXZ{1}*Sz) ;
+        AA.HmY = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXY{1}*Sx+DemagTensor.KglobYY{1}*Sy+DemagTensor.KglobYZ{1}*Sz) ;
+        AA.HmZ = @(Sx,Sy,Sz,t) - Mfact.*(DemagTensor.KglobXZ{1}*Sx+DemagTensor.KglobYZ{1}*Sy+DemagTensor.KglobZZ{1}*Sz) ;
+    end
 end
 % "H" : Effective field : external field
 
