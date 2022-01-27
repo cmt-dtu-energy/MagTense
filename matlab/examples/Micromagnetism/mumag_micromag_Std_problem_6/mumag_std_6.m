@@ -152,13 +152,13 @@ end
 if ~useFinDif
     % Direct Laplacian
     if numel(unique(GridInfo.Zel))-1
-        [D2X,D2Y,D2Z] = ComputeDifferentialOperatorsFromMesh_Neumann_GGDirLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
+        [D2X,D2Y,D2Z] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
         InteractionMatrices.A2 = D2X + D2Y + D2Z ;
     elseif numel(unique(GridInfo.Yel))-1
-        [D2X,D2Y] = ComputeDifferentialOperatorsFromMesh_Neumann_GGDirLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
+        [D2X,D2Y] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
         InteractionMatrices.A2 = D2X + D2Y ;
     else
-        [D2X] = ComputeDifferentialOperatorsFromMesh_Neumann_GGDirLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
+        [D2X] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
         InteractionMatrices.A2 = D2X ;
     end
 
