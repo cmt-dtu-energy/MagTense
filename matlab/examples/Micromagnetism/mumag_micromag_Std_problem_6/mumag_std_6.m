@@ -138,13 +138,13 @@ if contains(settings,'a')
 end
 if ~useFinDif
 if numel(unique(GridInfo.Zel))-1
-    [D2X,D2Y,D2Z] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,'extended',8,"Multimaterial",Aexch);
+    [D2X,D2Y,D2Z] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
     InteractionMatrices.A2 = D2X + D2Y + D2Z ;
 elseif numel(unique(GridInfo.Yel))-1
-    [D2X,D2Y] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,'extended',8,"Multimaterial",Aexch);
+    [D2X,D2Y] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
     InteractionMatrices.A2 = D2X + D2Y ;
 else
-    [D2X] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,'extended',8,"Multimaterial",Aexch);
+    [D2X] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
     InteractionMatrices.A2 = D2X ;
 end
 
