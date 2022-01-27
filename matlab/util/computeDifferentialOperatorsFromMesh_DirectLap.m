@@ -1,4 +1,4 @@
-function [DX,DY,DZ,W] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,interpn,weight,method,Aexch,ExtW)
+function [DX,DY,DZ,W] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,interpn,weight,method,Aexch,ExtW)
 %
 % [DX,DY,DZ,W] = ComputeDifferentialOperatorsFromMesh04_Neumann04_GGDirLap(GridInfo,interpn,weight,method,Aexch)
 %
