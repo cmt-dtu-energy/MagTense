@@ -418,7 +418,8 @@ include 'blas.f90'
     
     integer :: stat, ntot
     type(MATRIX_DESCR) :: descr
-    real(DP) :: alpha, beta
+    real(SP) :: alpha, beta
+    real(SP), dimension(:), allocatable :: temp
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -431,16 +432,16 @@ include 'blas.f90'
     allocate(temp(ntot))
     !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
     !y = alpha * (A_exch * Mx )
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, beta, solution%HjX )
-    solution%HjX = solution%HjX * solution%Jfact
+    stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, beta, temp )
+    solution%HjX = temp * solution%Jfact
     
     !Effective field in the Y-direction
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, beta, solution%HjY )
-    solution%HjY = solution%HjY * solution%Jfact
+    stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, beta, temp )
+    solution%HjY = temp * solution%Jfact
     
     !Effective field in the Z-direction
-    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, beta, solution%HjZ )
-    solution%HjZ = solution%HjZ * solution%Jfact
+    stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, beta, temp )
+    solution%HjZ = temp * solution%Jfact
     
     deallocate(temp)
     
