@@ -1,18 +1,39 @@
 function mumag_std_6(settings,useCVODE,tsteps)
+%%% Calculates the "standard" micromagnetic problem number 6 on a Cartesian 
+%%% mesh. The problem is described in
+%%% "Proposal for a micromagnetic standard problem: domain wall pinning at
+%%% phase boundaries" (2022), Heistracher et al. [https://arxiv.org/abs/2107.07855] 
+%%% 
+%%% Variables:
+%%% 
+%%% settings detail which of the three parameters change.
+%%%     a: Exchange interaction strength
+%%%     k: Anisotropy constant
+%%%     j (or m): Saturation magnetization
+%%% any combination may be used, such as 'ak', 'km', 'akj', '', etc.
+%%% NOTE that cases 'kj' and 'k' are ill posed.
+%%% 
+%%% useCVODE is a switch between the solvers. CVODE (true) and RK (false)
+%%% 
+%%% tsteps is the number of time steps used in the problem. CVODE is almost
+%%% immune, but RK is heavily dependent on the time resolution asked for.
 
 addpath('../../../../../MagTense/matlab/MEX_files');
 addpath('../../../../../MagTense/matlab/util');
 %addpath('../../micromagnetism');
 
 fnameSave = 'mumag_std_6_prismal' ;
-extra='';
-useFinDif = ~true;
+extra=''; % Extra text fragments for graph titles and filenames
+useFinDif = ~true; % Switch between Direct Laplacian method and finite difference method
 runFortranPart = true;
 runMatlabPart = false;
+
+% Theoretical domain wall pinning fields
 HPs=containers.Map({'akj','ak','aj','a','kj','k','j',''},[1.568,1.089,1.206,0.838,1.005,0.565,0,0]);
 
+%% Defaults
 if ~exist('settings','var')
-    settings='akj';%'akj';
+    settings='akj';
 end
 solver='CVODE';
 if ~exist('useCVODE','var')
@@ -21,9 +42,9 @@ elseif ~useCVODE
     solver='RK';
 end
 if ~exist('tsteps','var')
-    tsteps=401;
+    tsteps=401; % Overkill, but gives RK a fighting chance.
 end
-T_HP=HPs(settings);
+T_HP=HPs(settings); % Theoretical pinning field in our case.
 title_str=['"',settings,'" -- ',solver, ', ', num2str(tsteps),' steps, theoretical pinning field: ',num2str(T_HP),' T'];
 rng(9)
 %% Physical Parameters
@@ -33,39 +54,36 @@ dem_thres = 2;
 mu0 = 4*pi*1e-7;
 
 Ms = 1/mu0 ; % 1 T
-K0 = 1e6 ;    % J/m3
-A0 = 1e-11 ;  % J/m3
+K0 = 1e6 ;    % [J/m3]
+A0 = 1e-11 ;  % [J/m3]
 
 Ms_soft=0.25/mu0; %0.25 T
-A0_soft=0.25e-11; %J/m
-K0_soft=1e5; % J/m3
+A0_soft=0.25e-11; % [J/m]
+K0_soft=1e5; % [J/m3]
 
-gamma0 = 2.2128e5;%0;
-alpha0 = 1 ; %1e15 ; 
+gamma0 = 2.2128e5;
+alpha0 = 1 ;
 gamma = gamma0/(1+alpha0^2);
 alpha = alpha0*gamma0/(1+alpha0^2);
 
-%% Generate Voronoi regions with intergrain region
-
+%% Mesh generation. Generate Voronoi regions with intergrain region
 thisGridL = [80e-9,1e-9,1e-9];
 X = [0,thisGridL(1)] ;
 Y = [0,thisGridL(2)] ;
 Z = [0,thisGridL(3)] ;
 
-nGrains = 4 ; %5 ; % number of grains
-offSetD = 0 ; %2.*7e-9 ; % [m]
+nGrains = 4 ; % number of grains
+offSetD = 0 ; % [m]. No space between grains.
 x_gen = rand(nGrains,1).*thisGridL(1) ;
 y_gen = rand(nGrains,1).*thisGridL(2) ;
 z_gen = rand(nGrains,1).*thisGridL(3) ;
 
+% The number of Lloyd iterations are not relevant, since the x_generators
+% are fixed afterwards anyway. 
 [x_gen,y_gen,z_gen,~] = DoLloydIteration(X,Y,Z,x_gen,y_gen,z_gen,70);%3) ;
-% x_gen = thisGridL(1)*[1/4;3/4];
-% y_gen = thisGridL(2)*[1/2;1/2];
-% z_gen = thisGridL(3)*[1/2;1/2];
 x_gen = thisGridL(1)*[1/8;3/8;5/8;7/8];
-% y_gen = thisGridL(2)*1/2*ones(size(x_gen));
-% z_gen = thisGridL(3)*1/2*ones(size(x_gen));
 
+% Base filename
 fname = 'temp\ThisVoronoiMeshMumag06a' ;
 VoronoiStruct = GenerateVoronoiCells(X,Y,Z,x_gen,y_gen,z_gen,offSetD,fname);
 
@@ -88,8 +106,8 @@ resolution = [length(mesh_cart.pos_out) 1 1];
 
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 problem = problem.setUseCuda( true );
-problem.dem_appr = getMicroMagDemagApproximation(demag_approx);
-problem.dem_thres = dem_thres;
+problem.dem_appr = getMicroMagDemagApproximation(demag_approx); % turn off demag field
+problem.dem_thres = dem_thres;                                  % turn off demag field
 problem.grid_type = getMicroMagGridType('unstructuredPrisms');
 problem = problem.setSolverType( 'UseDynamicSolver' );
 problem.solver = getMicroMagSolver( 'Dynamic' );
@@ -98,73 +116,68 @@ problem.grid_pts = mesh_cart.pos_out ;
 problem.grid_abc = mesh_cart.dims_out ;
 problem.grid_L   = thisGridL ;
 
-%% Save the parameters
-
+%% General problem parameters
 problem.alpha = alpha;
 problem.gamma = gamma;
 problem.Ms = Ms*ones(prod(resolution),1);
 problem.K0 = K0*ones(prod(resolution),1);
-problem.A0 = A0;%*ones(prod(resolution),1);
+problem.A0 = A0;
 
 %% Grain anisotropies
 easyX = 1 ;
 easyY = 0 ;
 easyZ = 0 ;
 
-for i=1:nGrains
+for i=1:nGrains % For each of the grains, set the anisotropy direction
     problem.u_ea(mesh_cart.iIn{i},:)=repmat([easyX,easyY,easyZ],numel(mesh_cart.iIn{i}),1);
 end
 if contains(settings,'k')% soft anisotropy in left phase
-    for i=1:nGrains/2
+    for i=1:nGrains/2    % This corresponds to the first half of the grains
     problem.K0(mesh_cart.iIn{i},:)=K0_soft;
     end
 end
 
 %% Exchange matrix
-
 InteractionMatrices.GridInfo = GridInfo;
 InteractionMatrices.X = GridInfo.Xel ;
 InteractionMatrices.Y = GridInfo.Yel ;
 InteractionMatrices.Z = GridInfo.Zel ;
 
-GridInfo.TheTs=GridInfo.TheDs;
-
 Aexch=ones(numel(GridInfo.Xel),1);
-if contains(settings,'a')
-    for i=1:nGrains/2
-        Aexch(mesh_cart.iIn{i})= A0_soft/A0 ;
-        %problem.A0(mesh_cart.iIn{i},:)=A0_soft;
+if contains(settings,'a')% soft exchange stiffness in left phase
+    for i=1:nGrains/2 	 % This corresponds to the first half of the grains
+        Aexch(mesh_cart.iIn{i})= A0_soft/A0 ; % Hack so exchange strength varies
     end
 end
 if ~useFinDif
-if numel(unique(GridInfo.Zel))-1
-    [D2X,D2Y,D2Z] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
-    InteractionMatrices.A2 = D2X + D2Y + D2Z ;
-elseif numel(unique(GridInfo.Yel))-1
-    [D2X,D2Y] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
-    InteractionMatrices.A2 = D2X + D2Y ;
-else
-    [D2X] = ComputeDifferentialOperatorsFromMesh_Neumann04_GGDirLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
-    InteractionMatrices.A2 = D2X ;
-end
+    % Direct Laplacian
+    if numel(unique(GridInfo.Zel))-1
+        [D2X,D2Y,D2Z] = ComputeDifferentialOperatorsFromMesh_Neumann_GGDirLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
+        InteractionMatrices.A2 = D2X + D2Y + D2Z ;
+    elseif numel(unique(GridInfo.Yel))-1
+        [D2X,D2Y] = ComputeDifferentialOperatorsFromMesh_Neumann_GGDirLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
+        InteractionMatrices.A2 = D2X + D2Y ;
+    else
+        [D2X] = ComputeDifferentialOperatorsFromMesh_Neumann_GGDirLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
+        InteractionMatrices.A2 = D2X ;
+    end
 
-%--- Convert the exchange matrix to sparse
-problem = PrepareExchangeMatrix(InteractionMatrices.A2,problem) ;
+    %--- Convert the exchange matrix to sparse
+    problem = PrepareExchangeMatrix(InteractionMatrices.A2,problem) ;
 
 else
-% Finite difference stencil
+    % Finite difference stencil
     D2A = ComputeDifferentialOperatorsFromMesh_Neumann_FiniteDifference(GridInfo,Aexch);
     problem = PrepareExchangeMatrix(D2A,problem) ;
 end
 
 %% Applied Field
-
 HystDir = normalize([easyX,easyY,easyZ],'norm') ;
 
 %time-dependent applied field
-Hext0= 2e7*HystDir/mu0 .* 20e-9;
+Hext0= 2e7*HystDir/mu0 .* 20e-9; % Initial applied field for ill-conditioned 'k' and 'kj' cases.
+                                 % Could be 0 in any other case.
 HextFct = @(t) 2e7*HystDir/mu0 .* t' + Hext0;
-%problem = problem.setHext( HextFct, linspace(0,100e-9,2001) );
 problem = problem.setHext( HextFct, linspace(0,100e-9,2) );
 
 problem.HextFct{1} = @(t) 2e7*HystDir(1)/mu0 .* t' + Hext0;
@@ -178,7 +191,7 @@ problem.m0(:,2) = init_stat(2)/norm(init_stat) ;
 problem.m0(:,3) = init_stat(3)/norm(init_stat) ;
 
 for i=1:nGrains/2 
-    if contains(settings,'m') || contains(settings,'j')% Setting lower Ms for left region -- will this work?
+    if contains(settings,'m') || contains(settings,'j')% Setting lower Ms for left region
         problem.Ms(mesh_cart.iIn{i}) = Ms_soft;
     end
     % setting left half init state to point right.
@@ -190,9 +203,10 @@ if useCVODE
     problem = problem.setUseCVODE( true );
 end
 problem = problem.setTime( linspace(0,100e-9,tsteps) );
-problem.setTimeDis = int32(10);
-% problem = problem.setConvergenceCheckTime( linspace(0,40e-9,2) );
+problem.setTimeDis = int32(10); % Progress update intervals. Every 10th time step.
 
+% Extra parameters to be played with if problem doesn't converge
+% problem = problem.setConvergenceCheckTime( linspace(0,40e-9,2) );
 % problem.conv_tol = 1e-6;
 % problem.tol = 5e-7;
 % problem.tol = 1e-5;
@@ -215,14 +229,13 @@ if runFortranPart
     RunTime = toc ;
 
     save([fnameSave,solver,extra,'Solution.mat'],'solution')
-    %% Hysteresis Loop
-
+    
+    %% Get hysteresis loop
     MxMean2 = zeros(tsteps,1) ;
     MyMean2 = zeros(tsteps,1) ;
     MzMean2 = zeros(tsteps,1) ;
 
     for ij = 1:tsteps
-
         Mx_arr = (solution.M(ij,:,1,1)) ;
         My_arr = (solution.M(ij,:,1,2)) ;
         Mz_arr = (solution.M(ij,:,1,3)) ;
@@ -230,9 +243,7 @@ if runFortranPart
         MxMean2(ij) = sum(GridInfo.Volumes(:).*Mx_arr(:))/sum(GridInfo.Volumes(:)) ;
         MyMean2(ij) = sum(GridInfo.Volumes(:).*My_arr(:))/sum(GridInfo.Volumes(:)) ;
         MzMean2(ij) = sum(GridInfo.Volumes(:).*Mz_arr(:))/sum(GridInfo.Volumes(:)) ;
-
     end
-    % plot(problem.Hext(1:10:end,1),MxMean2)
     H=-mu0*solution.H_ext(:,1,1,1);
     M=MxMean2;
     figure
@@ -247,8 +258,6 @@ end
 if runMatlabPart
     %% Matlab
     problem = problem.setSolverType( 'UseDynamicSolver' );
-    %problem.m0(:) = SigmaInit(end,:);
-    %problem.m0 = single(problem.m0);
 
     problem = problem.setShowTheResult(true);
     problem = problem.setSaveTheResult(false);
@@ -259,21 +268,23 @@ if runMatlabPart
     
     problem.DemagTensorFileName= [oldPath,'/',problem.DirectoryFilename,problem.SimulationName,'_demag.mat'];
     prob_struct=struct(problem);
+    % Pre-calculate interaction matrices
     %if ~exist(problem.DemagTensorFileName,'file')
         [ProblemSetupStruct, ~] = SetupProblem(prob_struct);
-        ProblemSetupStruct.thresholdFract=dem_thres;
+        ProblemSetupStruct.thresholdFract=dem_thres; % Turn off demagnetization
         ProblemSetupStruct.FFTdims=[];
         %ProblemSetupStruct.use_single=true;
         %ProblemSetupStruct.use_sparse=false;
         InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct);
-        InteractionMatrices.A2=D2A;
+        InteractionMatrices.A2=D2A; % Supply our own exchange matrix
         save(ProblemSetupStruct.DemagTensorFileName,'InteractionMatrices') ;
     %end
     tic
     SigmaSol1 = ComputeTheSolution(prob_struct);
     toc
     cd(oldPath);
-
+    
+    % Get hysteresis loop
     for k=1:size(SigmaSol1,1) 
         Sigma = SigmaSol1(k,:).' ;
         NN = round(numel(Sigma)/3) ;
@@ -305,78 +316,4 @@ if runMatlabPart
     end
 end
 close all
-%{
-pause(inf)
-%% Plot
-hF = figure('color','w') ;
- ppsz = [2*20,19] ;
-    ppps = [0,0,2*20,19] ;
-    set(hF,'PaperUnits','centimeters','PaperSize',ppsz,'PaperPosition',ppps) ;
-
-hA1 = subplot(1,2,1) ;
-
-
-CartesianUnstructuredMeshPlot(mesh_cart.pos_out,mesh_cart.dims_out,GridInfo,mesh_cart.iIn,fname,hA1)  ;
-set(hA1,'visible','off') ;
-
-hA2 = subplot(2,2,2) ;
-
-
-
-hL1 = plot(H,M,'.-k','linewidth',1.5,'markersize',12,'parent',hA2) ;
-hold on ; hL2 = plot(Hc,0,'hw','markerfacecolor','r','markersize',9,'parent',hA2) ;
-text(Hc,0,'   H_C','horizontalalignment','left','verticalalignment','bottom','color','r','parent',hA2,'fontsize',13)
-
-hL3 = plot(-H_N,0,'hw','markerfacecolor','b','markersize',9,'parent',hA2) ;
-text(-H_N,0,'H_N   ','horizontalalignment','right','verticalalignment','bottom','color','b','parent',hA2,'fontsize',13) 
-set(gca,'ylim',[-1,+1].*1.2,'xlim',[min(Hvalues),max(Hvalues)]) ;
-legend([hL2,hL3],{'Coercive Field','Nucleation Field'},'fontsize',13,'location','northwest')
-grid on
-xlabel('H [T]','fontsize',13)
-ylabel('M / M_s [-]','fontsize',13)
-set(hA2,'linewidth',1.5,'fontsize',13)
-set(gcf,'units','normalized','position',[0.05,0.05,.9,.9]) ;
-
-
-theTextBoxA = annotation(hF,'textbox','position',[.6-.02,.35+.05,.3,.1],'string',[num2str(nGrains),' Grains'],'LineStyle','none','fontsize',13,'FontWeight','bold') ; 
-
-theTextBox1 = annotation(hF,'textbox','position',[.6,.3+.05,.3,.1],'string',[],'LineStyle','none','fontsize',13) ; 
-set(theTextBox1,'string',[...
-    'M_s^{ } = ',DoTheUnitThing(Ms*mu0,'T'),newline,...
-    'A_0^{ } = ',DoTheUnitThing(A0,'J/m^3'),newline,...
-    'K_0^{ } = ',DoTheUnitThing(K0,'J/m^3'),newline,...
-    '\sigma_{} = ',num2str(sigmaEasy),newline,...
-    ]) ;
-if offSetD > 0 
-theTextBoxB = annotation(hF,'textbox','position',[.75-.02,.35+.05,.3,.1],'string','Inter-Grain','LineStyle','none','fontsize',13,'FontWeight','bold') ; 
-theTextBox2 = annotation(hF,'textbox','position',[.75,.3+.05,.3,.1],'string',[],'LineStyle','none','fontsize',13) ; 
-set(theTextBox2,'string',[...
-    'M_s^* = ',DoTheUnitThing(Msig*mu0,'T'),newline,...
-    'A_0^* = ',DoTheUnitThing(A0*A0igFactor,'J/m^3'),newline,...
-    'K_0^* = ','0 J/m^3',newline,...
-    '\delta_{} = ',DoTheUnitThing(2*offSetD,'m'),newline,...
-     ]) ;
-end
- theTextBoxC = annotation(hF,'textbox','position',[.6-.02,.12+.05,.3,.1],'string',['Unstructured Cartesian Mesh (',num2str(ress),' refinments)'],'LineStyle','none','fontsize',13,'FontWeight','bold') ; 
- 
- theTextBox3 = annotation(hF,'textbox','position',[.6,.07+.05,.3,.1],'string',[],'LineStyle','none','fontsize',13) ; 
-set(theTextBox3,'string',[...
-    'L_x = ',DoTheUnitThing(thisGridL(1),'m'),' ',newline,...
-    'L_y = ',DoTheUnitThing(thisGridL(2),'m'),' ',newline,...
-    'L_z = ',DoTheUnitThing(thisGridL(3),'m'),' ',newline,...
-    ]) ;
-
- theTextBox4 = annotation(hF,'textbox','position',[.75,.07+.05,.3,.1],'string',[],'LineStyle','none','fontsize',13) ; 
-set(theTextBox4,'string',[...
-    'N_x base = ',num2str(NNs(1)),' ',newline,...
-    'N_y base = ',num2str(NNs(2)),' ',newline,...
-    'N_z base = ',num2str(NNs(3)),' ',newline,...
-    ]) ;
-
-    set(gcf,'PaperUnits','centimeters','PaperSize',ppsz,'PaperPosition',ppps) ;
-    set(gcf,'PaperUnits','inches','Renderer','painters') ;
-    figure(gcf) ;
-    eval(['print -dpdf ',fnameSave,'Result','.pdf']) ;
-
-%}
 end
