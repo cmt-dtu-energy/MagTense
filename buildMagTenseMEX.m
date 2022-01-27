@@ -59,7 +59,7 @@ end
 
 if (ispc)
     if (USE_CUDA)
-        CUDA_str  = '''-Lc:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.5/lib/x64/'' -lcublas -lcudart -lcuda -lcusparse';
+        CUDA_str  = '''-Lc:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/lib/x64/'' -lcublas -lcudart -lcuda -lcusparse';
         if (USE_RELEASE)
             build_str_MagTenseMicroMag = 'x64/release';
             build_str_NO_CUDA_MagTenseMicroMag = 'x64/Release_no_CUDA';
