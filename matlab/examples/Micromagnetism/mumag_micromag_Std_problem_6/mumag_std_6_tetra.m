@@ -178,7 +178,7 @@ else
 end
 
 %--- Convert the exchange matrix to sparse
-problem = PrepareExchangeMatrix(InteractionMatrices.A2,problem) ;
+problem = problem.setExchangeMatrixSparse( InteractionMatrices.A2 );
 
 %% Applied Field
 

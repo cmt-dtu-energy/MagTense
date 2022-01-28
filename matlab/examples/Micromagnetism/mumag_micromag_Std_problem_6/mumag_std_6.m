@@ -163,12 +163,12 @@ if ~useFinDif
     end
 
     %--- Convert the exchange matrix to sparse
-    problem = PrepareExchangeMatrix(InteractionMatrices.A2,problem) ;
+    problem = problem.setExchangeMatrixSparse( InteractionMatrices.A2 );
 
 else
     % Finite difference stencil
     D2A = ComputeDifferentialOperatorsFromMesh_Neumann_FiniteDifference(GridInfo,Aexch);
-    problem = PrepareExchangeMatrix(D2A,problem) ;
+    problem = problem.setExchangeMatrixSparse( D2A );
 end
 
 %% Applied Field
