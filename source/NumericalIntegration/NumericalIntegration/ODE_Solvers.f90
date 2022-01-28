@@ -284,7 +284,8 @@ private MTdmdt, MTy_out,MTf_vec
     ! solution vector, neq is set in the ode_functions module
     real(c_double),dimension(neq,nt),intent(inout) :: y_out
     real(c_double),dimension(neq),intent(in) :: ystart
-    real(c_double),dimension(neq) :: y_cur
+    real(c_double),dimension(neq) :: y_cur, y_norm
+    real(c_double) :: max_norm_dev
 
     !======= Internals ============
     ! initialize solution vector
@@ -363,6 +364,18 @@ private MTdmdt, MTy_out,MTf_vec
         call CVODE_error('Error in FCVodeSetInitStep, ierr = ', ierr,callback ) 
 		stop
     end if
+    
+    ! Test to see if results improve -- maxstep picoseconds?
+    !do outstep=1,size(t)-1
+    !    dum1=max(dum1,t(outstep+1)-t(outstep))
+    !enddo
+    !ierr = FCVodeSetMaxStep(cvode_mem, dum1)
+    !if (ierr /= 0) then
+    !    call CVODE_error('Error in FCVodeSetMaxStep, ierr = ', ierr,callback ) 
+    !    write(err_str,'(A32,G10.5)') 'Attempted max time step: ',dum1
+    !    call CVODE_error(trim(err_str), outstep,callback ) 
+	!	stop
+    !end if
 
     ! attach linear solver
     ierr = FCVodeSetLinearSolver(cvode_mem, sunlinsol_LS, sunmat_A);
@@ -392,6 +405,7 @@ private MTdmdt, MTy_out,MTf_vec
     do outstep = 2,nt
 	    ! call CVode
         if ( mod(outstep,callback_display) .eq. 0 ) then
+            ! Update user
             call callback( 'Time', outstep )
         endif
         
@@ -433,8 +447,33 @@ private MTdmdt, MTy_out,MTf_vec
                 call CVODE_error('Error in FCVodeGetNumSteps, ierr = ', ierr,callback )
             endif
 		exit
-	    endif
+        endif
+        
+        ! Check norm (under the assumption that y_cur is a magnetization vector containing x-, y- and z- components)
+        call Norm_error(neq, y_cur, y_norm, max_norm_dev)
+        ! If norm deviates from 1 by more than relative tolerance, rescale and reinitiate CVODE
+        if (max_norm_dev .gt. rtol) then
+            !call CVODE_error('Norm - 1 > relative tolerance. Rescaling. Time step nr. ', outstep,callback )
+            write(err_str,'(A50,G10.5,A30)') 'Norm - 1 > relative tolerance. Max deviation = ',max_norm_dev,'. Rescaling. Time step nr. '
+            call CVODE_error(err_str, outstep,callback ) 
+            y_cur=y_cur/y_norm
+            !call Norm_error(neq, y_cur, y_norm, max_norm_dev)
+            !write(err_str,'(A30,G10.5)') 'Maximum deviation after = ',max_norm_dev
+            !call CVODE_error(err_str, 0,callback ) 
+            ! and reinitialize solution vector ...
+            sunvec_y = FN_VMake_Serial(neq, y_cur)
+            if (.not. c_associated(sunvec_y)) then
+                call CVODE_error('Reinitialization of solution vector after rescaling failed', -1,callback )
+                stop
+            endif
+            ierr = FCVodeReInit(cvode_mem, t(outstep), sunvec_y)
+            if (ierr /= 0) then
+	            call CVODE_error('Error in FCVodeReInit, ierr = ', ierr,callback )
+	            stop
+            endif
+        endif
 	    y_out(:,outstep) = y_cur    ! Todo: Find a way to write directly to y_out
+
     enddo
 
     ! diagnostics output (custom function. Not written)
@@ -523,5 +562,25 @@ private MTdmdt, MTy_out,MTf_vec
         write(12,*) ierr
         close(12)
     end subroutine CVODE_error
+    
+    subroutine Norm_error(neq, y_cur, y_norm, max_norm_dev)
+        use, intrinsic :: iso_c_binding
+        integer, intent(in) :: neq
+        real(c_double), dimension(:), intent(in) :: y_cur
+        real(c_double), intent(out) :: max_norm_dev
+        real(c_double) :: tmp_norm
+        real(c_double),dimension(:), intent(out) :: y_norm
+        integer :: k, nvar
+        
+        nvar = neq/3
+        max_norm_dev=0.0
+        do k=1,nvar
+            tmp_norm=sqrt(y_cur(k)*y_cur(k)+y_cur(nvar+k)*y_cur(nvar+k)+y_cur(2*nvar+k)*y_cur(2*nvar+k))
+            max_norm_dev=max(max_norm_dev,abs(tmp_norm-1))
+            y_norm(k)=tmp_norm
+            y_norm(nvar+k)=tmp_norm
+            y_norm(2*nvar+k)=tmp_norm
+        enddo
+    end subroutine Norm_error
 #endif    
 end module ODE_Solvers
