@@ -21,7 +21,7 @@ GFortran compiler and Make utility (Windows + MacOS only)
   - Installation in conda environment
 
     ```bash
-    conda install -y make
+    conda install -y -c conda-forge make
     conda install -y -c msys m2w64-gcc-fortran
     ```
 
