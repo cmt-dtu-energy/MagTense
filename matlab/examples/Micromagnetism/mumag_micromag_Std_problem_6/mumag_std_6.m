@@ -46,7 +46,7 @@ if ~exist('tsteps','var')
 end
 T_HP=HPs(settings); % Theoretical pinning field in our case.
 title_str=['"',settings,'" -- ',solver, ', ', num2str(tsteps),' steps, theoretical pinning field: ',num2str(T_HP),' T'];
-rng(9)
+
 %% Physical Parameters
 demag_approx = 'threshold_fraction';
 dem_thres = 2;
@@ -57,7 +57,7 @@ Ms = 1/mu0 ; % 1 T
 K0 = 1e6 ;    % [J/m3]
 A0 = 1e-11 ;  % [J/m3]
 
-Ms_soft=0.25/mu0; %0.25 T
+Ms_soft=0.25/mu0; % 0.25 T
 A0_soft=0.25e-11; % [J/m]
 K0_soft=1e5; % [J/m3]
 
@@ -66,39 +66,12 @@ alpha0 = 1 ;
 gamma = gamma0/(1+alpha0^2);
 alpha = alpha0*gamma0/(1+alpha0^2);
 
-%% Mesh generation. Generate Voronoi regions with intergrain region
-thisGridL = [80e-9,1e-9,1e-9];
-X = [0,thisGridL(1)] ;
-Y = [0,thisGridL(2)] ;
-Z = [0,thisGridL(3)] ;
+%% Load mesh. Voronoi regions with no intergrain region
+thisGridL = [80e-9,1e-9,1e-9]; % Grid size. Determined by problem.
+nGrains = 4; % number of grains. Has to be even to ensure that the split is in the middle,
+             % has to be >=3 because our mesh generation is bad.
 
-nGrains = 4 ; % number of grains
-offSetD = 0 ; % [m]. No space between grains.
-x_gen = rand(nGrains,1).*thisGridL(1) ;
-y_gen = rand(nGrains,1).*thisGridL(2) ;
-z_gen = rand(nGrains,1).*thisGridL(3) ;
-
-% The number of Lloyd iterations are not relevant, since the x_generators
-% are fixed afterwards anyway. 
-[x_gen,y_gen,z_gen,~] = DoLloydIteration(X,Y,Z,x_gen,y_gen,z_gen,70);%3) ;
-x_gen = thisGridL(1)*[1/8;3/8;5/8;7/8];
-
-% Base filename
-fname = 'temp\ThisVoronoiMeshMumag06a' ;
-VoronoiStruct = GenerateVoronoiCells(X,Y,Z,x_gen,y_gen,z_gen,offSetD,fname);
-
-%NNs = [80,7,1] ; %--- NNs is a 3-elements array corresponding to the desired grid resolution (before refinment).
-% NNs = [80,2,2] ; %--- NNs is a 3-elements array corresponding to the desired grid resolution (before refinment).
-NNs = [80,1,1] ; %--- NNs is a 3-elements array corresponding to the desired grid resolution (before refinment).
-
-ress=3 ;
-mesh_cart = refineRectGrid_v6( [X(1),X(end)],[Y(1),Y(end)],[Z(1),Z(end)],[],[],[],NNs,ress,VoronoiStruct);
-% mesh_cart = refineRectGrid_v6( [X(1),X(end)],[Y(1),Y(end)],[Z(1),Z(end)],x_gen,y_gen,z_gen,NNs,ress,VoronoiStruct);
-
-%--- Analyze and plot Cartesian Unstructured Mesh
-mesh_cart = GetDomainsFromMeshHull(mesh_cart,VoronoiStruct) ;
-
-GridInfo = CartesianUnstructuredMeshAnalysis(mesh_cart.pos_out,mesh_cart.dims_out) ;
+load('Std_prob_6_unstructured_mesh_grains_4_res_80_1_1_ref_3','mesh_cart','GridInfo');
 
 resolution = [length(mesh_cart.pos_out) 1 1];
 

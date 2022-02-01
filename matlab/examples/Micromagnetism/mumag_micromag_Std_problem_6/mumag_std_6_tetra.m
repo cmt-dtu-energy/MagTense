@@ -25,7 +25,6 @@ addpath('../../../../../MagTense/matlab/micromagnetism_matlab_only_implementatio
 
 fnameSave = 'mumag_std_6_tetra' ;
 extra=''; % Extra text fragments for graph titles and filenames
-useFinDif = ~true; % Switch between Direct Laplacian method and finite difference method
 runFortranPart = true;
 runMatlabPart = false;
 
@@ -45,7 +44,7 @@ end
 if ~exist('tsteps','var')
     tsteps=401; % Overkill, but gives RK a fighting chance.
 end
-T_HP=HPs(settings);
+T_HP=HPs(settings); % Theoretical pinning field in our case.
 title_str=['"',settings,'" -- ',solver, ', ', num2str(tsteps),' steps, theoretical pinning field: ',num2str(T_HP),' T'];
 rng(9)
 %% Physical Parameters
@@ -69,49 +68,8 @@ alpha = alpha0*gamma0/(1+alpha0^2);
 
 %% Mesh generation. Generate Voronoi regions with intergrain region
 thisGridL = [80e-9,1e-9,1e-9];
-X = [0,thisGridL(1)] ;
-Y = [0,thisGridL(2)] ;
-Z = [0,thisGridL(3)] ;
-
-% Base filename
-fname = 'temp\ThisVoronoiMeshMumag06a' ;
-
-tetname = 'TetraModel_80_1_1_4GrainsRegular';
-if ~true
-    % Load Comsol created mesh
-    warning('Mesh is loaded, not generated')
-    % model is a structure passed to TetrahedralMeshAnalysis
-    load(tetname,'model') ; % Voronoi & Tetra
-    model.Mesh.Nodes = meshTetra.Vert.' ;  % Positions of the vertexes
-    model.Mesh.Elements = meshTetra.A.' ;  % Vertices-elements connectivity matrix (starts from 1)
-elseif true
-    % Load given mesh
-    nodes=importdata('donaumesh\paul.knt')*1e-9;
-    nodes=nodes+40e-9*repmat([1 0 0],size(nodes,1),1); % shift positions to start at x=0
-    elements=importdata('donaumesh\paul.ijk');
-    model = createpde();
-    geometryFromMesh(model,nodes',elements(:,1:4)');
-elseif true
-    % Create mesh in Matlab
-    mesh_res = thisGridL(1)/80;
-    % Fancy stuff to ensure exact boundary in the middle
-    model = CreateTetraMeshStdProb6(thisGridL,mesh_res);
-else
-    % Create mesh in Comsol
-    Res = thisGridL(1)/160;
-    L = 1;
-    oldFolder = cd('../../Library');
-    %% Generate Tetra Mesh
-    meshTetra = GetMeshFromComsol01(X,Y,Z,fname,Res,L);
-    meshTetra = GetDomainsFromMeshHull(meshTetra,VoronoiStruct) ;
-    cd(oldFolder)
-    model.Mesh.Nodes = meshTetra.Vert.' ;  % Positions of the vertexes
-    model.Mesh.Elements = meshTetra.A.' ;  % Vertices-elements connectivity matrix (starts from 1)
-    save(tetname,'model')
-end
-
-% Plot the mesh
-figure ; pdeplot3D(model,'FaceAlpha',0.1) ;
+tetname = 'TetraModel_80_1_1_4GrainsRegular'; % basename for mesh file
+model=load(tetname);
 
 %--- Setup the problem
 resolution = [size(model.Mesh.Elements,2),1,1];
