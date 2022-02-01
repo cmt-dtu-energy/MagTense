@@ -4676,3 +4676,224 @@
            0
  After sunlinsol free
            0
+    Norm - 1 > relative tolerance. Max deviation = .19119E-02   . Rescaling. Tim
+ e step nr.           
+           2
+    Norm - 1 > relative tolerance. Max deviation = .36870E-02   . Rescaling. Tim
+ e step nr.           
+           3
+    Norm - 1 > relative tolerance. Max deviation = .69471E-02   . Rescaling. Tim
+ e step nr.           
+           5
+    Norm - 1 > relative tolerance. Max deviation = .29338E-02   . Rescaling. Tim
+ e step nr.           
+           6
+    Norm - 1 > relative tolerance. Max deviation = .81432E-02   . Rescaling. Tim
+ e step nr.           
+           7
+    Norm - 1 > relative tolerance. Max deviation = .12759E-01   . Rescaling. Tim
+ e step nr.           
+           9
+    Norm - 1 > relative tolerance. Max deviation = .13237E-02   . Rescaling. Tim
+ e step nr.           
+          12
+    Norm - 1 > relative tolerance. Max deviation = .57441E-03   . Rescaling. Tim
+ e step nr.           
+          22
+    Norm - 1 > relative tolerance. Max deviation = .58215E-03   . Rescaling. Tim
+ e step nr.           
+          26
+    Norm - 1 > relative tolerance. Max deviation = .57696E-03   . Rescaling. Tim
+ e step nr.           
+          30
+    Norm - 1 > relative tolerance. Max deviation = .15164E-02   . Rescaling. Tim
+ e step nr.           
+          32
+    Norm - 1 > relative tolerance. Max deviation = .54301E-03   . Rescaling. Tim
+ e step nr.           
+          35
+    Norm - 1 > relative tolerance. Max deviation = .59161E-03   . Rescaling. Tim
+ e step nr.           
+          39
+    Norm - 1 > relative tolerance. Max deviation = .51673E-03   . Rescaling. Tim
+ e step nr.           
+          41
+    Norm - 1 > relative tolerance. Max deviation = .80519E-03   . Rescaling. Tim
+ e step nr.           
+          43
+    Norm - 1 > relative tolerance. Max deviation = .78877E-03   . Rescaling. Tim
+ e step nr.           
+          47
+    Norm - 1 > relative tolerance. Max deviation = .86242E-03   . Rescaling. Tim
+ e step nr.           
+          51
+    Norm - 1 > relative tolerance. Max deviation = .62015E-03   . Rescaling. Tim
+ e step nr.           
+          55
+    Norm - 1 > relative tolerance. Max deviation = .55382E-03   . Rescaling. Tim
+ e step nr.           
+          59
+    Norm - 1 > relative tolerance. Max deviation = .14065E-02   . Rescaling. Tim
+ e step nr.           
+          61
+    Norm - 1 > relative tolerance. Max deviation = .79369E-03   . Rescaling. Tim
+ e step nr.           
+          64
+    Norm - 1 > relative tolerance. Max deviation = .68652E-03   . Rescaling. Tim
+ e step nr.           
+          65
+    Norm - 1 > relative tolerance. Max deviation = .11263E-02   . Rescaling. Tim
+ e step nr.           
+          66
+    Norm - 1 > relative tolerance. Max deviation = .50322E-03   . Rescaling. Tim
+ e step nr.           
+          67
+    Norm - 1 > relative tolerance. Max deviation = .11259E-02   . Rescaling. Tim
+ e step nr.           
+          69
+    Norm - 1 > relative tolerance. Max deviation = .53349E-03   . Rescaling. Tim
+ e step nr.           
+          74
+    Norm - 1 > relative tolerance. Max deviation = .55293E-03   . Rescaling. Tim
+ e step nr.           
+          79
+    Norm - 1 > relative tolerance. Max deviation = .53415E-03   . Rescaling. Tim
+ e step nr.           
+          83
+    Norm - 1 > relative tolerance. Max deviation = .57057E-03   . Rescaling. Tim
+ e step nr.           
+          89
+    Norm - 1 > relative tolerance. Max deviation = .71531E-03   . Rescaling. Tim
+ e step nr.           
+          92
+    Norm - 1 > relative tolerance. Max deviation = .65025E-03   . Rescaling. Tim
+ e step nr.           
+          96
+    Norm - 1 > relative tolerance. Max deviation = .50030E-03   . Rescaling. Tim
+ e step nr.           
+          98
+    Norm - 1 > relative tolerance. Max deviation = .51624E-03   . Rescaling. Tim
+ e step nr.           
+         104
+    Norm - 1 > relative tolerance. Max deviation = .58479E-03   . Rescaling. Tim
+ e step nr.           
+         110
+    Norm - 1 > relative tolerance. Max deviation = .66626E-03   . Rescaling. Tim
+ e step nr.           
+         118
+    Norm - 1 > relative tolerance. Max deviation = .54572E-03   . Rescaling. Tim
+ e step nr.           
+         130
+    Norm - 1 > relative tolerance. Max deviation = .50747E-03   . Rescaling. Tim
+ e step nr.           
+         139
+    Norm - 1 > relative tolerance. Max deviation = .51926E-03   . Rescaling. Tim
+ e step nr.           
+         156
+    Norm - 1 > relative tolerance. Max deviation = .50252E-03   . Rescaling. Tim
+ e step nr.           
+         196
+    Norm - 1 > relative tolerance. Max deviation = .51937E-03   . Rescaling. Tim
+ e step nr.           
+         209
+    Norm - 1 > relative tolerance. Max deviation = .60207E-03   . Rescaling. Tim
+ e step nr.           
+         227
+    Norm - 1 > relative tolerance. Max deviation = .61294E-03   . Rescaling. Tim
+ e step nr.           
+         236
+    Norm - 1 > relative tolerance. Max deviation = .51783E-03   . Rescaling. Tim
+ e step nr.           
+         245
+    Norm - 1 > relative tolerance. Max deviation = .50416E-03   . Rescaling. Tim
+ e step nr.           
+         255
+    Norm - 1 > relative tolerance. Max deviation = .93742E-03   . Rescaling. Tim
+ e step nr.           
+         262
+    Norm - 1 > relative tolerance. Max deviation = .70376E-03   . Rescaling. Tim
+ e step nr.           
+         269
+    Norm - 1 > relative tolerance. Max deviation = .65055E-03   . Rescaling. Tim
+ e step nr.           
+         275
+    Norm - 1 > relative tolerance. Max deviation = .77385E-03   . Rescaling. Tim
+ e step nr.           
+         284
+    Norm - 1 > relative tolerance. Max deviation = .15217E-02   . Rescaling. Tim
+ e step nr.           
+         286
+    Norm - 1 > relative tolerance. Max deviation = .73156E-03   . Rescaling. Tim
+ e step nr.           
+         288
+    Norm - 1 > relative tolerance. Max deviation = .70703E-03   . Rescaling. Tim
+ e step nr.           
+         291
+    Norm - 1 > relative tolerance. Max deviation = .54062E-03   . Rescaling. Tim
+ e step nr.           
+         294
+    Norm - 1 > relative tolerance. Max deviation = .96859E-03   . Rescaling. Tim
+ e step nr.           
+         299
+    Norm - 1 > relative tolerance. Max deviation = .12496E-02   . Rescaling. Tim
+ e step nr.           
+         302
+    Norm - 1 > relative tolerance. Max deviation = .53830E-03   . Rescaling. Tim
+ e step nr.           
+         307
+    Norm - 1 > relative tolerance. Max deviation = .22754E-02   . Rescaling. Tim
+ e step nr.           
+         311
+    Norm - 1 > relative tolerance. Max deviation = .48534E-02   . Rescaling. Tim
+ e step nr.           
+         316
+    Norm - 1 > relative tolerance. Max deviation = .39243E-02   . Rescaling. Tim
+ e step nr.           
+         317
+ Before sunlinsol free
+           0
+ After sunlinsol free
+           0
+    Norm - 1 > relative tolerance. Max deviation = .42809E-03   . Rescaling. Tim
+ e step nr.           
+           2
+    Norm - 1 > relative tolerance. Max deviation = .10219E-03   . Rescaling. Tim
+ e step nr.           
+          63
+    Norm - 1 > relative tolerance. Max deviation = .10992E-03   . Rescaling. Tim
+ e step nr.           
+          97
+    Norm - 1 > relative tolerance. Max deviation = .10213E-03   . Rescaling. Tim
+ e step nr.           
+         150
+    Norm - 1 > relative tolerance. Max deviation = .14891E-03   . Rescaling. Tim
+ e step nr.           
+         179
+    Norm - 1 > relative tolerance. Max deviation = .10852E-03   . Rescaling. Tim
+ e step nr.           
+         185
+    Norm - 1 > relative tolerance. Max deviation = .11018E-03   . Rescaling. Tim
+ e step nr.           
+         191
+    Norm - 1 > relative tolerance. Max deviation = .13202E-03   . Rescaling. Tim
+ e step nr.           
+         202
+    Norm - 1 > relative tolerance. Max deviation = .16339E-03   . Rescaling. Tim
+ e step nr.           
+         220
+    Norm - 1 > relative tolerance. Max deviation = .11523E-03   . Rescaling. Tim
+ e step nr.           
+         230
+    Norm - 1 > relative tolerance. Max deviation = .10238E-03   . Rescaling. Tim
+ e step nr.           
+         237
+    Norm - 1 > relative tolerance. Max deviation = .82166E-03   . Rescaling. Tim
+ e step nr.           
+         238
+    Norm - 1 > relative tolerance. Max deviation = .15477E-02   . Rescaling. Tim
+ e step nr.           
+         239
+ Before sunlinsol free
+           0
+ After sunlinsol free
+           0

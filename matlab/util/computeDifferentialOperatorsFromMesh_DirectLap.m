@@ -1,6 +1,6 @@
 function [DX,DY,DZ,W] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,interpn,weight,method,Aexch,ExtW)
 %
-% [DX,DY,DZ,W] = ComputeDifferentialOperatorsFromMesh04_Neumann04_GGDirLap(GridInfo,interpn,weight,method,Aexch)
+% [DX,DY,DZ,W] = ComputeDifferentialOperatorsFromMesh_DirectLap(GridInfo,interpn,weight,method,Aexch,ExtW)
 %
 % References: [1] "Gradient Calculation Methods on Arbitrary Polyhedral Unstructured Meshes for Cell-Centered CFD Solvers"
 %             [2] "DifferentialOperatorMeshes" in the documentation folder in MagTense git repository
@@ -11,9 +11,9 @@ function [DX,DY,DZ,W] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,
 % K faces 
 % 
 % There are two methods in this function: Green Gauss and Direct Laplacian.
-% For Green Gauss (Direct Laplacian), the goal is to evaluate the (second) derivative of a function 
-% Phi in the center of each element n from the values that Phi assumes in 
-% the center of all the elements.
+% For Green Gauss (Direct Laplacian), the goal is to evaluate the (second) 
+% derivative of a function Phi in the center of each element n from the 
+% values that Phi assumes in the center of all the elements.
 % The goal corresponds to the creation of an N times N sparse matrix DX
 % 
 % This task is decomposed in two steps:
@@ -29,12 +29,24 @@ function [DX,DY,DZ,W] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,
 % evaluated from the value that (the gradient of) Phi assumes on the center
 % of each face that is on the boundary of the element n (see Eq. 14)
 % 
+% For Green Gauss,
 % The first step is performed by a K times N sparse matrix W:    W*phi(elements) =  phi(faces)
 % The second step is performed by N times K sparse matrix DDX: DDX*phi(faces)    = dphi(elements)
 % The matrix DX is thus given by DDX*W: DX*phi(elements) = (DDX*W)*phi(elements) = dphi(elements)
+%
+% For Direct Laplacian,
+% The first step is performed by a K times N sparse matrix W:    W*phi(elements) =  dphi(faces)
+% The second step is performed by N times K sparse matrix DDXA: DDXA*phi(faces)    = d2phi(elements)
+% The matrix DX is thus given by DDX*W: DX*phi(elements) = (DDXA*W)*phi(elements) = d2phi(elements)
+% 
+% DDXA differs from DDX in that the former takes the exchange stiffness
+% Aexch into account to form the second part of the operator
+% div(A grad(phi)),
+% whereas the latter forms the second part of the operator grad(phi).
 % 
 % INPUT ARGUMENTS:
 %
+% GridInfo contains several elements:
 % Volumes,Xel,Yel,Zel, are N times 1 arrays with the corresponding properties 
 % of the N elements (volumes, and centers)
 %
@@ -42,7 +54,11 @@ function [DX,DY,DZ,W] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,
 % of the K faces (areas, unitg normals, and centers). 
 %
 % T is a K times N sparse matrix which is used to create the matrix W.
-% The entry T(k,n) is 1 if the n-th element shares at least one vertex
+% The entry T(k,n) is 1 if the n-th element shares at least one edge
+% with the k-th face 
+% 
+% D is a K times N sparse matrix which is used to create the matrix W.
+% The entry D(k,n) is 1 if the n-th element shares at least one vertex
 % with the k-th face 
 %
 % Signs is a N times K sparse matrix.
@@ -56,7 +72,7 @@ function [DX,DY,DZ,W] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,
 % weight is the weighting scheme used in the interpolation. Any number is
 % treated as the exponent of reverse distance weighting.
 %
-% method can be either Green Gauss (GG) or DirectLaplacian.
+% method can be either Green Gauss (GG) or DirectLaplacian (DL).
 % 
 % Aexch is an n-vector containing the exchange interaction strength at each
 % tile.
@@ -85,7 +101,8 @@ Zel = GridInfo.Zel;
 Xf = GridInfo.Xf;
 Yf = GridInfo.Yf;
 Zf = GridInfo.Zf;
-T = GridInfo.TheDs;
+T = GridInfo.TheTs;
+D = GridInfo.TheDs;
 if ~exist('Aexch','var')
     Aexch=ones(size(Xel));
 elseif numel(Aexch)~=numel(Xel)
@@ -114,6 +131,9 @@ s = nonzeros(Signs) ;
 [n,k] = find(Signs) ;
 
 %% Constructing summing matrix according [2]
+% Constructing N times K sparse matrix DDXA: DDXA*dphi(faces) = d2phi(elements)
+% This takes the exchange stiffness Aexch into account to form the second
+% part of the operator div(A grad(phi))
 if method=="DirectLaplacianNeumann"
     % Setting up exchange interaction strength matrix for heterogeneous 
     %  materials. Also works for homogeneous materials. [2]
@@ -147,6 +167,7 @@ if method=="DirectLaplacianNeumann"
         end
     end
 elseif method=="GGNeumann"
+    % Constructing N times K sparse matrix DDX: DDX*phi(faces) = dphi(elements)
     ddx = s.*AX(k).*VolCoeff(n) ;
     DDX = sparse(n,k,ddx,N,K) ;
     ddy = s.*AY(k).*VolCoeff(n) ;
@@ -166,6 +187,7 @@ if ~exist('weight','var')
 elseif ~isnumeric(weight)
     try
         weight=str2double(weight); % Possibly the weight was entered as e.g. "2"
+        assert(~isnan(weight),'Supplied weight is not a number.')
     catch ME
         warning('Unrecognized weight "%g".',weight) % No further weight schemes supported
         rethrow(ME)
@@ -178,16 +200,17 @@ end
 % for interpolation.
 switch interpn
     case 'extended'
-        el2fa=T'; % extended. Use all neighbours that share a vertex.
+        el2fa=D'; % extended. Use all neighbours that share a vertex.
     case 'compact'
         el2fa=Signs; % compact. Use all neighbours that share a face.
         warning('untested method "compact"') % Probably gets stuck in voronoi.
     otherwise
         warning('unrecognized interpolation scheme "%s". Using extended scheme.',interpn)
-        el2fa=T'; % extended
+        el2fa=D'; % extended
 end
 
 %% Calculating weights
+% Determines which weights are to be used in the first interpolation step
 if ~exist('ExtW','var')
     [n,k] = find(el2fa) ;
     % Tile volumes may be used, but have not been here. Example:
@@ -218,14 +241,11 @@ inds1=[1;inds2+1];               % interpolation of each face.
 dx=Xel(n)-Xf(k);                 % X-distances.
 vw=zeros(length(w),1);           % Vector meant to contain interpolated face values
 vx=zeros(length(w),1);           % Vector meant to contain interpolated x-component of face gradients
-if (dims > 1)
-    dy=Yel(n)-Yf(k);
-    vy=zeros(length(w),1);
-    if (dims > 2)
-        dz=Zel(n)-Zf(k);
-        vz=zeros(length(w),1);
-    end
-end
+dy=Yel(n)-Yf(k);
+vy=zeros(length(w),1);
+dz=Zel(n)-Zf(k);
+vz=zeros(length(w),1);
+
 % Scale weights to avoid ill conditioning of the least squares
 % interpolation.
 wm=max(w(~isinf(w)));
@@ -242,19 +262,25 @@ w=w*(wm^(1/weight))/wm;
 
 
 %% Main loop
+% The creation of the matrix W for the first step:
+% W*phi(elements) = phi(faces) [Green Gauss]
+% W*phi(elements) = dphi(faces) [Direct Laplacian]
+% Calculated by solving
+% Gk * [phi(faces);dphi(faces)]_k = Hk ( * phi(elements) )
+% for each face, k. Details can be found in [2].
 % warning('off','MATLAB:nearlySingularMatrix') % 
 counter=0; % Number of edge faces encountered.
 for kk=1:K
     ind=inds1(kk):inds2(kk); % list of indices for tiles used in interpolation for face kk.
     Wk=w(ind)';              % relevant subset of weights
     dxk=dx(ind);             % relevant subset of x-distances
+    dyk=dy(ind);
+    dzk=dz(ind);
     scale=10^(round(log10(mean(abs(dxk))))); % Local distance scaling (see above for global alternative)
     if (dims > 1)
-        dyk=dy(ind);
         dks=[dxk;dyk];
         scale=10^(round(log10(mean(abs(dks)))));
         if (dims > 2)
-            dzk=dz(ind);
             dks=[dks;dzk];
             scale=10^(round(log10(mean(abs(dks)))));
             dzk=dzk/scale;% Scale distances to avoid ill conditioning
@@ -269,83 +295,75 @@ for kk=1:K
         counter=counter+1;
         lind=length(ind);
         e=ones(2*lind,1);
-        if (dims == 1)
-            nns=NX(kk); % normal "vector" at the edge
-            if all(nns==0) % z- or y-face. Nothing to see here.
-                continue
-            end
-            extra=dxk-2*nns.*(dxk*nns'); % mirror reflection on face plane
-        elseif (dims == 2)
-            nns=[NX(kk),NY(kk)]; % normal vector at the edge
-            if all(nns==[0,0]) % z-face. Nothing to see here.
-                continue
-            end
-            extra=[dxk,dyk]-2*nns.*([dxk,dyk]*nns'); % mirror reflection on face plane
-        else
-            nns=[NX(kk),NY(kk),NZ(kk)]; % normal vector at the edge
-            extra=[dxk,dyk,dzk]-2*nns.*([dxk,dyk,dzk]*nns'); % mirror reflection on face plane
-        end
+        nns=[NX(kk),NY(kk),NZ(kk)]; % normal vector at the edge
+        if (dims==1 && ~nns(1)) || (dims==2 && prod(~nns(1:2)))
+            continue % If the face is pointing exclusively in an extradimensional direction, ignore it.
+        end          % This check is only necessary for edge faces.
+        extra=[dxk,dyk,dzk]-2*nns.*([dxk,dyk,dzk]*nns'); % mirror reflection on face plane
+        
         dxk=[dxk;extra(:,1)]; % Virtual x-distances appended to the real ones
-        if (dims > 1)
-            dyk=[dyk;extra(:,2)];
-            if (dims > 2)
-                dzk=[dzk;extra(:,3)];
-            end
-        end
+        dyk=[dyk;extra(:,2)];
+        dzk=[dzk;extra(:,3)];
+        
         Wk=[Wk Wk]; % Virtual nodes inherit their mirror weights.
-        if (dims == 1 || abs(NX(kk))==1) % hack. What about NY, NZ cases?)
-            Gkl1=[e, dxk];
-            Gk=[Wk*Gkl1; Wk*(dxk.*Gkl1)]; % least squares matrix. See [1] or [2].
-        elseif (dims == 2)
-            Gkl1=[e, dxk, dyk];
-            Gk=[Wk*Gkl1; Wk*(dxk.*Gkl1); Wk*(dyk.*Gkl1)];
-        else
-            Gkl1=[e, dxk, dyk, dzk];
-            Gk=[Wk*Gkl1; Wk*(dxk.*Gkl1); Wk*(dyk.*Gkl1); Wk*(dzk.*Gkl1)];
-        end
+        Gkl1=[e, dxk, dyk, dzk];
+        Gk=[Wk*Gkl1; Wk*(dxk.*Gkl1); Wk*(dyk.*Gkl1); Wk*(dzk.*Gkl1)];
         Hk=Wk.*Gkl1'; % least squares vector. See [1] or [2].
+        
+        % Pick out only the components used in the face-sum.
+        % This means e.g. only x gradient of phi if dims==1 and/or the norm
+        % of the face is in the x-direction.
+        GkRed=Gk(~~[1;nns'],~~[1;nns']);
+        HkRed=Hk(~~[1;nns'],:);
         try
-            R=chol(Gk);% Speed upgrade, Gk is positive definite and symmetric
-            Wkfull=R\(R'\Hk);
+            R=chol(GkRed);% Speed upgrade, GkRed is positive definite and symmetric
+            Wktmp=R\(R'\HkRed);
         catch errmsg
-            Wkfull=Gk\Hk; % Speed downgrade, most likely a 2D mesh/tile
+            Wktmp=GkRed\HkRed; % Speed downgrade, most likely a 2D mesh/tile
         end
-        Wkfull=[Wkfull(1,:);Wkfull(2:end,:)/scale]; % Scale distances to avoid ill conditioning
-        vw(ind)=Wkfull(1,1:lind)+Wkfull(1,lind+1:end); % Interpolated face values
-        vx(ind)=Wkfull(2,1:lind)+Wkfull(2,lind+1:end); % Interpolated x-components of face gradients
-        if (dims > 1 && abs(NX(kk))~=1) % hack. What about NY, NZ cases?
-            vy(ind)=Wkfull(3,1:lind)+Wkfull(3,lind+1:end);
-            if (dims > 2)
-                vz(ind)=Wkfull(4,1:lind)+Wkfull(4,lind+1:end);
+        vw(ind)=Wktmp(1,1:lind)+Wktmp(1,lind+1:end); % Interpolated face values
+        
+        if nns(1) % Interpolated x-components of face gradients
+            vx(ind)=(Wktmp(2,1:lind)+Wktmp(2,lind+1:end))/scale; % rescaled
+            if nns(2) % Interpolated y-components of face gradients
+                vy(ind)=(Wktmp(3,1:lind)+Wktmp(3,lind+1:end))/scale; % rescaled
             end
+        elseif nns(2) % Interpolated y-components of face gradients
+            vy(ind)=(Wktmp(2,1:lind)+Wktmp(2,lind+1:end))/scale; % rescaled
         end
+        if nns(3) % Interpolated z-components of face gradients
+            vz(ind)=(Wktmp(end,1:lind)+Wktmp(end,lind+1:end))/scale; % rescaled
+        end
+        
     else % NOT an edge face. No mirror tricks necessary.
         e=ones(length(ind),1);
-        if (dims == 1 || abs(NX(kk))==1) % hack. What about NY, NZ cases?
-            Gkl1=[e, dxk];
-            Gk=[Wk*Gkl1; Wk*(dxk.*Gkl1)];
-        elseif (dims == 2)
-            Gkl1=[e, dxk, dyk];
-            Gk=[Wk*Gkl1; Wk*(dxk.*Gkl1); Wk*(dyk.*Gkl1)];
-        else
-            Gkl1=[e, dxk, dyk, dzk];
-            Gk=[Wk*Gkl1; Wk*(dxk.*Gkl1); Wk*(dyk.*Gkl1); Wk*(dzk.*Gkl1)];
-        end
+        nns=[NX(kk),NY(kk),NZ(kk)];
+        Gkl1=[e, dxk, dyk, dzk];
+        Gk=[Wk*Gkl1; Wk*(dxk.*Gkl1); Wk*(dyk.*Gkl1); Wk*(dzk.*Gkl1)];
         Hk=Wk.*Gkl1';
+        
+        % Pick out only the components used in the face-sum.
+        % This means e.g. only x gradient of phi if dims==1 and/or the norm
+        % of the face is in the x-direction.
+        GkRed=Gk(~~[1;nns'],~~[1;nns']);
+        HkRed=Hk(~~[1;nns'],:);
         try
-            R=chol(Gk);% Speed upgrade, Gk is positive definite and symmetric
-            Wkfull=R\(R'\Hk);
+            R=chol(GkRed);% Speed upgrade, GkRed is positive definite and symmetric
+            Wktmp=R\(R'\HkRed);
         catch errmsg
-            Wkfull=Gk\Hk; % Speed downgrade, most likely a 2D mesh/tile
+            Wktmp=GkRed\HkRed; % Speed downgrade, most likely a 2D mesh/tile
         end
-        Wkfull=[Wkfull(1,:);Wkfull(2:end,:)/scale];% Scale distances to avoid ill conditioning
-        vw(ind)=Wkfull(1,:);
-        vx(ind)=Wkfull(2,:);
-        if (dims > 1 && abs(NX(kk))~=1) % hack. What about NY, NZ cases?
-            vy(ind)=Wkfull(3,:);
-            if (dims > 2)
-                vz(ind)=Wkfull(4,:);
+        vw(ind)=Wktmp(1,:);
+        if nns(1) % Interpolated x-components of face gradients
+            vx(ind)=Wktmp(2,:)/scale; % rescaled
+            if nns(2) % Interpolated y-components of face gradients
+                vy(ind)=Wktmp(3,:)/scale; % rescaled
             end
+        elseif nns(2) % Interpolated y-components of face gradients
+            vy(ind)=Wktmp(2,:)/scale; % rescaled
+        end
+        if nns(3) % Interpolated z-components of face gradients
+            vz(ind)=Wktmp(end,:)/scale; % rescaled
         end
     end
 end

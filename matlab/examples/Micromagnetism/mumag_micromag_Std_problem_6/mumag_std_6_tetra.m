@@ -69,7 +69,7 @@ alpha = alpha0*gamma0/(1+alpha0^2);
 %% Mesh generation. Generate Voronoi regions with intergrain region
 thisGridL = [80e-9,1e-9,1e-9];
 tetname = 'TetraModel_80_1_1_4GrainsRegular'; % basename for mesh file
-model=load(tetname);
+load(tetname,'model','GridInfo');
 
 %--- Setup the problem
 resolution = [size(model.Mesh.Elements,2),1,1];
@@ -86,7 +86,6 @@ problem = problem.setSolverType( 'UseDynamicSolver' );
 problem.solver = getMicroMagSolver( 'Dynamic' );
 
 %--- Information on the grid
-GridInfo = TetrahedralMeshAnalysis(model) ;
 problem.grid_pts    = [GridInfo.Xel, GridInfo.Yel, GridInfo.Zel] ;
 problem.grid_ele    = int32(model.Mesh.Elements(:,:)) ;
 problem.grid_nod    = model.Mesh.Nodes(:,:) ;      
