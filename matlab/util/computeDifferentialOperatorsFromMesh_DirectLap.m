@@ -151,6 +151,9 @@ if method=="DirectLaplacianNeumann"
             disp(k(kk))
         else % If the face has two neighbours, its Aexch value from this side is calculated according to [2]
             Amat(kk)=2*Aexch(n(kk))*Aexch(tmp2)/(Aexch(n(kk))+Aexch(tmp2));
+            if (~Aexch(n(kk)) && ~Aexch(tmp2)) % If both values are 0,
+                Amat(kk)=0;                    % avoid division by 0 error.
+            end
         end
     end
 
