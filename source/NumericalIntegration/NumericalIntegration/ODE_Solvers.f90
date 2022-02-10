@@ -48,10 +48,8 @@ private MTdmdt, MTy_out,MTf_vec
     
     integer :: neq, nt, nt_conv
     real,allocatable,dimension(:,:) :: yderiv_out              !>The derivative of y_i wrt t at each time step
-    real(c_double),dimension(size(t)) :: t_out_double,t_double ! = t_out
+    real(c_double),dimension(size(t)) :: t_out_double ! = t_out
     real(c_double),dimension(size(y0),size(t)) :: y_out_double ! = y_out
-    real(c_double) :: t1b,t2b
-    real :: t1a,t2a
     
     
     !find the no. of equations and the no. of requested timesteps
@@ -88,11 +86,6 @@ private MTdmdt, MTy_out,MTf_vec
         !call MagTense_CVODEsuite( int(neq,c_int), real(t,c_double), int(nt,c_int), real(y0,c_double), t_out, y_out )
         t_out_double = real(t_out,c_double)
         y_out_double = real(y_out,c_double)
-        t_double = real(t,c_double)
-        t1a = t(1)
-        t2a = t(2)
-        t1b = t_double(1)
-        t2b = t_double(2)
         call MagTense_CVODEsuite( int(neq,c_int), real(t,c_double), int(nt,c_int), real(y0,c_double), t_out_double, y_out_double, real(tol,c_double), callback, callback_display )
         y_out = real(y_out_double)
         
@@ -481,9 +474,7 @@ private MTdmdt, MTy_out,MTf_vec
 
     ! clean up
     call FCVodeFree(cvode_mem)
-    call CVODE_error('Before sunlinsol free', 0,callback ) 
     call FSUNLinSolFree_SPGMR(sunlinsol_LS)
-    call CVODE_error('After sunlinsol free', 0,callback ) 
     call FSUNMatDestroy_Dense(sunmat_A)
     call FN_VDestroy_Serial(sunvec_y)
 	
