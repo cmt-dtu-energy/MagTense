@@ -1973,7 +1973,6 @@ include 'blas.f90'
     type(sparse_matrix_t),intent(out) :: A            !> The returned matrix from the sparse matrix creator
                 
     integer :: stat                                   !> Status value for the various sparse matrix operations        
-    type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
     integer :: nx,ny,nz                               !> Dimensions
     type(matrix_descr) :: descr                       !> Describes a sparse matrix operation
     
@@ -1981,13 +1980,7 @@ include 'blas.f90'
     ny = grid%ny
     nz = grid%nz
     
-    stat = mkl_sparse_d_create_csr ( tmp, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, grid%A_exch_load%rows_start, grid%A_exch_load%rows_end, grid%A_exch_load%cols, grid%A_exch_load%values)
-    descr%type = SPARSE_MATRIX_TYPE_GENERAL
-    descr%mode = SPARSE_FILL_MODE_FULL
-    descr%diag = SPARSE_DIAG_NON_UNIT
-    stat = mkl_sparse_copy ( tmp, descr, A )
-    
-    stat = mkl_sparse_destroy (tmp)
+    stat = mkl_sparse_d_create_csr ( A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, grid%A_exch_load%rows_start, grid%A_exch_load%rows_end, grid%A_exch_load%cols, grid%A_exch_load%values)
         
     end subroutine ConvertExchangeTerm3D_NonUniform
     
