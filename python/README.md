@@ -2,6 +2,18 @@
 
 The Fortran code is compiled and wrapped to a module that can be directly called from Python. The tool **f2py** of the NumPy package is used to wrap the interface file **lib/FortranToPythonIO.f90**.
 
+## Prerequistes to run micromagnetic part
+
+Prepare your terminal, so that MKL can find libraries during linking 
+
+- Linux
+
+    ```bash
+    export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/intel/oneapi/mkl/latest/lib/intel64/"
+    export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin/"
+    export LDFLAGS=-Wl,-rpath=/opt/intel/oneapi/mkl/latest/lib/intel64/
+    ```
+
 ## Deployment with Conda
 
 ### Step 1
