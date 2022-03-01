@@ -64,21 +64,23 @@ class DefaultMicroMagProblem():
     the file MagTenseMicroMagIO.f90 in the sub-project MagTenseMicroMag
     to the main project MagTense.
     '''
-    def __init__(self, res=[3,3,1], hext_fct=None, alpha_fct=None):
+    def __init__(
+        self,
+        res=[3,3,1],
+        hext_fct=lambda t: np.atleast_2d(t).T * [0, 0, 0],
+        alpha_fct=lambda t: np.atleast_2d(t).T * 0
+    ):
         self.grid_n = res
         self.ntot = np.prod(self.grid_n)
         # Size of the (rectangular) domain in each direction [m]
         self.grid_L = [500e-9, 125e-9, 3e-9]
 
-        # Function handle for external field
-        # HextFct = []
-
         # These are set to zero for a non-tetrahedron grid
-        self.grid_pts = 0
-        self.grid_ele = 0
-        self.grid_nod = 0
+        self.grid_pts = np.zeros(shape=(self.ntot,3), dtype=np.float64, order='F')
+        self.grid_ele = np.zeros(shape=(4, self.ntot), dtype=np.float64, order='F')
         self.grid_nnod = 0
-        self.grid_abc = 0
+        self.grid_nod = np.zeros(shape=(self.grid_nnod,3), dtype=np.float64, order='F')
+        self.grid_abc = np.zeros(shape=(self.ntot,3), dtype=np.float64, order='F')
         
         # Defines the grid type which currently only supports "uniform"
         self.grid_type = get_micromag_gridtype('uniform')
@@ -87,7 +89,7 @@ class DefaultMicroMagProblem():
         self.u_ea = np.zeros(shape=(self.ntot, 3))
 
         # new or old problem
-        self.prob_mod = get_micromag_problem_mode('new')
+        self.prob_mode = get_micromag_problem_mode('new')
 
         # solver type ('explicit', 'implicit' or 'dynamic')
         self.solver = get_micromag_solver('dynamic')
@@ -120,18 +122,12 @@ class DefaultMicroMagProblem():
         self.t_conv = 0
         
         self.setTimeDis = 10
-
-        if hext_fct is None:
-            hext_fct = lambda t: np.atleast_2d(t).T * [0, 0, 0]
-
-        self.nt_Hext = 10
-        self.set_Hext(hext_fct, self.nt_Hext)
         
         # Initial magnetization (mx = m0(1:n), my = m(n+1:2n), mz = m(2n+1:3n)
         # with n = no. of elements )
-        self.m0 = np.zeros(shape=(self.ntot, 3))
-        self.theta = np.pi * np.rand(shape=(self.ntot,1))
-        self.phi = 2 * np.pi * np.rand(shape=(self.ntot,1))
+        self.m0 = np.zeros(shape=(self.ntot, 3), dtype=np.float64, order='F')
+        self.theta = np.pi * np.random.rand(self.ntot)
+        self.phi = 2 * np.pi * np.random.rand(self.ntot)
         self.m0[:,0] = np.sin(self.theta) * np.cos(self.phi)
         self.m0[:,1] = np.sin(self.theta) * np.sin(self.phi)
         self.m0[:,2] = np.cos(self.theta)
@@ -139,24 +135,14 @@ class DefaultMicroMagProblem():
         # Initial value of the demag threshold is zero, i.e. it is not used
         self.dem_thres = 0
         # Set use cuda to default not
-        self.use_Cuda = 0
+        self.use_CUDA = 0
 		# Set use CVODE to default
         self.use_CVODE = 0
         # Set the demag approximation to the default, i.e. use no approximation
-        self.dem_appr = get_micromag_demag_approx('none')
+        self.dem_appr = get_micromag_demag_approx(None)
         
         #  Set alpha as function of time
-        if alpha_fct is None:
-            def get_alpha_fct(t):
-                if t > 0:
-                    return np.atleast_2d(t).T * 0
-                else:
-                    return None
-        self.set_alpha(get_alpha_fct, 0)
-        
-        # Set the default return N behavior
-        self.set_return_N_filename('t')
-        self.set_load_N_filename('t')
+        self.set_alpha(alpha_fct, np.zeros(shape=(1)))
         
         self.save = 0
         self.show = 1
@@ -166,12 +152,15 @@ class DefaultMicroMagProblem():
         self.fileName = ''
         self.recompute = 0
         self.ext_mesh = 0
+
         # Type of external mesh (Voronoi/Tetra)
         self.mesh_type = ''
         self.ext_mesh_filename = ''
         self.N_filename = 0
-        self.N_file_out = ''
-        self.N_file_in = ''
+
+        # Set the default return N behavior
+        self.set_return_N_filename('t')
+        self.set_load_N_filename('t')
 
         # Relative tolerance for the Fortran ODE solver
         self.tol = 1e-4
@@ -185,13 +174,12 @@ class DefaultMicroMagProblem():
         self.conv_tol = 1e-4
     
         # The exchange operator matrix
-        # exch_mat
-        # exch_nval
-        # exch_nrow
-        # exch_val
-        # exch_rows
-        # exch_rowe
-        # exch_col
+        self.exch_nval = 0
+        self.exch_nrow = 0
+        self.exch_val = 0.
+        self.exch_rows = 0
+        self.exch_rowe = 0
+        self.exch_col = 0
     
         # Defines if and how to return the N tensor (1 do not return, 2 return
         # in memory and >2 return as a file with file length = N_ret
@@ -216,7 +204,7 @@ class DefaultMicroMagProblem():
         already specified in this instance (self) of the class given the
         function handle fct
         '''
-        self.nt_Hext = len(t_Hext)        
+        self.nt_Hext = len(t_Hext)
         self.Hext = np.zeros(shape=(self.nt_Hext, 4))
         self.Hext[:,0] = t_Hext
         self.Hext[:,1:4] = fct(t_Hext)
@@ -268,12 +256,3 @@ class DefaultMicroMagProblem():
     def set_time_explicit(self, t_explicit):
         self.t_explicit  = t_explicit
         self.nt_explicit = len(t_explicit)
-    
-    def set_solver_type(self, type_var):
-        solver_dict = {
-            'UseImplicitSolver': 1,
-            'UseImplicitStepsSolver': 2,
-            'UseExplicitSolver': 3,
-            'UseDynamicSolver': 4
-        }
-        self.solver_type = solver_dict[type_var]
