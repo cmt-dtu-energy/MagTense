@@ -2,7 +2,6 @@
 #                   define the compiler names
 #=======================================================================
 F90 = gfortran
-#F90 = ifort
 
 #=======================================================================
 #                     additional flags
@@ -16,14 +15,17 @@ ifeq ($(F90),gfortran)
 	endif
 endif
 
-ifeq ($(F90),ifort)
-	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise /libs:static /threads
-    FCOMP = intelvem # for f2py
-endif
+MKLROOT=/opt/intel/oneapi/mkl/latest
+OPT= ${MKLROOT}/include/intel64/lp64 -I${MKLROOT}/include
+MKL= -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_lapack95_lp64 \
+-lmkl_blas95_lp64 -lmkl_intel_thread -lmkl_core -lpthread -lm -ldl
+MKL_OMP=-L/opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin/ -liomp5
 
 VPATH = ../../../source/NumericalIntegration/NumericalIntegration:\
 ../../../source/TileDemagTensor/TileDemagTensor:\
-../../../source/DemagField/DemagField
+../../../source/DemagField/DemagField:\
+../../../source/MagTenseMicroMag
+
 FPP = gfortran -E # gfortran f90wrap temp files only, not compilation
 FPP_F90FLAGS = -x f95-cpp-input -fPIC
 CC = gcc
@@ -56,8 +58,9 @@ PYTHON_MODN = magtensesource
 #=======================================================================
 # names (without suffix), f90 sources
 LIBSRC_SOURCES = IntegrationDataTypes quadpack SpecialFunctions TileTensorHelperFunctions \
-TileRectangularPrismTensor TileCircPieceTensor TileCylPieceTensor TilePlanarCoilTensor TileTriangle\
-TileNComponents DemagFieldGetSolution spline MagParameters IterateMagnetSolution
+TileRectangularPrismTensor TileCircPieceTensor TileCylPieceTensor TilePlanarCoilTensor TileTriangle \
+TileNComponents DemagFieldGetSolution spline MagParameters IterateMagnetSolution \
+MicroMagParameters RKSuitef90 ODE_Solvers LLODE_Debug util MagTenseMicroMagPyIO LandauLifshitzEquationSolver
 
 # file names
 LIBSRC_FILES = $(addsuffix .f90,${LIBSRC_SOURCES})
@@ -92,7 +95,7 @@ clean:
 	${CLEAN_FOLDER_WIN}
 
 .f90.o:
-	${F90} ${F90FLAGS} -c $< -o $@
+	${F90} ${F90FLAGS} -I $(OPT) -c $< -o $@
 
 .c.o:
 	${CC} ${CFLAGS} -c $< -o $@
@@ -101,4 +104,4 @@ libsrc.a: ${LIBSRC_OBJECTS}
 	${LIBTOOL} $@ $?
 
 _${PYTHON_MODN}.so: libsrc.a
-	f2py --build-dir . --fcompiler=${FCOMP} --opt='${F90FLAGS}' -c -m ${PYTHON_MODN} -L. -lsrc ${LIBSRC_WRAP_FILES} ${LIBSRC_OBJECTS}
+	f2py --build-dir . --fcompiler=${FCOMP} --opt='${F90FLAGS}' -c -m ${PYTHON_MODN} -L. -lsrc ${LIBSRC_WRAP_FILES} ${LIBSRC_OBJECTS} $(MKL) $(MKL_OMP)
