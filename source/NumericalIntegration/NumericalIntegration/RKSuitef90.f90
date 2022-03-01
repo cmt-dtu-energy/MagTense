@@ -13,7 +13,7 @@ module rksuite_90_prec
 !           Softreport 92-S1, Department of Mathematics, Southern Methodist 
 !           University, Dallas, Texas, U.S.A, 1992.  
     
-integer, parameter :: wp = kind(1.d0) !selected_real_kind(10,50)
+integer, parameter :: wp = kind(1.0) ! kind(1.d0) !selected_real_kind(10,50)
 
 end module rksuite_90_prec
 

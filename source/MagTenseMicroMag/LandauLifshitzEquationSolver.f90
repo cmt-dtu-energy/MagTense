@@ -8,7 +8,7 @@ include 'blas.f90'
  !   use MKL_VML
     use BLAS95
     use MicroMagParameters
-    use MagTenseMicroMagIO
+    use MagTenseMicroMagPyIO
     use LLODE_Debug
     use util_call
     use DemagFieldGetSolution
@@ -23,9 +23,9 @@ include 'blas.f90'
     type(MicroMagSolution) :: gb_solution
     type(MicroMagProblem) :: gb_problem
     
-    real(DP),dimension(:),allocatable :: crossX,crossY,crossZ   !>Cross product terms
-    real(DP),dimension(:),allocatable :: HeffX,HeffY,HeffZ      !>Effective fields
-    real(DP),dimension(:),allocatable :: HeffX2,HeffY2,HeffZ2      !>Effective fields
+    real(SP),dimension(:),allocatable :: crossX,crossY,crossZ   !>Cross product terms
+    real(SP),dimension(:),allocatable :: HeffX,HeffY,HeffZ      !>Effective fields
+    real(SP),dimension(:),allocatable :: HeffX2,HeffY2,HeffZ2      !>Effective fields
     
     private :: gb_solution,gb_problem,crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2
     
@@ -43,14 +43,14 @@ include 'blas.f90'
     integer :: ntot,i,j,k,ind,nt,nt_Hext,stat       !> total no. of tiles
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
-    real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
+    real(SP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
     
     
     !Save internal representation of the problem and the solution
     gb_solution = sol
     gb_problem = prob
     
-    call displayMatlabMessage( 'Initializing matrices' )
+    call displayMessage( 'Initializing matrices' )
     !Calculate the interaction matrices
     call initializeInteractionMatrices( gb_problem )
     
@@ -101,7 +101,7 @@ include 'blas.f90'
     
 
     
-    call displayMatlabMessage( 'Initializing solution' )
+    call displayMessage( 'Initializing solution' )
     !Initialize the solution, i.e. allocate various arrays
     call initializeSolution( gb_problem, gb_solution )
         
@@ -111,11 +111,11 @@ include 'blas.f90'
     
     
     
-    call displayMatlabMessage( 'Running solution' )
+    call displayMessage( 'Running solution' )
     !Do the solution
     fct => dmdt_fct
-    cb_fct => displayMatlabProgressMessage
-    
+    cb_fct => displayProgressMessage
+
     gb_solution%HextInd = 1;
     if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
         !Go through a range of applied fields and find the equilibrium solution for each of them
@@ -175,13 +175,12 @@ include 'blas.f90'
     
     !clean-up
     stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
-    
-        
-#if USE_CUDA    
-    if ( gb_problem%useCuda .eq. useCudaTrue ) then
-        call cudaDestroy()
-    endif
-#endif
+   
+! #if USE_CUDA    
+!     if ( gb_problem%useCuda .eqv. useCudaTrue ) then
+!         call cudaDestroy()
+!     endif
+! #endif
     !Make sure to return the correct state
     sol = gb_solution
     prob = gb_problem
@@ -201,9 +200,9 @@ include 'blas.f90'
     !> @param[inout] dmdt array size n for the derivatives at the time t
     !---------------------------------------------------------------------------    
     subroutine dmdt_fct ( t, m, dmdt )  
-    real(DP),intent(in) :: t
-    real(DP),dimension(:),intent(in) :: m
-    real(DP),dimension(:),intent(inout) :: dmdt
+    real(SP),intent(in) :: t
+    real(SP),dimension(:),intent(in) :: m
+    real(SP),dimension(:),intent(inout) :: dmdt
     integer :: ntot
     
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
@@ -264,8 +263,8 @@ include 'blas.f90'
     !> @param[in] t the time at which to evaluate alpha
     !> @param[in] problem the problem on which the solution is solved
     function alpha( t, problem )
-    real(DP) :: alpha
-    real(DP),intent(in) :: t
+    real(SP) :: alpha
+    real(SP),intent(in) :: t
     type(MicroMagProblem),intent(in) :: problem
     
     if ( problem%alpha0 .eq. 0 ) then
@@ -462,9 +461,9 @@ include 'blas.f90'
     subroutine updateExternalField( problem, solution, t )
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
-    real(DP),intent(in) :: t
+    real(SP),intent(in) :: t
     
-    real(DP) :: HextX,HextY,HextZ
+    real(SP) :: HextX,HextY,HextZ
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
          !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
@@ -857,7 +856,7 @@ include 'blas.f90'
     type(MicroMagProblem),intent(inout) :: problem                !> Grid data structure    
     
     type(MagTile),dimension(1) :: tile                            !> Tile representing the current tile under consideration
-    real(DP),dimension(:,:),allocatable :: H                      !> The field and the corresponding evaluation point arrays
+    real(SP),dimension(:,:),allocatable :: H                      !> The field and the corresponding evaluation point arrays
     integer :: i,j,k,nx,ny,nz,ntot,ind                            !> Internal counters and index variables
     integer :: i_a,j_a,k_a,nx_ave,ny_ave,nz_ave                   !> Internal counters and index variables for avering the demag tensor over the recieving tile
     real(DP),dimension(:),allocatable :: dx,dy,dz
@@ -1177,27 +1176,27 @@ include 'blas.f90'
             k_zz = 1
             do i=1,nx_K
                 do j=1,ny_K
-                    if (mask_xx(i,j) .eq. .true.) then
+                    if (mask_xx(i,j) .eqv. .true.) then
                         Kxx_abs(k_xx) = problem%Kxx(i,j) 
                         k_xx = k_xx + 1
                     endif
-                    if (mask_xy(i,j) .eq. .true.) then
+                    if (mask_xy(i,j) .eqv. .true.) then
                         Kxy_abs(k_xy) = problem%Kxy(i,j) 
                         k_xy = k_xy + 1
                     endif
-                    if (mask_xz(i,j) .eq. .true.) then
+                    if (mask_xz(i,j) .eqv. .true.) then
                         Kxz_abs(k_xz) = problem%Kxz(i,j) 
                         k_xz = k_xz + 1
                     endif
-                    if (mask_yy(i,j) .eq. .true.) then
+                    if (mask_yy(i,j) .eqv. .true.) then
                         Kyy_abs(k_yy) = problem%Kyy(i,j) 
                         k_yy = k_yy + 1
                     endif
-                    if (mask_yz(i,j) .eq. .true.) then
+                    if (mask_yz(i,j) .eqv. .true.) then
                         Kyz_abs(k_yz) = problem%Kyz(i,j) 
                         k_yz = k_yz + 1
                     endif
-                    if (mask_zz(i,j) .eq. .true.) then
+                    if (mask_zz(i,j) .eqv. .true.) then
                         Kzz_abs(k_zz) = problem%Kzz(i,j) 
                         k_zz = k_zz + 1
                     endif
@@ -1357,27 +1356,27 @@ include 'blas.f90'
             k_zz = 1
             do i=1,nx_K
                 do j=1,ny_K
-                    if (mask_xx(i,j) .eq. .true.) then
+                    if (mask_xx(i,j) .eqv. .true.) then
                         Kxx_abs(k_xx) = abs(Kxx_c(i,j)) 
                         k_xx = k_xx + 1
                     endif
-                    if (mask_xy(i,j) .eq. .true.) then
+                    if (mask_xy(i,j) .eqv. .true.) then
                         Kxy_abs(k_xy) = abs(Kxy_c(i,j))
                         k_xy = k_xy + 1
                     endif
-                    if (mask_xz(i,j) .eq. .true.) then
+                    if (mask_xz(i,j) .eqv. .true.) then
                         Kxz_abs(k_xz) = abs(Kxz_c(i,j))
                         k_xz = k_xz + 1
                     endif
-                    if (mask_yy(i,j) .eq. .true.) then
+                    if (mask_yy(i,j) .eqv. .true.) then
                         Kyy_abs(k_yy) = abs(Kyy_c(i,j)) 
                         k_yy = k_yy + 1
                     endif
-                    if (mask_yz(i,j) .eq. .true.) then
+                    if (mask_yz(i,j) .eqv. .true.) then
                         Kyz_abs(k_yz) = abs(Kyz_c(i,j))
                         k_yz = k_yz + 1
                     endif
-                    if (mask_zz(i,j) .eq. .true.) then
+                    if (mask_zz(i,j) .eqv. .true.) then
                         Kzz_abs(k_zz) = abs(Kzz_c(i,j)) 
                         k_zz = k_zz + 1
                     endif
@@ -1476,7 +1475,7 @@ include 'blas.f90'
         !starting index of the i'th row
         K%rows_start(i) = ind
         do j=1,ny
-            if ( mask(i,j) .eq. .true. ) then
+            if ( mask(i,j) .eqv. .true. ) then
                 K%values( ind ) = D(i,j)
                 
                 K%cols( ind ) = j
@@ -1543,7 +1542,7 @@ include 'blas.f90'
         !starting index of the i'th row
         K%rows_start(i) = ind
         do j=1,ny
-            if ( mask(i,j) .eq. .true. ) then
+            if ( mask(i,j) .eqv. .true. ) then
                 K%values( ind ) = D(i,j)
                 
                 K%cols( ind ) = j
@@ -1607,7 +1606,7 @@ include 'blas.f90'
         !starting index of the i'th row
         K%rows_start(i) = ind
         do j=1,ny
-            if ( mask(i,j) .eq. .true. ) then
+            if ( mask(i,j) .eqv. .true. ) then
                 K%values( ind ) = D(i,j)
                 
                 K%cols( ind ) = j
