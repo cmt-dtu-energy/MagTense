@@ -4,10 +4,6 @@ use DemagFieldGetSolution
 use IterateMagnetSolution
 use MagTenseMicroMagPyIO
 use LandauLifshitzSolution
-use IntegrationDataTypes
-use MKL_SPBLAS
-use MKL_DFTI
-use BLAS95
 implicit none
 
 contains
@@ -477,6 +473,7 @@ subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, Problem
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
     exch_rowe, exch_col, grid_abc, t_out, M, pts, H_exc, H_ext, H_dem, H_ani)
 
+    integer(4),intent(in) :: grid_nnod,  exch_nval, exch_nrow
     integer(4),dimension(3),intent(in) :: grid_n
     real(8),dimension(3),intent(in) :: grid_L
     integer(4),intent(in) :: grid_type
@@ -492,8 +489,8 @@ subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, Problem
     integer(4),dimension(exch_nrow),intent(in) :: exch_rows, exch_rowe
     integer(4),dimension(exch_nval),intent(in) :: exch_col
     real(8),dimension(nt_conv),intent(in) :: t_conv
-    integer(4),intent(in) :: ntot, grid_nnod, ProblemMode, solver, nt_Hext, nt, useCuda, dem_appr
-    integer(4),intent(in) :: N_ret, N_load, setTimeDis, nt_alpha, useCVODE, exch_nval, exch_nrow, nt_conv
+    integer(4),intent(in) :: ntot, ProblemMode, solver, nt_Hext, nt, useCuda, dem_appr
+    integer(4),intent(in) :: N_ret, N_load, setTimeDis, nt_alpha, useCVODE, nt_conv
     real(8),intent(in) :: A0, Ms, K0, gamma, alpha, MaxT0, tol, thres, conv_tol
     real(4),intent(in) :: dem_thres
     character*256,intent(in) :: N_file_in, N_file_out
