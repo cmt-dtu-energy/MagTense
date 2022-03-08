@@ -13,7 +13,7 @@ include "mkl_dfti.f90"
        
    !> Stores a table in one variable
     type MicroMagTable1D
-        real(SP),dimension(:),allocatable :: x,y        
+        real(DP),dimension(:),allocatable :: x,y        
     end type MicroMagTable1D
     
     !>---------------
@@ -56,14 +56,14 @@ include "mkl_dfti.f90"
     !The grid information
     type MicroMagGrid
         integer :: nx, ny, nz
-        real(SP) :: Lx,Ly,Lz
-        real(SP) :: dx,dy,dz
-        real(SP),dimension(:,:,:),allocatable :: x,y,z
-        real(SP),dimension(:), allocatable :: dV
-        real(SP),dimension(:,:), allocatable :: nodes       !> Arrys with the nodes for a tetrahedron grid
+        real(DP) :: Lx,Ly,Lz
+        real(DP) :: dx,dy,dz
+        real(DP),dimension(:,:,:),allocatable :: x,y,z
+        real(DP),dimension(:), allocatable :: dV
+        real(DP),dimension(:,:), allocatable :: nodes       !> Arrys with the nodes for a tetrahedron grid
         integer,dimension(:,:), allocatable :: elements     !> Arrys with the elements for a tetrahedron grid, i.e. which nodes belong to which element
-        real(SP),dimension(:,:),allocatable :: pts          !> Array with the x,y,z points on list form, i.e. pts(i,:) is the x,y,z components of the i'th point
-        real(SP),dimension(:,:),allocatable :: abc          !> Array with the side lengths a,b,c in list form
+        real(DP),dimension(:,:),allocatable :: pts          !> Array with the x,y,z points on list form, i.e. pts(i,:) is the x,y,z components of the i'th point
+        real(DP),dimension(:,:),allocatable :: abc          !> Array with the side lengths a,b,c in list form
         integer :: gridType
         integer :: nnodes                                   !> The number of nodes in a tetrahedral grid
         type(MagTenseSparse_d) :: A_exch_load                 !> The exchange matrix as read from Matlab
@@ -77,7 +77,7 @@ include "mkl_dfti.f90"
         !Below is stuff that needs to be provided by the "user":
         type(MicroMagGrid) :: grid                  !> Grid of the problem
         
-        real(SP),dimension(:,:),allocatable :: u_ea     !> Easy axis vectors that should have the dimensions (n,3) where n is the no. of grid points and thus u_ea(i,3) is the i'th point's z-component
+        real(DP),dimension(:,:),allocatable :: u_ea     !> Easy axis vectors that should have the dimensions (n,3) where n is the no. of grid points and thus u_ea(i,3) is the i'th point's z-component
         
         integer :: ProblemMode                      !> Defines the problem mode (new or continued from previous solution)
         
@@ -86,17 +86,17 @@ include "mkl_dfti.f90"
         real(DP) :: A0,gamma,alpha0,MaxT0         !> User defined coefficients determining part of the problem.
         real(DP) :: tol,thres_value                     !> User defined coefficients for the ODE solver
         
-        real(SP),dimension(:,:),allocatable :: Hext     !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
-        real(SP),dimension(:,:),allocatable :: alpha    !> A time dependent dampning parameter, i.e. as a function of time. Size (nt,1).
+        real(DP),dimension(:,:),allocatable :: Hext     !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
+        real(DP),dimension(:,:),allocatable :: alpha    !> A time dependent dampning parameter, i.e. as a function of time. Size (nt,1).
         
         real(DP),dimension(:),allocatable :: t          !> Time array for the desired output times
         real(DP),dimension(:),allocatable :: m0         !> Initial value of the magnetization
         real(DP),dimension(:),allocatable :: Ms,K0      !> User defined coefficients determining part of the problem.
         
-        real(SP),dimension(:),allocatable :: t_conv     !> Time array with the time values where the solution will be checked for convergence compared to the last timestep
-        real(SP) :: conv_tol                            !> Converge criteria on difference between magnetization at different timesteps
+        real(DP),dimension(:),allocatable :: t_conv     !> Time array with the time values where the solution will be checked for convergence compared to the last timestep
+        real(DP) :: conv_tol                            !> Converge criteria on difference between magnetization at different timesteps
         
-        real(SP) :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
+        real*4 :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         
         integer :: setTimeDisplay                               !> Determines how often the timestep is shown in Matlab
         integer :: useCuda                                      !> Defines whether to attempt using CUDA or not
@@ -117,11 +117,11 @@ include "mkl_dfti.f90"
         type(MagTenseSparse),dimension(6) :: K_s           !> Sparse matrices (used if the threshold is >0 )
         type(MagTenseSparse_c),dimension(6) :: K_s_c       !> Sparse matrices (used if the threshold is >0 ), complex version
         
-        real(SP),dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
-        real(SP),dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
-        real(SP),dimension(:,:),allocatable :: Kzz          !> Demag field tensor split out into the nine symmetric components
+        real*4,dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
+        real*4,dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
+        real*4,dimension(:,:),allocatable :: Kzz          !> Demag field tensor split out into the nine symmetric components
         
-        real(SP),dimension(:),allocatable :: Axx,Axy,Axz,Ayy,Ayz,Azz    !> Anisotropy vectors assuming local anisotropy only, i.e. no interaction between grains
+        real(DP),dimension(:),allocatable :: Axx,Axy,Axz,Ayy,Ayz,Azz    !> Anisotropy vectors assuming local anisotropy only, i.e. no interaction between grains
         
         
         
@@ -143,14 +143,14 @@ include "mkl_dfti.f90"
         complex(kind=4),dimension(:),allocatable :: Mx_FT, My_FT, Mz_FT    !> Fourier transform of Mx, My and Mz (complex)
         complex(kind=4),dimension(:),allocatable :: HmX_c,HmY_c,HmZ_c      !> Complex version of the demag field, used for the Fourier cut-off approach
         
-        real(SP),dimension(:),allocatable :: t_out          !> Output times at which the solution was computed
-        real(SP),dimension(:,:,:,:),allocatable :: M_out    !> The magnetization at each of these times (nt,ntot,nt_Hext,3)
-        real(SP),dimension(:,:,:,:),allocatable :: H_exc    !> The exchange field at each of these times (nt,ntot,nt_Hext,3)
-        real(SP),dimension(:,:,:,:),allocatable :: H_ext    !> The external field at each of these times (nt,ntot,nt_Hext,3)
-        real(SP),dimension(:,:,:,:),allocatable :: H_dem    !> The demagnetization field at each of these times (nt,ntot,nt_Hext,3)
-        real(SP),dimension(:,:,:,:),allocatable :: H_ani    !> The anisotropy field at each of these times (nt,ntot,nt_Hext,3)
+        real(DP),dimension(:),allocatable :: t_out          !> Output times at which the solution was computed
+        real(DP),dimension(:,:,:,:),allocatable :: M_out    !> The magnetization at each of these times (nt,ntot,nt_Hext,3)
+        real(DP),dimension(:,:,:,:),allocatable :: H_exc    !> The exchange field at each of these times (nt,ntot,nt_Hext,3)
+        real(DP),dimension(:,:,:,:),allocatable :: H_ext    !> The external field at each of these times (nt,ntot,nt_Hext,3)
+        real(DP),dimension(:,:,:,:),allocatable :: H_dem    !> The demagnetization field at each of these times (nt,ntot,nt_Hext,3)
+        real(DP),dimension(:,:,:,:),allocatable :: H_ani    !> The anisotropy field at each of these times (nt,ntot,nt_Hext,3)
         
-        real(SP),dimension(:,:),allocatable :: pts          !> n,3 array with the points (x,y,z) of the centers of the tiles
+        real(DP),dimension(:,:),allocatable :: pts          !> n,3 array with the points (x,y,z) of the centers of the tiles
         
         real(DP),dimension(:),allocatable :: Jfact,Mfact,Kfact
         
