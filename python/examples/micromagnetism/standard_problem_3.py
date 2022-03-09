@@ -1,6 +1,7 @@
 #%%
 import numpy as np
 import matplotlib.pyplot as plt
+import pathlib
 
 from magtense import magtense, micromag_problem
 
@@ -21,10 +22,13 @@ def std_prob_3(res=[10,10,10], L_loop=np.linspace(8,9,10), use_CUDA=False,
     lex = np.sqrt(problem.A0 / (0.5 * mu0 * problem.Ms**2))
     problem.setTimeDis = 10
     Hext_fct = lambda t: np.atleast_2d(t).T * [0, 0, 0]
+    L_loop = [8.5]
 
     # Time-dependent alpha parameter, to ensure faster convergence
     problem.alpha = 1e3
     E_arr = np.zeros(shape=(4, len(L_loop), 2))
+
+    ax = plt.figure().add_subplot(projection='3d')
 
     for i in range(len(L_loop)):
         print(f'ITERATION: {i} / {len(L_loop)}')
@@ -59,11 +63,20 @@ def std_prob_3(res=[10,10,10], L_loop=np.linspace(8,9,10), use_CUDA=False,
 
             t, M, pts, H_exc, H_ext, H_dem, H_ani = magtense.run_micromag_simulation(problem)
 
+            M_sq = np.squeeze(M, axis=2)
+
             if show:
+                for k, m in enumerate([M_sq[0,:,:], M_sq[-1,:,:]]):
+                    plt.clf()
+                    ax.quiver(pts[:,0], pts[:,1], pts[:,2], m[:,0], m[:,1], m[:,2])
+                    plt.title('Fortran starting magnetization')
+                    plt.savefig(f'{pathlib.Path(__file__).parent.resolve()}/state{j}_{k}.png')
+
                 plt.clf()
                 plt.plot(t, np.mean(M[:,:,0,0], axis=1), 'rx')
                 plt.plot(t, np.mean(M[:,:,0,1], axis=1), 'gx')
                 plt.plot(t, np.mean(M[:,:,0,2], axis=1), 'bx')
+                plt.savefig(f'{pathlib.Path(__file__).parent.resolve()}/mag_components.png')
             
             # Calculate the energy terms
             E_exc = np.sum((1/2) * (M[:,:,0,0] * H_exc[:,:,0,0] \
@@ -100,7 +113,7 @@ def std_prob_3(res=[10,10,10], L_loop=np.linspace(8,9,10), use_CUDA=False,
         plt.plot(L_loop, np.sum(E_arr[:,:,1], axis=0), 'o')
         plt.xlabel('L [l_ex]')
         plt.ylabel('E [-]')
-        plt.show()
+        plt.savefig(f'{pathlib.Path(__file__).parent.resolve()}/prob3.png')
 
     # print(f'Energy intersection: {np.interp(np.sum(E_arr[:,:,0], axis=0) - np.sum(E_arr[:,:,1], axis=0), L_loop, 0)})')
 
