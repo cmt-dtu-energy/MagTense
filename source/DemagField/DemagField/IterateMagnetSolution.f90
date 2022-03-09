@@ -11,8 +11,8 @@
 
      INTERFACE
                 FUNCTION displayIteration_fct(err,err_max)
-                REAL, INTENT(IN) :: err,err_max
-                integer :: displayIteration_fct
+                real( kind = 8 ), INTENT(IN) :: err,err_max
+                integer( kind = 4 ) :: displayIteration_fct
                 END FUNCTION displayIteration_fct
      END INTERFACE
     
@@ -494,6 +494,8 @@
     subroutine loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles)
+        
+        integer(4),intent(in) :: n_tiles
 
         !::Specific for a cylindrical tile piece
         real(8),dimension(n_tiles,3),intent(in) :: centerPos
@@ -520,7 +522,6 @@
         real(8),dimension(n_tiles),intent(in) :: Mrel
 
         type(MagTile),dimension(n_tiles),intent(inout) :: tiles
-        integer(4),intent(in) :: n_tiles
         integer :: i
 
         do i=1,n_tiles
