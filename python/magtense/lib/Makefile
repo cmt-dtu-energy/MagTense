@@ -131,9 +131,11 @@ clean:
 .c.o:
 	${CC} ${CFLAGS} -c $< -o $@
 
-# For Windows: libsrc.lib
+libsrc.lib: ${LIBSRC_OBJECTS}
+	${LIBTOOL}
+
 libsrc.a: ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
-${PYTHON_MODN_ALL}: libsrc.a
-	f2py --build-dir . --fcompiler=${FCOMP} --opt='${F90FLAGS}' -c -m ${PYTHON_MODN} ${LIB_OPT} ${LIBSRC_WRAP_FILES} ${LIBSRC_OBJECTS} $(MKL) $(MKL_OMP)
+${PYTHON_MODN_ALL}: libsrc.lib libsrc.a
+	f2py --build-dir . --fcompiler=${FCOMP} ${EXTRA_OPT} -c -m ${PYTHON_MODN} ${LIB_OPT} ${LIBSRC_WRAP_FILES} ${LIBSRC_OBJECTS} $(MKL) $(MKL_OMP)
