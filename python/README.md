@@ -2,18 +2,6 @@
 
 The Fortran code is compiled and wrapped to a module that can be directly called from Python. The tool **f2py** of the NumPy package is used to wrap the interface file **lib/FortranToPythonIO.f90**.
 
-## Prerequistes to run micromagnetic part
-
-Prepare your terminal, so that MKL can find libraries during linking 
-
-- Linux
-
-    ```bash
-    export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/intel/oneapi/mkl/latest/lib/intel64/"
-    export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin/"
-    export LDFLAGS=-Wl,-rpath=/opt/intel/oneapi/mkl/latest/lib/intel64/
-    ```
-
 ## Deployment with Conda
 
 ### Step 1
@@ -24,7 +12,7 @@ Installation of required python packages
 conda install -y numpy matplotlib
 ```
 
-### Step 2
+### Step 2 - Magnetostatic part only
 
 GFortran compiler and Make utility (Windows + MacOS only)
 
@@ -42,6 +30,33 @@ GFortran compiler and Make utility (Windows + MacOS only)
 - MacOS:
   - Installation from binary | [HPC Mac OS X](http://hpc.sourceforge.net/)
   - Installation with [Homebrew](https://brew.sh/) ( **brew install gcc** )
+
+
+### Step 2 - Magnetostatic + Micromagnetic part
+
+#### Software
+    
+    - [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
+    - [Intel® oneAPI Math Kernel Library](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html)
+
+- Linux
+    #### Compilation Time
+
+    Prepare your terminal, so that ifort and MKL can be found.
+
+    ```bash
+    . ~/intel/oneapi/setvars.sh
+    export LDFLAGS=-Wl,-rpath=/opt/intel/oneapi/mkl/latest/lib/intel64/
+    ```
+    
+    #### Runtime
+
+    Environment variables of oneapi have to be set.
+
+    ```bash
+    . ~/intel/oneapi/setvars.sh
+    ```
+    
 
 ### Step 3
 

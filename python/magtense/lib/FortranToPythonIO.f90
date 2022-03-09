@@ -46,6 +46,9 @@ end function dispIte_fct_no_output
 subroutine getNFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
     mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, N )
+    
+    integer(4),intent(in) :: n_tiles, n_pts
+    
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
     real(8),dimension(n_tiles,3),intent(in) :: dev_center
@@ -74,8 +77,6 @@ subroutine getNFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     real(8),dimension(n_pts,3) :: H    
     real(8),dimension(n_tiles,n_pts,3,3),intent(out) :: N
     type(MagTile),dimension(n_tiles) :: tiles
-    integer(4),intent(in) :: n_tiles
-    integer(4),intent(in) :: n_pts
     integer :: i
 
     !::initialise MagTile with specified parameters
@@ -127,6 +128,8 @@ subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, N, useStoredN )
     
+    integer(4),intent(in) :: n_tiles, n_pts
+
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
     real(8),dimension(n_tiles,3),intent(in) :: dev_center
@@ -159,8 +162,6 @@ subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     logical,intent(in) :: useStoredN
 
     type(MagTile),dimension(n_tiles) :: tiles
-    integer(4),intent(in) :: n_tiles
-    integer(4),intent(in) :: n_pts
     integer :: i
 
     !::initialise MagTile with specified parameters
@@ -260,6 +261,8 @@ subroutine IterateTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, 
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, nT, nH, n_stateFcn, &
     data_stateFcn, T, maxErr, nIteMax, Mag_out, Mrel_out )
     
+    integer(4),intent(in) :: n_tiles, n_stateFcn, nT,nH
+
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
     real(8),dimension(n_tiles,3),intent(in) :: dev_center
@@ -289,14 +292,11 @@ subroutine IterateTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, 
     real(8),intent(in) :: maxErr, T
     integer(4) :: nIteMax
     type(MagStateFunction),dimension(n_stateFcn) :: stateFcn
-    integer(4),intent(in) :: n_stateFcn
-    integer(4),intent(in) :: nT,nH
     real(8),dimension(nH,nT),intent(in) :: data_stateFcn
     real(8) :: resumeIteration
     procedure(displayIteration_fct),pointer :: disp_fct => null()
 
     type(MagTile),dimension(n_tiles) :: tiles
-    integer(4),intent(in) :: n_tiles
     integer :: i
 
     !! default value is zero, i.e. do not resume iteration
@@ -336,6 +336,8 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, n_stateFcn, nT, nH, &
     data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out, console )
     
+    integer(4),intent(in) :: n_tiles, n_pts, n_stateFcn, nT, nH
+
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
     real(8),dimension(n_tiles,3),intent(in) :: dev_center
@@ -367,8 +369,6 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     integer(4) :: nIteMax
     logical,intent(in) :: iterateSolution, returnSolution
     type(MagStateFunction),dimension(n_stateFcn) :: stateFcn
-    integer(4),intent(in) :: n_stateFcn !! Currently just one state function supported, can be extendend to input variable
-    integer(4),intent(in):: nT,nH
     real(8),dimension(nH,nT),intent(in) :: data_stateFcn
     real(8) :: start,finish,resumeIteration
     procedure(displayIteration_fct),pointer :: disp_fct => null()
@@ -378,8 +378,6 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     real(8),dimension(n_pts,3),intent(out) :: H
     real(8),dimension(n_pts,3) :: H_tmp
     type(MagTile),dimension(n_tiles) :: tiles
-    integer(4),intent(in) :: n_tiles
-    integer(4),intent(in) :: n_pts
     integer :: i
 
     call cpu_time(start)
@@ -473,6 +471,7 @@ subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, Problem
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
     exch_rowe, exch_col, grid_abc, t_out, M, pts, H_exc, H_ext, H_dem, H_ani)
 
+    integer(4),intent(in) :: ntot, nt_Hext, nt, nt_alpha, nt_conv
     integer(4),intent(in) :: grid_nnod,  exch_nval, exch_nrow
     integer(4),dimension(3),intent(in) :: grid_n
     real(8),dimension(3),intent(in) :: grid_L
@@ -489,8 +488,8 @@ subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, Problem
     integer(4),dimension(exch_nrow),intent(in) :: exch_rows, exch_rowe
     integer(4),dimension(exch_nval),intent(in) :: exch_col
     real(8),dimension(nt_conv),intent(in) :: t_conv
-    integer(4),intent(in) :: ntot, ProblemMode, solver, nt_Hext, nt, useCuda, dem_appr
-    integer(4),intent(in) :: N_ret, N_load, setTimeDis, nt_alpha, useCVODE, nt_conv
+    integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr
+    integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE
     real(8),intent(in) :: A0, Ms, K0, gamma, alpha, MaxT0, tol, thres, conv_tol
     real(4),intent(in) :: dem_thres
     character*256,intent(in) :: N_file_in, N_file_out

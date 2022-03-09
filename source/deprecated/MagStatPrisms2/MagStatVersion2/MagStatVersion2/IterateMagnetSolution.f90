@@ -10,8 +10,8 @@
 
      INTERFACE
                 FUNCTION displayIteration_fct(err,err_max)
-                REAL, INTENT(IN) :: err,err_max
-                integer :: displayIteration_fct
+                real( kind=8 ), INTENT(IN) :: err,err_max
+                integer( kind=4 ) :: displayIteration_fct
                 END FUNCTION displayIteration_fct
      END INTERFACE
     
