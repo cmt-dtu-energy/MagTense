@@ -740,7 +740,7 @@ def run_micromag_simulation(problem):
         hext=problem.Hext,
         nt=problem.nt,
         t=problem.t,
-        m0=np.reshape(problem.m0, (-1)),
+        m0=np.concatenate((problem.m0[:,0], problem.m0[:,1], problem.m0[:,2]), axis=None),
         dem_thres=problem.dem_thres,
         usecuda=problem.use_CUDA,
         dem_appr=problem.dem_appr,

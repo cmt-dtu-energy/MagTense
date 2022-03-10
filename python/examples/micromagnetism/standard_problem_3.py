@@ -1,6 +1,7 @@
 #%%
 import numpy as np
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import pathlib
 
 from magtense import magtense, micromag_problem
@@ -22,13 +23,11 @@ def std_prob_3(res=[10,10,10], L_loop=np.linspace(8,9,10), use_CUDA=False,
     lex = np.sqrt(problem.A0 / (0.5 * mu0 * problem.Ms**2))
     problem.setTimeDis = 10
     Hext_fct = lambda t: np.atleast_2d(t).T * [0, 0, 0]
-    L_loop = [8.5]
+    # L_loop = [8.5]
 
     # Time-dependent alpha parameter, to ensure faster convergence
     problem.alpha = 1e3
     E_arr = np.zeros(shape=(4, len(L_loop), 2))
-
-    ax = plt.figure().add_subplot(projection='3d')
 
     for i in range(len(L_loop)):
         print(f'ITERATION: {i} / {len(L_loop)}')
@@ -65,12 +64,13 @@ def std_prob_3(res=[10,10,10], L_loop=np.linspace(8,9,10), use_CUDA=False,
 
             M_sq = np.squeeze(M, axis=2)
 
-            if show:
-                for k, m in enumerate([M_sq[0,:,:], M_sq[-1,:,:]]):
-                    plt.clf()
-                    ax.quiver(pts[:,0], pts[:,1], pts[:,2], m[:,0], m[:,1], m[:,2])
-                    plt.title('Fortran starting magnetization')
-                    plt.savefig(f'{pathlib.Path(__file__).parent.resolve()}/state{j}_{k}.png')
+            if show_details:
+                # for k, m in enumerate([M_sq[0,:,:], M_sq[-1,:,:]]):
+                #     fig = go.Figure(
+                #         data=go.Cone(x=pts[:,0], y=pts[:,1], z=pts[:,2], u=m[:,0], v=m[:,1], w=m[:,2]),
+                #         layout_title_text=f'State{j}_{k}',
+                #     )
+                #     fig.show()
 
                 plt.clf()
                 plt.plot(t, np.mean(M[:,:,0,0], axis=1), 'rx')
