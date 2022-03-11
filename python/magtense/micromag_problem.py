@@ -86,7 +86,7 @@ class DefaultMicroMagProblem():
         self.grid_type = get_micromag_gridtype('uniform')
 
         # easy axes of each cell
-        self.u_ea = np.zeros(shape=(self.ntot, 3))
+        self.u_ea = np.zeros(shape=(np.prod(res), 3), dtype=np.float64, order='F')
 
         # new or old problem
         self.prob_mode = get_micromag_problem_mode('new')
