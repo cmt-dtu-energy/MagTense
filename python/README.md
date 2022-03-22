@@ -34,6 +34,8 @@ GFortran compiler and Make utility (Windows + MacOS only)
 
 ### Step 2 - Magnetostatic + Micromagnetic part
 
+INFO: Works currently only with Windows and Python >= 3.9 | On Linux, it compiles and runs, but results diverge
+
 - Software
     - [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
     - [Intel® oneAPI Math Kernel Library](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html)
