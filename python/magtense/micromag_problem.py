@@ -174,8 +174,8 @@ class DefaultMicroMagProblem():
         self.conv_tol = 1e-4
     
         # The exchange operator matrix
-        self.exch_nval = 0
-        self.exch_nrow = 0
+        self.exch_nval = 1
+        self.exch_nrow = 1
         self.exch_val = 0.
         self.exch_rows = 0
         self.exch_rowe = 0

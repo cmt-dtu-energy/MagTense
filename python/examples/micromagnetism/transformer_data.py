@@ -14,7 +14,7 @@ def transformer_data(res=[36,36,1], use_CUDA=False, show=True):
 
     problem.grid_L = [500e-9, 500e-9, 3e-9]
     problem.alpha = 4.42e3
-    problem.gamma = 2.21e5    
+    problem.gamma = 2.21e5
     problem.setTimeDis = 10
 
     timesteps = 500
