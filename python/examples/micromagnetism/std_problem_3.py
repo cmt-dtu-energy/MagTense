@@ -62,9 +62,8 @@ def std_prob_3(res=[10,10,10], L_loop=np.linspace(8,9,10), use_CUDA=False,
 
             t, M, pts, H_exc, H_ext, H_dem, H_ani = magtense.run_micromag_simulation(problem)
 
-            M_sq = np.squeeze(M, axis=2)
-
             if show_details:
+                # M_sq = np.squeeze(M, axis=2)
                 # for k, m in enumerate([M_sq[0,:,:], M_sq[-1,:,:]]):
                 #     fig = go.Figure(
                 #         data=go.Cone(x=pts[:,0], y=pts[:,1], z=pts[:,2], u=m[:,0], v=m[:,1], w=m[:,2]),
