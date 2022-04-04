@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from magtense import magtense, micromag_problem
 
 
-def std_prob_4(res=[36,36,1], NIST_field=1, use_CUDA=False, show=True):
+def std_prob_4(res=[60,15,1], NIST_field=1, use_CUDA=False, show=True):
     mu0 = 4*np.pi*1e-7
 
     ### Magnetization to s-state
@@ -14,7 +14,7 @@ def std_prob_4(res=[36,36,1], NIST_field=1, use_CUDA=False, show=True):
     problem_ini.dem_appr = micromag_problem.get_micromag_demag_approx(None)
     problem_ini.set_use_CUDA(use_CUDA)
 
-    problem_ini.grid_L = [500e-9, 500e-9, 3e-9]
+    problem_ini.grid_L = [500e-9, 125e-9, 3e-9]
 
     problem_ini.alpha = 4.42e3
     problem_ini.gamma = 0
@@ -49,7 +49,7 @@ def std_prob_4(res=[36,36,1], NIST_field=1, use_CUDA=False, show=True):
     problem_dym.dem_appr = micromag_problem.get_micromag_demag_approx(None)
     problem_dym.set_use_CUDA(use_CUDA)
 
-    problem_dym.grid_L = [500e-9, 500e-9, 3e-9]
+    problem_dym.grid_L = [500e-9, 125e-9, 3e-9]
 
     problem_dym.alpha = 4.42e3
     problem_dym.gamma = 2.21e5
@@ -61,9 +61,9 @@ def std_prob_4(res=[36,36,1], NIST_field=1, use_CUDA=False, show=True):
 
     # Two applied fields of standard problem 4
     if NIST_field == 1:
-        Hyst_dir = 1 / mu0 * [-24.6, 4.3, 0] / 1000
+        Hyst_dir = 1 / mu0 * np.array([-24.6, 4.3, 0]) / 1000
     if NIST_field == 2:
-        Hyst_dir = 1 / mu0 * [-35.5, -6.3, 0] / 1000
+        Hyst_dir = 1 / mu0 * np.array([-35.5, -6.3, 0]) / 1000
 
     HextFct = lambda t: np.expand_dims(t > -1, 0).T * Hyst_dir
     problem_dym.set_Hext(HextFct, np.linspace(0, t_end, 2000))
@@ -92,9 +92,15 @@ def std_prob_4(res=[36,36,1], NIST_field=1, use_CUDA=False, show=True):
 
         for k, m in enumerate([M_sq_ini[0,:,:], M_sq_ini[-1,:,:], M_sq_dym[-1,:,:]]):
             fig = go.Figure(
-                data=go.Cone(x=pts[:,0], y=pts[:,1], z=pts[:,2], u=m[:,0], v=m[:,1], w=m[:,2]),
+                data=go.Cone(
+                    x=pts[:,0],
+                    y=pts[:,1],
+                    z=pts[:,2],
+                    u=m[:,0], v=m[:,1], w=m[:,2]
+                ),
                 layout_title_text=f'State{k}',
             )
+            # fig.update_layout(scene=dict(aspectratio=dict(x=res[0]/10, y=res[1]/10, z=res[2]/10)))
             fig.show()
 
 
