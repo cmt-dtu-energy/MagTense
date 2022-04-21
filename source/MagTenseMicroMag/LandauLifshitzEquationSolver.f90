@@ -176,11 +176,11 @@ include 'blas.f90'
     !clean-up
     stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
    
-#if USE_CUDA    
+! #if USE_CUDA    
     if ( gb_problem%useCuda .eqv. useCudaTrue ) then
         call cudaDestroy()
     endif
-#endif
+! #endif
     !Make sure to return the correct state
     sol = gb_solution
     prob = gb_problem
@@ -585,7 +585,7 @@ include 'blas.f90'
             solution%HmZ = temp * ( solution%Mfact )
             !call vsmul( ntot, solution%HmZ, -solution%Mfact, solution%HmZ )
         else
-#if USE_CUDA
+! #if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
             pref = sngl(-1 )!* solution%Mfact)                                
             call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
