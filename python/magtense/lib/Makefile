@@ -18,7 +18,7 @@ endif
 
 ifeq ($(F90),ifort)
 	ifeq ($(OS),Windows_NT)
-    	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise /libs:static /threads
+    	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise /libs:static /threads /fpp
 		EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower --opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
 		FCOMP = intelvem
 	else
@@ -44,7 +44,10 @@ ifeq ($(OS),Windows_NT)
 	MKLROOT_COMP = "C:\Program Files (x86)\Intel\oneAPI\compiler\latest\windows\compiler"
 	MKL_OMP = -L${MKLROOT_COMP}/lib/intel64_win -llibiomp5md
 
-	OPT= ${MKLROOT}/include/intel64/lp64 -I${MKLROOT}/include
+	CUDA_ROOT = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6"
+	CUDA = -L${CUDA_ROOT}/lib/x64 -lcublas -lcudart -lcuda -lcusparse
+
+	OPT= ${MKLROOT}/include/intel64/lp64 -I${MKLROOT}/include  -I${CUDA_ROOT}/include
 	OPT_PATH1 = ${MKLROOT}/include/intel64/lp64
 	OPT_PATH2 = ${MKLROOT}/include
 	LIB_OPT = -I:${OPT_PATH1} -I:${OPT_PATH2} -L. -llibsrc
@@ -91,7 +94,7 @@ endif
 LIBSRC_SOURCES = IntegrationDataTypes quadpack SpecialFunctions TileTensorHelperFunctions \
 TileRectangularPrismTensor TileCircPieceTensor TileCylPieceTensor TilePlanarCoilTensor TileTriangle \
 TileNComponents DemagFieldGetSolution spline MagParameters IterateMagnetSolution \
-MicroMagParameters RKSuitef90 ODE_Solvers LLODE_Debug util MagTenseMicroMagPyIO LandauLifshitzEquationSolver
+MicroMagParameters RKSuitef90 ODE_Solvers LLODE_Debug util FortranCuda MagTenseMicroMagPyIO LandauLifshitzEquationSolver
 
 # file names
 LIBSRC_FILES = $(addsuffix .f90,${LIBSRC_SOURCES})
@@ -138,4 +141,4 @@ libsrc.a: ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
 ${PYTHON_MODN_ALL}: libsrc.lib libsrc.a
-	f2py --build-dir . --fcompiler=${FCOMP} ${EXTRA_OPT} -c -m ${PYTHON_MODN} ${LIB_OPT} ${LIBSRC_WRAP_FILES} ${LIBSRC_OBJECTS} $(MKL) $(MKL_OMP)
+	f2py --build-dir . --fcompiler=${FCOMP} ${EXTRA_OPT} -c -m ${PYTHON_MODN} ${LIB_OPT} ${LIBSRC_WRAP_FILES} ${LIBSRC_OBJECTS} $(MKL) $(MKL_OMP) $(CUDA)

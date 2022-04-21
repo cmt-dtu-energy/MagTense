@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from magtense import magtense, micromag_problem
 
 
-def std_prob_4(res=[60,15,1], NIST_field=1, use_CUDA=False, show=True):
+def std_prob_4(res=[64,16,1], NIST_field=1, use_CUDA=False, show=True):
     mu0 = 4*np.pi*1e-7
 
     ### Magnetization to s-state
@@ -105,4 +105,4 @@ def std_prob_4(res=[60,15,1], NIST_field=1, use_CUDA=False, show=True):
 
 
 if __name__ == '__main__':
-    std_prob_4(NIST_field=1, show=True)
+    std_prob_4(NIST_field=1, show=True, use_CUDA=True)

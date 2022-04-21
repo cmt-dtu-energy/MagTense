@@ -176,11 +176,11 @@ include 'blas.f90'
     !clean-up
     stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
    
-! #if USE_CUDA    
-!     if ( gb_problem%useCuda .eqv. useCudaTrue ) then
-!         call cudaDestroy()
-!     endif
-! #endif
+#if USE_CUDA    
+    if ( gb_problem%useCuda .eqv. useCudaTrue ) then
+        call cudaDestroy()
+    endif
+#endif
     !Make sure to return the correct state
     sol = gb_solution
     prob = gb_problem
