@@ -13,6 +13,8 @@ include 'blas.f90'
     use util_call
     use DemagFieldGetSolution
     use FortranCuda
+    !use, intrinsic :: omp_lib
+    use omp_lib
     implicit none
     
    
@@ -342,7 +344,7 @@ include 'blas.f90'
     type(MicroMagSolution),intent(inout) :: solution
     
     integer :: ntot
-    character(50) :: prog_str
+    !character(50) :: prog_str
     
     if ( problem%problemMode .eq. ProblemModeNew ) then
         !No. of grid points
@@ -394,7 +396,7 @@ include 'blas.f90'
 
     !"J" : exchange term
     solution%Jfact = problem%A0 / ( mu0 * problem%Ms )
-    call displayMatlabMessage( trim(prog_str) )
+    !call displayMatlabMessage( trim(prog_str) )
     !"H" : external field term (b.c. user input is in Tesla)
     !solution%Hfact = 1./mu0
     !"M" : demagnetization term
@@ -426,6 +428,7 @@ include 'blas.f90'
     descr%diag = SPARSE_DIAG_NON_UNIT
     
     alpha = -2.! * solution%Jfact
+    !alpha = -2. * problem%A0 / ( mu0 * 8.0e5 )
     beta = 0.
     
     ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
@@ -683,49 +686,42 @@ include 'blas.f90'
             alpha = -1.! * solution%Mfact
             beta = 0.0
             !Hmx = Kxx * Mx
-            call gemv( problem%Kxx, solution%Mx_s, temp, alpha, beta )
+            call gemv( problem%Kxx, solution%Mx_s, solution%HmX, alpha, beta )
             
             beta = 1.0
             !Hmx = Hmx + Kxy * My
-            call gemv( problem%Kxy, solution%My_s, temp, alpha, beta )
+            call gemv( problem%Kxy, solution%My_s, solution%HmX, alpha, beta )
             
             !Hmx = Hmx + Kxz * Mz
-            call gemv( problem%Kxz, solution%Mz_s, temp, alpha, beta )
-            !Scale with Mfact in case it varies
-            !ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
-            !call vsmul( ntot, solution%HmX, solution%Mfact, solution%HmX )
-            temp = solution%HmX * solution%Mfact
-            solution%HmX = temp
-            
+            call gemv( problem%Kxz, solution%Mz_s, solution%HmX, alpha, beta )
             
             beta = 0.0
             !HmY = Kyx * Mx
-            call gemv( problem%Kxy, solution%Mx_s, temp, alpha, beta )
+            call gemv( problem%Kxy, solution%Mx_s, solution%HmY, alpha, beta )
             
             beta = 1.0
             !HmY = HmY + Kyy * My
-            call gemv( problem%Kyy, solution%My_s, temp, alpha, beta )
+            call gemv( problem%Kyy, solution%My_s, solution%HmY, alpha, beta )
             
             !Hmy = Hmy + Kyz * Mz
-            call gemv( problem%Kyz, solution%Mz_s, temp, alpha, beta )
-            !Scale with Mfact in case it varies
-            !call vsmul( ntot, solution%HmY, solution%Mfact, solution%HmY )
-            temp = solution%HmY * solution%Mfact
-            solution%HmY = temp
+            call gemv( problem%Kyz, solution%Mz_s, solution%HmY, alpha, beta )
             
             
             beta = 0.0
             !HmZ = Kzx * Mx
-            call gemv( problem%Kxz, solution%Mx_s, temp, alpha, beta )
+            call gemv( problem%Kxz, solution%Mx_s, solution%HmZ, alpha, beta )
             
             beta = 1.0
             !HmZ = HmZ + Kzy * My
-            call gemv( problem%Kyz, solution%My_S, temp, alpha, beta )
+            call gemv( problem%Kyz, solution%My_s, solution%HmZ, alpha, beta )
             
             !HmZ = HmZ + Kzz * Mz
-            call gemv( problem%Kzz, solution%Mz_s, temp, alpha, beta )
-            !Scale with Mfact in case it varies
-            !call vsmul( ntot, solution%HmZ, solution%Mfact, solution%HmZ )
+            call gemv( problem%Kzz, solution%Mz_s, solution%HmZ, alpha, beta )
+            
+            temp = solution%HmX * solution%Mfact
+            solution%HmX = temp
+            temp = solution%HmY * solution%Mfact
+            solution%HmY = temp
             temp = solution%HmZ * solution%Mfact
             solution%HmZ = temp
             
@@ -845,9 +841,10 @@ include 'blas.f90'
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2022
     !> @brief
     !> Calculates and returns the demag field tensor
+    !> The calculations
     !> @param[inout] problem, the struct containing the problem
     
     !>-----------------------------------------
@@ -871,6 +868,14 @@ include 'blas.f90'
     logical,dimension(:,:),allocatable :: mask_xx, mask_xy, mask_xz     !> mask used for finding non-zero values
     logical,dimension(:,:),allocatable :: mask_yy, mask_yz, mask_zz     !> mask used for finding non-zero values
     integer,dimension(4) :: indx_ele
+    real :: rate
+    integer :: c1,c2,cr,cm
+    character(10) :: prog_str
+    
+    ! First initialize the system_clock
+    call system_clock(count_rate=cr)
+    call system_clock(count_max=cm)
+    rate = REAL(cr)
     
     nx = problem%grid%nx
     ny = problem%grid%ny
@@ -886,32 +891,41 @@ include 'blas.f90'
     if ( problem%demagTensorLoadState .gt. DemagTensorReturnMemory ) then
         call loadDemagTensorFromDisk( problem )
     else
-           
-        allocate(H(ntot,3))
-        
+
+        CALL SYSTEM_CLOCK(c1)
+ 
+        call mkl_set_num_threads(problem%nThreadsMatlab)
+        call omp_set_num_threads(problem%nThreadsMatlab)
+               
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
-            !Setup template tile
-            tile(1)%tileType = 2 !(for prism)
-            !dimensions of the tile
-            tile(1)%a = problem%grid%dx
-            tile(1)%b = problem%grid%dy
-            tile(1)%c = problem%grid%dz
-            tile(1)%exploitSymmetry = 0 !0 for no and this is important
-            tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
-            tile(1)%M(:) = 0.
-                
-        
+            
+            !$OMP PARALLEL shared(problem) 
+            !$omp do private(ind, tile, H, Nout, k, j, i)
+                   
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx
+                        !Setup template tile
+                        tile(1)%tileType = 2 !(for prism)
+                        !dimensions of the tile
+                        tile(1)%a = problem%grid%dx
+                        tile(1)%b = problem%grid%dy
+                        tile(1)%c = problem%grid%dz
+                        tile(1)%exploitSymmetry = 0 !0 for no and this is important
+                        tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+                        tile(1)%M(:) = 0.
+                        
                         !Set the center of the tile to be the current point
                         tile(1)%offset(1) = problem%grid%x(i,j,k)
                         tile(1)%offset(2) = problem%grid%y(i,j,k)
                         tile(1)%offset(3) = problem%grid%z(i,j,k)
-                        !Nout will be allocated by the subroutine. Should be de-allocated afterwards for consistency
-                        call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout )
-                    
+                        
+                        allocate(Nout(1,ntot,3,3))
+                        allocate(H(ntot,3))
+                        
+                        call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                        
                         !Copy Nout into the proper structure used by the micro mag model
                         ind = (k-1) * nx * ny + (j-1) * nx + i
                     
@@ -930,25 +944,35 @@ include 'blas.f90'
                         !Kzy(ind,:) = Nout(1,:,3,2)
                         problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
                     
+                        !Clean up
                         deallocate(Nout)
+                        deallocate(H)
                     enddo
                 enddo
             enddo
             
+            !$omp end do
+            !$OMP END PARALLEL
+            
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
-            !Setup template tile
-            tile(1)%tileType = 5 !(for tetrahedron)
-            tile(1)%exploitSymmetry = 0 !0 for no and this is important
-            tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
-            tile(1)%M(:) = 0.
-        
+            !$OMP PARALLEL shared(problem)
+            !$omp do private(ind, tile, H, Nout)
+            
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do i=1,nx
+                !Setup template tile
+                tile(1)%tileType = 5 !(for tetrahedron)
+                tile(1)%exploitSymmetry = 0 !0 for no and this is important
+                tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+                tile(1)%M(:) = 0.
+            
                 indx_ele = problem%grid%elements(:,i)
-                tile(1)%vert(:,:) = problem%grid%nodes(:,indx_ele)     
+                tile(1)%vert(:,:) = problem%grid%nodes(:,indx_ele)   
                 
-                !Nout will be allocated by the subroutine. Should be de-allocated afterwards for consistency
-                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout )
+                allocate(Nout(1,ntot,3,3))
+                allocate(H(ntot,3))
+                
+                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
                     
                 !Copy Nout into the proper structure used by the micro mag model
                 ind = i
@@ -968,18 +992,27 @@ include 'blas.f90'
                 !Kzy(ind,:) = Nout(1,:,3,2)
                 problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
                 
+                !Clean up
                 deallocate(Nout)
+                deallocate(H)
             enddo
+            
+            !$omp end do
+            !$OMP END PARALLEL
         
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
-            !Setup template tile
-            tile(1)%tileType = 2 !(for prism)
-            tile(1)%exploitSymmetry = 0 !0 for no and this is important
-            tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
-            tile(1)%M(:) = 0.
+            
+            !$OMP PARALLEL shared(problem)
+            !$omp do private(ind, tile, H, Nout)
             
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do i=1,nx
+                !Setup template tile
+                tile(1)%tileType = 2 !(for prism)
+                tile(1)%exploitSymmetry = 0 !0 for no and this is important
+                tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+                tile(1)%M(:) = 0.
+            
                 !dimensions of the tile
                 tile(1)%a = problem%grid%abc(i,1)
                 tile(1)%b = problem%grid%abc(i,2)
@@ -990,9 +1023,11 @@ include 'blas.f90'
                 tile(1)%offset(2) = problem%grid%pts(i,2)
                 tile(1)%offset(3) = problem%grid%pts(i,3)
                 
-                !Nout will be allocated by the subroutine. Should be de-allocated afterwards for consistency
-                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout )
-                    
+                allocate(Nout(1,ntot,3,3))
+                allocate(H(ntot,3))
+
+                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                                    
                 !Copy Nout into the proper structure used by the micro mag model
                 ind = i
                     
@@ -1011,18 +1046,33 @@ include 'blas.f90'
                 !Kzy(ind,:) = Nout(1,:,3,2)
                 problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
                 
+                !Clean up
                 deallocate(Nout)
+                deallocate(H)
             enddo
         
+            !$omp end do
+            !$OMP END PARALLEL
+            
         endif
+        
+        CALL SYSTEM_CLOCK(c2)
+
+        !Display the time to compute the demag tensor and its first entry
+        !call displayMatlabMessage( 'Time demag tensor:' )
+        !write (prog_str,'(f10.3)') (c2 - c1)/rate
+        !call displayMatlabMessage( prog_str )
+        
+        !call displayMatlabMessage( 'Kxx(1,1):' )
+        !write (prog_str,'(f10.3)') problem%Kxx(1,1)
+        !call displayMatlabMessage( prog_str )
+        
         
         !Write the demag tensors to disk if asked to do so            
         if ( problem%demagTensorReturnState .gt. DemagTensorReturnMemory ) then
             call writeDemagTensorToDisk( problem )
         endif            
-        !Clean up
-        deallocate(H)
-    
+        
     endif
     
     

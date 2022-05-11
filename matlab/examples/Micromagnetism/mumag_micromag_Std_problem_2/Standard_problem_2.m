@@ -124,57 +124,6 @@ end
 
 if run_single_curve
 %% --------------------------------------------------------------------------------------------------------------------------------------
-%% -------------------------------------------------------------------- MATLAB ----------------------------------------------------------
-%% --------------------------------------------------------------------------------------------------------------------------------------
-%% Run the Matlab version of the micromagnetism code
-    addpath('..\..\micromagnetism')
-    
-    problem = problem.setHext( HextFct, linspace(MaxH,-0.159*MaxH,101) );
-
-    ddHextFct = @(t) HystDir + 0.*t';
-    problem = problem.setddHext( ddHextFct, linspace(MaxH,-0.159*MaxH,101) );
-
-    problem.alpha = @(t) 1e3*(10.^(5*min(t,2e-9)/2e-9));
-
-    %% The implicit solver
-    problem = problem.setSolverType( 'UseImplicitSolver' );
-    SigmaSol = ComputeTheSolution(problem);
-
-    for k=1:size(SigmaSol,1) 
-        Sigma = SigmaSol(k,:).' ;
-        NN = round(numel(Sigma)/3) ;
-        SigmaX = Sigma(0*NN+[1:NN]) ;
-        SigmaY = Sigma(1*NN+[1:NN]) ;
-        SigmaZ = Sigma(2*NN+[1:NN]) ;
-        SigmaN = sqrt(SigmaX.^2+SigmaY.^2+SigmaZ.^2) ;
-        Mx(k) = mean(SigmaX./SigmaN) ;
-        My(k) = mean(SigmaY./SigmaN) ;
-        Mz(k) = mean(SigmaZ./SigmaN) ;
-        Mk(k) = Mx(k)*HystDir(1) + My(k)*HystDir(2) + Mz(k)*HystDir(3) ;
-    end
-    plot(fig1,problem.Hext(:,1),mu0*Mk,'ro') %Minus signs added to correspond to regular hysteresis plots.
-
-    %% The explicit solver
-    problem = problem.setSolverType( 'UseExplicitSolver' );
-    problem = problem.setHext( HextFct, linspace(MaxH,-MaxH,26) );
-
-    SigmaSol2 = ComputeTheSolution(problem);
-
-    for k=1:size(SigmaSol2,1) 
-        Sigma = SigmaSol2(k,:).' ;
-        NN = round(numel(Sigma)/3) ;
-        SigmaX = Sigma(0*NN+[1:NN]) ;
-        SigmaY = Sigma(1*NN+[1:NN]) ;
-        SigmaZ = Sigma(2*NN+[1:NN]) ;
-        Mx2(k) = mean(SigmaX) ;
-        My2(k) = mean(SigmaY) ;
-        Mz2(k) = mean(SigmaZ) ;
-        Mk2(k) = Mx2(k)*HystDir(1) + My2(k)*HystDir(2) + Mz2(k)*HystDir(3) ;
-    end
-    plot(fig1,problem.Hext(:,1),mu0*Mk2,'r.-')
-
-
-%% --------------------------------------------------------------------------------------------------------------------------------------
 %% --------------------------------------------------------------------  mumag -----------------------------------------------------------
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% Compare with published solutions available from mumag webpage for single curve for d/l_ex = 30
@@ -186,7 +135,7 @@ if run_single_curve
     plot(fig1,mu0*H,M,'k^');
 
     % legend(fig1,'Fortran Mx','Fortran My','Fortran Mz','Matlab Mx','Matlab My','Matlab Mz','\mu{}mag \sigma{}(Mx)','\mu{}mag <Mx>','\mu{}mag \sigma{}(My)','\mu{}mag <My>','\mu{}mag \sigma{}(Mz)','\mu{}mag <Mz>');
-    legend(fig1,'"Fortran Explicit method"','"Matlab Implicit method"', 'Matlab Explicit method','OOMMF 2D','OOMMF Quasi3D','OOMMF 3D','Location','SouthEast');
+    legend(fig1,'"Fortran Explicit method"','OOMMF 2D','OOMMF Quasi3D','OOMMF 3D','Location','SouthEast');
     ylabel(fig1,'<M_i>/M_s')
     xlabel(fig1,'\mu_{0}H_{applied} [T]')
     xlim(fig1,[-0.1 0.1])

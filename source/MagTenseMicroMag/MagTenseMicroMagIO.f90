@@ -24,7 +24,7 @@
         integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
-        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr
+        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
         mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
@@ -201,7 +201,7 @@
         else
             problem%useCuda = useCudaFalse
         endif
-                
+               
         sx = 1
         demApproxPtr = mxGetField( prhs, i, problemFields(20) )
         call mxCopyPtrToInteger4(mxGetPr(demApproxPtr), problem%demag_approximation, sx )
@@ -323,6 +323,10 @@
         else
             problem%usePrecision = usePrecisionFalse
         endif
+        
+        sx = 1
+        nThreadPtr = mxGetField( prhs, i, problemFields(47) )
+        call mxCopyPtrToInteger4(mxGetPr(nThreadPtr), problem%nThreadsMatlab, sx )
         
         !Clean-up 
         deallocate(problemFields)
@@ -459,7 +463,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=46
+        integer,parameter :: nf=47
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -512,6 +516,7 @@
         fieldnames(44) = 'exch_col'
         fieldnames(45) = 'grid_abc'
         fieldnames(46) = 'usePres'
+        fieldnames(47) = 'nThreads'
         
     end subroutine getProblemFieldnames
     

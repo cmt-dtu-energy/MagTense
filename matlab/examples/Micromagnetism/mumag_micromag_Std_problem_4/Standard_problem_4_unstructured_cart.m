@@ -93,7 +93,7 @@ prob_struct = struct(problem_ini);
 
 tic
 solution_ini = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
-% [Mx,My,Mz,mx,my,mz] = ComputeMagneticMomentGeneralMesh(solution_ini.M,GridInfo.Volumes) ;
+% [Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution_ini.M,GridInfo.Volumes) ;
 elapsedTime_part1 = toc
 if (ShowTheResult)
     figure; M_end = squeeze(solution_ini.M(end,:,:)); quiver(solution_ini.pts(:,1),solution_ini.pts(:,2),M_end(:,1),M_end(:,2)); axis equal; title('Starting state - Fortran')
@@ -145,7 +145,7 @@ tic
 solution_dym = problem_dym.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_dym );
 elapsedTime_part2 = toc
 
-[Mx,My,Mz,mx,my,mz] = ComputeMagneticMomentGeneralMesh(solution_dym.M,GridInfo.Volumes) ;
+[Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution_dym.M,GridInfo.Volumes) ;
 if (ShowTheResult)
     plot(fig1,solution_dym.t,Mx,'rx');
     plot(fig1,solution_dym.t,My,'gx');
