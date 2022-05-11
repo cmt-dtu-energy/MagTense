@@ -102,10 +102,10 @@ for i = 1:length(d_loop)
         Mx(j) = mean(Mx_arr./MN) ;
         My(j) = mean(My_arr./MN) ;
         Mz(j) = mean(Mz_arr./MN) ;
-        M(j) = Mx(j) + My(j) + Mz(j) ;
+        M(j) = Mx(j)*HystDir(1) + My(j)*HystDir(2) + Mz(j)*HystDir(3) ;
     end
     if (ShowTheResult)
-        plot(fig1,sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,M,'rp') %Minus signs added to correspond to regular hysteresis plots.
+        plot(fig1,sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,mu0*M,'rp') %Minus signs added to correspond to regular hysteresis plots.
     end
     
     results.Mxr(i) = interp1(sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,Mx,0);
