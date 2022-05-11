@@ -105,6 +105,7 @@ include "mkl_dfti.f90"
         integer :: demag_approximation                          !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         integer :: demagTensorReturnState                       !> Flag describing how or if the demag tensor should be returned
         integer :: demagTensorLoadState                         !> Flag describing how or if to load the demag tensor (from disk e.g.)
+        integer :: nThreadsMatlab                               !> Number of threads to use in the OpenMP demag tensor allocation
         character*256 :: demagTensorFileOut, demagTensorFileIn  !> Filename (including path) for output (input) of demag tensor if it is to be returned as a file (demagTensorReturnState >2 and the value is equal to the length of the file including path)
         
         
@@ -169,6 +170,5 @@ include "mkl_dfti.f90"
     !!@todo Do NOT have useCVODETrue/-False variables both here and in IntegrationDataTypes.
     integer,parameter :: useCVODETrue=1,useCVODEFalse=0
     integer,parameter :: usePrecisionTrue=1,usePrecisionFalse=0
-    
     
 end module MicroMagParameters    

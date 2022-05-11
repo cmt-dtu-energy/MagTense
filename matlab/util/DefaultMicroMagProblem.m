@@ -133,6 +133,9 @@ properties
    
     % function handle for external field
     HextFct = [] ;
+
+    %The number of threads used by OpenMP for building the demag tensor
+    nThreads = int32(1);
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -374,7 +377,8 @@ methods
            obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolver_mex;
        else
            obj.useCuda = int32(0);
-           obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolverNoCUDA_mex;
+%            obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolverNoCUDA_mex;
+           obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolver_mex;
        end
     end
     
@@ -434,6 +438,8 @@ methods
         obj.exch_rows = int32(rs);
         obj.exch_rowe = int32(re);
         obj.exch_col  = int32(c);
+
+        disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(10^9)) ' Gb'])
     end
     
     %Override struct function for a final check before handing to Fortran
