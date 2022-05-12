@@ -377,8 +377,8 @@ methods
            obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolver_mex;
        else
            obj.useCuda = int32(0);
-%            obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolverNoCUDA_mex;
-           obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolver_mex;
+           obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolverNoCUDA_mex;
+%            obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolver_mex;
        end
     end
     
