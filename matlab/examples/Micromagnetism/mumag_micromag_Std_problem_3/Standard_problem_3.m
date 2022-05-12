@@ -1,4 +1,4 @@
-function [elapsedTime,problem,solution,E_arr,L_loop] = Standard_problem_3( resolution, use_CUDA, ShowTheResult, SaveTheResult, ShowTheResultDetails, RunMatlab, L_loop )
+function [elapsedTime,problem,solution,E_arr,L_loop] = Standard_problem_3( resolution, use_CUDA, ShowTheResult, ShowTheResultDetails, L_loop )
 
 clearvars -except  resolution use_CUDA ShowTheResult SaveTheResult ShowTheResultDetails RunMatlab L_loop 
 close all
@@ -12,14 +12,8 @@ end
 if ~exist('ShowTheResult','var')
     ShowTheResult = 1;
 end
-if ~exist('SaveTheResult','var')
-    SaveTheResult = 0;
-end
 if ~exist('ShowTheResultDetails','var')
     ShowTheResultDetails = 0;
-end
-if ~exist('RunMatlab','var')
-    RunMatlab = 0;
 end
 if ~exist('L_loop','var')
     L_loop = linspace(8,9,10);
@@ -36,7 +30,7 @@ if (ShowTheResult)
 end
 
 if (ShowTheResultDetails)
-    RunMatlab = 1;
+    RunMatlab = 0;
     figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
     figure2= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig2 = axes('Parent',figure2,'Layer','top','FontSize',16); hold on; grid on; box on
     figure3= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig3 = axes('Parent',figure3,'Layer','top','FontSize',16); hold on; grid on; box on
@@ -58,12 +52,15 @@ problem.dem_appr = getMicroMagDemagApproximation('none');
 problem = problem.setUseCuda( use_CUDA );
 
 problem.gamma = 0;
-problem.Ms = 1000e3 ;
-problem.K0 = 0.1*1/2*mu0*problem.Ms^2 ;
+Ms = 1000e3;
+K0 = 0.1*1/2*mu0*Ms^2;
+problem.Ms = Ms*ones(prod(resolution),1);
+problem.K0 = K0*ones(prod(resolution),1);
 problem.A0 = 1.74532925199e-10;
+
 problem.u_ea = zeros( prod(resolution), 3 );
 problem.u_ea(:,3) = 1;
-lex = sqrt(problem.A0/(1/2*mu0*problem.Ms^2));
+lex = sqrt(problem.A0/(1/2*mu0*Ms^2));
 problem.setTimeDis = int32(10);
 HextFct = @(t) (t)' .* [0,0,0];
 
@@ -109,8 +106,8 @@ for i = 1:length(L_loop)
         solution = problem.MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
 
         if (ShowTheResultDetails)
-            M_1 = squeeze(solution.M(1,:,:)); figure(figure3); subplot(2,2,1); quiver3(solution.pts(:,1),solution.pts(:,2),solution.pts(:,3),M_1(:,1),M_1(:,2),M_1(:,3)); axis equal; title('Fortran starting magnetization')
-            M_end = squeeze(solution.M(end,:,:)); figure(figure3); subplot(2,2,3); quiver3(solution.pts(:,1),solution.pts(:,2),solution.pts(:,3),M_end(:,1),M_end(:,2),M_end(:,3)); axis equal; title('Fortran ending magnetization')
+            M_1 = squeeze(solution.M(1,:,:)); figure(figure3); subplot(2,1,1); quiver3(solution.pts(:,1),solution.pts(:,2),solution.pts(:,3),M_1(:,1),M_1(:,2),M_1(:,3)); axis equal; title('Fortran starting magnetization')
+            M_end = squeeze(solution.M(end,:,:)); figure(figure3); subplot(2,1,2); quiver3(solution.pts(:,1),solution.pts(:,2),solution.pts(:,3),M_end(:,1),M_end(:,2),M_end(:,3)); axis equal; title('Fortran ending magnetization')
 
             plot(fig1,solution.t,mean(solution.M(:,:,1),2),'rx'); 
             plot(fig1,solution.t,mean(solution.M(:,:,2),2),'gx'); 
@@ -122,8 +119,35 @@ for i = 1:length(L_loop)
         E_ext = sum(      (solution.M(:,:,1).*solution.H_ext(:,:,1) + solution.M(:,:,2).*solution.H_ext(:,:,2) + solution.M(:,:,3).*solution.H_ext(:,:,3)),2) ;
         E_dem = sum((1/2)*(solution.M(:,:,1).*solution.H_dem(:,:,1) + solution.M(:,:,2).*solution.H_dem(:,:,2) + solution.M(:,:,3).*solution.H_dem(:,:,3)),2) ;
         E_ani = sum((1/2)*(solution.M(:,:,1).*solution.H_ani(:,:,1) + solution.M(:,:,2).*solution.H_ani(:,:,2) + solution.M(:,:,3).*solution.H_ani(:,:,3)),2) ;
-        E_arr(:,i,j) = mu0*[E_exc(end) E_ext(end) E_dem(end) E_ani(end)];
-
+                   
+        %--- Normalize the energy to the volume elements
+        dV = prod(problem.grid_L./resolution);
+        E_exc = mu0*E_exc*Ms*dV;  % [J]
+        E_ext = mu0*E_ext*Ms*dV;  % [J]
+        E_dem = mu0*E_dem*Ms*dV;  % [J]
+        E_ani = mu0*E_ani*Ms*dV;  % [J]
+        
+        %--- The anistropy energy must be added the constant volume term of the integral of K0 over the volume 
+        %--- See "Nonlinear Magnetization Dynamics in Thin-films and Nanoparticles" by Massimiliano d'Aquino, Eq. (1.43)
+        E_ani = E_ani + K0*prod(problem.grid_L);
+        
+        %--- Calcute the energy densities
+        E_exc_dens = E_exc/prod(problem.grid_L);  % [J/m^3]
+        E_ext_dens = E_ext/prod(problem.grid_L);  % [J/m^3]
+        E_dem_dens = E_dem/prod(problem.grid_L);  % [J/m^3]
+        E_ani_dens = E_ani/prod(problem.grid_L);  % [J/m^3]
+        
+        Km = (1/2)*(Ms^2)*mu0;  % [J/m^3] 
+        %--- See Eq. (29) from "Standard Problems in Micromagnetics", Donald Porter and Michael Donahue (2018)
+        
+        %--- Reduced energies, i.e. normalized by Km
+        E_exc_red = E_exc_dens./Km;
+        E_ext_red = E_ext_dens./Km;
+        E_dem_red = E_dem_dens./Km;
+        E_ani_red = E_ani_dens./Km;
+        
+        E_arr(:,i,j) = [E_dem_red(end) E_exc_red(end) E_ani_red(end) E_ext_red(end)];
+        
         if (ShowTheResultDetails)
             plot(fig2,solution.t,mu0*E_exc-mu0*E_exc(1),'.')
             plot(fig2,solution.t,mu0*E_ext-mu0*E_ext(1),'.')
@@ -132,43 +156,6 @@ for i = 1:length(L_loop)
             xlabel(fig2,'Time [s]')
             ylabel(fig2,'Energy [-]')
             legend(fig2,{'E_{exc}','E_{ext}','E_{dem}','E_{ani}'},'Location','East');
-        end
-        
-%% --------------------------------------------------------------------------------------------------------------------------------------
-%% -------------------------------------------------------------------- MATLAB ----------------------------------------------------------
-%% --------------------------------------------------------------------------------------------------------------------------------------
-%% Run the Matlab version of the micromagnetism code
-        if (RunMatlab)
-            addpath('..\..\micromagnetism')
-            problem = problem.setSolverType( 'UseDynamicSolver' );
-            problem.DirectoryFilename = [''];
-            problem.SimulationName = 'Matlab_DynamicsStdProb3';
-            [SigmaSol1,~,InteractionMatrices] = ComputeTheSolution(problem);
-
-            for k=1:size(SigmaSol1,1)
-                Sigma = SigmaSol1(k,:).' ;
-                NN = round(numel(Sigma)/3) ;
-                SigmaX(:,k) = Sigma(0*NN+[1:NN]) ;
-                SigmaY(:,k) = Sigma(1*NN+[1:NN]) ;
-                SigmaZ(:,k) = Sigma(2*NN+[1:NN]) ;
-                SigmaN(:,k) = sqrt(SigmaX(:,k).^2+SigmaY(:,k).^2+SigmaZ(:,k).^2) ;
-                Mx(k) = mean(SigmaX(:,k)./SigmaN(:,k)) ;
-                My(k) = mean(SigmaY(:,k)./SigmaN(:,k)) ;
-                Mz(k) = mean(SigmaZ(:,k)./SigmaN(:,k)) ;
-            end
-disp(['Max ERROR: ',num2str(max(abs(SigmaN(:)-1)))]) ;
-            if (ShowTheResultDetails)
-                plot(fig1, problem.t,Mx,'ro')
-                plot(fig1, problem.t,My,'go')
-                plot(fig1, problem.t,Mz,'bo')
-                xlabel(fig1,'Time [s]')
-                ylabel(fig1,'Magnetization [-]')
-                legend(fig1,{'Fortran M_x','Fortran M_y','Fortran M_z','Matlab M_x','Matlab M_y','Matlab M_z'});
-
-                figure(figure3); subplot(2,2,2); quiver3(InteractionMatrices.X(:),InteractionMatrices.Y(:),InteractionMatrices.Z(:),SigmaX(:,1),SigmaY(:,1),SigmaZ(:,1)); axis equal;  title('Matlab starting magnetization')
-                figure(figure3); subplot(2,2,4); quiver3(InteractionMatrices.X(:),InteractionMatrices.Y(:),InteractionMatrices.Z(:),SigmaX(:,end),SigmaY(:,end),SigmaZ(:,end)); axis equal;  title('Matlab ending magnetization')
-                xlabel('x'); ylabel('y'); zlabel('z');
-            end
         end
     end
 end
@@ -179,8 +166,7 @@ if (ShowTheResult)
     plot(fig10,L_loop,sum(E_arr(:,:,2),1),'.')
     xlabel(fig10,'L [l_{ex}]')
     ylabel(fig10,'E [-]')
+    legend(fig10,'Flower state','Vortex state');
 end
-
-% disp(['Energy intersection: ' num2str(interp1(sum(E_arr(:,:,1),1)-sum(E_arr(:,:,2),1),L_loop,0))]);
 
 end

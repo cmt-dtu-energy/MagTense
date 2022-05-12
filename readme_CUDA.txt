@@ -19,7 +19,7 @@ Step 1.
 Step 2.
  From the Intel 64 prompt (Start Menu -> Intel Parallel Studio -> latest x64 cmd) compile the C++ wrapper with icl including the cuda stuff*:
  
- icl -c MagTenseCudaBlasICLWrapper.cxx MagTenseCudaBlas.obj  /link "c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.4\lib\x64\cublas.lib"
+ icl -c MagTenseCudaBlasICLWrapper.cxx MagTenseCudaBlas.obj  /link "c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6\lib\x64\cublas.lib"
  
 Step 3.
  Compile MagTense as usual (there is a project in the MagTense solution that deals with CUDA)

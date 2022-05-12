@@ -91,13 +91,7 @@ for i = 1:length(L_loop)
     InteractionMatrices.A2 = D2X + D2Y + D2Z ;
 
     %--- Convert the exchange matrix to sparse
-    [v,c,rs,re] = convertToCSR(InteractionMatrices.A2);
-    problem.exch_nval = int32(numel(v));
-    problem.exch_nrow = int32(numel(rs));
-    problem.exch_val  = single(v);
-    problem.exch_rows = int32(rs);
-    problem.exch_rowe = int32(re);
-    problem.exch_col  = int32(c);
+    problem = problem.setExchangeMatrixSparse( InteractionMatrices.A2 );
 
     problem.setTimeDis = int32(10);
     HextFct = @(t) (t)' .* [0,0,0];
@@ -138,7 +132,7 @@ for i = 1:length(L_loop)
         prob_struct = struct(problem);  %convert the class obj to a struct so it can be loaded into fortran
 
         solution = problem.MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
-        [Mx,My,Mz,mx,my,mz] = ComputeMagneticMomentGeneralMesh(solution.M,GridInfo.Volumes) ;
+        [Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution.M,GridInfo.Volumes) ;
 
         if (ShowTheResultDetails)
             if (j == 1)

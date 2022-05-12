@@ -1,9 +1,11 @@
 include 'blas.f90'
+!include 'mkl_vml.f90'
     module LandauLifshitzSolution
     use ODE_Solvers
     use integrationDataTypes
     use MKL_SPBLAS
     use MKL_DFTI
+ !   use MKL_VML
     use BLAS95
     use MicroMagParameters
     use MagTenseMicroMagIO
@@ -11,6 +13,8 @@ include 'blas.f90'
     use util_call
     use DemagFieldGetSolution
     use FortranCuda
+    !use, intrinsic :: omp_lib
+    use omp_lib
     implicit none
     
    
@@ -51,7 +55,7 @@ include 'blas.f90'
     call initializeInteractionMatrices( gb_problem )
     
     
-
+    !Copy the demag tensor to CUDA
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
         call displayMatlabMessage( 'Copying to CUDA' )
 #if USE_CUDA            
@@ -340,6 +344,7 @@ include 'blas.f90'
     type(MicroMagSolution),intent(inout) :: solution
     
     integer :: ntot
+    !character(50) :: prog_str
     
     if ( problem%problemMode .eq. ProblemModeNew ) then
         !No. of grid points
@@ -349,6 +354,13 @@ include 'blas.f90'
         solution%Mx(:) = 0.
         solution%My(:) = 0.
         solution%Mz(:) = 0.
+        
+        !Magnetization in single variables
+        allocate( solution%Mx_s(ntot), solution%My_s(ntot), solution%Mz_s(ntot) )
+        solution%Mx_s(:) = 0.
+        solution%My_s(:) = 0.
+        solution%Mz_s(:) = 0.
+        
         !Exchange effective field
         allocate( solution%HjX(ntot), solution%HjY(ntot), solution%HjZ(ntot) )
         solution%HjX(:) = 0.
@@ -381,9 +393,10 @@ include 'blas.f90'
         
         
     endif
-    
+
     !"J" : exchange term
     solution%Jfact = problem%A0 / ( mu0 * problem%Ms )
+    !call displayMatlabMessage( trim(prog_str) )
     !"H" : external field term (b.c. user input is in Tesla)
     !solution%Hfact = 1./mu0
     !"M" : demagnetization term
@@ -405,27 +418,35 @@ include 'blas.f90'
     type(MicroMagProblem),intent(in) :: problem
     type(MicroMagSolution),intent(inout) :: solution
     
-    integer :: stat
+    integer :: stat, ntot
     type(MATRIX_DESCR) :: descr
-    real*4 :: alpha, beta
+    real(DP) :: alpha, beta
+    real(DP), dimension(:), allocatable :: temp
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
     
-    
-    alpha = -2 * solution%Jfact
+    alpha = -2.! * solution%Jfact
+    !alpha = -2. * problem%A0 / ( mu0 * 8.0e5 )
     beta = 0.
     
+    ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+    allocate(temp(ntot))
     !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
     !y = alpha * (A_exch * Mx )
-    stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, beta, solution%HjX )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, beta, temp )
+    solution%HjX = temp * solution%Jfact
     
     !Effective field in the Y-direction
-    stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, beta, solution%HjY )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, beta, temp )
+    solution%HjY = temp * solution%Jfact
     
     !Effective field in the Z-direction
-    stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, beta, solution%HjZ )
+    stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, beta, temp )
+    solution%HjZ = temp * solution%Jfact
+    
+    deallocate(temp)
     
     end subroutine updateExchangeTerms
 
@@ -480,7 +501,7 @@ include 'blas.f90'
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     
-    real :: prefact                                       !> Multiplicative scalar factor
+    !real :: prefact                                       !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
     
     
@@ -489,12 +510,15 @@ include 'blas.f90'
     descr%diag = SPARSE_DIAG_NON_UNIT
     
     
-    prefact = -2.*solution%Kfact
+    !prefact = -2.*solution%Kfact
     
     !Notice that the anisotropy matrix is symmetric and so Axy = Ayx etc.
-    solution%Hkx = prefact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-    solution%Hky = prefact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-    solution%Hkz = prefact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
+    !solution%Hkx = prefact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
+    !solution%Hky = prefact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
+    !solution%Hkz = prefact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
+    solution%Hkx = -2.*solution%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
+    solution%Hky = -2.*solution%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
+    solution%Hkz = -2.*solution%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
     
 
     
@@ -513,45 +537,65 @@ include 'blas.f90'
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     integer :: stat,ntot,i
     type(matrix_descr) :: descr
-    real*4 :: pref,alpha,beta
+    real(SP) :: pref,alpha,beta
     complex(kind=4) :: alpha_c, beta_c
+    real(SP), dimension(:), allocatable :: temp
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
     
+    ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+    allocate(temp(ntot))
+    
+    ! Convert the magnetization to single before the demag calculation
+    solution%Mx_s = real(solution%Mx, SP)
+    solution%My_s = real(solution%My, SP)
+    solution%Mz_s = real(solution%Mz, SP)
+
+    
     if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
         if ( problem%useCuda .eq. useCudaFalse ) then
-            !Do the matrix multiplications using sparse matrices 
-            alpha = 1.0
+            !Do the matrix multiplications using sparse matrices
+            alpha = -1.0
             beta = 0.
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(1)%A, descr, solution%Mx, beta, solution%HmX )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(1)%A, descr, solution%Mx_s, beta, temp )
             beta = 1.0
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My, beta, solution%HmX )
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz, beta, solution%HmX )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My_s, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz_s, beta, temp )
         
-            solution%HmX = solution%HmX * (-solution%Mfact )
+            solution%HmX = temp * ( solution%Mfact )
+            !ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+            !call vsmul( ntot, solution%HmX, -solution%Mfact, solution%HmX )
             
             beta = 0.
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx, beta, solution%HmY )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx_s, beta, temp )
             beta = 1.0
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My, beta, solution%HmY )
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz, beta, solution%HmY )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My_s, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz_s, beta, temp )
         
-            solution%HmY = solution%HmY * (-solution%Mfact )
+            solution%HmY = temp * ( solution%Mfact )
+            !call vsmul( ntot, solution%HmY, -solution%Mfact, solution%HmY )
           
             beta = 0.
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx, beta, solution%HmZ )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx_s, beta, temp )
             beta = 1.0
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My, beta, solution%HmZ )
-            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz, beta, solution%HmZ )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My_s, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz_s, beta, temp )
         
-            solution%HmZ = solution%HmZ * (-solution%Mfact )
+            solution%HmZ = temp * ( solution%Mfact )
+            !call vsmul( ntot, solution%HmZ, -solution%Mfact, solution%HmZ )
         else
 #if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
-            pref = sngl(-1 * solution%Mfact)                                
-            call cudaMatrVecMult_sparse( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
+            pref = sngl(-1 )!* solution%Mfact)                                
+            call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
+            temp = solution%HmX * solution%Mfact
+            solution%HmX = temp
+            temp = solution%HmY * solution%Mfact
+            solution%HmY = temp
+            temp = solution%HmZ * solution%Mfact
+            solution%HmZ = temp
 #endif            
         endif
         
@@ -562,9 +606,9 @@ include 'blas.f90'
                 
         !Convert to complex format
         do i=1,ntot
-            solution%Mx_FT(i) = cmplx( solution%Mx(i), 0. )
-            solution%My_FT(i) = cmplx( solution%My(i), 0. )
-            solution%Mz_FT(i) = cmplx( solution%Mz(i), 0. )
+            solution%Mx_FT(i) = cmplx( solution%Mx_s(i), 0. )
+            solution%My_FT(i) = cmplx( solution%My_s(i), 0. )
+            solution%Mz_FT(i) = cmplx( solution%Mz_s(i), 0. )
         enddo
         
         stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mx_FT )
@@ -597,6 +641,7 @@ include 'blas.f90'
         
         !Get the field
         solution%HmX = -solution%Mfact * real(solution%HmX_c)
+        !call vsmul( ntot, real(solution%HmX_c), -solution%Mfact, solution%HmX )
         
         
         !Second Hy = Kyx * Mx + Kyy * My + Kyz * Mz        
@@ -611,7 +656,7 @@ include 'blas.f90'
         
         !Get the field        
         solution%HmY = -solution%Mfact * real(solution%HmY_c)
-        
+        !call vsmul( ntot, real(solution%HmY_c), -solution%Mfact, solution%HmY )
         
         
         !Third Hz = Kzx * Mx + Kzy * My + Kzz * Mz        
@@ -625,6 +670,7 @@ include 'blas.f90'
         stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmZ_c )
         !finally, get the field out        
         solution%HmZ = -solution%Mfact * real(solution%HmZ_c)
+        !call vsmul( ntot, real(solution%HmZ_c), -solution%Mfact, solution%HmZ )
         
     
         
@@ -637,52 +683,66 @@ include 'blas.f90'
             !solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
             !solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
             
-            alpha = -1. * solution%Mfact
+            alpha = -1.! * solution%Mfact
             beta = 0.0
             !Hmx = Kxx * Mx
-            call gemv( problem%Kxx, solution%Mx, solution%HmX, alpha, beta )
+            call gemv( problem%Kxx, solution%Mx_s, solution%HmX, alpha, beta )
             
             beta = 1.0
             !Hmx = Hmx + Kxy * My
-            call gemv( problem%Kxy, solution%My, solution%HmX, alpha, beta )
+            call gemv( problem%Kxy, solution%My_s, solution%HmX, alpha, beta )
             
             !Hmx = Hmx + Kxz * Mz
-            call gemv( problem%Kxz, solution%Mz, solution%HmX, alpha, beta )
+            call gemv( problem%Kxz, solution%Mz_s, solution%HmX, alpha, beta )
             
             beta = 0.0
             !HmY = Kyx * Mx
-            call gemv( problem%Kxy, solution%Mx, solution%HmY, alpha, beta )
+            call gemv( problem%Kxy, solution%Mx_s, solution%HmY, alpha, beta )
             
             beta = 1.0
             !HmY = HmY + Kyy * My
-            call gemv( problem%Kyy, solution%My, solution%HmY, alpha, beta )
+            call gemv( problem%Kyy, solution%My_s, solution%HmY, alpha, beta )
             
             !Hmy = Hmy + Kyz * Mz
-            call gemv( problem%Kyz, solution%Mz, solution%HmY, alpha, beta )
+            call gemv( problem%Kyz, solution%Mz_s, solution%HmY, alpha, beta )
             
             
             beta = 0.0
             !HmZ = Kzx * Mx
-            call gemv( problem%Kxz, solution%Mx, solution%HmZ, alpha, beta )
+            call gemv( problem%Kxz, solution%Mx_s, solution%HmZ, alpha, beta )
             
             beta = 1.0
             !HmZ = HmZ + Kzy * My
-            call gemv( problem%Kyz, solution%My, solution%HmZ, alpha, beta )
+            call gemv( problem%Kyz, solution%My_s, solution%HmZ, alpha, beta )
             
             !HmZ = HmZ + Kzz * Mz
-            call gemv( problem%Kzz, solution%Mz, solution%HmZ, alpha, beta )
+            call gemv( problem%Kzz, solution%Mz_s, solution%HmZ, alpha, beta )
+            
+            temp = solution%HmX * solution%Mfact
+            solution%HmX = temp
+            temp = solution%HmY * solution%Mfact
+            solution%HmY = temp
+            temp = solution%HmZ * solution%Mfact
+            solution%HmZ = temp
             
         else
-            pref = sngl(-1 * solution%Mfact)
+            pref = sngl(-1)! * solution%Mfact)
 #if USE_CUDA        
-            call cudaMatrVecMult( solution%Mx, solution%My, solution%Mz, solution%HmX, solution%HmY, solution%HmZ, pref )
+            call cudaMatrVecMult( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
+            temp = solution%HmX * solution%Mfact
+            solution%HmX = temp
+            temp = solution%HmY * solution%Mfact
+            solution%HmY = temp
+            temp = solution%HmZ * solution%Mfact
+            solution%HmZ = temp
 #endif            
         endif 
     endif
-    
+       
     !open(12,file='count_dmdt.txt',status='old',access='append',form='formatted',action='write')    
     !write(12,*) 1
     !close(12)
+    deallocate(temp)
     
     end subroutine updateDemagfield
     
@@ -781,9 +841,10 @@ include 'blas.f90'
     
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2022
     !> @brief
     !> Calculates and returns the demag field tensor
+    !> The calculations
     !> @param[inout] problem, the struct containing the problem
     
     !>-----------------------------------------
@@ -801,12 +862,20 @@ include 'blas.f90'
     real(SP),dimension(:),allocatable  :: Kxx_abs, Kxy_abs, Kxz_abs, Kyy_abs, Kyz_abs, Kzz_abs  !> Temporary matrices with absolute values of the demag tensor, for threshold calculations
     complex(kind=4) :: thres
     integer,dimension(3) :: L                                                !> Array specifying the dimensions of the fft
-    real*4 :: threshold_var, alpha, beta
+    real(SP) :: threshold_var, alpha, beta
     complex(kind=4) :: alpha_c, beta_c
     integer ::  nx_K, ny_K, k_xx, k_xy, k_xz, k_yy, k_yz, k_zz 
     logical,dimension(:,:),allocatable :: mask_xx, mask_xy, mask_xz     !> mask used for finding non-zero values
     logical,dimension(:,:),allocatable :: mask_yy, mask_yz, mask_zz     !> mask used for finding non-zero values
     integer,dimension(4) :: indx_ele
+    real :: rate
+    integer :: c1,c2,cr,cm
+    character(10) :: prog_str
+    
+    ! First initialize the system_clock
+    call system_clock(count_rate=cr)
+    call system_clock(count_max=cm)
+    rate = REAL(cr)
     
     nx = problem%grid%nx
     ny = problem%grid%ny
@@ -822,32 +891,41 @@ include 'blas.f90'
     if ( problem%demagTensorLoadState .gt. DemagTensorReturnMemory ) then
         call loadDemagTensorFromDisk( problem )
     else
-           
-        allocate(H(ntot,3))
-        
+
+        CALL SYSTEM_CLOCK(c1)
+ 
+        call mkl_set_num_threads(problem%nThreadsMatlab)
+        call omp_set_num_threads(problem%nThreadsMatlab)
+               
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
-            !Setup template tile
-            tile(1)%tileType = 2 !(for prism)
-            !dimensions of the tile
-            tile(1)%a = problem%grid%dx
-            tile(1)%b = problem%grid%dy
-            tile(1)%c = problem%grid%dz
-            tile(1)%exploitSymmetry = 0 !0 for no and this is important
-            tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
-            tile(1)%M(:) = 0.
-                
-        
+            
+            !$OMP PARALLEL shared(problem) 
+            !$omp do private(ind, tile, H, Nout, k, j, i)
+                   
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx
+                        !Setup template tile
+                        tile(1)%tileType = 2 !(for prism)
+                        !dimensions of the tile
+                        tile(1)%a = problem%grid%dx
+                        tile(1)%b = problem%grid%dy
+                        tile(1)%c = problem%grid%dz
+                        tile(1)%exploitSymmetry = 0 !0 for no and this is important
+                        tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+                        tile(1)%M(:) = 0.
+                        
                         !Set the center of the tile to be the current point
                         tile(1)%offset(1) = problem%grid%x(i,j,k)
                         tile(1)%offset(2) = problem%grid%y(i,j,k)
                         tile(1)%offset(3) = problem%grid%z(i,j,k)
-                        !Nout will be allocated by the subroutine. Should be de-allocated afterwards for consistency
-                        call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout )
-                    
+                        
+                        allocate(Nout(1,ntot,3,3))
+                        allocate(H(ntot,3))
+                        
+                        call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                        
                         !Copy Nout into the proper structure used by the micro mag model
                         ind = (k-1) * nx * ny + (j-1) * nx + i
                     
@@ -866,25 +944,35 @@ include 'blas.f90'
                         !Kzy(ind,:) = Nout(1,:,3,2)
                         problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
                     
+                        !Clean up
                         deallocate(Nout)
+                        deallocate(H)
                     enddo
                 enddo
             enddo
             
+            !$omp end do
+            !$OMP END PARALLEL
+            
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
-            !Setup template tile
-            tile(1)%tileType = 5 !(for tetrahedron)
-            tile(1)%exploitSymmetry = 0 !0 for no and this is important
-            tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
-            tile(1)%M(:) = 0.
-        
+            !$OMP PARALLEL shared(problem)
+            !$omp do private(ind, tile, H, Nout)
+            
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do i=1,nx
+                !Setup template tile
+                tile(1)%tileType = 5 !(for tetrahedron)
+                tile(1)%exploitSymmetry = 0 !0 for no and this is important
+                tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+                tile(1)%M(:) = 0.
+            
                 indx_ele = problem%grid%elements(:,i)
-                tile(1)%vert(:,:) = problem%grid%nodes(:,indx_ele)     
+                tile(1)%vert(:,:) = problem%grid%nodes(:,indx_ele)   
                 
-                !Nout will be allocated by the subroutine. Should be de-allocated afterwards for consistency
-                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout )
+                allocate(Nout(1,ntot,3,3))
+                allocate(H(ntot,3))
+                
+                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
                     
                 !Copy Nout into the proper structure used by the micro mag model
                 ind = i
@@ -904,18 +992,27 @@ include 'blas.f90'
                 !Kzy(ind,:) = Nout(1,:,3,2)
                 problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
                 
+                !Clean up
                 deallocate(Nout)
+                deallocate(H)
             enddo
+            
+            !$omp end do
+            !$OMP END PARALLEL
         
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
-            !Setup template tile
-            tile(1)%tileType = 2 !(for prism)
-            tile(1)%exploitSymmetry = 0 !0 for no and this is important
-            tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
-            tile(1)%M(:) = 0.
+            
+            !$OMP PARALLEL shared(problem)
+            !$omp do private(ind, tile, H, Nout)
             
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do i=1,nx
+                !Setup template tile
+                tile(1)%tileType = 2 !(for prism)
+                tile(1)%exploitSymmetry = 0 !0 for no and this is important
+                tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+                tile(1)%M(:) = 0.
+            
                 !dimensions of the tile
                 tile(1)%a = problem%grid%abc(i,1)
                 tile(1)%b = problem%grid%abc(i,2)
@@ -926,9 +1023,11 @@ include 'blas.f90'
                 tile(1)%offset(2) = problem%grid%pts(i,2)
                 tile(1)%offset(3) = problem%grid%pts(i,3)
                 
-                !Nout will be allocated by the subroutine. Should be de-allocated afterwards for consistency
-                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout )
-                    
+                allocate(Nout(1,ntot,3,3))
+                allocate(H(ntot,3))
+
+                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                                    
                 !Copy Nout into the proper structure used by the micro mag model
                 ind = i
                     
@@ -947,18 +1046,33 @@ include 'blas.f90'
                 !Kzy(ind,:) = Nout(1,:,3,2)
                 problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
                 
+                !Clean up
                 deallocate(Nout)
+                deallocate(H)
             enddo
         
+            !$omp end do
+            !$OMP END PARALLEL
+            
         endif
+        
+        CALL SYSTEM_CLOCK(c2)
+
+        !Display the time to compute the demag tensor and its first entry
+        !call displayMatlabMessage( 'Time demag tensor:' )
+        !write (prog_str,'(f10.3)') (c2 - c1)/rate
+        !call displayMatlabMessage( prog_str )
+        
+        !call displayMatlabMessage( 'Kxx(1,1):' )
+        !write (prog_str,'(f10.3)') problem%Kxx(1,1)
+        !call displayMatlabMessage( prog_str )
+        
         
         !Write the demag tensors to disk if asked to do so            
         if ( problem%demagTensorReturnState .gt. DemagTensorReturnMemory ) then
             call writeDemagTensorToDisk( problem )
         endif            
-        !Clean up
-        deallocate(H)
-    
+        
     endif
     
     
@@ -1270,7 +1384,7 @@ include 'blas.f90'
     !>-----------------------------------------
     subroutine ConvertDenseToSparse_d( D, K, threshold)
     real(DP),dimension(:,:),intent(in) :: D                 !> Dense input matrix    
-    real*4,intent(in) :: threshold                          !> Values less than this (in absolute) of D are considered zero
+    real(SP),intent(in) :: threshold                          !> Values less than this (in absolute) of D are considered zero
     type(MagTenseSparse),intent(inout) :: K                 !> Sparse matrix allocation
     
     integer :: nx,ny, nnonzero
@@ -1341,6 +1455,7 @@ include 'blas.f90'
     logical,dimension(:,:),allocatable :: mask          !> mask used for finding non-zero values
     integer,dimension(:),allocatable :: colInds         !> Used for storing the values 1...n used for indexing
     integer :: i,j,ind,stat
+    character(10) :: prog_str
     
     nx = size(D(:,1))
     ny = size(D(1,:))
@@ -1350,6 +1465,9 @@ include 'blas.f90'
     mask = abs(D) .gt. threshold
     
     nnonzero = count( mask )
+    call displayMatlabMessage( 'Number of nonzero demag elements:' )
+    write (prog_str,'(I10.9)') nnonzero
+    call displayMatlabMessage( prog_str )
     
     allocate( K%values(nnonzero),K%cols(nnonzero))
     allocate( K%rows_start(nx), K%rows_end(nx), colInds(ny) )
@@ -1460,71 +1578,79 @@ include 'blas.f90'
     !> @params[in] threshold a faction specifying the fraction of the smallest elements that are to be removed
     !>-----------------------------------------
     subroutine FindThresholdFraction(Kxx, Kxy, Kxz, Kyy, Kyz, Kzz, threshold_var)
-    real(SP),dimension(:),intent(inout) :: Kxx, Kxy, Kxz, Kyy, Kyz, Kzz                !> The absolute of the demag tensors 
-    real*4,intent(inout) :: threshold_var
-    real*4 :: f_large, f_small, f_middle
+    real(SP),dimension(:),intent(in) :: Kxx, Kxy, Kxz, Kyy, Kyz, Kzz                !> The absolute of the demag tensors 
+    real(SP),intent(inout) :: threshold_var
+    real(SP) :: f_large, f_small, f_middle
     integer,dimension(6) :: count_ind
     integer :: count_middle, n_ele_nonzero, k_do  
     character*(10) :: prog_str
-        
-    call displayMatlabMessage( 'Starting threshold calculation.' )
     
-    !The total number of nonzero elements in the demag tensor
-    n_ele_nonzero = size( Kxx )
-    n_ele_nonzero = n_ele_nonzero + size( Kxy )
-    n_ele_nonzero = n_ele_nonzero + size( Kxz )
-    n_ele_nonzero = n_ele_nonzero + size( Kyy )
-    n_ele_nonzero = n_ele_nonzero + size( Kyz )
-    n_ele_nonzero = n_ele_nonzero + size( Kzz )
+    if (threshold_var .ge. 1) then ! special case. 
+        call displayMatlabMessage( 'Threshold fraction >= 1 selected. Setting demagnetization to zero.' )
+        !f_large = max(maxval(Kxx), maxval(Kxy), maxval(Kxz), maxval(Kyy), maxval(Kyz), maxval(Kzz))
+        !2*f_large because f_large sometimes leaves elements in demag tensors, possibly due to numerical errors.
+        !threshold_var = 2*f_large
+        threshold_var = huge(threshold_var)
+    else
+        call displayMatlabMessage( 'Starting threshold calculation.' )
     
-    !Find the maximum and minimum value in the individual demag tensors than is greater than zero
-    f_large = max(maxval(Kxx), maxval(Kxy), maxval(Kxz), maxval(Kyy), maxval(Kyz), maxval(Kzz))    
-    f_small = min(minval(Kxx), minval(Kxy), minval(Kxz), minval(Kyy), minval(Kyz), minval(Kzz))
+        !The total number of nonzero elements in the demag tensor
+        n_ele_nonzero = size( Kxx )
+        n_ele_nonzero = n_ele_nonzero + size( Kxy )
+        n_ele_nonzero = n_ele_nonzero + size( Kxz )
+        n_ele_nonzero = n_ele_nonzero + size( Kyy )
+        n_ele_nonzero = n_ele_nonzero + size( Kyz )
+        n_ele_nonzero = n_ele_nonzero + size( Kzz )
     
-    !Bisection algoritm for find the function value for a corresponding fraction
-    k_do = 1
-    do 
-        f_middle = (f_large-f_small)/2+f_small
+        !Find the maximum and minimum value in the individual demag tensors than is greater than zero
+        f_large = max(maxval(Kxx), maxval(Kxy), maxval(Kxz), maxval(Kyy), maxval(Kyz), maxval(Kzz))    
+        f_small = min(minval(Kxx), minval(Kxy), minval(Kxz), minval(Kyy), minval(Kyz), minval(Kzz))
+    
+        !Bisection algoritm for find the function value for a corresponding fraction
+        k_do = 1
+        do 
+            f_middle = (f_large-f_small)/2+f_small
                 
-        !Count only the elements larger than epsilon in each of the matrices
-        count_ind(1) = count( Kxx .le. f_middle )
-        count_ind(2) = count( Kxy .le. f_middle )
-        count_ind(3) = count( Kxz .le. f_middle )
-        count_ind(4) = count( Kyy .le. f_middle )
-        count_ind(5) = count( Kyz .le. f_middle )
-        count_ind(6) = count( Kzz .le. f_middle )
+            !Count only the elements larger than epsilon in each of the matrices
+            count_ind(1) = count( Kxx .le. f_middle )
+            count_ind(2) = count( Kxy .le. f_middle )
+            count_ind(3) = count( Kxz .le. f_middle )
+            count_ind(4) = count( Kyy .le. f_middle )
+            count_ind(5) = count( Kyz .le. f_middle )
+            count_ind(6) = count( Kzz .le. f_middle )
                 
-        count_middle = sum(count_ind)
+            count_middle = sum(count_ind)
                    
-        if ( count_middle .gt. threshold_var*n_ele_nonzero ) then
-            f_large = f_middle
-        else
-            f_small = f_middle
-        endif            
+            if ( count_middle .gt. threshold_var*n_ele_nonzero ) then
+                f_large = f_middle
+            else
+                f_small = f_middle
+            endif            
             
-        !check if we have found the value that defines the threshold
-        if ( ( count_middle .ge. (threshold_var-0.01)*n_ele_nonzero ) .and. ( count_middle .le. (threshold_var+0.01)*n_ele_nonzero ) ) then
-            threshold_var = f_middle
+            !check if we have found the value that defines the threshold
+            if ( ( count_middle .ge. (threshold_var-0.01)*n_ele_nonzero ) .and. ( count_middle .le. (threshold_var+0.01)*n_ele_nonzero ) ) then
+                threshold_var = f_middle
                 
-            exit
-        endif
+                exit
+            endif
             
-        if ( k_do .gt. 1000 ) then
-            call displayMatlabMessage( 'Iterations exceeded in finding threshold value. Stopping iterations.' )
+            if ( k_do .gt. 1000 ) then
+                call displayMatlabMessage( 'Iterations exceeded in finding threshold value. Stopping iterations.' )
                 
-            threshold_var = f_middle
-            exit
-        endif
+                threshold_var = f_middle
+                exit
+            endif
                 
-        k_do = k_do+1
-    enddo  
+            k_do = k_do+1
+        enddo  
     
-    call displayMatlabMessage( 'Using a threshold value of :' )
-    write (prog_str,'(F10.9)') threshold_var
-    call displayMatlabMessage( prog_str )
-    call displayMatlabMessage( 'i.e. a fraction of:' )
-    write (prog_str,'(F6.4)') real(count_middle)/real(n_ele_nonzero)
-    call displayMatlabMessage( prog_str )
+        call displayMatlabMessage( 'Using a threshold value of :' )
+        write (prog_str,'(F10.9)') threshold_var
+        call displayMatlabMessage( prog_str )
+        call displayMatlabMessage( 'i.e. a fraction of:' )
+        write (prog_str,'(F6.4)') real(count_middle)/real(n_ele_nonzero)
+        call displayMatlabMessage( prog_str )
+    endif
     
     end subroutine FindThresholdFraction
     
@@ -1561,12 +1687,12 @@ include 'blas.f90'
     type(sparse_matrix_t),intent(inout) :: A           !> The returned matrix from the sparse matrix creator
         
     integer :: stat                                   !> Status value for the various sparse matrix operations        
-    type(MagTenseSparse) :: d2dx2, d2dy2, d2dz2       !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
+    type(MagTenseSparse_d) :: d2dx2, d2dy2, d2dz2       !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
     type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
     integer :: ind, ntot,colInd,rowInd                !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
     integer :: i,j,k,nx,ny,nz                         !> For-loop counters
     type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
-    real*4 :: const
+    real(DP) :: const
     
     !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
@@ -1647,7 +1773,7 @@ include 'blas.f90'
     
     
     !Create the sparse matrix for the d^2dx^2
-    stat = mkl_sparse_s_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
+    stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
     
     
     !----------------------------------d^2dx^2 ends -----------------------------!
@@ -1742,7 +1868,7 @@ include 'blas.f90'
     d2dy2%values = d2dy2%values * 1./grid%dy**2
         
     !Create the sparse matrix for the d^2dy^2
-    stat = mkl_sparse_s_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
+    stat = mkl_sparse_d_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
     
     !----------------------------------d^2dy^2 ends ----------------------------!
     
@@ -1843,7 +1969,7 @@ include 'blas.f90'
         d2dz2%values = d2dz2%values * 1./grid%dz**2
         
         !Create the sparse matrix for the d^2dz^2
-        stat = mkl_sparse_s_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
+        stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
     endif
     
     !----------------------------------d^2dz^2 ends ----------------------------!
@@ -1856,12 +1982,12 @@ include 'blas.f90'
     !call writeSparseMatrixToDisk( d2dy2%A, nx*ny*nz, 'd2dy2.dat' )
     
     const = 1.
-    stat = mkl_sparse_s_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dy2%A, tmp)    
+    stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dy2%A, tmp)    
     
     !call writeSparseMatrixToDisk( tmp, nx*ny*nz, 'A_exch.dat' )
     
     if ( nz .gt. 1 ) then    
-        stat = mkl_sparse_s_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, const, tmp, A)
+        stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, const, tmp, A)
         !clean up        
         deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
         stat = mkl_sparse_destroy (d2dz2%A)
@@ -1887,7 +2013,7 @@ include 'blas.f90'
     end subroutine ComputeExchangeTerm3D_Uniform
        
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2020
     !> @brief
     !> Converts the loaded information from Matlab in CSR 
     !> format to a CSR MKL type
@@ -1897,7 +2023,6 @@ include 'blas.f90'
     type(sparse_matrix_t),intent(out) :: A            !> The returned matrix from the sparse matrix creator
                 
     integer :: stat                                   !> Status value for the various sparse matrix operations        
-    type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
     integer :: nx,ny,nz                               !> Dimensions
     type(matrix_descr) :: descr                       !> Describes a sparse matrix operation
     
@@ -1905,19 +2030,13 @@ include 'blas.f90'
     ny = grid%ny
     nz = grid%nz
     
-    stat = mkl_sparse_s_create_csr ( tmp, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, grid%A_exch_load%rows_start, grid%A_exch_load%rows_end, grid%A_exch_load%cols, grid%A_exch_load%values)
-    descr%type = SPARSE_MATRIX_TYPE_GENERAL
-    descr%mode = SPARSE_FILL_MODE_FULL
-    descr%diag = SPARSE_DIAG_NON_UNIT
-    stat = mkl_sparse_copy ( tmp, descr, A )
-    
-    stat = mkl_sparse_destroy (tmp)
+    stat = mkl_sparse_d_create_csr ( A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, grid%A_exch_load%rows_start, grid%A_exch_load%rows_end, grid%A_exch_load%cols, grid%A_exch_load%values)
         
     end subroutine ConvertExchangeTerm3D_NonUniform
     
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2020
     !> @brief
     !> Calculates the anisotropy term sparse matrix assuming the effective field anisotropy is linear in m    
     !> @param[inout] problem the data structure containing the problem
@@ -1930,7 +2049,7 @@ include 'blas.f90'
     end subroutine ComputeAnisotropyTerm3D
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2020
     !> @brief
     !> Calculates the anisotropy term matrix on any grid  
     !> @param[inout] problem the data structure containing the problem

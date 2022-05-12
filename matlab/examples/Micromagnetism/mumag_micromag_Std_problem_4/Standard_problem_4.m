@@ -1,6 +1,6 @@
-function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( NIST_field, resolution, use_CUDA, ShowTheResult, SaveTheResult )
+function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( NIST_field, resolution, use_CUDA, ShowTheResult )
 
-clearvars -except NIST_field resolution use_CUDA SaveTheResult ShowTheResult
+clearvars -except NIST_field resolution use_CUDA ShowTheResult
 % close all
 
 %--- Use either field 1 or field 2 from the mumag example
@@ -16,15 +16,7 @@ end
 if ~exist('ShowTheResult','var')
     ShowTheResult = 1;
 end
-if ~exist('SaveTheResult','var')
-    SaveTheResult = 0;
-end
 
-if use_CUDA
-    dir_m = 'GPU';
-else
-    dir_m = 'CPU';
-end
 use_CVODE = false;
 
 if (ShowTheResult)
@@ -42,6 +34,8 @@ addpath('../../../util');
 %takes the size of the grid as arguments (nx,ny,nz) and a function handle
 %that produces the desired field (if not present zero applied field is inferred)
 problem_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
+problem_ini.grid_L = [500e-9,125e-9,3e-9];%m
+problem_ini.nThreads = int32(8);
 
 problem_ini.dem_appr = getMicroMagDemagApproximation('none');
 problem_ini = problem_ini.setUseCuda( use_CUDA );
@@ -53,11 +47,19 @@ problem_ini = problem_ini.setUseCVODE( use_CVODE );
 % end
 % problem_ini = problem_ini.setReturnNFilename( loadFile );
 
+problem_ini.Ms = 8e5*ones(prod(resolution),1);
+problem_ini.K0 = 0*zeros(prod(resolution),1);
+problem_ini.A0 = 1.3e-11;
+
 problem_ini.alpha = 4.42e3;
 problem_ini.gamma = 0;
 
 %initial magnetization
-problem_ini.m0(:) = 1/sqrt(3);
+problem_ini.m0(:,1) = 1/sqrt(3);
+problem_ini.m0(:,2) = 1/sqrt(3);
+problem_ini.m0(:,3) = 1/sqrt(3);
+
+% problem_ini.u_ea(:,:) = 0;
     
 %time grid on which to solve the problem
 problem_ini = problem_ini.setTime( linspace(0,100e-9,200) );
@@ -67,6 +69,11 @@ HystDir = 1/mu0*[1,1,1] ;
 %time-dependent applied field
 HextFct = @(t) (1e-9-t)' .* HystDir .* (t<1e-9)';
 problem_ini = problem_ini.setHext( HextFct, linspace(0,100e-9,2000) );
+
+
+problem_ini = problem_ini.setConvergenceCheckTime( linspace(0,40e-9,2) );
+% problem_ini.conv_tol = 1e-6;
+
 
 %% Create Preset
 solution_ini = struct();
@@ -89,6 +96,10 @@ problem_dym = problem_dym.setUseCVODE( use_CVODE );
 problem_dym.dem_appr = getMicroMagDemagApproximation('none');
 problem_dym = problem_dym.setTime( linspace(0,1e-9,200) );
 problem_dym.setTimeDis = int32(10);
+problem_dym.Ms = 8e5*ones(prod(resolution),1);
+problem_dym.K0 = 0*zeros(prod(resolution),1);
+problem_dym.A0 = 1.3e-11;
+problem_dym.nThreads = problem_ini.nThreads;
 
 if (NIST_field == 1)
     %field 1
@@ -119,67 +130,6 @@ if (ShowTheResult)
     % figure; hold all; for i=2:4; plot(problem.Hext(:,1),problem.Hext(:,i),'.'); end;
 end
 
-%% --------------------------------------------------------------------------------------------------------------------------------------
-%% -------------------------------------------------------------------- MATLAB ----------------------------------------------------------
-%% --------------------------------------------------------------------------------------------------------------------------------------
-%% Run the Matlab version of the micromagnetism code
-addpath('..\..\..\micromagnetism_matlab_only_implementation')
-disp('Running Matlab model')
-
-problem_ini = problem_ini.setShowTheResult(ShowTheResult);
-problem_ini = problem_ini.setSaveTheResult(SaveTheResult);      
-problem_ini.DirectoryFilename = ['Field_' num2str(NIST_field)' '\Matlab_simulations_' dir_m '\Matlab_resolution_' num2str(resolution(1)) '_' num2str(resolution(2)) '_' num2str(resolution(3)) ];
-problem_ini.SimulationName = 'Matlab_InitialStdProb4';
-
-%% Matlab: Setup the problem for the initial configuration
-problem_ini = problem_ini.setSolverType( 'UseDynamicSolver' );
-tic
-[SigmaInit,~,InteractionMatrices] = ComputeTheSolution(problem_ini);
-toc
-
-for k=1:size(SigmaInit,1) 
-    Sigma = SigmaInit(k,:).' ;
-    NN = round(numel(Sigma)/3) ;
-
-    SigmaX = Sigma(0*NN+[1:NN]) ;
-    SigmaY = Sigma(1*NN+[1:NN]) ;
-    SigmaZ = Sigma(2*NN+[1:NN]) ;
-end
-if (ShowTheResult)
-    figure; quiver(InteractionMatrices.X(:),InteractionMatrices.Y(:),SigmaX,SigmaY); axis equal;  title('Starting state - Matlab')
-end
-
-%% Matlab: Setup problem for the time-dependent solver
-problem_dym = problem_dym.setSolverType( 'UseDynamicSolver' );
-problem_dym.m0(:) = SigmaInit(end,:);
-
-problem_dym = problem_dym.setShowTheResult(ShowTheResult);
-problem_dym = problem_dym.setSaveTheResult(SaveTheResult);
-problem_dym.DirectoryFilename = ['Field_' num2str(NIST_field)' '\Matlab_simulations_' dir_m '\Matlab_resolution_' num2str(resolution(1)) '_' num2str(resolution(2)) '_' num2str(resolution(3))];
-problem_dym.SimulationName = 'Matlab_DynamicsStdProb4';
-
-tic
-SigmaSol1 = ComputeTheSolution(problem_dym);
-toc
-
-for k=1:size(SigmaSol1,1) 
-    Sigma = SigmaSol1(k,:).' ;
-    NN = round(numel(Sigma)/3) ;
-
-    SigmaX = Sigma(0*NN+[1:NN]) ;
-    SigmaY = Sigma(1*NN+[1:NN]) ;
-    SigmaZ = Sigma(2*NN+[1:NN]) ;
-    SigmaN = sqrt(SigmaX.^2+SigmaY.^2+SigmaZ.^2) ;
-    Mx(k) = mean(SigmaX./SigmaN) ;
-    My(k) = mean(SigmaY./SigmaN) ;
-    Mz(k) = mean(SigmaZ./SigmaN) ;
-end
-
-if (ShowTheResult)
-    plot(fig1, problem_dym.t,Mx,'ro')
-    plot(fig1, problem_dym.t,My,'go')
-    plot(fig1, problem_dym.t,Mz,'bo')
-end
 
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% --------------------------------------------------------------------  mumag -----------------------------------------------------------
