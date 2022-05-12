@@ -17,15 +17,15 @@ Step 1.
  nvcc -c MagTenseCudaBlas.cu
  
 Step 2.
- From the Intel 64 prompt (Start Menu -> Intel Parallel Studio -> latest x64 cmd) compile the C++ wrapper with icl including the cuda stuff:
+ From the Intel 64 prompt (Start Menu -> Intel Parallel Studio -> latest x64 cmd) compile the C++ wrapper with icl including the cuda stuff*:
  
- icl -c MagTenseCudaBlasICLWrapper.cxx MagTenseCudaBlas.obj  /link "c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64\cublas.lib"
+ icl -c MagTenseCudaBlasICLWrapper.cxx MagTenseCudaBlas.obj  /link "c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6\lib\x64\cublas.lib"
  
 Step 3.
  Compile MagTense as usual (there is a project in the MagTense solution that deals with CUDA)
  
  
-
+ * CUDA v10.2 is supported (for now) -- simply rename the file MagTenseCudaBlasV10_2.cu -> MagTenseCudaBlas.cu, and point to v10.2 cublas lib when compiling the wrapper.
 
 Old comment - no longer applies:
 Previously there was a problem getting cusparse BLAS to compile (in Windows)

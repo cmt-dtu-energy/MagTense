@@ -7,7 +7,22 @@
 #include <cublas_v2.h>
 
 
- 
+// This will output the proper CUDA error strings in the event that a CUDA host call returns an error
+#define checkCudaErrors(err)  __checkCudaErrors (err, __FILE__, __LINE__)
+
+// These are the inline versions for all of the SDK helper functions
+void __checkCudaErrors( int err, const char *file, const int line )
+{
+    if( 0 != err) {
+		FILE *fp;
+
+		fp = fopen("error.txt", "w+");
+		fprintf(fp,"Error in file <%s>, line %i:  Error code %d\n", file, line, err );
+		fclose(fp);
+        exit(-1);
+    }
+}
+
  /**
  Demag matrices to be stored in GPU memory
  */
@@ -17,7 +32,6 @@
  float* d_Kyy = NULL;
  float* d_Kyz = NULL;
  float* d_Kzz = NULL;
- 
  
  //Magnetization vectors on GPU
  float* d_Mx = NULL;
@@ -29,6 +43,16 @@
  float* d_Hy = NULL;
  float* d_Hz = NULL;
  
+ //Vector handles
+ cusparseDnVecDescr_t d_Mx_descr = NULL;
+ cusparseDnVecDescr_t d_My_descr = NULL;
+ cusparseDnVecDescr_t d_Mz_descr = NULL;
+ 
+ cusparseDnVecDescr_t d_Hx_descr = NULL;
+ cusparseDnVecDescr_t d_Hy_descr = NULL;
+ cusparseDnVecDescr_t d_Hz_descr = NULL;
+ 
+ 
  //size of the matrices (n_K x n_K)
  int n_K;
  
@@ -38,7 +62,8 @@
  
  struct CUSparse
  {
-
+	// api handle
+	cusparseSpMatDescr_t descr = NULL;
 	//data values
 	float* values = NULL;
 	//column indices (size nnz)
@@ -47,10 +72,7 @@
 	int* rows;
 	//no of matrix elements (matrices are n x n )
 	int n;
-	//no. of non zero element
-	int nnz;
  };
-	
  
  CUSparse spKxx;
  CUSparse spKxy;
@@ -64,10 +86,10 @@
  
  
  //handle to the sparse matrix description
-cusparseMatDescr_t sparse_descr = NULL;
+ cusparseMatDescr_t sparse_descr = NULL;
 
-//handle to the sparse matrix blas
-cusparseHandle_t sparse_handle = NULL; 
+ //handle to the sparse matrix blas
+ cusparseHandle_t sparse_handle = NULL; 
  
  void loadSparseToDevice( float* values, int* colInds, int* rowInds, CUSparse* mat, int nnz_ );
  void freeSparseMatrix( CUSparse* mat );
@@ -89,7 +111,7 @@ cusparseHandle_t sparse_handle = NULL;
 	 if ( sparse_handle == NULL )
 	 {
 		 //handle to the sparse matrix multiplier in CUDA
-		cusparseStatus_t status = cusparseCreate(&sparse_handle);
+		checkCudaErrors(cusparseCreate(&sparse_handle));
 		
 		//no. of rows and columns
 		spKxx.n = *n;
@@ -98,58 +120,56 @@ cusparseHandle_t sparse_handle = NULL;
 		spKyy.n = *n;
 		spKyz.n = *n;
 		spKzz.n = *n;
-		cudaError_t err;
+		
 		//allocate memory for the magnetization vectors
-		err = cudaMalloc((void**) &d_Mx, *n * sizeof(float));
-		err = cudaMalloc((void**) &d_My, *n * sizeof(float));
-		err = cudaMalloc((void**) &d_Mz, *n * sizeof(float));
+		checkCudaErrors(cudaMalloc((void**) &d_Mx, *n * sizeof(float)));
+		checkCudaErrors(cudaMalloc((void**) &d_My, *n * sizeof(float)));
+		checkCudaErrors(cudaMalloc((void**) &d_Mz, *n * sizeof(float)));
 		
 		//allocate memory for the magnetic field vectors
-		err = cudaMalloc((void**) &d_Hx, *n * sizeof(float));
-		err = cudaMalloc((void**) &d_Hy, *n * sizeof(float));
-		err = cudaMalloc((void**) &d_Hz, *n * sizeof(float));
+		checkCudaErrors(cudaMalloc((void**) &d_Hx, *n * sizeof(float)));
+		checkCudaErrors(cudaMalloc((void**) &d_Hy, *n * sizeof(float)));
+		checkCudaErrors(cudaMalloc((void**) &d_Hz, *n * sizeof(float)));
 			 
-		status = cusparseCreateMatDescr(&sparse_descr);
-		cusparseSetMatType(sparse_descr,CUSPARSE_MATRIX_TYPE_GENERAL);
-		cusparseSetMatIndexBase(sparse_descr,CUSPARSE_INDEX_BASE_ONE);
+		checkCudaErrors(cusparseCreateMatDescr(&sparse_descr));
+		checkCudaErrors(cusparseSetMatType(sparse_descr,CUSPARSE_MATRIX_TYPE_GENERAL));
+		checkCudaErrors(cusparseSetMatIndexBase(sparse_descr,CUSPARSE_INDEX_BASE_ONE));
 		
-		/*Kaspar: This code will not work on Windows before the next major release thanks to nvidia
+		
 		//The handle on the device for the magnetization vectors
-		cusparseCreateDnVec( &d_Mx_descr, n_sparse, d_Mx, CUDA_R_32F);
-		cusparseCreateDnVec( &d_My_descr, n_sparse, d_My, CUDA_R_32F);
-		cusparseCreateDnVec( &d_Mz_descr, n_sparse, d_Mz, CUDA_R_32F);
+		checkCudaErrors(cusparseCreateDnVec( &d_Mx_descr, *n, d_Mx, CUDA_R_32F));
+		checkCudaErrors(cusparseCreateDnVec( &d_My_descr, *n, d_My, CUDA_R_32F));
+		checkCudaErrors(cusparseCreateDnVec( &d_Mz_descr, *n, d_Mz, CUDA_R_32F));
 		
 		//handles for the field on the device
-		cusparseCreateDnVec( &d_Hx_descr, n_sparse, d_Hx, CUDA_R_32F);
-		cusparseCreateDnVec( &d_Hy_descr, n_sparse, d_Hy, CUDA_R_32F);
-		cusparseCreateDnVec( &d_Hz_descr, n_sparse, d_Hz, CUDA_R_32F);
-			*/	
+		checkCudaErrors(cusparseCreateDnVec( &d_Hx_descr, *n, d_Hx, CUDA_R_32F));
+		checkCudaErrors(cusparseCreateDnVec( &d_Hy_descr, *n, d_Hy, CUDA_R_32F));
+		checkCudaErrors(cusparseCreateDnVec( &d_Hz_descr, *n, d_Hz, CUDA_R_32F));
 		
 		
 	 }
 	
 	switch( *mat_no )
 	{
-		case 1:
-			
+		case 1:			
 			loadSparseToDevice( values, colInds, rowInds, &spKxx, *nnz );
-								
+
 			break;
 		case 2:
 			loadSparseToDevice( values, colInds, rowInds, &spKxy, *nnz );
-			
+
 			break;
 		case 3:
 			loadSparseToDevice( values, colInds, rowInds, &spKxz, *nnz );
-			
+
 			break;
 		case 4:
 			loadSparseToDevice( values, colInds, rowInds, &spKyy, *nnz );
-			
+
 			break;
 		case 5:
 			loadSparseToDevice( values, colInds, rowInds, &spKyz, *nnz );
-			
+
 			break;
 		case 6:
 			loadSparseToDevice( values, colInds, rowInds, &spKzz, *nnz );
@@ -165,30 +185,25 @@ cusparseHandle_t sparse_handle = NULL;
  
  void loadSparseToDevice( float* values, int* colInds, int* rowInds, CUSparse* mat, int nnz_ )
  {
-	cudaError_t err;
-	//set the no. of non-zero entries
- 	mat->nnz = nnz_;
-	 //allocate the row inds (+1 in size as the last element contains nnz + rowInds(0)
-	err = cudaMalloc((void**) &(mat->rows), (mat->n + 1) * sizeof(int));
+	//allocate the row inds (+1 in size as the last element contains nnz + rowInds(0)
+	checkCudaErrors(cudaMalloc((void**) &(mat->rows), (mat->n + 1) * sizeof(int)));
 	//allocate the column inds
-	err = cudaMalloc((void**) &(mat->cols), mat->nnz * sizeof(int));
+	checkCudaErrors(cudaMalloc((void**) &(mat->cols), nnz_ * sizeof(int)));
 	//allocate the values array
-	err = cudaMalloc((void**) &(mat->values), mat->nnz * sizeof(float));
+	checkCudaErrors(cudaMalloc((void**) &(mat->values), nnz_ * sizeof(float)));
 	
 	//copy to device
-	err = cudaMemcpy( mat->rows, rowInds, (mat->n+1) * sizeof(int),cudaMemcpyHostToDevice);
-	err = cudaMemcpy( mat->cols, colInds, mat->nnz * sizeof(int),cudaMemcpyHostToDevice);
-	err = cudaMemcpy( mat->values, values, mat->nnz * sizeof(float),cudaMemcpyHostToDevice);
-	
-	
+	checkCudaErrors(cudaMemcpy( mat->rows, rowInds, (mat->n + 1) * sizeof(int),cudaMemcpyHostToDevice));
+	checkCudaErrors(cudaMemcpy( mat->cols, colInds, nnz_ * sizeof(int),cudaMemcpyHostToDevice));
+	checkCudaErrors(cudaMemcpy( mat->values, values, nnz_ * sizeof(float),cudaMemcpyHostToDevice));
 	
 	//init the sparse matrix handles
-	/*Kaspar: This code will not work before the next major release thanks to nvidia
-	cusparseCreateCsr(&mat, n_sparse, n_sparse, nnz_, d_rowInds, d_colInds, d_values,
+	checkCudaErrors(cusparseCreateCsr(&(mat->descr), mat->n, mat->n, nnz_, mat->rows, mat->cols, mat->values,
                                       CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
-                                      CUSPARSE_INDEX_BASE_ONE, CUDA_R_32F);
-									  */
+                                      CUSPARSE_INDEX_BASE_ONE, CUDA_R_32F));
+	
  }
+
  
  /**
  Kaspar K. Nielsen, kasparkn@gmail.com.dk, 2019
@@ -201,129 +216,84 @@ cusparseHandle_t sparse_handle = NULL;
  */
  void cu_MVMult_GetH_sparse(const float* Mx, const float* My, const float* Mz, float* Hx, float* Hy, float* Hz, const float* pref)
  {	 
-	
-	cusparseStatus_t status;
-	
-	
-	
 	int n = spKxx.n;
+	
+	//Possible extra memory needed for CUDA operations
+	size_t bufferSize = 0;
+	void *dBuffer = NULL;
+	
 	//Copy Mx, My and Mz to device memory	
-	cudaMemcpy( d_Mx, Mx, n * sizeof(float), cudaMemcpyHostToDevice );
-	cudaMemcpy( d_My, My, n * sizeof(float), cudaMemcpyHostToDevice );
-	cudaMemcpy( d_Mz, Mz, n * sizeof(float), cudaMemcpyHostToDevice );
+	checkCudaErrors(cudaMemcpy( d_Mx, Mx, n * sizeof(float), cudaMemcpyHostToDevice ));
+	checkCudaErrors(cudaMemcpy( d_My, My, n * sizeof(float), cudaMemcpyHostToDevice ));
+	checkCudaErrors(cudaMemcpy( d_Mz, Mz, n * sizeof(float), cudaMemcpyHostToDevice ));
 	
 	float alpha = *pref;
+	//Hx = Kxx * Mx + Kxy * My + Kxz * Mz	
 	float beta = 0.0;
 	//by setting beta = 0 in the first call we ensure that the previous values of d_Hx are irrelevant
 	//as this operation does the following:
 	//d_Hx = alpha * d_Kxx * d_Mx + beta * d_Hx
-	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKxx.nnz,
-                           &alpha, sparse_descr, spKxx.values, spKxx.rows, spKxx.cols,
-                           d_Mx, &beta, d_Hx);
-	
-	//set beta = 1 so as to keep the previous set values of d_Hx
-	beta = 1.0;
-	//Hx = Kxy * My
-	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKxy.nnz,
-                           &alpha, sparse_descr, spKxy.values, spKxy.rows, spKxy.cols,
-                           d_My, &beta, d_Hx);
-	//Hx = Kxz * Mz
-	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKxz.nnz,
-                           &alpha, sparse_descr, spKxz.values, spKxz.rows, spKxz.cols,
-                           d_Mz, &beta, d_Hx);						   
-						   
-						   
-	//reset beta = 0 such that any previous values of d_Hy are erased
-	beta = 0.;
-	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKxy.nnz,
-                           &alpha, sparse_descr, spKxy.values, spKxy.rows, spKxy.cols,
-                           d_Mx, &beta, d_Hy);
-	
-	//set beta = 1 so as to keep the previous set values of d_Hy
-	beta = 1.0;
-	//Hy = Kyy * My
-	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKyy.nnz,
-                           &alpha, sparse_descr, spKyy.values, spKyy.rows, spKyy.cols,
-                           d_My, &beta, d_Hy);
-	//Hy = Kyz * Mz
-	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKyz.nnz,
-                           &alpha, sparse_descr, spKyz.values, spKyz.rows, spKyz.cols,
-                           d_Mz, &beta, d_Hy);						   
-						   
-						   
-	//reset beta = 0 such that any previous values of d_Hz are erased
-	beta = 0.;
-	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKxz.nnz,
-                           &alpha, sparse_descr, spKxz.values, spKxz.rows, spKxz.cols,
-                           d_Mx, &beta, d_Hz);
-	
-	//set beta = 1 so as to keep the previous set values of d_Hy
-	beta = 1.0;
-	//Hz = Kzy * My
-	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKyz.nnz,
-                           &alpha, sparse_descr, spKyz.values, spKyz.rows, spKyz.cols,
-                           d_My, &beta, d_Hz);
-	//Hz = Kzz * Mz
-	status = cusparseScsrmv( sparse_handle,CUSPARSE_OPERATION_NON_TRANSPOSE, n, n, spKzz.nnz,
-                           &alpha, sparse_descr, spKzz.values, spKzz.rows, spKzz.cols,
-                           d_Mz, &beta, d_Hz);									   
-						   
-	//kaspar: All the calls below will not work before the next major release by nvidia
-	
-	//Hx = Kxx * Mx + Kxy * My + Kxz * Mz	
 	//Kxx * Mx
-	/*
-	cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                 &alpha, d_Kxx_descr, d_Mx_descr, &beta, d_Hx_descr, CUDA_R_32F,
-                                 CUSPARSE_MV_ALG_DEFAULT, dBuffer);
+	checkCudaErrors(cusparseSpMV_bufferSize( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+								 &alpha, spKxx.descr, d_Mx_descr, &beta, d_Hx_descr, CUDA_R_32F, 
+								 CUSPARSE_SPMV_ALG_DEFAULT, &bufferSize));
+	checkCudaErrors(cudaMalloc( &dBuffer, bufferSize ));
+	checkCudaErrors(cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                 &alpha, spKxx.descr, d_Mx_descr, &beta, d_Hx_descr, CUDA_R_32F,
+                                 CUSPARSE_SPMV_ALG_DEFAULT, dBuffer));
 			
 	beta = 1.0;
 	//Kxy * My
-	cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                 &alpha, d_Kxy_descr, d_My_descr, &beta, d_Hx_descr, CUDA_R_32F,
-                                 CUSPARSE_MV_ALG_DEFAULT, dBuffer);
+	checkCudaErrors(cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                 &alpha, spKxy.descr, d_My_descr, &beta, d_Hx_descr, CUDA_R_32F,
+                                 CUSPARSE_SPMV_ALG_DEFAULT, dBuffer));
 								 
-	cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                 &alpha, d_Kxz_descr, d_Mz_descr, &beta, d_Hx_descr, CUDA_R_32F,
-                                 CUSPARSE_MV_ALG_DEFAULT, dBuffer);
+	checkCudaErrors(cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                 &alpha, spKxz.descr, d_Mz_descr, &beta, d_Hx_descr, CUDA_R_32F,
+                                 CUSPARSE_SPMV_ALG_DEFAULT, dBuffer));
 
 			   
 	//Hy = Kxy * Mx + Kyy * My + Kyz * Mz	
 	beta = 0.;
-	cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                 &alpha, d_Kxy_descr, d_Mx_descr, &beta, d_Hy_descr, CUDA_R_32F,
-                                 CUSPARSE_MV_ALG_DEFAULT, dBuffer);
+	checkCudaErrors(cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                 &alpha, spKxy.descr, d_Mx_descr, &beta, d_Hy_descr, CUDA_R_32F,
+                                 CUSPARSE_SPMV_ALG_DEFAULT, dBuffer));
 			
 	beta = 1.0;	
-	cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                 &alpha, d_Kyy_descr, d_My_descr, &beta, d_Hy_descr, CUDA_R_32F,
-                                 CUSPARSE_MV_ALG_DEFAULT, dBuffer);
+	checkCudaErrors(cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                 &alpha, spKyy.descr, d_My_descr, &beta, d_Hy_descr, CUDA_R_32F,
+                                 CUSPARSE_SPMV_ALG_DEFAULT, dBuffer));
 								 
-	cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                 &alpha, d_Kyz_descr, d_Mz_descr, &beta, d_Hy_descr, CUDA_R_32F,
-                                 CUSPARSE_MV_ALG_DEFAULT, dBuffer);
+	checkCudaErrors(cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                 &alpha, spKyz.descr, d_Mz_descr, &beta, d_Hy_descr, CUDA_R_32F,
+                                 CUSPARSE_SPMV_ALG_DEFAULT, dBuffer));
 								 
 	//Hz = Kzx * Mx + Kzy * My + Kzz * Mz		
 	beta = 0.;
-	cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                 &alpha, d_Kxz_descr, d_Mx_descr, &beta, d_Hz_descr, CUDA_R_32F,
-                                 CUSPARSE_MV_ALG_DEFAULT, dBuffer);
+	checkCudaErrors(cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                 &alpha, spKxz.descr, d_Mx_descr, &beta, d_Hz_descr, CUDA_R_32F,
+                                 CUSPARSE_SPMV_ALG_DEFAULT, dBuffer));
 			
 	beta = 1.0;
 	//Kxy * My
-	cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                 &alpha, d_Kyz_descr, d_My_descr, &beta, d_Hz_descr, CUDA_R_32F,
-                                 CUSPARSE_MV_ALG_DEFAULT, dBuffer);
+	checkCudaErrors(cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                 &alpha, spKyz.descr, d_My_descr, &beta, d_Hz_descr, CUDA_R_32F,
+                                 CUSPARSE_SPMV_ALG_DEFAULT, dBuffer));
 								 
-	cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                 &alpha, d_Kzz_descr, d_Mz_descr, &beta, d_Hz_descr, CUDA_R_32F,
-                                 CUSPARSE_MV_ALG_DEFAULT, dBuffer);
+	checkCudaErrors(cusparseSpMV( sparse_handle, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                 &alpha, spKzz.descr, d_Mz_descr, &beta, d_Hz_descr, CUDA_R_32F,
+                                 CUSPARSE_SPMV_ALG_DEFAULT, dBuffer));
 			   
-			   */
 	//copy the solution back
-	cudaMemcpy( Hx, d_Hx, n * sizeof(float), cudaMemcpyDeviceToHost );
-	cudaMemcpy( Hy, d_Hy, n * sizeof(float), cudaMemcpyDeviceToHost );
-	cudaMemcpy( Hz, d_Hz, n * sizeof(float), cudaMemcpyDeviceToHost );
+	checkCudaErrors(cudaMemcpy( Hx, d_Hx, n * sizeof(float), cudaMemcpyDeviceToHost ));
+	checkCudaErrors(cudaMemcpy( Hy, d_Hy, n * sizeof(float), cudaMemcpyDeviceToHost ));
+	checkCudaErrors(cudaMemcpy( Hz, d_Hz, n * sizeof(float), cudaMemcpyDeviceToHost ));
+	
+	if ( dBuffer != NULL )
+	{
+		cudaFree( dBuffer );
+		dBuffer = NULL;
+	}
  }
  
  
@@ -344,7 +314,6 @@ cusparseHandle_t sparse_handle = NULL;
 	fclose(fp);
 	 */
 	 
-	 cublasStatus_t stat;
 	 n_K = *n;
 	 
 	 //Allocate the device (GPU) arrays
@@ -360,12 +329,12 @@ cusparseHandle_t sparse_handle = NULL;
 	 
 	 
 	 //copy the demag tensors to the device	 
-	 stat = cublasSetMatrix (n_K,n_K, sizeof (float), Kxx, n_K, d_Kxx, n_K );
-	 stat = cublasSetMatrix (n_K,n_K, sizeof (float), Kxy, n_K, d_Kxy, n_K );
-	 stat = cublasSetMatrix (n_K,n_K, sizeof (float), Kxz, n_K, d_Kxz, n_K );
-	 stat = cublasSetMatrix (n_K,n_K, sizeof (float), Kyy, n_K, d_Kyy, n_K );
-	 stat = cublasSetMatrix (n_K,n_K, sizeof (float), Kyz, n_K, d_Kyz, n_K );
-	 stat = cublasSetMatrix (n_K,n_K, sizeof (float), Kzz, n_K, d_Kzz, n_K );
+	 checkCudaErrors(cublasSetMatrix (n_K,n_K, sizeof (float), Kxx, n_K, d_Kxx, n_K ));
+	 checkCudaErrors(cublasSetMatrix (n_K,n_K, sizeof (float), Kxy, n_K, d_Kxy, n_K ));
+	 checkCudaErrors(cublasSetMatrix (n_K,n_K, sizeof (float), Kxz, n_K, d_Kxz, n_K ));
+	 checkCudaErrors(cublasSetMatrix (n_K,n_K, sizeof (float), Kyy, n_K, d_Kyy, n_K ));
+	 checkCudaErrors(cublasSetMatrix (n_K,n_K, sizeof (float), Kyz, n_K, d_Kyz, n_K ));
+	 checkCudaErrors(cublasSetMatrix (n_K,n_K, sizeof (float), Kzz, n_K, d_Kzz, n_K ));
 	 
 	//allocate the internal M and H vectors
 	bytes = n_K * sizeof(float);
@@ -397,11 +366,10 @@ cusparseHandle_t sparse_handle = NULL;
  */
  void cu_MVMult_GetH( const float* Mx, const float* My, const float* Mz, float* Hx, float* Hy, float* Hz, int* n, float* pref )
  {
-	 cublasStatus_t stat;
 	 //copy the M vectors to the GPU card
-	 stat = cublasSetVector (n_K, sizeof (float), Mx, 1, d_Mx, 1);
-	 stat = cublasSetVector (n_K, sizeof (float), My, 1, d_My, 1);
-	 stat = cublasSetVector (n_K, sizeof (float), Mz, 1, d_Mz, 1);
+	 checkCudaErrors(cublasSetVector (n_K, sizeof (float), Mx, 1, d_Mx, 1));
+	 checkCudaErrors(cublasSetVector (n_K, sizeof (float), My, 1, d_My, 1));
+	 checkCudaErrors(cublasSetVector (n_K, sizeof (float), Mz, 1, d_Mz, 1));
 	 
 	 float beta = 0.;
 	 
@@ -432,9 +400,9 @@ cusparseHandle_t sparse_handle = NULL;
 	 cublasSgemv(handle, CUBLAS_OP_N, n_K, n_K, pref, d_Kzz, n_K, d_Mz, 1, &beta, d_Hz, 1);
 	 
 	 //copy the resulting field vector back	 
-	 stat = cublasGetVector (n_K, sizeof (float), d_Hx, 1, Hx, 1);
-	 stat = cublasGetVector (n_K, sizeof (float), d_Hy, 1, Hy, 1);
-	 stat = cublasGetVector (n_K, sizeof (float), d_Hz, 1, Hz, 1);
+	 checkCudaErrors(cublasGetVector (n_K, sizeof (float), d_Hx, 1, Hx, 1));
+	 checkCudaErrors(cublasGetVector (n_K, sizeof (float), d_Hy, 1, Hy, 1));
+	 checkCudaErrors(cublasGetVector (n_K, sizeof (float), d_Hz, 1, Hz, 1));
 	 
  }
  
@@ -451,82 +419,93 @@ cusparseHandle_t sparse_handle = NULL;
  
  void cu_destroy()
  {
-	 if ( d_Kxx != NULL )
-	 {
-		 cudaFree( d_Kxx );
-		 d_Kxx = NULL;
-		 cudaFree( d_Kxy );
-		 d_Kxy = NULL;
-		 cudaFree( d_Kxz );
-		 d_Kxz = NULL;
-		 cudaFree( d_Kyy );
-		 d_Kyy = NULL;
-		 cudaFree( d_Kyz );
-		 d_Kyz = NULL;
-		 cudaFree( d_Kzz );
-		 d_Kzz = NULL;
-	 }
-	 
-	 if ( d_Hx != NULL )
-	 {	 
-		 cudaFree( d_Hx );
-		 d_Hx = NULL;
-		 cudaFree( d_Hy );
-		 d_Hy = NULL;
-		 cudaFree( d_Hz );
-		 d_Hz = NULL;
-	 }
-	 
-	 if ( d_Mx != NULL )
-	 {
-		 cudaFree( d_Mx );
-		 d_Mx = NULL;
-		 cudaFree( d_My );
-		 d_My = NULL;
-		 cudaFree( d_Mz );
-		 d_Mz = NULL;
-	 }
-	 
-	 if ( handle != NULL )
+	if ( d_Kxx != NULL )
 	{
-		cublasDestroy(handle);
+		checkCudaErrors(cudaFree( d_Kxx ));
+		d_Kxx = NULL;
+		checkCudaErrors(cudaFree( d_Kxy ));
+		d_Kxy = NULL;
+		checkCudaErrors(cudaFree( d_Kxz ));
+		d_Kxz = NULL;
+		checkCudaErrors(cudaFree( d_Kyy ));
+		d_Kyy = NULL;
+		checkCudaErrors(cudaFree( d_Kyz ));
+		d_Kyz = NULL;
+		checkCudaErrors(cudaFree( d_Kzz ));
+		d_Kzz = NULL;
+	}
+	 
+	if ( d_Hx != NULL )
+	{	 
+		checkCudaErrors(cudaFree( d_Hx ));
+		d_Hx = NULL;
+		checkCudaErrors(cudaFree( d_Hy ));
+		d_Hy = NULL;
+		checkCudaErrors(cudaFree( d_Hz ));
+		d_Hz = NULL;
+	}
+	 
+	if ( d_Mx != NULL )
+	{
+		checkCudaErrors(cudaFree( d_Mx ));
+		d_Mx = NULL;
+		checkCudaErrors(cudaFree( d_My ));
+		d_My = NULL;
+		checkCudaErrors(cudaFree( d_Mz ));
+		d_Mz = NULL;
+	}
+	 
+	if ( d_Hx_descr )
+	{	 
+		checkCudaErrors(cusparseDestroyDnVec( d_Hx_descr ));
+		checkCudaErrors(cusparseDestroyDnVec( d_Hy_descr ));
+		checkCudaErrors(cusparseDestroyDnVec( d_Hz_descr ));
+	}
+	 
+	if ( d_Mx_descr )
+	{
+		checkCudaErrors(cusparseDestroyDnVec( d_Mx_descr ));
+		checkCudaErrors(cusparseDestroyDnVec( d_My_descr ));
+		checkCudaErrors(cusparseDestroyDnVec( d_Mz_descr ));
+	}
+	 
+	if ( handle != NULL )
+	{
+		checkCudaErrors(cublasDestroy(handle));
 		handle = NULL;
 	}
-	
+
 		
 	freeSparseMatrix( &spKxx );
 	freeSparseMatrix( &spKxy );
 	freeSparseMatrix( &spKxz );
 	freeSparseMatrix( &spKyy );
 	freeSparseMatrix( &spKyz );
-	freeSparseMatrix( &spKzz );
+	freeSparseMatrix( &spKzz );	
 
 	if ( sparse_descr != NULL )
 	{
-		cusparseDestroyMatDescr(sparse_descr);
+		checkCudaErrors(cusparseDestroyMatDescr(sparse_descr));
 		sparse_descr = NULL;
 	}
 
 	if (sparse_handle != NULL )
 	{
-		cusparseDestroy(sparse_handle);
+		checkCudaErrors(cusparseDestroy(sparse_handle));
 		sparse_handle = NULL;
 	}
-
  }
-
-
 
 void freeSparseMatrix( CUSparse* mat )
 {
 	if ( mat->values != NULL )
 	{
-		cudaFree( mat->values );
+		checkCudaErrors(cusparseDestroySpMat( mat->descr ));
+		checkCudaErrors(cudaFree( mat->values ));
 		mat->values = NULL;
-		cudaFree( mat->cols );
+		checkCudaErrors(cudaFree( mat->cols ));
 		mat->cols = NULL;
-		cudaFree( mat->rows );
+		checkCudaErrors(cudaFree( mat->rows ));
 		mat->rows = NULL;
-
 	}
 }

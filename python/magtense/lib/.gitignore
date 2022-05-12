@@ -1,0 +1,10 @@
+# Compiled MagTense source code to python module
+*.o
+*.mod
+*.o.d
+libsrc.a
+fortranobject.c
+fortranobject.h
+magtensesource*
+Release
+src.*/

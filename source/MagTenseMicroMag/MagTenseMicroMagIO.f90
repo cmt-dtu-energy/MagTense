@@ -21,10 +21,10 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
-        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr
+        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
         mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
@@ -33,9 +33,10 @@
         mwPointer :: genericProblemPtr
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
         mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr
+        mwPointer :: usePrecisionPtr
         integer,dimension(3) :: int_arr
-        real*8,dimension(3) :: real_arr
-        real*8 :: demag_fac
+        real(DP),dimension(3) :: real_arr
+        real(DP) :: demag_fac
     
         !Get the expected names of the fields
         call getProblemFieldnames( problemFields, nFieldsProblem)
@@ -135,11 +136,13 @@
         A0ProblemPtr = mxGetField( prhs, i, problemFields(7) )
         call mxCopyPtrToReal8(mxGetPr(A0ProblemPtr), problem%A0, sx )
         
-        sx = 1
+        allocate( problem%Ms(ntot) )
+        sx = ntot
         MsProblemPtr = mxGetField( prhs, i, problemFields(8) )
         call mxCopyPtrToReal8(mxGetPr(MsProblemPtr), problem%Ms, sx )
         
-        sx = 1
+        allocate( problem%K0(ntot) )
+        sx = ntot
         K0ProblemPtr = mxGetField( prhs, i, problemFields(9) )
         call mxCopyPtrToReal8(mxGetPr(K0ProblemPtr), problem%K0, sx )
         
@@ -198,7 +201,7 @@
         else
             problem%useCuda = useCudaFalse
         endif
-                
+               
         sx = 1
         demApproxPtr = mxGetField( prhs, i, problemFields(20) )
         call mxCopyPtrToInteger4(mxGetPr(demApproxPtr), problem%demag_approximation, sx )
@@ -246,8 +249,8 @@
         !problem%alpha(:,1) is the time grid while problem%alpha(:,2) are the alpha values
         sx = nt_alpha * 2
         allocate( problem%alpha(nt_alpha,2) )
-        HextProblemPtr = mxGetField( prhs, i, problemFields(27) )
-        call mxCopyPtrToReal8(mxGetPr(HextProblemPtr), problem%alpha, sx )
+        alphaProblemPtr = mxGetField( prhs, i, problemFields(27) )
+        call mxCopyPtrToReal8(mxGetPr(alphaProblemPtr), problem%alpha, sx )
         
         sx = 1
         tolProblemPtr = mxGetField( prhs, i, problemFields(28) )
@@ -283,7 +286,7 @@
              
             sx = nvalues
             valuesPtr = mxGetField( prhs, i, problemFields(41) )
-            call mxCopyPtrToReal4(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
+            call mxCopyPtrToReal8(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
             
             sx = nrows
             rows_startPtr = mxGetField( prhs, i, problemFields(42) )
@@ -312,6 +315,19 @@
         genericProblemPtr = mxGetField( prhs, i, problemFields(34) )
         call mxCopyPtrToReal8(mxGetPr(genericProblemPtr), problem%conv_tol, sx )
 
+        sx = 1
+        usePrecisionPtr = mxGetField( prhs, i, problemFields(46) )
+        call mxCopyPtrToInteger4(mxGetPr(usePrecisionPtr), usePrecision, sx )
+        if ( usePrecision .eq. 1 ) then
+            problem%usePrecision = usePrecisionTrue
+        else
+            problem%usePrecision = usePrecisionFalse
+        endif
+        
+        sx = 1
+        nThreadPtr = mxGetField( prhs, i, problemFields(47) )
+        call mxCopyPtrToInteger4(mxGetPr(nThreadPtr), problem%nThreadsMatlab, sx )
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -447,7 +463,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=45
+        integer,parameter :: nf=47
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -499,6 +515,8 @@
         fieldnames(43) = 'exch_rowe'
         fieldnames(44) = 'exch_col'
         fieldnames(45) = 'grid_abc'
+        fieldnames(46) = 'usePres'
+        fieldnames(47) = 'nThreads'
         
     end subroutine getProblemFieldnames
     
@@ -638,7 +656,7 @@
         
     end subroutine displayMatlabProgressMessage
     
-    subroutine displayMatlabProgessTime( mess, time  )
+    subroutine displayMatlabProgressTime( mess, time  )
         character(*),intent(in) :: mess
         real,intent(in) :: time
         character*(4) :: prog_str   
@@ -649,7 +667,7 @@
         call displayMatlabMessage( mess )
         call displayMatlabMessage( prog_str )
         
-    end subroutine displayMatlabProgessTime
+    end subroutine displayMatlabProgressTime
     
     end module MagTenseMicroMagIO
     

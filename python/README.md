@@ -1,110 +1,77 @@
-# Python Interface of MagTense
+# Python Interface
 
-The fortran code can be directly called from Python.
-The tool f2py of the numpy package is used to wrap the interface file *lib_mag/FortranToPythonIO.f90*.
+The Fortran code is compiled and wrapped to a module that can be directly called from Python. The tool **f2py** of the NumPy package is used to wrap the interface file **lib/FortranToPythonIO.f90**.
 
-## Prerequisites
+## Deployment with Conda
 
-The required packages to run the code can be found in *documentation/environment.yml*.
+### Step 1
 
-For creating a conda environment in the current folder run:
+Installation of required python packages
 
-```Powershell
-conda env create --prefix ./envs -f ./documentation/environment.yml
+```bash
+conda install -y numpy matplotlib
 ```
 
-## Accessible functions
+### Step 2
 
-- **iterate_magnetization**(tiles, **options):  
-    Iterates through the given tiles to determine their influence on each other.  
-    Updated tiles are returned.
+GFortran compiler and Make utility (Windows + MacOS only)
 
-    ```Python
-    # Options:
-    max_error = 0.00001 # Iteration stops if magnetization change of tiles is below this value
-    max_it = 500 # Maximum number of performed iterations
-    T = 300. # Temperature for the state function if required
+- Windows
+
+  - Installation in conda environment
+
+    ```bash
+    conda install -y -c conda-forge make
+    conda install -y -c msys m2w64-gcc-fortran
     ```
 
-- **get_N_tensor**(tiles, points):  
-    Returns the demagnetization tensor N of the given tiles and the specified evaluation points.
+  - Installation from binary | [MinGW](https://gcc.gnu.org/wiki/GFortranBinaries#Windows)
 
-- **get_H_field**(tiles, points, N=None):  
-    Returns the magnetic field H at the specified evaluation points of the given tiles.  
-    Optionally, a precalculated demagnization tensor N can be handed over in order to prevent unnecessary and expensive recalculation of N if geometry of the setup does not change.
+- MacOS:
+  - Installation from binary | [HPC Mac OS X](http://hpc.sourceforge.net/)
+  - Installation with [Homebrew](https://brew.sh/) ( **brew install gcc** )
 
-- **create_plot**(iterated_tiles, points, H, grid=None):  
-    Creates a matlibplot with the iterated tiles and the calculated magnetic field H at the evaluation points as quiver plot.  
-    Additionally, an optional grid can be displayed.
+### Step 3
 
-- **run_simulation**(tiles, points, **options):  
-    Does all the previous mentioned steps all together.  
-    Demagnetization tensor will not be reused.
+Creation of an importable Python module from Fortran source code
 
-    ```Python
-    # Options:
-    plot = False # Boolean if results shall be plotted
-    grid = None # Optional grid can be displayed
-    max_error = 0.00001 # Iteration stops if magnetization change of tiles is below this value
-    max_it = 500 # Maximum number of performed iterations
-    T = 300. # Temperature for the state function if required
-    iterate_solution = True # Boolean if the magnetization of the tiles shall be iterated
-    return_field=True # Boolean if magnetic field shall be calculated
-    ```
+Navigate to folder **MagTense/python/magtense/lib/**, run **make**, and install the package
 
-## Arguments
+```bash
+cd /path/to/repo/python/magtense/lib/
+make
+cd /path/to/repo/python/
+pip install -e .
+```
 
-- Magnetic Tiles [Defined in **source/MagTense.py** as **Tiles()**]
 
-    ```Python
-    def __init__(self, n):
-        # Initialization of arrays for specific tile parameters
-        # Input to Fortran derived type MagTile
-        self.center_pos = np.zeros(shape=(n,3), dtype=np.float64, order='F') # r0, theta0, z0
-        self.dev_center = np.zeros(shape=(n,3), dtype=np.float64, order='F') # dr, dtheta, dz
-        self.size = np.zeros(shape=(n,3), dtype=np.float64, order='F') # a, b, c
-        self.M = np.zeros(shape=(n,3), dtype=np.float64, order='F') # Mx, My, Mz
-        self.u_ea = np.zeros(shape=(n,3), dtype=np.float64, order='F') # Easy axis
-        self.u_oa1 = np.zeros(shape=(n,3), dtype=np.float64, order='F')
-        self.u_oa2 = np.zeros(shape=(n,3), dtype=np.float64, order='F')
-        self.mu_r_ea = np.ones(shape=(n), dtype=np.float64, order='F')
-        self.mu_r_oa = np.ones(shape=(n), dtype=np.float64, order='F')
-        self.M_rem = np.zeros(shape=(n), dtype=np.float64, order='F')
-        self.tile_type = np.ones(n, dtype=np.int32, order='F') # 1 = cylinder, 2 = prism, 3 = ellipsoid
-        self.offset = np.zeros(shape=(n,3), dtype=np.float64, order='F') # Offset of global coordinates
-        self.rot = np.zeros(shape=(n,3), dtype=np.float64, order='F')
-        self.color = np.zeros(shape=(n,3), dtype=np.float64, order='F')
-        self.magnetic_type = np.ones(n, dtype=np.int32, order='F') # 1 = hard magnet, 2 = soft magnet
-        self.stfcn_index = np.ones(shape=(n), dtype=np.int32, order='F') # Default index into the state function
-        self.incl_it = np.ones(shape=(n), dtype=np.int32, order='F') # If equal to zero the tile is not included in the iteration
-        self.use_sym = np.ones(shape=(n), dtype=np.int32, order='F') # Whether to exploit symmetry
-        self.sym_op = np.ones(shape=(n,3), dtype=np.float64, order='F') # 1 for symmetry and -1 for anti-symmetry respectively to the planes
-        self.M_rel = np.zeros(shape=(n), dtype=np.float64, order='F')
-        self.grid_pos = np.zeros(shape=(n,3), dtype=np.float64, order='F') # Positions in the grid
-        self.n = n
-    ```
+## Read-in customized M-H-curve
+This feature is currently only supported for soft magnetic tiles ([type=2](magtense/magtense.py#L49)).
 
-- Evaluation Points
+In  [iterate_magnetization()](magtense/magtense.py#L611), an arbitrary number of state functions (M-H-curves) can be defined:
 
-    ```Python
-        points = np.zeros(shape=(number_of_points,3), dtype=np.float64, order='F')
-    ```
+```python
+mu_r = 100
+datapath = f'./magtense/utils/data/Fe_mur_{mu_r}_Ms_2_1.csv'
 
-- Demagnetization Tensor
+ ...
 
-    ```Python
-        N = np.zeros(shape=(number_of_tiles,number_of_points,3,3), dtype=np.float64, order='F')
-    ```
+data_statefcn = numpy.genfromtxt(datapath, delimiter=';')
+n_statefcn = 1
+```
 
-- Magnetic Field
+[Here](magtense/utils/data), three sample M-H-curves for Fe with different relative permeabilities and a saturation magnetization of 2.1 T are stored as CSV-files. The data format is as follows:
 
-    ```Python
-        H = np.zeros(shape=(number_of_points,3), dtype=np.float64, order='F')
-    ```
+```csv
+0; Temp0; Temp1; ...
+H0-field; M0@Temp0; M0@Temp1;...
+H1-field; M1@Temp0; M1@Temp1;...
+.
+.
+H100-field; M100@Temp0; M100@Temp1; ...
+.
+```
 
-- Grid [Defined in **source/MagTense.py** as **Grid()**]
+With only one state function given, the same M-H-curve applies to all tiles of type 2.
 
-## Additional remarks
-
-In order to run the code the Fortran code has to be wrapped with f2py on your machine.  
-The usage of the corresponding Makefile can be found in subfolder *lib_mag/*.
+When the soft tiles differ in their M-H-curves, multiple state function can be combined. In order to match a specific M-H-curve with the corresponding tile, the variable [stfcn_index](magtense/magtense.py#L54) can be set.

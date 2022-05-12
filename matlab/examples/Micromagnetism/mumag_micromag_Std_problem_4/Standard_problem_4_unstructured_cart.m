@@ -63,13 +63,7 @@ InteractionMatrices.Z = GridInfo.Zel ;
 InteractionMatrices.A2 = D2X + D2Y ;
 
 %--- Convert the exchange matrix to sparse
-[v,c,rs,re] = convertToCSR(InteractionMatrices.A2);
-problem_ini.exch_nval = int32(numel(v));
-problem_ini.exch_nrow = int32(numel(rs));
-problem_ini.exch_val  = single(v);
-problem_ini.exch_rows = int32(rs);
-problem_ini.exch_rowe = int32(re);
-problem_ini.exch_col  = int32(c);
+problem_ini = problem_ini.setExchangeMatrixSparse( InteractionMatrices.A2 );
 
 %% Setup the problem for the initial configuration
 problem_ini.dem_appr = getMicroMagDemagApproximation('none');
@@ -99,7 +93,7 @@ prob_struct = struct(problem_ini);
 
 tic
 solution_ini = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
-% [Mx,My,Mz,mx,my,mz] = ComputeMagneticMomentGeneralMesh(solution_ini.M,GridInfo.Volumes) ;
+% [Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution_ini.M,GridInfo.Volumes) ;
 elapsedTime_part1 = toc
 if (ShowTheResult)
     figure; M_end = squeeze(solution_ini.M(end,:,:)); quiver(solution_ini.pts(:,1),solution_ini.pts(:,2),M_end(:,1),M_end(:,2)); axis equal; title('Starting state - Fortran')
@@ -151,7 +145,7 @@ tic
 solution_dym = problem_dym.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_dym );
 elapsedTime_part2 = toc
 
-[Mx,My,Mz,mx,my,mz] = ComputeMagneticMomentGeneralMesh(solution_dym.M,GridInfo.Volumes) ;
+[Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution_dym.M,GridInfo.Volumes) ;
 if (ShowTheResult)
     plot(fig1,solution_dym.t,Mx,'rx');
     plot(fig1,solution_dym.t,My,'gx');

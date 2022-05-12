@@ -136,6 +136,9 @@ properties
    
     % function handle for external field
     HextFct = [] ;
+
+    %The number of threads used by OpenMP for building the demag tensor
+    nThreads = int32(1);
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -181,6 +184,10 @@ properties (SetAccess=private,GetAccess=public)
     %1 for do use (int32). Currently implemented alternative is RK_SUITE,
     %active if CVODE is not used.
     useCVODE
+
+    %defines what precision is used for the demag tensor. Right now only
+    %single is supported. All other varibales are double.
+    usePres
     
     %defines whether to save the result or not
     SaveTheResult
@@ -241,9 +248,9 @@ methods
         % Exchange term constant
         obj.A0 = 1.3e-11;
         % demag magnetization constant
-        obj.Ms = 8e5; %A/m
+        obj.Ms = 8e5*ones(obj.ntot,1); %A/m
         %Anisotropy constant
-        obj.K0 = 0; 
+        obj.K0 = zeros(obj.ntot,1); 
 
         %precession constant
         obj.gamma = 0; %m/A*s
@@ -290,6 +297,8 @@ methods
         obj.useCuda = int32(0);
 		%set use CVODE to default
         obj.useCVODE = int32(0);
+        %set use CVODE to default
+        obj.usePres = int32(0);
         %set the demag approximation to the default, i.e. use no
         %approximation
         obj.dem_appr = getMicroMagDemagApproximation('none');
@@ -372,6 +381,7 @@ methods
        else
            obj.useCuda = int32(0);
            obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolverNoCUDA_mex;
+%            obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolver_mex;
        end
     end
     
@@ -420,6 +430,42 @@ methods
             case 'UseDynamicSolver'
                 obj.SolverType = 4;
         end
+    end
+
+    function obj = setExchangeMatrixSparse( obj, ExchangeMatrix )
+    % Convert the Exchange matrix to CSR and store it in the problem statement
+        [v,c,rs,re]   = convertToCSR(ExchangeMatrix);
+        obj.exch_nval = int32(numel(v));
+        obj.exch_nrow = int32(numel(rs));
+        obj.exch_val  = double(v);
+        obj.exch_rows = int32(rs);
+        obj.exch_rowe = int32(re);
+        obj.exch_col  = int32(c);
+
+        disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(10^9)) ' Gb'])
+    end
+    
+    %Override struct function for a final check before handing to Fortran
+    function obj2 = struct(obj)
+        if length(obj.Ms)==1 % Check if Ms is vectorized
+            obj.Ms=obj.Ms*ones(obj.ntot,1);
+        end
+        if length(obj.K0)==1 % Check if K0 is vectorized
+            obj.K0=obj.K0*ones(obj.ntot,1);
+        end
+        mnorm=vecnorm(obj.m0,2,2); % Check if input array is normalized
+        normcondfail=abs(mnorm-ones(obj.ntot,1)) >= obj.tol;
+        if any(normcondfail)
+            if all(mnorm(normcondfail)==0*mnorm(normcondfail))
+                warning('Zero magnetization in initial array')
+            else
+                warning('Initial array not normalized -- Normalizing')
+                obj.m0=obj.m0./mnorm;
+            end
+        end
+        warning('off','MATLAB:structOnObject')
+        obj2=builtin('struct',obj); % Actual struct conversion
+        warning('on','MATLAB:structOnObject')
     end
     
 end

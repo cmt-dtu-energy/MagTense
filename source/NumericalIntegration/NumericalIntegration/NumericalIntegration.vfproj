@@ -23,7 +23,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Debug|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2019b\extern\include\;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran\Debug;C:\Program Files (x86)\sundials-4.1.0\instdir\include;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran" PreprocessorDefinitions="USE_CVODE" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2021a\extern\include\;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran\Debug;C:\Program Files (x86)\sundials-4.1.0\instdir\include;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran" PreprocessorDefinitions="USE_CVODE" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
 				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="C:\Program Files (x86)\sundials-4.1.0\instdir\lib"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -32,7 +32,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2019b\extern\include\;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran\Release;C:\Program Files (x86)\sundials-4.1.0\instdir\include;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran" PreprocessorDefinitions="USE_CVODE" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" RealKIND="realKIND8"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2021a\extern\include\;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran\Release;C:\Program Files (x86)\sundials-4.1.0\instdir\include;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran" PreprocessorDefinitions="USE_CVODE" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" RealKIND="realKIND8"/>
 				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="C:\Program Files (x86)\sundials-4.1.0\instdir\lib"/>
 				<Tool Name="VFResourceCompilerTool" AdditionalIncludeDirectories="C:\Program Files (x86)\sundials\inst_dir\include"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -50,7 +50,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Debug_no_CVODE|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2019b\extern\include\;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran\Debug;C:\Program Files (x86)\sundials-4.1.0\instdir\include;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2021a\extern\include\;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran\Debug;C:\Program Files (x86)\sundials-4.1.0\instdir\include;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
 				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="C:\Program Files (x86)\sundials-4.1.0\instdir\lib"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -68,7 +68,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release_no_CVODE|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2019b\extern\include\;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran\Release;C:\Program Files (x86)\sundials-4.1.0\instdir\include;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" RealKIND="realKIND8"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2021a\extern\include\;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran\Release;C:\Program Files (x86)\sundials-4.1.0\instdir\include;C:\Program Files (x86)\sundials-4.1.0\instdir\fortran" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" RealKIND="realKIND8"/>
 				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="C:\Program Files (x86)\sundials-4.1.0\instdir\lib"/>
 				<Tool Name="VFResourceCompilerTool" AdditionalIncludeDirectories="C:\Program Files (x86)\sundials\inst_dir\include"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -86,7 +86,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Debug_nocuda|x64" ConfigurationType="typeStaticLibrary">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2019a\extern\include\" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2021a\extern\include\" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
 				<Tool Name="VFLibrarianTool"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
