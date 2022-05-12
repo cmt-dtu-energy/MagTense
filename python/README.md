@@ -45,7 +45,7 @@ pip install -e .
 ```
 
 
-## Read-in cutomized M-H-curve
+## Read-in customized M-H-curve
 This feature is currently only supported for soft magnetic tiles ([type=2](magtense/magtense.py#L49)).
 
 In  [iterate_magnetization()](magtense/magtense.py#L611), an arbitrary number of state functions (M-H-curves) can be defined:
