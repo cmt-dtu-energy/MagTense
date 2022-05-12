@@ -24,15 +24,15 @@ Prerequisites
 ----------------------------------------------
 Add scripts to PYTHONPATH
 ----------------------------------------------
-* python/lib_mag/
-* python/source/
+* python/magtense/lib/
+* python/magtense/
 
 ----------------------------------------------
 Build python module from Fortran source code 
 ----------------------------------------------
 ::
 
-    cd python/lib_mag/
+    cd python/magtense/lib/
     make
 
 

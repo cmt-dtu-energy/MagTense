@@ -19,12 +19,13 @@
     !!@param n_ele, the number of points at which to evaluate the field
     !!@param Nout the demag tensor calculated by this function (size (n_tiles,n_pts,3,3) )
     !!
-    subroutine getFieldFromTiles( tiles, H, pts, n_tiles, n_ele, Nout )
+    subroutine getFieldFromTiles( tiles, H, pts, n_tiles, n_ele, Nout, useStoredNorg )
         type(MagTile),intent(inout),dimension(n_tiles) :: tiles
         real,dimension(n_ele,3),intent(inout) :: H
         real,dimension(n_ele,3),intent(in) :: pts
         integer,intent(in) :: n_tiles,n_ele
         real,dimension(:,:,:,:),allocatable,optional :: Nout
+        logical,optional :: useStoredNorg
     
         integer :: i,prgCnt,tid,prog,OMP_GET_THREAD_NUM
         real,dimension(:,:),allocatable :: H_tmp
@@ -50,10 +51,14 @@
         else
             useStoredN = .false.
         endif
-                
+
+        if ( present( useStoredNorg ) ) then 
+            useStoredN = useStoredNorg;
+        endif
+        
         allocate(H_tmp(n_ele,3))
         H(:,:) = 0.
-    
+        
         prgCnt = 0
         prog = 0
     
@@ -153,7 +158,7 @@
         ! Finding the minimum: d( ||K||^2 ) / dHnorm = 0 => Hnorm_min = -Happ_norm * (v1 dot v2 ) / ||v1||^2 with
         !v1 = ((mur-1) * N*Happ) - Happ_un
         !v2 = Happ_un
-    
+        
         !Note that N is likely negative as we by convention absorb the sign into the demag tensor
         if ( localFieldSoft .eqv. .true. )  then
             
@@ -179,7 +184,7 @@
             endif
         endif
         deallocate(H_tmp)
-    
+        
         !!Subtract M of a tile in points that are inside that tile in order to actually get H (only for CylindricalTiles as these actually calculate the B-field (divided by mu0)
         !!@todo Should this function not only be called if tileTypeCylPiece?
         call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_ele)

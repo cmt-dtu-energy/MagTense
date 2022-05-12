@@ -218,7 +218,7 @@
                     if ( tiles(i)%tileType .lt. 100 ) then
                         
                         !>If the magnet is assumed to have a constant permeability, then its own field is not included in this summation but rather calculated explicitly (see a few lines down)
-                        if ( tiles(i)%magnetType .eq. magnetTypeSoftConstPerm ) then
+                        if ( tiles(i)%magnetType .eq. magnetTypeSoftConstPerm .OR. tiles(i)%magnetType .eq. MagnetTypeSoft ) then
                             tiles(i)%excludeFromSummation = .true.
                         endif
                         
@@ -229,7 +229,7 @@
                         H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
                         
                         !>Set the flag back to false such that the tile is included in the next round of summation
-                        if ( tiles(i)%magnetType .eq. magnetTypeSoftConstPerm ) then
+                        if ( tiles(i)%magnetType .eq. magnetTypeSoftConstPerm .OR. tiles(i)%magnetType .eq. MagnetTypeSoft ) then
                             tiles(i)%excludeFromSummation = .false.
                         endif
                     endif
@@ -425,12 +425,12 @@
     
         index = tile%stateFunctionIndex
         !call splint( stateFunction(index)%H, stateFunction(index)%M(1,:), stateFunction(index)%y2a, Hnorm, Mnorm, stateFunction(index)%nH )
-         call spline_b_val ( stateFunction(index)%nH, stateFunction(index)%H, stateFunction(index)%M(1,:), Hnorm, Mnorm )
-         if ( Hnorm .ne. 0 ) then
-             tile%M = Mnorm * H / Hnorm  !< Assume that the M vector is along the H vector
-         else
-             tile%M(:) = 0
-         endif
+        call spline_b_val ( stateFunction(index)%nH, stateFunction(index)%H, stateFunction(index)%M(1,:), Hnorm, Mnorm )
+        if ( Hnorm .ne. 0 ) then
+            tile%M = Mnorm * H / Hnorm  !< Assume that the M vector is along the H vector
+        else
+            tile%M(:) = 0
+        endif
      
     end subroutine getM_SoftMagnet
     
@@ -559,6 +559,9 @@
                 call setupEvaluationPoints( tiles(i) )
             endif
 
+            !> Set the default behavior to false such that the tile by default is included in the calculation
+            tiles(i)%excludeFromSummation = .false.
+
         enddo
 
     end subroutine loadTiles
@@ -583,21 +586,11 @@
             allocate( stateFcn(i)%y2a(stateFcn(i)%nH) )
         
             stateFcn(i)%T(1) = data_stateFcn(1,2)
-            stateFcn(i)%T(2) = data_stateFcn(1,3)
-            stateFcn(i)%T(3) = data_stateFcn(1,4)
 
             do j=2,nH
                 k = j - 1
                 stateFcn(i)%H(k) = data_stateFcn(j,1)
                 stateFcn(i)%M(1,k) = data_stateFcn(j,2)
-                stateFcn(i)%M(2,k) = data_stateFcn(j,3)
-                stateFcn(i)%M(3,k) = data_stateFcn(j,4)
-                
-                !! make the spline derivatives for later interpolation
-                !call splie2( sngl(stateFunction(i)%T), sngl(stateFunction(i)%H), sngl(stateFunction(i)%M), sngl(stateFunction(i)%nT), sngl(stateFunction(i)%nH), sngl(stateFunction(i)%y2a) )
-                !!@todo If this code is deprecated, the spline.f90 code can be removed as it is only called here.
-                !call spline( stateFunction(i)%H, stateFunction(i)%M(1,:), 1e30, 1e30, stateFunction(i)%y2a, stateFunction(i)%nH )
-            
             enddo
         enddo
 
