@@ -200,3 +200,5 @@ matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mexw64
 *.mexw64
 
 *.vtuneproj
+
+executable/
