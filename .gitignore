@@ -202,3 +202,9 @@ matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mexw64
 *.vtuneproj
 
 executable/
+
+matlab/resources/
+
+matlab/MagTense_matlab_project.prj
+
+*.prj

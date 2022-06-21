@@ -1,4 +1,4 @@
-function D2 = ComputeDifferentialOperatorsFromMesh_Neumann_FiniteDifference(GridInfo,Aexch)
+function D2 = computeDifferentialOperatorsFromMesh_Neumann_FiniteDifference(GridInfo,Aexch)
 %
 % D2 = ComputeDifferentialOperatorsFromMesh_Neumann_FiniteDifference(GridInfo,Aexch)
 %

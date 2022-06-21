@@ -26,7 +26,6 @@ addpath('../../../../../MagTense/matlab/micromagnetism_matlab_only_implementatio
 fnameSave = 'mumag_std_6_tetra' ;
 extra=''; % Extra text fragments for graph titles and filenames
 runFortranPart = true;
-runMatlabPart = false;
 
 % Theoretical domain wall pinning fields
 HPs=containers.Map({'akj','ak','aj','a','kj','k','j',''},[1.568,1.089,1.206,0.838,1.005,0.565,0,0]);
@@ -77,13 +76,13 @@ disp(['Tetra N_grid = ' num2str(prod(resolution))])
 
 %% Problem structure creation
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
-problem.grid_type = getMicroMagGridType('tetrahedron');
+problem = problem.setMicroMagGridType('tetrahedron');
 
 problem = problem.setUseCuda( true );
-problem.dem_appr = getMicroMagDemagApproximation(demag_approx); % turn off demag field
+problem = problem.setMicroMagDemagApproximation(demag_approx);  % turn off demag field
 problem.dem_thres = dem_thres;                                  % turn off demag field
 problem = problem.setSolverType( 'UseDynamicSolver' );
-problem.solver = getMicroMagSolver( 'Dynamic' );
+problem = problem.setMicroMagSolver( 'Dynamic' );
 
 %--- Information on the grid
 problem.grid_pts    = [GridInfo.Xel, GridInfo.Yel, GridInfo.Zel] ;
@@ -218,65 +217,6 @@ if runFortranPart
     save(['Std_prob_6\',fnameSave,solver,extra,'SolutionSetting',settings,'_',num2str(tsteps),'_tsteps.mat'],'solution','Hp','H','M') ;
     savefig(['Std_prob_6\',solver,extra,'_',num2str(tsteps),'_',settings,'_no_precond'])
 end
-if runMatlabPart
-    %% Matlab
-    problem = problem.setSolverType( 'UseDynamicSolver' );
 
-    problem = problem.setShowTheResult(true);
-    problem = problem.setSaveTheResult(false);
-    problem.DirectoryFilename = ['Matlab_simulations/Matlab_resolution_' num2str(resolution(1)) '_' num2str(resolution(2)) '_' num2str(resolution(3))];
-    problem.SimulationName = [fnameSave,'MATLAB_ode45',extra,'SolSetting',settings,'_',num2str(tsteps),'_tsteps'];
-
-    oldPath = cd('../../../../../MagTense/matlab/micromagnetism_matlab_only_implementation');
-    
-    problem.DemagTensorFileName= [oldPath,'/',problem.DirectoryFilename,problem.SimulationName,'_demag.mat'];
-    prob_struct=struct(problem);
-    % Pre-calculate interaction matrices
-    %if ~exist(problem.DemagTensorFileName,'file')
-        [ProblemSetupStruct, ~] = SetupProblem(prob_struct);
-        ProblemSetupStruct.thresholdFract=dem_thres; % Turn off demagnetization
-        ProblemSetupStruct.FFTdims=[];
-        %ProblemSetupStruct.use_single=true;
-        %ProblemSetupStruct.use_sparse=false;
-        InteractionMatrices = CalculateInteractionMatrices(ProblemSetupStruct);
-        InteractionMatrices.A2=D2X + D2Y + D2Z ; % Supply our own exchange matrix
-        save(ProblemSetupStruct.DemagTensorFileName,'InteractionMatrices') ;
-    %end
-    tic
-    SigmaSol1 = ComputeTheSolution(prob_struct);
-    toc
-    cd(oldPath);
-
-    % Get hysteresis loop
-    for k=1:size(SigmaSol1,1) 
-        Sigma = SigmaSol1(k,:).' ;
-        NN = round(numel(Sigma)/3) ;
-
-        SigmaX = Sigma(0*NN+[1:NN]) ;
-        SigmaY = Sigma(1*NN+[1:NN]) ;
-        SigmaZ = Sigma(2*NN+[1:NN]) ;
-        SigmaN = sqrt(SigmaX.^2+SigmaY.^2+SigmaZ.^2) ;
-        Mx(k) = mean(SigmaX./SigmaN) ;
-        My(k) = mean(SigmaY./SigmaN) ;
-        Mz(k) = mean(SigmaZ./SigmaN) ;
-    end
-    figure
-    plot(mu0*HextFct(problem.t),Mx)
-    xlabel('\mu_0H_{app} [T]')
-    ylabel('\langle m_x \rangle')
-    title_str=['"',settings,'" -- MATLAB Ode45, ', num2str(tsteps),' steps, theoretical pinning field: ',num2str(T_HP),' T'];
-	title(title_str)
-    fnameSave='mumag_std_6_tetraMATLAB_ode45';
-    solver='MATLAB_ODE45';
-    Hp = mu0*HextFct(min(problem.t(Mx>1-1e-3)));
-    Hp = Hp(:,1);
-    save(['Std_prob_6\',fnameSave,'SolutionSetting',settings,'_',num2str(tsteps),'_tsteps.mat'],'problem','Hp','SigmaSol1') ;
-    savefig(['Std_prob_6\',solver,'_',num2str(tsteps),'_',settings,'_no_precond'])
-    if (ShowTheResult)
-        plot(fig1, problem.t,Mx,'ro')
-        plot(fig1, problem.t,My,'go')
-        plot(fig1, problem.t,Mz,'bo')
-    end
-end
 close all
 end
