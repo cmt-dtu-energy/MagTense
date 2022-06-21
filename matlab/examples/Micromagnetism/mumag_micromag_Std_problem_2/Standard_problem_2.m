@@ -42,7 +42,7 @@ addpath('../../../util');
 %% Setup the problem
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
-problem.dem_appr = getMicroMagDemagApproximation('none');
+problem = problem.setMicroMagDemagApproximation('none');
 problem = problem.setUseCuda( use_CUDA );
 problem.alpha = 1e3;
 % problem.gamma = 2.21e5;
@@ -57,7 +57,7 @@ HextFct = @(t) HystDir .* t';
 problem.m0(:) = 1/sqrt(3);
 
 problem = problem.setSolverType( 'UseExplicitSolver' );
-problem.solver = getMicroMagSolver( 'Explicit' );
+problem = problem.setMicroMagSolver( 'Explicit' );
 
 problem = problem.setHext( HextFct, linspace(MaxH,-MaxH,40) );
 problem = problem.setTime( linspace(0,40e-9,2) );

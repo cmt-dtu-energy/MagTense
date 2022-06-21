@@ -47,7 +47,7 @@ cartesianUnstructuredMeshPlot(mesh.pos_out,mesh.dims_out,GridInfo,mesh.iIn);
 resolution = [length(mesh.pos_out) 1 1];
 disp(['Prisms N_grid = ' num2str(prod(resolution))])
 problem_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
-problem_ini.grid_type = getMicroMagGridType('unstructuredPrisms');
+problem_ini = problem_ini.setMicroMagGridType('unstructuredPrisms');
 
 %--- Information on the grid
 problem_ini.grid_pts    = mesh.pos_out;
@@ -66,7 +66,7 @@ InteractionMatrices.A2 = D2X + D2Y ;
 problem_ini = problem_ini.setExchangeMatrixSparse( InteractionMatrices.A2 );
 
 %% Setup the problem for the initial configuration
-problem_ini.dem_appr = getMicroMagDemagApproximation('none');
+problem_ini = problem_ini.setMicroMagDemagApproximation('none');
 problem_ini = problem_ini.setUseCuda( use_CUDA );
 problem_ini = problem_ini.setUseCVODE( use_CVODE );
 
@@ -101,7 +101,7 @@ end
 
 %% Setup problem for the time-dependent solver
 problem_dym = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
-problem_dym.grid_type = getMicroMagGridType('unstructuredPrisms');
+problem_dym = problem_dym.setMicroMagGridType('unstructuredPrisms');
 
 %--- Information on the grid
 problem_dym.grid_pts    = problem_ini.grid_pts;
@@ -119,7 +119,7 @@ problem_dym.alpha = 4.42e3 ;
 problem_dym.gamma = 2.21e5 ;
 problem_dym = problem_dym.setUseCuda( use_CUDA );
 problem_dym = problem_dym.setUseCVODE( use_CVODE );
-problem_dym.dem_appr = getMicroMagDemagApproximation('none');
+problem_dym = problem_dym.setMicroMagDemagApproximation('none');
 problem_dym = problem_dym.setTime( linspace(0,1e-9,200) );
 problem_dym.setTimeDis = int32(10);
 

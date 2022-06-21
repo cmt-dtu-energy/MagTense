@@ -235,15 +235,15 @@ methods
         
         
         %defines the grid type which currently only supports "uniform"
-        obj.grid_type = getMicroMagGridType('uniform');
+        obj = obj.setMicroMagGridType('uniform');
 
 
         %easy axes of each cell
         obj.u_ea = zeros( obj.ntot, 3 );
         %new or old problem
-        obj.ProblemMod = getMicroMagProblemMode( 'new' );
+        obj = obj.setMicroMagProblemMode( 'new' );
         %solver type ('Explicit', 'Implicit' or 'Dynamic')
-        obj.solver = getMicroMagSolver( 'Dynamic' );
+        obj = obj.setMicroMagSolver( 'Dynamic' );
 
         % Exchange term constant
         obj.A0 = 1.3e-11;
@@ -301,7 +301,7 @@ methods
         obj.usePres = int32(0);
         %set the demag approximation to the default, i.e. use no
         %approximation
-        obj.dem_appr = getMicroMagDemagApproximation('none');
+        obj = obj.setMicroMagDemagApproximation('none');
         
 
         %--- Set alpha as function of time
@@ -444,6 +444,72 @@ methods
 
         disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(10^9)) ' Gb'])
     end
+
+    function obj = setMicroMagDemagApproximation( obj, type_var )
+
+        switch type_var
+            case 'none'
+                %no approximation applied to the demag tensor
+                obj.dem_appr = int32(1);
+            case 'threshold'
+                %cut-off all values below threshold and make the matrix sparse
+                obj.dem_appr = int32(2);
+            case 'fft_thres'
+                %apply the threshold in fourier-space through:
+                % NP = FT * N * IFT
+                % NP(NP<threshold) = 0
+                % NP = sparse(NP)
+                %H = IFT ( NP * FT * M )
+                %with FT = fft( eye(n,n) ) and IFT = ifft( eye(n,n) )
+                obj.dem_appr = int32(3);
+            case 'threshold_fraction'
+                %cut-off all values below a certain fraction specified by threshold and make the matrix sparse
+                obj.dem_appr = int32(4);
+            case 'fft_threshold_fraction'
+                %cut-off all values below a certain fraction specified by threshold and make the matrix sparse
+                obj.dem_appr = int32(5);
+            otherwise
+                error('Chosen demag approximation does not exist');
+        end
+    end
+
+    function obj = setMicroMagProblemMode( obj, type_var )
+    % Set the problem mode
+        switch type_var
+            case 'new'
+                obj.ProblemMod = int32(1);
+            case 'old'
+                obj.ProblemMod = int32(2);
+        end
+    end
+
+    function obj = setMicroMagGridType( obj, type_var )
+    % maps the grid type from name to internal int value
+        
+        switch type_var
+            case 'uniform' 
+                obj.grid_type = int32(1);
+            case 'tetrahedron' 
+                obj.grid_type = int32(2);
+            case 'unstructuredPrisms' 
+                obj.grid_type = int32(3);
+        end
+    end
+
+    function obj = setMicroMagSolver( obj, type_var  )
+    %the following maps from naming to internal (fortran) representation of the solver type
+        
+        switch type_var
+            case 'Explicit'
+                obj.solver = int32(1);
+            case 'Dynamic'
+                obj.solver = int32(2);
+            case 'Implicit'
+                obj.solver = int32(3);
+        end
+            
+    end
+
     
     %Override struct function for a final check before handing to Fortran
     function obj2 = struct(obj)

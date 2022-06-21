@@ -65,8 +65,8 @@ for i = 1:length(L_loop)
     problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
     problem = problem.setUseCuda( use_CUDA );
     problem = problem.setUseCVODE( use_CVODE );
-    problem.dem_appr = getMicroMagDemagApproximation('none');
-    problem.grid_type = getMicroMagGridType('unstructuredPrisms');
+    problem = problem.setMicroMagDemagApproximation('none');
+    problem = problem.setMicroMagGridType('unstructuredPrisms');
 
     %--- Save the parameters
     problem.alpha = alpha;
