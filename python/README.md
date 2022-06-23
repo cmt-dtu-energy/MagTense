@@ -67,7 +67,7 @@ Navigate to folder **MagTense/python/magtense/lib/**, run **make**, and install 
 
 ```bash
 cd /path/to/repo/python/magtense/lib/
-make
+make SHELL=cmd
 cd /path/to/repo/python/
 pip install -e .
 ```

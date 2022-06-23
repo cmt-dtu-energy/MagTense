@@ -53,7 +53,7 @@ ifeq ($(OS),Windows_NT)
 	LIB_OPT = -I:${OPT_PATH1} -I:${OPT_PATH2} -L. -llibsrc
 	
 	LIBTOOL = LIB $? /OUT:$@
-	CLEAN_FILES = -del libsrc.lib *.o *.mod *.pyd
+	CLEAN_FILES = -del libsrc.a libsrc.lib *.o *.mod *.pyd
 	CLEAN_FOLDER = -rmdir /s /q Release 2>NUL || VER>NUL
 	CLEAN_FOLDER_WIN = -for /f %%i in ('dir /a:d /b src.win-*') do rd /s /q %%i
 else
@@ -71,7 +71,7 @@ else
 	else
   		LIBTOOL = ar src $@ $?
 	endif
-	CLEAN_FILES = -rm libsrc.a *.o *.mod *.so 
+	CLEAN_FILES = -rm libsrc.a libsrc.lib *.o *.mod *.so 
 	CLEAN_FOLDER = -rm -r src.*
 	CLEAN_FOLDER_WIN = -true
 endif
