@@ -1,16 +1,10 @@
 function buildMagTenseMEX(USE_RELEASE,USE_CUDA,USE_CVODE)
 %use clear all as this also clears dependencies to the .mex files and thus they can be overwritten
       
-clearvars -except USE_RELEASE USE_CUDA USE_CVODE
-  
-if ~exist('USE_RELEASE','var')
-    USE_RELEASE = true;
-end
-if ~exist('USE_CUDA','var')
-    USE_CUDA = true;
-end
-if ~exist('USE_CVODE','var')
-    USE_CVODE = true;
+arguments
+    USE_RELEASE {mustBeNumericOrLogical} = true;
+    USE_CUDA {mustBeNumericOrLogical} = true;
+    USE_CVODE {mustBeNumericOrLogical} = true;
 end
 
 %% The different possible cases
@@ -43,10 +37,10 @@ end
 if (ispc)
     if (USE_RELEASE)
         Debug_flag = '' ;
-        build_str = 'x64/release';
+        build_str = 'x64/Release';
     else
         Debug_flag = '-g' ;
-        build_str = 'x64/debug';
+        build_str = 'x64/Debug';
     end
 else
     if (USE_RELEASE)
@@ -60,20 +54,11 @@ end
 if (ispc)
     if (USE_CUDA)
         CUDA_str  = '''-Lc:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/lib/x64/'' -lcublas -lcudart -lcuda -lcusparse';
-        if (USE_RELEASE)
-            build_str_MagTenseMicroMag = 'x64/release';
-            build_str_NO_CUDA_MagTenseMicroMag = 'x64/Release_no_CUDA';
-        else
-            build_str_MagTenseMicroMag = 'x64/debug';
-            build_str_NO_CUDA_MagTenseMicroMag = 'x64/Debug_no_CUDA';
-        end
+        build_str_MagTenseMicroMag = build_str;
+        build_str_NO_CUDA_MagTenseMicroMag = [build_str '_no_CUDA'];
     else
-        CUDA_str  = '';
-        if (USE_RELEASE)
-            build_str_MagTenseMicroMag = 'x64/Release_no_CUDA';
-        else
-            build_str_MagTenseMicroMag = 'x64/Debug_no_CUDA';
-        end
+        CUDA_str  = '';        
+        build_str_MagTenseMicroMag = [build_str '_no_CUDA'];
     end
 else
     if (USE_CUDA)
@@ -93,18 +78,10 @@ if (ispc)
                  '''-Lc:/Program Files (x86)/sundials-4.1.0/instdir/lib'' -lsundials_cvode ' ...
                  '''-Lc:/Program Files (x86)/sundials-4.1.0/instdir/lib'' -lsundials_fsunnonlinsolfixedpoint_mod ' ...
                  '''-Ic:/Program Files (x86)/sundials-4.1.0/instdir/include'''];
-        if (USE_RELEASE)
-            build_str_NumericalIntegration = 'x64/release';
-        else
-            build_str_NumericalIntegration = 'x64/debug';
-        end
     else
         CVODE_str  = '';
-        if (USE_RELEASE)
-            build_str_NumericalIntegration = 'x64/Release_no_CVODE';
-        else
-            build_str_NumericalIntegration = 'x64/Debug_no_CVODE';
-        end
+        build_str = [build_str '_no_CVODE'];
+        build_str_MagTenseMicroMag = [build_str_MagTenseMicroMag '_no_CVODE'];
     end
 else
     if (USE_CVODE)
@@ -112,17 +89,16 @@ else
     else
         CVODE_str  = '';
     end
-    build_str_NumericalIntegration = '';
 end
 
 %--- The individual Fortran parts
 MagneticForceIntegrator_str = ['-Lsource/MagneticForceIntegrator/MagneticForceIntegrator/' build_str '/ ' MagneticForceIntegrator_lib_str ' -Isource/MagneticForceIntegrator/MagneticForceIntegrator/' build_str '/'];
 DemagField_str              = ['-Lsource/DemagField/DemagField/' build_str '/ ' DemagField_lib_str ' -Isource/DemagField/DemagField/' build_str '/'];
-NumericalIntegration_str    = ['-Lsource/NumericalIntegration/NumericalIntegration/' build_str_NumericalIntegration '/ ' NumericalIntegration_lib_str ' -Isource/NumericalIntegration/NumericalIntegration/' build_str_NumericalIntegration '/'];
+NumericalIntegration_str    = ['-Lsource/NumericalIntegration/NumericalIntegration/' build_str '/ ' NumericalIntegration_lib_str ' -Isource/NumericalIntegration/NumericalIntegration/' build_str '/'];
 TileDemagTensor_str         = ['-Lsource/TileDemagTensor/TileDemagTensor/' build_str '/ ' TileDemagTensor_lib_str ' -Isource/TileDemagTensor/TileDemagTensor/' build_str '/'];
 MagTenseMicroMag_str        = ['-Lsource/MagTenseMicroMag/' build_str_MagTenseMicroMag '/ ' MagTenseMicroMag_lib_str ' -Isource/MagTenseMicroMag/' build_str_MagTenseMicroMag '/'];
 
-Options_str                 = 'COMPFLAGS="$COMPFLAGS /Qopenmp /O3 /free /real_size:64 /fpe:0" -R2018a';
+Options_str                 = 'COMPFLAGS="$COMPFLAGS /Qopenmp /O3 /free /real-size:64 /fpe:0" -R2018a'; %/real_size:64
 if (ispc)
     MKL_str                 = '''-LC:/Program Files (x86)/Intel/oneAPI/mkl/latest/lib/intel64'' -lmkl_intel_lp64 -lmkl_blas95_lp64 ''-IC:\Program Files (x86)\Intel\oneAPI\mkl\latest\include''';%''-Ic:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/include/''';
 else
@@ -146,19 +122,16 @@ movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_file
 
 %% No CUDA version of MagTenseLandauLifshitzSolver_mex
 if (USE_CUDA)
-%     if (USE_RELEASE)
-        MagTenseMicroMag_str        = ['-Lsource/MagTenseMicroMag/' build_str_NO_CUDA_MagTenseMicroMag '/ ' MagTenseMicroMag_lib_str ' -Isource/MagTenseMicroMag/' build_str_MagTenseMicroMag '/'];
-        Source_str = 'source/MagTenseMEX/MagTenseMEX/MagTenseLandauLifshitzSolver_mex.f90';
-        mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' MagTenseMicroMag_str ' ' DemagField_str ' ' TileDemagTensor_str ' ' NumericalIntegration_str ' ' CVODE_str ' ' MKL_str ' ' Source_str ' ' Options_str];
-        eval(mex_str) 
-%     end
+    MagTenseMicroMag_str        = ['-Lsource/MagTenseMicroMag/' build_str_NO_CUDA_MagTenseMicroMag '/ ' MagTenseMicroMag_lib_str ' -Isource/MagTenseMicroMag/' build_str_MagTenseMicroMag '/'];
+    Source_str = 'source/MagTenseMEX/MagTenseMEX/MagTenseLandauLifshitzSolver_mex.f90';
+    mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' MagTenseMicroMag_str ' ' DemagField_str ' ' TileDemagTensor_str ' ' NumericalIntegration_str ' ' CVODE_str ' ' MKL_str ' ' Source_str ' ' Options_str];
+    eval(mex_str) 
     if ~USE_RELEASE
         movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/MagTenseLandauLifshitzSolverNoCUDA_mex.mex' MEX_str '64.pdb']);
     end
-    if ~USE_RELEASE
-    %movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/MagTenseLandauLifshitzSolverNoCUDA_mex.mex' MEX_str '64.pdb']);
+    pause(5)
+    movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_files/MagTenseLandauLifshitzSolverNoCUDA_mex.mex' MEX_str '64']);
 end
-%movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_files/MagTenseLandauLifshitzSolverNoCUDA_mex.mex' MEX_str '64']);
 
 %% IterateMagnetization_mex
 Source_str = 'source/MagTenseMEX/MagTenseMEX/IterateMagnetization_mex.f90';
