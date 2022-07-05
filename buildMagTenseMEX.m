@@ -54,10 +54,10 @@ else
 end
 
 if (ispc)
+    build_str_NO_CUDA_MagTenseMicroMag = [build_str '_no_CUDA'];
     if (USE_CUDA)
         CUDA_str  = '''-Lc:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/lib/x64/'' -lcublas -lcudart -lcuda -lcusparse';
         build_str_MagTenseMicroMag = build_str;
-        build_str_NO_CUDA_MagTenseMicroMag = [build_str '_no_CUDA'];
     else
         CUDA_str  = '';        
         build_str_MagTenseMicroMag = [build_str '_no_CUDA'];
@@ -84,6 +84,7 @@ if (ispc)
         CVODE_str  = '';
         build_str = [build_str '_no_CVODE'];
         build_str_MagTenseMicroMag = [build_str_MagTenseMicroMag '_no_CVODE'];
+        build_str_NO_CUDA_MagTenseMicroMag = [build_str_NO_CUDA_MagTenseMicroMag '_no_CVODE'];
     end
 else
     if (USE_CVODE)
