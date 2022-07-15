@@ -99,6 +99,9 @@ properties
     %filename from which N is loaded from
     N_file_in char = '';
     
+    %the number of points to average the demag tensor in for x-, y-, z-
+    N_ave = int32([1 1 1]);
+
     %filename for the Matlab save file
     DirectoryFilename = '';
     

@@ -859,7 +859,10 @@ include 'blas.f90'
     type(MagTile),dimension(1) :: tile                            !> Tile representing the current tile under consideration
     real(DP),dimension(:,:),allocatable :: H                      !> The field and the corresponding evaluation point arrays
     integer :: i,j,k,nx,ny,nz,ntot,ind                            !> Internal counters and index variables
-    real(DP),dimension(:,:,:,:),allocatable :: Nout               !> Temporary storage for the demag tensor            
+    integer :: i_a,j_a,k_a,nx_ave,ny_ave,nz_ave                   !> Internal counters and index variables for avering the demag tensor over the recieving tile
+    real(DP),dimension(:),allocatable :: dx,dy,dz
+    real(DP), dimension(:,:),allocatable :: pts_arr
+    real(DP),dimension(:,:,:,:),allocatable :: Nout,Noutave       !> Temporary storage for the demag tensor            
     complex(kind=4),dimension(:,:),allocatable :: eye,FT,IFT,temp,temp2 !> Identity matrix, the indentity matrix' fourier transform and its inverse fourier transform
     type(DFTI_DESCRIPTOR), POINTER :: desc_handle                 !> Handle for the FFT MKL stuff
     integer :: status
@@ -887,6 +890,11 @@ include 'blas.f90'
     nz = problem%grid%nz
     ntot = nx * ny * nz
     
+    !The number of elements to average the receiving tile over
+    nx_ave = problem%N_ave(1)
+    ny_ave = problem%N_ave(2)
+    nz_ave = problem%N_ave(3)
+    
     !Demag tensor components
     allocate( problem%Kxx(ntot,ntot), problem%Kxy(ntot,ntot), problem%Kxz(ntot,ntot) )
     allocate( problem%Kyy(ntot,ntot), problem%Kyz(ntot,ntot) )
@@ -904,9 +912,13 @@ include 'blas.f90'
                
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
             
+            if (nx_ave*ny_ave*nz_ave > 1) then
+                call displayMatlabMessage( 'Averaging the N_tensor not supported for this tile type' )
+            endif
+        
             !$OMP PARALLEL shared(problem) 
             !$omp do private(ind, tile, H, Nout, k, j, i)
-                   
+        
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do k=1,nz
                 do j=1,ny                
@@ -960,6 +972,11 @@ include 'blas.f90'
             !$OMP END PARALLEL
             
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
+        
+            if (nx_ave*ny_ave*nz_ave > 1) then
+                call displayMatlabMessage( 'Averaging the N_tensor not supported for this tile type' )
+            endif
+    
             !$OMP PARALLEL shared(problem)
             !$omp do private(ind, tile, H, Nout)
             
@@ -1008,10 +1025,10 @@ include 'blas.f90'
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
             
             !$OMP PARALLEL shared(problem)
-            !$omp do private(ind, tile, H, Nout)
+            !$omp do private(ind, tile, H, Nout,Noutave,dx,dy,dz,pts_arr)
             
             !for each element find the tensor for all evaluation points (i.e. all elements)
-            do i=1,nx
+            do i=1,ntot
                 !Setup template tile
                 tile(1)%tileType = 2 !(for prism)
                 tile(1)%exploitSymmetry = 0 !0 for no and this is important
@@ -1030,9 +1047,39 @@ include 'blas.f90'
                 
                 allocate(Nout(1,ntot,3,3))
                 allocate(H(ntot,3))
+                
+                allocate(Noutave(1,ntot,3,3))
+                allocate(dx(ntot))
+                allocate(dy(ntot))
+                allocate(dz(ntot))
+                allocate(pts_arr(ntot,3))
+                
+                Noutave(1,:,:,:) = 0;
 
-                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
-                                    
+                !Calculate the spacing between the points to do average in
+                !Note that abc is the full side length of the tile - it is divided with 1/2 in the demag tensor calculation
+                !to make it compatible to the expression in Smith_2010
+                dx = problem%grid%abc(:,1)/(nx_ave+1)
+                dy = problem%grid%abc(:,2)/(ny_ave+1)
+                dz = problem%grid%abc(:,3)/(nz_ave+1)
+                do k_a=1,nz_ave
+                    do j_a=1,ny_ave                
+                        do i_a=1,nx_ave
+                            !x = -2; a = 6; N = 4; dx = a/(N+1); figure; hold all; plot(x,0,'kd'); plot(x-a/2,0,'bd'); plot(x+a/2,0,'bd'); plot((x-a/2)+(1:N)*dx,0,'k*');
+                            pts_arr(:,1) =  (problem%grid%pts(:,1)-problem%grid%abc(:,1)/2)+dx(:)*i_a
+                            pts_arr(:,2) =  (problem%grid%pts(:,2)-problem%grid%abc(:,2)/2)+dy(:)*j_a
+                            pts_arr(:,3) =  (problem%grid%pts(:,3)-problem%grid%abc(:,3)/2)+dz(:)*k_a
+                            !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                            call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
+                            
+                            Noutave = Noutave+Nout
+                            
+                        enddo
+                    enddo
+                enddo
+                
+                Nout = Noutave/(nx_ave*ny_ave*nz_ave)
+                
                 !Copy Nout into the proper structure used by the micro mag model
                 ind = i
                     
@@ -1054,6 +1101,11 @@ include 'blas.f90'
                 !Clean up
                 deallocate(Nout)
                 deallocate(H)
+                deallocate(Noutave)
+                deallocate(dx)
+                deallocate(dy)
+                deallocate(dz)
+                deallocate(pts_arr)
             enddo
         
             !$omp end do
