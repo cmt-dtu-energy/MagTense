@@ -33,7 +33,7 @@
         mwPointer :: genericProblemPtr
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
         mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr
-        mwPointer :: usePrecisionPtr
+        mwPointer :: usePrecisionPtr, N_aveProblemPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
         real(DP) :: demag_fac
@@ -328,6 +328,10 @@
         nThreadPtr = mxGetField( prhs, i, problemFields(47) )
         call mxCopyPtrToInteger4(mxGetPr(nThreadPtr), problem%nThreadsMatlab, sx )
         
+        sx = 3
+        N_aveProblemPtr = mxGetField( prhs, i, problemFields(48) )
+        call mxCopyPtrToInteger4(mxGetPr(N_aveProblemPtr), problem%N_ave, sx )
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -463,7 +467,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=47
+        integer,parameter :: nf=48
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -517,6 +521,7 @@
         fieldnames(45) = 'grid_abc'
         fieldnames(46) = 'usePres'
         fieldnames(47) = 'nThreads'
+        fieldnames(48) = 'N_ave'
         
     end subroutine getProblemFieldnames
     

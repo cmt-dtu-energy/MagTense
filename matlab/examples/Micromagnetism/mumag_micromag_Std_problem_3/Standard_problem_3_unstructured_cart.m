@@ -1,6 +1,6 @@
-function [elapsedTime,problem,solution,E_arr,E_arr_v,L_loop] = Standard_problem_3_unstructured_cart( use_CUDA, ShowTheResult, SaveTheResult, ShowTheResultDetails, RunMatlab, L_loop, mesh_res_param, exch_meth, exch_weight )
+function [elapsedTime,problem,solution,E_arr,E_arr_v,L_loop] = Standard_problem_3_unstructured_cart( use_CUDA, ShowTheResult, ShowTheResultDetails, L_loop, n, L, mesh_res_param )
 
-clearvars -except  resolution use_CUDA ShowTheResult SaveTheResult ShowTheResultDetails RunMatlab L_loop mesh_res_param exch_meth exch_weight
+clearvars -except  resolution use_CUDA ShowTheResult ShowTheResultDetails RunMatlab L_loop n L mesh_res_param
 % close all
 
 if ~exist('use_CUDA','var')
@@ -8,9 +8,6 @@ if ~exist('use_CUDA','var')
 end
 if ~exist('ShowTheResult','var')
     ShowTheResult = 1;
-end
-if ~exist('SaveTheResult','var')
-    SaveTheResult = 0;
 end
 if ~exist('ShowTheResultDetails','var')
     ShowTheResultDetails = 0;
@@ -32,6 +29,8 @@ if (ShowTheResultDetails)
     figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
     figure2= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig2 = axes('Parent',figure2,'Layer','top','FontSize',16); hold on; grid on; box on
 end
+use_CVODE = false;
+
 mu0 = 4*pi*1e-7;
 
 addpath('../../../MEX_files');
@@ -41,11 +40,10 @@ addpath('../../../micromagnetism_matlab_only_implementation');
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% ------------------------------------------------------------------- MAGTENSE ---------------------------------------------------------
 %% --------------------------------------------------------------------------------------------------------------------------------------
-
 %--- Load the unstructured mesh
 %--- The parameters Ms, K0 and A0 are used to generate the mesh and thus they are loaded as well
-% load('Std_prob_3_unstructured_mesh_grains_9_mesh_4_ref_2.mat')
-load('Std_prob_3_unstructured_mesh_grains_9_mesh_7_ref_2.mat')
+load('Std_prob_3_unstructured_mesh_grains_9_mesh_4_ref_2.mat')
+% load('Std_prob_3_unstructured_mesh_grains_9_mesh_7_ref_2.mat')
 
 %% Setup the problem for the initial configuration
 for i = 1:length(L_loop)  
@@ -53,6 +51,7 @@ for i = 1:length(L_loop)
     
     mesh = mesh_arr(i);
     GridInfo = GridInfo_arr(i);
+    cartesianUnstructuredMeshPlot(mesh.pos_out,mesh.dims_out,GridInfo,mesh.iIn);
     
     %--- Define parameters
     alpha = 1e3;
@@ -65,8 +64,9 @@ for i = 1:length(L_loop)
     disp(['Prisms N_grid = ' num2str(prod(resolution))])
     problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
     problem = problem.setUseCuda( use_CUDA );
-    problem.dem_appr = getMicroMagDemagApproximation('none');
-    problem.grid_type = getMicroMagGridType('unstructuredPrisms');
+    problem = problem.setUseCVODE( use_CVODE );
+    problem = problem.setMicroMagDemagApproximation('none');
+    problem = problem.setMicroMagGridType('unstructuredPrisms');
 
     %--- Save the parameters
     problem.alpha = alpha;

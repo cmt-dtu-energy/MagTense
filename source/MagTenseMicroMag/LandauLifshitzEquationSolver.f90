@@ -600,9 +600,10 @@ include 'blas.f90'
         endif
         
     elseif ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
-        !!No CUDA support for this part yet
-        !fourier transform Mx, My and Mz
-        ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+        
+        if ( problem%useCuda .eq. useCudaFalse ) then
+            !fourier transform Mx, My and Mz
+            ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
                 
         !Convert to complex format
         do i=1,ntot
@@ -611,48 +612,48 @@ include 'blas.f90'
             solution%Mz_FT(i) = cmplx( solution%Mz_s(i), 0. )
         enddo
         
-        stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mx_FT )
-        !normalization
-        solution%Mx_FT = solution%Mx_FT / ntot
+            stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mx_FT )
+            !normalization
+            solution%Mx_FT = solution%Mx_FT / ntot
                 
-        stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%My_FT )
-        !normalization
-        solution%My_FT = solution%My_FT / ntot
+            stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%My_FT )
+            !normalization
+            solution%My_FT = solution%My_FT / ntot
         
-        stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mz_FT )
-        !normalization
-        solution%Mz_FT = solution%Mz_FT / ntot
+            stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mz_FT )
+            !normalization
+            solution%Mz_FT = solution%Mz_FT / ntot
             
-        !sparse matrix multiplication with the demag matrices in fourier space...                
-        ! use problem%K_s(1..6) with cuda or MKL to do the sparse matrix-vector product with the FFT(M) and subsequently the IFT on the whole thing to get H
+            !sparse matrix multiplication with the demag matrices in fourier space...                
+            ! use problem%K_s(1..6) with cuda or MKL to do the sparse matrix-vector product with the FFT(M) and subsequently the IFT on the whole thing to get H
         
-        !First Hx = Kxx * Mx + Kxy * My + Kxz * Mz
+            !First Hx = Kxx * Mx + Kxy * My + Kxz * Mz
         
-        alpha_c = cmplx(1.,0)
-        beta_c = cmplx(0.,0.)
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(1)%A, descr, solution%Mx_FT, beta_c, solution%HmX_c )
-        beta_c = cmplx(1.0,0.)
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%My_FT, beta_c, solution%HmX_c )
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(3)%A, descr, solution%Mz_FT, beta_c, solution%HmX_c )
+            alpha_c = cmplx(1.,0)
+            beta_c = cmplx(0.,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(1)%A, descr, solution%Mx_FT, beta_c, solution%HmX_c )
+            beta_c = cmplx(1.0,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%My_FT, beta_c, solution%HmX_c )
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(3)%A, descr, solution%Mz_FT, beta_c, solution%HmX_c )
         
         
-        !Fourier transform backwards to get the field
-        stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmX_C )
+            !Fourier transform backwards to get the field
+            stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmX_C )
         
         !Get the field
         solution%HmX = -solution%Mfact * real(solution%HmX_c)
         !call vsmul( ntot, real(solution%HmX_c), -solution%Mfact, solution%HmX )
         
         
-        !Second Hy = Kyx * Mx + Kyy * My + Kyz * Mz        
-        beta_c = cmplx(0.,0.)
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%Mx_FT, beta_c, solution%HmY_c )
-        beta_c = cmplx(1.0,0.)
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(4)%A, descr, solution%My_FT, beta_c, solution%HmY_c )
-        stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(5)%A, descr, solution%Mz_FT, beta_c, solution%HmY_c )
+            !Second Hy = Kyx * Mx + Kyy * My + Kyz * Mz        
+            beta_c = cmplx(0.,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%Mx_FT, beta_c, solution%HmY_c )
+            beta_c = cmplx(1.0,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(4)%A, descr, solution%My_FT, beta_c, solution%HmY_c )
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(5)%A, descr, solution%Mz_FT, beta_c, solution%HmY_c )
         
-        !Fourier transform backwards to get the field
-        stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmY_c )
+            !Fourier transform backwards to get the field
+            stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmY_c )
         
         !Get the field        
         solution%HmY = -solution%Mfact * real(solution%HmY_c)
@@ -672,7 +673,11 @@ include 'blas.f90'
         solution%HmZ = -solution%Mfact * real(solution%HmZ_c)
         !call vsmul( ntot, real(solution%HmZ_c), -solution%Mfact, solution%HmZ )
         
-    
+        else
+            !!No CUDA support for this part yet
+            call displayMatlabMessage( 'CUDA not currently supported with FFT - exiting!' )
+            stop
+        endif
         
     else        
         !Default way of doing the problem
@@ -854,8 +859,11 @@ include 'blas.f90'
     type(MagTile),dimension(1) :: tile                            !> Tile representing the current tile under consideration
     real(DP),dimension(:,:),allocatable :: H                      !> The field and the corresponding evaluation point arrays
     integer :: i,j,k,nx,ny,nz,ntot,ind                            !> Internal counters and index variables
-    real(DP),dimension(:,:,:,:),allocatable :: Nout               !> Temporary storage for the demag tensor            
-    complex(kind=4),dimension(:,:),allocatable :: eye,FT,IFT,temp !> Identity matrix, the indentity matrix' fourier transform and its inverse fourier transform
+    integer :: i_a,j_a,k_a,nx_ave,ny_ave,nz_ave                   !> Internal counters and index variables for avering the demag tensor over the recieving tile
+    real(DP),dimension(:),allocatable :: dx,dy,dz
+    real(DP), dimension(:,:),allocatable :: pts_arr
+    real(DP),dimension(:,:,:,:),allocatable :: Nout,Noutave       !> Temporary storage for the demag tensor            
+    complex(kind=4),dimension(:,:),allocatable :: eye,FT,IFT,temp,temp2 !> Identity matrix, the indentity matrix' fourier transform and its inverse fourier transform
     type(DFTI_DESCRIPTOR), POINTER :: desc_handle                 !> Handle for the FFT MKL stuff
     integer :: status
     complex(kind=4),dimension(:,:),allocatable :: Kxx_c, Kxy_c, Kxz_c, Kyy_c, Kyz_c, Kzz_c !> Temporary matrices for storing the complex version of the demag matrices
@@ -882,6 +890,11 @@ include 'blas.f90'
     nz = problem%grid%nz
     ntot = nx * ny * nz
     
+    !The number of elements to average the receiving tile over
+    nx_ave = problem%N_ave(1)
+    ny_ave = problem%N_ave(2)
+    nz_ave = problem%N_ave(3)
+    
     !Demag tensor components
     allocate( problem%Kxx(ntot,ntot), problem%Kxy(ntot,ntot), problem%Kxz(ntot,ntot) )
     allocate( problem%Kyy(ntot,ntot), problem%Kyz(ntot,ntot) )
@@ -899,9 +912,13 @@ include 'blas.f90'
                
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
             
+            if (nx_ave*ny_ave*nz_ave > 1) then
+                call displayMatlabMessage( 'Averaging the N_tensor not supported for this tile type' )
+            endif
+        
             !$OMP PARALLEL shared(problem) 
             !$omp do private(ind, tile, H, Nout, k, j, i)
-                   
+        
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do k=1,nz
                 do j=1,ny                
@@ -955,6 +972,11 @@ include 'blas.f90'
             !$OMP END PARALLEL
             
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
+        
+            if (nx_ave*ny_ave*nz_ave > 1) then
+                call displayMatlabMessage( 'Averaging the N_tensor not supported for this tile type' )
+            endif
+    
             !$OMP PARALLEL shared(problem)
             !$omp do private(ind, tile, H, Nout)
             
@@ -1003,10 +1025,10 @@ include 'blas.f90'
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
             
             !$OMP PARALLEL shared(problem)
-            !$omp do private(ind, tile, H, Nout)
+            !$omp do private(ind, tile, H, Nout,Noutave,dx,dy,dz,pts_arr)
             
             !for each element find the tensor for all evaluation points (i.e. all elements)
-            do i=1,nx
+            do i=1,ntot
                 !Setup template tile
                 tile(1)%tileType = 2 !(for prism)
                 tile(1)%exploitSymmetry = 0 !0 for no and this is important
@@ -1025,9 +1047,39 @@ include 'blas.f90'
                 
                 allocate(Nout(1,ntot,3,3))
                 allocate(H(ntot,3))
+                
+                allocate(Noutave(1,ntot,3,3))
+                allocate(dx(ntot))
+                allocate(dy(ntot))
+                allocate(dz(ntot))
+                allocate(pts_arr(ntot,3))
+                
+                Noutave(1,:,:,:) = 0;
 
-                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
-                                    
+                !Calculate the spacing between the points to do average in
+                !Note that abc is the full side length of the tile - it is divided with 1/2 in the demag tensor calculation
+                !to make it compatible to the expression in Smith_2010
+                dx = problem%grid%abc(:,1)/(nx_ave+1)
+                dy = problem%grid%abc(:,2)/(ny_ave+1)
+                dz = problem%grid%abc(:,3)/(nz_ave+1)
+                do k_a=1,nz_ave
+                    do j_a=1,ny_ave                
+                        do i_a=1,nx_ave
+                            !x = -2; a = 6; N = 4; dx = a/(N+1); figure; hold all; plot(x,0,'kd'); plot(x-a/2,0,'bd'); plot(x+a/2,0,'bd'); plot((x-a/2)+(1:N)*dx,0,'k*');
+                            pts_arr(:,1) =  (problem%grid%pts(:,1)-problem%grid%abc(:,1)/2)+dx(:)*i_a
+                            pts_arr(:,2) =  (problem%grid%pts(:,2)-problem%grid%abc(:,2)/2)+dy(:)*j_a
+                            pts_arr(:,3) =  (problem%grid%pts(:,3)-problem%grid%abc(:,3)/2)+dz(:)*k_a
+                            !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                            call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
+                            
+                            Noutave = Noutave+Nout
+                            
+                        enddo
+                    enddo
+                enddo
+                
+                Nout = Noutave/(nx_ave*ny_ave*nz_ave)
+                
                 !Copy Nout into the proper structure used by the micro mag model
                 ind = i
                     
@@ -1049,6 +1101,11 @@ include 'blas.f90'
                 !Clean up
                 deallocate(Nout)
                 deallocate(H)
+                deallocate(Noutave)
+                deallocate(dx)
+                deallocate(dy)
+                deallocate(dz)
+                deallocate(pts_arr)
             enddo
         
             !$omp end do
@@ -1186,7 +1243,6 @@ include 'blas.f90'
         !create the FT and IFT matrices
         allocate(eye(ntot,ntot),FT(ntot,ntot),IFT(ntot,ntot))
         
-        
         !make the identity matrix
         eye(:,:) = 0
         do i=1,ntot
@@ -1208,11 +1264,9 @@ include 'blas.f90'
         enddo
         
         !Find the inverse of the fourier transform
-        !We need to check if we should divide by the no of elements
         allocate(temp(ntot,ntot) )
         temp = conjg(FT)
         IFT = transpose(temp) / ntot
-        
         
         !do the change of basis of each of the demag tensor matrices
         !And make room for the very temporary complex output matrices
@@ -1223,33 +1277,37 @@ include 'blas.f90'
         beta_c  = cmplx(0.0,0.0)
         Kxx_c = FT
         temp = cmplx(problem%Kxx)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kxx_c, ntot)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kxx_c, ntot, IFT , ntot, beta_c, Kxx_c, ntot)
+        
+        !temporary array to hold the results of the first calculation
+        allocate(temp2(ntot,ntot) )
+
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, temp2, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, temp2, ntot, IFT , ntot, beta_c, Kxx_c, ntot)
        
         Kxy_c = FT
         temp = cmplx(problem%Kxy)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kxy_c, ntot)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kxy_c, ntot, IFT , ntot, beta_c, Kxy_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, temp2, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, temp2, ntot, IFT , ntot, beta_c, Kxy_c, ntot)
         
         Kxz_c = FT
         temp = cmplx(problem%Kxz)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kxz_c, ntot)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kxz_c, ntot, IFT , ntot, beta_c, Kxz_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, temp2, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, temp2, ntot, IFT , ntot, beta_c, Kxz_c, ntot)
         
         Kyy_c = FT
         temp = cmplx(problem%Kyy)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kyy_c, ntot)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kyy_c, ntot, IFT , ntot, beta_c, Kyy_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, temp2, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, temp2, ntot, IFT , ntot, beta_c, Kyy_c, ntot)
         
         Kyz_c = FT
         temp = cmplx(problem%Kyz)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kyz_c, ntot)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kyz_c, ntot, IFT , ntot, beta_c, Kyz_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, temp2, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, temp2, ntot, IFT , ntot, beta_c, Kyz_c, ntot)
         
         Kzz_c = FT
         temp = cmplx(problem%Kzz)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, Kzz_c, ntot)
-        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, Kzz_c, ntot, IFT , ntot, beta_c, Kzz_c, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, FT   , ntot, temp, ntot, beta_c, temp2, ntot)
+        call cgemm('N', 'N', ntot, ntot, ntot, alpha_c, temp2, ntot, IFT , ntot, beta_c, Kzz_c, ntot)
         !Kxx_c = matmul( matmul( FT, problem%Kxx ), IFT )
         !Kxy_c = matmul( matmul( FT, problem%Kxy ), IFT )
         !Kxz_c = matmul( matmul( FT, problem%Kxz ), IFT )
@@ -1257,6 +1315,7 @@ include 'blas.f90'
         !Kyz_c = matmul( matmul( FT, problem%Kyz ), IFT )
         !Kzz_c = matmul( matmul( FT, problem%Kzz ), IFT )
         deallocate(temp)
+        deallocate(temp2)
         
         threshold_var = problem%demag_threshold
         !If a fraction of entries is specified that are to be removed, find the function value for this
