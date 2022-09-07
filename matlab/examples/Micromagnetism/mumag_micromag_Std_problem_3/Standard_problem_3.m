@@ -48,7 +48,7 @@ addpath('../../../util');
 %that produces the desired field (if not present zero applied field is inferred)
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
-problem.dem_appr = getMicroMagDemagApproximation('none');
+problem = problem.setMicroMagDemagApproximation('none');
 problem = problem.setUseCuda( use_CUDA );
 
 problem.gamma = 0;
