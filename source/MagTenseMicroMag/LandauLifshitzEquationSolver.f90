@@ -540,9 +540,9 @@ include 'blas.f90'
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     integer :: stat,ntot,i
     type(matrix_descr) :: descr
-    real*4 :: pref,alpha,beta
+    real(SP) :: pref,alpha,beta
     complex(kind=4) :: alpha_c, beta_c
-    real*4, dimension(:), allocatable :: temp
+    real(SP), dimension(:), allocatable :: temp
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -870,10 +870,10 @@ include 'blas.f90'
     type(DFTI_DESCRIPTOR), POINTER :: desc_handle                 !> Handle for the FFT MKL stuff
     integer :: status
     complex(kind=4),dimension(:,:),allocatable :: Kxx_c, Kxy_c, Kxz_c, Kyy_c, Kyz_c, Kzz_c !> Temporary matrices for storing the complex version of the demag matrices
-    real(DP),dimension(:),allocatable  :: Kxx_abs, Kxy_abs, Kxz_abs, Kyy_abs, Kyz_abs, Kzz_abs  !> Temporary matrices with absolute values of the demag tensor, for threshold calculations
+    real(SP),dimension(:),allocatable  :: Kxx_abs, Kxy_abs, Kxz_abs, Kyy_abs, Kyz_abs, Kzz_abs  !> Temporary matrices with absolute values of the demag tensor, for threshold calculations
     complex(kind=4) :: thres
     integer,dimension(3) :: L                                     !> Array specifying the dimensions of the fft
-    real*4 :: threshold_var, alpha, beta
+    real(SP) :: threshold_var, alpha, beta
     complex(kind=4) :: alpha_c, beta_c
     integer ::  nx_K, ny_K, k_xx, k_xy, k_xz, k_yy, k_yz, k_zz 
     logical,dimension(:,:),allocatable :: mask_xx, mask_xy, mask_xz     !> mask used for finding non-zero values
@@ -1641,7 +1641,7 @@ include 'blas.f90'
     !>-----------------------------------------
     subroutine FindThresholdFraction(Kxx, Kxy, Kxz, Kyy, Kyz, Kzz, threshold_var)
     real(SP),dimension(:),intent(in) :: Kxx, Kxy, Kxz, Kyy, Kyz, Kzz                !> The absolute of the demag tensors 
-    real*4,intent(inout) :: threshold_var
+    real(SP),intent(inout) :: threshold_var
     real(SP) :: f_large, f_small, f_middle
     integer,dimension(6) :: count_ind
     integer :: count_middle, n_ele_nonzero, k_do  
