@@ -128,7 +128,7 @@ implicit none
     !> calls the icl wrapper to pass the data to the gpu
     !> in double precision
     subroutine cudaInit_d( Kxx_in, Kxy_in, Kxz_in, Kyy_in, Kyz_in, Kzz_in )
-    real*4,dimension(:,:) :: Kxx_in,Kxy_in,Kxz_in,Kyy_in,Kyz_in,Kzz_in
+    real*8,dimension(:,:) :: Kxx_in,Kxy_in,Kxz_in,Kyy_in,Kyz_in,Kzz_in
 
     real*4,dimension(:),allocatable :: Kxx, Kxy, Kxz, Kyy, Kyz, Kzz
     integer*4 :: n,i,j,ind
