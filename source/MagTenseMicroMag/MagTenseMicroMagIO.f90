@@ -616,7 +616,7 @@ end subroutine loadDemagTensorFromDisk
 !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 !>
 !! Routine for displaying progress within Matlab
-subroutine displayMatlabMessage( mess )
+subroutine displayMessage( mess )
     character(*),intent(in) :: mess
 
     integer :: mexCallMATLAB, nlhs_cb, nrhs_cb, tmp
@@ -644,7 +644,7 @@ subroutine displayMatlabMessage( mess )
         tmp = mexCallMATLAB(nlhs_cb, plhs_cb, nrhs_cb, prhs_cb, "disp")
     endif
 
-end subroutine displayMatlabMessage
+end subroutine displayMessage
 
 subroutine displayMatlabProgressMessage( mess, prog )
     character(*),intent(in) :: mess
@@ -656,8 +656,8 @@ subroutine displayMatlabProgressMessage( mess, prog )
     fmt = '(I4.2)'
     write (prog_str,fmt) prog
     
-    call displayMatlabMessage( mess )
-    call displayMatlabMessage( prog_str )
+    call displayMessage( mess )
+    call displayMessage( prog_str )
     
 end subroutine displayMatlabProgressMessage
 
@@ -669,8 +669,8 @@ subroutine displayMatlabProgessTime( mess, time  )
         
     write (prog_str,'(F4.2)') time
     
-    call displayMatlabMessage( mess )
-    call displayMatlabMessage( prog_str )
+    call displayMessage( mess )
+    call displayMessage( prog_str )
     
 end subroutine displayMatlabProgessTime
 

@@ -3,6 +3,7 @@
 #=======================================================================
 # F90 = gfortran
 F90 = ifort
+USE_CUDA = 0
 
 #=======================================================================
 #                     additional flags
@@ -18,11 +19,11 @@ endif
 
 ifeq ($(F90),ifort)
 	ifeq ($(OS),Windows_NT)
-    	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise /libs:static /threads /fpp
+    	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise /libs:static /threads /fpp /DUSE_CUDA=${USE_CUDA} /DUSE_PYTHON=1
 		EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower --opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
 		FCOMP = intelvem
 	else
-		F90FLAGS = -i8 -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 -fp-model precise -threads
+		F90FLAGS = -i8 -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 -fp-model precise -threads -fpp -DUSE_PYTHON=1
 		EXTRA_OPT = --opt='${F90FLAGS}'
 		FCOMP = intelem
 	endif
@@ -44,10 +45,15 @@ ifeq ($(OS),Windows_NT)
 	MKLROOT_COMP = "C:\Program Files (x86)\Intel\oneAPI\compiler\latest\windows\compiler"
 	MKL_OMP = -L${MKLROOT_COMP}/lib/intel64_win -llibiomp5md
 
-	CUDA_ROOT = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6"
-	CUDA = -L${CUDA_ROOT}/lib/x64 -lcublas -lcudart -lcuda -lcusparse
+	ifeq ($(USE_CUDA),1)
+		CUDA_ROOT = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6"
+		CUDA = -L${CUDA_ROOT}/lib/x64 -lcublas -lcudart -lcuda -lcusparse
+		OPT = ${MKLROOT}/include/intel64/lp64 -I${MKLROOT}/include  -I${CUDA_ROOT}/include
+	else
+		CUDA = 
+		OPT = ${MKLROOT}/include/intel64/lp64 -I${MKLROOT}/include
+	endif
 
-	OPT= ${MKLROOT}/include/intel64/lp64 -I${MKLROOT}/include  -I${CUDA_ROOT}/include
 	OPT_PATH1 = ${MKLROOT}/include/intel64/lp64
 	OPT_PATH2 = ${MKLROOT}/include
 	LIB_OPT = -I:${OPT_PATH1} -I:${OPT_PATH2} -L. -llibsrc
