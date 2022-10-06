@@ -150,10 +150,9 @@ private MTdmdt, MTy_out,MTf_vec
     real :: hstart                              !>Whether the code should choose the size of the first step. Set to 0.0d if so (recommended)    
     real :: t_step                              !>The current time at the end of a time step
     real :: conv_error                          !>The maximum error in the current time step
-    ! real :: min_diff, diff
     type(rk_comm_real_1d) :: setup_comm         !>Stores all the stuff used by setup
     integer :: flag                             !>Flag indicating how the integration went
-    integer :: i, k !j,                         !>Counter variable
+    integer :: i, k                             !>Counter variable
     !integer,parameter :: n_write=100
     !Perform allocations. 
     allocate(thres(neq))
@@ -207,16 +206,6 @@ private MTdmdt, MTy_out,MTf_vec
         
         !Check if the time which the solution is returned is part of the array that checks for converge or if it part of the times where the simulation is to be saved
         ind = findloc(t_conv,t_comb_unique(i))
-        ! ind = 0
-        ! min_diff = huge(1.0)
-
-        ! do j = 1, size(t_conv)
-        !     diff = abs(t_conv(j)-t_comb_unique(i))
-        !     if ( diff < min_diff) then
-        !         ind = j
-        !         min_diff = diff
-        !     end if
-        ! end do
         if (maxval(ind) .gt. 0) then !If the time is part of the converge array, we check for converge
             conv_error = maxval(abs(y_step-y_last))
             if (conv_error < conv_tol) then
@@ -232,16 +221,6 @@ private MTdmdt, MTy_out,MTf_vec
         
         !Check if we should save the result in the array to be returned
         ind = findloc(t,t_comb_unique(i))
-        ! ind = 0
-        ! min_diff = huge(1.0)
-
-        ! do j = 1, size(t_conv)
-        !     diff = abs(t_conv(j)-t_comb_unique(i))
-        !     if ( diff < min_diff) then
-        !         ind = j
-        !         min_diff = diff
-        !     end if
-        ! end do
         if (maxval(ind) .gt. 0) then !If the time is part of the save array
             y_out(:,k) = y_step
             yderiv_out(:,k) = yderiv_step

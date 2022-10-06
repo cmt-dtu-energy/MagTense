@@ -1,4 +1,7 @@
-!include 'blas.f90'
+#if !(USE_PYTHON)
+include 'blas.f90'
+#endif
+
 !include 'mkl_vml.f90'
     module LandauLifshitzSolution
     use ODE_Solvers
