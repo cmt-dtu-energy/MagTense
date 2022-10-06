@@ -4,6 +4,7 @@
 # F90 = gfortran
 F90 = ifort
 USE_CUDA = 0
+USE_CVODE = 0
 
 #=======================================================================
 #                     additional flags
@@ -19,11 +20,11 @@ endif
 
 ifeq ($(F90),ifort)
 	ifeq ($(OS),Windows_NT)
-    	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise /libs:static /threads /fpp /DUSE_CUDA=${USE_CUDA} /DUSE_PYTHON=1
+    	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise /libs:static /threads /fpp /DUSE_CUDA=${USE_CUDA} /DUSE_CVODE=${USE_CVODE} /DUSE_PYTHON=1
 		EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower --opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
 		FCOMP = intelvem
 	else
-		F90FLAGS = -i8 -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 -fp-model precise -threads -fpp -DUSE_PYTHON=1
+		F90FLAGS = -i8 -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 -fp-model precise -threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} -DUSE_PYTHON=1
 		EXTRA_OPT = --opt='${F90FLAGS}'
 		FCOMP = intelem
 	endif
