@@ -23,7 +23,7 @@ include "mkl_dfti.f90"
     !> matrix handle    
     type MagTenseSparse
         type(sparse_matrix_t) :: A                                      !> Sparse matrix handle to MKL
-        real(SP),dimension(:),allocatable :: values                     !> the non-zero values
+        real*4,dimension(:),allocatable :: values                     !> the non-zero values
         integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
         integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
         integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
@@ -137,9 +137,9 @@ include "mkl_dfti.f90"
         real(DP),dimension(:),allocatable :: HjX,HjY,HjZ                   !> Effective fields for the exchange term (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: HhX,HhY,HhZ                   !> Effective fields for the external field (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: HkX,HkY,HkZ                   !> Effective fields for the anisotropy energy term (X,Y and Z-directions, respectively)        
-        real(SP),dimension(:),allocatable :: HmX,HmY,HmZ                   !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
+        real*4,dimension(:),allocatable :: HmX,HmY,HmZ                   !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
         real(DP),dimension(:),allocatable :: Mx,My,Mz                      !> The magnetization components used internally as the solution progresses
-        real(SP),dimension(:),allocatable :: Mx_s,My_s,Mz_s                !> The magnetization components used internally as the solution progresses in single precision
+        real*4,dimension(:),allocatable :: Mx_s,My_s,Mz_s                !> The magnetization components used internally as the solution progresses in single precision
         complex(kind=4),dimension(:),allocatable :: Mx_FT, My_FT, Mz_FT    !> Fourier transform of Mx, My and Mz (complex)
         complex(kind=4),dimension(:),allocatable :: HmX_c,HmY_c,HmZ_c      !> Complex version of the demag field, used for the Fourier cut-off approach
         

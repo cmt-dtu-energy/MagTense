@@ -1,4 +1,4 @@
-include 'blas.f90'
+!include 'blas.f90'
 !include 'mkl_vml.f90'
     module LandauLifshitzSolution
     use ODE_Solvers
@@ -8,7 +8,11 @@ include 'blas.f90'
  !   use MKL_VML
     use BLAS95
     use MicroMagParameters
+#if USE_PYTHON
     use MagTenseMicroMagPyIO
+#else
+    use MagTenseMicroMagIO
+#endif
     use LLODE_Debug
     use util_call
     use DemagFieldGetSolution
@@ -57,8 +61,8 @@ include 'blas.f90'
     
     !Copy the demag tensor to CUDA
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
-        call displayMatlabMessage( 'Copying to CUDA' )
-#if USE_CUDA            
+        call displayMessage( 'Copying to CUDA' )
+#if USE_CUDA
         !Initialize the Cuda arrays and load the demag tensors into the GPU memory
         if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
            
@@ -71,9 +75,9 @@ include 'blas.f90'
             
         endif
 #else
-        call displayMatlabMessage( 'MagTense not compiled with CUDA - exiting!' )
+        call displayMessage( 'MagTense not compiled with CUDA - exiting!' )
         stop
-#endif            
+#endif
     endif
 
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
@@ -176,17 +180,14 @@ include 'blas.f90'
     !clean-up
     stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
    
-! #if USE_CUDA    
+#if USE_CUDA
     if ( gb_problem%useCuda .eqv. useCudaTrue ) then
         call cudaDestroy()
     endif
-! #endif
+#endif
     !Make sure to return the correct state
     sol = gb_solution
     prob = gb_problem
-    
-    
-    
     
     end subroutine SolveLandauLifshitzEquation
 
@@ -395,7 +396,7 @@ include 'blas.f90'
 
     !"J" : exchange term
     solution%Jfact = problem%A0 / ( mu0 * problem%Ms )
-    !call displayMatlabMessage( trim(prog_str) )
+    !call displayMessage( trim(prog_str) )
     !"H" : external field term (b.c. user input is in Tesla)
     !solution%Hfact = 1./mu0
     !"M" : demagnetization term
@@ -536,9 +537,9 @@ include 'blas.f90'
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     integer :: stat,ntot,i
     type(matrix_descr) :: descr
-    real(SP) :: pref,alpha,beta
+    real*4 :: pref,alpha,beta
     complex(kind=4) :: alpha_c, beta_c
-    real(SP), dimension(:), allocatable :: temp
+    real*4, dimension(:), allocatable :: temp
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -585,7 +586,7 @@ include 'blas.f90'
             solution%HmZ = temp * ( solution%Mfact )
             !call vsmul( ntot, solution%HmZ, -solution%Mfact, solution%HmZ )
         else
-! #if USE_CUDA
+#if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
             pref = sngl(-1 )!* solution%Mfact)                                
             call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
@@ -595,7 +596,7 @@ include 'blas.f90'
             solution%HmY = temp
             temp = solution%HmZ * solution%Mfact
             solution%HmZ = temp
-#endif            
+#endif
         endif
         
     elseif ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
@@ -674,7 +675,7 @@ include 'blas.f90'
         
         else
             !!No CUDA support for this part yet
-            call displayMatlabMessage( 'CUDA not currently supported with FFT - exiting!' )
+            call displayMessage( 'CUDA not currently supported with FFT - exiting!' )
             stop
         endif
         
@@ -731,7 +732,7 @@ include 'blas.f90'
             
         else
             pref = sngl(-1)! * solution%Mfact)
-#if USE_CUDA        
+#if USE_CUDA
             call cudaMatrVecMult( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
             temp = solution%HmX * solution%Mfact
             solution%HmX = temp
@@ -739,7 +740,7 @@ include 'blas.f90'
             solution%HmY = temp
             temp = solution%HmZ * solution%Mfact
             solution%HmZ = temp
-#endif            
+#endif
         endif 
     endif
        
@@ -912,7 +913,7 @@ include 'blas.f90'
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
             
             if (nx_ave*ny_ave*nz_ave > 1) then
-                call displayMatlabMessage( 'Averaging the N_tensor not supported for this tile type' )
+                call displayMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
         
             !$OMP PARALLEL shared(problem) 
@@ -973,7 +974,7 @@ include 'blas.f90'
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
         
             if (nx_ave*ny_ave*nz_ave > 1) then
-                call displayMatlabMessage( 'Averaging the N_tensor not supported for this tile type' )
+                call displayMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
     
             !$OMP PARALLEL shared(problem)
@@ -1115,13 +1116,13 @@ include 'blas.f90'
         CALL SYSTEM_CLOCK(c2)
 
         !Display the time to compute the demag tensor and its first entry
-        !call displayMatlabMessage( 'Time demag tensor:' )
+        !call displayMessage( 'Time demag tensor:' )
         !write (prog_str,'(f10.3)') (c2 - c1)/rate
-        !call displayMatlabMessage( prog_str )
+        !call displayMessage( prog_str )
         
-        !call displayMatlabMessage( 'Kxx(1,1):' )
+        !call displayMessage( 'Kxx(1,1):' )
         !write (prog_str,'(f10.3)') problem%Kxx(1,1)
-        !call displayMatlabMessage( prog_str )
+        !call displayMessage( prog_str )
         
         
         !Write the demag tensors to disk if asked to do so            
@@ -1523,9 +1524,9 @@ include 'blas.f90'
     mask = abs(D) .gt. threshold
     
     nnonzero = count( mask )
-    call displayMatlabMessage( 'Number of nonzero demag elements:' )
+    call displayMessage( 'Number of nonzero demag elements:' )
     write (prog_str,'(I10.9)') nnonzero
-    call displayMatlabMessage( prog_str )
+    call displayMessage( prog_str )
     
     allocate( K%values(nnonzero),K%cols(nnonzero))
     allocate( K%rows_start(nx), K%rows_end(nx), colInds(ny) )
@@ -1637,20 +1638,20 @@ include 'blas.f90'
     !>-----------------------------------------
     subroutine FindThresholdFraction(Kxx, Kxy, Kxz, Kyy, Kyz, Kzz, threshold_var)
     real(SP),dimension(:),intent(in) :: Kxx, Kxy, Kxz, Kyy, Kyz, Kzz                !> The absolute of the demag tensors 
-    real(SP),intent(inout) :: threshold_var
+    real*4,intent(inout) :: threshold_var
     real(SP) :: f_large, f_small, f_middle
     integer,dimension(6) :: count_ind
     integer :: count_middle, n_ele_nonzero, k_do  
     character*(10) :: prog_str
     
     if (threshold_var .ge. 1) then ! special case. 
-        call displayMatlabMessage( 'Threshold fraction >= 1 selected. Setting demagnetization to zero.' )
+        call displayMessage( 'Threshold fraction >= 1 selected. Setting demagnetization to zero.' )
         !f_large = max(maxval(Kxx), maxval(Kxy), maxval(Kxz), maxval(Kyy), maxval(Kyz), maxval(Kzz))
         !2*f_large because f_large sometimes leaves elements in demag tensors, possibly due to numerical errors.
         !threshold_var = 2*f_large
         threshold_var = huge(threshold_var)
     else
-        call displayMatlabMessage( 'Starting threshold calculation.' )
+        call displayMessage( 'Starting threshold calculation.' )
     
         !The total number of nonzero elements in the demag tensor
         n_ele_nonzero = size( Kxx )
@@ -1693,7 +1694,7 @@ include 'blas.f90'
             endif
             
             if ( k_do .gt. 1000 ) then
-                call displayMatlabMessage( 'Iterations exceeded in finding threshold value. Stopping iterations.' )
+                call displayMessage( 'Iterations exceeded in finding threshold value. Stopping iterations.' )
                 
                 threshold_var = f_middle
                 exit
@@ -1702,12 +1703,12 @@ include 'blas.f90'
             k_do = k_do+1
         enddo  
     
-        call displayMatlabMessage( 'Using a threshold value of :' )
+        call displayMessage( 'Using a threshold value of :' )
         write (prog_str,'(F10.9)') threshold_var
-        call displayMatlabMessage( prog_str )
-        call displayMatlabMessage( 'i.e. a fraction of:' )
+        call displayMessage( prog_str )
+        call displayMessage( 'i.e. a fraction of:' )
         write (prog_str,'(F6.4)') real(count_middle)/real(n_ele_nonzero)
-        call displayMatlabMessage( prog_str )
+        call displayMessage( prog_str )
     endif
     
     end subroutine FindThresholdFraction
