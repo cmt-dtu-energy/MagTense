@@ -95,7 +95,9 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     problem%ProblemMode = ProblemMode
     problem%solver = solver
     problem%A0 = A0
+    allocate( problem%Ms(ntot) )
     problem%Ms = Ms
+    allocate( problem%K0(ntot) )
     problem%K0 = K0
     problem%gamma = gamma
     problem%alpha0 = alpha
