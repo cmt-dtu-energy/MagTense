@@ -567,9 +567,9 @@
     
     n = problem%grid%nx * problem%grid%ny * problem%grid%nz
         
-            open (11, file=problem%demagTensorFileOut,	&
-			        status='unknown', form='unformatted',	&
-			        access='direct', recl=1*n*n)
+        open (11, file=problem%demagTensorFileOut,	&
+                status='unknown', form='unformatted',	&
+                access='direct', recl=1*n*n)
 
         write(11,rec=1) problem%Kxx
         write(11,rec=2) problem%Kxy
@@ -646,7 +646,7 @@
 
     end subroutine displayMessage
 
-    subroutine displayMatlabProgressMessage( mess, prog )
+    subroutine displayProgressMessage( mess, prog )
         character(*),intent(in) :: mess
         integer,intent(in) :: prog
         character*(4) :: prog_str
@@ -659,19 +659,6 @@
         call displayMessage( mess )
         call displayMessage( prog_str )
         
-    end subroutine displayMatlabProgressMessage
-
-    subroutine displayMatlabProgessTime( mess, time  )
-        character(*),intent(in) :: mess
-        real,intent(in) :: time
-        character*(4) :: prog_str
-                
-            
-        write (prog_str,'(F4.2)') time
-        
-        call displayMessage( mess )
-        call displayMessage( prog_str )
-        
-    end subroutine displayMatlabProgessTime
+    end subroutine displayProgressMessage
 
     end module MagTenseMicroMagIO

@@ -1508,8 +1508,8 @@ include 'blas.f90'
     !> single precision
     !>-----------------------------------------
     subroutine ConvertDenseToSparse_s( D, K, threshold)
-    real*4,dimension(:,:),intent(in) :: D                 !> Dense input matrix    
-    real*4,intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
+    real(SP),dimension(:,:),intent(in) :: D                 !> Dense input matrix    
+    real(SP),intent(in) :: threshold                        !> Values less than this (in absolute) of D are considered zero
     type(MagTenseSparse),intent(inout) :: K                 !> Sparse matrix allocation
     
     integer :: nx,ny, nnonzero

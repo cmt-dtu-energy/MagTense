@@ -5,7 +5,7 @@ include "mkl_dfti.f90"
     use MKL_SPBLAS
     Use MKL_DFTI
     INTEGER, PARAMETER :: SP = SELECTED_REAL_KIND(6, 37)
-    INTEGER, PARAMETER :: DP = KIND(1.0D0)
+    INTEGER, PARAMETER :: DP = SELECTED_REAL_KIND(15, 307)
     
     !>------------------
     !> Custom types
