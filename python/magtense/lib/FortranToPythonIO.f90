@@ -469,29 +469,24 @@ subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, Problem
     gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
     N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-    exch_rowe, exch_col, grid_abc, t_out, M, pts, H_exc, H_ext, H_dem, H_ani)
+    exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, t_out, M, pts, H_exc, H_ext, H_dem, H_ani)
 
-    integer(4),intent(in) :: ntot, nt_Hext, nt, nt_alpha, nt_conv
-    integer(4),intent(in) :: grid_nnod,  exch_nval, exch_nrow
-    integer(4),dimension(3),intent(in) :: grid_n
+    integer(4),intent(in) :: ntot, nt_Hext, nt, nt_alpha, nt_conv, grid_type, grid_nnod, exch_nval, exch_nrow
+    integer(4),dimension(3),intent(in) :: grid_n, N_ave
     real(8),dimension(3),intent(in) :: grid_L
-    integer(4),intent(in) :: grid_type
-    real(8),dimension(ntot, 3),intent(in) :: grid_pts
-    integer(4),dimension(4, ntot),intent(in) :: grid_ele
-    real(8),dimension(grid_nnod, 3),intent(in) :: grid_nod
-    real(8),dimension(ntot, 3),intent(in) :: grid_abc
-    real(8),dimension(ntot, 3),intent(in) :: u_ea
+    real(8),dimension(ntot,3),intent(in) :: grid_pts
+    integer(4),dimension(4,ntot),intent(in) :: grid_ele
+    real(8),dimension(grid_nnod,3),intent(in) :: grid_nod
+    real(8),dimension(ntot, 3),intent(in) :: grid_abc, u_ea
     real(8),dimension(nt_Hext, 4),intent(in) :: Hext
     real(8),dimension(3*ntot),intent(in) :: m0
     real(8),dimension(nt_alpha,2),intent(in) :: alphat
-    integer(4),dimension(exch_nval),intent(in) :: exch_val
+    integer(4),dimension(exch_nval),intent(in) :: exch_val, exch_col
     integer(4),dimension(exch_nrow),intent(in) :: exch_rows, exch_rowe
-    integer(4),dimension(exch_nval),intent(in) :: exch_col
     real(8),dimension(nt_conv),intent(in) :: t_conv
-    integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr
+    integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
     integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE
-    real(8),intent(in) :: A0, Ms, K0, gamma, alpha, MaxT0, tol, thres, conv_tol
-    real(4),intent(in) :: dem_thres
+    real(8),intent(in) :: A0, Ms, K0, gamma, alpha, MaxT0, tol, thres, conv_tol, dem_thres
     character*256,intent(in) :: N_file_in, N_file_out
 
     type(MicroMagProblem) :: problem
@@ -507,7 +502,7 @@ subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, Problem
         gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
         N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-        exch_rowe, exch_col, grid_abc, problem )
+        exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, problem )
 
     call SolveLandauLifshitzEquation( problem, solution )
 

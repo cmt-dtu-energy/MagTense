@@ -10,7 +10,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
     N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-    exch_rowe, exch_col, grid_abc, problem )
+    exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, problem )
     
     integer(4), intent(in) :: ntot, nt_conv, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow
     integer(4),dimension(3),intent(in) :: grid_n
@@ -29,10 +29,10 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     integer(4),dimension(exch_nrow),intent(in) :: exch_rows, exch_rowe
     integer(4),dimension(exch_nval),intent(in) :: exch_col
     real(8),dimension(nt_conv),intent(in) :: t_conv
-    integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr
+    integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
     integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE
-    real(8),intent(in) :: A0, Ms, K0, gamma, alpha, MaxT0, tol, thres, conv_tol
-    real(4),intent(in) :: dem_thres
+    real(8),intent(in) :: A0, Ms, K0, gamma, alpha, MaxT0, tol, thres, conv_tol, dem_thres
+    integer(4), dimension(3) :: N_ave
     real(8) :: demag_fac
     character*256,intent(in) :: N_file_in, N_file_out
 
@@ -181,7 +181,16 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     allocate( problem%t_conv(nt_conv) )
     problem%t_conv = t_conv
     problem%conv_tol = conv_tol
+
+    if ( usePrecision .eq. 1 ) then
+        problem%usePrecision = usePrecisionTrue
+    else
+        problem%usePrecision = usePrecisionFalse
+    endif
     
+    problem%nThreadsMatlab = nThreadsMatlab
+    problem%N_ave = N_ave
+
 end subroutine loadMicroMagProblem
 
 
@@ -201,98 +210,6 @@ subroutine returnMicroMagSolutionPy( solution, nt, ntot, ndim, t, M, pts, H_exc,
     H_ani = solution%H_ani
 
 end subroutine returnMicroMagSolutionPy
-
-
-!>-----------------------------------------
-!> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
-!> Returns an array with the names of the fields expected in the MicroMagProblem struct
-!> @param[inout] fieldnames, array of the names of the fields
-!> @param[inout] nfields the no. of elements in fieldnames
-!>-----------------------------------------
-subroutine getProblemFieldnames( fieldnames, nfields)
-    integer,intent(out) :: nfields
-    integer,parameter :: nf=45
-    character(len=10),dimension(:),intent(out),allocatable :: fieldnames
-        
-    nfields = nf
-    allocate(fieldnames(nfields))
-    
-    !! Setup the names of the members of the input struct
-    fieldnames(1) = 'grid_n'
-    fieldnames(2) = 'grid_L'
-    fieldnames(3) = 'grid_type'
-    fieldnames(4) = 'u_ea'
-    fieldnames(5) = 'ProblemMode'
-    fieldnames(6) = 'solver'
-    fieldnames(7) = 'A0'
-    fieldnames(8) = 'Ms'
-    fieldnames(9) = 'K0'
-    fieldnames(10) = 'gamma'
-    fieldnames(11) = 'alpha'
-    fieldnames(12) = 'MaxT0'
-    fieldnames(13) = 'nt_Hext'
-    fieldnames(14) = 'Hext'
-    fieldnames(15) = 'nt'
-    fieldnames(16) = 't'
-    fieldnames(17) = 'm0'
-    fieldnames(18) = 'dem_thres'
-    fieldnames(19) = 'useCuda'
-    fieldnames(20) = 'dem_appr'
-    fieldnames(21) = 'N_ret'
-    fieldnames(22) = 'N_file_out'
-    fieldnames(23) = 'N_load'
-    fieldnames(24) = 'N_file_in'
-    fieldnames(25) = 'setTimeDis'
-    fieldnames(26) = 'nt_alpha'
-    fieldnames(27) = 'alphat'
-    fieldnames(28) = 'tol'
-    fieldnames(29) = 'thres'
-    fieldnames(30) = 'useCVODE'
-    fieldnames(31) = 'exch_mat'
-    fieldnames(32) = 'nt_conv'
-    fieldnames(33) = 't_conv'
-    fieldnames(34) = 'conv_tol'
-    fieldnames(35) = 'grid_pts'
-    fieldnames(36) = 'grid_ele'
-    fieldnames(37) = 'grid_nod'
-    fieldnames(38) = 'grid_nnod'
-    fieldnames(39) = 'exch_nval'
-    fieldnames(40) = 'exch_nrow'
-    fieldnames(41) = 'exch_val'
-    fieldnames(42) = 'exch_rows'
-    fieldnames(43) = 'exch_rowe'
-    fieldnames(44) = 'exch_col'
-    fieldnames(45) = 'grid_abc'
-    
-end subroutine getProblemFieldnames
-
-
-    !>-----------------------------------------
-!> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
-!> Returns an array with the names of the fields expected in the MicroMagSolution struct
-!> @param[inout] fieldnames, array of the names of the fields
-!> @param[inout] nfields the no. of elements in fieldnames
-!>-----------------------------------------
-subroutine getSolutionFieldnames( fieldnames, nfields)
-    integer,intent(out) :: nfields
-    integer,parameter :: nf=7
-    character(len=10),dimension(:),intent(out),allocatable :: fieldnames
-        
-    nfields = nf
-    allocate(fieldnames(nfields))
-    
-    !! Setup the names of the members of the input struct
-    fieldnames(1) = 't'
-    fieldnames(2) = 'M'
-    fieldnames(3) = 'pts'
-    fieldnames(4) = 'H_exc'
-    fieldnames(5) = 'H_ext'
-    fieldnames(6) = 'H_dem'
-    fieldnames(7) = 'H_ani'
-    
-    
-    
-end subroutine getSolutionFieldnames
 
 
 !>----------------------------------------
@@ -376,18 +293,5 @@ subroutine displayProgressMessage( mess, prog )
     call displayMessage( prog_str )
     
 end subroutine displayProgressMessage
-
-subroutine displayProgessTime( mess, time  )
-    character(*),intent(in) :: mess
-    real,intent(in) :: time
-    character*(4) :: prog_str
-            
-        
-    write (prog_str,'(F4.2)') time
-    
-    call displayMessage( mess )
-    call displayMessage( prog_str )
-    
-end subroutine displayProgessTime
 
 end module MagTenseMicroMagPyIO
