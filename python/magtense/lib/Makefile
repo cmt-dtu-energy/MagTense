@@ -1,44 +1,27 @@
 #=======================================================================
-#                   define the compiler names
+#                       compiler names and flags
 #=======================================================================
-# F90 = gfortran
 F90 = ifort
+CC = gcc
+CFLAGS = -fPIC
+PYTHON_MODN = magtensesource
 USE_CUDA = 0
 USE_CVODE = 0
-
-#=======================================================================
-#                     additional flags
-#=======================================================================
-ifeq ($(F90),gfortran)
-	F90FLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512
-	ifeq ($(OS),Windows_NT)
-    	FCOMP = gnu95 --compiler=mingw32
-	else
-		FCOMP = gnu95
-	endif
-endif
-
-ifeq ($(F90),ifort)
-	ifeq ($(OS),Windows_NT)
-    	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise /libs:static /threads /fpp /DUSE_CUDA=${USE_CUDA} /DUSE_CVODE=${USE_CVODE} /DUSE_PYTHON=1
-		EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower --opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
-		FCOMP = intelvem
-	else
-		F90FLAGS = -i8 -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 -fp-model precise -threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} -DUSE_PYTHON=1
-		EXTRA_OPT = --opt='${F90FLAGS}'
-		FCOMP = intelem
-	endif
-endif
 
 VPATH = ../../../source/NumericalIntegration/NumericalIntegration:\
 ../../../source/TileDemagTensor/TileDemagTensor:\
 ../../../source/DemagField/DemagField:\
 ../../../source/MagTenseMicroMag
 
-CC = gcc
-CFLAGS = -fPIC # ==> universal for ifort, gfortran, pgi
 
 ifeq ($(OS),Windows_NT)
+	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise /libs:static \
+	/threads /fpp /DUSE_CUDA=${USE_CUDA} /DUSE_CVODE=${USE_CVODE} /DUSE_PYTHON=1
+
+	EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower \
+	--opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
+
+	FCOMP = intelvem
 	MKLROOT = "C:\Program Files (x86)\Intel\oneAPI\mkl\latest"
 	MKL = -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_lapack95_lp64 \
 	-lmkl_blas95_lp64 -lmkl_intel_thread -lmkl_core
@@ -63,7 +46,17 @@ ifeq ($(OS),Windows_NT)
 	CLEAN_FILES = -del libsrc.a libsrc.lib *.o *.mod *.pyd
 	CLEAN_FOLDER = -rmdir /s /q Release 2>NUL || VER>NUL
 	CLEAN_FOLDER_WIN = -for /f %%i in ('dir /a:d /b src.win-*') do rd /s /q %%i
+	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
+
 else
+	export LDFLAGS=-Wl,-rpath=/opt/intel/oneapi/mkl/latest/lib/intel64/
+	
+	F90FLAGS = -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 -fp-model precise \
+	-threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} -DUSE_PYTHON=1
+
+	EXTRA_OPT = --opt='${F90FLAGS}'
+	FCOMP = intelem
+
 	MKLROOT =/opt/intel/oneapi/mkl/latest
 	MKL = -L${MKLROOT}/lib/intel64/ -lmkl_intel_ilp64 -lmkl_lapack95_ilp64 \
 	-lmkl_blas95_ilp64 -lmkl_intel_thread -lmkl_core -lpthread -lm -ldl
@@ -78,19 +71,10 @@ else
 	else
   		LIBTOOL = ar src $@ $?
 	endif
+	
 	CLEAN_FILES = -rm libsrc.a libsrc.lib *.o *.mod *.so 
 	CLEAN_FOLDER = -rm -r src.*
 	CLEAN_FOLDER_WIN = -true
-endif
-
-# ======================================================================
-# PROJECT CONFIG, do not put spaced behind the variables
-# ======================================================================
-# Python module name
-PYTHON_MODN = magtensesource
-ifeq ($(OS),Windows_NT)
-	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
-else
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.so
 endif
 
@@ -99,9 +83,10 @@ endif
 #=======================================================================
 # names (without suffix), f90 sources
 LIBSRC_SOURCES = IntegrationDataTypes quadpack SpecialFunctions TileTensorHelperFunctions \
-TileRectangularPrismTensor TileCircPieceTensor TileCylPieceTensor TilePlanarCoilTensor TileTriangle \
-TileNComponents DemagFieldGetSolution spline MagParameters IterateMagnetSolution \
-MicroMagParameters RKSuitef90 ODE_Solvers LLODE_Debug util FortranCuda MagTenseMicroMagPyIO LandauLifshitzEquationSolver
+TileRectangularPrismTensor TileCircPieceTensor TileCylPieceTensor TilePlanarCoilTensor \
+TileTriangle TileNComponents DemagFieldGetSolution spline MagParameters IterateMagnetSolution \
+MicroMagParameters RKSuitef90 ODE_Solvers LLODE_Debug util FortranCuda MagTenseMicroMagPyIO \
+LandauLifshitzEquationSolver
 
 # file names
 LIBSRC_FILES = $(addsuffix .f90,${LIBSRC_SOURCES})
@@ -148,4 +133,5 @@ libsrc.a: ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
 ${PYTHON_MODN_ALL}: libsrc.lib libsrc.a
-	f2py --build-dir . --fcompiler=${FCOMP} ${EXTRA_OPT} -c -m ${PYTHON_MODN} ${LIB_OPT} ${LIBSRC_WRAP_FILES} ${LIBSRC_OBJECTS} $(MKL) $(MKL_OMP) $(CUDA)
+	f2py --build-dir . --fcompiler=${FCOMP} ${EXTRA_OPT} -c -m ${PYTHON_MODN} \
+	${LIB_OPT} ${LIBSRC_WRAP_FILES} ${LIBSRC_OBJECTS} $(MKL) $(MKL_OMP) $(CUDA)
