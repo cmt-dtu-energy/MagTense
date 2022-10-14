@@ -69,7 +69,7 @@ class MicromagProblem:
         precision: bool = False,
         n_threads: int = 1,
         N_ave: List[int] = [1, 1, 1],
-        t_alpha: np.array = np.zeros(1),
+        t_alpha: np.ndarray = np.zeros(1),
         alpha_fct = lambda t: np.atleast_2d(t).T * 0
     ) -> None:
         ntot = np.prod(res)
