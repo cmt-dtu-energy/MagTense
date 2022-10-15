@@ -41,6 +41,7 @@ class Tiles:
         center_pos: Optional[List] = None,
         dev_center: Optional[List] = None,
         size: Optional[List] = None,
+        vertices: Optional[List] = None,
         tile_type: Union[int, List, None] = None,
         offset: Optional[List] = None,
         rot: Optional[List] = None,
@@ -79,6 +80,7 @@ class Tiles:
         if center_pos is not None: self.center_pos = center_pos
         if dev_center is not None: self.dev_center = dev_center
         if size is not None: self.size = size
+        if vertices is not None: self.vertices = vertices
         if tile_type is not None: self.tile_type = tile_type
         if offset is not None: self.offset = offset
         if rot is not None: self.rot = rot
@@ -166,20 +168,22 @@ class Tiles:
     @vertices.setter
     def vertices(self, val):
         if isinstance(val, Tuple):
-            if val[0].shape == (3,4):
-                self._vertices[val[1]] = np.asarray(val[0])
-            elif val[0].shape == (4,3):
-                self._vertices[val[1]] = np.asarray(val[0]).T
+            vert = np.asarray(val[0])
+            if vert.shape == (3,4):
+                self._vertices[val[1]] = vert
+            elif vert.shape == (4,3):
+                self._vertices[val[1]] = vert.T
             else:
                 raise ValueError("Four 3-D vertices have to be defined!")
         else:
-            if val.shape == (3,4):
-                self._vertices[:] = np.asarray(val)
-            elif val.shape == (4,3):
-                self._vertices[:] = np.asarray(val).T
+            vert = np.asarray(val)
+            if vert.shape == (3,4):
+                self._vertices[:] = vert
+            elif vert.shape == (4,3):
+                self._vertices[:] = vert.T
             else:
-                assert val[0].shape == (3,4)
-                self._vertices = np.asarray(val)
+                assert vert[0].shape == (3,4)
+                self._vertices = vert
 
     @property
     def tile_type(self):
