@@ -2,8 +2,9 @@
 import math
 
 from magtense.magstatics import Tiles
-from magtense.utils.eval import validation
+from magtense.utils import validation
 
+mu0 = 4 * math.pi * 1e-7
 
 def valid_prism():
     tile_val = Tiles(
@@ -12,7 +13,7 @@ def valid_prism():
         offset=[0.5, 0.4, 0.1],
         rot=[math.pi/2, -math.pi/3, math.pi/4],
         tile_type=2,
-        M_rem=1.2/(4*math.pi*1e-7),
+        M_rem=1.2/mu0,
         easy_axis=[0.35355339, 0.61237244, 0.70710678],
         color=[1, 0, 0]
     )
@@ -27,8 +28,8 @@ def valid_circpiece():
         offset=[0.1, 0.3, 0.2],
         rot=[0, 0, 0],
         tile_type=3,
-        M_rem=1.2/(4*math.pi*1e-7),
-        easy_axis=[-0.3095974 , -0.22493568,  0.92387953],
+        M_rem=1.2/mu0,
+        easy_axis=[-0.3095974, -0.22493568, 0.92387953],
         color=[1, 0, 0]
     )
     validation('circpiece', tile_val,
@@ -43,7 +44,7 @@ def valid_circ_inv():
         offset=[0.3, 0.5, 0.1],
         rot=[0, 0, 0],
         tile_type=4,
-        M_rem=1.2/(4*math.pi*1e-7),
+        M_rem=1.2/mu0,
         easy_axis=[0.41562694, 0.41562694, 0.80901699],
         color=[1, 0, 0]
     )
@@ -57,7 +58,7 @@ def valid_sphere():
         size=[0.25, 0, 0],
         offset=[0.3, 0.5, 0.1],
         tile_type=6,
-        M_rem=1.2/(4*math.pi*1e-7),
+        M_rem=1.2/mu0,
         easy_axis=[1, 0, -1],
         color=[1, 0, 0]
     )
@@ -72,7 +73,7 @@ def valid_spheroid():
         offset=[0.1, 0.3, 0.45],
         rot=[-2, 1, 2],
         tile_type=7,
-        M_rem=1.2/(4*math.pi*1e-7),
+        M_rem=1.2/mu0,
         easy_axis=[0, 1, 0],
     )
     validation('spheroid', tile_val, [0.3, 0.45, 0.2],
@@ -84,7 +85,7 @@ def valid_tetrahedron():
         n=1,
         vertices=[[2.5,3,1],[2,1,4],[1.5,4,3],[4.5,5,2]],
         tile_type=5,
-        M_rem=1.2 / (4*math.pi*1e-7),
+        M_rem=1.2/mu0,
         easy_axis=[0.324264068, 0.734846928, 0.891545179],
         color = [1, 0, 0]
     )    
