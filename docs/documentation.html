@@ -5,7 +5,8 @@
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  
+  <meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
   <title>Documentation &mdash; MagTense TechManual  documentation</title>
@@ -23,11 +24,11 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
-        <script src="_static/language_data.js"></script>
-        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -36,6 +37,8 @@
   
   <link rel="stylesheet" href="_static/techmanual.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/techmanual.css" type="text/css" />
     <link rel="author" title="About these documents" href="about.html" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -59,7 +62,7 @@
 
           
             
-            <img src="_static/MagTense_logo.PNG" class="logo" alt="Logo"/>
+            <img src="_static/MagTense_logo.png" class="logo" alt="Logo"/>
           
           </a>
 
@@ -94,21 +97,16 @@
 <li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Documentation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#python">Python</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#objects">Objects</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#id1">MagTiles</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#evaluation-points">Evaluation points</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#demagnetization-tensor">Demagnetization tensor</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#h-field">H-field</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tiles-source">Tiles [source]</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#functions">Functions</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#functions">Functions</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#id2">iterate_magnetization (tiles, **options)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#id3">get_N_tensor (tiles, points)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#id4">get_H_field (tiles, points, N=None)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#id5">run_simulation (tiles, points, **options)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#id6">create_plot (iterated_tiles, points, H, grid=None)</a></li>
-</ul>
-</li>
+<li class="toctree-l3"><a class="reference internal" href="#grid-config-source">grid_config [source]</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#iterate-magnetization-source">iterate_magnetization [source]</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#get-demag-tensor-source">get_demag_tensor [source]</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#get-h-field-source">get_H_field [source]</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#run-simulation-source">run_simulation [source]</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#create-plot-source">create_plot [source]</a></li>
 </ul>
 </li>
 </ul>
@@ -146,117 +144,125 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="documentation">
-<h1>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="python">
-<h2>Python<a class="headerlink" href="#python" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="objects">
-<h3>Objects<a class="headerlink" href="#objects" title="Permalink to this headline">¶</a></h3>
-<div class="section" id="id1">
-<h4><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/MagTense.py#L9">MagTiles</a><a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h4>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
-    <span class="c1"># Initialization of arrays for specific tile parameters</span>
-    <span class="c1"># Input to Fortran derived type MagTile</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">center_pos</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># r0, theta0, z0</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">dev_center</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># dr, dtheta, dz</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># a, b, c</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">4</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># v1, v2, v3, v4 as column vectors</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">M</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># Mx, My, Mz</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">u_ea</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># Easy axis</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">u_oa1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">u_oa2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">mu_r_ea</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">mu_r_oa</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">M_rem</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
-    <span class="c1"># Implemented tile types:</span>
-    <span class="c1"># 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,</span>
-    <span class="c1"># 5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">tile_type</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">offset</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># offset of global coordinates</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">rot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">color</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">magnetic_type</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># 1 = hard magnet, 2 = soft magnet</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">stfcn_index</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># default index into the state function</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">incl_it</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># if equal to zero the tile is not included in the iteration</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">use_sym</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># whether to exploit symmetry</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">sym_op</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># 1 for symmetry and -1 for anti-symmetry respectively to the planes</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">M_rel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+  <section id="documentation">
+<h1>Documentation<a class="headerlink" href="#documentation" title="Permalink to this heading">¶</a></h1>
+<section id="python">
+<h2>Python<a class="headerlink" href="#python" title="Permalink to this heading">¶</a></h2>
+<section id="tiles-source">
+<h3>Tiles [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/magtense/magstatics.py#L9">source</a>]<a class="headerlink" href="#tiles-source" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="bp">self</span><span class="o">.</span><span class="n">init</span><span class="p">(</span>
+    <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">center_pos</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">dev_center</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">vertices</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">tile_type</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">offset</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">rot</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">M_rem</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">easy_axis</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">color</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">magnet_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">mag_angle</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 
-    <span class="c1"># Internal parameters for python to prepare configuration</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">grid_pos</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span> <span class="c1"># positions in the grid</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+<span class="bp">self</span><span class="o">.</span><span class="n">set_easy_axis</span><span class="p">(</span>
+    <span class="n">val</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">idx</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+
+<span class="bp">self</span><span class="o">.</span><span class="n">refine_prism</span><span class="p">(</span>
+    <span class="n">idx</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">List</span><span class="p">],</span>
+    <span class="n">mat</span><span class="p">:</span> <span class="n">List</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="evaluation-points">
-<h4>Evaluation points<a class="headerlink" href="#evaluation-points" title="Permalink to this headline">¶</a></h4>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">points</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">number_of_points</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+<section id="functions">
+<h4>Functions<a class="headerlink" href="#functions" title="Permalink to this heading">¶</a></h4>
+</section>
+</section>
+<section id="grid-config-source">
+<h3>grid_config [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/magtense/magstatics.py#L517">source</a>]<a class="headerlink" href="#grid-config-source" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">grid_config</span><span class="p">(</span>
+    <span class="n">spots</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+    <span class="n">area</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+    <span class="n">filled_pos</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">n_pts</span><span class="p">:</span> <span class="n">List</span> <span class="o">=</span> <span class="p">[</span><span class="mi">20</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;uniform&quot;</span><span class="p">,</span>
+    <span class="n">n_tiles</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">mag_angles</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">B_rem</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.2</span><span class="p">,</span>
+    <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Tiles</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="demagnetization-tensor">
-<h4>Demagnetization tensor<a class="headerlink" href="#demagnetization-tensor" title="Permalink to this headline">¶</a></h4>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">N</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">number_of_tiles</span><span class="p">,</span><span class="n">number_of_points</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+</section>
+<section id="iterate-magnetization-source">
+<h3>iterate_magnetization [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/magtense/magstatics.py#L655">source</a>]<a class="headerlink" href="#iterate-magnetization-source" title="Permalink to this heading">¶</a></h3>
+<p>Iterate through tiles to determine their influence on each other.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">iterate_magnetization</span><span class="p">(</span>
+    <span class="n">tiles</span><span class="p">:</span> <span class="n">Tiles</span><span class="p">,</span>
+    <span class="n">max_error</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
+    <span class="n">max_it</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
+    <span class="n">T</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">300.</span><span class="p">,</span>
+    <span class="n">mu_r</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">20</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tiles</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="h-field">
-<h4>H-field<a class="headerlink" href="#h-field" title="Permalink to this headline">¶</a></h4>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">H</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">number_of_points</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+</section>
+<section id="get-demag-tensor-source">
+<h3>get_demag_tensor [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/magtense/magstatics.py#L713">source</a>]<a class="headerlink" href="#get-demag-tensor-source" title="Permalink to this heading">¶</a></h3>
+<p>Get demagnetization tensor of tiles and the specified evaluation points.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_demag_tensor</span><span class="p">(</span>
+    <span class="n">tiles</span><span class="p">:</span> <span class="n">Tiles</span><span class="p">,</span>
+    <span class="n">pts</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
 </pre></div>
 </div>
-</div>
-</div>
-<div class="section" id="functions">
-<h3>Functions<a class="headerlink" href="#functions" title="Permalink to this headline">¶</a></h3>
-<div class="section" id="id2">
-<h4><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/MagTense.py#L441">iterate_magnetization (tiles, **options)</a><a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h4>
-<p>Returns updated tiles. Iterates through the given tiles to determine their influence
-on each other.</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Options:</span>
-<span class="n">max_error</span> <span class="o">=</span> <span class="mf">0.00001</span> <span class="c1"># Iteration stops if magnetization change of tiles is below this value</span>
-<span class="n">max_it</span> <span class="o">=</span> <span class="mi">500</span> <span class="c1"># Maximum number of performed iterations</span>
-<span class="n">T</span> <span class="o">=</span> <span class="mf">300.</span> <span class="c1"># Temperature for the state function if required</span>
+</section>
+<section id="get-h-field-source">
+<h3>get_H_field [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/magtense/magstatics.py#L752">source</a>]<a class="headerlink" href="#get-h-field-source" title="Permalink to this heading">¶</a></h3>
+<p>Calculate the demagnetizing field strength of a magnetic setup.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_H_field</span><span class="p">(</span>
+    <span class="n">tiles</span><span class="p">:</span> <span class="n">Tiles</span><span class="p">,</span>
+    <span class="n">pts</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">demag_tensor</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="id3">
-<h4><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/MagTense.py#L459">get_N_tensor (tiles, points)</a><a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h4>
-<p>Returns the demagnetization tensor N of the given tiles and
-the specified evaluation points.</p>
-</div>
-<div class="section" id="id4">
-<h4><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/MagTense.py#L468">get_H_field (tiles, points, N=None)</a><a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h4>
-<p>Returns the magnetic field H at the specified evaluation
-points of the given tiles.
-Optionally, a precalculated demagnetization tensor N can be
-handed over in order to prevent unnecessary and expensive
-recalculation of N if geometry of the setup does not change.</p>
-</div>
-<div class="section" id="id5">
-<h4><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/MagTense.py#L406">run_simulation (tiles, points, **options)</a><a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h4>
-<p>Does the previous mentioned steps all together.
-Demagnetization tensor will not be reused.</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Options:</span>
-<span class="n">plot</span> <span class="o">=</span> <span class="kc">False</span> <span class="c1"># Boolean if results shall be plotted</span>
-<span class="n">grid</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># Optional grid can be displayed</span>
-<span class="n">max_error</span> <span class="o">=</span> <span class="mf">0.00001</span> <span class="c1"># Iteration stops if magnetization change of tiles is below this value</span>
-<span class="n">max_it</span> <span class="o">=</span> <span class="mi">500</span> <span class="c1"># Maximum number of performed iterations</span>
-<span class="n">T</span> <span class="o">=</span> <span class="mf">300.</span> <span class="c1"># Temperature for the state function if required</span>
-<span class="n">iterate_solution</span> <span class="o">=</span> <span class="kc">True</span> <span class="c1"># Boolean if the magnetization of the tiles shall be iterated</span>
-<span class="n">return_field</span><span class="o">=</span><span class="kc">True</span> <span class="c1"># Boolean if magnetic field shall be calculated</span>
+</section>
+<section id="run-simulation-source">
+<h3>run_simulation [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/magtense/magstatics.py#L590">source</a>]<a class="headerlink" href="#run-simulation-source" title="Permalink to this heading">¶</a></h3>
+<p>Run MagTense with the Fortran source code as Python module.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">run_simulation</span><span class="p">(</span>
+    <span class="n">tiles</span><span class="p">:</span> <span class="n">Tiles</span><span class="p">,</span>
+    <span class="n">pts</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">max_error</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
+    <span class="n">max_it</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
+    <span class="n">T</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">300.</span><span class="p">,</span>
+    <span class="n">console</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Tiles</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
 </pre></div>
 </div>
+</section>
+<section id="create-plot-source">
+<h3>create_plot [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/magtense/utils.py#L452">source</a>]<a class="headerlink" href="#create-plot-source" title="Permalink to this heading">¶</a></h3>
+<p>Creates a plot with the iterated tiles and the calculated magnetic field H at the
+evaluation points as quiver plot. Additionally, an optional grid can be displayed.
+<strong>Tile types</strong>: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">create_plot</span><span class="p">(</span>
+    <span class="n">tiles</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tiles</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">eval_pts</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">field</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">spots</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">area</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</pre></div>
 </div>
-<div class="section" id="id6">
-<h4><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/util_plot.py#L422">create_plot (iterated_tiles, points, H, grid=None)</a><a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h4>
-<p>Creates a matplotlib with the iterated tiles and the calculated
-H-field at the evaluation points as quiver plot.
-Additionally, an optional grid can be displayed.</p>
-</div>
-</div>
-</div>
-</div>
+</section>
+</section>
+</section>
 
 
            </div>

@@ -4,10 +4,15 @@ Installation
 ==============================================
 Matlab
 ==============================================
-MagTense is directly useable in Matlab by downloading the 
-already compiled `MEX-files <https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/MEX_files>`_. The files are directly useable 
-with no compilation required, although Matlab 2018a or greater 
-is required.
+
+----------------------------------------------
+Prerequisites
+----------------------------------------------
+* Matlab :math:`\geq` 2018a
+
+MagTense is directly useable in Matlab by downloading the already compiled
+`MEX-files <https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/MEX_files>`_.
+
 
 ==============================================
 Python
@@ -16,28 +21,38 @@ Python
 ----------------------------------------------
 Prerequisites
 ----------------------------------------------
-* python installation
-* numpy package
-* matplotlib
-* gfortran :math:`\geq` 5
+* Python :math:`\geq` 3.9
+* `Intel® Fortran Compiler <https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran>`_
+* `Intel® oneAPI Math Kernel Library <https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html>`_
 
 ----------------------------------------------
-Add scripts to PYTHONPATH
+Required Packages
 ----------------------------------------------
-* python/magtense/lib/
-* python/magtense/
+[Info] On Linux, Make utility is pre-installed.
 
-----------------------------------------------
-Build python module from Fortran source code 
-----------------------------------------------
 ::
 
-    cd python/magtense/lib/
-    make
+    conda install -y numpy matplotlib
+    conda install -y -c conda-forge make
 
+----------------------------------------------
+Prepare terminal
+----------------------------------------------
+Setting environment variables to recognize ifort and MKL.
+[Info] On Windows, the environment variables might be set already.
 
-==============================================
-Standalone
-==============================================
-An EXE-file is available `here <https://github.com/cmt-dtu-energy/MagTense/tree/master/executable>`_.
-It can be used with a `Python script <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/MagTenseStandalone.py>`_.
+::
+
+    . ~/intel/oneapi/setvars.sh
+
+----------------------------------------------
+Build Python module
+----------------------------------------------
+Fortran source code becomes accessible from Python.
+
+::
+
+    cd /path/to/repo/python/magtense/lib/
+    make SHELL=cmd
+    cd /path/to/repo/python/
+    pip install -e .
