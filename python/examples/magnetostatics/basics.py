@@ -168,7 +168,7 @@ def prism_multiple(n_mag=1, soft=None, res=16, max=[1,1,1]):
     create_plot(updated_tiles, pts_eval, H_out)
 
 
-def halbach():
+def halbach_prism():
     '''
     Magnetic tiles shaped as rectangular prisms in Halbach configuration.
     Optimal angle:

@@ -30,7 +30,7 @@ setup(
     author_email="spol@dtu.dk",
     license="GPL 3.0",
     packages=find_packages(include=['magtense', 'magtense.*']),
-    package_data={'magtense': ['material_properties/*.csv']},
+    package_data={'magtense': ['mat/*.csv']},
     python_requires="==3.9.*",
     include_package_data=True,
     install_requires=["numpy", "matplotlib"],

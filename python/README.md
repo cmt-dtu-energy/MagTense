@@ -52,7 +52,7 @@ In  [iterate_magnetization()](magtense/magtense.py#L611), an arbitrary number of
 
 ```python
 mu_r = 100
-datapath = f'./magtense/material_properties/Fe_mur_{mu_r}_Ms_2_1.csv'
+datapath = f'./magtense/mat/Fe_mur_{mu_r}_Ms_2_1.csv'
 
  ...
 
@@ -60,7 +60,7 @@ data_statefcn = numpy.genfromtxt(datapath, delimiter=';')
 n_statefcn = 1
 ```
 
-[Here](magtense/material_properties), three sample M-H-curves for Fe with different relative permeabilities and a saturation magnetization of 2.1 T are stored as CSV-files. The data format is as follows:
+[Here](magtense/mat), three sample M-H-curves for Fe with different relative permeabilities and a saturation magnetization of 2.1 T are stored as CSV-files. The data format is as follows:
 
 ```csv
 0; Temp0; Temp1; ...

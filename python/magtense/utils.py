@@ -538,6 +538,51 @@ def create_plot(
     plt.show()
 
 
+def plot_magfield(field, magnet=None, vmax=1):
+    plt.clf()
+    labels = ['Bx-field', 'By-field', 'Bz-field']
+    nrows = 3 if len(field.shape) == 4 else 1
+    if magnet is not None: nrows += 1
+    fig, axes = plt.subplots(nrows=nrows, ncols=3, sharex=True,
+                             sharey=True, figsize=(15,10))
+    norm = colors.Normalize(vmin=-vmax, vmax=vmax)
+
+    if len(field.shape) == 3:
+        for i, comp in enumerate(field):
+            ax = axes.flat[i]
+            im = ax.imshow(comp, cmap='bwr', norm=norm, origin="lower")
+            ax.set_title(labels[i])
+
+    elif len(field.shape) == 4:
+        for i, z in enumerate([0, 1, 2]):
+            for j, comp in enumerate(field[:,:,:,z]):
+                ax = axes.flat[i * 3 + j]
+                im = ax.imshow(comp, cmap='bwr', norm=norm, origin="lower")
+                ax.set_title(labels[j] + f'@{z+1}')
+    
+    else:
+        raise NotImplementedError()
+
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.825, 0.345, 0.015, 0.3])
+    fig.colorbar(im, cax=cbar_ax)
+
+    if magnet is not None:
+        params = f'(x, y, a, |M|, phi)'
+        for i in range(magnet.shape[0]):
+            params += '\n\n('
+            for j in range(magnet.shape[1]):
+                params += f'{magnet[i,j]:.3f}, '
+            params += ')'
+        ax = axes.flat[-3]
+        ax.text(0, 0, params, fontsize=20)
+        ax.set_axis_off()
+        axes.flat[-2].set_axis_off()
+        axes.flat[-1].set_axis_off()
+
+    plt.show()
+
+
 def load_COMSOL(
     fname: str,
     eval_offset: List,
