@@ -1,4 +1,3 @@
-from optparse import Option
 import numpy as np
 
 from typing import Optional, List, Tuple, Union
@@ -41,6 +40,8 @@ class Tiles:
         dev_center: Optional[List] = None,
         size: Optional[List] = None,
         vertices: Optional[List] = None,
+        mu_r_ea: Union[int, List, None] = None,
+        mu_r_oa: Union[int, List, None] = None,
         tile_type: Union[int, List, None] = None,
         offset: Optional[List] = None,
         rot: Optional[List] = None,
@@ -77,6 +78,8 @@ class Tiles:
         if dev_center is not None: self.dev_center = dev_center
         if size is not None: self.size = size
         if vertices is not None: self.vertices = vertices
+        if mu_r_ea is not None: self.mu_r_ea = mu_r_ea
+        if mu_r_oa is not None: self.mu_r_oa = mu_r_oa
         if tile_type is not None: self.tile_type = tile_type
         if offset is not None: self.offset = offset
         if rot is not None: self.rot = rot
@@ -220,7 +223,13 @@ class Tiles:
 
     @M.setter
     def M(self, val):
-        self._M = val
+        if isinstance(val, Tuple):
+            self._M[val[1]] = val[0]
+        else:
+            if isinstance(val, (int, float)):
+                self._M = np.asarray([val for _ in range(self.n)])
+            elif len(val) == self.n:
+                self._M = np.asarray(val)
 
     @property
     def u_ea(self):
@@ -423,7 +432,7 @@ class Tiles:
         self._offset = np.append(self._offset, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0)
         self._rot = np.append(self._rot, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0)
         self._color = np.append(self._color, np.zeros(shape=(n,3), dtype=np.float64, order='F'), axis = 0)
-        self._magnettype = np.append(self._magnet_type, np.ones(n, dtype=np.int32, order='F'), axis = 0)
+        self._magnet_type = np.append(self._magnet_type, np.ones(n, dtype=np.int32, order='F'), axis = 0)
         self._stfcn_index = np.append(self._stfcn_index, np.ones(shape=(n), dtype=np.int32, order='F'), axis = 0)
         self._incl_it = np.append(self._incl_it, np.ones(shape=(n), dtype=np.int32, order='F'), axis = 0)
         self._use_sym = np.append(self._use_sym, np.zeros(shape=(n), dtype=np.int32, order='F'), axis = 0)
@@ -465,7 +474,7 @@ class Tiles:
                         self._M[idx] = self.M[i]
                         self._M_rel[idx] = self.M_rel[i]
                         self._color[idx] = self.color[i]
-                        self._magnettype[idx] = self.magnet_type[i]
+                        self._magnet_type[idx] = self.magnet_type[i]
                         self._mu_r_ea[idx] = self.mu_r_ea[i]
                         self._mu_r_oa[idx] = self.mu_r_oa[i]
                         self._rot[idx] = self.rot[i]
@@ -596,7 +605,7 @@ def run_simulation(
     console: bool = True
 ) -> tuple[Tiles, np.ndarray]:
     '''
-    Run MagTense with the Fortran source code as Python module.
+    Run magnetostatic simulation to calculate the demagnetizing field strength.
 
     Args:
         tiles: Magnetic tiles to produce magnetic field.
@@ -610,7 +619,7 @@ def run_simulation(
         Updated tiles.
         Demagnetizing field strength in evaluation points.
     '''
-    DATA_PATH = resource_filename('magtense', 'material_properties/data_stateFcn.csv')
+    DATA_PATH = resource_filename('magtense', 'mat/data_stateFcn.csv')
     data_stateFcn = np.genfromtxt(DATA_PATH, delimiter=';', dtype=np.float64)
 
     H_out, M_out, Mrel_out = magtensesource.fortrantopythonio.runsimulation( 
@@ -672,7 +681,7 @@ def iterate_magnetization(
     Returns:
         Updated tiles.
     '''    
-    DATA_PATH = resource_filename('magtense', f'material_properties/Fe_mur_{mu_r}_Ms_2_1.csv')
+    DATA_PATH = resource_filename('magtense', f'mat/Fe_mur_{mu_r}_Ms_2_1.csv')
     data_stateFcn = np.genfromtxt(DATA_PATH, delimiter=';', dtype=np.float64)
 
     M_out, Mrel_out = magtensesource.fortrantopythonio.iteratetiles(
