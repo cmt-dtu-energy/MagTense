@@ -55,3 +55,4 @@ venv.bak/
 # Data from DL scripts
 data/
 demag/
+evals/
