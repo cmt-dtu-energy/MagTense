@@ -96,7 +96,7 @@ def spheroid():
     points = [[i * seg[0] + seg[0]/2,
                j * seg[1] + seg[1]/2,
                k * seg[2] + seg[2]/2]
-               for i in range(0,n_points[0])
+               for i in range(0, n_points[0])
                for j in range(0, n_points[1])
                for k in range(0, n_points[2])]
     points = np.asarray(points, dtype=np.float64, order='F')

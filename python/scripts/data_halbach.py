@@ -34,7 +34,7 @@ def load_demag_tensor(
             print('[WARNING] No demagnetization tensor found for this Halbach configuration!')
             print('[RECOMMENDATION] Run `load_demag_tensor(store=True)` first for a larger amount of samples.')
         print('Calculating demagnetization tensor...')
-        demag_tensor = get_demag_tensor(halbach.tiles, pts_eval.coordinates)
+        demag_tensor = get_demag_tensor(halbach.tiles, pts_eval.coords)
         if store:
             if not fpath.parent.exists(): fpath.parent.mkdir()
             np.save(fpath, demag_tensor)
@@ -56,8 +56,8 @@ def calculate_demag_field(
     (3) Demagnetizing field: H = N * M
     '''
     demag_tensor = load_demag_tensor(halbach, pts_eval)
-    iterated_tiles = iterate_magnetization(halbach.tiles, max_error=1e-12, max_it=500, mu_r=halbach.mu_r)
-    field = get_H_field(iterated_tiles, pts_eval.coordinates, demag_tensor)
+    it_tiles = iterate_magnetization(halbach.tiles, max_error=1e-12, mu_r=halbach.mu_r)
+    field = get_H_field(it_tiles, pts_eval.coords , demag_tensor)
     # Filter posssible nan values - TODO Check with magtense
     idx_nan = [i for i, H_vec in enumerate(field) if np.isnan(np.linalg.norm(H_vec))]
     field[idx_nan,:] = [0,0,0]
@@ -75,9 +75,8 @@ def get_p2p(H_field: np.ndarray, pts_eval: np.ndarray, log: bool = False) -> flo
     Returns:
         Peak-to-peak (p2p) value in [parts per million].
     '''
-    coords = pts_eval.coordinates
     B_norm = [np.linalg.norm(H_vec) * 4 * np.pi * 1e-7 for i, H_vec in enumerate(H_field) 
-        if (coords[i][0]**2 + coords[i][1]**2 + coords[i][2]**2) <= pts_eval.r**2]
+        if (pts_eval.coords[i][0]**2 + pts_eval.coords[i][1]**2 + pts_eval.coords[i][2]**2) <= pts_eval.r**2]
     p2p = ((max(B_norm) - min(B_norm)) / max(B_norm))
 
     return np.log10(p2p) if log else p2p * 1e6
@@ -104,11 +103,12 @@ def evaluate_shimming(
     pts_eval: EvaluationPoints,
     log_p2p: bool = False
 ) -> tuple[np.ndarray, float]:
-    H_field_next = calculate_demag_field(halbach, pts_eval)
-    B_field_next = H_field_next.reshape((*pts_eval.res,3)).transpose((3,0,1,2)) * 4*np.pi*1e-7
-    p2p_next = get_p2p(H_field_next, pts_eval, log=log_p2p)
+    H_next = calculate_demag_field(halbach, pts_eval)
 
-    return B_field_next, p2p_next
+    B_next = H_next.reshape((*pts_eval.res,3)).transpose((3,0,1,2)) * 4 * np.pi * 1e-7
+    p2p_next = get_p2p(H_next, pts_eval, log=log_p2p)
+
+    return B_next, p2p_next
 
 
 ### API ###
@@ -277,6 +277,7 @@ def create_dataset(
                     np_action[i,j] = -1000
     
     datapath = Path(__file__).parent.absolute() / '..' / 'data'
+    if not datapath.exists(): datapath.mkdir()
     fname = name if name is not None else f'{spots}_{n_halbach}_{n_mat}_{field_res[0]}'
     n_config = n_halbach
 
@@ -310,14 +311,14 @@ def create_dataset(
         db.create_dataset("halbach_M_rem", shape=(n_config, halbach.n_hard_tiles), dtype="float32")
         db.create_dataset("halbach_easy_axes", shape=(n_config, halbach.n_hard_tiles, 3), dtype="float32")
         db.create_dataset("field", shape=(n_config, n_mat, 3, field_res[0], field_res[1], field_res[2]), dtype="float32")
-        db.create_dataset("shim_field", shape=(n_config, n_mat, halbach.shimming_points.coordinates.shape[0], 3), dtype="float32")
+        db.create_dataset("shim_field", shape=(n_config, n_mat, halbach.shimming_points.coords.shape[0], 3), dtype="float32")
         db.create_dataset("shim_mat", shape=(n_config, n_mat, spots), dtype="int32")
         db['shim_mat'][:,:] = symm_mat[start_idx:end_idx]
         db.create_dataset("p2p", shape=(n_config, n_mat, 1), dtype="float64")
 
         db.attrs['n_halbach'] = n_halbach
         db.attrs['n_mat'] = n_mat
-        db.attrs['shim_pos'] = halbach.shimming_points.coordinates
+        db.attrs['shim_pos'] = halbach.shimming_points.coords
         db.attrs['shim_segs'] = shim_segs
         db.attrs['shim_layers'] = shim_layers
         db.attrs['mu_r'] = mu_r
@@ -330,7 +331,7 @@ def create_dataset(
 
     if no_shim and "p2p_no_shim" not in db:
         db.create_dataset("field_no_shim", shape=(n_config, 3, field_res[0], field_res[1], field_res[2]), dtype="float32")
-        db.create_dataset("shim_field_no_shim", shape=(n_config, halbach.shimming_points.coordinates.shape[0], 3), dtype="float32")
+        db.create_dataset("shim_field_no_shim", shape=(n_config, halbach.shimming_points.coords.shape[0], 3), dtype="float32")
         db.create_dataset("p2p_no_shim", shape=(n_config, 1), dtype="float64")
 
     if action and "action" not in db:
@@ -417,4 +418,4 @@ def create_db_mp(n_workers=None, **kwargs):
 
 
 if __name__ == "__main__":
-    create_dataset(n_halbach=3, n_mat=2, shim_segs=16, shim_layers=3)
+    create_dataset(n_halbach=3, field_res=[16,16,16], n_mat=2, shim_segs=16, shim_layers=3, no_shim=False)

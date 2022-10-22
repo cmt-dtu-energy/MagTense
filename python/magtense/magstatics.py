@@ -181,9 +181,9 @@ class Tiles:
             self._tile_type[val[1]] = val[0]
         else:
             if isinstance(val, (int, float)):
-                self._tile_type = np.asarray([val for _ in range(self.n)])
+                self._tile_type = np.asarray([val for _ in range(self.n)], dtype=np.int32)
             elif len(val) == self.n:
-                self._tile_type = np.asarray(val)
+                self._tile_type = np.asarray(val, dtype=np.int32)
 
     @property
     def offset(self):
@@ -787,7 +787,8 @@ def get_H_field(
         dev_center=tiles.dev_center,
         tile_size=tiles.size,
         vertices=tiles.vertices,
-        mag=tiles.M, u_ea=tiles.u_ea,
+        mag=tiles.M,
+        u_ea=tiles.u_ea,
         u_oa1=tiles.u_oa1,
         u_oa2=tiles.u_oa2,
         mu_r_ea=tiles.mu_r_ea,
