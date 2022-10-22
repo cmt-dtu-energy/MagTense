@@ -126,7 +126,7 @@ end subroutine getNFromTiles
 !!
 subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
     mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
-    includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, N, useStoredN )
+    includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, N, useStoredN, H)
     
     integer(4),intent(in) :: n_tiles, n_pts
 
@@ -157,8 +157,7 @@ subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     real(8),dimension(n_pts,3),intent(in) :: pts
     real(8),dimension(n_pts,3),intent(out) :: H
     real(8),dimension(n_pts,3) :: H_tmp
-    real(8),dimension(n_tiles,n_pts,3,3),intent(in) :: N
-    real(8),dimension(n_tiles,n_pts,3,3) :: N_out
+    real(8),dimension(n_tiles,n_pts,3,3),intent(inout) :: N
     logical,intent(in) :: useStoredN
 
     type(MagTile),dimension(n_tiles) :: tiles
@@ -169,7 +168,6 @@ subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
 
-    N_out = N
     H(:,:) = 0.
 
     ! $OMP PARALLEL DO PRIVATE(i,H_tmp)    
@@ -185,49 +183,49 @@ subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
         select case ( tiles(i)%tileType )
         case ( tileTypeCylPiece )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )    
+                call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypePrism )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypeSphere )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypeSpheroid )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypeCircPiece )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypeCircPieceInverted )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypeTetrahedron )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypePlanarCoil )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts )            
             endif
