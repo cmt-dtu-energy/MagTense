@@ -49,7 +49,7 @@ class EvaluationPoints:
         self._coords = _coords.transpose((0,2,1,3)).reshape(3,-1).T
 
     @property
-    def coordinates(self):
+    def coords(self):
         return self._coords
 
     @property
