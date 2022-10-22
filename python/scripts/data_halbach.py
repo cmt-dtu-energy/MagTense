@@ -415,7 +415,3 @@ def create_db_mp(n_workers=None, **kwargs):
     print('Database created')
 
 #%%
-
-
-if __name__ == "__main__":
-    create_halbach(n_halbach=3, field_res=[16,16,16], n_mat=2, shim_segs=16, shim_layers=3, no_shim=False)
