@@ -57,7 +57,7 @@ def calculate_demag_field(
     '''
     demag_tensor = load_demag_tensor(halbach, pts_eval)
     it_tiles = iterate_magnetization(halbach.tiles, max_error=1e-12, mu_r=halbach.mu_r)
-    field = get_H_field(it_tiles, pts_eval.coords , demag_tensor)
+    field = get_H_field(it_tiles, pts_eval.coords, demag_tensor)
     # Filter posssible nan values - TODO Check with magtense
     idx_nan = [i for i, H_vec in enumerate(field) if np.isnan(np.linalg.norm(H_vec))]
     field[idx_nan,:] = [0,0,0]
@@ -147,7 +147,7 @@ def db_merge(db_name):
     
     if not Path(datapath, db_name).is_file():
         db = h5py.File(Path(datapath, filenames[0]), mode='r')
-        create_dataset(
+        create_halbach(
             n_halbach=db.attrs['n_halbach'],
             n_mat=db.attrs['n_mat'],
             shim_segs=db.attrs['shim_segs'],
@@ -204,7 +204,7 @@ def db_merge(db_name):
     db_final.close()
 
 
-def create_dataset(
+def create_halbach(
     n_halbach: int,
     n_mat: int,
     shim_segs: int = 8,
@@ -397,7 +397,7 @@ def create_db_mp(n_workers=None, **kwargs):
     for i in range(n_workers):
         end_intv = min((i+1) * intv, kwargs['n_halbach'])
         kwargs['interval'] = [i * intv, end_intv]
-        p = Process(target=create_dataset, kwargs=kwargs)
+        p = Process(target=create_halbach, kwargs=kwargs)
         p.start()
         l_p.append(p)
         if end_intv == kwargs['n_halbach']: break
@@ -418,4 +418,4 @@ def create_db_mp(n_workers=None, **kwargs):
 
 
 if __name__ == "__main__":
-    create_dataset(n_halbach=3, field_res=[16,16,16], n_mat=2, shim_segs=16, shim_layers=3, no_shim=False)
+    create_halbach(n_halbach=3, field_res=[16,16,16], n_mat=2, shim_segs=16, shim_layers=3, no_shim=False)

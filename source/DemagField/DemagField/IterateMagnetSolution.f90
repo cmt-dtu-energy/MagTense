@@ -37,28 +37,28 @@
     !! -1 max number of iterations reached without satisfying the minimum error
     subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max, max_ite, dispIteFct, resumeIteration )
         type(MagTile),dimension(n),intent(inout) :: tiles
-        integer,intent(in) :: n
+        integer(4),intent(in) :: n
         type(MagStateFunction),intent(in),dimension(n_stf) :: stateFunction    
-        integer,intent(in) :: n_stf
+        integer(4),intent(in) :: n_stf
         procedure(displayIteration_fct),pointer,intent(in) :: dispIteFct
-        real,intent(in) :: resumeIteration 
-        real,intent(in) :: T    
-        real,optional :: err_max
-        integer,optional :: max_ite 
+        real(8),intent(in) :: resumeIteration 
+        real(8),intent(in) :: T    
+        real(8),optional :: err_max
+        integer(4),optional :: max_ite 
     
         !!@todo This parameter is not used. Remove?
         integer,parameter :: cnt_max = 200
         
         logical :: done
-        integer :: i,j,cnt,i_err,lambdaCnt
-        real,dimension(3) :: M
-        real,dimension(:,:),allocatable :: H,H_old
-        real,dimension(:),allocatable :: Hnorm,Hnorm_old,err_val,Mnorm,Mnorm_old
+        integer(4) :: i,j,cnt,i_err,lambdaCnt
+        real(8),dimension(3) :: M
+        real(8),dimension(:,:),allocatable :: H,H_old
+        real(8),dimension(:),allocatable :: Hnorm,Hnorm_old,err_val,Mnorm,Mnorm_old
         type(NStoreArr),dimension(:),allocatable :: Nstore
-        real,dimension(3) :: pts    
-        real :: H_par,H_trans_1,H_trans_2,err,lambda,tmp
-        real,dimension(4) :: maxRelDiffArr
-        real,dimension(3,3) :: rotMat,rotMatInv
+        real(8),dimension(3) :: pts    
+        real(8) :: H_par,H_trans_1,H_trans_2,err,lambda,tmp
+        real(8),dimension(4) :: maxRelDiffArr
+        real(8),dimension(3,3) :: rotMat,rotMatInv
         logical :: lCh
     
         !::set default error margin if nothing has been specified by the user
@@ -295,8 +295,8 @@
     !<
     !! Reduces lambda and sets lCh to true, if maxDiff oscillates.
     subroutine updateLambda( lambda, maxDiff, lCh )
-        real,intent(inout) :: lambda
-        real,intent(in),dimension(4) :: maxDiff
+        real(8),intent(inout) :: lambda
+        real(8),intent(in),dimension(4) :: maxDiff
         logical,intent(inout) :: lCh
 
         lCh = .false.
@@ -318,11 +318,11 @@
     !!
     !!@todo Why does this function exist in a _1 and an _n version? The _1 version seems only to be called if tiles(i)%tileType .eq. tileTypeCylPiece.
     subroutine getM_HardMagnet_1( H, tile )
-        real,dimension(3), intent(in) :: H
+        real(8),dimension(3), intent(in) :: H
         type(MagTile), intent(inout) :: tile
 
-        real,dimension(3) :: M,un_x,un_y,un_z
-        real :: H_par,H_trans_1,H_trans_2
+        real(8),dimension(3) :: M,un_x,un_y,un_z
+        real(8) :: H_par,H_trans_1,H_trans_2
     
         un_x(1) = 1
         un_x(2:3) = 0
@@ -362,13 +362,13 @@
     !!@param tile: type MagTile and is the tile under consideration
     !!@param n: the number of field evaluations
     subroutine getM_HardMagnet_n( H, tile, n )
-        real,dimension(n,3), intent(in) :: H
+        real(8),dimension(n,3), intent(in) :: H
         type(MagTile), intent(inout) :: tile
         integer,intent(in) :: n
 
-        real,dimension(3) :: M,un_x,un_y,un_z
-        real :: H_par,H_trans_1,H_trans_2
-        integer :: i
+        real(8),dimension(3) :: M,un_x,un_y,un_z
+        real(8) :: H_par,H_trans_1,H_trans_2
+        integer(4) :: i
     
         un_x(1) = 1
         un_x(2:3) = 0
@@ -412,14 +412,14 @@
     !! Derives the magnetization of a soft ferromagnet given the input field and the state function
     !!
     subroutine getM_SoftMagnet( T, H, tile, stateFunction, n_stf)
-        real,intent(in) :: T
-        real,dimension(3), intent(in) :: H
+        real(8),intent(in) :: T
+        real(8),dimension(3), intent(in) :: H
         type(MagTile), intent(inout) :: tile
         type(MagStateFunction),intent(in),dimension(n_stf) :: stateFunction
-        integer,intent(in) :: n_stf
+        integer(4),intent(in) :: n_stf
     
-        integer :: index    
-        real :: Hnorm,Mnorm
+        integer(4) :: index    
+        real(8) :: Hnorm,Mnorm
     
         Hnorm = sqrt( H(1)**2 + H(2)**2 + H(3)**2 )
     
@@ -441,7 +441,7 @@
     !!
     subroutine getM_SoftConstMur( tile, H )
         type(MagTile),intent(inout) :: tile
-        real,dimension(3),intent(in) :: H
+        real(8),dimension(3),intent(in) :: H
         
         !Assuming B = mur * mu0 * (H + M) = mur * mu0 * H => M = H(mur-1)
         
@@ -456,10 +456,10 @@
     !!
     subroutine saveMagnetizationDebug( tiles, n, snaps )
         type(MagTile),dimension(n),intent(in) :: tiles
-        integer,intent(in) :: n,snaps
+        integer(4),intent(in) :: n,snaps
     
-        real,dimension(:,:),allocatable :: M
-        integer :: i
+        real(8),dimension(:,:),allocatable :: M
+        integer(4) :: i
     
         allocate(M(n,3))
     
@@ -522,7 +522,7 @@
         real(8),dimension(n_tiles),intent(in) :: Mrel
 
         type(MagTile),dimension(n_tiles),intent(inout) :: tiles
-        integer :: i
+        integer(4) :: i
 
         do i=1,n_tiles
             tiles(i)%r0 = centerPos(i,1)
@@ -572,11 +572,11 @@
     !!
     subroutine loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
         
-        integer,intent(in) :: nT,nH
+        integer(4),intent(in) :: nT,nH
         type(MagStateFunction),dimension(n_stateFcn),intent(inout) :: stateFcn
-        real,dimension(nH,nT),intent(in) :: data_stateFcn
-        integer,intent(in) :: n_stateFcn
-        integer :: i, j, k
+        real(8),dimension(nH,nT),intent(in) :: data_stateFcn
+        integer(4),intent(in) :: n_stateFcn
+        integer(4) :: i, j, k
 
         do i=1,n_stateFcn
             stateFcn(i)%nT = nT-1

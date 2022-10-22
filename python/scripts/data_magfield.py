@@ -160,13 +160,13 @@ def gen_magfield_sample(
     if shared: pba.update.remote(1)
 
 
-def create_db(
+def create_magfield_db(
     size: int,
     name: str = '',
     res: int = 256,
     dim: int = 2,
     check: bool = False,
-    num_proc: Optional[int] = None,
+    worker: Optional[int] = None,
     start_idx: int = 0,
     x_places: int = 10,
     z_places: int = 5, 
@@ -179,11 +179,11 @@ def create_db(
     datapath = Path(__file__).parent.resolve() / '..' / 'data' / f'{name}_{res}'
     if not datapath.exists(): datapath.mkdir(parents=True)
     
-    worker = cpu_count() if num_proc is None else num_proc
+    if worker is None: worker = cpu_count()
     if worker > 1: ray.init(num_cpus=worker, include_dashboard=False, local_mode=False)
     print(f'[INFO] #Data: {size} | #Worker: {worker} | #Path: {datapath}')
 
-    if num_proc == 1:
+    if worker == 1:
         for idx in range(start_idx, size):
             gen_magfield_sample(idx, res, dim, datapath, filled_mat, empty_mat, check)
     else:

@@ -21,20 +21,20 @@
     !!
     subroutine getFieldFromTiles( tiles, H, pts, n_tiles, n_ele, Nout, useStoredNorg )
         type(MagTile),intent(inout),dimension(n_tiles) :: tiles
-        real,dimension(n_ele,3),intent(inout) :: H
-        real,dimension(n_ele,3),intent(in) :: pts
-        integer,intent(in) :: n_tiles,n_ele
-        real,dimension(:,:,:,:),allocatable,optional :: Nout
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3),intent(in) :: pts
+        integer(4),intent(in) :: n_tiles,n_ele
+        real(8),dimension(:,:,:,:),allocatable,optional :: Nout
         logical,optional :: useStoredNorg
     
-        integer :: i,prgCnt,tid,prog,OMP_GET_THREAD_NUM
-        real,dimension(:,:),allocatable :: H_tmp
-        integer,parameter :: cbCnt = 10
+        integer(4) :: i,prgCnt,tid,prog,OMP_GET_THREAD_NUM
+        real(8),dimension(:,:),allocatable :: H_tmp
+        integer(4),parameter :: cbCnt = 10
         logical :: useStoredN,localFieldSoft    !>Indicates whether the local field of the tile should be found as if the tile is made of a soft ferromagnetic material
-        real,dimension(3,3) :: N_current_tile   !>The tensor for the current tile where the field has to be handled differently (see below)
-        real,dimension(3) :: mur                !>The permeability tensor
-        real :: Happ_nrm,Hnorm
-        real,dimension(3) :: Happ_un,NHapp,v1,v2
+        real(8),dimension(3,3) :: N_current_tile   !>The tensor for the current tile where the field has to be handled differently (see below)
+        real(8),dimension(3) :: mur                !>The permeability tensor
+        real(8) :: Happ_nrm,Hnorm
+        real(8),dimension(3) :: Happ_un,NHapp,v1,v2
             
         !set to false by default and update later
         localFieldSoft = .false.
@@ -188,7 +188,7 @@
         !!Subtract M of a tile in points that are inside that tile in order to actually get H (only for CylindricalTiles as these actually calculate the B-field (divided by mu0)
         !!@todo Should this function not only be called if tileTypeCylPiece?
         call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_ele)
-    
+
     end subroutine getFieldFromTiles
     
     
@@ -203,10 +203,10 @@
     !!
     subroutine getFieldFromRectangularPrismTile( prismTile, H, pts, n_ele, N_out, useStoredN )
         type(MagTile),intent(in) :: prismTile
-        real,dimension(n_ele,3),intent(inout) :: H
-        real,dimension(n_ele,3) :: pts
-        integer,intent(in) :: n_ele
-        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
         logical,intent(in),optional :: useStoredN
     
         procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
@@ -233,10 +233,10 @@
     !!
     subroutine getFieldFromSphereTile( tile, H, pts, n_ele, N_out, useStoredN )
         type(MagTile),intent(in) :: tile
-        real,dimension(n_ele,3),intent(inout) :: H
-        real,dimension(n_ele,3) :: pts
-        integer,intent(in) :: n_ele
-        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
         logical,intent(in),optional :: useStoredN
     
         procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
@@ -259,10 +259,10 @@
     !!
     subroutine getFieldFromSpheroidTile( tile, H, pts, n_ele, N_out, useStoredN )
         type(MagTile),intent(in) :: tile
-        real,dimension(n_ele,3),intent(inout) :: H
-        real,dimension(n_ele,3) :: pts
-        integer,intent(in) :: n_ele
-        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
         logical,intent(in),optional :: useStoredN
     
         procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
@@ -285,10 +285,10 @@
     !!
     subroutine getFieldFromTetrahedronTile( tile, H, pts, n_ele, N_out, useStoredN )
         type(MagTile),intent(in) :: tile
-        real,dimension(n_ele,3),intent(inout) :: H
-        real,dimension(n_ele,3) :: pts
-        integer,intent(in) :: n_ele
-        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
         logical,intent(in),optional :: useStoredN
     
         procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
@@ -313,25 +313,25 @@
     !!
     subroutine getFieldFromCylTile( cylTile, H, pts, n_ele, N_out, useStoredN )
         type(MagTile), intent(inout) :: cylTile
-        real,dimension(n_ele,3),intent(inout) :: H
-        real,dimension(n_ele,3) :: pts
-        integer,intent(in) :: n_ele
-        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
-        real,dimension(:),allocatable :: r,x,phi
-        real,dimension(:,:),allocatable :: pts_local
-        real :: phi_orig,z_orig
-        real,dimension(3) :: M_orig !,M_tmp
-        real,dimension(3,3) :: N,Rz,Rz_inv
-        integer :: i
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
+        real(8),dimension(:),allocatable :: r,x,phi
+        real(8),dimension(:,:),allocatable :: pts_local
+        real(8) :: phi_orig,z_orig
+        real(8),dimension(3) :: M_orig !,M_tmp
+        real(8),dimension(3,3) :: N,Rz,Rz_inv
+        integer(4) :: i
         logical,intent(in),optional :: useStoredN
-        real :: x_nan_val
+        real(8) :: x_nan_val
         
         x_nan_val = 0.
         x_nan_val = 0./x_nan_val
-        
+
         !::Run the calculation
-        allocate( r(n_ele), x(n_ele), phi(n_ele), pts_local(n_ele,3) )    
-      
+        allocate( r(n_ele), x(n_ele), phi(n_ele), pts_local(n_ele,3) )
+
         !::Include the offset between the global coordinate system and the tile's coordinate system
         !::the pts array is always in global coordinates
         pts_local(:,1) = pts(:,1) - cylTile%offset(1)
@@ -434,15 +434,15 @@
     !!Function to calcuate H within a cylindrical tile that is rotated, as for CylindricalTiles it is actually the B-field divided by mu0 that is calculated
     !!
     subroutine SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_pts)
-        real,dimension(n_pts,3),intent(inout) :: H
+        real(8),dimension(n_pts,3),intent(inout) :: H
         type(MagTile),dimension(n_tiles),intent(in) :: tiles
-        real,dimension(n_pts,3),intent(in) :: pts
-        integer,intent(in) :: n_tiles,n_pts
+        real(8),dimension(n_pts,3),intent(in) :: pts
+        integer(4),intent(in) :: n_tiles,n_pts
     
-        real,dimension(:),allocatable :: r,theta,z
-        real,dimension(:,:),allocatable :: pts_local
-        real :: rmin,rmax,thetamin,thetamax,zmin,zmax
-        integer :: i
+        real(8),dimension(:),allocatable :: r,theta,z
+        real(8),dimension(:,:),allocatable :: pts_local
+        real(8) :: rmin,rmax,thetamin,thetamax,zmin,zmax
+        integer(4) :: i
     
         allocate( r(n_pts), theta(n_pts), z(n_pts),  pts_local(n_pts,3) )
               
@@ -497,10 +497,10 @@
     !!
     subroutine getFieldFromCircPieceTile( circTile, H, pts, n_ele, N_out, useStoredN )
         type(MagTile),intent(in) :: circTile
-        real,dimension(n_ele,3),intent(inout) :: H
-        real,dimension(n_ele,3) :: pts
-        integer,intent(in) :: n_ele
-        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
         logical,intent(in),optional :: useStoredN
     
         procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
@@ -556,10 +556,10 @@
     !!
     subroutine getFieldFromCircPieceInvertedTile( circTile, H, pts, n_ele, N_out, useStoredN )
         type(MagTile),intent(in) :: circTile
-        real,dimension(n_ele,3),intent(inout) :: H
-        real,dimension(n_ele,3) :: pts
-        integer,intent(in) :: n_ele
-        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
         logical,intent(in),optional :: useStoredN  
     
         procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
@@ -617,15 +617,15 @@
     !!
     subroutine getFieldFromPlanarCoilTile( tile, H, pts, n_ele, N_out, useStoredN )
         type(MagTile),intent(in) :: tile
-        real,dimension(n_ele,3),intent(inout) :: H
-        real,dimension(n_ele,3) :: pts
-        integer,intent(in) :: n_ele
-        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
         logical,intent(in),optional :: useStoredN
-        real,dimension(3) :: diffPos,dotProd
-        real,dimension(3,3) :: N
+        real(8),dimension(3) :: diffPos,dotProd
+        real(8),dimension(3,3) :: N
         !real,dimension(3,3) :: rotMat,rotMatInv
-        integer :: i
+        integer(4) :: i
     
         !::get the rotation matrices
         !call getRotationMatrices( tile, rotMat, rotMatInv)
@@ -675,16 +675,16 @@
     !!
     subroutine getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
         type(MagTile),intent(in) :: tile
-        real,dimension(n_ele,3),intent(inout) :: H
-        real,dimension(n_ele,3),intent(in) :: pts
-        integer,intent(in) :: n_ele
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3),intent(in) :: pts
+        integer(4),intent(in) :: n_ele
         procedure (N_tensor_subroutine), pointer, intent(in) :: N_tensor
-        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
         logical,intent(in),optional:: useStoredN
             
-        real,dimension(3,3) :: rotMat,rotMatInv,N
-        integer :: i
-        real,dimension(3) :: diffPos,dotProd        
+        real(8),dimension(3,3) :: rotMat,rotMatInv,N
+        integer(4) :: i
+        real(8),dimension(3) :: diffPos,dotProd        
     
         !! get the rotation matrices
         call getRotationMatrices( tile, rotMat, rotMatInv)
@@ -707,17 +707,17 @@
             else
                 call N_tensor( tile, diffPos, N )
             endif
-        
+
             !! Rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
             call getDotProd( N, matmul( rotMat, tile%M ), dotProd )
-        
+
             !! Rotate the resulting field back to the global coordinate system
             dotProd = matmul( rotMatInv, dotProd )        
         
             !! Update the solution.
             H(i,:) = dotProd
         enddo
-    
+
     end subroutine getFieldFromTile
     
     
@@ -734,18 +734,18 @@
     !!
     subroutine getFieldFromTile_symm(tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
         type(MagTile),intent(in) :: tile
-        real,dimension(n_ele,3),intent(inout) :: H
-        real,dimension(n_ele,3),intent(in) :: pts
-        integer,intent(in) :: n_ele
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3),intent(in) :: pts
+        integer(4),intent(in) :: n_ele
         procedure (N_tensor_subroutine), pointer, intent(in) :: N_tensor
-        real,dimension(n_ele,3,3),intent(inout),optional :: N_out
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
         logical,intent(in),optional:: useStoredN
         
-        real,dimension(:,:,:),allocatable :: N_tmp    
-        real,dimension(3,3) :: rotMat,rotMatInv,N
-        integer :: i,j
-        real,dimension(3) :: diffPos,dotProd
-        real,dimension(8,3,3) :: symm_op_M, symm_op_H
+        real(8),dimension(:,:,:),allocatable :: N_tmp    
+        real(8),dimension(3,3) :: rotMat,rotMatInv,N
+        integer(4) :: i,j
+        real(8),dimension(3) :: diffPos,dotProd
+        real(8),dimension(8,3,3) :: symm_op_M, symm_op_H
         !!@todo Why is this temporary variable used instead of just useStoredN
         logical :: useStoredN_tmp
     
@@ -822,10 +822,10 @@
     !! if @param symm_ops is 1 the operation is symmetric, if it is -1 the operation is anti-symmetric
     !!
     subroutine getSymmOpMatrices( symm_M, symm_H, symm_ops )
-        real,dimension(8,3,3),intent(inout) :: symm_M, symm_H
-        real,dimension(3),intent(in) :: symm_ops
-        real,dimension(3,3) :: SymmX,SymmY,SymmZ    
-        real :: theta_x,theta_y,theta_z
+        real(8),dimension(8,3,3),intent(inout) :: symm_M, symm_H
+        real(8),dimension(3),intent(in) :: symm_ops
+        real(8),dimension(3,3) :: SymmX,SymmY,SymmZ    
+        real(8) :: theta_x,theta_y,theta_z
     
         SymmX(:,:) = 0.
         SymmX(1,1) = -1.
@@ -898,9 +898,9 @@
     !! Dot product between (3,3) matrix and (1,3) vector
     !!
     subroutine getDotProd( N, M, dot_prod )
-        real,intent(in),dimension(3,3) :: N
-        real,intent(in),dimension(3) :: M
-        real,intent(inout),dimension(3) :: dot_prod
+        real(8),intent(in),dimension(3,3) :: N
+        real(8),intent(in),dimension(3) :: M
+        real(8),intent(inout),dimension(3) :: dot_prod
 
         dot_prod(1) = sum(N(1,:) * M(:))
         dot_prod(2) = sum(N(2,:) * M(:))
@@ -915,9 +915,9 @@
     !!
     subroutine getRotationMatrices( tile, rotMat, rotMatInv)
         type(MagTile),intent(in) :: tile    
-        real,intent(inout),dimension(3,3) :: rotMat,rotMatInv
+        real(8),intent(inout),dimension(3,3) :: rotMat,rotMatInv
     
-        real,dimension(3,3) :: RotX,RotY,RotZ
+        real(8),dimension(3,3) :: RotX,RotY,RotZ
 
         !! The minus sign is important since a rotated prism can be represented with a rotation about the given axis in the opposite direction
         call getRotX( -tile%rotAngles(1), RotX )
@@ -943,8 +943,8 @@
     !! Returns the rotation matrix for a rotation of angle radians about the x-axis
     !!
     subroutine getRotX( angle, rotMat )
-        real,intent(in) :: angle
-        real,intent(inout),dimension(3,3) :: rotMat
+        real(8),intent(in) :: angle
+        real(8),intent(inout),dimension(3,3) :: rotMat
 
         !! Fortran matrices are (row,col)
         rotMat(1,1) = 1
@@ -964,8 +964,8 @@
     !! Returns the rotation matrix for a rotation of angle radians about the y-axis
     !!
     subroutine getRotY( angle, rotMat )
-        real,intent(in) :: angle
-        real,intent(inout),dimension(3,3) :: rotMat
+        real(8),intent(in) :: angle
+        real(8),intent(inout),dimension(3,3) :: rotMat
 
         !! Fortran matrices are (row,col)
         !! Top row
@@ -988,8 +988,8 @@
     !! Get rotation matrix for rotation about the z-axis
     !!
     subroutine getRotZ( phi, Rz )
-        real*8,intent(in) :: phi
-        real*8,dimension(3,3),intent(inout) :: Rz
+        real(8),intent(in) :: phi
+        real(8),dimension(3,3),intent(inout) :: Rz
         Rz(:,:) = 0
     
         Rz(1,1) = cos(phi)
