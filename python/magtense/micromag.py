@@ -1,6 +1,6 @@
 import numpy as np
 
-from typing import Optional, List
+from typing import Optional, Union, List
 from magtense.lib import magtensesource
 
 
@@ -48,6 +48,7 @@ class MicromagProblem:
         grid_type: Optional[str] = 'uniform',
         prob_mode: Optional[str] = 'new',
         solver: Optional[str] = 'dynamic',
+        m0: Union[None, int, float, List, np.ndarray] = None,
         A0: float = 1.3e-11,
         Ms: float = 8e5,
         K0: float = 0.,        
@@ -87,10 +88,12 @@ class MicromagProblem:
         self.grid_abc = np.zeros(shape=(ntot,3), dtype=np.float64, order='F')
         self.u_ea = np.zeros(shape=(ntot, 3), dtype=np.float64, order='F')
         
-        self.set_mm_grid_type(grid_type)
-        self.set_mm_prob_mode(prob_mode)
-        self.set_mm_solver(solver)
+        self.grid_type = grid_type
+        self.prob_mode = prob_mode
+        self.solver = solver
         
+        self.m0 = m0
+
         self.A0 = A0
         self.Ms = Ms
         self.K0 = K0
@@ -104,15 +107,8 @@ class MicromagProblem:
         self.thres = thres
         self.setTimeDis = setTimeDis
 
-        self.m0 = np.zeros(shape=(ntot,3), dtype=np.float64, order='F')
-        theta = np.pi * np.random.rand(ntot)
-        phi = 2 * np.pi * np.random.rand(ntot)
-        self.m0[:,0] = np.sin(theta) * np.cos(phi)
-        self.m0[:,1] = np.sin(theta) * np.sin(phi)
-        self.m0[:,2] = np.cos(theta)
-
         self.dem_thres = dem_thres
-        self.set_mm_demag_approx(demag_approx)
+        self.dem_appr = demag_approx
 
         self.nt_alpha = len(t_alpha)
         self.alphat = np.zeros(shape=(self.nt_alpha,2), dtype=np.float64, order='F')
@@ -135,27 +131,82 @@ class MicromagProblem:
         self.n_threads = n_threads
         self.N_ave = np.array(N_ave, dtype=np.int32, order='F')
 
-    def set_mm_demag_approx(self, nm=None):
-        approx_dict = {None: 1, 'threshold': 2, 'fft_thres': 3,
-                      'threshold_fraction': 4, 'fft_threshold_fraction': 5}
-        self.dem_appr = approx_dict[nm]
+    @property
+    def m0(self):
+        return self._m0
 
-    def set_mm_grid_type(self, nm=None):
-        grid_dict = {None: -1, 'uniform': 1, 'tetrahedron': 2, 'unstructuredPrisms': 3}
-        self.grid_type = grid_dict[nm]
+    @m0.setter
+    def m0(self, val):
+        self._m0 = np.zeros(shape=(self.ntot,3), dtype=np.float64, order='F')
+        
+        if isinstance(val, type(None)):
+            theta = np.pi * np.random.rand(self.ntot)
+            phi = 2 * np.pi * np.random.rand(self.ntot)
+            self._m0[:,0] = np.sin(theta) * np.cos(phi)
+            self._m0[:,1] = np.sin(theta) * np.sin(phi)
+            self._m0[:,2] = np.cos(theta)
 
-    def set_mm_prob_mode(self, nm=None):
-        mode_dict = {None: -1, 'new': 1, 'old': 2}
-        self.prob_mode = mode_dict[nm]
+        elif isinstance(val, (int, float)):
+            self._m0[:] = val
+        
+        else:
+            assert np.asarray(val).shape == (self.ntot,3)
+            self._m0 = np.asarray(val, dtype=np.float64, order='F')
+    
+    @property
+    def dem_appr(self):
+        return self._dem_appr
 
-    def set_mm_solver(self, nm=None):
-        solver_dict = {None: -1, 'explicit': 1, 'dynamic': 2, 'implicit': 3}
-        self.solver = solver_dict[nm]
+    @dem_appr.setter
+    def dem_appr(self, val=None):
+        self._dem_appr = {
+            None: 1,
+            'threshold': 2,
+            'fft_thres': 3,
+            'threshold_fraction': 4,
+            'fft_threshold_fraction': 5
+        }[val]
 
+    @property
+    def grid_type(self):
+        return self._grid_type
+
+    @grid_type.setter
+    def grid_type(self, val=None):
+        self._grid_type = {
+            None: -1,
+            'uniform': 1,
+            'tetrahedron': 2,
+            'unstructuredPrisms': 3
+        }[val]
+
+    @property
+    def prob_mode(self):
+        return self._prob_mode
+
+    @prob_mode.setter
+    def prob_mode(self, val=None):
+        self._prob_mode = {
+            None: -1,
+            'new': 1,
+            'old': 2
+        }[val]
+
+    @property
+    def solver(self):
+        return self._solver
+
+    @solver.setter
+    def solver(self, val=None):
+        self._solver = {
+            None: -1,
+            'explicit': 1,
+            'dynamic': 2,
+            'implicit': 3
+        }[val]
 
     def run_simulation(self, t_end, nt, fct_Hext, nt_Hext):
         t = np.linspace(0, t_end, nt)
-        # Calculating applied field as a function of time
         Hext = np.zeros(shape=(nt_Hext, 4), dtype=np.float64, order='F')
         Hext[:,0] = np.linspace(0, t_end, nt_Hext)
         Hext[:,1:4] = fct_Hext(np.linspace(0, t_end, nt_Hext))
