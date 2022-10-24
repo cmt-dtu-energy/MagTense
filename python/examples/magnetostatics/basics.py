@@ -65,7 +65,7 @@ def cylinder():
         dev_center=[0.3, np.pi/4, 0.1],
         offset=[0.8, -0.1, 0.3],
         rot=[0, 0, 0],
-        # rot = [-np.pi/6, np.pi/5, np.pi/2],
+        # rot=[-np.pi/6, np.pi/5, np.pi/2],
         tile_type=1,
         M_rem=1.2 / mu0,
         color=[1, 0, 0],
@@ -90,9 +90,8 @@ def spheroid():
         color=[[1, 0, 0], [1, 0, 1], [0, 0, 1]]
     )
 
-    area = [3, 3, 3]
     n_points = [7, 7, 7]
-    seg = area / np.asarray(n_points)
+    seg = [3, 3, 3] / np.asarray(n_points)
     points = [[i * seg[0] + seg[0]/2,
                j * seg[1] + seg[1]/2,
                k * seg[2] + seg[2]/2]
@@ -106,18 +105,22 @@ def spheroid():
 
     norm = [np.linalg.norm(H_point) * mu0 for H_point in H_out]
 
-    print("Average magnetic field: " + str(sum(norm) / len(norm)))
-    print("Peak to peak: " + str(max(norm) - min(norm)))
+    print(f'Average magnetic field: {sum(norm) / len(norm):.3f}')
+    print(f'Peak to peak: {max(norm) - min(norm):.3f}')
 
 
 def four_prisms():
     spots = [10, 10, 1]
     area = [1, 1, 0.01]
-    filled_pos = [[2, 4, 0], [4, 2, 0], [4, 6, 0], [6, 4, 0]]
-    mag_angles = [[0, np.pi/2], [np.pi, np.pi/2],
-                  [np.pi, np.pi/2], [0, np.pi/2]]
 
-    tiles, pts = magstatics.grid_config(spots, area, filled_pos, mag_angles=mag_angles)
+    tiles, pts = magstatics.grid_config(
+        spots,
+        area,
+        filled_pos=[[2, 4, 0], [4, 2, 0],
+                    [4, 6, 0], [6, 4, 0]],
+        mag_angles=[[0, np.pi/2], [np.pi, np.pi/2],
+                    [np.pi, np.pi/2], [0, np.pi/2]]
+    )
     print(tiles)
 
     it_tiles = magstatics.iterate_magnetization(tiles)
@@ -127,15 +130,18 @@ def four_prisms():
 
 
 def prism_grid():
-    filled_pos = [[4, 3, 4], [1, 2, 2], [3, 1, 0], [2, 7, 2], [8, 9, 3]]
-    tiles, points = magstatics.grid_config([10, 10, 5], [1, 1, 0.5],
-                                           filled_pos, [10, 10, 5])
+    tiles, points = magstatics.grid_config(
+        spots=[10, 10, 5],
+        area=[1, 1, 0.5],
+        filled_pos=[[4, 3, 4], [1, 2, 2], [3, 1, 0],
+                    [2, 7, 2], [8, 9, 3]],
+        n_pts=[10, 10, 5]
+    )
     _, H_out = magstatics.run_simulation(tiles, points)
-
     norm = [np.linalg.norm(H_point) * mu0 for H_point in H_out]
 
-    print("Average magnetic field: " + str(sum(norm) / len(norm)))
-    print("Peak to peak: " + str(max(norm) - min(norm)))
+    print(f'Average magnetic field: {sum(norm) / len(norm):.3f}')
+    print(f'Peak to peak: {max(norm) - min(norm):.3f}')
 
 
 def prism_multiple(n_mag=1, soft=None, res=16, max=[1,1,1]):
@@ -187,6 +193,6 @@ def halbach_prism():
 
     _, H_out = magstatics.run_simulation(tiles, points)
     norm = [np.linalg.norm(H_point) * mu0 for H_point in H_out]
-    print(f'Average magnetic field: {str(sum(norm) / len(norm))}')
-    print(f'Peak to peak: {str(max(norm) - min(norm))}')
+    print(f'Average magnetic field: {sum(norm) / len(norm):.3f}')
+    print(f'Peak to peak: {max(norm) - min(norm):.3f}')
 # %%
