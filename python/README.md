@@ -6,8 +6,11 @@ The tool **f2py** of the NumPy package is used to wrap the interface file **lib/
 ## Deployment with Conda
 
 ### Requirements
--  Python >= 3.9
+
+- Python >= 3.9
+
 - [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
+
 - [Intel® oneAPI Math Kernel Library](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html)
 
   [Linux] Prepare your terminal, so that ifort and MKL can be found:
@@ -16,25 +19,28 @@ The tool **f2py** of the NumPy package is used to wrap the interface file **lib/
     . ~/intel/oneapi/setvars.sh
     ```
 
-### Step 1
+- [Windows + MacOS only] Installation of Make utility
 
-Installation of required python packages
+    ```bash
+    conda install -y -c conda-forge make
+    ```
 
-```bash
-conda install -y numpy matplotlib
-```
+- Required python packages
 
-[Windows + MacOS only] Installation of Make utility
+    ```bash
+    conda install -y numpy matplotlib
+    ```
 
-```bash
-conda install -y -c conda-forge make
-```
+- Additional python packages to run data creation scripts
 
+    ```bash
+    conda install -y h5py tqdm
+    pip install -U ray
+    ```
 
-### Step 2
+### Installation from source
 
 Create an importable Python module from Fortran source code.
-
 Navigate to folder **python/magtense/lib/**, run **make**, and install the package:
 
 ```bash
@@ -44,8 +50,8 @@ cd /path/to/repo/python/
 pip install -e .
 ```
 
-
 ## Read-in customized M-H-curve
+
 This feature is currently only supported for soft magnetic tiles ([type=2](magtense/magtense.py#L49)).
 
 In  [iterate_magnetization()](magtense/magtense.py#L611), an arbitrary number of state functions (M-H-curves) can be defined:
