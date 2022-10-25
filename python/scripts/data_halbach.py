@@ -4,9 +4,8 @@ import numpy as np
 
 from magtense.halbach import HalbachCylinder, EvaluationPoints
 from magtense.magstatics import iterate_magnetization, get_demag_tensor, get_H_field
-from typing import Optional, List
+from typing import Optional, List, Union
 from pathlib import Path
-from multiprocessing import Process, cpu_count
 
 from tqdm import tqdm
 
@@ -82,18 +81,22 @@ def get_p2p(H_field: np.ndarray, pts_eval: np.ndarray, log: bool = False) -> flo
     return np.log10(p2p) if log else p2p * 1e6
 
 
-def get_shim_mat(symm_mat, shim_layers, shim_segs, symm) -> np.ndarray:
-    n_shim = shim_layers * shim_segs
+def get_shim_mat(
+    mat: Union[List, np.ndarray],
+    layers: int,
+    segs: int,
+    symm: bool
+) -> np.ndarray:
+    n_shim = layers * segs
     shim_mat = np.zeros(n_shim)
     if symm:
         # Set bottom and center layers
-        shim_mat[:shim_segs * (shim_layers // 2 + shim_layers % 2)] = symm_mat
+        shim_mat[:segs * (layers // 2 + layers % 2)] = mat
         # Set top layers symmetrical to bottom layers
-        for i in range(shim_layers // 2):
-            shim_mat[n_shim - (i+1) * shim_segs:n_shim - i * shim_segs] \
-                = symm_mat[i * shim_segs:(i+1) * shim_segs]
+        for i in range(layers // 2):
+            shim_mat[n_shim-(i+1)*segs:n_shim-i*segs] = mat[i*segs:(i+1)*segs]
     else:
-        shim_mat[:] = symm_mat
+        shim_mat[:] = mat
 
     return shim_mat
 
@@ -140,71 +143,36 @@ def get_db_stats(db_name, no_shim=False):
     print(f'Std: {arr.std(axis=0)}')
 
 
-def db_merge(db_name):
-    datapath = Path(__file__).parent.absolute() / '..' / 'data'
-    p = datapath.glob('**/*')
-    filenames = [x.name for x in p if x.is_file() and x.name[:len(db_name)] == db_name and x.name[:-3] != db_name]
-    
-    if not Path(datapath, db_name).is_file():
-        db = h5py.File(Path(datapath, filenames[0]), mode='r')
-        create_halbach(
-            n_halbach=db.attrs['n_halbach'],
-            n_mat=db.attrs['n_mat'],
-            shim_segs=db.attrs['shim_segs'],
-            shim_layers=db.attrs['shim_layers'],
-            field_res=db.attrs['field_res'],
-            norm_var=db.attrs['norm_var'],
-            mu_r=db.attrs['mu_r'],
-            r_probe=db.attrs['r_probe'],
-            symm=db.attrs['symmetry'],
-            seed_shim=db.attrs['seed_shim'],
-            seed_pertubation=db.attrs['seed_pertubation'],
-            action="action" in db,
-            no_shim="p2p_no_shim" in db,
-            name=db_name,
-            empty=True
-        )
-        db.close()
-    
-    db_final = h5py.File(f'{datapath}/{db_name}.h5', mode='a')
-    for name in filenames:
-        db_path = datapath / name
-        db = h5py.File(db_path, mode='r')
-        intv_0 = int(name[name[:name.rfind('_')].rfind('_') + 1:name.rfind('_')])
-        intv_1 = int(name[name.rfind('_') + 1:-3])
+def db_assign(db_t, fpath):
+    db_s = h5py.File(fpath, mode='r')
+    i_s = 0
 
-        i_per = 0
-        for idx_per in range(intv_0, intv_1):
-            db_final['halbach_M_rem'][idx_per] = db['halbach_M_rem'][i_per]
-            db_final['halbach_easy_axes'][idx_per] = db['halbach_easy_axes'][i_per]
+    for i_t in range(db_s.attrs['interval'][0], db_s.attrs['interval'][1]):            
+        db_t['halbach_M_rem'][i_t] = db_s['halbach_M_rem'][i_s]
+        db_t['halbach_ea'][i_t] = db_s['halbach_ea'][i_s]
 
-            if "p2p_no_shim" in db_final:                
-                db_final['shim_field_no_shim'][idx_per] = db['shim_field_no_shim'][i_per]
-                db_final['field_no_shim'][idx_per] = db['field_no_shim'][i_per]
-                db_final['p2p_no_shim'][idx_per] = db['p2p_no_shim'][i_per]
-                db_final['sph_ampl_no_shim'][idx_per] = db['sph_ampl_no_shim'][i_per]
-            
-            for idx_shim in range(db_final['p2p'].shape[1]):
-                db_final['shim_field'][idx_per, idx_shim] = db['shim_field'][i_per, idx_shim]
-                db_final['field'][idx_per, idx_shim] = db['field'][i_per, idx_shim]
-                db_final['shim_mat'][idx_per, idx_shim] = db['shim_mat'][i_per, idx_shim]
-                db_final['p2p'][idx_per, idx_shim] = db['p2p'][i_per, idx_shim]
-                db_final['sph_ampl'][idx_per, idx_shim] = db['sph_ampl'][i_per, idx_shim]
+        if "p2p_no_shim" in db_t:                
+            db_t['shim_field_no_shim'][i_t] = db_s['shim_field_no_shim'][i_s]
+            db_t['field_no_shim'][i_t] = db_s['field_no_shim'][i_s]
+            db_t['p2p_no_shim'][i_t] = db_s['p2p_no_shim'][i_s]
+        
+        for idx_shim in range(db_t['p2p'].shape[1]):
+            db_t['shim_field'][i_t, idx_shim] = db_s['shim_field'][i_s, idx_shim]
+            db_t['field'][i_t, idx_shim] = db_s['field'][i_s, idx_shim]
+            db_t['shim_mat'][i_t, idx_shim] = db_s['shim_mat'][i_s, idx_shim]
+            db_t['p2p'][i_t, idx_shim] = db_s['p2p'][i_s, idx_shim]
 
-                if "action" in db_final:
-                    db_final['action'][idx_per, idx_shim] = db['action'][i_per, idx_shim]
-                    db_final['p2p_next'][idx_per, idx_shim] = db['p2p_next'][i_per, idx_shim]
-                    db_final['sph_ampl_next'][idx_per, idx_shim] = db['sph_ampl_next'][i_per, idx_shim]
+            if "action" in db_t:
+                db_t['action'][i_t, idx_shim] = db_s['action'][i_s, idx_shim]
+                db_t['p2p_next'][i_t, idx_shim] = db_s['p2p_next'][i_s, idx_shim]
+        
+        i_s += 1
 
-            i_per += 1
-
-        db.close()
-        db_path.unlink()
-
-    db_final.close()
+    db_s.close()
 
 
 def create_halbach(
+    datapath: Path,
     n_halbach: int,
     n_mat: int,
     shim_segs: int = 8,
@@ -219,7 +187,6 @@ def create_halbach(
     action: bool = False,
     no_shim: bool = True,
     interval: Optional[List] = None,
-    append: bool = False,
     name: Optional[str] = None,
     empty: bool = False
 ):
@@ -228,6 +195,7 @@ def create_halbach(
     Name: '{available spots for shim magnets}_{# halbach configurations}_{# shim matrices}.h5'
     
     Args:
+        datapath: Path to database.
         n_halbach: Number of different Halbach configuration.
         n_mat: Number of shim matrices per Halbach configuration.
         shim_segs: Number of shim magnets per layer.
@@ -242,7 +210,6 @@ def create_halbach(
         action: If set, action as single placement of a shim magnet is stored.
         no_shim: If set, information of unshimmed field is stored.
         interval: Data range to iterate over.
-        append: If set, appending to existing database.
         name: Optional filename for database.
         empty: If set, an empty database is created.
     '''
@@ -255,7 +222,6 @@ def create_halbach(
 
     rng_shim = np.random.default_rng(seed_shim)
     symm_mat = rng_shim.choice([0, 1], size=(n_halbach, n_mat, spots))
-
 
     rng_per = np.random.default_rng(seed_pertubation)
     B_rem = rng_per.normal(
@@ -276,58 +242,38 @@ def create_halbach(
                 else:
                     np_action[i,j] = -1000
     
-    datapath = Path(__file__).parent.absolute() / '..' / 'data'
-    if not datapath.exists(): datapath.mkdir()
     fname = name if name is not None else f'{spots}_{n_halbach}_{n_mat}_{field_res[0]}'
-    n_config = n_halbach
 
-    if append:
-        db = h5py.File(f'{datapath}/{fname}.h5', libver='latest', mode='a')
-        assert db.attrs['n_halbach'] == n_halbach
-        assert db.attrs['n_mat'] == n_mat
-        assert db.attrs['seed_shim'] == seed_shim
-        assert db.attrs['seed_pertubation'] == seed_pertubation
-        assert db.attrs['shim_segs'] == shim_segs
-        assert db.attrs['shim_layers'] == shim_layers
-        assert db.attrs['mu_r'] == mu_r
-        assert db.attrs['r_probe'] == r_probe
-        assert db.attrs['norm_var'] == norm_var
-        assert db.attrs['symmetry'] == symm
-        assert (db.attrs['field_res'] == field_res).all()
-        
-        if interval is not None:
-            start_idx = interval[0]
-            end_idx = interval[1]
+    if interval is None:
+        n_config = n_halbach
+        interval = [0, n_config]
 
     else:
-        if interval is not None:
-            n_config = interval[1] - interval[0]
-            fname += f'_{interval[0]}_{interval[1]}'
+        fname += f'_{interval[0]}_{interval[1]}'
+        n_config = interval[1] - interval[0]
 
-        start_idx = 0
-        end_idx = n_config
+    db = h5py.File(f'{datapath}/{fname}.h5', libver='latest', mode='w')
+    db.create_dataset("halbach_M_rem", shape=(n_config, halbach.n_hard_tiles), dtype="float32")
+    db.create_dataset("halbach_ea", shape=(n_config, halbach.n_hard_tiles, 3), dtype="float32")
+    db.create_dataset("field", shape=(n_config, n_mat, 3, field_res[0], field_res[1], field_res[2]), dtype="float32")
+    db.create_dataset("shim_field", shape=(n_config, n_mat, halbach.shimming_points.coords.shape[0], 3), dtype="float32")
+    db.create_dataset("shim_mat", shape=(n_config, n_mat, spots), dtype="int32")
+    db['shim_mat'][:,:] = symm_mat[interval[0]:interval[1]]
+    db.create_dataset("p2p", shape=(n_config, n_mat, 1), dtype="float64")
 
-        db = h5py.File(f'{datapath}/{fname}.h5', libver='latest', mode='w')
-        db.create_dataset("halbach_M_rem", shape=(n_config, halbach.n_hard_tiles), dtype="float32")
-        db.create_dataset("halbach_easy_axes", shape=(n_config, halbach.n_hard_tiles, 3), dtype="float32")
-        db.create_dataset("field", shape=(n_config, n_mat, 3, field_res[0], field_res[1], field_res[2]), dtype="float32")
-        db.create_dataset("shim_field", shape=(n_config, n_mat, halbach.shimming_points.coords.shape[0], 3), dtype="float32")
-        db.create_dataset("shim_mat", shape=(n_config, n_mat, spots), dtype="int32")
-        db['shim_mat'][:,:] = symm_mat[start_idx:end_idx]
-        db.create_dataset("p2p", shape=(n_config, n_mat, 1), dtype="float64")
-
-        db.attrs['n_halbach'] = n_halbach
-        db.attrs['n_mat'] = n_mat
-        db.attrs['shim_pos'] = halbach.shimming_points.coords
-        db.attrs['shim_segs'] = shim_segs
-        db.attrs['shim_layers'] = shim_layers
-        db.attrs['mu_r'] = mu_r
-        db.attrs['r_probe'] = r_probe
-        db.attrs['norm_var'] = norm_var
-        db.attrs['symmetry'] = symm
-        db.attrs['field_res'] = field_res
-        db.attrs['seed_shim'] = seed_shim
-        db.attrs['seed_pertubation'] = seed_pertubation
+    db.attrs['n_halbach'] = n_halbach
+    db.attrs['n_mat'] = n_mat
+    db.attrs['shim_pos'] = halbach.shimming_points.coords
+    db.attrs['shim_segs'] = shim_segs
+    db.attrs['shim_layers'] = shim_layers
+    db.attrs['mu_r'] = mu_r
+    db.attrs['r_probe'] = r_probe
+    db.attrs['norm_var'] = norm_var
+    db.attrs['symmetry'] = symm
+    db.attrs['field_res'] = field_res
+    db.attrs['seed_shim'] = seed_shim
+    db.attrs['seed_pertubation'] = seed_pertubation
+    db.attrs['interval'] = interval
 
     if no_shim and "p2p_no_shim" not in db:
         db.create_dataset("field_no_shim", shape=(n_config, 3, field_res[0], field_res[1], field_res[2]), dtype="float32")
@@ -336,18 +282,18 @@ def create_halbach(
 
     if action and "action" not in db:
         db.create_dataset("action", shape=(n_config, n_mat, 1), dtype="int32")
-        db['action'][:,:] = np_action[start_idx:end_idx]
+        db['action'][:,:] = np_action[interval[0]:interval[1]]
         db.create_dataset("p2p_next", shape=(n_config, n_mat, 1), dtype="float64")
 
     if empty:
         db.close()
-        return
+        return fname, n_halbach
 
     with tqdm(total=n_config * n_mat) as pbar:
-        for idx_per in range(start_idx, end_idx):
-            halbach.perturb_config(B_rem[idx_per])
+        for idx_per in range(n_config):
+            halbach.perturb_config(B_rem[interval[0] + idx_per])
             db['halbach_M_rem'][idx_per] = halbach.remanence
-            db['halbach_easy_axes'][idx_per] = halbach.easy_axes
+            db['halbach_ea'][idx_per] = halbach.easy_axes
 
             if no_shim:
                 shim_field_no_shim = calculate_demag_field(halbach, halbach.shimming_points)
@@ -358,7 +304,8 @@ def create_halbach(
                 db['p2p_no_shim'][idx_per] = p2p_no_shim
             
             for idx_shim in range(n_mat):
-                shim_mat = get_shim_mat(symm_mat[idx_per, idx_shim], shim_layers, shim_segs, symm)
+                shim_mat = get_shim_mat(symm_mat[interval[0] + idx_per, idx_shim],
+                                        shim_layers, shim_segs, symm)
                 halbach.set_shim_matrix(shim_mat)
                 shim_field = calculate_demag_field(halbach, halbach.shimming_points)
                 B_field, p2p = evaluate_shimming(halbach, pts_eval)
@@ -386,32 +333,4 @@ def create_halbach(
                 pbar.update(1)
     
     db.close()
-
-
-def create_db_mp(n_workers=None, **kwargs):
-    if n_workers is None: n_workers = cpu_count()
-    intv = kwargs['n_halbach'] // n_workers
-    if kwargs['n_halbach'] % n_workers > 0: intv += 1
-        
-    l_p = []
-    for i in range(n_workers):
-        end_intv = min((i+1) * intv, kwargs['n_halbach'])
-        kwargs['interval'] = [i * intv, end_intv]
-        p = Process(target=create_halbach, kwargs=kwargs)
-        p.start()
-        l_p.append(p)
-        if end_intv == kwargs['n_halbach']: break
-
-    for proc in l_p:
-        proc.join()
-    
-    # TODO Get name of database
-    if 'name' in kwargs.keys():
-        db_name = kwargs['name']
-    else:
-        spots = kwargs['shim_segs'] * (kwargs['shim_layers'] // 2 + 1)
-        db_name = f'{spots}_{kwargs["n_halbach"]}_{kwargs["n_mat"]}_{16}'
-    db_merge(db_name)
-    print('Database created')
-
 #%%
