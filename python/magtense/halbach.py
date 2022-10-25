@@ -174,15 +174,15 @@ class HalbachCylinder:
         Norm, azimuth, or polar angle are drawn from a normal distribution.
         This should reflect manufacturing limitations.
         '''
-        assert len(B_rem) == self.n_hard_tiles
         self.reset()
-        self.tiles.M_rem = B_rem / (4 * np.pi * 1e-7)
         if azimuth is None: azimuth = self.l_azimuth_opt
         if polar is None: polar = np.ones(self.n_hard_tiles) * np.pi / 2
-        mag_angles = np.concatenate((np.expand_dims(polar, axis=1), np.expand_dims(azimuth, axis=1)), axis=1)
+        mag_angles = np.concatenate((np.expand_dims(polar, axis=1),
+                                     np.expand_dims(azimuth, axis=1)), axis=1)
         
-        for idx in range(self.n_hard_tiles):
-            self.tiles.set_easy_axis(mag_angles[idx], idx)
+        for i in range(self.n_hard_tiles):
+            self.tiles.M_rem = (B_rem[i] / (4 * np.pi * 1e-7), i)
+            self.tiles.set_easy_axis(mag_angles[i], i)
 
 
     def add_shim_magnets(self, n_layers, n_segs=None, shim_grid=None, mu_r=None, r_i=0.01):
@@ -260,7 +260,6 @@ class HalbachCylinder:
 
     
     def set_one_shim_magnet(self, idx):
-        assert idx < self.n_hard_tiles
         self.reset(shim_magnets=False)
         self.tiles.incl_it = (1, self.n_hard_tiles + idx)
 
@@ -268,7 +267,8 @@ class HalbachCylinder:
     def reset(self, shim_magnets=True):
         ''' Reset all calculated magnetizations after a change of the Halbach configuration.
         '''
-        for idx in range(self.n_hard_tiles):
-            self.tiles.M = (0, idx)
-            if shim_magnets and idx >= self.n_hard_tiles:
+        self.tiles.M = [0, 0, 0]
+
+        if shim_magnets:
+            for idx in range(self.n_hard_tiles, self.tiles.n):
                 self.tiles.incl_it = (0, idx)
