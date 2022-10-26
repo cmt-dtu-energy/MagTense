@@ -6,18 +6,19 @@ from pathlib import Path
 from typing import Optional, List
 from multiprocessing import Process, cpu_count
 from magtense.halbach import HalbachCylinder, EvaluationPoints
+from magtense.magstatics import Tiles, grid_config, run_simulation
 
 from tqdm import tqdm
 
-from scripts.utils_halbach import load_demag_tensor, calc_demag_field, eval_shimming, get_shim_mat
-from scripts.utils_std_prob_4 import gen_s_state, gen_seq
+from scripts.db_utils import load_demag_tensor, calc_demag_field, eval_shimming
+from scripts.db_utils import get_shim_mat, gen_s_state, gen_seq
 
 
 def db_std_prob_4(
     datapath: Path,
+    n_seq: int,
     res: List,
     grid_size: List = [500e-9, 500e-9, 3e-9],
-    n_seq: int = 4,
     t_steps: int = 500,
     t_per_step: float = 4e-12,
     h_ext_a: List = [0, 360],
@@ -31,10 +32,11 @@ def db_std_prob_4(
     fname = name if name is not None else f'{n_seq}_{t_steps}_{res[0]}_{res[1]}'
     if intv is None: intv = [0, n_seq]
     if not empty: fname += f'_{intv[0]}_{intv[1]}'
+    n_intv = intv[1] - intv[0]
 
     db = h5py.File(f'{datapath}/{fname}.h5', 'w')
-    db.create_dataset('sequence', shape=(n_seq, t_steps, 3, res[0], res[1]), dtype='float32')
-    db.create_dataset('field', shape=(n_seq, 3), dtype='float32')
+    db.create_dataset('sequence', shape=(n_intv, t_steps, 3, res[0], res[1]), dtype='float32')
+    db.create_dataset('field', shape=(n_intv, 3), dtype='float32')
     if not empty: db.attrs['intv'] = intv
 
     if empty:
@@ -53,7 +55,7 @@ def db_std_prob_4(
     rng = np.random.default_rng(seed)
     rnd_mat = rng.random(size=(n_seq, 2))
 
-    for i in tqdm(range(intv[1] - intv[0])):
+    for i in tqdm(range(n_intv)):
         h_ext = np.zeros(3)
         d = (h_ext_n[1] - h_ext_n[0]) * rnd_mat[i,0] + h_ext_n[0]
         theta = np.deg2rad((h_ext_a[1] - h_ext_a[0]) * rnd_mat[i,1] + h_ext_a[0])
@@ -241,23 +243,235 @@ def db_halbach_field_stats(db_path):
     print(f'Std: {np.std(arr, axis=0)}')
 
 
+def db_magfield(
+    datapath: Path,
+    n_samples: int,
+    res: int,
+    dim: int,
+    spots: List = [10, 10, 5],
+    area: List = [1, 1, 0.5],
+    gap: float = 0.05,
+    seed: int = 0,
+    intv: Optional[List] = None,
+    name: str = 'magfield',
+    empty: bool = False
+) -> None:
+    """ 
+    Generate 3-D magnetic fields of experimental setup.
+
+    Args:
+        filepath: Indicates where to store the data sample.
+        n_samples: Size of database.
+        res: Resolution of magnetic field.
+        dim: Dimension of demagnetizing field strength.
+        spots: Available positions in setup.
+        area: Size of setup.
+        gap: Gap between measurement area and surrounding magnets.
+        seed: Seed for random number generator of matrices.
+        intv: Data range to iterate over.
+        empty: If set, an empty database is created.
+    """
+    fname = f'{name}_{res}'
+    if intv is None: intv = [0, n_samples]
+    if not empty: fname += f'_{intv[0]}_{intv[1]}'
+    n_intv = intv[1] - intv[0]
+    
+    db = h5py.File(f'{datapath}/{fname}.h5', libver='latest', mode='w')
+    out_shape = (n_intv, 3, res, res, dim) if dim == 3 else (n_intv, 3, res, res)
+    db.create_dataset('field', shape=out_shape, dtype="float32")
+    if not empty: db.attrs['intv'] = intv
+
+    if empty:
+        db.attrs['spots'] = spots
+        db.attrs['area'] = area
+        db.attrs['gap'] = gap
+        db.attrs['seed'] = seed
+        db.close()
+
+        return fname, n_samples
+
+    rng = np.random.default_rng(seed)
+    tile_size = np.asarray(area) / np.asarray(spots)
+    filled_mat = rng.integers(2, size=(n_samples, spots[0], spots[1], spots[2]))
+    empty_mat = rng.integers(4, size=(n_samples,))
+
+    for idx in tqdm(range(n_intv)):
+        emp_x, emp_y = {0:[4,5], 1:[4,6], 2:[3,6], 3:[3,7]}[empty_mat[idx + intv[0]]]
+        s_x = emp_x * tile_size[0]
+        s_y = emp_y * tile_size[1]
+        
+        filled_pos = [[i, j, k] 
+                      for i in range(spots[0])
+                      for j in range(spots[1])
+                      for k in range(spots[2]) 
+                      if filled_mat[intv[0] + idx][i][j][k] == 1 and (i < emp_x or i > emp_y
+                        or j < emp_x or j > emp_y or k < 2 or k > 2)]
+        
+        tiles, _ = grid_config(spots, area, filled_pos)
+
+        x_eval = np.linspace(s_x + gap, s_y + gap, res)
+        y_eval = np.linspace(s_x + gap, s_y + gap, res)
+
+        if dim == 2:
+            xv, yv = np.meshgrid(x_eval, y_eval)
+            zv = np.zeros(res * res) + area[2] / 2
+        
+        elif dim == 3:
+            z_eval = np.linspace(-(s_y-s_x)/res, (s_y-s_x)/res, dim) + area[2] / 2
+            xv, yv, zv = np.meshgrid(x_eval, y_eval, z_eval)
+        
+        else:
+            raise ValueError('Only 2-D and 3-D magnetic field can be generated!')
+        
+        pts_eval = np.hstack([xv.reshape(-1,1), yv.reshape(-1,1), zv.reshape(-1,1)])
+        _, h_out = run_simulation(tiles, pts_eval, console=False)
+
+        # Tensor image with shape CxHxWxD [T]
+        field = h_out.reshape((res,res,dim,3)).transpose((3,0,1,2)) \
+            if dim == 3 else h_out.reshape((res,res,3)).transpose((2,0,1))    
+
+        db['field'][idx] = field * 4 * np.pi * 1e-7
+
+    db.close()
+
+
+def db_single_magnets(
+    datapath: Path,
+    n_samples: int,
+    res: int,
+    num_mag: int,
+    dim: int = 2,
+    M_fixed: bool = False,
+    min_pos:float = 0,
+    min_magnet_size: float = 0.5,
+    max_magnet_size: float = 2,
+    height: float = 1,
+    area_x: float = 10,
+    seed: int = 0,
+    intv: Optional[List] = None,
+    name: str = 'mags',
+    empty: bool = False
+) -> None:
+    fname = f'{name}_{num_mag}_{res}'
+    if M_fixed: datapath += '_M_fixed'
+    if intv is None: intv = [0, n_samples]
+    if not empty: fname += f'_{intv[0]}_{intv[1]}'
+    n_intv = intv[1] - intv[0]
+
+    if empty:
+        if Path(f'{datapath}/{fname}.h5').is_file():
+            input(f'Overwriting file "{fname}.h5". Press Enter to continue')
+
+    n_params = 6 if dim == 3 else 5
+    if M_fixed: n_params -= 1
+
+    db = h5py.File(f"{datapath}/{fname}.h5", libver="latest", mode='w')
+    db.create_dataset("field", shape=(n_intv, dim, res, res), dtype="float32")
+    db.create_dataset("sample", shape=(n_intv, num_mag, n_params), dtype="float32")
+    db.create_dataset("info", shape=(n_intv,), dtype="float32")
+    if not empty: db.attrs['intv'] = intv
+
+    if empty:
+        db.attrs['spots'] = M_fixed
+        db.attrs['min_pos'] = min_pos
+        db.attrs['min_magnet_size'] = min_magnet_size
+        db.attrs['max_magnet_size'] = max_magnet_size
+        db.attrs['height'] = height
+        db.attrs['area_x'] = area_x
+        db.attrs['seed'] = seed
+        db.close()
+
+        return fname, n_samples
+
+    rng = np.random.default_rng(seed)
+    param_mat = rng.random(size=(n_samples, num_mag, n_params))
+
+    x_eval = np.linspace(0, area_x, res) + (area_x / (2 * res))
+    xv, yv = np.meshgrid(x_eval, x_eval)
+    zv = np.zeros(res * res) + height / 2
+    pts_eval = np.hstack([xv.reshape(-1,1), yv.reshape(-1,1), zv.reshape(-1,1)])
+
+    for idx in tqdm(range(n_intv)):
+        pos = np.zeros(shape=(num_mag,3))
+        size = np.zeros(shape=(num_mag,3))
+        M_rem = np.zeros(shape=(num_mag,))
+        mag_angle = np.zeros(shape=(num_mag,2))
+        n_mag = num_mag
+
+        for i in range(num_mag):
+            pos[i] = [param_mat[intv[0]+idx,i,0] * (area_x - 2 * min_pos) + min_pos,
+                      param_mat[intv[0]+idx,i,1] * (area_x - 2 * min_pos) + min_pos,
+                      height/2]
+            size_x = param_mat[intv[0]+idx,i,2] * (max_magnet_size - min_magnet_size) + min_magnet_size
+            size[i] = [size_x, size_x, height]
+            M_rem[i] = 1.28 if M_fixed else param_mat[intv[0]+idx,i,3] + 0.5
+            polar_angle = param_mat[intv[0]+idx,i,-1] * np.pi if dim == 3 else np.pi/2
+            mag_angle[i] = [param_mat[intv[0]+idx,i,-2] * 2 * np.pi, polar_angle]
+
+        overlap = True
+        while overlap:
+            overlap = False
+            for i in range(pos.shape[0] - 1):
+                for j in range(i + 1, pos.shape[0]):
+                    d = np.sqrt(((pos[i,:2] - pos[j,:2])**2).sum())
+                    if d < np.sqrt(2)*((size[i][0] + size[j][0]) / 2):
+                        overlap = True
+                        pos = np.delete(pos, j, 0)
+                        size = np.delete(size, j, 0)
+                        M_rem = np.delete(M_rem, j, 0)
+                        mag_angle = np.delete(mag_angle, j, 0)
+                        n_mag -= 1
+
+        tile = Tiles(
+            n=pos.shape[0],
+            tile_type=2,
+            offset=pos,
+            size=size,
+            M_rem=M_rem/(4*np.pi*1e-7),
+            mag_angle=mag_angle, 
+            color=[1,0,0]
+        )
+        _, h_out = run_simulation(tile, pts_eval, console=False)
+        h_out = h_out.reshape((res,res,-1)).transpose((2,0,1))
+
+        sample = np.zeros(shape=(num_mag, n_params), dtype=np.float32)
+        for i in range(pos.shape[0]):
+            sample[i,0] = pos[i][0]
+            sample[i,1] = pos[i][1]
+            sample[i,2] = size[i][0]
+            sample[i,3] = M_rem[i]
+            sample[i,4] = mag_angle[i][0]
+            if dim == 3: sample[i,5] = mag_angle[i][1]
+
+        db['field'][idx] = h_out[:dim] * 4 * np.pi * 1e-7
+        db['sample'][idx] = sample
+        db['info'][idx] = n_mag
+
+    db.close()
+
+
 def create_db_mp(
     data: str,
     n_workers: Optional[int] = None,
     datapath: Optional[Path] = None,
     **kwargs
 ) -> None:
-    if data == 'halbach':
-        target = db_halbach
-    elif data == 'std_prob_4':
-        target = db_std_prob_4
-    else:
-        raise NotImplementedError()
 
     if datapath is None: 
         datapath = Path(__file__).parent.absolute() / '..' / 'data'
     if not datapath.exists(): datapath.mkdir(parents=True)
     kwargs['datapath'] = datapath
+
+    if data == 'halbach':
+        target = db_halbach
+    elif data == 'std_prob_4':
+        target = db_std_prob_4
+    elif data == 'magfield':
+        target = db_magfield
+    elif data == 'single_magnets':
+        target = db_single_magnets
+    else:
+        raise NotImplementedError()
     
     db_name, n_tasks = target(**kwargs, empty=True)
     
@@ -295,15 +509,15 @@ def create_db_mp(
 # %%
 
 if __name__ == '__main__':
-    db_kwargs = {
-        'n_halbach': 5,
-        'n_mat': 2,
-        'shim_segs': 8,
-        'shim_layers': 3,
-        'name': 'test1'
-    }
+    # db_kwargs = {
+    #     'n_halbach': 5,
+    #     'n_mat': 2,
+    #     'shim_segs': 8,
+    #     'shim_layers': 3,
+    #     'name': 'test1'
+    # }
 
-    create_db_mp('halbach', n_workers=1, **db_kwargs)
+    # create_db_mp('halbach', n_workers=1, **db_kwargs)
 
     # db_kwargs = {
     #     'res': [16, 4, 1],
@@ -313,3 +527,17 @@ if __name__ == '__main__':
 
     # create_db_mp('std_prob_4', n_workers=1, **db_kwargs)
 
+    # db_kwargs = {
+    #     'n_samples': 10,
+    #     'res': 32,
+    #     'dim': 2,
+    # }
+    # create_db_mp('magfield', n_workers=5, **db_kwargs)
+
+    db_kwargs = {
+        'n_samples': 10,
+        'res': 32,
+        'num_mag': 3,
+        'dim': 3
+    }
+    create_db_mp('single_magnets', n_workers=5, **db_kwargs)

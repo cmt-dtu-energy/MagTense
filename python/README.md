@@ -35,7 +35,6 @@ The tool **f2py** of the NumPy package is used to wrap the interface file **lib/
 
     ```bash
     conda install -y h5py tqdm
-    pip install -U ray
     ```
 
 ### Installation from source
