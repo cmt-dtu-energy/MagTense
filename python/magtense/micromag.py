@@ -205,11 +205,11 @@ class MicromagProblem:
             'implicit': 3
         }[val]
 
-    def run_simulation(self, t_end, nt, fct_Hext, nt_Hext):
+    def run_simulation(self, t_end, nt, fct_h_ext, nt_h_ext):
         t = np.linspace(0, t_end, nt)
-        Hext = np.zeros(shape=(nt_Hext, 4), dtype=np.float64, order='F')
-        Hext[:,0] = np.linspace(0, t_end, nt_Hext)
-        Hext[:,1:4] = fct_Hext(np.linspace(0, t_end, nt_Hext))
+        h_ext = np.zeros(shape=(nt_h_ext, 4), dtype=np.float64, order='F')
+        h_ext[:,0] = np.linspace(0, t_end, nt_h_ext)
+        h_ext[:,1:4] = fct_h_ext(np.linspace(0, t_end, nt_h_ext))
 
         return magtensesource.fortrantopythonio.runmicromagsimulation( 
             ntot=self.ntot,
@@ -225,8 +225,8 @@ class MicromagProblem:
             gamma=self.gamma,
             alpha=self.alpha,
             maxt0=self.max_T0,
-            nt_hext=nt_Hext,
-            hext=Hext,
+            nt_hext=nt_h_ext,
+            hext=h_ext,
             nt=nt,
             t=t,
             m0=np.concatenate((self.m0[:,0], self.m0[:,1], self.m0[:,2]), axis=None),
