@@ -164,7 +164,7 @@ class HalbachCylinder:
         return self.tiles.u_ea[:self.n_hard_tiles]
 
     @property
-    def shimming_points(self) -> Optional[EvaluationPoints]:
+    def pts_shim(self) -> Optional[EvaluationPoints]:
         return self._pts_shim
 
 
