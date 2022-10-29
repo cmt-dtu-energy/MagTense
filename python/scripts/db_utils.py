@@ -264,7 +264,7 @@ def plot_shim_matrix(
     plt.show()
 
 
-def plot_field(field: np.ndarray) -> None:  
+def plot_halbach_field(field: np.ndarray) -> None:  
     z_idx = 0 if field.shape[0] == 2 else field.shape[3] // 2
     field = np.linalg.norm(field, axis=0)[:,:,z_idx]
     var_field = (field - field.mean()) * 1e6
@@ -281,7 +281,7 @@ def plot_field(field: np.ndarray) -> None:
     plt.show()
 
 
-def plot_field_line(
+def plot_halbach_line(
     field: np.ndarray,
     eval_pts: Union[List[float], np.ndarray],
     best_p2p: Optional[int] = None
