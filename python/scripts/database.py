@@ -213,7 +213,6 @@ def db_halbach(
                 db['shim_field'][idx_per, idx_shim] = shim_field
                 db['field'][idx_per, idx_shim] = B_field
                 db['p2p'][idx_per, idx_shim] = p2p
-                print(p2p)
 
                 if action:
                     if np_action[intv[0] + idx_per, idx_shim] < 0:
@@ -509,15 +508,17 @@ def create_db_mp(
 # %%
 
 if __name__ == '__main__':
-    # db_kwargs = {
-    #     'n_halbach': 5,
-    #     'n_mat': 2,
-    #     'shim_segs': 8,
-    #     'shim_layers': 3,
-    #     'name': 'test1'
-    # }
+    db_kwargs = {
+        'n_halbach': 1000,
+        'n_mat': 1,
+        'shim_segs': 16,
+        'shim_layers': 3,
+        'name': 'test_pre_3000f_1r',
+        'seed_shim' : 51,
+        'seed_pertubation': 52
+    }
 
-    # create_db_mp('halbach', n_workers=1, **db_kwargs)
+    create_db_mp('halbach', n_workers=15, **db_kwargs)
 
     # db_kwargs = {
     #     'res': [16, 4, 1],
@@ -534,10 +535,12 @@ if __name__ == '__main__':
     # }
     # create_db_mp('magfield', n_workers=5, **db_kwargs)
 
-    db_kwargs = {
-        'n_samples': 10,
-        'res': 32,
-        'num_mag': 3,
-        'dim': 3
-    }
-    create_db_mp('single_magnets', n_workers=5, **db_kwargs)
+    # db_kwargs = {
+    #     'n_samples': 10,
+    #     'res': 32,
+    #     'num_mag': 3,
+    #     'dim': 3
+    # }
+    # create_db_mp('single_magnets', n_workers=5, **db_kwargs)
+
+# %%
