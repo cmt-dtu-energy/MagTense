@@ -1,58 +1,63 @@
 # Python Interface
 
-The Fortran code is compiled and wrapped to a module that can be directly called from Python. The tool **f2py** of the NumPy package is used to wrap the interface file **lib/FortranToPythonIO.f90**.
+The Fortran code is compiled and wrapped to a module that can be directly called from Python.
+The tool **f2py** of the NumPy package is used to wrap the interface file **lib/FortranToPythonIO.f90**.
 
 ## Deployment with Conda
 
-### Step 1
+### Requirements
 
-Installation of required python packages
+- Python >= 3.9
 
-```bash
-conda install -y numpy matplotlib
-```
+- [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
-### Step 2
+- [Intel® oneAPI Math Kernel Library](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html)
 
-GFortran compiler and Make utility (Windows + MacOS only)
+  [Linux] Prepare your terminal, so that ifort and MKL can be found:
 
-- Windows
+    ```bash
+    . ~/intel/oneapi/setvars.sh
+    ```
 
-  - Installation in conda environment
+- [Windows + MacOS only] Installation of Make utility
 
     ```bash
     conda install -y -c conda-forge make
-    conda install -y -c msys m2w64-gcc-fortran
     ```
 
-  - Installation from binary | [MinGW](https://gcc.gnu.org/wiki/GFortranBinaries#Windows)
+- Required python packages
 
-- MacOS:
-  - Installation from binary | [HPC Mac OS X](http://hpc.sourceforge.net/)
-  - Installation with [Homebrew](https://brew.sh/) ( **brew install gcc** )
+    ```bash
+    conda install -y numpy matplotlib
+    ```
 
-### Step 3
+- Additional python packages to run data creation scripts
 
-Creation of an importable Python module from Fortran source code
+    ```bash
+    conda install -y h5py tqdm
+    ```
 
-Navigate to folder **MagTense/python/magtense/lib/**, run **make**, and install the package
+### Installation from source
+
+Create an importable Python module from Fortran source code.
+Navigate to folder **python/magtense/lib/**, run **make**, and install the package:
 
 ```bash
 cd /path/to/repo/python/magtense/lib/
-make
+make SHELL=cmd
 cd /path/to/repo/python/
 pip install -e .
 ```
 
-
 ## Read-in customized M-H-curve
+
 This feature is currently only supported for soft magnetic tiles ([type=2](magtense/magtense.py#L49)).
 
 In  [iterate_magnetization()](magtense/magtense.py#L611), an arbitrary number of state functions (M-H-curves) can be defined:
 
 ```python
 mu_r = 100
-datapath = f'./magtense/utils/data/Fe_mur_{mu_r}_Ms_2_1.csv'
+datapath = f'./magtense/mat/Fe_mur_{mu_r}_Ms_2_1.csv'
 
  ...
 
@@ -60,7 +65,7 @@ data_statefcn = numpy.genfromtxt(datapath, delimiter=';')
 n_statefcn = 1
 ```
 
-[Here](magtense/utils/data), three sample M-H-curves for Fe with different relative permeabilities and a saturation magnetization of 2.1 T are stored as CSV-files. The data format is as follows:
+[Here](magtense/mat), three sample M-H-curves for Fe with different relative permeabilities and a saturation magnetization of 2.1 T are stored as CSV-files. The data format is as follows:
 
 ```csv
 0; Temp0; Temp1; ...

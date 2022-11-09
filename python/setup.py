@@ -5,7 +5,7 @@ with open("../README.md", "r") as fh:
 
 setup(
     name='magtense',
-    version='1.0.1',
+    version='2.0.1',
     description="MagTense - a micromagnetism and magnetostatic framework",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -30,7 +30,7 @@ setup(
     author_email="spol@dtu.dk",
     license="GPL 3.0",
     packages=find_packages(include=['magtense', 'magtense.*']),
-    package_data={'magtense': ['utils/data/*.csv']},
+    package_data={'magtense': ['mat/*.csv']},
     python_requires="==3.9.*",
     include_package_data=True,
     install_requires=["numpy", "matplotlib"],

@@ -52,8 +52,7 @@ venv.bak/
 # Visual Studio Code configurations
 .vscode/
 
-# Evaluations
-evaluations/
-
-# Plots of python examples
-!examples/figs/*
+# Data from DL scripts
+data/
+demag/
+evals/

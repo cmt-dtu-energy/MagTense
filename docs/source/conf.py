@@ -56,7 +56,7 @@ html_theme_options = {
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
 #
-html_logo = './static/MagTense_logo.PNG'
+html_logo = './static/MagTense_logo.png'
 html_favicon = './static/MagTense_logo.ico'
 html_show_sourcelink = False
 

@@ -5,7 +5,8 @@
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  
+  <meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
   <title>Installation &mdash; MagTense TechManual  documentation</title>
@@ -23,11 +24,12 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
-        <script src="_static/language_data.js"></script>
-        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -36,6 +38,8 @@
   
   <link rel="stylesheet" href="_static/techmanual.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/techmanual.css" type="text/css" />
     <link rel="author" title="About these documents" href="about.html" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -59,7 +63,7 @@
 
           
             
-            <img src="_static/MagTense_logo.PNG" class="logo" alt="Logo"/>
+            <img src="_static/MagTense_logo.png" class="logo" alt="Logo"/>
           
           </a>
 
@@ -90,14 +94,17 @@
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#matlab">Matlab</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#python">Python</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#matlab">Matlab</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#add-scripts-to-pythonpath">Add scripts to PYTHONPATH</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#build-python-module-from-fortran-source-code">Build python module from Fortran source code</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#standalone">Standalone</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#python">Python</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id1">Prerequisites</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#required-packages">Required Packages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#prepare-terminal">Prepare terminal</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#build-python-module">Build Python module</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
@@ -136,47 +143,57 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="installation">
-<h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="matlab">
-<h2>Matlab<a class="headerlink" href="#matlab" title="Permalink to this headline">¶</a></h2>
-<p>MagTense is directly useable in Matlab by downloading the
-already compiled <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/MEX_files">MEX-files</a>. The files are directly useable
-with no compilation required, although Matlab 2018a or greater
-is required.</p>
-</div>
-<div class="section" id="python">
-<h2>Python<a class="headerlink" href="#python" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="prerequisites">
-<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h3>
+  <section id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Permalink to this heading">¶</a></h1>
+<section id="matlab">
+<h2>Matlab<a class="headerlink" href="#matlab" title="Permalink to this heading">¶</a></h2>
+<section id="prerequisites">
+<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this heading">¶</a></h3>
 <ul class="simple">
-<li><p>python installation</p></li>
-<li><p>numpy package</p></li>
-<li><p>matplotlib</p></li>
-<li><p>gfortran <span class="math notranslate nohighlight">\(\geq\)</span> 5</p></li>
+<li><p>Matlab <span class="math notranslate nohighlight">\(\geq\)</span> 2018a</p></li>
 </ul>
-</div>
-<div class="section" id="add-scripts-to-pythonpath">
-<h3>Add scripts to PYTHONPATH<a class="headerlink" href="#add-scripts-to-pythonpath" title="Permalink to this headline">¶</a></h3>
+<p>MagTense is directly useable in Matlab by downloading the already compiled
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/MEX_files">MEX-files</a>.</p>
+</section>
+</section>
+<section id="python">
+<h2>Python<a class="headerlink" href="#python" title="Permalink to this heading">¶</a></h2>
+<section id="id1">
+<h3>Prerequisites<a class="headerlink" href="#id1" title="Permalink to this heading">¶</a></h3>
 <ul class="simple">
-<li><p>python/magtense/lib/</p></li>
-<li><p>python/magtense/</p></li>
+<li><p>Python <span class="math notranslate nohighlight">\(\geq\)</span> 3.9</p></li>
+<li><p><a class="reference external" href="https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran">Intel® Fortran Compiler</a></p></li>
+<li><p><a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html">Intel® oneAPI Math Kernel Library</a></p></li>
 </ul>
-</div>
-<div class="section" id="build-python-module-from-fortran-source-code">
-<h3>Build python module from Fortran source code<a class="headerlink" href="#build-python-module-from-fortran-source-code" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="n">python</span><span class="o">/</span><span class="n">magtense</span><span class="o">/<span class="n">lib</span><span class="o">/</span>
-<span class="n">make</span>
+</section>
+<section id="required-packages">
+<h3>Required Packages<a class="headerlink" href="#required-packages" title="Permalink to this heading">¶</a></h3>
+<p>[Info] On Linux, Make utility is pre-installed.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">y</span> <span class="n">numpy</span> <span class="n">matplotlib</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">y</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">make</span>
 </pre></div>
 </div>
+</section>
+<section id="prepare-terminal">
+<h3>Prepare terminal<a class="headerlink" href="#prepare-terminal" title="Permalink to this heading">¶</a></h3>
+<p>Setting environment variables to recognize ifort and MKL.
+[Info] On Windows, the environment variables might be set already.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">.</span> <span class="o">~/</span><span class="n">intel</span><span class="o">/</span><span class="n">oneapi</span><span class="o">/</span><span class="n">setvars</span><span class="o">.</span><span class="n">sh</span>
+</pre></div>
 </div>
+</section>
+<section id="build-python-module">
+<h3>Build Python module<a class="headerlink" href="#build-python-module" title="Permalink to this heading">¶</a></h3>
+<p>Fortran source code becomes accessible from Python.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="o">/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">repo</span><span class="o">/</span><span class="n">python</span><span class="o">/</span><span class="n">magtense</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span>
+<span class="n">make</span> <span class="n">SHELL</span><span class="o">=</span><span class="n">cmd</span>
+<span class="n">cd</span> <span class="o">/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">repo</span><span class="o">/</span><span class="n">python</span><span class="o">/</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="o">.</span>
+</pre></div>
 </div>
-<div class="section" id="standalone">
-<h2>Standalone<a class="headerlink" href="#standalone" title="Permalink to this headline">¶</a></h2>
-<p>An EXE-file is available <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/executable">here</a>.
-It can be used with a <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/MagTenseStandalone.py">Python script</a>.</p>
-</div>
-</div>
+</section>
+</section>
+</section>
 
 
            </div>
