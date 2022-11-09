@@ -614,7 +614,51 @@
     end subroutine loadDemagTensorFromDisk
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    !>
+    !---------------------------------------------------------------- Message back to the GUI ---------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    !>----------------------------------------
+    !> Rasmus Bjørk, rabj@gdtu.dk, August 2022
+    !> Callback to display message to the GUI launching the simulation
+    !> @params[in] mess The message to display to the GUI
+    !>----------------------------------------    
+    
+    subroutine displayGUIMessage( mess )
+        character(*),intent(in) :: mess
+
+#if USE_MATLAB    
+        call displayMatlabMessage( mess )
+#endif 
+    
+    end subroutine displayGUIMessage
+
+    
+    subroutine displayGUIProgressMessage( mess, prog )
+        character(*),intent(in) :: mess
+        integer,intent(in) :: prog
+
+#if USE_MATLAB  
+        call displayMatlabProgressMessage( mess, prog )
+#endif
+
+    end subroutine displayGUIProgressMessage
+    
+    
+    subroutine displayGUIProgressTime( mess, time  )
+        character(*),intent(in) :: mess
+        real,intent(in) :: time
+
+#if USE_MATLAB        
+        call displayMatlabProgressTime( mess, time  )
+#endif
+        
+    end subroutine displayGUIProgressTime
+    
+    
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !---------------------------------------------------------------- Message Matlab interface ---------------------------------------------------------------------------------
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
     !! Routine for displaying progress within Matlab
     subroutine displayMatlabMessage( mess )
         character(*),intent(in) :: mess
@@ -674,5 +718,5 @@
         
     end subroutine displayMatlabProgressTime
     
-    end module MagTenseMicroMagIO
+end module MagTenseMicroMagIO
     
