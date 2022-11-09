@@ -6,13 +6,6 @@ function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_d
 %------
 %   Standard_problem_4()
 %   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( NIST_field, resolution, options)
-%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( NIST_field, resolution), use_CUDA, ShowTheResult )
-%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( NIST_field, resolution), use_CUDA, ShowTheResult )
-%   function_with_docstring_following_the_template()
-%   output_1 = function_with_docstring_following_the_template(var_1)
-%   [output_1, output_2] = function_with_docstring_following_the_template(var_1, var_2)
-%   [__] = function_with_docstring_following_the_template(__, options=val)
-%   [__, complex_matrix] = function_with_docstring_following_the_template(__, complex_matrix=val)
 %
 %Description of syntax:
 %------
