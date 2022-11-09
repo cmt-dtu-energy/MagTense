@@ -4,8 +4,8 @@ include "mkl_dfti.f90"
     module MicroMagParameters
     use MKL_SPBLAS
     Use MKL_DFTI
-    INTEGER, PARAMETER :: SP = KIND(1.0E0)
-    INTEGER, PARAMETER :: DP = KIND(1.0D0)
+    INTEGER, PARAMETER :: SP = SELECTED_REAL_KIND(6, 37)
+    INTEGER, PARAMETER :: DP = SELECTED_REAL_KIND(15, 307)
     
     !>------------------
     !> Custom types
@@ -105,7 +105,7 @@ include "mkl_dfti.f90"
         integer :: demag_approximation                          !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         integer :: demagTensorReturnState                       !> Flag describing how or if the demag tensor should be returned
         integer :: demagTensorLoadState                         !> Flag describing how or if to load the demag tensor (from disk e.g.)
-        integer :: nThreadsMatlab                               !> Number of threads to use in the OpenMP demag tensor allocation
+        integer*4 :: nThreadsMatlab                             !> Number of threads to use in the OpenMP demag tensor allocation
         integer,dimension(3) :: N_ave                           !> Number of points to average the demag tensor in in the recieving tile, N_ave(1) = N_x etc
         character*256 :: demagTensorFileOut, demagTensorFileIn  !> Filename (including path) for output (input) of demag tensor if it is to be returned as a file (demagTensorReturnState >2 and the value is equal to the length of the file including path)
         
@@ -152,7 +152,8 @@ include "mkl_dfti.f90"
         
         real(DP),dimension(:,:),allocatable :: pts          !> n,3 array with the points (x,y,z) of the centers of the tiles
         
-        real(DP),dimension(:),allocatable :: Jfact,Mfact,Kfact
+        real(DP),dimension(:),allocatable :: Jfact,Kfact
+        real(SP),dimension(:),allocatable :: Mfact
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
     end type MicroMagSolution

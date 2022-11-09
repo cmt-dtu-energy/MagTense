@@ -567,9 +567,9 @@
     
     n = problem%grid%nx * problem%grid%ny * problem%grid%nz
         
-            open (11, file=problem%demagTensorFileOut,	&
-			        status='unknown', form='unformatted',	&
-			        access='direct', recl=1*n*n)
+        open (11, file=problem%demagTensorFileOut,	&
+                status='unknown', form='unformatted',	&
+                access='direct', recl=1*n*n)
 
         write(11,rec=1) problem%Kxx
         write(11,rec=2) problem%Kxy
@@ -577,28 +577,28 @@
         write(11,rec=4) problem%Kyy
         write(11,rec=5) problem%Kyz
         write(11,rec=6) problem%Kzz
-    
+
         close(11)
         
-    
+
     end subroutine writeDemagTensorToDisk
-    
-    
+
+
     !>----------------------------------------
     !> Kaspar K. Nielsen, kasparkn@gmail.com, January 2020
     !> Loads the demag tensors from disk given a file in problem
     !> @params[inout] problem the struct containing the entire problem
-    !>----------------------------------------    
+    !>----------------------------------------
     subroutine loadDemagTensorFromDisk( problem )
     type( MicroMagProblem ), intent(inout) :: problem
     integer :: n
-    
+
             n = problem%grid%nx * problem%grid%ny * problem%grid%nz
             
             
-             open (11, file=problem%demagTensorFileIn,	&
-			           status='unknown', form='unformatted',	&
-			           access='direct', recl=1*n*n)
+                open (11, file=problem%demagTensorFileIn,	&
+                        status='unknown', form='unformatted',	&
+                        access='direct', recl=1*n*n)
 
             read(11,rec=1) problem%Kxx
             read(11,rec=2) problem%Kxy
@@ -606,73 +606,59 @@
             read(11,rec=4) problem%Kyy
             read(11,rec=5) problem%Kyz
             read(11,rec=6) problem%Kzz
-    
+
             close(11)
-    
-    
-    
+
+
+
     end subroutine loadDemagTensorFromDisk
-    
+
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>
     !! Routine for displaying progress within Matlab
-    subroutine displayMatlabMessage( mess )
+    subroutine displayMessage( mess )
         character(*),intent(in) :: mess
-    
+
         integer :: mexCallMATLAB, nlhs_cb, nrhs_cb, tmp
         mwPointer plhs_cb(1), prhs_cb(1),mxCreateString
         character*(4) functionName_cb
         logical :: ex
-    
+
         
         !! test if we are inside Matlab or called from a stand-alone. The simple test
         !! is whether io.txt exists in the current path (false for Matlab, true for stand-alone)
         !! nothing bad should happen if in fact we are called from ML but the file somehow
         !! exists - the written output will just not be shown to the user
-    
+
         inquire( file='io.txt', EXIST=ex )
-    
+
         if ( ex .eq. .true. ) then
             write(*,*) mess
-        else            
+        else
             functionName_cb = "disp"
             nlhs_cb = 0
             nrhs_cb = 1
-      
+        
             prhs_cb(1) = mxCreateString(mess)
-      
+        
             tmp = mexCallMATLAB(nlhs_cb, plhs_cb, nrhs_cb, prhs_cb, "disp")
         endif
-    
-    end subroutine displayMatlabMessage
-    
-    subroutine displayMatlabProgressMessage( mess, prog )
+
+    end subroutine displayMessage
+
+    subroutine displayProgressMessage( mess, prog )
         character(*),intent(in) :: mess
         integer,intent(in) :: prog
-        character*(4) :: prog_str   
+        character*(4) :: prog_str
         character(len=8) :: fmt
         
-    
+
         fmt = '(I4.2)'
         write (prog_str,fmt) prog
         
-        call displayMatlabMessage( mess )
-        call displayMatlabMessage( prog_str )
+        call displayMessage( mess )
+        call displayMessage( prog_str )
         
-    end subroutine displayMatlabProgressMessage
-    
-    subroutine displayMatlabProgressTime( mess, time  )
-        character(*),intent(in) :: mess
-        real,intent(in) :: time
-        character*(4) :: prog_str   
-                
-            
-        write (prog_str,'(F4.2)') time
-        
-        call displayMatlabMessage( mess )
-        call displayMatlabMessage( prog_str )
-        
-    end subroutine displayMatlabProgressTime
-    
+    end subroutine displayProgressMessage
+
     end module MagTenseMicroMagIO
-    

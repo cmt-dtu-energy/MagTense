@@ -3,6 +3,7 @@
 *.mod
 *.o.d
 libsrc.a
+libsrc.lib
 fortranobject.c
 fortranobject.h
 magtensesource*

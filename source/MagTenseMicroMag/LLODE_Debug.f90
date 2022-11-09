@@ -1,5 +1,6 @@
-#include "fintrf.h"  
-
+#if !(USE_PYTHON)
+#include "fintrf.h"
+#endif
 
     module LLODE_Debug
     use MKL_SPBLAS

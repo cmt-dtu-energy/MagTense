@@ -2918,11 +2918,11 @@ subroutine r83_uniform ( n, seed, a )
   integer ( kind = 4 ) seed
 
   a(1,1) = 0.0D+00
-  call r8vec_uniform_01 ( n-1, seed, a(1,2:n) )
+  call r8vec_uniform_01 ( n-INT(1, kind=4), seed, a(1,2:n) )
 
   call r8vec_uniform_01 ( n,   seed, a(2,1:n) )
 
-  call r8vec_uniform_01 ( n-1, seed, a(3,1:n-1) )
+  call r8vec_uniform_01 ( n-INT(1, kind=4), seed, a(3,1:n-1) )
   a(3,n) = 0.0D+00
 
   return
@@ -6170,7 +6170,7 @@ subroutine spline_overhauser_val ( dim_num, ndata, tdata, ydata, tval, yval )
 !  Evaluate the "left hand" quadratic defined at T(LEFT-1), T(LEFT), T(RIGHT).
 !
   if ( 0 < left-1 ) then
-    call parabola_val2 ( dim_num, ndata, tdata, ydata, left-1, tval, yl )
+    call parabola_val2 ( dim_num, ndata, tdata, ydata, left-INT(1, kind=4), tval, yl )
   end if
 !
 !  Evaluate the "right hand" quadratic defined at T(LEFT), T(RIGHT), T(RIGHT+1).

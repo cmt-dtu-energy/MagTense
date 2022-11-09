@@ -2,6 +2,8 @@ module FortranToPythonIO
 
 use DemagFieldGetSolution
 use IterateMagnetSolution
+use MagTenseMicroMagPyIO
+use LandauLifshitzSolution
 implicit none
 
 contains
@@ -44,6 +46,9 @@ end function dispIte_fct_no_output
 subroutine getNFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
     mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, N )
+    
+    integer(4),intent(in) :: n_tiles, n_pts
+    
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
     real(8),dimension(n_tiles,3),intent(in) :: dev_center
@@ -72,8 +77,6 @@ subroutine getNFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     real(8),dimension(n_pts,3) :: H    
     real(8),dimension(n_tiles,n_pts,3,3),intent(out) :: N
     type(MagTile),dimension(n_tiles) :: tiles
-    integer(4),intent(in) :: n_tiles
-    integer(4),intent(in) :: n_pts
     integer :: i
 
     !::initialise MagTile with specified parameters
@@ -123,8 +126,10 @@ end subroutine getNFromTiles
 !!
 subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
     mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
-    includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, N, useStoredN )
+    includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, N, useStoredN, H)
     
+    integer(4),intent(in) :: n_tiles, n_pts
+
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
     real(8),dimension(n_tiles,3),intent(in) :: dev_center
@@ -152,13 +157,10 @@ subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     real(8),dimension(n_pts,3),intent(in) :: pts
     real(8),dimension(n_pts,3),intent(out) :: H
     real(8),dimension(n_pts,3) :: H_tmp
-    real(8),dimension(n_tiles,n_pts,3,3),intent(in) :: N
-    real(8),dimension(n_tiles,n_pts,3,3) :: N_out
+    real(8),dimension(n_tiles,n_pts,3,3),intent(inout) :: N
     logical,intent(in) :: useStoredN
 
     type(MagTile),dimension(n_tiles) :: tiles
-    integer(4),intent(in) :: n_tiles
-    integer(4),intent(in) :: n_pts
     integer :: i
 
     !::initialise MagTile with specified parameters
@@ -166,7 +168,6 @@ subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
 
-    N_out = N
     H(:,:) = 0.
 
     ! $OMP PARALLEL DO PRIVATE(i,H_tmp)    
@@ -182,49 +183,49 @@ subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
         select case ( tiles(i)%tileType )
         case ( tileTypeCylPiece )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )    
+                call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypePrism )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypeSphere )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypeSpheroid )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypeCircPiece )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypeCircPieceInverted )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromCircPieceInvertedTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypeTetrahedron )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts )
             endif
         case ( tileTypePlanarCoil )
             if ( useStoredN .eqv. .true. ) then
-                call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts, N_out(i,:,:,:), useStoredN )
+                call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
             else
                 call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts )            
             endif
@@ -258,6 +259,8 @@ subroutine IterateTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, 
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, nT, nH, n_stateFcn, &
     data_stateFcn, T, maxErr, nIteMax, Mag_out, Mrel_out )
     
+    integer(4),intent(in) :: n_tiles, n_stateFcn, nT,nH
+
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
     real(8),dimension(n_tiles,3),intent(in) :: dev_center
@@ -287,14 +290,11 @@ subroutine IterateTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, 
     real(8),intent(in) :: maxErr, T
     integer(4) :: nIteMax
     type(MagStateFunction),dimension(n_stateFcn) :: stateFcn
-    integer(4),intent(in) :: n_stateFcn
-    integer(4),intent(in) :: nT,nH
     real(8),dimension(nH,nT),intent(in) :: data_stateFcn
     real(8) :: resumeIteration
     procedure(displayIteration_fct),pointer :: disp_fct => null()
 
     type(MagTile),dimension(n_tiles) :: tiles
-    integer(4),intent(in) :: n_tiles
     integer :: i
 
     !! default value is zero, i.e. do not resume iteration
@@ -334,6 +334,8 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, n_stateFcn, nT, nH, &
     data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out, console )
     
+    integer(4),intent(in) :: n_tiles, n_pts, n_stateFcn, nT, nH
+
     !::Specific for a cylindrical tile piece
     real(8),dimension(n_tiles,3),intent(in) :: centerPos
     real(8),dimension(n_tiles,3),intent(in) :: dev_center
@@ -365,8 +367,6 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     integer(4) :: nIteMax
     logical,intent(in) :: iterateSolution, returnSolution
     type(MagStateFunction),dimension(n_stateFcn) :: stateFcn
-    integer(4),intent(in) :: n_stateFcn !! Currently just one state function supported, can be extendend to input variable
-    integer(4),intent(in):: nT,nH
     real(8),dimension(nH,nT),intent(in) :: data_stateFcn
     real(8) :: start,finish,resumeIteration
     procedure(displayIteration_fct),pointer :: disp_fct => null()
@@ -376,8 +376,6 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     real(8),dimension(n_pts,3),intent(out) :: H
     real(8),dimension(n_pts,3) :: H_tmp
     type(MagTile),dimension(n_tiles) :: tiles
-    integer(4),intent(in) :: n_tiles
-    integer(4),intent(in) :: n_pts
     integer :: i
 
     call cpu_time(start)
@@ -406,31 +404,7 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
         call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, disp_fct, resumeIteration )
 
         do i=1,n_tiles
-            ! centerPos(i,1) = tiles(i)%r0
-            ! centerPos(i,2) = tiles(i)%theta0
-            ! centerPos(i,3) = tiles(i)%z0
-            ! dev_center(i,1) = tiles(i)%dr
-            ! dev_center(i,2) = tiles(i)%dtheta
-            ! dev_center(i,3) = tiles(i)%dz
-            ! tile_size(i,1) = tiles(i)%a
-            ! tile_size(i,2) = tiles(i)%b
-            ! tile_size(i,3) = tiles(i)%c
             Mag_out(i,:) = tiles(i)%M
-            ! u_ea_out(i,:) = tiles(i)%u_ea
-            ! u_oa1_out(i,:) = tiles(i)%u_oa1
-            ! u_oa2_out(i,:) = tiles(i)%u_oa2
-            ! mu_r_ea(i) = tiles(i)%mu_r_ea
-            ! mu_r_oa(i) = tiles(i)%mu_r_oa
-            ! Mrem(i) = tiles(i)%Mrem
-            ! tileType(i) = tiles(i)%tileType
-            ! offset(i,:) = tiles(i)%offset
-            ! rotAngles(i,:) = tiles(i)%rotAngles
-            ! color(i,:) = tiles(i)%color
-            ! magnetType(i) = tiles(i)%magnetType
-            ! stateFunctionIndex(i) = tiles(i)%stateFunctionIndex
-            ! includeInIteration(i) = tiles(i)%includeInIteration
-            ! exploitSymmetry(i) = tiles(i)%exploitSymmetry
-            ! symmetryOps(i,:) = tiles(i)%symmetryOps
             Mrel_out(i) = tiles(i)%Mrel
         enddo
     endif
@@ -487,6 +461,58 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     endif
 
 end subroutine runSimulation
+
+
+subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
+    gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+    N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
+    conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
+    exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, t_out, M, pts, H_exc, H_ext, H_dem, H_ani)
+
+    integer(4),intent(in) :: ntot, nt_Hext, nt, nt_alpha, nt_conv, grid_type, grid_nnod, exch_nval, exch_nrow
+    integer(4),dimension(3),intent(in) :: grid_n, N_ave
+    real(8),dimension(3),intent(in) :: grid_L
+    real(8),dimension(ntot,3),intent(in) :: grid_pts
+    integer(4),dimension(4,ntot),intent(in) :: grid_ele
+    real(8),dimension(grid_nnod,3),intent(in) :: grid_nod
+    real(8),dimension(ntot, 3),intent(in) :: grid_abc, u_ea
+    real(8),dimension(nt_Hext, 4),intent(in) :: Hext
+    real(8),dimension(3*ntot),intent(in) :: m0
+    real(8),dimension(nt_alpha,2),intent(in) :: alphat
+    integer(4),dimension(exch_nval),intent(in) :: exch_val, exch_col
+    integer(4),dimension(exch_nrow),intent(in) :: exch_rows, exch_rowe
+    real(8),dimension(nt_conv),intent(in) :: t_conv
+    integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
+    integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE
+    real(8),intent(in) :: A0, Ms, K0, gamma, alpha, MaxT0, tol, thres, conv_tol, dem_thres
+    character*256,intent(in) :: N_file_in, N_file_out
+
+    type(MicroMagProblem) :: problem
+    type(MicroMagSolution) :: solution
+    real(8),dimension(nt),intent(in) :: t
+    real(8),dimension(nt),intent(out) :: t_out
+    real(8),dimension(nt,ntot,1,3),intent(out) :: M
+    real(8),dimension(nt,ntot,1,3),intent(out) :: H_exc, H_ext, H_dem, H_ani
+    real(8),dimension(ntot,3),intent(out) :: pts
+
+
+    call loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
+        gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+        N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
+        conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
+        exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, problem )
+
+    call SolveLandauLifshitzEquation( problem, solution )
+
+    t_out = solution%t_out
+    M = solution%M_out
+    pts = solution%pts
+    H_exc = solution%H_exc
+    H_ext = solution%H_ext
+    H_dem = solution%H_dem
+    H_ani = solution%H_ani
+
+end subroutine RunMicroMagSimulation
 
 
 end module FortranToPythonIO

@@ -5,7 +5,8 @@
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  
+  <meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
   <title>Micromagnetism &mdash; MagTense TechManual  documentation</title>
@@ -23,11 +24,12 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
-        <script src="_static/language_data.js"></script>
-        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -36,6 +38,8 @@
   
   <link rel="stylesheet" href="_static/techmanual.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/techmanual.css" type="text/css" />
     <link rel="author" title="About these documents" href="about.html" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -59,7 +63,7 @@
 
           
             
-            <img src="_static/MagTense_logo.PNG" class="logo" alt="Logo"/>
+            <img src="_static/MagTense_logo.png" class="logo" alt="Logo"/>
           
           </a>
 
@@ -131,11 +135,11 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="micromagnetism">
-<h1>Micromagnetism<a class="headerlink" href="#micromagnetism" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="basic-input">
-<h2>Basic input<a class="headerlink" href="#basic-input" title="Permalink to this headline">¶</a></h2>
-<p>The matlab file <em>DefaultMicroMagProblem.m</em> contains an updated list of all parameters that can be specified in a micromagnetic problem.</p>
+  <section id="micromagnetism">
+<h1>Micromagnetism<a class="headerlink" href="#micromagnetism" title="Permalink to this heading">¶</a></h1>
+<section id="basic-input">
+<h2>Basic input<a class="headerlink" href="#basic-input" title="Permalink to this heading">¶</a></h2>
+<p>The matlab file <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/micromag_python_rebase/matlab/util/DefaultMicroMagProblem.m">DefaultMicroMagProblem.m</a> contains an updated list of all parameters that can be specified in a micromagnetic problem.</p>
 <p>For now, the micromagnetic model automatically generates a rectangular grid.</p>
 <p>The common parameters are:</p>
 <ul class="simple">
@@ -147,16 +151,16 @@
 <li><p>Damping constant, <span class="math notranslate nohighlight">\(\alpha\)</span></p></li>
 <li><p>Precession constant, <span class="math notranslate nohighlight">\(\gamma\)</span></p></li>
 </ul>
-</div>
-<div class="section" id="dynamic-simulations">
-<h2>Dynamic simulations<a class="headerlink" href="#dynamic-simulations" title="Permalink to this headline">¶</a></h2>
-<p>An example of how to run a dynamic simulation is given in matlab/examples/NIST_micromag_Std_problem_2</p>
-</div>
-<div class="section" id="hysteresis-loop-simulation">
-<h2>Hysteresis loop simulation<a class="headerlink" href="#hysteresis-loop-simulation" title="Permalink to this headline">¶</a></h2>
-<p>An example of how to run a hysteresis loop simulation is given in matlab/examples/NIST_micromag_Std_problem_4</p>
-</div>
-</div>
+</section>
+<section id="dynamic-simulations">
+<h2>Dynamic simulations<a class="headerlink" href="#dynamic-simulations" title="Permalink to this heading">¶</a></h2>
+<p>An example of how to run a dynamic simulation is given <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/micromag_python_rebase/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_2/Standard_problem_2.m">here</a>.</p>
+</section>
+<section id="hysteresis-loop-simulation">
+<h2>Hysteresis loop simulation<a class="headerlink" href="#hysteresis-loop-simulation" title="Permalink to this heading">¶</a></h2>
+<p>An example of how to run a hysteresis loop simulation is given <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/micromag_python_rebase/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4/Standard_problem_4.m">here</a>.</p>
+</section>
+</section>
 
 
            </div>

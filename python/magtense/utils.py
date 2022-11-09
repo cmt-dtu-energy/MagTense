@@ -4,14 +4,21 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cm
 
+from pathlib import Path
+from typing import Optional, List
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
+
+from magtense.magstatics import get_rotmat, Tiles, run_simulation
 
 
 def plot_cube(axes, size, offset, rotation, M, color):
     ax = axes
 
-    # Define the vertices of the unit cubic and move them in order to center the cube on origo
-    ver = np.array([[1, 1, 0], [0, 1, 0], [0, 1, 1], [1, 1, 1], [0, 0, 1], [1, 0, 1], [1, 0, 0], [0, 0, 0]]) - 0.5
+    # Define the vertices of the unit cubic and 
+    # move them in order to center the cube on origo
+    ver = np.array([[1, 1, 0], [0, 1, 0], [0, 1, 1],
+                    [1, 1, 1], [0, 0, 1], [1, 0, 1],
+                    [1, 0, 0], [0, 0, 0]]) - 0.5
     ver_cube = ver * size
     R = get_rotmat(rotation)
     ver_cube = (np.dot(R, ver_cube.T)).T
@@ -23,10 +30,12 @@ def plot_cube(axes, size, offset, rotation, M, color):
     surfaces = ver_cube[fac]
 
     # plot sides
-    ax.add_collection3d(Poly3DCollection(surfaces, facecolors=color, linewidths=1, edgecolors=color, alpha=.25))
+    ax.add_collection3d(
+        Poly3DCollection(surfaces, facecolors=color, linewidths=1, edgecolors=color, alpha=.25))
 
     # Plot vector of magnetization in the center of the cube
-    ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(size)/4, pivot='middle', normalize=True)
+    ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2], color=color,
+              length=np.linalg.norm(size)/4, pivot='middle', normalize=True)
 
 
 def plot_sphere(ax, r, offset, M, color):
@@ -45,14 +54,16 @@ def plot_sphere(ax, r, offset, M, color):
     c_psi = r * np.cos(psi)
     zeros = np.zeros(shape=psi.shape)
     # a-axis 
-    ax.plot(zeros + offset[0], s_psi + offset[1], c_psi + offset[2], color=color, alpha=.75, linewidth=1)
+    ax.plot(zeros+offset[0], s_psi+offset[1], c_psi+offset[2], color=color, alpha=.75, linewidth=1)
     # b-axis 
-    ax.plot(s_psi + offset[0], zeros + offset[1], c_psi + offset[2], color=color, alpha=.75, linewidth=1)
+    ax.plot(s_psi+offset[0], zeros+offset[1], c_psi+offset[2], color=color, alpha=.75, linewidth=1)
     # c-axis
-    ax.plot(s_psi + offset[0], c_psi + offset[1], zeros + offset[2], color=color, alpha=.75, linewidth=1)
+    ax.plot(s_psi+offset[0], c_psi+offset[1], zeros+offset[2], color=color, alpha=.75, linewidth=1)
 
     # Plot vector of magnetization in the center of the cube
-    ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2], color=color, length=r/3, pivot='middle', normalize=True)
+    ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2],
+              color=color, length=r/3, pivot='middle', normalize=True)
+
 
 def plot_spheroid(ax, size, offset, rotation, M, color):
     # Create meash of surface points
@@ -114,7 +125,8 @@ def plot_spheroid(ax, size, offset, rotation, M, color):
     ax.plot(x_third, y_third, z_third, color=color, alpha=.75, linewidth=1)
 
     # Plot vector of magnetization in the center of the cube
-    ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(size)/4, pivot='middle', normalize=True)
+    ax.quiver(offset[0], offset[1], offset[2], M[0], M[1], M[2],
+              color=color, length=np.linalg.norm(size)/4, pivot='middle', normalize=True)
 
 
 def plot_tetrahedron(axes, vertices, M, color):
@@ -126,13 +138,16 @@ def plot_tetrahedron(axes, vertices, M, color):
     surfaces = vert[fac]
 
     # plot sides
-    ax.add_collection3d(Poly3DCollection(surfaces, facecolors=color, linewidths=1, edgecolors=color, alpha=.25))
+    ax.add_collection3d(
+        Poly3DCollection(surfaces, facecolors=color, linewidths=1, edgecolors=color, alpha=.25))
 
     # Volume of tetrahedron in order to relate the size of the magnetization vector
-    volume = np.linalg.norm(np.dot((vert[0] - vert[3]), np.cross((vert[1] - vert[3]), (vert[2] - vert[3])))) / 6
+    volume = np.linalg.norm(np.dot((vert[0] - vert[3]),
+                                   np.cross((vert[1] - vert[3]), (vert[2] - vert[3])))) / 6
 
     # Plot vector of magnetization in the center of the cube
-    ax.quiver(np.mean(vert[:,0]), np.mean(vert[:,1]), np.mean(vert[:,2]), M[0], M[1], M[2], color=color, length=volume*5, pivot='middle', normalize=True)
+    ax.quiver(np.mean(vert[:,0]), np.mean(vert[:,1]), np.mean(vert[:,2]), M[0], M[1], M[2],
+              color=color, length=volume*5, pivot='middle', normalize=True)
 
 
 def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color):
@@ -146,14 +161,22 @@ def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color):
     center = np.array([xc, yc, zc])
 
     # Define cylindrical tile regarding to its local spherical coordinate system
-    ver_cyl = np.array([[(r - dr/2) * math.cos(theta - dtheta/2), (r - dr/2) * math.sin(theta - dtheta/2), z - dz/2],\
-        [(r + dr/2) * math.cos(theta - dtheta/2), (r + dr/2) * math.sin(theta - dtheta/2), z - dz/2],\
-        [(r - dr/2) * math.cos(theta + dtheta/2), (r - dr/2) * math.sin(theta + dtheta/2), z - dz/2],\
-        [(r + dr/2) * math.cos(theta + dtheta/2), (r + dr/2) * math.sin(theta + dtheta/2), z - dz/2],\
-        [(r - dr/2) * math.cos(theta - dtheta/2), (r - dr/2) * math.sin(theta - dtheta/2), z + dz/2],\
-        [(r + dr/2) * math.cos(theta - dtheta/2), (r + dr/2) * math.sin(theta - dtheta/2), z + dz/2],\
-        [(r - dr/2) * math.cos(theta + dtheta/2), (r - dr/2) * math.sin(theta + dtheta/2), z + dz/2],\
-        [(r + dr/2) * math.cos(theta + dtheta/2), (r + dr/2) * math.sin(theta + dtheta/2), z + dz/2]])
+    ver_cyl = np.array([[(r - dr/2) * math.cos(theta - dtheta/2),
+                         (r - dr/2) * math.sin(theta - dtheta/2), z - dz/2],
+                        [(r + dr/2) * math.cos(theta - dtheta/2),
+                         (r + dr/2) * math.sin(theta - dtheta/2), z - dz/2],
+                        [(r - dr/2) * math.cos(theta + dtheta/2),
+                         (r - dr/2) * math.sin(theta + dtheta/2), z - dz/2],
+                        [(r + dr/2) * math.cos(theta + dtheta/2),
+                         (r + dr/2) * math.sin(theta + dtheta/2), z - dz/2],
+                        [(r - dr/2) * math.cos(theta - dtheta/2),
+                         (r - dr/2) * math.sin(theta - dtheta/2), z + dz/2],
+                        [(r + dr/2) * math.cos(theta - dtheta/2),
+                         (r + dr/2) * math.sin(theta - dtheta/2), z + dz/2],
+                        [(r - dr/2) * math.cos(theta + dtheta/2),
+                         (r - dr/2) * math.sin(theta + dtheta/2), z + dz/2],
+                        [(r + dr/2) * math.cos(theta + dtheta/2),
+                         (r + dr/2) * math.sin(theta + dtheta/2), z + dz/2]])
     
     # Add rotation
     R = get_rotmat([rotation[0], rotation[1], 0])
@@ -195,7 +218,8 @@ def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color):
     surfaces = ver_cyl[fac]
 
     # Plot rectangular sides
-    ax.add_collection3d(Poly3DCollection(surfaces, facecolors=color, linewidths=1, edgecolors=color, alpha=.25))
+    ax.add_collection3d(
+        Poly3DCollection(surfaces, facecolors=color, linewidths=1, edgecolors=color, alpha=.25))
     
     # Plot curves
     for seg_curve in seg_curves:
@@ -206,11 +230,17 @@ def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color):
     comb = np.array([[0, 1], [1, 3], [2, 3], [0, 2]])
     for j in range(comb.shape[0]):   
         for i in range(resolution-1):        
-            curved_surfaces[i+(resolution-1)*j] = [seg_curves[comb[j][0]][:,i], seg_curves[comb[j][1]][:,i], seg_curves[comb[j][1]][:,i+1], seg_curves[comb[j][0]][:,i+1]]
-    ax.add_collection3d(Poly3DCollection(curved_surfaces, facecolors=color, linewidths=1, alpha=.25))
+            curved_surfaces[i+(resolution-1)*j] = [seg_curves[comb[j][0]][:,i],
+                                                   seg_curves[comb[j][1]][:,i],
+                                                   seg_curves[comb[j][1]][:,i+1],
+                                                   seg_curves[comb[j][0]][:,i+1]]
+    ax.add_collection3d(
+        Poly3DCollection(curved_surfaces, facecolors=color, linewidths=1, alpha=.25))
 
     # Plot vector of magnetization in the center of the cube
-    ax.quiver(offset[0] + center[0], offset[1] + center[1], offset[2] + center[2], M[0], M[1], M[2], color=color, length=np.linalg.norm(dr)/2, pivot='middle', normalize=True)
+    ax.quiver(offset[0] + center[0], offset[1] + center[1], offset[2] + center[2],
+              M[0], M[1], M[2], color=color, length=np.linalg.norm(dr)/2,
+              pivot='middle', normalize=True)
 
 
 def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv=False):
@@ -288,69 +318,67 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
             triangle_surfaces[i+(resolution-1)*j] = [seg_curves[j][:,i], ver_cyl[5-j], seg_curves[j][:,i+1]]
     ax.add_collection3d(Poly3DCollection(triangle_surfaces, facecolors=color, linewidths=1, alpha=.25))
 
-    min_side = r*min(abs(math.cos(theta + dtheta/2) - math.cos(theta - dtheta/2)), abs(math.sin(theta + dtheta/2) - math.sin(theta - dtheta/2)))
+    min_side = r * min(abs(math.cos(theta + dtheta/2) - math.cos(theta - dtheta/2)),
+                       abs(math.sin(theta + dtheta/2) - math.sin(theta - dtheta/2)))
 
     if inv:
-        r_M = r + 0.25*min_side
+        r_M = r + 0.25 * min_side
     else:
-        r_M = r - 0.5*min_side
+        r_M = r - 0.5 * min_side
 
     # Plot vector of magnetization in the center of the cube
-    ax.quiver(offset[0] + (r_M)*math.cos(center_pos[1]), offset[1] + (r_M)*math.sin(center_pos[1]),\
-        offset[2] + center_pos[2], M[0], M[1], M[2], color=color, length=0.5*min_side, pivot='middle', normalize=True)
+    ax.quiver(offset[0] + (r_M) * math.cos(center_pos[1]),
+              offset[1] + (r_M)*math.sin(center_pos[1]),
+              offset[2] + center_pos[2], M[0], M[1], M[2], color=color,
+              length=0.5*min_side, pivot='middle', normalize=True)
 
 
-def get_rotmat(rot):
-    rot_x = [1, 0, 0], [0, math.cos(rot[0]), -math.sin(rot[0])], [0, math.sin(rot[0]), math.cos(rot[0])]
-    rot_y = [math.cos(rot[1]), 0, math.sin(rot[1])], [0, 1, 0], [-math.sin(rot[1]), 0, math.cos(rot[1])]
-    rot_z = [math.cos(rot[2]), -math.sin(rot[2]), 0], [math.sin(rot[2]), math.cos(rot[2]), 0], [0, 0, 1]
-    # TODO: Check rotation from local to global: (1) Rot_X, (2) Rot_Y, (3) Rot_Z
-    # G to L in local coordinate system: 
-    R = np.asarray(rot_x) @ np.asarray(rot_y) @ np.asarray(rot_z)
-
-    return R
-
-def plot_field(axes, points, H):
+def plot_field(axes, pts, field):
     ax = axes
     cmap = cm.get_cmap('Blues')
-    # Max color is set to norm of 30000
     norm = colors.Normalize(vmin=0, vmax=30000)
+
     # Set length of field arrows depending on number of evaluated points
-    if len(points) > 1000:
+    if len(pts) > 1000:
         len_arrow = 0.01
-    elif len(points) > 500:
+    elif len(pts) > 500:
         len_arrow = 0.025
-    elif len(points) > 100:
+    elif len(pts) > 100:
         len_arrow = 0.05
     else:
         len_arrow = 0.125
-    for i, point in enumerate(points):
-        ax.quiver(point[0], point[1], point[2], H[i][0], H[i][1], H[i][2], colors=cmap(norm(np.linalg.norm(H[i]))),
-        pivot='middle', length=len_arrow, normalize=True)
+    
+    for i, pt in enumerate(pts):
+        ax.quiver(pt[0], pt[1], pt[2], field[i][0], field[i][1], field[i][2],
+                  colors=cmap(norm(np.linalg.norm(field[i]))), pivot='middle',
+                  length=len_arrow, normalize=True)
+    
     plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax)
 
 
-def plot_grid(ax, grid):
-    # Draw grid lines
+def plot_grid(ax, spots, area):
     ax.grid(False)
-    x = np.linspace(0, grid.area[0], grid.places[0]+1)
-    y = np.linspace(0, grid.area[1], grid.places[1]+1)
-    z = np.linspace(0, grid.area[2], grid.places[2]+1)
+    x = np.linspace(0, area[0], spots[0]+1)
+    y = np.linspace(0, area[1], spots[1]+1)
+    z = np.linspace(0, area[2], spots[2]+1)
+
     segs = []
     for mark_x in x:
-        segs.append(np.array([[mark_x, 0, 0], [mark_x, grid.area[1], 0]]))
-        segs.append(np.array([[mark_x, 1, 0], [mark_x, 1, grid.area[2]]]))
+        segs.append(np.array([[mark_x, 0, 0], [mark_x, area[1], 0]]))
+        segs.append(np.array([[mark_x, 1, 0], [mark_x, 1, area[2]]]))
+
     for mark_y in y:
-        segs.append(np.array([[0, mark_y, 0], [grid.area[0], mark_y, 0]]))
-        segs.append(np.array([[1, mark_y, 0], [1, mark_y, grid.area[2]]]))
+        segs.append(np.array([[0, mark_y, 0], [area[0], mark_y, 0]]))
+        segs.append(np.array([[1, mark_y, 0], [1, mark_y, area[2]]]))
+
     for mark_z in z:
-        if mark_z == 0:
-            pass
+        if mark_z == 0: pass
         segs.append(np.array([[1, 0, mark_z], [1, 1, mark_z]]))
         segs.append(np.array([[1, 0, mark_z], [1, 1, mark_z]]))
         segs.append(np.array([[0, 1, mark_z], [1, 1, mark_z]]))
         segs.append(np.array([[0, 1, mark_z], [1, 1, mark_z]]))
-    segs.append(np.array([[1, 1, grid.area[2]], [0, 1, grid.area[2]]]))
+
+    segs.append(np.array([[1, 1, area[2]], [0, 1, area[2]]]))
     line_segments = Line3DCollection(segs, colors='0.75')
     ax.add_collection(line_segments)
 
@@ -361,9 +389,12 @@ def zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale=0.1)
         cur_xlim = ax.get_xlim()
         cur_ylim = ax.get_ylim()
         cur_zlim = ax.get_zlim()
-        cur_lim_range = max(cur_xlim[1] - cur_xlim[0], cur_ylim[1] - cur_ylim[0], cur_zlim[1] - cur_zlim[0])
+        cur_lim_range = max(cur_xlim[1] - cur_xlim[0],
+                            cur_ylim[1] - cur_ylim[0],
+                            cur_zlim[1] - cur_zlim[0])
         cur_center_x = sum(cur_xlim[:])/2
         cur_center_y = sum(cur_ylim[:])/2
+
         if event.button == 'up':
             # deal with zoom in
             cur_lim_range = max(cur_lim_range - scale, scale/5)
@@ -418,60 +449,65 @@ def zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale=0.1)
     return (zoom_scroll, zoom_onpress)
 
 
-def create_plot(tiles, eval_points=None, H=None, grid=None):
+def create_plot(
+    tiles: Optional[Tiles] = None,
+    eval_pts: Optional[np.ndarray] = None,
+    field: Optional[np.ndarray] = None,
+    spots: Optional[List] = None,
+    area: Optional[List] = None,
+) -> None:
     '''
-    Creates a plot with the iterated tiles and the calculated magnetic field H at the evaluation points as quiver plot.  
-    Additionally, an optional grid can be displayed.
+    Creates a plot with the iterated tiles and the calculated magnetic field H at the
+    evaluation points as quiver plot. Additionally, an optional grid can be displayed.
+    Tile types: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
+                5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
     '''
     fig = plt.figure()
     ax = fig.gca(projection='3d')
+
     if tiles is not None:
-        # Plotting for MagTenseStandalone
-        if isinstance(tiles, list):
-            for tile in tiles:
-                if (tile.get_tile_type() == 2):
-                    plot_cube(ax, tile.get_size(), tile.get_offset(), tile.get_rotation(), tile.get_M(), tile.get_color())
-        # Plotting for MagTense
-        else:
-            for i in range(tiles.get_n()):
-                # 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 5 = tetrahedron,
-                # 6 = sphere, 7 = spheroid, 10 = ellipsoid
-                if (tiles.get_tile_type(i) == 1):
-                    plot_cylindrical(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), \
-                        tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
+        for i in range(tiles.n):
+            if (tiles.tile_type[i] == 1):
+                plot_cylindrical(ax, tiles.center_pos[i], tiles.dev_center[i],
+                                 tiles.offset[i], tiles.rot[i], tiles.M[i],
+                                 tiles.color[i])
 
-                elif (tiles.get_tile_type(i) == 2):
-                    plot_cube(ax, tiles.get_size(i), tiles.get_offset(i), tiles.get_rotation(i), \
-                        tiles.get_M(i), tiles.get_color(i))
+            elif (tiles.tile_type[i] == 2):
+                plot_cube(ax, tiles.size[i], tiles.offset[i], tiles.rot[i],
+                          tiles.M[i], tiles.color[i])
 
-                elif (tiles.get_tile_type(i) == 3):
-                    plot_circpiece(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), \
-                        tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
+            elif (tiles.tile_type[i] == 3):
+                plot_circpiece(ax, tiles.center_pos[i], tiles.dev_center[i],
+                               tiles.offset[i], tiles.rot[i], tiles.M[i],
+                               tiles.color[i])
 
-                elif (tiles.get_tile_type(i) == 4):
-                    plot_circpiece(ax, tiles.get_center_pos(i), tiles.get_dev_center(i), \
-                        tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i), inv=True)
+            elif (tiles.tile_type[i] == 4):
+                plot_circpiece(ax, tiles.center_pos[i], tiles.dev_center[i],
+                               tiles.offset[i], tiles.rot[i], tiles.M[i],
+                               tiles.color[i], inv=True)
 
-                elif (tiles.get_tile_type(i) == 5):
-                    plot_tetrahedron(ax, tiles.get_vertices(i), tiles.get_M(i), tiles.get_color(i))
+            elif (tiles.tile_type[i] == 5):
+                plot_tetrahedron(ax, tiles.vertices[i], tiles.M[i],
+                                 tiles.color[i])
 
-                elif (tiles.get_tile_type(i) == 6):
-                    plot_sphere(ax, tiles.get_size(i)[0], tiles.get_offset(i), tiles.get_M(i), tiles.get_color(i))
+            elif (tiles.tile_type[i] == 6):
+                plot_sphere(ax, tiles.size[i][0], tiles.offset[i], tiles.M[i],
+                            tiles.color[i])
 
-                elif (tiles.get_tile_type(i) == 7):
-                    plot_spheroid(ax, tiles.get_size(i), tiles.get_offset(i), tiles.get_rotation(i), tiles.get_M(i), tiles.get_color(i))
+            elif (tiles.tile_type[i] == 7):
+                plot_spheroid(ax, tiles.size[i], tiles.offset[i],
+                              tiles.rot[i], tiles.M[i], tiles.color[i])
 
-                elif (tiles.get_tile_type(i) == 10):
-                    # TODO plot_ellipsoid()
-                    pass
-                else:
-                    print("Tile type not supported!")
+            elif (tiles.tile_type[i] == 10):
+                # TODO plot_ellipsoid()
+                pass
 
-    if eval_points is not None and H is not None:
-        plot_field(ax, eval_points, H)
+            else:
+                raise ValueError("Tile type not supported!")
 
-    if grid is not None:
-        plot_grid(ax, grid)
+    if not (None in eval_pts or None in field): plot_field(ax, eval_pts, field)
+    if not (None in (spots, area)): plot_grid(ax, spots, area)
+
     # Workaround added get_proj function inside site-packages\mpl_toolkits\mplot3d\axes3d.py
     # Setting length of each axis individually - currrently not support for axes3d
     # https://stackoverflow.com/questions/10326371/setting-aspect-ratio-of-3d-plot
@@ -484,8 +520,12 @@ def create_plot(tiles, eval_points=None, H=None, grid=None):
     data_xlim = ax.get_xlim()
     data_ylim = ax.get_ylim()
     data_zlim = ax.get_zlim()
+
     # Scaling axis equally
-    data_lim_range = max(data_xlim[1] - data_xlim[0], data_ylim[1] - data_ylim[0], data_zlim[1] - data_zlim[0])
+    data_lim_range = max(data_xlim[1] - data_xlim[0],
+                         data_ylim[1] - data_ylim[0],
+                         data_zlim[1] - data_zlim[0])
+
     ax.set_xlim([data_xlim[0], data_xlim[0] + data_lim_range])
     ax.set_ylim([data_ylim[0], data_ylim[0] + data_lim_range])
     ax.set_zlim([data_zlim[0], data_zlim[0] + data_lim_range])
@@ -495,4 +535,123 @@ def create_plot(tiles, eval_points=None, H=None, grid=None):
     ax.set_zlabel('Z')
 
     zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range)
+    plt.show()
+
+
+def plot_magfield(field, magnet=None, vmax=1):
+    plt.clf()
+    labels = ['Bx-field', 'By-field', 'Bz-field']
+    nrows = 3 if len(field.shape) == 4 else 1
+    if magnet is not None: nrows += 1
+    fig, axes = plt.subplots(nrows=nrows, ncols=3, sharex=True,
+                             sharey=True, figsize=(15,10))
+    norm = colors.Normalize(vmin=-vmax, vmax=vmax)
+
+    if len(field.shape) == 3:
+        for i, comp in enumerate(field):
+            ax = axes.flat[i]
+            im = ax.imshow(comp, cmap='bwr', norm=norm, origin="lower")
+            ax.set_title(labels[i])
+
+    elif len(field.shape) == 4:
+        for i, z in enumerate([0, 1, 2]):
+            for j, comp in enumerate(field[:,:,:,z]):
+                ax = axes.flat[i * 3 + j]
+                im = ax.imshow(comp, cmap='bwr', norm=norm, origin="lower")
+                ax.set_title(labels[j] + f'@{z+1}')
+    
+    else:
+        raise NotImplementedError()
+
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.825, 0.345, 0.015, 0.3])
+    fig.colorbar(im, cax=cbar_ax)
+
+    if magnet is not None:
+        params = f'(x, y, a, |M|, phi)'
+        for i in range(magnet.shape[0]):
+            params += '\n\n('
+            for j in range(magnet.shape[1]):
+                params += f'{magnet[i,j]:.3f}, '
+            params += ')'
+        ax = axes.flat[-3]
+        ax.text(0, 0, params, fontsize=20)
+        ax.set_axis_off()
+        axes.flat[-2].set_axis_off()
+        axes.flat[-1].set_axis_off()
+
+    plt.show()
+
+
+def load_COMSOL(
+    fname: str,
+    eval_offset: List,
+    COMSOL_eval_path: Path, 
+    model_offset: List,
+    unit: str,
+    pts_special: Optional[np.ndarray] = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+    '''
+    Load reference points from COMSOL calculation
+    '''
+    with open(Path(COMSOL_eval_path, fname), "r") as file:
+        T = file.readlines()[8:]
+
+    T_split = np.asarray([line.split() for line in T], dtype=np.float64)
+    H_norm_COMSOL = T_split[:,1]
+    if unit == 'T': H_norm_COMSOL *= 4 * np.pi * 1e-7
+    pts_coor = T_split[:,0] if pts_special is None else pts_special
+    struc = np.ones(len(pts_coor))
+
+    if fname[-5] == 'x':
+        pts = np.c_[pts_coor - model_offset[0],
+                    struc * eval_offset[1],
+                    struc * eval_offset[2]]
+    elif fname[-5] == 'y':
+        pts = np.c_[struc * eval_offset[0],
+                    pts_coor - model_offset[1],
+                    struc * eval_offset[2]]
+    elif fname[-5] == 'z':
+        pts = np.c_[struc * eval_offset[0],
+                    struc * eval_offset[1],
+                    pts_coor - model_offset[2]]
+
+    return pts, H_norm_COMSOL
+
+
+def validation(
+    shape: str,
+    tile: Tiles,
+    offset: List,
+    model_offset: List = [0, 0, 0],
+    plot_COMSOL: bool = True,
+    plot_error: bool = False,
+    unit: str = 'A/m'
+    ) -> None:
+    mu0 = 4 * np.pi * 1e-7
+    prefix = 'py_' if 'spher' in shape else ''
+    suffix = '_prolate' if shape == 'spheroid' else ''
+    COMSOL_eval_path = Path(__file__).parent.absolute() / '..' / '..' / '..' / \
+        'documentation' / 'examples_FEM_validation' / f'Validation_{shape}'
+
+    fig, ax = plt.subplots(1,3)
+    fig.suptitle(f'{shape} - MagTensePy vs. COMSOL')
+
+    for i, coord in enumerate(['x', 'y', 'z']):
+        fname = f'{prefix}Validation_{shape}{suffix}_normH_{coord}.txt'
+        pts, H_n_COMSOL = load_COMSOL(fname, offset, COMSOL_eval_path, model_offset, unit)
+        _, H_mt = run_simulation(tile, pts)
+        H_n_mt = [np.linalg.norm(H_point) * mu0 for H_point in H_mt]
+
+        ax[i].plot(pts[:,i], H_n_mt, 'r*', label='MagTense')
+        if plot_COMSOL: ax[i].plot(pts[:,i], H_n_COMSOL, 'bx', label='COMSOL')
+
+        if plot_error:
+            error = abs(H_n_COMSOL - H_n_mt)
+            ax[i].plot(pts[:,i], error, 'g', label= 'Error')
+
+        ax[i].legend()
+        ax[i].set_xlabel(f'{coord}_axis')
+        ax[i].set_ylabel('H_norm')
+
     plt.show()
