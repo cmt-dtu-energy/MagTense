@@ -1,4 +1,4 @@
-#if !(USE_PYTHON)
+#if USE_MATLAB
 #include "fintrf.h"
 #endif
 

@@ -274,14 +274,14 @@ end subroutine loadDemagTensorFromDisk
 !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 !>
 !! Routine for displaying progress
-subroutine displayMessage( mess )
+subroutine displayGUIMessage( mess )
     character(*),intent(in) :: mess
 
     write(*,*) mess
 
-end subroutine displayMessage
+end subroutine displayGUIMessage
 
-subroutine displayProgressMessage( mess, prog )
+subroutine displayGUIProgressMessage( mess, prog )
     character(*),intent(in) :: mess
     integer,intent(in) :: prog
     character*(4) :: prog_str
@@ -291,9 +291,9 @@ subroutine displayProgressMessage( mess, prog )
     fmt = '(I4.2)'
     write (prog_str,fmt) prog
     
-    call displayMessage( mess )
-    call displayMessage( prog_str )
+    call displayGUIMessage( mess )
+    call displayGUIMessage( prog_str )
     
-end subroutine displayProgressMessage
+end subroutine displayGUIProgressMessage
 
 end module MagTenseMicroMagPyIO

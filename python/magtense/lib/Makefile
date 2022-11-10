@@ -16,7 +16,7 @@ VPATH = ../../../source/NumericalIntegration/NumericalIntegration:\
 
 ifeq ($(OS),Windows_NT)
 	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise /libs:static \
-	/threads /fpp /DUSE_CUDA=${USE_CUDA} /DUSE_CVODE=${USE_CVODE} /DUSE_PYTHON=1
+	/threads /fpp /DUSE_CUDA=${USE_CUDA} /DUSE_CVODE=${USE_CVODE} /DUSE_MATLAB=0
 
 	EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower \
 	--opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
@@ -52,7 +52,7 @@ else
 	export LDFLAGS=-Wl,-rpath=/opt/intel/oneapi/mkl/latest/lib/intel64/
 	
 	F90FLAGS = -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 -fp-model precise \
-	-threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} -DUSE_PYTHON=1
+	-threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} -DUSE_MATLAB=0
 
 	EXTRA_OPT = --opt='${F90FLAGS}'
 	FCOMP = intelem
