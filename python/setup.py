@@ -30,5 +30,5 @@ setup(
     packages=find_packages(include=['magtense']),
     python_requires=">=3.9, <3.11",
     include_package_data=True,
-    install_requires=["numpy", "matplotlib", "intel-fortran-rt==2022.1.0"],
+    install_requires=["numpy", "matplotlib"],
 )

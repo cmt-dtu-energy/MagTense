@@ -1,7 +1,7 @@
 # Python Interface
 
 The Fortran code is compiled and wrapped to a module that can be directly called from Python.
-The tool **f2py** of the NumPy package is used to wrap the interface file **lib/FortranToPythonIO.f90**.
+The tool `f2py` of the NumPy package is used to wrap the interface file `lib/FortranToPythonIO.f90`.
 
 ## Deployment with Conda
 
@@ -13,13 +13,13 @@ The tool **f2py** of the NumPy package is used to wrap the interface file **lib/
 
 - [Intel® oneAPI Math Kernel Library](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html)
 
-  [Linux] Prepare your terminal, so that ifort and MKL can be found:
+- [Linux] Prepare your terminal, so that ifort and MKL can be found:
 
     ```bash
     . ~/intel/oneapi/setvars.sh
     ```
 
-- [Windows + MacOS only] Installation of Make utility
+- [Windows + MacOS] Installation of Make utility
 
     ```bash
     conda install -y -c conda-forge make
@@ -40,7 +40,7 @@ The tool **f2py** of the NumPy package is used to wrap the interface file **lib/
 ### Installation from source
 
 Create an importable Python module from Fortran source code.
-Navigate to folder **python/magtense/lib/**, run **make**, and install the package:
+Navigate to folder `python/magtense/lib/`, run `make`, and install the package:
 
 ```bash
 cd /path/to/repo/python/magtense/lib/
@@ -48,6 +48,34 @@ make SHELL=cmd
 cd /path/to/repo/python/
 pip install -e .
 ```
+
+## [Linux] Set LD_LIBRARY_PATH for specific conda environment only
+
+Adapted from https://stackoverflow.com/questions/46826497/conda-set-ld-library-path-for-env-only.
+
+1. Create these subdirectories and files in the directory of the specific conda environment:
+    ```sh
+    cd /PATH/TO/CONDA/ENV/
+    mkdir -p ./etc/conda/activate.d
+    mkdir -p ./etc/conda/deactivate.d
+    touch ./etc/conda/activate.d/env_vars.sh
+    touch ./etc/conda/deactivate.d/env_vars.sh
+    ```
+2. Edit `./etc/conda/activate.d/env_vars.sh`
+    ```sh
+    #!/bin/sh
+
+    export OLD_LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+    export LD_LIBRARY_PATH=/PATH/TO/CONDA/ENV/lib/:${LD_LIBRARY_PATH}
+    ```
+
+3. Edit `./etc/conda/deactivate.d/env_vars.sh`
+    ```sh
+    #!/bin/sh
+
+    export LD_LIBRARY_PATH=${OLD_LD_LIBRARY_PATH}
+    unset OLD_LD_LIBRARY_PATH
+    ```
 
 ## Read-in customized M-H-curve
 
