@@ -1,1 +1,3 @@
 recursive-include magtense/lib *.pyd *.so
+recursive-include magtense/mat *.csv
+include README_top.md

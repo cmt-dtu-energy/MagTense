@@ -1,4 +1,4 @@
-#if !(USE_PYTHON)
+#if USE_MATLAB
 include 'blas.f90'
 #endif
 
@@ -12,6 +12,8 @@ include 'blas.f90'
     use BLAS95
 #if USE_MATLAB        
     use MagTenseMicroMagIO
+#else
+    use MagTenseMicroMagPyIO
 #endif
     use MicroMagParameters
     use LLODE_Debug
@@ -63,7 +65,7 @@ include 'blas.f90'
     !Copy the demag tensor to CUDA
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
         call displayGUIMessage( 'Copying to CUDA' )
-#if USE_CUDA            
+#if USE_CUDA
         !Initialize the Cuda arrays and load the demag tensors into the GPU memory
         if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
            
