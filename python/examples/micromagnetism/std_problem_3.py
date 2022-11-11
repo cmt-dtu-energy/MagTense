@@ -2,12 +2,19 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pathlib import Path
+from typing import List
+
 from magtense.micromag import MicromagProblem
+from magtense.utils import plot_M_avg_seq, plot_M_thin_film
 
 
-def std_prob_3(res=[10,10,10], L_loop=np.linspace(8,9,10),
-               cuda=False, show=True, show_details=False):  
+def std_prob_3(
+    res: List[int] = [10,10,10],
+    L_loop: np.ndarray = np.linspace(8,9,10),
+    cuda: bool = False,
+    show: bool = True,
+    show_details: bool = False
+) -> None:  
     mu0 = 4 * np.pi * 1e-7
     Ms = 1e6
 
@@ -49,22 +56,13 @@ def std_prob_3(res=[10,10,10], L_loop=np.linspace(8,9,10),
                 t_end = 200e-9
 
             problem.grid_L = np.array([lex, lex, lex]) * L_loop[i]
-            t, M_out, pts, H_exc, H_ext, H_dem, H_ani = problem.run_simulation(t_end, 50, Hext_fct, 2)
+            t, M_out, _, H_exc, H_ext, H_dem, H_ani = problem.run_simulation(t_end, 50, Hext_fct, 2)
 
             if show_details:
-                # M_sq = np.squeeze(M, axis=2)
-                # for k, m in enumerate([M_sq[0,:,:], M_sq[-1,:,:]]):
-                #     fig = go.Figure(
-                #         data=go.Cone(x=pts[:,0], y=pts[:,1], z=pts[:,2], u=m[:,0], v=m[:,1], w=m[:,2]),
-                #         layout_title_text=f'State{j}_{k}',
-                #     )
-                #     fig.show()
-
-                plt.clf()
-                plt.plot(t, np.mean(M_out[:,:,0,0], axis=1), 'rx')
-                plt.plot(t, np.mean(M_out[:,:,0,1], axis=1), 'gx')
-                plt.plot(t, np.mean(M_out[:,:,0,2], axis=1), 'bx')
-                plt.savefig(f'{Path(__file__).parent.resolve()}/mag_components.png')
+                M_sq = np.squeeze(M_out, axis=2)
+                plot_M_avg_seq(t, M_sq)
+                plot_M_thin_film(M_sq[0], res)
+                plot_M_thin_film(M_sq[-1], res)
             
             # Calculate the energy terms
             E_exc = np.sum((1/2) * (M_out[:,:,0,0] * H_exc[:,:,0,0] \
@@ -91,20 +89,17 @@ def std_prob_3(res=[10,10,10], L_loop=np.linspace(8,9,10),
                     plt.plot(t, mu0 * E_x - mu0 * E_x[0], '.')
                 plt.xlabel('Time [s]')
                 plt.ylabel('Energy [-]')
-                plt.legend({'E_{exc}', 'E_{ext}', 'E_{dem}', 'E_{ani}'}, 'Location', 'East')
+                plt.legend([r'$E_{exc}$', r'$E_{ext}$', r'$E_{dem}$', r'$E_{ani}$'])
+                plt.show()
 
     if show:
         plt.clf()
         plt.plot(L_loop, np.sum(E_arr[:,:,0], axis=0), '.')
         plt.plot(L_loop, np.sum(E_arr[:,:,1], axis=0), 'o')
         plt.xlabel('L [l_ex]')
-        plt.ylabel('E [-]')
-        plt.savefig(f'{Path(__file__).parent.resolve()}/prob3.png')
-
-    # print(f'Energy intersection: {np.interp(np.sum(E_arr[:,:,0], axis=0) - np.sum(E_arr[:,:,1], axis=0), L_loop, 0)})')
-
-    return problem, (t, M_out, pts, H_exc, H_ext, H_dem, H_ani), E_arr, L_loop
+        plt.ylabel('Energy [-]')
+        plt.show()
 #%%
 
 if __name__ == '__main__':
-    std_prob_3(show=True, L_loop=np.linspace(8,9,10))
+    std_prob_3(show=True, show_details=True)
