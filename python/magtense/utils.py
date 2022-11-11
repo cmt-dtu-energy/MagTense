@@ -6,6 +6,8 @@ import matplotlib.cm as cm
 
 from pathlib import Path
 from typing import Optional, List
+from matplotlib.lines import Line2D
+from matplotlib.pyplot import figure
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 
 from magtense.magstatics import get_rotmat, Tiles, run_simulation
@@ -538,7 +540,11 @@ def create_plot(
     plt.show()
 
 
-def plot_magfield(field, magnet=None, vmax=1):
+def plot_magfield(
+    field: np.ndarray,
+    magnet: Optional[np.ndarray] = None,
+    vmax: float = 1
+) -> None:
     plt.clf()
     labels = ['Bx-field', 'By-field', 'Bz-field']
     nrows = 3 if len(field.shape) == 4 else 1
@@ -583,6 +589,62 @@ def plot_magfield(field, magnet=None, vmax=1):
     plt.show()
 
 
+def plot_M_avg_seq(t: np.ndarray, M_seq: np.ndarray) -> None:
+    plt.clf()
+    plt.plot(t, np.mean(M_seq[:,:,0], axis=1), 'rx')
+    plt.plot(t, np.mean(M_seq[:,:,1], axis=1), 'gx')
+    plt.plot(t, np.mean(M_seq[:,:,2], axis=1), 'bx')
+
+    legend_elements = [
+        Line2D([0], [0], marker='x', color='r', label=r'$M_x$'),
+        Line2D([0], [0], marker='x', color='g', label=r'$M_y$'),
+        Line2D([0], [0], marker='x', color='b', label=r'$M_z$'),
+    ]
+    plt.legend(handles=legend_elements)
+    plt.setp(plt.gca().get_legend().get_texts(), fontsize='14')
+
+    plt.xlabel('Time [s]', fontsize='14')
+    plt.ylabel(r'$m_i$' + ' [-]', fontsize='14')
+    plt.show()
+
+
+def plot_M_thin_film(
+    m: np.ndarray,
+    res: List[int],
+    title: Optional[str] = None,
+    scale: Optional[float] = None,
+    width: float = 0.002,
+    headwidth: float = 3,
+    headlength: float = 5
+) -> None:
+    l = np.moveaxis(m.reshape(res[1], res[0], res[2], 3).swapaxes(0,1), -1, 0)
+    l = l[:,:,:,0]
+
+    plt.clf()
+    plt.quiver(
+        l[0].T + 1e-20,
+        l[1].T + 1e-20,
+        pivot='mid',
+        scale=scale,
+        width=width,
+        headwidth=headwidth,
+        headlength=headlength
+    )
+
+    nz = colors.Normalize(0.0, 2*np.pi)
+    clr = np.swapaxes(cm.hsv(nz(np.arctan2(l[1], l[0]) + np.pi)), 0, 1)
+    plt.imshow(clr, interpolation="bicubic")
+
+    plt.axis("scaled")
+    ax = plt.gca()
+    ax.axes.xaxis.set_visible(False)
+    ax.axes.yaxis.set_visible(False)
+
+    if title: plt.title(title)
+    figure(figsize=(res[0]/4, res[1]/4), dpi=140)
+    plt.show()
+
+
 def load_COMSOL(
     fname: str,
     eval_offset: List,
@@ -590,7 +652,7 @@ def load_COMSOL(
     model_offset: List,
     unit: str,
     pts_special: Optional[np.ndarray] = None,
-    ) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     '''
     Load reference points from COMSOL calculation
     '''
@@ -627,7 +689,7 @@ def validation(
     plot_COMSOL: bool = True,
     plot_error: bool = False,
     unit: str = 'A/m'
-    ) -> None:
+) -> None:
     mu0 = 4 * np.pi * 1e-7
     prefix = 'py_' if 'spher' in shape else ''
     suffix = '_prolate' if shape == 'spheroid' else ''
