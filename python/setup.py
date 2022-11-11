@@ -27,6 +27,7 @@ setup(
     author="Stefan Pollok",
     author_email="spol@dtu.dk",
     license="GPL 3.0",
+    license_files=('LICENSE',),
     packages=find_packages(include=['magtense']),
     python_requires=">=3.9, <3.11",
     include_package_data=True,
