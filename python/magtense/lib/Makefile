@@ -43,13 +43,14 @@ ifeq ($(OS),Windows_NT)
 	LIB_OPT = -I:${OPT_PATH1} -I:${OPT_PATH2} -L. -llibsrc
 	
 	LIBTOOL = LIB $? /OUT:$@
+	STATIC_LIB = libsrc.lib
 	CLEAN_FILES = -del libsrc.a libsrc.lib *.o *.mod *.pyd
 	CLEAN_FOLDER = -rmdir /s /q Release 2>NUL || VER>NUL
 	CLEAN_FOLDER_WIN = -for /f %%i in ('dir /a:d /b src.win-*') do rd /s /q %%i
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
 
 else
-	export LDFLAGS=-Wl,-rpath=/opt/intel/oneapi/mkl/latest/lib/intel64/
+	export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib/
 	
 	F90FLAGS = -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 -fp-model precise \
 	-threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} -DUSE_MATLAB=0
@@ -57,13 +58,8 @@ else
 	EXTRA_OPT = --opt='${F90FLAGS}'
 	FCOMP = intelem
 
-	MKLROOT =/opt/intel/oneapi/mkl/latest
-	MKL = -L${MKLROOT}/lib/intel64/ -lmkl_intel_ilp64 -lmkl_lapack95_ilp64 \
-	-lmkl_blas95_ilp64 -lmkl_intel_thread -lmkl_core -lpthread -lm -ldl
-
-	MKL_OMP = -L/opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin/ -liomp5
-
-	OPT= ${MKLROOT}/include/intel64/ilp64 -I${MKLROOT}/include
+	MKL = -L${CONDA_PREFIX}/lib/ -lmkl_rt -lpthread -lm -ldl -liomp5 -L./blas95/lib/ -lmkl_blas95_lp64
+	OPT = ${CONDA_PREFIX}/include/ -I./blas95/include/
 	LIB_OPT = -I${OPT} -L. -lsrc
 
 	ifeq (${UNAME}, Darwin)
@@ -72,7 +68,8 @@ else
   		LIBTOOL = ar src $@ $?
 	endif
 	
-	CLEAN_FILES = -rm libsrc.a libsrc.lib *.o *.mod *.so 
+	STATIC_LIB = libsrc.a
+	CLEAN_FILES = -rm libsrc.a *.o *.mod *.so 
 	CLEAN_FOLDER = -rm -r src.*
 	CLEAN_FOLDER_WIN = -true
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.so
@@ -89,10 +86,10 @@ MicroMagParameters RKSuitef90 ODE_Solvers LLODE_Debug util FortranCuda MagTenseM
 LandauLifshitzEquationSolver
 
 # file names
-LIBSRC_FILES = $(addsuffix .f90,${LIBSRC_SOURCES})
+LIBSRC_FILES = $(addsuffix .f90, ${LIBSRC_SOURCES})
 
 # object files
-LIBSRC_OBJECTS = $(addsuffix .o,${LIBSRC_SOURCES})
+LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 #=======================================================================
 #       List all source files that require a Python interface
@@ -101,7 +98,7 @@ LIBSRC_OBJECTS = $(addsuffix .o,${LIBSRC_SOURCES})
 LIBSRC_WRAP_SOURCES = FortranToPythonIO
 
 # file names
-LIBSRC_WRAP_FILES = $(addsuffix .f90,${LIBSRC_WRAP_SOURCES})
+LIBSRC_WRAP_FILES = $(addsuffix .f90, ${LIBSRC_WRAP_SOURCES})
 
 #=======================================================================
 #                 Relevant suffixes
@@ -132,6 +129,6 @@ libsrc.lib: ${LIBSRC_OBJECTS}
 libsrc.a: ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
-${PYTHON_MODN_ALL}: libsrc.lib libsrc.a
+${PYTHON_MODN_ALL}: ${STATIC_LIB}
 	f2py --build-dir . --fcompiler=${FCOMP} ${EXTRA_OPT} -c -m ${PYTHON_MODN} \
-	${LIB_OPT} ${LIBSRC_WRAP_FILES} ${LIBSRC_OBJECTS} $(MKL) $(MKL_OMP) $(CUDA)
+	${LIB_OPT} ${LIBSRC_WRAP_FILES} ${LIBSRC_OBJECTS} $(MKL) $(CUDA)
