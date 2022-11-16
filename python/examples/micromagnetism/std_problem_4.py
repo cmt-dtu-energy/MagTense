@@ -40,4 +40,4 @@ def std_prob_4(res=[64,16,1], NIST_field=1, cuda=False, show=True):
 # %%
 
 if __name__ == '__main__':
-    std_prob_4(NIST_field=1, show=True, cuda=False)
+    std_prob_4(NIST_field=1, show=True, cuda=True)

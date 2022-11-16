@@ -9,5 +9,3 @@ fortranobject.h
 magtensesource*
 Release
 src.*/
-
-!blas95/include/blas95.mod

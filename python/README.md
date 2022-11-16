@@ -1,7 +1,7 @@
 # Python Interface
 
 The Fortran code is compiled and wrapped to a module that can be directly called from Python.
-The tool `f2py` of the NumPy package is used to wrap the interface file `lib/FortranToPythonIO.f90`.
+The tool `f2py` of the NumPy package is used to wrap the interface file `MagTense/python/magtense/lib/FortranToPythonIO.f90`.
 
 ## Deployment with Conda
 
@@ -9,28 +9,35 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `lib/For
 
 - Python >= 3.9
 
-- [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
-
-  - [Windows] Activation via [VS Code extension for Intel® oneAPI Toolkits](https://github.com/intel/vscode-oneapi-environment-configurator)
+- [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#inpage-nav-6-undefined) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
   - [Linux] Prepare your terminal, so that ifort compiler can be found:
 
     ```bash
-    . ~/intel/oneapi/setvars.sh
+    . /opt/intel/oneapi/setvars.sh
     ```
 
-- [Windows + MacOS] Installation of Make utility
-
-    ```bash
-    conda install -y -c conda-forge make
-    ```
+  - [Windows] Activation via [VS Code extension for Intel® oneAPI Toolkits](https://github.com/intel/vscode-oneapi-environment-configurator)
 
 - Required python packages
 
     ```bash
-    conda install -y numpy matplotlib mkl mkl-include intel-fortran-rt
-    conda install -y -c intel mkl-static
+    conda install -y -c intel mkl mkl-include mkl-static
+    conda install -y -c "nvidia/label/cuda-${CUDA_VERSION}" cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev
+    conda install -y numpy matplotlib
     ```
+
+    - [ Linux ]
+
+        ```bash
+        conda install -y -c intel intel-fortran-rt
+        ```
+
+    - [ Windows / MacOS ] Installation of Make utility
+
+        ```bash
+        conda install -y -c conda-forge make
+        ```
 
 - Additional python packages to run data creation scripts
 
@@ -38,49 +45,31 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `lib/For
     conda install -y h5py tqdm
     ```
 
+### Preparation of cuda objects
+
+Create importable objects from cuda source code.
+
+HINT: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version.
+
+```bash
+cd MagTense/source/MagTenseFortranCuda/cuda/
+nvcc -shared -Xcompiler -fPIC -c MagTenseCudaBlas.cu
+icx -fPIC -c MagTenseCudaBlasICLWrapper.cxx
+```
+
 ### Installation from source
 
 Create an importable Python module from Fortran source code.
-Navigate to folder `python/magtense/lib/`, run `make`, and install the package:
+
+Navigate to folder `MagTense/python/magtense/lib/`, run `make`, and install the package:
 
 ```bash
-cd /path/to/repo/python/magtense/lib/
+cd MagTense/python/magtense/lib/
 make SHELL=cmd
-cd /path/to/repo/python/
+cd MagTense/python/
 pip install -e .
 ```
 
-## [Linux] Set LD_LIBRARY_PATH for specific conda environment only
-
-Adapted from https://stackoverflow.com/questions/46826497/conda-set-ld-library-path-for-env-only.
-
-1. Create these subdirectories and files in the directory of the specific conda environment:
-    ```sh
-    cd /CONDA_ENV_PATH/
-    mkdir -p ./etc/conda/activate.d
-    mkdir -p ./etc/conda/deactivate.d
-    touch ./etc/conda/activate.d/env_vars.sh
-    touch ./etc/conda/deactivate.d/env_vars.sh
-    ```
-2. Edit `./etc/conda/activate.d/env_vars.sh`
-    ```sh
-    #!/bin/sh
-
-    export OLD_LD_PRELOAD=${LD_PRELOAD}
-    export LD_PRELOAD=/CONDA_ENV_PATH/lib/libmkl_core.so:/CONDA_ENV_PATH/lib/libmkl_intel_lp64.so:/CONDA_ENV_PATH/lib/libmkl_intel_thread.so:/CONDA_ENV_PATH/lib/libiomp5.so:${LD_PRELOAD}
-    export OLD_LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
-    export LD_LIBRARY_PATH=/CONDA_ENV_PATH/lib/:${LD_LIBRARY_PATH}
-    ```
-
-3. Edit `./etc/conda/deactivate.d/env_vars.sh`
-    ```sh
-    #!/bin/sh
-
-    export LD_PRELOAD=${OLD_LD_PRELOAD}
-    export LD_LIBRARY_PATH=${OLD_LD_LIBRARY_PATH}
-    unset OLD_LD_PRELOAD
-    unset OLD_LD_LIBRARY_PATH
-    ```
 
 ## Read-in customized M-H-curve
 
