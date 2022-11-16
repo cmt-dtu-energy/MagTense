@@ -641,7 +641,6 @@ def plot_M_thin_film(
     ax.axes.yaxis.set_visible(False)
 
     if title: plt.title(title)
-    figure(figsize=(res[0]/4, res[1]/4), dpi=140)
     plt.show()
 
 
