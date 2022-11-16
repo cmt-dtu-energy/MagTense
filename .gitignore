@@ -168,44 +168,33 @@ $RECYCLE.BIN/
 
 *.asv
 
-# MagTense evaluations
-executable/io.txt
-executable/test_tiles.txt
-executable/tiles_out.txt
-executable/std_alone_points.txt
-executable/H_out.txt
-
 # MagTense TechManual
 !docs/*
 docs/.buildinfo
 docs/source/_build
+
+# Compiled cuda objects
+source/MagTenseFortranCuda/cuda/MagTenseCudaBlas_v*
+source/MagTenseFortranCuda/cuda/MagTenseCudaBlasICLWrapper.o
+
+# Compiled mex files
 papers/JMMM_HB_Optimized_Homogeneity/getHFromTiles_mex.mexw64
-
 papers/JMMM_HB_Optimized_Homogeneity/getMagForce_mex.mexw64
-
 papers/JMMM_HB_Optimized_Homogeneity/getNFromCylTile_mex.mexw64
-
 papers/JMMM_HB_Optimized_Homogeneity/IterateMagnetization_mex.mexw64
 
 matlab/MEX_files/getHFromTiles_mex.mexw64
-
 matlab/MEX_files/getMagForce_mex.mexw64
-
 matlab/MEX_files/getNFromTile_mex.mexw64
-
 matlab/MEX_files/IterateMagnetization_mex.mexw64
-
 matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mexw64
-
 *.mexw64
 
-*.vtuneproj
-
+# Deprecated directories
 executable/
-
 matlab/resources/
-
 matlab/MagTense_matlab_project.prj
 
+*.vtuneproj
 *.prj
 *.mod

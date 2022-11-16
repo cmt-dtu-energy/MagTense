@@ -5,39 +5,32 @@ F90 = ifort
 CC = gcc
 CFLAGS = -fPIC
 PYTHON_MODN = magtensesource
-USE_CUDA = 0
+USE_CUDA = 1
 USE_CVODE = 0
 
 VPATH = ../../../source/NumericalIntegration/NumericalIntegration:\
 ../../../source/TileDemagTensor/TileDemagTensor:\
 ../../../source/DemagField/DemagField:\
-../../../source/MagTenseMicroMag
+../../../source/MagTenseMicroMag:\
+../../../source/MagTenseFortranCuda/cuda
 
 
 ifeq ($(OS),Windows_NT)
 	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise \
 	/threads /fpp /DUSE_CUDA=${USE_CUDA} /DUSE_CVODE=${USE_CVODE} /DUSE_MATLAB=0
 
-	EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower \
-	--opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
-
+	EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower --opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
 	FCOMP = intelvem
-	MKL = -L${CONDA_PREFIX}/Library/lib/ -lmkl_blas95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core
-	MKLROOT_COMP = "C:\Program Files (x86)\Intel\oneAPI\compiler\latest\windows\compiler"
-	MKL_OMP = -L${MKLROOT_COMP}/lib/intel64_win -llibiomp5md
 
 	ifeq ($(USE_CUDA),1)
-		CUDA_ROOT = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6"
-		CUDA = -L${CUDA_ROOT}/lib/x64 -lcublas -lcudart -lcuda -lcusparse
-		OPT = ${MKLROOT}/include/intel64/lp64 -I${MKLROOT}/include  -I${CUDA_ROOT}/include
-	else
-		CUDA = 
-		OPT = ${CONDA_PREFIX}/Library/include/ -I${CONDA_PREFIX}/Library/include/intel64/ilp64/
+		CUDA = -L${CONDA_PREFIX}/Lib/x64 -lcublas -lcudart -lcuda -lcusparse
+		CUDA_OBJECTS = MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj
 	endif
 
-	OPT_PATH1 = ${CONDA_PREFIX}/Library/include/
-	OPT_PATH2 = ${CONDA_PREFIX}/Library/include/intel64/ilp64/
-	LIB_OPT = -I:${OPT_PATH1} -I:${OPT_PATH2} -L. -llibsrc
+	MKL = -L${CONDA_PREFIX}/Library/lib -lmkl_blas95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core
+	MKL_OMP = -L"C:\Program Files (x86)\Intel\oneAPI\compiler\latest\windows\compiler\lib\intel64_win" -llibiomp5md
+	OPT = ${CONDA_PREFIX}/Library/include -I${CONDA_PREFIX}/Library/include/intel64/ilp64
+	LIB_OPT = -I:${OPT} -L. -llibsrc
 	
 	LIBTOOL = LIB $? /OUT:$@
 	STATIC_LIB = libsrc.lib
@@ -47,16 +40,21 @@ ifeq ($(OS),Windows_NT)
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
 
 else
-	export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib/
+	export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib
 	
-	F90FLAGS = -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 -fp-model precise \
-	-threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} -DUSE_MATLAB=0
+	F90FLAGS = -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 \
+	-fp-model precise -threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} -DUSE_MATLAB=0
 
 	EXTRA_OPT = --opt='${F90FLAGS}'
 	FCOMP = intelem
 
-	MKL = -L${CONDA_PREFIX}/lib/ -lmkl_rt -lpthread -lm -ldl -liomp5 -lmkl_blas95_lp64
-	OPT = ${CONDA_PREFIX}/include/ -I${CONDA_PREFIX}/include/intel64/ilp64/
+	ifeq ($(USE_CUDA),1)
+		CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
+		CUDA_OBJECTS = MagTenseCudaBlas.o MagTenseCudaBlasICLWrapper.o
+	endif
+
+	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -lpthread -lm -ldl -liomp5 -lmkl_blas95_lp64
+	OPT = ${CONDA_PREFIX}/include -I${CONDA_PREFIX}/include/intel64/ilp64
 	LIB_OPT = -I${OPT} -L. -lsrc
 
 	ifeq (${UNAME}, Darwin)
@@ -70,6 +68,11 @@ else
 	CLEAN_FOLDER = -rm -r src.*
 	CLEAN_FOLDER_WIN = -true
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.so
+endif
+
+ifeq ($(USE_CUDA),0)
+	CUDA =
+	CUDA_OBJECTS =
 endif
 
 #=======================================================================
@@ -120,10 +123,7 @@ clean:
 .c.o:
 	${CC} ${CFLAGS} -c $< -o $@
 
-libsrc.lib: ${LIBSRC_OBJECTS}
-	${LIBTOOL}
-
-libsrc.a: ${LIBSRC_OBJECTS}
+${STATIC_LIB}: ${LIBSRC_OBJECTS} ${CUDA_OBJECTS}
 	${LIBTOOL}
 
 ${PYTHON_MODN_ALL}: ${STATIC_LIB}

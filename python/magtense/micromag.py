@@ -1,3 +1,4 @@
+import shutil
 import numpy as np
 
 from typing import Optional, Union, List
@@ -125,7 +126,12 @@ class MicromagProblem:
         self.N_ret = len(filename)
         self.N_file_out = filename
 
-        self.cuda = int(cuda)
+        if cuda and not shutil.which("nvidia-smi"):
+            print('[WARNING] No GPU available! Falling back to `cuda=false`!')
+            self.cuda = 0
+        else:
+            self.cuda = int(cuda)
+        
         self.cvode = int(cvode)
         self.precision = int(precision)
         self.n_threads = n_threads
