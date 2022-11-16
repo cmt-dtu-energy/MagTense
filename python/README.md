@@ -11,13 +11,13 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `lib/For
 
 - [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
-    - [Windows] Activation via [VS Code extension for Intel® oneAPI Toolkits](https://github.com/intel/vscode-oneapi-environment-configurator)
+  - [Windows] Activation via [VS Code extension for Intel® oneAPI Toolkits](https://github.com/intel/vscode-oneapi-environment-configurator)
 
-    - [Linux] Prepare your terminal, so that ifort compiler can be found:
+  - [Linux] Prepare your terminal, so that ifort compiler can be found:
 
-        ```bash
-        . ~/intel/oneapi/setvars.sh
-        ```
+    ```bash
+    . ~/intel/oneapi/setvars.sh
+    ```
 
 - [Windows + MacOS] Installation of Make utility
 
@@ -29,6 +29,7 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `lib/For
 
     ```bash
     conda install -y numpy matplotlib mkl mkl-include intel-fortran-rt
+    conda install -y -c intel mkl-static
     ```
 
 - Additional python packages to run data creation scripts

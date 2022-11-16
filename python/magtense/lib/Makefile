@@ -15,17 +15,14 @@ VPATH = ../../../source/NumericalIntegration/NumericalIntegration:\
 
 
 ifeq ($(OS),Windows_NT)
-	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise /libs:static \
+	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise \
 	/threads /fpp /DUSE_CUDA=${USE_CUDA} /DUSE_CVODE=${USE_CVODE} /DUSE_MATLAB=0
 
 	EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower \
 	--opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
 
 	FCOMP = intelvem
-	MKLROOT = "C:\Program Files (x86)\Intel\oneAPI\mkl\latest"
-	MKL = -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_lapack95_lp64 \
-	-lmkl_blas95_lp64 -lmkl_intel_thread -lmkl_core
-
+	MKL = -L${CONDA_PREFIX}/Library/lib/ -lmkl_blas95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core
 	MKLROOT_COMP = "C:\Program Files (x86)\Intel\oneAPI\compiler\latest\windows\compiler"
 	MKL_OMP = -L${MKLROOT_COMP}/lib/intel64_win -llibiomp5md
 
@@ -35,16 +32,16 @@ ifeq ($(OS),Windows_NT)
 		OPT = ${MKLROOT}/include/intel64/lp64 -I${MKLROOT}/include  -I${CUDA_ROOT}/include
 	else
 		CUDA = 
-		OPT = ${MKLROOT}/include/intel64/lp64 -I${MKLROOT}/include
+		OPT = ${CONDA_PREFIX}/Library/include/ -I${CONDA_PREFIX}/Library/include/intel64/ilp64/
 	endif
 
-	OPT_PATH1 = ${MKLROOT}/include/intel64/lp64
-	OPT_PATH2 = ${MKLROOT}/include
+	OPT_PATH1 = ${CONDA_PREFIX}/Library/include/
+	OPT_PATH2 = ${CONDA_PREFIX}/Library/include/intel64/ilp64/
 	LIB_OPT = -I:${OPT_PATH1} -I:${OPT_PATH2} -L. -llibsrc
 	
 	LIBTOOL = LIB $? /OUT:$@
 	STATIC_LIB = libsrc.lib
-	CLEAN_FILES = -del libsrc.a libsrc.lib *.o *.mod *.pyd
+	CLEAN_FILES = -del libsrc.lib *.o *.mod *.pyd
 	CLEAN_FOLDER = -rmdir /s /q Release 2>NUL || VER>NUL
 	CLEAN_FOLDER_WIN = -for /f %%i in ('dir /a:d /b src.win-*') do rd /s /q %%i
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
@@ -58,8 +55,8 @@ else
 	EXTRA_OPT = --opt='${F90FLAGS}'
 	FCOMP = intelem
 
-	MKL = -L${CONDA_PREFIX}/lib/ -lmkl_rt -lpthread -lm -ldl -liomp5 -L./blas95/lib/ -lmkl_blas95_lp64
-	OPT = ${CONDA_PREFIX}/include/ -I./blas95/include/
+	MKL = -L${CONDA_PREFIX}/lib/ -lmkl_rt -lpthread -lm -ldl -liomp5 -lmkl_blas95_lp64
+	OPT = ${CONDA_PREFIX}/include/ -I${CONDA_PREFIX}/include/intel64/ilp64/
 	LIB_OPT = -I${OPT} -L. -lsrc
 
 	ifeq (${UNAME}, Darwin)
