@@ -1,7 +1,9 @@
-from pathlib import Path
 import platform
 import itertools
 import subprocess
+
+from pathlib import Path
+
 
 def main():
     mt_version = '2.1.0'
