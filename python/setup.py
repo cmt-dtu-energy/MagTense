@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='magtense',
-    version='2.0.1',
+    version='2.1.0',
     description="MagTense - a micromagnetism and magnetostatic framework",
     long_description=open('README_top.md').read(),
     long_description_content_type="text/markdown",
@@ -28,8 +28,7 @@ setup(
     author_email="spol@dtu.dk",
     license="GPL 3.0",
     license_files=('LICENSE',),
-    packages=find_packages(include=['magtense']),
+    packages=find_packages(include=['magtense', 'magtense.lib', 'magtense.mat']),
     python_requires=">=3.9, <3.11",
     include_package_data=True,
-    install_requires=["numpy", "matplotlib"],
 )

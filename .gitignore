@@ -173,10 +173,6 @@ $RECYCLE.BIN/
 docs/.buildinfo
 docs/source/_build
 
-# Compiled cuda objects
-source/MagTenseFortranCuda/cuda/MagTenseCudaBlas_v*
-source/MagTenseFortranCuda/cuda/MagTenseCudaBlasICLWrapper.o
-
 # Compiled mex files
 papers/JMMM_HB_Optimized_Homogeneity/getHFromTiles_mex.mexw64
 papers/JMMM_HB_Optimized_Homogeneity/getMagForce_mex.mexw64
