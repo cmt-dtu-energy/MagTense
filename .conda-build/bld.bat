@@ -22,8 +22,6 @@ SET wheels[5].link=https://files.pythonhosted.org/packages/f5/d8/c00e6973dd92ce6
 
 REM Installation of matching wheel
 FOR /L %%i IN ( 0 1 5 ) DO  (
-    CALL echo %%wheels[%%i].name%%
-    CALL echo %MT_VERSION%+%CUDA_PIP%_py%PY_PIP%
     IF !wheels[%%i].name! == "%MT_VERSION%+%CUDA_PIP%_py%PY_PIP%" (
         CALL python -m pip install -vv --use-deprecated=legacy-resolver %%wheels[%%i].link%%
     )
