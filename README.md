@@ -2,7 +2,7 @@
   <img src="https://cmt-dtu-energy.github.io/MagTense/_static/MagTense_logo.PNG" height=250><br>
 </div>
 
-# MagTense version 2021
+# MagTense version 2023
 
 MagTense consists of both a magnetostatic and a micromagnetism calculation framework.
 
@@ -17,7 +17,7 @@ The TechManual on the code is available at https://cmt-dtu-energy.github.io/MagT
 
 ## Usage with Matlab
 
-MagTense is directly useable in Matlab on Windows by downloading the already compiled MEX-files in [Releases](https://github.com/cmt-dtu-energy/MagTense/releases). The files are directly useable with no compilation required, although Matlab 2018a or greater is required. Examples of how to calculate magnetostatic and micromagnetic problems using the Matlab interface can be found in [matlab/examples](https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples).
+MagTense is directly useable in Matlab on Windows by downloading the already compiled MEX-files in [Releases](https://github.com/cmt-dtu-energy/MagTense/releases). The files are directly useable with no compilation required, although Matlab 2020b or greater is required. Examples of how to calculate magnetostatic and micromagnetic problems using the Matlab interface can be found in [matlab/examples](https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples).
 
 
 ### Compilation with a Visual Studio project file
