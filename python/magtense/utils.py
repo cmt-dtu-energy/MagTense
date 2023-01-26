@@ -464,8 +464,7 @@ def create_plot(
     Tile types: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
                 5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
     '''
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
+    ax = plt.figure().add_subplot(projection='3d')
 
     if tiles is not None:
         for i in range(tiles.n):
