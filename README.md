@@ -27,18 +27,21 @@ If you want to compile MagTense with a Visual Studio project file for Windows, [
 
 ## Usage with Python interface
 
-Instructions on how to build and use the Python interface are listed in [python](https://github.com/cmt-dtu-energy/MagTense/tree/master/python). Installation is recommended via `conda` package manager (requires **Python 3.9** or **3.10**). Additionally, binary installers for the Python interface are available at the [Python
-Package Index (PyPI)](https://pypi.org/project/magtense).
+Instructions on how to build and use the Python interface are listed in [python](https://github.com/cmt-dtu-energy/MagTense/tree/master/python). Installation is recommended via `conda` package manager (requires **Python 3.9** or **3.10**). Additionally, binary installers for the Python interface are available at the [Python Package Index (PyPI)](https://pypi.org/project/magtense).
 
-- Select matching `${CUDA_LABEL}` from { `11.4.4` , `11.6.2` , `11.7.0` } for optional CUDA support, and append the channel to the installation of `magtense`:
+- Append matching CUDA label from { `11.4.4` , `11.6.2` , `11.7.0` } for CUDA support:
   
-  ```sh
-  conda install magtense -c cmt-dtu-energy/label/cuda-${CUDA_LABEL} -c nvidia/label/cuda-${CUDA_LABEL}
-
-  # Without CUDA
-  # conda install magtense -c cmt-dtu-energy/label/cpu
+  ```
+  conda install magtense -c cmt-dtu-energy/label/cuda-11.7.0 -c nvidia/label/cuda-11.7.0
   ```
 
+- Installation without CUDA support:
+
+  ```
+  conda install magtense -c cmt-dtu-energy/label/cpu
+  ```
+
+INFO: The latest update of `matplotlib` causes an issue during plotting, please make sure that its version `< 3.6`.
 
 
 ## Current code development
