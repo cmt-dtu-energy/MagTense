@@ -250,7 +250,7 @@ def plot_shim_matrix(
         
         shim_idx += 1
 
-    ax = plt.figure().gca(projection='3d')
+    ax = plt.figure().add_subplot(projection='3d')
     for i in range(shim_magnets.n):
         plot_cube(ax, shim_magnets.size[i], shim_magnets.offset[i],
                   shim_magnets.rot[i], shim_magnets.M[i],
