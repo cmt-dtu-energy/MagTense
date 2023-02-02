@@ -10,8 +10,8 @@ from magtense.magstatics import Tiles, grid_config, run_simulation
 
 from tqdm import tqdm
 
-from scripts.db_utils import load_demag_tensor, calc_demag_field, eval_shimming
-from scripts.db_utils import get_shim_mat, gen_s_state, gen_seq
+from db_utils import load_demag_tensor, calc_demag_field, eval_shimming
+from db_utils import get_shim_mat, gen_s_state, gen_seq
 
 
 def db_std_prob_4(
@@ -245,8 +245,7 @@ def db_halbach_field_stats(db_path):
 def db_magfield(
     datapath: Path,
     n_samples: int,
-    res: int,
-    dim: int,
+    res: List[int],
     spots: List = [10, 10, 5],
     area: List = [1, 1, 0.5],
     gap: float = 0.05,
@@ -262,7 +261,6 @@ def db_magfield(
         filepath: Indicates where to store the data sample.
         n_samples: Size of database.
         res: Resolution of magnetic field.
-        dim: Dimension of demagnetizing field strength.
         spots: Available positions in setup.
         area: Size of setup.
         gap: Gap between measurement area and surrounding magnets.
@@ -270,13 +268,13 @@ def db_magfield(
         intv: Data range to iterate over.
         empty: If set, an empty database is created.
     """
-    fname = f'{name}_{res}'
+    fname = f'{name}_{res[0]}'
     if intv is None: intv = [0, n_samples]
     if not empty: fname += f'_{intv[0]}_{intv[1]}'
     n_intv = intv[1] - intv[0]
     
     db = h5py.File(f'{datapath}/{fname}.h5', libver='latest', mode='w')
-    out_shape = (n_intv, 3, res, res, dim) if dim == 3 else (n_intv, 3, res, res)
+    out_shape = (n_intv, 3, *res)
     db.create_dataset('field', shape=out_shape, dtype="float32")
     if not empty: db.attrs['intv'] = intv
 
@@ -308,15 +306,17 @@ def db_magfield(
         
         tiles, _ = grid_config(spots, area, filled_pos)
 
-        x_eval = np.linspace(s_x + gap, s_y + gap, res)
-        y_eval = np.linspace(s_x + gap, s_y + gap, res)
+        x_eval = np.linspace(s_x + gap, s_y + gap, res[0])
+        y_eval = np.linspace(s_x + gap, s_y + gap, res[1])
 
-        if dim == 2:
+        if len(res) == 2:
             xv, yv = np.meshgrid(x_eval, y_eval)
-            zv = np.zeros(res * res) + area[2] / 2
+            zv = np.zeros(res[0] * res[1]) + area[2] / 2
         
-        elif dim == 3:
-            z_eval = np.linspace(-(s_y-s_x)/res, (s_y-s_x)/res, dim) + area[2] / 2
+        elif len(res) == 3:
+            # Pixel length in z-direction equal to x-direction
+            s_z = (s_y - s_x) / res[0]
+            z_eval = np.linspace(-s_z, s_z, res[2]) + area[2] / 2
             xv, yv, zv = np.meshgrid(x_eval, y_eval, z_eval)
         
         else:
@@ -326,8 +326,8 @@ def db_magfield(
         _, h_out = run_simulation(tiles, pts_eval, console=False)
 
         # Tensor image with shape CxHxWxD [T]
-        field = h_out.reshape((res,res,dim,3)).transpose((3,0,1,2)) \
-            if dim == 3 else h_out.reshape((res,res,3)).transpose((2,0,1))    
+        field = h_out.reshape((*res,3))
+        field = field.transpose((3,0,1,2)) if len(res) == 3 else field.transpose((2,0,1))
 
         db['field'][idx] = field * 4 * np.pi * 1e-7
 
@@ -483,12 +483,29 @@ def create_db_mp(
         end_intv = min((i+1) * intv, n_tasks)
         kwargs['intv'] = [i*intv, end_intv]
         p = Process(target=target, kwargs=kwargs)
+        p.daemon = True
         p.start()
         l_p.append(p)
         if end_intv == n_tasks: break
 
-    for proc in l_p:
-        proc.join()
+    try:
+        for p in l_p:
+            p.join()
+    
+    except KeyboardInterrupt:
+        for p in l_p:
+            p.terminate()
+    
+        path = datapath.glob('**/*')
+        fnames = [x.name for x in path if x.is_file()
+                and x.name[:len(db_name)] == db_name
+                and x.name[:-3] != db_name]
+    
+        for name in fnames:
+            Path(datapath, name).unlink()
+        
+        Path(datapath, f'{db_name}.h5').unlink()
+        exit(130)
     
     path = datapath.glob('**/*')
     fnames = [x.name for x in path if x.is_file()
@@ -508,17 +525,17 @@ def create_db_mp(
 # %%
 
 if __name__ == '__main__':
-    db_kwargs = {
-        'n_halbach': 1000,
-        'n_mat': 1,
-        'shim_segs': 16,
-        'shim_layers': 3,
-        'name': 'test_pre_3000f_1r',
-        'seed_shim' : 51,
-        'seed_pertubation': 52
-    }
+    # db_kwargs = {
+    #     'n_halbach': 1000,
+    #     'n_mat': 1,
+    #     'shim_segs': 16,
+    #     'shim_layers': 3,
+    #     'name': 'test_pre_3000f_1r',
+    #     'seed_shim' : 51,
+    #     'seed_pertubation': 52
+    # }
 
-    create_db_mp('halbach', n_workers=15, **db_kwargs)
+    # create_db_mp('halbach', n_workers=15, **db_kwargs)
 
     # db_kwargs = {
     #     'res': [16, 4, 1],
@@ -528,12 +545,11 @@ if __name__ == '__main__':
 
     # create_db_mp('std_prob_4', n_workers=1, **db_kwargs)
 
-    # db_kwargs = {
-    #     'n_samples': 10,
-    #     'res': 32,
-    #     'dim': 2,
-    # }
-    # create_db_mp('magfield', n_workers=5, **db_kwargs)
+    db_kwargs = {
+        'n_samples': 24,
+        'res': [256, 256, 3],
+    }
+    create_db_mp('magfield', n_workers=3, **db_kwargs)
 
     # db_kwargs = {
     #     'n_samples': 10,
