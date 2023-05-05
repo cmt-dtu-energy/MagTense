@@ -1,5 +1,5 @@
-#if !(USE_PYTHON)
-include 'blas.f90'
+#if USE_MATLAB
+include 'mkl_blas.f90'
 #endif
 
 !include 'mkl_vml.f90'
@@ -20,6 +20,7 @@ include 'blas.f90'
     use FortranCuda
     !use, intrinsic :: omp_lib
     use omp_lib
+    use IO_GENERAL
     implicit none
     
    
