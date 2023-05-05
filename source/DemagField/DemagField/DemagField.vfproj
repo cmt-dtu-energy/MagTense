@@ -40,6 +40,15 @@
 				<Tool Name="VFCustomBuildTool"/>
 				<Tool Name="VFPreLinkEventTool"/>
 				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/></Configuration>
+		<Configuration Name="Release_Standalone_exe|x64" ConfigurationType="typeStaticLibrary">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../TileDemagTensor/TileDemagTensor/x64/release_Standalone_exe/;../../NumericalIntegration/NumericalIntegration/x64/Release_Standalone_exe/;C:\Program Files\MATLAB\R2022a\extern\include\" FixedFormLineLength="fixedLength132" RealKIND="realKIND8"/>
+				<Tool Name="VFLibrarianTool"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/></Configuration></Configurations>
 	<Files>
 		<Filter Name="Header Files" Filter="fi;fd"/>
@@ -49,6 +58,8 @@
 			<FileConfiguration Name="Release_no_CVODE|x64">
 				<Tool Name="VFFortranCompilerTool" AdditionalIncludeDirectories="../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/;../../../TileDemagTensor/TileDemagTensor/TileDemagTensor/x64/release/" OpenMP="OpenMPParallelCode"/></FileConfiguration>
 			<FileConfiguration Name="Release|x64">
+				<Tool Name="VFFortranCompilerTool" AdditionalIncludeDirectories="../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/;../../../TileDemagTensor/TileDemagTensor/TileDemagTensor/x64/release/" OpenMP="OpenMPParallelCode"/></FileConfiguration>
+			<FileConfiguration Name="Release_Standalone_exe|x64">
 				<Tool Name="VFFortranCompilerTool" AdditionalIncludeDirectories="../../../NumericalIntegrationLib/NumericalIntegration/NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/;../../../TileDemagTensor/TileDemagTensor/TileDemagTensor/x64/release/" OpenMP="OpenMPParallelCode"/></FileConfiguration></File>
 		<File RelativePath=".\IterateMagnetSolution.f90"/>
 		<File RelativePath=".\MagParameters.f90"/>
