@@ -153,6 +153,7 @@ private MTdmdt, MTy_out,MTf_vec
     type(rk_comm_real_1d) :: setup_comm         !>Stores all the stuff used by setup
     integer :: flag                             !>Flag indicating how the integration went
     integer :: i, k                             !>Counter variable
+    character*(100) :: prog_str                 !>Variable holding the output string
     !integer,parameter :: n_write=100
     !Perform allocations. 
     allocate(thres(neq))
@@ -201,7 +202,8 @@ private MTdmdt, MTy_out,MTf_vec
         call range_integrate( setup_comm, fct, t_comb_unique(i), t_step, y_step, yderiv_step, flag )
         
         if ( mod(i,callback_display) .eq. 0 ) then
-            call callback( 'Time', i )
+            write(prog_str,'(A6, F6.2, A15, I4.1, A1, I4.1)') 'Time: ', t_step*1e9, ' ns, i.e. step ', i, '/', size(t_comb_unique)
+            call callback( prog_str, -1 )
         endif
         
         !Check if the time which the solution is returned is part of the array that checks for converge or if it part of the times where the simulation is to be saved

@@ -17,22 +17,6 @@ MODULE StandAlone_IO
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>
-    !> function for displaying output (to the terminal)
-    !! @param err the current relative error
-    !! @param err_max the current maximum allowed error
-    function dispIte_fct( err, err_max )
-        real,intent(in) :: err,err_max
-        integer :: dispIte_fct
-    
-        write(*,*) err,err_max
-    
-        dispIte_fct = 0
-    
-    end function dispIte_fct
-    
-    
-    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    !>
     !> Wrapper function for loading tiles from a file of any supported type.
     !! However, we only support a simple ASCII file format at the moment
     !! @param tiles array of tiles to be returned
