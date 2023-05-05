@@ -209,3 +209,7 @@ matlab/MagTense_matlab_project.prj
 
 *.prj
 *.mod
+
+*.vsidx
+
+*.lock
