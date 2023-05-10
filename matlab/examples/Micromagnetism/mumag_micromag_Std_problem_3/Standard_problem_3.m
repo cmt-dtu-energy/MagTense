@@ -115,37 +115,8 @@ for i = 1:length(L_loop)
         end
         
         %--- Calculate the energy terms
-        E_exc = sum((1/2)*(solution.M(:,:,1).*solution.H_exc(:,:,1) + solution.M(:,:,2).*solution.H_exc(:,:,2) + solution.M(:,:,3).*solution.H_exc(:,:,3)),2) ;        
-        E_ext = sum(      (solution.M(:,:,1).*solution.H_ext(:,:,1) + solution.M(:,:,2).*solution.H_ext(:,:,2) + solution.M(:,:,3).*solution.H_ext(:,:,3)),2) ;
-        E_dem = sum((1/2)*(solution.M(:,:,1).*solution.H_dem(:,:,1) + solution.M(:,:,2).*solution.H_dem(:,:,2) + solution.M(:,:,3).*solution.H_dem(:,:,3)),2) ;
-        E_ani = sum((1/2)*(solution.M(:,:,1).*solution.H_ani(:,:,1) + solution.M(:,:,2).*solution.H_ani(:,:,2) + solution.M(:,:,3).*solution.H_ani(:,:,3)),2) ;
-                   
-        %--- Normalize the energy to the volume elements
-        dV = prod(problem.grid_L./resolution);
-        E_exc = mu0*E_exc*Ms*dV;  % [J]
-        E_ext = mu0*E_ext*Ms*dV;  % [J]
-        E_dem = mu0*E_dem*Ms*dV;  % [J]
-        E_ani = mu0*E_ani*Ms*dV;  % [J]
-        
-        %--- The anistropy energy must be added the constant volume term of the integral of K0 over the volume 
-        %--- See "Nonlinear Magnetization Dynamics in Thin-films and Nanoparticles" by Massimiliano d'Aquino, Eq. (1.43)
-        E_ani = E_ani + K0*prod(problem.grid_L);
-        
-        %--- Calcute the energy densities
-        E_exc_dens = E_exc/prod(problem.grid_L);  % [J/m^3]
-        E_ext_dens = E_ext/prod(problem.grid_L);  % [J/m^3]
-        E_dem_dens = E_dem/prod(problem.grid_L);  % [J/m^3]
-        E_ani_dens = E_ani/prod(problem.grid_L);  % [J/m^3]
-        
-        Km = (1/2)*(Ms^2)*mu0;  % [J/m^3] 
-        %--- See Eq. (29) from "Standard Problems in Micromagnetics", Donald Porter and Michael Donahue (2018)
-        
-        %--- Reduced energies, i.e. normalized by Km
-        E_exc_red = E_exc_dens./Km;
-        E_ext_red = E_ext_dens./Km;
-        E_dem_red = E_dem_dens./Km;
-        E_ani_red = E_ani_dens./Km;
-        
+        tile_volumes = repmat(prod(problem.grid_L)/(prod(resolution)),prod(resolution),1);
+        [E_dem_red, E_exc_red, E_ani_red, E_ext_red] = computeMagneticEnergy(solution,tile_volumes,problem,Ms);
         E_arr(:,i,j) = [E_dem_red(end) E_exc_red(end) E_ani_red(end) E_ext_red(end)];
         
         if (ShowTheResultDetails)
