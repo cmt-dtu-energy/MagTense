@@ -42,8 +42,8 @@ addpath('../../../micromagnetism_matlab_only_implementation');
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %--- Load the unstructured mesh
 %--- The parameters Ms, K0 and A0 are used to generate the mesh and thus they are loaded as well
-load('Std_prob_3_unstructured_mesh_grains_9_mesh_4_ref_2.mat')
-% load('Std_prob_3_unstructured_mesh_grains_9_mesh_7_ref_2.mat')
+load('Std_prob_3_unstructured_cartesian_grains_9_mesh_4_ref_2.mat')
+% load('Std_prob_3_unstructured_cartesian_grains_9_mesh_7_ref_2.mat')
 
 %% Setup the problem for the initial configuration
 for i = 1:length(L_loop)  
@@ -152,12 +152,10 @@ for i = 1:length(L_loop)
         end
         
         toc
-        %--- Calculate the energy terms       
-        E_exc = sum((1/2)*(mx(:,:).*solution.H_exc(:,:,1) + my(:,:).*solution.H_exc(:,:,2) + mz(:,:).*solution.H_exc(:,:,3)),2) ;        
-        E_ext = sum(      (mx(:,:).*solution.H_ext(:,:,1) + my(:,:).*solution.H_ext(:,:,2) + mz(:,:).*solution.H_ext(:,:,3)),2) ;
-        E_dem = sum((1/2)*(mx(:,:).*solution.H_dem(:,:,1) + my(:,:).*solution.H_dem(:,:,2) + mz(:,:).*solution.H_dem(:,:,3)),2) ;
-        E_ani = sum((1/2)*(mx(:,:).*solution.H_ani(:,:,1) + my(:,:).*solution.H_ani(:,:,2) + mz(:,:).*solution.H_ani(:,:,3)),2) ;
-        E_arr_v(:,i,j) = mu0*[E_exc(end) E_ext(end) E_dem(end) E_ani(end)];
+
+        %--- Calculate the energy terms            
+        [E_dem_red, E_exc_red, E_ani_red, E_ext_red] = computeMagneticEnergy(solution,GridInfo.Volumes,problem,Ms);
+        E_arr(:,i,j) = [E_dem_red(end) E_exc_red(end) E_ani_red(end) E_ext_red(end)];
     end
 end
 elapsedTime = toc
@@ -165,8 +163,8 @@ elapsedTime = toc
 save(['Standard_problem_3_unstructured_results.mat'],'GridInfo','problem','solution','-v7.3')
 
 if (ShowTheResult)
-    plot(fig10,L_loop,sum(E_arr_v(:,:,1),1)/sum(E_arr_v(:,1,1),1),'rd')
-    plot(fig10,L_loop,sum(E_arr_v(:,:,2),1)/sum(E_arr_v(:,1,1),1),'bd')
+    plot(fig10,L_loop,sum(E_arr(:,:,1),1),'.')
+    plot(fig10,L_loop,sum(E_arr(:,:,2),1),'.')
     xlabel(fig10,'L [l_{ex}]')
     ylabel(fig10,'E [a.u.]')
     legend('Flower state','Vortex state');
