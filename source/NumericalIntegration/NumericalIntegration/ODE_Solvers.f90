@@ -202,7 +202,7 @@ private MTdmdt, MTy_out,MTf_vec
         call range_integrate( setup_comm, fct, t_comb_unique(i), t_step, y_step, yderiv_step, flag )
         
         if ( mod(i,callback_display) .eq. 0 ) then
-            write(prog_str,'(A6, F6.2, A15, I4.1, A1, I4.1)') 'Time: ', t_step*1e9, ' ns, i.e. step ', i, '/', size(t_comb_unique)
+            write(prog_str,'(A6, F8.2, A15, I4.1, A1, I4.1)') 'Time: ', t_step*1e9, ' ns, i.e. step ', i, '/', size(t_comb_unique)
             call callback( prog_str, -1 )
         endif
         
