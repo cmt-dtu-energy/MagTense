@@ -1,41 +1,25 @@
-function [elapsedTime,problem,solution,E_arr,E_arr_v,L_loop] = Standard_problem_3_unstructured_cart( use_CUDA, ShowTheResult, ShowTheResultDetails, L_loop, n, L, mesh_res_param )
+function [elapsedTime,problem,solution,E_arr] = Standard_problem_3_unstructured_cart( options )
 
-clearvars -except  resolution use_CUDA ShowTheResult ShowTheResultDetails RunMatlab L_loop n L mesh_res_param
-% close all
-
-if ~exist('use_CUDA','var')
-    use_CUDA = true;
-end
-if ~exist('ShowTheResult','var')
-    ShowTheResult = 1;
-end
-if ~exist('ShowTheResultDetails','var')
-    ShowTheResultDetails = 0;
+arguments
+    options.use_CUDA {mustBeNumericOrLogical}               = true              %--- Use CUDA for the calculations
+    options.ShowTheResult {mustBeNumericOrLogical}          = true              %--- Show the result
+    options.ShowTheResultDetails {mustBeNumericOrLogical}   = false             %--- Show the magnetization at each L
+    options.use_CVODE {mustBeNumericOrLogical}              = false;            %--- Use CVODE for the numerical time evolution
 end
 
-if ~exist('exch_meth','var')
-    exch_method = "DirectLaplacian";
-end
-
-if ~exist('exch_weight','var')
-    exch_weight = 4;
-end
-
-if (ShowTheResult)
+if (options.ShowTheResult)
     figure10= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig10 = axes('Parent',figure10,'Layer','top','FontSize',16); hold on; grid on; box on
 end
 
-if (ShowTheResultDetails)
+if (options.ShowTheResultDetails)
     figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
     figure2= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig2 = axes('Parent',figure2,'Layer','top','FontSize',16); hold on; grid on; box on
 end
-use_CVODE = false;
 
 mu0 = 4*pi*1e-7;
 
 addpath('../../../MEX_files');
 addpath('../../../util');
-addpath('../../../micromagnetism_matlab_only_implementation');
 
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% ------------------------------------------------------------------- MAGTENSE ---------------------------------------------------------
@@ -51,21 +35,20 @@ for i = 1:length(L_loop)
     
     mesh = mesh_arr(i);
     GridInfo = GridInfo_arr(i);
-    cartesianUnstructuredMeshPlot(mesh.pos_out,mesh.dims_out,GridInfo,mesh.iIn);
-    
+    if (i == 1)
+        cartesianUnstructuredMeshPlot(mesh.pos_out,mesh.dims_out,GridInfo,mesh.iIn);
+    end
+
     %--- Define parameters
     alpha = 1e3;
     gamma = 0;
-    lex = sqrt(A0/(1/2*mu0*Ms^2));
-    thisGridL = [lex,lex,lex]*L_loop(i);%m
 
     %--- Setup the problem
     resolution = [length(mesh.pos_out) 1 1];
     disp(['Prisms N_grid = ' num2str(prod(resolution))])
     problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
-    problem = problem.setUseCuda( use_CUDA );
-    problem = problem.setUseCVODE( use_CVODE );
-    problem = problem.setMicroMagDemagApproximation('none');
+    problem = problem.setUseCuda( options.use_CUDA );
+    problem = problem.setUseCVODE( options.use_CVODE );
     problem = problem.setMicroMagGridType('unstructuredPrisms');
 
     %--- Save the parameters
@@ -80,6 +63,8 @@ for i = 1:length(L_loop)
     %--- Information on the grid
     problem.grid_pts    = mesh.pos_out;
     problem.grid_abc    = mesh.dims_out;
+    lex = sqrt(problem.A0/(1/2*mu0*Ms^2));
+    thisGridL = [lex,lex,lex]*L_loop(i); %m
 
     %--- Calculate the exchange matrix
     InteractionMatrices.GridInfo = GridInfo;
@@ -106,7 +91,7 @@ for i = 1:length(L_loop)
                 problem.m0(:) = 0;
                 problem.m0(:,3) = 1 ;
                 
-                t_end = 2000e-9;  
+                t_end = 300e-9;  
                 
             case 2
                 disp('Vortex state') ;
@@ -117,7 +102,7 @@ for i = 1:length(L_loop)
                 problem.m0(:,3) = yvec(:) ;
                 problem.m0 = problem.m0./repmat(sqrt(sum(problem.m0.^2,2)),1,3);
                 
-                t_end = 2000e-9;
+                t_end = 300e-9;
         end
 
         %time grid on which to solve the problem
@@ -132,9 +117,10 @@ for i = 1:length(L_loop)
         prob_struct = struct(problem);  %convert the class obj to a struct so it can be loaded into fortran
 
         solution = problem.MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+        
         [Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution.M,GridInfo.Volumes) ;
 
-        if (ShowTheResultDetails)
+        if (options.ShowTheResultDetails)
             if (j == 1)
                 s1 = 1;
                 s2 = 3;
@@ -149,6 +135,9 @@ for i = 1:length(L_loop)
             plot(fig1,solution.t,Mx,'rd'); 
             plot(fig1,solution.t,My,'gd'); 
             plot(fig1,solution.t,Mz,'bd'); 
+            xlabel(fig1,'Time [ns]')
+            ylabel(fig1,'Reduced magnetization, m_i [-]')
+            legend(fig1,'<m_x>','<m_y>','<m_z>')
         end
         
         toc
@@ -160,14 +149,12 @@ for i = 1:length(L_loop)
 end
 elapsedTime = toc
 
-save(['Standard_problem_3_unstructured_results.mat'],'GridInfo','problem','solution','-v7.3')
-
-if (ShowTheResult)
+if (options.ShowTheResult)
     plot(fig10,L_loop,sum(E_arr(:,:,1),1),'.')
     plot(fig10,L_loop,sum(E_arr(:,:,2),1),'.')
     xlabel(fig10,'L [l_{ex}]')
-    ylabel(fig10,'E [a.u.]')
-    legend('Flower state','Vortex state');
+    ylabel(fig10,'E [-]')
+    legend(fig10,'Flower state','Vortex state');
 end
 
 end
