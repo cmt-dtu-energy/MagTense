@@ -3,7 +3,7 @@
 The Fortran code is compiled and wrapped to a module that can be directly called from Python.
 The tool `f2py` of the NumPy package is used to wrap the interface file `MagTense/python/magtense/lib/FortranToPythonIO.f90`.
 
-## Deployment with Conda
+## Deployment with Conda (Intel architectures)
 
 ### Requirements
 
@@ -25,7 +25,7 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
   HINT: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.
 
   ```bash
-  conda install -y numpy matplotlib mkl 
+  conda install -y numpy matplotlib mkl
   conda install -y -c "nvidia/label/cuda-${CUDA_LABEL}" cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev
   conda install -y -c intel mkl-include mkl-static
   ```
@@ -48,7 +48,7 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
     conda install -y h5py tqdm
     ```
 
-### Installation from source
+### Installation from source (including MacOS Intel & ARM)
 
 Create an importable Python module from Fortran source code.
 
@@ -57,6 +57,15 @@ Navigate to folder `MagTense/python/magtense/lib/`, run `make`, and install the 
 ```bash
 cd MagTense/python/magtense/lib/
 make SHELL=cmd
+cd MagTense/python/
+pip install -e .
+```
+
+For MACos ARM architetures, use the associated Makefile. Currently this supports only magnetostatics.
+
+```bash
+cd MagTense/python/magtense/lib/
+make -f Makefile.arm64
 cd MagTense/python/
 pip install -e .
 ```
@@ -99,7 +108,7 @@ Libraries have to be pre-build for now, and should be located in `MagTense/pytho
 
 ```bash
 # Required conda packages for distribution
-conda install -y twine anaconda-client conda-build 
+conda install -y twine anaconda-client conda-build
 
 cd MagTense/python/
 
