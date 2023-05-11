@@ -1,4 +1,7 @@
-﻿#include "fintrf.h"
+#if USE_MATLAB
+#include "fintrf.h"
+#endif
+
 module IO_GENERAL
 
     implicit none
@@ -8,7 +11,7 @@ module IO_GENERAL
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     !>----------------------------------------
-    !> Rasmus Bj�rk, rabj@gdtu.dk, August 2022
+    !> Rasmus Bjørk, rabj@dtu.dk, August 2022
     !> Callback to display message to the GUI launching the simulation
     !> @params[in] mess The message to display to the GUI
     !>----------------------------------------    
