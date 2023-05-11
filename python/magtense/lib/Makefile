@@ -3,8 +3,16 @@
 #=======================================================================
 USE_CUDA = 1
 USE_CVODE = 0
+USE_MICROMAG = 1
 
 F90 = ifort
+
+ifeq (${F90}, gfortran)
+	USE_CUDA = 0
+	USE_MKL = 0
+	USE_MICROMAG = 0
+endif
+
 CC = gcc
 CFLAGS = -fPIC
 CU = nvcc
@@ -25,11 +33,18 @@ CUDA_OBJECT = $(addsuffix .o, ${CUDA_SOURCE})
 CUDA_WRAP = $(addsuffix .o, ${CUDA_WRAP_SOURCE})
 
 ifeq ($(OS),Windows_NT)
-	F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 /fp:precise /libs:static \
-	/threads /fpp /DUSE_CUDA=${USE_CUDA} /DUSE_CVODE=${USE_CVODE} /DUSE_MATLAB=0
+	ifeq (${F90}, ifort)
+		F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 \
+		/fp:precise /libs:static /threads /fpp /DUSE_CUDA=${USE_CUDA} \
+		/DUSE_CVODE=${USE_CVODE} /DUSE_MICROMAG=${USE_MICROMAG} /DUSE_MATLAB=0
+		FCOMP = intelvem
+		EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower --opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
+	else ifeq (${F90}, gfortran)
+		F90FLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 -cpp -DUSE_MICROMAG=${USE_MICROMAG}
+		FCOMP = gnu95 --compiler=mingw32
+		EXTRA_OPT = --opt='${F90FLAGS}'
+	endif
 
-	EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower --opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
-	FCOMP = intelvem
 	CPP = icl
 	CPPFLAGS = /Fo:${CUDA_WRAP}
 	CUFLAGS =
@@ -49,11 +64,17 @@ ifeq ($(OS),Windows_NT)
 else
 	export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib
 	
-	F90FLAGS = -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 \
-	-fp-model precise -threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} -DUSE_MATLAB=0
+	ifeq (${F90}, ifort)
+		F90FLAGS = -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 \
+		-fp-model precise -threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} \
+		-DUSE_MICROMAG=${USE_MICROMAG} -DUSE_MATLAB=0
+		FCOMP = intelem
+	else ifeq (${F90}, gfortran)
+		F90FLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 -cpp -DUSE_MICROMAG=${USE_MICROMAG}
+		FCOMP = gnu95
+	endif
 
 	EXTRA_OPT = --opt='${F90FLAGS}'
-	FCOMP = intelem
 	CPP = icx
 	CPPFLAGS = ${CFLAGS} -o ${CUDA_WRAP}
 	CUFLAGS = -shared -Xcompiler -fPIC
@@ -75,6 +96,10 @@ else
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.so
 endif
 
+ifeq ($(USE_MKL),0)
+	MKL =
+endif
+
 ifeq ($(USE_CUDA),0)
 	CUDA =
 	CUDA_WRAP =
@@ -87,9 +112,12 @@ endif
 # names (without suffix), f90 sources
 LIBSRC_SOURCES = IntegrationDataTypes quadpack SpecialFunctions TileTensorHelperFunctions \
 TileRectangularPrismTensor TileCircPieceTensor TileCylPieceTensor TilePlanarCoilTensor \
-TileTriangle TileNComponents DemagFieldGetSolution spline MagParameters IterateMagnetSolution \
-MicroMagParameters RKSuitef90 ODE_Solvers LLODE_Debug util FortranCuda MagTenseMicroMagPyIO \
-LandauLifshitzEquationSolver
+TileTriangle TileNComponents DemagFieldGetSolution spline MagParameters IterateMagnetSolution
+
+ifeq ($(USE_MICROMAG),1)
+	LIBSRC_SOURCES += MicroMagParameters RKSuitef90 ODE_Solvers LLODE_Debug util FortranCuda \
+	MagTenseMicroMagPyIO LandauLifshitzEquationSolver
+endif
 
 # file names
 LIBSRC_FILES = $(addsuffix .f90, ${LIBSRC_SOURCES})
