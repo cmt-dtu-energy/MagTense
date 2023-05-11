@@ -9,30 +9,6 @@ implicit none
 contains
 
 !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-!> function for displaying output (to the terminal)
-!! @param err the current relative error
-!! @param err_max the current maximum allowed error
-!!
-function dispIte_fct( err, err_max )
-    real(8),intent(in) :: err,err_max
-    integer(4) :: dispIte_fct
-   
-    write(*,*) err,err_max
-  
-    dispIte_fct = 0
-    
-end function dispIte_fct
-
-function dispIte_fct_no_output( err, err_max )
-    real(8),intent(in) :: err,err_max
-    integer(4) :: dispIte_fct_no_output
-  
-    dispIte_fct_no_output = 0
-    
-end function dispIte_fct_no_output
-
-
-!--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 !< Function getNFromTiles
 !! @param tileType - defines whether the tile is cylindrical, a prism, an ellipsoid and so on
 !! @param offset - the centre coordinates relative to the global coordinate system
@@ -292,15 +268,12 @@ subroutine IterateTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, 
     type(MagStateFunction),dimension(n_stateFcn) :: stateFcn
     real(8),dimension(nH,nT),intent(in) :: data_stateFcn
     real(8) :: resumeIteration
-    procedure(displayIteration_fct),pointer :: disp_fct => null()
 
     type(MagTile),dimension(n_tiles) :: tiles
     integer :: i
 
     !! default value is zero, i.e. do not resume iteration
     resumeIteration = 0.
-    
-    disp_fct => dispIte_fct_no_output
 
     !::initialise MagTile with specified parameters
     call loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
@@ -309,7 +282,7 @@ subroutine IterateTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, 
     
     !::load state function from table
     call loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn)
-    call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, disp_fct, resumeIteration )
+    call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, resumeIteration )
 
     do i=1,n_tiles
         Mag_out(i,:) = tiles(i)%M
@@ -369,7 +342,6 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     type(MagStateFunction),dimension(n_stateFcn) :: stateFcn
     real(8),dimension(nH,nT),intent(in) :: data_stateFcn
     real(8) :: start,finish,resumeIteration
-    procedure(displayIteration_fct),pointer :: disp_fct => null()
     logical, intent(in) :: console
 
     real(8),dimension(n_pts,3),intent(in) :: pts
@@ -379,12 +351,6 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
     integer :: i
 
     call cpu_time(start)
-
-    if (console) then
-        disp_fct => dispIte_fct
-    else
-        disp_fct => dispIte_fct_no_output
-    endif
     
     !!@todo no support for resuming iterations at the moment
     resumeIteration = 0
@@ -401,7 +367,7 @@ subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea,
         if (console) then
             write(*,*) 'Doing iteration'
         endif
-        call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, disp_fct, resumeIteration )
+        call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, resumeIteration )
 
         do i=1,n_tiles
             Mag_out(i,:) = tiles(i)%M
