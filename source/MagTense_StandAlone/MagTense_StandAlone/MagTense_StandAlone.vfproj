@@ -14,8 +14,8 @@
 				<Tool Name="VFPostBuildEventTool"/>
 				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
 		<Configuration Name="Release|x64">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\NumericalIntegration\NumericalIntegration\x64\Release\;..\..\DemagField\DemagField\x64\Release\;..\..\TileDemagTensor\TileDemagTensor\x64\Release\;;C:\Program Files\MATLAB\R2022a\extern\lib\win64\microsoft\" RealKIND="realKIND8"/>
-				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalYes" SuppressStartupBanner="true" AdditionalLibraryDirectories="..\..\NumericalIntegration\NumericalIntegration\x64\Release\;..\..\DemagField\DemagField\x64\Release\;..\..\TileDemagTensor\TileDemagTensor\x64\Release\;C:\Program Files\MATLAB\R2022a\extern\lib\win64\microsoft\" LinkLibraryDependencies="false" SubSystem="subSystemConsole" AdditionalDependencies="TileDemagTensor.lib DemagField.lib NumericalIntegration.lib"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\NumericalIntegration\NumericalIntegration\x64\Release\;..\..\DemagField\DemagField\x64\Release\;..\..\TileDemagTensor\TileDemagTensor\x64\Release\;;C:\Program Files\MATLAB\R2022a\extern\lib\win64\microsoft\;c:\Program Files\MATLAB\R2022a\extern\include\" PreprocessorDefinitions="USE_MATLAB" RealKIND="realKIND8"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalYes" SuppressStartupBanner="true" AdditionalLibraryDirectories="..\..\NumericalIntegration\NumericalIntegration\x64\Release\;..\..\DemagField\DemagField\x64\Release\;..\..\TileDemagTensor\TileDemagTensor\x64\Release\;C:\Program Files\MATLAB\R2022a\extern\lib\win64\microsoft\;c:\Program Files\MATLAB\R2022a\extern\include\" SubSystem="subSystemConsole" AdditionalDependencies="TileDemagTensor.lib DemagField.lib NumericalIntegration.lib"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>
@@ -36,6 +36,16 @@
 		<Configuration Name="Release_no_CVODE|x64">
 				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\NumericalIntegration\NumericalIntegration\x64\Release_no_CVODE\;..\..\DemagField\DemagField\x64\Release_no_CVODE\;..\..\TileDemagTensor\TileDemagTensor\x64\Release_no_CVODE\;;C:\Program Files\MATLAB\R2022a\extern\lib\win64\microsoft\" RealKIND="realKIND8"/>
 				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalYes" SuppressStartupBanner="true" AdditionalLibraryDirectories="..\..\NumericalIntegration\NumericalIntegration\x64\Release_no_CVODE\;..\..\DemagField\DemagField\x64\Release_no_CVODE\;..\..\TileDemagTensor\TileDemagTensor\x64\Release_no_CVODE\;C:\Program Files\MATLAB\R2022a\extern\lib\win64\microsoft\" LinkLibraryDependencies="false" SubSystem="subSystemConsole" AdditionalDependencies="TileDemagTensor.lib DemagField.lib NumericalIntegration.lib"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool" CommandLine="copy &quot;$(TargetPath)&quot; &quot;..\..\..\executable\&quot;"/>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
+		<Configuration Name="Release_Standalone_exe|x64">
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" AdditionalIncludeDirectories="..\..\NumericalIntegration\NumericalIntegration\x64\Release_Standalone_exe\;..\..\DemagField\DemagField\x64\Release_Standalone_exe\;..\..\TileDemagTensor\TileDemagTensor\x64\Release_Standalone_exe\;C:\Program Files\MATLAB\R2022a\extern\lib\win64\microsoft\;c:\Program Files\MATLAB\R2022a\extern\include\" RealKIND="realKIND8"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalYes" SuppressStartupBanner="true" AdditionalLibraryDirectories="..\..\NumericalIntegration\NumericalIntegration\x64\Release_Standalone_exe\;..\..\DemagField\DemagField\x64\Release_Standalone_exe\;..\..\TileDemagTensor\TileDemagTensor\x64\Release_Standalone_exe\;C:\Program Files\MATLAB\R2022a\extern\lib\win64\microsoft\;c:\Program Files\MATLAB\R2022a\extern\include\" SubSystem="subSystemConsole" AdditionalDependencies="TileDemagTensor.lib DemagField.lib NumericalIntegration.lib"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>

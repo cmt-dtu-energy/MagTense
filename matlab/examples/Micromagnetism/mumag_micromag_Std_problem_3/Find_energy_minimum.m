@@ -15,7 +15,8 @@ end
 
 function E_diff = Find_energy_cross(arr)
     L = arr(1); i = arr(2);
-    [~,~,~,E_arr,~] = Standard_problem_3( [i i i], 1, 0, 0, 0, 0, L ); 
+    options.ShowTheResult = false;
+    [~,~,~,E_arr,~] = Standard_problem_3( [i i i], L, options ); 
     E_diff = abs(sum(E_arr(:,:,1),1)-sum(E_arr(:,:,2),1));
     
     if (numel(E_diff) > 1)

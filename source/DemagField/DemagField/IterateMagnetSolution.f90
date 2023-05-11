@@ -4,17 +4,11 @@
     use DemagFieldGetSolution
     use MagParameters
     use spline
+    use IO_GENERAL
 
     
 
     implicit none
-
-     INTERFACE
-                FUNCTION displayIteration_fct(err,err_max)
-                real( kind = 8 ), INTENT(IN) :: err,err_max
-                integer( kind = 4 ) :: displayIteration_fct
-                END FUNCTION displayIteration_fct
-     END INTERFACE
     
     contains   
     
@@ -35,12 +29,11 @@
     !! Error state is returned in i_err:
     !! 0 no error
     !! -1 max number of iterations reached without satisfying the minimum error
-    subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max, max_ite, dispIteFct, resumeIteration )
+    subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max, max_ite, resumeIteration )
         type(MagTile),dimension(n),intent(inout) :: tiles
         integer(4),intent(in) :: n
         type(MagStateFunction),intent(in),dimension(n_stf) :: stateFunction    
         integer(4),intent(in) :: n_stf
-        procedure(displayIteration_fct),pointer,intent(in) :: dispIteFct
         real(8),intent(in) :: resumeIteration 
         real(8),intent(in) :: T    
         real(8),optional :: err_max
@@ -60,6 +53,7 @@
         real(8),dimension(4) :: maxRelDiffArr
         real(8),dimension(3,3) :: rotMat,rotMatInv
         logical :: lCh
+        character*(100) :: prog_str 
     
         !::set default error margin if nothing has been specified by the user
         if ( .not. present(err_max) ) err_max = 1e-10
@@ -283,9 +277,9 @@
         
             lambdaCnt = lambdaCnt + 1
 
-             !call displayIteration( err, err_max * lambda )
-             tmp = dispIteFct( err, err_max * lambda )
-        
+            write(prog_str,'(A7, F15.7, A13, F15.7)') 'Error: ', err, ' Max. Error: ', err_max * lambda
+            call displayGUIMessage( trim(prog_str) )
+             
         enddo    
         deallocate(H,H_old,Hnorm,Hnorm_old,Nstore,err_val,Mnorm,Mnorm_old)
     end subroutine IterateMagnetization
