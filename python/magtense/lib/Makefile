@@ -5,7 +5,7 @@ USE_CUDA = 1
 USE_CVODE = 0
 USE_MICROMAG = 1
 
-F90 = ifort
+F90 = gfortran
 
 ifeq (${F90}, gfortran)
 	USE_CUDA = 0
@@ -39,10 +39,15 @@ ifeq ($(OS),Windows_NT)
 		/DUSE_CVODE=${USE_CVODE} /DUSE_MICROMAG=${USE_MICROMAG} /DUSE_MATLAB=0
 		FCOMP = intelvem
 		EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower --opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
+		OPT = ${CONDA_PREFIX}/Library/include -I${CONDA_PREFIX}/Library/include/intel64/ilp64
+		F90_OPT = -I ${OPT}
+		LIB_OPT = -I:${OPT} -L. -llibsrc
 	else ifeq (${F90}, gfortran)
 		F90FLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 -cpp -DUSE_MICROMAG=${USE_MICROMAG}
 		FCOMP = gnu95 --compiler=mingw32
 		EXTRA_OPT = --opt='${F90FLAGS}'
+		F90_OPT =
+		LIB_OPT = -L. -llibsrc
 	endif
 
 	CPP = icl
@@ -51,9 +56,7 @@ ifeq ($(OS),Windows_NT)
 	CUDA = -L${CONDA_PREFIX}/Lib/x64 -lcublas -lcudart -lcuda -lcusparse
 	MKL = -L${CONDA_PREFIX}/Library/lib -lmkl_blas95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core
 	MKL_OMP = -L"C:\Program Files (x86)\Intel\oneAPI\compiler\latest\windows\compiler\lib\intel64_win" -llibiomp5md
-	OPT = ${CONDA_PREFIX}/Library/include -I${CONDA_PREFIX}/Library/include/intel64/ilp64
-	LIB_OPT = -I:${OPT} -L. -llibsrc
-	
+		
 	LIBTOOL = LIB $? /OUT:$@
 	STATIC_LIB = libsrc.lib
 	CLEAN_FILES = -del libsrc.lib *.o *.mod *.pyd
@@ -69,9 +72,14 @@ else
 		-fp-model precise -threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} \
 		-DUSE_MICROMAG=${USE_MICROMAG} -DUSE_MATLAB=0
 		FCOMP = intelem
+		OPT = ${CONDA_PREFIX}/include -I${CONDA_PREFIX}/include/intel64/ilp64
+		F90_OPT = -I ${OPT}
+		LIB_OPT = -I${OPT} -L. -lsrc
 	else ifeq (${F90}, gfortran)
 		F90FLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 -cpp -DUSE_MICROMAG=${USE_MICROMAG}
 		FCOMP = gnu95
+		F90_OPT =
+		LIB_OPT = -L. -lsrc
 	endif
 
 	EXTRA_OPT = --opt='${F90FLAGS}'
@@ -80,8 +88,6 @@ else
 	CUFLAGS = -shared -Xcompiler -fPIC
 	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
 	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -lpthread -lm -ldl -liomp5 -lmkl_blas95_lp64
-	OPT = ${CONDA_PREFIX}/include -I${CONDA_PREFIX}/include/intel64/ilp64
-	LIB_OPT = -I${OPT} -L. -lsrc
 
 	ifeq (${UNAME}, Darwin)
   		LIBTOOL = libtool -static -o $@ $?
@@ -152,7 +158,7 @@ clean:
 	${CLEAN_FOLDER_WIN}
 
 .f90.o:
-	${F90} ${F90FLAGS} -I $(OPT) -c $< -o $@
+	${F90} ${F90FLAGS} $(F90_OPT) -c $< -o $@
 
 .c.o:
 	${CC} ${CFLAGS} -c $< -o $@
