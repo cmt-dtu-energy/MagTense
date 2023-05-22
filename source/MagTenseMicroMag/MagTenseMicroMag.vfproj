@@ -15,7 +15,7 @@
 				<Tool Name="VFPostBuildEventTool"/></Configuration>
 		<Configuration Name="Release|x64" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 				<Tool Name="VFFortranCompilerTool" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2022a\extern\include\;..\NumericalIntegration\NumericalIntegration\x64\Release\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_CUDA;USE_MATLAB" UseMkl="mklParallel"/>
-				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;..\DemagField\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6\lib\x64\;..\MagTenseFortranCuda\cuda\" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
+				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;..\DemagField\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6\lib\x64\;..\MagTenseFortranCuda\cuda\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\intel64\lp64" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>
@@ -86,7 +86,16 @@
 				<Tool Name="VFPreLinkEventTool"/>
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/>
-				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration></Configurations>
+				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
+		<Configuration Name="Release_Standalone_exe|x64" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
+				<Tool Name="VFFortranCompilerTool" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2022a\extern\include\;..\NumericalIntegration\NumericalIntegration\x64\Release_Standalone_exe\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_CUDA" UseMkl="mklParallel"/>
+				<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\NumericalIntegration\x64\release\;..\DemagField\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.6\lib\x64\;..\MagTenseFortranCuda\cuda\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\intel64\lp64" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
+				<Tool Name="VFResourceCompilerTool"/>
+				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+				<Tool Name="VFCustomBuildTool"/>
+				<Tool Name="VFPreLinkEventTool"/>
+				<Tool Name="VFPreBuildEventTool"/>
+				<Tool Name="VFPostBuildEventTool"/></Configuration></Configurations>
 	<Files>
 		<Filter Name="Header Files" Filter="fi;fd;h;inc"/>
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>

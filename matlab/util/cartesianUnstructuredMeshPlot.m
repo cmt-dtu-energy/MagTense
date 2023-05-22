@@ -1,20 +1,31 @@
-function CartesianUnstructuredMeshPlot(pos, dims, GridInfo, iIn, fnamesave)
+function cartesianUnstructuredMeshPlot(pos, dims, GridInfo, iIn, fnamesave,hF)
 %
 % CartesianUnstructuredMeshPlot   plots Cartesian unstructured mesh
 
-
-hF = figure('position',[0 0 600 600],'Color',[1 1 1]);
-% ppsz = .2.*[20,19] ;
-% ppps = .2.*[0,0,20,19] ;
-
-% set(gcf,'PaperUnits','centimeters','PaperSize',ppsz,'PaperPosition',ppps) ;
-
+if ~exist('hF','var')
+    hF = figure('position',[0 0 600 600],'Color',[1 1 1]);
+    ppsz = .2.*[20,19] ;
+    ppps = .2.*[0,0,20,19] ;
+    set(gcf,'PaperUnits','centimeters','PaperSize',ppsz,'PaperPosition',ppps) ;
+else
+    ppsz=get(gcf,'PaperSize');
+    ppps=get(gcf,'PaperPosition');
+    if isequal(get(hF,'type'),'figure')
+        
+        figure(hF)
+        clf(hF)
+    else
+        
+        axes(hF) ;
+    end
+end
 view(30,30) ;
 hold on
 %%
 cols = [hsv(numel(iIn)-1);[1,1,1].*0.4];
 iOne = sum(abs(GridInfo.TheSigns),1) == 1 ;
 iOneInd = find(iOne) ;
+TheLW = 1.5 ;
 for ik=1:numel(iOneInd)
     k = iOneInd(ik) ;
     n= find(GridInfo.TheSigns(:,k)) ;
@@ -40,18 +51,18 @@ for ik=1:numel(iOneInd)
     if abs(GridInfo.fNormX(k))
       hP(ik) = patch(pos(n,1)+[1,1,1,1].*GridInfo.fNormX(k).*dims(n,1)./2,...
             pos(n,2)+([0,0,1,1]-1/2).*dims(n,2),...
-            pos(n,3)+([0,1,1,0]-1/2).*dims(n,3),ik,ColProperty,thisCol,'linestyle',TheLS) ;
+            pos(n,3)+([0,1,1,0]-1/2).*dims(n,3),ik,ColProperty,thisCol,'linestyle',TheLS,'linewidth',TheLW) ;
     end
     if abs(GridInfo.fNormY(k))
         hP(ik) = patch(pos(n,1)+([0,0,1,1]-1/2).*dims(n,1),...
             pos(n,2)+[1,1,1,1].*GridInfo.fNormY(k).*dims(n,2)./2,...
-            pos(n,3)+([0,1,1,0]-1/2).*dims(n,3),ik,ColProperty,thisCol,'linestyle',TheLS) ;
+            pos(n,3)+([0,1,1,0]-1/2).*dims(n,3),ik,ColProperty,thisCol,'linestyle',TheLS,'linewidth',TheLW) ;
     end
     
     if abs(GridInfo.fNormZ(k))
         hP(ik) = patch(pos(n,1)+([0,1,1,0]-1/2).*dims(n,1),...
             pos(n,2)+([0,0,1,1]-1/2).*dims(n,2),...
-            pos(n,3)+[1,1,1,1].*GridInfo.fNormZ(k).*dims(n,3)./2,ik,ColProperty,thisCol,'linestyle',TheLS) ;
+            pos(n,3)+[1,1,1,1].*GridInfo.fNormZ(k).*dims(n,3)./2,ik,ColProperty,thisCol,'linestyle',TheLS,'linewidth',TheLW) ;
     end
     '' ;
 %     drawnow ;
@@ -73,9 +84,7 @@ xlabel('x') ; ylabel('y') ; zlabel('z') ;
 %%
 if numel(iIn)==1
     if size(iIn{1},3)> 1
-        if exist('fnamesave','var')
-            SaveGifFrames(hF,[fnamesave,'Animation'],1) ;
-        end
+        SaveGifFrames(hF,[fnamesave,'Animation'],1) ;
         for ii = 2:size(iIn{1},3)
             for ik=1:numel(iOneInd)
                 k = iOneInd(ik) ;
@@ -84,21 +93,19 @@ if numel(iIn)==1
                 set(hP(ik),'facecolor',iIn{1}(n,:,ii)) ;
             end
             
-            if exist('fnamesave','var')
-                SaveGifFrames(hF,[fnamesave,'Animation'],ii) ;
-            end
+            SaveGifFrames(hF,[fnamesave,'Animation'],ii) ;
         end
     end
 end
 
 %%
-if exist('fnamesave','var')
-%     set(hF,'PaperUnits','centimeters','PaperSize',ppsz,'PaperPosition',ppps) ;
-%     set(hF,'PaperUnits','inches') ;
-    figure(hF) ;
-    eval(['print -dtiff ',fnamesave,'Cartesian.tiff']) ;
-    savefig(hF,[fnamesave,'Cartesian.fig'])
-end
+% if exist('fnamesave','var')
+%     set(gcf,'PaperUnits','centimeters','PaperSize',ppsz,'PaperPosition',ppps) ;
+%     set(gcf,'PaperUnits','inches') ;
+%     figure(gcf) ;
+%     eval(['print -dtiff ',fnamesave,'Cartesian.tiff']) ;
+%     savefig(gcf,[fnamesave,'Cartesian.fig'])
+% end
 end
 
 function SaveGifFrames(hF,filename,n)
