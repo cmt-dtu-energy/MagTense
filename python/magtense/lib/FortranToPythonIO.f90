@@ -312,7 +312,7 @@ module FortranToPythonIO
 
         !::load state function from table
         call loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn)
-        call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, disp_fct, resumeIteration )
+        call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, resumeIteration )
 
         do i=1,n_tiles
             Mag_out(i,:) = tiles(i)%M
@@ -404,7 +404,7 @@ module FortranToPythonIO
             if (console) then
                 write(*,*) 'Doing iteration'
             endif
-            call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, disp_fct, resumeIteration )
+            call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, resumeIteration )
 
             do i=1,n_tiles
                 Mag_out(i,:) = tiles(i)%M
