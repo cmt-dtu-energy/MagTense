@@ -11,30 +11,6 @@ module FortranToPythonIO
     contains
 
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    !> function for displaying output (to the terminal)
-    !! @param err the current relative error
-    !! @param err_max the current maximum allowed error
-    !!
-    function dispIte_fct( err, err_max )
-        real(8),intent(in) :: err,err_max
-        integer(4) :: dispIte_fct
-
-        write(*,*) err,err_max
-
-        dispIte_fct = 0
-
-    end function dispIte_fct
-
-    function dispIte_fct_no_output( err, err_max )
-        real(8),intent(in) :: err,err_max
-        integer(4) :: dispIte_fct_no_output
-
-        dispIte_fct_no_output = 0
-
-    end function dispIte_fct_no_output
-
-
-    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !< Function getNFromTiles
     !! @param tileType - defines whether the tile is cylindrical, a prism, an ellipsoid and so on
     !! @param offset - the centre coordinates relative to the global coordinate system
