@@ -48,9 +48,9 @@ module FortranToPythonIO
     subroutine getNFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, N )
-        
+
         integer(4),intent(in) :: n_tiles, n_pts
-        
+
         !::Specific for a cylindrical tile piece
         real(8),dimension(n_tiles,3),intent(in) :: centerPos
         real(8),dimension(n_tiles,3),intent(in) :: dev_center
@@ -294,7 +294,7 @@ module FortranToPythonIO
         integer(4),intent(in) :: nT,nH
         real(8),dimension(nH,nT),intent(in) :: data_stateFcn
         real(8) :: resumeIteration
-        procedure(displayIteration_fct),pointer :: disp_fct => null()
+        procedure(dispIte_fct),pointer :: disp_fct => null()
 
         type(MagTile),dimension(n_tiles) :: tiles
         integer(4),intent(in) :: n_tiles
@@ -372,7 +372,7 @@ module FortranToPythonIO
         type(MagStateFunction),dimension(n_stateFcn) :: stateFcn
         real(8),dimension(nH,nT),intent(in) :: data_stateFcn
         real(8) :: start,finish,resumeIteration
-        procedure(displayIteration_fct),pointer :: disp_fct => null()
+        procedure(dispIte_fct),pointer :: disp_fct => null()
         logical, intent(in) :: console
 
         real(8),dimension(n_pts,3),intent(in) :: pts
