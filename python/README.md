@@ -52,16 +52,8 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
 
 Create an importable Python module from Fortran source code.
 
+For MacOS ARM architectures, currently only magnetostatics with the gfortran compiler is supported.
 Navigate to folder `MagTense/python/magtense/lib/`, run `make`, and install the package:
-
-```bash
-cd MagTense/python/magtense/lib/
-make SHELL=cmd
-cd MagTense/python/
-pip install -e .
-```
-
-For MACos ARM architetures, use the associated Makefile. Currently this supports only magnetostatics.
 
 ```bash
 cd MagTense/python/magtense/lib/

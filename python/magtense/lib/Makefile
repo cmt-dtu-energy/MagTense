@@ -5,7 +5,15 @@ USE_CUDA = 1
 USE_CVODE = 0
 USE_MICROMAG = 1
 
-F90 = gfortran
+ifeq ($(OS),Windows_NT)
+	F90 = ifort
+else
+	ifeq (${UNAME}, Darwin)
+  		F90 = gfortran
+	else
+  		F90 = ifort
+	endif
+endif
 
 ifeq (${F90}, gfortran)
 	USE_CUDA = 0

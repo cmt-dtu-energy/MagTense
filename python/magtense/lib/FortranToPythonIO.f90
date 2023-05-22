@@ -294,7 +294,6 @@ module FortranToPythonIO
         integer(4),intent(in) :: nT,nH
         real(8),dimension(nH,nT),intent(in) :: data_stateFcn
         real(8) :: resumeIteration
-        procedure(dispIte_fct),pointer :: disp_fct => null()
 
         type(MagTile),dimension(n_tiles) :: tiles
         integer(4),intent(in) :: n_tiles
@@ -302,8 +301,6 @@ module FortranToPythonIO
 
         !! default value is zero, i.e. do not resume iteration
         resumeIteration = 0.
-
-        disp_fct => dispIte_fct_no_output
 
         !::initialise MagTile with specified parameters
         call loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
@@ -372,7 +369,6 @@ module FortranToPythonIO
         type(MagStateFunction),dimension(n_stateFcn) :: stateFcn
         real(8),dimension(nH,nT),intent(in) :: data_stateFcn
         real(8) :: start,finish,resumeIteration
-        procedure(dispIte_fct),pointer :: disp_fct => null()
         logical, intent(in) :: console
 
         real(8),dimension(n_pts,3),intent(in) :: pts
@@ -382,12 +378,6 @@ module FortranToPythonIO
         integer :: i
 
         call cpu_time(start)
-
-        if (console) then
-            disp_fct => dispIte_fct
-        else
-            disp_fct => dispIte_fct_no_output
-        endif
 
         !!@todo no support for resuming iterations at the moment
         resumeIteration = 0
