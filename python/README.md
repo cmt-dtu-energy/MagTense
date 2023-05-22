@@ -65,7 +65,7 @@ For MACos ARM architetures, use the associated Makefile. Currently this supports
 
 ```bash
 cd MagTense/python/magtense/lib/
-make -f Makefile.arm64
+make
 cd MagTense/python/
 pip install -e .
 ```
