@@ -62,6 +62,8 @@ cd MagTense/python/
 pip install -e .
 ```
 
+For development, one can optionally execute tests with `pytest`.
+
 ## Read-in customized M-H-curve
 
 This feature is currently only supported for soft magnetic tiles ([type=2](magtense/magtense.py#L49)).
