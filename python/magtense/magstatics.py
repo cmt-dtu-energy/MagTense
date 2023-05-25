@@ -6,6 +6,41 @@ from pkg_resources import resource_filename
 from magtense.lib import magtensesource
 
 
+class Tile:
+    """
+    This is a proxy class to enable Tiles to be accessed as if they were a list of Tile
+    objects. So, for example,
+
+    t = Tiles(5)
+    print(t[0].center_pos)  # [0, 0, 0]
+    t[0].center_pos = [1, 1, 1]
+    print(t[0].center_pos)  # [1, 1, 1]
+    """
+
+    def __init__(self, parent, index):
+        self._parent = parent
+        self._index = index
+
+    def __getattr__(self, name):
+        # Get the attribute from the parent
+        attr = getattr(self._parent, name)
+        # If the attribute is a np.ndarray, return the element at our index
+        if isinstance(attr, np.ndarray):
+            return attr[self._index]
+        # Otherwise, just return the attribute itself
+        return attr
+
+    def __setattr__(self, name, value):
+        if name in ["_parent", "_index"]:
+            # For these attributes, set them normally
+            super().__setattr__(name, value)
+        else:
+            # For all other attributes, set the value in the parent's attribute array
+            attr = getattr(self._parent, name)
+            if isinstance(attr, np.ndarray):
+                attr[self._index] = value
+
+
 class Tiles:
     """
     Input to Fortran derived type MagTile.
@@ -110,6 +145,11 @@ class Tiles:
         for i in range(self.n):
             res += f"Tile_{i} with coordinates {self.offset[i]}.\n"
         return res
+
+    def __getitem__(self, index):
+        if index < 0 or index >= self.n:
+            raise IndexError("Index out of bounds")
+        return Tile(self, index)
 
     @property
     def n(self):
