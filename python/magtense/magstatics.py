@@ -710,8 +710,9 @@ def run_simulation(
     pts: np.ndarray,
     max_error: float = 1e-5,
     max_it: int = 500,
-    T: float = 300.,
-    console: bool = True
+    T: float = 300.0,
+    mu_r: float = 20,
+    console: bool = True,
 ) -> tuple[Tiles, np.ndarray]:
     """
     Run magnetostatic simulation to calculate the demagnetizing field strength.
@@ -727,9 +728,9 @@ def run_simulation(
     Returns:
         Updated tiles.
         Demagnetizing field strength in evaluation points.
-    '''
-    DATA_PATH = resource_filename('magtense', 'mat/data_stateFcn.csv')
-    data_stateFcn = np.genfromtxt(DATA_PATH, delimiter=';', dtype=np.float64)
+    """
+    DATA_PATH = resource_filename("magtense", f"mat/Fe_mur_{mu_r}_Ms_2_1.csv")
+    data_stateFcn = np.genfromtxt(DATA_PATH, delimiter=";", dtype=np.float64)
 
     H_out, M_out, Mrel_out = magtensesource.fortrantopythonio.runsimulation(
         centerpos=tiles.center_pos,
