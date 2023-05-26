@@ -53,7 +53,7 @@ class DemagMatrix:
             values = values.reshape((3, 3))
         self.values = values
         if not self.is_valid:
-            warn("DemagMatrix is not valid.")
+            warn(f"DemagMatrix {self} is not valid.")
 
     def __repr__(self):
         return f"DemagMatrix({self.values})"
@@ -71,12 +71,12 @@ class DemagMatrix:
     @property
     def _is_traceless(self):
         """Check if the matrix is traceless."""
-        return np.allclose(self.values.trace(), 0.0)
+        return np.isclose(self.values.trace(), 0.0)
 
     @property
     def _is_unit_trace(self):
         """Check if the matrix has unit trace."""
-        return np.allclose(self.values.trace(), 1.0)
+        return np.isclose(self.values.trace(), -1.0)
 
     @property
     def is_valid(self):
