@@ -584,17 +584,17 @@ class Tiles:
         x_off, y_off, z_off = self.size[i] / mat
         c_0 = -self.size[i] / 2 + (self.size[i] / mat) / 2
         c_pts = [
-            c_0 + [x_off * j, y_off * k, z_off * l]
+            c_0 + [x_off * j, y_off * k, z_off * m]
             for j in range(mat[0])
             for k in range(mat[1])
-            for l in range(mat[2])
+            for m in range(mat[2])
         ]
         ver_cube = (np.dot(R_mat, np.array(c_pts).T)).T + self.offset[i]
 
         for j in range(mat[0]):
             for k in range(mat[1]):
-                for l in range(mat[2]):
-                    cube_idx = j * mat[1] * mat[2] + k * mat[2] + l
+                for m in range(mat[2]):
+                    cube_idx = j * mat[1] * mat[2] + k * mat[2] + m
                     idx = cube_idx + old_n
                     if idx == self.n:
                         self._offset[i] = ver_cube[cube_idx]

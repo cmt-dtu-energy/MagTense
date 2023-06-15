@@ -29,7 +29,8 @@ def std_prob_3(
 
     problem.u_ea[:,2] = 1
     lex = np.sqrt(problem.A0 / (0.5 * mu0 * Ms**2))
-    Hext_fct = lambda t: np.atleast_2d(t).T * [0, 0, 0]
+    def Hext_fct(t):
+        return np.atleast_2d(t).T * [0, 0, 0]
 
     E_arr = np.zeros(shape=(4, len(L_loop), 2))
 
@@ -52,11 +53,13 @@ def std_prob_3(
                 yvec = -np.cos(np.arctan2(z, x))
                 problem.m0[:,0] = xvec.swapaxes(0,2).reshape((-1))
                 problem.m0[:,2] = yvec.swapaxes(0,2).reshape((-1))
-                problem.m0 = problem.m0 / np.tile(np.expand_dims(np.sqrt(np.sum(problem.m0**2, axis=1)), axis=1), (1, 3))
+                problem.m0 = problem.m0 / np.tile(np.expand_dims(
+                    np.sqrt(np.sum(problem.m0**2, axis=1)), axis=1), (1, 3))
                 t_end = 200e-9
 
             problem.grid_L = np.array([lex, lex, lex]) * L_loop[i]
-            t, M_out, _, H_exc, H_ext, H_dem, H_ani = problem.run_simulation(t_end, 50, Hext_fct, 2)
+            t, M_out, _, H_exc, H_ext, H_dem, H_ani = \
+                problem.run_simulation(t_end, 50, Hext_fct, 2)
 
             if show_details:
                 M_sq = np.squeeze(M_out, axis=2)
