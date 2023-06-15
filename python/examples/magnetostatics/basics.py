@@ -145,7 +145,8 @@ def prism_grid():
 
 
 def prism_multiple(n_mag=1, soft=None, res=16, max=[1,1,1]):
-    if soft is None: soft = [0 for _ in range(n_mag)]
+    if soft is None:
+        soft = [0 for _ in range(n_mag)]
     prism = magstatics.Tiles(n_mag, tile_type=2, size=[0.1, 0.3, 0.2])
 
     for i in range(n_mag):
