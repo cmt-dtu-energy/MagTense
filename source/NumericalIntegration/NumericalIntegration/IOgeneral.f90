@@ -18,22 +18,15 @@ module IO_GENERAL
 
     subroutine displayGUIMessage( mess )
         character(*),intent(in) :: mess
-        logical :: ex
 
-
-        !! test if we are inside Matlab or called from a stand-alone. The simple test
-        !! is whether io.txt exists in the current path (false for Matlab, true for stand-alone)
+        !! test if we are inside Matlab or called from python or a stand-alone
         !! nothing bad should happen if in fact we are called from ML but the file somehow
         !! exists - the written output will just not be shown to the user
 
-        inquire( file='io.txt', EXIST=ex )
-
-        if ( ex .eqv. .true. ) then
-            write(*,*) mess
-        endif
-
 #if USE_MATLAB
         call displayMatlabMessage( mess )
+#else
+        write(*,*) mess
 #endif
 
     end subroutine displayGUIMessage
