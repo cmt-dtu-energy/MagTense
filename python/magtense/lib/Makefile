@@ -60,7 +60,7 @@ ifeq ($(OS),Windows_NT)
 
 	CPP = icl
 	CPPFLAGS = /Fo:${CUDA_WRAP}
-	CUFLAGS =
+	CUFLAGS = -I ${OPT}
 	CUDA = -L${CONDA_PREFIX}/Lib/x64 -lcublas -lcudart -lcuda -lcusparse
 	MKL = -L${CONDA_PREFIX}/Library/lib -lmkl_blas95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core
 	MKL_OMP = -L"C:\Program Files (x86)\Intel\oneAPI\compiler\latest\windows\compiler\lib\intel64_win" -llibiomp5md
@@ -93,7 +93,7 @@ else
 	EXTRA_OPT = --opt='${F90FLAGS}'
 	CPP = icx
 	CPPFLAGS = ${CFLAGS} -o ${CUDA_WRAP}
-	CUFLAGS = -shared -Xcompiler -fPIC
+	CUFLAGS = -shared -Xcompiler -fPIC -I ${OPT}
 	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
 	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -lpthread -lm -ldl -liomp5 -lmkl_blas95_lp64
 
