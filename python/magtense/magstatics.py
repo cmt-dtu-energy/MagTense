@@ -709,21 +709,20 @@ def grid_config(
         raise NotImplementedError()
 
     if filled_pos is None:
-        filled_pos = []
         if n_tiles is None:
-            n_tiles = rng.integers(np.prod(spots))
+            n_tiles = 1 + rng.integers(np.prod(spots))
 
-        cnt_tiles = 0
-        while cnt_tiles < n_tiles:
-            new_pos = [
-                rng.integers(spots[0]),
-                rng.integers(spots[1]),
-                rng.integers(spots[2]),
-            ]
+        # Generate unique linear indices
+        linear_indices = rng.choice(np.prod(spots), size=n_tiles, replace=False)
 
-            if new_pos not in filled_pos:
-                filled_pos.append(new_pos)
-                cnt_tiles += 1
+        # Convert the linear indices to 3D coordinates
+        filled_pos = np.empty((n_tiles, 3), dtype=int)
+        for idx, linear_index in enumerate(linear_indices):
+            filled_pos[idx, 2] = linear_index // (spots[0] * spots[1])
+            filled_pos[idx, 1] = (linear_index % (spots[0] * spots[1])) // spots[0]
+            filled_pos[idx, 0] = linear_index % spots[0]
+        filled_pos = filled_pos.tolist()
+
 
     if len(filled_pos) == 0:
         tiles = None
