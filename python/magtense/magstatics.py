@@ -321,8 +321,11 @@ class Tiles:
             for i, ea in enumerate(val):
                 self._u_ea[i] = np.around(ea / np.linalg.norm(ea), decimals=9)
                 self.M = (self.M_rem[i] * self.u_ea[i], i)
-                oa_1 = np.array([val[i][1], -val[i][0], 0])
-                self._u_oa1[i] = np.around(oa_1 / np.linalg.norm(oa_1), decimals=9)
+                if ea[1] != 0 or ea[2] != 0:
+                    w = np.array([1, 0, 0])
+                else:
+                    w = np.array([0, 1, 0])
+                self._u_oa1[i] = np.around(np.cross(self.u_ea[i], w), decimals=9)
                 self._u_oa2[i] = np.around(
                     np.cross(self.u_ea[i], self.u_oa1[i]), decimals=9
                 )
