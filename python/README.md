@@ -26,7 +26,7 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
 
   ```bash
   conda install -y numpy matplotlib
-  conda install -y -c "nvidia/label/cuda-${CUDA_LABEL}" cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev
+  conda install -y -c "nvidia/label/cuda-${CUDA_LABEL}" cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink
   conda install -y -c intel mkl-static
   ```
 
