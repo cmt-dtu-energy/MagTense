@@ -1,9 +1,7 @@
 {% set version = "2.2.0" %}
 {% set py_version = "3.10" %}
 {% set cuda_version = "cuda12.1" %}
-{% set cublas_version = "12.1.3.1" %}
-{% set cusparse_version = "12.1.0.106" %}
-{% set cudart_version = "12.1.105" %}
+{% set cuda_pkg_version = "12" %}
 {% set numpy_version = "1.24.3" %}
 {% set mkl_version = "2023.1.0" %}
 {% set arch_pip = "unix" %}
@@ -31,12 +29,14 @@ requirements:
     - matplotlib
     - mkl =={{ mkl_version }}
     - intel-fortran-rt =={{ mkl_version }} # [unix]
-    - libcusparse =={{ cusparse_version }} # [unix]
-    - libcusparse-dev =={{ cusparse_version }} # [win]
-    - libcublas =={{ cublas_version }} # [unix]
-    - libcublas-dev =={{ cublas_version }} # [win]
-    - cuda-cudart =={{ cudart_version }} # [unix]
-    - cuda-cudart-dev =={{ cudart_version }} # [win]
+    - libcusparse =={{ cuda_pkg_version }} # [unix]
+    - libcusparse-dev =={{ cuda_pkg_version }} # [win]
+    - libcublas =={{ cuda_pkg_version }} # [unix]
+    - libcublas-dev =={{ cuda_pkg_version }} # [win]
+    - cuda-cudart =={{ cuda_pkg_version }} # [unix]
+    - cuda-cudart-dev =={{ cuda_pkg_version }} # [win]
+    - libnvjitlink =={{ cuda_pkg_version }} # [unix]
+    - libnvjitlink-dev =={{ cuda_pkg_version }} # [win]
 
 test:
   imports:
