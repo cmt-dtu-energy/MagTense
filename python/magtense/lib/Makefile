@@ -74,8 +74,6 @@ ifeq ($(OS),Windows_NT)
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
 
 else
-	export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib
-	
 	ifeq (${F90}, ifort)
 		F90FLAGS = -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 \
 		-fp-model precise -threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} \
