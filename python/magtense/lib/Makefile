@@ -41,13 +41,14 @@ CUDA_OBJECT = $(addsuffix .o, ${CUDA_SOURCE})
 CUDA_WRAP = $(addsuffix .o, ${CUDA_WRAP_SOURCE})
 
 ifeq ($(OS),Windows_NT)
+	MKL_ROOT = "C:\Program Files (x86)\Intel\oneAPI\mkl\latest"
 	ifeq (${F90}, ifort)
 		F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 \
 		/fp:precise /libs:static /threads /fpp /DUSE_CUDA=${USE_CUDA} \
 		/DUSE_CVODE=${USE_CVODE} /DUSE_MICROMAG=${USE_MICROMAG} /DUSE_MATLAB=0
 		FCOMP = intelvem
 		EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower --opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
-		OPT = ${CONDA_PREFIX}/Library/include -I${CONDA_PREFIX}/Library/include/intel64/ilp64
+		OPT = ${CONDA_PREFIX}/Library/include -I${MKL_ROOT}/include -I${CONDA_PREFIX}/Library/include/intel64/ilp64
 		F90_OPT = -I ${OPT}
 		LIB_OPT = -I:${OPT} -L. -llibsrc
 	else ifeq (${F90}, gfortran)
@@ -62,8 +63,8 @@ ifeq ($(OS),Windows_NT)
 	CPPFLAGS = /Fo:${CUDA_WRAP}
 	CUFLAGS = -I ${OPT}
 	CUDA = -L${CONDA_PREFIX}/Lib/x64 -lcublas -lcudart -lcuda -lcusparse
-	MKL = -L${CONDA_PREFIX}/Library/lib -lmkl_blas95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core
-	MKL_OMP = -L"C:\Program Files (x86)\Intel\oneAPI\compiler\latest\windows\compiler\lib\intel64_win" -llibiomp5md
+	MKL = -L${MKL_ROOT}/lib/intel64 -lmkl_rt -lmkl_blas95_ilp64
+	MKL_OMP = -L${MKL_ROOT}/windows/compiler/lib/intel64_win -llibiomp5md
 		
 	LIBTOOL = LIB $? /OUT:$@
 	STATIC_LIB = libsrc.lib
@@ -95,7 +96,7 @@ else
 	CPPFLAGS = ${CFLAGS} -o ${CUDA_WRAP}
 	CUFLAGS = -shared -Xcompiler -fPIC -I ${OPT}
 	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
-	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -lpthread -lm -ldl -liomp5 -lmkl_blas95_lp64
+	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -lpthread -lm -ldl -liomp5 -lmkl_blas95_ilp64
 
 	ifeq (${UNAME}, Darwin)
   		LIBTOOL = libtool -static -o $@ $?
