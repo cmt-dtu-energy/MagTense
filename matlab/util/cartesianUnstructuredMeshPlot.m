@@ -24,6 +24,7 @@ hold on
 %%
 cols = [hsv(numel(iIn)-1);[1,1,1].*0.4];
 iOne = sum(abs(GridInfo.TheSigns),1) == 1 ;
+% plot3(GridInfo.Xf(iOne),GridInfo.Yf(iOne),GridInfo.Zf(iOne),'.')
 iOneInd = find(iOne) ;
 TheLW = 1.5 ;
 for ik=1:numel(iOneInd)
@@ -48,21 +49,34 @@ for ik=1:numel(iOneInd)
             TheLS = '-' ;
         end
     end
+     
     if abs(GridInfo.fNormX(k))
-      hP(ik) = patch(pos(n,1)+[1,1,1,1].*GridInfo.fNormX(k).*dims(n,1)./2,...
+        if isfield(GridInfo,'DimsF')
+            hP(ik) = patch(GridInfo.Xf(k)+[0,0,0,0],GridInfo.Yf(k)+([0,0,1,1]-1/2).*GridInfo.DimsF(k,2),GridInfo.Zf(k)+([0,1,1,0]-1/2).*GridInfo.DimsF(k,3),ik,ColProperty,thisCol,'linestyle',TheLS,'linewidth',TheLW) ;
+        else
+            hP(ik) = patch(pos(n,1)+[1,1,1,1].*GridInfo.fNormX(k).*dims(n,1)./2,...
             pos(n,2)+([0,0,1,1]-1/2).*dims(n,2),...
             pos(n,3)+([0,1,1,0]-1/2).*dims(n,3),ik,ColProperty,thisCol,'linestyle',TheLS,'linewidth',TheLW) ;
+        end
     end
     if abs(GridInfo.fNormY(k))
-        hP(ik) = patch(pos(n,1)+([0,0,1,1]-1/2).*dims(n,1),...
+        if isfield(GridInfo,'DimsF')
+            hP(ik) = patch(GridInfo.Xf(k)+([0,1,1,0]-1/2).*GridInfo.DimsF(k,1),GridInfo.Yf(k)+[0,0,0,0],GridInfo.Zf(k)+([0,0,1,1]-1/2).*GridInfo.DimsF(k,3),ik,ColProperty,thisCol,'linestyle',TheLS,'linewidth',TheLW) ;
+        else
+            hP(ik) = patch(pos(n,1)+([0,0,1,1]-1/2).*dims(n,1),...
             pos(n,2)+[1,1,1,1].*GridInfo.fNormY(k).*dims(n,2)./2,...
             pos(n,3)+([0,1,1,0]-1/2).*dims(n,3),ik,ColProperty,thisCol,'linestyle',TheLS,'linewidth',TheLW) ;
+        end
     end
     
     if abs(GridInfo.fNormZ(k))
-        hP(ik) = patch(pos(n,1)+([0,1,1,0]-1/2).*dims(n,1),...
+        if isfield(GridInfo,'DimsF')
+            hP(ik) = patch(GridInfo.Xf(k)+([0,0,1,1]-1/2).*GridInfo.DimsF(k,1),GridInfo.Yf(k)+([0,1,1,0]-1/2).*GridInfo.DimsF(k,2),GridInfo.Zf(k)+[0,0,0,0],ik,ColProperty,thisCol,'linestyle',TheLS,'linewidth',TheLW) ;
+        else
+            hP(ik) = patch(pos(n,1)+([0,1,1,0]-1/2).*dims(n,1),...
             pos(n,2)+([0,0,1,1]-1/2).*dims(n,2),...
             pos(n,3)+[1,1,1,1].*GridInfo.fNormZ(k).*dims(n,3)./2,ik,ColProperty,thisCol,'linestyle',TheLS,'linewidth',TheLW) ;
+        end
     end
     '' ;
 %     drawnow ;
