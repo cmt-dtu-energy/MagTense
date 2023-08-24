@@ -118,7 +118,7 @@ if run_MrHc
     if (ShowTheResult)
         figure; plot(results.dlex,results.Mxr,'.'); xlabel('d/l_{ex}'); ylabel('M_{xr}/M_s');
         figure; plot(results.dlex,results.Myr,'.'); xlabel('d/l_{ex}'); ylabel('M_{yr}/M_s');
-        figure; plot(results.dlex,results.abs(Hc),'.'); xlabel('d/l_{ex}'); ylabel('|H_c|/M_s');
+        figure; plot(results.dlex,abs(results.Hc),'.'); xlabel('d/l_{ex}'); ylabel('|H_c|/M_s');
     end
 end
 
