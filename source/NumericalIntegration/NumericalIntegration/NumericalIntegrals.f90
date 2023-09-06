@@ -318,7 +318,7 @@
         real :: h
         real,intent(in) :: xx
         real :: ss, res
-        class(dataCollectionBase), target :: dat
+        class(dataCollectionBase),intent(inout),target :: dat
         procedure (f_int_dat_vec), pointer :: f_ptr => null ()
         real :: tmp
 
