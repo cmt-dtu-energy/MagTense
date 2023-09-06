@@ -1,43 +1,75 @@
+#=======================================================================
+#                       compiler names and flags
+#=======================================================================
+FC = ifort
+# FC = gfortran
 
-FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
+USE_CVODE = 0
 
+ifeq ($(OS),Windows_NT)
+	ifeq (${FC}, ifort)
+		FFLAGS = /nologo /real-size:64 /O3 /assume:nocc_omp /Qopenmp /fpp \
+		/fpe:0 /fp:source /fp:precise /libs:static /DUSE_CVODE=${USE_CVODE}
+	else ifeq (${FC}, gfortran)
+		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
+		-cpp -DUSE_CVODE=${USE_CVODE}
+	endif
 
-FFLAGS = -r8 -O3 -fpp -fpe0 -fp-model source -fpic -libs:static
+	LIBTOOL = LIB $? /OUT:$@
+	STATIC_LIB = libNumericalIntegration.lib
+	CLEAN_FILES = -del ${STATIC_LIB} *.o *.mod
+else
+	ifeq (${FC}, ifort)
+		FFLAGS = -r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source \
+		-fp-model precise -fpic -libs:static -DUSE_CVODE=${USE_CVODE}
+	else ifeq (${FC}, gfortran)
+		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
+		-cpp -DUSE_CVODE=${USE_CVODE}
+	endif
 
+	ifeq (${UNAME}, Darwin)
+  		LIBTOOL = libtool -static -o $@ $?
+	else
+  		LIBTOOL = ar src $@ $?
+	endif
+	STATIC_LIB = libNumInt.a
+	CLEAN_FILES = -rm -f ${STATIC_LIB} *.o *.mod
+endif
 
-#FC = /usr/bin/gfortran
+#=======================================================================
+#                     Intel's libtool
+#=======================================================================
+# LIBTOOL = xiar rc $@ $?
 
-#FFLAGS = -O3 -fopenmp -fdefault-real-8 -ffixed-line-length-none -fPIC
+#=======================================================================
+#       List all source files required for the project
+#=======================================================================
+# names (without suffix), f90 sources
+LIBSRC_SOURCES = IntegrationDataTypes quadpack SpecialFunctions NumericalIntegrals \
+SpecialFunctions RKSuitef90 ODE_Solvers ODE_MagTense util locate
 
+# object files
+LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
-
-
-.KEEP_STATE:
-.SUFFIXES:
+#=======================================================================
+#						Relevant suffixes
+#=======================================================================
 .SUFFIXES: .for .f90 .F90 .f .o
+
+#=======================================================================
+#							Targets
+#=======================================================================
 .f.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -c $< -o $@
 .f90.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -c $< -o $@
 .F90.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -c $< -o $@
 .for.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -c $< -o $@
 
-NumericalIntegrationLib = $(FC) IntegrationDataTypes.o quadpack.o NumericalIntegrals.o ODE_Solvers.o ODE_MagTense.o RKSuitef90.o util.o locate.o
-
-libNumericalIntegration.a: $(NumericalIntegrationLib)
-	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/xiar rc libNumericalIntegration.a IntegrationDataTypes.o quadpack.o NumericalIntegrals.o ODE_Solvers.o ODE_MagTense.o RKSuitef90.o util.o locate.o
-
+${STATIC_LIB}: ${LIBSRC_OBJECTS}
+	${LIBTOOL}
 
 clean:
-	rm -f *.o *.x *.mod *.a
-
-
-quadpack.o	:quadpack.f90 IntegrationDataTypes.o
-IntegrationDataTypes.o	:IntegrationDataTypes.f90 
-NumericalIntegrals.o	:NumericalIntegrals.f90 quadpack.o IntegrationDataTypes.o
-RKSuitef90.o	:RKSuitef90.f90
-ODE_Solvers.o	:ODE_Solvers.f90 RKSuitef90.o
-util.o	:util.f90
-locate.o :locate.for
+	${CLEAN_FILES}
