@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"magtense.lib" = ["*.pyd", "*.so"]
+"magtense.mat" = ["*.csv"]
+
+[project]
+name = "magtense"
+version = "2.2.1"
+authors = [
+  { name="Stefan Pollok", email="spol@dtu.dk" },
+]
+description = "MagTense - a micromagnetism and magnetostatic framework"
+readme = "README_top.md"
+requires-python = ">=3.9, <3.12"
+license = {file = "LICENSE"}
+keywords = [
+    "Micromagnetism",
+    "Magnetostatics",
+    "Demagnetization tensor",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.urls]
+"Homepage" = "https://www.magtense.org/"
+"Source" = "https://github.com/cmt-dtu-energy/MagTense"
+"Documentation" = "https://cmt-dtu-energy.github.io/MagTense/"

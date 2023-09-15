@@ -1,8 +1,8 @@
 {% set version = "2.2.0" %}
 {% set py_version = "3.10" %}
-{% set cuda_version = "cuda12.1" %}
+{% set cuda_version = "2" %}
 {% set cuda_pkg_version = "12" %}
-{% set numpy_version = "1.24.3" %}
+{% set numpy_version = "1.25.2" %}
 {% set mkl_version = "2023.1.0" %}
 {% set arch_pip = "unix" %}
 
