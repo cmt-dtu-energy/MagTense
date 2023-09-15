@@ -14,7 +14,7 @@ where = ["src"]
 
 [project]
 name = "magtense"
-version = "2.2.1"
+version = "2.2.0"
 authors = [
   { name="Stefan Pollok", email="spol@dtu.dk" },
 ]
