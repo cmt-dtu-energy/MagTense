@@ -1,7 +1,7 @@
 # Python Interface
 
 The Fortran code is compiled and wrapped to a module that can be directly called from Python.
-The tool `f2py` of the NumPy package is used to wrap the interface file `MagTense/python/magtense/lib/FortranToPythonIO.f90`.
+The tool `f2py` of the NumPy package is used to wrap the interface file `MagTense/python/src/magtense/lib/FortranToPythonIO.f90`.
 
 ## Deployment with Conda (Intel architectures)
 
@@ -53,13 +53,13 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
 Create an importable Python module from Fortran source code.
 
 For MacOS ARM architectures, currently only magnetostatics with the gfortran compiler is supported.
-Navigate to folder `MagTense/python/magtense/lib/`, run `make`, and install the package:
+Navigate to folder `MagTense/python/src/magtense/lib/`, run `make`, and install the package:
 
 ```bash
-cd MagTense/python/magtense/lib/
+cd MagTense/python/src/magtense/lib/
 make
 cd MagTense/python/
-pip install -e .
+python -m pip install -e .
 ```
 
 ## Read-in customized M-H-curve
@@ -96,16 +96,16 @@ When the soft tiles differ in their M-H-curves, multiple state function can be c
 
 ## Distribution on [PyPI](https://pypi.org/project/magtense/) and [Anaconda](https://anaconda.org/cmt-dtu-energy/magtense)
 
-Libraries have to be pre-build for now, and should be located in `MagTense/python/magtense/compiled_libs`.
+Libraries have to be pre-build for now, and should be located in `MagTense/python/compiled_libs`.
 
 ```bash
-# Required conda packages for distribution
+# Required python packages for distribution
+python -m pip install build
 conda install -y twine anaconda-client conda-build
 
 cd MagTense/python/
 
 # Create wheels
-pip install build
 python scripts/dist_pypi.py
 
 # Upload to pypi.org
@@ -118,6 +118,8 @@ conda config --show channels
 conda config --env --append channels nvidia/label/cuda-${CUDA_LABEL}
 
 cd MagTense/.conda-build
+
+# Wheel links have to be added in advance to build.sh / bld.bat
 conda-build .
 
 # Upload to anadonda

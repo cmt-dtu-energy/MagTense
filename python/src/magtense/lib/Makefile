@@ -26,12 +26,12 @@ CFLAGS = -fPIC
 CU = nvcc
 PYTHON_MODN = magtensesource
 
-VPATH = ../../../source/NumericalIntegration/NumericalIntegration:\
-../../../source/TileDemagTensor/TileDemagTensor:\
-../../../source/DemagField/DemagField:\
-../../../source/MagTenseMicroMag
+VPATH = ../../../../source/NumericalIntegration/NumericalIntegration:\
+../../../../source/TileDemagTensor/TileDemagTensor:\
+../../../../source/DemagField/DemagField:\
+../../../../source/MagTenseMicroMag
 
-CU_PATH = ../../../source/MagTenseFortranCuda/cuda
+CU_PATH = ../../../../source/MagTenseFortranCuda/cuda
 CUDA_SOURCE = MagTenseCudaBlas
 CUDA_WRAP_SOURCE = MagTenseCudaBlasICLWrapper
 
