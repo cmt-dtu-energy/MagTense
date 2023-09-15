@@ -48,7 +48,7 @@ SET wheels[14].name="2.2.0-cuda12_py3.11"
 SET wheels[14].link=https://files.pythonhosted.org/packages/92/b4/7752c40a40edfc84dcd673855b91c8e64f4b3e778e9a0604d313238edf3d/magtense-2.2.0-2-py311-none-win_amd64.whl
 
 REM Installation of matching wheel
-FOR /L %%i IN ( 0 1 5 ) DO  (
+FOR /L %%i IN ( 0 1 14 ) DO  (
     IF !wheels[%%i].name! == "%MT_VERSION%-%CUDA_PIP%_py%PY_PIP%" (
         CALL python -m pip install -vv --use-deprecated=legacy-resolver %%wheels[%%i].link%%
     )
