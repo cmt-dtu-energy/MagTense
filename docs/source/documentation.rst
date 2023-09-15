@@ -6,7 +6,7 @@ Python
 ========================================
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Tiles [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/magtense/magstatics.py#L9>`_]
+Tiles [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L9>`_]
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ::
@@ -44,7 +44,7 @@ Functions
 ----------------------------------------
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-grid_config [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/magtense/magstatics.py#L528>`_]
+grid_config [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L528>`_]
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ::
@@ -63,7 +63,7 @@ grid_config [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa2
 
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-iterate_magnetization [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/magtense/magstatics.py#L666>`_]
+iterate_magnetization [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L666>`_]
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Iterate through tiles to determine their influence on each other.
 
@@ -78,7 +78,7 @@ Iterate through tiles to determine their influence on each other.
     ) -> Tiles
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-get_demag_tensor [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/magtense/magstatics.py#L724>`_]
+get_demag_tensor [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L724>`_]
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Get demagnetization tensor of tiles and the specified evaluation points.
 
@@ -90,7 +90,7 @@ Get demagnetization tensor of tiles and the specified evaluation points.
     ) -> np.ndarray
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-get_H_field [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/magtense/magstatics.py#L763>`_]
+get_H_field [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L763>`_]
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Calculate the demagnetizing field strength of a magnetic setup.
 
@@ -103,7 +103,7 @@ Calculate the demagnetizing field strength of a magnetic setup.
     ) -> np.ndarray
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-run_simulation [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/magtense/magstatics.py#L601>`_]
+run_simulation [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L601>`_]
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Run MagTense with the Fortran source code as Python module.
 
@@ -119,7 +119,7 @@ Run MagTense with the Fortran source code as Python module.
     ) -> tuple[Tiles, np.ndarray]:
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-create_plot [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/magtense/utils.py#L452>`_]
+create_plot [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/utils.py#L452>`_]
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Creates a plot with the iterated tiles and the calculated magnetic field H at the
 evaluation points as quiver plot. Additionally, an optional grid can be displayed.

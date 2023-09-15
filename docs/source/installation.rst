@@ -52,7 +52,7 @@ Fortran source code becomes accessible from Python.
 
 ::
 
-    cd /path/to/repo/python/magtense/lib/
+    cd /path/to/repo/python/src/magtense/lib/
     make SHELL=cmd
     cd /path/to/repo/python/
     pip install -e .
