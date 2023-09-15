@@ -22,4 +22,4 @@ wheels['2.1.0+cuda11.7_py3.9_win']='https://files.pythonhosted.org/packages/d6/7
 wheels['2.1.0+cuda11.7_py3.10_win']='https://files.pythonhosted.org/packages/f5/d8/c00e6973dd92ce6e903ae091cf03d040edf2e0767d93b92374d4ac89489f/magtense-2.1.0+cuda117-py310-none-win_amd64.whl'
 
 # Installation of matching wheel
-python -m pip install -vv --use-deprecated=legacy-resolver "${wheels[${MT_VERSION}+${CUDA_PIP}_py${PY_PIP}_${ARCH_PIP}]}"
+python -m pip install -vv --use-deprecated=legacy-resolver "${wheels[${MT_VERSION}-${CUDA_PIP}_py${PY_PIP}_${ARCH_PIP}]}"

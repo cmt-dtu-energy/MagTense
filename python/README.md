@@ -105,6 +105,7 @@ conda install -y twine anaconda-client conda-build
 cd MagTense/python/
 
 # Create wheels
+pip install build
 python scripts/dist_pypi.py
 
 # Upload to pypi.org
