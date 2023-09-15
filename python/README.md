@@ -101,7 +101,7 @@ Libraries have to be pre-build for now, and should be located in `MagTense/pytho
 ```bash
 # Required python packages for distribution
 python -m pip install build
-conda install -y twine anaconda-client conda-build
+conda install -y twine
 
 cd MagTense/python/
 
@@ -116,6 +116,8 @@ twine upload dist/*
 # Add nvidia channel to find CUDA libraries
 conda config --show channels
 conda config --env --append channels nvidia/label/cuda-${CUDA_LABEL}
+
+conda install -y anaconda-client conda-build
 
 cd MagTense/.conda-build
 
