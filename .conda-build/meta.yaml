@@ -2,8 +2,7 @@
 {% set py_version = "3.11" %}
 {% set cuda_version = "cuda12" %}
 {% set cuda_pkg_version = "12.*" %}
-{% set numpy_version = "1.25.2" %}
-{% set mkl_version = "2023.1.0" %}
+{% set mkl_version = "2023.*" %}
 {% set arch_pip = "unix" %}
 
 package:
@@ -25,7 +24,7 @@ requirements:
     - pip
   run:
     - python {{ py_version }}
-    - numpy =={{ numpy_version }}
+    - numpy
     - matplotlib
     - mkl =={{ mkl_version }}
     - intel-fortran-rt =={{ mkl_version }} # [unix]
