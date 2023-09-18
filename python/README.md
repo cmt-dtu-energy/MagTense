@@ -99,6 +99,13 @@ When the soft tiles differ in their M-H-curves, multiple state function can be c
 ```bash
 conda install -y anaconda-client conda-build
 
+# Add nvidia channel to find CUDA and intel libraries
+# conda config --show channels
+conda config --env --append channels nvidia/label/cuda-12.2.2
+conda config --env --append channels intel
+# On Windows
+# conda config --env --append channels conda-forge
+
 # Version numbers have to be set in advance
 cd MagTense/python/
 python scripts/dist_conda.py
