@@ -94,7 +94,17 @@ With only one state function given, the same M-H-curve applies to all tiles of t
 
 When the soft tiles differ in their M-H-curves, multiple state function can be combined. In order to match a specific M-H-curve with the corresponding tile, the variable [stfcn_index](magtense/magtense.py#L54) can be set.
 
-## Distribution on [PyPI](https://pypi.org/project/magtense/) and [Anaconda](https://anaconda.org/cmt-dtu-energy/magtense)
+## Distribution on [Anaconda](https://anaconda.org/cmt-dtu-energy/magtense)
+
+```bash
+conda install -y anaconda-client conda-build
+
+# Version numbers have to be set in advance
+cd MagTense/python/
+python scripts/dist_conda.py
+```
+
+## Distribution on [PyPI](https://pypi.org/project/magtense/)
 
 Libraries have to be pre-build for now, and should be located in `MagTense/python/compiled_libs`.
 
@@ -104,26 +114,9 @@ python -m pip install build
 conda install -y twine
 
 cd MagTense/python/
-
-# Create wheels
 python scripts/dist_pypi.py
 
 # Upload to pypi.org
 # twine upload --repository testpypi dist/*
 twine upload dist/*
-
-# Build tarball to distribute on anaconda.org
-# Add nvidia channel to find CUDA libraries
-conda config --show channels
-conda config --env --append channels nvidia/label/cuda-${CUDA_LABEL}
-
-conda install -y anaconda-client conda-build
-
-cd MagTense/.conda-build
-
-# Wheel links have to be added in advance to build.sh / bld.bat
-conda-build .
-
-# Upload to anadonda
-anaconda upload --user cmt-dtu-energy ${CONDA_PREFIX}/conda-bld/${ARCH}/magtense-${MT_VERSION}-py${PY}_cuda${CUDA_VERSION}.tar.bz2
 ```
