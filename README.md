@@ -32,13 +32,13 @@ Instructions on how to build and use the Python interface are listed in [python]
 - Installation with CUDA 11.x:
   
   ```
-  conda install magtense -c cmt-dtu-energy/label/cuda-11 -c conda-forge
+  conda install magtense -c cmt-dtu-energy/label/cuda-11 -c nvidia/label/cuda-11.8.0
   ```
 
 - Installation with CUDA 12.x:
   
   ```
-  conda install magtense -c cmt-dtu-energy/label/cuda-12 -c conda-forge
+  conda install magtense -c cmt-dtu-energy/label/cuda-12 -c nvidia/label/cuda-12.2.2
   ```
 
 - Installation without CUDA support:
