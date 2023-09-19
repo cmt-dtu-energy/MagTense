@@ -2,6 +2,7 @@
 # Compiler names and flags
 #==========================
 USE_CUDA = 1
+USE_NVCC = 1
 USE_CVODE = 0
 USE_MICROMAG = 1
 
@@ -22,6 +23,7 @@ ifeq (${F90}, gfortran)
 endif
 
 CC = gcc
+CPP = icx
 CFLAGS = -fPIC
 CU = nvcc
 PYTHON_MODN = magtensesource
@@ -62,7 +64,6 @@ ifeq ($(OS),Windows_NT)
 		LIB_OPT = -L. -llibsrc
 	endif
 
-	CPP = icl
 	CPPFLAGS = /Fo:${CUDA_WRAP}
 	CUFLAGS = -I ${OPT}
 	CUDA = -L${CONDA_PREFIX}/Lib/x64 -lcublas -lcudart -lcuda -lcusparse
@@ -93,7 +94,6 @@ else
 	endif
 
 	EXTRA_OPT = --opt='${F90FLAGS}'
-	CPP = icx
 	CPPFLAGS = ${CFLAGS} -o ${CUDA_WRAP}
 	CUFLAGS = -shared -Xcompiler -fPIC -I ${OPT}
 	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
@@ -153,7 +153,11 @@ LIBSRC_WRAP_FILES = $(addsuffix .f90, ${LIBSRC_WRAP_SOURCES})
 #=======================================================================
 #                 Relevant suffixes
 #=======================================================================
+ifeq ($(USE_NVCC),0)
+.SUFFIXES: .f90 .cxx
+else
 .SUFFIXES: .f90 .cu .cxx
+endif
 
 #=======================================================================
 #
