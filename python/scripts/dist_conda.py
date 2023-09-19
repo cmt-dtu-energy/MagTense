@@ -10,24 +10,26 @@ def main(mt_version = '2.2.1', py_versions = ['3.11']):
     else:
         arch = "linux-64"
 
-    s_0 = "#=========================="
-    s_1 = "# Compiler names and flags"
-
     for py in py_versions:
         for cuda in ["cuda12"]:
-            if cuda == "cpu":
-                s_2 = "USE_CUDA = 0"
-            else:
-                s_2 = "USE_CUDA = 1"
-        
             with open("src/magtense/lib/Makefile", 'r') as source_file:
-                lines_to_append = source_file.readlines()[4:]
+                lines_to_append = source_file.readlines()[5:]
 
             with open("scripts/temp.txt", "w") as file:
-                file.write(s_0 + '\n')
-                file.write(s_1 + '\n')
-                file.write(s_0 + '\n')
-                file.write(s_2 + '\n')
+                file.write("#==========================\n")
+                file.write("# Compiler names and flags\n")
+                file.write("#==========================\n")
+
+                if cuda == "cpu":
+                    file.write("USE_CUDA = 0\n")
+                else:
+                    file.write("USE_CUDA = 1\n")
+
+                if platform.system() == 'Windows':
+                    file.write("USE_NVCC = 0\n")
+                else:
+                    file.write("USE_NVCC = 1\n")
+
                 file.writelines(lines_to_append)
 
             shutil.move("scripts/temp.txt", "src/magtense/lib/Makefile")

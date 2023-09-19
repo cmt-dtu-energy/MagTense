@@ -111,6 +111,11 @@ conda config --env --append channels intel
 # On Windows
 # conda config --env --append channels conda-forge
 
+# Quick fix for error of nvcc during build on Windows
+# conda install -y -c nvidia/label/cuda-12.2.2 cuda-nvcc
+# cd MagTense/source/MagTenseFortranCuda/cuda/
+# nvcc -c MagTenseCudaBlas.cu -o MagTenseCudaBlas.o
+
 # Version numbers have to be set in advance in pyproject.toml
 cd MagTense/python/
 python scripts/dist_conda.py
