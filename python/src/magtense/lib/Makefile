@@ -29,14 +29,17 @@ PYTHON_MODN = magtensesource
 VPATH = ../../../../source/NumericalIntegration/NumericalIntegration:\
 ../../../../source/TileDemagTensor/TileDemagTensor:\
 ../../../../source/DemagField/DemagField:\
-../../../../source/MagTenseMicroMag
+../../../../source/MagTenseMicroMag:\
+../../../../source/MagTenseFortranCuda/cuda
 
-CU_PATH = ../../../../source/MagTenseFortranCuda/cuda
 CUDA_SOURCE = MagTenseCudaBlas
 CUDA_WRAP_SOURCE = MagTenseCudaBlasICLWrapper
 
+# file names
 CUDA_FILE = $(addsuffix .cu, ${CUDA_SOURCE})
 CUDA_WRAP_FILE = $(addsuffix .cxx, ${CUDA_WRAP_SOURCE})
+
+# object files
 CUDA_OBJECT = $(addsuffix .o, ${CUDA_SOURCE})
 CUDA_WRAP = $(addsuffix .o, ${CUDA_WRAP_SOURCE})
 
@@ -150,7 +153,7 @@ LIBSRC_WRAP_FILES = $(addsuffix .f90, ${LIBSRC_WRAP_SOURCES})
 #=======================================================================
 #                 Relevant suffixes
 #=======================================================================
-.SUFFIXES: .f90
+.SUFFIXES: .f90 .cu .cxx
 
 #=======================================================================
 #
@@ -170,11 +173,11 @@ clean:
 .c.o:
 	${CC} ${CFLAGS} -c $< -o $@
 
-${CUDA_OBJECT}:
-	${CU} ${CUFLAGS} -c ${CU_PATH}/${CUDA_FILE} -o $@
+.cu.o:
+	${CU} ${CUFLAGS} -c $< -o $@
 
-${CUDA_WRAP}:
-	${CPP} ${CPPFLAGS} -c ${CU_PATH}/${CUDA_WRAP_FILE}
+.cxx.o:
+	${CPP} ${CPPFLAGS} -c $< -o $@
 
 ${STATIC_LIB}: ${LIBSRC_OBJECTS} ${CUDA_OBJECT} ${CUDA_WRAP}
 	${LIBTOOL}

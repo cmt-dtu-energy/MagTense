@@ -3,6 +3,7 @@
 {% set cuda_version = "cuda12" %}
 {% set cuda_pkg_version = "12.*" %}
 {% set mkl_version = "2023.*" %}
+{% set numpy_version_build = "1.25.2" %}
 
 package:
   name: magtense
@@ -15,11 +16,12 @@ build:
 requirements:
   build:
     - python {{ py_version }}
-    - numpy
+    - numpy =={{ numpy_version_build }}
     - mkl =={{ mkl_version }}
     - mkl-static
     - intel-fortran-rt # [unix]
 {% if cuda_version != 'cpu' %}
+    - cuda-nvcc =={{ cuda_pkg_version }}
     - libcusparse-dev =={{ cuda_pkg_version }}
     - libcublas-dev =={{ cuda_pkg_version }}
     - cuda-cudart-dev =={{ cuda_pkg_version }}
