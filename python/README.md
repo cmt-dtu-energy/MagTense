@@ -96,6 +96,11 @@ When the soft tiles differ in their M-H-curves, multiple state function can be c
 
 ## Distribution on [Anaconda](https://anaconda.org/cmt-dtu-energy/magtense)
 
+### Required compilers have to be pre-installed
+
+- [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#inpage-nav-6-undefined)
+- [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
+
 ```bash
 conda install -y anaconda-client conda-build
 
@@ -106,7 +111,7 @@ conda config --env --append channels intel
 # On Windows
 # conda config --env --append channels conda-forge
 
-# Version numbers have to be set in advance
+# Version numbers have to be set in advance in pyproject.toml
 cd MagTense/python/
 python scripts/dist_conda.py
 ```
