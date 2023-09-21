@@ -699,7 +699,7 @@ include 'mkl_blas.f90'
             beta = 0.0
             !Hmx = Kxx * Mx
             call gemv( problem%Kxx, solution%Mx_s, solution%HmX, alpha, beta )
-            
+                                   
             beta = 1.0
             !Hmx = Hmx + Kxy * My
             call gemv( problem%Kxy, solution%My_s, solution%HmX, alpha, beta )
@@ -914,8 +914,9 @@ include 'mkl_blas.f90'
 
         CALL SYSTEM_CLOCK(c1)
  
-        call mkl_set_num_threads(problem%nThreadsMatlab)
-        call omp_set_num_threads(problem%nThreadsMatlab)
+        !call mkl_set_num_threads(problem%nThreadsMatlab)
+        !call omp_set_num_threads(problem%nThreadsMatlab)
+        call omp_set_num_threads(1)
                
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
             
@@ -984,10 +985,10 @@ include 'mkl_blas.f90'
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
     
-            !$OMP PARALLEL shared(problem)
-            !$omp do private(ind, tile, H, Nout)
-            
+            !$OMP PARALLEL shared(problem) private(ind, indx_ele, tile, H, Nout, pts_arr, i)
+                        
             !for each element find the tensor for all evaluation points (i.e. all elements)
+            !$omp do
             do i=1,nx
                 !Setup template tile
                 tile(1)%tileType = 5 !(for tetrahedron)
@@ -1001,7 +1002,13 @@ include 'mkl_blas.f90'
                 allocate(Nout(1,ntot,3,3))
                 allocate(H(ntot,3))
                 
-                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                allocate(pts_arr(ntot,3))
+                pts_arr(:,1) =  problem%grid%pts(:,1)
+                pts_arr(:,2) =  problem%grid%pts(:,2)
+                pts_arr(:,3) =  problem%grid%pts(:,3)
+                
+                !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
                     
                 !Copy Nout into the proper structure used by the micro mag model
                 ind = i
@@ -1022,13 +1029,15 @@ include 'mkl_blas.f90'
                 problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
                 
                 !Clean up
+                deallocate(pts_arr)
                 deallocate(Nout)
                 deallocate(H)
             enddo
-            
             !$omp end do
+            
             !$OMP END PARALLEL
-        
+            
+            
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
             
             !$OMP PARALLEL shared(problem)
@@ -1129,8 +1138,7 @@ include 'mkl_blas.f90'
         
         !call displayGUIMessage( 'Kxx(1,1):' )
         !write (prog_str,'(f10.3)') problem%Kxx(1,1)
-        !call displayGUIMessage( prog_str )
-        
+        !call displayGUIMessage( prog_str )      
         
         !Write the demag tensors to disk if asked to do so            
         if ( problem%demagTensorReturnState .gt. DemagTensorReturnMemory ) then
