@@ -1,0 +1,69 @@
+{% set version = "2.2.1" %}
+{% set py_version = "3.11" %}
+{% set cuda_version = "cuda12" %}
+{% set cuda_pkg_version = "12.*" %}
+{% set mkl_version = "2023.*" %}
+{% set numpy_version_build = "1.25.2" %}
+
+package:
+  name: magtense
+  version: {{ version }}
+
+build:
+  number: 0
+  string: py{{ py_version }}_{{ cuda_version }}
+
+requirements:
+  build:
+    - python {{ py_version }}
+    - numpy =={{ numpy_version_build }}
+    - mkl =={{ mkl_version }}
+    - mkl-static
+    - intel-fortran-rt # [unix]
+{% if cuda_version != 'cpu' %}
+    - cuda-nvcc =={{ cuda_pkg_version }}
+    - libcusparse-dev =={{ cuda_pkg_version }}
+    - libcublas-dev =={{ cuda_pkg_version }}
+    - cuda-cudart-dev =={{ cuda_pkg_version }}
+    - libnvjitlink-dev =={{ cuda_pkg_version }}
+{% endif %}
+    - make # [win]
+  host:
+    - python {{ py_version }}
+    - pip
+  run:
+    - python {{ py_version }}
+    - numpy
+    - matplotlib
+    - mkl =={{ mkl_version }}
+    - intel-fortran-rt # [unix]
+  {% if cuda_version != 'cpu' %}
+    - libcusparse =={{ cuda_pkg_version }} # [unix]
+    - libcusparse-dev =={{ cuda_pkg_version }} # [win]
+    - libcublas =={{ cuda_pkg_version }} # [unix]
+    - libcublas-dev =={{ cuda_pkg_version }} # [win]
+    - cuda-cudart =={{ cuda_pkg_version }} # [unix]
+    - cuda-cudart-dev =={{ cuda_pkg_version }} # [win]
+    - libnvjitlink =={{ cuda_pkg_version }} # [unix]
+    - libnvjitlink-dev =={{ cuda_pkg_version }} # [win]
+  {% endif %}
+
+test:
+  imports:
+    - magtense
+  commands:
+    - pip check
+  requires:
+    - pip
+
+about:
+  home: https://www.magtense.org/
+  summary: MagTense - a micromagnetism and magnetostatic framework
+  dev_url: https://github.com/cmt-dtu-energy/MagTense
+  doc_url: https://cmt-dtu-energy.github.io/MagTense/
+  license: GPL-3.0-or-later
+  license_file: ../LICENSE
+
+extra:
+  recipe-maintainers:
+    - spol@dtu.dk

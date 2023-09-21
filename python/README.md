@@ -1,7 +1,7 @@
 # Python Interface
 
 The Fortran code is compiled and wrapped to a module that can be directly called from Python.
-The tool `f2py` of the NumPy package is used to wrap the interface file `MagTense/python/magtense/lib/FortranToPythonIO.f90`.
+The tool `f2py` of the NumPy package is used to wrap the interface file `MagTense/python/src/magtense/lib/FortranToPythonIO.f90`.
 
 ## Deployment with Conda (Intel architectures)
 
@@ -25,9 +25,9 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
   HINT: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.
 
   ```bash
-  conda install -y numpy matplotlib mkl
-  conda install -y -c "nvidia/label/cuda-${CUDA_LABEL}" cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev
-  conda install -y -c intel mkl-include mkl-static
+  conda install -y numpy matplotlib
+  conda install -y -c "nvidia/label/cuda-${CUDA_LABEL}" cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
+  conda install -y -c intel mkl-static
   ```
 
   - [ Linux ]
@@ -53,13 +53,13 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
 Create an importable Python module from Fortran source code.
 
 For MacOS ARM architectures, currently only magnetostatics with the gfortran compiler is supported.
-Navigate to folder `MagTense/python/magtense/lib/`, run `make`, and install the package:
+Navigate to folder `MagTense/python/src/magtense/lib/`, run `make`, and install the package:
 
 ```bash
-cd MagTense/python/magtense/lib/
+cd MagTense/python/src/magtense/lib/
 make
 cd MagTense/python/
-pip install -e .
+python -m pip install -e .
 ```
 
 ## Read-in customized M-H-curve
@@ -94,31 +94,46 @@ With only one state function given, the same M-H-curve applies to all tiles of t
 
 When the soft tiles differ in their M-H-curves, multiple state function can be combined. In order to match a specific M-H-curve with the corresponding tile, the variable [stfcn_index](magtense/magtense.py#L54) can be set.
 
-## Distribution on [PyPI](https://pypi.org/project/magtense/) and [Anaconda](https://anaconda.org/cmt-dtu-energy/magtense)
+## Distribution on [Anaconda](https://anaconda.org/cmt-dtu-energy/magtense)
 
-Libraries have to be pre-build for now, and should be located in `MagTense/python/magtense/compiled_libs`.
+### Required compilers have to be pre-installed
+
+- [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#inpage-nav-6-undefined)
+- [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
 ```bash
-# Required conda packages for distribution
-conda install -y twine anaconda-client conda-build
+conda install -y anaconda-client conda-build
+
+# Add nvidia channel to find CUDA and intel libraries
+# conda config --show channels
+conda config --env --append channels nvidia/label/cuda-12.2.2
+conda config --env --append channels intel
+# On Windows
+# conda config --env --append channels conda-forge
+
+# Quick fix for error of nvcc during build on Windows
+# conda install -y -c nvidia/label/cuda-12.2.2 cuda-nvcc
+# cd MagTense/source/MagTenseFortranCuda/cuda/
+# nvcc -c MagTenseCudaBlas.cu -o MagTenseCudaBlas.o
+
+# Version numbers have to be set in advance in pyproject.toml
+cd MagTense/python/
+python scripts/dist_conda.py
+```
+
+## Distribution on [PyPI](https://pypi.org/project/magtense/)
+
+Libraries have to be pre-build for now, and should be located in `MagTense/python/compiled_libs`.
+
+```bash
+# Required python packages for distribution
+python -m pip install build
+conda install -y twine
 
 cd MagTense/python/
-
-# Create wheels
 python scripts/dist_pypi.py
 
 # Upload to pypi.org
 # twine upload --repository testpypi dist/*
 twine upload dist/*
-
-# Build tarball to distribute on anaconda.org
-# Add nvidia channel to find CUDA libraries
-conda config --show channels
-conda config --env --append channels nvidia/label/cuda-${CUDA_LABEL}
-
-cd MagTense/.conda-build
-conda-build .
-
-# Upload to anadonda
-anaconda upload --user cmt-dtu-energy ${CONDA_PREFIX}/conda-bld/${ARCH}/magtense-${MT_VERSION}-py${PY}_cuda${CUDA_VERSION}.tar.bz2
 ```

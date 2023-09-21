@@ -30,14 +30,19 @@ def db_std_prob_4(
     cuda: bool = False,
 ) -> None:
     fname = name if name is not None else f'{n_seq}_{t_steps}_{res[0]}_{res[1]}'
-    if intv is None: intv = [0, n_seq]
-    if not empty: fname += f'_{intv[0]}_{intv[1]}'
+    if intv is None:
+        intv = [0, n_seq]
+    if not empty:
+        fname += f'_{intv[0]}_{intv[1]}'
     n_intv = intv[1] - intv[0]
 
     db = h5py.File(f'{datapath}/{fname}.h5', 'w')
-    db.create_dataset('sequence', shape=(n_intv, t_steps, 3, res[0], res[1]), dtype='float32')
+    db.create_dataset(
+        'sequence', shape=(n_intv, t_steps, 3, res[0], res[1]), dtype='float32'
+    )
     db.create_dataset('field', shape=(n_intv, 3), dtype='float32')
-    if not empty: db.attrs['intv'] = intv
+    if not empty:
+        db.attrs['intv'] = intv
 
     if empty:
         s_state = gen_s_state(res, grid_size)
@@ -73,7 +78,9 @@ def db_std_prob_4(
         )
 
         # Output shape: (t, comp, res_x, res_y)
-        db['sequence'][i] = np.moveaxis(seq.reshape(t_steps, res[1], res[0], 3).swapaxes(1,2), -1, 1)
+        db['sequence'][i] = np.moveaxis(
+            seq.reshape(t_steps, res[1], res[0], 3).swapaxes(1,2), -1, 1
+        )
 
     db.close()
 
@@ -99,7 +106,7 @@ def db_halbach(
 ):
     ''' 
     Dataset creation.
-    Name: '{available spots for shim magnets}_{# halbach configurations}_{# shim matrices}.h5'
+    Name: '{available spots for shim magnets}_{# halbach configs}_{# shim matrices}.h5'
     
     Args:
         datapath: Path to database.
@@ -131,21 +138,48 @@ def db_halbach(
     symm_mat = rng_shim.choice([0, 1], size=(n_halbach, n_mat, spots))
 
     fname = name if name is not None else f'{spots}_{n_halbach}_{n_mat}_{field_res[0]}'
-    if intv is None: intv = [0, n_halbach]
+    if intv is None:
+        intv = [0, n_halbach]
     n_config = intv[1] - intv[0]
-    if not empty: fname += f'_{intv[0]}_{intv[1]}'
+    if not empty:
+        fname += f'_{intv[0]}_{intv[1]}'
 
     db = h5py.File(f'{datapath}/{fname}.h5', libver='latest', mode='w')
-    db.create_dataset("halbach_M_rem", shape=(n_config, halbach.n_hard_tiles), dtype="float32")
-    db.create_dataset("halbach_ea", shape=(n_config, halbach.n_hard_tiles, 3), dtype="float32")
-    db.create_dataset("field", shape=(n_config, n_mat, 3, field_res[0], field_res[1], field_res[2]), dtype="float32")
-    db.create_dataset("shim_field", shape=(n_config, n_mat, halbach.pts_shim.coords.shape[0], 3), dtype="float32")
+    db.create_dataset(
+        "halbach_M_rem",
+        shape=(n_config, halbach.n_hard_tiles),
+        dtype="float32"
+    )
+    db.create_dataset(
+        "halbach_ea",
+        shape=(n_config, halbach.n_hard_tiles, 3),
+        dtype="float32"
+    )
+    db.create_dataset(
+        "field",
+        shape=(n_config, n_mat, 3, field_res[0], field_res[1], field_res[2]),
+        dtype="float32"
+    )
+    db.create_dataset(
+        "shim_field",
+        shape=(n_config, n_mat, halbach.pts_shim.coords.shape[0], 3),
+        dtype="float32"
+    )
     db.create_dataset("p2p", shape=(n_config, n_mat, 1), dtype="float64")
-    if not empty: db.attrs['intv'] = intv
+    if not empty:
+        db.attrs['intv'] = intv
 
     if no_shim:
-        db.create_dataset("field_no_shim", shape=(n_config, 3, field_res[0], field_res[1], field_res[2]), dtype="float32")
-        db.create_dataset("shim_field_no_shim", shape=(n_config, halbach.pts_shim.coords.shape[0], 3), dtype="float32")
+        db.create_dataset(
+            "field_no_shim",
+            shape=(n_config, 3, field_res[0], field_res[1], field_res[2]),
+            dtype="float32"
+        )
+        db.create_dataset(
+            "shim_field_no_shim",
+            shape=(n_config, halbach.pts_shim.coords.shape[0], 3),
+            dtype="float32"
+        )
         db.create_dataset("p2p_no_shim", shape=(n_config, 1), dtype="float64")
 
     if action:
@@ -157,7 +191,9 @@ def db_halbach(
         for i in range(n_halbach):
             for j in range(n_mat):
                 if (i in empty_spots[0]) and (j in empty_spots[1]):
-                    np_action[i,j] = rng_action.integers(np.where(symm_mat[i,j] == 0)[0].shape[0])
+                    np_action[i,j] = rng_action.integers(
+                        np.where(symm_mat[i,j] == 0)[0].shape[0]
+                    )
                 else:
                     np_action[i,j] = -1000
 
@@ -236,7 +272,7 @@ def db_halbach(
 
 def db_halbach_field_stats(db_path):
     with h5py.File(db_path, mode='r') as db:
-        arr = np.mean(db[f'field'], axis=(2,3,4))
+        arr = np.mean(db['field'], axis=(2,3,4))
 
     print(f'Mean: {np.mean(arr, axis=0)}')
     print(f'Std: {np.std(arr, axis=0)}')
@@ -269,14 +305,17 @@ def db_magfield(
         empty: If set, an empty database is created.
     """
     fname = f'{name}_{res[0]}'
-    if intv is None: intv = [0, n_samples]
-    if not empty: fname += f'_{intv[0]}_{intv[1]}'
+    if intv is None:
+        intv = [0, n_samples]
+    if not empty:
+        fname += f'_{intv[0]}_{intv[1]}'
     n_intv = intv[1] - intv[0]
     
     db = h5py.File(f'{datapath}/{fname}.h5', libver='latest', mode='w')
     out_shape = (n_intv, 3, *res)
     db.create_dataset('field', shape=out_shape, dtype="float32")
-    if not empty: db.attrs['intv'] = intv
+    if not empty:
+        db.attrs['intv'] = intv
 
     if empty:
         db.attrs['spots'] = spots
@@ -301,8 +340,9 @@ def db_magfield(
                       for i in range(spots[0])
                       for j in range(spots[1])
                       for k in range(spots[2]) 
-                      if filled_mat[intv[0] + idx][i][j][k] == 1 and (i < emp_x or i > emp_y
-                        or j < emp_x or j > emp_y or k < 2 or k > 2)]
+                      if filled_mat[intv[0] + idx][i][j][k] == 1 
+                        and (i < emp_x or i > emp_y or j < emp_x
+                        or j > emp_y or k < 2 or k > 2)]
         
         tiles, _ = grid_config(spots, area, filled_pos)
 
@@ -327,7 +367,10 @@ def db_magfield(
 
         # Tensor image with shape CxHxWxD [T]
         field = h_out.reshape((*res,3))
-        field = field.transpose((3,0,1,2)) if len(res) == 3 else field.transpose((2,0,1))
+        if len(res) == 3:
+            field = field.transpose((3,0,1,2))
+        else:
+            field = field.transpose((2,0,1))
 
         db['field'][idx] = field * 4 * np.pi * 1e-7
 
@@ -352,9 +395,12 @@ def db_single_magnets(
     empty: bool = False
 ) -> None:
     fname = f'{name}_{num_mag}_{res}'
-    if M_fixed: datapath += '_M_fixed'
-    if intv is None: intv = [0, n_samples]
-    if not empty: fname += f'_{intv[0]}_{intv[1]}'
+    if M_fixed:
+        datapath += '_M_fixed'
+    if intv is None:
+        intv = [0, n_samples]
+    if not empty:
+        fname += f'_{intv[0]}_{intv[1]}'
     n_intv = intv[1] - intv[0]
 
     if empty:
@@ -362,13 +408,15 @@ def db_single_magnets(
             input(f'Overwriting file "{fname}.h5". Press Enter to continue')
 
     n_params = 6 if dim == 3 else 5
-    if M_fixed: n_params -= 1
+    if M_fixed:
+        n_params -= 1
 
     db = h5py.File(f"{datapath}/{fname}.h5", libver="latest", mode='w')
     db.create_dataset("field", shape=(n_intv, dim, res, res), dtype="float32")
     db.create_dataset("sample", shape=(n_intv, num_mag, n_params), dtype="float32")
     db.create_dataset("info", shape=(n_intv,), dtype="float32")
-    if not empty: db.attrs['intv'] = intv
+    if not empty:
+        db.attrs['intv'] = intv
 
     if empty:
         db.attrs['spots'] = M_fixed
@@ -401,7 +449,8 @@ def db_single_magnets(
             pos[i] = [param_mat[intv[0]+idx,i,0] * (area_x - 2 * min_pos) + min_pos,
                       param_mat[intv[0]+idx,i,1] * (area_x - 2 * min_pos) + min_pos,
                       height/2]
-            size_x = param_mat[intv[0]+idx,i,2] * (max_magnet_size - min_magnet_size) + min_magnet_size
+            size_x = param_mat[intv[0]+idx,i,2] * (max_magnet_size - min_magnet_size) \
+                + min_magnet_size
             size[i] = [size_x, size_x, height]
             M_rem[i] = 1.28 if M_fixed else param_mat[intv[0]+idx,i,3] + 0.5
             polar_angle = param_mat[intv[0]+idx,i,-1] * np.pi if dim == 3 else np.pi/2
@@ -440,7 +489,8 @@ def db_single_magnets(
             sample[i,2] = size[i][0]
             sample[i,3] = M_rem[i]
             sample[i,4] = mag_angle[i][0]
-            if dim == 3: sample[i,5] = mag_angle[i][1]
+            if dim == 3:
+                sample[i,5] = mag_angle[i][1]
 
         db['field'][idx] = h_out[:dim] * 4 * np.pi * 1e-7
         db['sample'][idx] = sample
@@ -458,7 +508,8 @@ def create_db_mp(
 
     if datapath is None: 
         datapath = Path(__file__).parent.absolute() / '..' / 'data'
-    if not datapath.exists(): datapath.mkdir(parents=True)
+    if not datapath.exists():
+        datapath.mkdir(parents=True)
     kwargs['datapath'] = datapath
 
     if data == 'halbach':
@@ -474,9 +525,11 @@ def create_db_mp(
     
     db_name, n_tasks = target(**kwargs, empty=True)
     
-    if n_workers is None: n_workers = cpu_count()
+    if n_workers is None:
+        n_workers = cpu_count()
     intv = n_tasks // n_workers
-    if n_tasks % n_workers > 0: intv += 1
+    if n_tasks % n_workers > 0:
+        intv += 1
         
     l_p = []
     for i in range(n_workers):
@@ -486,7 +539,8 @@ def create_db_mp(
         p.daemon = True
         p.start()
         l_p.append(p)
-        if end_intv == n_tasks: break
+        if end_intv == n_tasks:
+            break
 
     try:
         for p in l_p:
@@ -546,10 +600,10 @@ if __name__ == '__main__':
     # create_db_mp('std_prob_4', n_workers=1, **db_kwargs)
 
     db_kwargs = {
-        'n_samples': 24,
+        'n_samples': 1,
         'res': [256, 256, 3],
     }
-    create_db_mp('magfield', n_workers=3, **db_kwargs)
+    create_db_mp('magfield', n_workers=1, **db_kwargs)
 
     # db_kwargs = {
     #     'n_samples': 10,

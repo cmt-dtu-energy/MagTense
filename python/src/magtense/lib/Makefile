@@ -1,7 +1,8 @@
-#=======================================================================
-#                       compiler names and flags
-#=======================================================================
+#==========================
+# Compiler names and flags
+#==========================
 USE_CUDA = 1
+USE_NVCC = 1
 USE_CVODE = 0
 USE_MICROMAG = 1
 
@@ -22,32 +23,37 @@ ifeq (${F90}, gfortran)
 endif
 
 CC = gcc
+CPP = icx
 CFLAGS = -fPIC
 CU = nvcc
 PYTHON_MODN = magtensesource
 
-VPATH = ../../../source/NumericalIntegration/NumericalIntegration:\
-../../../source/TileDemagTensor/TileDemagTensor:\
-../../../source/DemagField/DemagField:\
-../../../source/MagTenseMicroMag
+VPATH = ../../../../source/NumericalIntegration/NumericalIntegration:\
+../../../../source/TileDemagTensor/TileDemagTensor:\
+../../../../source/DemagField/DemagField:\
+../../../../source/MagTenseMicroMag:\
+../../../../source/MagTenseFortranCuda/cuda
 
-CU_PATH = ../../../source/MagTenseFortranCuda/cuda
 CUDA_SOURCE = MagTenseCudaBlas
 CUDA_WRAP_SOURCE = MagTenseCudaBlasICLWrapper
 
+# file names
 CUDA_FILE = $(addsuffix .cu, ${CUDA_SOURCE})
 CUDA_WRAP_FILE = $(addsuffix .cxx, ${CUDA_WRAP_SOURCE})
+
+# object files
 CUDA_OBJECT = $(addsuffix .o, ${CUDA_SOURCE})
 CUDA_WRAP = $(addsuffix .o, ${CUDA_WRAP_SOURCE})
 
 ifeq ($(OS),Windows_NT)
+	MKL_ROOT = "C:\Program Files (x86)\Intel\oneAPI\mkl\latest"
 	ifeq (${F90}, ifort)
 		F90FLAGS = /nologo /O3 /assume:nocc_omp /Qopenmp /real-size:64 \
 		/fp:precise /libs:static /threads /fpp /DUSE_CUDA=${USE_CUDA} \
 		/DUSE_CVODE=${USE_CVODE} /DUSE_MICROMAG=${USE_MICROMAG} /DUSE_MATLAB=0
 		FCOMP = intelvem
 		EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower --opt='${F90FLAGS} /assume:nounderscore /names:uppercase'
-		OPT = ${CONDA_PREFIX}/Library/include -I${CONDA_PREFIX}/Library/include/intel64/ilp64
+		OPT = ${CONDA_PREFIX}/Library/include -I${MKL_ROOT}/include -I${CONDA_PREFIX}/Library/include/intel64/ilp64
 		F90_OPT = -I ${OPT}
 		LIB_OPT = -I:${OPT} -L. -llibsrc
 	else ifeq (${F90}, gfortran)
@@ -58,12 +64,11 @@ ifeq ($(OS),Windows_NT)
 		LIB_OPT = -L. -llibsrc
 	endif
 
-	CPP = icl
 	CPPFLAGS = /Fo:${CUDA_WRAP}
-	CUFLAGS =
+	CUFLAGS = -I ${OPT}
 	CUDA = -L${CONDA_PREFIX}/Lib/x64 -lcublas -lcudart -lcuda -lcusparse
-	MKL = -L${CONDA_PREFIX}/Library/lib -lmkl_blas95_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core
-	MKL_OMP = -L"C:\Program Files (x86)\Intel\oneAPI\compiler\latest\windows\compiler\lib\intel64_win" -llibiomp5md
+	MKL = -L${MKL_ROOT}/lib/intel64 -lmkl_rt -lmkl_blas95_ilp64
+	MKL_OMP = -L${MKL_ROOT}/windows/compiler/lib/intel64_win -llibiomp5md
 		
 	LIBTOOL = LIB $? /OUT:$@
 	STATIC_LIB = libsrc.lib
@@ -73,8 +78,6 @@ ifeq ($(OS),Windows_NT)
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
 
 else
-	export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib
-	
 	ifeq (${F90}, ifort)
 		F90FLAGS = -fPIC -nologo -O3 -assume nocc_omp -qopenmp -real-size 64 \
 		-fp-model precise -threads -fpp -DUSE_CUDA=${USE_CUDA} -DUSE_CVODE=${USE_CVODE} \
@@ -91,11 +94,10 @@ else
 	endif
 
 	EXTRA_OPT = --opt='${F90FLAGS}'
-	CPP = icx
 	CPPFLAGS = ${CFLAGS} -o ${CUDA_WRAP}
-	CUFLAGS = -shared -Xcompiler -fPIC
+	CUFLAGS = -shared -Xcompiler -fPIC -I ${OPT}
 	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
-	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -lpthread -lm -ldl -liomp5 -lmkl_blas95_lp64
+	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -lpthread -lm -ldl -liomp5 -lmkl_blas95_ilp64
 
 	ifeq (${UNAME}, Darwin)
   		LIBTOOL = libtool -static -o $@ $?
@@ -151,7 +153,11 @@ LIBSRC_WRAP_FILES = $(addsuffix .f90, ${LIBSRC_WRAP_SOURCES})
 #=======================================================================
 #                 Relevant suffixes
 #=======================================================================
-.SUFFIXES: .f90
+ifeq ($(USE_NVCC),0)
+.SUFFIXES: .f90 .cxx
+else
+.SUFFIXES: .f90 .cu .cxx
+endif
 
 #=======================================================================
 #
@@ -171,11 +177,11 @@ clean:
 .c.o:
 	${CC} ${CFLAGS} -c $< -o $@
 
-${CUDA_OBJECT}:
-	${CU} ${CUFLAGS} -c ${CU_PATH}/${CUDA_FILE} -o $@
+.cu.o:
+	${CU} ${CUFLAGS} -c $< -o $@
 
-${CUDA_WRAP}:
-	${CPP} ${CPPFLAGS} -c ${CU_PATH}/${CUDA_WRAP_FILE}
+.cxx.o:
+	${CPP} ${CPPFLAGS} -c $< -o $@
 
 ${STATIC_LIB}: ${LIBSRC_OBJECTS} ${CUDA_OBJECT} ${CUDA_WRAP}
 	${LIBTOOL}

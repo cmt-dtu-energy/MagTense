@@ -321,8 +321,11 @@ class Tiles:
             for i, ea in enumerate(val):
                 self._u_ea[i] = np.around(ea / np.linalg.norm(ea), decimals=9)
                 self.M = (self.M_rem[i] * self.u_ea[i], i)
-                oa_1 = np.array([val[i][1], -val[i][0], 0])
-                self._u_oa1[i] = np.around(oa_1 / np.linalg.norm(oa_1), decimals=9)
+                if ea[1] != 0 or ea[2] != 0:
+                    w = np.array([1, 0, 0])
+                else:
+                    w = np.array([0, 1, 0])
+                self._u_oa1[i] = np.around(np.cross(self.u_ea[i], w), decimals=9)
                 self._u_oa2[i] = np.around(
                     np.cross(self.u_ea[i], self.u_oa1[i]), decimals=9
                 )
@@ -581,17 +584,17 @@ class Tiles:
         x_off, y_off, z_off = self.size[i] / mat
         c_0 = -self.size[i] / 2 + (self.size[i] / mat) / 2
         c_pts = [
-            c_0 + [x_off * j, y_off * k, z_off * l]
+            c_0 + [x_off * j, y_off * k, z_off * m]
             for j in range(mat[0])
             for k in range(mat[1])
-            for l in range(mat[2])
+            for m in range(mat[2])
         ]
         ver_cube = (np.dot(R_mat, np.array(c_pts).T)).T + self.offset[i]
 
         for j in range(mat[0]):
             for k in range(mat[1]):
-                for l in range(mat[2]):
-                    cube_idx = j * mat[1] * mat[2] + k * mat[2] + l
+                for m in range(mat[2]):
+                    cube_idx = j * mat[1] * mat[2] + k * mat[2] + m
                     idx = cube_idx + old_n
                     if idx == self.n:
                         self._offset[i] = ver_cube[cube_idx]
@@ -679,7 +682,6 @@ def grid_config(
 ) -> tuple[Tiles, np.ndarray]:
     spots = np.asarray(spots)
     area = np.asarray(area)
-    tile_size = area / spots
     rng = np.random.default_rng(seed)
 
     if mode == "uniform":
@@ -706,39 +708,33 @@ def grid_config(
         raise NotImplementedError()
 
     if filled_pos is None:
-        filled_pos = []
         if n_tiles is None:
-            n_tiles = rng.integers(np.prod(spots))
+            n_tiles = 1 + rng.integers(np.prod(spots))
+        elif n_tiles < 1 or n_tiles > np.prod(spots):
+            raise ValueError("n_tiles out of range!")
 
-        cnt_tiles = 0
-        while cnt_tiles < n_tiles:
-            new_pos = [
-                rng.integers(spots[0]),
-                rng.integers(spots[1]),
-                rng.integers(spots[2]),
-            ]
+        # Generate unique linear indices
+        linear_indices = rng.choice(np.prod(spots), size=n_tiles, replace=False)
 
-            if new_pos not in filled_pos:
-                filled_pos.append(new_pos)
-                cnt_tiles += 1
+        # Convert the linear indices to 3D coordinates
+        filled_pos = np.empty((n_tiles, 3), dtype=int)
+        for idx, linear_index in enumerate(linear_indices):
+            filled_pos[idx, 2] = linear_index // (spots[0] * spots[1])
+            filled_pos[idx, 1] = (linear_index % (spots[0] * spots[1])) // spots[0]
+            filled_pos[idx, 0] = linear_index % spots[0]
+        filled_pos = filled_pos.tolist()
+    elif len(filled_pos) == 0:
+        raise ValueError("filled_pos is empty!")
 
-    if len(filled_pos) == 0:
-        tiles = None
-    else:
-        tiles = Tiles(
-            n=len(filled_pos),
-            size=tile_size,
-            tile_type=2,
-            M_rem=B_rem / (4 * np.pi * 1e-7),
-            color=[1, 0, 0],
-            mag_angle=mag_angles,
-        )
-
-        for i, pos in enumerate(filled_pos):
-            pos = np.asarray(pos)
-            if np.greater_equal(pos, spots).any():
-                raise ValueError(f"Desired position {pos} is not in the grid!")
-            tiles.offset = (np.around((pos + 0.5) * tile_size, decimals=9), i)
+    tiles = Tiles(
+        n=len(filled_pos),
+        size=area / spots,
+        tile_type=2,
+        M_rem=B_rem / (4 * np.pi * 1e-7),
+        color=[1, 0, 0],
+        mag_angle=mag_angles,
+        offset=[(np.asarray(pos) + 0.5) * (area / spots) for pos in filled_pos],
+    )
 
     eval_pts = np.asarray(pts, dtype=np.float64, order="F")
 
