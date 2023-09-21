@@ -1,5 +1,6 @@
 module TileTriangle
     use SPECIALFUNCTIONS
+    use, intrinsic :: ieee_arithmetic
     implicit none
     
     real,parameter :: pi=3.14159265359
@@ -169,8 +170,8 @@ module TileTriangle
     
     ! Returns the Nxz tensor component in the local coordinate system
         Nxz = -1./(4.*pi) * ( F_Nxz(r,h,l,h) - F_Nxz(r,0.,l,h) - ( G_Nxz(r,h) - G_Nxz(r,0.) ) )
-        
-    end function Nxz
+    
+        end function Nxz
 
     function F_Nxz( r, yp, l, h )
     real :: F_Nxz
@@ -189,6 +190,10 @@ module TileTriangle
     real,dimension(3),intent(in) :: r
     real,intent(in) :: yp
         G_Nxz = atanh( ( r(2)-yp )/ (sqrt(r(1)**2+(r(2)-yp)**2+r(3)**2)) )
+        
+        if (.not.ieee_is_finite(G_Nxz)) then     ! variable is not finite
+            G_Nxz = 0;
+        endif
     end function G_Nxz
 
     !---------------------------------------------------------------------------    
@@ -223,6 +228,10 @@ module TileTriangle
     real,dimension(3),intent(in) :: r
     real,intent(in) :: xp
         L_Nyz = atanh( (r(1) - xp) / (sqrt((r(1)-xp)**2+r(2)**2+r(3)**2)) )
+        
+        if (.not.ieee_is_finite(L_Nyz)) then     ! variable is not finite
+            L_Nyz = 0;
+        endif
     end function L_Nyz
 
     !---------------------------------------------------------------------------    

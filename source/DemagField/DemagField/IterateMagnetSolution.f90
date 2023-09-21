@@ -204,6 +204,12 @@
                         
                         pts = pts + tiles(i)%offset     !< Finally add the offset to translate the circ piece
                             
+                    case(tileTypeTetrahedron)
+                        !! No rotation is needed as the center of the tetrahedron is with respect to the vertices
+                        pts(1) = (tiles(i)%vert(1,1) + tiles(i)%vert(1,2) + tiles(i)%vert(1,3) + tiles(i)%vert(1,4))/4.0
+                        pts(2) = (tiles(i)%vert(2,1) + tiles(i)%vert(2,2) + tiles(i)%vert(2,3) + tiles(i)%vert(2,4))/4.0
+                        pts(3) = (tiles(i)%vert(3,1) + tiles(i)%vert(3,2) + tiles(i)%vert(3,3) + tiles(i)%vert(3,4))/4.0
+
             
                     case default
                 

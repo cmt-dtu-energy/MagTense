@@ -115,7 +115,7 @@ end
 %% MagTenseLandauLifshitzSolver_mex
 Source_str = 'source/MagTenseMEX/MagTenseMEX/MagTenseLandauLifshitzSolver_mex.f90';
 mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' MagTenseMicroMag_str ' ' DemagField_str ' ' TileDemagTensor_str ' ' NumericalIntegration_str ' ' CUDA_str ' ' CVODE_str ' ' MKL_str ' ' Source_str ' ' Options_str];
-eval(mex_str) 
+eval_MEX(mex_str)
 if ~USE_RELEASE
     pause(pause_time)
     movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb']);
@@ -127,7 +127,7 @@ movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_file
 MagTenseMicroMag_str        = ['-Lsource/MagTenseMicroMag/' build_str_NO_CUDA_MagTenseMicroMag '/ ' MagTenseMicroMag_lib_str ' -Isource/MagTenseMicroMag/' build_str_MagTenseMicroMag '/'];
 Source_str = 'source/MagTenseMEX/MagTenseMEX/MagTenseLandauLifshitzSolver_mex.f90';
 mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' MagTenseMicroMag_str ' ' DemagField_str ' ' TileDemagTensor_str ' ' NumericalIntegration_str ' ' CVODE_str ' ' MKL_str ' ' Source_str ' ' Options_str];
-eval(mex_str) 
+eval_MEX(mex_str)
 if ~USE_RELEASE
     pause(pause_time)
     movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/MagTenseLandauLifshitzSolverNoCUDA_mex.mex' MEX_str '64.pdb']);
@@ -139,7 +139,7 @@ movefile(['MagTenseLandauLifshitzSolver_mex.mex' MEX_str '64'],['matlab/MEX_file
 %% IterateMagnetization_mex
 Source_str = 'source/MagTenseMEX/MagTenseMEX/IterateMagnetization_mex.f90';
 mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' DemagField_str ' ' TileDemagTensor_str ' ' NumericalIntegration_str ' ' Source_str ' ' Options_str];
-eval(mex_str) 
+eval_MEX(mex_str)
 if ~USE_RELEASE
     pause(pause_time)
     movefile(['IterateMagnetization_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/IterateMagnetization_mex.mex' MEX_str '64.pdb']);
@@ -150,7 +150,7 @@ movefile(['IterateMagnetization_mex.mex' MEX_str '64'],['matlab/MEX_files/Iterat
 %% getHFromTiles_mex
 Source_str = 'source/MagTenseMEX/MagTenseMEX/getHFromTiles_mex.f90';
 mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' DemagField_str ' ' TileDemagTensor_str ' ' NumericalIntegration_str ' ' Source_str ' ' Options_str];
-eval(mex_str) 
+eval_MEX(mex_str)
 if ~USE_RELEASE
     pause(pause_time)
     movefile(['getHFromTiles_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/getHFromTiles_mex.mex' MEX_str '64.pdb']);
@@ -161,7 +161,7 @@ movefile(['getHFromTiles_mex.mex' MEX_str '64'],['matlab/MEX_files/getHFromTiles
 %% getNFromTile_mex
 Source_str = 'source/MagTenseMEX/MagTenseMEX/getNFromTile_mex.f90';
 mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' DemagField_str ' ' NumericalIntegration_str ' ' TileDemagTensor_str ' ' Source_str ' ' Options_str];
-eval(mex_str) 
+eval_MEX(mex_str)
 if ~USE_RELEASE
     pause(pause_time)
     movefile(['getNFromTile_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/getNFromTile_mex.mex' MEX_str '64.pdb']);
@@ -172,7 +172,7 @@ movefile(['getNFromTile_mex.mex' MEX_str '64'],['matlab/MEX_files/getNFromTile_m
 %% getMagForce_mex
 Source_str = 'source/MagTenseMEX/MagTenseMEX/getMagForce_mex.f90';
 mex_str = ['mex ' compiler_str ' ' Debug_flag ' ' MagneticForceIntegrator_str ' ' DemagField_str ' ' NumericalIntegration_str ' ' TileDemagTensor_str ' ' Source_str ' ' Options_str];
-eval(mex_str) 
+eval_MEX(mex_str)
 if ~USE_RELEASE
     pause(pause_time)
     movefile(['getMagForce_mex.mex' MEX_str '64.pdb'],['matlab/MEX_files/getMagForce_mex.mex' MEX_str '64.pdb']);
@@ -180,4 +180,27 @@ end
 pause(pause_time)
 movefile(['getMagForce_mex.mex' MEX_str '64'],['matlab/MEX_files/getMagForce_mex.mex' MEX_str '64']);
     
+end
+
+function eval_MEX(mex_str)
+
+try
+    eval(mex_str);
+catch ME
+    if (strcmp(ME.message(91:117),'mt : general error c101008d'))
+        fail_mex = true; 
+        while fail_mex
+            try 
+                disp('Microsoft manifest tool error - retrying')
+                eval(mex_str); 
+                fail_mex = false; 
+            catch
+                continue
+            end
+        end
+    else
+        disp(ME.message)
+        rethrow(ME)
+    end
+end
 end
