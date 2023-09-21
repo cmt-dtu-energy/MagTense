@@ -6,6 +6,8 @@ FC = ifort
 
 USE_CVODE = 0
 
+LIB_NAME = libNumericalIntegration
+
 ifeq ($(OS),Windows_NT)
 	ifeq (${FC}, ifort)
 		FFLAGS = /nologo /real-size:64 /O3 /assume:nocc_omp /Qopenmp /fpp \
@@ -16,7 +18,7 @@ ifeq ($(OS),Windows_NT)
 	endif
 
 	LIBTOOL = LIB $? /OUT:$@
-	STATIC_LIB = libNumericalIntegration.lib
+	STATIC_LIB = ${LIB_NAME}.lib
 	CLEAN_FILES = -del ${STATIC_LIB} *.o *.mod
 else
 	ifeq (${FC}, ifort)
@@ -32,7 +34,7 @@ else
 	else
   		LIBTOOL = ar src $@ $?
 	endif
-	STATIC_LIB = libNumInt.a
+	STATIC_LIB = ${LIB_NAME}.a
 	CLEAN_FILES = -rm -f ${STATIC_LIB} *.o *.mod
 endif
 
@@ -45,8 +47,8 @@ endif
 #       List all source files required for the project
 #=======================================================================
 # names (without suffix), f90 sources
-LIBSRC_SOURCES = IntegrationDataTypes quadpack SpecialFunctions NumericalIntegrals \
-SpecialFunctions RKSuitef90 ODE_Solvers ODE_MagTense util locate
+LIBSRC_SOURCES = IntegrationDataTypes quadpack SpecialFunctions \
+NumericalIntegrals RKSuitef90 ODE_Solvers ODE_MagTense util locate
 
 # object files
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})

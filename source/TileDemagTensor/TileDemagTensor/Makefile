@@ -1,47 +1,81 @@
+#=======================================================================
+#                       compiler names and flags
+#=======================================================================
+# FC = ifort
+FC = gfortran
 
-FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
+USE_CVODE = 0
 
+LIB_NAME = libTileDemagTensor
 
-FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -static-intel -libs:static -I../../NumericalIntegration/NumericalIntegration/ \
+VPATH = ../../NumericalIntegration/NumericalIntegration
 
+ifeq ($(OS),Windows_NT)
+	ifeq (${FC}, ifort)
+		FFLAGS = /nologo /real-size:64 /O3 /assume:nocc_omp /Qopenmp /fpp \
+		/fpe:0 /fp:source /fp:precise /libs:static /DUSE_CVODE=${USE_CVODE}
+	else ifeq (${FC}, gfortran)
+		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
+		-cpp -DUSE_CVODE=${USE_CVODE}
+	endif
 
-#FC = /usr/bin/gfortran
+	LIBTOOL = LIB $? /OUT:$@
+	STATIC_LIB = ${LIB_NAME}.lib
+	CLEAN_FILES = -del ${STATIC_LIB} *.o *.mod
+else
+	ifeq (${FC}, ifort)
+		FFLAGS = -r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source \
+		-fp-model precise -fpic -libs:static -DUSE_CVODE=${USE_CVODE}
+	else ifeq (${FC}, gfortran)
+		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
+		-cpp -DUSE_CVODE=${USE_CVODE}
+	endif
 
-#FFLAGS = -O3 -fopenmp -fdefault-real-8 -ffixed-line-length-none -fPIC
+	ifeq (${UNAME}, Darwin)
+  		LIBTOOL = libtool -static -o $@ $?
+	else
+  		LIBTOOL = ar src $@ $?
+	endif
+	STATIC_LIB = ${LIB_NAME}.a
+	CLEAN_FILES = -rm -f ${STATIC_LIB} *.o *.mod
+endif
 
+#=======================================================================
+#                     Intel's libtool
+#=======================================================================
+# LIBTOOL = xiar rc $@ $?
 
+#=======================================================================
+#       List all source files required for the project
+#=======================================================================
+# names (without suffix), f90 sources
+LIBSRC_SOURCES = IntegrationDataTypes quadpack SpecialFunctions TileTensorHelperFunctions \
+TileCylPieceTensor TileRectangularPrismTensor TilePlanarCoilTensor TileTriangle \
+TileCircPieceTensor TileNComponents
 
+# object files
+LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
-.KEEP_STATE:
-.SUFFIXES:
+#=======================================================================
+#						Relevant suffixes
+#=======================================================================
 .SUFFIXES: .for .f90 .F90 .f .o
+
+#=======================================================================
+#							Targets
+#=======================================================================
 .f.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -c $< -o $@
 .f90.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -c $< -o $@
 .F90.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -c $< -o $@
 .for.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -c $< -o $@
 
-TileDemagTensorLib = $(FC) SpecialFunctions.o TileTensorHelperFunctions.o TileTriangle.o TileCircPieceTensor.o TileCylPieceTensor.o TileRectangularPrismTensor.o TilePlanarCoilTensor.o  TileNComponents.o
-
-libTileDemagTensor.a: $(TileDemagTensorLib)
-	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/xiar rc libTileDemagTensor.a SpecialFunctions.o TileTensorHelperFunctions.o TileTriangle.o TileCircPieceTensor.o TileCylPieceTensor.o TileRectangularPrismTensor.o TilePlanarCoilTensor.o  TileNComponents.o
-
+${STATIC_LIB}: ${LIBSRC_OBJECTS}
+	${LIBTOOL}
 
 clean:
-	rm -f *.o *.x *.mod *.a
-
-SpecialFunctions.o	:SpecialFunctions.f90
-TileTensorHelperFunctions.o	:TileTensorHelperFunctions.f90
-TileCircPieceTensor.o	:TileCircPieceTensor.f90 TileTensorHelperFunctions.o
-TileCylPieceTensor.o   :TileCylPieceTensor.f90 TileTensorHelperFunctions.o
-TileRectangularPrismTensor.o   :TileRectangularPrismTensor.f90 TileTensorHelperFunctions.o
-TilePlanarCoilTensor.o   :TilePlanarCoilTensor.f90 TileTensorHelperFunctions.o
-TileTriangle.o   :TileTriangle.f90 TileTensorHelperFunctions.o
-TileNComponents.o	:TileNComponents.f90 TileTensorHelperFunctions.o TileTriangle.o TileCircPieceTensor.o TileCylPieceTensor.o TileRectangularPrismTensor.o TilePlanarCoilTensor.o
-
-
-
+	${CLEAN_FILES}
 
