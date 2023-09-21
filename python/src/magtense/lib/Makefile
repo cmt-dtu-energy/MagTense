@@ -126,9 +126,10 @@ endif
 #       List all source files required for the project
 #=======================================================================
 # names (without suffix), f90 sources
-LIBSRC_SOURCES = IOgeneral IntegrationDataTypes quadpack SpecialFunctions TileTensorHelperFunctions \
-TileRectangularPrismTensor TileCircPieceTensor TileCylPieceTensor TilePlanarCoilTensor \
-TileTriangle TileNComponents DemagFieldGetSolution spline MagParameters IterateMagnetSolution
+LIBSRC_SOURCES = IOgeneral IntegrationDataTypes quadpack SpecialFunctions \
+TileTensorHelperFunctions TileRectangularPrismTensor TileCircPieceTensor \
+TileCylPieceTensor TilePlanarCoilTensor TileTriangle TileNComponents \
+DemagFieldGetSolution spline MagParameters IterateMagnetSolution
 
 ifeq ($(USE_MICROMAG),1)
 	LIBSRC_SOURCES += MicroMagParameters RKSuitef90 ODE_Solvers LLODE_Debug util FortranCuda \

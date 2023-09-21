@@ -1,46 +1,85 @@
+#=======================================================================
+#                       compiler names and flags
+#=======================================================================
+# FC = ifort
+FC = gfortran
 
-FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
+#=======================================================================
+#       List all source files required for the project
+#=======================================================================
+LIBSRC_SOURCES = DemagFieldGetSolution MagParameters spline IterateMagnetSolution 
 
+LIB_NAME = libDemagField
 
-FFLAGS = -r8 -O3 -fpp -fpe0 -fp-model source -fpic -static-intel -libs:static -I../../NumericalIntegration/NumericalIntegration/ \
-	-I../../TileDemagTensor/TileDemagTensor/ -I/apps/external/matlab/2019/b/extern/include/ 
+NUM_INT_LIB_NAME = libNumericalIntegration
+NUM_INT_PATH = ../../NumericalIntegration/NumericalIntegration
 
+TILE_DEMAG_TENSOR_LIB_NAME = libTileDemagTensor
+TILE_DEMAG_TENSOR_PATH = ../../TileDemagTensor/TileDemagTensor
 
-#FC = /usr/bin/gfortran
+ifeq ($(OS),Windows_NT)
+	ifeq (${FC}, ifort)
+		FFLAGS = /nologo /real-size:64 /O3 /assume:nocc_omp /Qopenmp /fpp \
+		/fpe:0 /fp:source /fp:precise /libs:static /DUSE_CVODE=0
+	else ifeq (${FC}, gfortran)
+		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
+		-cpp -DUSE_CVODE=0
+	endif
 
-#FFLAGS = -O3 -fpp -fopenmp -fdefault-real-8 -ffixed-line-length-none -fPIC
+	LIBTOOL = LIB $? /OUT:$@
+	STATIC_LIB = ${LIB_NAME}.lib
+	NUM_INT_LIB = ${NUM_INT_LIB_NAME}.lib
+	TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_LIB_NAME}.lib
+	CLEAN_FILES = -del ${STATIC_LIB} *.o *.mod
+else
+	ifeq (${FC}, ifort)
+		FFLAGS = -r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source \
+		-fp-model precise -fpic -libs:static -DUSE_CVODE=0
+	else ifeq (${FC}, gfortran)
+		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
+		-cpp -DUSE_CVODE=0
+	endif
 
+	ifeq (${UNAME}, Darwin)
+  		LIBTOOL = libtool -static -o $@ $?
+	else
+  		LIBTOOL = ar src $@ $?
+	endif
+	STATIC_LIB = ${LIB_NAME}.a
+	NUM_INT_LIB = ${NUM_INT_LIB_NAME}.a
+	TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_LIB_NAME}.a
+	CLEAN_FILES = -rm -f ${STATIC_LIB} *.o *.mod
+endif
 
+#=======================================================================
+#						Relevant suffixes
+#=======================================================================
+LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
-
-.KEEP_STATE:
-.SUFFIXES:
 .SUFFIXES: .for .f90 .F90 .f .o
+
+#=======================================================================
+#							Targets
+#=======================================================================
+.PHONY: all clean
+
+all: pre-build ${STATIC_LIB}
+
 .f.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -c $< -o $@
 .f90.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -c $< -o $@
 .F90.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -c $< -o $@
 .for.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -c $< -o $@
 
-DemagFieldLib = $(FC) DemagFieldGetSolution.o MagParameters.o MagTileIO.o spline.o IterateMagnetSolution.o
+pre-build:
+	cd ${NUM_INT_PATH} && $(MAKE)
+	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE)
 
-libDemagField.a: $(DemagFieldLib)
-	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/xiar rc libDemagField.a DemagFieldGetSolution.o MagParameters.o MagTileIO.o  spline.o IterateMagnetSolution.o
-
+${STATIC_LIB}: ${NUM_INT_PATH}/${NUM_INT_LIB} ${TILE_DEMAG_TENSOR_PATH}/${TILE_DEMAG_TENSOR_LIB} ${LIBSRC_OBJECTS}
+	${LIBTOOL}
 
 clean:
-	rm -f *.o *.x *.mod *.a
-
-
-DemagFieldGetSolution.o	:DemagFieldGetSolution.f90
-MagParameters.o	:MagParameters.f90
-MagTileIO.o	:MagTileIO.f90
-spline.o	:spline.f90
-IterateMagnetSolution.o	:IterateMagnetSolution.f90 MagParameters.o DemagFieldGetSolution.o spline.o MagTileIO.o
-
-
-
-
+	${CLEAN_FILES}

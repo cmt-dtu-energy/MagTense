@@ -1,49 +1,79 @@
+#=======================================================================
+#                       compiler names and flags
+#=======================================================================
+# FC = ifort
+FC = gfortran
 
-FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
+#=======================================================================
+#       List all source files required for the project
+#=======================================================================
+LIBSRC_SOURCES = IO StandAloneIO MagTense_StandAlone
 
-NumIntLib = ../../NumericalIntegration/NumericalIntegration/
-TileDemagTensorLib = ../../TileDemagTensor/TileDemagTensor/
-DemagFieldLib = ../../DemagField/DemagField/
+NUM_INT_LIB_NAME = libNumericalIntegration
+NUM_INT_PATH = ../../NumericalIntegration/NumericalIntegration
 
+TILE_DEMAG_TENSOR_LIB_NAME = libTileDemagTensor
+TILE_DEMAG_TENSOR_PATH = ../../TileDemagTensor/TileDemagTensor
 
-FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I$(NumIntLib) -I$(TileDemagTensorLib) -I$(DemagFieldLib)
+DEMAG_FIELD_LIB_NAME = libDemagField
+DEMAG_FIELD_PATH = ../../DemagField/DemagField
 
+ifeq ($(OS),Windows_NT)
+	ifeq (${FC}, ifort)
+		FFLAGS = /nologo /real-size:64 /O3 /assume:nocc_omp /Qopenmp /fpp \
+		/fpe:0 /fp:source /fp:precise /DUSE_CVODE=0
+	else ifeq (${FC}, gfortran)
+		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
+		-cpp -DUSE_CVODE=0
+	endif
 
-#FC = /usr/bin/gfortran
+	NUM_INT_LIB = ${NUM_INT_LIB_NAME}.lib
+	TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_LIB_NAME}.lib
+	DEMAG_FIELD_LIB = ${DEMAG_FIELD_LIB_NAME}.lib
+	CLEAN_FILES = -del *.x *.o *.mod
+else
+	ifeq (${FC}, ifort)
+		FFLAGS = -r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source \
+		-fp-model precise -fpic -DUSE_CVODE=0
+	else ifeq (${FC}, gfortran)
+		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
+		-cpp -DUSE_CVODE=0
+	endif
 
-#FFLAGS = -O3 -fopenmp -fdefault-real-8 -ffixed-line-length-none -fPIC
+	NUM_INT_LIB = ${NUM_INT_LIB_NAME}.a
+	TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_LIB_NAME}.a
+	DEMAG_FIELD_LIB = ${DEMAG_FIELD_LIB_NAME}.a
+	CLEAN_FILES = -rm -f *.x *.o *.mod
+endif
 
+#=======================================================================
+#						Relevant suffixes
+#=======================================================================
+LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
-
-
-.KEEP_STATE:
-.SUFFIXES:
 .SUFFIXES: .for .f90 .F90 .f .o
-.f.o:
-	$(FC) -c $(FFLAGS) $<
-.f90.o:
-	$(FC) -c $(FFLAGS) $<
-.F90.o:
-	$(FC) -c $(FFLAGS) $<
-.for.o:
-	$(FC) -c $(FFLAGS) $<
+#=======================================================================
+#							Targets
+#=======================================================================
+.PHONY: all clean
 
-MagTense.x = StandAloneIO.o MagTense_StandAlone.o
-
-MagTense.x: $(MagTense.x)
-	$(FC) $(FFLAGS) $(MagTense.x) -Wl,--start-group $(NumIntLib)libNumericalIntegration.a \
-	$(TileDemagTensorLib)libTileDemagTensor.a $(DemagFieldLib)libDemagField.a \
-	 -Wl,--end-group -o MagTense.x
-
+all: MagTense.x
 
 clean:
-	rm -f *.o *.x *.mod *.a
+	${CLEAN_FILES}
 
+.f.o:
+	$(FC) $(FFLAGS) -c $<
+.f90.o:
+	$(FC) $(FFLAGS) -I ${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -c  $<
+.F90.o:
+	$(FC) $(FFLAGS) -c $<
+.for.o:
+	$(FC) $(FFLAGS) -c $<
 
-IO.o	:IO.f90
-MagTense_StandAlone.o		:MagTense_StandAlone.f90 StandAloneIO.o
-
-
-
-
-
+MagTense.x: ${LIBSRC_OBJECTS}
+	$(FC) $(FFLAGS) StandAloneIO.o MagTense_StandAlone.o -Wl,--start-group \
+	${NUM_INT_PATH}/${NUM_INT_LIB} \
+	${TILE_DEMAG_TENSOR_PATH}/${TILE_DEMAG_TENSOR_LIB} \
+	${DEMAG_FIELD_PATH}/${DEMAG_FIELD_LIB} \
+	-Wl,--end-group -o MagTense.x

@@ -57,7 +57,7 @@
         
         !! If requested, save the found magnetic field
         !! Load the points where the solution is wanted
-        if ( setts%returnSolution .eq. .true. ) then
+        if ( setts%returnSolution .eqv. .true. ) then
             write(*,*) 'Finding solution at requested points'
             call loadSolutionPoints( pts, file_field_pts, n_pts )
             allocate(H(n_pts,3))
