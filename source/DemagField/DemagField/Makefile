@@ -3,62 +3,37 @@
 #=======================================================================
 # FC = ifort
 FC = gfortran
-
+FFLAGS =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
-LIBSRC_SOURCES = DemagFieldGetSolution MagParameters spline IterateMagnetSolution 
-
-LIB_NAME = libDemagField
-
-NUM_INT_LIB_NAME = libNumericalIntegration
-NUM_INT_PATH = ../../NumericalIntegration/NumericalIntegration
-
-TILE_DEMAG_TENSOR_LIB_NAME = libTileDemagTensor
-TILE_DEMAG_TENSOR_PATH = ../../TileDemagTensor/TileDemagTensor
+LIBSRC_SOURCES = DemagFieldGetSolution MagParameters spline IterateMagnetSolution
+LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
-	ifeq (${FC}, ifort)
-		FFLAGS = /nologo /real-size:64 /O3 /assume:nocc_omp /Qopenmp /fpp \
-		/fpe:0 /fp:source /fp:precise /libs:static
-	else ifeq (${FC}, gfortran)
-		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 -cpp
-	endif
-
 	LIBTOOL = LIB $? /OUT:$@
-	STATIC_LIB = ${LIB_NAME}.lib
-	NUM_INT_LIB = ${NUM_INT_PATH}/${NUM_INT_LIB_NAME}.lib
-	TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_PATH}/${TILE_DEMAG_TENSOR_LIB_NAME}.lib
-	CLEAN_FILES = -del ${STATIC_LIB} *.o *.mod
+	LIB_SUFFIX = .lib
+	CLEAN_FILES = -del *.lib *.o *.mod
 else
-	ifeq (${FC}, ifort)
-		FFLAGS = -r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source \
-		-fp-model precise -fpic -libs:static
-	else ifeq (${FC}, gfortran)
-		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 -cpp
-	endif
-
 	ifeq (${UNAME}, Darwin)
   		LIBTOOL = libtool -static -o $@ $?
 	else
   		LIBTOOL = ar src $@ $?
 	endif
-	STATIC_LIB = ${LIB_NAME}.a
-	NUM_INT_LIB = ${NUM_INT_PATH}/${NUM_INT_LIB_NAME}.a
-	TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_PATH}/${TILE_DEMAG_TENSOR_LIB_NAME}.a
-	CLEAN_FILES = -rm -f ${STATIC_LIB} *.o *.mod
+	LIB_SUFFIX = .a
+	CLEAN_FILES = -rm -f *.a *.o *.mod
 endif
 
-#=======================================================================
-#						Relevant suffixes
-#=======================================================================
-LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
+STATIC_LIB = libDemagField${LIB_SUFFIX}
+NUM_INT_PATH = ../../NumericalIntegration/NumericalIntegration
+NUM_INT_LIB = ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX}
 
-.SUFFIXES: .f90
-
+TILE_DEMAG_TENSOR_PATH = ../../TileDemagTensor/TileDemagTensor
+TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX}
 #=======================================================================
 #							Targets
 #=======================================================================
+.SUFFIXES: .f90
 .PHONY: all clean
 
 all: pre-build ${STATIC_LIB}
@@ -67,8 +42,8 @@ all: pre-build ${STATIC_LIB}
 	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -c $< -o $@
 
 pre-build:
-	cd ${NUM_INT_PATH} && $(MAKE)
-	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE)
+	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
+	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
 
 ${STATIC_LIB}: ${NUM_INT_LIB} ${TILE_DEMAG_TENSOR_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
