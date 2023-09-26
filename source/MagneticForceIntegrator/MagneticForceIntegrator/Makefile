@@ -21,15 +21,14 @@ TILE_DEMAG_TENSOR_PATH = ../../TileDemagTensor/TileDemagTensor
 DEMAG_FIELD_LIB_NAME = libDemagField
 DEMAG_FIELD_PATH = ../../DemagField/DemagField
 
-OPT = -I ${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I{MATLAB_INCLUDE}
+OPT = -I ${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I${MATLAB_INCLUDE}
 
 ifeq ($(OS),Windows_NT)
 	ifeq (${FC}, ifort)
 		FFLAGS = /nologo /real-size:64 /O3 /assume:nocc_omp /Qopenmp /fpp \
-		/fpe:0 /fp:source /fp:precise /libs:static /DUSE_CVODE=0
+		/fpe:0 /fp:source /fp:precise /libs:static
 	else ifeq (${FC}, gfortran)
-		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
-		-cpp -DUSE_CVODE=0
+		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 -cpp
 	endif
 
 	LIBTOOL = LIB $? /OUT:$@
@@ -39,10 +38,9 @@ ifeq ($(OS),Windows_NT)
 else
 	ifeq (${FC}, ifort)
 		FFLAGS = -r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source \
-		-fp-model precise -fpic -libs:static -DUSE_CVODE=0
+		-fp-model precise -fpic -libs:static
 	else ifeq (${FC}, gfortran)
-		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
-		-cpp -DUSE_CVODE=0
+		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 -cpp
 	endif
 
 	ifeq (${UNAME}, Darwin)
@@ -60,7 +58,7 @@ endif
 #=======================================================================
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
-.SUFFIXES: .for .f90 .F90 .f .o
+.SUFFIXES: .f90
 #=======================================================================
 #							Targets
 #=======================================================================
@@ -68,14 +66,8 @@ LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 all: ${STATIC_LIB}
 
-.f.o:
-	$(FC) $(FFLAGS) -c $<
 .f90.o:
 	$(FC) $(FFLAGS) ${OPT} -c $<
-.F90.o:
-	$(FC) $(FFLAGS) -c $<
-.for.o:
-	$(FC) $(FFLAGS) -c $<
 
 ${STATIC_LIB}: ${LIBSRC_OBJECTS}
 	${LIBTOOL}

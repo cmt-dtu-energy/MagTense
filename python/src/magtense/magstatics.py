@@ -748,7 +748,6 @@ def run_simulation(
     max_it: int = 500,
     T: float = 300.0,
     mu_r: float = 20,
-    console: bool = True,
 ) -> tuple[Tiles, np.ndarray]:
     """
     Run magnetostatic simulation to calculate the demagnetizing field strength.
@@ -759,7 +758,6 @@ def run_simulation(
         max_error: Iteration stops if magnetization change below this value.
         max_it: Maximum number of performed iterations.
         T: Temperature for the state function if required.
-        console: Boolean if output in console.
 
     Returns:
         Updated tiles.
@@ -798,7 +796,6 @@ def run_simulation(
         nitemax=max_it,
         iteratesolution=True,
         returnsolution=True,
-        console=console,
     )
 
     tiles.M = M_out

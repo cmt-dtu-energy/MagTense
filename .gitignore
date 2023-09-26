@@ -16,6 +16,9 @@ x64/
 build/
 [Bb]in/
 [Oo]bj/
+executable/
+matlab/resources/
+matlab/MagTense_matlab_project.prj
 
 # Enable "build/" folder in the NuGet Packages folder since NuGet packages use it for MSBuild targets
 !packages/*/build/
@@ -173,32 +176,15 @@ $RECYCLE.BIN/
 docs/.buildinfo
 docs/source/_build
 
-# Compiled mex files
-papers/JMMM_HB_Optimized_Homogeneity/getHFromTiles_mex.mexw64
-papers/JMMM_HB_Optimized_Homogeneity/getMagForce_mex.mexw64
-papers/JMMM_HB_Optimized_Homogeneity/getNFromCylTile_mex.mexw64
-papers/JMMM_HB_Optimized_Homogeneity/IterateMagnetization_mex.mexw64
-
-matlab/MEX_files/getHFromTiles_mex.mexw64
-matlab/MEX_files/getMagForce_mex.mexw64
-matlab/MEX_files/getNFromTile_mex.mexw64
-matlab/MEX_files/IterateMagnetization_mex.mexw64
-matlab/MEX_files/MagTenseLandauLifshitzSolver_mex.mexw64
+# Compiled files and libraries
 *.mexw64
-
-# Deprecated directories
-executable/
-matlab/resources/
-matlab/MagTense_matlab_project.prj
+*.mod
+*.o
+*.a
+*.lib
 
 *.vtuneproj
 *.prj
-*.mod
 
 *.vsidx
-
 *.lock
-
-python/examples/micromagnetism/.idea/inspectionProfiles/
-
-python/examples/micromagnetism/.idea/

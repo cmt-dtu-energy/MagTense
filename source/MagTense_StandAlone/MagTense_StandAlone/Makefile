@@ -21,10 +21,9 @@ DEMAG_FIELD_PATH = ../../DemagField/DemagField
 ifeq ($(OS),Windows_NT)
 	ifeq (${FC}, ifort)
 		FFLAGS = /nologo /real-size:64 /O3 /assume:nocc_omp /Qopenmp /fpp \
-		/fpe:0 /fp:source /fp:precise /DUSE_CVODE=0
+		/fpe:0 /fp:source /fp:precise
 	else ifeq (${FC}, gfortran)
-		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
-		-cpp -DUSE_CVODE=0
+		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 -cpp
 	endif
 
 	NUM_INT_LIB = ${NUM_INT_LIB_NAME}.lib
@@ -34,10 +33,9 @@ ifeq ($(OS),Windows_NT)
 else
 	ifeq (${FC}, ifort)
 		FFLAGS = -r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source \
-		-fp-model precise -fpic -DUSE_CVODE=0
+		-fp-model precise -fpic
 	else ifeq (${FC}, gfortran)
-		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
-		-cpp -DUSE_CVODE=0
+		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 -cpp
 	endif
 
 	NUM_INT_LIB = ${NUM_INT_LIB_NAME}.a
@@ -51,7 +49,7 @@ endif
 #=======================================================================
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
-.SUFFIXES: .for .f90 .F90 .f .o
+.SUFFIXES: .f90
 #=======================================================================
 #							Targets
 #=======================================================================
@@ -62,14 +60,8 @@ all: MagTense.x
 clean:
 	${CLEAN_FILES}
 
-.f.o:
-	$(FC) $(FFLAGS) -c $<
 .f90.o:
 	$(FC) $(FFLAGS) -I ${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -c  $<
-.F90.o:
-	$(FC) $(FFLAGS) -c $<
-.for.o:
-	$(FC) $(FFLAGS) -c $<
 
 MagTense.x: ${LIBSRC_OBJECTS}
 	$(FC) $(FFLAGS) StandAloneIO.o MagTense_StandAlone.o -Wl,--start-group \
