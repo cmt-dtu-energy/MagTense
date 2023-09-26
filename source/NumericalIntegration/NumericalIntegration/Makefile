@@ -49,7 +49,7 @@ endif
 #=======================================================================
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
-.SUFFIXES: .for .f90 .F90 .f .o
+.SUFFIXES: .for .f90
 
 #=======================================================================
 #							Targets
@@ -61,11 +61,7 @@ all: ${STATIC_LIB}
 clean:
 	${CLEAN_FILES}
 
-.f.o:
-	$(FC) $(FFLAGS) -c $< -o $@
 .f90.o:
-	$(FC) $(FFLAGS) -c $< -o $@
-.F90.o:
 	$(FC) $(FFLAGS) -c $< -o $@
 .for.o:
 	$(FC) $(FFLAGS) -c $< -o $@

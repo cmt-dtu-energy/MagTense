@@ -308,7 +308,7 @@ module FortranToPythonIO
     subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, n_stateFcn, nT, nH, &
-        data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out, console )
+        data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out )
 
         integer(4),intent(in) :: n_tiles, n_pts, n_stateFcn, nT, nH
 
@@ -345,7 +345,6 @@ module FortranToPythonIO
         type(MagStateFunction),dimension(n_stateFcn) :: stateFcn
         real(8),dimension(nH,nT),intent(in) :: data_stateFcn
         real(8) :: start,finish,resumeIteration
-        logical, intent(in) :: console
 
         real(8),dimension(n_pts,3),intent(in) :: pts
         real(8),dimension(n_pts,3),intent(out) :: H
@@ -367,9 +366,7 @@ module FortranToPythonIO
         call loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
 
         if ( iterateSolution .eqv. .true. ) then
-            if (console) then
-                write(*,*) 'Doing iteration'
-            endif
+            write(*,*) 'Doing iteration'
             call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, resumeIteration )
 
             do i=1,n_tiles
@@ -379,9 +376,7 @@ module FortranToPythonIO
         endif
 
         if ( returnSolution .eqv. .true. ) then
-            if (console) then
-                write(*,*) 'Finding solution at requested points'
-            endif
+            write(*,*) 'Finding solution at requested points'
 
             H(:,:) = 0.
 
@@ -391,8 +386,8 @@ module FortranToPythonIO
                 !Make sure to allocate H_tmp on the heap and for each thread
                 ! $OMP CRITICAL
                 H_tmp(:,:) = 0.
-
                 ! $OMP END CRITICAL
+
                 !! Here a selection of which subroutine to use should be done, i.e. whether the tile
                 !! is cylindrical, a prism or an ellipsoid or another geometry
                 select case (tiles(i)%tileType )
@@ -414,8 +409,10 @@ module FortranToPythonIO
                     call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts )
                 case default
                 end select
-
+                
+                ! $OMP CRITICAL
                 H = H + H_tmp
+                ! $OMP END CRITICAL
 
             enddo
             ! $OMP END PARALLEL DO
@@ -425,9 +422,7 @@ module FortranToPythonIO
 
         call cpu_time(finish)
 
-        if (console) then
-            write(*,*) 'Elapsed time', finish-start
-        endif
+        write(*,*) 'Elapsed time', finish-start
 
     end subroutine runSimulation
 
