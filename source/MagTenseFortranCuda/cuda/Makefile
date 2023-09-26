@@ -1,9 +1,6 @@
 #==========================
 # Compiler names and flags
 #==========================
-FC = ifort
-# FC = gfortran
-
 CPP = icx
 #=======================================================================
 #       List all source files required for the project
