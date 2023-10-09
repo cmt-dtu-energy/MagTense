@@ -1,12 +1,22 @@
 #=======================================================================
 #                       compiler names and flags
 #=======================================================================
-# FC = ifort
-FC = gfortran
+FC = ifort
+# FC = gfortran
 
-USE_MATLAB = 0
+CPP = icx
+COMPILE_MICROMAG = 1
+
+USE_MATLAB = 1
+MATLAB_INCLUDE = /usr/local/MATLAB/R2021b/extern/include
+
 USE_CUDA = 1
 USE_CVODE = 0
+
+MKL_ROOT = /opt/intel/oneapi/mkl/latest 						# Linux - oneapi
+# MKL_ROOT = ${CONDA_PREFIX} 									# Linux - conda
+# MKL_ROOT = "C:\Program Files (x86)\Intel\oneAPI\mkl\latest" 	# Win - oneapi
+# MKL_ROOT = ${CONDA_PREFIX}/Library 							# Win - conda
 
 ifeq (${FC}, ifort)
 	ifeq ($(OS),Windows_NT)
@@ -20,21 +30,38 @@ ifeq (${FC}, ifort)
 	endif
 else ifeq (${FC}, gfortran)
 FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 -cpp -DUSE_CVODE=${USE_CVODE}
+USE_CUDA = 0
+COMPILE_MICROMAG= 0
+endif
+
+ifeq ($(USE_CUDA),0)
+	COMPILE_CUDA =
+else
+	COMPILE_CUDA = cuda
+endif
+
+ifeq ($(COMPILE_MICROMAG),0)
+	MICROMAG =
+else
+	MICROMAG = micromagnetism
 endif
 #=======================================================================
 #							Targets
 #=======================================================================
 .PHONY: all clean
 
-all: magnetostatic # micromag standalone forceintegrator
+all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} # standalone forceintegrator
 
 magnetostatic:
-	cd source/NumericalIntegration/NumericalIntegration && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
+	cd source/NumericalIntegration/NumericalIntegration && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 	cd source/TileDemagTensor/TileDemagTensor && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
 	cd source/DemagField/DemagField && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
 
-micromag:
-	cd source/MagTenseMicroMag && $(MAKE) FFLAGS='$(FFLAGS)' USE_MATLAB=$(USE_MATLAB)
+micromagnetism:
+	cd source/MagTenseMicroMag && $(MAKE) FFLAGS='$(FFLAGS)' USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE) MKL_ROOT=$(MKL_ROOT)
+
+cuda:
+	cd source/MagTenseFortranCuda/cuda && $(MAKE) CPP=$(CPP)
 
 forceintegrator:
 	cd source/MagneticForceIntegrator/MagneticForceIntegrator && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
@@ -49,6 +76,7 @@ clean:
 	cd source/TileDemagTensor/TileDemagTensor && make clean
 	cd source/DemagField/DemagField && make clean
 	cd source/MagTenseMicroMag && make clean
+	cd source/MagTenseFortranCuda/cuda && make clean
 	cd source/MagTense_StandAlone/MagTense_StandAlone && make clean
 	cd source/MagneticForceIntegrator/MagneticForceIntegrator && make clean
 	rm -r build/

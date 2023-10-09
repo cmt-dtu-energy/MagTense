@@ -3,9 +3,8 @@
 #=======================================================================
 FC = ifort
 USE_MATLAB = 1
-MATLAB_INCLUDE = /usr/local/MATLAB/R2021b/extern/include
-MKL_ROOT = /opt/intel/oneapi/mkl/latest
-# MKL_ROOT = "C:\Program Files (x86)\Intel\oneAPI\mkl\latest"
+MATLAB_INCLUDE =
+MKL_ROOT =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
@@ -22,13 +21,11 @@ LIBSRC_SOURCES += LandauLifshitzEquationSolver
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
-F90_OPT = -I ${CONDA_PREFIX}/Library/include -I${MKL_ROOT}/include -I${CONDA_PREFIX}/Library/include/intel64/ilp64
 LIBTOOL = LIB $? /OUT:$@
 LIB_SUFFIX = .lib
 CLEAN_FILES = -del *.lib *.o *.mod
 
 else
-F90_OPT = -I ${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/ilp64
 LIB_SUFFIX = .a
 CLEAN_FILES = -rm -f *.a *.o *.mod
 
@@ -57,7 +54,7 @@ DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
 all: pre-build ${STATIC_LIB}
 
 .f90.o:
-	$(FC) $(FFLAGS) $(F90_OPT) -I${MATLAB_INCLUDE} -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -c $< -o $@
+	$(FC) $(FFLAGS) -I${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/ilp64 -I${MATLAB_INCLUDE} -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -c $< -o $@
 
 pre-build:
 	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'

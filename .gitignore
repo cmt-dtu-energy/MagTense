@@ -178,6 +178,7 @@ docs/source/_build
 
 # Compiled files and libraries
 *.mexw64
+*.mexa64
 *.mod
 *.o
 *.a

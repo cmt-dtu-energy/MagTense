@@ -3,6 +3,7 @@
 #=======================================================================
 # FC = ifort
 FC = gfortran
+MATLAB_INCLUDE =
 FFLAGS =
 #=======================================================================
 #       List all source files required for the project
@@ -39,7 +40,7 @@ clean:
 	${CLEAN_FILES}
 
 .f90.o:
-	$(FC) $(FFLAGS) -c $< -o $@
+	$(FC) $(FFLAGS) -I${MATLAB_INCLUDE} -c $< -o $@
 .for.o:
 	$(FC) $(FFLAGS) -c $< -o $@
 
