@@ -9,8 +9,8 @@ end
 
 compiler_root = '/opt/intel/oneapi/compiler/latest';
 mkl_root = '/opt/intel/oneapi/mkl/latest';
-cuda_root = '/home/spol/miniconda3/envs/mt-cuda-py310';
-cvode_root = '/home/spol/sundials-4.1.0/instdir';
+cuda_root = getenv('CONDA_PREFIX');
+cvode_root = '/usr/local/sundials-4.1.0/instdir';
 mex_root = 'source/MagTenseMEX/MagTenseMEX/';
 
 NumericalIntegration_path = 'source/NumericalIntegration/NumericalIntegration';

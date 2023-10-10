@@ -13,7 +13,7 @@ MATLAB_INCLUDE = /usr/local/MATLAB/R2021b/extern/include
 USE_CUDA = 0
 
 USE_CVODE = 1
-CVODE_ROOT= /home/spol/sundials-4.1.0/instdir
+CVODE_ROOT= /usr/local/sundials-4.1.0/instdir
 
 MKL_ROOT = /opt/intel/oneapi/mkl/latest 						# Linux - oneapi
 # MKL_ROOT = ${CONDA_PREFIX} 									# Linux - conda
@@ -50,9 +50,10 @@ endif
 
 ifeq ($(USE_MATLAB),0)
 	FORCEINTEGRATOR =
-	MATLAB_INCLUDE =
+	MATLAB_OPT =
 else
 	FORCEINTEGRATOR = forceintegrator
+	MATLAB_OPT = -I${MATLAB_INCLUDE}
 endif
 #=======================================================================
 #							Targets
@@ -62,18 +63,18 @@ endif
 all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} # standalone 
 
 magnetostatic:
-	cd source/NumericalIntegration/NumericalIntegration && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd source/NumericalIntegration/NumericalIntegration && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) MATLAB_OPT=$(MATLAB_OPT)
 	cd source/TileDemagTensor/TileDemagTensor && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
-	cd source/DemagField/DemagField && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd source/DemagField/DemagField && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' USE_MATLAB=$(USE_MATLAB) MATLAB_OPT=$(MATLAB_OPT)
 
 micromagnetism:
-	cd source/MagTenseMicroMag && $(MAKE) FFLAGS='$(FFLAGS)' USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE) MKL_ROOT=$(MKL_ROOT)
+	cd source/MagTenseMicroMag && $(MAKE) FFLAGS='$(FFLAGS)' USE_MATLAB=$(USE_MATLAB) MATLAB_OPT=$(MATLAB_OPT) MKL_ROOT=$(MKL_ROOT)
 
 cuda:
 	cd source/MagTenseFortranCuda/cuda && $(MAKE) CPP=$(CPP)
 
 forceintegrator:
-	cd source/MagneticForceIntegrator/MagneticForceIntegrator && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd source/MagneticForceIntegrator/MagneticForceIntegrator && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' MATLAB_OPT=$(MATLAB_OPT)
 
 standalone:
 	cd source/MagTense_StandAlone/MagTense_StandAlone && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
