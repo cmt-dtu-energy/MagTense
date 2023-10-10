@@ -3,6 +3,8 @@
 #=======================================================================
 # FC = ifort
 FC = gfortran
+USE_CVODE = 0
+CVODE_ROOT =
 MATLAB_INCLUDE =
 FFLAGS =
 #=======================================================================
@@ -28,6 +30,12 @@ else
 	CLEAN_FILES = -rm -f .a *.o *.mod
 endif
 STATIC_LIB = libNumericalIntegration${LIB_SUFFIX}
+
+ifeq ($(USE_CVODE),0)
+	OPT = -I${MATLAB_INCLUDE}
+else
+	OPT = -I${CVODE_ROOT}/fortran/ -I${MATLAB_INCLUDE}
+endif
 #=======================================================================
 #							Targets
 #=======================================================================
@@ -40,7 +48,7 @@ clean:
 	${CLEAN_FILES}
 
 .f90.o:
-	$(FC) $(FFLAGS) -I${MATLAB_INCLUDE} -c $< -o $@
+	$(FC) $(FFLAGS) ${OPT}  -c $< -o $@
 .for.o:
 	$(FC) $(FFLAGS) -c $< -o $@
 
