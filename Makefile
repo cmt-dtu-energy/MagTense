@@ -3,18 +3,15 @@
 #=======================================================================
 FC = ifort
 # FC = gfortran
-
 CPP = icx
-COMPILE_MICROMAG = 1
-
-USE_MATLAB = 1
-MATLAB_INCLUDE = /usr/local/MATLAB/R2021b/extern/include
 
 USE_CUDA = 0
-
 USE_CVODE = 1
-CVODE_ROOT= /usr/local/sundials-4.1.0/instdir
+USE_MATLAB = 1
+COMPILE_MICROMAG = 1
 
+CVODE_ROOT= /usr/local/sundials-4.1.0/instdir
+MATLAB_INCLUDE = /usr/local/MATLAB/R2021b/extern/include
 MKL_ROOT = /opt/intel/oneapi/mkl/latest 						# Linux - oneapi
 # MKL_ROOT = ${CONDA_PREFIX} 									# Linux - conda
 # MKL_ROOT = "C:\Program Files (x86)\Intel\oneAPI\mkl\latest" 	# Win - oneapi
@@ -42,10 +39,10 @@ else
 	COMPILE_CUDA = cuda
 endif
 
-ifeq ($(COMPILE_MICROMAG),0)
-	MICROMAG =
+ifeq ($(USE_CVODE),0)
+	CVODE_OPT =
 else
-	MICROMAG = micromagnetism
+	CVODE_OPT = -I${CVODE_ROOT}/fortran
 endif
 
 ifeq ($(USE_MATLAB),0)
@@ -55,6 +52,12 @@ else
 	FORCEINTEGRATOR = forceintegrator
 	MATLAB_OPT = -I${MATLAB_INCLUDE}
 endif
+
+ifeq ($(COMPILE_MICROMAG),0)
+	MICROMAG =
+else
+	MICROMAG = micromagnetism
+endif
 #=======================================================================
 #							Targets
 #=======================================================================
@@ -63,7 +66,7 @@ endif
 all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} # standalone 
 
 magnetostatic:
-	cd source/NumericalIntegration/NumericalIntegration && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) MATLAB_OPT=$(MATLAB_OPT)
+	cd source/NumericalIntegration/NumericalIntegration && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' CVODE_OPT=$(CVODE_OPT) MATLAB_OPT=$(MATLAB_OPT)
 	cd source/TileDemagTensor/TileDemagTensor && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
 	cd source/DemagField/DemagField && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' USE_MATLAB=$(USE_MATLAB) MATLAB_OPT=$(MATLAB_OPT)
 

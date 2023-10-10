@@ -139,7 +139,7 @@ ifeq ($(USE_CVODE),0)
 	CVODE =
 	CVODE_OPT =
 else
-	CVODE_OPT = -I${CVODE_ROOT}/fortran/
+	CVODE_OPT = -I${CVODE_ROOT}/fortran
 endif
 
 ifeq ($(USE_MICROMAG),0)
