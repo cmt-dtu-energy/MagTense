@@ -4,10 +4,17 @@
 # FC = ifort
 FC = gfortran
 FFLAGS =
+USE_MATLAB = 0
+MATLAB_INCLUDE =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
 LIBSRC_SOURCES = DemagFieldGetSolution MagParameters spline IterateMagnetSolution
+
+ifeq ($(USE_MATLAB),1)
+	LIBSRC_SOURCES += MagTileIO
+endif
+
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
@@ -39,7 +46,7 @@ TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX
 all: pre-build ${STATIC_LIB}
 
 .f90.o:
-	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -c $< -o $@
+	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${MATLAB_INCLUDE} -c $< -o $@
 
 pre-build:
 	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'

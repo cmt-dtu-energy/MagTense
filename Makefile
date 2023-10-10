@@ -10,7 +10,7 @@ COMPILE_MICROMAG = 1
 USE_MATLAB = 1
 MATLAB_INCLUDE = /usr/local/MATLAB/R2021b/extern/include
 
-USE_CUDA = 1
+USE_CUDA = 0
 USE_CVODE = 0
 
 MKL_ROOT = /opt/intel/oneapi/mkl/latest 						# Linux - oneapi
@@ -45,17 +45,23 @@ ifeq ($(COMPILE_MICROMAG),0)
 else
 	MICROMAG = micromagnetism
 endif
+
+ifeq ($(USE_MATLAB),0)
+	FORCEINTEGRATOR =
+else
+	FORCEINTEGRATOR = forceintegrator
+endif
 #=======================================================================
 #							Targets
 #=======================================================================
 .PHONY: all clean
 
-all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} # standalone forceintegrator
+all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} # standalone 
 
 magnetostatic:
 	cd source/NumericalIntegration/NumericalIntegration && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 	cd source/TileDemagTensor/TileDemagTensor && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
-	cd source/DemagField/DemagField && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
+	cd source/DemagField/DemagField && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 
 micromagnetism:
 	cd source/MagTenseMicroMag && $(MAKE) FFLAGS='$(FFLAGS)' USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE) MKL_ROOT=$(MKL_ROOT)
@@ -64,7 +70,7 @@ cuda:
 	cd source/MagTenseFortranCuda/cuda && $(MAKE) CPP=$(CPP)
 
 forceintegrator:
-	cd source/MagneticForceIntegrator/MagneticForceIntegrator && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
+	cd source/MagneticForceIntegrator/MagneticForceIntegrator && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)' MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 
 standalone:
 	cd source/MagTense_StandAlone/MagTense_StandAlone && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
