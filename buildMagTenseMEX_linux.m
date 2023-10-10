@@ -88,24 +88,23 @@ end
 end
 
 function eval_MEX(mex_str)
-
-    try
-        eval(mex_str);
-    catch ME
-        if (strcmp(ME.message(91:117),'mt : general error c101008d'))
-            fail_mex = true; 
-            while fail_mex
-                try 
-                    disp('Microsoft manifest tool error - retrying')
-                    eval(mex_str); 
-                    fail_mex = false; 
-                catch
-                    continue
-                end
+try
+    eval(mex_str);
+catch ME
+    if (strcmp(ME.message(91:117),'mt : general error c101008d'))
+        fail_mex = true; 
+        while fail_mex
+            try 
+                disp('Microsoft manifest tool error - retrying')
+                eval(mex_str); 
+                fail_mex = false; 
+            catch
+                continue
             end
-        else
-            disp(ME.message)
-            rethrow(ME)
         end
+    else
+        disp(ME.message)
+        rethrow(ME)
     end
-    end
+end
+end
