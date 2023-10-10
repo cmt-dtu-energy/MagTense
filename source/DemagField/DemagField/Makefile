@@ -5,7 +5,7 @@
 FC = gfortran
 FFLAGS =
 USE_MATLAB = 0
-MATLAB_INCLUDE =
+MATLAB_OPT =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
@@ -46,7 +46,7 @@ TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX
 all: pre-build ${STATIC_LIB}
 
 .f90.o:
-	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${MATLAB_INCLUDE} -c $< -o $@
+	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} ${MATLAB_OPT} -c $< -o $@
 
 pre-build:
 	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'

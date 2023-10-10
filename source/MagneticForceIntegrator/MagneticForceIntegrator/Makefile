@@ -5,7 +5,7 @@
 FC = gfortran
 FFLAGS =
 
-MATLAB_INCLUDE =
+MATLAB_OPT =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
@@ -44,7 +44,7 @@ DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
 all: ${STATIC_LIB}
 
 .f90.o:
-	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I${MATLAB_INCLUDE} -c $<
+	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} ${MATLAB_OPT} -c $<
 
 ${STATIC_LIB}: ${LIBSRC_OBJECTS} ${NUM_INT_LIB} ${TILE_DEMAG_TENSOR_LIB} ${DEMAG_FIELD_LIB}
 	${LIBTOOL}
