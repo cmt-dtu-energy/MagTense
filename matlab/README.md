@@ -36,6 +36,8 @@ If you want to compile MagTense with a Visual Studio project file for Windows, [
 
   [ Linux ] `/usr/local/sundials-4.1.0/instdir`
 
+  **Note:** Shared libraries for Fortran modules are not distributed in conda package of [sundials](https://anaconda.org/conda-forge/sundials). CVODE has to be built beforehand locally when linked dynamically. During runtime, path has to added to LD_LIBRARY_PATH on Linux.
+
 ### Compilation
 
 Prepare your terminal, so that ifort compiler can be found:
