@@ -10,7 +10,7 @@ end
 compiler_root = '/opt/intel/oneapi/compiler/latest';
 mkl_root = '/opt/intel/oneapi/mkl/latest';
 cuda_root = '/home/spol/miniconda3/envs/mt-cuda-py310';
-cvode_root = '/home/spol/cvode-6.6.0/instdir';
+cvode_root = '/home/spol/sundials-4.1.0/instdir';
 mex_root = 'source/MagTenseMEX/MagTenseMEX/';
 
 NumericalIntegration_path = 'source/NumericalIntegration/NumericalIntegration';
@@ -37,24 +37,21 @@ else
     name_suffix = 'NoCUDA';
 end
 
-%{
- if (USE_CVODE)
-    CVODE_include = ['-I' cvode_root '/include'];
+if (USE_CVODE)
+    CVODE_include = join(['-I' cvode_root '/fortran'], '');
     CVODE = ['-L' cvode_root '/lib -lsundials_nvecserial -lsundials_sunmatrixdense -lsundials_sunlinsoldense' ...
     ' -lsundials_fnvecserial_mod -lsundials_cvode -lsundials_fsunnonlinsolfixedpoint_mod'];
 else
+    CVODE_include = '';
     CVODE = '';
-    name_suffix = [name_suffix '_no_CVODE'];
-end 
-%}
+end
 
-CVODE = '';
 COMPILE = ['FC="' compiler_root '/linux/bin/intel64/ifort"'];
 DEFINES = 'DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"';
 FFLAGS = 'FFLAGS="-i8 -r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source -fp-model precise -fpic -libs:static"';
 INCLUDE = ['INCLUDE="$INCLUDE -I' mkl_root '/include -I' mkl_root '/include/intel64/ilp64 -I' ... 
     NumericalIntegration_path ' -I' DemagField_path ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ...
-    ' -I' ForceIntegrator_path '"'];
+    ' -I' ForceIntegrator_path ' ' CVODE_include '"'];
 LIBS = ['-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' DemagField_path ' -lDemagField -L' ...
     TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration -L' ...
     ForceIntegrator_path ' -lMagneticForceIntegrator'];
@@ -71,9 +68,11 @@ for i = 1:length(names)
     disp(join(mex_str, ' '))
     eval(join(mex_str, ' '))
     if names(i) ~= "MagTenseLandauLifshitzSolver"
-        name_suffix = '';
+        name_sffx = '';
+    else
+        name_sffx = name_suffix;
     end
-    movefile(join([names(i) '_mex.mex' mex_suffix '64'], ''), join(['matlab/MEX_files/' names(i) name_suffix '_mex.mex' mex_suffix '64'], ''));
+    movefile(join([names(i) '_mex.mex' mex_suffix '64'], ''), join(['matlab/MEX_files/' names(i) name_sffx '_mex.mex' mex_suffix '64'], ''));
 end
  
 end

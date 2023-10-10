@@ -33,6 +33,18 @@ Enable only the following settings (if not all settings appear, select the appro
 Click "Generate" in cmake
 	(if any paths contain spaces or parentheses, escape the offending symbols with \ and generate again. Likely culprit: BLAS libraries.)
 
+=================================
+cmake on LINUX
+=================================
+cmake --verbose -DCMAKE_INSTALL_PREFIX=/path/to/sundials-4.1.0/instdir \
+-DEXAMPLES_INSTALL_PATH=/path/to/sundials-4.1.0/instdir/examples \
+-DBUILD_ARKODE=OFF -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF \
+-DBUILD_CVODE=ON -DBUILD_STATIC_LIBS=ON -DBUILD_TESTING=ON \
+-DCMAKE_Fortran_COMPILER=/opt/intel/oneapi/compiler/latest/linux/bin/intel64/ifort \
+-DEXAMPLES_ENABLE_C=ON -DEXAMPLES_ENABLE_CXX=ON -DEXAMPLES_ENABLE_F77=ON -DEXAMPLES_ENABLE_F90=ON \
+-DF2003_INTERFACE_ENABLE=ON -DF77_INTERFACE_ENABLE=ON -DOPENMP_ENABLE=ON ../srcdir
+=================================
+
 Now copy build_rest.bat into builddir and run it in the command window.
 
 In the command window run "msbuild ALL_BUILD.vcxproj -property:Configuration=Debug"
