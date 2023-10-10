@@ -2,7 +2,7 @@
 #                       compiler names and flags
 #=======================================================================
 FC = ifort
-USE_MATLAB = 1
+USE_MATLAB = 0
 MATLAB_INCLUDE =
 MKL_ROOT =
 #=======================================================================
@@ -54,7 +54,7 @@ DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
 all: pre-build ${STATIC_LIB}
 
 .f90.o:
-	$(FC) $(FFLAGS) -I${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/ilp64 -I${MATLAB_INCLUDE} -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -c $< -o $@
+	$(FC) $(FFLAGS) -I${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/ilp64 -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I${MATLAB_INCLUDE} -c $< -o $@
 
 pre-build:
 	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'

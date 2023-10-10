@@ -5,7 +5,7 @@
 FC = gfortran
 FFLAGS =
 
-MATLAB_INCLUDE = /apps/external/matlab/2019/b/extern/include/
+MATLAB_INCLUDE =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
@@ -35,8 +35,6 @@ TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX
 
 DEMAG_FIELD_PATH = ../../DemagField/DemagField
 DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
-
-OPT = -I ${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I${MATLAB_INCLUDE}
 #=======================================================================
 #							Targets
 #=======================================================================
@@ -46,7 +44,7 @@ OPT = -I ${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I${M
 all: ${STATIC_LIB}
 
 .f90.o:
-	$(FC) $(FFLAGS) ${OPT} -c $<
+	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I${MATLAB_INCLUDE} -c $<
 
 ${STATIC_LIB}: ${LIBSRC_OBJECTS} ${NUM_INT_LIB} ${TILE_DEMAG_TENSOR_LIB} ${DEMAG_FIELD_LIB}
 	${LIBTOOL}
