@@ -36,6 +36,8 @@ If you want to compile MagTense with a Visual Studio project file for Windows, [
 
   [ Linux ] `/usr/local/sundials-4.1.0/instdir`
 
+  A guide for custom installation of sundials-4.1.0 from this repository can be found [here](#install-cvode-from-sundials-4.1.0) 
+
   **Note:** Shared libraries for Fortran modules are not distributed in conda package of [sundials](https://anaconda.org/conda-forge/sundials). CVODE has to be built beforehand locally when linked dynamically. During runtime, path has to added to LD_LIBRARY_PATH on Linux.
 
 ### Compilation
@@ -52,11 +54,11 @@ Prepare your terminal, so that ifort compiler can be found:
   . /opt/intel/oneapi/setvars.sh
   ```
 
-Set flags in [Makefile](https://github.com/cmt-dtu-energy/MagTense/blob/master/Makefile) corresponding to your setupand then run:
+Set flags and paths in [Makefile](https://github.com/cmt-dtu-energy/MagTense/blob/master/Makefile) corresponding to your setup and then run:
 
 ```
 cd path/to/MagTense/
-make
+make USE_CUDA=1 USE_CVODE=1 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2021b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest	 
 ```
 
 ## Building MEX-files
@@ -101,7 +103,107 @@ Prepare your terminal, so that ifort compiler and required libraries can be foun
   run('Standard_problem_3.m')
   ```
 
-# How to: Compile changes in CUDA code on Windows with Intel Fortran
+# Install CVODE from sundials-4.1.0  
+
+- Requirements:
+
+    - [cmake](https://cmake.org/)
+
+    - [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
+
+- Unzip [sundials-4.1.0.tar.gz](https://github.com/cmt-dtu-energy/MagTense/blob/compile_matlab_linux/source/CVODE_installation/sundials-4.1.0.tar.gz) located in `source/CVODE_installation`
+
+    ```
+    tar -xf sundials-4.1.0.tar.gz
+    ```
+    Note: It is not possible to get the cmake installer to work if sundials is unzipped in a directory with spaces.
+
+- Rename the unpacked folder `sundials-4.1.0` to `srcdir`
+
+    ```
+    mv sundials-4.1.0 srcdir
+    mkdir sundials-4.1.0
+    mv srcdir ./sundials-4.1.0
+    cd sundials-4.1.0
+    mkdir builddir
+    mkdir instdir
+    ```
+
+- Open the file "scrdir\config\SundialsFortran.cmake" and change the following two lines to:
+
+    ```
+    214     "FIND_FILE(FLIB flib.f ${FortranTest_DIR})\n"
+    262     "FIND_FILE(FLIB flib.f ${FortranTest_DIR})\n"
+    ```
+
+## Build with cmake on Windows
+
+- Open Visual Studio and open a Developer Command Prompt (Tools/Command Line/Developer Command Prompt)
+
+    ```
+    cd builddir
+    "C:\Program Files\CMake\bin\cmake-gui.exe" ../srcdir
+    ```
+
+- Click "Configure"
+
+    Choose Visual Studio 16 2019 (or whatever latest version you have) as generator
+	Write "Intel C++ Compiler 19.0" (or whatever latest version you have) in "Optional toolset to use"
+
+- Set the CMAKE_INSTALL_PREFIX to the full path to the instdir
+- Set the EXAMPLES_INSTALL_PATH to the full path to the instdir/examples
+- Enable only the following settings (if not all settings appear, select the appropriate onces and click "Configure" again):
+    ```
+	BUILD_CVODE
+	BUILD_STATIC_LIBS
+	BUILD_TESTING
+	EXAMPLES_ENABLE_C
+	EXAMPLES_ENABLE_CXX
+	EXAMPLES_ENABLE_F77
+	EXAMPLES_ENABLE_F90
+	F2003_INTERFACE_ENABLE
+	F77_INTERFACE_ENABLE
+	OPENMP_ENABLE
+    ```
+
+- Click "Generate" in cmake
+	
+    Note: If any paths contain spaces or parentheses, escape the offending symbols with \ and generate again. Likely culprit: BLAS libraries.
+
+- Copy [build_rest.bat](https://github.com/cmt-dtu-energy/MagTense/blob/compile_matlab_linux/source/CVODE_installation/build_rest.bat) into builddir
+
+    ```
+    cp source/CVODE_installation/build_rest.bat .
+    ```
+
+- In Visual Studio command window run the following commands:
+    ```
+    msbuild ALL_BUILD.vcxproj -property:Configuration=Debug
+    msbuild INSTALL.vcxproj -property:Configuration=Debug
+
+    msbuild ALL_BUILD.vcxproj -property:Configuration=Release
+    msbuild INSTALL.vcxproj -property:Configuration=Release
+    ```
+
+- CVODE is now installed in the instdir. Move the folder `sundials-4.1.0` to the expected location:
+
+    ```
+    cd ..
+    mv sundials-4.1.0 "C:\Program Files (x86)\sundials-4.1.0"
+    ``` 
+
+Note: The last four instructions *could* be put into the .bat file, but it's easier to isolate warnings / errors if they aren't.
+Building ALL_BUILD causes two linker warnings because SUNDIALS gave compile flags to the linker as well as the compiler.
+Building INSTALL can cause one (strange) warning, MSB8065, which is apparently a bug of no consequence (https://gitlab.kitware.com/cmake/cmake/issues/19737).
+
+## Build with cmake on Linux
+
+```
+cd builddir
+cmake --verbose -DCMAKE_INSTALL_PREFIX=/path/to/sundials-4.1.0/instdir -DEXAMPLES_INSTALL_PATH=/path/to/sundials-4.1.0/instdir/examples -DBUILD_ARKODE=OFF -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_CVODE=ON -DBUILD_STATIC_LIBS=ON -DBUILD_TESTING=ON -DCMAKE_Fortran_COMPILER=/opt/intel/oneapi/compiler/latest/linux/bin/intel64/ifort -DEXAMPLES_ENABLE_C=ON -DEXAMPLES_ENABLE_CXX=ON -DEXAMPLES_ENABLE_F77=ON -DEXAMPLES_ENABLE_F90=ON -DF2003_INTERFACE_ENABLE=ON -DF77_INTERFACE_ENABLE=ON -DOPENMP_ENABLE=ON ../srcdir
+```
+
+# Compile changes in CUDA code on Windows with Intel Fortran
 
 Intel's Fortran Compiler and the PG Fortran compiler (which is used for doing CUDA directly in Fortran) are not compatible. One simply cannot link object files from the two compilers as there is no standard for this.
 
