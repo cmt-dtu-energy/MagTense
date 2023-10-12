@@ -2,7 +2,7 @@
 
 ##  Compilation with Visual Studio
 
-If you want to compile MagTense with a Visual Studio project file for Windows, [MagTense.sln](https://github.com/cmt-dtu-energy/MagTense/blob/master/MagTense.sln), is available, as well as a Matlab function to build the MEX-files, [buildMagTenseMEX.m](https://github.com/cmt-dtu-energy/MagTense/blob/master/buildMagTenseMEX.m). MagTense utilizes Intel MKL for the micromagnetic simlations and can also utilize CUDA and CVODE. The Visual Studio environment has configuration for Release, Debug as well as for configurations included NO_CUDA and NO_CVODE.
+If you want to compile MagTense with a Visual Studio project file for Windows, [MagTense.sln](../MagTense.sln), is available, as well as a Matlab function to build the MEX-files, [buildMagTenseMEX.m](buildMagTenseMEX.m). MagTense utilizes Intel MKL for the micromagnetic simlations and can also utilize CUDA and CVODE. The Visual Studio environment has configuration for Release, Debug as well as for configurations included NO_CUDA and NO_CVODE.
 
 ##  Compilation with make
 
@@ -77,9 +77,9 @@ Prepare your terminal, so that ifort compiler can be found:
 
 Start Matlab via command line and run build script:
 ```
-cd path/to/MagTense/
+cd path/to/MagTense/matlab
 /path/to/Matlab/installation/bin/matlab -nodisplay -nosplash -nodesktop
-run('buildMagTenseMEX_linux.m')
+run('buildMagTenseMEX.m')
 ```
 
 ## Runtime
@@ -98,9 +98,9 @@ Prepare your terminal, so that ifort compiler and required libraries can be foun
 
 - Test with standard problem #3
   ```
-  cd path/to/MagTense/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_3
+  cd path/to/MagTense/matlab/
   /path/to/Matlab/installation/bin/matlab -nodisplay -nosplash -nodesktop
-  run('Standard_problem_3.m')
+  run('examples/Micromagnetism/mumag_micromag_Std_problem_3/Standard_problem_3.m')
   ```
 
 # Install CVODE from sundials-4.1.0  
@@ -111,12 +111,13 @@ Prepare your terminal, so that ifort compiler and required libraries can be foun
 
     - [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
-- Unzip [sundials-4.1.0.tar.gz](https://github.com/cmt-dtu-energy/MagTense/blob/compile_matlab_linux/source/CVODE_installation/sundials-4.1.0.tar.gz) located in `source/CVODE_installation`
+    - [Sundials-4.1.0](https://github.com/LLNL/sundials/releases/tag/v4.1.0)
 
-    ```
-    tar -xf sundials-4.1.0.tar.gz
-    ```
-    Note: It is not possible to get the cmake installer to work if sundials is unzipped in a directory with spaces.
+        ```
+        wget https://github.com/LLNL/sundials/releases/download/v4.1.0/sundials-4.1.0.tar.gz
+        tar -xf sundials-4.1.0.tar.gz
+        ```
+        Note: It is not possible to get the cmake installer to work if sundials is unzipped in a directory with spaces.
 
 - Rename the unpacked folder `sundials-4.1.0` to `srcdir`
 
@@ -170,10 +171,10 @@ Prepare your terminal, so that ifort compiler and required libraries can be foun
 	
     Note: If any paths contain spaces or parentheses, escape the offending symbols with \ and generate again. Likely culprit: BLAS libraries.
 
-- Copy [build_rest.bat](https://github.com/cmt-dtu-energy/MagTense/blob/compile_matlab_linux/source/CVODE_installation/build_rest.bat) into builddir
+- Copy [build_rest.bat](build_rest.bat) into builddir
 
     ```
-    cp source/CVODE_installation/build_rest.bat .
+    cp matlab/build_rest.bat .
     ```
 
 - In Visual Studio command window run the following commands:
