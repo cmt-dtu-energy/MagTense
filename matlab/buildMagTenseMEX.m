@@ -92,7 +92,11 @@ MKL = ['-L' mkl_root '/lib/intel64 -lmkl_rt -lmkl_blas95_ilp64 -lpthread -lm -ld
 %%------------------------------------------------------------------
 %%--------------- Build the MEX files ------------------------------
 %%----------------------------------- ------------------------------
-names = ["MagTenseLandauLifshitzSolver", "MagTenseLandauLifshitzSolverNoCUDA", "IterateMagnetization", "getHFromTiles", "getNFromTile", "getMagForce"];
+if (ispc)
+    names = ["MagTenseLandauLifshitzSolver", "MagTenseLandauLifshitzSolverNoCUDA", "IterateMagnetization", "getHFromTiles", "getNFromTile", "getMagForce"];
+else
+    names = ["MagTenseLandauLifshitzSolver", "IterateMagnetization", "getHFromTiles", "getNFromTile", "getMagForce"];
+end
 
 for i = 1:length(names)
     if names(i) == "MagTenseLandauLifshitzSolverNoCUDA"
