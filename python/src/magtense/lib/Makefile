@@ -52,7 +52,7 @@ ifeq ($(OS),Windows_NT)
 	MKL_ROOT = ${CONDA_PREFIX}/Library
 	MKL_ONEAPI = "C:\Program Files (x86)\Intel\oneAPI\mkl\latest"
 	CUDA = -L${CONDA_PREFIX}/Lib/x64 -lcublas -lcudart -lcuda -lcusparse
-	MKL = -L${MKL_ONEAPI}/lib/intel64 -lmkl_rt -lmkl_blas95_ilp64
+	MKL = -L${MKL_ONEAPI}/lib/intel64 -lmkl_rt -lmkl_blas95_lp64
 	MKL_OMP = -L${MKL_ONEAPI}/windows/compiler/lib/intel64_win -llibiomp5md
 	CVODE_ROOT = "C:\Program Files (x86)\sundials-4.1.0\instdir"
 
@@ -61,7 +61,7 @@ ifeq ($(OS),Windows_NT)
 		EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower \
 		--opt='${FFLAGS} /assume:nounderscore /names:uppercase'
 		OPT = ${MKL_ROOT}/include -I${MKL_ONEAPI}/include \
-		-I${MKL_ROOT}/include/intel64/ilp64 -I${CVODE_ROOT}/fortran \
+		-I${MKL_ROOT}/include/intel64/lp64 -I${CVODE_ROOT}/fortran \
 		-I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} \
 		-I${MICROMAG_PATH} -I${FORTRAN_CUDA_PATH}
 		LIB_OPT = -I:${OPT} -L. -llibsrc
@@ -84,7 +84,7 @@ else
 
 	ifeq (${FC}, ifort)
 		FCOMP = intelem
-		OPT = ${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/ilp64 \
+		OPT = ${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 \
 		-I${CVODE_ROOT}/fortran -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} \
 		-I${DEMAG_FIELD_PATH} -I${MICROMAG_PATH} -I${FORTRAN_CUDA_PATH}
 		LIB_OPT = -I${OPT} -L. -lsrc
@@ -95,7 +95,7 @@ else
 
 	EXTRA_OPT = --opt='${FFLAGS}'
 	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
-	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -lpthread -lm -ldl -liomp5 -lmkl_blas95_ilp64
+	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -lpthread -lm -ldl -liomp5 -lmkl_blas95_lp64
 
 	ifeq (${UNAME}, Darwin)
   		LIBTOOL = libtool -static -o $@ $?
