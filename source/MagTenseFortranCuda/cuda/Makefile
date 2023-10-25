@@ -21,7 +21,7 @@ CUDA_WRAP = $(addsuffix .o, ${CUDA_WRAP_SOURCE})
 ifeq ($(OS),Windows_NT)
 	COMPILE_CUDA =
 	CPPFLAGS = /Fo:${CUDA_WRAP}
-	CLEAN_FILES = -del *.o
+	CLEAN_FILES = -del *.obj
 
 else
 	COMPILE_CUDA = cuda
