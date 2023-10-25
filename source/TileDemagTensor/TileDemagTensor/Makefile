@@ -4,6 +4,10 @@
 # FC = ifort
 FC = gfortran
 FFLAGS =
+USE_CVODE =
+CVODE_ROOT =
+USE_MATLAB =
+MATLAB_INCLUDE =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
@@ -41,7 +45,7 @@ all: pre-build ${STATIC_LIB}
 	$(FC) $(FFLAGS) -I ${NUM_INT_PATH} -c $< -o $@
 
 pre-build:
-	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
+	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
 
 ${STATIC_LIB}: ${NUM_INT_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}

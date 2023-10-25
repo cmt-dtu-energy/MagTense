@@ -3,8 +3,10 @@
 #=======================================================================
 # FC = ifort
 FC = gfortran
-CVODE_OPT =
-MATLAB_OPT =
+USE_CVODE =
+CVODE_ROOT =
+USE_MATLAB =
+MATLAB_INCLUDE =
 FFLAGS =
 #=======================================================================
 #       List all source files required for the project
@@ -29,10 +31,22 @@ else
 	CLEAN_FILES = -rm -f .a *.o *.mod
 endif
 STATIC_LIB = libNumericalIntegration${LIB_SUFFIX}
+
+ifeq ($(USE_CVODE),0)
+	CVODE_OPT =
+else
+	CVODE_OPT = -I"${CVODE_ROOT}"/fortran
+endif
+
+ifeq ($(USE_MATLAB),0)
+	MATLAB_OPT =
+else
+	MATLAB_OPT = -I"${MATLAB_INCLUDE}"
+endif
 #=======================================================================
 #							Targets
 #=======================================================================
-.SUFFIXES: .for .f90
+.SUFFIXES: .f90
 .PHONY: all clean
 
 all: ${STATIC_LIB}
@@ -42,8 +56,6 @@ clean:
 
 .f90.o:
 	$(FC) $(FFLAGS) ${CVODE_OPT} ${MATLAB_OPT} -c $< -o $@
-.for.o:
-	$(FC) $(FFLAGS) -c $< -o $@
 
 ${STATIC_LIB}: ${LIBSRC_OBJECTS}
 	${LIBTOOL}

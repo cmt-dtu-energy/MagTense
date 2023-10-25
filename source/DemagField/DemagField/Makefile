@@ -4,15 +4,20 @@
 # FC = ifort
 FC = gfortran
 FFLAGS =
-USE_MATLAB = 0
-MATLAB_OPT =
+USE_CVODE =
+CVODE_ROOT =
+USE_MATLAB =
+MATLAB_INCLUDE =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
 LIBSRC_SOURCES = DemagFieldGetSolution MagParameters spline IterateMagnetSolution
 
 ifeq ($(USE_MATLAB),1)
-	LIBSRC_SOURCES += MagTileIO
+LIBSRC_SOURCES += MagTileIO
+MATLAB_OPT = -I"${MATLAB_INCLUDE}"
+else
+MATLAB_OPT =
 endif
 
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
@@ -49,8 +54,8 @@ all: pre-build ${STATIC_LIB}
 	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} ${MATLAB_OPT} -c $< -o $@
 
 pre-build:
-	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
-	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE) FC=$(FC) FFLAGS='$(FFLAGS)'
+	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
+	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
 
 ${STATIC_LIB}: ${NUM_INT_LIB} ${TILE_DEMAG_TENSOR_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
