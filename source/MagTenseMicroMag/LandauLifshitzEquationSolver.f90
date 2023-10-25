@@ -1,6 +1,6 @@
-#if USE_MATLAB
-include 'mkl_blas.f90'
-#endif
+! #if USE_MATLAB
+! include 'mkl_blas.f90'
+! #endif
 
 !include 'mkl_vml.f90'
     module LandauLifshitzSolution
