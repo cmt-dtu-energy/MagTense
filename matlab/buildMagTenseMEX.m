@@ -81,7 +81,7 @@ end
 
 if (ispc)
     DEFINES = '-R2018a';
-    FFLAGS = 'COMPFLAGS="/fixed:512 /nologo /real-size:64 /O2 /assume:nocc_omp /Qopenmp /fpp /fpe:0 /fp:source /fp:precise /libs:static"';
+    FFLAGS = 'COMPFLAGS="$COMPFLAGS /free /nologo /real-size:64 /O2 /assume:nocc_omp /Qopenmp /fpp /fpe:0 /fp:source /fp:precise /libs:static"';
     INCLUDE = ['-I' mkl_include ' -I' mkl_lp64 ' -I' NumericalIntegration_path BUILD '-I' DemagField_path BUILD '-I' TileDemagTensor_path ...
         BUILD '-I' MagTenseMicroMag_path BUILD_MagTenseMicroMag '-I' ForceIntegrator_path BUILD CVODE_include];
     LIBS = ['-L' MagTenseMicroMag_path BUILD_MagTenseMicroMag '-lMagTenseMicroMag -L' DemagField_path BUILD ...
@@ -122,15 +122,17 @@ end
 for i = 1:length(names)
     if names(i) == "MagTenseLandauLifshitzSolverNoCUDA"
         source = [mex_root 'MagTenseLandauLifshitzSolver_mex.f90'];
-        mex_str = ['mex' ' ' DEBUG ' ' DEFINES ' ' FFLAGS ' ' INCLUDE_NO_CUDA ' ' OBJS ' '  LIBS_NO_CUDA ' ' MKL ' ' CUDA ' ' CVODE ' ' join(source, '')];
+        mex_str = ['mex' ' ' DEBUG ' ' DEFINES ' ' INCLUDE_NO_CUDA ' ' OBJS ' ' FFLAGS ' '  LIBS_NO_CUDA ' ' MKL ' ' CUDA ' ' CVODE ' ' join(source, '')];
+        orig_name = "MagTenseLandauLifshitzSolver";
     else
         source = [mex_root names(i) '_mex.f90'];
         mex_str = ['mex' DEBUG DEFINES FFLAGS INCLUDE OBJS LIBS MKL CUDA CVODE join(source, '')];
+        orig_name = names(i);
     end
     disp(join(mex_str, ' '))
     eval_MEX(join(mex_str, ' '))
     pause(pause_time)
-    movefile(join([names(i) '_mex.mex' mex_suffix '64'], ''), join(['MEX_files/' names(i) '_mex.mex' mex_suffix '64'], ''));
+    movefile(join([orig_name '_mex.mex' mex_suffix '64'], ''), join(['MEX_files/' names(i) '_mex.mex' mex_suffix '64'], ''));
 end
  
 end
