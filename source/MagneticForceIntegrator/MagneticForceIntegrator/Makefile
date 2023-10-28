@@ -11,7 +11,7 @@ MATLAB_INCLUDE =
 LIBSRC_SOURCES = MagForceIO MagForceMaxwellStressTensor MagneticForce
 
 ifeq ($(OS),Windows_NT)
-OBJ_SUFFIX = .o
+OBJ_SUFFIX = .obj
 LIB_SUFFIX = .lib
 LIBTOOL = LIB $? /OUT:$@
 CLEAN_FILES = -del ${STATIC_LIB} *.obj *.mod

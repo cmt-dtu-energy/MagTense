@@ -94,7 +94,7 @@ if (ispc)
         ' -lNumericalIntegration -L' ForceIntegrator_path BUILD ' -lMagneticForceIntegrator'];
     
     if (MKL_STATIC)
-        MKL = ['-L' mkl_lib ' -lmkl_intel_thread.lib -lmkl_core -lmkl_intel_lp64 -lmkl_blas95_lp64 -llibiomp5md'];
+        MKL = ['-L' mkl_lib ' -lmkl_intel_thread -lmkl_core -lmkl_intel_lp64 -lmkl_blas95_lp64 -llibiomp5md'];
     else
         MKL = ['-L' mkl_lib ' -lmkl_rt -lmkl_blas95_lp64'];
     end
@@ -122,7 +122,7 @@ end
 for i = 1:length(names)
     if names(i) == "MagTenseLandauLifshitzSolverNoCUDA"
         source = [mex_root 'MagTenseLandauLifshitzSolver_mex.f90'];
-        mex_str = ['mex' ' ' DEBUG ' ' DEFINES ' ' INCLUDE_NO_CUDA ' ' OBJS ' ' FFLAGS ' '  LIBS_NO_CUDA ' ' MKL ' ' CUDA ' ' CVODE ' ' join(source, '')];
+        mex_str = ['mex' ' ' DEBUG ' ' DEFINES ' ' FFLAGS ' ' INCLUDE_NO_CUDA ' ' OBJS ' ' LIBS_NO_CUDA ' ' MKL ' ' CUDA ' ' CVODE ' ' join(source, '')];
         orig_name = "MagTenseLandauLifshitzSolver";
     else
         source = [mex_root names(i) '_mex.f90'];

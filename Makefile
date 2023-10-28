@@ -5,8 +5,8 @@ FC = ifort
 # FC = gfortran
 CPP = icx
 
-USE_CUDA = 0
-USE_CVODE = 1
+USE_CUDA = 1
+USE_CVODE = 0
 USE_MATLAB = 1
 COMPILE_MICROMAG = 1
 

@@ -69,16 +69,6 @@ Prepare your terminal, so that ifort compiler can be found:
 
 - [ Windows]
 
-  ```bash
-  "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
-  ```
-
-  Modify variable `CMDLINE100` in `C:\Users\<user>\AppData\Roaming\MathWorks\MATLAB\R2023b\mex_FORTRAN_win64.xml`, so that the paths stored in `INCLUDE` can be found during building.
-  
-  ```bash
-  CMDLINE100="$COMPILER /c $COMPFLAGS $INCLUDE $OPTIM $SRC /Fo$OBJ"
-  ```
-
   Configuration of FORTRAN compiler used for mex:
 
   ```bash
@@ -102,12 +92,6 @@ run('buildMagTenseMEX.m')
 ## Runtime
 
 Prepare your terminal, so that ifort compiler and required libraries can be found:
-
-- [ Windows]
-
-  ```bash
-  "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
-  ```
 
 - [ Linux ]
 
