@@ -36,10 +36,10 @@ else
 end
 
 if (USE_RELEASE)
-    DEBUG = '-v';
+    DEBUG = '';
     BUILD = '/x64/Release';
 else
-    DEBUG = '-v -g';
+    DEBUG = '-g';
     BUILD = '/x64/Debug';
 end
 
@@ -57,6 +57,8 @@ else
     OBJS = '';
     BUILD_MagTenseMicroMag = [BUILD '_no_CUDA'];
 end
+CUDA_NO_CUDA = '';
+OBJS_NO_CUDA = '';
 
 if (USE_CVODE)
     CVODE_include = join(['-I' cvode_include], '');
@@ -83,7 +85,8 @@ end
 
 if (ispc)
     DEFINES = '-R2018a';
-    FFLAGS = 'COMPFLAGS="$COMPFLAGS /free /nologo /real-size:64 /O2 /assume:nocc_omp /Qopenmp /fpp /fpe:0 /fp:source /fp:precise /libs:static"';
+    FFLAGS_NO_CUDA = 'COMPFLAGS="$COMPFLAGS /free /nologo /real-size:64 /O2 /assume:nocc_omp /Qopenmp /fpp /fpe:0 /fp:source /fp:precise"';
+    FFLAGS = [FFLAGS_NO_CUDA(1:(end-1)) ' /libs:static"'];
     INCLUDE = ['-I' mkl_include ' -I' mkl_lp64 ' -I' NumericalIntegration_path BUILD '-I' DemagField_path BUILD '-I' TileDemagTensor_path ...
         BUILD '-I' MagTenseMicroMag_path BUILD_MagTenseMicroMag '-I' ForceIntegrator_path BUILD CVODE_include];
     LIBS = ['-L' MagTenseMicroMag_path BUILD_MagTenseMicroMag '-lMagTenseMicroMag -L' DemagField_path BUILD ...
@@ -102,7 +105,8 @@ if (ispc)
     end
 else
     DEFINES = ['FC="' compiler_root '/bin/intel64/ifort" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
-    FFLAGS = 'FFLAGS="-r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source -fp-model precise -fpic -libs:static"';
+    FFLAGS_NO_CUDA = 'FFLAGS="-r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source -fp-model precise -fpic -libs:static"';
+    FFLAGS = [FFLAGS_NO_CUDA(1:(end-1)) ' /libs:static"'];
     INCLUDE = ['INCLUDE="$INCLUDE -I' mkl_root '/include -I' mkl_root '/include/intel64/lp64 -I' ... 
         NumericalIntegration_path ' -I' DemagField_path ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ...
         ' -I' ForceIntegrator_path ' ' CVODE_include '"'];
@@ -120,11 +124,14 @@ if (ispc) && (VS_STUDIO)
 else
     names = ["MagTenseLandauLifshitzSolver", "IterateMagnetization", "getHFromTiles", "getNFromTile", "getMagForce"];
 end
+if (~USE_CUDA)
+     names(1) = "MagTenseLandauLifshitzSolverNoCUDA";
+end
 
 for i = 1:length(names)
     if names(i) == "MagTenseLandauLifshitzSolverNoCUDA"
         source = [mex_root 'MagTenseLandauLifshitzSolver_mex.f90'];
-        mex_str = ['mex' ' ' DEBUG ' ' DEFINES ' ' FFLAGS ' ' INCLUDE_NO_CUDA ' ' OBJS ' ' LIBS_NO_CUDA ' ' MKL ' ' CUDA ' ' CVODE ' ' join(source, '')];
+        mex_str = ['mex' ' ' DEBUG ' ' DEFINES ' ' FFLAGS_NO_CUDA ' ' INCLUDE_NO_CUDA ' ' OBJS_NO_CUDA ' ' LIBS_NO_CUDA ' ' MKL ' ' CUDA_NO_CUDA ' ' CVODE ' ' join(source, '')];
         orig_name = "MagTenseLandauLifshitzSolver";
     else
         source = [mex_root names(i) '_mex.f90'];
