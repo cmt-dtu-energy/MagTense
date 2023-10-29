@@ -30,7 +30,8 @@ else
     compiler_root = '/opt/intel/oneapi/compiler/latest/linux';
     mkl_root = '/opt/intel/oneapi/mkl/latest';
     cuda_root = join([getenv('CONDA_PREFIX') '/lib'], '');
-    cvode_root = '/usr/local/sundials-4.1.0/instdir';
+    cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
+    cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
     mex_suffix = 'a';
 end
 
