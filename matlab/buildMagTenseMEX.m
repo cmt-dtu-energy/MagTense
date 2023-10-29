@@ -23,7 +23,8 @@ if (ispc)
     mkl_lp64 = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\intel64\lp64"';
     mkl_lib = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\lib\intel64"';
     cuda_root = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\lib\x64"';
-    cvode_root = '"C:\Program Files (x86)\sundials-4.1.0\instdir"';
+    cvode_include = '"C:\Program Files (x86)\sundials-4.1.0\instdir\fortran"';
+    cvode_lib = '"C:\Program Files (x86)\sundials-4.1.0\instdir\lib"';
     mex_suffix = 'w';
 else
     compiler_root = '/opt/intel/oneapi/compiler/latest/linux';
@@ -57,8 +58,8 @@ else
 end
 
 if (USE_CVODE)
-    CVODE_include = join(['-I' cvode_root '/fortran'], '');
-    CVODE = ['-L' cvode_root '/lib -lsundials_nvecserial -lsundials_sunmatrixdense -lsundials_sunlinsoldense' ...
+    CVODE_include = join(['-I' cvode_include], '');
+    CVODE = ['-L' cvode_lib ' -lsundials_nvecserial -lsundials_sunmatrixdense -lsundials_sunlinsoldense' ...
     ' -lsundials_fnvecserial_mod -lsundials_cvode -lsundials_fsunnonlinsolfixedpoint_mod'];
 else
     CVODE_include = '';
