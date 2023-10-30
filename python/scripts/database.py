@@ -1,4 +1,6 @@
 #%%
+import os
+import sys
 import h5py
 import numpy as np
 
@@ -363,7 +365,11 @@ def db_magfield(
             raise ValueError('Only 2-D and 3-D magnetic field can be generated!')
         
         pts_eval = np.hstack([xv.reshape(-1,1), yv.reshape(-1,1), zv.reshape(-1,1)])
+        devnull = open('/dev/null', 'w')
+        oldstdout_fno = os.dup(sys.stdout.fileno())
+        os.dup2(devnull.fileno(), 1)
         _, h_out = run_simulation(tiles, pts_eval)
+        os.dup2(oldstdout_fno, 1)
 
         # Tensor image with shape CxHxWxD [T]
         field = h_out.reshape((*res,3))
@@ -479,7 +485,11 @@ def db_single_magnets(
             mag_angle=mag_angle, 
             color=[1,0,0]
         )
+        devnull = open('/dev/null', 'w')
+        oldstdout_fno = os.dup(sys.stdout.fileno())
+        os.dup2(devnull.fileno(), 1)
         _, h_out = run_simulation(tile, pts_eval)
+        os.dup2(oldstdout_fno, 1)
         h_out = h_out.reshape((res,res,-1)).transpose((2,0,1))
 
         sample = np.zeros(shape=(num_mag, n_params), dtype=np.float32)

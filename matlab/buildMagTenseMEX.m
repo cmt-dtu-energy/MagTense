@@ -43,6 +43,8 @@ else
     BUILD = '/x64/Debug';
 end
 
+CUDA_NO_CUDA = '';
+OBJS_NO_CUDA = '';
 BUILD_NO_CUDA_MagTenseMicroMag = [BUILD '_no_CUDA'];
 if (USE_CUDA)
     CUDA = ['-L' cuda_root ' -lcublas -lcudart -lcuda -lcusparse'];
@@ -57,8 +59,6 @@ else
     OBJS = '';
     BUILD_MagTenseMicroMag = [BUILD '_no_CUDA'];
 end
-CUDA_NO_CUDA = '';
-OBJS_NO_CUDA = '';
 
 if (USE_CVODE)
     CVODE_include = join(['-I' cvode_include], '');
@@ -106,7 +106,7 @@ if (ispc)
 else
     DEFINES = ['FC="' compiler_root '/bin/intel64/ifort" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
     FFLAGS_NO_CUDA = 'FFLAGS="-r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source -fp-model precise -fpic -libs:static"';
-    FFLAGS = [FFLAGS_NO_CUDA(1:(end-1)) ' /libs:static"'];
+    FFLAGS = [FFLAGS_NO_CUDA(1:(end-1)) ' -libs:static"'];
     INCLUDE = ['INCLUDE="$INCLUDE -I' mkl_root '/include -I' mkl_root '/include/intel64/lp64 -I' ... 
         NumericalIntegration_path ' -I' DemagField_path ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ...
         ' -I' ForceIntegrator_path ' ' CVODE_include '"'];
@@ -121,11 +121,11 @@ end
 %%----------------------------------- ------------------------------
 if (ispc) && (VS_STUDIO)
     names = ["MagTenseLandauLifshitzSolver", "MagTenseLandauLifshitzSolverNoCUDA", "IterateMagnetization", "getHFromTiles", "getNFromTile", "getMagForce"];
+    if (~USE_CUDA)
+        names = names(2:end);
+    end
 else
     names = ["MagTenseLandauLifshitzSolver", "IterateMagnetization", "getHFromTiles", "getNFromTile", "getMagForce"];
-end
-if (~USE_CUDA)
-     names(1) = "MagTenseLandauLifshitzSolverNoCUDA";
 end
 
 for i = 1:length(names)
