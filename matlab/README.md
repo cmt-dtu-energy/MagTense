@@ -81,6 +81,16 @@ Prepare your terminal, so that ifort compiler can be found:
   . /opt/intel/oneapi/setvars.sh
   ```
 
+  For static linking of MKL, the file `mex_FORTRAN_glnxa64.xml` located in `/home/<user>/.matlab/R2021b/` has to be adjusted as follows:
+
+  ```bash
+  LINKLIBS="[...] -Wl,--start-group"
+  CMDLINE2="$LDF $LDFLAGS $LDTYPE $LINKOPTIM $LINKEXPORTVER $OBJS $FLIBS $LINKLIBS -Wl,--end-group -o $EXE"
+  ```
+
+  The reason for that is that Matlab recognizes `-Wl,--end-group` as `Error: Illegal use of reserved keyword "end".`, when running the build script.
+
+
 Start Matlab via command line and run build script:
 
 ```bash
