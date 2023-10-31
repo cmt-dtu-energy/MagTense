@@ -27,8 +27,11 @@ if (ispc)
     cvode_lib = '"C:\Program Files (x86)\sundials-4.1.0\instdir\lib"';
     mex_suffix = 'w';
 else
+    VS_STUDIO = false;
+    MKL_STATIC = false;
     compiler_root = '/opt/intel/oneapi/compiler/latest/linux';
     mkl_root = '/opt/intel/oneapi/mkl/latest';
+    mkl_lib = '/opt/intel/oneapi/mkl/latest/lib/intel64';
     cuda_root = join([getenv('CONDA_PREFIX') '/lib'], '');
     cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
     cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
@@ -51,7 +54,7 @@ if (USE_CUDA)
     if (ispc)
         OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.obj ' FortranCuda_path '/MagTenseCudaBlas.obj" '];
     else
-        OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.o' FortranCuda_path '/MagTenseCudaBlas.o" '];
+        OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.o ' FortranCuda_path '/MagTenseCudaBlas.o" '];
     end
     BUILD_MagTenseMicroMag = BUILD;
 else
@@ -105,7 +108,7 @@ if (ispc)
     end
 else
     DEFINES = ['FC="' compiler_root '/bin/intel64/ifort" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
-    FFLAGS_NO_CUDA = 'FFLAGS="-r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source -fp-model precise -fpic -libs:static"';
+    FFLAGS_NO_CUDA = 'FFLAGS="-r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source -fp-model precise -fpic"';
     FFLAGS = [FFLAGS_NO_CUDA(1:(end-1)) ' -libs:static"'];
     INCLUDE = ['INCLUDE="$INCLUDE -I' mkl_root '/include -I' mkl_root '/include/intel64/lp64 -I' ... 
         NumericalIntegration_path ' -I' DemagField_path ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ...
@@ -113,7 +116,12 @@ else
     LIBS = ['-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' DemagField_path ' -lDemagField -L' ...
         TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration -L' ...
         ForceIntegrator_path ' -lMagneticForceIntegrator'];
-    MKL = ['-L' mkl_root '/lib/intel64 -lmkl_rt -lmkl_blas95_lp64 -lpthread -lm -ldl'];
+    if (MKL_STATIC)
+        MKL = ['-liomp5 -lpthread -lm -ldl LINKLIBS="$LINKLIBS ' mkl_lib '/libmkl_blas95_lp64.a ' mkl_lib ...
+            '/libmkl_intel_lp64.a ' mkl_lib '/libmkl_intel_thread.a ' mkl_lib '/libmkl_core.a"'];
+    else
+        MKL = ['-L' mkl_root '/lib/intel64 -lmkl_rt -lmkl_blas95_lp64 -lpthread -lm -ldl'];
+    end
 end
 
 %%------------------------------------------------------------------
