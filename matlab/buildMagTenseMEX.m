@@ -108,20 +108,29 @@ if (ispc)
     end
 else
     DEFINES = ['FC="' compiler_root '/bin/intel64/ifort" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
-    FFLAGS_NO_CUDA = 'FFLAGS="-r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source -fp-model precise -fpic"';
-    FFLAGS = [FFLAGS_NO_CUDA(1:(end-1)) ' -libs:static"'];
-    INCLUDE = ['INCLUDE="$INCLUDE -I' mkl_root '/include -I' mkl_root '/include/intel64/lp64 -I' ... 
-        NumericalIntegration_path ' -I' DemagField_path ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ...
-        ' -I' ForceIntegrator_path ' ' CVODE_include '"'];
+    INCLUDE = ['INCLUDE="$INCLUDE -I' mkl_root '/include -I' NumericalIntegration_path ' -I' DemagField_path ...
+        ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ' -I' ForceIntegrator_path ' -I' mkl_root];
     LIBS = ['-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' DemagField_path ' -lDemagField -L' ...
         TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration -L' ...
         ForceIntegrator_path ' -lMagneticForceIntegrator'];
+    FFLAGS = 'FFLAGS="';
     if (MKL_STATIC)
-        MKL = ['-liomp5 -lpthread -lm -ldl LINKLIBS="$LINKLIBS ' mkl_lib '/libmkl_blas95_lp64.a ' mkl_lib ...
-            '/libmkl_intel_lp64.a ' mkl_lib '/libmkl_intel_thread.a ' mkl_lib '/libmkl_core.a"'];
+        MKL = ['-liomp5 -lpthread -lm -ldl LINKLIBS="$LINKLIBS ' mkl_lib '/libmkl_intel_thread.a ' mkl_lib ...
+            '/libmkl_core.a ' mkl_lib '/libmkl_blas95_lp64.a ' mkl_lib '/libmkl_intel_lp64.a"'];
+        INCLUDE = [INCLUDE '/include/intel64/lp64 '];
     else
-        MKL = ['-L' mkl_root '/lib/intel64 -lmkl_rt -lmkl_blas95_lp64 -lpthread -lm -ldl'];
+        MKL = ['-L' mkl_root '/lib/intel64 -lmkl_rt -lpthread -lm -ldl '];
+        if (USE_CUDA)
+            INCLUDE = [INCLUDE '/include/intel64/lp64 '];
+            MKL = [MKL '-lmkl_blas95_lp64'];
+        else
+            FFLAGS = [FFLAGS '-i8 '];
+            INCLUDE = [INCLUDE '/include/intel64/ilp64 '];
+            MKL = [MKL '-lmkl_blas95_ilp64'];
+        end
     end
+    INCLUDE = [INCLUDE CVODE_include '"'];
+    FFLAGS = [FFLAGS '-r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source -fp-model precise -fpic -diag-disable 10006 -libs:static"'];
 end
 
 %%------------------------------------------------------------------
@@ -151,7 +160,7 @@ for i = 1:length(names)
     pause(pause_time)
     movefile(join([orig_name '_mex.mex' mex_suffix '64'], ''), join(['MEX_files/' names(i) '_mex.mex' mex_suffix '64'], ''));
 end
- 
+
 end
 
 function eval_MEX(mex_str)

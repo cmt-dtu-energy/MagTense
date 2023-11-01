@@ -60,7 +60,7 @@ Set flags and paths in [Makefile](https://github.com/cmt-dtu-energy/MagTense/blo
 
 ```bash
 cd path/to/MagTense/
-make USE_CUDA=1 USE_CVODE=1 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2021b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest     
+make USE_CUDA=1 USE_CVODE=1 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2021b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest
 ```
 
 ## Building MEX-files
@@ -95,7 +95,7 @@ Start Matlab via command line and run build script:
 
 ```bash
 cd path/to/MagTense/matlab
-/path/to/Matlab/installation/bin/matlab -nodisplay -nosplash -nodesktop
+/usr/local/MATLAB/R2021b/bin/matlab -nodisplay -nosplash -nodesktop
 run('buildMagTenseMEX.m')
 ```
 
@@ -110,11 +110,13 @@ Prepare your terminal, so that ifort compiler and required libraries can be foun
   export LD_LIBRARY_PATH=<path_to_CVODE_libs>:<path_to_CUDA_libs>:$LD_LIBRARY_PATH
   ```
 
+  When MKL is statically linked, having [Runtime for Intel® Fortran Compiler](https://anaconda.org/intel/intel-fortran-rt) is sufficient and no installation of `ifort` or `mkl` is required.
+
 - Test with standard problem #3
 
   ```bash
   cd path/to/MagTense/matlab/
-  /path/to/Matlab/installation/bin/matlab -nodisplay -nosplash -nodesktop
+  /usr/local/MATLAB/R2021b/bin/matlab -nodisplay -nosplash -nodesktop
   run('examples/Micromagnetism/mumag_micromag_Std_problem_3/Standard_problem_3.m')
   ```
 
