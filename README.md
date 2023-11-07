@@ -1,5 +1,9 @@
 <div align="center">
-  <img src="https://cmt-dtu-energy.github.io/MagTense/_static/MagTense_logo.PNG" height=250><br>
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="./docs/source/static/MagTense_logo.png" height=250>
+    <img alt="MagTense Logo" src="./docs/source/static/MagTenseLogo_White.svg" height=250>
+  </picture>
+  <br>
 </div>
 
 # MagTense version 2023
