@@ -506,8 +506,10 @@ def create_plot(
             else:
                 raise ValueError("Tile type not supported!")
 
-    if not (None in eval_pts or None in field): plot_field(ax, eval_pts, field)
-    if not (None in (spots, area)): plot_grid(ax, spots, area)
+    if eval_pts is not None and field is not None:
+        plot_field(ax, eval_pts, field)
+    if spots is not None and area is not None:
+        plot_grid(ax, spots, area)
 
     # Workaround added get_proj function inside site-packages\mpl_toolkits\mplot3d\axes3d.py
     # Setting length of each axis individually - currrently not support for axes3d
