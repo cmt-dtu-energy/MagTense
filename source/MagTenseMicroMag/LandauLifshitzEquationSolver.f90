@@ -181,8 +181,14 @@
         call StoreHeffComponents ( gb_problem, gb_solution )
         
     endif
-    !Clean up
+    
+    !clean up
     deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
+    
+    !clean up
+    if (gb_problem%CV > 0) then
+        deallocate(gb_solution%u1, gb_solution%u2, gb_solution%u3, gb_solution%u4, gb_solution%u5, gb_solution%u6)
+    endif
     
     !clean-up
     stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
@@ -410,6 +416,12 @@
     solution%Mfact = problem%Ms
     !"K" : anisotropy term
     solution%Kfact = problem%K0 / ( mu0 * problem%Ms )
+    
+    !If a random noise is present initialize the random vectors
+    if (problem%CV > 0) then
+        call AddUncertaintyToDemagField( problem, solution)
+    endif
+    
     
     end subroutine initializeSolution
     
@@ -755,6 +767,12 @@
     !write(12,*) 1
     !close(12)
     deallocate(temp)
+    
+    if (problem%CV > 0) then
+        solution%HmX = solution%HmX + solution%HmX*problem%CV*sqrt(-2d0*log(solution%u1))*cos(2d0*pi*solution%u2)
+        solution%HmY = solution%HmY + solution%HmY*problem%CV*sqrt(-2d0*log(solution%u3))*cos(2d0*pi*solution%u4)
+        solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
+    endif
     
     end subroutine updateDemagfield
     
@@ -2150,6 +2168,41 @@
         problem%Azz = problem%u_ea(:,3) * problem%u_ea(:,3)
     
     end subroutine ComputeAnisotropyTerm3D_General
+    
+    !>-----------------------------------------
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
+    !> @brief
+    !> Change the demag field based on a error drawn from a standard distribution  
+    !> @param[inout] problem the data structure containing the problem
+    !---------------------------------------------------------------------------   
+    subroutine AddUncertaintyToDemagField( problem, solution)
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
+    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+    
+    integer :: nx,ny,nz,ntot
+    
+        nx = problem%grid%nx
+        ny = problem%grid%ny
+        nz = problem%grid%nz
+        ntot = nx * ny * nz
+        
+        !For each field value, use this as the mean for a normal distribution and draw random numbers from this
+        !Use the Box-Muller transformation to generate the random numbers
+        allocate(solution%u1(ntot), solution%u2(ntot),solution%u3(ntot), solution%u4(ntot),solution%u5(ntot), solution%u6(ntot))
+        call random_number(solution%u1)
+        call random_number(solution%u2)
+        call random_number(solution%u3)
+        call random_number(solution%u4)
+        call random_number(solution%u5)
+        call random_number(solution%u6)
+        solution%u1 = 1d0 - solution%u1
+        solution%u2 = 1d0 - solution%u2
+        solution%u3 = 1d0 - solution%u3
+        solution%u4 = 1d0 - solution%u4
+        solution%u5 = 1d0 - solution%u5
+        solution%u6 = 1d0 - solution%u6
+        
+    end subroutine AddUncertaintyToDemagField
 
     
 end module LandauLifshitzSolution

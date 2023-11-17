@@ -67,9 +67,10 @@ function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_d
 arguments
     NIST_field (1,1) {mustBeInteger}                = 1             %--- Use either field 1 or field 2 from the mumag example
     resolution (1,3) {mustBeInteger}                = [36,9,1];     %--- [nx,ny,nz] of the grid
-    options.use_CUDA {mustBeNumericOrLogical} = true                %--- Use CUDA for the calculations
-    options.ShowTheResult {mustBeNumericOrLogical} = true           %--- Show the result
-    options.use_CVODE {mustBeNumericOrLogical} = false;             %--- Use CVODE for the numerical time evolution
+    options.use_CUDA {mustBeNumericOrLogical}       = true          %--- Use CUDA for the calculations
+    options.ShowTheResult {mustBeNumericOrLogical}  = true          %--- Show the result
+    options.use_CVODE {mustBeNumericOrLogical}      = false;        %--- Use CVODE for the numerical time evolution
+    options.CV {mustBeNumeric}                      = 0;            %--- Use coefficient of variation to add random noise
 end
 
 mu0 = 4*pi*1e-7;
@@ -113,6 +114,8 @@ problem_ini = problem_ini.setHext( HextFct, linspace(0,100e-9,2000) );
 
 problem_ini = problem_ini.setConvergenceCheckTime( linspace(0,40e-9,2) );
 
+% Add random noise to the demag vector
+problem_ini.CV = options.CV;
 
 %% Solve the initial configuration
 % Convert the class obj to a struct so it can be loaded into fortran
@@ -163,6 +166,9 @@ problem_dym = problem_dym.setHext( HextFct, linspace(0,1e-9,2000) );
 
 % Set the starting state to be that found in the initial part of the problem
 problem_dym.m0(:) = solution_ini.M(end,:,:);
+
+% Add random noise to the demag vector
+problem_dym.CV = options.CV;
 
 %% Solve the dynamic configuration
 % Convert the class obj to a struct so it can be loaded into fortran

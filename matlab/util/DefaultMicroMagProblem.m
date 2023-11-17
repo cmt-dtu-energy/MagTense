@@ -78,6 +78,11 @@ properties
     % tensors are made into sparse matrices, i.e. if abs(K) < dem_thres
     % then K = 0
     dem_thres
+
+    %add a random noise to the demag field. CV is the coefficient of
+    %variation, with a mean of the correct value from the demag field, from
+    %which numbers will be drawn from a random distribution
+    CV
     
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
@@ -296,6 +301,8 @@ methods
         obj.m0(2*obj.ntot+1:3*obj.ntot) = cos(obj.theta);
         %initial value of the demag threshold is zero, i.e. it is not used
         obj.dem_thres = 0;
+        %initial value of the CV is zero, i.e. it is not used
+        obj.CV = 0;
         %set use cuda to default not
         obj.useCuda = int32(0);
 		%set use CVODE to default

@@ -26,7 +26,7 @@
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
-        mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr
+        mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr, CVThresProblemPtr
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
         mwPointer :: tolProblemPtr, thres_valueProblemPtr
         mwPointer :: exch_matProblemPtr, irPtr, jcPtr
@@ -36,7 +36,7 @@
         mwPointer :: usePrecisionPtr, N_aveProblemPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
-        real(DP) :: demag_fac
+        real(DP) :: demag_fac, CV
     
         !Get the expected names of the fields
         call getProblemFieldnames( problemFields, nFieldsProblem)
@@ -332,6 +332,15 @@
         N_aveProblemPtr = mxGetField( prhs, i, problemFields(48) )
         call mxCopyPtrToInteger4(mxGetPr(N_aveProblemPtr), problem%N_ave, sx )
         
+        !Coefficient of variation value
+        problem%CV = 0
+        
+        CVThresProblemPtr = mxGetField(prhs,i,problemFields(49))
+        sx = 1
+        call mxCopyPtrToReal8(mxGetPr(CVThresProblemPtr), CV, sx )
+            
+        problem%CV = sngl(CV)
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -522,6 +531,7 @@
         fieldnames(46) = 'usePres'
         fieldnames(47) = 'nThreads'
         fieldnames(48) = 'N_ave'
+        fieldnames(49) = 'CV'
         
     end subroutine getProblemFieldnames
     

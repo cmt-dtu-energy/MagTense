@@ -52,7 +52,7 @@ class MicromagProblem:
         m0: Union[None, int, float, List, np.ndarray] = None,
         A0: float = 1.3e-11,
         Ms: float = 8e5,
-        K0: float = 0.,        
+        K0: float = 0.,
         alpha: float = 0.02,
         gamma: float = 0.,
         max_T0: float = 2.,
@@ -63,6 +63,7 @@ class MicromagProblem:
         setTimeDis: int = 10,
         dem_thres: float = 0.,
         demag_approx: Optional[str] = None,
+        CV: float = 0.,
         exch_nval: int = 1,
         exch_nrow: int = 1,
         filename: str = 't',
@@ -110,6 +111,7 @@ class MicromagProblem:
 
         self.dem_thres = dem_thres
         self.dem_appr = demag_approx
+        self.CV = CV
 
         self.nt_alpha = len(t_alpha)
         self.alphat = np.zeros(shape=(self.nt_alpha,2), dtype=np.float64, order='F')
@@ -239,6 +241,7 @@ class MicromagProblem:
             dem_thres=self.dem_thres,
             usecuda=self.cuda,
             dem_appr=self.dem_appr,
+            CV=self.CV,
             n_ret=self.N_ret,
             n_file_out=self.N_file_out,
             n_load=self.N_load,
