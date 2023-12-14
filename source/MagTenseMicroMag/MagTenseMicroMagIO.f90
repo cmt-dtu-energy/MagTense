@@ -21,7 +21,7 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr
@@ -33,7 +33,7 @@
         mwPointer :: genericProblemPtr
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
         mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr
-        mwPointer :: usePrecisionPtr, N_aveProblemPtr
+        mwPointer :: usePrecisionPtr, N_aveProblemPtr, useReturnHallProblemPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
         real(DP) :: demag_fac, CV
@@ -335,11 +335,22 @@
         !Coefficient of variation value
         problem%CV = 0
         
-        CVThresProblemPtr = mxGetField(prhs,i,problemFields(49))
         sx = 1
+        CVThresProblemPtr = mxGetField(prhs,i,problemFields(49))
         call mxCopyPtrToReal8(mxGetPr(CVThresProblemPtr), CV, sx )
             
         problem%CV = sngl(CV)
+        
+        !Parameter to determine if the specific H_fields are returned (exchange, demag, etc.)
+        sx = 1
+        useReturnHallProblemPtr = mxGetField(prhs,i,problemFields(50))
+        
+        call mxCopyPtrToInteger4(mxGetPr(useReturnHallProblemPtr), useReturnHall, sx )
+        if ( useReturnHall .eq. 1 ) then
+            problem%useReturnHall = useReturnHallTrue
+        else
+            problem%useReturnHall = useReturnHallFalse
+        endif
         
         !Clean-up 
         deallocate(problemFields)
@@ -412,8 +423,8 @@
         
         
         ndim = 4
-        dims_4(1) = nt
-        dims_4(2) = ntot
+        dims_4(1) = size( solution%H_exc(:,1,1,1) )
+        dims_4(2) = size( solution%H_exc(1,:,1,1) )
         dims_4(3) = size( solution%H_exc(1,1,:,1) )
         dims_4(4) = 3
         classid = mxClassIDFromClassName( 'double' )
@@ -425,8 +436,8 @@
         
         
         ndim = 4
-        dims_4(1) = nt
-        dims_4(2) = ntot
+        dims_4(1) = size( solution%H_ext(:,1,1,1) )
+        dims_4(2) = size( solution%H_ext(1,:,1,1) )
         dims_4(3) = size( solution%H_ext(1,1,:,1) )
         dims_4(4) = 3
         classid = mxClassIDFromClassName( 'double' )
@@ -438,8 +449,8 @@
         
         
         ndim = 4
-        dims_4(1) = nt
-        dims_4(2) = ntot
+        dims_4(1) = size( solution%H_dem(:,1,1,1) )
+        dims_4(2) = size( solution%H_dem(1,:,1,1) )
         dims_4(3) = size( solution%H_dem(1,1,:,1) )
         dims_4(4) = 3
         classid = mxClassIDFromClassName( 'double' )
@@ -451,8 +462,8 @@
         
         
         ndim = 4
-        dims_4(1) = nt
-        dims_4(2) = ntot
+        dims_4(1) = size( solution%H_ani(:,1,1,1) )
+        dims_4(2) = size( solution%H_ani(1,:,1,1) )
         dims_4(3) = size( solution%H_ani(1,1,:,1) )
         dims_4(4) = 3
         classid = mxClassIDFromClassName( 'double' )
@@ -476,7 +487,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=48
+        integer,parameter :: nf=50
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -532,6 +543,7 @@
         fieldnames(47) = 'nThreads'
         fieldnames(48) = 'N_ave'
         fieldnames(49) = 'CV'
+        fieldnames(50) = 'ReturnHall'
         
     end subroutine getProblemFieldnames
     

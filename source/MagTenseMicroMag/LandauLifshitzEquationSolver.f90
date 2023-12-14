@@ -125,62 +125,71 @@
     cb_fct => displayGUIProgressMessage
     
     gb_solution%HextInd = 1;
+    
+    !Go through a range of applied fields and find the equilibrium solution for each of them
+    !The no. of applied fields to consider
+    nt = size( gb_problem%t ) 
+        
     if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
-        !Go through a range of applied fields and find the equilibrium solution for each of them
-        !The no. of applied fields to consider
-        nt = size( gb_problem%t ) 
         nt_Hext = size(gb_problem%Hext, 1) 
-
-        !has an extra nt results as this is the total time-dependent solution for each applied field
-        allocate(M_out(3*ntot,nt,nt_Hext))   
-        allocate(gb_solution%M_out(size(gb_problem%t),ntot,nt_Hext,3))
+    else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
+        nt_Hext = 1
+    endif
+    
+    allocate(M_out(3*ntot,nt,nt_Hext))   
+    allocate(gb_solution%M_out(size(gb_problem%t),ntot,nt_Hext,3))
+    if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
         allocate(gb_solution%H_exc(size(gb_problem%t),ntot,nt_Hext,3))
         allocate(gb_solution%H_ext(size(gb_problem%t),ntot,nt_Hext,3))
         allocate(gb_solution%H_dem(size(gb_problem%t),ntot,nt_Hext,3))
-        allocate(gb_solution%H_ani(size(gb_problem%t),ntot,nt_Hext,3))       
-        
+        allocate(gb_solution%H_ani(size(gb_problem%t),ntot,nt_Hext,3))  
+    else
+        allocate(gb_solution%H_exc(1,1,1,3))
+        allocate(gb_solution%H_ext(1,1,1,3))
+        allocate(gb_solution%H_dem(1,1,1,3))
+        allocate(gb_solution%H_ani(1,1,1,3))
+        gb_solution%H_exc(:,:,:,:) = 0
+        gb_solution%H_ext(:,:,:,:) = 0
+        gb_solution%H_dem(:,:,:,:) = 0
+        gb_solution%H_ani(:,:,:,:) = 0
+    endif
+    
+    !if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
         !loop over the range of applied fields
-        do i=1,nt_Hext
-            !Applied field
-            gb_solution%HextInd = i
-                       
+    do i=1,nt_Hext
+        !Applied field
+        gb_solution%HextInd = i
+        
+        if (gb_problem%solver .eq. MicroMagSolverExplicit) then               
             write(prog_str,'(A20, I5.2, A8, I5.2, A6, F6.2, A7)') 'External Field nr.: ', i, ' out of ', nt_Hext, ' i.e. ', real(i)/real(nt_Hext)*100,'% done'
             call displayGUIMessage( trim(prog_str) )
-            
-            !call cb_fct( 'External Field nr.: ', i )
-            
-            call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )          
-            
-            !the initial state of the next solution is the previous solution result
-            gb_problem%m0 = M_out(:,nt,i)
-            
-            gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
-            gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
-            gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
-            
-            call StoreHeffComponents ( gb_problem, gb_solution )
-            
-        enddo
+        endif
         
-        
-    else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
-        !Simply do a time evolution as specified in the problem        
-        allocate(M_out(3*ntot,size(gb_problem%t),1))    
-        allocate(gb_solution%M_out(size(gb_problem%t),ntot,1,3))
-        allocate(gb_solution%H_exc(size(gb_problem%t),ntot,1,3))
-        allocate(gb_solution%H_ext(size(gb_problem%t),ntot,1,3))
-        allocate(gb_solution%H_dem(size(gb_problem%t),ntot,1,3))
-        allocate(gb_solution%H_ani(size(gb_problem%t),ntot,1,3))
-        
-        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
-    
-        gb_solution%M_out(:,:,1,1) = transpose( M_out(1:ntot,:,1) )
-        gb_solution%M_out(:,:,1,2) = transpose( M_out((ntot+1):2*ntot,:,1) )
-        gb_solution%M_out(:,:,1,3) = transpose( M_out((2*ntot+1):3*ntot,:,1) )
-        
+        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )          
+            
+        !the initial state of the next solution is the previous solution result
+        gb_problem%m0 = M_out(:,nt,i)
+            
+        gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
+        gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
+        gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
+            
         call StoreHeffComponents ( gb_problem, gb_solution )
+            
+    enddo
         
-    endif
+        
+    !else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
+        !Simply do a time evolution as specified in the problem        
+    !    call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
+    
+    !    gb_solution%M_out(:,:,1,1) = transpose( M_out(1:ntot,:,1) )
+    !    gb_solution%M_out(:,:,1,2) = transpose( M_out((ntot+1):2*ntot,:,1) )
+    !    gb_solution%M_out(:,:,1,3) = transpose( M_out((2*ntot+1):3*ntot,:,1) )
+        
+    !    call StoreHeffComponents ( gb_problem, gb_solution )
+        
+    !endif
     
     !clean up
     deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
@@ -324,22 +333,24 @@
         !Demag. field
         call updateDemagfield( gb_problem, gb_solution )
     
-        !Store the components of the effective field
-        gb_solution%H_exc(j,:,i,1) = gb_solution%HjX
-        gb_solution%H_exc(j,:,i,2) = gb_solution%HjY
-        gb_solution%H_exc(j,:,i,3) = gb_solution%HjZ
+        if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
+            !Store the components of the effective field
+            gb_solution%H_exc(j,:,i,1) = gb_solution%HjX
+            gb_solution%H_exc(j,:,i,2) = gb_solution%HjY
+            gb_solution%H_exc(j,:,i,3) = gb_solution%HjZ
         
-        gb_solution%H_ext(j,:,i,1) = gb_solution%HhX
-        gb_solution%H_ext(j,:,i,2) = gb_solution%HhY
-        gb_solution%H_ext(j,:,i,3) = gb_solution%HhZ
+            gb_solution%H_ext(j,:,i,1) = gb_solution%HhX
+            gb_solution%H_ext(j,:,i,2) = gb_solution%HhY
+            gb_solution%H_ext(j,:,i,3) = gb_solution%HhZ
         
-        gb_solution%H_dem(j,:,i,1) = gb_solution%HmX
-        gb_solution%H_dem(j,:,i,2) = gb_solution%HmY
-        gb_solution%H_dem(j,:,i,3) = gb_solution%HmZ
+            gb_solution%H_dem(j,:,i,1) = gb_solution%HmX
+            gb_solution%H_dem(j,:,i,2) = gb_solution%HmY
+            gb_solution%H_dem(j,:,i,3) = gb_solution%HmZ
         
-        gb_solution%H_ani(j,:,i,1) = gb_solution%HkX
-        gb_solution%H_ani(j,:,i,2) = gb_solution%HkY
-        gb_solution%H_ani(j,:,i,3) = gb_solution%HkZ
+            gb_solution%H_ani(j,:,i,1) = gb_solution%HkX
+            gb_solution%H_ani(j,:,i,2) = gb_solution%HkY
+            gb_solution%H_ani(j,:,i,3) = gb_solution%HkZ
+        endif
     enddo
     
     end subroutine StoreHeffComponents

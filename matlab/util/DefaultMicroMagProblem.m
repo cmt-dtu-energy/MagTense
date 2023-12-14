@@ -83,6 +83,10 @@ properties
     %variation, with a mean of the correct value from the demag field, from
     %which numbers will be drawn from a random distribution
     CV
+
+    %A parameter to determine if the specific H_fields, like exchange, demag etc. 
+    % are returned from Fortran
+    ReturnHall
     
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
@@ -303,6 +307,8 @@ methods
         obj.dem_thres = 0;
         %initial value of the CV is zero, i.e. it is not used
         obj.CV = 0;
+        %initial value of the ReturnHall is zero, i.e. the specific fields are not returned
+        obj.ReturnHall = int32(0);
         %set use cuda to default not
         obj.useCuda = int32(0);
 		%set use CVODE to default

@@ -64,6 +64,7 @@ class MicromagProblem:
         dem_thres: float = 0.,
         demag_approx: Optional[str] = None,
         CV: float = 0.,
+        ReturnHall: int = 0,
         exch_nval: int = 1,
         exch_nrow: int = 1,
         filename: str = 't',
@@ -112,6 +113,7 @@ class MicromagProblem:
         self.dem_thres = dem_thres
         self.dem_appr = demag_approx
         self.CV = CV
+        self.ReturnHall = ReturnHall
 
         self.nt_alpha = len(t_alpha)
         self.alphat = np.zeros(shape=(self.nt_alpha,2), dtype=np.float64, order='F')
@@ -242,6 +244,7 @@ class MicromagProblem:
             usecuda=self.cuda,
             dem_appr=self.dem_appr,
             CV=self.CV,
+            ReturnHall=self.ReturnHall,
             n_ret=self.N_ret,
             n_file_out=self.N_file_out,
             n_load=self.N_load,

@@ -103,6 +103,7 @@ include "mkl_dfti.f90"
         integer :: useCuda                                      !> Defines whether to attempt using CUDA or not
         integer :: useCVODE                                     !> Defines whether to attempt using CVODE or not
         integer :: usePrecision                                 !> Defines whether to use single (false) or double precision (true)
+        integer :: useReturnHall                                !> Defines whether to return all the specific H-fields (exchange, demag) ´(true) or not (false)
         integer :: demag_approximation                          !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         integer :: demagTensorReturnState                       !> Flag describing how or if the demag tensor should be returned
         integer :: demagTensorLoadState                         !> Flag describing how or if to load the demag tensor (from disk e.g.)
@@ -175,5 +176,6 @@ include "mkl_dfti.f90"
     !!@todo Do NOT have useCVODETrue/-False variables both here and in IntegrationDataTypes.
     integer,parameter :: useCVODETrue=1,useCVODEFalse=0
     integer,parameter :: usePrecisionTrue=1,usePrecisionFalse=0
+    integer,parameter :: useReturnHallTrue=1,useReturnHallFalse=0
     
 end module MicroMagParameters    
