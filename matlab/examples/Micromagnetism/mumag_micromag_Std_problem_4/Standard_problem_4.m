@@ -112,8 +112,6 @@ HystDir = 1/mu0*[1,1,1] ;
 HextFct = @(t) (1e-9-t)' .* HystDir .* (t<1e-9)';
 problem_ini = problem_ini.setHext( HextFct, linspace(0,100e-9,2000) );
 
-problem_ini = problem_ini.setConvergenceCheckTime( linspace(0,40e-9,2) );
-
 % Add random noise to the demag vector
 problem_ini.CV = options.CV;
 
@@ -135,22 +133,15 @@ if (options.ShowTheResult)
 end
 
 %% Setup problem for the time-dependent solver'
-% Setup a new problem for the dynamical part of the simulations
-problem_dym = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
-problem_dym = problem_dym.setUseCuda( options.use_CUDA );
-problem_dym = problem_dym.setUseCVODE( options.use_CVODE );
-problem_dym.nThreads = problem_ini.nThreads;
+% Use the initial problem to setup the dynamical part of the simulations
+problem_dym = problem_ini;
 
 % Calculate to 1 ns and save the results in 200 steps
 problem_dym = problem_dym.setTime( linspace(0,1e-9,200) );
 problem_dym.setTimeDis = int32(10);
 
 % Material properties
-problem_dym.alpha = 4.42e3 ;
 problem_dym.gamma = 2.21e5 ;
-problem_dym.Ms = 8e5*ones(prod(resolution),1);
-problem_dym.K0 = 0*zeros(prod(resolution),1);
-problem_dym.A0 = 1.3e-11;
 
 % The external field applied
 if (NIST_field == 1)
@@ -166,9 +157,6 @@ problem_dym = problem_dym.setHext( HextFct, linspace(0,1e-9,2000) );
 
 % Set the starting state to be that found in the initial part of the problem
 problem_dym.m0(:) = solution_ini.M(end,:,:);
-
-% Add random noise to the demag vector
-problem_dym.CV = options.CV;
 
 %% Solve the dynamic configuration
 % Convert the class obj to a struct so it can be loaded into fortran
