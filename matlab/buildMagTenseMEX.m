@@ -32,7 +32,7 @@ else
     compiler_root = '/opt/intel/oneapi/compiler/latest';
     mkl_root = '/opt/intel/oneapi/mkl/latest';
     mkl_lib = '/opt/intel/oneapi/mkl/latest/lib/intel64';
-    cuda_root = join([getenv('CONDA_PREFIX') '/lib'], '');
+    cuda_root = '/usr/local/cuda-12.3/lib64/';
     cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
     cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
     mex_suffix = 'a';
@@ -46,9 +46,6 @@ else
     BUILD = '/x64/Debug';
 end
 
-CUDA_NO_CUDA = '';
-OBJS_NO_CUDA = '';
-BUILD_NO_CUDA_MagTenseMicroMag = [BUILD '_no_CUDA'];
 if (USE_CUDA)
     CUDA = ['-L' cuda_root ' -lcublas -lcudart -lcuda -lcusparse'];
     if (ispc)
@@ -72,32 +69,26 @@ else
     CVODE = '';
     BUILD = [BUILD '_no_CVODE'];
     BUILD_MagTenseMicroMag = [BUILD_MagTenseMicroMag '_no_CVODE'];
-    BUILD_NO_CUDA_MagTenseMicroMag = [BUILD_NO_CUDA_MagTenseMicroMag '_no_CVODE'];
 end
 
 if (VS_STUDIO)
     BUILD = [BUILD ' '];
     BUILD_MagTenseMicroMag = [BUILD_MagTenseMicroMag ' '];
-    BUILD_NO_CUDA_MagTenseMicroMag = [BUILD_NO_CUDA_MagTenseMicroMag ' '];
 else
     BUILD = ' ';
     BUILD_MagTenseMicroMag = ' ';
-    BUILD_NO_CUDA_MagTenseMicroMag = ' ';
 end
 
 
 if (ispc)
     DEFINES = '-R2018a';
-    FFLAGS_NO_CUDA = 'COMPFLAGS="$COMPFLAGS /free /nologo /real-size:64 /O2 /assume:nocc_omp /Qopenmp /fpp /fpe:0 /fp:source /fp:precise"';
-    FFLAGS = [FFLAGS_NO_CUDA(1:(end-1)) ' /libs:static"'];
+    FFLAGS = 'COMPFLAGS="$COMPFLAGS /free /nologo /real-size:64 /O2 /assume:nocc_omp /Qopenmp /fpp /fpe:0 /fp:source /fp:precise"';
+    if (USE_CUDA)
+        FFLAGS = [FFLAGS(1:(end-1)) ' /libs:static"'];
+    end
     INCLUDE = ['-I' mkl_include ' -I' mkl_lp64 ' -I' NumericalIntegration_path BUILD '-I' DemagField_path BUILD '-I' TileDemagTensor_path ...
         BUILD '-I' MagTenseMicroMag_path BUILD_MagTenseMicroMag '-I' ForceIntegrator_path BUILD CVODE_include];
     LIBS = ['-L' MagTenseMicroMag_path BUILD_MagTenseMicroMag '-lMagTenseMicroMag -L' DemagField_path BUILD ...
-        ' -lDemagField -L' TileDemagTensor_path BUILD ' -lTileDemagTensor -L' NumericalIntegration_path BUILD ...
-        ' -lNumericalIntegration -L' ForceIntegrator_path BUILD ' -lMagneticForceIntegrator'];
-    INCLUDE_NO_CUDA = ['-I' mkl_include ' -I' mkl_lp64 ' -I' NumericalIntegration_path BUILD '-I' DemagField_path BUILD '-I' TileDemagTensor_path ...
-        BUILD '-I' MagTenseMicroMag_path BUILD_NO_CUDA_MagTenseMicroMag '-I' ForceIntegrator_path BUILD CVODE_include];
-    LIBS_NO_CUDA = ['-L' MagTenseMicroMag_path BUILD_NO_CUDA_MagTenseMicroMag ' -lMagTenseMicroMag -L' DemagField_path BUILD ...
         ' -lDemagField -L' TileDemagTensor_path BUILD ' -lTileDemagTensor -L' NumericalIntegration_path BUILD ...
         ' -lNumericalIntegration -L' ForceIntegrator_path BUILD ' -lMagneticForceIntegrator'];
     
@@ -143,14 +134,14 @@ end
  
 for i = 1:length(names)
     if names(i) == "MagTenseLandauLifshitzSolverNoCUDA"
-        source = [mex_root 'MagTenseLandauLifshitzSolver_mex.f90'];
-        mex_str = ['mex' ' ' DEBUG ' ' DEFINES ' ' FFLAGS_NO_CUDA ' ' INCLUDE_NO_CUDA ' ' OBJS_NO_CUDA ' ' LIBS_NO_CUDA ' ' MKL ' ' CUDA_NO_CUDA ' ' CVODE ' ' join(source, '')];
+        source = [mex_root "MagTenseLandauLifshitzSolver_mex.f90"];
         orig_name = "MagTenseLandauLifshitzSolver";
     else
         source = [mex_root names(i) '_mex.f90'];
-        mex_str = ['mex' DEBUG DEFINES FFLAGS INCLUDE OBJS LIBS MKL CUDA CVODE join(source, '')];
         orig_name = names(i);
     end
+    mex_str = ['mex' DEBUG DEFINES FFLAGS INCLUDE OBJS LIBS MKL CUDA CVODE join(source, '')];
+
     disp(join(mex_str, ' '))
     eval_MEX(join(mex_str, ' '))
     pause(pause_time)
