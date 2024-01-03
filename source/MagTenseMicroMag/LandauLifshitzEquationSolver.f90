@@ -133,6 +133,7 @@
     if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
         nt_Hext = size(gb_problem%Hext, 1) 
     else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
+        !Simply do a time evolution as specified in the problem  
         nt_Hext = 1
     endif
     
@@ -154,8 +155,7 @@
         gb_solution%H_ani(:,:,:,:) = 0
     endif
     
-    !if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
-        !loop over the range of applied fields
+    !loop over the range of applied fields
     do i=1,nt_Hext
         !Applied field
         gb_solution%HextInd = i
@@ -177,19 +177,6 @@
         call StoreHeffComponents ( gb_problem, gb_solution )
             
     enddo
-        
-        
-    !else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
-        !Simply do a time evolution as specified in the problem        
-    !    call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,1), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
-    
-    !    gb_solution%M_out(:,:,1,1) = transpose( M_out(1:ntot,:,1) )
-    !    gb_solution%M_out(:,:,1,2) = transpose( M_out((ntot+1):2*ntot,:,1) )
-    !    gb_solution%M_out(:,:,1,3) = transpose( M_out((2*ntot+1):3*ntot,:,1) )
-        
-    !    call StoreHeffComponents ( gb_problem, gb_solution )
-        
-    !endif
     
     !clean up
     deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
