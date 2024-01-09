@@ -146,6 +146,12 @@ for i = 1:length(names)
     eval_MEX(join(mex_str, ' '))
     pause(pause_time)
     movefile(join([orig_name '_mex.mex' mex_suffix '64'], ''), join(['MEX_files/' names(i) '_mex.mex' mex_suffix '64'], ''));
+
+    %--- Move the debug pdb files as well
+    if (~USE_RELEASE)
+        pause(pause_time)
+        movefile(join([orig_name '_mex.mex' mex_suffix '64.pdb'], ''), join(['MEX_files/' names(i) '_mex.mex' mex_suffix '64.pdb'], ''));
+    end
 end
 
 end
