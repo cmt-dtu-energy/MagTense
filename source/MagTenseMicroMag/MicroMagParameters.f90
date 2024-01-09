@@ -123,6 +123,9 @@ include "mkl_dfti.f90"
         real(SP),dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
         real(SP),dimension(:,:),allocatable :: Kzz          !> Demag field tensor split out into the nine symmetric components
         
+        integer,dimension(:,:),allocatable :: tensorMap     !> A map of the unique entries in the demagnetization tensor
+        logical,dimension(:,:),allocatable :: tensorMapX, tensorMapY, tensorMapZ   !> The sign of the different components in the demagnetization tensor map
+        
         real(DP),dimension(:),allocatable :: Axx,Axy,Axz,Ayy,Ayz,Azz    !> Anisotropy vectors assuming local anisotropy only, i.e. no interaction between grains
         
         
