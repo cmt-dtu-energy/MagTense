@@ -131,8 +131,9 @@ properties
     %magnetization between two timesteps
     conv_tol = 1e-4;
     
-    %defines whether to recompute the Interaction Matrices or not
-    RecomputeInteractionMatrices = 0 ;
+    %defines how often to calculate the demagnetization tensor in
+    %hysteresis problems. Zero is every step
+    demigstp = int32(0) ;
     
     %defines whether to use an External Mesh or not
     ExternalMesh = 0 ; 
@@ -336,7 +337,7 @@ methods
         obj.ShowTheResult = int32(1);
 
         obj.DirectoryFilename = '';
-        obj.RecomputeInteractionMatrices = int32(0) ;
+        obj.demigstp = int32(0) ;
         obj.ExternalMesh = int32(0) ;
         obj.MeshType = '' ;
         obj.ExternalMeshFileName = '' ;
