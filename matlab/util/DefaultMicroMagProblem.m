@@ -458,7 +458,7 @@ methods
         obj.exch_rowe = int32(re);
         obj.exch_col  = int32(c);
 
-        disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(10^9)) ' Gb'])
+        disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(2^30)) ' Gb'])
     end
 
     function obj = setMicroMagDemagApproximation( obj, type_var )

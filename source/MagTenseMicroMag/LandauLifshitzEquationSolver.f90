@@ -59,10 +59,14 @@
     gb_solution = sol
     gb_problem = prob
     
+    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+    
     call displayGUIMessage( 'Initializing matrices' )
     !Calculate the interaction matrices
     call initializeInteractionMatrices( gb_problem )
     
+    !write(prog_str,'(A37, F8.4, A5)') 'Demagnetization tensor memory usage: ', 6*storage_size(gb_problem%Kxx)*ntot/(8*2**30), ' gigabytes'
+    !call displayGUIMessage( trim(prog_str) )    
     
     !Copy the demag tensor to CUDA
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
@@ -84,8 +88,7 @@
         stop
 #endif
     endif
-
-    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+   
     allocate( gb_solution%pts(ntot,3) )
     if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then   
         do k=1,gb_problem%grid%nz
@@ -157,7 +160,6 @@
     endif
     
     !loop over the range of applied fields
-    gb_problem%demag_ignore_counter = 1
     do i=1,nt_Hext
         !Applied field
         gb_solution%HextInd = i
@@ -239,7 +241,14 @@
     call updateAnisotropy(  gb_problem, gb_solution )
     
     !Demag. field
-    call updateDemagfield( gb_problem, gb_solution )
+    if ( (mod(gb_solution%HextInd,gb_problem%demag_ignore_steps) .eq. 0) .and. (gb_problem%solver .eq. MicroMagSolverExplicit) ) then
+       ! Do not perform the demag tensor calculation.
+       ! Instead assume that it is equal to the previous value
+    
+       !call displayGUIMessage( 'Not performing the demagnetization calculation' )
+    else
+        call updateDemagfield( gb_problem, gb_solution )
+    endif
     
     !Effective field
     HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
@@ -573,205 +582,196 @@
     solution%My_s = real(solution%My, SP)
     solution%Mz_s = real(solution%Mz, SP)
     
-    if ( (problem%demag_ignore_counter .eq. problem%demag_ignore_steps) .and. (problem%solver .eq. MicroMagSolverExplicit) ) then
-       ! Do not perform the demag tensor calculation.
-       ! Instead assume that it is equal to the previous value
     
-        ! Set the counter to 1 again
-       problem%demag_ignore_counter = 1
-       !call displayGUIMessage( 'Not performing the demagnetization calculation' )
-    else
-        if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
-            if ( problem%useCuda .eq. useCudaFalse ) then
-                !Do the matrix multiplications using sparse matrices
-                alpha = -1.0
-                beta = 0.
-                stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(1)%A, descr, solution%Mx_s, beta, temp )
-                beta = 1.0
-                stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My_s, beta, temp )
-                stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz_s, beta, temp )
+    if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
+        if ( problem%useCuda .eq. useCudaFalse ) then
+            !Do the matrix multiplications using sparse matrices
+            alpha = -1.0
+            beta = 0.
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(1)%A, descr, solution%Mx_s, beta, temp )
+            beta = 1.0
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My_s, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz_s, beta, temp )
         
-                solution%HmX = temp * ( solution%Mfact )
-                !ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
-                !call vsmul( ntot, solution%HmX, -solution%Mfact, solution%HmX )
+            solution%HmX = temp * ( solution%Mfact )
+            !ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+            !call vsmul( ntot, solution%HmX, -solution%Mfact, solution%HmX )
             
-                beta = 0.
-                stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx_s, beta, temp )
-                beta = 1.0
-                stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My_s, beta, temp )
-                stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz_s, beta, temp )
+            beta = 0.
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx_s, beta, temp )
+            beta = 1.0
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My_s, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz_s, beta, temp )
         
-                solution%HmY = temp * ( solution%Mfact )
-                !call vsmul( ntot, solution%HmY, -solution%Mfact, solution%HmY )
+            solution%HmY = temp * ( solution%Mfact )
+            !call vsmul( ntot, solution%HmY, -solution%Mfact, solution%HmY )
           
-                beta = 0.
-                stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx_s, beta, temp )
-                beta = 1.0
-                stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My_s, beta, temp )
-                stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz_s, beta, temp )
+            beta = 0.
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx_s, beta, temp )
+            beta = 1.0
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My_s, beta, temp )
+            stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz_s, beta, temp )
         
-                solution%HmZ = temp * ( solution%Mfact )
-                !call vsmul( ntot, solution%HmZ, -solution%Mfact, solution%HmZ )
-            else
+            solution%HmZ = temp * ( solution%Mfact )
+            !call vsmul( ntot, solution%HmZ, -solution%Mfact, solution%HmZ )
+        else
 #if USE_CUDA
-                !Do the sparse matrix multiplication using CUDA
-                pref = sngl(-1 )!* solution%Mfact)                                
-                call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
-                temp = solution%HmX * solution%Mfact
-                solution%HmX = temp
-                temp = solution%HmY * solution%Mfact
-                solution%HmY = temp
-                temp = solution%HmZ * solution%Mfact
-                solution%HmZ = temp
+            !Do the sparse matrix multiplication using CUDA
+            pref = sngl(-1 )!* solution%Mfact)                                
+            call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
+            temp = solution%HmX * solution%Mfact
+            solution%HmX = temp
+            temp = solution%HmY * solution%Mfact
+            solution%HmY = temp
+            temp = solution%HmZ * solution%Mfact
+            solution%HmZ = temp
 #endif
-            endif
-        
-        elseif ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
-        
-            if ( problem%useCuda .eq. useCudaFalse ) then
-                !fourier transform Mx, My and Mz
-                ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
-                
-                !Convert to complex format
-                do i=1,ntot
-                    solution%Mx_FT(i) = cmplx( solution%Mx_s(i), 0. )
-                    solution%My_FT(i) = cmplx( solution%My_s(i), 0. )
-                    solution%Mz_FT(i) = cmplx( solution%Mz_s(i), 0. )
-                enddo
-        
-                stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mx_FT )
-                !normalization
-                solution%Mx_FT = solution%Mx_FT / ntot
-                
-                stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%My_FT )
-                !normalization
-                solution%My_FT = solution%My_FT / ntot
-        
-                stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mz_FT )
-                !normalization
-                solution%Mz_FT = solution%Mz_FT / ntot
-            
-                !sparse matrix multiplication with the demag matrices in fourier space...                
-                ! use problem%K_s(1..6) with cuda or MKL to do the sparse matrix-vector product with the FFT(M) and subsequently the IFT on the whole thing to get H
-        
-                !First Hx = Kxx * Mx + Kxy * My + Kxz * Mz
-        
-                alpha_c = cmplx(1.,0)
-                beta_c = cmplx(0.,0.)
-                stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(1)%A, descr, solution%Mx_FT, beta_c, solution%HmX_c )
-                beta_c = cmplx(1.0,0.)
-                stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%My_FT, beta_c, solution%HmX_c )
-                stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(3)%A, descr, solution%Mz_FT, beta_c, solution%HmX_c )
-        
-        
-                !Fourier transform backwards to get the field
-                stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmX_C )
-        
-                !Get the field
-                solution%HmX = -solution%Mfact * real(solution%HmX_c)
-                !call vsmul( ntot, real(solution%HmX_c), -solution%Mfact, solution%HmX )
-        
-        
-                !Second Hy = Kyx * Mx + Kyy * My + Kyz * Mz        
-                beta_c = cmplx(0.,0.)
-                stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%Mx_FT, beta_c, solution%HmY_c )
-                beta_c = cmplx(1.0,0.)
-                stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(4)%A, descr, solution%My_FT, beta_c, solution%HmY_c )
-                stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(5)%A, descr, solution%Mz_FT, beta_c, solution%HmY_c )
-        
-                !Fourier transform backwards to get the field
-                stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmY_c )
-        
-                !Get the field        
-                solution%HmY = -solution%Mfact * real(solution%HmY_c)
-                !call vsmul( ntot, real(solution%HmY_c), -solution%Mfact, solution%HmY )
-        
-        
-                !Third Hz = Kzx * Mx + Kzy * My + Kzz * Mz        
-                beta_c = cmplx(0.,0.)
-                stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(3)%A, descr, solution%Mx_FT, beta_c, solution%HmZ_c )
-                beta_c = cmplx(1.0,0.)
-                stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(5)%A, descr, solution%My_FT, beta_c, solution%HmZ_c )
-                stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(6)%A, descr, solution%Mz_FT, beta_c, solution%HmZ_c )
-        
-                !Fourier transform backwards to get the field
-                stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmZ_c )
-                !finally, get the field out        
-                solution%HmZ = -solution%Mfact * real(solution%HmZ_c)
-                !call vsmul( ntot, real(solution%HmZ_c), -solution%Mfact, solution%HmZ )
-        
-            else
-                !!No CUDA support for this part yet
-                call displayGUIMessage( 'CUDA not currently supported with FFT - exiting!' )
-                stop
-            endif
-        
-        else        
-            !Default way of doing the problem
-            if ( problem%useCuda .eq. useCudaFalse ) then
-                !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
-                !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
-                !solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
-                !solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
-                !solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
-            
-                alpha = -1.! * solution%Mfact
-                beta = 0.0
-                !Hmx = Kxx * Mx
-                call gemv( problem%Kxx, solution%Mx_s, solution%HmX, alpha, beta )
-                                   
-                beta = 1.0
-                !Hmx = Hmx + Kxy * My
-                call gemv( problem%Kxy, solution%My_s, solution%HmX, alpha, beta )
-            
-                !Hmx = Hmx + Kxz * Mz
-                call gemv( problem%Kxz, solution%Mz_s, solution%HmX, alpha, beta )
-            
-                beta = 0.0
-                !HmY = Kyx * Mx
-                call gemv( problem%Kxy, solution%Mx_s, solution%HmY, alpha, beta )
-            
-                beta = 1.0
-                !HmY = HmY + Kyy * My
-                call gemv( problem%Kyy, solution%My_s, solution%HmY, alpha, beta )
-            
-                !Hmy = Hmy + Kyz * Mz
-                call gemv( problem%Kyz, solution%Mz_s, solution%HmY, alpha, beta )
-            
-                beta = 0.0
-                !HmZ = Kzx * Mx
-                call gemv( problem%Kxz, solution%Mx_s, solution%HmZ, alpha, beta )
-            
-                beta = 1.0
-                !HmZ = HmZ + Kzy * My
-                call gemv( problem%Kyz, solution%My_s, solution%HmZ, alpha, beta )
-            
-                !HmZ = HmZ + Kzz * Mz
-                call gemv( problem%Kzz, solution%Mz_s, solution%HmZ, alpha, beta )
-            
-                temp = solution%HmX * solution%Mfact
-                solution%HmX = temp
-                temp = solution%HmY * solution%Mfact
-                solution%HmY = temp
-                temp = solution%HmZ * solution%Mfact
-                solution%HmZ = temp
-            
-            else
-                pref = sngl(-1)! * solution%Mfact)
-#if USE_CUDA
-                call cudaMatrVecMult( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
-                temp = solution%HmX * solution%Mfact
-                solution%HmX = temp
-                temp = solution%HmY * solution%Mfact
-                solution%HmY = temp
-                temp = solution%HmZ * solution%Mfact
-                solution%HmZ = temp
-#endif
-            endif 
         endif
         
-        problem%demag_ignore_counter = problem%demag_ignore_counter + 1
+    elseif ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
+        
+        if ( problem%useCuda .eq. useCudaFalse ) then
+            !fourier transform Mx, My and Mz
+            ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+                
+            !Convert to complex format
+            do i=1,ntot
+                solution%Mx_FT(i) = cmplx( solution%Mx_s(i), 0. )
+                solution%My_FT(i) = cmplx( solution%My_s(i), 0. )
+                solution%Mz_FT(i) = cmplx( solution%Mz_s(i), 0. )
+            enddo
+        
+            stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mx_FT )
+            !normalization
+            solution%Mx_FT = solution%Mx_FT / ntot
+                
+            stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%My_FT )
+            !normalization
+            solution%My_FT = solution%My_FT / ntot
+        
+            stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mz_FT )
+            !normalization
+            solution%Mz_FT = solution%Mz_FT / ntot
+            
+            !sparse matrix multiplication with the demag matrices in fourier space...                
+            ! use problem%K_s(1..6) with cuda or MKL to do the sparse matrix-vector product with the FFT(M) and subsequently the IFT on the whole thing to get H
+        
+            !First Hx = Kxx * Mx + Kxy * My + Kxz * Mz
+        
+            alpha_c = cmplx(1.,0)
+            beta_c = cmplx(0.,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(1)%A, descr, solution%Mx_FT, beta_c, solution%HmX_c )
+            beta_c = cmplx(1.0,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%My_FT, beta_c, solution%HmX_c )
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(3)%A, descr, solution%Mz_FT, beta_c, solution%HmX_c )
+        
+        
+            !Fourier transform backwards to get the field
+            stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmX_C )
+        
+            !Get the field
+            solution%HmX = -solution%Mfact * real(solution%HmX_c)
+            !call vsmul( ntot, real(solution%HmX_c), -solution%Mfact, solution%HmX )
+        
+        
+            !Second Hy = Kyx * Mx + Kyy * My + Kyz * Mz        
+            beta_c = cmplx(0.,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(2)%A, descr, solution%Mx_FT, beta_c, solution%HmY_c )
+            beta_c = cmplx(1.0,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(4)%A, descr, solution%My_FT, beta_c, solution%HmY_c )
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(5)%A, descr, solution%Mz_FT, beta_c, solution%HmY_c )
+        
+            !Fourier transform backwards to get the field
+            stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmY_c )
+        
+            !Get the field        
+            solution%HmY = -solution%Mfact * real(solution%HmY_c)
+            !call vsmul( ntot, real(solution%HmY_c), -solution%Mfact, solution%HmY )
+        
+        
+            !Third Hz = Kzx * Mx + Kzy * My + Kzz * Mz        
+            beta_c = cmplx(0.,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(3)%A, descr, solution%Mx_FT, beta_c, solution%HmZ_c )
+            beta_c = cmplx(1.0,0.)
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(5)%A, descr, solution%My_FT, beta_c, solution%HmZ_c )
+            stat = mkl_sparse_c_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha_c, problem%K_s_c(6)%A, descr, solution%Mz_FT, beta_c, solution%HmZ_c )
+        
+            !Fourier transform backwards to get the field
+            stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmZ_c )
+            !finally, get the field out        
+            solution%HmZ = -solution%Mfact * real(solution%HmZ_c)
+            !call vsmul( ntot, real(solution%HmZ_c), -solution%Mfact, solution%HmZ )
+        
+        else
+            !!No CUDA support for this part yet
+            call displayGUIMessage( 'CUDA not currently supported with FFT - exiting!' )
+            stop
+        endif
+        
+    else        
+        !Default way of doing the problem
+        if ( problem%useCuda .eq. useCudaFalse ) then
+            !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
+            !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
+            !solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
+            !solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
+            !solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
+            
+            alpha = -1.! * solution%Mfact
+            beta = 0.0
+            !Hmx = Kxx * Mx
+            call gemv( problem%Kxx, solution%Mx_s, solution%HmX, alpha, beta )
+                                   
+            beta = 1.0
+            !Hmx = Hmx + Kxy * My
+            call gemv( problem%Kxy, solution%My_s, solution%HmX, alpha, beta )
+            
+            !Hmx = Hmx + Kxz * Mz
+            call gemv( problem%Kxz, solution%Mz_s, solution%HmX, alpha, beta )
+            
+            beta = 0.0
+            !HmY = Kyx * Mx
+            call gemv( problem%Kxy, solution%Mx_s, solution%HmY, alpha, beta )
+            
+            beta = 1.0
+            !HmY = HmY + Kyy * My
+            call gemv( problem%Kyy, solution%My_s, solution%HmY, alpha, beta )
+            
+            !Hmy = Hmy + Kyz * Mz
+            call gemv( problem%Kyz, solution%Mz_s, solution%HmY, alpha, beta )
+            
+            beta = 0.0
+            !HmZ = Kzx * Mx
+            call gemv( problem%Kxz, solution%Mx_s, solution%HmZ, alpha, beta )
+            
+            beta = 1.0
+            !HmZ = HmZ + Kzy * My
+            call gemv( problem%Kyz, solution%My_s, solution%HmZ, alpha, beta )
+            
+            !HmZ = HmZ + Kzz * Mz
+            call gemv( problem%Kzz, solution%Mz_s, solution%HmZ, alpha, beta )
+            
+            temp = solution%HmX * solution%Mfact
+            solution%HmX = temp
+            temp = solution%HmY * solution%Mfact
+            solution%HmY = temp
+            temp = solution%HmZ * solution%Mfact
+            solution%HmZ = temp
+            
+        else
+            pref = sngl(-1)! * solution%Mfact)
+#if USE_CUDA
+            call cudaMatrVecMult( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
+            temp = solution%HmX * solution%Mfact
+            solution%HmX = temp
+            temp = solution%HmY * solution%Mfact
+            solution%HmY = temp
+            temp = solution%HmZ * solution%Mfact
+            solution%HmZ = temp
+#endif
+        endif 
     endif
+        
        
     deallocate(temp)
     
@@ -1065,7 +1065,9 @@
             
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
             
+            call displayGUIMessage( 'Constructing the Tensormap' )
             call ConstructDemagTensorMap( problem )
+            call displayGUIMessage( 'Done constructing the Tensormap' )
             
             !$OMP PARALLEL shared(problem)
             !$omp do private(ind, tile, H, Nout,Noutave,dx,dy,dz,pts_arr)
@@ -2325,22 +2327,22 @@
         !problem%tensorMapY = Transpose(problem%tensorMapY)
         !problem%tensorMapZ = Transpose(problem%tensorMapZ)
         
-        open(21,file='tensorMap.txt',status='unknown',form='formatted',action='write')
-        open(22,file='tensorMapX.txt',status='unknown',form='formatted',action='write')
-        open(23,file='tensorMapY.txt',status='unknown',form='formatted',action='write')
-        open(24,file='tensorMapZ.txt',status='unknown',form='formatted',action='write')
-        do i=1,ntot
-            do j=1,m
-	            write(21,*)  problem%tensorMap(i,j)
-                write(22,*)  problem%tensorMapX(i,j)
-                write(23,*)  problem%tensorMapY(i,j)
-                write(24,*)  problem%tensorMapZ(i,j)
-            enddo
-        enddo
-        close(21)
-        close(22)
-        close(23)
-        close(24)
+        !open(21,file='tensorMap.txt',status='unknown',form='formatted',action='write')
+        !open(22,file='tensorMapX.txt',status='unknown',form='formatted',action='write')
+        !open(23,file='tensorMapY.txt',status='unknown',form='formatted',action='write')
+        !open(24,file='tensorMapZ.txt',status='unknown',form='formatted',action='write')
+        !do i=1,ntot
+        !    do j=1,m
+	    !        write(21,*)  problem%tensorMap(i,j)
+        !        write(22,*)  problem%tensorMapX(i,j)
+        !        write(23,*)  problem%tensorMapY(i,j)
+        !        write(24,*)  problem%tensorMapZ(i,j)
+        !    enddo
+        !enddo
+        !close(21)
+        !close(22)
+        !close(23)
+        !close(24)
         
     end subroutine ConstructDemagTensorMap
     

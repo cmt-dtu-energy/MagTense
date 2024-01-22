@@ -99,7 +99,6 @@ include "mkl_dfti.f90"
         real(SP) :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         real(SP) :: CV                                  !> The coefficient of variation (CV), i.e. the ratio of the standard deviation to the mean, which can be used to add an error to the demag field
         integer :: demag_ignore_steps                   !> Only compute the demag tensor every demag_ignore_steps'th-step in a calculation using the hysteresis-model. Otherwise the parameter is ignore (i.e. in the dynamic solver)
-        integer :: demag_ignore_counter                 !> Count how long since demag_ignore_steps'th-step was taken
         
         integer :: setTimeDisplay                               !> Determines how often the timestep is shown in Matlab
         integer :: useCuda                                      !> Defines whether to attempt using CUDA or not
