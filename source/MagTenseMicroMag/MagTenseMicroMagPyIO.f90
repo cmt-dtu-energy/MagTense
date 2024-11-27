@@ -12,10 +12,9 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
     exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, problem )
     
-    integer(4), intent(in) :: ntot, nt_conv, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow
+    integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow
     integer(4),dimension(3),intent(in) :: grid_n
     real(8),dimension(3),intent(in) :: grid_L
-    integer(4),intent(in) :: grid_type
     real(8),dimension(ntot, 3),intent(in) :: grid_pts
     integer(4),dimension(4, ntot),intent(in) :: grid_ele
     real(8),dimension(grid_nnod, 3),intent(in) :: grid_nod
