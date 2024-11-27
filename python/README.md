@@ -9,32 +9,20 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
 
 - Python >= 3.9
 
-- [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#inpage-nav-6-undefined) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
-
-  - [Linux] Prepare your terminal, so that ifort compiler can be found:
-
-    ```bash
-    . /opt/intel/oneapi/setvars.sh
-    ```
-
-  - [Windows] Activation via [VS Code extension for Intel® oneAPI Toolkits](https://github.com/intel/vscode-oneapi-environment-configurator)
-
 - Required python packages
 
   Find available `${CUDA_LABEL}` [here](https://anaconda.org/nvidia/cuda).
   HINT: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.
 
+  More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
+  HINT: Set "`${OS}` to `win` or `linux`, respectively.
+
   ```bash
   conda install -y numpy matplotlib
   conda install -y -c "nvidia/label/cuda-${CUDA_LABEL}" cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
-  conda install -y -c intel mkl-static
+  conda install -y -c https://software.repos.intel.com/python/conda/ -c conda-forge mkl mkl-static "dpcpp_${OS}-64" intel-fortran-rt "ifx_${OS}-64"
+  conda install -y meson charset-normalizer
   ```
-
-  - [ Linux ]
-
-    ```bash
-    conda install -y -c intel intel-fortran-rt
-    ```
 
   - [ Windows / MacOS ] Installation of Make utility
 
@@ -42,10 +30,10 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
     conda install -y -c conda-forge make
     ```
 
-- Additional python packages to run data creation scripts
+- Additional python packages to run scripts
 
     ```bash
-    conda install -y h5py tqdm
+    conda install -y notebook h5py tqdm
     ```
 
 ### Installation from source (including MacOS Intel & ARM)

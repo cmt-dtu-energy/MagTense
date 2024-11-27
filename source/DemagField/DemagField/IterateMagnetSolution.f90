@@ -31,11 +31,10 @@
     !! -1 max number of iterations reached without satisfying the minimum error
     subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max, max_ite, resumeIteration )
         type(MagTile),dimension(n),intent(inout) :: tiles
-        integer(4),intent(in) :: n
-        type(MagStateFunction),intent(in),dimension(n_stf) :: stateFunction    
-        integer(4),intent(in) :: n_stf
+        integer(4),intent(in) :: n, n_stf
+        type(MagStateFunction),intent(in),dimension(n_stf) :: stateFunction
         real(8),intent(in) :: resumeIteration 
-        real(8),intent(in) :: T    
+        real(8),intent(in) :: T
         real(8),optional :: err_max
         integer(4),optional :: max_ite 
     
@@ -572,10 +571,9 @@
     !!
     subroutine loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
         
-        integer(4),intent(in) :: nT,nH
+        integer(4),intent(in) :: nT, nH, n_stateFcn
         type(MagStateFunction),dimension(n_stateFcn),intent(inout) :: stateFcn
         real(8),dimension(nH,nT),intent(in) :: data_stateFcn
-        integer(4),intent(in) :: n_stateFcn
         integer(4) :: i, j, k
 
         do i=1,n_stateFcn
