@@ -195,3 +195,5 @@ docs/source/_build
 .vs/MagTense/CopilotIndices/
 
 *.msg
+# Notebooks
+nbs/
