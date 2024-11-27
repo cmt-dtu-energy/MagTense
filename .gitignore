@@ -189,3 +189,6 @@ docs/source/_build
 
 *.vsidx
 *.lock
+
+# Notebooks
+nbs/
