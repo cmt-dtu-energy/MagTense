@@ -40,22 +40,21 @@ FORTRAN_CUDA_PATH = ../../../../source/MagTenseFortranCuda/cuda
 VPATH = ${NUM_INT_PATH}:${TILE_DEMAG_TENSOR_PATH}:${DEMAG_FIELD_PATH}:\
 ${MICROMAG_PATH}:${FORTRAN_CUDA_PATH}
 
+EXTRA_OPT = --f90flags='${FFLAGS}'
 ifeq ($(OS),Windows_NT)
 	MKL_ROOT = ${CONDA_PREFIX}/Library
 	CUDA = -L${CONDA_PREFIX}/Lib/x64 -lcublas -lcudart -lcuda -lcusparse
 	MKL = -L${MKL_ROOT}/lib -lmkl_rt -lmkl_blas95_lp64 -llibiomp5md
 	CVODE_ROOT = "C:\Program Files (x86)\sundials-4.1.0\instdir"
+	LIB_LOCAL = -llibsrc
 
 	ifeq (${FC}, ifx)
 		EXTRA_OPT = -DNO_APPEND_FORTRAN -DUPPERCASE_FORTRAN --no-lower \
 		--f90flags='${FFLAGS} /assume:nounderscore /names:uppercase'
-		OPT = ${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 -I${CVODE_ROOT}/fortran \
-		-I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} \
-		-I${MICROMAG_PATH} -I${FORTRAN_CUDA_PATH}
-		LIB_OPT = -I:${OPT} -L. -llibsrc
-	else ifeq (${FC}, gfortran)
-		EXTRA_OPT = --opt='${FFLAGS}'
-		LIB_OPT = -L. -llibsrc
+		OPT = ${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 \
+		-I../${NUM_INT_PATH} -I../${TILE_DEMAG_TENSOR_PATH} \
+		-I../${DEMAG_FIELD_PATH} -I../${MICROMAG_PATH} -I../${FORTRAN_CUDA_PATH}
+		LIB_OPT = -llibNumericalIntegration -llibTileDemagTensor -llibDemagField -llibMagTenseMicroMag
 	endif
 		
 	LIBTOOL = LIB $? /OUT:$@
@@ -65,21 +64,19 @@ ifeq ($(OS),Windows_NT)
 	CLEAN_FOLDER_WIN = -for /f %%i in ('dir /a:d /b src.win-*') do rd /s /q %%i
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
 
-# -I${CVODE_ROOT}/fortran
 else
 	MKL_ROOT = ${CONDA_PREFIX}
+	MKL = -L${MKL_ROOT}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
+	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
+	CVODE_ROOT = "/usr/local/sundials-4.1.0/instdir"
+	LIB_LOCAL = -lsrc
+
 	ifeq (${FC}, ifx)
 		OPT = ${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 \
 		-I../${NUM_INT_PATH} -I../${TILE_DEMAG_TENSOR_PATH} \
 		-I../${DEMAG_FIELD_PATH} -I../${MICROMAG_PATH} -I../${FORTRAN_CUDA_PATH}
 		LIB_OPT = -lNumericalIntegration -lTileDemagTensor -lDemagField -lMagTenseMicroMag
-	else ifeq (${FC}, gfortran)
-		LIB_OPT = 
 	endif
-
-	EXTRA_OPT = --f90flags='${FFLAGS}'
-	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
-	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
 
 	ifeq (${UNAME}, Darwin)
   		LIBTOOL = libtool -static -o $@ $?
@@ -94,18 +91,22 @@ else
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.so
 endif
 
-STATIC_LIB = libsrc${LIB_SUFFIX}
-NUM_INT_LIB = ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX}
-TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX}
-DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
-MICROMAG_LIB = ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX}
-
-CVODE = -L${CVODE_ROOT}/lib -lsundials_nvecserial -lsundials_sunmatrixdense \
--lsundials_sunlinsoldense -lsundials_fnvecserial_mod -lsundials_cvode \
--lsundials_fsunnonlinsolfixedpoint_mod
+ifeq (${FC}, gfortran)
+	LIB_OPT =
+endif
 
 ifeq ($(USE_MKL),0)
 	MKL =
+endif
+
+ifeq ($(USE_CVODE),0)
+	CVODE =
+	CVODE_OPT =
+else
+	CVODE = -L${CVODE_ROOT}/lib -lsundials_nvecserial -lsundials_sunmatrixdense \
+	-lsundials_sunlinsoldense -lsundials_fnvecserial_mod -lsundials_cvode \
+	-lsundials_fsunnonlinsolfixedpoint_mod
+	CVODE_OPT = -I${CVODE_ROOT}/fortran
 endif
 
 ifeq ($(USE_CUDA),0)
@@ -118,14 +119,7 @@ else
 	COMPILE_CUDA = cuda
 	CUDA_WRAP = ${FORTRAN_CUDA_PATH}/MagTenseCudaBlasICLWrapper.o
 	CUDA_OBJECT = ${FORTRAN_CUDA_PATH}/MagTenseCudaBlas.o
-	LIB_OPT_SRC =  -I${OPT} -L../../ -lsrc ${LIB_OPT}
-endif
-
-ifeq ($(USE_CVODE),0)
-	CVODE =
-	CVODE_OPT =
-else
-	CVODE_OPT = -I${CVODE_ROOT}/fortran
+	LIB_OPT_SRC =  -I${OPT} ${CVODE_OPT} -L../../ ${LIB_LOCAL} ${LIB_OPT}
 endif
 
 ifeq ($(USE_MICROMAG),0)
@@ -163,6 +157,7 @@ ifeq ($(USE_MICROMAG),1)
 endif
 
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
+STATIC_LIB = libsrc${LIB_SUFFIX}
 
 .PHONY: all clean
 
@@ -190,10 +185,10 @@ cuda:
 	cd ${FORTRAN_CUDA_PATH} && $(MAKE) CPP=$(CPP)
 
 ${STATIC_LIB}: ${CUDA_OBJECT} ${CUDA_WRAP}
-	cp ${NUM_INT_LIB} .
-	cp ${TILE_DEMAG_TENSOR_LIB} .
-	cp ${DEMAG_FIELD_LIB} .
-	cp ${MICROMAG_LIB} .
+	cp ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX} .
+	cp ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX} .
+	cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
+	cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
 	${LIBTOOL}
 
 ${PYTHON_MODN_ALL}: ${STATIC_LIB}
