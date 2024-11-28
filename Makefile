@@ -24,7 +24,7 @@ ifeq (${FC}, ifort)
 		/DUSE_CUDA=${USE_CUDA} /DUSE_MATLAB=${USE_MATLAB}
 	else
 		FFLAGS = -O3 -fpp -real-size 64 -assume nocc_omp -qopenmp \
-		-fpe0 -fp-model=source -fp-model=precise -fpic -DUSE_CVODE=${USE_CVODE} \
+		-fpe0 -fp-model=source -fpic -DUSE_CVODE=${USE_CVODE} \
 		-DUSE_CUDA=${USE_CUDA} -DUSE_MATLAB=${USE_MATLAB}
 	endif
 else ifeq (${FC}, gfortran)

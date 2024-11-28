@@ -940,8 +940,7 @@
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
         
-            !$OMP PARALLEL shared(problem) 
-            !$omp do private(ind, tile, H, Nout, k, j, i)
+            !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout, k, j, i)
         
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do k=1,nz
@@ -992,8 +991,7 @@
                 enddo
             enddo
             
-            !$omp end do
-            !$OMP END PARALLEL
+            !$OMP END PARALLEL DO
             
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
         
@@ -1001,10 +999,8 @@
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
     
-            !$OMP PARALLEL shared(problem) private(ind, indx_ele, tile, H, Nout, pts_arr, i)
-                        
+            !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, indx_ele, tile, H, Nout, pts_arr, i)
             !for each element find the tensor for all evaluation points (i.e. all elements)
-            !$omp do
             do i=1,nx
                 !Setup template tile
                 tile(1)%tileType = 5 !(for tetrahedron)
@@ -1049,15 +1045,12 @@
                 deallocate(Nout)
                 deallocate(H)
             enddo
-            !$omp end do
-            
-            !$OMP END PARALLEL
+            !$OMP END PARALLEL DO
             
             
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
             
-            !$OMP PARALLEL shared(problem)
-            !$omp do private(ind, tile, H, Nout,Noutave,dx,dy,dz,pts_arr)
+            !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout,Noutave,dx,dy,dz,pts_arr)
             
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do i=1,ntot
@@ -1140,8 +1133,7 @@
                 deallocate(pts_arr)
             enddo
         
-            !$omp end do
-            !$OMP END PARALLEL
+            !$OMP END PARALLEL DO
             
         endif
         
