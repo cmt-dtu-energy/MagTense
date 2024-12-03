@@ -12,24 +12,25 @@ FFLAGS =
 #       List all source files required for the project
 #=======================================================================
 LIBSRC_SOURCES = IOgeneral IntegrationDataTypes quadpack \
-SpecialFunctions NumericalIntegrals RKSuitef90 ODE_Solvers util
+	SpecialFunctions NumericalIntegrals RKSuitef90 ODE_Solvers util
 
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
-	LIBTOOL = LIB $? /OUT:$@
+	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
+	LIBTOOL = LIB $? /NOLOGO /OUT:$@
 	LIB_SUFFIX = .lib
-	CLEAN_FILES = -del *.lib *.o *.mod
 	
 else
+	OPT =
+	LIB_SUFFIX = .a
 	ifeq (${UNAME}, Darwin)
   		LIBTOOL = libtool -static -o $@ $?
 	else
   		LIBTOOL = ar src $@ $?
 	endif
-	LIB_SUFFIX = .a
-	CLEAN_FILES = -rm -f .a *.o *.mod
 endif
+
 STATIC_LIB = libNumericalIntegration${LIB_SUFFIX}
 
 ifeq ($(USE_CVODE),0)
@@ -52,10 +53,10 @@ endif
 all: ${STATIC_LIB}
 
 clean:
-	${CLEAN_FILES}
+	-rm -f *${LIB_SUFFIX} *.o *.mod
 
 .f90.o:
-	$(FC) $(FFLAGS) ${CVODE_OPT} ${MATLAB_OPT} -c $< -o $@
+	$(FC) $(FFLAGS) ${OPT} ${CVODE_OPT} ${MATLAB_OPT} -c $< -o $@
 
 ${STATIC_LIB}: ${LIBSRC_OBJECTS}
 	${LIBTOOL}

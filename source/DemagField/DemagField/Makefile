@@ -14,26 +14,27 @@ MATLAB_INCLUDE =
 LIBSRC_SOURCES = DemagFieldGetSolution MagParameters spline IterateMagnetSolution
 
 ifeq ($(USE_MATLAB),1)
-LIBSRC_SOURCES += MagTileIO
-MATLAB_OPT = -I"${MATLAB_INCLUDE}"
+	LIBSRC_SOURCES += MagTileIO
+	MATLAB_OPT = -I"${MATLAB_INCLUDE}"
 else
-MATLAB_OPT =
+	MATLAB_OPT =
 endif
 
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
-	LIBTOOL = LIB $? /OUT:$@
+	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
+	LIBTOOL = LIB $? /NOLOGO /OUT:$@
 	LIB_SUFFIX = .lib
-	CLEAN_FILES = -del *.lib *.o *.mod
 else
+	OPT =
+	LIB_SUFFIX = .a
+
 	ifeq (${UNAME}, Darwin)
   		LIBTOOL = libtool -static -o $@ $?
 	else
   		LIBTOOL = ar src $@ $?
 	endif
-	LIB_SUFFIX = .a
-	CLEAN_FILES = -rm -f *.a *.o *.mod
 endif
 
 STATIC_LIB = libDemagField${LIB_SUFFIX}
@@ -51,14 +52,14 @@ TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX
 all: pre-build ${STATIC_LIB}
 
 .f90.o:
-	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} ${MATLAB_OPT} -c $< -o $@
+	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} ${OPT} ${MATLAB_OPT} -c $< -o $@
 
 pre-build:
 	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
 	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
 
-${STATIC_LIB}: ${NUM_INT_LIB} ${TILE_DEMAG_TENSOR_LIB} ${LIBSRC_OBJECTS}
+${STATIC_LIB}: ${TILE_DEMAG_TENSOR_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
 clean:
-	${CLEAN_FILES}
+	-rm -f *${LIB_SUFFIX} *.o *.mod

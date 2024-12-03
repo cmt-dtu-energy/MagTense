@@ -30,6 +30,48 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
     conda install -y -c conda-forge make
     ```
 
+  - Windows pecularities
+
+    - Installation of [Visual Studio 2022](https://visualstudio.microsoft.com)
+
+    - When `make` can not be found during Makefile execution, change to Developer PowerShell.
+      This can be added to your profiles in VS Code by adding the follwing to `settings.json`:
+
+      ```bash
+      "Developer PowerShell for VS 2022": {
+              "source": "PowerShell",
+              "icon": "terminal-powershell",
+              "args": [
+                "-NoExit",
+                "-ExecutionPolicy",
+                "ByPass",
+                "-File",
+                "C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/Launch-VsDevShell.ps1"
+              ]
+          },
+      ```
+    
+    - Compilation with `nvcc` should be executed in `x64 Native Tools Command Prompt for VS 2022`.
+      Otherwise, `x86` will be silently used, which results in `error: asm operand type size(8) does not match type/size implied by constraint 'r'` in `cuda_bf16.hpp`.
+      Also, `f2py` needs to be run in that shell to make `ifx` compiler available for meson. 
+      The x64 Command Prompt can be added to your profiles in VS Code by adding the follwing to `settings.json`:
+
+      ```bash
+      "DevCmd": {
+            "path": [
+                "${env:windir}\\Sysnative\\cmd.exe",
+                "${env:windir}\\System32\\cmd.exe"
+            ],
+            "args": [
+                "/d",
+                "/k", 
+                "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat",
+                "amd64"],
+            "icon": "terminal-cmd"
+        },
+       ```
+
+
 - Additional python packages to run scripts
 
     ```bash

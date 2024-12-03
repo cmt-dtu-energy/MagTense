@@ -12,25 +12,38 @@ CUDA_WRAP_SOURCE = MagTenseCudaBlasICLWrapper
 #=======================================================================
 CUDA_FILE = $(addsuffix .cu, ${CUDA_SOURCE})
 CUDA_WRAP_FILE = $(addsuffix .cxx, ${CUDA_WRAP_SOURCE})
+CUDA_OBJECT = $(addsuffix .o, ${CUDA_SOURCE})
+CUDA_WRAP = $(addsuffix .o, ${CUDA_WRAP_SOURCE})
 #=======================================================================
 #
 #=======================================================================
 ifeq ($(OS),Windows_NT)
-	CUDA_OBJECT = $(addsuffix .obj, ${CUDA_SOURCE})
-	CUDA_WRAP = $(addsuffix .obj, ${CUDA_WRAP_SOURCE})
-	CPPFLAGS = /Fo:${CUDA_WRAP}
-	CLEAN_FILES = -del *.obj
+	CPPFLAGS = /nologo /Fo:${CUDA_WRAP}
+	NVCC =
+	LIBTOOL = LIB $? /NOLOGO /OUT:$@
+	LIB_SUFFIX = .lib
+	CLEAN_FILES =
 else
-	CUDA_OBJECT = $(addsuffix .o, ${CUDA_SOURCE})
-	CUDA_WRAP = $(addsuffix .o, ${CUDA_WRAP_SOURCE})
 	CUFLAGS = -shared -Xcompiler -fPIC -I ${CONDA_PREFIX}/include
 	CPPFLAGS = ${CFLAGS} -o ${CUDA_WRAP}
+	NVCC = cuda
+	LIB_SUFFIX = .a
+	ifeq (${UNAME}, Darwin)
+  		LIBTOOL = libtool -static -o $@ $?
+	else
+  		LIBTOOL = ar src $@ $?
+	endif
 	CLEAN_FILES = -rm *.o
 endif
 
+STATIC_LIB = libCuda${LIB_SUFFIX}
+
+#=======================================================================
+#							Targets
+#=======================================================================
 .PHONY: all clean
 
-all: cuda cuda_wrap
+all: ${NVCC} ${STATIC_LIB}
 
 clean:
 	${CLEAN_FILES}
@@ -38,5 +51,8 @@ clean:
 cuda: 
 	nvcc ${CUFLAGS} -c ${CUDA_FILE} -o ${CUDA_OBJECT}
 
-cuda_wrap: 
-	${CPP} ${CPPFLAGS} -c ${CUDA_WRAP_FILE} -o ${CUDA_WRAP}
+${CUDA_WRAP}: 
+	${CPP} ${CPPFLAGS} -c ${CUDA_WRAP_FILE} -o $@
+
+${STATIC_LIB}: ${CUDA_OBJECT} ${CUDA_WRAP}
+	${LIBTOOL}
