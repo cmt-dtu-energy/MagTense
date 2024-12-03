@@ -11,36 +11,22 @@ MATLAB_INCLUDE =
 LIBSRC_SOURCES = MagForceIO MagForceMaxwellStressTensor MagneticForce
 
 ifeq ($(OS),Windows_NT)
-OBJ_SUFFIX = .obj
-LIB_SUFFIX = .lib
-LIBTOOL = LIB $? /OUT:$@
-CLEAN_FILES = -del ${STATIC_LIB} *.obj *.mod
+	LIB_SUFFIX = .lib
+	LIBTOOL = LIB $? /OUT:$@
 else
-OBJ_SUFFIX = .o
-ifeq (${UNAME}, Darwin)
-	LIBTOOL = libtool -static -o $@ $?
-else
-	LIBTOOL = ar src $@ $?
-endif
-LIB_SUFFIX = .a
-CLEAN_FILES = -rm -f ${STATIC_LIB} *.o *.mod
+	LIB_SUFFIX = .a
+
+	ifeq (${UNAME}, Darwin)
+		LIBTOOL = libtool -static -o $@ $?
+	else
+		LIBTOOL = ar src $@ $?
+	endif
 endif
 
-LIBSRC_OBJECTS = $(addsuffix ${OBJ_SUFFIX}, ${LIBSRC_SOURCES})
-IO = MagForceIO${OBJ_SUFFIX}
-IO_SRC = MagForceIO.f90
-STRESSTENSOR = MagForceMaxwellStressTensor${OBJ_SUFFIX}
-STRESSTENSOR_SRC = MagForceMaxwellStressTensor.f90
-FORCE = MagneticForce${OBJ_SUFFIX}
-FORCE_SRC = MagneticForce.f90
-
+LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 STATIC_LIB = libMagneticForceIntegrator${LIB_SUFFIX}
 NUM_INT_PATH = ../../NumericalIntegration/NumericalIntegration
-NUM_INT_LIB = ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX}
-
 TILE_DEMAG_TENSOR_PATH = ../../TileDemagTensor/TileDemagTensor
-TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX}
-
 DEMAG_FIELD_PATH = ../../DemagField/DemagField
 DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
 #=======================================================================
@@ -51,17 +37,11 @@ DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
 
 all: ${STATIC_LIB}
 
-${IO}:
-	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I"${MATLAB_INCLUDE}" -c ${IO_SRC} -o $@
+.f90.o:
+	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I"${MATLAB_INCLUDE}" -c $< -o $@
 
-${STRESSTENSOR}:
-	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I"${MATLAB_INCLUDE}" -c ${STRESSTENSOR_SRC} -o $@
-
-${FORCE}:
-	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I"${MATLAB_INCLUDE}" -c ${FORCE_SRC} -o $@
-
-${STATIC_LIB}: ${IO} ${STRESSTENSOR} ${FORCE} ${NUM_INT_LIB} ${TILE_DEMAG_TENSOR_LIB} ${DEMAG_FIELD_LIB}   
+${STATIC_LIB}: ${DEMAG_FIELD_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
 clean:
-	${CLEAN_FILES}
+	-rm -f ${STATIC_LIB} *.o *.mod
