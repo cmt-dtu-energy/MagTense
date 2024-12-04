@@ -1,7 +1,7 @@
 #==========================
 # Compiler names and flags
 #==========================
-USE_CUDA = 0
+USE_CUDA = 1
 USE_CVODE = 0
 USE_MICROMAG = 1
 CPP = icx
@@ -48,7 +48,6 @@ ifeq ($(OS),Windows_NT)
 	MKL_LIB = -L${CONDA_PATH}/Library/lib -lmkl_intel_lp64 -lmkl_intel_thread \
 		-lmkl_core -lmkl_blas95_lp64 -llibiomp5md
 	CVODE_ROOT = "C:\Program Files (x86)\sundials-4.1.0\instdir"
-	LIB_LOCAL = -llibsrc
 
 	ifeq (${FC}, ifx)
 		EXTRA_OPT = --f90flags='${FFLAGS} /assume:underscore /names:lowercase'
@@ -66,7 +65,6 @@ else
 	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
 	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
 	CVODE_ROOT = "/usr/local/sundials-4.1.0/instdir"
-	LIB_LOCAL = -lsrc
 	EXTRA_OPT =
 
 	ifeq (${FC}, ifx)
@@ -113,11 +111,14 @@ endif
 ifeq ($(USE_CUDA),0)
 	COMPILE_CUDA =
 	CUDA =
-	LIB_LCL =
 else
 	COMPILE_CUDA = cuda
-	LIB_LCL = ${LIB_LOCAL}
-	CP_LIB += cp ${FORTRAN_CUDA_PATH}/libCuda${LIB_SUFFIX} .
+	CP_LIB += && cp ${FORTRAN_CUDA_PATH}/libCuda${LIB_SUFFIX} .
+	ifeq ($(OS),Windows_NT)
+		LIB_OPT += -llibCuda
+	else
+		LIB_OPT += -lCuda
+	endif
 endif
 
 INCLUDE_OBJ = ${MKFILE_PATH}/${NUM_INT_PATH} \
@@ -194,4 +195,4 @@ ${PYTHON_MODN_ALL}:
 	${CP_LIB}
 	FC=$(FC) LDFLAGS='/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib' f2py -c -m ${PYTHON_MODN} \
 		--build-dir ./build --f90flags='${FFLAGS}' ${EXTRA_OPT} -I${OPT} -I${INCLUDE_OBJ} ${CVODE_OPT} \
-		-L${MKFILE_PATH} ${LIB_LCL} ${LIB_OPT} FortranToPythonIO.f90 ${MKL_LIB} ${CUDA} ${CVODE}
+		-L${MKFILE_PATH} ${LIB_OPT} FortranToPythonIO.f90 ${MKL_LIB} ${CUDA} ${CVODE}
