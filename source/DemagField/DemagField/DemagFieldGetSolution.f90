@@ -202,6 +202,7 @@
     !!Returns the magnetic field from a rectangular prism
     !!
     subroutine getFieldFromRectangularPrismTile( prismTile, H, pts, n_ele, N_out, useStoredN )
+        !DEC$ ATTRIBUTES ALIAS:"getfieldfromrectangularprismtile_" :: getFieldFromRectangularPrismTile
         type(MagTile),intent(in) :: prismTile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3) :: pts
@@ -232,6 +233,7 @@
     !!Returns the magnetic field from a sphere
     !!
     subroutine getFieldFromSphereTile( tile, H, pts, n_ele, N_out, useStoredN )
+        !DEC$ ATTRIBUTES ALIAS:"getfieldfromspheretile_" :: getFieldFromSphereTile
         type(MagTile),intent(in) :: tile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3) :: pts
@@ -258,6 +260,7 @@
     !!Returns the magnetic field from a sphere
     !!
     subroutine getFieldFromSpheroidTile( tile, H, pts, n_ele, N_out, useStoredN )
+        !DEC$ ATTRIBUTES ALIAS:"getfieldfromspheroidtile_" :: getFieldFromSpheroidTile
         type(MagTile),intent(in) :: tile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3) :: pts
@@ -284,6 +287,7 @@
     !!Returns the magnetic field from a tetrahedron
     !!
     subroutine getFieldFromTetrahedronTile( tile, H, pts, n_ele, N_out, useStoredN )
+        !DEC$ ATTRIBUTES ALIAS:"getfieldfromtetrahedrontile_" :: getFieldFromTetrahedronTile
         type(MagTile),intent(in) :: tile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3) :: pts
@@ -312,6 +316,7 @@
     !!Returns the magnetic field from a cylindrical tile
     !!
     subroutine getFieldFromCylTile( cylTile, H, pts, n_ele, N_out, useStoredN )
+        !DEC$ ATTRIBUTES ALIAS:"getfieldfromcyltile_" :: getFieldFromCylTile
         type(MagTile), intent(inout) :: cylTile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3) :: pts
@@ -434,6 +439,7 @@
     !!Function to calcuate H within a cylindrical tile that is rotated, as for CylindricalTiles it is actually the B-field divided by mu0 that is calculated
     !!
     subroutine SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_pts)
+        !DEC$ ATTRIBUTES ALIAS:"subtractmfromcylindricaltiles_" :: SubtractMFromCylindricalTiles
         real(8),dimension(n_pts,3),intent(inout) :: H
         type(MagTile),dimension(n_tiles),intent(in) :: tiles
         real(8),dimension(n_pts,3),intent(in) :: pts
@@ -496,6 +502,7 @@
     !!Returns the magnetic field from a tile that is a piece of circle
     !!
     subroutine getFieldFromCircPieceTile( circTile, H, pts, n_ele, N_out, useStoredN )
+        !DEC$ ATTRIBUTES ALIAS:"getfieldfromcircpiecetile_" :: getFieldFromCircPieceTile
         type(MagTile),intent(in) :: circTile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3) :: pts
@@ -555,6 +562,7 @@
     !!Returns the magnetic field from a piece of circle that is inverted, i.e. pointing inwards
     !!
     subroutine getFieldFromCircPieceInvertedTile( circTile, H, pts, n_ele, N_out, useStoredN )
+        !DEC$ ATTRIBUTES ALIAS:"getfieldfromcircpieceinvertedtile_" :: getFieldFromCircPieceInvertedTile
         type(MagTile),intent(in) :: circTile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3) :: pts
@@ -616,6 +624,7 @@
     !!@todo Rotation has not been implemented yet for this tile type
     !!
     subroutine getFieldFromPlanarCoilTile( tile, H, pts, n_ele, N_out, useStoredN )
+        !DEC$ ATTRIBUTES ALIAS:"getfieldfromplanarcoiltile_" :: getFieldFromPlanarCoilTile
         type(MagTile),intent(in) :: tile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3) :: pts

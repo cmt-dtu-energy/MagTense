@@ -3,7 +3,7 @@
 #==========================
 USE_CUDA = 0
 USE_CVODE = 0
-USE_MICROMAG = 0
+USE_MICROMAG = 1
 CPP = icx
 FC = ifx
 MKFILE_PATH := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
@@ -18,9 +18,8 @@ endif
 ifeq (${FC}, ifx)
 	ifeq ($(OS),Windows_NT)
 		FFLAGS = /O3 /fpp /real-size:64 /Qopenmp /assume:nocc_omp /fpe:0 \
-			/fp:source /nologo /assume:underscore /names:lowercase \
-			/DUSE_CVODE=${USE_CVODE} /DUSE_MATLAB=0 /DUSE_CUDA=${USE_CUDA} \
-			/DUSE_MICROMAG=${USE_MICROMAG}
+			/fp:source /nologo /DUSE_CVODE=${USE_CVODE} /DUSE_MATLAB=0 \
+			/DUSE_CUDA=${USE_CUDA} /DUSE_MICROMAG=${USE_MICROMAG}
 	else
 		FFLAGS = -O3 -fpp -real-size 64 -qopenmp -assume nocc_omp -fpe0 \
 			-fp-model=source -fpic -nologo -DUSE_CVODE=${USE_CVODE} \
@@ -42,7 +41,6 @@ FORTRAN_CUDA_PATH = ../../../../source/MagTenseFortranCuda/cuda
 VPATH = ${NUM_INT_PATH}:${TILE_DEMAG_TENSOR_PATH}:${DEMAG_FIELD_PATH}:\
 ${MICROMAG_PATH}:${FORTRAN_CUDA_PATH}
 
-EXTRA_OPT = --f90flags='${FFLAGS}'
 ifeq ($(OS),Windows_NT)
 	CONDA_PATH = $(subst \,/,${CONDA_PREFIX})
 	CUDA = -L${CONDA_PATH}/Library/lib -lcublas -lcudart -lcuda -lcusparse
@@ -69,6 +67,7 @@ else
 	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
 	CVODE_ROOT = "/usr/local/sundials-4.1.0/instdir"
 	LIB_LOCAL = -lsrc
+	EXTRA_OPT =
 
 	ifeq (${FC}, ifx)
 		OPT = ${CONDA_PREFIX}/include -I${CONDA_PREFIX}/include/intel64/lp64
@@ -103,11 +102,11 @@ ifeq ($(USE_MICROMAG),0)
 	CP_LIB = cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
 else
 	MICROMAG = micromagnetism
-	CP_LIB = cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} . && cp ${FORTRAN_CUDA_PATH}/libCuda${LIB_SUFFIX} .
+	CP_LIB = cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
 	ifeq ($(OS),Windows_NT)
-		LIB_OPT += -llibMagTenseMicroMag
+		LIB_OPT = -llibMagTenseMicroMag
 	else
-		LIB_OPT += -lMagTenseMicroMag
+		LIB_OPT = -lMagTenseMicroMag
 	endif
 endif
 
@@ -118,6 +117,7 @@ ifeq ($(USE_CUDA),0)
 else
 	COMPILE_CUDA = cuda
 	LIB_LCL = ${LIB_LOCAL}
+	CP_LIB += cp ${FORTRAN_CUDA_PATH}/libCuda${LIB_SUFFIX} .
 endif
 
 INCLUDE_OBJ = ${MKFILE_PATH}/${NUM_INT_PATH} \
@@ -193,5 +193,5 @@ cuda:
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
 	FC=$(FC) LDFLAGS='/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib' f2py -c -m ${PYTHON_MODN} \
-		--build-dir ./build ${EXTRA_OPT} -I${OPT} -I${INCLUDE_OBJ} ${CVODE_OPT} -L${MKFILE_PATH} \
-		${LIB_LCL} ${LIB_OPT} FortranToPythonIO.f90 ${MKL_LIB} ${CUDA} ${CVODE}
+		--build-dir ./build --f90flags='${FFLAGS}' ${EXTRA_OPT} -I${OPT} -I${INCLUDE_OBJ} ${CVODE_OPT} \
+		-L${MKFILE_PATH} ${LIB_LCL} ${LIB_OPT} FortranToPythonIO.f90 ${MKL_LIB} ${CUDA} ${CVODE}
