@@ -56,5 +56,6 @@ venv.bak/
 data/
 demag/
 evals/
+figs/
 
 examples/micromagnetism/.idea/

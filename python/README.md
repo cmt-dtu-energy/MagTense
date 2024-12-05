@@ -20,8 +20,8 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
   ```bash
   conda install -y numpy matplotlib
   conda install -y -c "nvidia/label/cuda-${CUDA_LABEL}" cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
-  conda install -y -c https://software.repos.intel.com/python/conda/ -c conda-forge mkl mkl-static "dpcpp_${OS}-64" intel-fortran-rt "ifx_${OS}-64"
-  conda install -y meson charset-normalizer
+  conda install -y -c https://software.repos.intel.com/python/conda/ -c conda-forge mkl mkl-devel "dpcpp_${OS}-64" intel-fortran-rt "ifx_${OS}-64"
+  conda install -y meson charset-normalizer ncurses
   ```
 
   - [ Windows / MacOS ] Installation of Make utility
@@ -123,15 +123,13 @@ conda install -y anaconda-client conda-build
 
 # Add nvidia channel to find CUDA and intel libraries
 # conda config --show channels
-conda config --env --append channels nvidia/label/cuda-12.2.2
-conda config --env --append channels intel
-# On Windows
-# conda config --env --append channels conda-forge
+conda config --env --append channels nvidia/label/cuda-12.6.3
+conda config --env --append channels https://software.repos.intel.com/python/conda/
+conda config --env --append channels conda-forge
 
-# Quick fix for error of nvcc during build on Windows
-# conda install -y -c nvidia/label/cuda-12.2.2 cuda-nvcc
-# cd MagTense/source/MagTenseFortranCuda/cuda/
-# nvcc -c MagTenseCudaBlas.cu -o MagTenseCudaBlas.o
+# Quick fix for now
+# Copy pre-compiled Python extension to MagTense/python/src/magtense/lib
+# Build conda seperately for each version
 
 # Version numbers have to be set in advance in pyproject.toml
 cd MagTense/python/
