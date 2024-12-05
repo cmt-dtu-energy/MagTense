@@ -44,10 +44,14 @@ ${MICROMAG_PATH}:${FORTRAN_CUDA_PATH}
 ifeq ($(OS),Windows_NT)
 	CONDA_PATH = $(subst \,/,${CONDA_PREFIX})
 	CUDA = -L${CONDA_PATH}/Library/lib -lcublas -lcudart -lcuda -lcusparse
-	MKL = -L${CONDA_PATH}/Library/bin -lmkl_rt
-	MKL_LIB = -L${CONDA_PATH}/Library/lib -lmkl_intel_lp64 -lmkl_intel_thread \
-		-lmkl_core -lmkl_blas95_lp64 -llibiomp5md
+	MKL = -L${CONDA_PATH}/Library/lib -lmkl_intel_lp64_dll -lmkl_intel_thread_dll \
+		-lmkl_core_dll -lmkl_blas95_lp64 -llibiomp5md
 	CVODE_ROOT = "C:\Program Files (x86)\sundials-4.1.0\instdir"
+	LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib'
+	LIB_SUFFIX = .lib
+	CLEAN_FILES = -rm *.lib *.o *.mod *.pyd
+	CLEAN_FOLDER = -rm -r build
+	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
 
 	ifeq (${FC}, ifx)
 		EXTRA_OPT = --f90flags='${FFLAGS} /assume:underscore /names:lowercase'
@@ -56,25 +60,21 @@ ifeq ($(OS),Windows_NT)
 			-I${CONDA_PATH}/opt/compiler/include/intel64
 		LIB_OPT = -llibDemagField
 	endif
-	LIB_SUFFIX = .lib
-	CLEAN_FILES = -rm *.lib *.o *.mod *.pyd
-	CLEAN_FOLDER = -rm -r build
-	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
-
 else
 	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
 	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
 	CVODE_ROOT = "/usr/local/sundials-4.1.0/instdir"
-	EXTRA_OPT =
-
-	ifeq (${FC}, ifx)
-		OPT = ${CONDA_PREFIX}/include -I${CONDA_PREFIX}/include/intel64/lp64
-		LIB_OPT = -lNumericalIntegration -lTileDemagTensor -lDemagField
-	endif
+	LDFLAGS =
 	LIB_SUFFIX = .a
 	CLEAN_FILES = -rm *.a *.o *.mod *.so 
 	CLEAN_FOLDER = -rm -r build
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.so
+
+	ifeq (${FC}, ifx)
+		EXTRA_OPT = --f90flags='${FFLAGS}'
+		OPT = ${CONDA_PREFIX}/include -I${CONDA_PREFIX}/include/intel64/lp64
+		LIB_OPT = -lNumericalIntegration -lTileDemagTensor -lDemagField
+	endif
 endif
 
 ifeq (${FC}, gfortran)
@@ -97,14 +97,24 @@ endif
 
 ifeq ($(USE_MICROMAG),0)
 	MICROMAG =
-	CP_LIB = cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
+	ifeq ($(OS),Windows_NT)
+		CP_LIB = cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
+	else
+		CP_LIB = cp ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX} .
+		CP_LIB += && cp ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX} .
+		CP_LIB += && cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
+	endif
 else
 	MICROMAG = micromagnetism
-	CP_LIB = cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
 	ifeq ($(OS),Windows_NT)
 		LIB_OPT = -llibMagTenseMicroMag
+		CP_LIB = cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
 	else
-		LIB_OPT = -lMagTenseMicroMag
+		LIB_OPT += -lMagTenseMicroMag
+		CP_LIB = cp ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX} .
+		CP_LIB += && cp ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX} .
+		CP_LIB += && cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
+		CP_LIB += && cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
 	endif
 endif
 
@@ -181,18 +191,18 @@ clean_build:
 	${CLEAN_FOLDER}
 
 magnetostatic:
-	cd ${NUM_INT_PATH} && ${MAKE} FC=$(FC) FFLAGS='${FFLAGS}' CVODE_OPT=${CVODE_OPT} USE_MATLAB=0
-	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} FC=$(FC) FFLAGS='${FFLAGS}'
-	cd ${DEMAG_FIELD_PATH} && ${MAKE} FC=$(FC) FFLAGS='${FFLAGS}' USE_MATLAB=0
+	cd ${NUM_INT_PATH} && ${MAKE} FC=${FC} FFLAGS='${FFLAGS}' CVODE_OPT=${CVODE_OPT} USE_MATLAB=0
+	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} FC=${FC} FFLAGS='${FFLAGS}'
+	cd ${DEMAG_FIELD_PATH} && ${MAKE} FC=${FC} FFLAGS='${FFLAGS}' USE_MATLAB=0
 
 micromagnetism:
-	cd ${MICROMAG_PATH} && ${MAKE} FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=${USE_CVODE} CVODE_ROOT=${CVODE_ROOT} USE_MATLAB=0 MATLAB_INCLUDE=""
+	cd ${MICROMAG_PATH} && ${MAKE} FC=${FC} FFLAGS='${FFLAGS}' USE_CVODE=${USE_CVODE} CVODE_ROOT=${CVODE_ROOT} USE_MATLAB=0 MATLAB_INCLUDE=""
 
 cuda:
 	cd ${FORTRAN_CUDA_PATH} && ${MAKE} CPP=${CPP}
 
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
-	FC=$(FC) LDFLAGS='/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib' f2py -c -m ${PYTHON_MODN} \
+	FC=${FC} LDFLAGS=${LDFLAGS} f2py -c -m ${PYTHON_MODN} \
 		--build-dir ./build --f90flags='${FFLAGS}' ${EXTRA_OPT} -I${OPT} -I${INCLUDE_OBJ} ${CVODE_OPT} \
-		-L${MKFILE_PATH} ${LIB_OPT} FortranToPythonIO.f90 ${MKL_LIB} ${CUDA} ${CVODE}
+		-L${MKFILE_PATH} ${LIB_OPT} FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE}
