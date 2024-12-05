@@ -16,25 +16,6 @@ build:
 requirements:
   build:
     - python {{ py_version }}
-    - numpy =={{ numpy_version_build }}
-    - mkl =={{ mkl_version }}
-    - mkl-devel =={{ mkl_version }}
-    - intel-fortran-rt =={{ mkl_version }}
-    - dpcpp_win-64 =={{ mkl_version }} # [win]
-    - dpcpp_linux-64 =={{ mkl_version }} # [unix]
-    - ifx_win-64 =={{ mkl_version }} # [win]
-    - ifx_linux-64 =={{ mkl_version }} # [unix]
-    - meson
-    - charset-normalizer
-    - ncurses
-{% if cuda_version != 'cpu' %}
-    - cuda-nvcc =={{ cuda_pkg_version }}
-    - libcusparse-dev =={{ cuda_pkg_version }}
-    - libcublas-dev =={{ cuda_pkg_version }}
-    - cuda-cudart-dev =={{ cuda_pkg_version }}
-    - libnvjitlink-dev =={{ cuda_pkg_version }}
-{% endif %}
-    - make # [win]
   host:
     - python {{ py_version }}
     - pip
