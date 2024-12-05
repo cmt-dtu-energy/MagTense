@@ -2,6 +2,8 @@
 
 :: Navigate to wrapper file for python module
 cd %RECIPE_DIR%\..\python\src\magtense\lib
+del *.lib
+rmdir /S /Q build
 rmdir /S /Q %RECIPE_DIR%\..\python\src\magtense.egg-info
 rmdir /S /Q %RECIPE_DIR%\..\python\build
 
