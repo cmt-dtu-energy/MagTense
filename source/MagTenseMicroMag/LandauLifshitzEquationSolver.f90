@@ -47,7 +47,8 @@
     !> @param[inout] prob data structure containing the problem to be solved
     !> @param[inout] sol data structure containing the solution    
     !>-----------------------------------------
-    subroutine SolveLandauLifshitzEquation( prob, sol )    
+    subroutine SolveLandauLifshitzEquation( prob, sol )
+    !DEC$ ATTRIBUTES ALIAS:"solvelandaulifshitzequation_" :: SolveLandauLifshitzEquation
     type(MicroMagProblem),intent(inout) :: prob     !> The problem data structure
     type(MicroMagSolution),intent(inout) :: sol     !> The solution data structure    
     integer :: ntot,i,j,k,ind,nt,nt_Hext,stat       !> total no. of tiles
@@ -1051,7 +1052,6 @@
             enddo
             
             !$OMP END PARALLEL DO
-            
             
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
             
