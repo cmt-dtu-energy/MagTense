@@ -20,9 +20,9 @@ if (ispc)
     VS_STUDIO = true;
     MKL_STATIC = true;
     mkl_include = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include"';
-    mkl_lp64 = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\intel64\lp64"';
-    mkl_lib = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\lib\intel64"';
-    cuda_root = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\lib\x64"';
+    mkl_lp64 = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\mkl\intel64\lp64"';
+    mkl_lib = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\lib"';
+    cuda_root = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\lib\x64"';
     cvode_include = '"C:\Program Files (x86)\sundials-4.1.0\instdir\fortran"';
     cvode_lib = '"C:\Program Files (x86)\sundials-4.1.0\instdir\lib"';
     mex_suffix = 'w';

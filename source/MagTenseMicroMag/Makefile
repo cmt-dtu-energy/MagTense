@@ -10,7 +10,7 @@ MKL_ROOT =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
-LIBSRC_SOURCES = MicroMagParameters LLODE_Debug FortranCuda
+LIBSRC_SOURCES = MicroMagParameters util_micromag DemagAuxFunctions FortranCuda
 
 ifeq ($(USE_MATLAB),1)
 	LIBSRC_SOURCES += MagTenseMicroMagIO
