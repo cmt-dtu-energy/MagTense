@@ -7,22 +7,29 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
 
 ### Requirements
 
-- Python >= 3.9
+- Python >= 3.12
+  ```
+  conda create -y -n magtense-env python==3.12 numpy matplotlib meson charset-normalizer notebook h5py tqdm
+  conda activate magtense-env
+  ```
 
 - Required python packages
 
-  Find available `${CUDA_LABEL}` [here](https://anaconda.org/nvidia/cuda).\
+  Available CUDA versions can be found at [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda).\
   *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.*
 
   More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)\
   *Note: Set `${OS}` to `win` or `linux`, respectively.*
 
   ```bash
-  conda install -y numpy matplotlib
-  conda install -y -c "nvidia/label/cuda-${CUDA_LABEL}" cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
-  conda install -y -c https://software.repos.intel.com/python/conda/ -c conda-forge mkl mkl-devel "dpcpp_${OS}-64" intel-fortran-rt "ifx_${OS}-64"
-  conda install -y meson charset-normalizer ncurses
+  conda install -y -c "nvidia/label/cuda-12.6.3" cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
+  conda install -y -c https://software.repos.intel.com/python/conda/ -c conda-forge mkl mkl-devel mkl-static "dpcpp_${OS}-64" intel-fortran-rt "ifx_${OS}-64"
   ```
+
+  - [ Linux ]
+    ```bash
+    conda install -y ncurses
+    ```
 
   - [ Windows / MacOS ] Installation of Make utility
 
@@ -70,13 +77,6 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
             "icon": "terminal-cmd"
         },
        ```
-
-
-- Additional python packages to run scripts
-
-    ```bash
-    conda install -y notebook h5py tqdm
-    ```
 
 ### Installation from source (including MacOS Intel & ARM)
 
