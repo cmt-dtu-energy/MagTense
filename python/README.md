@@ -13,70 +13,86 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
   conda activate magtense-env
   ```
 
-- Required python packages
+- Required python packages for CUDA and MKL
 
-  Available CUDA versions can be found at [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda).\
+  Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda)\
   *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.*
 
-  More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)\
-  *Note: Set `${OS}` to `win` or `linux`, respectively.*
-
-  ```bash
+    ```bash
   conda install -y -c "nvidia/label/cuda-12.6.3" cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
-  conda install -y -c https://software.repos.intel.com/python/conda/ -c conda-forge mkl mkl-devel mkl-static "dpcpp_${OS}-64" intel-fortran-rt "ifx_${OS}-64"
   ```
+
+  More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
   - [ Linux ]
     ```bash
-    conda install -y ncurses
+    conda install -y -c https://software.repos.intel.com/python/conda/ -c conda-forge mkl mkl-devel mkl-static "dpcpp_linux-64" intel-fortran-rt "ifx_linux-64" ncurses
     ```
 
-  - [ Windows / MacOS ] Installation of Make utility
+  - [ Windows ] Additonal installation of Make utility
 
     ```bash
-    conda install -y -c conda-forge make
+    conda install -y -c https://software.repos.intel.com/python/conda/ -c conda-forge mkl mkl-devel mkl-static "dpcpp_win-64" intel-fortran-rt "ifx_win-64" make
     ```
 
-  - Windows pecularities
+#### Compile Fortran source files
+- Linux
+  ```bash
+  cd MagTense/python/src/magtense/lib/
+  make
+  ```
 
-    - Installation of [Visual Studio 2022](https://visualstudio.microsoft.com)
+- Windows
 
-    - When `make` can not be found during Makefile execution, change to Developer PowerShell.
-      This can be added to your profiles in VS Code by adding the follwing to `settings.json`:
+  - Installation of [Visual Studio 2022](https://visualstudio.microsoft.com)
 
-      ```bash
-      "Developer PowerShell for VS 2022": {
-              "source": "PowerShell",
-              "icon": "terminal-powershell",
-              "args": [
-                "-NoExit",
-                "-ExecutionPolicy",
-                "ByPass",
-                "-File",
-                "C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/Launch-VsDevShell.ps1"
-              ]
-          },
-      ```
-    
-    - Compilation with `nvcc` should be executed in `x64 Native Tools Command Prompt for VS 2022`.
-      Otherwise, `x86` will be silently used, which results in `error: asm operand type size(8) does not match type/size implied by constraint 'r'` in `cuda_bf16.hpp`.
-      Also, `f2py` needs to be run in that shell to make `ifx` compiler available for meson. 
-      The x64 Command Prompt can be added to your profiles in VS Code by adding the follwing to `settings.json`:
+  - When `make` can not be found during Makefile execution, change to Developer PowerShell.
+    This can be added to your profiles in VS Code by adding the follwing to `settings.json`:
 
-      ```bash
-      "DevCmd": {
-            "path": [
-                "${env:windir}\\Sysnative\\cmd.exe",
-                "${env:windir}\\System32\\cmd.exe"
-            ],
+    ```bash
+    "Developer PowerShell for VS 2022": {
+            "source": "PowerShell",
+            "icon": "terminal-powershell",
             "args": [
-                "/d",
-                "/k", 
-                "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat",
-                "amd64"],
-            "icon": "terminal-cmd"
+              "-NoExit",
+              "-ExecutionPolicy",
+              "ByPass",
+              "-File",
+              "C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/Launch-VsDevShell.ps1"
+            ]
         },
-       ```
+    ```
+    ```bash
+    cd MagTense/python/src/magtense/lib/
+    make ps
+    ```
+
+  - Compilation with `nvcc` should be executed in `x64 Native Tools Command Prompt for VS 2022`.
+    Otherwise, `x86` will be silently used, which results in `error: asm operand type size(8) does not match type/size implied by constraint 'r'` in `cuda_bf16.hpp`.
+    Also, `f2py` needs to be run in that shell to make `ifx` compiler available for meson. 
+    The x64 Command Prompt can be added to your profiles in VS Code by adding the follwing to `settings.json`:
+
+    ```bash
+    "DevCmd": {
+          "path": [
+              "${env:windir}\\Sysnative\\cmd.exe",
+              "${env:windir}\\System32\\cmd.exe"
+          ],
+          "args": [
+              "/d",
+              "/k", 
+              "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat",
+              "amd64"],
+          "icon": "terminal-cmd"
+      },
+      ```
+
+      ```bash
+      cd MagTense/source/MagTenseFortranCuda/cuda
+      make ps
+      cd MagTense/python/src/magtense/lib/
+      make 
+      ```
 
 ### Installation from source (including MacOS Intel & ARM)
 
@@ -86,8 +102,6 @@ For MacOS ARM architectures, currently only magnetostatics with the gfortran com
 Navigate to folder `MagTense/python/src/magtense/lib/`, run `make`, and install the package:
 
 ```bash
-cd MagTense/python/src/magtense/lib/
-make
 cd MagTense/python/
 python -m pip install -e .
 ```

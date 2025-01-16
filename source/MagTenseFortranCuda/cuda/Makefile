@@ -19,14 +19,12 @@ CUDA_WRAP = $(addsuffix .o, ${CUDA_WRAP_SOURCE})
 #=======================================================================
 ifeq ($(OS),Windows_NT)
 	CPPFLAGS = /nologo /Fo:${CUDA_WRAP}
-	NVCC =
 	LIBTOOL = LIB $? /NOLOGO /OUT:$@
 	LIB_SUFFIX = .lib
 	CLEAN_FILES =
 else
 	CUFLAGS = -shared -Xcompiler -fPIC -I ${CONDA_PREFIX}/include
 	CPPFLAGS = ${CFLAGS} -o ${CUDA_WRAP}
-	NVCC = cuda
 	LIB_SUFFIX = .a
 	ifeq (${UNAME}, Darwin)
   		LIBTOOL = libtool -static -o $@ $?
@@ -43,7 +41,7 @@ STATIC_LIB = libCuda${LIB_SUFFIX}
 #=======================================================================
 .PHONY: all clean
 
-all: ${NVCC} ${STATIC_LIB}
+all: cuda ${STATIC_LIB}
 
 clean:
 	${CLEAN_FILES}

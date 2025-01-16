@@ -54,7 +54,7 @@ ifeq ($(OS),Windows_NT)
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
 
 	ifeq (${FC}, ifx)
-		EXTRA_OPT = --f90flags='${FFLAGS} /assume:underscore /names:lowercase'
+		EXTRA_FFLAGS = '${FFLAGS} /assume:underscore /names:lowercase'
 		OPT = ${CONDA_PATH}/Library/include \
 			-I${CONDA_PATH}/Library/include/intel64/lp64 \
 			-I${CONDA_PATH}/opt/compiler/include/intel64
@@ -71,7 +71,7 @@ else
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.so
 
 	ifeq (${FC}, ifx)
-		EXTRA_OPT = --f90flags='${FFLAGS}'
+		EXTRA_FFLAGS = '${FFLAGS}'
 		OPT = ${CONDA_PREFIX}/include -I${CONDA_PREFIX}/include/intel64/lp64
 		LIB_OPT = -lNumericalIntegration -lTileDemagTensor -lDemagField
 	endif
@@ -203,6 +203,6 @@ cuda:
 
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
-	FC=${FC} LDFLAGS=${LDFLAGS} f2py -c -m ${PYTHON_MODN} \
-		--build-dir ./build --f90flags='${FFLAGS}' ${EXTRA_OPT} -I${OPT} -I${INCLUDE_OBJ} ${CVODE_OPT} \
+	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} python -m numpy.f2py -c -m ${PYTHON_MODN} \
+		--build-dir ./build -I${OPT} -I${INCLUDE_OBJ} ${CVODE_OPT} \
 		-L${MKFILE_PATH} ${LIB_OPT} FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE}
