@@ -5,12 +5,21 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
 
 ## Deployment with Conda (Intel architectures)
 
-### Requirements
+Create an importable Python module from Fortran source code.
 
-- Python >= 3.12
-  ```
-  conda create -y -n magtense-env python==3.12 numpy matplotlib meson charset-normalizer notebook h5py tqdm
+For MacOS ARM architectures, currently only magnetostatics with the gfortran compiler is supported.
+
+### Linux
+
+- New conda environment with Python >= 3.12
+  ```bash
+  conda create -y -n magtense-env 
   conda activate magtense-env
+  conda config --env --add channels conda-forge
+  conda config --env --add channels nvidia/label/cuda-12.6.3
+  conda config --env --add channels https://software.repos.intel.com/python/conda/
+  conda install -y python
+  conda install -y numpy matplotlib meson charset-normalizer ncurses git notebook h5py tqdm
   ```
 
 - Required python packages for CUDA and MKL
@@ -18,35 +27,36 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
   Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda)\
   *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.*
 
-    ```bash
-  conda install -y -c "nvidia/label/cuda-12.6.3" cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
+  ```bash
+  conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   ```
 
   More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
-  - [ Linux ]
-    ```bash
-    conda install -y -c https://software.repos.intel.com/python/conda/ -c conda-forge mkl mkl-devel mkl-static "dpcpp_linux-64" intel-fortran-rt "ifx_linux-64" ncurses
-    ```
-
-  - [ Windows ] Additonal installation of Make utility
-
-    ```bash
-    conda install -y -c https://software.repos.intel.com/python/conda/ -c conda-forge mkl mkl-devel mkl-static "dpcpp_win-64" intel-fortran-rt "ifx_win-64" make
-    ```
-
-#### Compile Fortran source files
-- Linux
   ```bash
-  cd MagTense/python/src/magtense/lib/
+  conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" intel-fortran-rt "ifx_linux-64"
+  ```
+
+- Compile Fortran source files
+  ```bash
+  cd python/src/magtense/lib/
   make
   ```
 
-- Windows
+### Windows
 
-  - Installation of [Visual Studio 2022](https://visualstudio.microsoft.com)
+- Conda environment from `environment.yml`
 
-  - When `make` can not be found during Makefile execution, change to Developer PowerShell.
+  ```bash
+  conda create -f python/environment.yml
+  ```
+
+- Compile Fortran source files
+  
+  - Installation of [Visual Studio 2022](https://visualstudio.microsoft.com) / Desktop development with C++
+
+  - TODO Update for terminal in Visual Studio
+    When `make` can not be found during Makefile execution, change to Developer PowerShell.
     This can be added to your profiles in VS Code by adding the follwing to `settings.json`:
 
     ```bash
@@ -63,7 +73,7 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
         },
     ```
     ```bash
-    cd MagTense/python/src/magtense/lib/
+    cd python/src/magtense/lib/
     make ps
     ```
 
@@ -85,24 +95,42 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
               "amd64"],
           "icon": "terminal-cmd"
       },
-      ```
+    ```
+
+    ```bash
+    cd source/MagTenseFortranCuda/cuda
+    make
+    ```
+
+    - In case you get `nvcc fatal   : Could not set up the environment for Microsoft Visual Studio [...]`, the environment path in the active conda environment prevents `nvcc` to work correctly. A quick fix to compile `MagTenseCudaBlas` is to initialize a `x64 Native Tools Command Prompt for VS 2022` without `conda`:
 
       ```bash
-      cd MagTense/source/MagTenseFortranCuda/cuda
-      make ps
-      cd MagTense/python/src/magtense/lib/
-      make 
+      "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin\nvcc.exe"  -c MagTenseCudaBlas.cu -o MagTenseCudaBlas.o
       ```
 
-### Installation from source (including MacOS Intel & ARM)
+      And then only compile `MagTenseCudaBlasICLWrapper.cxx` before creating `libCuda` in the activated environment:
 
-Create an importable Python module from Fortran source code.
+      ```bash
+      cd source/MagTenseFortranCuda/cuda
+      make wrap
+      ```
 
-For MacOS ARM architectures, currently only magnetostatics with the gfortran compiler is supported.
-Navigate to folder `MagTense/python/src/magtense/lib/`, run `make`, and install the package:
+  - Linking and wrapping libraries with `f2py`  
+    ```bash
+    cd python/src/magtense/lib/
+    make cmdx64
+    ```
+
+    - In case you get `meson.build:1:0: ERROR: Unknown compiler(s): [['ifx']]`, it should help te reinitialize your conda environment to ensure having the correct environment path:
+      ```bash
+      conda deactivate
+      conda activate magtense-env
+      ```
+
+### Install local editable magtense package
 
 ```bash
-cd MagTense/python/
+cd python/
 python -m pip install -e .
 ```
 
