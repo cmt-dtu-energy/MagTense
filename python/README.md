@@ -5,11 +5,11 @@ The tool `f2py` of the NumPy package is used to wrap the interface file `MagTens
 
 ## Deployment with Conda (Intel architectures)
 
-Create an importable Python module from Fortran source code.
+For MacOS ARM architectures, currently only magnetostatics with the `gfortran` compiler is supported.
 
-For MacOS ARM architectures, currently only magnetostatics with the gfortran compiler is supported.
+### Create an importable Python module from Fortran source code
 
-### Linux
+#### Linux
 
 - New conda environment with Python >= 3.12
   ```bash
@@ -43,7 +43,7 @@ For MacOS ARM architectures, currently only magnetostatics with the gfortran com
   make
   ```
 
-### Windows
+#### Windows
 
 - Conda environment from `environment.yml`
 
@@ -55,23 +55,45 @@ For MacOS ARM architectures, currently only magnetostatics with the gfortran com
   
   - Installation of [Visual Studio 2022](https://visualstudio.microsoft.com) / Desktop development with C++
 
-  - TODO Update for terminal in Visual Studio
-    When `make` can not be found during Makefile execution, change to Developer PowerShell.
-    This can be added to your profiles in VS Code by adding the follwing to `settings.json`:
+  - Setting up customized versions of `Developer PowerShell` and `x64 Native Tools Command Prompt for VS 2022`:
 
-    ```bash
-    "Developer PowerShell for VS 2022": {
-            "source": "PowerShell",
-            "icon": "terminal-powershell",
-            "args": [
+    - In [VS Code](https://code.visualstudio.com), these integrated terminals can be added to your profiles by editing `settings.json`. Further, the Python extension ensures that the correct `conda` environment is activated in all terminals.
+      ```bash
+      "terminal.integrated.profiles.windows": {
+          "Developer PowerShell for VS 2022": {
+              "source": "PowerShell",
+              "icon": "terminal-powershell",
+              "args": [
               "-NoExit",
               "-ExecutionPolicy",
               "ByPass",
               "-File",
               "C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/Launch-VsDevShell.ps1"
-            ]
-        },
-    ```
+              ]
+          },
+          "DevCmdx64": {
+              "path": [
+                  "${env:windir}\\Sysnative\\cmd.exe",
+                  "${env:windir}\\System32\\cmd.exe"
+              ],
+              "args": [
+                  "/k",
+                  "C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/VsDevCmd.bat",
+                  "-startdir=None",
+                  "-arch=amd64",
+                  "-host_arch=x64"
+              ],
+              "icon": "terminal-cmd"
+          },
+      },
+      ```
+
+    - Alternatively, customized profiles can be set up in the `Windows Terminal` app with the following guide: https://learn.microsoft.com/en-us/windows/terminal/install#settings-json-file
+
+      Further, `conda` has to be initialized in these terminals to have access to the `make` executable and other necessary packages.
+
+  - Open a `Developer PowerShell` and run:
+
     ```bash
     cd python/src/magtense/lib/
     make ps
@@ -79,33 +101,16 @@ For MacOS ARM architectures, currently only magnetostatics with the gfortran com
 
   - Compilation with `nvcc` should be executed in `x64 Native Tools Command Prompt for VS 2022`.
     Otherwise, `x86` will be silently used, which results in `error: asm operand type size(8) does not match type/size implied by constraint 'r'` in `cuda_bf16.hpp`.
-    Also, `f2py` needs to be run in that shell to make `ifx` compiler available for meson. 
-    The x64 Command Prompt can be added to your profiles in VS Code by adding the follwing to `settings.json`:
-
-    ```bash
-    "DevCmd": {
-          "path": [
-              "${env:windir}\\Sysnative\\cmd.exe",
-              "${env:windir}\\System32\\cmd.exe"
-          ],
-          "args": [
-              "/d",
-              "/k", 
-              "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat",
-              "amd64"],
-          "icon": "terminal-cmd"
-      },
-    ```
 
     ```bash
     cd source/MagTenseFortranCuda/cuda
     make
     ```
 
-    - In case you get `nvcc fatal   : Could not set up the environment for Microsoft Visual Studio [...]`, the environment path in the active conda environment prevents `nvcc` to work correctly. A quick fix to compile `MagTenseCudaBlas` is to initialize a `x64 Native Tools Command Prompt for VS 2022` without `conda`:
+    - **Note:** In case the error `nvcc fatal   : Could not set up the environment for Microsoft Visual Studio [...]` shows up, the environment path in the active conda environment prevents `nvcc` to work correctly. A quick fix to compile `MagTenseCudaBlas` is to initialize a `x64 Native Tools Command Prompt for VS 2022` without `conda`:
 
       ```bash
-      "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin\nvcc.exe"  -c MagTenseCudaBlas.cu -o MagTenseCudaBlas.o
+      "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin\nvcc.exe" -c MagTenseCudaBlas.cu -o MagTenseCudaBlas.o
       ```
 
       And then only compile `MagTenseCudaBlasICLWrapper.cxx` before creating `libCuda` in the activated environment:
@@ -115,13 +120,15 @@ For MacOS ARM architectures, currently only magnetostatics with the gfortran com
       make wrap
       ```
 
-  - Linking and wrapping libraries with `f2py`  
+  - Linking and wrapping libraries with `f2py` needs to be run in `x64 Native Tools Command Prompt for VS 2022` to make `ifx` compiler available for `meson`:
+
     ```bash
     cd python/src/magtense/lib/
     make cmdx64
     ```
 
-    - In case you get `meson.build:1:0: ERROR: Unknown compiler(s): [['ifx']]`, it should help te reinitialize your conda environment to ensure having the correct environment path:
+    - **Note:** In case error `meson.build:1:0: ERROR: Unknown compiler(s): [['ifx']]` shows up, it should help to reinitialize your conda environment to ensure having the correct environment path:
+
       ```bash
       conda deactivate
       conda activate magtense-env

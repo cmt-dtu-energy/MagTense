@@ -21,7 +21,6 @@ ifeq ($(OS),Windows_NT)
 	CPPFLAGS = /nologo /Fo:${CUDA_WRAP}
 	LIBTOOL = LIB $? /NOLOGO /OUT:$@
 	LIB_SUFFIX = .lib
-	CLEAN_FILES =
 else
 	CUFLAGS = -shared -Xcompiler -fPIC -I ${CONDA_PREFIX}/include
 	CPPFLAGS = ${CFLAGS} -o ${CUDA_WRAP}
@@ -31,9 +30,9 @@ else
 	else
   		LIBTOOL = ar src $@ $?
 	endif
-	CLEAN_FILES = -rm *.o
 endif
 
+CLEAN_FILES = -rm *.o
 STATIC_LIB = libCuda${LIB_SUFFIX}
 
 #=======================================================================
@@ -42,6 +41,8 @@ STATIC_LIB = libCuda${LIB_SUFFIX}
 .PHONY: all clean
 
 all: cuda ${STATIC_LIB}
+
+wrap: ${STATIC_LIB}
 
 clean:
 	${CLEAN_FILES}
