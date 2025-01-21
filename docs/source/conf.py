@@ -15,7 +15,7 @@ import sphinx_rtd_theme
 # -- Project information -----------------------------------------------------
 
 project = 'MagTense TechManual'
-copyright = '2020, MagTense Developers'
+copyright = 'MagTense Developers'
 author = 'Stefan Pollok'
 
 

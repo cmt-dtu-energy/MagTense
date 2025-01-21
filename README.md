@@ -6,13 +6,13 @@
   <br>
 </div>
 
-# MagTense version 2024
+# MagTense
 
 MagTense consists of both a magnetostatic and a micromagnetism calculation framework.
 
 The magnetostatic framework can calculate the magnetic field from objects shaped as cylinders, pieces of cylinders, prisms, circular pieces and tetrahedrons. This is done using a fully analytical calculation of the demagnetization tensor. The framework is fully implemented in Fortran and has both a Matlab MEX interface and a Python interface.
 
-The micromagnetism framework solves the Landau-Lifshitz equation. The framework is fully implemented in Fortran and has a Matlab MEX interface and a Python interface, as well as an older Matlab implementation. The micromagnetism framework utilizes the magnetostatic framework for calculating the demagnetization field.
+The micromagnetism framework solves the Landau-Lifshitz equation. The framework is fully implemented in Fortran and has a Matlab MEX interface and a Python interface. The micromagnetism framework utilizes the magnetostatic framework for calculating the demagnetization field.
 
 The webpage of the code is available at https://www.magtense.org.
 
@@ -45,7 +45,3 @@ Instructions on how to build and use the Python interface are listed in [python]
   conda install magtense -c cmt-dtu-energy/label/cpu -c https://software.repos.intel.com/python/conda/ -c conda-forge
   ```
 
-## Current code development
-The main features being worked on at the moment are:
-- Proper code documentation
-- Non-uniform grids
