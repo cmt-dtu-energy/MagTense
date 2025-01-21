@@ -113,17 +113,14 @@
         enddo
     endif    
     
-
     
     call displayGUIMessage( 'Initializing solution' )
     !Initialize the solution, i.e. allocate various arrays
     call initializeSolution( gb_problem, gb_solution )
-        
-    
+         
     !Set the initial values for m (remember that M is organized such that mx = m(1:ntot), my = m(ntot+1:2*ntot), mz = m(2*ntot+1:3*ntot)
     allocate(gb_solution%t_out(size(gb_problem%t)))
-    
-    
+        
     
     call displayGUIMessage( 'Running solution' )
     !Do the solution
@@ -137,6 +134,7 @@
     nt = size( gb_problem%t ) 
         
     if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
+        !Run several different applied fields
         nt_Hext = size(gb_problem%Hext, 1) 
     else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
         !Simply do a time evolution as specified in the problem  
@@ -145,6 +143,8 @@
     
     allocate(M_out(3*ntot,nt,nt_Hext))   
     allocate(gb_solution%M_out(size(gb_problem%t),ntot,nt_Hext,3))
+    !Allocate the arrays for the different fields
+    !Only if these are to be returned are they saved at every time step
     if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
         allocate(gb_solution%H_exc(size(gb_problem%t),ntot,nt_Hext,3))
         allocate(gb_solution%H_ext(size(gb_problem%t),ntot,nt_Hext,3))
@@ -173,9 +173,10 @@
         
         call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )          
             
-        !the initial state of the next solution is the previous solution result
+        !The initial state of the next solution is the previous solution result
         gb_problem%m0 = M_out(:,nt,i)
-            
+        
+        !Store the solution
         gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
         gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
         gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
@@ -200,7 +201,8 @@
         call cudaDestroy()
     endif
 #endif
-    !Make sure to return the correct state
+    
+    !Return the correct state
     sol = gb_solution
     prob = gb_problem
     
@@ -267,8 +269,6 @@
     dmdt(ntot+1:2*ntot) = -gb_problem%gamma * crossY - alpha(t,gb_problem) * HeffY2 
     !dMzdt
     dmdt(2*ntot+1:3*ntot) = -gb_problem%gamma * crossZ - alpha(t,gb_problem) * HeffZ2 
-    
-
 
     end subroutine dmdt_fct
     
