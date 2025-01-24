@@ -9,12 +9,12 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Run x64 Native Tools Command Prompt for VS 2022
-      shell: cmd /k """"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat""" && {0}" -startdir=none -arch=amd64 -host_arch=x64
+      shell: cmd /k """"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat""" & {0}"-arch=amd64 -host_arch=x64
       working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
       run: ls -al
 
     - name: Run Developer PowerShell for VS 2022
-      shell: powershell -NoExit -Command "&{Import-Module """C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"""; Enter-VsDevShell c7833c14 -SkipAutomaticLocation -DevCmdArguments """-arch=x64 -host_arch=x64"""; '{0}'}"
+      shell: powershell -NoExit -Command "&{Import-Module """C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"""; Enter-VsDevShell c7833c14 -SkipAutomaticLocation -DevCmdArguments """-arch=x64 -host_arch=x64"""; {0}}"
       working-directory: ${{ github.workspace }}/python/src/magtense/lib/
       run: ls
       
