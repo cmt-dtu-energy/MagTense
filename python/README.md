@@ -45,10 +45,10 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
 
 #### Windows
 
-- Conda environment from `environment.yml`
+- Conda environment from `environment_win.yml`
 
   ```bash
-  conda create -f python/environment.yml
+  conda create -f python/environment_win.yml
   ```
 
 - Compile Fortran source files
@@ -137,8 +137,7 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
 ### Install local editable magtense package
 
 ```bash
-cd python/
-python -m pip install -e .
+python -m pip install -e ./python
 ```
 
 
