@@ -105,6 +105,7 @@ dependencies:
   - ifx_impl_linux-64=2025.0.1=intel_1240
   - ifx_linux-64=2025.0.1=intel_1240
   - importlib-metadata=8.5.0=py312h06a4308_0
+  - importlib_resources=6.4.0=py312h06a4308_0
   - intel-cmplr-lib-rt=2025.0.1=intel_1240
   - intel-cmplr-lib-ur=2025.0.1=intel_1240
   - intel-cmplr-lic-rt=2025.0.1=intel_1240
