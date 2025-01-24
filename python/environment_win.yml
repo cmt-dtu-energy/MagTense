@@ -22,11 +22,11 @@ dependencies:
   - brotli-bin=1.1.0=h2466b09_2
   - brotli-python=1.1.0=py312h275cf98_2
   - bzip2=1.0.8=h2466b09_7
-  - ca-certificates=2024.12.14=h56e8100_0
+  - ca-certificates=2024.12.31=haa95532_0
   - cached-property=1.5.2=hd8ed1ab_1
   - cached_property=1.5.2=pyha770c72_1
   - cairo=1.18.2=h5782bbf_1
-  - certifi=2024.12.14=pyhd8ed1ab_0
+  - certifi=2024.12.14=py312haa95532_0
   - cffi=1.17.1=py312h4389bb4_0
   - charset-normalizer=3.4.1=pyhd8ed1ab_0
   - colorama=0.4.6=pyhd8ed1ab_1
