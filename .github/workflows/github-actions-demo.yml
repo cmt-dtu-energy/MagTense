@@ -19,9 +19,6 @@ jobs:
         uses: git-for-windows/setup-git-for-windows-sdk@v1
         with:
           flavor: full
-      - name: Build
-        shell: bash
-        run: make
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
       - name: Run script
