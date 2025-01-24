@@ -7,12 +7,12 @@ jobs:
     runs-on: windows-latest
 
     steps:
+    - uses: actions/checkout@v4
     - name: Run Developer PowerShell for VS 2022
       shell: pwsh -NoExit -ExecutionPolicy ByPass -File "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/Common7/Tools/Launch-VsDevShell.ps1" {0}
-      # working-directory: ${{ github.workspace }}/python/src/magtense/lib/
+      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
       run: |
         ls
-        pwd
 
     - name: Run x64 Native Tools Command Prompt for VS 2022
       shell: cmd /k C:/Program Files/Microsoft Visual Studio/2022/Enterprise/Common7/Tools/VsDevCmd.bat -arch=amd64 -host_arch=x64 {0}
