@@ -202,7 +202,7 @@ cuda:
 	cd ${FORTRAN_CUDA_PATH} && ${MAKE} CPP=${CPP}
 
 rm_ld_flags:
-	LDFLAGS =
+	set LD_FLAGS =
 
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
