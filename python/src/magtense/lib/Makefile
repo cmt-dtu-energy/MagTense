@@ -47,7 +47,7 @@ ifeq ($(OS),Windows_NT)
 	MKL = -L${CONDA_PATH}/Library/lib -lmkl_intel_lp64_dll -lmkl_intel_thread_dll \
 		-lmkl_core_dll -lmkl_blas95_lp64 -llibiomp5md
 	CVODE_ROOT = "C:\Program Files (x86)\sundials-4.1.0\instdir"
-	LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib'
+	LDFLAGS =
 	LIB_SUFFIX = .lib
 	CLEAN_FILES = -rm *.lib *.o *.mod *.pyd
 	CLEAN_FOLDER = -rm -r build
@@ -175,7 +175,7 @@ all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
 
 ps: magnetostatic ${MICROMAG}
 
-cmdx64: rm_ld_flags ${PYTHON_MODN_ALL}
+cmdx64: ${PYTHON_MODN_ALL}
 
 clean:
 	cd ${NUM_INT_PATH} && ${MAKE} clean
@@ -200,9 +200,6 @@ micromagnetism:
 
 cuda:
 	cd ${FORTRAN_CUDA_PATH} && ${MAKE} CPP=${CPP}
-
-rm_ld_flags:
-	set LDFLAGS =
 
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
