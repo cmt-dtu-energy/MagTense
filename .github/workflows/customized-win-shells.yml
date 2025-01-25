@@ -18,25 +18,17 @@ jobs:
     - name: Install minimal packages
       shell: bash -el {0}
       run: |
-        conda install cuda-nvcc make
+        conda install cuda-nvcc make vs2022_win-64
 
     - name: Run x64 Native Tools Command Prompt for VS 2022
       shell: cmd /k "{0}" -arch=amd64 -host_arch=x64
       working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
       run: |
         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
-        conda list
-        ls -al
-        LIB /VERBOSE
-        nvcc --version
-        make cuda
-        ls -al
-        make
-        ls -al
-
+        ls -al && LIB /VERBOSE && nvcc --version && make cuda && ls -al && make && ls -al
 
     - name: Run Command Prompt
-      shell: cmd
+      shell: bash -el {0}
       working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
       run: |
         conda list
