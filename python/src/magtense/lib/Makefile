@@ -203,7 +203,6 @@ cuda:
 
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
-	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} LD_LIBRARYPATH=${CONDA_PATH}/Library/lib \
-		python -m numpy.f2py -c -m ${PYTHON_MODN} \
+	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} python -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ./build -I${OPT} -I${INCLUDE_OBJ} ${CVODE_OPT} \
 		-L${MKFILE_PATH} ${LIB_OPT} FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE}
