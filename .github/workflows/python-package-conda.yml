@@ -18,9 +18,10 @@ jobs:
     
     - name: Compile Fortran files in Developer PowerShell for VS 2022
       shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
       run: |
-        "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1"
+        cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
+        .\Launch-VsDevShell.ps1
+        cd ${{ github.workspace }}/python/src/magtense/lib/
         make ps
 
     - name: Compile with nvcc in x64 Native Tools Command Prompt for VS 2022
