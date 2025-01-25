@@ -54,7 +54,7 @@ ifeq ($(OS),Windows_NT)
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
 
 	ifeq (${FC}, ifx)
-		EXTRA_FFLAGS = '${FFLAGS} /assume:underscore /names:lowercase'
+		EXTRA_FFLAGS = '/assume:underscore /names:lowercase'
 		OPT = ${CONDA_PATH}/Library/include \
 			-I${CONDA_PATH}/Library/include/intel64/lp64 \
 			-I${CONDA_PATH}/opt/compiler/include/intel64
@@ -203,6 +203,6 @@ cuda:
 
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
-	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} LIBS=${CONDA_PATH}/Library/lib/libiomp5md python -m numpy.f2py -c -m ${PYTHON_MODN} \
+	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} python -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ./build -I${OPT} -I${INCLUDE_OBJ} ${CVODE_OPT} \
 		-L${MKFILE_PATH} ${LIB_OPT} FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE}
