@@ -11,9 +11,9 @@ jobs:
     - uses: conda-incubator/setup-miniconda@v3
       with:
         activate-environment: magtense-env
-        auto-update-conda: true
         python-version: 3.12
         channels: conda-forge,nvidia/label/cuda-12.6.3
+        auto-activate-base: false
 
     - name: Install minimal packages
       shell: bash -el {0}
@@ -25,6 +25,7 @@ jobs:
       working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
       run: |
         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+        conda list
         ls -al
         LIB /VERBOSE
         nvcc --version
@@ -38,6 +39,7 @@ jobs:
       shell: cmd
       working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
       run: |
+        conda list
         nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.42.34433\bin\Hostx64\x64"
         make cuda
         ls -al
