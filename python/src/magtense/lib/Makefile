@@ -175,7 +175,7 @@ all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
 
 ps: magnetostatic ${MICROMAG}
 
-cmdx64: ${PYTHON_MODN_ALL}
+cmdx64: rm_ld_flags ${PYTHON_MODN_ALL}
 
 clean:
 	cd ${NUM_INT_PATH} && ${MAKE} clean
@@ -200,6 +200,9 @@ micromagnetism:
 
 cuda:
 	cd ${FORTRAN_CUDA_PATH} && ${MAKE} CPP=${CPP}
+
+rm_ld_flags:
+	LDFLAGS =
 
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
