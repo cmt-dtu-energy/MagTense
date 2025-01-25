@@ -12,30 +12,28 @@ jobs:
       with:
         activate-environment: magtense-env
         python-version: 3.12
-        channels: conda-forge,nvidia/label/cuda-12.6.3
+        channels: conda-forge,nvidia/label/cuda-12.6.3,https://software.repos.intel.com/python/conda/
         auto-activate-base: false
 
     - name: Install minimal packages
       shell: bash -el {0}
       run: |
-        conda install cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev make vs2022_win-64
+        conda install cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev make vs2022_win-64 "dpcpp_win-64"
 
     - name: Run Command Prompt
       shell: bash -el {0}
       working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
       run: |
         nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.42.34433\bin\Hostx64\x64" -o MagTenseCudaBlas.o
-        ls -al
-        make clean
 
     - name: Run Command Prompt with VS activation
       shell: bash -el {0}
       working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
       run: |
         "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/Common7/Tools/VsDevCmd.bat"
-        make cuda
+        LIB /VERBOSE
+        make wrap
         ls -al
-        make clean
 
     - name: Run x64 Native Tools Command Prompt for VS 2022
       shell: cmd /k "{0}" -arch=amd64 -host_arch=x64
