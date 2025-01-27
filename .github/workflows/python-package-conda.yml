@@ -43,9 +43,10 @@ jobs:
         make wrap
 
     - name: Build Python wrapper in Command Prompt
-      shell: cmd
+      shell: cmd /C CALL {0}
       working-directory: ${{ github.workspace }}/python/src/magtense/lib/
-      run: make cmdx64
+      run: >-
+        make cmdx64
 
     # - name: Build Python wrapper in Developer PowerShell for VS 2022
     #   shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
