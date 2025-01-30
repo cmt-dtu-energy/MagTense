@@ -16,9 +16,9 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
   conda create -y -n magtense-env 
   conda activate magtense-env
   conda config --env --add channels conda-forge
+  conda install -y python
   conda config --env --add channels nvidia/label/cuda-12.6.3
   conda config --env --add channels https://software.repos.intel.com/python/conda/
-  conda install -y python
   conda install -y numpy matplotlib meson charset-normalizer ncurses git notebook h5py tqdm
   ```
 

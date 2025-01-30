@@ -36,13 +36,13 @@ If you want to compile MagTense with a Visual Studio project file for Windows, [
 
   [ Linux ] `/usr/local/sundials-4.1.0/instdir`
 
-  A guide for custom installation of sundials-4.1.0 from this repository can be found [here].(#install-cvode-from-sundials-4.1.0) 
+  A guide for custom installation of sundials-4.1.0 from this repository can be found [here](#install-cvode-from-sundials-4.1.0).
 
   **Note:** Shared libraries for Fortran modules are not distributed in conda package of [sundials](https://anaconda.org/conda-forge/sundials). CVODE has to be built beforehand locally when linked dynamically. During runtime, path has to be added to LD_LIBRARY_PATH on Linux.
 
 ### Compilation
 
-Prepare your terminal, so that ifort compiler can be found:
+Prepare your terminal, so that ifx compiler can be found:
 
 - [ Windows]
 
@@ -60,12 +60,12 @@ Set flags and paths in [Makefile](https://github.com/cmt-dtu-energy/MagTense/blo
 
 ```bash
 cd path/to/MagTense/
-make USE_CUDA=1 USE_CVODE=1 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2021b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest
+make USE_CUDA=1 USE_CVODE=1 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2023b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest
 ```
 
 ## Building MEX-files
 
-Prepare your terminal, so that ifort compiler can be found:
+Prepare your terminal, so that `ifx` compiler can be found:
 
 - [ Windows]
 
@@ -81,27 +81,16 @@ Prepare your terminal, so that ifort compiler can be found:
   . /opt/intel/oneapi/setvars.sh
   ```
 
-  For static linking of MKL, the file `mex_FORTRAN_glnxa64.xml` located in `/home/<user>/.matlab/R2021b/` has to be adjusted as follows:
-
-  ```bash
-  LINKLIBS="[...] -Wl,--start-group"
-  CMDLINE2="$LDF $LDFLAGS $LDTYPE $LINKOPTIM $LINKEXPORTVER $OBJS $FLIBS $LINKLIBS -Wl,--end-group -o $EXE"
-  ```
-
-  The reason for that is that Matlab recognizes `-Wl,--end-group` as `Error: Illegal use of reserved keyword "end".`, when running the build script.
-
-
 Start Matlab via command line and run build script:
 
 ```bash
-cd path/to/MagTense/matlab
-/usr/local/MATLAB/R2021b/bin/matlab -nodisplay -nosplash -nodesktop
-run('buildMagTenseMEX.m')
+/usr/local/MATLAB/R2023b/bin/matlab -nodisplay -nosplash -nodesktop
+run('matlab/buildMagTenseMEX.m')
 ```
 
 ## Runtime
 
-Prepare your terminal, so that ifort compiler and required libraries can be found:
+Prepare your terminal, so that `ifx` compiler and required libraries can be found:
 
 - [ Linux ]
 
@@ -110,14 +99,13 @@ Prepare your terminal, so that ifort compiler and required libraries can be foun
   export LD_LIBRARY_PATH=<path_to_CVODE_libs>:<path_to_CUDA_libs>:$LD_LIBRARY_PATH
   ```
 
-  When MKL is statically linked, having [Runtime for Intel® Fortran Compiler](https://anaconda.org/intel/intel-fortran-rt) is sufficient and no installation of `ifort` or `mkl` is required.
+  When MKL is statically linked, having [Runtime for Intel® Fortran Compiler](https://anaconda.org/intel/intel-fortran-rt) is sufficient and no installation of `ifx` or `mkl` is required.
 
 - Test with standard problem #3
 
   ```bash
-  cd path/to/MagTense/matlab/
-  /usr/local/MATLAB/R2021b/bin/matlab -nodisplay -nosplash -nodesktop
-  run('examples/Micromagnetism/mumag_micromag_Std_problem_3/Standard_problem_3.m')
+  /usr/local/MATLAB/R2023b/bin/matlab -nodisplay -nosplash -nodesktop
+  run('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_3/Standard_problem_3.m')
   ```
 
 ## Install CVODE from sundials-4.1.0
