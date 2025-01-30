@@ -3,7 +3,7 @@ function buildMagTenseMEX(USE_RELEASE, USE_CUDA, USE_CVODE)
 
 arguments
     USE_RELEASE {mustBeNumericOrLogical} = true;
-    USE_CUDA {mustBeNumericOrLogical} = true;
+    USE_CUDA {mustBeNumericOrLogical} = false;
     USE_CVODE {mustBeNumericOrLogical} = true;
 end
 
@@ -29,10 +29,10 @@ if (ispc)
 else
     VS_STUDIO = false;
     MKL_STATIC = false;
-    compiler_root = '/opt/intel/oneapi/compiler/latest';
-    mkl_root = '/opt/intel/oneapi/mkl/latest';
-    mkl_lib = '/opt/intel/oneapi/mkl/latest/lib/intel64';
-    cuda_root = '/usr/local/cuda-12.3/lib64/';
+    compiler_root = '/home/spol/miniconda3/envs/magtense-env-py12';
+    mkl_root = '/home/spol/miniconda3/envs/magtense-env-py12';
+    mkl_lib = '/home/spol/miniconda3/envs/magtense-env-py12/lib';
+    cuda_root = '/home/spol/miniconda3/envs/magtense-env-py12/lib';
     cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
     cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
     mex_suffix = 'a';
@@ -62,8 +62,9 @@ end
 
 if (USE_CVODE)
     CVODE_include = join(['-I' cvode_include], '');
-    CVODE = ['-L' cvode_lib ' -lsundials_nvecserial -lsundials_sunmatrixdense -lsundials_sunlinsoldense' ...
-    ' -lsundials_fnvecserial_mod -lsundials_cvode -lsundials_fsunnonlinsolfixedpoint_mod'];
+    CVODE = ['LINKLIBS="$LINKLIBS ' cvode_lib '/libsundials_nvecserial.a ' cvode_lib '/libsundials_sunmatrixdense.a ' ...
+        cvode_lib '/libsundials_sunlinsoldense.a ' cvode_lib '/libsundials_fnvecserial_mod.a ' ...
+        cvode_lib '/libsundials_cvode.a ' cvode_lib '/libsundials_fsunnonlinsolfixedpoint_mod.a"'];
 else
     CVODE_include = '';
     CVODE = '';
@@ -82,7 +83,7 @@ end
 
 if (ispc)
     DEFINES = '-R2018a';
-    FFLAGS = 'COMPFLAGS="$COMPFLAGS /free /O3 /fpp /real-size:64 /Qopenmp /assume:nocc_omp /fpe:0 /fp:source"';
+    FFLAGS = 'COMPFLAGS="$COMPFLAGS /free /O3 /fpp /real-size:64 /Qopenmp /assume:nocc_omp /fpe:0 /fp:source /nologo"';
     if (USE_CUDA)
         FFLAGS = [FFLAGS(1:(end-1)) ' /libs:static"'];
     end
@@ -98,7 +99,7 @@ if (ispc)
         MKL = ['-L' mkl_lib ' -lmkl_rt -lmkl_blas95_lp64'];
     end
 else
-    DEFINES = ['FC="' compiler_root '/bin/ifort" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
+    DEFINES = ['FC="' compiler_root '/bin/ifx" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
     INCLUDE = ['INCLUDE="$INCLUDE -I' mkl_root '/include -I' NumericalIntegration_path ' -I' DemagField_path ...
         ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ' -I' ForceIntegrator_path ' -I' mkl_root];
     LIBS = ['-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' DemagField_path ' -lDemagField -L' ...
@@ -110,7 +111,7 @@ else
             '/libmkl_core.a ' mkl_lib '/libmkl_blas95_lp64.a ' mkl_lib '/libmkl_intel_lp64.a"'];
         INCLUDE = [INCLUDE '/include/intel64/lp64 '];
     else
-        MKL = ['-L' mkl_root '/lib/intel64 -lmkl_rt -lpthread -lm -ldl '];
+        MKL = ['-L' mkl_lib ' -lmkl_rt -lpthread -lm -ldl '];
         if (USE_CUDA)
             INCLUDE = [INCLUDE '/include/intel64/lp64 '];
             MKL = [MKL '-lmkl_blas95_lp64'];
@@ -121,7 +122,7 @@ else
         end
     end
     INCLUDE = [INCLUDE CVODE_include '"'];
-    FFLAGS = [FFLAGS '-O3 -fpp -real-size 64 -qopenmp -assume nocc_omp -fpe0 -fp-model=source -fpic -diag-disable 10006"'];
+    FFLAGS = [FFLAGS '-O3 -fpp -real-size 64 -qopenmp -assume nocc_omp -fpe0 -fp-model=source -fpic -nologo -diag-disable 10006"'];
 end
 
 %%------------------------------------------------------------------

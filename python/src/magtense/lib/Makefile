@@ -85,15 +85,6 @@ ifeq ($(USE_MKL),0)
 	MKL =
 endif
 
-ifeq (${USE_CVODE},0)
-	CVODE =
-	CVODE_OPT =
-else
-	CVODE = -L${CVODE_ROOT}/lib -lsundials_nvecserial -lsundials_sunmatrixdense \
-		-lsundials_sunlinsoldense -lsundials_fnvecserial_mod -lsundials_cvode \
-		-lsundials_fsunnonlinsolfixedpoint_mod
-	CVODE_OPT = -I${CVODE_ROOT}/fortran
-endif
 
 ifeq ($(USE_MICROMAG),0)
 	MICROMAG =
@@ -191,7 +182,7 @@ clean_build:
 	${CLEAN_FOLDER}
 
 magnetostatic:
-	cd ${NUM_INT_PATH} && ${MAKE} FC=${FC} FFLAGS='${FFLAGS}' CVODE_OPT=${CVODE_OPT} USE_MATLAB=0
+	cd ${NUM_INT_PATH} && ${MAKE} FC=${FC} FFLAGS='${FFLAGS}' USE_CVODE=${USE_CVODE} CVODE_ROOT=${CVODE_ROOT} USE_MATLAB=0
 	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} FC=${FC} FFLAGS='${FFLAGS}'
 	cd ${DEMAG_FIELD_PATH} && ${MAKE} FC=${FC} FFLAGS='${FFLAGS}' USE_MATLAB=0
 
