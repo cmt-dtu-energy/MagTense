@@ -54,7 +54,7 @@ ifeq ($(OS),Windows_NT)
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.dll
 
 	ifeq (${FC}, ifx)
-		EXTRA_FFLAGS = '${FFLAGS} /assume:underscore /names:lowercase'
+		EXTRA_FFLAGS = "${FFLAGS} /assume:underscore /names:lowercase"
 		OPT = ${CONDA_PATH}/Library/include \
 			-I${CONDA_PATH}/Library/include/intel64/lp64 \
 			-I${CONDA_PATH}/opt/compiler/include/intel64
@@ -71,7 +71,7 @@ else
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.so
 
 	ifeq (${FC}, ifx)
-		EXTRA_FFLAGS = '${FFLAGS}'
+		EXTRA_FFLAGS = "${FFLAGS}"
 		OPT = ${CONDA_PREFIX}/include -I${CONDA_PREFIX}/include/intel64/lp64
 		LIB_OPT = -lNumericalIntegration -lTileDemagTensor -lDemagField
 	endif
@@ -191,12 +191,12 @@ clean_build:
 	${CLEAN_FOLDER}
 
 magnetostatic:
-	cd ${NUM_INT_PATH} && ${MAKE} FC=${FC} FFLAGS='${FFLAGS}' CVODE_OPT=${CVODE_OPT} USE_MATLAB=0
-	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} FC=${FC} FFLAGS='${FFLAGS}'
-	cd ${DEMAG_FIELD_PATH} && ${MAKE} FC=${FC} FFLAGS='${FFLAGS}' USE_MATLAB=0
+	cd ${NUM_INT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" CVODE_OPT=${CVODE_OPT} USE_MATLAB=0
+	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}"
+	cd ${DEMAG_FIELD_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_MATLAB=0
 
 micromagnetism:
-	cd ${MICROMAG_PATH} && ${MAKE} FC=${FC} FFLAGS='${FFLAGS}' USE_CVODE=${USE_CVODE} CVODE_ROOT=${CVODE_ROOT} USE_MATLAB=0 MATLAB_INCLUDE=""
+	cd ${MICROMAG_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT=${CVODE_ROOT} USE_MATLAB=0 MATLAB_INCLUDE=""
 
 cuda:
 	cd ${FORTRAN_CUDA_PATH} && ${MAKE} CPP=${CPP}
