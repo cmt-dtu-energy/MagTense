@@ -189,3 +189,12 @@ docs/source/_build
 
 *.vsidx
 *.lock
+
+# Notebooks
+nbs/
+
+.vs/MagTense/v17/
+
+.vs/MagTense/CopilotIndices/
+
+*.msg

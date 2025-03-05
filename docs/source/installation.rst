@@ -11,7 +11,7 @@ Prerequisites
 * Matlab :math:`\geq` 2018a
 
 MagTense is directly useable in Matlab by downloading the already compiled
-`MEX-files <https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/MEX_files>`_.
+`MEX-files <https://github.com/cmt-dtu-energy/MagTense/releases>`_.
 
 
 ==============================================

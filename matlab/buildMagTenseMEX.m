@@ -20,9 +20,9 @@ if (ispc)
     VS_STUDIO = true;
     MKL_STATIC = true;
     mkl_include = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include"';
-    mkl_lp64 = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\intel64\lp64"';
-    mkl_lib = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\lib\intel64"';
-    cuda_root = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\lib\x64"';
+    mkl_lp64 = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\mkl\intel64\lp64"';
+    mkl_lib = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\lib"';
+    cuda_root = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\lib\x64"';
     cvode_include = '"C:\Program Files (x86)\sundials-4.1.0\instdir\fortran"';
     cvode_lib = '"C:\Program Files (x86)\sundials-4.1.0\instdir\lib"';
     mex_suffix = 'w';
@@ -82,7 +82,7 @@ end
 
 if (ispc)
     DEFINES = '-R2018a';
-    FFLAGS = 'COMPFLAGS="$COMPFLAGS /free /nologo /real-size:64 /O2 /assume:nocc_omp /Qopenmp /fpp /fpe:0 /fp:source /fp:precise"';
+    FFLAGS = 'COMPFLAGS="$COMPFLAGS /free /O3 /fpp /real-size:64 /Qopenmp /assume:nocc_omp /fpe:0 /fp:source"';
     if (USE_CUDA)
         FFLAGS = [FFLAGS(1:(end-1)) ' /libs:static"'];
     end
@@ -121,7 +121,7 @@ else
         end
     end
     INCLUDE = [INCLUDE CVODE_include '"'];
-    FFLAGS = [FFLAGS '-r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source -fp-model precise -fpic -diag-disable 10006 -libs:static"'];
+    FFLAGS = [FFLAGS '-O3 -fpp -real-size 64 -qopenmp -assume nocc_omp -fpe0 -fp-model=source -fpic -diag-disable 10006"'];
 end
 
 %%------------------------------------------------------------------
@@ -146,6 +146,12 @@ for i = 1:length(names)
     eval_MEX(join(mex_str, ' '))
     pause(pause_time)
     movefile(join([orig_name '_mex.mex' mex_suffix '64'], ''), join(['MEX_files/' names(i) '_mex.mex' mex_suffix '64'], ''));
+
+    %--- Move the debug pdb files as well
+    if (~USE_RELEASE)
+        pause(pause_time)
+        movefile(join([orig_name '_mex.mex' mex_suffix '64.pdb'], ''), join(['MEX_files/' names(i) '_mex.mex' mex_suffix '64.pdb'], ''));
+    end
 end
 
 end

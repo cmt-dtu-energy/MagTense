@@ -5,125 +5,131 @@ Documentation
 Python
 ========================================
 
-----------------------------------------
-Objects
-----------------------------------------
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-`MagTiles <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/MagTense.py#L9>`_
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Tiles [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L9>`_]
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ::
 
-    def __init__(self, n):
-        # Initialization of arrays for specific tile parameters
-        # Input to Fortran derived type MagTile     
-        self.center_pos = np.zeros(shape=(n,3), dtype=np.float64, order='F') # r0, theta0, z0
-        self.dev_center = np.zeros(shape=(n,3), dtype=np.float64, order='F') # dr, dtheta, dz
-        self.size = np.zeros(shape=(n,3), dtype=np.float64, order='F') # a, b, c
-        self.vertices = np.zeros(shape=(n,3,4), dtype=np.float64, order='F') # v1, v2, v3, v4 as column vectors
-        self.M = np.zeros(shape=(n,3), dtype=np.float64, order='F') # Mx, My, Mz
-        self.u_ea = np.zeros(shape=(n,3), dtype=np.float64, order='F') # Easy axis
-        self.u_oa1 = np.zeros(shape=(n,3), dtype=np.float64, order='F')
-        self.u_oa2 = np.zeros(shape=(n,3), dtype=np.float64, order='F')
-        self.mu_r_ea = np.ones(shape=(n), dtype=np.float64, order='F')
-        self.mu_r_oa = np.ones(shape=(n), dtype=np.float64, order='F')
-        self.M_rem = np.zeros(shape=(n), dtype=np.float64, order='F')
-        # Implemented tile types: 
-        # 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
-        # 5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
-        self.tile_type = np.ones(n, dtype=np.int32, order='F')
-        self.offset = np.zeros(shape=(n,3), dtype=np.float64, order='F') # offset of global coordinates
-        self.rot = np.zeros(shape=(n,3), dtype=np.float64, order='F')
-        self.color = np.zeros(shape=(n,3), dtype=np.float64, order='F')
-        self.magnetic_type = np.ones(n, dtype=np.int32, order='F') # 1 = hard magnet, 2 = soft magnet
-        self.stfcn_index = np.ones(shape=(n), dtype=np.int32, order='F') # default index into the state function
-        self.incl_it = np.ones(shape=(n), dtype=np.int32, order='F') # if equal to zero the tile is not included in the iteration
-        self.use_sym = np.zeros(shape=(n), dtype=np.int32, order='F') # whether to exploit symmetry
-        self.sym_op = np.ones(shape=(n,3), dtype=np.float64, order='F') # 1 for symmetry and -1 for anti-symmetry respectively to the planes
-        self.M_rel = np.zeros(shape=(n), dtype=np.float64, order='F')
- 
-        # Internal parameters for python to prepare configuration
-        self.grid_pos = np.zeros(shape=(n,3), dtype=np.float64, order='F') # positions in the grid
-        self.n = n
+    self.init(
+        n: int,
+        center_pos: Optional[List] = None,
+        dev_center: Optional[List] = None,
+        size: Optional[List] = None,
+        vertices: Optional[List] = None,
+        tile_type: Union[int, List, None] = None,
+        offset: Optional[List] = None,
+        rot: Optional[List] = None,
+        M_rem: Union[int, List, None] = None,
+        easy_axis: Optional[List] = None,
+        color: Optional[List] = None,
+        magnet_type: Optional[List] = None,
+        mag_angle: Optional[List] = None,
+    ) -> None
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Evaluation points
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    self.set_easy_axis(
+        val: Optional[List] = None,
+        idx: Optional[int] = None,
+        seed: int = 42
+    ) -> None
 
-::
-
-    points = np.zeros(shape=(number_of_points,3), dtype=np.float64, order='F')
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Demagnetization tensor
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-::
-
-    N = np.zeros(shape=(number_of_tiles,number_of_points,3,3), dtype=np.float64, order='F')
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-H-field
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-::
-
-    H = np.zeros(shape=(number_of_points,3), dtype=np.float64, order='F')
+    self.refine_prism(
+        idx: Union[int, List],
+        mat: List
+    ) -> None
 
 
 ----------------------------------------
 Functions
 ----------------------------------------
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-`iterate_magnetization (tiles, **options) <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/MagTense.py#L441>`_
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Returns updated tiles. Iterates through the given tiles to determine their influence 
-on each other.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+grid_config [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L528>`_]
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ::
 
-    # Options:
-    max_error = 0.00001 # Iteration stops if magnetization change of tiles is below this value
-    max_it = 500 # Maximum number of performed iterations
-    T = 300. # Temperature for the state function if required
+    grid_config(
+        spots: Union[List, np.ndarray],
+        area: Union[List, np.ndarray],
+        filled_pos: Optional[List] = None,
+        n_pts: List = [20, 20, 1],
+        mode: str = "uniform",
+        n_tiles: Optional[int] = None,
+        mag_angles: Optional[List] = None,
+        B_rem: float = 1.2,
+        seed: int = 42
+    ) -> tuple[Tiles, np.ndarray]
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-`get_N_tensor (tiles, points) <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/MagTense.py#L459>`_
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Returns the demagnetization tensor N of the given tiles and 
-the specified evaluation points.
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-`get_H_field (tiles, points, N=None) <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/MagTense.py#L468>`_
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Returns the magnetic field H at the specified evaluation 
-points of the given tiles.
-Optionally, a precalculated demagnetization tensor N can be 
-handed over in order to prevent unnecessary and expensive 
-recalculation of N if geometry of the setup does not change.
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-`run_simulation (tiles, points, **options) <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/MagTense.py#L406>`_
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Does the previous mentioned steps all together.
-Demagnetization tensor will not be reused.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+iterate_magnetization [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L666>`_]
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Iterate through tiles to determine their influence on each other.
 
 ::
 
-    # Options:
-    plot = False # Boolean if results shall be plotted
-    grid = None # Optional grid can be displayed
-    max_error = 0.00001 # Iteration stops if magnetization change of tiles is below this value
-    max_it = 500 # Maximum number of performed iterations
-    T = 300. # Temperature for the state function if required
-    iterate_solution = True # Boolean if the magnetization of the tiles shall be iterated
-    return_field=True # Boolean if magnetic field shall be calculated
+    iterate_magnetization(
+        tiles: Tiles,
+        max_error: float = 1e-5,
+        max_it: int = 500,
+        T: float = 300.,
+        mu_r: float = 20
+    ) -> Tiles
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-`create_plot (iterated_tiles, points, H, grid=None) <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/source/util_plot.py#L422>`_
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Creates a matplotlib with the iterated tiles and the calculated 
-H-field at the evaluation points as quiver plot.
-Additionally, an optional grid can be displayed.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+get_demag_tensor [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L724>`_]
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Get demagnetization tensor of tiles and the specified evaluation points.
+
+::
+
+    get_demag_tensor(
+        tiles: Tiles,
+        pts: np.ndarray
+    ) -> np.ndarray
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+get_H_field [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L763>`_]
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Calculate the demagnetizing field strength of a magnetic setup.
+
+::
+    
+    get_H_field(
+        tiles: Tiles,
+        pts: np.ndarray,
+        demag_tensor: Optional[np.ndarray] = None
+    ) -> np.ndarray
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+run_simulation [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L601>`_]
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Run MagTense with the Fortran source code as Python module.
+
+::
+
+    run_simulation(
+        tiles: Tiles,
+        pts: np.ndarray,
+        max_error: float = 1e-5,
+        max_it: int = 500,
+        T: float = 300.,
+    ) -> tuple[Tiles, np.ndarray]:
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+create_plot [`source <https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/utils.py#L452>`_]
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Creates a plot with the iterated tiles and the calculated magnetic field H at the
+evaluation points as quiver plot. Additionally, an optional grid can be displayed.
+**Tile types**: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
+
+::
+
+    create_plot(
+        tiles: Optional[Tiles] = None,
+        eval_pts: Optional[np.ndarray] = None,
+        field: Optional[np.ndarray] = None,
+        spots: Optional[List] = None,
+        area: Optional[List] = None,
+    ) -> None

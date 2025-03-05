@@ -131,8 +131,9 @@ properties
     %magnetization between two timesteps
     conv_tol = 1e-4;
     
-    %defines whether to recompute the Interaction Matrices or not
-    RecomputeInteractionMatrices = 0 ;
+    %defines how often to calculate the demagnetization tensor in
+    %hysteresis problems. Zero is every step
+    demigstp = int32(0) ;
     
     %defines whether to use an External Mesh or not
     ExternalMesh = 0 ; 
@@ -336,7 +337,7 @@ methods
         obj.ShowTheResult = int32(1);
 
         obj.DirectoryFilename = '';
-        obj.RecomputeInteractionMatrices = int32(0) ;
+        obj.demigstp = int32(0) ;
         obj.ExternalMesh = int32(0) ;
         obj.MeshType = '' ;
         obj.ExternalMeshFileName = '' ;
@@ -457,7 +458,7 @@ methods
         obj.exch_rowe = int32(re);
         obj.exch_col  = int32(c);
 
-        disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(10^9)) ' Gb'])
+        disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(2^30)) ' Gb'])
     end
 
     function obj = setMicroMagDemagApproximation( obj, type_var )

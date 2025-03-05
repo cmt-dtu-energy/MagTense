@@ -1,11 +1,9 @@
 #!/bin/bash
 
-# Preparation of terminal to find ifort
-. /opt/intel/oneapi/setvars.sh
-
 # Navigate to wrapper file for python module
-cd $RECIPE_DIR/../python/src/magtense/lib
-make
+# cd $RECIPE_DIR/../python/src/magtense/lib
+# make
+# TODO Copy compiled library to python module
 
 # Navigate to distribution script
 cd $RECIPE_DIR/../python

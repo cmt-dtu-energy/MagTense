@@ -2,6 +2,7 @@ module UTIL_CALL
 
     implicit none
     contains
+    
 subroutine getBilinInterp( table, xval,yval,n1, n2, x, y, res )
 integer,intent(in) :: n1,n2
 real,intent(in) :: x,y

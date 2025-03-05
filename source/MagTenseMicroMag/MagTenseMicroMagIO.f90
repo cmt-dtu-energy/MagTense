@@ -34,6 +34,7 @@
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
         mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr
         mwPointer :: usePrecisionPtr, N_aveProblemPtr, useReturnHallProblemPtr
+        mwPointer :: demag_ignore_stepsProblemPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
         real(DP) :: demag_fac, CV
@@ -352,6 +353,10 @@
             problem%useReturnHall = useReturnHallFalse
         endif
         
+        sx = 1
+        demag_ignore_stepsProblemPtr = mxGetField( prhs, i, problemFields(51) )
+        call mxCopyPtrToInteger4(mxGetPr(demag_ignore_stepsProblemPtr), problem%demag_ignore_steps, sx )
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -487,7 +492,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=50
+        integer,parameter :: nf=51
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -544,6 +549,7 @@
         fieldnames(48) = 'N_ave'
         fieldnames(49) = 'CV'
         fieldnames(50) = 'ReturnHall'
+        fieldnames(51) = 'demigstp'
         
     end subroutine getProblemFieldnames
     
