@@ -48,7 +48,7 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
 - Conda environment from `environment.yml`
 
   ```bash
-  conda create -f python/environment.yml
+  conda env create -f python/environment.yml
   ```
 
 - Compile Fortran source files
@@ -95,6 +95,7 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
   - Open a `Developer PowerShell` and run:
 
     ```bash
+	conda activate magtense-env
     cd python/src/magtense/lib/
     make ps
     ```
@@ -123,6 +124,7 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
   - Linking and wrapping libraries with `f2py` needs to be run in `x64 Native Tools Command Prompt for VS 2022` to make `ifx` compiler available for `meson`:
 
     ```bash
+	conda activate magtense-env
     cd python/src/magtense/lib/
     make cmdx64
     ```
