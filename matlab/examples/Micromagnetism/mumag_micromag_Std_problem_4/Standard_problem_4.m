@@ -1,4 +1,4 @@
-function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( NIST_field, resolution, options )
+function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,int_error] = Standard_problem_4( NIST_field, resolution, options )
 %STANDARD_PROBLEM_4 
 %A function script to setup and simulate mumag standard problem 4
 %
@@ -54,13 +54,16 @@ function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_d
 %   solution_dym : Struct
 %      A struct containing the MagTense solution for the dynamic part of the mumag standard problem 4
 %
+%   int_error : Array
+%      A double array containing the integrated error (the difference between the curves) between the NIST published solutions and the MagTense computed solution. The array is the three components of the average magnetization.
+%
 %Detailed description:
 %-------
 %   The script setups up and runs the mumag standard problem 4 for a prismal mesh.
 %
-%Version: 1.0.0
+%Version: 1.0.1
 %Author:  Rasmus Bjørk
-%Date:    2022.06.21
+%Date:    2025.03.06
 %
 %See also: Benchmark_using_Standard_problem_4
 
@@ -201,6 +204,15 @@ if (options.ShowTheResult)
 
     xlim(fig1,[0 1e-9])
     figure(figure1)
+
+    % Interpolate the MagTense solution to the NIST-published solutions and
+    % calculate the difference between the results as an integral.
+    Magtense_M(:,1) = interp1(solution_dym.t,mean(solution_dym.M(:,:,1),2),1e-9*t);
+    Magtense_M(:,2) = interp1(solution_dym.t,mean(solution_dym.M(:,:,2),2),1e-9*t);
+    Magtense_M(:,3) = interp1(solution_dym.t,mean(solution_dym.M(:,:,3),2),1e-9*t);
+    int_error(1) = trapz(1e-9*t,abs(mean_avg(1,:,1)-Magtense_M(:,1)'));
+    int_error(2) = trapz(1e-9*t,abs(mean_avg(1,:,2)-Magtense_M(:,2)'));
+    int_error(3) = trapz(1e-9*t,abs(mean_avg(1,:,3)-Magtense_M(:,3)'));
 end
 
 end
