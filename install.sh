@@ -20,3 +20,4 @@ source "$prefix/bin/activate"
 conda init bash
 conda create --name magtense python=3.11
 conda activate magtense
+conda install magtense -c cmt-dtu-energy/label/cpu -c https://software.repos.intel.com/python/conda/ -c conda-forge
