@@ -49,7 +49,6 @@
 		<File RelativePath="..\fsolve.f90"/>
 		<File RelativePath="..\getS_findzero.f90"/>
 		<File RelativePath="..\io.f90"/>
-		<File RelativePath="..\locate.for"/>
 		<File RelativePath="..\parameters.f90"/>
 		<File RelativePath="..\polint.f"/>
 		<File RelativePath="..\qromb.f"/>

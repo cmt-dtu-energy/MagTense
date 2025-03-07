@@ -1,53 +1,70 @@
+#=======================================================================
+#                       compiler names and flags
+#=======================================================================
+FC = ifx
+FFLAGS =
+USE_CVODE =
+CVODE_ROOT =
+USE_MATLAB =
+MATLAB_INCLUDE =
 
-FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
+#=======================================================================
+#       List all source files required for the project
+#=======================================================================
+LIBSRC_SOURCES = MicroMagParameters util_micromag DemagAuxFunctions FortranCuda
 
+ifeq (${USE_MATLAB},1)
+	LIBSRC_SOURCES += MagTenseMicroMagIO
+	MATLAB_OPT = -I"${MATLAB_INCLUDE}"
+else
+	LIBSRC_SOURCES += MagTenseMicroMagPyIO
+	MATLAB_OPT =
+endif
 
-FFLAGS = -O3 -mkl -fpp -fpe0 -fp-model source -fpic -static-intel -libs:static -lmkl_intel_lp64 -lmkl_lapack95_lp64 -lmkl_blas95_lp64 -I../NumericalIntegration/NumericalIntegration/ \
-	-I../DemagField/DemagField/ -I/apps/external/matlab/2019/b/extern/include/ -I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/ \
-	-I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/ -I/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/include/intel64/lp64 \
-	-I../TileDemagTensor/TileDemagTensor/  \
-	-Wl, --start-group /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_lp64.a \
-	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_blas95_lp64.a \
-	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_lapack95_lp64.a \
-	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_intel_thread.a \
-	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl
+LIBSRC_SOURCES += LandauLifshitzEquationSolver
+LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
+ifeq ($(OS),Windows_NT)
+	CONDA_PATH = $(subst \,/,${CONDA_PREFIX})
+	MKL_ROOT = ${CONDA_PATH}/Library
+	OPT = -I${CONDA_PATH}/opt/compiler/include/intel64
+	LIBTOOL = LIB $? /NOLOGO /OUT:$@
+	LIB_SUFFIX = .lib
+else
+	MKL_ROOT = ${CONDA_PREFIX}
+	OPT =
+	LIB_SUFFIX = .a
 
+	ifeq (${UNAME}, Darwin)
+		LIBTOOL = libtool -static -o $@ $?
+	else
+		LIBTOOL = ar src $@ $?
+	endif
+endif
 
-#FC = /usr/bin/gfortran
+STATIC_LIB = libMagTenseMicroMag${LIB_SUFFIX}
+NUM_INT_PATH = ../NumericalIntegration/NumericalIntegration
+TILE_DEMAG_TENSOR_PATH = ../TileDemagTensor/TileDemagTensor
+DEMAG_FIELD_PATH = ../DemagField/DemagField
+DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
+#=======================================================================
+#							Targets
+#=======================================================================
+.SUFFIXES: .f90
+.PHONY: all clean
 
-#FFLAGS = -O3 -fpp -fopenmp -fdefault-real-8 -ffixed-line-length-none -fPIC
+all: pre-build ${STATIC_LIB}
 
-
-
-
-.KEEP_STATE:
-.SUFFIXES:
-.SUFFIXES: .for .f90 .F90 .f .o
-.f.o:
-	$(FC) -c $(FFLAGS) $<
 .f90.o:
-	$(FC) -c $(FFLAGS) $<
-.F90.o:
-	$(FC) -c $(FFLAGS) $<
-.for.o:
-	$(FC) -c $(FFLAGS) $<
+	${FC} ${FFLAGS} -I${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} ${OPT} ${MATLAB_OPT} -c $< -o $@
 
-MagTenseMicroMagLib = $(FC) LandauLifshitzEquationSolver.o MagTenseMicroMagIO.o MicroMagParameters.o FortranCuda.o LLODE_Debug.o
+pre-build:
+	cd ${NUM_INT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
+	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
+	cd ${DEMAG_FIELD_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
 
-libMagTenseMicroMag.a: $(MagTenseMicroMagLib)
-	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/xiar rc libMagTenseMicroMag.a LandauLifshitzEquationSolver.o MagTenseMicroMagIO.o MicroMagParameters.o FortranCuda.o LLODE_Debug.o
-
+${STATIC_LIB}: ${DEMAG_FIELD_LIB} ${LIBSRC_OBJECTS}
+	${LIBTOOL}
 
 clean:
-	rm -f *.o *.x *.mod *.a
-
-
-MagTenseMicroMagIO.o	:MagTenseMicroMagIO.f90
-MicroMagParameters.o	:MicroMagParameters.f90
-FortranCuda.o	:FortranCuda.f90
-LLODE_Debug.o	:LLODE_Debug.f90 MicroMagParameters.o
-LandauLifshitzEquationSolver.o	:LandauLifshitzEquationSolver.f90 LLODE_Debug.o FortranCuda.o MicroMagParameters.o MagTenseMicroMagIO.o
-
-
-
+	-rm -f *${LIB_SUFFIX} *.o *.mod

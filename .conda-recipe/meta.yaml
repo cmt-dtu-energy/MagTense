@@ -1,9 +1,9 @@
 {% set version = "2.2.1" %}
-{% set py_version = "3.11" %}
+{% set py_version = "3.12" %}
 {% set cuda_version = "cuda12" %}
 {% set cuda_pkg_version = "12.*" %}
-{% set mkl_version = "2023.*" %}
-{% set numpy_version_build = "1.25.2" %}
+{% set mkl_version = "2025.0.1" %}
+{% set numpy_version_build = "2.1.3" %}
 
 package:
   name: magtense
@@ -16,35 +16,23 @@ build:
 requirements:
   build:
     - python {{ py_version }}
-    - numpy =={{ numpy_version_build }}
-    - mkl =={{ mkl_version }}
-    - mkl-static
-    - intel-fortran-rt # [unix]
-{% if cuda_version != 'cpu' %}
-    - cuda-nvcc =={{ cuda_pkg_version }}
-    - libcusparse-dev =={{ cuda_pkg_version }}
-    - libcublas-dev =={{ cuda_pkg_version }}
-    - cuda-cudart-dev =={{ cuda_pkg_version }}
-    - libnvjitlink-dev =={{ cuda_pkg_version }}
-{% endif %}
-    - make # [win]
   host:
     - python {{ py_version }}
     - pip
   run:
     - python {{ py_version }}
-    - numpy
+    - numpy =={{ numpy_version_build }}
     - matplotlib
     - mkl =={{ mkl_version }}
-    - intel-fortran-rt # [unix]
+    - intel-fortran-rt =={{ mkl_version }}
   {% if cuda_version != 'cpu' %}
-    - libcusparse =={{ cuda_pkg_version }} # [unix]
+    - libcusparse # [unix]
     - libcusparse-dev =={{ cuda_pkg_version }} # [win]
-    - libcublas =={{ cuda_pkg_version }} # [unix]
+    - libcublas # [unix]
     - libcublas-dev =={{ cuda_pkg_version }} # [win]
-    - cuda-cudart =={{ cuda_pkg_version }} # [unix]
+    - cuda-cudart # [unix]
     - cuda-cudart-dev =={{ cuda_pkg_version }} # [win]
-    - libnvjitlink =={{ cuda_pkg_version }} # [unix]
+    - libnvjitlink # [unix]
     - libnvjitlink-dev =={{ cuda_pkg_version }} # [win]
   {% endif %}
 

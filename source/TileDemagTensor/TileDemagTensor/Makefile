@@ -1,81 +1,56 @@
 #=======================================================================
 #                       compiler names and flags
 #=======================================================================
-# FC = ifort
+# FC = ifx
 FC = gfortran
-
-USE_CVODE = 0
-
-LIB_NAME = libTileDemagTensor
-
-VPATH = ../../NumericalIntegration/NumericalIntegration
+FFLAGS =
+USE_CVODE =
+CVODE_ROOT =
+USE_MATLAB =
+MATLAB_INCLUDE =
+#=======================================================================
+#       List all source files required for the project
+#=======================================================================
+LIBSRC_SOURCES = TileTensorHelperFunctions TileCylPieceTensor \
+	TileRectangularPrismTensor TilePlanarCoilTensor TileTriangle \
+	TileCircPieceTensor TileNComponents
+LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
-	ifeq (${FC}, ifort)
-		FFLAGS = /nologo /real-size:64 /O3 /assume:nocc_omp /Qopenmp /fpp \
-		/fpe:0 /fp:source /fp:precise /libs:static /DUSE_CVODE=${USE_CVODE}
-	else ifeq (${FC}, gfortran)
-		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
-		-cpp -DUSE_CVODE=${USE_CVODE}
-	endif
-
-	LIBTOOL = LIB $? /OUT:$@
-	STATIC_LIB = ${LIB_NAME}.lib
-	CLEAN_FILES = -del ${STATIC_LIB} *.o *.mod
+	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
+	LIBTOOL = LIB $? /NOLOGO /OUT:$@
+	LIB_SUFFIX = .lib
 else
-	ifeq (${FC}, ifort)
-		FFLAGS = -r8 -O3 -assume nocc_omp -qopenmp -fpp -fpe0 -fp-model source \
-		-fp-model precise -fpic -libs:static -DUSE_CVODE=${USE_CVODE}
-	else ifeq (${FC}, gfortran)
-		FFLAGS = -fPIC -O3 -fopenmp -fdefault-real-8 -ffree-line-length-512 \
-		-cpp -DUSE_CVODE=${USE_CVODE}
-	endif
+	OPT =
+	LIB_SUFFIX = .a
 
 	ifeq (${UNAME}, Darwin)
   		LIBTOOL = libtool -static -o $@ $?
 	else
   		LIBTOOL = ar src $@ $?
 	endif
-	STATIC_LIB = ${LIB_NAME}.a
-	CLEAN_FILES = -rm -f ${STATIC_LIB} *.o *.mod
 endif
 
-#=======================================================================
-#                     Intel's libtool
-#=======================================================================
-# LIBTOOL = xiar rc $@ $?
-
-#=======================================================================
-#       List all source files required for the project
-#=======================================================================
-# names (without suffix), f90 sources
-LIBSRC_SOURCES = IntegrationDataTypes quadpack SpecialFunctions TileTensorHelperFunctions \
-TileCylPieceTensor TileRectangularPrismTensor TilePlanarCoilTensor TileTriangle \
-TileCircPieceTensor TileNComponents
-
-# object files
-LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
-
-#=======================================================================
-#						Relevant suffixes
-#=======================================================================
-.SUFFIXES: .for .f90 .F90 .f .o
-
+STATIC_LIB = libTileDemagTensor${LIB_SUFFIX}
+NUM_INT_PATH = ../../NumericalIntegration/NumericalIntegration
+NUM_INT_LIB = ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX}
 #=======================================================================
 #							Targets
 #=======================================================================
-.f.o:
-	$(FC) $(FFLAGS) -c $< -o $@
-.f90.o:
-	$(FC) $(FFLAGS) -c $< -o $@
-.F90.o:
-	$(FC) $(FFLAGS) -c $< -o $@
-.for.o:
-	$(FC) $(FFLAGS) -c $< -o $@
+.SUFFIXES: .f90
+.PHONY: all clean
 
-${STATIC_LIB}: ${LIBSRC_OBJECTS}
+all: pre-build ${STATIC_LIB}
+
+.f90.o:
+	${FC} ${FFLAGS} -I ${NUM_INT_PATH} ${OPT} -c $< -o $@
+
+pre-build:
+	cd ${NUM_INT_PATH} && ${MAKE} FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="${MATLAB_INCLUDE}"
+
+${STATIC_LIB}: ${NUM_INT_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
 clean:
-	${CLEAN_FILES}
-
+	-rm -f *${LIB_SUFFIX} *.o *.mod
+	

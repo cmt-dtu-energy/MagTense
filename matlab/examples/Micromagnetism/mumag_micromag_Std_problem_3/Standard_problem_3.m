@@ -40,6 +40,7 @@ addpath('../../../util');
     problem = problem.setMicroMagDemagApproximation('none');
     problem = problem.setUseCuda( options.use_CUDA );
     problem = problem.setUseCVODE( options.use_CVODE );
+    problem.ReturnHall = int32(1);
 
     %--- Save the parameters
     problem.alpha = alpha;

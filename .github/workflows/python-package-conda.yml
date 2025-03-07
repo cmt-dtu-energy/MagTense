@@ -1,0 +1,103 @@
+name: Building & testing Python package using Conda
+
+on: [push]
+
+jobs:
+  build-win:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Conda with Python 3.12
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        activate-environment: magtense-env
+        environment-file: python/environment_win.yml
+        python-version: 3.12
+        auto-activate-base: false
+
+    # - name: Compile Fortran source code and build Python wrapper
+    #   shell: bash -el {0}
+    #   working-directory: ${{ github.workspace }}/python/src/magtense/lib/
+    #   run: make
+    
+    - name: Compile Fortran files in Developer PowerShell for VS 2022
+      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      run: |
+        cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
+        .\Launch-VsDevShell.ps1
+        cd ${{ github.workspace }}/python/src/magtense/lib/
+        make ps
+    
+    - name: Compile with nvcc in Bash
+      shell: bash -el {0}
+      working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+      run: nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.42.34433\bin\Hostx64\x64" -o MagTenseCudaBlas.o
+  
+    - name: Link Cuda wrapper in Developer PowerShell for VS 2022
+      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      run: |
+        cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
+        .\Launch-VsDevShell.ps1
+        cd ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+        make wrap
+
+    - name: Build Python wrapper in Command Prompt
+      shell: cmd /C CALL {0}
+      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
+      run: >-
+        make cmdx64
+
+    # - name: Build Python wrapper in Developer PowerShell for VS 2022
+    #   shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+    #   run: |
+    #     cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
+    #     .\Launch-VsDevShell.ps1
+    #     cd ${{ github.workspace }}/python/src/magtense/lib/
+    #     conda deactivate
+    #     conda activate magtense-env
+    #     make cmdx64
+
+    # - name: Build Python wrapper in x64 Native Tools Command Prompt for VS 2022
+    #   shell: cmd /k "{0}" -arch=amd64 -host_arch=x64
+    #   working-directory: ${{ github.workspace }}/python/src/magtense/lib/
+    #   run: |
+    #     call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+    #     make cmdx64
+
+    - name: Install local magtense package with pip
+      run: python -m pip install -e ${{ github.workspace }}/python
+
+    - name: Test with pytest
+      run: |
+        conda install pytest
+        pytest
+
+
+  build-linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Conda with Python 3.12
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        activate-environment: magtense-env
+        environment-file: python/environment_linux.yml
+        python-version: 3.12
+        auto-activate-base: false
+
+    - name: Compile Fortran source code and build Python wrapper
+      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
+      run: make
+
+    - name: Install local magtense package with pip
+      run: python -m pip install -e ${{ github.workspace }}/python
+      
+    - name: Test with pytest
+      run: |
+        conda install pytest
+        pytest

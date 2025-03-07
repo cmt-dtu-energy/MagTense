@@ -78,6 +78,15 @@ properties
     % tensors are made into sparse matrices, i.e. if abs(K) < dem_thres
     % then K = 0
     dem_thres
+
+    %add a random noise to the demag field. CV is the coefficient of
+    %variation, with a mean of the correct value from the demag field, from
+    %which numbers will be drawn from a random distribution
+    CV
+
+    %A parameter to determine if the specific H_fields, like exchange, demag etc. 
+    % are returned from Fortran
+    ReturnHall
     
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
@@ -122,8 +131,9 @@ properties
     %magnetization between two timesteps
     conv_tol = 1e-4;
     
-    %defines whether to recompute the Interaction Matrices or not
-    RecomputeInteractionMatrices = 0 ;
+    %defines how often to calculate the demagnetization tensor in
+    %hysteresis problems. Zero is every step
+    demigstp = int32(0) ;
     
     %defines whether to use an External Mesh or not
     ExternalMesh = 0 ; 
@@ -296,6 +306,10 @@ methods
         obj.m0(2*obj.ntot+1:3*obj.ntot) = cos(obj.theta);
         %initial value of the demag threshold is zero, i.e. it is not used
         obj.dem_thres = 0;
+        %initial value of the CV is zero, i.e. it is not used
+        obj.CV = 0;
+        %initial value of the ReturnHall is zero, i.e. the specific fields are not returned
+        obj.ReturnHall = int32(0);
         %set use cuda to default not
         obj.useCuda = int32(0);
 		%set use CVODE to default
@@ -323,7 +337,7 @@ methods
         obj.ShowTheResult = int32(1);
 
         obj.DirectoryFilename = '';
-        obj.RecomputeInteractionMatrices = int32(0) ;
+        obj.demigstp = int32(0) ;
         obj.ExternalMesh = int32(0) ;
         obj.MeshType = '' ;
         obj.ExternalMeshFileName = '' ;
@@ -384,7 +398,6 @@ methods
        else
            obj.useCuda = int32(0);
            obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolverNoCUDA_mex;
-%            obj.MagTenseLandauLifshitzSolver_mex = @MagTenseLandauLifshitzSolver_mex;
        end
     end
     
@@ -445,7 +458,7 @@ methods
         obj.exch_rowe = int32(re);
         obj.exch_col  = int32(c);
 
-        disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(10^9)) ' Gb'])
+        disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(2^30)) ' Gb'])
     end
 
     function obj = setMicroMagDemagApproximation( obj, type_var )

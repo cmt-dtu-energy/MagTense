@@ -1,30 +1,8 @@
 About
 ==============================================
 
-MagTense is actively developed at the Technical University of Denmark 
-by the Department of Energy Conversion and Storage.
+MagTense is actively developed at the Technical University of Denmark by the Department of Energy Conversion and Storage. The code is developed by Rasmus Bjørk, Stefan Pollok and Kaspar Kirstein Nielsen. Major current and past code developers are Andrea Roberto Insinga and Emil Blaabjerg Poulsen.
 
-Major code developers are 
-`Andrea Roberto Insinga <https://www.dtu.dk/english/service/phonebook/person?id=86373&tab=2&qt=dtupublicationquery>`_, 
-`Emil Blaabjerg Poulsen <https://www.dtu.dk/english/service/phonebook/person?id=142409&cpid=262058&tab=3&qt=dtuprojectquery>`_
-and `Stefan Pollok <https://www.dtu.dk/service/telefonbog/person?id=144368&cpid=265240&tab=3&qt=dtuprojectquery>`_.
+MagTense development has been sponsored by the Carlsberg Foundation Semper Ardens Advance project CF24-0920 entitled "Novel magnets through interdisiplinarity and nanocomposites", by the Villum Foundation Synergy project number 50091 entitled "Physics-aware machine learning", by the Independent Research Fund Denmark, grant “Magnetic Enhancements through Nanoscale Orientation (METEOR)”, 1032-00251B, by the Poul Due Jensen Foundation, in the project "Browns paradox in permanent magnets", project nr. 2018-016, by the Independent Research Fund Denmark project, contract. no. 7017-00034. 
 
-.. sidebar:: Funded by
-
-   |pic|
-
-.. |pic| image:: ./static/poul_due_jensen_foundation.png
-    :width: 100%
-    :alt: Poul Due Jensen Foundation
-
-Development of the code and the associated research on permanent magnets 
-is sponsored by the Poul Due Jensen Foundation, in a project aimed to 
-understand the coercivity of permanent magnets. Furthermore, development 
-is also sponsored by the Independent Research Fund Denmark project, 
-contract. no. 7017-00034.
-
-Previously the development of the demagnetization part of the framework 
-has been partly financed by the ENOVHEAT project, which is funded by 
-Innovation Fund Denmark (contract no. 12-132673), and also the Programme 
-Commission on Energy and Environment (EnM) (contract no. 2104-06-0032) 
-which was part of the Danish Council for Strategic Research.
+Previously the development of the demagnetization part of the framework has been partly financed by the ENOVHEAT project, which is funded by Innovation Fund Denmark (contract no. 12-132673), and also the Programme Commission on Energy and Environment (EnM) (contract no. 2104-06-0032) which was part of the Danish Council for Strategic Research.

@@ -1,45 +1,87 @@
+#=======================================================================
+#                       compiler names and flags
+#=======================================================================
+FC = ifx
+# FC = gfortran
+CPP = icx
 
-FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
+USE_CUDA = 1
+USE_CVODE = 0
+USE_MATLAB = 1
+COMPILE_MICROMAG = 1
 
+CVODE_ROOT= /usr/local/sundials-4.1.0/instdir
+# MATLAB_INCLUDE = /usr/local/MATLAB/R2023b/extern/include			# Linux
+MATLAB_INCLUDE = "C:\Program Files\MATLAB\R2023b\extern\include"	# Win
+MKL_ROOT = ${CONDA_PREFIX} 											# Linux - mkl
+# MKL_ROOT = "C:\Program Files (x86)\Intel\oneAPI\mkl\latest" 		# Win - mkl (oneapi)
+# MKL_ROOT = ${CONDA_PREFIX}/Library 								# Win - mkl (conda)
 
-FFLAGS = -r8 -O3 -fpe0 -fp-model source -fpic -I../../NumericalIntegration/NumericalIntegration/ \
+ifeq (${FC}, ifort)
+	ifeq ($(OS),Windows_NT)
+		FFLAGS = /O3 /fpp /real-size:64 /assume:nocc_omp /Qopenmp \
+		/fpe:0 /fp:source /libs:static /DUSE_CVODE=${USE_CVODE} \
+		/DUSE_CUDA=${USE_CUDA} /DUSE_MATLAB=${USE_MATLAB}
+	else
+		FFLAGS = -O3 -fpp -real-size 64 -assume nocc_omp -qopenmp \
+		-fpe0 -fp-model=source -fpic -DUSE_CVODE=${USE_CVODE} \
+		-DUSE_CUDA=${USE_CUDA} -DUSE_MATLAB=${USE_MATLAB}
+	endif
+else ifeq (${FC}, gfortran)
+FFLAGS = -O3 -fdefault-real-8 -fopenmp -ffree-line-length-512 -cpp -fPIC -DUSE_CVODE=${USE_CVODE}
+USE_CUDA = 0
+COMPILE_MICROMAG= 0
+endif
 
+ifeq ($(USE_CUDA),0)
+	COMPILE_CUDA =
+else
+	COMPILE_CUDA = cuda
+endif
 
-#FC = /usr/bin/gfortran
+ifeq ($(USE_MATLAB),0)
+	FORCEINTEGRATOR =
+else
+	FORCEINTEGRATOR = forceintegrator
+endif
 
-#FFLAGS = -O3 -fopenmp -fdefault-real-8 -ffixed-line-length-none -fPIC
+ifeq ($(COMPILE_MICROMAG),0)
+	MICROMAG =
+else
+	MICROMAG = micromagnetism
+endif
+#=======================================================================
+#							Targets
+#=======================================================================
+.PHONY: all clean
 
+all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} # standalone
 
+magnetostatic:
+	cd source/NumericalIntegration/NumericalIntegration && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd source/TileDemagTensor/TileDemagTensor && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd source/DemagField/DemagField && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 
+micromagnetism:
+	cd source/MagTenseMicroMag && $(MAKE) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE) MKL_ROOT=$(MKL_ROOT)
 
-.KEEP_STATE:
-.SUFFIXES:
-.SUFFIXES: .for .f90 .F90 .f .o
-.f.o:
-	$(FC) -c $(FFLAGS) $<
-.f90.o:
-	$(FC) -c $(FFLAGS) $<
-.F90.o:
-	$(FC) -c $(FFLAGS) $<
-.for.o:
-	$(FC) -c $(FFLAGS) $<
+cuda:
+	cd source/MagTenseFortranCuda/cuda && $(MAKE) CPP=$(CPP)
 
-all: 
-	cd source/NumericalIntegration/NumericalIntegration && $(MAKE)
-	cd source/TileDemagTensor/TileDemagTensor && $(MAKE)
-	cd source/DemagField/DemagField && $(MAKE) 
-	cd source/MagTense_StandAlone/MagTense_StandAlone && $(MAKE) 
-	cd source/MagneticForceIntegrator/MagneticForceIntegrator && $(MAKE) 
-	cp source/MagTense_StandAlone/MagTense_StandAlone/MagTense.x executable/MagTense.x 
-	cd source/MagTenseMicroMag && $(MAKE)
+forceintegrator:
+	cd source/MagneticForceIntegrator/MagneticForceIntegrator && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+
+standalone:
+	cd source/MagTense_StandAlone/MagTense_StandAlone && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)"
+	mkdir build
+	cp source/MagTense_StandAlone/MagTense_StandAlone/MagTense.x build/MagTense.x
 
 clean:
-	cd source/NumericalIntegration/NumericalIntegration && rm -f *.o *.x *.mod *.a
-	cd source/TileDemagTensor/TileDemagTensor && rm -f *.o *.x *.mod *.a
-	cd source/DemagField/DemagField && rm -f *.o *.x *.mod *.a
-	cd source/MagTense_StandAlone/MagTense_StandAlone && rm -f *.o *.x *.mod *.a
-	cd source/MagneticForceIntegrator/MagneticForceIntegrator && rm -f *.o *.x *.mod *.a
-	cd source/MagTenseMicroMag  && rm -f *.o *.x *.mod *.a
-
-
-
+	cd source/NumericalIntegration/NumericalIntegration && make clean
+	cd source/TileDemagTensor/TileDemagTensor && make clean
+	cd source/DemagField/DemagField && make clean
+	cd source/MagTenseMicroMag && make clean
+	cd source/MagTenseFortranCuda/cuda && make clean
+	cd source/MagTense_StandAlone/MagTense_StandAlone && make clean
+	cd source/MagneticForceIntegrator/MagneticForceIntegrator && make clean
+	rm -r build/

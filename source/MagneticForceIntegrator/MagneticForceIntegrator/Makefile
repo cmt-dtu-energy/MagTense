@@ -1,42 +1,47 @@
+#=======================================================================
+#                       compiler names and flags
+#=======================================================================
+# FC = ifx
+FC = gfortran
+FFLAGS =
+MATLAB_INCLUDE =
+#=======================================================================
+#       List all source files required for the project
+#=======================================================================
+LIBSRC_SOURCES = MagForceIO MagForceMaxwellStressTensor MagneticForce
 
-FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
+ifeq ($(OS),Windows_NT)
+	LIB_SUFFIX = .lib
+	LIBTOOL = LIB $? /OUT:$@
+else
+	LIB_SUFFIX = .a
 
+	ifeq (${UNAME}, Darwin)
+		LIBTOOL = libtool -static -o $@ $?
+	else
+		LIBTOOL = ar src $@ $?
+	endif
+endif
 
-FFLAGS = -r8 -O3 -fpe0 -fpp -fp-model source -fpic -static-intel -libs:static -I../../NumericalIntegration/NumericalIntegration/ \
-	-I../../TileDemagTensor/TileDemagTensor/ -I../../DemagField/DemagField/  -I/apps/external/matlab/2019/b/extern/include/ 
+LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
+STATIC_LIB = libMagneticForceIntegrator${LIB_SUFFIX}
+NUM_INT_PATH = ../../NumericalIntegration/NumericalIntegration
+TILE_DEMAG_TENSOR_PATH = ../../TileDemagTensor/TileDemagTensor
+DEMAG_FIELD_PATH = ../../DemagField/DemagField
+DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
+#=======================================================================
+#							Targets
+#=======================================================================
+.SUFFIXES: .f90
+.PHONY: all clean
 
+all: ${STATIC_LIB}
 
-
-
-#FC = /usr/bin/gfortran
-
-#FFLAGS = -O3 -fopenmp -fdefault-real-8 -ffixed-line-length-none -fPIC
-
-
-
-
-.KEEP_STATE:
-.SUFFIXES:
-.SUFFIXES: .for .f90 .F90 .f .o
-.f.o:
-	$(FC) -c $(FFLAGS) $<
 .f90.o:
-	$(FC) -c $(FFLAGS) $<
-.F90.o:
-	$(FC) -c $(FFLAGS) $<
-.for.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I"${MATLAB_INCLUDE}" -c $< -o $@
 
-MagneticForceIntegratorLib = $(FC) MagForceIO.o MagForceMaxwellStressTensor.o MagneticForce.o
-
-libMagneticForceIntegrator.a: $(MagneticForceIntegratorLib)
-	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/xiar rc libMagneticForceIntegrator.a MagForceIO.o MagForceMaxwellStressTensor.o MagneticForce.o
-
+${STATIC_LIB}: ${DEMAG_FIELD_LIB} ${LIBSRC_OBJECTS}
+	${LIBTOOL}
 
 clean:
-	rm -f *.o *.x *.mod *.a
-
-
-MagForceIO.o	:MagForceIO.f90
-MagForceMaxwellStressTensor.o	:MagForceMaxwellStressTensor.f90 
-MagneticForce.o	:MagneticForce.f90
+	-rm -f ${STATIC_LIB} *.o *.mod

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.705
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35431.28
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{6989167D-11E4-40FE-8C1A-2192A86A7E90}") = "MagTenseMEX", "MagTenseMEX\MagTenseMEX.vfproj", "{7DC31451-6AB4-45E3-8466-31CF5EB70E93}"
 EndProject
@@ -11,8 +11,8 @@ Global
 		Release|Win32 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{7DC31451-6AB4-45E3-8466-31CF5EB70E93}.Debug|Win32.ActiveCfg = Debug|Win32
-		{7DC31451-6AB4-45E3-8466-31CF5EB70E93}.Debug|Win32.Build.0 = Debug|Win32
+		{7DC31451-6AB4-45E3-8466-31CF5EB70E93}.Debug|Win32.ActiveCfg = Debug|x64
+		{7DC31451-6AB4-45E3-8466-31CF5EB70E93}.Debug|Win32.Build.0 = Debug|x64
 		{7DC31451-6AB4-45E3-8466-31CF5EB70E93}.Release|Win32.ActiveCfg = Release|Win32
 		{7DC31451-6AB4-45E3-8466-31CF5EB70E93}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection

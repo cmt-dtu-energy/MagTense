@@ -1,5 +1,6 @@
 module FortranToPythonIO
 
+    use MagParameters
     use DemagFieldGetSolution
     use IterateMagnetSolution
 #if USE_MICROMAG
@@ -236,7 +237,8 @@ module FortranToPythonIO
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, nT, nH, n_stateFcn, &
         data_stateFcn, T, maxErr, nIteMax, Mag_out, Mrel_out )
-
+        
+        integer(4),intent(in) :: n_tiles, n_stateFcn, nT, nH
         !::Specific for a cylindrical tile piece
         real(8),dimension(n_tiles,3),intent(in) :: centerPos
         real(8),dimension(n_tiles,3),intent(in) :: dev_center
@@ -266,13 +268,10 @@ module FortranToPythonIO
         real(8),intent(in) :: maxErr, T
         integer(4) :: nIteMax
         type(MagStateFunction),dimension(n_stateFcn) :: stateFcn
-        integer(4),intent(in) :: n_stateFcn
-        integer(4),intent(in) :: nT,nH
         real(8),dimension(nH,nT),intent(in) :: data_stateFcn
         real(8) :: resumeIteration
 
         type(MagTile),dimension(n_tiles) :: tiles
-        integer(4),intent(in) :: n_tiles
         integer :: i
 
         !! default value is zero, i.e. do not resume iteration
@@ -308,7 +307,7 @@ module FortranToPythonIO
     subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, n_stateFcn, nT, nH, &
-        data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out, console )
+        data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out )
 
         integer(4),intent(in) :: n_tiles, n_pts, n_stateFcn, nT, nH
 
@@ -345,7 +344,6 @@ module FortranToPythonIO
         type(MagStateFunction),dimension(n_stateFcn) :: stateFcn
         real(8),dimension(nH,nT),intent(in) :: data_stateFcn
         real(8) :: start,finish,resumeIteration
-        logical, intent(in) :: console
 
         real(8),dimension(n_pts,3),intent(in) :: pts
         real(8),dimension(n_pts,3),intent(out) :: H
@@ -367,9 +365,7 @@ module FortranToPythonIO
         call loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
 
         if ( iterateSolution .eqv. .true. ) then
-            if (console) then
-                write(*,*) 'Doing iteration'
-            endif
+            write(*,*) 'Doing iteration'
             call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, resumeIteration )
 
             do i=1,n_tiles
@@ -379,9 +375,7 @@ module FortranToPythonIO
         endif
 
         if ( returnSolution .eqv. .true. ) then
-            if (console) then
-                write(*,*) 'Finding solution at requested points'
-            endif
+            write(*,*) 'Finding solution at requested points'
 
             H(:,:) = 0.
 
@@ -391,8 +385,8 @@ module FortranToPythonIO
                 !Make sure to allocate H_tmp on the heap and for each thread
                 ! $OMP CRITICAL
                 H_tmp(:,:) = 0.
-
                 ! $OMP END CRITICAL
+
                 !! Here a selection of which subroutine to use should be done, i.e. whether the tile
                 !! is cylindrical, a prism or an ellipsoid or another geometry
                 select case (tiles(i)%tileType )
@@ -414,8 +408,10 @@ module FortranToPythonIO
                     call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts )
                 case default
                 end select
-
+                
+                ! $OMP CRITICAL
                 H = H + H_tmp
+                ! $OMP END CRITICAL
 
             enddo
             ! $OMP END PARALLEL DO
@@ -425,20 +421,18 @@ module FortranToPythonIO
 
         call cpu_time(finish)
 
-        if (console) then
-            write(*,*) 'Elapsed time', finish-start
-        endif
+        write(*,*) 'Elapsed time', finish-start
 
     end subroutine runSimulation
 
 
     subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-        gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+        gamma, alpha_mm, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
         N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-        exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, t_out, M, pts, H_exc, H_ext, H_dem, H_ani)
+        exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani)
 
-        integer(4),intent(in) :: ntot, nt_Hext, nt, nt_alpha, nt_conv, grid_type, grid_nnod, exch_nval, exch_nrow
+        integer(4),intent(in) :: ntot, nt_Hext, nt, nt_alpha, nt_conv, grid_nnod, exch_nval, exch_nrow
         integer(4),dimension(3),intent(in) :: grid_n, N_ave
         real(8),dimension(3),intent(in) :: grid_L
         real(8),dimension(ntot,3),intent(in) :: grid_pts
@@ -451,14 +445,14 @@ module FortranToPythonIO
         integer(4),dimension(exch_nval),intent(in) :: exch_val, exch_col
         integer(4),dimension(exch_nrow),intent(in) :: exch_rows, exch_rowe
         real(8),dimension(nt_conv),intent(in) :: t_conv
-        integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
-        integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE
-        real(8),intent(in) :: A0, Ms, K0, gamma, alpha, MaxT0, tol, thres, conv_tol, dem_thres
+        integer(4),intent(in) :: ProblemMode, solver, grid_type, dem_appr, usePrecision, nThreadsMatlab
+        integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCuda, useCVODE
+        real(8),intent(in) :: A0, Ms, K0, gamma, alpha_mm, MaxT0, tol, thres, conv_tol, dem_thres
         character*256,intent(in) :: N_file_in, N_file_out
 
         real(8),dimension(nt),intent(in) :: t
         real(8),dimension(nt),intent(out) :: t_out
-        real(8),dimension(nt,ntot,1,3),intent(out) :: M
+        real(8),dimension(nt,ntot,1,3),intent(out) :: M_mm
         real(8),dimension(nt,ntot,1,3),intent(out) :: H_exc, H_ext, H_dem, H_ani
         real(8),dimension(ntot,3),intent(out) :: pts
 
@@ -467,7 +461,7 @@ module FortranToPythonIO
         type(MicroMagSolution) :: solution
 
         call loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-            gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+            gamma, alpha_mm, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
             exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, problem )
@@ -475,7 +469,7 @@ module FortranToPythonIO
         call SolveLandauLifshitzEquation( problem, solution )
 
         t_out = solution%t_out
-        M = solution%M_out
+        M_mm = solution%M_out
         pts = solution%pts
         H_exc = solution%H_exc
         H_ext = solution%H_ext
@@ -484,7 +478,7 @@ module FortranToPythonIO
 #else
         write(*,*) 'Compiled without micromagnetic part. Returning zeros.'
         t_out = 0.
-        M(:,:,:,:) = 0.
+        M_mm(:,:,:,:) = 0.
         pts(:,:) = 0.
         H_exc(:,:,:,:) = 0.
         H_ext(:,:,:,:) = 0.

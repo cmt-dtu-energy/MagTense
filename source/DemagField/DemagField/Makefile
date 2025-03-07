@@ -1,46 +1,65 @@
+#=======================================================================
+#                       compiler names and flags
+#=======================================================================
+# FC = ifx
+FC = gfortran
+FFLAGS =
+USE_CVODE =
+CVODE_ROOT =
+USE_MATLAB =
+MATLAB_INCLUDE =
+#=======================================================================
+#       List all source files required for the project
+#=======================================================================
+LIBSRC_SOURCES = DemagFieldGetSolution MagParameters spline IterateMagnetSolution
 
-FC = /apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/ifort
+ifeq ($(USE_MATLAB),1)
+	LIBSRC_SOURCES += MagTileIO
+	MATLAB_OPT = -I"${MATLAB_INCLUDE}"
+else
+	MATLAB_OPT =
+endif
 
+LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
-FFLAGS = -r8 -O3 -fpp -fpe0 -fp-model source -fpic -static-intel -libs:static -I../../NumericalIntegration/NumericalIntegration/ \
-	-I../../TileDemagTensor/TileDemagTensor/ -I/apps/external/matlab/2019/b/extern/include/ 
+ifeq ($(OS),Windows_NT)
+	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
+	LIBTOOL = LIB $? /NOLOGO /OUT:$@
+	LIB_SUFFIX = .lib
+else
+	OPT =
+	LIB_SUFFIX = .a
 
+	ifeq (${UNAME}, Darwin)
+  		LIBTOOL = libtool -static -o $@ $?
+	else
+  		LIBTOOL = ar src $@ $?
+	endif
+endif
 
-#FC = /usr/bin/gfortran
+STATIC_LIB = libDemagField${LIB_SUFFIX}
+NUM_INT_PATH = ../../NumericalIntegration/NumericalIntegration
+NUM_INT_LIB = ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX}
 
-#FFLAGS = -O3 -fpp -fopenmp -fdefault-real-8 -ffixed-line-length-none -fPIC
+TILE_DEMAG_TENSOR_PATH = ../../TileDemagTensor/TileDemagTensor
+TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX}
+#=======================================================================
+#							Targets
+#=======================================================================
+.SUFFIXES: .f90
+.PHONY: all clean
 
+all: pre-build ${STATIC_LIB}
 
-
-
-.KEEP_STATE:
-.SUFFIXES:
-.SUFFIXES: .for .f90 .F90 .f .o
-.f.o:
-	$(FC) -c $(FFLAGS) $<
 .f90.o:
-	$(FC) -c $(FFLAGS) $<
-.F90.o:
-	$(FC) -c $(FFLAGS) $<
-.for.o:
-	$(FC) -c $(FFLAGS) $<
+	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} ${OPT} ${MATLAB_OPT} -c $< -o $@
 
-DemagFieldLib = $(FC) DemagFieldGetSolution.o MagParameters.o MagTileIO.o spline.o IterateMagnetSolution.o
+pre-build:
+	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
+	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
 
-libDemagField.a: $(DemagFieldLib)
-	/apps/external/intel/2019/compilers_and_libraries_2019.4.243/linux/bin/intel64/xiar rc libDemagField.a DemagFieldGetSolution.o MagParameters.o MagTileIO.o  spline.o IterateMagnetSolution.o
-
+${STATIC_LIB}: ${TILE_DEMAG_TENSOR_LIB} ${LIBSRC_OBJECTS}
+	${LIBTOOL}
 
 clean:
-	rm -f *.o *.x *.mod *.a
-
-
-DemagFieldGetSolution.o	:DemagFieldGetSolution.f90
-MagParameters.o	:MagParameters.f90
-MagTileIO.o	:MagTileIO.f90
-spline.o	:spline.f90
-IterateMagnetSolution.o	:IterateMagnetSolution.f90 MagParameters.o DemagFieldGetSolution.o spline.o MagTileIO.o
-
-
-
-
+	-rm -f *${LIB_SUFFIX} *.o *.mod

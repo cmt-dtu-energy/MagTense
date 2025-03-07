@@ -31,7 +31,7 @@ Easy axis and other axes
 The easy axis defines the direction of preferred magnetization in the magnetic tile.
 With the other axes a orthonormal set is formed.
 In the Matlab and python interfaces, the easy axis of the magnetization of 
-is defined according to the global three-dimensional global coordinate 
+is defined according to the global three-dimensional global coordinate 
 system with two angles: polar angle :math:`\theta`, and azimuth :math:`\phi`, where 
 :math:`\theta \in [0, \pi]` and :math:`\phi \in [0, 2 \pi]` .
 

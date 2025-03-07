@@ -30,12 +30,12 @@
     !! 0 no error
     !! -1 max number of iterations reached without satisfying the minimum error
     subroutine iterateMagnetization( tiles, n, stateFunction, n_stf, T, err_max, max_ite, resumeIteration )
+        !DEC$ ATTRIBUTES ALIAS:"iteratemagnetization_" :: iterateMagnetization
         type(MagTile),dimension(n),intent(inout) :: tiles
-        integer(4),intent(in) :: n
-        type(MagStateFunction),intent(in),dimension(n_stf) :: stateFunction    
-        integer(4),intent(in) :: n_stf
+        integer(4),intent(in) :: n, n_stf
+        type(MagStateFunction),intent(in),dimension(n_stf) :: stateFunction
         real(8),intent(in) :: resumeIteration 
-        real(8),intent(in) :: T    
+        real(8),intent(in) :: T
         real(8),optional :: err_max
         integer(4),optional :: max_ite 
     
@@ -494,6 +494,7 @@
     subroutine loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles)
+        !DEC$ ATTRIBUTES ALIAS:"loadtiles_" :: loadTiles
         
         integer(4),intent(in) :: n_tiles
 
@@ -571,11 +572,10 @@
     !< Function to load the state function for each tile from python to fortran
     !!
     subroutine loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
-        
-        integer(4),intent(in) :: nT,nH
+        !DEC$ ATTRIBUTES ALIAS:"loadstatefunction_" :: loadStateFunction
+        integer(4),intent(in) :: nT, nH, n_stateFcn
         type(MagStateFunction),dimension(n_stateFcn),intent(inout) :: stateFcn
         real(8),dimension(nH,nT),intent(in) :: data_stateFcn
-        integer(4),intent(in) :: n_stateFcn
         integer(4) :: i, j, k
 
         do i=1,n_stateFcn

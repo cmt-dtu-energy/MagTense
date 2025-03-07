@@ -1,7 +1,7 @@
 from typing import List, Optional, Tuple, Union
+import importlib_resources
 
 import numpy as np
-from pkg_resources import resource_filename
 
 from magtense.lib import magtensesource
 
@@ -748,7 +748,6 @@ def run_simulation(
     max_it: int = 500,
     T: float = 300.0,
     mu_r: float = 20,
-    console: bool = True,
 ) -> tuple[Tiles, np.ndarray]:
     """
     Run magnetostatic simulation to calculate the demagnetizing field strength.
@@ -759,14 +758,14 @@ def run_simulation(
         max_error: Iteration stops if magnetization change below this value.
         max_it: Maximum number of performed iterations.
         T: Temperature for the state function if required.
-        console: Boolean if output in console.
 
     Returns:
         Updated tiles.
         Demagnetizing field strength in evaluation points.
     """
-    DATA_PATH = resource_filename("magtense", f"mat/Fe_mur_{mu_r}_Ms_2_1.csv")
-    data_stateFcn = np.genfromtxt(DATA_PATH, delimiter=";", dtype=np.float64)
+    ref = importlib_resources.files("magtense") / f"mat/Fe_mur_{mu_r}_Ms_2_1.csv"
+    with importlib_resources.as_file(ref) as path:
+        data_stateFcn = np.genfromtxt(path, delimiter=";", dtype=np.float64)
 
     H_out, M_out, Mrel_out = magtensesource.fortrantopythonio.runsimulation(
         centerpos=tiles.center_pos,
@@ -798,7 +797,6 @@ def run_simulation(
         nitemax=max_it,
         iteratesolution=True,
         returnsolution=True,
-        console=console,
     )
 
     tiles.M = M_out
@@ -827,8 +825,9 @@ def iterate_magnetization(
     Returns:
         Updated tiles.
     """
-    DATA_PATH = resource_filename("magtense", f"mat/Fe_mur_{mu_r}_Ms_2_1.csv")
-    data_stateFcn = np.genfromtxt(DATA_PATH, delimiter=";", dtype=np.float64)
+    ref = importlib_resources.files("magtense") / f"mat/Fe_mur_{mu_r}_Ms_2_1.csv"
+    with importlib_resources.as_file(ref) as path:
+        data_stateFcn = np.genfromtxt(path, delimiter=";", dtype=np.float64)
 
     M_out, Mrel_out = magtensesource.fortrantopythonio.iteratetiles(
         centerpos=tiles.center_pos,

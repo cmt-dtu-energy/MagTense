@@ -75,15 +75,15 @@ include "mkl_dfti.f90"
     !>-----------------
     type MicroMagProblem
         !Below is stuff that needs to be provided by the "user":
-        type(MicroMagGrid) :: grid                  !> Grid of the problem
+        type(MicroMagGrid) :: grid                      !> Grid of the problem
         
         real(DP),dimension(:,:),allocatable :: u_ea     !> Easy axis vectors that should have the dimensions (n,3) where n is the no. of grid points and thus u_ea(i,3) is the i'th point's z-component
         
-        integer :: ProblemMode                      !> Defines the problem mode (new or continued from previous solution)
+        integer :: ProblemMode                          !> Defines the problem mode (new or continued from previous solution)
         
-        integer :: solver                           !> Determines what type of solver to use
+        integer :: solver                               !> Determines what type of solver to use
         
-        real(DP) :: A0,gamma,alpha0,MaxT0         !> User defined coefficients determining part of the problem.
+        real(DP) :: A0,gamma,alpha0,MaxT0               !> User defined coefficients determining part of the problem.
         real(DP) :: tol,thres_value                     !> User defined coefficients for the ODE solver
         
         real(DP),dimension(:,:),allocatable :: Hext     !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
@@ -97,11 +97,14 @@ include "mkl_dfti.f90"
         real(DP) :: conv_tol                            !> Converge criteria on difference between magnetization at different timesteps
         
         real(SP) :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
+        real(SP) :: CV                                  !> The coefficient of variation (CV), i.e. the ratio of the standard deviation to the mean, which can be used to add an error to the demag field
+        integer :: demag_ignore_steps                   !> Only compute the demag tensor every demag_ignore_steps'th-step in a calculation using the hysteresis-model. Otherwise the parameter is ignore (i.e. in the dynamic solver)
         
         integer :: setTimeDisplay                               !> Determines how often the timestep is shown in Matlab
         integer :: useCuda                                      !> Defines whether to attempt using CUDA or not
         integer :: useCVODE                                     !> Defines whether to attempt using CVODE or not
         integer :: usePrecision                                 !> Defines whether to use single (false) or double precision (true)
+        integer :: useReturnHall                                !> Defines whether to return all the specific H-fields (exchange, demag) ´(true) or not (false)
         integer :: demag_approximation                          !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         integer :: demagTensorReturnState                       !> Flag describing how or if the demag tensor should be returned
         integer :: demagTensorLoadState                         !> Flag describing how or if to load the demag tensor (from disk e.g.)
@@ -120,6 +123,9 @@ include "mkl_dfti.f90"
         real(SP),dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
         real(SP),dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
         real(SP),dimension(:,:),allocatable :: Kzz          !> Demag field tensor split out into the nine symmetric components
+        
+        integer,dimension(:,:),allocatable :: tensorMap     !> A map of the unique entries in the demagnetization tensor
+        logical,dimension(:,:),allocatable :: tensorMapX, tensorMapY, tensorMapZ   !> The sign of the different components in the demagnetization tensor map
         
         real(DP),dimension(:),allocatable :: Axx,Axy,Axz,Ayy,Ayz,Azz    !> Anisotropy vectors assuming local anisotropy only, i.e. no interaction between grains
         
@@ -155,6 +161,8 @@ include "mkl_dfti.f90"
         real(DP),dimension(:),allocatable :: Jfact,Kfact
         real(SP),dimension(:),allocatable :: Mfact
         
+        real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
+        
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
     end type MicroMagSolution
     
@@ -172,5 +180,6 @@ include "mkl_dfti.f90"
     !!@todo Do NOT have useCVODETrue/-False variables both here and in IntegrationDataTypes.
     integer,parameter :: useCVODETrue=1,useCVODEFalse=0
     integer,parameter :: usePrecisionTrue=1,usePrecisionFalse=0
+    integer,parameter :: useReturnHallTrue=1,useReturnHallFalse=0
     
 end module MicroMagParameters    

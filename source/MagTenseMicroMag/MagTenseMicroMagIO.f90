@@ -21,22 +21,23 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
-        mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr
+        mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr, CVThresProblemPtr
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
         mwPointer :: tolProblemPtr, thres_valueProblemPtr
         mwPointer :: exch_matProblemPtr, irPtr, jcPtr
         mwPointer :: genericProblemPtr
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
         mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr
-        mwPointer :: usePrecisionPtr, N_aveProblemPtr
+        mwPointer :: usePrecisionPtr, N_aveProblemPtr, useReturnHallProblemPtr
+        mwPointer :: demag_ignore_stepsProblemPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
-        real(DP) :: demag_fac
+        real(DP) :: demag_fac, CV
     
         !Get the expected names of the fields
         call getProblemFieldnames( problemFields, nFieldsProblem)
@@ -332,6 +333,30 @@
         N_aveProblemPtr = mxGetField( prhs, i, problemFields(48) )
         call mxCopyPtrToInteger4(mxGetPr(N_aveProblemPtr), problem%N_ave, sx )
         
+        !Coefficient of variation value
+        problem%CV = 0
+        
+        sx = 1
+        CVThresProblemPtr = mxGetField(prhs,i,problemFields(49))
+        call mxCopyPtrToReal8(mxGetPr(CVThresProblemPtr), CV, sx )
+            
+        problem%CV = sngl(CV)
+        
+        !Parameter to determine if the specific H_fields are returned (exchange, demag, etc.)
+        sx = 1
+        useReturnHallProblemPtr = mxGetField(prhs,i,problemFields(50))
+        
+        call mxCopyPtrToInteger4(mxGetPr(useReturnHallProblemPtr), useReturnHall, sx )
+        if ( useReturnHall .eq. 1 ) then
+            problem%useReturnHall = useReturnHallTrue
+        else
+            problem%useReturnHall = useReturnHallFalse
+        endif
+        
+        sx = 1
+        demag_ignore_stepsProblemPtr = mxGetField( prhs, i, problemFields(51) )
+        call mxCopyPtrToInteger4(mxGetPr(demag_ignore_stepsProblemPtr), problem%demag_ignore_steps, sx )
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -403,8 +428,8 @@
         
         
         ndim = 4
-        dims_4(1) = nt
-        dims_4(2) = ntot
+        dims_4(1) = size( solution%H_exc(:,1,1,1) )
+        dims_4(2) = size( solution%H_exc(1,:,1,1) )
         dims_4(3) = size( solution%H_exc(1,1,:,1) )
         dims_4(4) = 3
         classid = mxClassIDFromClassName( 'double' )
@@ -416,8 +441,8 @@
         
         
         ndim = 4
-        dims_4(1) = nt
-        dims_4(2) = ntot
+        dims_4(1) = size( solution%H_ext(:,1,1,1) )
+        dims_4(2) = size( solution%H_ext(1,:,1,1) )
         dims_4(3) = size( solution%H_ext(1,1,:,1) )
         dims_4(4) = 3
         classid = mxClassIDFromClassName( 'double' )
@@ -429,8 +454,8 @@
         
         
         ndim = 4
-        dims_4(1) = nt
-        dims_4(2) = ntot
+        dims_4(1) = size( solution%H_dem(:,1,1,1) )
+        dims_4(2) = size( solution%H_dem(1,:,1,1) )
         dims_4(3) = size( solution%H_dem(1,1,:,1) )
         dims_4(4) = 3
         classid = mxClassIDFromClassName( 'double' )
@@ -442,8 +467,8 @@
         
         
         ndim = 4
-        dims_4(1) = nt
-        dims_4(2) = ntot
+        dims_4(1) = size( solution%H_ani(:,1,1,1) )
+        dims_4(2) = size( solution%H_ani(1,:,1,1) )
         dims_4(3) = size( solution%H_ani(1,1,:,1) )
         dims_4(4) = 3
         classid = mxClassIDFromClassName( 'double' )
@@ -467,7 +492,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=48
+        integer,parameter :: nf=51
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -522,6 +547,9 @@
         fieldnames(46) = 'usePres'
         fieldnames(47) = 'nThreads'
         fieldnames(48) = 'N_ave'
+        fieldnames(49) = 'CV'
+        fieldnames(50) = 'ReturnHall'
+        fieldnames(51) = 'demigstp'
         
     end subroutine getProblemFieldnames
     

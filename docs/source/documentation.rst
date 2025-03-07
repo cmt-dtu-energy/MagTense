@@ -115,7 +115,6 @@ Run MagTense with the Fortran source code as Python module.
         max_error: float = 1e-5,
         max_it: int = 500,
         T: float = 300.,
-        console: bool = True
     ) -> tuple[Tiles, np.ndarray]:
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
