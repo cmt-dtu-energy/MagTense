@@ -184,15 +184,14 @@ end
 %% Compare with published solutions available from mumag webpage
 if (options.ShowTheResult)
     t=linspace(0,1,1000);
-    data = load(['Published_solutions_field' num2str(NIST_field)]);
-    mean_avg=data.mean_avg; err=data.err;
+    data = load(['..\..\..\..\documentation\examples_NIST_validation\Validation_standard_problem_4\Field_' num2str(NIST_field) '_NIST_mean_solution.txt']);
     colours = [[1 0 0];[0 1 0];[0 0 1]];
     weak_colours = colours + ~colours*0.75;
     fill_ts=[t,fliplr(t)];  
     for j=1:3
-        std_errors{j}(1:2,:)=[mean_avg(1,:,j)+err(1,:,j);mean_avg(1,:,j)-err(1,:,j)];
-        interval = [std_errors{j}(1,:),fliplr(std_errors{j}(2,:))];
-        plot(fig1,1e-9*t,mean_avg(1,:,j),'color',colours(j,:))
+        std_errors(1:2,:)=[data(:,(j-1)*2+1)+data(:,j*2), data(:,(j-1)*2+1)-data(:,j*2)]';
+        interval = [std_errors(1,:),fliplr(std_errors(2,:))];
+        plot(fig1,1e-9*t,data(:,(j-1)*2+1),'color',colours(j,:))
         fill(fig1,1e-9*fill_ts,interval,weak_colours(j,:),'linestyle','none')
     end
 
