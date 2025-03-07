@@ -1,11 +1,14 @@
 # %%
 import numpy as np
+import matplotlib.pyplot as plt
 
+from matplotlib.lines import Line2D
+from pathlib import Path
 from magtense.micromag import MicromagProblem
 from magtense.utils import plot_M_avg_seq, plot_M_thin_film
 
 
-def std_prob_4(res=[64, 16, 1], NIST_field=1, cuda=False, show=True):
+def std_prob_4(res=[36, 9, 1], NIST_field=1, cuda=False, show=True):
     mu0 = 4 * np.pi * 1e-7
     grid_L = [500e-9, 125e-9, 3e-9]
 
@@ -39,14 +42,72 @@ def std_prob_4(res=[64, 16, 1], NIST_field=1, cuda=False, show=True):
 
     t_dym, M_out, _, _, _, _, _ = problem_dym.run_simulation(1e-9, 200, h_ext_fct, 2000)
 
+    M_sq_dym = np.squeeze(M_out, axis=2)
+    Mx = np.mean(M_sq_dym[:, :, 0], axis=1)
+    My = np.mean(M_sq_dym[:, :, 1], axis=1)
+    Mz = np.mean(M_sq_dym[:, :, 2], axis=1)
+
+    ## Compare with published solutions available from mumag webpage
+    mumag_eval_path = (
+        Path(__file__).parent.absolute()
+        / ".."
+        / ".."
+        / ".."
+        / "documentation"
+        / "examples_NIST_validation"
+        / "Validation_standard_problem_4"
+    )
+    fname = f"Field_{NIST_field}_NIST_mean_solution.txt"
+
+    with open(Path(mumag_eval_path, fname), "r") as file:
+        T = file.readlines()[1:]
+
+    M_mumag = np.asarray([line.split() for line in T], dtype=np.float64)
+
+    # Interpolate the MagTense solution to the NIST-published solutions and
+    # calculate the difference between the results as an integral.
+    t = np.linspace(0, 1e-9, 1000)
+    Magtense_Mx_interpolated = np.interp(t, t_dym, Mx)
+    Magtense_My_interpolated = np.interp(t, t_dym, My)
+    Magtense_Mz_interpolated = np.interp(t, t_dym, Mz)
+    int_error = [
+        np.trapz(np.abs(M_mumag[:, 0] - Magtense_Mx_interpolated), t),
+        np.trapz(np.abs(M_mumag[:, 2] - Magtense_My_interpolated), t),
+        np.trapz(np.abs(M_mumag[:, 4] - Magtense_Mz_interpolated), t),
+    ]
+
     if show:
-        M_sq_dym = np.squeeze(M_out, axis=2)
-        plot_M_avg_seq(t_dym, M_sq_dym)
+        fig, ax1 = plt.subplots()
+
+        ax1.plot(t_dym, Mx, "rx")
+        ax1.plot(t_dym, My, "gx")
+        ax1.plot(t_dym, Mz, "bx")
+
+        ax1.plot(t, M_mumag[:, 0], "r-")
+        ax1.plot(t, M_mumag[:, 2], "g-")
+        ax1.plot(t, M_mumag[:, 4], "b-")
+
+        legend_elements = [
+            Line2D([0], [0], marker="x", color="r", label=r"MagTense $M_x$", linestyle="None"),
+            Line2D([0], [0], marker="x", color="g", label=r"MagTense $M_y$", linestyle="None"),
+            Line2D([0], [0], marker="x", color="b", label=r"MagTense $M_z$", linestyle="None"),
+            Line2D([0], [0], marker="none", color="r", label=r"$\mu{}mag$ $<M_x>$"),
+            Line2D([0], [0], marker="none", color="g", label=r"$\mu{}mag$ $<M_y>$"),
+            Line2D([0], [0], marker="none", color="b", label=r"$\mu{}mag$ $<M_z>$"),
+        ]
+        ax1.legend(handles=legend_elements)
+        plt.setp(plt.gca().get_legend().get_texts(), fontsize="14")
+        plt.xlabel("Time [s]", fontsize="14")
+        plt.ylabel(r"$M_i$" + " [-]", fontsize="14")
+        plt.title(f"Standard problem 4, Field {NIST_field}")
+        plt.show()
+
         plot_M_thin_film(M_sq_dym[0], res, "Start state")
         plot_M_thin_film(M_sq_dym[-1], res, "Final state")
 
+    return int_error
 
 # %%
 
 if __name__ == "__main__":
-    std_prob_4(NIST_field=1, show=False, cuda=False)
+    int_error = std_prob_4(NIST_field=1, show=True, cuda=False)
