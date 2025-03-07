@@ -185,34 +185,34 @@ end
 %% --------------------------------------------------------------------  mumag ----------------------------------------------------------
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% Compare with published solutions available from mumag webpage
+t=1e-9*linspace(0,1,1000);
+M_mumag = load(['..\..\..\..\documentation\examples_NIST_validation\Validation_standard_problem_4\Field_' num2str(NIST_field) '_NIST_mean_solution.txt']);
+
+% Interpolate the MagTense solution to the NIST-published solutions and
+% calculate the difference between the results as an integral.
+Magtense_M_interpolated(:,1) = interp1(solution_dym.t,mean(solution_dym.M(:,:,1),2),t);
+Magtense_M_interpolated(:,2) = interp1(solution_dym.t,mean(solution_dym.M(:,:,2),2),t);
+Magtense_M_interpolated(:,3) = interp1(solution_dym.t,mean(solution_dym.M(:,:,3),2),t);
+int_error(1) = trapz(t,abs(M_mumag(:,1)-Magtense_M_interpolated(:,1)));
+int_error(2) = trapz(t,abs(M_mumag(:,3)-Magtense_M_interpolated(:,2)));
+int_error(3) = trapz(t,abs(M_mumag(:,5)-Magtense_M_interpolated(:,3)));
+
 if (options.ShowTheResult)
-    t=linspace(0,1,1000);
-    data = load(['..\..\..\..\documentation\examples_NIST_validation\Validation_standard_problem_4\Field_' num2str(NIST_field) '_NIST_mean_solution.txt']);
     colours = [[1 0 0];[0 1 0];[0 0 1]];
     weak_colours = colours + ~colours*0.75;
     fill_ts=[t,fliplr(t)];  
     for j=1:3
-        std_errors(1:2,:)=[data(:,(j-1)*2+1)+data(:,j*2), data(:,(j-1)*2+1)-data(:,j*2)]';
+        std_errors(1:2,:)=[M_mumag(:,(j-1)*2+1)+M_mumag(:,j*2), M_mumag(:,(j-1)*2+1)-M_mumag(:,j*2)]';
         interval = [std_errors(1,:),fliplr(std_errors(2,:))];
-        plot(fig1,1e-9*t,data(:,(j-1)*2+1),'color',colours(j,:))
-        fill(fig1,1e-9*fill_ts,interval,weak_colours(j,:),'linestyle','none')
+        plot(fig1,t,M_mumag(:,(j-1)*2+1),'color',colours(j,:))
+        fill(fig1,fill_ts,interval,weak_colours(j,:),'linestyle','none')
     end
 
     legend(fig1,'MagTense M_x','MagTense M_y','MagTense M_z','\mu{}mag <M_x>','\mu{}mag \sigma{}(M_x)','\mu{}mag <M_y>','\mu{}mag \sigma{}(M_y)','\mu{}mag <M_z>','\mu{}mag \sigma{}(M_z)','Location','eastoutside');
     ylabel(fig1,'<M_i>/M_s')
     xlabel(fig1,'Time [ns]')
-
     xlim(fig1,[0 1e-9])
-    figure(figure1)
-
-    % Interpolate the MagTense solution to the NIST-published solutions and
-    % calculate the difference between the results as an integral.
-    Magtense_M(:,1) = interp1(solution_dym.t,mean(solution_dym.M(:,:,1),2),1e-9*t);
-    Magtense_M(:,2) = interp1(solution_dym.t,mean(solution_dym.M(:,:,2),2),1e-9*t);
-    Magtense_M(:,3) = interp1(solution_dym.t,mean(solution_dym.M(:,:,3),2),1e-9*t);
-    int_error(1) = trapz(1e-9*t,abs(mean_avg(1,:,1)-Magtense_M(:,1)'));
-    int_error(2) = trapz(1e-9*t,abs(mean_avg(1,:,2)-Magtense_M(:,2)'));
-    int_error(3) = trapz(1e-9*t,abs(mean_avg(1,:,3)-Magtense_M(:,3)'));
+    figure(figure1)   
 end
 
 end
