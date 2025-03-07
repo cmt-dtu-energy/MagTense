@@ -1,6 +1,7 @@
 
 %%This function compares MagTense to a FEM simulations for a single permanent magnet.
-function [] = MagTense_Validation_prism()
+function [int_error] = MagTense_Validation_prism()
+%Return the integrated error, to enable check for consistency
 
 %make sure to source the right path for the generic Matlab routines
 addpath(genpath('../../../util/'));
@@ -95,11 +96,22 @@ plot(data_FEM_x(:,1),data_FEM_x(:,2),'ro');
 plot(data_FEM_y(:,1),data_FEM_y(:,2),'go');
 plot(data_FEM_z(:,1),data_FEM_z(:,2),'bo');
 
-error = [abs(interp1(data_FEM_x(:,1),data_FEM_x(:,2),x,'linear','extrap')'-Hnorm_along_x); abs(interp1(data_FEM_y(:,1),data_FEM_y(:,2),y,'linear','extrap')'-Hnorm_along_y); abs(interp1(data_FEM_z(:,1),data_FEM_z(:,2),z,'linear','extrap')'-Hnorm_along_z)];
-disp(['Mean error between MagTense and FEM = ' num2str(mean(error)) '+/-' num2str(std(error))])
-
 h_l = legend('MagTense, x for y,z=offset','MagTense, y for x,z=offset','MagTense, z for x,y=offset','FEM, x for y,z=offset','FEM, y for x,z=offset','FEM, z for x,y=offset','Location','West');
 set(h_l,'fontsize',10);
 ylabel('|\mu_0{}H| [T]');
 xlabel('x, y or z [m]');
+
+% Interpolate the MagTense solution to the NIST-published solutions and
+% calculate the difference between the results as an integral.
+FEM_interp(:,1) = interp1(data_FEM_x(:,1),data_FEM_x(:,2),x,'linear','extrap');
+FEM_interp(:,2) = interp1(data_FEM_y(:,1),data_FEM_y(:,2),y,'linear','extrap');
+FEM_interp(:,3) = interp1(data_FEM_z(:,1),data_FEM_z(:,2),z,'linear','extrap');
+int_error(1) = trapz(x,abs(FEM_interp(:,1)-Hnorm_along_x));
+int_error(2) = trapz(y,abs(FEM_interp(:,2)-Hnorm_along_y));
+int_error(3) = trapz(z,abs(FEM_interp(:,3)-Hnorm_along_z));
+
+pointwise_error = [abs(interp1(data_FEM_x(:,1),data_FEM_x(:,2),x,'linear','extrap')'-Hnorm_along_x); abs(interp1(data_FEM_y(:,1),data_FEM_y(:,2),y,'linear','extrap')'-Hnorm_along_y); abs(interp1(data_FEM_z(:,1),data_FEM_z(:,2),z,'linear','extrap')'-Hnorm_along_z)];
+disp(['Mean error between MagTense and FEM = ' num2str(mean(pointwise_error)) '+/-' num2str(std(pointwise_error))])
+disp(['Integrated error between MagTense and FEM is Mx = ' num2str(int_error(1)) ', My = ' num2str(int_error(2)) ', Mz = ' num2str(int_error(3)) ])
+
 end
