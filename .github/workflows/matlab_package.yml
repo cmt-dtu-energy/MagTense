@@ -48,6 +48,18 @@ jobs:
 
     - name: Dir list2
       run: ls -l ${CONDA_PREFIX}/lib
+
+    - name: Pwd1
+      run: cd ${CONDA_PREFIX}
+
+    - name: Pwd2
+      run: pwd
+      
+    - name: Pwd3
+      run: pwd ${CONDA_PREFIX}
+
+    - name: Which1
+      run: which ifx
           
     - name: Compile Fortran source code and build Python wrapper
       #working-directory: ${{ github.workspace }}
