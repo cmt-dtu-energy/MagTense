@@ -29,9 +29,9 @@ if (ispc)
 else
     VS_STUDIO = false;
     MKL_STATIC = false;
-    compiler_root = '/home/spol/miniconda3/envs/magtense-env-py12';
-    mkl_root = '/home/spol/miniconda3/envs/magtense-env-py12';
-    mkl_lib = '/home/spol/miniconda3/envs/magtense-env-py12/lib';
+    compiler_root = '/usr/share/miniconda/envs/magtense-env/bin';
+    mkl_root = '/home/runner/work/MagTense/MagTense';
+    mkl_lib = '/home/runner/work/MagTense/MagTense/lib';
     cuda_root = '/home/spol/miniconda3/envs/magtense-env-py12/lib';
     cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
     cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
