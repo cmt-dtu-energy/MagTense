@@ -1,7 +1,7 @@
 from typing import List, Optional, Tuple, Union
+import importlib_resources
 
 import numpy as np
-from pkg_resources import resource_filename
 
 from magtense.lib import magtensesource
 
@@ -763,8 +763,9 @@ def run_simulation(
         Updated tiles.
         Demagnetizing field strength in evaluation points.
     """
-    DATA_PATH = resource_filename("magtense", f"mat/Fe_mur_{mu_r}_Ms_2_1.csv")
-    data_stateFcn = np.genfromtxt(DATA_PATH, delimiter=";", dtype=np.float64)
+    ref = importlib_resources.files("magtense") / f"mat/Fe_mur_{mu_r}_Ms_2_1.csv"
+    with importlib_resources.as_file(ref) as path:
+        data_stateFcn = np.genfromtxt(path, delimiter=";", dtype=np.float64)
 
     H_out, M_out, Mrel_out = magtensesource.fortrantopythonio.runsimulation(
         centerpos=tiles.center_pos,
@@ -824,8 +825,9 @@ def iterate_magnetization(
     Returns:
         Updated tiles.
     """
-    DATA_PATH = resource_filename("magtense", f"mat/Fe_mur_{mu_r}_Ms_2_1.csv")
-    data_stateFcn = np.genfromtxt(DATA_PATH, delimiter=";", dtype=np.float64)
+    ref = importlib_resources.files("magtense") / f"mat/Fe_mur_{mu_r}_Ms_2_1.csv"
+    with importlib_resources.as_file(ref) as path:
+        data_stateFcn = np.genfromtxt(path, delimiter=";", dtype=np.float64)
 
     M_out, Mrel_out = magtensesource.fortrantopythonio.iteratetiles(
         centerpos=tiles.center_pos,
