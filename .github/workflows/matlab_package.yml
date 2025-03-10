@@ -20,3 +20,34 @@ jobs:
           make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2021b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest
     
       - run: echo "Workflow done"
+
+  
+  build-linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Conda with Python 3.12
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        activate-environment: magtense-env
+        environment-file: python/environment_linux.yml
+        python-version: 3.12
+        auto-activate-base: false
+
+    - name: Set up MATLAB
+      uses: matlab-actions/setup-matlab@v2
+      with:
+        release: R2023b
+          
+    - name: Compile Fortran source code and build Python wrapper
+      working-directory: ${{ github.workspace }}
+      run: make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2023b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest
+
+    - name: Run script
+      uses: matlab-actions/run-command@v2
+      with:
+        command: matlab\buildMagTenseMEX.m
