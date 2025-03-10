@@ -29,7 +29,7 @@ if (ispc)
 else
     VS_STUDIO = false;
     MKL_STATIC = false;
-    compiler_root = '/usr/share/miniconda/envs/magtense-env/bin';
+    compiler_root = '/usr/share/miniconda/envs/magtense-env';
     mkl_root = '/home/runner/work/MagTense/MagTense';
     mkl_lib = '/home/runner/work/MagTense/MagTense/lib';
     cuda_root = '/home/spol/miniconda3/envs/magtense-env-py12/lib';
