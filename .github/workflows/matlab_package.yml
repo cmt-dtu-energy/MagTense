@@ -1,6 +1,7 @@
 name: Building Matlab MEX files
 
-on: [workflow_dispatch]
+on: 
+  workflow_dispatch:
 
 jobs:
   build-win:
