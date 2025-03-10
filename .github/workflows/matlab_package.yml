@@ -41,9 +41,6 @@ jobs:
     - name: Printenv
       run: printenv
       
-    - name: Dir list
-      run: ls -l /opt/hostedtoolcache/MATLAB/2023.2.999/x64
-
     - name: Dir list2
       run: ls -l ${CONDA_PREFIX}/lib
 
@@ -59,13 +56,16 @@ jobs:
     - name: Which1
       run: which ifx
 
-    - name: Which2
-      run: ls -l /home/runner/work/MagTense/MagTense/lib
-
     - name: Set up MATLAB
       uses: matlab-actions/setup-matlab@v2
       with:
         release: R2023b
+
+    - name: Dir list
+      run: ls -l /opt/hostedtoolcache/MATLAB/2023.2.999/x64
+      
+    - name: Which2
+      run: ls -l /home/runner/work/MagTense/MagTense/lib
 
     - name: Compile Fortran source code and build Python wrapper
       #working-directory: ${{ github.workspace }}
