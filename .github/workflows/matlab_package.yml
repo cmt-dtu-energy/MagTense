@@ -5,9 +5,9 @@ on: [push]
 jobs:
   build-win:
     runs-on: [self-hosted, Windows]
-    steps:
-      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
+    steps:  
       - uses: actions/checkout@v4
+      
       - name: Set up Conda with Python 3.12
         uses: conda-incubator/setup-miniconda@v3
         with:
