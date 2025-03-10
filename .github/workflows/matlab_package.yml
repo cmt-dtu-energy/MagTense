@@ -53,7 +53,7 @@ jobs:
       #working-directory: ${{ github.workspace }}
       #run: make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2023.2.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}/lib
       working-directory: ${{ github.workspace }}/python/src/magtense/lib/
-      run: make ps USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2023.2.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}/lib
+      run: make ps USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2023.2.999/x64/extern/include
 
     - name: Run script
       uses: matlab-actions/run-command@v2
