@@ -38,11 +38,9 @@ jobs:
         python-version: 3.12
         auto-activate-base: false
 
-    - name: Set up MATLAB
-      uses: matlab-actions/setup-matlab@v2
-      with:
-        release: R2023b
-
+    - name: Printenv
+      run: printenv
+      
     - name: Dir list
       run: ls -l /opt/hostedtoolcache/MATLAB/2023.2.999/x64
 
@@ -63,7 +61,12 @@ jobs:
 
     - name: Which2
       run: ls -l /home/runner/work/MagTense/MagTense/lib
-          
+
+    - name: Set up MATLAB
+      uses: matlab-actions/setup-matlab@v2
+      with:
+        release: R2023b
+
     - name: Compile Fortran source code and build Python wrapper
       #working-directory: ${{ github.workspace }}
       #run: make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2023.2.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}/lib
@@ -73,4 +76,4 @@ jobs:
     - name: Run script
       uses: matlab-actions/run-command@v2
       with:
-        command: pwd; dir; cd('matlab'); buildMagTenseMEX(1, 0, 0)
+        command: pwd; dir; cd('matlab'); getenv; buildMagTenseMEX(1, 0, 0)
