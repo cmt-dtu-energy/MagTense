@@ -47,7 +47,7 @@ jobs:
       run: ls -l /opt/hostedtoolcache/MATLAB/2023.2.999/x64
 
     - name: Dir list2
-      run: ls -l ${CONDA_PATH}/Library/lib
+      run: ls -l /usr/share/miniconda/Library/lib
           
     - name: Compile Fortran source code and build Python wrapper
       working-directory: ${{ github.workspace }}
