@@ -7,16 +7,13 @@ jobs:
     runs-on: [self-hosted, Windows]
     steps:  
       - uses: actions/checkout@v4
-      
-      - name: Set up Conda with Python 3.12
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          activate-environment: magtense-env
-          environment-file: python/environment_win.yml
-          python-version: 3.12
-          auto-activate-base: false
 
-      - name: Build Python wrapper in Command Prompt
+      - name: Test shell
+        shell: cmd /C CALL {0}
+        working-directory: ${{ github.workspace }}
+        run: echo "Workflow starting"
+      
+      - name: Start shell and run make
         shell: cmd /C CALL {0}
         working-directory: ${{ github.workspace }}
         run: >-
