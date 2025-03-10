@@ -1,4 +1,4 @@
-name: Building & testing Python package using Conda
+name: Building Matlab MEX files
 
 on: [workflow_dispatch]
 
