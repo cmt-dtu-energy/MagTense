@@ -30,8 +30,8 @@ else
     VS_STUDIO = false;
     MKL_STATIC = false;
     compiler_root = '/usr/share/miniconda/envs/magtense-env';
-    mkl_root = '/home/runner/work/MagTense/MagTense';
-    mkl_lib = '/home/runner/work/MagTense/MagTense/lib';
+    mkl_root = '/usr/share/miniconda/envs/magtense-env';
+    mkl_lib = '/usr/share/miniconda/envs/magtense-env/lib';
     cuda_root = '/home/spol/miniconda3/envs/magtense-env-py12/lib';
     cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
     cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
