@@ -11,7 +11,7 @@ jobs:
       - name: Test shell
         shell: cmd /C CALL {0}
         working-directory: ${{ github.workspace }}
-        run: echo "Workflow starting"
+        run: conda info --envs
       
       - name: Start shell and run make
         shell: cmd /C CALL {0}
