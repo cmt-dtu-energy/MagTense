@@ -67,8 +67,8 @@ jobs:
     - name: Which2
       run: ls -l /usr/share/miniconda/envs/magtense-env
 
-    #- name: Which3
-    #  run: ls -l /usr/share/miniconda/envs/magtense-env/lib
+    - name: Which3
+      run: ls -l /usr/share/miniconda/envs/magtense-env/lib
 
     - name: Compile Fortran source code and build Python wrapper
       working-directory: ${{ github.workspace }}
