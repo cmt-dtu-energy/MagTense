@@ -25,7 +25,7 @@ ifeq (${FC}, ifx)
 
 		LIB_SUFFIX = .lib
 	else
-		FFLAGS = -O3 -fpp -static-intel -real-size 64 -assume nocc_omp -qopenmp \
+		FFLAGS = -O3 -fpp -static-intel -lifcoremt -real-size 64 -assume nocc_omp -qopenmp \
 		-fpe0 -fp-model=source -fPIC -nologo -DUSE_CVODE=${USE_CVODE} \
 		-DUSE_MATLAB=${USE_MATLAB} -DUSE_MICROMAG=${USE_MICROMAG}
 
