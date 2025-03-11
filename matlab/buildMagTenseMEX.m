@@ -28,7 +28,7 @@ if (ispc)
     mex_suffix = 'w';
 else
     VS_STUDIO = false;
-    MKL_STATIC = false;
+    MKL_STATIC = true;
     compiler_root = '/usr/share/miniconda/envs/magtense-env';
     mkl_root = '/usr/share/miniconda/envs/magtense-env';
     mkl_lib = '/usr/share/miniconda/envs/magtense-env/lib';
