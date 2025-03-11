@@ -81,7 +81,7 @@ jobs:
     - name: Run script
       uses: matlab-actions/run-command@v2
       with:
-        command: dir; pwd; cd('matlab'); getenv; buildMagTenseMEX(1, 0, 0); cd('examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4(); disp(int_error);
+        command: dir; pwd; cd('matlab'); getenv; buildMagTenseMEX(1, 0, 0); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4(); disp(int_error);
 
     - name: Which4
       run: ls -l matlab/MEX_files
