@@ -78,6 +78,9 @@ jobs:
       #working-directory: ${{ github.workspace }}/python/src/magtense/lib/
       #run: make ps USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2023.2.999/x64/extern/include
 
+    - name: Which5
+      run: export LD_LIBRARY_PATH=/usr/share/miniconda/envs/magtense-env/lib:$LD_LIBRARY_PATH
+
     - name: Run script
       uses: matlab-actions/run-command@v2
       with:
