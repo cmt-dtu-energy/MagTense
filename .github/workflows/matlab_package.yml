@@ -67,8 +67,13 @@ jobs:
     - name: Which2
       run: ls -l /usr/share/miniconda/envs/magtense-env
 
-    - name: Which3
-      run: ls -l /usr/share/miniconda/envs/magtense-env/lib
+    #- name: Which3
+    #  run: ls -l /usr/share/miniconda/envs/magtense-env/lib
+
+    - name: Compile Fortran source code and build Python wrapper
+      working-directory: ${{ github.workspace }}
+      run: make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2023.2.999/x64/extern/include MKL_ROOT=/usr/share/miniconda/envs/magtense-env
+
 
     - name: Compile Fortran source code and build Python wrapper
       #working-directory: ${{ github.workspace }}
