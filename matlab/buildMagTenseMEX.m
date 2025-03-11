@@ -107,8 +107,8 @@ else
         ForceIntegrator_path ' -lMagneticForceIntegrator'];
     FFLAGS = 'FFLAGS="';
     if (MKL_STATIC)
-        MKL = ['-liomp5 -lpthread -lm -ldl LINKLIBS="$LINKLIBS ' mkl_lib '/libmkl_intel_thread.a ' mkl_lib ...
-            '/libmkl_core.a ' mkl_lib '/libmkl_blas95_lp64.a ' mkl_lib '/libifcoremt.a ' mkl_lib '/libmkl_intel_lp64.a"'];
+        MKL = ['-liomp5 -lpthread -lm -ldl -lifcoremt LINKLIBS="$LINKLIBS ' mkl_lib '/libmkl_intel_thread.a ' mkl_lib ...
+            '/libmkl_core.a ' mkl_lib '/libmkl_blas95_lp64.a ' mkl_lib '/libmkl_intel_lp64.a"'];
         INCLUDE = [INCLUDE '/include/intel64/lp64 '];
     else
         MKL = ['-L' mkl_lib ' -lmkl_rt -lpthread -lm -ldl '];
