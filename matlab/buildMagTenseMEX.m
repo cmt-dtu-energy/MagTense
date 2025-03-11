@@ -122,7 +122,7 @@ else
         end
     end
     INCLUDE = [INCLUDE CVODE_include '"'];
-    FFLAGS = [FFLAGS '-O3 -fpp -real-size 64 -qopenmp -assume nocc_omp -fpe0 -fp-model=source -fPIC -nologo -diag-disable 10006"'];
+    FFLAGS = [FFLAGS '-O3 -fpp -static-intel -real-size 64 -qopenmp -assume nocc_omp -fpe0 -fp-model=source -fPIC -nologo -diag-disable 10006"'];
 end
 
 %%------------------------------------------------------------------
