@@ -48,7 +48,23 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
 - Conda environment from `environment_win.yml`
 
   ```bash
-  conda env create -f python/environment.yml
+  conda env create -f python/environment_win.yml
+  ```
+
+  OR
+
+  ```bash
+  conda create -y -n magtense-env
+  conda activate magtense-env
+  conda config --env --add channels conda-forge
+  conda install -y python=3.12
+  python -m pip install numpy meson charset-normalizer
+  conda config --env --add channels https://software.repos.intel.com/python/conda/
+  conda install -y mkl mkl-devel mkl-static "dpcpp_win-64" intel-fortran-rt "ifx_win-64"
+  conda config --env --add channels nvidia/label/cuda-12.8.1
+  conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
+  conda install -y git make
+  python -m pip install matplotlib notebook h5py tqdm importlib_resources
   ```
 
 - Compile Fortran source files
