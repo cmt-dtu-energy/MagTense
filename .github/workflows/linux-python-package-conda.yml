@@ -27,7 +27,7 @@ jobs:
         CACHE_NUMBER: 0
       with:
         path: ${{ env.CONDA }}/envs
-        key: conda-${{ runner.os }}-${{hashFiles('python/build_env_linux.yml') }}${{ env.CACHE_NUMBER }}
+        key: conda-${{ runner.os }}-${{hashFiles('python/build_env_linux.yml') }}-${{ env.CACHE_NUMBER }}
       id: cache
 
     - name: Update environment
@@ -39,43 +39,31 @@ jobs:
         mkdir ${{ github.workspace }}/python/cpu_libs
         mkdir ${{ github.workspace }}/python/cu12_libs
 
-    - name: cpu - Compile Fortran source code and build Python wrapper
-      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
-      run: make USE_CUDA=0
-
-    - name: cpu - Copy wrapper to cpu_libs
+    - name: Compile Fortran source code and build Python wrappers
       working-directory: ${{ github.workspace }}/python/src/magtense/lib/
       run: |
+        make USE_CUDA=0
         cp magtensesource.*.so ${{ github.workspace }}/python/cpu_libs/
-        ls -al ${{ github.workspace }}/python/cpu_libs/
-
-    - name: cu12 - Compile Fortran source code and build Python wrapper
-      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
-      run: |
         make clean
         make USE_CUDA=1
-
-    - name: cu12 - Copy wrapper to cu12_libs
-      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
-      run: |
         cp magtensesource.*.so ${{ github.workspace }}/python/cu12_libs/
-        ls -al ${{ github.workspace }}/python/cu12_libs/
+        make clean
 
     - name: Build pip-wheels
       working-directory: ${{ github.workspace }}/python/
       run: python scripts/dist_pypi.py
-    
+
     - name: cpu - Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
         name: pip-wheel-cpu
-        path: dist/magtense-*-0-*.whl
+        path: ${{ github.workspace }}/python/dist/magtense-*-0-*.whl
 
     - name: cu12 - Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
         name: pip-wheel-cu12
-        path: dist/magtense-*-1-*.whl
+        path: ${{ github.workspace }}/python/dist/magtense-*-1-*.whl
 
 
   test-linux-cpu:
