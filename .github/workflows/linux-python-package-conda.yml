@@ -13,26 +13,26 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Setup Miniforge
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-version: latest
+        activate-environment: magtense-env
+        use-mamba: true
+
     - name: Cache conda
       uses: actions/cache@v4
       env:
         # Increase this value to reset cache manually
         CACHE_NUMBER: 0
       with:
-        enableCrossOsArchive: true
-        path: ~/conda_pkgs_dir
-        key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{
-            hashFiles('python/build_env_linux.yml') }}
+        path: ${{ env.CONDA }}/envs
+        key: conda-${{ runner.os }}-${{hashFiles('python/build_env_linux.yml') }}${{ env.CACHE_NUMBER }}
+      id: cache
 
-    - name: Set up Conda with Python 3.12
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        activate-environment: magtense-env
-        environment-file: python/build_env_linux.yml
-        python-version: 3.12
-        auto-activate-base: false
-        use-only-tar-bz2: true
+    - name: Update environment
+      run: conda env update -n magtense-env -f python/build_env_linux.yml
+      if: steps.cache.outputs.cache-hit != 'true'
     
     - name: Create directory for wrappers of compiled Fortran source code
       working-directory: ${{ github.workspace }}/python/
@@ -67,13 +67,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: pip-wheel-cpu
-        path: dist/magtense-2.2.1-0-*.whl
+        path: dist/magtense-*-0-*.whl
 
     - name: cu12 - Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
         name: pip-wheel-cu12
-        path: dist/magtense-2.2.1-1-*.whl
+        path: dist/magtense-*-1-*.whl
 
 
   test-linux-cpu:

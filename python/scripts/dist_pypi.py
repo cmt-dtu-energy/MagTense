@@ -2,12 +2,24 @@ import itertools
 import subprocess
 
 from pathlib import Path
+import argparse
+import tomllib
 
 
-def main():
-    # TODO parse arguments
-    mt_version = "2.2.1"
-    py_versions = ["312"]
+def parse_args():
+    parser = argparse.ArgumentParser(description="Build and distribute.")
+    parser.add_argument(
+        "--py_versions",
+        type=str,
+        default="312",
+        help="Python versions (comma-separated)",
+    )
+    return parser.parse_args()
+
+
+def main(py_versions):
+    with open(Path(__file__).parent.parent / "pyproject.toml", "rb") as f:
+        mt_version = tomllib.load(f)["project"]["version"]
     cu_versions = ["cpu", "cu12"]
     lib_path = None
 
@@ -67,4 +79,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    py_versions = args.py_versions.split(",")
+    main(py_versions)
