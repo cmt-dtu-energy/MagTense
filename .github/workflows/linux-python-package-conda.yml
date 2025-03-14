@@ -1,0 +1,100 @@
+name: Linux - Python package using conda / pip
+
+on: [push]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Set up Conda with Python 3.12
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        activate-environment: magtense-env
+        environment-file: python/build_env_linux.yml
+        python-version: 3.12
+        auto-activate-base: false
+    
+    - name: Create directory for wrappers of compiled Fortran source code
+      working-directory: ${{ github.workspace }}/python/
+      run: mkdir compiled_libs
+
+    - name: cpu - Compile Fortran source code and build Python wrapper
+      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
+      run: |
+        make USE_CUDA=0
+        mv magtensesource.*.so ${{ github.workspace }}/python/compiled_libs/
+        make clean
+
+    - name: cu12 - Compile Fortran source code and build Python wrapper
+      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
+      run: |
+        make USE_CUDA=1
+        mv magtensesource.*.so ${{ github.workspace }}/python/compiled_libs/
+        make clean
+
+    - name: Build pip-wheels
+      working-directory: ${{ github.workspace }}/python/
+      run: python scripts/dist_pypi.py
+    
+    - name: cpu - Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-cpu
+        path: dist/magtense-2.2.1-0-*.whl
+
+    - name: cu12 - Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-cu12
+        path: dist/magtense-2.2.1-1-*.whl
+
+
+  test-linux-cpu:
+    runs-on: ubuntu-24.04
+    needs: build-linux
+    defaults:
+      run:
+        shell: bash -el {0}
+    
+    steps:
+    - name: Download a single artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-cpu
+    
+    - name: Install pip-wheel
+      run: python3 -m pip install dist/*.whl
+
+    - name: Test with pytest
+      run: |
+        python3 -m pip install pytest
+        pytest
+
+
+  test-linux-cu12:
+    runs-on: ubuntu-24.04
+    needs: build-linux
+    defaults:
+      run:
+        shell: bash -el {0}
+    
+    steps:
+    - name: Download a single artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-cu12
+    
+    - name: Install pip-wheel
+      run: python3 -m pip install dist/*.whl
+
+    - name: Test with pytest
+      run: |
+        python3 -m pip install pytest
+        pytest
+      

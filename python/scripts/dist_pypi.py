@@ -5,12 +5,13 @@ from pathlib import Path
 
 
 def main():
+    # TODO parse arguments
     mt_version = "2.2.1"
     py_versions = ["312"]
-    cu_versions = ["cpu", "cuda12"]
+    cu_versions = ["cpu", "cu12"]
     lib_path = None
 
-    build_tag = {"cpu": 0, "cuda12": 1}
+    build_tag = {"cpu": 0, "cu12": 1}
 
     for lib_file in Path("src/magtense/lib").glob("*.pyd"):
         subprocess.run(["rm", lib_file])
@@ -18,7 +19,7 @@ def main():
     for lib_file in Path("src/magtense/lib").glob("*.so"):
         subprocess.run(["rm", lib_file])
 
-    for platform in ["win", "linux"]:
+    for platform in ["linux"]:  # ["win", "linux"]:
         if platform == "win":
             suffix = "pyd"
             arch = "win_amd64"
@@ -51,6 +52,7 @@ def main():
                     lib_path,
                 ]
             )
+            subprocess.run(["cp", f"requirements-{cuda}.txt", "requirements.txt"])
             subprocess.run(["python3", "-m", "build", "--wheel"])
             subprocess.run(
                 [

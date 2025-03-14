@@ -193,6 +193,9 @@ docs/source/_build
 # Notebooks
 nbs/
 
+# Virtual environment
+.venv*/
+
 .vs/MagTense/v17/
 
 .vs/MagTense/CopilotIndices/
