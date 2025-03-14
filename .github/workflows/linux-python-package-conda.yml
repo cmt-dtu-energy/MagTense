@@ -35,29 +35,31 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
     
     - name: Create directory for wrappers of compiled Fortran source code
-      working-directory: ${{ github.workspace }}/python/
-      run: mkdir compiled_libs
+      run: |
+        mkdir ${{ github.workspace }}/python/cpu_libs
+        mkdir ${{ github.workspace }}/python/cu12_libs
 
     - name: cpu - Compile Fortran source code and build Python wrapper
       working-directory: ${{ github.workspace }}/python/src/magtense/lib/
       run: make USE_CUDA=0
 
-    - name: cpu - Copy wrapper to compiled_libs
+    - name: cpu - Copy wrapper to cpu_libs
       working-directory: ${{ github.workspace }}/python/src/magtense/lib/
       run: |
-        cp ./magtensesource.*.so ${{ github.workspace }}/python/compiled_libs/
-        make clean
+        cp magtensesource.*.so ${{ github.workspace }}/python/cpu_libs/
+        ls -al ${{ github.workspace }}/python/cpu_libs/
 
     - name: cu12 - Compile Fortran source code and build Python wrapper
       working-directory: ${{ github.workspace }}/python/src/magtense/lib/
       run: |
+        make clean
         make USE_CUDA=1
 
-    - name: cu12 - Copy wrapper to compiled_libs
+    - name: cu12 - Copy wrapper to cu12_libs
       working-directory: ${{ github.workspace }}/python/src/magtense/lib/
       run: |
-        cp ./magtensesource.*.so ${{ github.workspace }}/python/compiled_libs/
-        make clean
+        cp magtensesource.*.so ${{ github.workspace }}/python/cu12_libs/
+        ls -al ${{ github.workspace }}/python/cu12_libs/
 
     - name: Build pip-wheels
       working-directory: ${{ github.workspace }}/python/
