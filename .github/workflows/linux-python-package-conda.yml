@@ -80,7 +80,13 @@ jobs:
         name: pip-wheel-cpu
     
     - name: Install pip-wheel
-      run: python3 -m pip install dist/*.whl
+      run: python3 -m pip install ${{ github.workspace }}/python/dist/*.whl
+
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/tests/
 
     - name: Test with pytest
       run: |
@@ -102,7 +108,13 @@ jobs:
         name: pip-wheel-cu12
     
     - name: Install pip-wheel
-      run: python3 -m pip install dist/*.whl
+      run: python3 -m pip install ${{ github.workspace }}/python/dist/*.whl
+
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/tests/
 
     - name: Test with pytest
       run: |
