@@ -7,4 +7,4 @@ if (toml_location / "pyproject.toml").exists():
     with open(toml_location / "pyproject.toml", "rb") as f:
         __version__ = tomllib.load(f)["project"]["version"]
 else:
-    __version__ = importlib.metadata.version("package")
+    __version__ = importlib.metadata.version("magtense")
