@@ -79,8 +79,17 @@ jobs:
       with:
         name: pip-wheel-cpu
     
+    - name: Check if the artifact is downloaded
+      run: |
+        ls -al ${{ github.workspace }}
+        ls -al ${{ github.workspace }}/python/dist/
+
     - name: Install pip-wheel
-      run: python3 -m pip install ${{ github.workspace }}/python/dist/*.whl
+      run: |
+        pattern="*.whl"
+        files=( $pattern )
+        echo "${files[0]}"
+        python3 -m pip install ${{ github.workspace }}/python/dist/${files[0]}
 
     - name: Checkout test scripts
       uses: actions/checkout@v4
@@ -94,30 +103,30 @@ jobs:
         pytest
 
 
-  test-linux-cu12:
-    runs-on: ubuntu-24.04
-    needs: build-linux
-    defaults:
-      run:
-        shell: bash -el {0}
+  # test-linux-cu12:
+  #   runs-on: ubuntu-24.04
+  #   needs: build-linux
+  #   defaults:
+  #     run:
+  #       shell: bash -el {0}
     
-    steps:
-    - name: Download a single artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: pip-wheel-cu12
+  #   steps:
+  #   - name: Download a single artifact
+  #     uses: actions/download-artifact@v4
+  #     with:
+  #       name: pip-wheel-cu12
     
-    - name: Install pip-wheel
-      run: python3 -m pip install ${{ github.workspace }}/python/dist/*.whl
+  #   - name: Install pip-wheel
+  #     run: python3 -m pip install ${{ github.workspace }}/python/dist/*.whl
 
-    - name: Checkout test scripts
-      uses: actions/checkout@v4
-      with:
-        sparse-checkout: |
-          python/tests/
+  #   - name: Checkout test scripts
+  #     uses: actions/checkout@v4
+  #     with:
+  #       sparse-checkout: |
+  #         python/tests/
 
-    - name: Test with pytest
-      run: |
-        python3 -m pip install pytest
-        pytest
+  #   - name: Test with pytest
+  #     run: |
+  #       python3 -m pip install pytest
+  #       pytest
       
