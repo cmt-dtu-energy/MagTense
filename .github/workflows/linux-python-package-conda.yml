@@ -81,11 +81,11 @@ jobs:
 
     - name: Create a new virtual environment
       run: |
-        python3 -m venv .venv
+        python3 -m venv ${{ github.workspace }}/.venv
 
     - name: Install pip-wheel
       run: |
-        source .venv/bin/activate
+        source ${{ github.workspace }}/.venv/bin/activate
         files=(*)
         python3 -m pip install ${{ github.workspace }}/${files[0]}
 
@@ -97,8 +97,8 @@ jobs:
 
     - name: Test with pytest
       run: |
-        source .venv/bin/activate
-        export LD_LIBRARY_PATH=.venv/lib:$LD_LIBRARY_PATH
+        source ${{ github.workspace }}/.venv/bin/activate
+        export LD_LIBRARY_PATH=${{ github.workspace }}/.venv/lib:$LD_LIBRARY_PATH
         python3 -m pip install pytest
         pytest
 
@@ -118,11 +118,11 @@ jobs:
 
     - name: Create a new virtual environment
       run: |
-        python3 -m venv .venv
+        python3 -m venv ${{ github.workspace }}/.venv
     
     - name: Install pip-wheel
       run: |
-        source .venv/bin/activate
+        source ${{ github.workspace }}/.venv/bin/activate
         files=(*)
         python3 -m pip install ${{ github.workspace }}/${files[0]}
 
@@ -134,8 +134,8 @@ jobs:
 
     - name: Test with pytest
       run: |
-        source .venv/bin/activate
-        export LD_LIBRARY_PATH=.venv/lib:$LD_LIBRARY_PATH
+        source ${{ github.workspace }}/.venv/bin/activate
+        export LD_LIBRARY_PATH=${{ github.workspace }}/.venv/lib:$LD_LIBRARY_PATH
         python3 -m pip install pytest
         pytest
       
