@@ -1,0 +1,141 @@
+name: Linux - Python package using conda / pip
+
+on: [push]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Miniforge
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-version: latest
+        activate-environment: magtense-env
+        use-mamba: true
+
+    - name: Cache conda
+      uses: actions/cache@v4
+      env:
+        # Increase this value to reset cache manually
+        CACHE_NUMBER: 0
+      with:
+        path: ${{ env.CONDA }}/envs
+        key: conda-${{ runner.os }}-${{hashFiles('python/build_env_linux.yml') }}-${{ env.CACHE_NUMBER }}
+      id: cache
+
+    - name: Update environment
+      run: conda env update -n magtense-env -f python/build_env_linux.yml
+      if: steps.cache.outputs.cache-hit != 'true'
+    
+    - name: Create directory for wrappers of compiled Fortran source code
+      run: |
+        mkdir ${{ github.workspace }}/python/cpu_libs
+        mkdir ${{ github.workspace }}/python/cu12_libs
+
+    - name: Compile Fortran source code and build Python wrappers
+      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
+      run: |
+        make USE_CUDA=0
+        cp magtensesource.*.so ${{ github.workspace }}/python/cpu_libs/
+        make clean
+        make USE_CUDA=1
+        cp magtensesource.*.so ${{ github.workspace }}/python/cu12_libs/
+        make clean
+
+    - name: Build pip-wheels
+      working-directory: ${{ github.workspace }}/python/
+      run: python scripts/dist_pypi.py
+
+    - name: cpu - Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-cpu
+        path: ${{ github.workspace }}/python/dist/magtense-*-0-*.whl
+
+    - name: cu12 - Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-cu12
+        path: ${{ github.workspace }}/python/dist/magtense-*-1-*.whl
+
+
+  test-linux-cpu:
+    runs-on: ubuntu-24.04
+    needs: build-linux
+    defaults:
+      run:
+        shell: bash -el {0}
+    
+    steps:
+    - name: Download a single artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-cpu
+
+    - name: Create a new virtual environment
+      run: |
+        python3 -m venv ${{ github.workspace }}/.venv
+
+    - name: Install pip-wheel
+      run: |
+        source ${{ github.workspace }}/.venv/bin/activate
+        files=(*)
+        python3 -m pip install ${{ github.workspace }}/${files[0]}
+
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/tests/
+
+    - name: Test with pytest
+      run: |
+        source ${{ github.workspace }}/.venv/bin/activate
+        export LD_LIBRARY_PATH=${{ github.workspace }}/.venv/lib:$LD_LIBRARY_PATH
+        python3 -m pip install pytest
+        pytest
+
+
+  test-linux-cu12:
+    runs-on: ubuntu-24.04
+    needs: build-linux
+    defaults:
+      run:
+        shell: bash -el {0}
+    
+    steps:
+    - name: Download a single artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-cu12
+
+    - name: Create a new virtual environment
+      run: |
+        python3 -m venv ${{ github.workspace }}/.venv
+    
+    - name: Install pip-wheel
+      run: |
+        source ${{ github.workspace }}/.venv/bin/activate
+        files=(*)
+        python3 -m pip install ${{ github.workspace }}/${files[0]}
+
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/tests/
+
+    - name: Test with pytest
+      run: |
+        source ${{ github.workspace }}/.venv/bin/activate
+        export LD_LIBRARY_PATH=${{ github.workspace }}/.venv/lib:$LD_LIBRARY_PATH
+        python3 -m pip install pytest
+        pytest
+      

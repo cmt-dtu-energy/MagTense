@@ -132,7 +132,6 @@ dependencies:
       - jupyterlab-pygments==0.3.0
       - jupyterlab-server==2.27.3
       - kiwisolver==1.4.8
-      - magtense==2.2.1
       - markupsafe==3.0.2
       - matplotlib==3.10.1
       - matplotlib-inline==0.1.7

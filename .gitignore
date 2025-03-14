@@ -190,6 +190,12 @@ docs/source/_build
 *.vsidx
 *.lock
 
+# Notebooks
+nbs/
+
+# Virtual environment
+.venv*/
+
 .vs/MagTense/v17/
 
 .vs/MagTense/CopilotIndices/

@@ -1,10 +1,14 @@
+from pathlib import Path
 import os
 import platform
 import subprocess
 import shutil
+import tomllib
 
 
-def main(mt_version="2.2.1", py_versions=["3.12"]):
+def main(py_versions=["3.12"]):
+    with open(Path(__file__).parent.parent / "pyproject.toml", "rb") as f:
+        mt_version = tomllib.load(f)["project"]["version"]
     if platform.system() == "Windows":
         arch = "win-64"
     else:

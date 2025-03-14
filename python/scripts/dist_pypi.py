@@ -2,15 +2,28 @@ import itertools
 import subprocess
 
 from pathlib import Path
+import argparse
+import tomllib
 
 
-def main():
-    mt_version = "2.2.1"
-    py_versions = ["312"]
-    cu_versions = ["cpu", "cuda12"]
+def parse_args():
+    parser = argparse.ArgumentParser(description="Build and distribute.")
+    parser.add_argument(
+        "--py_versions",
+        type=str,
+        default="312",
+        help="Python versions (comma-separated)",
+    )
+    return parser.parse_args()
+
+
+def main(py_versions):
+    with open(Path(__file__).parent.parent / "pyproject.toml", "rb") as f:
+        mt_version = tomllib.load(f)["project"]["version"]
+    cu_versions = ["cpu", "cu12"]
     lib_path = None
 
-    build_tag = {"cpu": 0, "cuda12": 1}
+    build_tag = {"cpu": 0, "cu12": 1}
 
     for lib_file in Path("src/magtense/lib").glob("*.pyd"):
         subprocess.run(["rm", lib_file])
@@ -18,7 +31,7 @@ def main():
     for lib_file in Path("src/magtense/lib").glob("*.so"):
         subprocess.run(["rm", lib_file])
 
-    for platform in ["win", "linux"]:
+    for platform in ["linux"]:  # ["win", "linux"]:
         if platform == "win":
             suffix = "pyd"
             arch = "win_amd64"
@@ -37,20 +50,14 @@ def main():
             subprocess.run(
                 [
                     "cp",
-                    f"compiled_libs/magtensesource.{py_lib}-{arch}_{cuda}.{suffix}",
-                    "src/magtense/lib",
+                    f"{cuda}_libs/magtensesource.{py_lib}-{arch}.{suffix}",
+                    "src/magtense/lib/",
                 ]
             )
             if lib_path is not None:
                 subprocess.run(["rm", lib_path])
             lib_path = f"src/magtense/lib/magtensesource.{py_lib}-{arch}.{suffix}"
-            subprocess.run(
-                [
-                    "mv",
-                    f"src/magtense/lib/magtensesource.{py_lib}-{arch}_{cuda}.{suffix}",
-                    lib_path,
-                ]
-            )
+            subprocess.run(["cp", f"requirements-{cuda}.txt", "requirements.txt"])
             subprocess.run(["python3", "-m", "build", "--wheel"])
             subprocess.run(
                 [
@@ -65,4 +72,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    py_versions = args.py_versions.split(",")
+    main(py_versions)
