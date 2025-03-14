@@ -78,16 +78,10 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: pip-wheel-cpu
-    
-    - name: Check if the artifact is downloaded
-      run: |
-        ls -al ${{ github.workspace }}
-        ls -al ${{ github.workspace }}/python/dist/
 
     - name: Install pip-wheel
       run: |
-        pattern="*.whl"
-        files=( $pattern )
+        files=(*)
         echo "${files[0]}"
         python3 -m pip install ${{ github.workspace }}/python/dist/${files[0]}
 
