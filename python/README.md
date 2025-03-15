@@ -13,11 +13,11 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
   ```bash
   conda create -y -n magtense-env && conda activate magtense-env
   conda config --env --add channels conda-forge
-  conda install -y python=3.12.3
+  conda install -y python
   python3 -m pip install numpy meson ninja charset-normalizer
   ````
 
-- Required python packages for CUDA and MKL
+- Required python packages for CUDA
 
   Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda) \
   Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment \
@@ -27,6 +27,8 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
   conda config --env --add channels nvidia/label/cuda-12.8.1
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   ```
+
+- Required python packages for Intel compilers and MKL
 
   More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
@@ -46,7 +48,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 - Conda environment from `environment_win.yml`
 
   ```bash
-  conda env create -f python/environment_win.yml
+  conda env create -f python/.build/environment_win.yml
   ```
 
   OR
@@ -158,7 +160,7 @@ python3 -m pip install -e ./python
 
 ### Required packages at runtime
 
-`requirements-cpu.txt` and `requirements-cuda.txt` contain specific package versions and are shipped with the respective pip-wheel.
+The `python/.build/` contains requirement-files, which are shipped with the respective pip-wheel.
 
 ```bash
 python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm
@@ -174,7 +176,7 @@ Libraries have to be pre-build for now, and should be located in `MagTense/pytho
 python3 -m pip install build
 
 cd python/
-python scripts/dist_pypi.py
+python .build/dist_pypi.py
 
 # Upload to pypi.org
 python3 -m pip install twine
@@ -200,12 +202,12 @@ conda config --env --append channels https://software.repos.intel.com/python/con
 conda config --env --append channels conda-forge
 
 # Quick fix for now
-# Copy pre-compiled Python extension to MagTense/python/src/magtense/lib
+# Copy pre-compiled Python extension to python/src/magtense/lib
 # Build conda seperately for each version
 
 # Version numbers have to be set in advance in pyproject.toml
-cd MagTense/python/
-python scripts/dist_conda.py
+cd python/
+python .build/dist_conda.py
 ```
 
 ## Read-in customized M-H-curve
