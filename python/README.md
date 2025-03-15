@@ -1,11 +1,9 @@
 # Python Interface
 
 The Fortran code is compiled and wrapped to a module that can be directly called from Python.
-The tool `f2py` of the NumPy package is used to wrap the interface file `MagTense/python/src/magtense/lib/FortranToPythonIO.f90`.
+The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/magtense/lib/FortranToPythonIO.f90).
 
 ## Deployment with Conda (Intel architectures)
-
-For MacOS ARM architectures, currently only magnetostatics with the `gfortran` compiler is supported.
 
 ### Create an importable Python module from Fortran source code
 
