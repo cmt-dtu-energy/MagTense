@@ -4,6 +4,9 @@ on: [push]
 
 jobs:
   build-linux:
+    strategy:
+      matrix:
+        py-version: [312]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -57,19 +60,20 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: pip-wheel-cpu
-        path: ${{ github.workspace }}/python/dist/magtense-*-0-*.whl
+        path: ${{ github.workspace }}/python/dist/magtense-2.2.1-0-py${{ matrix.py-version }}-none-manylinux1_x86_64.whl
 
     - name: cu12 - Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
         name: pip-wheel-cu12
-        path: ${{ github.workspace }}/python/dist/magtense-*-1-*.whl
+        path: ${{ github.workspace }}/python/dist/magtense-2.2.1-1-py${{ matrix.py-version }}-none-manylinux1_x86_64.whl
 
 
   test-linux:
     strategy:
       matrix:
-        version: [cpu, cu12]
+        mt-punit: [cpu, cu12]
+        py-version: [312]
     runs-on: ubuntu-24.04
     needs: build-linux
     defaults:
@@ -82,24 +86,23 @@ jobs:
       with:
         sparse-checkout: |
           python/tests/
-          ls -al ${{ github.workspace }}
-          ls -al ${{ github.workspace }}/python/
-          ls -al ${{ github.workspace }}/python/tests/
     
     - name: Download a single artifact
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-${{ matrix.version }}
+        name: pip-wheel-${{ matrix.mt-punit }}
           
     - name: Create a new virtual environment
       run: |
+        ls -al ${{ github.workspace }}
+        ls -al ${{ github.workspace }}/python/
+        ls -al ${{ github.workspace }}/python/tests/
         python3 -m venv ${{ github.workspace }}/.venv
 
     - name: Install pip-wheel and pytest
       run: |
         source ${{ github.workspace }}/.venv/bin/activate
-        files=(*.so)
-        python3 -m pip install ${{ github.workspace }}/${files[0]}
+        python3 -m pip install ${{ github.workspace }}/*.whl
         python3 -m pip install pytest
 
     - name: Run tests
