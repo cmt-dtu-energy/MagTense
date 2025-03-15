@@ -79,27 +79,27 @@ jobs:
       with:
         name: pip-wheel-cpu
 
-    - name: Create a new virtual environment
-      run: |
-        python3 -m venv ${{ github.workspace }}/.venv
-
-    - name: Install pip-wheel
-      run: |
-        source ${{ github.workspace }}/.venv/bin/activate
-        files=(*)
-        python3 -m pip install ${{ github.workspace }}/${files[0]}
-
     - name: Checkout test scripts
       uses: actions/checkout@v4
       with:
         sparse-checkout: |
           python/tests/
 
-    - name: Test with pytest
+    - name: Create a new virtual environment
+      run: |
+        python3 -m venv ${{ github.workspace }}/.venv
+
+    - name: Install pip-wheel and pytest
+      run: |
+        source ${{ github.workspace }}/.venv/bin/activate
+        files=(*)
+        python3 -m pip install ${{ github.workspace }}/${files[0]}
+        python3 -m pip install pytest
+
+    - name: Run tests
       run: |
         source ${{ github.workspace }}/.venv/bin/activate
         export LD_LIBRARY_PATH=${{ github.workspace }}/.venv/lib:$LD_LIBRARY_PATH
-        python3 -m pip install pytest
         pytest
 
 
@@ -116,26 +116,26 @@ jobs:
       with:
         name: pip-wheel-cu12
 
-    - name: Create a new virtual environment
-      run: |
-        python3 -m venv ${{ github.workspace }}/.venv
-    
-    - name: Install pip-wheel
-      run: |
-        source ${{ github.workspace }}/.venv/bin/activate
-        files=(*)
-        python3 -m pip install ${{ github.workspace }}/${files[0]}
-
     - name: Checkout test scripts
       uses: actions/checkout@v4
       with:
         sparse-checkout: |
           python/tests/
 
-    - name: Test with pytest
+    - name: Create a new virtual environment
+      run: |
+        python3 -m venv ${{ github.workspace }}/.venv
+    
+    - name: Install pip-wheel and pytest
+      run: |
+        source ${{ github.workspace }}/.venv/bin/activate
+        files=(*)
+        python3 -m pip install ${{ github.workspace }}/${files[0]}
+        python3 -m pip install pytest
+
+    - name: Run tests
       run: |
         source ${{ github.workspace }}/.venv/bin/activate
         export LD_LIBRARY_PATH=${{ github.workspace }}/.venv/lib:$LD_LIBRARY_PATH
-        python3 -m pip install pytest
         pytest
       
