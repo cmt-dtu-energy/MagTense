@@ -66,7 +66,10 @@ jobs:
         path: ${{ github.workspace }}/python/dist/magtense-*-1-*.whl
 
 
-  test-linux-cpu:
+  test-linux:
+    strategy:
+      matrix:
+        version: [cpu, cu12]
     runs-on: ubuntu-24.04
     needs: build-linux
     defaults:
@@ -74,17 +77,20 @@ jobs:
         shell: bash -el {0}
     
     steps:
-    - name: Download a single artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: pip-wheel-cpu
-
     - name: Checkout test scripts
       uses: actions/checkout@v4
       with:
         sparse-checkout: |
           python/tests/
-
+          ls -al ${{ github.workspace }}
+          ls -al ${{ github.workspace }}/python/
+          ls -al ${{ github.workspace }}/python/tests/
+    
+    - name: Download a single artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-${{ matrix.version }}
+          
     - name: Create a new virtual environment
       run: |
         python3 -m venv ${{ github.workspace }}/.venv
@@ -92,7 +98,7 @@ jobs:
     - name: Install pip-wheel and pytest
       run: |
         source ${{ github.workspace }}/.venv/bin/activate
-        files=(*)
+        files=(*.so)
         python3 -m pip install ${{ github.workspace }}/${files[0]}
         python3 -m pip install pytest
 
@@ -101,41 +107,3 @@ jobs:
         source ${{ github.workspace }}/.venv/bin/activate
         export LD_LIBRARY_PATH=${{ github.workspace }}/.venv/lib:$LD_LIBRARY_PATH
         pytest
-
-
-  test-linux-cu12:
-    runs-on: ubuntu-24.04
-    needs: build-linux
-    defaults:
-      run:
-        shell: bash -el {0}
-    
-    steps:
-    - name: Download a single artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: pip-wheel-cu12
-
-    - name: Checkout test scripts
-      uses: actions/checkout@v4
-      with:
-        sparse-checkout: |
-          python/tests/
-
-    - name: Create a new virtual environment
-      run: |
-        python3 -m venv ${{ github.workspace }}/.venv
-    
-    - name: Install pip-wheel and pytest
-      run: |
-        source ${{ github.workspace }}/.venv/bin/activate
-        files=(*)
-        python3 -m pip install ${{ github.workspace }}/${files[0]}
-        python3 -m pip install pytest
-
-    - name: Run tests
-      run: |
-        source ${{ github.workspace }}/.venv/bin/activate
-        export LD_LIBRARY_PATH=${{ github.workspace }}/.venv/lib:$LD_LIBRARY_PATH
-        pytest
-      
