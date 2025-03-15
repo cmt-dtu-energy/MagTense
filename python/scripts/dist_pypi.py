@@ -58,12 +58,24 @@ def main(py_versions):
                 subprocess.run(["rm", lib_path])
             lib_path = f"src/magtense/lib/magtensesource.{py_lib}-{arch}.{suffix}"
             if platform == "linux":
-                # subprocess.run(
-                #     ["patchelf", "--set-rpath", "$ORIGIN/../../../../../lib", lib_path]
-                # )
-                subprocess.run(
-                    ["chrpath", "-r", "$ORIGIN/../../../../../lib", lib_path]
-                )
+                if cuda == "cpu":
+                    subprocess.run(
+                        [
+                            "patchelf",
+                            "--set-rpath",
+                            "$ORIGIN/../../../../../lib",
+                            lib_path,
+                        ]
+                    )
+                elif cuda == "cu12":
+                    subprocess.run(
+                        [
+                            "patchelf",
+                            "--set-rpath",
+                            "$ORIGIN/../../../../../lib:$ORIGIN/../../nvidia/cublas/lib/:$ORIGIN/../../nvidia/cuda_runtime/lib/:$ORIGIN/../../nvidia/cusparse/lib/",
+                            lib_path,
+                        ]
+                    )
             subprocess.run(["cp", f"requirements-{cuda}.txt", "requirements.txt"])
             subprocess.run(["python3", "-m", "build", "--wheel"])
             subprocess.run(
