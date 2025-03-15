@@ -57,6 +57,13 @@ def main(py_versions):
             if lib_path is not None:
                 subprocess.run(["rm", lib_path])
             lib_path = f"src/magtense/lib/magtensesource.{py_lib}-{arch}.{suffix}"
+            if platform == "linux":
+                # subprocess.run(
+                #     ["patchelf", "--set-rpath", "$ORIGIN/../../../../../lib", lib_path]
+                # )
+                subprocess.run(
+                    ["chrpath", "-r", "$ORIGIN/../../../../../lib", lib_path]
+                )
             subprocess.run(["cp", f"requirements-{cuda}.txt", "requirements.txt"])
             subprocess.run(["python3", "-m", "build", "--wheel"])
             subprocess.run(
