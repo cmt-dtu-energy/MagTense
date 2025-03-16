@@ -15,11 +15,11 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
   ```bash
   conda create -y -n magtense-env && conda activate magtense-env
   conda config --env --add channels conda-forge
-  conda install -y python=3.12.3
+  conda install -y python
   python3 -m pip install numpy meson ninja charset-normalizer
   ````
 
-- Required python packages for CUDA and MKL
+- Required python packages for CUDA
 
   Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda) \
   Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment \
@@ -29,6 +29,8 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
   conda config --env --add channels nvidia/label/cuda-12.8.1
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   ```
+
+- Required python packages for Intel compilers and MKL
 
   More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
@@ -48,7 +50,7 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
 - Conda environment from `environment_win.yml`
 
   ```bash
-  conda env create -f python/environment_win.yml
+  conda env create -f python/.build/environment_win.yml
   ```
 
   OR
@@ -160,7 +162,7 @@ python3 -m pip install -e ./python
 
 ### Required packages at runtime
 
-`requirements-cpu.txt` and `requirements-cuda.txt` contain specific package versions and are shipped with the respective pip-wheel.
+The `python/.build/` contains requirement-files, which are shipped with the respective pip-wheel.
 
 ```bash
 python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm

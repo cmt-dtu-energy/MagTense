@@ -6,7 +6,7 @@ jobs:
   build-linux:
     strategy:
       matrix:
-        py-version: [312]
+        py-version: [312, 313]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -75,7 +75,7 @@ jobs:
     strategy:
       matrix:
         mt-punit: [cpu, cu12]
-        py-version: [312]
+        py-version: [312, 313]
     runs-on: ubuntu-24.04
     needs: build-linux
     defaults:

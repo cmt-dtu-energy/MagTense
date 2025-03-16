@@ -79,7 +79,7 @@ def main(py_versions):
                         ]
                     )
             subprocess.run(
-                ["cp", f".build/requirement-{py}-{cuda}.txt", "requirements.txt"]
+                ["cp", f".build/requirements-{py}-{cuda}.txt", "requirements.txt"]
             )
             subprocess.run(["python3", "-m", "build", "--wheel"])
             subprocess.run(
