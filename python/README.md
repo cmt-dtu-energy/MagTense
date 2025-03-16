@@ -176,7 +176,7 @@ Libraries have to be pre-build for now, and should be located in `MagTense/pytho
 python3 -m pip install build
 
 cd python/
-python scripts/dist_pypi.py
+python .build/dist_pypi.py
 
 # Upload to pypi.org
 python3 -m pip install twine
@@ -202,12 +202,12 @@ conda config --env --append channels https://software.repos.intel.com/python/con
 conda config --env --append channels conda-forge
 
 # Quick fix for now
-# Copy pre-compiled Python extension to MagTense/python/src/magtense/lib
+# Copy pre-compiled Python extension to python/src/magtense/lib
 # Build conda seperately for each version
 
 # Version numbers have to be set in advance in pyproject.toml
-cd MagTense/python/
-python scripts/dist_conda.py
+cd python/
+python .build/dist_conda.py
 ```
 
 ## Read-in customized M-H-curve

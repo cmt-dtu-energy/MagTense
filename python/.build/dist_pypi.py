@@ -62,6 +62,7 @@ def main(py_versions):
                     subprocess.run(
                         [
                             "patchelf",
+                            "--force-rpath",
                             "--set-rpath",
                             "$ORIGIN/../../../../../lib",
                             lib_path,
@@ -71,12 +72,15 @@ def main(py_versions):
                     subprocess.run(
                         [
                             "patchelf",
+                            "--force-rpath",
                             "--set-rpath",
                             "$ORIGIN/../../../../../lib:$ORIGIN/../../nvidia/cublas/lib/:$ORIGIN/../../nvidia/cuda_runtime/lib/:$ORIGIN/../../nvidia/cusparse/lib/",
                             lib_path,
                         ]
                     )
-            subprocess.run(["cp", f"requirements-{cuda}.txt", "requirements.txt"])
+            subprocess.run(
+                ["cp", f".build/requirement-{py}-{cuda}.txt", "requirements.txt"]
+            )
             subprocess.run(["python3", "-m", "build", "--wheel"])
             subprocess.run(
                 [

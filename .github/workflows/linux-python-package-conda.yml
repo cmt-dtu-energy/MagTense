@@ -11,6 +11,8 @@ jobs:
     defaults:
       run:
         shell: bash -el {0}
+    env:
+      build_file: python/.build/env-${{ matrix.py-version }}-linux.yml
 
     steps:
     - name: Checkout repository
@@ -27,18 +29,15 @@ jobs:
       uses: actions/cache@v4
       env:
         # Increase this value to reset cache manually
-        CACHE_NUMBER: 0
+        cache_number: 0
       with:
         path: ${{ env.CONDA }}/envs
-        key: conda-${{ runner.os }}-${{hashFiles('python/build_env_linux.yml') }}-${{ env.CACHE_NUMBER }}
+        key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
       id: cache
 
     - name: Update environment
-      run: conda env update -n magtense-env -f python/build_env_linux.yml
+      run: conda env update -n magtense-env -f ${{ env.build_file }}
       if: steps.cache.outputs.cache-hit != 'true'
-
-    - name: Install chrpath
-      run: sudo apt install -y chrpath
     
     - name: Create directory for wrappers of compiled Fortran source code
       run: |
@@ -57,7 +56,7 @@ jobs:
 
     - name: Build pip-wheels
       working-directory: ${{ github.workspace }}/python/
-      run: python scripts/dist_pypi.py
+      run: python .build/dist_pypi.py
 
     - name: cpu - Archive pip-wheel
       uses: actions/upload-artifact@v4
