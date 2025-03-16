@@ -27,6 +27,7 @@ httpcore==1.0.7
 httpx==0.28.1
 idna==3.10
 impi-rt==2021.14.2
+importlib_resources==6.5.2
 intel-cmplr-lib-rt==2025.0.5
 intel-cmplr-lib-ur==2025.0.5
 intel-cmplr-lic-rt==2025.0.5
