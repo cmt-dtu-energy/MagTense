@@ -16,7 +16,7 @@ MagTense is a framework for magnetostatic and micromagnetic calculations.
 - Fully analytical calculation of demagnetization tensor for cylinders, pieces of cylinders, prisms, circular pieces and tetrahedrons;
 - Micromagnetic solutions of the Landau-Lifshitz equations, using the analytical demagnetization tensor described above;
 - GPU-accelerated code with [CUDA®](https://developer.nvidia.com/cuda-zone) (requires NVIDIA graphics card).
-- Uses Intel MKL for the micromagnetic simlations and can also utilize CVODE.
+- Uses Intel MKL for the micromagnetic simlations and can also utilize [CVODE](https://computing.llnl.gov/projects/sundials/cvode).
 - Tested in Linux and Windows 11+ (macOS not supported at the moment).
 
 ## Installation and usage with the Python interface
