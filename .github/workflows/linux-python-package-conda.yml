@@ -109,6 +109,12 @@ jobs:
         python3 -m pip install ${{ github.workspace }}/*.whl
         python3 -m pip install pytest
 
+    - name: Check external libraries
+      if: ${{ matrix.py-version == '3.13' }}
+      run: |
+        source ${{ github.workspace }}/.venv/bin/activate
+        ldd ${{ github.workspace }}/.venv/lib/python3.13/site-packages/magtense/magtensesource.cpython-312-x86_64-linux-gnu.so 
+
     - name: Run tests
       run: |
         source ${{ github.workspace }}/.venv/bin/activate
