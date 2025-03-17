@@ -21,19 +21,11 @@ MagTense is a framework for magnetostatic and micromagnetic calculations.
 
 ## Installation and usage with the Python interface
 
-Installation is recommended via `conda` package manager (requires >=**Python 3.12**).
+Installation is recommended via `pip` (requires >=**Python 3.12**):
 
-- Installation with CUDA 12 (requires NVIDIA graphics card):
-  
-  ```
-  pip install magtense
-  ```
-
-- Installation without CUDA support:
-
-  ```
-  pip install magtense-cpu
-  ```
+```
+pip install magtense
+```
 
 Examples of how to calculate magnetostatic and micromagnetic problems using the Python interface can be found [python/examples/](./python/examples/).
 

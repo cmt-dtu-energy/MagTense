@@ -30,24 +30,27 @@ else
     VS_STUDIO = false;
     MKL_STATIC = true;
     
-    %--- Check if miniconda is in /usr/share or in the users home
-    share_dir = system('ls /usr/share/miniconda/envs/magtense-env/');
+    %--- The CONDA installation directory
+    pre_str = getenv('CONDA_PREFIX');
 
-    %--- Get the username of the current user, which is where the miniconda
-    %--- is installed
-    [~,username] = system('whoami');
-    user = username(1:(end-1));
-
-    if (share_dir == 0)
-        pre_str = '/usr/share/miniconda';
-    else
-        pre_str = ['/home/' user '/miniconda3'];
+    if (isempty(pre_str))
+        %--- Check if miniconda is in /usr/share or in the users home
+        share_dir = system('ls /usr/share/miniconda/envs/magtense-env/');
+    
+        if (share_dir == 0)
+            pre_str = '/usr/share/miniconda';
+        else
+            %--- Get the username of the current user, which is where the miniconda is installed
+            [~,username] = system('whoami');
+            user = username(1:(end-1));
+            pre_str = ['/home/' user '/miniconda3'];
+        end
     end
 
     compiler_root = [pre_str '/envs/magtense-env'];
     mkl_root = [pre_str '/envs/magtense-env'];
     mkl_lib = [pre_str '/envs/magtense-env/lib'];
-    cuda_root = [pre_str /'envs/magtense-env-py12/lib'];
+    cuda_root = [pre_str '/envs/magtense-env-py12/lib'];
     cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
     cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
     mex_suffix = 'a';
@@ -123,7 +126,7 @@ else
     if (MKL_STATIC)
         LIBS = [LIBS(1:(end-1)) ' ' mkl_lib '/libmkl_blas95_lp64.a -Wl,--start-group ' ...
                mkl_lib '/libmkl_intel_lp64.a ' mkl_lib '/libmkl_intel_thread.a ' ...
-               mkl_lib '/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl -static-intel'''];
+               mkl_lib '/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl -static-intel -z no-exec-stack'''];
         MKL = [];
         %INCLUDE = [INCLUDE '/include/intel64/lp64 '];
     else
