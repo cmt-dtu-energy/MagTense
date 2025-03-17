@@ -30,19 +30,8 @@ else
     VS_STUDIO = false;
     MKL_STATIC = true;
     
-    %--- Check if miniconda is in /usr/share or in the users home
-    share_dir = system('ls /usr/share/miniconda/envs/magtense-env/');
-
-    %--- Get the username of the current user, which is where the miniconda
-    %--- is installed
-    [~,username] = system('whoami');
-    user = username(1:(end-1));
-
-    if (share_dir == 0)
-        pre_str = '/usr/share/miniconda';
-    else
-        pre_str = ['/home/' user '/miniconda3'];
-    end
+    %--- The CONDA installation directory
+    pre_str = getenv('CONDA_PREFIX');
 
     compiler_root = [pre_str '/envs/magtense-env'];
     mkl_root = [pre_str '/envs/magtense-env'];
