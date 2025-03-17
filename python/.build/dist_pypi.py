@@ -9,21 +9,26 @@ import tomllib
 def parse_args():
     parser = argparse.ArgumentParser(description="Build and distribute.")
     parser.add_argument(
-        "--py_versions",
+        "--py_version",
         type=str,
         default="312",
         help="Python versions (comma-separated)",
     )
+    parser.add_argument(
+        "--platform",
+        type=str,
+        default="win,linux",
+        help="Platforms (comma-separated)",
+    )
     return parser.parse_args()
 
 
-def main(py_versions):
+def main(py_versions, platforms):
     py_folder = Path(__file__).parent.parent
     lib_folder = py_folder / "src" / "magtense" / "lib"
     with open(py_folder / "pyproject.toml", "rb") as f:
         mt_version = tomllib.load(f)["project"]["version"]
     cu_versions = ["cpu", "cu12"]
-
     build_tag = {"cpu": 0, "cu12": 1}
 
     for lib_file in lib_folder.glob("*.pyd"):
@@ -32,7 +37,7 @@ def main(py_versions):
     for lib_file in lib_folder.glob("*.so"):
         subprocess.run(["rm", lib_file])
 
-    for platform in ["linux"]:  # ["win", "linux"]:
+    for platform in platforms:
         if platform == "win":
             suffix = "pyd"
             arch = "win_amd64"
@@ -48,7 +53,9 @@ def main(py_versions):
             else:
                 py_lib = "cpython-" + py
 
-            subprocess.run(["rm", f"{lib_folder}/*.{suffix}"])
+            subprocess.run(
+                ["rm", f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}"]
+            )
             subprocess.run(
                 [
                     "cp",
@@ -109,5 +116,6 @@ def main(py_versions):
 
 if __name__ == "__main__":
     args = parse_args()
-    py_versions = args.py_versions.split(",")
-    main(py_versions)
+    py_versions = args.py_version.split(",")
+    platforms = args.platform.split(",")
+    main(py_versions, platforms)

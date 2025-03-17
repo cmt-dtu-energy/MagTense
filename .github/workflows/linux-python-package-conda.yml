@@ -6,13 +6,14 @@ jobs:
   build-linux:
     strategy:
       matrix:
-        py-version: [312]
+        py-major: [3]
+        py-minor: [12]
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash -el {0}
     env:
-      build_file: python/.build/env-${{ matrix.py-version }}-linux.yml
+      build_file: python/.build/env-${{ matrix.py-major }}${{ matrix.py-minor }}-linux.yml
 
     steps:
     - name: Checkout repository
@@ -56,26 +57,27 @@ jobs:
 
     - name: Build pip-wheels
       working-directory: ${{ github.workspace }}/python/
-      run: python .build/dist_pypi.py --py_versions ${{ matrix.py-version }}
+      run: python .build/dist_pypi.py --py_version ${{ matrix.py-major }}${{ matrix.py-minor }} --platform linux
 
     - name: cpu - Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
-        name: pip-wheel-py${{ matrix.py-version[0] }}-cpu
-        path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-version[0] }}-none-manylinux1_x86_64.whl
+        name: pip-wheel-py${{ matrix.py-major }}-cpu
+        path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-major }}-none-manylinux1_x86_64.whl
 
     - name: cu12 - Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
-        name: pip-wheel-py${{ matrix.py-version[0] }}-cu12
-        path: ${{ github.workspace }}/python/dist/magtense-*-1-py${{ matrix.py-version[0] }}-none-manylinux1_x86_64.whl
+        name: pip-wheel-py${{ matrix.py-major }}-cu12
+        path: ${{ github.workspace }}/python/dist/magtense-*-1-py${{ matrix.py-major }}-none-manylinux1_x86_64.whl
 
 
   test-linux:
     strategy:
       matrix:
         mt-punit: [cpu, cu12]
-        py-version: [312]
+        py-major: [3]
+        py-minor: [12]
     runs-on: ubuntu-latest
     needs: build-linux
     defaults:
@@ -93,27 +95,12 @@ jobs:
     - name: Download a single artifact
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-py${{ matrix.py-version[0] }}-${{ matrix.mt-punit }}
-
-    - name: Get python major and minor version
-      uses: actions/github-script@v7
-      id: py-major-minor
-      env:
-        py-version: ${{ matrix.py-version }}
-      with:
-        script: |
-          console.log(process)
-          const str = String(process.env.py-version)
-          const major = str.substring(0,1)
-          const minor = str.substring(1,3)
-          const result = major + "." + minor
-          return result
-        result-encoding: string
+        name: pip-wheel-py${{ matrix.py-major }}-${{ matrix.mt-punit }}
 
     - name: Setup python with correct version number
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ steps.py-major-minor.outputs.result }}
+        python-version: ${{ matrix.py-major }}.${{ matrix.py-minor }}
 
     - name: Create a new virtual environment
       run: python3 -m venv ${{ github.workspace }}/.venv
@@ -125,7 +112,7 @@ jobs:
         python3 -m pip install pytest
 
     - name: Check external libraries
-      if: ${{ matrix.py-version == 312 }}
+      if: ${{ matrix.py-minor == 12 }}
       run: |
         ldd ${{ github.workspace }}/.venv/lib/python3.12/site-packages/magtense/lib/magtensesource.cpython-312-x86_64-linux-gnu.so 
 
