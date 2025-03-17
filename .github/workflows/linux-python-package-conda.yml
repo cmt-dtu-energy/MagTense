@@ -96,13 +96,13 @@ jobs:
         name: pip-wheel-py${{ matrix.py-version }}-${{ matrix.mt-punit }}
 
     - name: Setup python 3.12
-      if: ${{ matrix.py-version }} == 312
+      if: ${{ matrix.py-version == 312 }}
       uses: actions/setup-python@v5
       with:
         python-version: "3.12"
     
     - name: Setup python 3.13
-      if: ${{ matrix.py-version }} == 313
+      if: ${{ matrix.py-version == 313 }}
       uses: actions/setup-python@v5
       with:
         python-version: "3.13"
