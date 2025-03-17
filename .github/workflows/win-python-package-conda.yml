@@ -29,7 +29,7 @@ jobs:
       working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
       run: |
         call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
-        nvcc -c MagTenseCudaBlas.cu -o MagTenseCudaBlas.o
+        nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.42.34438\bin\Hostx64\x64" -o MagTenseCudaBlas.o
 
     - name: Link Cuda wrapper in Developer PowerShell for VS 2022
       shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
