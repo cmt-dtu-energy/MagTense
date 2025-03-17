@@ -11,6 +11,7 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+dist_old/
 downloads/
 eggs/
 .eggs/
@@ -59,3 +60,6 @@ evals/
 figs/
 
 examples/micromagnetism/.idea/
+
+# Requirement file
+requirements.txt

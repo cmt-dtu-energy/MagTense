@@ -61,12 +61,12 @@ ifeq ($(OS),Windows_NT)
 		LIB_OPT = -llibDemagField
 	endif
 else
-	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
+ 	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
 	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
 	CVODE_ROOT = "/usr/local/sundials-4.1.0/instdir"
 	LDFLAGS =
 	LIB_SUFFIX = .a
-	CLEAN_FILES = -rm *.a *.o *.mod *.so 
+	CLEAN_FILES = -rm *.a *.o *.mod *.so
 	CLEAN_FOLDER = -rm -r build
 	PYTHON_MODN_ALL = _${PYTHON_MODN}.so
 
@@ -194,6 +194,7 @@ cuda:
 
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
-	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} python -m numpy.f2py -c -m ${PYTHON_MODN} \
+	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
+		python -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ./build -I${OPT} -I${INCLUDE_OBJ} ${CVODE_OPT} \
 		-L${MKFILE_PATH} ${LIB_OPT} FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE}

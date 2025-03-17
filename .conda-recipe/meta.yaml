@@ -1,5 +1,5 @@
-{% set version = "2.2.1" %}
-{% set py_version = "3.12" %}
+{% set version = "" %}
+{% set py_version = "" %}
 {% set cuda_version = "cuda12" %}
 {% set cuda_pkg_version = "12.*" %}
 {% set mkl_version = "2025.0.1" %}

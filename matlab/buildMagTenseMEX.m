@@ -28,10 +28,10 @@ if (ispc)
     mex_suffix = 'w';
 else
     VS_STUDIO = false;
-    MKL_STATIC = false;
+    MKL_STATIC = true;
     compiler_root = '/usr/share/miniconda/envs/magtense-env';
-    mkl_root = '/home/runner/work/MagTense/MagTense';
-    mkl_lib = '/home/runner/work/MagTense/MagTense/lib';
+    mkl_root = '/usr/share/miniconda/envs/magtense-env';
+    mkl_lib = '/usr/share/miniconda/envs/magtense-env/lib';
     cuda_root = '/home/spol/miniconda3/envs/magtense-env-py12/lib';
     cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
     cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
@@ -107,7 +107,7 @@ else
         ForceIntegrator_path ' -lMagneticForceIntegrator'];
     FFLAGS = 'FFLAGS="';
     if (MKL_STATIC)
-        MKL = ['-liomp5 -lpthread -lm -ldl LINKLIBS="$LINKLIBS ' mkl_lib '/libmkl_intel_thread.a ' mkl_lib ...
+        MKL = ['-liomp5 -lpthread -lm -ldl -lifcoremt LINKLIBS="$LINKLIBS ' mkl_lib '/libmkl_intel_thread.a ' mkl_lib ...
             '/libmkl_core.a ' mkl_lib '/libmkl_blas95_lp64.a ' mkl_lib '/libmkl_intel_lp64.a"'];
         INCLUDE = [INCLUDE '/include/intel64/lp64 '];
     else
@@ -122,7 +122,7 @@ else
         end
     end
     INCLUDE = [INCLUDE CVODE_include '"'];
-    FFLAGS = [FFLAGS '-O3 -fpp -real-size 64 -qopenmp -assume nocc_omp -fpe0 -fp-model=source -fpic -nologo -diag-disable 10006"'];
+    FFLAGS = [FFLAGS '-O3 -fpp -static-intel -lifcoremt -real-size 64 -qopenmp -assume nocc_omp -fpe0 -fp-model=source -fPIC -nologo -diag-disable 10006"'];
 end
 
 %%------------------------------------------------------------------

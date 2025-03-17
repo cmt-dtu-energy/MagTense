@@ -1,11 +1,9 @@
 # Python Interface
 
 The Fortran code is compiled and wrapped to a module that can be directly called from Python.
-The tool `f2py` of the NumPy package is used to wrap the interface file `MagTense/python/src/magtense/lib/FortranToPythonIO.f90`.
+The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/magtense/lib/FortranToPythonIO.f90).
 
 ## Deployment with Conda (Intel architectures)
-
-For MacOS ARM architectures, currently only magnetostatics with the `gfortran` compiler is supported.
 
 ### Create an importable Python module from Fortran source code
 
@@ -13,28 +11,28 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
 
 - New conda environment with Python >= 3.12
   ```bash
-  conda create -y -n magtense-env 
-  conda activate magtense-env
+  conda create -y -n magtense-env && conda activate magtense-env
   conda config --env --add channels conda-forge
-  conda install -y python
-  conda config --env --add channels nvidia/label/cuda-12.6.3
-  conda config --env --add channels https://software.repos.intel.com/python/conda/
-  conda install -y numpy matplotlib meson charset-normalizer ncurses git notebook h5py tqdm
-  ```
+  conda install -y python=3.12.3
+  python3 -m pip install numpy meson ninja charset-normalizer
+  ````
 
 - Required python packages for CUDA and MKL
 
-  Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda)\
+  Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda) \
+  Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment \
   *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.*
 
   ```bash
+  conda config --env --add channels nvidia/label/cuda-12.8.1
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   ```
 
   More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
   ```bash
-  conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" intel-fortran-rt "ifx_linux-64"
+  conda config --env --add channels https://software.repos.intel.com/python/conda/
+  conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" "ifx_linux-64"
   ```
 
 - Compile Fortran source files
@@ -48,7 +46,23 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
 - Conda environment from `environment_win.yml`
 
   ```bash
-  conda env create -f python/environment.yml
+  conda env create -f python/environment_win.yml
+  ```
+
+  OR
+
+  ```bash
+  conda create -y -n magtense-env
+  conda activate magtense-env
+  conda config --env --add channels conda-forge
+  conda install -y python=3.12
+  python -m pip install numpy meson charset-normalizer
+  conda config --env --add channels https://software.repos.intel.com/python/conda/
+  conda install -y mkl mkl-devel mkl-static "dpcpp_win-64" intel-fortran-rt "ifx_win-64"
+  conda config --env --add channels nvidia/label/cuda-12.8.1
+  conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
+  conda install -y git make
+  python -m pip install matplotlib notebook h5py tqdm importlib_resources
   ```
 
 - Compile Fortran source files
@@ -139,9 +153,17 @@ For MacOS ARM architectures, currently only magnetostatics with the `gfortran` c
 ### Install local editable magtense package
 
 ```bash
-python -m pip install -e ./python
+python3 -m pip install -e ./python
 ```
 
+### Required packages at runtime
+
+`requirements-cpu.txt` and `requirements-cuda.txt` contain specific package versions and are shipped with the respective pip-wheel.
+
+```bash
+python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm
+python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cusparse-cu12 nvidia-nvjitlink-cu12 # only required for cuda support
+```
 
 ## Distribution on [PyPI](https://pypi.org/project/magtense/)
 
@@ -149,13 +171,13 @@ Libraries have to be pre-build for now, and should be located in `MagTense/pytho
 
 ```bash
 # Required python packages for distribution
-python -m pip install build
-conda install -y twine
+python3 -m pip install build
 
-cd MagTense/python/
+cd python/
 python scripts/dist_pypi.py
 
 # Upload to pypi.org
+python3 -m pip install twine
 # twine upload --repository testpypi dist/*
 twine upload dist/*
 ```
