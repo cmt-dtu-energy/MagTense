@@ -111,7 +111,7 @@ jobs:
         miniforge-version: latest
         python-version: 3.12
         auto-activate-base: true
-        activate-environment: ""
+        activate-environment: true
 
     - name: Setup Miniforge for python 3.13
       if: ${{ matrix.py-version }} == 313
@@ -120,8 +120,8 @@ jobs:
         miniforge-version: latest
         python-version: 3.13
         auto-activate-base: true
-        activate-environment: ""
-          
+        activate-environment: true
+
     - name: Create a new virtual environment
       run: python3 -m venv ${{ github.workspace }}/.venv
 
