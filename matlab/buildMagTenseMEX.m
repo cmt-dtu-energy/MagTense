@@ -3,7 +3,7 @@ function buildMagTenseMEX(USE_RELEASE, USE_CUDA, USE_CVODE)
 
 arguments
     USE_RELEASE {mustBeNumericOrLogical} = true;
-    USE_CUDA {mustBeNumericOrLogical} = false;
+    USE_CUDA {mustBeNumericOrLogical} = true;
     USE_CVODE {mustBeNumericOrLogical} = true;
 end
 
@@ -62,9 +62,8 @@ end
 
 if (USE_CVODE)
     CVODE_include = join(['-I' cvode_include], '');
-    CVODE = ['LINKLIBS="$LINKLIBS ' cvode_lib '/libsundials_nvecserial.a ' cvode_lib '/libsundials_sunmatrixdense.a ' ...
-        cvode_lib '/libsundials_sunlinsoldense.a ' cvode_lib '/libsundials_fnvecserial_mod.a ' ...
-        cvode_lib '/libsundials_cvode.a ' cvode_lib '/libsundials_fsunnonlinsolfixedpoint_mod.a"'];
+    CVODE = ['-L' cvode_lib ' -lsundials_nvecserial -lsundials_sunmatrixdense -lsundials_sunlinsoldense' ...
+    ' -lsundials_fnvecserial_mod -lsundials_cvode -lsundials_fsunnonlinsolfixedpoint_mod'];
 else
     CVODE_include = '';
     CVODE = '';
@@ -83,7 +82,7 @@ end
 
 if (ispc)
     DEFINES = '-R2018a';
-    FFLAGS = 'COMPFLAGS="$COMPFLAGS /free /O3 /fpp /real-size:64 /Qopenmp /assume:nocc_omp /fpe:0 /fp:source /nologo"';
+    FFLAGS = 'COMPFLAGS="$COMPFLAGS /free /nologo /real-size:64 /O2 /assume:nocc_omp /Qopenmp /fpp /fpe:0 /fp:source /fp:precise"';
     if (USE_CUDA)
         FFLAGS = [FFLAGS(1:(end-1)) ' /libs:static"'];
     end
@@ -99,7 +98,7 @@ if (ispc)
         MKL = ['-L' mkl_lib ' -lmkl_rt -lmkl_blas95_lp64'];
     end
 else
-    DEFINES = ['FC="' compiler_root '/bin/ifx" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
+    DEFINES = ['FC="' compiler_root '/bin/ifort" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
     INCLUDE = ['INCLUDE="$INCLUDE -I' mkl_root '/include -I' NumericalIntegration_path ' -I' DemagField_path ...
         ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ' -I' ForceIntegrator_path ' -I' mkl_root];
     LIBS = ['-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' DemagField_path ' -lDemagField -L' ...
@@ -111,7 +110,7 @@ else
             '/libmkl_core.a ' mkl_lib '/libmkl_blas95_lp64.a ' mkl_lib '/libmkl_intel_lp64.a"'];
         INCLUDE = [INCLUDE '/include/intel64/lp64 '];
     else
-        MKL = ['-L' mkl_lib ' -lmkl_rt -lpthread -lm -ldl '];
+        MKL = ['-L' mkl_root '/lib/intel64 -lmkl_rt -lpthread -lm -ldl '];
         if (USE_CUDA)
             INCLUDE = [INCLUDE '/include/intel64/lp64 '];
             MKL = [MKL '-lmkl_blas95_lp64'];

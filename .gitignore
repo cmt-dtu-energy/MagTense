@@ -200,3 +200,11 @@ nbs/
 
 # Virtual environment
 .venv*/
+
+.vs/MagTense/v17/
+
+.vs/MagTense/CopilotIndices/
+
+*.msg
+
+source/MagTenseMEX/.vs/
