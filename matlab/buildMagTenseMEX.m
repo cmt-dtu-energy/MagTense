@@ -29,10 +29,16 @@ if (ispc)
 else
     VS_STUDIO = false;
     MKL_STATIC = true;
-    compiler_root = '/usr/share/miniconda/envs/magtense-env';
-    mkl_root = '/usr/share/miniconda/envs/magtense-env';
-    mkl_lib = '/usr/share/miniconda/envs/magtense-env/lib';
-    cuda_root = '/home/spol/miniconda3/envs/magtense-env-py12/lib';
+    
+    %--- Get the username of the current user, which is where the miniconda
+    %--- is installed
+    [~,username] = system('whoami');
+    user = username(1:(end-1));
+    
+    compiler_root = ['/home/' user '/miniconda3/envs/magtense-env'];
+    mkl_root = ['/home/' user '/miniconda3/envs/magtense-env'];
+    mkl_lib = ['/home/' user '/miniconda3/envs/magtense-env/lib'];
+    cuda_root = ['/home/' user '/miniconda3/envs/magtense-env-py12/lib'];
     cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
     cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
     mex_suffix = 'a';
@@ -98,17 +104,19 @@ if (ispc)
         MKL = ['-L' mkl_lib ' -lmkl_rt -lmkl_blas95_lp64'];
     end
 else
-    DEFINES = ['FC="' compiler_root '/bin/ifort" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
-    INCLUDE = ['INCLUDE="$INCLUDE -I' mkl_root '/include -I' NumericalIntegration_path ' -I' DemagField_path ...
-        ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ' -I' ForceIntegrator_path ' -I' mkl_root];
-    LIBS = ['-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' DemagField_path ' -lDemagField -L' ...
-        TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration -L' ...
-        ForceIntegrator_path ' -lMagneticForceIntegrator'];
-    FFLAGS = 'FFLAGS="';
+    DEFINES = ['FC="' compiler_root '/bin/ifx" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
+    INCLUDE = ['INCLUDE="$INCLUDE -I' NumericalIntegration_path ' -I' DemagField_path ...
+        ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ' -I' ForceIntegrator_path ... 
+        ' -I' mkl_root '/include' ' -I' mkl_root '/include/intel64/lp64'];
+    LIBS = ['LINKLIBS=''$LINKLIBS ' '-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' ...
+        ForceIntegrator_path ' -lMagneticForceIntegrator -L' DemagField_path ' -lDemagField -L' ...
+        TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration'''];
     if (MKL_STATIC)
-        MKL = ['-liomp5 -lpthread -lm -ldl -lifcoremt LINKLIBS="$LINKLIBS ' mkl_lib '/libmkl_intel_thread.a ' mkl_lib ...
-            '/libmkl_core.a ' mkl_lib '/libmkl_blas95_lp64.a ' mkl_lib '/libmkl_intel_lp64.a"'];
-        INCLUDE = [INCLUDE '/include/intel64/lp64 '];
+        LIBS = [LIBS(1:(end-1)) ' ' mkl_lib '/libmkl_blas95_lp64.a -Wl,--start-group ' ...
+               mkl_lib '/libmkl_intel_lp64.a ' mkl_lib '/libmkl_intel_thread.a ' ...
+               mkl_lib '/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl -static-intel'''];
+        MKL = [];
+        %INCLUDE = [INCLUDE '/include/intel64/lp64 '];
     else
         MKL = ['-L' mkl_root '/lib/intel64 -lmkl_rt -lpthread -lm -ldl '];
         if (USE_CUDA)
@@ -121,7 +129,7 @@ else
         end
     end
     INCLUDE = [INCLUDE CVODE_include '"'];
-    FFLAGS = [FFLAGS '-O3 -fpp -static-intel -lifcoremt -real-size 64 -qopenmp -assume nocc_omp -fpe0 -fp-model=source -fPIC -nologo -diag-disable 10006"'];
+    FFLAGS = ['FFLAGS="-O3 -fpp -real-size 64 -fpe0 -fp-model=source -fPIC -nologo -diag-disable 10006"'];
 end
 
 %%------------------------------------------------------------------
