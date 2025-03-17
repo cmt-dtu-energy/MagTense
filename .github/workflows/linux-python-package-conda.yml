@@ -104,23 +104,18 @@ jobs:
     #       core.setOutput('id', id)
     # - run: echo "${{steps.get-id.outputs.id}}"
 
-    - name: Setup Miniforge for python 3.12
+    - name: Setup python 3.12
       if: ${{ matrix.py-version == 312 }}
-      uses: conda-incubator/setup-miniconda@v3
+      uses: actions/setup-python@v5
       with:
-        miniforge-version: latest
-        python-version: 3.12
-        auto-activate-base: true
-        activate-environment: true
+        python-version: '3.12'
 
-    - name: Setup Miniforge for python 3.13
+    - name: Setup python 3.13
       if: ${{ matrix.py-version == 313 }} 
-      uses: conda-incubator/setup-miniconda@v3
+      uses: actions/setup-python@v5
       with:
-        miniforge-version: latest
-        python-version: 3.13
-        auto-activate-base: true
-        activate-environment: true
+        python-version: '3.13'
+
 
     - name: Create a new virtual environment
       run: python3 -m venv ${{ github.workspace }}/.venv
@@ -131,6 +126,11 @@ jobs:
         source ${{ github.workspace }}/.venv/bin/activate
         python3 -m pip install ${{ github.workspace }}/*.whl
         python3 -m pip install pytest
+
+    - name: Check external libraries
+      if: ${{ matrix.py-version == 312 }}
+      run: |
+        ldd ${{ github.workspace }}/.venv/lib/python3.12/site-packages/magtense/magtensesource.cpython-312-x86_64-linux-gnu.so 
 
     - name: Run tests
       run: |
