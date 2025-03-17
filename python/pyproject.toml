@@ -17,7 +17,7 @@ dependencies = {file = ["requirements.txt"]}
 
 [project]
 name = "magtense"
-version = "2.2.1"
+version = "2.2.2"
 authors = [
   { name="Stefan Pollok", email="spol@dtu.dk" },
 ]
