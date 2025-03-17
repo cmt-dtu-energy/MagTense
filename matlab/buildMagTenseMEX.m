@@ -36,7 +36,7 @@ else
     compiler_root = [pre_str '/envs/magtense-env'];
     mkl_root = [pre_str '/envs/magtense-env'];
     mkl_lib = [pre_str '/envs/magtense-env/lib'];
-    cuda_root = [pre_str /'envs/magtense-env-py12/lib'];
+    cuda_root = [pre_str '/envs/magtense-env-py12/lib'];
     cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
     cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
     mex_suffix = 'a';
