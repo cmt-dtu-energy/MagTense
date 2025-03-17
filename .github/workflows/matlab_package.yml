@@ -27,8 +27,8 @@ jobs:
     defaults:
       run:
         shell: bash -el {0}
-      env:
-        build_file: python/.build/env-${{ matrix.py-version}}-linux.yml  
+    env:
+      build_file: python/.build/env-${{ matrix.py-version}}-linux.yml
 
     steps:
     - name: Checkout repository
