@@ -56,7 +56,7 @@ jobs:
 
     - name: Build pip-wheels
       working-directory: ${{ github.workspace }}/python/
-      run: python .build/dist_pypi.py
+      run: python .build/dist_pypi.py --py_versions ${{ matrix.py-version }}
 
     - name: cpu - Archive pip-wheel
       uses: actions/upload-artifact@v4
