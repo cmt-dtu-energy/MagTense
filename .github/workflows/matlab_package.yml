@@ -27,6 +27,8 @@ jobs:
     defaults:
       run:
         shell: bash -el {0}
+      env:
+        build_file: python/.build/env-${{ matrix.py-version}}-linux.yml  
 
     steps:
     - name: Checkout repository
@@ -38,14 +40,6 @@ jobs:
         miniforge-version: latest
         activate-environment: magtense-env
         use-mamba: true
-    
-    #- name: Set up Conda with Python 3.12
-    #  uses: conda-incubator/setup-miniconda@v3
-    #  with:
-    #    activate-environment: magtense-env
-    #    environment-file: python/.build/environment_linux.yml
-    #    python-version: 3.12
-    #    auto-activate-base: false
 
     - name: Cache conda
       uses: actions/cache@v4
