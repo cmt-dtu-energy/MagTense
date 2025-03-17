@@ -59,6 +59,11 @@ ipch/
 *.sdf
 *.cachefile
 
+# Visual Studio
+.vs/MagTense/v17/
+.vs/MagTense/CopilotIndices/
+*.vsidx
+
 # Visual Studio profiler
 *.psess
 *.vsp
@@ -187,7 +192,7 @@ docs/source/_build
 *.vtuneproj
 *.prj
 
-*.vsidx
+*.msg
 *.lock
 
 # Notebooks
@@ -195,9 +200,3 @@ nbs/
 
 # Virtual environment
 .venv*/
-
-.vs/MagTense/v17/
-
-.vs/MagTense/CopilotIndices/
-
-*.msg

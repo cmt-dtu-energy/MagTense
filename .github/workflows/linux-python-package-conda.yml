@@ -4,10 +4,15 @@ on: [push]
 
 jobs:
   build-linux:
+    strategy:
+      matrix:
+        py-version: [312, 313]
     runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash -el {0}
+    env:
+      build_file: python/.build/env-${{ matrix.py-version }}-linux.yml
 
     steps:
     - name: Checkout repository
@@ -24,14 +29,14 @@ jobs:
       uses: actions/cache@v4
       env:
         # Increase this value to reset cache manually
-        CACHE_NUMBER: 0
+        cache_number: 0
       with:
         path: ${{ env.CONDA }}/envs
-        key: conda-${{ runner.os }}-${{hashFiles('python/build_env_linux.yml') }}-${{ env.CACHE_NUMBER }}
+        key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
       id: cache
 
     - name: Update environment
-      run: conda env update -n magtense-env -f python/build_env_linux.yml
+      run: conda env update -n magtense-env -f ${{ env.build_file }}
       if: steps.cache.outputs.cache-hit != 'true'
     
     - name: Create directory for wrappers of compiled Fortran source code
@@ -51,91 +56,83 @@ jobs:
 
     - name: Build pip-wheels
       working-directory: ${{ github.workspace }}/python/
-      run: python scripts/dist_pypi.py
+      run: python .build/dist_pypi.py --py_versions ${{ matrix.py-version }}
 
     - name: cpu - Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
-        name: pip-wheel-cpu
-        path: ${{ github.workspace }}/python/dist/magtense-*-0-*.whl
+        name: pip-wheel-${{ matrix.py-version }}-cpu
+        path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-version }}-none-manylinux1_x86_64.whl
 
     - name: cu12 - Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
-        name: pip-wheel-cu12
-        path: ${{ github.workspace }}/python/dist/magtense-*-1-*.whl
+        name: pip-wheel-${{ matrix.py-version }}-cu12
+        path: ${{ github.workspace }}/python/dist/magtense-*-1-py${{ matrix.py-version }}-none-manylinux1_x86_64.whl
 
 
-  test-linux-cpu:
-    runs-on: ubuntu-24.04
+  test-linux:
+    strategy:
+      matrix:
+        mt-punit: [cpu, cu12]
+        py-version: [312, 313]
+    runs-on: ubuntu-latest
     needs: build-linux
     defaults:
       run:
         shell: bash -el {0}
     
     steps:
-    - name: Download a single artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: pip-wheel-cpu
-
-    - name: Create a new virtual environment
-      run: |
-        python3 -m venv ${{ github.workspace }}/.venv
-
-    - name: Install pip-wheel
-      run: |
-        source ${{ github.workspace }}/.venv/bin/activate
-        files=(*)
-        python3 -m pip install ${{ github.workspace }}/${files[0]}
-
     - name: Checkout test scripts
       uses: actions/checkout@v4
       with:
         sparse-checkout: |
           python/tests/
-
-    - name: Test with pytest
-      run: |
-        source ${{ github.workspace }}/.venv/bin/activate
-        export LD_LIBRARY_PATH=${{ github.workspace }}/.venv/lib:$LD_LIBRARY_PATH
-        python3 -m pip install pytest
-        pytest
-
-
-  test-linux-cu12:
-    runs-on: ubuntu-24.04
-    needs: build-linux
-    defaults:
-      run:
-        shell: bash -el {0}
+          documentation/examples_FEM_validation/
     
-    steps:
     - name: Download a single artifact
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-cu12
+        name: pip-wheel-${{ matrix.py-version }}-${{ matrix.mt-punit }}
+
+    # TODO Setup version selection with JavaScript
+    # - id: get-id
+    #   uses: actions/github-script@0.9.0
+    #   with:
+    #     script: |
+    #       const id = context.payload.client_payload.value.split('-')[1]
+    #       core.setOutput('id', id)
+    # - run: echo "${{steps.get-id.outputs.id}}"
+
+    - name: Setup Miniforge for python 3.12
+      if: ${{ matrix.py-version }} == 312
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-version: latest
+        python-version: 3.12
+        auto-activate-base: true
+        activate-environment: true
+
+    - name: Setup Miniforge for python 3.13
+      if: ${{ matrix.py-version }} == 313
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-version: latest
+        python-version: 3.13
+        auto-activate-base: true
+        activate-environment: true
 
     - name: Create a new virtual environment
-      run: |
-        python3 -m venv ${{ github.workspace }}/.venv
-    
-    - name: Install pip-wheel
+      run: python3 -m venv ${{ github.workspace }}/.venv
+
+    # TODO Cache pip
+    - name: Install pip-wheel and pytest
       run: |
         source ${{ github.workspace }}/.venv/bin/activate
-        files=(*)
-        python3 -m pip install ${{ github.workspace }}/${files[0]}
-
-    - name: Checkout test scripts
-      uses: actions/checkout@v4
-      with:
-        sparse-checkout: |
-          python/tests/
-
-    - name: Test with pytest
-      run: |
-        source ${{ github.workspace }}/.venv/bin/activate
-        export LD_LIBRARY_PATH=${{ github.workspace }}/.venv/lib:$LD_LIBRARY_PATH
+        python3 -m pip install ${{ github.workspace }}/*.whl
         python3 -m pip install pytest
+
+    - name: Run tests
+      run: |
+        source ${{ github.workspace }}/.venv/bin/activate
         pytest
-      

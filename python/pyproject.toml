@@ -24,7 +24,7 @@ authors = [
 description = "MagTense - a micromagnetism and magnetostatic framework"
 dynamic = ["dependencies"]
 readme = "README_top.md"
-requires-python = ">=3.12, <3.13"
+requires-python = ">=3.12"
 license = {file = "LICENSE"}
 keywords = [
     "Micromagnetism",
