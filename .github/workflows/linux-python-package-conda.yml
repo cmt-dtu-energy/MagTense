@@ -54,6 +54,11 @@ jobs:
         cp magtensesource.*.so ${{ github.workspace }}/python/cu12_libs/
         make clean
 
+    - name: Check for built libraries
+      run: |
+        ls ${{ github.workspace }}/python/cpu_libs/
+        ls ${{ github.workspace }}/python/cu12_libs/
+
     - name: Build pip-wheels
       working-directory: ${{ github.workspace }}/python/
       run: python .build/dist_pypi.py --py_versions ${{ matrix.py-version }}
@@ -100,7 +105,11 @@ jobs:
       id: py-major-minor
       with:
         script: |
-          console.log(context)
+          console.log(process)
+          // const str = String(process.matrix.py-version)
+          // const major = str.substring(0,1)
+          // const minor = str.substring(1,3)
+          // const result = major + "." + minor
           return "3.12"
         result-encoding: string
 
