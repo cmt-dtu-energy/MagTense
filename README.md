@@ -8,14 +8,15 @@
 
 # MagTense
 
-Library for magnetostaic and micromagnetism calculations.
+MagTense is a framework for magnetostatic and micromagnetism calculations.
 
 ## Features
 
-- High-level interfaces for MATLAB and Python, with the core implemented in Fortran for speed;
+- Interfaces for MATLAB and Python, with the core implemented in Fortran for speed;
 - Fully analytical calculation of demagnetization tensor for cylinders, pieces of cylinders, prisms, circular pieces and tetrahedrons;
 - Micromagnetic solutions of the Landau-Lifshitz equations, using the analytical demagnetization tensor described above;
-- (Optional) GPU-accelerated code with [CUDA®](https://developer.nvidia.com/cuda-zone) (requires NVIDIA graphics card).
+- GPU-accelerated code with [CUDA®](https://developer.nvidia.com/cuda-zone) (requires NVIDIA graphics card).
+- Uses Intel MKL for the micromagnetic simlations and can also utilize CVODE.
 - Tested in Linux and Windows 11+ (macOS not supported at the moment).
 
 ## Installation and usage with the Python interface
@@ -34,21 +35,21 @@ Installation is recommended via `conda` package manager (requires >=**Python 3.9
   conda install magtense -c cmt-dtu-energy/label/cpu -c https://software.repos.intel.com/python/conda/ -c conda-forge
   ```
 
-See also the [examples](./python/examples/) of working with the Python interface.
+Examples of how to calculate magnetostatic and micromagnetic problems using the Python interface can be found [python/examples/](./python/examples/).
 
-### Build from source
+### Building from source
 
-Detailed instructions for building the Python interface with the Fortran core are available [here](/python/README.md).
+If you want to build MagTense yourself, you can find detailed instructions for building the Python interface with the Fortran core [here](/python/README.md).
 
 ## Installation and usage with the MATLAB interface
 
-MagTense is directly useable in Matlab on Windows by downloading the already compiled MEX-files in [Releases](https://github.com/cmt-dtu-energy/MagTense/releases). The files are directly useable with no compilation required, although Matlab 2020b or greater is required.
+MagTense is directly useable in Matlab on Windows by downloading the MEX-files in [Releases](https://github.com/cmt-dtu-energy/MagTense/releases). Only Matlab 2020b or greater is required.
 
-Examples of how to calculate magnetostatic and micromagnetic problems using the Matlab interface can be found in [matlab/examples](matlab/examples).
+Examples of how to calculate magnetostatic and micromagnetic problems using the Matlab interface can be found in [matlab/examples](./matlab/examples).
 
-### Compilation with a Visual Studio project file
+### Building from source
 
-If you want to compile MagTense with a Visual Studio project file for Windows, [MagTense.sln](MagTense.sln), is available, as well as a Matlab function to build the MEX-files, [buildMagTenseMEX.m](matlab/buildMagTenseMEX.m). MagTense utilizes Intel MKL for the micromagnetic simlations and can also utilize CUDA and CVODE.
+If you want to compile MagTense on Windows, we provide a Visual Studio project file, [MagTense.sln](MagTense.sln), while for Linux we provide a Makefile. To build the MEX-files, we provide a Matlab function called [buildMagTenseMEX.m](matlab/buildMagTenseMEX.m) that works on both OS. You can find more information [here](/matlab/README.md)
 
 ## Further documentation
 
