@@ -18,17 +18,18 @@ def parse_args():
 
 
 def main(py_versions):
-    with open(Path(__file__).parent.parent / "pyproject.toml", "rb") as f:
+    py_folder = Path(__file__).parent.parent
+    lib_folder = py_folder / "src" / "magtense" / "lib"
+    with open(py_folder / "pyproject.toml", "rb") as f:
         mt_version = tomllib.load(f)["project"]["version"]
     cu_versions = ["cpu", "cu12"]
-    lib_path = None
 
     build_tag = {"cpu": 0, "cu12": 1}
 
-    for lib_file in Path("src/magtense/lib").glob("*.pyd"):
+    for lib_file in lib_folder.glob("*.pyd"):
         subprocess.run(["rm", lib_file])
 
-    for lib_file in Path("src/magtense/lib").glob("*.so"):
+    for lib_file in lib_folder.glob("*.so"):
         subprocess.run(["rm", lib_file])
 
     for platform in ["linux"]:  # ["win", "linux"]:
@@ -47,16 +48,14 @@ def main(py_versions):
             else:
                 py_lib = "cpython-" + py
 
+            subprocess.run(["rm", f"{lib_folder}/*.{suffix}"])
             subprocess.run(
                 [
                     "cp",
-                    f"{cuda}_libs/magtensesource.{py_lib}-{arch}.{suffix}",
-                    "src/magtense/lib/",
+                    f"{py_folder}/{cuda}_libs/magtensesource.{py_lib}-{arch}.{suffix}",
+                    lib_folder,
                 ]
             )
-            if lib_path is not None:
-                subprocess.run(["rm", lib_path])
-            lib_path = f"src/magtense/lib/magtensesource.{py_lib}-{arch}.{suffix}"
             if platform == "linux":
                 if cuda == "cpu":
                     subprocess.run(
@@ -65,7 +64,7 @@ def main(py_versions):
                             "--force-rpath",
                             "--set-rpath",
                             "$ORIGIN/../../../../../lib",
-                            lib_path,
+                            f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}",
                         ]
                     )
                 elif cuda == "cu12":
@@ -75,23 +74,37 @@ def main(py_versions):
                             "--force-rpath",
                             "--set-rpath",
                             "$ORIGIN/../../../../../lib:$ORIGIN/../../nvidia/cublas/lib/:$ORIGIN/../../nvidia/cuda_runtime/lib/:$ORIGIN/../../nvidia/cusparse/lib/",
-                            lib_path,
+                            f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}",
                         ]
                     )
             subprocess.run(
-                ["cp", f".build/requirements-{py}-{cuda}.txt", "requirements.txt"]
+                [
+                    "cp",
+                    f"{py_folder}/.build/requirements-py{py[0]}-{cuda}.txt",
+                    f"{py_folder}/requirements.txt",
+                ]
             )
-            subprocess.run(["python3", "-m", "build", "--wheel"])
+            subprocess.run(
+                ["python3", "-m", "build", "--wheel"],
+                cwd=py_folder,
+            )
             subprocess.run(
                 [
                     "mv",
-                    f"dist/magtense-{mt_version}-py3-none-any.whl",
-                    f"dist/magtense-{mt_version}-{build_tag[cuda]}-py{py}-none-{whl_arch}.whl",
+                    f"{py_folder}/dist/magtense-{mt_version}-py{py[0]}-none-any.whl",
+                    f"{py_folder}/dist/magtense-{mt_version}-{build_tag[cuda]}-py{py[0]}-none-{whl_arch}.whl",
                 ]
             )
 
-            if Path("src/magtense.egg-info").is_dir():
-                subprocess.run(["rm", "-r", "src/magtense.egg-info/", "build/"])
+            if Path(py_folder / "src" / "magtense.egg-info").is_dir():
+                subprocess.run(
+                    [
+                        "rm",
+                        "-r",
+                        f"{py_folder}/src/magtense.egg-info/",
+                        f"{py_folder}/build/",
+                    ]
+                )
 
 
 if __name__ == "__main__":
