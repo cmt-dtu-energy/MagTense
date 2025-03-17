@@ -41,7 +41,7 @@ Examples of how to calculate magnetostatic and micromagnetic problems using the 
 
 If you want to build MagTense yourself, you can find detailed instructions for building the Python interface with the Fortran core [here](/python/README.md).
 
-## Installation and usage with the MATLAB interface
+## Installation and usage with the Matlab interface
 
 MagTense is directly useable in Matlab on Windows by downloading the MEX-files in [Releases](https://github.com/cmt-dtu-energy/MagTense/releases). Only Matlab 2020b or greater is required.
 
@@ -49,7 +49,7 @@ Examples of how to calculate magnetostatic and micromagnetic problems using the 
 
 ### Building from source
 
-If you want to compile MagTense on Windows, we provide a Visual Studio project file, [MagTense.sln](MagTense.sln), while for Linux we provide a Makefile. To build the MEX-files, we provide a Matlab function called [buildMagTenseMEX.m](matlab/buildMagTenseMEX.m) that works on both OS. You can find more information [here](/matlab/README.md)
+If you want to compile MagTense on Windows, we provide a Visual Studio project file, [MagTense.sln](MagTense.sln), while for Linux we provide a Makefile. To build the MEX-files, we provide a Matlab function called [buildMagTenseMEX.m](matlab/buildMagTenseMEX.m) that works on both OS. You can find more information [here](/matlab/README.md).
 
 ## Further documentation
 
