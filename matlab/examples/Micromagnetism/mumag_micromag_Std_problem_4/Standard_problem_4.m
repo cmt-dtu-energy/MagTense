@@ -186,7 +186,7 @@ end
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% Compare with published solutions available from mumag webpage
 t=1e-9*linspace(0,1,1000);
-M_mumag = load(['..\..\..\..\documentation\examples_NIST_validation\Validation_standard_problem_4\Field_' num2str(NIST_field) '_NIST_mean_solution.txt']);
+M_mumag = load(['../../../../documentation/examples_NIST_validation/Validation_standard_problem_4/Field_' num2str(NIST_field) '_NIST_mean_solution.txt']);
 
 % Interpolate the MagTense solution to the NIST-published solutions and
 % calculate the difference between the results as an integral.
