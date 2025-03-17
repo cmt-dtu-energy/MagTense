@@ -8,7 +8,7 @@
 
 # MagTense
 
-MagTense is a framework for magnetostatic and micromagnetism calculations.
+MagTense is a framework for magnetostatic and micromagnetic calculations.
 
 ## Features
 
