@@ -155,6 +155,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 ### Install local editable magtense package
 
 ```bash
+cp python/.build/requirements_dev.txt python/.build/requirements.txt
 python3 -m pip install -e ./python
 ```
 
