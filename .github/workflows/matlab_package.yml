@@ -26,7 +26,7 @@ jobs:
     strategy:
       matrix:
         py-version: [312]
-        mat-version: [R2024b]
+        mat-version: [R2024a]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -130,7 +130,7 @@ jobs:
     strategy:
       matrix:
         mt-punit: [cpu]
-        mat-version: [R2024b]
+        mat-version: [R2024a]
     runs-on: ubuntu-latest
     needs: build-linux
     defaults:
