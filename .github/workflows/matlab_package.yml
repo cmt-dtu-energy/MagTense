@@ -135,6 +135,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: MEX-Linux
+        path: ${{ github.workspace }}/matlab/MEX_files
 
     - name: Set up MATLAB R2020b
       if: ${{ matrix.mat-version == 'R2020b' }}
