@@ -137,8 +137,12 @@ jobs:
     strategy:
       matrix:
         mt-punit: [cpu]
-        mat-version: [R2024a]
-    runs-on: ubuntu-latest
+        mat-version: [R2022b,R2024a]
+        os-version: [ubuntu-latest, ubuntu-22.04]
+        exclude:
+          - os: ubuntu-latest
+            version: 'R2022b' # MATLAB not available
+    runs-on: ${{matrix.os-version}}
     needs: build-linux
     defaults:
       run:
