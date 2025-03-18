@@ -1,7 +1,7 @@
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: light)" srcset="./docs/source/static/MagTense_logo.png" height=250>
-    <img alt="MagTense Logo" src="./docs/source/static/MagTenseLogo_White.svg" height=250>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/cmt-dtu-energy/MagTense/refs/heads/master/docs/source/static/MagTenseLogo_White.svg" height=250>
+    <img alt="MagTense Logo" src="https://raw.githubusercontent.com/cmt-dtu-energy/MagTense/refs/heads/master/docs/source/static/MagTense_logo.png" height=250>
   </picture>
   <br>
 </div>

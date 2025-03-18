@@ -62,13 +62,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: pip-wheel-py${{ matrix.py-version }}-cpu
-        path: ${{ github.workspace }}/python/dist/magtense-*-0-py3-none-manylinux1_x86_64.whl
+        path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-version }}-none-manylinux1_x86_64.whl
 
     - name: cu12 - Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
         name: pip-wheel-py${{ matrix.py-version }}-cu12
-        path: ${{ github.workspace }}/python/dist/magtense-*-1-py3-none-manylinux1_x86_64.whl
+        path: ${{ github.workspace }}/python/dist/magtense-*-1-py${{ matrix.py-version }}-none-manylinux1_x86_64.whl
 
 
   test-linux:

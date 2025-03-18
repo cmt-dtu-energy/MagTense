@@ -99,9 +99,18 @@ def main(py_versions, platforms):
                 [
                     "mv",
                     f"{py_folder}/dist/magtense-{mt_version}-py{py[0]}-none-any.whl",
-                    f"{py_folder}/dist/magtense-{mt_version}-{build_tag[cuda]}-py{py[0]}-none-{whl_arch}.whl",
+                    f"{py_folder}/dist/magtense-{mt_version}-{build_tag[cuda]}-py{py}-none-{whl_arch}.whl",
                 ]
             )
+
+            # if cuda == "cu12":
+            #     subprocess.run(
+            #         [
+            #             "cp",
+            #             f"{py_folder}/dist/magtense-{mt_version}-{build_tag[cuda]}-py{py}-none-{whl_arch}.whl",
+            #             f"{py_folder}/dist/magtense-{mt_version}-py{py}-none-{whl_arch}.whl",
+            #         ]
+            #     )
 
             if Path(py_folder / "src" / "magtense.egg-info").is_dir():
                 subprocess.run(
