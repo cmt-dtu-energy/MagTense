@@ -59,6 +59,9 @@ jobs:
       run: conda env update -n magtense-env -f ${{ env.build_file }}
       if: steps.cache.outputs.cache-hit != 'true'
 
+    - name: Update CONDA
+      run: conda update --all
+
     - name: Printenv
       run: printenv
       
