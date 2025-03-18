@@ -8,10 +8,17 @@ jobs:
     steps:  
       - uses: actions/checkout@v4
 
-      - name: Test shell
+      - name: Setup Miniforge
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: magtense-env
+          use-mamba: true
+
+      - name: Install make
         shell: cmd /C CALL {0}
         working-directory: ${{ github.workspace }}
-        run: dir
+        run: conda install make
       
       - name: Start shell and run make
         shell: cmd /C CALL {0}
