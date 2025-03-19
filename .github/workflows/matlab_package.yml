@@ -15,25 +15,12 @@ jobs:
         with:
           miniforge-version: latest
           activate-environment: magtense-env
+          environment-file: ${{ env.build_file }}
           use-mamba: true
-          installation-dir: ${{ runner.temp}}\miniconda3
+          installation-dir: ${{ runner.temp }}\miniconda3
 
-      - name: Cache conda
-        uses: actions/cache@v4
-        env:
-          # Increase this value to reset cache manually
-          cache_number: 0
-        with:
-          path: ${{ env.CONDA }}/envs
-          key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
-        id: cache
-
-      - name: Update environment
-        run: conda env update -n magtense-env -f ${{ env.build_file }}
-        if: steps.cache.outputs.cache-hit != 'true'
       
       - name: Start shell and run make
-        shell: cmd /C CALL {0}
         working-directory: ${{ github.workspace }}
         run: >-
           make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2021b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest
