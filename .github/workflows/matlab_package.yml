@@ -1,4 +1,4 @@
-name: Building Matlab MEX files
+name: Building and testing Matlab MEX files on Windows and Linux
 
 on: [push]
 
@@ -62,30 +62,9 @@ jobs:
         key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
       id: cache
 
-    - name: Update environment
+    - name: Update environment if needed
       run: conda env update -n magtense-env -f ${{ env.build_file }}
       if: steps.cache.outputs.cache-hit != 'true'
-
-    - name: Update CONDA
-      run: conda update --all
-
-    - name: Printenv
-      run: printenv
-      
-    - name: Dir list2
-      run: ls -l ${CONDA_PREFIX}/lib
-
-    - name: Pwd1
-      run: cd ${CONDA_PREFIX}
-
-    - name: Pwd2
-      run: pwd
-      
-    - name: Pwd3
-      run: pwd ${CONDA_PREFIX}
-
-    - name: Which1
-      run: which ifx
 
     - name: Set up MATLAB R2024a
       if: ${{ matrix.mat-version == 'R2024a' }}
@@ -99,54 +78,39 @@ jobs:
       with:
         release: R2024b    
 
-    #- name: Dir list
-    #  run: ls -l /opt/hostedtoolcache/MATLAB/2023.2.999/x64
-      
-    #- name: Which2
-    #  run: ls -l /usr/share/miniconda/envs/magtense-env
-
-    #- name: Which3
-    #  run: ls -l /usr/share/miniconda/envs/magtense-env/lib
-
-    - name: Compile Fortran source code using R2024a
+    - name: Compile Fortran source code with CUDA including R2024a
       if: ${{ matrix.mat-version == 'R2024a' }}
       working-directory: ${{ github.workspace }}
       run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}
 
-    - name: Compile Fortran source code using R2024b
+    - name: Compile Fortran source code with CUDA including R2024b
       if: ${{ matrix.mat-version == 'R2024b' }}
       working-directory: ${{ github.workspace }}
       run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}
 
-    - name: Run script
+    - name: Compile MEX code using Matlab with CUDA
       uses: matlab-actions/run-command@v2
       with:
-        command: dir; pwd; cd('matlab'); buildMagTenseMEX(1, 1, 0); dir; dir('MEX_files');
+        command: cd('matlab'); buildMagTenseMEX(1, 1, 0);
 
-    - name: Which4
-      run: ls -l matlab/MEX_files
-
-    - name: Clean up
+    - name: Clean up the source files
       working-directory: ${{ github.workspace }}
       run: make clean
 
-    - name: Compile Fortran source code using R2024a
+    - name: Compile Fortran source code without CUDA using R2024a
       if: ${{ matrix.mat-version == 'R2024a' }}
       working-directory: ${{ github.workspace }}
       run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}
 
-    - name: Compile Fortran source code using R2024b
+    - name: Compile Fortran source code without CUDA using R2024b
       if: ${{ matrix.mat-version == 'R2024b' }}
       working-directory: ${{ github.workspace }}
       run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}
 
-    - name: Run script
+    - name: Compile MEX code using Matlab without CUDA and test
       uses: matlab-actions/run-command@v2
       with:
-        command: dir; pwd; cd('matlab'); buildMagTenseMEX(1, 0, 0); dir; dir('MEX_files'); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
-
-    - name: Which4
-      run: ls -l matlab/MEX_files
+        command: cd('matlab'); buildMagTenseMEX(1, 0, 0); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
 
     - name: Archive MEX-files
       uses: actions/upload-artifact@v4
@@ -177,11 +141,8 @@ jobs:
         sparse-checkout: |
           matlab
           documentation
-
-    - name: Pwd1
-      run: cd matlab/MEX_files
-          
-    - name: Download a single artifact
+      
+    - name: Download the MEX files as an artifact
       uses: actions/download-artifact@v4
       with:
         name: MEX-Linux
@@ -205,7 +166,7 @@ jobs:
       with:
         release: R2024b
 
-    - name: Run script
+    - name: Run test script on download MEX-file without CUDA
       uses: matlab-actions/run-command@v2
       with:
         command: cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
