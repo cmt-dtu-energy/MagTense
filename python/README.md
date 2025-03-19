@@ -39,8 +39,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 
 - Compile Fortran source files
   ```bash
-  cd python/src/magtense/lib/
-  make
+  make python
   ```
 
 #### Windows
@@ -111,8 +110,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
   - Open a `Developer PowerShell` and run:
 
     ```bash
-	conda activate magtense-env
-    cd python/src/magtense/lib/
+	  conda activate magtense-env
     make ps
     ```
 
@@ -141,7 +139,6 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 
     ```bash
 	conda activate magtense-env
-    cd python/src/magtense/lib/
     make cmdx64
     ```
 
