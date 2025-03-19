@@ -188,6 +188,8 @@ docs/source/_build
 *.o
 *.a
 *.lib
+*.so
+*.pyd
 
 *.vtuneproj
 *.prj
