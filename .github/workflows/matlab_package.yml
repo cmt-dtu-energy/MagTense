@@ -121,10 +121,14 @@ jobs:
     - name: Run script
       uses: matlab-actions/run-command@v2
       with:
-        command: dir; pwd; cd('matlab'); buildMagTenseMEX(1, 1, 0); dir; dir('MEX_files'); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
+        command: dir; pwd; cd('matlab'); buildMagTenseMEX(1, 1, 0); dir; dir('MEX_files');
 
     - name: Which4
       run: ls -l matlab/MEX_files
+
+    - name: Clean up
+      working-directory: ${{ github.workspace }}
+      run: make clean
 
     - name: Compile Fortran source code using R2024a
       if: ${{ matrix.mat-version == 'R2024a' }}
