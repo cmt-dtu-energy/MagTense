@@ -50,7 +50,7 @@ else
     compiler_root = [pre_str '/envs/magtense-env'];
     mkl_root = [pre_str '/envs/magtense-env'];
     mkl_lib = [pre_str '/envs/magtense-env/lib'];
-    cuda_root = [pre_str '/envs/magtense-env-py12/lib'];
+    cuda_root = [pre_str '/envs/magtense-env/lib'];
     cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
     cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
     mex_suffix = 'a';
@@ -65,10 +65,11 @@ else
 end
 
 if (USE_CUDA)
-    CUDA = ['-L' cuda_root ' -lcublas -lcudart -lcuda -lcusparse'];
     if (ispc)
+        CUDA = ['-L' cuda_root ' -lcublas -lcudart -lcuda -lcusparse'];
         OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.obj ' FortranCuda_path '/MagTenseCudaBlas.obj" '];
     else
+        CUDA = ['-Wl,-Bdynamic ' '-L' cuda_root ' -lcublas -lcudart -lcusparse'];
         OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.o ' FortranCuda_path '/MagTenseCudaBlas.o" '];
     end
     BUILD_MagTenseMicroMag = BUILD;
@@ -129,6 +130,10 @@ else
                mkl_lib '/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl -static-intel'''];
         MKL = [];
         %INCLUDE = [INCLUDE '/include/intel64/lp64 '];
+        if (USE_CUDA)
+            LIBS = [LIBS(1:(end-1)) ' ' CUDA ''''];
+            CUDA = '';
+        end
     else
         MKL = ['-L' mkl_root '/lib/intel64 -lmkl_rt -lpthread -lm -ldl '];
         if (USE_CUDA)
