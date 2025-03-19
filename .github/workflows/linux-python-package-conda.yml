@@ -45,12 +45,12 @@ jobs:
         mkdir ${{ github.workspace }}/python/cu12_libs
 
     - name: Compile Fortran source code and build Python wrappers
-      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
+      working-directory: ${{ github.workspace }}
       run: |
-        make USE_CUDA=0
+        make python USE_CUDA=0
         cp magtensesource.*.so ${{ github.workspace }}/python/cpu_libs/
         make clean
-        make USE_CUDA=1
+        make python USE_CUDA=1
         cp magtensesource.*.so ${{ github.workspace }}/python/cu12_libs/
         make clean
 
