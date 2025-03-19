@@ -7,6 +7,9 @@ jobs:
     runs-on: [self-hosted, Windows]
     env:
       build_file: python/.build/environment_win.yml
+    defaults:
+      run:
+        shell: cmd /C CALL {0}
     steps:  
       - uses: actions/checkout@v4
 
