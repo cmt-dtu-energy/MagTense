@@ -5,6 +5,8 @@ on: [push]
 jobs:
   build-win:
     runs-on: [self-hosted, Windows]
+    env:
+      build_file: python/.build/environment_win.yml
     steps:  
       - uses: actions/checkout@v4
 
@@ -15,10 +17,19 @@ jobs:
           activate-environment: magtense-env
           use-mamba: true
 
-      - name: Install make
-        shell: cmd /C CALL {0}
-        working-directory: ${{ github.workspace }}
-        run: conda install make
+      - name: Cache conda
+        uses: actions/cache@v4
+        env:
+          # Increase this value to reset cache manually
+          cache_number: 0
+        with:
+          path: ${{ env.CONDA }}/envs
+          key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
+        id: cache
+
+      - name: Update environment
+        run: conda env update -n magtense-env -f ${{ env.build_file }}
+        if: steps.cache.outputs.cache-hit != 'true'
       
       - name: Start shell and run make
         shell: cmd /C CALL {0}
