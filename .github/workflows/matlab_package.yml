@@ -12,6 +12,7 @@ jobs:
 
       - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
+        continue-on-error: true
         with:
           miniforge-version: latest
           activate-environment: magtense-env
