@@ -21,7 +21,7 @@ jobs:
 
       - name: Start shell and run make
         working-directory: ${{ github.workspace }}
-        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+        shell: powershell.exe -NoExit -ExecutionPolicy ByPass -File {0}
         run: >-
           make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2021b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest
       - run: echo "Workflow done"
