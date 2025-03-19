@@ -20,6 +20,7 @@ jobs:
           miniforge-version: latest
           activate-environment: magtense-env
           use-mamba: true
+          installation-dir: ${{ runner.tmp}}\miniconda3
 
       - name: Cache conda
         uses: actions/cache@v4
