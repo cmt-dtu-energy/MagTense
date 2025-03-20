@@ -65,10 +65,10 @@ nest-asyncio==1.6.0
 notebook==7.3.2
 notebook_shim==0.2.4
 numpy==2.2.3
-nvidia-cublas-cu12==12.8.4.1
-nvidia-cuda-runtime-cu12==12.8.90
-nvidia-cusparse-cu12==12.5.8.93
-nvidia-nvjitlink-cu12==12.8.93
+nvidia-cublas-cu12==12.*
+nvidia-cuda-runtime-cu12==12.*
+nvidia-cusparse-cu12==12.*
+nvidia-nvjitlink-cu12==12.*
 overrides==7.7.0
 packaging==24.2
 pandocfilters==1.5.1

@@ -1,11 +1,24 @@
-function buildMagTenseMEX(USE_RELEASE, USE_CUDA, USE_CVODE)
+function buildMagTenseMEX(options)
 %use clear all as this also clears dependencies to the .mex files and thus they can be overwritten
 
 arguments
-    USE_RELEASE {mustBeNumericOrLogical} = true;
-    USE_CUDA {mustBeNumericOrLogical} = true;
-    USE_CVODE {mustBeNumericOrLogical} = true;
+    options.USE_RELEASE {mustBeNumericOrLogical} = true;
+    options.USE_CUDA {mustBeNumericOrLogical}    = true;
+    options.USE_CVODE {mustBeNumericOrLogical}   = true;
+    
+    %--- Set the right include paths on Windows or allow the user to set them manually
+    options.mkl_include   = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include"';
+    options.mkl_lp64      = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\mkl\intel64\lp64"';
+    options.mkl_lib       = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\lib"';
+    options.cuda_root     = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\lib\x64"';
+    options.cvode_include = '"C:\Program Files (x86)\sundials-4.1.0\instdir\fortran"';
+    options.cvode_lib     = '"C:\Program Files (x86)\sundials-4.1.0\instdir\lib"';
 end
+
+%--- Unpack the options
+USE_RELEASE = options.USE_RELEASE;
+USE_CUDA    = options.USE_CUDA;
+USE_CVODE   = options.USE_CVODE;
 
 pause_time = 1; %Time to wait between making and moving the generated files
 mex_root = '../source/MagTenseMEX/MagTenseMEX/';
@@ -17,14 +30,14 @@ ForceIntegrator_path = '../source/MagneticForceIntegrator/MagneticForceIntegrato
 FortranCuda_path = '../source/MagTenseFortranCuda/cuda';
 
 if (ispc)
-    VS_STUDIO = true;
+    VS_STUDIO  = true;
     MKL_STATIC = true;
-    mkl_include = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include"';
-    mkl_lp64 = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\mkl\intel64\lp64"';
-    mkl_lib = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\lib"';
-    cuda_root = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\lib\x64"';
-    cvode_include = '"C:\Program Files (x86)\sundials-4.1.0\instdir\fortran"';
-    cvode_lib = '"C:\Program Files (x86)\sundials-4.1.0\instdir\lib"';
+    mkl_include   = options.mkl_include;
+    mkl_lp64      = options.mkl_lp64;
+    mkl_lib       = options.mkl_lib;
+    cuda_root     = options.cuda_root;
+    cvode_include = options.cvode_include;
+    cvode_lib     = options.cvode_lib;
     mex_suffix = 'w';
 else
     VS_STUDIO = false;

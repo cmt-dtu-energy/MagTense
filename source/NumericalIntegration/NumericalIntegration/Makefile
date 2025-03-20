@@ -17,7 +17,7 @@ LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
-	LIBTOOL = LIB $? /NOLOGO /OUT:$@
+	LIBTOOL = LIB $? /OUT:$@
 	LIB_SUFFIX = .lib
 	
 else
@@ -41,7 +41,7 @@ endif
 ifeq ($(USE_MATLAB),0)
 	MATLAB_OPT =
 else
-	MATLAB_OPT = -I"${MATLAB_INCLUDE}"
+	MATLAB_OPT = -I${MATLAB_INCLUDE}
 endif
 #=======================================================================
 #							Targets

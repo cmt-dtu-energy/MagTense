@@ -4,12 +4,23 @@ on: [push, workflow_dispatch]
 
 jobs:
   build-win:
-    runs-on: [Windows]
+    runs-on: [windows-latest]
     env:
       build_file: python/.build/environment_win.yml
     steps:
       - uses: actions/checkout@v4
 
+      #- name: Cmd.exe
+      #  shell: cmd /C CALL {0}
+      #  run: >-
+      #    "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && where lib
+          
+      #- name: Bash
+      #  shell: bash -el {0}
+      #  run: |
+      #    "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+      #    lib
+    
       - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -17,15 +28,148 @@ jobs:
           activate-environment: magtense-env
           environment-file: ${{ env.build_file }}
           use-mamba: true
-          installation-dir: ${{ runner.temp }}\miniconda3
+        #  installation-dir: ${{ runner.temp }}\miniconda3
 
-      - name: Start shell and run make
-        working-directory: ${{ github.workspace }}
-        shell: powershell.exe -NoExit -ExecutionPolicy ByPass -File {0}
+      #- name: Setup Miniforge
+      #  uses: conda-incubator/setup-miniconda@v3
+      #  with:
+      #    miniforge-version: latest
+      #    activate-environment: magtense-env
+      #    use-mamba: true
+
+      #- name: Cache conda
+      #  uses: actions/cache@v4
+      #  env:
+      #    # Increase this value to reset cache manually
+      #    cache_number: 0
+      #  with:
+      #    path: ${{ env.CONDA }}\envs
+      #    key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
+      #  id: cache
+
+      #- name: Update environment if needed
+      #  run: conda env update -n magtense-env -f ${{ env.build_file }}
+      #  if: steps.cache.outputs.cache-hit != 'true'
+
+      - name: Set up MATLAB R2024b
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2024b
+          
+      - name: Run Developer PowerShell for VS 2022
+        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+        run: |
+          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
+          .\Launch-VsDevShell.ps1
+          conda info
+          cd ${{ github.workspace }}
+          pwd
+          make magnetostatic micromagnetism forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
+            
+      - name: PowerShell
+        shell: powershell
+        run: |
+          cd C:\Users\runneradmin\\miniconda3\envs\magtense-env\Library 
+          mkdir compiler 
+          cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\compiler
+          mkdir 2024.2 
+          cd 2024.2 
+          cmd /c mklink /D bin C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\bin 
+          
+      - name: Cmd.exe 4
+        shell: cmd /C CALL {0}
         run: >-
-          make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2021b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest
-      - run: echo "Workflow done"
+          dir C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\compiler\2024.2
+      
+      - name: Compile MEX code using Matlab without CUDA and test
+        uses: matlab-actions/run-command@v2
+        with:
+          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -v -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; buildMagTenseMEX('USE_CUDA',false,'USE_CVODE',false,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64'); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
+          
+          
+          
+        
+      #- name: Bash
+      #  shell: bash -el {0}
+      #  run: make USE_CUDA=0 LIBPATH="C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64"
+      
+      #- name: PowerShell
+      #  shell: powershell
+      #  run: make USE_CUDA=0
+      
+      #- name: PowerShell Core
+      #  shell: pwsh
+      #  run: make USE_CUDA=0
+      
+      #- name: Cmd.exe
+      #  shell: cmd /C CALL {0}
+      #  run: >-
+      #    make USE_CUDA=0
+          
+      #- name: Start shell and run make
+      #  working-directory: ${{ github.workspace }}
+      #  shell: powershell.exe -NoExit -ExecutionPolicy ByPass -File {0}
+      #  run: >-
+      #    make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2021b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest
+      #- run: echo "Workflow done"
 
+      #- name: Run Developer PowerShell for VS 2022
+      #  shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      #  run: |
+      #    cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
+      #    .\Launch-VsDevShell.ps1
+      #    cd ${{ github.workspace }}
+      #    pwd
+
+      #- name: Cmd.exe
+      #  shell: cmd /C CALL {0}
+      #  run: >-
+      #    dir ${{ runner.temp }}\miniconda3\envs\magtense-env\Library\include
+
+      #- name: Bash
+      #  shell: bash -el {0}
+      #  run: |
+      #    conda info
+      #    conda list
+      
+      #- name: PowerShell
+      #  shell: powershell
+      #  run: |
+      #    conda info
+      #    conda list
+      
+      #- name: PowerShell Core
+      #  shell: pwsh
+      #  run: |
+      #    conda info
+      #    conda list
+      
+      #- name: Cmd.exe
+      #  shell: cmd /C CALL {0}
+      #  run: >-
+      #    conda info && conda list
+
+      #- name: Add msbuild to PATH
+      #  uses: microsoft/setup-msbuild@v2
+
+      #- name: Cmd.exe
+      #  shell: cmd /C CALL {0}
+      #  run: >-
+      #    "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && make USE_CUDA=0
+          
+      #- name: "LIB TESTER"
+      #  shell: powershell
+      #  run: |
+      #    cmd.exe /c "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+      #    lib
+  
+      #- name: "Compile"
+      #  shell: powershell
+      #  run: |
+      #    cmd.exe /c "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+      #    make USE_CUDA=0
+      
+      
   
   build-linux:
     strategy:
@@ -79,17 +223,17 @@ jobs:
     - name: Compile Fortran source code with CUDA including R2024a
       if: ${{ matrix.mat-version == 'R2024a' }}
       working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}
+      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include
 
     - name: Compile Fortran source code with CUDA including R2024b
       if: ${{ matrix.mat-version == 'R2024b' }}
       working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}
+      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include 
 
     - name: Compile MEX code using Matlab with CUDA
       uses: matlab-actions/run-command@v2
       with:
-        command: cd('matlab'); buildMagTenseMEX(1, 1, 0);
+        command: cd('matlab'); buildMagTenseMEX('USE_RELEASE', true, 'USE_CUDA', true, 'USE_CVODE', false);
 
     - name: Clean up the source files
       working-directory: ${{ github.workspace }}
@@ -98,17 +242,17 @@ jobs:
     - name: Compile Fortran source code without CUDA using R2024a
       if: ${{ matrix.mat-version == 'R2024a' }}
       working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}
+      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include
 
     - name: Compile Fortran source code without CUDA using R2024b
       if: ${{ matrix.mat-version == 'R2024b' }}
       working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}
+      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include
 
     - name: Compile MEX code using Matlab without CUDA and test
       uses: matlab-actions/run-command@v2
       with:
-        command: cd('matlab'); buildMagTenseMEX(1, 0, 0); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
+        command: cd('matlab'); buildMagTenseMEX('USE_RELEASE', true, 'USE_CUDA', false, 'USE_CVODE', false); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
 
     - name: Archive MEX-files
       uses: actions/upload-artifact@v4

@@ -6,6 +6,7 @@ USE_CVODE = 0
 USE_MICROMAG = 1
 USE_MATLAB = 0
 MATLAB_INCLUDE =
+
 # /usr/local/MATLAB/<version>/extern/include (Linux)
 # "C:\Program Files\MATLAB\<version>\extern\include" (Win)
 CPP = icx
