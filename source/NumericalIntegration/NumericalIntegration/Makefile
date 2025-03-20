@@ -18,7 +18,7 @@ LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
-	LIBTOOL = "${LIBPATH}\LIB" $? /NOLOGO /OUT:$@
+	LIBTOOL = "${LIBPATH}\LIB.exe" $? /NOLOGO /OUT:$@
 	LIB_SUFFIX = .lib
 	
 else
