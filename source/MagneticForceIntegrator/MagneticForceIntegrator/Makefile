@@ -5,7 +5,6 @@
 FC = gfortran
 FFLAGS =
 MATLAB_INCLUDE =
-LIBPATH = 
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
@@ -13,7 +12,7 @@ LIBSRC_SOURCES = MagForceIO MagForceMaxwellStressTensor MagneticForce
 
 ifeq ($(OS),Windows_NT)
 	LIB_SUFFIX = .lib
-	LIBTOOL = "${LIBPATH}\LIB.exe" $? /OUT:$@
+	LIBTOOL = LIB $? /OUT:$@
 else
 	LIB_SUFFIX = .a
 
