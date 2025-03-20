@@ -7,7 +7,7 @@ CVODE_ROOT =
 USE_MATLAB =
 MATLAB_INCLUDE =
 FFLAGS =
-LIBPATH = C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64
+LIBPATH = 
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================

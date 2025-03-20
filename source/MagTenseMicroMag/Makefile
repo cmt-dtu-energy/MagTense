@@ -7,7 +7,7 @@ USE_CVODE =
 CVODE_ROOT =
 USE_MATLAB =
 MATLAB_INCLUDE =
-
+LIBPATH = 
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
@@ -28,7 +28,7 @@ ifeq ($(OS),Windows_NT)
 	CONDA_PATH = $(subst \,/,${CONDA_PREFIX})
 	MKL_ROOT = ${CONDA_PATH}/Library
 	OPT = -I${CONDA_PATH}/opt/compiler/include/intel64
-	LIBTOOL = LIB $? /NOLOGO /OUT:$@
+	LIBTOOL = "${LIBPATH}\LIB.exe" $? /OUT:$@
 	LIB_SUFFIX = .lib
 else
 	MKL_ROOT = ${CONDA_PREFIX}
