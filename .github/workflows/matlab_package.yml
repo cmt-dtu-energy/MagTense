@@ -42,9 +42,9 @@ jobs:
         run: >-
           conda info && conda list
 
-      - name: Bash
-        shell: bash -el {0}
-        run: make USE_CUDA=0
+      #- name: Bash
+      #  shell: bash -el {0}
+      #  run: make USE_CUDA=0
       
       - name: PowerShell
         shell: powershell
