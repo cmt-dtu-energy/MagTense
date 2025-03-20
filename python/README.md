@@ -183,31 +183,6 @@ twine upload dist/*
 ```
 
 
-## Distribution on [Anaconda](https://anaconda.org/cmt-dtu-energy/magtense)
-
-### Required compilers have to be pre-installed
-
-- [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#inpage-nav-6-undefined)
-- [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
-
-```bash
-conda install -y anaconda-client conda-build
-
-# Add nvidia channel to find CUDA and intel libraries
-# conda config --show channels
-conda config --env --append channels nvidia/label/cuda-12.6.3
-conda config --env --append channels https://software.repos.intel.com/python/conda/
-conda config --env --append channels conda-forge
-
-# Quick fix for now
-# Copy pre-compiled Python extension to python/src/magtense/lib
-# Build conda seperately for each version
-
-# Version numbers have to be set in advance in pyproject.toml
-cd python/
-python .build/dist_conda.py
-```
-
 ## Read-in customized M-H-curve
 
 This feature is currently only supported for soft magnetic tiles ([type=2](magtense/magtense.py#L49)).
