@@ -46,9 +46,9 @@ jobs:
       #  shell: bash -el {0}
       #  run: make USE_CUDA=0
       
-      - name: PowerShell
-        shell: powershell
-        run: make USE_CUDA=0
+      #- name: PowerShell
+      #  shell: powershell
+      #  run: make USE_CUDA=0
       
       - name: PowerShell Core
         shell: pwsh
