@@ -48,7 +48,7 @@ jobs:
       - name: Cmd.exe
         shell: cmd /C CALL {0}
         run: >-
-          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && lib && make USE_CUDA=0
+          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && make USE_CUDA=0
           
       - name: "LIB TESTER"
         shell: powershell
