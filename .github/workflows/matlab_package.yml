@@ -44,6 +44,17 @@ jobs:
 
       #- name: Add msbuild to PATH
       #  uses: microsoft/setup-msbuild@v2
+
+      - name: Cmd.exe
+        shell: cmd /C CALL {0}
+        run: >-
+          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && lib && make USE_CUDA=0
+          
+      - name: "LIB TESTER"
+        shell: powershell
+        run: |
+          cmd.exe /c "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          lib
   
       - name: "Compile"
         shell: powershell
