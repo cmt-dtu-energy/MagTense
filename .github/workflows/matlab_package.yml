@@ -75,7 +75,7 @@ jobs:
       
       - name: Bash
         shell: bash -el {0}
-        run: make USE_CUDA=0 LIBPATH='C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64'
+        run: make USE_CUDA=0 LIBPATH="C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64"
       
       #- name: PowerShell
       #  shell: powershell

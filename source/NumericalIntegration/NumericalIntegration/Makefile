@@ -7,7 +7,10 @@ CVODE_ROOT =
 USE_MATLAB =
 MATLAB_INCLUDE =
 FFLAGS =
-LIBPATH = 
+LIBPATH =
+E =
+S = $E $E
+ 
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
@@ -18,7 +21,7 @@ LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
-	LIBTOOL = "${LIBPATH}\LIB.exe" $? /OUT:$@
+	LIBTOOL = "$(subst ^,$S,$(var))\LIB.exe" $? /OUT:$@
 	LIB_SUFFIX = .lib
 	
 else
