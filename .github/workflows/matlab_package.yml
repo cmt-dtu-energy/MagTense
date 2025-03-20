@@ -4,7 +4,7 @@ on: [push, workflow_dispatch]
 
 jobs:
   build-win:
-    runs-on: [Windows]
+    runs-on: [windows-latest]
     env:
       build_file: python/.build/environment_win.yml
     steps:
