@@ -50,9 +50,9 @@ jobs:
       #  shell: powershell
       #  run: make USE_CUDA=0
       
-      - name: PowerShell Core
-        shell: pwsh
-        run: make USE_CUDA=0
+      #- name: PowerShell Core
+      #  shell: pwsh
+      #  run: make USE_CUDA=0
       
       - name: Cmd.exe
         shell: cmd /C CALL {0}
