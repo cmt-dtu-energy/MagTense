@@ -21,7 +21,8 @@ LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
-	LIBTOOL = "$(subst ^,$S,$(var))\LIB.exe" $? /OUT:$@
+	#LIBTOOL = "$(subst ^,$S,$(var))\LIB.exe" $? /OUT:$@
+	LIBTOOL = LIB $? /OUT:$@
 	LIB_SUFFIX = .lib
 	
 else
