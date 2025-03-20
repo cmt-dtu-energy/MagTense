@@ -7,6 +7,7 @@ CVODE_ROOT =
 USE_MATLAB =
 MATLAB_INCLUDE =
 FFLAGS =
+LIBPATH = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64\"
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
@@ -17,7 +18,7 @@ LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
-	LIBTOOL = LIB $? /NOLOGO /OUT:$@
+	LIBTOOL = ${LIBPATH}LIB $? /NOLOGO /OUT:$@
 	LIB_SUFFIX = .lib
 	
 else
