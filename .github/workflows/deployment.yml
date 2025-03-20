@@ -1,0 +1,37 @@
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-testing:
+    name: Build and test pip-wheels
+    uses: ./.github/workflows/linux-python-package-conda.yml
+  
+  pypi-publish:
+    name: Upload release to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/magtense/
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+    steps:
+    - name: Download py312 pip-wheel
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py312-cu12
+
+    - name: Download py313 pip-wheel
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py313-cu12
+
+    - name: Move wheels to dist/
+      run: |
+        mkdir dist/
+        mv ${{ github.workspace }}/*.whl dist/
+
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
