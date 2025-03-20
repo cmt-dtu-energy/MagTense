@@ -10,6 +10,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cmd.exe
+        shell: cmd /C CALL {0}
+        run: >-
+          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && where lib
+          
+      - name: Bash
+        shell: bash -el {0}
+        run: |
+          "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          lib
+
       - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
