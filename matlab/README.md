@@ -1,6 +1,43 @@
-# Usage with Matlab
+# Using MagTense with Matlab
 
-## Compilation with Visual Studio
+Using MagTense with Matlab is as easy as downloading the latest [release](https://github.com/cmt-dtu-energy/MagTense/releases) as this contains MEX-files for both Windows and Linux. The example scripts provided with the release, also available [here](https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples), shows how to call the MEX-functions from Matlab.
+
+# Compiling MEX-files for Matlab yourself
+
+If you want to compile your own MEX-files, the guide below shows how to do so.
+
+## Compilation on Linux using make
+To build the MEX-files on Linux using make (at present without the additional CVODE libraries), one can simply use the python environment provided with MagTense to install all required compilers etc. All that is required is an installation of Matlab present on the machine.
+
+One starts by doing a clone of the MagTense repository, followed by installing the required linux packages, which are
+```
+sudo apt install make
+sudo apt install gcc
+sudo apt install gfortran
+```
+where gfortran is only required to make Matlab acknowledge that a fortran MEX-compiler exists - otherwise it is not utilized.
+
+Next Miniconda (or Anaconda) must be installed, after which the MagTense conda environment with all necessary compilers can be created using
+
+```
+conda env create -f python/.build/env-313-linux.yml
+conda activate magtense-env
+```
+
+Following this compilation of the MagTense Fortran files is as simple as
+
+```
+make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=path_to_matlab/extern/include MKL_ROOT=${CONDA_PREFIX}
+```
+Please set the `path_to_matlab` and set `USE_CUDA=0` if the machine does not have a CUDA-supported GPU.
+
+Finally, start up Matlab, and first setup the MEX-compiler using `mex -setup FORTRAN` and then run 
+```
+buildMagTenseMEX(1, 1, 0)
+```
+to build the MEX-files. If you want to build without CUDA, please do `buildMagTenseMEX(1, 0, 0)`
+
+## Compilation with Visual Studio on Windows
 
 If you want to compile MagTense with a Visual Studio project file for Windows, [MagTense.sln](../MagTense.sln), is available, as well as a Matlab function to build the MEX-files, [buildMagTenseMEX.m](buildMagTenseMEX.m). MagTense utilizes Intel MKL for the micromagnetic simlations and can also utilize CUDA and CVODE. The Visual Studio environment has configuration for Release, Debug as well as for configurations included NO_CUDA and NO_CVODE.
 
