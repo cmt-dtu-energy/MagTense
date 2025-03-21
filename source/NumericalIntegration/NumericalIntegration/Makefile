@@ -41,7 +41,7 @@ endif
 ifeq ($(USE_MATLAB),0)
 	MATLAB_OPT =
 else
-	MATLAB_OPT = -I"${MATLAB_INCLUDE}"
+	MATLAB_OPT = -I${MATLAB_INCLUDE}
 endif
 #=======================================================================
 #							Targets
