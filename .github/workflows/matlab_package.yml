@@ -51,10 +51,25 @@ jobs:
       #    use-mamba: true
         #  installation-dir: ${{ runner.temp }}\miniconda3
     
+      - name: Cmd.exe 2
+        shell: cmd /C CALL {0}
+        run: >-
+          cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library && dir
+        
+      - name: Cmd.exe 3
+        shell: cmd /C CALL {0}
+        run: >-
+          cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library && mkdir compiler && cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\compiler
+          
+      - name: Cmd.exe 4
+        shell: cmd /C CALL {0}
+        run: >-
+          cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\compiler
+      
       - name: Bash
         shell: bash -el {0}
         run: |
-          cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library 
+          cd C:/Users/runneradmin/miniconda3/envs/magtense-env/Library 
           mkdir compiler 
           cd compiler 
           mkdir 2024.2 
