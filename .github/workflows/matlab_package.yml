@@ -27,6 +27,15 @@ jobs:
       #  with:
       #    platform: x64
     
+      - name: Setup Miniforge
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: magtense-env
+          environment-file: ${{ env.build_file }}
+          use-mamba: true
+          installation-dir: ${{ runner.temp }}\miniconda3
+    
       - name: Cmd.exe 1
         shell: cmd /C CALL {0}
         run: >-
@@ -56,14 +65,7 @@ jobs:
           cd ${{ github.workspace }}
           pwd
 
-      - name: Setup Miniforge
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: latest
-          activate-environment: magtense-env
-          environment-file: ${{ env.build_file }}
-          use-mamba: true
-          installation-dir: ${{ runner.temp }}\miniconda3
+      
 
       - name: Compile MEX code using Matlab without CUDA and test
         uses: matlab-actions/run-command@v2
