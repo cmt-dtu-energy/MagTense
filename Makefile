@@ -49,7 +49,7 @@ STANDALONE_PATH = source/MagTense_StandAlone/MagTense_StandAlone
 FORCEINTEGRATOR_PATH = source/MagneticForceIntegrator/MagneticForceIntegrator
 
 VPATH = ${NUM_INT_PATH}:${TILE_DEMAG_TENSOR_PATH}:${DEMAG_FIELD_PATH}:\
-${MICROMAG_PATH}:${FORTRAN_CUDA_PATH}
+${MICROMAG_PATH}:${FORTRAN_CUDA_PATH}:${STANDALONE_PATH}:${FORCEINTEGRATOR_PATH}
 
 ifeq ($(OS),Windows_NT)
 	CONDA_PATH = $(subst \,/,${CONDA_PREFIX})
@@ -71,7 +71,7 @@ ifeq ($(OS),Windows_NT)
 else
  	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
 	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
-	CVODE_ROOT = "/usr/local/sundials-4.1.0/instdir"
+	CVODE_ROOT = ${MKFILE_PATH}/cvode
 	LDFLAGS =
 	LIB_SUFFIX = .a
 	PY_MOD_SUFFIX = .so
@@ -167,7 +167,7 @@ clean:
 	cd $(STANDALONE_PATH) && ${MAKE} clean
 	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
-	rm -f -r ${PYTHON_LIBPATH}/build
+	rm -rf ${PYTHON_LIBPATH}/build
 
 magnetostatic:
 	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
