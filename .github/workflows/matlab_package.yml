@@ -31,11 +31,12 @@ jobs:
         shell: cmd /C CALL {0}
         run: >-
           cd C:\Users\github_runner\.conda\envs\magtense-env\Library\bin && mkdir compiler && cd compiler && mkdir 2024.2 && cd 2024.2
-      
-      - name: Cmd.exe 2
-        shell: cmd /C CALL {0}
-        run: >-
-          cd C:\Users\github_runner\.conda\envs\magtense-env\Library\compiler\2024.2 && mklink C:\Users\github_runner\.conda\envs\magtense-env\Library\bin bin
+           
+      - name: PowerShell
+        shell: powershell
+        run: |
+          cd C:\Users\github_runner\.conda\envs\magtense-env\Library\compiler\2024.2
+          mklink C:\Users\github_runner\.conda\envs\magtense-env\Library\bin bin
           
       - name: Set up MATLAB R2024b
         uses: matlab-actions/setup-matlab@v2
