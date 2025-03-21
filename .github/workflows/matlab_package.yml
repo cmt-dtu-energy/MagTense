@@ -27,26 +27,26 @@ jobs:
       #  with:
       #    platform: x64
     
-    - name: Setup Miniforge
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        miniforge-version: latest
-        activate-environment: magtense-env
-        use-mamba: true
+      - name: Setup Miniforge
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: magtense-env
+          use-mamba: true
 
-    - name: Cache conda
-      uses: actions/cache@v4
-      env:
-        # Increase this value to reset cache manually
-        cache_number: 0
-      with:
-        path: ${{ env.CONDA }}/envs
-        key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
-      id: cache
+      - name: Cache conda
+        uses: actions/cache@v4
+        env:
+          # Increase this value to reset cache manually
+          cache_number: 0
+        with:
+          path: ${{ env.CONDA }}/envs
+          key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
+        id: cache
 
-    - name: Update environment if needed
-      run: conda env update -n magtense-env -f ${{ env.build_file }}
-      if: steps.cache.outputs.cache-hit != 'true'
+      - name: Update environment if needed
+        run: conda env update -n magtense-env -f ${{ env.build_file }}
+        if: steps.cache.outputs.cache-hit != 'true'
       
       #- name: Setup Miniforge
       #  uses: conda-incubator/setup-miniconda@v3
