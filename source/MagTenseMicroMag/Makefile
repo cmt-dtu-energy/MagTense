@@ -14,7 +14,7 @@ LIBSRC_SOURCES = MicroMagParameters util_micromag DemagAuxFunctions FortranCuda
 
 ifeq (${USE_MATLAB},1)
 	LIBSRC_SOURCES += MagTenseMicroMagIO
-	MATLAB_OPT = -I"${MATLAB_INCLUDE}"
+	MATLAB_OPT = -I${MATLAB_INCLUDE}
 else
 	LIBSRC_SOURCES += MagTenseMicroMagPyIO
 	MATLAB_OPT =
