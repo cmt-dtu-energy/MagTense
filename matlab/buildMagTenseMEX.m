@@ -13,12 +13,15 @@ arguments
     options.cuda_root     = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\lib\x64"';
     options.cvode_include = '"C:\Program Files (x86)\sundials-4.1.0\instdir\fortran"';
     options.cvode_lib     = '"C:\Program Files (x86)\sundials-4.1.0\instdir\lib"';
+
+    options.VS_STUDIO {mustBeNumericOrLogical} = false;
 end
 
 %--- Unpack the options
-USE_RELEASE = options.USE_RELEASE;
-USE_CUDA    = options.USE_CUDA;
-USE_CVODE   = options.USE_CVODE;
+USE_RELEASE   = options.USE_RELEASE;
+USE_CUDA      = options.USE_CUDA;
+USE_CVODE     = options.USE_CVODE;
+VS_STUDIO     = options.VS_STUDIO;
 
 pause_time = 1; %Time to wait between making and moving the generated files
 mex_root = '../source/MagTenseMEX/MagTenseMEX/';
@@ -30,7 +33,6 @@ ForceIntegrator_path = '../source/MagneticForceIntegrator/MagneticForceIntegrato
 FortranCuda_path = '../source/MagTenseFortranCuda/cuda';
 
 if (ispc)
-    VS_STUDIO  = true;
     MKL_STATIC = true;
     mkl_include   = options.mkl_include;
     mkl_lp64      = options.mkl_lp64;
@@ -89,7 +91,11 @@ if (USE_CUDA)
 else
     CUDA = '';
     OBJS = '';
-    BUILD_MagTenseMicroMag = [BUILD '_no_CUDA'];
+    if (VS_STUDIO)
+        BUILD_MagTenseMicroMag = [BUILD '_no_CUDA'];
+    else
+        BUILD_MagTenseMicroMag = BUILD;
+    end
 end
 
 if (USE_CVODE)
@@ -99,8 +105,10 @@ if (USE_CVODE)
 else
     CVODE_include = '';
     CVODE = '';
-    BUILD = [BUILD '_no_CVODE'];
-    BUILD_MagTenseMicroMag = [BUILD_MagTenseMicroMag '_no_CVODE'];
+    if (VS_STUDIO)
+        BUILD = [BUILD '_no_CVODE'];
+        BUILD_MagTenseMicroMag = [BUILD_MagTenseMicroMag '_no_CVODE'];
+    end
 end
 
 if (VS_STUDIO)
