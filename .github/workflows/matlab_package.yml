@@ -95,7 +95,7 @@ jobs:
           conda info
           cd ${{ github.workspace }}
           pwd
-          make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0 MATLAB_INCLUDE= MKL_ROOT=${{ runner.temp }}\miniconda3\envs\magtense-env\Library\include
+          make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0 MATLAB_INCLUDE= MKL_ROOT=${{ runner.temp }}\miniconda3\envs\magtense-env\Library
         
       #- name: Bash
       #  shell: bash -el {0}
