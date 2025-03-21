@@ -13,9 +13,11 @@ MATLAB_INCLUDE =
 LIBSRC_SOURCES = MicroMagParameters util_micromag DemagAuxFunctions FortranCuda
 
 ifeq (${USE_MATLAB},1)
+    OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
 	LIBSRC_SOURCES += MagTenseMicroMagIO
 	MATLAB_OPT = -I${MATLAB_INCLUDE}
 else
+    OPT =
 	LIBSRC_SOURCES += MagTenseMicroMagPyIO
 	MATLAB_OPT =
 endif
@@ -56,7 +58,7 @@ DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
 all: pre-build ${STATIC_LIB}
 
 .f90.o:
-	${FC} ${FFLAGS} -I${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} ${OPT} ${MATLAB_OPT} -c $< -o $@
+	${FC} ${FFLAGS} -I${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} ${OPT} ${MATLAB_OPT} ${OPT} -c $< -o $@
 
 pre-build:
 	cd ${NUM_INT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"

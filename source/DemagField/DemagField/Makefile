@@ -13,9 +13,11 @@ MATLAB_INCLUDE =
 LIBSRC_SOURCES = DemagFieldGetSolution MagParameters spline IterateMagnetSolution
 
 ifeq ($(USE_MATLAB),1)
+    OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
 	LIBSRC_SOURCES += MagTileIO
 	MATLAB_OPT = -I${MATLAB_INCLUDE}
 else
+    OPT =
 	MATLAB_OPT =
 endif
 
