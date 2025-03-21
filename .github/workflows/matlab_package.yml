@@ -64,10 +64,8 @@ jobs:
           conda info
           cd ${{ github.workspace }}
           pwd
-          make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=D:\hostedtoolcache\windows\MATLAB\2024.2.999\x64 MKL_ROOT=C:\Users\runneradmin\miniconda3\envs\magtense-env\Library
-           
-      
-      
+          make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64
+            
       - name: PowerShell
         shell: powershell
         run: |
@@ -222,12 +220,12 @@ jobs:
     - name: Compile Fortran source code with CUDA including R2024a
       if: ${{ matrix.mat-version == 'R2024a' }}
       working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}
+      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include
 
     - name: Compile Fortran source code with CUDA including R2024b
       if: ${{ matrix.mat-version == 'R2024b' }}
       working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}
+      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include 
 
     - name: Compile MEX code using Matlab with CUDA
       uses: matlab-actions/run-command@v2
@@ -241,12 +239,12 @@ jobs:
     - name: Compile Fortran source code without CUDA using R2024a
       if: ${{ matrix.mat-version == 'R2024a' }}
       working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}
+      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include
 
     - name: Compile Fortran source code without CUDA using R2024b
       if: ${{ matrix.mat-version == 'R2024b' }}
       working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include MKL_ROOT=${CONDA_PREFIX}
+      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include
 
     - name: Compile MEX code using Matlab without CUDA and test
       uses: matlab-actions/run-command@v2
