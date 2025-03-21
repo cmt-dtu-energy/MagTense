@@ -28,39 +28,8 @@ jobs:
           activate-environment: magtense-env
           environment-file: ${{ env.build_file }}
           use-mamba: true
-          installation-dir: ${{ runner.temp }}\miniconda3
+          #installation-dir: ${{ runner.temp }}\miniconda3
 
-      - name: Run Developer PowerShell for VS 2022
-        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-        run: |
-          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-          .\Launch-VsDevShell.ps1
-          conda info
-          cd ${{ github.workspace }}
-          pwd
-          make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0 MATLAB_INCLUDE= MKL_ROOT=${{ runner.temp }}\miniconda3\envs\magtense-env\Library
-           
-      - name: Setup Miniforge
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: latest
-          activate-environment: magtense-env
-          use-mamba: true
-
-      - name: Cache conda
-        uses: actions/cache@v4
-        env:
-          # Increase this value to reset cache manually
-          cache_number: 0
-        with:
-          path: ${{ env.CONDA }}\envs
-          key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
-        id: cache
-
-      - name: Update environment if needed
-        run: conda env update -n magtense-env -f ${{ env.build_file }}
-        if: steps.cache.outputs.cache-hit != 'true'
-      
       - name: Run Developer PowerShell for VS 2022
         shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
         run: |
@@ -70,7 +39,28 @@ jobs:
           cd ${{ github.workspace }}
           pwd
           make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=D:\hostedtoolcache\windows\MATLAB\2024.2.999\x64 MKL_ROOT=C:\Users\runneradmin\miniconda3\envs\magtense-env\Library
-    
+           
+      #- name: Setup Miniforge
+      #  uses: conda-incubator/setup-miniconda@v3
+      #  with:
+      #    miniforge-version: latest
+      #    activate-environment: magtense-env
+      #    use-mamba: true
+
+      #- name: Cache conda
+      #  uses: actions/cache@v4
+      #  env:
+      #    # Increase this value to reset cache manually
+      #    cache_number: 0
+      #  with:
+      #    path: ${{ env.CONDA }}\envs
+      #    key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
+      #  id: cache
+
+      #- name: Update environment if needed
+      #  run: conda env update -n magtense-env -f ${{ env.build_file }}
+      #  if: steps.cache.outputs.cache-hit != 'true'
+      
       - name: PowerShell
         shell: powershell
         run: |
@@ -86,21 +76,11 @@ jobs:
         run: >-
           dir C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\compiler\2024.2
       
-      #- name: Cmd.exe 1
-      #  shell: cmd /C CALL {0}
-      #  run: >-
-      #    dir C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\compiler\2024.2\bin
-
       - name: Set up MATLAB R2024b
         uses: matlab-actions/setup-matlab@v2
         with:
           release: R2024b    
         
-      - name: Get MEX to work
-        uses: matlab-actions/run-command@v2
-        with:
-          command:     
-
       - name: Compile MEX code using Matlab without CUDA and test
         uses: matlab-actions/run-command@v2
         with:
