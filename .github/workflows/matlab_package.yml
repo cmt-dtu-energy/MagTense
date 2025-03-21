@@ -20,12 +20,6 @@ jobs:
       #  run: |
       #    "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
       #    lib
-
-
-      #- name: Set up MinGW
-      #  uses: egor-tensin/setup-mingw@v2
-      #  with:
-      #    platform: x64
     
       - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
@@ -40,7 +34,7 @@ jobs:
           # Increase this value to reset cache manually
           cache_number: 0
         with:
-          path: ${{ env.CONDA }}/envs
+          path: ${{ env.CONDA }}\envs
           key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
         id: cache
 
@@ -57,138 +51,7 @@ jobs:
       #    use-mamba: true
         #  installation-dir: ${{ runner.temp }}\miniconda3
     
-      - name: Cmd.exe 1
-        shell: cmd /C CALL {0}
-        run: >-
-          cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\bin && mkdir compiler && cd compiler && mkdir 2024.2 && cd 2024.2
-           
-      - name: Cmd.exe 1
-        shell: cmd /C CALL {0}
-        run: >-
-          mklink /D bin C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\bin 
       
-      - name: Set up MATLAB R2024b
-        uses: matlab-actions/setup-matlab@v2
-        with:
-          release: R2024b    
-        
-      - name: Get MEX to work
-        uses: matlab-actions/run-command@v2
-        with:
-          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -v -setup FORTRAN;
-      
-
-      - name: Run Developer PowerShell for VS 2022
-        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-        run: |
-          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-          .\Launch-VsDevShell.ps1
-          cd ${{ github.workspace }}
-          pwd
-
-      
-
-      - name: Compile MEX code using Matlab without CUDA and test
-        uses: matlab-actions/run-command@v2
-        with:
-          command: mex -v -setup FORTRAN;
-
-      - name: Cmd.exe
-        shell: cmd /C CALL {0}
-        run: >-
-          dir ${{ runner.temp }}\miniconda3\envs\magtense-env\Library\include
-
-      - name: Bash
-        shell: bash -el {0}
-        run: |
-          conda info
-          conda list
-      
-      - name: PowerShell
-        shell: powershell
-        run: |
-          conda info
-          conda list
-      
-      - name: PowerShell Core
-        shell: pwsh
-        run: |
-          conda info
-          conda list
-      
-      - name: Cmd.exe
-        shell: cmd /C CALL {0}
-        run: >-
-          conda info && conda list
-
-      #- name: Add msbuild to PATH
-      #  uses: microsoft/setup-msbuild@v2
-
-      #- name: Cmd.exe
-      #  shell: cmd /C CALL {0}
-      #  run: >-
-      #    "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && make USE_CUDA=0
-          
-      #- name: "LIB TESTER"
-      #  shell: powershell
-      #  run: |
-      #    cmd.exe /c "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-      #    lib
-  
-      #- name: "Compile"
-      #  shell: powershell
-      #  run: |
-      #    cmd.exe /c "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-      #    make USE_CUDA=0
-      
-      - name: Run Developer PowerShell for VS 2022
-        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-        run: |
-          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-          .\Launch-VsDevShell.ps1
-          conda info
-          cd ${{ github.workspace }}
-          pwd
-          make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=D:\hostedtoolcache\windows\MATLAB\2024.2.999\x64 MKL_ROOT=${{ runner.temp }}\miniconda3\envs\magtense-env\Library
-      
-      - name: Set up MinGW
-        uses: egor-tensin/setup-mingw@v2
-        with:
-          platform: x64
-    
-      - name: Set up MATLAB R2024b
-        uses: matlab-actions/setup-matlab@v2
-        with:
-          release: R2024b    
-        
-      - name: Compile MEX code using Matlab without CUDA and test
-        uses: matlab-actions/run-command@v2
-        with:
-          command: mex -setup FORTRAN; cd('matlab'); buildMagTenseMEX(1, 0, 0); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
-        
-      #- name: Bash
-      #  shell: bash -el {0}
-      #  run: make USE_CUDA=0 LIBPATH="C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64"
-      
-      #- name: PowerShell
-      #  shell: powershell
-      #  run: make USE_CUDA=0
-      
-      #- name: PowerShell Core
-      #  shell: pwsh
-      #  run: make USE_CUDA=0
-      
-      #- name: Cmd.exe
-      #  shell: cmd /C CALL {0}
-      #  run: >-
-      #    make USE_CUDA=0
-          
-      #- name: Start shell and run make
-      #  working-directory: ${{ github.workspace }}
-      #  shell: powershell.exe -NoExit -ExecutionPolicy ByPass -File {0}
-      #  run: >-
-      #    make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2021b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest
-      #- run: echo "Workflow done"
 
   
   build-linux:
