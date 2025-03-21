@@ -28,7 +28,7 @@ jobs:
           activate-environment: magtense-env
           environment-file: ${{ env.build_file }}
           use-mamba: true
-          installation-dir: ${{ runner.temp }}\miniconda3
+        #  installation-dir: ${{ runner.temp }}\miniconda3
 
       - name: Run Developer PowerShell for VS 2022
         shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
@@ -38,7 +38,7 @@ jobs:
           conda info
           cd ${{ github.workspace }}
           pwd
-          make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0 MATLAB_INCLUDE=D:\hostedtoolcache\windows\MATLAB\2024.2.999\x64 MKL_ROOT=${{ runner.temp }}\miniconda3\envs\magtense-env\Library
+          make USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0 MATLAB_INCLUDE= MKL_ROOT=C:\Users\runneradmin\miniconda3\envs\magtense-env\Library
            
       #- name: Setup Miniforge
       #  uses: conda-incubator/setup-miniconda@v3
