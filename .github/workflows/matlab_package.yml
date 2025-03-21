@@ -105,7 +105,7 @@ jobs:
       - name: Compile MEX code using Matlab without CUDA and test
         uses: matlab-actions/run-command@v2
         with:
-          command: cd('matlab'); buildMagTenseMEX(1, 0, 0); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
+          command: mex -setup FORTRAN; cd('matlab'); buildMagTenseMEX(1, 0, 0); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
         
       #- name: Bash
       #  shell: bash -el {0}
