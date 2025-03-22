@@ -12,6 +12,7 @@ jobs:
   pypi-publish:
     name: Upload release to PyPI
     runs-on: ubuntu-latest
+    needs: build-and-testing
     environment:
       name: testpypi
       url: https://test.pypi.org/project/magtense/
@@ -32,8 +33,7 @@ jobs:
       run: |
         mkdir dist/
         mv ${{ github.workspace }}/*.whl dist/
+        ls -al dist/
 
-    - name: Publish package distributions to PyPI
+    - name: Publish package distributions to TestPyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
