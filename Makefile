@@ -53,7 +53,7 @@ ${MICROMAG_PATH}:${FORTRAN_CUDA_PATH}:${STANDALONE_PATH}:${FORCEINTEGRATOR_PATH}
 
 ifeq ($(OS),Windows_NT)
 	CONDA_PATH = $(subst \,/,${CONDA_PREFIX})
-	CUDA = -L${CONDA_PATH}/Library/lib -lcublas -lcudart -lcuda -lcusparse
+	CUDA_ROOT = ${CONDA_PATH}/Library/lib
 	MKL = -L${CONDA_PATH}/Library/lib -lmkl_intel_lp64_dll -lmkl_intel_thread_dll \
 		-lmkl_core_dll -lmkl_blas95_lp64 -llibiomp5md
 	CVODE_ROOT = "C:\Program Files (x86)\sundials-4.1.0\instdir"
@@ -70,7 +70,7 @@ ifeq ($(OS),Windows_NT)
 	endif
 else
  	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
-	CUDA = -L${CONDA_PREFIX}/lib -lcublas -lcudart -lcuda -lcusparse
+	CUDA_ROOT = ${CONDA_PREFIX}/lib
 	CVODE_ROOT = ${MKFILE_PATH}/cvode
 	LDFLAGS =
 	LIB_SUFFIX = .a
@@ -127,12 +127,20 @@ ifeq ($(USE_CUDA),0)
 	CUDA =
 else
 	COMPILE_CUDA = cuda
+	CUDA = -L${CUDA_ROOT} -lcublas -lcudart -lcuda -lcusparse
 	CP_LIB += && cp ${FORTRAN_CUDA_PATH}/libCuda${LIB_SUFFIX} .
 	ifeq ($(OS),Windows_NT)
 		LIB_OPT += -llibCuda
 	else
 		LIB_OPT += -lCuda
 	endif
+endif
+
+ifeq ($(USE_CVODE),0)
+	CVODE =
+else
+	CVODE = -L${CVODE_ROOT}/lib -lsundials_fcore_mod -lsundials_fcvode_mod \
+		-lsundials_fnvecserial_mod -lsundials_fsunmatrixdense_mod -lsundials_fsunlinsolspgmr_mod
 endif
 
 INCLUDE_OBJ = ${MKFILE_PATH}/${NUM_INT_PATH} \

@@ -9,6 +9,7 @@ jobs:
     strategy:
       matrix:
         py-version: [312, 313]
+        cvode: [0]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -40,6 +41,24 @@ jobs:
     - name: Update environment
       run: conda env update -n magtense-env -f ${{ env.build_file }}
       if: steps.cache.outputs.cache-hit != 'true'
+
+    - name: Download cvode (sundials-7.2.1)
+      working-directory: ${{ github.workspace }}
+      if: ${{ matrix.cvode == 1 }}
+      run: |
+        wget https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz
+        tar -xf cvode-7.2.1.tar.gz
+        mkdir cvode
+        mv cvode-7.2.1 cvode/srcdir
+        mkdir cvode/builddir
+    
+    - name: Compile cvode for Fortran
+      working-directory: ${{ github.workspace }}/cvode/builddir/
+      if: ${{ matrix.cvode == 1 }}
+      run: |
+        cmake -DCMAKE_INSTALL_PREFIX=.. -DEXAMPLES_INSTALL_PATH=../examples -DCMAKE_C_COMPILER=${CONDA_PREFIX}/bin/icx -DCMAKE_C_FLAGS=-Wunused-command-line-argument -DCMAKE_Fortran_COMPILER=${CONDA_PREFIX}/bin/ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON -DENABLE_CUDA=ON ../srcdir
+        make
+        make install
     
     - name: Create directory for wrappers of compiled Fortran source code
       run: |
@@ -49,16 +68,22 @@ jobs:
     - name: Compile Fortran source code and build Python wrappers
       working-directory: ${{ github.workspace }}
       run: |
-        make python USE_CUDA=0
+        make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
         cp magtensesource.*.so ${{ github.workspace }}/python/cpu_libs/
         make clean
-        make python USE_CUDA=1
+        make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
         cp magtensesource.*.so ${{ github.workspace }}/python/cu12_libs/
         make clean
 
-    - name: Build pip-wheels
+    - name: Build pip-wheels with cvode
+      if: ${{ matrix.cvode == 1 }}
       working-directory: ${{ github.workspace }}/python/
-      run: python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --platform linux
+      run: python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --platform linux --cvode
+
+    - name: Build pip-wheels without cvode
+      if: ${{ matrix.cvode == 0 }}
+      working-directory: ${{ github.workspace }}/python/
+      run: python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --platform linux --no-cvode
 
     - name: cpu - Archive pip-wheel
       uses: actions/upload-artifact@v4
