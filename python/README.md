@@ -38,8 +38,9 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
   ```
 
 - Compile Fortran source files
+
   ```bash
-  make python
+  make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0
   ```
 
 #### Windows
@@ -152,7 +153,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 ### Install local editable magtense package
 
 ```bash
-cp python/.build/requirements_dev.txt python/.build/requirements.txt
+cp python/.build/requirements-py3-dev.txt python/requirements.txt
 python3 -m pip install -e ./python
 ```
 
@@ -163,6 +164,12 @@ The `python/.build/` contains requirement-files, which are shipped with the resp
 ```bash
 python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm
 python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cusparse-cu12 nvidia-nvjitlink-cu12 # only required for cuda support
+```
+
+For the local editable version of `magtense` with `cvode`, the respective libraries have to be search for in the active terminal: 
+
+```bash
+export LD_LIBRARY_PATH=/path/to/MagTense/cvode/lib:$LD_LIBRARY_PATH
 ```
 
 ## Install CVODE from sundials-7.2.1
