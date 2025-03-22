@@ -12,6 +12,7 @@ def std_prob_3(
     res: List[int] = [10, 10, 10],
     L_loop: np.ndarray = np.linspace(8, 9, 10),
     cuda: bool = False,
+    cvode: bool = False,
     show: bool = True,
     show_details: bool = False,
 ) -> None:
@@ -25,6 +26,7 @@ def std_prob_3(
         K0=0.1 * 0.5 * mu0 * Ms**2,
         alpha=1e3,
         cuda=cuda,
+        cvode=cvode,
     )
 
     problem.u_ea[:, 2] = 1
@@ -134,4 +136,4 @@ def std_prob_3(
 # %%
 
 if __name__ == "__main__":
-    std_prob_3(show=False, cuda=False, show_details=True)
+    std_prob_3(show=False, cuda=True, cvode=False, show_details=True)

@@ -210,3 +210,7 @@ nbs/
 *.msg
 
 source/MagTenseMEX/.vs/
+
+# CVODE downloaded files and folders
+cvode*/
+*tar.gz

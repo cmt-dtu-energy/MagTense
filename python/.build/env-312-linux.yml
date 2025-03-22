@@ -11,7 +11,9 @@ dependencies:
   - binutils_impl_linux-64=2.43=h4bf12b8_4
   - binutils_linux-64=2.43=h4852527_4
   - bzip2=1.0.8=h4bc722e_7
-  - ca-certificates=2025.1.31=hbcca054_0
+  - c-ares=1.34.4=hb9d3cd8_0
+  - ca-certificates=2025.2.25=h06a4308_0
+  - cmake=3.31.6=h74e3db0_0
   - compiler_shared=2025.0.4=intel_1519
   - cuda-cccl_linux-64=12.8.90=0
   - cuda-crt-dev_linux-64=12.8.93=ha770c72_0
@@ -50,11 +52,15 @@ dependencies:
   - intel-openmp=2025.0.4=intel_1519
   - intel-sycl-rt=2025.0.4=intel_1519
   - kernel-headers_linux-64=4.18.0=h8bc681e_7
+  - krb5=1.21.3=h143b758_0
   - ld_impl_linux-64=2.43=h712a8e2_4
   - libcublas=12.8.4.1=0
   - libcublas-dev=12.8.4.1=0
+  - libcurl=8.12.1=h332b0f4_0
   - libcusparse=12.5.8.93=0
   - libcusparse-dev=12.5.8.93=0
+  - libedit=3.1.20230828=h5eee18b_0
+  - libev=4.33=h7f8727e_1
   - libexpat=2.6.4=h5888daf_0
   - libffi=3.4.6=h2dba641_0
   - libgcc=14.2.0=h767d61c_2
@@ -63,15 +69,18 @@ dependencies:
   - libgomp=14.2.0=h767d61c_2
   - liblzma=5.6.4=hb9d3cd8_0
   - liblzma-devel=5.6.4=hb9d3cd8_0
+  - libnghttp2=1.64.0=h161d5f1_0
   - libnsl=2.0.1=hd590300_0
   - libnvjitlink=12.8.93=1
   - libnvjitlink-dev=12.8.93=1
   - libsanitizer=14.2.0=hed042b8_2
   - libsqlite=3.49.1=hee588c1_1
+  - libssh2=1.11.1=hf672d98_0
   - libstdcxx=14.2.0=h8f9b012_2
   - libstdcxx-devel_linux-64=14.2.0=h9c4974d_102
   - libstdcxx-ng=14.2.0=h4852527_2
   - libuuid=2.38.1=h0b41bf4_0
+  - libuv=1.50.0=hb9d3cd8_0
   - libxcrypt=4.4.36=hd590300_1
   - libzlib=1.3.1=hb9d3cd8_2
   - mkl=2025.0.1=intel_14
@@ -83,6 +92,7 @@ dependencies:
   - pip=25.0.1=pyh8b19718_0
   - python=3.12.3=hab00c5b_0_cpython
   - readline=8.2=h8c095d6_2
+  - rhash=1.4.5=hb9d3cd8_0
   - setuptools=75.8.2=pyhff2d567_0
   - sysroot_linux-64=2.28=h8bc681e_7
   - tbb=2022.0.0=intel_402
@@ -95,6 +105,7 @@ dependencies:
   - xz=5.6.4=hbcc6ac9_0
   - xz-gpl-tools=5.6.4=hbcc6ac9_0
   - xz-tools=5.6.4=hb9d3cd8_0
+  - zstd=1.5.7=hb8e6e7a_2
   - pip:
       - build==1.2.2.post1
       - charset-normalizer==3.4.1

@@ -165,23 +165,30 @@ python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm
 python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cusparse-cu12 nvidia-nvjitlink-cu12 # only required for cuda support
 ```
 
-## Distribution on [PyPI](https://pypi.org/project/magtense/)
+## Install CVODE from sundials-7.2.1
 
-Libraries have to be pre-build for now, and should be located in `MagTense/python/compiled_libs`.
+- Requirements (already present in `.build/env-313-linux`): `cmake`, `ifx`, `icx`
+- Download latest version of `cvode`:
 
-```bash
-# Required python packages for distribution
-python3 -m pip install build
+  ```bash
+  wget https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz
+  tar -xf cvode-7.2.1.tar.gz
+  ```
 
-cd python/
-python .build/dist_pypi.py
+- Prepare folder structure
+  ```bash
+  mkdir cvode
+  mv cvode-7.2.1 cvode/srcdir
+  mkdir cvode/builddir
+  ```
 
-# Upload to pypi.org
-python3 -m pip install twine
-# twine upload --repository testpypi dist/*
-twine upload dist/*
-```
-
+- Run `cmake` and `make`for installation
+  ```bash
+  cd cvode/builddir
+  cmake -DCMAKE_INSTALL_PREFIX=.. -DEXAMPLES_INSTALL_PATH=../examples -DCMAKE_C_COMPILER=${CONDA_PREFIX}/bin/icx -DCMAKE_Fortran_COMPILER=${CONDA_PREFIX}/bin/ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON -DENABLE_CUDA=ON ../srcdir
+  make
+  make install
+  ```
 
 ## Read-in customized M-H-curve
 

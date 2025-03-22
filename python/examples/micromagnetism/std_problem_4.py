@@ -2,19 +2,27 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from typing import List
+
 from matplotlib.lines import Line2D
 from pathlib import Path
 from magtense.micromag import MicromagProblem
-from magtense.utils import plot_M_avg_seq, plot_M_thin_film
+from magtense.utils import plot_M_thin_film
 
 
-def std_prob_4(res=[36, 9, 1], NIST_field=1, cuda=False, show=True):
+def std_prob_4(
+    res: List[int] = [36, 9, 1],
+    NIST_field: int = 1,
+    cuda: bool = False,
+    cvode: bool = False,
+    show: bool = True,
+) -> List[float]:
     mu0 = 4 * np.pi * 1e-7
     grid_L = [500e-9, 125e-9, 3e-9]
 
     ### Magnetization to s-state
     problem_ini = MicromagProblem(
-        res, grid_L, m0=1 / np.sqrt(3), alpha=4.42e3, cuda=cuda
+        res=res, grid_L=grid_L, m0=1 / np.sqrt(3), alpha=4.42e3, cuda=cuda, cvode=cvode
     )
     h_ext = np.array([1, 1, 1]) / mu0
 
@@ -26,7 +34,13 @@ def std_prob_4(res=[36, 9, 1], NIST_field=1, cuda=False, show=True):
 
     ### Time-dependent solver
     problem_dym = MicromagProblem(
-        res, grid_L, m0=M_sq_ini[-1], alpha=4.42e3, gamma=2.21e5, cuda=cuda
+        res=res,
+        grid_L=grid_L,
+        m0=M_sq_ini[-1],
+        alpha=4.42e3,
+        gamma=2.21e5,
+        cuda=cuda,
+        cvode=cvode,
     )
 
     # Two applied external fields of std problem 4
@@ -71,9 +85,9 @@ def std_prob_4(res=[36, 9, 1], NIST_field=1, cuda=False, show=True):
     Magtense_My_interpolated = np.interp(t, t_dym, My)
     Magtense_Mz_interpolated = np.interp(t, t_dym, Mz)
     int_error = [
-        np.trapz(np.abs(M_mumag[:, 0] - Magtense_Mx_interpolated), t),
-        np.trapz(np.abs(M_mumag[:, 2] - Magtense_My_interpolated), t),
-        np.trapz(np.abs(M_mumag[:, 4] - Magtense_Mz_interpolated), t),
+        np.trapezoid(np.abs(M_mumag[:, 0] - Magtense_Mx_interpolated), t),
+        np.trapezoid(np.abs(M_mumag[:, 2] - Magtense_My_interpolated), t),
+        np.trapezoid(np.abs(M_mumag[:, 4] - Magtense_Mz_interpolated), t),
     ]
 
     if show:
@@ -88,9 +102,30 @@ def std_prob_4(res=[36, 9, 1], NIST_field=1, cuda=False, show=True):
         ax1.plot(t, M_mumag[:, 4], "b-")
 
         legend_elements = [
-            Line2D([0], [0], marker="x", color="r", label=r"MagTense $M_x$", linestyle="None"),
-            Line2D([0], [0], marker="x", color="g", label=r"MagTense $M_y$", linestyle="None"),
-            Line2D([0], [0], marker="x", color="b", label=r"MagTense $M_z$", linestyle="None"),
+            Line2D(
+                [0],
+                [0],
+                marker="x",
+                color="r",
+                label=r"MagTense $M_x$",
+                linestyle="None",
+            ),
+            Line2D(
+                [0],
+                [0],
+                marker="x",
+                color="g",
+                label=r"MagTense $M_y$",
+                linestyle="None",
+            ),
+            Line2D(
+                [0],
+                [0],
+                marker="x",
+                color="b",
+                label=r"MagTense $M_z$",
+                linestyle="None",
+            ),
             Line2D([0], [0], marker="none", color="r", label=r"$\mu{}mag$ $<M_x>$"),
             Line2D([0], [0], marker="none", color="g", label=r"$\mu{}mag$ $<M_y>$"),
             Line2D([0], [0], marker="none", color="b", label=r"$\mu{}mag$ $<M_z>$"),
@@ -107,7 +142,8 @@ def std_prob_4(res=[36, 9, 1], NIST_field=1, cuda=False, show=True):
 
     return int_error
 
+
 # %%
 
 if __name__ == "__main__":
-    int_error = std_prob_4(NIST_field=1, show=True, cuda=False)
+    int_error = std_prob_4(NIST_field=1, show=True, cuda=True, cvode=False)

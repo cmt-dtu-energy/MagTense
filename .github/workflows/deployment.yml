@@ -1,8 +1,6 @@
 on:
-  push:
   release:
     types: [published]
-  workflow_dispatch:
 
 jobs:
   build-and-testing:
@@ -17,7 +15,7 @@ jobs:
       name: testpypi
       url: https://test.pypi.org/project/magtense/
     permissions:
-      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: write
     steps:
     - name: Download py312 pip-wheel
       uses: actions/download-artifact@v4
