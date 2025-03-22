@@ -136,4 +136,4 @@ def std_prob_3(
 # %%
 
 if __name__ == "__main__":
-    std_prob_3(show=False, cuda=True, cvode=False, show_details=True)
+    std_prob_3(show=False, cuda=True, cvode=True, show_details=True)
