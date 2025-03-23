@@ -290,7 +290,6 @@ module ODE_Solvers
     real(c_double), dimension(neq) :: y_cur, y_norm
     real(c_double) :: max_norm_dev
     
-    call callback( 'Number of equations =', int(neq, c_int) )
     !======= Internals ============
     ! create the SUNDIALS context
     ierr = FSUNContext_Create(SUN_COMM_NULL, ctx)
@@ -482,9 +481,12 @@ module ODE_Solvers
 
     ! clean up
     call FCVodeFree(cvode_mem)
-    ierr = FSUNLinSolFree_SPGMR(sunls)
-    call FSUNMatDestroy_Dense(sunmat_A)
-    call FN_VDestroy_Serial(sunvec_y)
+    ! call FSUNMatDestroy_Dense(sunmat_A)
+    call FSUNMatDestroy(sunmat_A)
+    call FN_VDestroy(sunvec_y)
+    ! call FN_VDestroy_Serial(sunvec_y)
+    ! ierr = FSUNLinSolFree_SPGMR(sunls)
+    ierr = FSUNLinSolFree(sunls)
     ierr = FSUNContext_Free(ctx)
 	
     end subroutine MagTense_CVODEsuite
@@ -510,11 +512,12 @@ module ODE_Solvers
 
         ! pointers to data in SUNDAILS vectors
         integer(c_long) :: i, neq
-        real(c_double), pointer, dimension(3000) :: yvec(:)
-        real(c_double), pointer, dimension(3000) :: fvec(:)
+        real(c_double), pointer, dimension(:) :: yvec(:)
+        real(c_double), pointer, dimension(:) :: fvec(:)
 
         neq = transfer(user_data, neq)
-        !======= Internals ============
+        allocate(yvec(neq))
+        allocate(fvec(neq))
 
         ! get data arrays from SUNDIALS vectors
         ! call FN_VGetData_Serial(sunvec_y, yvec)
@@ -528,8 +531,8 @@ module ODE_Solvers
         enddo
         
         ! fill RHS vector
-        !fvec(1) = lamda*yvec(1) + 1.0/(1.0+tn*tn) - lamda*atan(tn);
-        call MTdmdt( tn, MTy_out, MTf_vec )  
+        ! fvec(1) = lamda * yvec(1) + 1.0 / (1.0 + tn * tn) - lamda * atan(tn);
+        call MTdmdt( real(tn), MTy_out, MTf_vec )  
 
         !copy the result back
         do i = 1, neq
