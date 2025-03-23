@@ -51,8 +51,8 @@ module ODE_Solvers
         
         integer :: neq, nt, nt_conv
         real, allocatable, dimension(:,:) :: yderiv_out         !>The derivative of y_i wrt t at each time step
-        real(c_double),dimension(size(t)) :: t_out_double       ! = t_out
-        real(c_double),dimension(size(y0), size(t)) :: y_out_double ! = y_out
+        real(c_double),dimension(size(t)) :: t_out_d       ! = t_out
+        real(c_double),dimension(size(y0), size(t)) :: y_out_d ! = y_out
     
         !find the no. of equations and the no. of requested timesteps
         neq = size(y0)
@@ -84,11 +84,11 @@ module ODE_Solvers
             allocate( MTy_out(neq), MTf_vec(neq) )
             
             !call solver...
-            t_out_double = real(t_out, c_double)
-            y_out_double = real(y_out, c_double)
-            call MagTense_CVODEsuite( int(neq, c_long), real(t, c_double), int(nt, c_long), real(y0, c_double), t_out_double, y_out_double, real(tol, c_double), callback, int(callback_display, c_long) )
-            y_out = real(y_out_double)
-            t_out = real(t_out_double)
+            t_out_d = real(t_out, c_double)
+            y_out_d = real(y_out, c_double)
+            call MagTense_CVODEsuite( int(neq, c_long), real(t, c_double), int(nt, c_long), real(y0, c_double), t_out_d, y_out_d, real(tol, c_double), callback, int(callback_display, c_long) )
+            y_out = real(y_out_d)
+            t_out = real(t_out_d)
             !clean-up
             deallocate(MTy_out, MTf_vec)
 #else
@@ -246,7 +246,7 @@ module ODE_Solvers
     !> @param[inout] t_out output array with the times at which y_i are found
     !> @param[inout] y_out output array with the y_i values
     !---------------------------------------------------------------------------
-    subroutine MagTense_CVODEsuite( neq, t, nt, ystart, t_out, y_out, tol, callback, callback_display )
+    subroutine MagTense_CVODEsuite( neq, t, nt, ystart, t_out, y_out, rtol, callback, callback_display )
 	use, intrinsic :: iso_c_binding
     
     use fsundials_core_mod           ! Fortran interface to data types and constants
@@ -262,11 +262,11 @@ module ODE_Solvers
     real(c_double), dimension(nt), intent(inout) :: t_out ! output time
     real(c_double)  :: tcur(1)                            ! current time
     procedure(callback_fct), pointer :: callback          !> Callback function
-    real(c_double), intent(in) :: tol  
-    real(c_double) :: rtol, atol                  ! relative and absolute tolerance
+    real(c_double), intent(in) :: rtol                    ! relative tolerance
+    real(c_double) :: atol                                ! absolute tolerance
     real(c_double) :: hlast(1)
-    real(c_double) :: dum1
-    real(c_double) :: dum2(1)
+    real(c_double) :: dum
+    real(c_double) :: dum_t(1)
     character(100) :: err_str                             ! error string for diagnostics
 
     integer(c_int) :: ierr                                ! error flags from C functions
@@ -275,7 +275,7 @@ module ODE_Solvers
     integer(c_long) :: linconvfails(1)
 
     integer(c_long) :: outstep                            ! output loop counter
-    integer(c_long), intent(in) :: callback_display               !>Sets at what time index values Fortran displays the results in Matlab
+    integer(c_long), intent(in) :: callback_display       !>Sets at what time index values Fortran displays the results in Matlab
     
     type(N_Vector), pointer :: sunvec_y      ! sundials vector
     type(SUNMatrix), pointer :: sunmat_A              ! sundials matrix
@@ -290,11 +290,11 @@ module ODE_Solvers
     real(c_double), dimension(neq) :: y_cur, y_norm
     real(c_double) :: max_norm_dev
     
+    call callback( 'Number of equations =', int(neq, c_int) )
     !======= Internals ============
     ! create the SUNDIALS context
     ierr = FSUNContext_Create(SUN_COMM_NULL, ctx)
     ! set relative and absolute tolerances
-    rtol = tol
     atol = 1.0d-10
 
     ! initialize solution vector
@@ -376,24 +376,12 @@ module ODE_Solvers
     end if
     
     ! Input because otherwise we get error that in- and output times are too close
-    dum1 = (t(2) - t(1)) / 2
-    ierr = FCVodeSetInitStep(cvode_mem, dum1)
+    dum_t(1) = (t(2) - t(1)) / 2
+    ierr = FCVodeSetInitStep(cvode_mem, dum_t(1))
     if (ierr /= 0) then
         call CVODE_error('Error in FCVodeSetInitStep, ierr = ', ierr, callback ) 
 		stop
     end if
-    
-    ! Test to see if results improve -- maxstep picoseconds?
-    !do outstep=1,size(t)-1
-    !    dum1=max(dum1,t(outstep+1)-t(outstep))
-    !enddo
-    !ierr = FCVodeSetMaxStep(cvode_mem, dum1)
-    !if (ierr /= 0) then
-    !    call CVODE_error('Error in FCVodeSetMaxStep, ierr = ', ierr, callback ) 
-    !    write(err_str,'(A32,G10.5)') 'Attempted max time step: ',dum1
-    !    call CVODE_error(trim(err_str), outstep,callback ) 
-	!	stop
-    !end if
 
     ! attach linear solver
     ierr = FCVodeSetLinearSolver(cvode_mem, sunls, sunmat_A);
@@ -403,12 +391,12 @@ module ODE_Solvers
     end if
     
     ! ensure FCVode doesn't overstep on the last evolution
-    dum1 = t(nt)
-    ierr = FCVodeSetStopTime(cvode_mem, dum1)
+    dum_t(1) = t(nt)
+    ierr = FCVodeSetStopTime(cvode_mem, dum_t(1))
     if (ierr /= 0) then
         call CVODE_error( 'Error in FCVodeSetStopTime, ierr = ', ierr, callback  )
-        write(err_str,'(A22,G10.5)') 'Attempted stop time: ', dum1
-        call CVODE_error(trim(err_str), nt,callback ) 
+        write(err_str,'(A22,G10.5)') 'Attempted stop time: ', dum_t
+        call CVODE_error(trim(err_str), int(nt, c_int), callback ) 
         stop
     end if
     call callback('Finished initialization, starting time steps', 0 )
@@ -419,12 +407,10 @@ module ODE_Solvers
 	    ! call CVode
         if ( mod(outstep, callback_display) .eq. 0 ) then
             ! Update user
-            call callback( 'Time', outstep )
+            call callback( 'Time', int(outstep, c_int) )
         endif
-        
 	    ierr = FCVode(cvode_mem, t(outstep), sunvec_y, t_out(outstep), CV_NORMAL)
         ! http://sundials.wikidot.com/return-time
-        !ierr = FCVode(cvode_mem, t(outstep), sunvec_y, t_out(outstep), CV_NORMAL_TSTOP)
 	    if (ierr .lt. 0) then
             call CVODE_error('Error in FCVODE, ierr = ', ierr, callback ) 
             ierr = FCVodeGetLastStep(cvode_mem, hlast)
@@ -434,9 +420,9 @@ module ODE_Solvers
             else
                 call CVODE_error('Error in FCVodeGetLastStep, ierr = ', ierr, callback )
             endif
-            ierr = FCVodeGetCurrentTime(cvode_mem, dum2);
+            ierr = FCVodeGetCurrentTime(cvode_mem, dum_t(1));
             if (ierr .eq. 0) then
-                write(err_str,'(A30,G10.5)') 'Last time, t = ',dum1
+                write(err_str,'(A30,G10.5)') 'Last time, t = ', dum_t
                 call CVODE_error(err_str, 0, callback ) 
             else
                 call CVODE_error('Error in FCVodeGetCurrentTime, ierr = ', ierr, callback )
@@ -459,7 +445,8 @@ module ODE_Solvers
             else
                 call CVODE_error('Error in FCVodeGetNumSteps, ierr = ', ierr, callback )
             endif
-		exit
+
+		    exit
         endif
         
         ! Check norm (under the assumption that y_cur is a magnetization vector containing x-, y- and z- components)
@@ -468,24 +455,25 @@ module ODE_Solvers
         if (max_norm_dev .gt. rtol) then
             !call CVODE_error('Norm - 1 > relative tolerance. Rescaling. Time step nr. ', outstep,callback )
             write(err_str,'(A50,G10.5,A30)') 'Norm - 1 > relative tolerance. Max deviation = ',max_norm_dev,'. Rescaling. Time step nr. '
-            call CVODE_error(err_str, outstep, callback ) 
-            y_cur=y_cur/y_norm
+            call CVODE_error(err_str, int(outstep, c_int), callback ) 
+            y_cur = y_cur / y_norm
             !call Norm_error(neq, y_cur, y_norm, max_norm_dev)
             !write(err_str,'(A30,G10.5)') 'Maximum deviation after = ',max_norm_dev
             !call CVODE_error(err_str, 0,callback ) 
             ! and reinitialize solution vector ...
-            sunvec_y = FN_VMake_Serial(neq, y_cur, ctx)
-            ! if (.not. associated(sunvec_y)) then
-            !     call CVODE_error('Reinitialization of solution vector after rescaling failed', -1, callback )
-            !     stop
-            ! endif
+            ! sunvec_y = FN_VMake_Serial(neq, y_cur, ctx)
+            sunvec_y => FN_VMake_Serial(neq, y_cur, ctx)
+            if (.not. associated(sunvec_y)) then
+                call CVODE_error('Reinitialization of solution vector after rescaling failed', -1, callback )
+                stop
+            endif
             ierr = FCVodeReInit(cvode_mem, t(outstep), sunvec_y)
             if (ierr /= 0) then
 	            call CVODE_error('Error in FCVodeReInit, ierr = ', ierr, callback )
 	            stop
             endif
         endif
-	    y_out(:,outstep) = y_cur    ! Todo: Find a way to write directly to y_out
+	    y_out(:, outstep) = y_cur    ! Todo: Find a way to write directly to y_out
 
     enddo
 
@@ -522,13 +510,10 @@ module ODE_Solvers
 
         ! pointers to data in SUNDAILS vectors
         integer(c_long) :: i, neq
-        real(c_double), pointer, dimension(:) :: yvec(:)
-        real(c_double), pointer, dimension(:) :: fvec(:)
+        real(c_double), pointer, dimension(3000) :: yvec(:)
+        real(c_double), pointer, dimension(3000) :: fvec(:)
 
         neq = transfer(user_data, neq)
-        allocate(yvec(neq))
-        allocate(fvec(neq))
-        
         !======= Internals ============
 
         ! get data arrays from SUNDIALS vectors
