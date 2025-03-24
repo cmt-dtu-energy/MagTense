@@ -126,7 +126,14 @@ jobs:
         shell: bash -el {0}
         run: |
           dir D:/a/MagTense/MagTense/matlab/MEX_files
-          
+        
+      - name: Archive MEX-files
+        uses: actions/upload-artifact@v4
+        with:
+          name: MEX-Windows
+          path: D:/a/MagTense/MagTense/matlab/MEX_files/*
+
+        
       #- name: Bash
       #  shell: bash -el {0}
       #  run: make USE_CUDA=0 LIBPATH="C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64"
@@ -207,7 +214,38 @@ jobs:
       #    cmd.exe /c "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
       #    make USE_CUDA=0
       
-      
+ 
+
+
+  test-windows:
+    runs-on: [self-hosted,Windows,CUDA]
+    defaults:
+      run:
+        shell: bash -el {0}
+    
+    steps:
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          matlab
+          documentation
+    
+    - name: Download the MEX files as an artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: MEX-Windows
+        path: ${{ github.workspace }}/matlab/MEX_files
+        
+    - name: Dir
+      shell: cmd /C CALL {0}
+      run: |
+        dir ${{ github.workspace }}\matlab\MEX_files
+        
+    - name: Dir
+      shell: cmd /C CALL {0}
+      run: |
+        "C:\Program Files\MATLAB\R2024b\bin\matlab.exe" -batch "cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true)"
   
   build-linux:
     strategy:
