@@ -1,0 +1,33 @@
+name: Building and testing Matlab MEX files on Windows and Linux
+
+on: [push, workflow_dispatch]
+
+jobs:
+  test-windows:
+    strategy:
+      matrix:
+        gpu-version: [CUDA]
+        mat-version: [R2024b]
+    runs-on: [self-hosted,Windows,${{matrix.gpu-version}}]
+    defaults:
+      run:
+        shell: bash -el {0}
+    
+    steps:
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          matlab
+          documentation
+      
+    #- name: Download the MEX files as an artifact
+    #  uses: actions/download-artifact@v4
+    #  with:
+    #    name: MEX-Windows
+    #    path: ${{ github.workspace }}/matlab/MEX_files
+
+    - name: Run test script on download MEX-file with CUDA
+      uses: matlab-actions/run-command@v2
+      with:
+        command: cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true); disp(int_error);
