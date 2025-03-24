@@ -23,11 +23,19 @@ jobs:
     #    name: MEX-Windows
     #    path: ${{ github.workspace }}/matlab/MEX_files
 
+
+
+
     - name: Run test script on download MEX-file with CUDA
       uses: matlab-actions/run-command@v2
       with:
         command: disp(2+2); pwd; dir
-        
+    
+    - name: Cmd.exe
+        shell: cmd /C CALL {0}
+        run: >-
+          "C:\Program Files\MATLAB\R2024b\bin\matlab.exe" -batch "C:\Users\github_runner\Downloads\MagTense-static-linking-mex\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4\Standard_problem_4('USE_CUDA',true)"
+    
     - name: Run test script on download MEX-file with CUDA
       uses: matlab-actions/run-command@v2
       with:
