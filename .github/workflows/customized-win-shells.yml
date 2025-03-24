@@ -7,6 +7,36 @@ jobs:
     runs-on: windows-latest
 
     steps:
+    - name: Dir
+      shell: bash -el {0}
+      working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+      run: |
+        ls -lh "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC"
+
+    - name: Dir
+      shell: bash -el {0}
+      working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+      run: |
+        ls -lh "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools"
+
+    - name: Dir
+      shell: bash -el {0}
+      working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+      run: |
+        ls -lh "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC"
+
+    - name: Dir
+      shell: bash -el {0}
+      working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+      run: |
+        ls -lh "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.42.34438"
+
+    - name: Dir
+      shell: bash -el {0}
+      working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+      run: |
+        ls -lh "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.42.34438\bin"
+    
     - uses: actions/checkout@v4
     - uses: conda-incubator/setup-miniconda@v3
       with:
