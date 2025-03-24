@@ -15,7 +15,7 @@ jobs:
         channels: conda-forge,nvidia/label/cuda-12.6.3,https://software.repos.intel.com/python/conda/
         auto-activate-base: false
 
-    - name: Install minimal packages
+    - name: Install minimal packages in bash
       shell: bash -el {0}
       run: |
         conda install cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev make vs2022_win-64 "dpcpp_win-64"
