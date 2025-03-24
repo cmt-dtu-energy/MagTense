@@ -16,20 +16,22 @@ jobs:
         sparse-checkout: |
           matlab
           documentation
-      
+          
     #- name: Download the MEX files as an artifact
     #  uses: actions/download-artifact@v4
     #  with:
     #    name: MEX-Windows
     #    path: ${{ github.workspace }}/matlab/MEX_files
 
-    - name: PowerShell
-        shell: powershell
-        run: dir
+    - name: Cmd.exe
+        shell: cmd /C CALL {0}
+        run: >-
+          dir
         
-    - name: PowerShell
-        shell: powershell
-        run: pwd        
+    - name: Cmd.exe
+        shell: cmd /C CALL {0}
+        run: >-
+          pwd  
         
     - name: Run test script on download MEX-file with CUDA
       uses: matlab-actions/run-command@v2
