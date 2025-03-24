@@ -6,8 +6,10 @@ jobs:
   test-windows:
     strategy:
       matrix:
-        gpu-version: [CUDA]
-    runs-on: [self-hosted,Windows,${{matrix.gpu-version}}]
+        mat-version: [R2024b]
+        os-version: [CUDA]
+    runs-on: self-hosted,Windows,${{matrix.os-version}}
+    needs: build-linux
     defaults:
       run:
         shell: bash -el {0}
