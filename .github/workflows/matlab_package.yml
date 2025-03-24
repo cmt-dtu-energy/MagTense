@@ -261,7 +261,7 @@ jobs:
         os-version: [ubuntu-latest]
         exclude:
           - os-version: ubuntu-latest
-            mat-version: 'R2022b' # MATLAB not available
+            mat-version: 'R2022b'
     runs-on: ${{matrix.os-version}}
     needs: build-linux
     defaults:
