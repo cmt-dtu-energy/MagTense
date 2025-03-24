@@ -9,7 +9,6 @@ jobs:
     steps:
     - name: Dir
       shell: cmd /C CALL {0}
-      working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
       run: |
         dir "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC"
 
