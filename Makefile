@@ -162,9 +162,7 @@ standalone: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} standal
 
 python: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
 
-ps: magnetostatic ${MICROMAG}
-
-cmdx64: ${PYTHON_MODN_ALL}
+python_win: ${PYTHON_MODN_ALL}
 
 clean:
 	cd ${NUM_INT_PATH} && ${MAKE} clean
@@ -174,7 +172,7 @@ clean:
 	cd ${FORTRAN_CUDA_PATH} && ${MAKE} clean
 	cd $(STANDALONE_PATH) && ${MAKE} clean
 	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
-	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
+	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
 	rm -rf ${PYTHON_LIBPATH}/build
 
 magnetostatic:
