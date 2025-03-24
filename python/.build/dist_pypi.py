@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 import argparse
 import tomllib
+from typing import List
 
 
 def parse_args():
@@ -13,6 +14,12 @@ def parse_args():
         type=str,
         default="312",
         help="Python versions (comma-separated)",
+    )
+    parser.add_argument(
+        "--cu_version",
+        type=str,
+        default="cpu,cu12",
+        help="Cuda / cpu versions (comma-separated)",
     )
     parser.add_argument(
         "--platform",
@@ -26,13 +33,17 @@ def parse_args():
     return parser.parse_args()
 
 
-def main(py_versions, platforms, cvode):
+def main(
+    py_versions: List[str],
+    cu_versions: List[str],
+    platforms: List[str],
+    cvode: bool,
+    build_tag: dict = {"cpu": 0, "cu12": 1},
+):
     py_folder = Path(__file__).parent.parent
     lib_folder = py_folder / "src" / "magtense" / "lib"
     with open(py_folder / "pyproject.toml", "rb") as f:
         mt_version = tomllib.load(f)["project"]["version"]
-    cu_versions = ["cpu", "cu12"]
-    build_tag = {"cpu": 0, "cu12": 1}
 
     for lib_file in lib_folder.glob("*.pyd"):
         subprocess.run(["rm", lib_file])
@@ -130,6 +141,7 @@ def main(py_versions, platforms, cvode):
 if __name__ == "__main__":
     args = parse_args()
     py_versions = args.py_version.split(",")
+    cu_versions = args.cu_version.split(",")
     platforms = args.platform.split(",")
     cvode = args.cvode
-    main(py_versions, platforms, cvode)
+    main(py_versions, cu_versions, platforms, cvode)

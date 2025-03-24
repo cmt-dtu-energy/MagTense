@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         py-version: [312, 313]
-        cvode: [0]
+        cvode: [1]
     runs-on: ubuntu-latest
     defaults:
       run:
