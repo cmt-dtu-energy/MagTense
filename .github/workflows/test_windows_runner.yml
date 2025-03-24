@@ -23,7 +23,18 @@ jobs:
     #    name: MEX-Windows
     #    path: ${{ github.workspace }}/matlab/MEX_files
 
+    - name: Bash
+        shell: bash -el {0}
+        run: |
+          dir ${{ github.workspace }}
+          
+    - name: Run test script on download MEX-file with CUDA
+      uses: matlab-actions/run-command@v2
+      with:
+        command: disp(2+2); pwd; dir
+        
     - name: Run test script on download MEX-file with CUDA
       uses: matlab-actions/run-command@v2
       with:
         command: cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true); disp(int_error);
+    
