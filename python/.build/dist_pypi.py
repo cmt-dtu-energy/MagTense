@@ -53,10 +53,23 @@ def main(
 
     subprocess.run(["rm", "-rf", f"{lib_folder}/cvode/"])
     if cvode:
+        cvode_libs = ["fcore", "fcvode"]
         subprocess.run(["mkdir", f"{lib_folder}/cvode/"])
-        subprocess.run(
-            ["cp", "-r", f"{py_folder}/../cvode/lib/", f"{lib_folder}/cvode/lib/"]
-        )
+        subprocess.run(["mkdir", f"{lib_folder}/cvode/lib/"])
+        for cvode_lib in cvode_libs:
+            subprocess.run(
+                [
+                    "find",
+                    f"{py_folder}/../cvode/lib/",
+                    "-name",
+                    f"libsundials_{cvode_lib}_mod.so*",
+                    "-exec",
+                    "cp",
+                    "{}",
+                    f"{lib_folder}/cvode/lib/",
+                    ";",
+                ]
+            )
 
     for platform in platforms:
         if platform == "win":
