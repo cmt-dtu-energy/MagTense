@@ -8,7 +8,7 @@ jobs:
       matrix:
         mat-version: [R2024b]
         os-version: [CUDA]
-    runs-on: self-hosted,Windows,${{matrix.os-version}}
+    runs-on: [self-hosted,Windows,${{matrix.os-version}}]
     defaults:
       run:
         shell: bash -el {0}
