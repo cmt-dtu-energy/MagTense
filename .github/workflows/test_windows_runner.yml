@@ -21,7 +21,12 @@ jobs:
         sparse-checkout: |
           matlab
           documentation
-          
+    
+    - name: Dir
+      shell: cmd /C CALL {0}
+      run: |
+        dir ${{ github.workspace }}/matlab/MEX_files
+        
     #- name: Download the MEX files as an artifact
     #  uses: actions/download-artifact@v4
     #  with:
@@ -40,9 +45,4 @@ jobs:
     #    shell: cmd /C CALL {0}
     #    run: >-
     #      "C:\Program Files\MATLAB\R2024b\bin\matlab.exe" -batch "C:\Users\github_runner\Downloads\MagTense-static-linking-mex\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4\Standard_problem_4('USE_CUDA',true)"
-    
-    - name: Run test script on download MEX-file with CUDA
-      uses: matlab-actions/run-command@v2
-      with:
-        command: cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true); disp(int_error);
     
