@@ -38,8 +38,9 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
   ```
 
 - Compile Fortran source files
+
   ```bash
-  make python
+  make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0
   ```
 
 #### Windows
@@ -152,7 +153,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 ### Install local editable magtense package
 
 ```bash
-cp python/.build/requirements_dev.txt python/.build/requirements.txt
+cp python/.build/requirements-py3-dev.txt python/requirements.txt
 python3 -m pip install -e ./python
 ```
 
@@ -161,27 +162,40 @@ python3 -m pip install -e ./python
 The `python/.build/` contains requirement-files, which are shipped with the respective pip-wheel.
 
 ```bash
-python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm
+python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm importlib_resources
 python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cusparse-cu12 nvidia-nvjitlink-cu12 # only required for cuda support
 ```
 
-## Distribution on [PyPI](https://pypi.org/project/magtense/)
-
-Libraries have to be pre-build for now, and should be located in `MagTense/python/compiled_libs`.
+For the local editable version of `magtense` with `cvode`, the respective libraries have to be search for in the active terminal: 
 
 ```bash
-# Required python packages for distribution
-python3 -m pip install build
-
-cd python/
-python .build/dist_pypi.py
-
-# Upload to pypi.org
-python3 -m pip install twine
-# twine upload --repository testpypi dist/*
-twine upload dist/*
+export LD_LIBRARY_PATH=/path/to/MagTense/cvode/lib:$LD_LIBRARY_PATH
 ```
 
+## Install CVODE from sundials-7.2.1
+
+- Requirements (already present in `.build/env-313-linux`): `cmake`, `ifx`, `icx`
+- Download latest version of `cvode`:
+
+  ```bash
+  wget https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz
+  tar -xf cvode-7.2.1.tar.gz
+  ```
+
+- Prepare folder structure
+  ```bash
+  mkdir cvode
+  mv cvode-7.2.1 cvode/srcdir
+  mkdir cvode/builddir
+  ```
+
+- Run `cmake` and `make`for installation
+  ```bash
+  cd cvode/builddir
+  cmake -DCMAKE_INSTALL_PREFIX=.. -DEXAMPLES_INSTALL_PATH=../examples -DCMAKE_C_COMPILER=${CONDA_PREFIX}/bin/icx -DCMAKE_Fortran_COMPILER=${CONDA_PREFIX}/bin/ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON -DENABLE_CUDA=ON ../srcdir
+  make
+  make install
+  ```
 
 ## Read-in customized M-H-curve
 

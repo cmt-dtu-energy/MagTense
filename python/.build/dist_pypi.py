@@ -20,10 +20,13 @@ def parse_args():
         default="win,linux",
         help="Platforms (comma-separated)",
     )
+    parser.add_argument(
+        "--cvode", action=argparse.BooleanOptionalAction, help="Enable cvode"
+    )
     return parser.parse_args()
 
 
-def main(py_versions, platforms):
+def main(py_versions, platforms, cvode):
     py_folder = Path(__file__).parent.parent
     lib_folder = py_folder / "src" / "magtense" / "lib"
     with open(py_folder / "pyproject.toml", "rb") as f:
@@ -36,6 +39,13 @@ def main(py_versions, platforms):
 
     for lib_file in lib_folder.glob("*.so"):
         subprocess.run(["rm", lib_file])
+
+    subprocess.run(["rm", "-rf", f"{lib_folder}/cvode/"])
+    if cvode:
+        subprocess.run(["mkdir", f"{lib_folder}/cvode/"])
+        subprocess.run(
+            ["cp", "-r", f"{py_folder}/../cvode/lib/", f"{lib_folder}/cvode/lib/"]
+        )
 
     for platform in platforms:
         if platform == "win":
@@ -64,26 +74,20 @@ def main(py_versions, platforms):
                 ]
             )
             if platform == "linux":
-                if cuda == "cpu":
-                    subprocess.run(
-                        [
-                            "patchelf",
-                            "--force-rpath",
-                            "--set-rpath",
-                            "$ORIGIN/../../../../../lib",
-                            f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}",
-                        ]
-                    )
-                elif cuda == "cu12":
-                    subprocess.run(
-                        [
-                            "patchelf",
-                            "--force-rpath",
-                            "--set-rpath",
-                            "$ORIGIN/../../../../../lib:$ORIGIN/../../nvidia/cublas/lib/:$ORIGIN/../../nvidia/cuda_runtime/lib/:$ORIGIN/../../nvidia/cusparse/lib/",
-                            f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}",
-                        ]
-                    )
+                rpath = "$ORIGIN/../../../../../lib"
+                if cvode:
+                    rpath += ":$ORIGIN/../../cvode/lib/"
+                if cuda == "cu12":
+                    rpath += ":$ORIGIN/../../nvidia/cublas/lib/:$ORIGIN/../../nvidia/cuda_runtime/lib/:$ORIGIN/../../nvidia/cusparse/lib/"
+                subprocess.run(
+                    [
+                        "patchelf",
+                        "--force-rpath",
+                        "--set-rpath",
+                        f"{rpath}",
+                        f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}",
+                    ]
+                )
             subprocess.run(
                 [
                     "cp",
@@ -127,4 +131,5 @@ if __name__ == "__main__":
     args = parse_args()
     py_versions = args.py_version.split(",")
     platforms = args.platform.split(",")
-    main(py_versions, platforms)
+    cvode = args.cvode
+    main(py_versions, platforms, cvode)
