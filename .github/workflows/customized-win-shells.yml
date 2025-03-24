@@ -11,7 +11,7 @@ jobs:
     - uses: conda-incubator/setup-miniconda@v3
       with:
         activate-environment: magtense-env
-        python-version: 3.12
+        miniforge-version: latest
         channels: conda-forge,nvidia/label/cuda-12.6.3,https://software.repos.intel.com/python/conda/
         auto-activate-base: false
 
@@ -19,6 +19,12 @@ jobs:
       shell: bash -el {0}
       run: |
         conda install cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev make vs2022_win-64 "dpcpp_win-64"
+
+    - name: Dir
+      shell: bash -el {0}
+      working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+      run: |
+        ls -lh "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.42.34438\bin\Hostx64\x64"
 
     - name: Run Command Prompt
       shell: bash -el {0}
