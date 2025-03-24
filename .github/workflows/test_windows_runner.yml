@@ -25,7 +25,7 @@ jobs:
     - name: Dir
       shell: cmd /C CALL {0}
       run: |
-        dir ${{ github.workspace }}/matlab/MEX_files
+        dir ${{ github.workspace }}\matlab\MEX_files
         
     #- name: Download the MEX files as an artifact
     #  uses: actions/download-artifact@v4
