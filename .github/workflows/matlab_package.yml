@@ -86,9 +86,42 @@ jobs:
         with:
           command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -v -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; buildMagTenseMEX('USE_CUDA',false,'USE_CVODE',false,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64'); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
           
+      - name: Run Command Prompt
+        shell: bash -el {0}
+        working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+        run: |
+          nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64" -o MagTenseCudaBlas.o
+
+      - name: Run Developer PowerShell for VS 2022
+        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+        run: |
+          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
+          .\Launch-VsDevShell.ps1
+          cd ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+          make wrap
+          ls
+      
+      - name: Run Developer PowerShell for VS 2022
+        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+        run: |
+          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
+          .\Launch-VsDevShell.ps1
+          conda info
+          cd ${{ github.workspace }}
+          pwd
+          make clean
+          make magnetostatic micromagnetism forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
+      
+      - name: Compile MEX code using Matlab with CUDA and test
+        uses: matlab-actions/run-command@v2
+        with:
+          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -v -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',false,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64'); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
+       
+      - name: Cmd.exe 5
+        shell: cmd /C CALL {0}
+        run: >-
+          dir D:/a/MagTense/MagTense/matlab/MEX_files
           
-          
-        
       #- name: Bash
       #  shell: bash -el {0}
       #  run: make USE_CUDA=0 LIBPATH="C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64"
