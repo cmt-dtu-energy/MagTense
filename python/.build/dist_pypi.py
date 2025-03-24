@@ -87,7 +87,7 @@ def main(
             if platform == "linux":
                 rpath = "$ORIGIN/../../../../../lib"
                 if cvode:
-                    rpath += ":$ORIGIN/../../cvode/lib/"
+                    rpath += ":$ORIGIN/cvode/lib/"
                 if cuda == "cu12":
                     rpath += ":$ORIGIN/../../nvidia/cublas/lib/:$ORIGIN/../../nvidia/cuda_runtime/lib/:$ORIGIN/../../nvidia/cusparse/lib/"
                 subprocess.run(
