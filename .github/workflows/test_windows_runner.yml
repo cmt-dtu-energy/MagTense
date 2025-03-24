@@ -7,7 +7,6 @@ jobs:
     strategy:
       matrix:
         gpu-version: [CUDA]
-        mat-version: [R2024b]
     runs-on: [self-hosted,Windows,${{matrix.gpu-version}}]
     defaults:
       run:
