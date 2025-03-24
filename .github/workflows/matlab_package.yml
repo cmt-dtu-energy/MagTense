@@ -10,6 +10,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Bash
+        shell: bash -el {0}
+        run: |
+          dir D:/a/MagTense/MagTense/matlab/MEX_files
+
       #- name: Cmd.exe
       #  shell: cmd /C CALL {0}
       #  run: >-
@@ -117,9 +122,9 @@ jobs:
         with:
           command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -v -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',false,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64'); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
        
-      - name: Cmd.exe 5
-        shell: cmd /C CALL {0}
-        run: >-
+      - name: Bash
+        shell: bash -el {0}
+        run: |
           dir D:/a/MagTense/MagTense/matlab/MEX_files
           
       #- name: Bash
