@@ -40,7 +40,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 - Compile Fortran source files
 
   ```bash
-  make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0
+  make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
   ```
 
 #### Windows
@@ -112,7 +112,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 
     ```bash
 	  conda activate magtense-env
-    make ps
+    make magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0
     ```
 
   - Compilation with `nvcc` should be executed in `x64 Native Tools Command Prompt for VS 2022`.
@@ -139,8 +139,8 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
   - Linking and wrapping libraries with `f2py` needs to be run in `x64 Native Tools Command Prompt for VS 2022` to make `ifx` compiler available for `meson`:
 
     ```bash
-	conda activate magtense-env
-    make cmdx64
+	  conda activate magtense-env
+    make python_win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
     ```
 
     - **Note:** In case error `meson.build:1:0: ERROR: Unknown compiler(s): [['ifx']]` shows up, it should help to reinitialize your conda environment to ensure having the correct environment path:

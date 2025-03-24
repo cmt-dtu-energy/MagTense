@@ -4,7 +4,10 @@ on: [push]
 
 jobs:
   build-win:
-    runs-on: [ENRGK-PW11TEST1]
+    strategy:
+      matrix:
+        py-version: [312]
+    runs-on: [windows-latest]
     env:
       build_file: python/.build/environment_win.yml
 
@@ -32,21 +35,12 @@ jobs:
     - name: Update environment
       run: conda env update -n magtense-env -f ${{ env.build_file }}
       if: steps.cache.outputs.cache-hit != 'true'
-
-    - name: Compile Fortran files in Developer PowerShell for VS 2022
-      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-      run: |
-        cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-        .\Launch-VsDevShell.ps1
-        cd ${{ github.workspace }}/python/src/magtense/lib/
-        make ps
     
-    - name: Compile with nvcc in x64 Native Tools Command Prompt for VS 2022
-      shell: cmd /k "{0}" -arch=amd64 -host_arch=x64
+    - name: Compile with nvcc in Bash
+      shell: bash -el {0}
       working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
-        nvcc -c MagTenseCudaBlas.cu -o MagTenseCudaBlas.o
+        nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64" -o MagTenseCudaBlas.o
 
     - name: Link Cuda wrapper in Developer PowerShell for VS 2022
       shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
@@ -56,16 +50,35 @@ jobs:
         cd ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
         make wrap
 
-    - name: Build Python wrapper in Command Prompt
-      shell: cmd /C CALL {0}
-      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
-      run: >-
-        make cmdx64
-
-    - name: Install local magtense package with pip
-      run: python -m pip install -e ${{ github.workspace }}/python
-
-    - name: Test with pytest
+    - name: Compile Fortran files in Developer PowerShell for VS 2022
+      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
       run: |
-        conda install pytest
-        pytest
+        cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
+        .\Launch-VsDevShell.ps1
+        cd ${{ github.workspace }}
+        make magnetostatic micromagnetism USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
+
+    - name: Compile Fortran files in Developer PowerShell for VS 2022
+      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      run: |
+        cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
+        .\Launch-VsDevShell.ps1
+        cd ${{ github.workspace }}
+        make python_win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
+
+    - name: Run x64 Native Tools Command Prompt for VS 2022
+      shell: cmd /k "{0}" -arch=amd64 -host_arch=x64
+      working-directory: ${{ github.workspace }}
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+        make python_win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
+
+    - name: Build pip-wheels without cvode
+      working-directory: ${{ github.workspace }}/python/
+      run: python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu --platform win --no-cvode
+
+    - name: cpu - Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version }}-cpu
+        path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-version }}-none-win_amd64.whl
