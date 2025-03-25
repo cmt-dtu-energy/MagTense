@@ -120,7 +120,7 @@ def main(
                 ]
             )
             subprocess.run(
-                ["python3", "-m", "build", "--wheel"],
+                ["python", "-m", "build", "--wheel"],
                 cwd=py_folder,
             )
             subprocess.run(
