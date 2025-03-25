@@ -200,7 +200,7 @@ standalone:
 
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
-	FC=${FC} FFLAGS=${EXTRA_FFLAGS} CFLAGS='/assume:underscore /names:lowercase' LDFLAGS=${LDFLAGS} \
+	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
 		python -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} ${CVODE_OPT} \
 		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE}
