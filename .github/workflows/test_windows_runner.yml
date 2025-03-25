@@ -20,7 +20,7 @@ jobs:
         CUDA: true
       shell: cmd /C CALL {0}
       run: |
-        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "disp(1+1)"
+        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "disp(1+1); getenv('CUDA')"
     
     
     - name: Define with or without CUDA        
@@ -29,7 +29,7 @@ jobs:
         CUDA: false
       shell: cmd /C CALL {0}
       run: |
-        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "disp(1+1)"
+        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "disp(1+1); getenv('CUDA')"
         
     #- name: Checkout test scripts
     #  uses: actions/checkout@v4
@@ -43,11 +43,10 @@ jobs:
     #  run: |
     #    dir ${{ github.workspace }}\matlab\MEX_files
         
-    - name: Dir
-      shell: cmd /C CALL {0}
-      run: |
-        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "disp(1+1)"
-    #    cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true)"
+    #- name: Dir
+    #  shell: cmd /C CALL {0}
+    #  run: |
+    #    "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true)"
        
    
    
