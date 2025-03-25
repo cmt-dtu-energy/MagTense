@@ -18,6 +18,8 @@ jobs:
       if: ${{ matrix.cuda-version == 'CUDA' }}
       env:
         CUDA: true
+    
+    - name: Define with or without CUDA        
       if: ${{ matrix.cuda-version == 'noCUDA' }}
       env:
         CUDA: false
