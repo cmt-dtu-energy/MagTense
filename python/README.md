@@ -140,7 +140,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 
     ```bash
 	  conda activate magtense-env
-    make python_win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
+    make python-win USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0
     ```
 
     - **Note:** In case error `meson.build:1:0: ERROR: Unknown compiler(s): [['ifx']]` shows up, it should help to reinitialize your conda environment to ensure having the correct environment path:
