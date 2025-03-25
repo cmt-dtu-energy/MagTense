@@ -15,12 +15,12 @@ jobs:
     
     steps:
     - name: Define with or without CUDA
-        if: ${{ matrix.cuda-version == 'CUDA' }}
-        env:
-          CUDA: true
-        if: ${{ matrix.cuda-version == 'noCUDA' }}
-        env:
-          CUDA: false
+      if: ${{ matrix.cuda-version == 'CUDA' }}
+      env:
+        CUDA: true
+      if: ${{ matrix.cuda-version == 'noCUDA' }}
+      env:
+        CUDA: false
 
     #- name: Checkout test scripts
     #  uses: actions/checkout@v4
