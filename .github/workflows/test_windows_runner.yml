@@ -15,7 +15,6 @@ jobs:
     
     steps:
     - name: Define with or without CUDA
-      if: ${{ matrix.cuda-version == 'CUDA' }}
       env:
         CUDA: ${{ matrix.cuda-version == 'noCUDA' && 'false' || 'true' }}
       shell: cmd /C CALL {0}
