@@ -17,7 +17,7 @@ jobs:
     - name: Define with or without CUDA
       if: ${{ matrix.cuda-version == 'CUDA' }}
       env:
-        CUDA: ${{ (contains(${{ matrix.cuda-version }}, 'noCUDA') && 'false') || 'true' }}
+        CUDA: ${{ matrix.cuda-version == 'noCUDA' && 'false') || 'true' }}
       shell: cmd /C CALL {0}
       run: |
         "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "disp(1+1); getenv('CUDA')"
