@@ -58,6 +58,11 @@ jobs:
         cd ${{ github.workspace }}
         make magnetostatic micromagnetism USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
 
+    - name: Check version of Windows Driver Kit
+      shell: cmd /C CALL {0}
+      run: >-
+        dir "C:\Program Files (x86)\Windows Kits\10\lib"
+
     - name: Compile Fortran files in Developer PowerShell for VS 2022
       shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
       run: |
