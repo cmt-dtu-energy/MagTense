@@ -18,6 +18,7 @@ jobs:
       if: ${{ matrix.cuda-version == 'CUDA' }}
       env:
         CUDA: true
+      shell: cmd /C CALL {0}
       run: |
         "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "disp(1+1)"
     
@@ -26,6 +27,7 @@ jobs:
       if: ${{ matrix.cuda-version == 'noCUDA' }}
       env:
         CUDA: false
+      shell: cmd /C CALL {0}
       run: |
         "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "disp(1+1)"
         
