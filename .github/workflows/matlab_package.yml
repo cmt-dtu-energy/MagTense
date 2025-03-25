@@ -253,6 +253,9 @@ jobs:
       matrix:
         mat-version: [R2023a,R2023b,R2024a,R2024b]
         os-version: [ubuntu-22.04,ubuntu-latest]
+        exclude:
+          - os-version: ubuntu-latest
+            mat-version: 'R2024b'
     runs-on: ["${{ matrix.os-version }}"]
     needs: build-linux
     defaults:
