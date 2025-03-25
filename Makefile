@@ -57,7 +57,7 @@ ifeq ($(OS),Windows_NT)
 	MKL = -L${CONDA_PATH}/Library/lib -lmkl_intel_lp64_dll -lmkl_intel_thread_dll \
 		-lmkl_core_dll -lmkl_blas95_lp64 -llibiomp5md
 	CVODE_ROOT = "C:\Program Files (x86)\sundials-4.1.0\instdir"
-	LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib'
+	LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib'
 	LIB_SUFFIX = .lib
 	PY_MOD_SUFFIX = .pyd
 
@@ -162,7 +162,7 @@ standalone: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} standal
 
 python: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
 
-python_win: ${PYTHON_MODN_ALL}
+python-win: ${PYTHON_MODN_ALL}
 
 clean:
 	cd ${NUM_INT_PATH} && ${MAKE} clean
@@ -173,6 +173,10 @@ clean:
 	cd $(STANDALONE_PATH) && ${MAKE} clean
 	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
+	rm -rf ${PYTHON_LIBPATH}/build
+
+clean-build:
+	rm -f ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
 	rm -rf ${PYTHON_LIBPATH}/build
 
 magnetostatic:
