@@ -146,7 +146,7 @@ jobs:
     - name: Check that the MEX-files are there    
       shell: cmd /C CALL {0}
       run: |
-        dir ${{ github.workspace }}\matlab\MEX_files
+        dir ${{ github.workspace }}\matlab\MEX_files 
     
     - name: Run different Matlab versions and test the MEX-files with and without CUDA
       env:
