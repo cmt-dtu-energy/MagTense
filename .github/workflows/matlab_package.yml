@@ -57,7 +57,7 @@ jobs:
       - name: Setup a symbolic link to the ifx compiler so that Matlab's "mex -setup FORTRAN" can find it
         shell: powershell
         run: |
-          cd C:\Users\runneradmin\\miniconda3\envs\magtense-env\Library 
+          cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library 
           mkdir compiler 
           cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\compiler
           mkdir 2024.2 
@@ -147,11 +147,23 @@ jobs:
       run: |
         dir ${{ github.workspace }}\matlab\MEX_files
     
-    - name: Run MATLAB R2020b
-      if: ${{ matrix.mat-version == 'R2020b' }}
+    - name: Run MATLAB R2023a
+      if: ${{ matrix.mat-version == 'R2023a' }}
       shell: cmd /C CALL {0}
       run: |
-        "C:\Program Files\MATLAB\R2020b\bin\matlab.exe" -batch "cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true)"
+        "C:\Program Files\MATLAB\R2023a\bin\matlab.exe" -batch "cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true)"
+        
+    - name: Run MATLAB R2023b
+      if: ${{ matrix.mat-version == 'R2023b' }}
+      shell: cmd /C CALL {0}
+      run: |
+        "C:\Program Files\MATLAB\R2023b\bin\matlab.exe" -batch "cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true)"
+        
+    - name: Run MATLAB R2024a
+      if: ${{ matrix.mat-version == 'R2024a' }}
+      shell: cmd /C CALL {0}
+      run: |
+        "C:\Program Files\MATLAB\R2024a\bin\matlab.exe" -batch "cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true)"
         
     - name: Run MATLAB R2024b
       if: ${{ matrix.mat-version == 'R2024b' }}
