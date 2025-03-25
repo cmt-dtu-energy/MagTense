@@ -18,12 +18,17 @@ jobs:
       if: ${{ matrix.cuda-version == 'CUDA' }}
       env:
         CUDA: true
+      run: |
+        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "disp(1+1)"
+    
     
     - name: Define with or without CUDA        
       if: ${{ matrix.cuda-version == 'noCUDA' }}
       env:
         CUDA: false
-
+      run: |
+        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "disp(1+1)"
+        
     #- name: Checkout test scripts
     #  uses: actions/checkout@v4
     #  with:
