@@ -57,7 +57,7 @@ ifeq ($(OS),Windows_NT)
 	MKL = -L${CONDA_PATH}/Library/lib -lmkl_intel_lp64_dll -lmkl_intel_thread_dll \
 		-lmkl_core_dll -lmkl_blas95_lp64 -llibiomp5md
 	CVODE_ROOT = "C:\Program Files (x86)\sundials-4.1.0\instdir"
-	LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib'
+	LDFLAGS = '/LIBPATH:${CONDA_PATH}/Library/lib'
 	LIB_SUFFIX = .lib
 	PY_MOD_SUFFIX = .pyd
 
