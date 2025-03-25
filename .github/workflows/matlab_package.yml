@@ -57,7 +57,7 @@ jobs:
       - name: Setup a symbolic link to the ifx compiler so that Matlab's "mex -setup FORTRAN" can find it
         shell: powershell
         run: |
-          cd C:\Users\runneradmin\\miniconda3\envs\magtense-env\Library 
+          cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library 
           mkdir compiler 
           cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\compiler
           mkdir 2024.2 
@@ -121,8 +121,9 @@ jobs:
   test-windows:
     strategy:
       matrix:
-        mat-version: [R2020b,R2024b]
-    runs-on: [self-hosted,Windows,CUDA]
+        mat-version: [R2023a,R2023b,R2024a,R2024b]
+        cuda-version: [CUDA,noCUDA]
+    runs-on: [ self-hosted, Windows, "${{ matrix.cuda-version }}"]
     needs: build-windows
     defaults:
       run:
@@ -142,24 +143,18 @@ jobs:
         name: MEX-Windows
         path: ${{ github.workspace }}/matlab/MEX_files
         
-    - name: Check that the MEX-files are there
+    - name: Check that the MEX-files are there    
       shell: cmd /C CALL {0}
       run: |
         dir ${{ github.workspace }}\matlab\MEX_files
     
-    - name: Run MATLAB R2020b
-      if: ${{ matrix.mat-version == 'R2020b' }}
+    - name: Run different Matlab versions and test the MEX-files with and without CUDA
+      env:
+        CUDA: ${{ matrix.cuda-version == 'noCUDA' && 'false' || 'true' }}
       shell: cmd /C CALL {0}
       run: |
-        "C:\Program Files\MATLAB\R2020b\bin\matlab.exe" -batch "cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true)"
-        
-    - name: Run MATLAB R2024b
-      if: ${{ matrix.mat-version == 'R2024b' }}
-      shell: cmd /C CALL {0}
-      run: |
-        "C:\Program Files\MATLAB\R2024b\bin\matlab.exe" -batch "cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true)"
-  
-  
+        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "USE_CUDA = getenv('CUDA'); cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA)"
+          
   #################################
   
   build-linux:

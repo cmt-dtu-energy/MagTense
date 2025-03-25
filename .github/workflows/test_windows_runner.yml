@@ -4,45 +4,48 @@ on: [push]
 
 jobs:
   test-windows:
-    runs-on: [self-hosted,Windows,CUDA]
+    strategy:
+      matrix:
+        mat-version: [R2023a,R2023b,R2024a,R2024b]
+        cuda-version: [CUDA,noCUDA]
+    runs-on: [ self-hosted, Windows, "${{ matrix.cuda-version }}"]
     defaults:
       run:
         shell: bash -el {0}
     
     steps:
-    - name: Dir
+    - name: Define with or without CUDA
+      env:
+        CUDA: ${{ matrix.cuda-version == 'noCUDA' && 'false' || 'true' }}
       shell: cmd /C CALL {0}
       run: |
-        "C:\Program Files\MATLAB\R2024b\bin\matlab.exe" -batch "cd('C:\Users\github_runner\Downloads\MagTense-static-linking-mex\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true)"
+        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "disp(1+1); getenv('CUDA')"
     
-    - name: Checkout test scripts
-      uses: actions/checkout@v4
-      with:
-        sparse-checkout: |
-          matlab
-          documentation
     
-    - name: Dir
-      shell: cmd /C CALL {0}
-      run: |
-        dir ${{ github.workspace }}\matlab\MEX_files
+    #- name: Define with or without CUDA        
+    #  if: ${{ matrix.cuda-version == 'noCUDA' }}
+    #  env:
+    #    CUDA: false
+    #  shell: cmd /C CALL {0}
+    #  run: |
+    #    "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "disp(1+1); sjask = getenv('CUDA')"
         
-    #- name: Download the MEX files as an artifact
-    #  uses: actions/download-artifact@v4
+    #- name: Checkout test scripts
+    #  uses: actions/checkout@v4
     #  with:
-    #    name: MEX-Windows
-    #    path: ${{ github.workspace }}/matlab/MEX_files
-
-
-
-
-    - name: Run test script on download MEX-file with CUDA
-      uses: matlab-actions/run-command@v2
-      with:
-        command: disp(2+2); pwd; dir
+    #    sparse-checkout: |
+    #      matlab
+    #      documentation
     
-    #- name: Cmd.exe
-    #    shell: cmd /C CALL {0}
-    #    run: >-
-    #      "C:\Program Files\MATLAB\R2024b\bin\matlab.exe" -batch "C:\Users\github_runner\Downloads\MagTense-static-linking-mex\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4\Standard_problem_4('USE_CUDA',true)"
-    
+    #- name: Dir
+    #  shell: cmd /C CALL {0}
+    #  run: |
+    #    dir ${{ github.workspace }}\matlab\MEX_files
+        
+    #- name: Dir
+    #  shell: cmd /C CALL {0}
+    #  run: |
+    #    "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',true)"
+       
+   
+   
