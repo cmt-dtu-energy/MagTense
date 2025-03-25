@@ -150,7 +150,7 @@ jobs:
     
     - name: Run different Matlab versions and test the MEX-files with and without CUDA
       env:
-        CUDA: ${{ matrix.cuda-version == 'noCUDA' && '0' || '1' }}
+        CUDA: ${{ matrix.cuda-version == 'noCUDA' && '0' || '1' }} 
       shell: cmd /C CALL {0}
       run: |
         "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "USE_CUDA = getenv('CUDA'); cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA)"
