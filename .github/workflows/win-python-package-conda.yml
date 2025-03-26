@@ -72,7 +72,7 @@ jobs:
 
     - name: Compile Fortran files in Bash
       shell: bash -el {0}
-      working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+      working-directory: ${{ github.workspace }}
       run: make python-win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
 
     - name: Build pip-wheels without cvode
