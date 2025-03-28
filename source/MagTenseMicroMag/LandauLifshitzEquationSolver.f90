@@ -25,6 +25,7 @@
     use omp_lib
     use IO_GENERAL
     use iso_fortran_env
+    use UnstructuredMeshAnalysis
     implicit none
     
    
@@ -56,12 +57,23 @@
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
     real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
     character*(100) :: prog_str 
+    type(MicroMagGridInfo) :: GridInfo
     
     !Save internal representation of the problem and the solution
     gb_solution = sol
     gb_problem = prob
     
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+    
+    
+    call displayGUIMessage( 'Test 1' )
+    if ( gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
+        !> Pure testing code to see if we can analyze the mesh in Fortran
+        call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, GridInfo)
+    endif
+    
+    
+    
     
     call displayGUIMessage( 'Initializing matrices' )
     !Calculate the interaction matrices
@@ -1042,7 +1054,6 @@
             !$OMP END PARALLEL DO
             
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
-            
             !call displayGUIMessage( 'Constructing the Tensormap' )
             !call ConstructDemagTensorMap( problem )
             !call displayGUIMessage( 'Done constructing the Tensormap' )

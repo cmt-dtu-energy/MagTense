@@ -1,4 +1,4 @@
-function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,int_error] = Standard_problem_4( NIST_field, resolution, options )
+function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error] = Standard_problem_4( NIST_field, resolution, options )
 %STANDARD_PROBLEM_4 
 %A function script to setup and simulate mumag standard problem 4
 %
@@ -73,7 +73,6 @@ arguments
     options.use_CUDA {mustBeNumericOrLogical}       = true          %--- Use CUDA for the calculations
     options.ShowTheResult {mustBeNumericOrLogical}  = true          %--- Show the result
     options.use_CVODE {mustBeNumericOrLogical}      = false;        %--- Use CVODE for the numerical time evolution
-    options.CV {mustBeNumeric}                      = 0;            %--- Use coefficient of variation to add random noise
 end
 
 mu0 = 4*pi*1e-7;
@@ -90,6 +89,7 @@ problem_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 problem_ini.grid_L = [500e-9,125e-9,3e-9]; %m
 problem_ini.nThreads = int32(8);
 
+% Set specific flags on options
 problem_ini = problem_ini.setMicroMagDemagApproximation('none');
 problem_ini = problem_ini.setUseCuda( options.use_CUDA );
 problem_ini = problem_ini.setUseCVODE( options.use_CVODE );
@@ -114,9 +114,6 @@ problem_ini.setTimeDis = int32(100);
 HystDir = 1/mu0*[1,1,1] ;
 HextFct = @(t) (1e-9-t)' .* HystDir .* (t<1e-9)';
 problem_ini = problem_ini.setHext( HextFct, linspace(0,100e-9,2000) );
-
-% Add random noise to the demag vector
-problem_ini.CV = options.CV;
 
 %% Solve the initial configuration
 % Convert the class obj to a struct so it can be loaded into fortran
@@ -170,15 +167,7 @@ tic
 solution_dym = problem_dym.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_dym );
 elapsedTime_part2 = toc
 
-if (options.ShowTheResult)
-    if (options.ShowTheResult)
-        figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
-    end
-
-    plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,1),2),'rx'); 
-    plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,2),2),'gx'); 
-    plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,3),2),'bx'); 
-end
+[Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution_dym.M);
 
 
 %% --------------------------------------------------------------------------------------------------------------------------------------
@@ -188,16 +177,23 @@ end
 t=1e-9*linspace(0,1,1000);
 M_mumag = load(['../../../../documentation/examples_NIST_validation/Validation_standard_problem_4/Field_' num2str(NIST_field) '_NIST_mean_solution.txt']);
 
-% Interpolate the MagTense solution to the NIST-published solutions and
-% calculate the difference between the results as an integral.
-Magtense_M_interpolated(:,1) = interp1(solution_dym.t,mean(solution_dym.M(:,:,1),2),t);
-Magtense_M_interpolated(:,2) = interp1(solution_dym.t,mean(solution_dym.M(:,:,2),2),t);
-Magtense_M_interpolated(:,3) = interp1(solution_dym.t,mean(solution_dym.M(:,:,3),2),t);
-int_error(1) = trapz(t,abs(M_mumag(:,1)-Magtense_M_interpolated(:,1)));
-int_error(2) = trapz(t,abs(M_mumag(:,3)-Magtense_M_interpolated(:,2)));
-int_error(3) = trapz(t,abs(M_mumag(:,5)-Magtense_M_interpolated(:,3)));
+% Interpolate the MagTense solution to the mumag solution and calculate the relative error in percent
+rel_int_error(1) = calculate_relative_integral_error(t,M_mumag(:,1),solution_dym.t,Mx);
+rel_int_error(2) = calculate_relative_integral_error(t,M_mumag(:,3),solution_dym.t,My);
+rel_int_error(3) = calculate_relative_integral_error(t,M_mumag(:,5),solution_dym.t,Mz);
 
+%% --------------------------------------------------------------------------------------------------------------------------------------
+%% ---------------------------------------------------------------  Plot the results ----------------------------------------------------
+%% --------------------------------------------------------------------------------------------------------------------------------------
 if (options.ShowTheResult)
+    figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
+
+    %--- Plot the MagTense magnetization
+    plot(fig1,solution_dym.t,Mx,'rx'); 
+    plot(fig1,solution_dym.t,My,'gx'); 
+    plot(fig1,solution_dym.t,Mz,'bx'); 
+
+    %--- Plot the mumag solutions
     colours = [[1 0 0];[0 1 0];[0 0 1]];
     weak_colours = colours + ~colours*0.75;
     fill_ts=[t,fliplr(t)];  

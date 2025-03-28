@@ -67,7 +67,26 @@ include "mkl_dfti.f90"
         integer :: gridType
         integer :: nnodes                                   !> The number of nodes in a tetrahedral grid
         type(MagTenseSparse_d) :: A_exch_load                 !> The exchange matrix as read from Matlab
-     end type MicroMagGrid
+    end type MicroMagGrid
+    
+    !Additional information about the grid
+    type MicroMagGridInfo
+        real(dp), allocatable :: fNormX(:)
+        real(dp), allocatable :: fNormY(:)
+        real(dp), allocatable :: fNormZ(:)
+        real(dp), allocatable :: AreaFaces(:)
+        real(dp), allocatable :: Volumes(:)
+        type(sparse_matrix_t) :: TheSigns                                   !> Sparse matrix handle to MKL
+        type(sparse_matrix_t) :: TheTs                                      !> Sparse matrix handle to MKL
+        type(sparse_matrix_t) :: TheDs                                      !> Sparse matrix handle to MKL
+        real(dp), allocatable :: Xel(:)
+        real(dp), allocatable :: Yel(:)
+        real(dp), allocatable :: Zel(:)
+        real(dp), allocatable :: Xf(:)
+        real(dp), allocatable :: Yf(:)
+        real(dp), allocatable :: Zf(:)
+        real(dp), allocatable :: DimsF(:,:)
+     end type MicroMagGridInfo
      
     !>-----------------
     !> Overall data structure for a micro magnetism problem.
