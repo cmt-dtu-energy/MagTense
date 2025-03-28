@@ -57,6 +57,7 @@ jobs:
         make clean
 
     - name: Build pip-wheels without cvode
+      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
       working-directory: ${{ github.workspace }}/python/
       run: python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu --platform win --no-cvode
 
