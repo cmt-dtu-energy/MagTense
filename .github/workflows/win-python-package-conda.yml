@@ -86,7 +86,7 @@ jobs:
     #     call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" && make python-win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
     
     - name: Compile Fortran files in x64 Native Tools Command Prompt for VS 2022
-      shell: cmd
+      shell: cmd /k "{0}" -startdir=None -arch=amd64 -host_arch=x64
       run: make python-win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
 
     - name: Build pip-wheels without cvode
