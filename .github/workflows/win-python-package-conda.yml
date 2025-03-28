@@ -65,20 +65,27 @@ jobs:
     #     cd ${{ github.workspace }}
     #     make python-win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
 
-    - name: Check path for x64 Native Tools Command Prompt for VS 2022
-      shell: cmd /k "{0}" -startdir=None -arch=amd64 -host_arch=x64
-      run: >-
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" && echo %PATH%
+    # - name: Check path for x64 Native Tools Command Prompt for VS 2022
+    #   shell: cmd /k "{0}" -startdir=None -arch=amd64 -host_arch=x64
+    #   run: >-
+    #     call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" && echo %PATH%
     
-    - name: Add path to x64 Native Tools Command Prompt for VS 2022
-      shell: cmd /k "{0}" -startdir=None -arch=amd64 -host_arch=x64
-      run: >-
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" && set PATH=%PATH%;C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\HostX64\x64 && echo %PATH%
+    # - name: Add path to x64 Native Tools Command Prompt for VS 2022
+    #   shell: cmd /k "{0}" -startdir=None -arch=amd64 -host_arch=x64
+    #   run: >-
+    #     call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" && set PATH=%PATH%;C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\HostX64\x64 && echo %PATH%
 
-    - name: Compile Fortran files in x64 Native Tools Command Prompt for VS 2022
-      shell: cmd /k "{0}" -startdir=None -arch=amd64 -host_arch=x64
-      run: >-
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" && make python-win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
+    # - name: Compile Fortran files in x64 Native Tools Command Prompt for VS 2022
+    #   shell: cmd /k "{0}" -startdir=None -arch=amd64 -host_arch=x64
+    #   run: >-
+    #     call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" && make python-win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
+
+    - name: Compile Fortran files in msvc-dev-cmd
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: amd64
+    
+    - run: make python-win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
 
     - name: Build pip-wheels without cvode
       working-directory: ${{ github.workspace }}/python/
