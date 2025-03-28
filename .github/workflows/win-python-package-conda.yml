@@ -7,7 +7,10 @@ jobs:
     strategy:
       matrix:
         py-version: [312]
-    runs-on: [windows-latest]
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
     env:
       build_file: python/.build/environment_win.yml
 
@@ -46,20 +49,19 @@ jobs:
         mkdir ${{ github.workspace }}/python/cpu_libs
         mkdir ${{ github.workspace }}/python/cu12_libs
 
-    - name: Compile Fortran files in Developer PowerShell for VS 2022
-      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+    - name: Compile Fortran files
       working-directory: ${{ github.workspace }}
       run: |
-        (get-command link).Path
         rm ${{ env.CONDA }}/envs/magtense-env/Library/usr/bin/link.exe
         make python USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
         cp magtensesource.*.pyd ${{ github.workspace }}/python/cpu_libs/
         make clean
 
     - name: Build pip-wheels without cvode
-      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
       working-directory: ${{ github.workspace }}/python/
-      run: python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu --platform win --no-cvode
+      run: |
+        dir ${{ github.workspace }}/python/cpu_libs
+        ${{ env.CONDA }}/envs/magtense-env/python.exe .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu --platform win --no-cvode
 
     - name: cpu - Archive pip-wheel
       uses: actions/upload-artifact@v4
