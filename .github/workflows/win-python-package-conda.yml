@@ -41,25 +41,10 @@ jobs:
       run: conda env update -n magtense-env -f ${{ env.build_file }}
       if: steps.cache.outputs.cache-hit != 'true'
     
-    - name: Compile with nvcc in Bash
-      shell: bash -el {0}
-      working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
-      run: nvcc -c MagTenseCudaBlas.cu -o MagTenseCudaBlas.o
-
-    - name: Link Cuda wrapper in Developer PowerShell for VS 2022
-      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-      working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
-      run: make wrap
-
-    - name: Compile Fortran files in Developer PowerShell for VS 2022
-      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-      working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
-
-    # - name: Compile Fortran files in x64 Native Tools Command Prompt for VS 2022
-    #   shell: cmd /k "{0}" -arch=amd64 -host_arch=x64
-    #   run: >-
-    #     make python-win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
+    - name: Create directory for wrappers of compiled Fortran source code
+      run: |
+        mkdir ${{ github.workspace }}/python/cpu_libs
+        mkdir ${{ github.workspace }}/python/cu12_libs
 
     - name: Compile Fortran files in Developer PowerShell for VS 2022
       shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
@@ -67,12 +52,9 @@ jobs:
       run: |
         (get-command link).Path
         rm ${{ env.CONDA }}/envs/magtense-env/Library/usr/bin/link.exe
-        make python-win USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
-
-    - name: Make cuda in Developer PowerShell for VS 2022
-      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-      working-directory: ${{ github.workspace }}
-      run: make cuda
+        make python USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
+        cp magtensesource.*.pyd ${{ github.workspace }}/python/cpu_libs/
+        make clean
 
     - name: Build pip-wheels without cvode
       working-directory: ${{ github.workspace }}/python/
