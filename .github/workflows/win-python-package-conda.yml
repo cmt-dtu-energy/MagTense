@@ -23,55 +23,49 @@ jobs:
       with:
         arch: amd64
 
+    - name: Setup Miniforge
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-version: latest
+        activate-environment: magtense-env
+        use-mamba: true
+
+    - name: Cache conda
+      uses: actions/cache@v4
+      env:
+        # Increase this value to reset cache manually
+        cache_number: 0
+      with:
+        path: ${{ env.CONDA }}/envs
+        key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
+      id: cache
+
+    - name: Update environment
+      run: conda env update -n magtense-env -f ${{ env.build_file }}
+      if: steps.cache.outputs.cache-hit != 'true'
+    
+    - name: Create directory for wrappers of compiled Fortran source code
+      run: |
+        mkdir '${{ github.workspace }}'/python/cpu_libs
+        mkdir '${{ github.workspace }}'/python/cu12_libs
+
     - name: Compile Fortran files
       working-directory: ${{ github.workspace }}
       run: |
-        which link
+        rm /usr/bin/link
         rm '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
-        rm /usr/bin/link.exe
+        make python USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
+        cp magtensesource.*.pyd '${{ github.workspace }}'/python/cpu_libs/
+        make clean
 
-    # - name: Setup Miniforge
-    #   uses: conda-incubator/setup-miniconda@v3
-    #   with:
-    #     miniforge-version: latest
-    #     activate-environment: magtense-env
-    #     use-mamba: true
+    - name: Build pip-wheels without cvode
+      working-directory: ${{ github.workspace }}/python/
+      run: |
+        dir '${{ github.workspace }}'/python/cpu_libs
+        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu --platform win --no-cvode
 
-    # - name: Cache conda
-    #   uses: actions/cache@v4
-    #   env:
-    #     # Increase this value to reset cache manually
-    #     cache_number: 0
-    #   with:
-    #     path: ${{ env.CONDA }}/envs
-    #     key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
-    #   id: cache
-
-    # - name: Update environment
-    #   run: conda env update -n magtense-env -f ${{ env.build_file }}
-    #   if: steps.cache.outputs.cache-hit != 'true'
-    
-    # - name: Create directory for wrappers of compiled Fortran source code
-    #   run: |
-    #     mkdir '${{ github.workspace }}'/python/cpu_libs
-    #     mkdir '${{ github.workspace }}'/python/cu12_libs
-
-    # - name: Compile Fortran files
-    #   working-directory: ${{ github.workspace }}
-    #   run: |
-    #     rm '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
-    #     make python USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
-    #     cp magtensesource.*.pyd '${{ github.workspace }}'/python/cpu_libs/
-    #     make clean
-
-    # - name: Build pip-wheels without cvode
-    #   working-directory: ${{ github.workspace }}/python/
-    #   run: |
-    #     dir '${{ github.workspace }}'/python/cpu_libs
-    #     python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu --platform win --no-cvode
-
-    # - name: cpu - Archive pip-wheel
-    #   uses: actions/upload-artifact@v4
-    #   with:
-    #     name: pip-wheel-py${{ matrix.py-version }}-cpu
-    #     path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-version }}-none-win_amd64.whlxs
+    - name: cpu - Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version }}-cpu
+        path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-version }}-none-win_amd64.whl
