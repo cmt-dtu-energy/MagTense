@@ -74,3 +74,54 @@ jobs:
       with:
         name: pip-wheel-py${{ matrix.py-version }}-cpu
         path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-version }}-none-win_amd64.whl
+
+  test-win:
+    strategy:
+      matrix:
+        mt-punit: [cpu]
+        py-version: [312]
+    runs-on: windows-latest
+    needs: build-win
+    defaults:
+      run:
+        shell: bash -el {0}
+    
+    steps:
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/tests/
+          documentation/examples_FEM_validation/
+    
+    - name: Download a single artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version }}-${{ matrix.mt-punit }}
+
+    - name: Setup python 3.12
+      if: ${{ matrix.py-version == 312 }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    
+    - name: Setup python 3.13
+      if: ${{ matrix.py-version == 313 }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+
+    - name: Create a new virtual environment
+      run: python3 -m venv ${{ github.workspace }}/.venv
+
+    - name: Install pip-wheel and pytest
+      run: |
+        source ${{ github.workspace }}/.venv/bin/activate
+        python3 -m pip install ${{ github.workspace }}/*.whl
+        python3 -m pip install pytest
+
+    - name: Run tests
+      run: |
+        source ${{ github.workspace }}/.venv/bin/activate
+        pytest
+        
