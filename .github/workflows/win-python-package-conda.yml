@@ -60,14 +60,7 @@ jobs:
 
     - name: Build pip-wheels without cvode
       working-directory: ${{ github.workspace }}/python/
-      run: |
-        which python
-        which python3
-        ls '${{ github.workspace }}'/python/cpu_libs
-        conda activate magtense-env
-        which python
-        which python3
-        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu --platform win --no-cvode
+      run: python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu --platform win --no-cvode
 
     - name: cpu - Archive pip-wheel
       uses: actions/upload-artifact@v4
@@ -112,16 +105,15 @@ jobs:
         python-version: "3.13"
 
     - name: Create a new virtual environment
-      run: python3 -m venv ${{ github.workspace }}/.venv
+      run: python3 -m venv '${{ github.workspace }}'/.venv
 
     - name: Install pip-wheel and pytest
       run: |
-        source ${{ github.workspace }}/.venv/bin/activate
-        python3 -m pip install ${{ github.workspace }}/*.whl
+        source '${{ github.workspace }}'/.venv/bin/activate
+        python3 -m pip install '${{ github.workspace }}'/*.whl
         python3 -m pip install pytest
 
     - name: Run tests
       run: |
-        source ${{ github.workspace }}/.venv/bin/activate
+        source '${{ github.workspace }}'/.venv/bin/activate
         pytest
-        
