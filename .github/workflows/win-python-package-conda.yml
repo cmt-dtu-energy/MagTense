@@ -10,7 +10,7 @@ jobs:
     runs-on: windows-latest
     defaults:
       run:
-        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+        shell: bash -el {0} # pwsh -NoExit -ExecutionPolicy ByPass -File {0}
     env:
       build_file: python/.build/environment_win.yml
 
@@ -61,7 +61,7 @@ jobs:
       working-directory: ${{ github.workspace }}/python/
       run: |
         dir ${{ github.workspace }}/python/cpu_libs
-        ${{ env.CONDA }}/envs/magtense-env/python.exe .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu --platform win --no-cvode
+        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu --platform win --no-cvode
 
     - name: cpu - Archive pip-wheel
       uses: actions/upload-artifact@v4
