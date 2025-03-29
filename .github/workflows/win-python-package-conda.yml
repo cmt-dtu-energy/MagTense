@@ -55,13 +55,18 @@ jobs:
       run: |
         rm ${{ env.CONDA }}/envs/magtense-env/Library/usr/bin/link.exe
         make python USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
-        cp magtensesource.*.pyd '${{ github.workspace }}'/python/cpu_libs/
+        cp magtensesource.*.pyd ${{ github.workspace }}/python/cpu_libs/
         make clean
 
     - name: Build pip-wheels without cvode
       working-directory: ${{ github.workspace }}/python/
       run: |
-        dir '${{ github.workspace }}'/python/cpu_libs
+        which python
+        which python3
+        ls '${{ github.workspace }}'/python/cpu_libs
+        conda activate magtense-env
+        which python
+        which python3
         python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu --platform win --no-cvode
 
     - name: cpu - Archive pip-wheel
