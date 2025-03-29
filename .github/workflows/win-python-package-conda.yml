@@ -53,7 +53,7 @@ jobs:
       working-directory: ${{ github.workspace }}
       run: |
         rm /usr/bin/link
-        ls '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/
+        which link
         make python USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
         cp magtensesource.*.pyd '${{ github.workspace }}'/python/cpu_libs/
         make clean
