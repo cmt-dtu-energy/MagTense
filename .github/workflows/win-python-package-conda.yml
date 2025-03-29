@@ -46,21 +46,21 @@ jobs:
     
     - name: Create directory for wrappers of compiled Fortran source code
       run: |
-        mkdir ${{ github.workspace }}/python/cpu_libs
-        mkdir ${{ github.workspace }}/python/cu12_libs
+        mkdir '${{ github.workspace }}'/python/cpu_libs
+        mkdir '${{ github.workspace }}'/python/cu12_libs
 
     - name: Compile Fortran files
       working-directory: ${{ github.workspace }}
       run: |
-        rm ${{ env.CONDA }}/envs/magtense-env/Library/usr/bin/link.exe
+        rm '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
         make python USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
-        cp magtensesource.*.pyd ${{ github.workspace }}/python/cpu_libs/
+        cp magtensesource.*.pyd '${{ github.workspace }}'/python/cpu_libs/
         make clean
 
     - name: Build pip-wheels without cvode
       working-directory: ${{ github.workspace }}/python/
       run: |
-        dir ${{ github.workspace }}/python/cpu_libs
+        dir '${{ github.workspace }}'/python/cpu_libs
         python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu --platform win --no-cvode
 
     - name: cpu - Archive pip-wheel
