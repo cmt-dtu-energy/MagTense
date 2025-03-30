@@ -1,37 +1,44 @@
-name: Linux - Python package using conda / pip
+name: Python - Pip-wheel with conda
 
-on:
-  push:
-  workflow_call:
+on: push
 
 jobs:
-  build-linux:
+  build-wheel:
     strategy:
       matrix:
         py-version: [312, 313]
-        cvode: [1]
-    runs-on: ubuntu-latest
+        cvode: [0]
+        sys:
+          - { os: windows-latest, name: win, whl-arch: win_amd64 }
+          - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
+    runs-on: ${{ matrix.sys.os }}
     defaults:
       run:
         shell: bash -el {0}
     env:
-      build_file: python/.build/env-${{ matrix.py-version }}-linux.yml
+      build_file: python/.build/env-${{ matrix.py-version }}-${{ matrix.sys.name }}.yml
+      conda-env-name: magtense-env
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Setup msvc-dev-cmd
+      if: ${{ runner.os == 'windows-latest' }}
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: amd64
+
     - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v3
       with:
         miniforge-version: latest
-        activate-environment: magtense-env
+        activate-environment: ${{ env.conda-env-name }}
         use-mamba: true
 
     - name: Cache conda
       uses: actions/cache@v4
       env:
-        # Increase this value to reset cache manually
         cache_number: 0
       with:
         path: ${{ env.CONDA }}/envs
@@ -39,33 +46,43 @@ jobs:
       id: cache
 
     - name: Update environment
-      run: conda env update -n magtense-env -f ${{ env.build_file }}
+      run: conda env update -n ${{ env.conda-env-name }} -f ${{ env.build_file }}
       if: steps.cache.outputs.cache-hit != 'true'
 
     - name: Download cvode (sundials-7.2.1)
       working-directory: ${{ github.workspace }}
-      if: ${{ matrix.cvode == 1 }}
+      if: ${{ matrix.cvode == 1 && runner.os == 'ubuntu-latest' }}
       run: |
         wget https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz
         tar -xf cvode-7.2.1.tar.gz
         mkdir cvode
         mv cvode-7.2.1 cvode/srcdir
         mkdir cvode/builddir
-    
-    - name: Compile cvode for Fortran
-      working-directory: ${{ github.workspace }}/cvode/builddir/
-      if: ${{ matrix.cvode == 1 }}
-      run: |
+        cd ${{ github.workspace }}/cvode/builddir/
         cmake -DCMAKE_INSTALL_PREFIX=.. -DEXAMPLES_INSTALL_PATH=../examples -DCMAKE_C_COMPILER=${CONDA_PREFIX}/bin/icx -DCMAKE_C_FLAGS=-Wunused-command-line-argument -DCMAKE_Fortran_COMPILER=${CONDA_PREFIX}/bin/ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON -DENABLE_CUDA=ON ../srcdir
         make
         make install
     
     - name: Create directory for wrappers of compiled Fortran source code
       run: |
-        mkdir ${{ github.workspace }}/python/cpu_libs
-        mkdir ${{ github.workspace }}/python/cu12_libs
+        mkdir '${{ github.workspace }}'/python/cpu_libs
+        mkdir '${{ github.workspace }}'/python/cu12_libs
 
-    - name: Compile Fortran source code and build Python wrappers
+    - name: Win - Compile Fortran source code and build Python wrapper
+      if: ${{ runner.os == 'windows-latest' }}
+      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      working-directory: ${{ github.workspace }}
+      run: |
+        rm ${{ env.CONDA }}/envs/magtense-env/Library/usr/bin/link.exe
+        make python USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
+        cp magtensesource.*.pyd ${{ github.workspace }}/python/cpu_libs/
+        make clean
+        make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0
+        cp magtensesource.*.pyd ${{ github.workspace }}/python/cu12_libs/
+        make clean
+
+    - name: Linux - Compile Fortran source code and build Python wrapper
+      if: ${{ runner.os == 'ubuntu-latest' }}
       working-directory: ${{ github.workspace }}
       run: |
         make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
@@ -76,35 +93,35 @@ jobs:
         make clean
 
     - name: Build pip-wheels with cvode
-      if: ${{ matrix.cvode == 1 }}
+      if: ${{ matrix.cvode == 1 && runner.os == 'ubuntu-latest' }}
       working-directory: ${{ github.workspace }}/python/
       run: python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --platform linux --cvode
 
     - name: Build pip-wheels without cvode
       if: ${{ matrix.cvode == 0 }}
       working-directory: ${{ github.workspace }}/python/
-      run: python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --platform linux --no-cvode
+      run: python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --platform ${{ matrix.sys.name }} --no-cvode
 
     - name: cpu - Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
-        name: pip-wheel-py${{ matrix.py-version }}-cpu
-        path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-version }}-none-manylinux1_x86_64.whl
+        name: pip-wheel-py${{ matrix.py-version }}-cpu-${{ runner.os }}
+        path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
 
     - name: cu12 - Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
-        name: pip-wheel-py${{ matrix.py-version }}-cu12
-        path: ${{ github.workspace }}/python/dist/magtense-*-1-py${{ matrix.py-version }}-none-manylinux1_x86_64.whl
+        name: pip-wheel-py${{ matrix.py-version }}-cu12-${{ runner.os }}
+        path: ${{ github.workspace }}/python/dist/magtense-*-1-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
 
 
-  test-linux:
+  test-wheel:
     strategy:
       matrix:
         mt-punit: [cpu, cu12]
         py-version: [312, 313]
-    runs-on: ubuntu-latest
-    needs: build-linux
+    runs-on: [windows-latest, ubuntu-latest]
+    needs: build-wheel
     defaults:
       run:
         shell: bash -el {0}
@@ -120,7 +137,7 @@ jobs:
     - name: Download a single artifact
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-py${{ matrix.py-version }}-${{ matrix.mt-punit }}
+        name: pip-wheel-py${{ matrix.py-version }}-${{ matrix.mt-punit }}-${{ runner.os }}
 
     - name: Setup python 3.12
       if: ${{ matrix.py-version == 312 }}
@@ -135,15 +152,20 @@ jobs:
         python-version: "3.13"
 
     - name: Create a new virtual environment
-      run: python3 -m venv ${{ github.workspace }}/.venv
+      run: python3 -m venv '${{ github.workspace }}'/.venv
 
-    - name: Install pip-wheel and pytest
+    - name: Win - Install pip-wheel and pytest
+      if: ${{ runner.os == 'windows-latest' }}
       run: |
         source ${{ github.workspace }}/.venv/bin/activate
-        python3 -m pip install ${{ github.workspace }}/*.whl
+        python3 -m pip install '${{ github.workspace }}'/*.whl
         python3 -m pip install pytest
+        pytest
 
-    - name: Run tests
+    - name: Linux - Install pip-wheel and pytest
+      if: ${{ runner.os == 'ubuntu-latest' }}
       run: |
         source ${{ github.workspace }}/.venv/bin/activate
+        python3 -m pip install '${{ github.workspace }}'/*.whl
+        python3 -m pip install pytest
         pytest

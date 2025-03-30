@@ -7,7 +7,7 @@ jobs:
     strategy:
       matrix:
         py-version: [313]
-        cvode: [1]
+        cvode: [0]
     runs-on: windows-latest
     defaults:
       run:
