@@ -57,6 +57,9 @@ jobs:
         make python USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
         cp magtensesource.*.pyd ${{ github.workspace }}/python/cpu_libs/
         make clean
+        make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0
+        cp magtensesource.*.pyd ${{ github.workspace }}/python/cu12_libs/
+        make clean
 
     - name: Build pip-wheels without cvode
       working-directory: ${{ github.workspace }}/python/
@@ -68,10 +71,16 @@ jobs:
         name: pip-wheel-py${{ matrix.py-version }}-cpu
         path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-version }}-none-win_amd64.whl
 
+    - name: cu12 - Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version }}-cu12
+        path: ${{ github.workspace }}/python/dist/magtense-*-1-py${{ matrix.py-version }}-none-win_amd64.whl
+
   test-win:
     strategy:
       matrix:
-        mt-punit: [cpu]
+        mt-punit: [cpu, cu12]
         py-version: [312]
     runs-on: windows-latest
     needs: build-win
@@ -109,11 +118,11 @@ jobs:
 
     - name: Install pip-wheel and pytest
       run: |
-        source '${{ github.workspace }}'/.venv/bin/activate
+        '${{ github.workspace }}'\.venv\Scripts\activate
         python3 -m pip install '${{ github.workspace }}'/*.whl
         python3 -m pip install pytest
 
     - name: Run tests
       run: |
-        source '${{ github.workspace }}'/.venv/bin/activate
+        '${{ github.workspace }}'\.venv\Scripts\activate
         pytest
