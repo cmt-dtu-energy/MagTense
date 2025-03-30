@@ -11,9 +11,9 @@ jobs:
     runs-on: windows-latest
     defaults:
       run:
-        shell: bash -el {0} # pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+        shell: bash -el {0}
     env:
-      build_file: python/.build/env-312-win.yml
+      build_file: python/.build/env-${{ matrix.py-version }}-win.yml
 
     steps:
     - name: Checkout repository
