@@ -1,7 +1,21 @@
+import os
 import shutil
+from pathlib import Path
+from typing import List, Optional, Union
+
 import numpy as np
 
-from typing import Optional, Union, List
+# Windows only
+if hasattr(os, 'add_dll_directory'):
+    mkl_path = Path(__file__).parent / ".." / ".." / ".." / "Library" / "bin"
+    if os.path.isdir(mkl_path):
+        os.add_dll_directory(mkl_path)
+
+    nvidia_path = Path(__file__).parent / ".." / "nvidia"
+    for lib in ["cublas", "cuda_runtime", "cusparse"]:
+        if os.path.isdir(nvidia_path / lib / "bin"):
+            os.add_dll_directory(nvidia_path / lib / "bin")
+
 from magtense.lib import magtensesource
 
 
