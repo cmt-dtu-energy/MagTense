@@ -16,6 +16,10 @@ if hasattr(os, 'add_dll_directory'):
         if os.path.isdir(nvidia_path / lib / "bin"):
             os.add_dll_directory(nvidia_path / lib / "bin")
 
+    cvode_path = Path(__file__).parent / "lib" / "cvode" / "lib"
+    if os.path.isdir(cvode_path):
+        os.add_dll_directory(cvode_path)
+
 from magtense.lib import magtensesource
 
 

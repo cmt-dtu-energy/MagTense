@@ -60,7 +60,7 @@ jobs:
       working-directory: ${{ github.workspace }}/cvode/builddir/
       if: ${{ matrix.cvode == 1 }}
       run: |
-        cmake -DCMAKE_INSTALL_PREFIX=.. -DEXAMPLES_INSTALL_PATH=../examples -DCMAKE_Fortran_COMPILER=${CONDA_PREFIX}/bin/ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON -DENABLE_CUDA=ON ../srcdir
+        cmake -DCMAKE_INSTALL_PREFIX=.. -DEXAMPLES_INSTALL_PATH=../examples -DCMAKE_Fortran_COMPILER=${CONDA_PREFIX}/Library/bin/ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON -DENABLE_CUDA=ON ../srcdir
         make
         make install
     
