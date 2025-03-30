@@ -84,7 +84,7 @@ Compiling with make requires installation of Intels oneAPI compilers and MKL. Th
 First of all Miniconda (or Anaconda) must be installed, after which the MagTense conda environment with all necessary compilers can be created using
 
 ```
-conda env create -f python/.build/environment_win.yml
+conda env create -f python/.build/env-312-win.yml
 conda activate magtense-env
 ```
 

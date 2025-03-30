@@ -45,10 +45,10 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 
 #### Windows
 
-- Conda environment from `environment_win.yml`
+- Conda environment from `env-312-win.yml`
 
   ```bash
-  conda env create -f python/.build/environment_win.yml
+  conda env create -f python/.build/env-312-win.yml
   ```
 
   OR

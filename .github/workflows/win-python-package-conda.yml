@@ -12,7 +12,7 @@ jobs:
       run:
         shell: bash -el {0} # pwsh -NoExit -ExecutionPolicy ByPass -File {0}
     env:
-      build_file: python/.build/environment_win.yml
+      build_file: python/.build/env-312-win.yml
 
     steps:
     - name: Checkout repository
@@ -118,11 +118,11 @@ jobs:
 
     - name: Install pip-wheel and pytest
       run: |
-        '${{ github.workspace }}'\.venv\Scripts\activate
+        '${{ github.workspace }}'/.venv/Scripts/activate
         python3 -m pip install '${{ github.workspace }}'/*.whl
         python3 -m pip install pytest
 
     - name: Run tests
       run: |
-        '${{ github.workspace }}'\.venv\Scripts\activate
+        '${{ github.workspace }}'/.venv/Scripts/activate
         pytest

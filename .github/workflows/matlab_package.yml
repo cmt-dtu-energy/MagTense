@@ -6,7 +6,7 @@ jobs:
   build-windows:
     runs-on: [windows-latest]
     env:
-      build_file: python/.build/environment_win.yml
+      build_file: python/.build/env-312-win.yml
     steps:
       - uses: actions/checkout@v4
    
