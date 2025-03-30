@@ -12,7 +12,7 @@ if hasattr(os, 'add_dll_directory'):
         os.add_dll_directory(mkl_path)
 
     nvidia_path = Path(__file__).parent / ".." / "nvidia"
-    for lib in ["cublas", "cuda_runtime", "cusparse"]:
+    for lib in ["cublas", "cuda_runtime", "cusparse", "nvjitlink"]:
         if os.path.isdir(nvidia_path / lib / "bin"):
             os.add_dll_directory(nvidia_path / lib / "bin")
 
