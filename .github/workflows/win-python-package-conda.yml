@@ -6,7 +6,7 @@ jobs:
   build-win:
     strategy:
       matrix:
-        py-version: [312]
+        py-version: [313]
         cvode: [1]
     runs-on: windows-latest
     defaults:
