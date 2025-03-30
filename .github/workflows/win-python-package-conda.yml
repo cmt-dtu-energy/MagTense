@@ -50,7 +50,7 @@ jobs:
       working-directory: ${{ github.workspace }}
       if: ${{ matrix.cvode == 1 }}
       run: |
-        (new-object System.Net.WebClient).DownloadFile(https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz, ${{ github.workspace }}/cvode-7.2.1.tar.gz)
+        (new-object System.Net.WebClient).DownloadFile("https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz", "${{ github.workspace }}/cvode-7.2.1.tar.gz")
         mkdir cvode
         mv cvode-7.2.1 cvode/srcdir
         mkdir cvode/builddir
