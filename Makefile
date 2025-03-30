@@ -12,6 +12,7 @@ MATLAB_INCLUDE =
 CPP = icx
 FC = ifx
 MKFILE_PATH := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+CVODE_ROOT = ${MKFILE_PATH}/cvode
 
 ifeq (${UNAME}, Darwin)
 	FC = gfortran
@@ -56,10 +57,10 @@ ifeq ($(OS),Windows_NT)
 	CUDA_ROOT = ${CONDA_PATH}/Library/lib
 	MKL = -L${CONDA_PATH}/Library/lib -lmkl_intel_lp64_dll -lmkl_intel_thread_dll \
 		-lmkl_core_dll -lmkl_blas95_lp64 -llibiomp5md
-	CVODE_ROOT = "C:\Program Files (x86)\sundials-4.1.0\instdir"
 	LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib'
 	LIB_SUFFIX = .lib
 	PY_MOD_SUFFIX = .pyd
+	CVODE_SUFFIX = _static
 
 	ifeq (${FC}, ifx)
 		EXTRA_FFLAGS = "${FFLAGS} /assume:underscore /names:lowercase"
@@ -71,10 +72,10 @@ ifeq ($(OS),Windows_NT)
 else
  	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
 	CUDA_ROOT = ${CONDA_PREFIX}/lib
-	CVODE_ROOT = ${MKFILE_PATH}/cvode
 	LDFLAGS =
 	LIB_SUFFIX = .a
 	PY_MOD_SUFFIX = .so
+	CVODE_SUFFIX =
 
 	ifeq (${FC}, ifx)
 		EXTRA_FFLAGS = "${FFLAGS}"
@@ -139,8 +140,9 @@ endif
 ifeq ($(USE_CVODE),0)
 	CVODE =
 else
-	CVODE = -L${CVODE_ROOT}/lib -lsundials_fcore_mod -lsundials_fcvode_mod \
-		-lsundials_fnvecserial_mod -lsundials_fsunmatrixdense_mod -lsundials_fsunlinsolspgmr_mod
+	CVODE = -L${CVODE_ROOT}/lib -lsundials_core${CVODE_SUFFIX} -lsundials_cvode${CVODE_SUFFIX} \
+		-lsundials_fcore_mod -lsundials_fcvode_mod${CVODE_SUFFIX} -lsundials_fnvecserial_mod${CVODE_SUFFIX} \
+		-lsundials_fsunmatrixdense_mod${CVODE_SUFFIX} -lsundials_fsunlinsolspgmr_mod${CVODE_SUFFIX}
 endif
 
 INCLUDE_OBJ = ${MKFILE_PATH}/${NUM_INT_PATH} \
@@ -202,6 +204,6 @@ ${PYTHON_MODN_ALL}:
 	${CP_LIB}
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
 		python -m numpy.f2py -c -m ${PYTHON_MODN} \
-		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} ${CVODE_OPT} \
+		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} \
 		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE}
 	cp *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/
