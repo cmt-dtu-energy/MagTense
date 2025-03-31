@@ -13,8 +13,8 @@ jobs:
           - { bool: 0, flag: --no-cvode }
           - { bool: 1, flag: --cvode }
         sys:
-          - { os: windows-latest, name: win, whl-arch: win_amd64, shell: 'pwsh -NoExit -ExecutionPolicy ByPass -File {0}' }
-          - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64, shell: 'bash -el {0}' }
+          - { os: windows-latest, name: win, whl-arch: win_amd64}
+          - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
     runs-on: ${{ matrix.sys.os }}
     needs: cache-conda-win
     defaults:
@@ -76,9 +76,22 @@ jobs:
     - name: Win - Delete link.exe
       if: ${{ runner.os == 'Windows' }}
       run: rm '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
-
-    - name: Compile Fortran source code and build Python wrapper
-      shell: ${{ matrix.sys.shell }}
+    
+    # Shell cannot use job/matrix templates: https://github.com/actions/runner/issues/444
+    - name: Win - Compile Fortran source code and build Python wrapper
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      working-directory: ${{ github.workspace }}
+      run: |
+        make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode.bool }} USE_MATLAB=0
+        cp magtensesource.* '${{ github.workspace }}'/python/cpu_libs/
+        make clean
+        make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode.bool }} USE_MATLAB=0
+        cp magtensesource.* '${{ github.workspace }}'/python/cu12_libs/
+        make clean
+    
+    - name: Linux - Compile Fortran source code and build Python wrapper
+      if: ${{ runner.os == 'Linux' }}
       working-directory: ${{ github.workspace }}
       run: |
         make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode.bool }} USE_MATLAB=0
@@ -110,8 +123,8 @@ jobs:
       matrix:
         mt-punit: [cpu, cu12]
         py-version:
-          - { name: 312, id: 3.12 }
-          - { name: 313, id: 3.13 }
+          - { name: 312, id: "3.12" }
+          - { name: 313, id: "3.13" }
     runs-on: [windows-latest, ubuntu-latest]
     needs: build-wheel
     defaults:
@@ -134,7 +147,7 @@ jobs:
     - name: Setup python
       uses: actions/setup-python@v5
       with:
-        python-version: "${{ matrix.py-version.id }}"
+        python-version: ${{ matrix.py-version.id }}
 
     - name: Install pip-wheel and pytest
       run: |
