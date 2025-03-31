@@ -35,7 +35,7 @@ STATIC_LIB = libNumericalIntegration${LIB_SUFFIX}
 ifeq ($(USE_CVODE),0)
 	CVODE_OPT =
 else
-	CVODE_OPT = -I"${CVODE_ROOT}"/fortran
+	CVODE_OPT = -I${CVODE_ROOT}/fortran
 endif
 
 ifeq ($(USE_MATLAB),0)

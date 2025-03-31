@@ -45,42 +45,48 @@ def main(
     with open(py_folder / "pyproject.toml", "rb") as f:
         mt_version = tomllib.load(f)["project"]["version"]
 
-    subprocess.run(["rm", "-rf", f"{lib_folder}/cvode/"])
-    if cvode:
-        cvode_libs = ["fcore", "fcvode"]
-        subprocess.run(["mkdir", f"{lib_folder}/cvode/"])
-        subprocess.run(["mkdir", f"{lib_folder}/cvode/lib/"])
-
     for platform in platforms:
         suffix = "pyd" if platform == "win" else "so"
-        suffix_cvode = "dll" if platform == "win" else "so"
         arch = "win_amd64" if platform == "win" else "x86_64-linux-gnu"
         whl_arch = "win_amd64" if platform == "win" else "manylinux1_x86_64"
+        cvode_folder = "bin" if platform == "win" else "lib"
 
         for lib_file in lib_folder.glob(f"*.{suffix}"):
             subprocess.run(["rm", lib_file])
         
         if cvode:
+            subprocess.run(["rm", "-rf", f"{lib_folder}/cvode/"])
+            subprocess.run(["mkdir", f"{lib_folder}/cvode/"])
+            subprocess.run(["mkdir", f"{lib_folder}/cvode/{cvode_folder}/"])
+            cvode_libs = ["fcore_mod", "fcvode_mod"]
+            if platform == "win":
+                cvode_libs += ["core", "cvode"]
             for cvode_lib in cvode_libs:
-                subprocess.run(
-                    [
-                        "find",
-                        f"{py_folder}/../cvode/lib/",
-                        "-name",
-                        f"libsundials_{cvode_lib}_mod.{suffix_cvode}*",
-                        "-exec",
-                        "cp",
-                        "{}",
-                        f"{lib_folder}/cvode/lib/",
-                        ";",
-                    ]
-                )
+                if platform == "win":
+                    subprocess.run(
+                        [
+                            "cp",
+                            f"{py_folder}/../cvode/bin/sundials_{cvode_lib}.dll",
+                            f"{lib_folder}/cvode/bin/",
+                        ]
+                    )
+                else:
+                    subprocess.run(
+                        [
+                            "find",
+                            f"{py_folder}/../cvode/lib/",
+                            "-name",
+                            f"libsundials_{cvode_lib}.so*",
+                            "-exec",
+                            "cp",
+                            "{}",
+                            f"{lib_folder}/cvode/lib/",
+                            ";",
+                        ]
+                    )
 
         for cuda, py in itertools.product(cu_versions, py_versions):
             py_lib = "cp" + py if platform == "win" else "cpython-" + py
-            subprocess.run(
-                ["rm", f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}"]
-            )
             subprocess.run(
                 [
                     "cp",
@@ -131,6 +137,9 @@ def main(
             #         ]
             #     )
 
+            subprocess.run(
+                ["rm", f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}"]
+            )
             if Path(py_folder / "src" / "magtense.egg-info").is_dir():
                 subprocess.run(
                     [
