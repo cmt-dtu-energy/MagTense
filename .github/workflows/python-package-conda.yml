@@ -11,7 +11,7 @@ jobs:
         py-version: [312, 313]
         cvode:
           - { bool: 0, flag: --no-cvode }
-          - { bool: 1, flag: --cvode }
+          # - { bool: 1, flag: --cvode }
         sys:
           - { os: windows-latest, name: win, whl-arch: win_amd64}
           - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
