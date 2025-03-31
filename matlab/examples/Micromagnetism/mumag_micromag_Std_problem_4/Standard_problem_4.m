@@ -175,7 +175,7 @@ elapsedTime_part2 = toc
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% Compare with published solutions available from mumag webpage
 t=1e-9*linspace(0,1,1000);
-M_mumag = load(['../../../../documentation/examples_NIST_validation/Validation_standard_problem_4/Field_' num2str(NIST_field) '_NIST_mean_solution.txt']);
+M_mumag = load(['../../../../documentation/examples_mumag_validation/Validation_standard_problem_4/Field_' num2str(NIST_field) '_mumag_mean_solution.txt']);
 
 % Interpolate the MagTense solution to the mumag solution and calculate the relative error in percent
 rel_int_error(1) = calculate_relative_integral_error(t,M_mumag(:,1),solution_dym.t,Mx);

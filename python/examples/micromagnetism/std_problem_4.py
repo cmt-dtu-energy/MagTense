@@ -68,10 +68,10 @@ def std_prob_4(
         / ".."
         / ".."
         / "documentation"
-        / "examples_NIST_validation"
+        / "examples_mumag_validation"
         / "Validation_standard_problem_4"
     )
-    fname = f"Field_{NIST_field}_NIST_mean_solution.txt"
+    fname = f"Field_{NIST_field}_mumag_mean_solution.txt"
 
     with open(Path(mumag_eval_path, fname), "r") as file:
         T = file.readlines()[1:]

@@ -54,16 +54,19 @@ module UnstructuredMeshAnalysis
     real(dp), allocatable :: Volumes(:)
     real(dp) :: DimsScales(3)
     real(dp), allocatable :: XXel(:,:)
-    real(dp), allocatable :: Xf(:), Yf(:), Zf(:)
+    real(dp), allocatable :: Xf(:), Yf(:), Zf(:), XXF(:,:)
     real(dp), allocatable :: fNormX(:), fNormY(:), fNormZ(:)
     real(dp), allocatable :: AreaFaces(:)
     real(dp), allocatable :: DimsF(:,:)
+    real(dp), allocatable :: UminA(:), UmaxA(:), VminA(:), VmaxA(:)
+    real(dp), allocatable :: UminB(:), UmaxB(:), VminB(:), VmaxB(:)
     integer, allocatable :: ThePM(:), TheEE(:,:), TheNot(:,:)
     integer, allocatable :: Aindex(:), Bindex(:), indexItContainsTrue(:,:)
     integer, allocatable :: ia(:), ja(:)
     real(dp), allocatable :: a(:)
     logical, allocatable :: ItContains(:,:)
     real(dp), allocatable :: dimscopy(:,:)
+    character*(40) :: prog_str
 
     ! Initialize some variables
     Nel = size(pos, 1)
@@ -71,22 +74,64 @@ module UnstructuredMeshAnalysis
 
     ! Rescaling
     DimsScales = minval(dims, dim=1) / 2.0_dp
+       
     Xel = (pos(:,1) / DimsScales(1))
     Yel = (pos(:,2) / DimsScales(2))
     Zel = (pos(:,3) / DimsScales(3))
     XXel = reshape([Xel, Yel, Zel], [Nel, 3])
-    dimscopy = dims / reshape(DimsScales, [1, 3])
-
-     call displayGUIMessage( 'Test 2' )
+    
+    allocate(dimscopy(Nel, 3))
+    do i = 1, 3
+        dimscopy(:,i) = dims(:,i) / DimsScales(i)
+    end do
+         
     ! Construct all faces
     K = 6 * Nel
     allocate(fNormX(K), fNormY(K), fNormZ(K), AreaFaces(K), DimsF(K, 3))
     allocate(TheJ(3, 2), ThePM(2), TheEE(3, 3), TheNot(3, 2))
+    allocate(Xf(K), Yf(K), Zf(K), XXF(K,3))
+    
     ThePM = [-1, 1]
     TheEE = reshape([1, 0, 0, 0, 1, 0, 0, 0, 1], [3, 3])
-    TheNot = reshape([2, 3, 3, 1, 1, 2], [3, 2])
+    !TheNot = reshape([2, 3, 3, 1, 1, 2], [3, 2])
+    TheNot(:,1) = [2, 3, 1]
+    TheNot(:,2) = [3, 1, 2]
 
-     call displayGUIMessage( 'Test 3' )
+    call displayGUIMessage( 'TheNot' )
+    write (prog_str,'(I10)') (TheNot(1, 1))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheNot(2, 1))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheNot(3, 1))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheNot(1, 2))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheNot(2, 2))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheNot(3, 2))
+    call displayGUIMessage( prog_str )
+    
+    call displayGUIMessage( 'TheEE' )
+    write (prog_str,'(I10)') (TheEE(1, 1))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheEE(2, 1))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheEE(3, 1))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheEE(1, 2))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheEE(2, 2))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheEE(3, 2))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheEE(1, 3))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheEE(2, 3))
+    call displayGUIMessage( prog_str )
+    write (prog_str,'(I10)') (TheEE(3, 3))
+    call displayGUIMessage( prog_str )
+        
+    call displayGUIMessage( 'Test 3' )
     j = 0
     do idim = 1, 3
       do ipm = 1, 2
@@ -95,22 +140,44 @@ module UnstructuredMeshAnalysis
         fNormX((1 + (j-1) * Nel):(j * Nel)) = TheEE(idim, 1) * ThePM(ipm)
         fNormY((1 + (j-1) * Nel):(j * Nel)) = TheEE(idim, 2) * ThePM(ipm)
         fNormZ((1 + (j-1) * Nel):(j * Nel)) = TheEE(idim, 3) * ThePM(ipm)
-        call displayGUIMessage( 'Test 5' )
         Xf((1 + (j-1) * Nel):(j * Nel)) = Xel + TheEE(idim, 1) * ThePM(ipm) * dimscopy(:, 1) / 2.0
-        call displayGUIMessage( 'Test 5' )
         Yf((1 + (j-1) * Nel):(j * Nel)) = Yel + TheEE(idim, 2) * ThePM(ipm) * dimscopy(:, 2) / 2.0
         Zf((1 + (j-1) * Nel):(j * Nel)) = Zel + TheEE(idim, 3) * ThePM(ipm) * dimscopy(:, 3) / 2.0
-        call displayGUIMessage( 'Test 6' )
         DimsF((1 + (j-1) * Nel):(j * Nel), :) = reshape([dimscopy(:, 1) * (1 - TheEE(idim, 1)), dimscopy(:, 2) * (1 - TheEE(idim, 2)), dimscopy(:, 3) * (1 - TheEE(idim, 3))], [Nel, 3])
         AreaFaces((1 + (j-1) * Nel):(j * Nel)) = (DimsScales(TheNot(idim, 1)) * dimscopy(:, TheNot(idim, 1))) * (DimsScales(TheNot(idim, 2)) * dimscopy(:, TheNot(idim, 2)))
+        call displayGUIMessage( 'AreaFaces' )
+        write (prog_str,'(ES18.8)') AreaFaces(1)
+        call displayGUIMessage( prog_str )
+        write (prog_str,'(ES18.8)') (DimsScales(TheNot(idim, 1)) * dimscopy(1, TheNot(idim, 1)))
+        call displayGUIMessage( prog_str )
+        write (prog_str,'(ES18.8)') (DimsScales(TheNot(idim, 2)) * dimscopy(1, TheNot(idim, 2)))
+        call displayGUIMessage( prog_str )
+        write (prog_str,'(ES18.8)') (DimsScales(TheNot(idim, 2)))
+        call displayGUIMessage( prog_str )
+        write (prog_str,'(ES18.8)') (dimscopy(1, TheNot(idim, 2)))
+        call displayGUIMessage( prog_str )
+        write (prog_str,'(I10)') (TheNot(idim, 2))
+        call displayGUIMessage( prog_str )
         call displayGUIMessage( 'Test 7' )
       end do
     end do
     
     call displayGUIMessage( 'Test 4' )
 
+    open(21,file='Xf.txt',status='unknown',form='formatted',action='write')
+    do i=1,K
+        write(21,*)  Xf(i)
+    enddo
+    close(21)
+    
+    open(21,file='DimsF.txt',status='unknown',form='formatted',action='write')
+    do i=1,K
+        write(21,*)  DimsF(i,1)
+    enddo
+    close(21)
+    
     open(21,file='AreaFaces.txt',status='unknown',form='formatted',action='write')
-    do i=1,j
+    do i=1,K
         write(21,*)  AreaFaces(i)
     enddo
     close(21)
@@ -120,24 +187,43 @@ module UnstructuredMeshAnalysis
     ItContains = .false.
     allocate(indexItContainsTrue(0, 2))
 
-    !do idim = 1, 3
-    !  Aindex = (1 + (TheJ(idim, 1) - 1) * Nel):(TheJ(idim, 1) * Nel)
-    !  Bindex = (1 + (TheJ(idim, 2) - 1) * Nel):(TheJ(idim, 2) * Nel)
-    !  do kb = 1, Nel
-    !    do i = 1, size(Aindex)
-    !      if (XXf(Aindex(i), idim) == XXf(Bindex(kb), idim)) then
-    !        if ((XXf(Aindex(i), TheNot(idim, 1)) - 0.5_dp * DimsF(Aindex(i), TheNot(idim, 1)) <= XXf(Bindex(kb), TheNot(idim, 1)) - 0.5_dp * DimsF(Bindex(kb), TheNot(idim, 1))) .and. &
-    !            (XXf(Aindex(i), TheNot(idim, 1)) + 0.5_dp * DimsF(Aindex(i), TheNot(idim, 1)) >= XXf(Bindex(kb), TheNot(idim, 1)) + 0.5_dp * DimsF(Bindex(kb), TheNot(idim, 1))) .and. &
-    !            (XXf(Aindex(i), TheNot(idim, 2)) - 0.5_dp * DimsF(Aindex(i), TheNot(idim, 2)) <= XXf(Bindex(kb), TheNot(idim, 2)) - 0.5_dp * DimsF(Bindex(kb), TheNot(idim, 2))) .and. &
-    !            (XXf(Aindex(i), TheNot(idim, 2)) + 0.5_dp * DimsF(Aindex(i), TheNot(idim, 2)) >= XXf(Bindex(kb), TheNot(idim, 2)))) then
-    !          allocate(indexItContainsTrue(size(indexItContainsTrue, 1) + 1, 2))
-    !          indexItContainsTrue(size(indexItContainsTrue, 1), :) = [Aindex(i), Bindex(kb)]
-    !        end if
-    !      end if
-    !    end do
-    !  end do
-    !end do
+    allocate(UminA(Nel), UmaxA(Nel), VminA(Nel), VmaxA(Nel))
+    allocate(UminB(Nel), UmaxB(Nel), VminB(Nel), VmaxB(Nel))
+    
+    do idim = 1, 3
+      Aindex = [(1 + (TheJ(idim, 1) - 1) * Nel):(TheJ(idim, 1) * Nel)]
+      Bindex = [(1 + (TheJ(idim, 2) - 1) * Nel):(TheJ(idim, 2) * Nel)]
+      UminA = XXf(Aindex,TheNot(idim,1)) - 0.5_dp * DimsF(Aindex,TheNot(idim,1))
+      UmaxA = XXf(Aindex,TheNot(idim,1)) + 0.5_dp * DimsF(Aindex,TheNot(idim,1))
+      VminA = XXf(Aindex,TheNot(idim,2)) - 0.5_dp * DimsF(Aindex,TheNot(idim,2))
+      VmaxA = XXf(Aindex,TheNot(idim,2)) + 0.5_dp * DimsF(Aindex,TheNot(idim,2))
+    
+      UminB = XXf(Bindex,TheNot(idim,1)) - 0.5_dp * DimsF(Bindex,TheNot(idim,1))
+      UmaxB = XXf(Bindex,TheNot(idim,1)) + 0.5_dp * DimsF(Bindex,TheNot(idim,1))
+      VminB = XXf(Bindex,TheNot(idim,2)) - 0.5_dp * DimsF(Bindex,TheNot(idim,2))
+      VmaxB = XXf(Bindex,TheNot(idim,2)) + 0.5_dp * DimsF(Bindex,TheNot(idim,2))
+      
+      !Note to self: Code it such that indexItContainsTrue is defined to be an array that is (2*Nel, 2)
+      !to ensure that there is enough room for the elements. Then just assign them sequentially, and afterwards make a copy of the array
+      !to ensure that it is the right size.
+      
+      !do kb = 1, Nel
+      !  do i = 1, size(Aindex)
+      !    if (XXf(Aindex(i), idim) == XXf(Bindex(kb), idim)) then
+      !      if ((XXf(Aindex(i), TheNot(idim, 1)) - 0.5_dp * DimsF(Aindex(i), TheNot(idim, 1)) <= XXf(Bindex(kb), TheNot(idim, 1)) - 0.5_dp * DimsF(Bindex(kb), TheNot(idim, 1))) .and. &
+      !          (XXf(Aindex(i), TheNot(idim, 1)) + 0.5_dp * DimsF(Aindex(i), TheNot(idim, 1)) >= XXf(Bindex(kb), TheNot(idim, 1)) + 0.5_dp * DimsF(Bindex(kb), TheNot(idim, 1))) .and. &
+      !          (XXf(Aindex(i), TheNot(idim, 2)) - 0.5_dp * DimsF(Aindex(i), TheNot(idim, 2)) <= XXf(Bindex(kb), TheNot(idim, 2)) - 0.5_dp * DimsF(Bindex(kb), TheNot(idim, 2))) .and. &
+      !          (XXf(Aindex(i), TheNot(idim, 2)) + 0.5_dp * DimsF(Aindex(i), TheNot(idim, 2)) >= XXf(Bindex(kb), TheNot(idim, 2)))) then
+      !        allocate(indexItContainsTrue(size(indexItContainsTrue, 1) + 1, 2))
+      !        indexItContainsTrue(size(indexItContainsTrue, 1), :) = [Aindex(i), Bindex(kb)]
+      !      end if
+      !    end if
+      !  end do
+      !end do
+    end do
 
+    
+    
     !nnz = size(indexItContainsTrue, 1)
     !allocate(ia(K + 1), ja(nnz), a(nnz))
     !ia = 0
