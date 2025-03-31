@@ -16,6 +16,7 @@ jobs:
           - { os: windows-latest, name: win, whl-arch: win_amd64}
           - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
     runs-on: ${{ matrix.sys.os }}
+    # Workaround: Issue with msvc-dev-cmd and new conda installation
     needs: cache-conda-win
     defaults:
       run:
@@ -72,7 +73,7 @@ jobs:
         mkdir '${{ github.workspace }}'/python/cpu_libs
         mkdir '${{ github.workspace }}'/python/cu12_libs
     
-    # This is a workaround for the issue with msvc-dev-cmd and link.exe in the conda environment
+    # Workaround: Issue with msvc-dev-cmd and link.exe in the conda environment
     - name: Win - Delete link.exe
       if: ${{ runner.os == 'Windows' }}
       run: rm '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
