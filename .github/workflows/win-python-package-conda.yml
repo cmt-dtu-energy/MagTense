@@ -111,15 +111,15 @@ jobs:
         mkdir '${{ github.workspace }}'/python/cu12_libs
 
     - name: Compile Fortran files
-      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      # shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
       working-directory: ${{ github.workspace }}
       run: |
-        rm ${{ env.CONDA }}/envs/magtense-env/Library/usr/bin/link.exe
+        rm '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
         make python USE_CUDA=0 USE_CVODE=0 USE_MATLAB=0
-        cp magtensesource.*.pyd ${{ github.workspace }}/python/cpu_libs/
+        cp magtensesource.*.pyd '${{ github.workspace }}'/python/cpu_libs/
         make clean
         make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0
-        cp magtensesource.*.pyd ${{ github.workspace }}/python/cu12_libs/
+        cp magtensesource.*.pyd '${{ github.workspace }}'/python/cu12_libs/
         make clean
 
     - name: Build pip-wheels without cvode

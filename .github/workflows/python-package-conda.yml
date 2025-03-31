@@ -5,41 +5,6 @@ on:
   workflow_call:
 
 jobs:
-  cache-conda-win:
-    strategy:
-      matrix:
-        py-version: [312, 313]
-    runs-on: windows-latest
-    env:
-      build_file: python/.build/env-${{ matrix.py-version }}-win.yml
-
-    steps:
-    - name: Checkout environment file
-      uses: actions/checkout@v4
-      with:
-        sparse-checkout: |
-          python/.build/
-
-    - name: Setup Miniforge
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        miniforge-version: latest
-        activate-environment: magtense-env
-        use-mamba: true
-
-    - name: Cache conda
-      uses: actions/cache@v4
-      env:
-        cache_number: 0
-      with:
-        path: ${{ env.CONDA }}/envs
-        key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
-      id: cache
-
-    - name: Update environment
-      run: conda env update -f ${{ env.build_file }}
-      if: steps.cache.outputs.cache-hit != 'true'
-
   build-wheel:
     strategy:
       matrix:
@@ -51,6 +16,7 @@ jobs:
           - { os: windows-latest, name: win, whl-arch: win_amd64, shell: 'pwsh -NoExit -ExecutionPolicy ByPass -File {0}' }
           - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64, shell: 'bash -el {0}' }
     runs-on: ${{ matrix.sys.os }}
+    needs: cache-conda-win
     defaults:
       run:
         shell: bash -el {0}
@@ -109,8 +75,7 @@ jobs:
     # This is a workaround for the issue with msvc-dev-cmd and link.exe in the conda environment
     - name: Win - Delete link.exe
       if: ${{ runner.os == 'Windows' }}
-      shell: ${{ matrix.sys.shell }}
-      run: rm ${{ env.CONDA }}/envs/magtense-env/Library/usr/bin/link.exe
+      run: rm '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
 
     - name: Compile Fortran source code and build Python wrapper
       shell: ${{ matrix.sys.shell }}
@@ -176,3 +141,39 @@ jobs:
         python3 -m pip install '${{ github.workspace }}'/*.whl
         python3 -m pip install pytest
         pytest
+
+        
+  cache-conda-win:
+    strategy:
+      matrix:
+        py-version: [312, 313]
+    runs-on: windows-latest
+    env:
+      build_file: python/.build/env-${{ matrix.py-version }}-win.yml
+
+    steps:
+    - name: Checkout environment file
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/.build/
+
+    - name: Setup Miniforge
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-version: latest
+        activate-environment: magtense-env
+        use-mamba: true
+
+    - name: Cache conda
+      uses: actions/cache@v4
+      env:
+        cache_number: 0
+      with:
+        path: ${{ env.CONDA }}/envs
+        key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
+      id: cache
+
+    - name: Update environment
+      run: conda env update -f ${{ env.build_file }}
+      if: steps.cache.outputs.cache-hit != 'true'
