@@ -27,7 +27,7 @@ jobs:
     - name: Configure CMake
       run: |
         mkdir ${{github.workspace}}/install
-        cmake -G "Ninja" -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_ARKODE=OFF -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=ON -DBUILD_STATIC_LIBS=OFF -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/install -DEXAMPLES_INSTALL_PATH=${{github.workspace}}/install/examples -DCMAKE_C_FLAGS=-Wno-deprecated-declarations -DCMAKE_C_COMPILER=icx-cl -DCMAKE_CXX_COMPILER=icx-cl -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON
+        cmake -G "Ninja" -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_ARKODE=OFF -DBUILD_CVODES=ON -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=ON -DBUILD_STATIC_LIBS=OFF -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/install -DEXAMPLES_INSTALL_PATH=${{github.workspace}}/install/examples -DCMAKE_C_FLAGS=-Wno-deprecated-declarations -DCMAKE_C_COMPILER=icx-cl -DCMAKE_CXX_COMPILER=icx-cl -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON
     - name: Build
       run: cmake --build ${{github.workspace}}/build --verbose
 
@@ -39,6 +39,7 @@ jobs:
     #   run: ctest -C ${{env.BUILD_TYPE}} --output-on-failure
 
     - name: Check installation
+      shell: bash -el {0}
       run:
-        dir ${{github.workspace}}/install
-        dir ${{github.workspace}}/install/lib
+        ls -al ${{github.workspace}}/install
+        ls -al ${{github.workspace}}/install/lib

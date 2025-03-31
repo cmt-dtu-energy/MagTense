@@ -60,11 +60,11 @@ jobs:
       run: |
         wget https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz
         tar -xf cvode-7.2.1.tar.gz
-        mkdir cvode
+        mkdir ${{ github.workspace }}/cvode
         mv cvode-7.2.1 cvode/srcdir
-        mkdir cvode/builddir
+        mkdir ${{ github.workspace }}/cvode/builddir
         cd ${{ github.workspace }}/cvode/builddir/
-        cmake -DCMAKE_INSTALL_PREFIX=.. -DEXAMPLES_INSTALL_PATH=../examples -DCMAKE_C_COMPILER=${CONDA_PREFIX}/bin/icx -DCMAKE_C_FLAGS=-Wunused-command-line-argument -DCMAKE_Fortran_COMPILER=${CONDA_PREFIX}/bin/ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON -DENABLE_CUDA=ON ../srcdir
+        cmake -DBUILD_STATIC_LIBS=OFF -DCMAKE_INSTALL_PREFIX=.. -DEXAMPLES_INSTALL_PATH=../examples -DCMAKE_C_COMPILER=${CONDA_PREFIX}/bin/icx -DCMAKE_C_FLAGS=-Wunused-command-line-argument -DCMAKE_Fortran_COMPILER=${CONDA_PREFIX}/bin/ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON -DENABLE_CUDA=ON ../srcdir
         make
         make install
     
