@@ -53,14 +53,12 @@ def main(
 
         for lib_file in lib_folder.glob(f"*.{suffix}"):
             subprocess.run(["rm", lib_file])
-        
+
         if cvode:
             subprocess.run(["rm", "-rf", f"{lib_folder}/cvode/"])
             subprocess.run(["mkdir", f"{lib_folder}/cvode/"])
             subprocess.run(["mkdir", f"{lib_folder}/cvode/{cvode_folder}/"])
-            cvode_libs = ["fcore_mod", "fcvode_mod"]
-            if platform == "win":
-                cvode_libs += ["core", "cvode"]
+            cvode_libs = ["core", "cvode", "fcore_mod", "fcvode_mod"]
             for cvode_lib in cvode_libs:
                 if platform == "win":
                     subprocess.run(
@@ -95,7 +93,7 @@ def main(
                 ]
             )
             if platform == "linux":
-                rpath = "$ORIGIN/../../../../../lib"
+                rpath = "$ORIGIN/../../../../../lib/"
                 if cvode:
                     rpath += ":$ORIGIN/cvode/lib/"
                 if cuda == "cu12":
