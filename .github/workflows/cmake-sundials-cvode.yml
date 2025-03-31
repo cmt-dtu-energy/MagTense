@@ -1,7 +1,6 @@
 name: cvode - Build with win/intel/ninja
 
 on:
-  push:
   workflow_call:
 
 env:
