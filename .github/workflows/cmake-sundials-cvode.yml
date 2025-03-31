@@ -1,10 +1,16 @@
-name: cvode - Build and test with win/intel/ninja
+name: cvode - Build with win/intel/ninja
 
-on: push
+on:
+  push:
+  workflow_call:
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Release
 
 jobs:
   build_and_test:
-    runs-on: windows-latest
+    runs-on: [windows-latest, ubuntu-latest]
 
     steps:
     - uses: fortran-lang/setup-fortran@v1
@@ -20,6 +26,7 @@ jobs:
     #     # sub-packages: '["nvcc", "cusparse", "cublas", "cudart", "nvjitlink"]'
 
     - name: Install Ninja
+      if: ${{ runner.os == 'Windows' }}
       run: choco install ninja
 
     - uses: actions/checkout@v4
@@ -27,21 +34,64 @@ jobs:
         repository: LLNL/sundials
         ref: 'v7.2.1'
 
-    - name: Configure CMake
+    - name: Win - Configure CMake
+      if: ${{ runner.os == 'Windows' }}
       run: |
         mkdir ${{github.workspace}}/install
-        cmake -G "Ninja" -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DBUILD_ARKODE=OFF -DBUILD_CVODES=ON -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=ON -DBUILD_STATIC_LIBS=OFF -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/install -DEXAMPLES_INSTALL_PATH=${{github.workspace}}/install/examples -DCMAKE_C_FLAGS=-Wno-deprecated-declarations -DCMAKE_C_COMPILER=icx-cl -DCMAKE_CXX_COMPILER=icx-cl -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON
-        cmake --build ${{github.workspace}}/build --verbose
-        cmake --install ${{github.workspace}}/build --verbose
+        cmake \
+        -G "Ninja" \
+        -B ${{github.workspace}}/build \
+        -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+        -DBUILD_ARKODE=OFF \
+        -DBUILD_CVODE=ON \
+        -DBUILD_CVODES=OFF \
+        -DBUILD_IDA=OFF \
+        -DBUILD_IDAS=OFF \
+        -DBUILD_KINSOL=OFF \
+        -DBUILD_SHARED_LIBS=ON \
+        -DBUILD_STATIC_LIBS=OFF \
+        -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/install \
+        -DEXAMPLES_INSTALL_PATH=${{github.workspace}}/install/examples \
+        -DCMAKE_C_FLAGS=-Wno-deprecated-declarations \
+        -DCMAKE_C_COMPILER=icx-cl \
+        -DCMAKE_CXX_COMPILER=icx-cl \
+        -DCMAKE_Fortran_COMPILER=ifx \
+        -DBUILD_FORTRAN_MODULE_INTERFACE=ON \
+        -DENABLE_OPENMP=ON
 
-    - name: Check installation
-      shell: bash -el {0}
+    - name: Linux - Configure CMake
+      if: ${{ runner.os == 'Linux' }}
+      working-directory: ${{ github.workspace }}
       run: |
-        ls -al '${{github.workspace}}'/install
-        ls -al '${{github.workspace}}'/install/lib
+        mkdir ${{ github.workspace }}/install
+        cmake \
+        -B ${{github.workspace}}/build \
+        -D CMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+        -D BUILD_ARKODE=OFF \
+        -D BUILD_CVODE=ON \
+        -D BUILD_CVODES=OFF \
+        -D BUILD_IDA=OFF \
+        -D BUILD_IDAS=OFF \
+        -D BUILD_KINSOL=OFF \
+        -D BUILD_SHARED_LIBS=ON \
+        -D BUILD_STATIC_LIBS=OFF \
+        -D CMAKE_INSTALL_PREFIX=${{github.workspace}}/install \
+        -D EXAMPLES_INSTALL_PATH=${{github.workspace}}/install/examples \
+        -D CMAKE_C_COMPILER=$(which icx) \
+        -D CMAKE_CXX_COMPILER=$(which icpx) \
+        -D CMAKE_CXX_FLAGS="-fsycl" \
+        -D CMAKE_Fortran_COMPILER=(which ifx) \
+        -D BUILD_FORTRAN_MODULE_INTERFACE=ON \
+        -D ENABLE_OPENMP=ON
+        -D ENABLE_SYCL=ON
+
+    - name: Build and install
+      run: |
+        cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --verbose
+        cmake --install ${{github.workspace}}/build --verbose
 
     - name: Archive cvode libraries
       uses: actions/upload-artifact@v4
       with:
-        name: cvode
+        name: cvode-${{ runner.os }}
         path: ${{github.workspace}}/install
