@@ -81,13 +81,10 @@ jobs:
         -D CMAKE_INSTALL_PREFIX=${{github.workspace}}/install \
         -D EXAMPLES_INSTALL_PATH=${{github.workspace}}/install/examples \
         -D CMAKE_C_COMPILER=$(which icx) \
-        -D CMAKE_CXX_COMPILER=$(which icpx) \
-        -D CMAKE_CXX_FLAGS="-fsycl" \
         -D CMAKE_Fortran_COMPILER=$(which ifx) \
         -D BUILD_FORTRAN_MODULE_INTERFACE=ON \
-        -D ENABLE_OPENMP=ON \
-        -D ENABLE_SYCL=ON
-
+        -D ENABLE_OPENMP=ON
+        
     - name: Build and install
       run: |
         cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --verbose
