@@ -17,7 +17,7 @@ jobs:
           - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
     runs-on: ${{ matrix.sys.os }}
     # Workaround: Issue with msvc-dev-cmd and new conda installation
-    needs: cache-conda-win
+    needs: [cache-conda-win, build-cvode]
     defaults:
       run:
         shell: bash -el {0}
@@ -55,18 +55,11 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
 
     - name: Download cvode (sundials-7.2.1)
-      working-directory: ${{ github.workspace }}
-      if: ${{ matrix.cvode.bool == 1 && runner.os == 'Linux' }}
-      run: |
-        wget https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz
-        tar -xf cvode-7.2.1.tar.gz
-        mkdir ${{ github.workspace }}/cvode
-        mv cvode-7.2.1 cvode/srcdir
-        mkdir ${{ github.workspace }}/cvode/builddir
-        cd ${{ github.workspace }}/cvode/builddir/
-        cmake -DBUILD_STATIC_LIBS=OFF -DCMAKE_INSTALL_PREFIX=.. -DEXAMPLES_INSTALL_PATH=../examples -DCMAKE_C_COMPILER=${CONDA_PREFIX}/bin/icx -DCMAKE_C_FLAGS=-Wunused-command-line-argument -DCMAKE_Fortran_COMPILER=${CONDA_PREFIX}/bin/ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON -DENABLE_CUDA=ON ../srcdir
-        make
-        make install
+      if: ${{ matrix.cvode.bool == 1 }}
+      uses: actions/download-artifact@v4
+      with:
+        name: cvode-${{ runner.os }}
+        path: ${{ github.workspace }}/cvode/
     
     - name: Create directory for wrappers of compiled Fortran source code
       run: |
@@ -126,7 +119,8 @@ jobs:
         py-version:
           - { name: 312, id: "3.12" }
           - { name: 313, id: "3.13" }
-    runs-on: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     needs: build-wheel
     defaults:
       run:
@@ -191,3 +185,8 @@ jobs:
     - name: Update environment
       run: conda env update -f ${{ env.build_file }}
       if: steps.cache.outputs.cache-hit != 'true'
+
+  
+  build-cvode:
+    name: Build cvode
+    uses: ./.github/workflows/cmake-sundials-cvode.yml

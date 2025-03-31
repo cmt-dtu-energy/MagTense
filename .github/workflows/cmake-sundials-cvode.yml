@@ -10,7 +10,10 @@ env:
 
 jobs:
   build_and_test:
-    runs-on: [windows-latest, ubuntu-latest]
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: fortran-lang/setup-fortran@v1
