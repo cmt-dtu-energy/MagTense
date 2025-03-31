@@ -41,26 +41,7 @@ jobs:
       if: ${{ runner.os == 'Windows' }}
       run: |
         mkdir ${{github.workspace}}/install
-        cmake \
-        -G "Ninja" \
-        -B ${{github.workspace}}/build \
-        -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-        -DBUILD_ARKODE=OFF \
-        -DBUILD_CVODE=ON \
-        -DBUILD_CVODES=OFF \
-        -DBUILD_IDA=OFF \
-        -DBUILD_IDAS=OFF \
-        -DBUILD_KINSOL=OFF \
-        -DBUILD_SHARED_LIBS=ON \
-        -DBUILD_STATIC_LIBS=OFF \
-        -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/install \
-        -DEXAMPLES_INSTALL_PATH=${{github.workspace}}/install/examples \
-        -DCMAKE_C_FLAGS=-Wno-deprecated-declarations \
-        -DCMAKE_C_COMPILER=icx-cl \
-        -DCMAKE_CXX_COMPILER=icx-cl \
-        -DCMAKE_Fortran_COMPILER=ifx \
-        -DBUILD_FORTRAN_MODULE_INTERFACE=ON \
-        -DENABLE_OPENMP=ON
+        cmake -G "Ninja" -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_ARKODE=OFF -DBUILD_CVODE=ON -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=ON -DBUILD_STATIC_LIBS=OFF -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/install -DEXAMPLES_INSTALL_PATH=${{github.workspace}}/install/examples -DCMAKE_C_FLAGS=-Wno-deprecated-declarations -DCMAKE_C_COMPILER=icx-cl -DCMAKE_CXX_COMPILER=icx-cl -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON
 
     - name: Linux - Configure CMake
       if: ${{ runner.os == 'Linux' }}
