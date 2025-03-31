@@ -1,6 +1,8 @@
 name: Python - Pip-wheel with conda
 
-on: push
+on:
+  push:
+  workflow_call:
 
 jobs:
   build-wheel:
