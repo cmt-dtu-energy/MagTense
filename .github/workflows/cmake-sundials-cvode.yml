@@ -1,0 +1,41 @@
+name: Build and Test - Windows/intel/ninja
+
+on: push
+
+jobs:
+  build_and_test:
+    runs-on: windows-latest
+    defaults:
+        run:
+          shell: bash -el {0}
+
+    steps:
+    - uses: fortran-lang/setup-fortran@v1
+      id: setup-fortran
+      with:
+        compiler: intel
+        version: '2025.0'
+
+    - name: Install Ninja
+      run: choco install ninja
+
+    - name: Download cvode (sundials-7.2.1)
+      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      run: |
+        (new-object System.Net.WebClient).DownloadFile("https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz", "${{ github.workspace }}/cvode-7.2.1.tar.gz")
+        tar -xf cvode-7.2.1.tar.gz
+
+    - name: Configure CMake
+      run: cmake -G "Ninja" -B ${{github.workspace}}/cvode/build -S ${{github.workspace}}/cvode-7.2.1 -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/cvode -DEXAMPLES_INSTALL_PATH=${{github.workspace}}/cvode/examples -DCMAKE_C_FLAGS=-Wno-deprecated-declarations -DCMAKE_C_COMPILER=icx-cl -DCMAKE_CXX_COMPILER=icx-cl -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/cvode/build --verbose
+
+    - name: Install
+      run: cmake --install ${{github.workspace}}/cvode/build --verbose
+
+    - name: Check installation
+      run:
+        ls -al ${{github.workspace}}/cvode
+        ls -al ${{github.workspace}}/cvode/lib
+

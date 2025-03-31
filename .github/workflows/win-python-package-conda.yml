@@ -148,7 +148,7 @@ jobs:
     strategy:
       matrix:
         mt-punit: [cpu, cu12]
-        py-version: [312]
+        py-version: [313]
     runs-on: windows-latest
     needs: build-win
     defaults:
