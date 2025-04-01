@@ -56,8 +56,8 @@ jobs:
         -D BUILD_IDA=OFF \
         -D BUILD_IDAS=OFF \
         -D BUILD_KINSOL=OFF \
-        -D BUILD_SHARED_LIBS=ON \
-        -D BUILD_STATIC_LIBS=OFF \
+        -D BUILD_SHARED_LIBS=OFF \
+        -D BUILD_STATIC_LIBS=ON \
         -D CMAKE_INSTALL_PREFIX=${{github.workspace}}/install \
         -D EXAMPLES_INSTALL_PATH=${{github.workspace}}/install/examples \
         -D CMAKE_C_COMPILER=$(which icx) \

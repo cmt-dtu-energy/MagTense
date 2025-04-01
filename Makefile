@@ -138,7 +138,7 @@ endif
 ifeq ($(USE_CVODE),0)
 	CVODE =
 else
-	CVODE = -L${CVODE_ROOT}/lib -lsundials_fcore_mod -lsundials_fcvode_mod \
+	CVODE = -L${CVODE_ROOT}/lib -lsundials_core -lsundials_cvode -lsundials_fcore_mod -lsundials_fcvode_mod \
 		-lsundials_fnvecserial_mod -lsundials_fsunmatrixdense_mod -lsundials_fsunlinsolspgmr_mod
 endif
 
