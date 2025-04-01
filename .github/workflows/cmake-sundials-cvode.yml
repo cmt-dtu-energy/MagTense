@@ -1,8 +1,6 @@
-name: cvode - Build with win/intel/ninja
+name: cvode - Build with win/intel/ninja + linux/intel
 
-on:
-  push:
-  workflow_call:
+on: workflow_call
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
