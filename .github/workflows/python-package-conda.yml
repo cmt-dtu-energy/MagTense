@@ -1,7 +1,9 @@
 name: Python - Pip-wheel with conda
 
 on:
-  push:
+  pull_request:
+    branches:
+      - main
   workflow_call:
 
 jobs:
