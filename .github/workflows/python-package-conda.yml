@@ -76,10 +76,10 @@ jobs:
       working-directory: ${{ github.workspace }}
       run: |
         make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
-        cp magtensesource.* '${{ github.workspace }}'/python/cpu_libs/
+        cp magtensesource.* ${{ github.workspace }}/python/cpu_libs/
         make clean
         make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
-        cp magtensesource.* '${{ github.workspace }}'/python/cu12_libs/
+        cp magtensesource.* ${{ github.workspace }}/python/cu12_libs/
         make clean
     
     - name: Linux - Compile Fortran source code and build Python wrapper
@@ -186,5 +186,5 @@ jobs:
 
   
   build-cvode:
-    name: Build cvode
+    name: cvode
     uses: ./.github/workflows/cmake-sundials-cvode.yml
