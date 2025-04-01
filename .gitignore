@@ -193,6 +193,8 @@ docs/source/_build
 *.so
 *.pyd
 
+*.whl
+
 *.vtuneproj
 *.prj
 
