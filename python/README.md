@@ -112,7 +112,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 
     ```bash
 	  conda activate magtense-env
-    make magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0
+    make magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
     ```
 
   - Compilation with `nvcc` should be executed in `x64 Native Tools Command Prompt for VS 2022`.
@@ -140,7 +140,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 
     ```bash
 	  conda activate magtense-env
-    make python-win USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0
+    make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
     ```
 
     - **Note:** In case error `meson.build:1:0: ERROR: Unknown compiler(s): [['ifx']]` shows up, it should help to reinitialize your conda environment to ensure having the correct environment path:
@@ -166,13 +166,9 @@ python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm 
 python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cusparse-cu12 nvidia-nvjitlink-cu12 # only required for cuda support
 ```
 
-For the local editable version of `magtense` with `cvode`, the respective libraries have to be search for in the active terminal: 
-
-```bash
-export LD_LIBRARY_PATH=/path/to/MagTense/cvode/lib:$LD_LIBRARY_PATH
-```
-
 ## Install CVODE from sundials-7.2.1
+
+### Linux
 
 - Requirements (already present in `.build/env-313-linux`): `cmake`, `ifx`, `icx`
 - Download latest version of `cvode`:
@@ -185,17 +181,29 @@ export LD_LIBRARY_PATH=/path/to/MagTense/cvode/lib:$LD_LIBRARY_PATH
 - Prepare folder structure
   ```bash
   mkdir cvode
-  mv cvode-7.2.1 cvode/srcdir
-  mkdir cvode/builddir
+  mv cvode-7.2.1 cvode/src
+  mkdir cvode/install
   ```
 
 - Run `cmake` and `make`for installation
   ```bash
-  cd cvode/builddir
-  cmake -DCMAKE_INSTALL_PREFIX=.. -DEXAMPLES_INSTALL_PATH=../examples -DCMAKE_C_COMPILER=${CONDA_PREFIX}/bin/icx -DCMAKE_Fortran_COMPILER=${CONDA_PREFIX}/bin/ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON -DENABLE_CUDA=ON ../srcdir
-  make
-  make install
+  cmake \
+  -B cvode/build \
+  -S cvode/src \
+  -D CMAKE_INSTALL_PREFIX=cvode/install \
+  -D EXAMPLES_INSTALL_PATH=cvode/install/examples \
+  -D CMAKE_C_COMPILER=${CONDA_PREFIX}/bin/icx \
+  -D CMAKE_Fortran_COMPILER=${CONDA_PREFIX}/bin/ifx \
+  -D BUILD_FORTRAN_MODULE_INTERFACE=ON \
+  -D ENABLE_OPENMP=ON
+  cmake --build cvode/build --config Release --verbose
+  cmake --install cvode/build --verbose
   ```
+
+### Windows
+
+We recommend using the [associated workflow](../.github/workflows/cmake-sundials-cvode.yml) to create the required static libraries during compilation time.
+
 
 ## Read-in customized M-H-curve
 

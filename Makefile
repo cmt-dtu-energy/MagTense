@@ -60,6 +60,7 @@ ifeq ($(OS),Windows_NT)
 	LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib'
 	LIB_SUFFIX = .lib
 	PY_MOD_SUFFIX = .pyd
+	CVODE_SUFFIX = _static
 
 	ifeq (${FC}, ifx)
 		EXTRA_FFLAGS = "${FFLAGS} /assume:underscore /names:lowercase"
@@ -74,6 +75,7 @@ else
 	LDFLAGS =
 	LIB_SUFFIX = .a
 	PY_MOD_SUFFIX = .so
+	CVODE_SUFFIX =
 
 	ifeq (${FC}, ifx)
 		EXTRA_FFLAGS = "${FFLAGS}"
@@ -138,8 +140,9 @@ endif
 ifeq ($(USE_CVODE),0)
 	CVODE =
 else
-	CVODE = -L${CVODE_ROOT}/lib -lsundials_core -lsundials_cvode -lsundials_fcore_mod -lsundials_fcvode_mod \
-		-lsundials_fnvecserial_mod -lsundials_fsunmatrixdense_mod -lsundials_fsunlinsolspgmr_mod
+	CVODE = -L${CVODE_ROOT}/lib -lsundials_core${CVODE_SUFFIX} -lsundials_cvode${CVODE_SUFFIX} \
+		-lsundials_fcore_mod -lsundials_fcvode_mod${CVODE_SUFFIX} -lsundials_fnvecserial_mod${CVODE_SUFFIX} \
+		-lsundials_fsunmatrixdense_mod${CVODE_SUFFIX} -lsundials_fsunlinsolspgmr_mod${CVODE_SUFFIX}
 endif
 
 INCLUDE_OBJ = ${MKFILE_PATH}/${NUM_INT_PATH} \

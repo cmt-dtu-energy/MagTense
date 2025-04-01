@@ -10,8 +10,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "magtense.lib" = ["*.pyd", "*.so"]
-"magtense.lib.cvode.lib" = ["*.so*"]
-"magtense.lib.cvode.bin" = ["*.dll"]
 "magtense.mat" = ["*.csv"]
 
 [tool.setuptools.dynamic]

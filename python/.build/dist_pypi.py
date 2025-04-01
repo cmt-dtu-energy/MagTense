@@ -27,9 +27,6 @@ def parse_args():
         default="win,linux",
         help="Platforms (comma-separated)",
     )
-    parser.add_argument(
-        "--cvode", action=argparse.BooleanOptionalAction, help="Enable cvode"
-    )
     return parser.parse_args()
 
 
@@ -37,7 +34,6 @@ def main(
     py_versions: List[str],
     cu_versions: List[str],
     platforms: List[str],
-    cvode: bool,
     build_tag: dict = {"cpu": 0, "cu12": 1},
 ):
     py_folder = Path(__file__).parent.parent
@@ -52,20 +48,6 @@ def main(
 
         for lib_file in lib_folder.glob(f"*.{suffix}"):
             subprocess.run(["rm", lib_file])
-
-        if cvode and platform == "win":
-            subprocess.run(["rm", "-rf", f"{lib_folder}/cvode/"])
-            subprocess.run(["mkdir", f"{lib_folder}/cvode/"])
-            subprocess.run(["mkdir", f"{lib_folder}/cvode/bin/"])
-            cvode_libs = ["core", "cvode", "fcore_mod", "fcvode_mod"]
-            for cvode_lib in cvode_libs:
-                subprocess.run(
-                    [
-                        "cp",
-                        f"{py_folder}/../cvode/bin/sundials_{cvode_lib}.dll",
-                        f"{lib_folder}/cvode/bin/",
-                    ]
-                )
 
         for cuda, py in itertools.product(cu_versions, py_versions):
             py_lib = "cp" + py if platform == "win" else "cpython-" + py
@@ -136,5 +118,4 @@ if __name__ == "__main__":
     py_versions = args.py_version.split(",")
     cu_versions = args.cu_version.split(",")
     platforms = args.platform.split(",")
-    cvode = args.cvode
-    main(py_versions, cu_versions, platforms, cvode)
+    main(py_versions, cu_versions, platforms)
