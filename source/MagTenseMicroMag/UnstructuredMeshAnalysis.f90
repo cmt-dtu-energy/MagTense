@@ -119,24 +119,9 @@ module UnstructuredMeshAnalysis
     
     ThePM = [-1, 1]
     TheEE = reshape([1, 0, 0, 0, 1, 0, 0, 0, 1], [3, 3])
-    !TheNot = reshape([2, 3, 3, 1, 1, 2], [3, 2])
     TheNot(:,1) = [2, 3, 1]
     TheNot(:,2) = [3, 1, 2]
-
-    !call displayGUIMessage( 'TheNot' )
-    !write (prog_str,'(I10)') (TheNot(1, 1))
-    !call displayGUIMessage( prog_str )
-    !write (prog_str,'(I10)') (TheNot(2, 1))
-    !call displayGUIMessage( prog_str )
-    !write (prog_str,'(I10)') (TheNot(3, 1))
-    !call displayGUIMessage( prog_str )
-    !write (prog_str,'(I10)') (TheNot(1, 2))
-    !call displayGUIMessage( prog_str )
-    !write (prog_str,'(I10)') (TheNot(2, 2))
-    !call displayGUIMessage( prog_str )
-    !write (prog_str,'(I10)') (TheNot(3, 2))
-    !call displayGUIMessage( prog_str )
-            
+        
     call displayGUIMessage( 'Test 3' )
     j = 0
     do idim = 1, 3
@@ -151,36 +136,17 @@ module UnstructuredMeshAnalysis
         Zf((1 + (j-1) * Nel):(j * Nel)) = Zel + TheEE(idim, 3) * ThePM(ipm) * dimscopy(:, 3) / 2.0
         DimsF((1 + (j-1) * Nel):(j * Nel), :) = reshape([dimscopy(:, 1) * (1 - TheEE(idim, 1)), dimscopy(:, 2) * (1 - TheEE(idim, 2)), dimscopy(:, 3) * (1 - TheEE(idim, 3))], [Nel, 3])
         AreaFaces((1 + (j-1) * Nel):(j * Nel)) = (DimsScales(TheNot(idim, 1)) * dimscopy(:, TheNot(idim, 1))) * (DimsScales(TheNot(idim, 2)) * dimscopy(:, TheNot(idim, 2)))
-        !call displayGUIMessage( 'AreaFaces' )
-        !write (prog_str,'(ES18.8)') AreaFaces(1)
-        !call displayGUIMessage( prog_str )
-        call displayGUIMessage( 'Test 7' )
       end do
     end do
+
+    call displayGUIMessage( 'Test 7' )
+
     XXF(:,1) = Xf
     XXF(:,2) = Yf
     XXF(:,3) = Zf
     
     call displayGUIMessage( 'Test 4' )
 
-    open(21,file='Xf.txt',status='unknown',form='formatted',action='write')
-    do i=1,n_faces
-        write(21,*)  Xf(i)
-    enddo
-    close(21)
-    
-    open(21,file='DimsF.txt',status='unknown',form='formatted',action='write')
-    do i=1,n_faces
-        write(21,*)  DimsF(i,1)
-    enddo
-    close(21)
-    
-    open(21,file='AreaFaces.txt',status='unknown',form='formatted',action='write')
-    do i=1,n_faces
-        write(21,*)  AreaFaces(i)
-    enddo
-    close(21)
-    
     ! Check which faces are contained by other faces
     allocate(indexItContainsTrue(n_faces, 2))
 
@@ -214,8 +180,6 @@ module UnstructuredMeshAnalysis
       !to ensure that it is the right size.
       
       do kb = 1, Nel
-        
-                
         !SamePosAlongDim = (XXf(Aindex,idim) == XXf(Bindex(kb),idim)) ;
         SamePosAlongDim = (abs(XXf(Aindex,idim) - XXf(Bindex(kb),idim)) < 1e-9) ;
         !UAcontainsUB = ((UminA <= UminB(kb)) .and. (UmaxA >= UmaxB(kb)))
@@ -228,38 +192,11 @@ module UnstructuredMeshAnalysis
         UBcontainsUA = (((UminB(kb) - UminA) < +1e-9) .and. ((UmaxB(kb) - UmaxA) > -1e-9))
         VBcontainsVA = (((VminB(kb) - VminA) < +1e-9) .and. ((VmaxB(kb) - VmaxA) > -1e-9))
         
-        
-        
-        
-        
         AcontainsB = (SamePosAlongDim .and. UAcontainsUB .and. VAcontainsVB)
         BcontainsA = (SamePosAlongDim .and. UBcontainsUA .and. VBcontainsVA)
         
-        !open(21,file='BcontainsA.txt',status='unknown',form='formatted',action='write')
-        !    do i=1,Nel
-        !        write(21,*)  BcontainsA(i)
-        !enddo
-        !close(21) 
-            
-        
-        
         indxAB = pack(Aindex, AcontainsB)
         indxBA = pack(Aindex, BcontainsA)
-        
-        !open(21,file='indxBA.txt',status='unknown',form='formatted',action='write')
-        !    do i=1,size(indxBA)
-        !        write(21,*)  indxBA(i)
-        !enddo
-        !close(21) 
-            
-        
-        
-        !call displayGUIMessage( 'Test 6.1' )
-        
-        !write (prog_str,'(I10)') (size(indxAB))
-        !call displayGUIMessage( prog_str )
-        !write (prog_str,'(I10)') (size(indxBA))
-        !call displayGUIMessage( prog_str )
         
         allocate(firstindx(size(indxAB)+size(indxBA)))
         allocate(secondindx(size(indxAB)+size(indxBA)))
@@ -273,42 +210,6 @@ module UnstructuredMeshAnalysis
             firstindx(i) = Bindex(kb)
         enddo
         
-        !open(21,file='firstindx.txt',status='unknown',form='formatted',action='write')
-        !    do i=1,size(firstindx)
-        !        write(21,*)  firstindx(i)
-        !enddo
-        !close(21) 
-        
-        !if (k == 474) then
-        !    call displayGUIMessage( 'Test 474' )
-            
-        !    open(21,file='SamePosAlongDim.txt',status='unknown',form='formatted',action='write')
-        !    do i=1,Nel
-        !        write(21,*)  SamePosAlongDim(i)
-        !    enddo
-        !    close(21)
-            
-        !    open(21,file='UBcontainsUA.txt',status='unknown',form='formatted',action='write')
-        !    do i=1,Nel
-        !        write(21,*)  UBcontainsUA(i)
-        !    enddo
-        !    close(21)
-            
-        !    open(21,file='VBcontainsVA.txt',status='unknown',form='formatted',action='write')
-        !    do i=1,Nel
-        !        write(21,*)  VBcontainsVA(i)
-        !    enddo
-        !    close(21)  
-            
-           
-        !    call displayGUIMessage( 'Test 474 end' )
-        !endif
-        
-        !do i = 1,size(firstindx)
-        !    write (prog_str,'(I10)') (firstindx(i))
-        !    call displayGUIMessage( prog_str )
-        !enddo
-        
         k_i = 1
         do i = 1,size(indxAB)
             secondindx(i) = Bindex(kb)
@@ -318,16 +219,6 @@ module UnstructuredMeshAnalysis
             secondindx(i) = indxBA(i-(k_i-1))
         enddo
         
-        !do i = 1,size(secondindx)
-        !    write (prog_str,'(I10)') (secondindx(i))
-        !    call displayGUIMessage( prog_str )
-        !enddo
-      
-        !call displayGUIMessage( 'Test 6.2' )
-            
-        !firstindx = [indxAB repmat(Bindex(kb),1,length(indxBA))]
-        !secondindx = [repmat(Bindex(kb),1,length(indxAB)) indxBA]
-
         do i = 1,size(firstindx)
             indexItContainsTrue(k,1) = firstindx(i)
             indexItContainsTrue(k,2) = secondindx(i)
@@ -338,81 +229,64 @@ module UnstructuredMeshAnalysis
       end do               
     end do
     
-
-          open(21,file='indexItContainsTrue1.txt',status='unknown',form='formatted',action='write')
-          do i=1,Nel*2*3
-              write(21,*)  indexItContainsTrue(i,1)
-          enddo
-          close(21)
-          
-          open(21,file='indexItContainsTrue2.txt',status='unknown',form='formatted',action='write')
-          do i=1,Nel*2*3
-              write(21,*)  indexItContainsTrue(i,2)
-          enddo
-          close(21)
-
-
+    
+    
+    open(21,file='indexItContainsTrue1.txt',status='unknown',form='formatted',action='write')
+    do i=1,n_faces
+        write(21,*)  indexItContainsTrue(i,1)
+    enddo
+    close(21)
+    
+    open(21,file='indexItContainsTrue2.txt',status='unknown',form='formatted',action='write')
+    do i=1,n_faces
+        write(21,*)  indexItContainsTrue(i,2)
+    enddo
+    close(21)
+    
+    
+    
+    
+    
+    
+    
+    
+    
     indx = findloc(indexItContainsTrue(:,1), VALUE = 0, DIM = 1)
     allocate(ItContains(n_faces, n_faces), ItsContained(n_faces, n_faces), thisBoolean(n_faces, n_faces))
     ItContains = .false.
     
     call displayGUIMessage( 'Test 109' )
-    write (prog_str,'(I10)') (indx)
-    call displayGUIMessage( prog_str )
     
-    call displayGUIMessage( 'Test 110' )
-    
-    !ItContains(indexItContainsTrue(1:(indx-1),1), indexItContainsTrue(1:(indx-1),2)) = .true.
     do i = 1,(indx-1)
         ItContains(indexItContainsTrue(i,1),indexItContainsTrue(i,2))  = .true.
     end do
     
-    !ItContains(indexItContainsTrue(1:(indx-1),1),indexItContainsTrue(1:(indx-1),2)) = .true.
-    
-    k = COUNT(ItContains)
-    write (prog_str,'(I10)') (k)
-    call displayGUIMessage( prog_str )
-    
-    call displayGUIMessage( 'Test 111' )
-    ItsContained = transpose(ItContains)
-    
-    k = COUNT(ItsContained)
-    write (prog_str,'(I10)') (k)
-    call displayGUIMessage( prog_str )
     
     
     !open(21,file='ItContains.txt',status='unknown',form='formatted',action='write')
-    !do i = 1,n_faces
-    !    do j = 1,n_faces
-    !          write(21,*)  ItContains(i,j)
-    !    enddo
-    !enddo
+    !do i=1,n_faces 
+    !    do j=1,n_faces  
+    !        write(21,*)  ItContains(j,i)
+    !    end do
+    !end do
     !close(21)
-          
-    !      open(21,file='ItsContained.txt',status='unknown',form='formatted',action='write')
-    !      do i = 1,n_faces
-    !    do j = 1,n_faces
-    !          write(21,*)  ItsContained(i,2)
-    !    enddo
-    !    enddo
-    !      close(21)
     
-    call displayGUIMessage( 'Test 112' )
+    ItsContained = transpose(ItContains)
+        
     thisBoolean = ItContains .and. ItsContained
-    call displayGUIMessage( 'Test 113' )
-    
-    k = COUNT(thisBoolean)
-    write (prog_str,'(I10)') (k)
-    call displayGUIMessage( prog_str )
-    
+
+    k = count(thisBoolean)
     allocate(k1Mut_temp(k))
     allocate(k2Mut_temp(k))
+    k1Mut_temp(:) = 0
+    k2Mut_temp(:) = 0
+    
     k = 1;
     do i = 1,n_faces
         do j = 1,n_faces
-            if (thisBoolean(i,j)) then
-                k1Mut_temp(k) = i 
-                k2Mut_temp(k) = j
+            if (thisBoolean(j,i)) then
+                k1Mut_temp(k) = j 
+                k2Mut_temp(k) = i
                 k = k+1
             end if
         end do
@@ -424,13 +298,8 @@ module UnstructuredMeshAnalysis
     
     iYes = k1Mut_temp > k2Mut_temp
     
-    k = COUNT(iYes)
-    write (prog_str,'(I10)') (k)
-    call displayGUIMessage( prog_str )
-    
-    
-    allocate(k1Mut(k))
-    allocate(k2Mut(k))
+    allocate(k1Mut(count(iYes)))
+    allocate(k2Mut(count(iYes)))
     
     call displayGUIMessage( 'Test 115' )
 
@@ -439,7 +308,7 @@ module UnstructuredMeshAnalysis
     
     call displayGUIMessage( 'Test 116' )
     
-    thisBoolean = ItContains
+    thisBoolean(:,:) = ItContains(:,:)
     !jkC = ItContains == .true.
     do i = 1, n_faces
         do j = 1, n_faces
@@ -449,16 +318,26 @@ module UnstructuredMeshAnalysis
         end do
     end do
 
+    !open(21,file='thisBoolean_first.txt',status='unknown',form='formatted',action='write')
+    !do i=1,n_faces 
+    !    do j=1,n_faces  
+    !        write(21,*)  thisBoolean(j,i)
+    !    end do
+    !end do
+    !close(21)
+    
     call displayGUIMessage( 'Test 117' )
     
     allocate(k1NonMut(COUNT(thisBoolean)))
     allocate(k2NonMut(COUNT(thisBoolean)))
+    k1NonMut(:) = 0
+    k2NonMut(:) = 0
     k = 1
     do i = 1,n_faces
         do j = 1,n_faces
-            if (thisBoolean(i,j)) then
-                k1NonMut(k) = i 
-                k2NonMut(k) = j
+            if (thisBoolean(j,i)) then
+                k1NonMut(k) = j 
+                k2NonMut(k) = i
                 k = k+1
             end if
         end do
@@ -489,12 +368,6 @@ module UnstructuredMeshAnalysis
     do i=1,size(kRmv)
         mask1D(kRmv(i)) = .false.
     end do
-
-    open(21,file='kRmv.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(kRmv)
-            write(21,*)  kRmv(i)
-        enddo
-    close(21)
     
     !As there are duplicate entries in kRmv, this is the way to know the unique number of elements
     k = count(mask1D)   !n_faces-size(kRmv)
@@ -523,25 +396,7 @@ module UnstructuredMeshAnalysis
     !TheSigns(:,unique(kRmv)) = [] ;
     
     call displayGUIMessage( 'Test 121' )
-    
-    open(21,file='DimsF_temp1.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(DimsF_temp(:,1))
-            write(21,*)  DimsF_temp(i,1)
-        enddo
-    close(21)
-    
-    open(21,file='DimsF_temp2.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(DimsF_temp(:,2))
-            write(21,*)  DimsF_temp(i,2)
-        enddo
-    close(21)
-    
-    open(21,file='DimsF_temp3.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(DimsF_temp(:,3))
-            write(21,*)  DimsF_temp(i,3)
-        enddo
-    close(21)
-    
+        
     !Delete all the temporary arrays and put the values back into the original arrays
     deallocate(XXF,DimsF,TheSigns)
     deallocate(fNormX,fNormY,fNormZ,Xf,Yf,Zf,AreaFaces)
@@ -566,7 +421,6 @@ module UnstructuredMeshAnalysis
     Zf(:) = Zf_temp(:)
     call displayGUIMessage( 'Test 125' )
     AreaFaces(:) = AreaFaces_temp(:)
-    call displayGUIMessage( 'Test 125-1' )
     TheSigns(:,:) = TheSigns_temp(:,:)
     call displayGUIMessage( 'Test 126' )
     deallocate(XXF_temp,DimsF_temp,TheSigns_temp)
@@ -602,67 +456,15 @@ module UnstructuredMeshAnalysis
     iZero(:) = 0
     do i = 1,3
         mask1D = (abs(DimsF(:,i)) < 1e-9)
-        
-        if (i == 1) then
-             open(21,file='mask1D1.txt',status='unknown',form='formatted',action='write')
-                do j=1,size(mask1D)
-                    write(21,*)  mask1D(j)
-                enddo
-             close(21)
-             
-             where (mask1D) iZero = count_temp(:,i)
-             
-             !iZero(mask1D) = count_temp(mask1D,i)
-             
-             open(21,file='iZero.txt',status='unknown',form='formatted',action='write')
-                do j=1,size(iZero)
-                    write(21,*)  iZero(j)
-                enddo
-             close(21)
-             
-             iZero(:) = 0
-             
-        end if
-        
+                
         where (mask1D) iZero = iZero + count_temp(:,i)
         !iZero(mask1D) = iZero(mask1D)+count_temp(mask1D,i)
     end do
-   
-    open(21,file='iZero2.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(iZero)
-            write(21,*)  iZero(i)
-        enddo
-    close(21)
-    
     
     call displayGUIMessage( 'Test 131' )
     
     allocate(cols(size(iZero)))
     cols = mod(iZero+1,3)+1
-    
-    open(21,file='cols.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(cols)
-            write(21,*)  cols(i)
-        enddo
-    close(21)
-    
-    open(21,file='XXel.txt',status='unknown',form='formatted',action='write')
-        do i=1,Nel
-            write(21,*)  XXel(i,1)
-        enddo
-    close(21)
-    
-    open(21,file='dims.txt',status='unknown',form='formatted',action='write')
-        do i=1,Nel
-            write(21,*)  dims(i,1)
-        enddo
-    close(21)
-    
-    open(21,file='DimsF2.txt',status='unknown',form='formatted',action='write')
-        do i=1,Nel
-            write(21,*)  DimsF2(i,1)
-        enddo
-    close(21)
     
     call displayGUIMessage( 'Test 131-1' )
     
@@ -684,7 +486,7 @@ module UnstructuredMeshAnalysis
     
     call displayGUIMessage( 'Test 133' )
     
-    allocate(TheseMinXXel(Nel,3), TheseMaxXXel(Nel,3))
+    allocate(TheseMinXXel(size(Xf),3), TheseMaxXXel(size(Xf),3))
     allocate(theseA(size(Xf)),theseB(size(Xf)),theseC(size(Xf)),theseD(size(Xf)))
     allocate(theseA_int(size(Xf)),theseB_int(size(Xf)),theseC_int(size(Xf)),theseD_int(size(Xf)))
     allocate(theseNum(Nel))
@@ -694,30 +496,6 @@ module UnstructuredMeshAnalysis
     do n=1,Nel
         count1D(n) = n
     end do
-    
-    open(21,file='xxMinEl1.txt',status='unknown',form='formatted',action='write')
-        do i=1,Nel
-            write(21,*)  xxMinEl(i,1)
-        enddo
-    close(21)
-    
-    open(21,file='xxMinEl2.txt',status='unknown',form='formatted',action='write')
-        do i=1,Nel
-            write(21,*)  xxMinEl(i,2)
-        enddo
-    close(21)
-    
-    open(21,file='xxMinEl3.txt',status='unknown',form='formatted',action='write')
-        do i=1,Nel
-            write(21,*)  xxMinEl(i,3)
-        enddo
-    close(21)
-    
-    open(21,file='xVertA.txt',status='unknown',form='formatted',action='write')
-        do i=1,Nel
-            write(21,*)  xVertA(i,1)
-        enddo
-    close(21)
     
     allocate(TheTs(size(Xf),Nel), TheDs(size(Xf),Nel))
     TheTs(:,:) = .false.
@@ -730,48 +508,16 @@ module UnstructuredMeshAnalysis
         TheseMaxXXel(:,1) = xxMaxEl(n,1)
         TheseMaxXXel(:,2) = xxMaxEl(n,2)
         TheseMaxXXel(:,3) = xxMaxEl(n,3)
-        
-        if (n == 1) then
-            
-            write (prog_str,'(I10)') (xxMinEl(n,1))
-            call displayGUIMessage( prog_str )
-            write (prog_str,'(I10)') (TheseMinXXel(1,1))
-            call displayGUIMessage( prog_str )
-            write (prog_str,'(I10)') (TheseMinXXel(2,1))
-            call displayGUIMessage( prog_str )
-            write (prog_str,'(I10)') (TheseMinXXel(3,1))
-            call displayGUIMessage( prog_str )
-            
-                open(21,file='TheseMinXXel1.txt',status='unknown',form='formatted',action='write')
-                do i=1,Nel
-                    write(21,*)  TheseMinXXel(i,1)
-                enddo
-            close(21)
-            open(21,file='TheseMinXXel2.txt',status='unknown',form='formatted',action='write')
-                do i=1,Nel
-                    write(21,*)  TheseMinXXel(i,2)
-                enddo
-            close(21)
-            open(21,file='TheseMinXXel3.txt',status='unknown',form='formatted',action='write')
-                do i=1,Nel
-                    write(21,*)  TheseMinXXel(i,3)
-                enddo
-            close(21)
-    
-            open(21,file='TheseMaxXXel1.txt',status='unknown',form='formatted',action='write')
-                do i=1,Nel
-                    write(21,*)  TheseMaxXXel(i,1)
-                enddo
-            close(21)
-    endif
-    
-    !    TheseMinXXel = repmat(xxMinEl(n,:),K,1) ;
-    !    TheseMaxXXel = repmat(xxMaxEl(n,:),K,1) ;
-        theseA = all((TheseMinXXel <= xVertA ) .and. (TheseMaxXXel >= xVertA ),2)
-        theseB = all((TheseMinXXel <= xVertB ) .and. (TheseMaxXXel >= xVertB ),2) ;
-        theseC = all((TheseMinXXel <= xVertC ) .and. (TheseMaxXXel >= xVertC ),2) ;
-        theseD = all((TheseMinXXel <= xVertD ) .and. (TheseMaxXXel >= xVertD ),2) ;
-    
+
+        !theseA = all((TheseMinXXel <= xVertA ) .and. (TheseMaxXXel >= xVertA ),2)
+        !theseB = all((TheseMinXXel <= xVertB ) .and. (TheseMaxXXel >= xVertB ),2)
+        !theseC = all((TheseMinXXel <= xVertC ) .and. (TheseMaxXXel >= xVertC ),2)
+        !theseD = all((TheseMinXXel <= xVertD ) .and. (TheseMaxXXel >= xVertD ),2)
+        theseA = all((((TheseMinXXel - xVertA) < +1e-9 ) .and. ((TheseMaxXXel - xVertA ) > -1e-9)) ,2)
+        theseB = all((((TheseMinXXel - xVertB) < +1e-9 ) .and. ((TheseMaxXXel - xVertB ) > -1e-9)) ,2)
+        theseC = all((((TheseMinXXel - xVertC) < +1e-9 ) .and. ((TheseMaxXXel - xVertC ) > -1e-9)) ,2)
+        theseD = all((((TheseMinXXel - xVertD) < +1e-9 ) .and. ((TheseMaxXXel - xVertD ) > -1e-9)) ,2)
+                    
         theseA_int(:) = 0
         theseB_int(:) = 0
         theseC_int(:) = 0
@@ -793,34 +539,78 @@ module UnstructuredMeshAnalysis
         !theseKs = pack(count1D,mask1D))
         !deallocate(theseKs)
         
-         if (n == 1) then
+        mask1D = (theseNum >= 2)
+        where (mask1D) TheTs(:,n) = .true.
+        
+        if (n == 600) then
+            write (prog_str,'(I10)') (xxMinEl(n,1))
+            call displayGUIMessage( prog_str )
+            write (prog_str,'(I10)') (TheseMinXXel(1,1))
+            call displayGUIMessage( prog_str )
+            write (prog_str,'(I10)') (TheseMinXXel(2,1))
+            call displayGUIMessage( prog_str )
+            write (prog_str,'(I10)') (TheseMinXXel(3,1))
+            call displayGUIMessage( prog_str )
+            
+            open(21,file='TheseMinXXel1.txt',status='unknown',form='formatted',action='write')
+                do i=1,Nel
+                    write(21,*)  TheseMinXXel(i,1)
+                enddo
+            close(21)
+            open(21,file='TheseMinXXel2.txt',status='unknown',form='formatted',action='write')
+                do i=1,Nel
+                    write(21,*)  TheseMinXXel(i,2)
+                enddo
+            close(21)
+            open(21,file='TheseMinXXel3.txt',status='unknown',form='formatted',action='write')
+                do i=1,Nel
+                    write(21,*)  TheseMinXXel(i,3)
+                enddo
+            close(21)
+    
+            open(21,file='TheseMaxXXel1.txt',status='unknown',form='formatted',action='write')
+                do i=1,Nel
+                    write(21,*)  TheseMaxXXel(i,1)
+                enddo
+            close(21)
+            
              open(21,file='theseA.txt',status='unknown',form='formatted',action='write')
                 do j=1,size(theseA)
                     write(21,*)  theseA(j)
                 enddo
              close(21)
-         end if
+             
+             open(21,file='theseB.txt',status='unknown',form='formatted',action='write')
+                do j=1,size(theseB)
+                    write(21,*)  theseB(j)
+                enddo
+             close(21)
+             
+             open(21,file='theseC.txt',status='unknown',form='formatted',action='write')
+                do j=1,size(theseC)
+                    write(21,*)  theseC(j)
+                enddo
+             close(21)
+             
+             open(21,file='theseD.txt',status='unknown',form='formatted',action='write')
+                do j=1,size(theseD)
+                    write(21,*)  theseD(j)
+                enddo
+             close(21)
          
-         if (n == 1) then
              open(21,file='theseNum.txt',status='unknown',form='formatted',action='write')
                 do j=1,size(theseNum)
                     write(21,*)  theseNum(j)
                 enddo
              close(21)
-         end if
-                
-        mask1D = (theseNum >= 2)
-        where (mask1D) TheTs(:,n) = .true.
-        
-        if (n == 1) then
+         
+            
              open(21,file='mask1D1.txt',status='unknown',form='formatted',action='write')
                 do j=1,size(mask1D)
                     write(21,*)  mask1D(j)
                 enddo
              close(21)
-        end if
         
-        if (n == 1) then
              open(21,file='TheTs1.txt',status='unknown',form='formatted',action='write')
                 do j=1,size(Xf)
                     write(21,*)  TheTs(j,n)
@@ -840,13 +630,271 @@ module UnstructuredMeshAnalysis
      !   indexTheDs{n} = [ theseLs, repmat(n,size(theseLs,1),1) ];
     end do
 
+    open(21,file='k1Mut_temp.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(k1Mut_temp)
+        write(21,*)  k1Mut_temp(i)
+    enddo
+    close(21)
+    
+    open(21,file='k2Mut_temp.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(k2Mut_temp)
+        write(21,*)  k2Mut_temp(i)
+    enddo
+    close(21)
+    
+    open(21,file='iYes.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(iYes)
+        write(21,*)  iYes(i)
+    enddo
+    close(21)
+    
+    open(21,file='k1Mut.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(k1Mut)
+        write(21,*)  k1Mut(i)
+    enddo
+    close(21)
+    
+    open(21,file='k2Mut.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(k2Mut)
+        write(21,*)  k2Mut(i)
+    enddo
+    close(21)
+    
+    open(21,file='k1NonMut.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(k1NonMut)
+        write(21,*)  k1NonMut(i)
+    enddo
+    close(21)
+    
+    open(21,file='k2NonMut.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(k2NonMut)
+        write(21,*)  k2NonMut(i)
+    enddo
+    close(21)
+    
+    write (prog_str,'(I10)') (size(Xf))
+    call displayGUIMessage( prog_str )
+            
+    !open(21,file='Xf.txt',status='unknown',form='formatted',action='write')
+    !do i=1,size(Xf)
+    !    write(21,*)  Xf(i)
+    !enddo
+    !close(21)
+    
+    call displayGUIMessage( 'Test 140' )
+    
+    open(21,file='DimsF1.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(DimsF(:,1))
+        write(21,*)  DimsF(i,1)
+    enddo
+    close(21)
+    
+    open(21,file='DimsF2.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(DimsF(:,2))
+        write(21,*)  DimsF(i,2)
+    enddo
+    close(21)
+    
+    open(21,file='DimsF3.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(DimsF(:,3))
+        write(21,*)  DimsF(i,3)
+    enddo
+    close(21)
+
+    call displayGUIMessage( 'Test 140-1' )
+
+    open(21,file='AreaFaces.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(AreaFaces)
+        write(21,*)  AreaFaces(i)
+    enddo
+    close(21)
+    
+    call displayGUIMessage( 'Test 140-2' )
+    
+    open(21,file='kRmv.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(kRmv)
+            write(21,*)  kRmv(i)
+        enddo
+    close(21)
+    
+    call displayGUIMessage( 'Test 140-3' )
+        
+    open(21,file='iZero.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(iZero)
+            write(21,*)  iZero(i)
+        enddo
+    close(21)
+    
+    call displayGUIMessage( 'Test 140-7' )
+    
+    open(21,file='cols.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(cols)
+            write(21,*)  cols(i)
+        enddo
+    close(21)
+    
+    call displayGUIMessage( 'Test 140-8' )
+    
+    open(21,file='XXel1.txt',status='unknown',form='formatted',action='write')
+        do i=1,Nel
+            write(21,*)  XXel(i,1)
+        enddo
+    close(21)
+    
+    call displayGUIMessage( 'Test 140-9' )
+    
+    open(21,file='dims1.txt',status='unknown',form='formatted',action='write')
+        do i=1,Nel
+            write(21,*)  dims(i,1)
+        enddo
+    close(21)
+    
+    call displayGUIMessage( 'Test 140-10' )
+    
+    open(21,file='DimsF21.txt',status='unknown',form='formatted',action='write')
+        do i=1,Nel
+            write(21,*)  DimsF2(i,1)
+        enddo
+    close(21)
+    
+    call displayGUIMessage( 'Test 140-11' )
+    
+    open(21,file='xxMinEl1.txt',status='unknown',form='formatted',action='write')
+        do i=1,Nel
+            write(21,*)  xxMinEl(i,1)
+        enddo
+    close(21)
+    
+    call displayGUIMessage( 'Test 140-12' )
+    
+    open(21,file='xxMinEl2.txt',status='unknown',form='formatted',action='write')
+        do i=1,Nel
+            write(21,*)  xxMinEl(i,2)
+        enddo
+    close(21)
+    
+    call displayGUIMessage( 'Test 140-13' )
+    
+    open(21,file='xxMinEl3.txt',status='unknown',form='formatted',action='write')
+        do i=1,Nel
+            write(21,*)  xxMinEl(i,3)
+        enddo
+    close(21)
+    
+    open(21,file='xxMaxEl1.txt',status='unknown',form='formatted',action='write')
+        do i=1,Nel
+            write(21,*)  xxMaxEl(i,1)
+        enddo
+    close(21)
+    
+    call displayGUIMessage( 'Test 140-12' )
+    
+    open(21,file='xxMaxEl2.txt',status='unknown',form='formatted',action='write')
+        do i=1,Nel
+            write(21,*)  xxMaxEl(i,2)
+        enddo
+    close(21)
+    
+    call displayGUIMessage( 'Test 140-13' )
+    
+    open(21,file='xxMaxEl3.txt',status='unknown',form='formatted',action='write')
+        do i=1,Nel
+            write(21,*)  xxMaxEl(i,3)
+        enddo
+    close(21)
+    
+    call displayGUIMessage( 'Test 140-14' )
+    
+    open(21,file='xVertA1.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Xf)
+            write(21,*)  xVertA(i,1)
+        enddo
+    close(21)
+    
+    open(21,file='xVertA2.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Xf)
+            write(21,*)  xVertA(i,2)
+        enddo
+    close(21)
+    
+    open(21,file='xVertA3.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Xf)
+            write(21,*)  xVertA(i,3)
+        enddo
+    close(21)
+    
+    open(21,file='xVertB1.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Xf)
+            write(21,*)  xVertB(i,1)
+        enddo
+    close(21)
+    
+    open(21,file='xVertB2.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Xf)
+            write(21,*)  xVertB(i,2)
+        enddo
+    close(21)
+    
+    open(21,file='xVertB3.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Xf)
+            write(21,*)  xVertB(i,3)
+        enddo
+    close(21)
+    
+    open(21,file='xVertC1.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Xf)
+            write(21,*)  xVertC(i,1)
+        enddo
+    close(21)
+    
+    open(21,file='xVertC2.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Xf)
+            write(21,*)  xVertC(i,2)
+        enddo
+    close(21)
+    
+    open(21,file='xVertC3.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Xf)
+            write(21,*)  xVertC(i,3)
+        enddo
+    close(21)
+    
+    open(21,file='xVertD1.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Xf)
+            write(21,*)  xVertD(i,1)
+        enddo
+    close(21)
+    
+    open(21,file='xVertD2.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Xf)
+            write(21,*)  xVertD(i,2)
+        enddo
+    close(21)
+    
+    open(21,file='xVertD3.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Xf)
+            write(21,*)  xVertD(i,3)
+        enddo
+    close(21)
+    call displayGUIMessage( 'Test 140-15' )
+    
     open(21,file='TheTs.txt',status='unknown',form='formatted',action='write')
-    do j=1,Nel 
-        do i=1,size(Xf)        
-            write(21,*)  TheTs(i,j)
+    do i=1,Nel 
+        do j=1,size(Xf)        
+            write(21,*)  TheTs(j,i)
         end do
     end do
     close(21)
+    
+    open(21,file='TheDs.txt',status='unknown',form='formatted',action='write')
+    do i=1,Nel 
+        do j=1,size(Xf)        
+            write(21,*)  TheDs(j,i)
+        end do
+    end do
+    close(21)
+    
+    call displayGUIMessage( 'Test 141' )
     
     ! Rescaling (inverse)
     Xel = Xel * DimsScales(1)
