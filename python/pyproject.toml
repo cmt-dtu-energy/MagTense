@@ -93,6 +93,7 @@ ignore = [
   "E111",
   "E114",
   "E117",
+  "PLR0912", # Too many branches
   "PLR0913",
   "PLR0915",
   "PLR2004",

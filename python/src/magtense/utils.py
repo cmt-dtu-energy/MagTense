@@ -672,7 +672,7 @@ def zoom_factory(
     return (zoom_scroll, zoom_onpress)
 
 
-def create_plot(  # noqa: PLR0912
+def create_plot(
     tiles: Tiles | None = None,
     eval_pts: list[np.ndarray] | None = None,
     field: np.ndarray | None = None,
