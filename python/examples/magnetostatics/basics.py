@@ -157,7 +157,7 @@ def prism_grid() -> None:
 
 
 def prism_multiple(
-    n_mag: int = 1, soft: int | None = None, res: int = 16, max: tuple = (1, 1, 1)
+    n_mag: int = 1, soft: int | None = None, res: int = 16, max_val: tuple = (1, 1, 1)
 ) -> None:
     if soft is None:
         soft = [0 for _ in range(n_mag)]
@@ -181,7 +181,7 @@ def prism_multiple(
         prism.color = ([i / n_mag, 0, 0], i)
 
     l_n = complex(0, res)
-    coords = np.mgrid[0 : max[0] : l_n, 0 : max[1] : l_n, 0 : max[2] : l_n]
+    coords = np.mgrid[0 : max_val[0] : l_n, 0 : max_val[1] : l_n, 0 : max_val[2] : l_n]
     # Transpose from 'ij' to 'xy' notation
     pts_eval = coords.transpose((0, 2, 1, 3)).reshape(3, -1).T
 

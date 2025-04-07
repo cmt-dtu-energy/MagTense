@@ -83,7 +83,7 @@ def test_prism(
         assert np.any(np.sort(abs(H_n_COMSOL - H_n_mt))[:-1] < 5e-3)
 
 
-def test_plot_fn():
+def test_plot_fn() -> None:
     """
     Test the plot function
     """
