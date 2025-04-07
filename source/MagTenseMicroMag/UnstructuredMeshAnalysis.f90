@@ -48,7 +48,7 @@ module UnstructuredMeshAnalysis
     real(dp), intent(in) :: dims(:,:)
     type(MicroMagGridInfo), intent(out) :: GridInfo
 
-    integer :: Nel, K, idim, ipm, j, n, kb, i, k_i, indx, n_faces
+    integer :: Nel, K, idim, ipm, j, n, kb, i, k_i, indx, n_faces, i_end, k1, k2
     real(dp), allocatable :: Xel(:), Yel(:), Zel(:)
     real(dp), allocatable :: Volumes(:)
     real(dp) :: DimsScales(3)
@@ -63,7 +63,7 @@ module UnstructuredMeshAnalysis
     real(dp), allocatable :: UminA(:), UmaxA(:), VminA(:), VmaxA(:)
     real(dp), allocatable :: UminB(:), UmaxB(:), VminB(:), VmaxB(:)
     integer :: TheJ(3, 2), ThePM(2), TheEE(3, 3), TheNot(3, 2)
-    integer, allocatable :: Aindex(:), Bindex(:), indexItContainsTrue(:,:)
+    integer, allocatable :: Aindex(:), Bindex(:), indexItContainsTrue(:,:), indexItContainsTrue_temp(:,:)
     logical, allocatable :: ItContains(:,:), ItsContained(:,:), thisBoolean(:,:)
     real(dp), allocatable :: dimscopy(:,:)
     logical, allocatable :: SamePosAlongDim(:)
@@ -82,6 +82,7 @@ module UnstructuredMeshAnalysis
     integer, allocatable :: iZero(:), count_temp(:,:), count1D(:)
     integer, allocatable :: theseA_int(:),theseB_int(:),theseC_int(:),theseD_int(:),theseNum(:)
     logical, allocatable :: TheTs(:,:), TheDs(:,:)
+    integer, allocatable :: thisBoolean_arr(:,:), kMut_F(:,:), kNonMut_F(:,:), kMut_F_temp(:,:), kNonMut_F_temp(:,:)
     character*(40) :: prog_str
 
     call displayGUIMessage( 'Starting mesh analysis' )
@@ -143,7 +144,7 @@ module UnstructuredMeshAnalysis
     XXF(:,3) = Zf
     
     ! Check which faces are contained by other faces
-    allocate(indexItContainsTrue(n_faces, 2))
+    allocate(indexItContainsTrue_temp(n_faces, 2))
 
     allocate(UminA(Nel), UmaxA(Nel), VminA(Nel), VmaxA(Nel))
     allocate(UminB(Nel), UmaxB(Nel), VminB(Nel), VmaxB(Nel))
@@ -207,8 +208,8 @@ module UnstructuredMeshAnalysis
         enddo
         
         do i = 1,size(firstindx)
-            indexItContainsTrue(k,1) = firstindx(i)
-            indexItContainsTrue(k,2) = secondindx(i)
+            indexItContainsTrue_temp(k,1) = firstindx(i)
+            indexItContainsTrue_temp(k,2) = secondindx(i)
             k = k+1;
         enddo
                 
@@ -216,7 +217,78 @@ module UnstructuredMeshAnalysis
       end do               
     end do
     
-    indx = findloc(indexItContainsTrue(:,1), VALUE = 0, DIM = 1)
+    allocate(indexItContainsTrue(k-1,2))
+    indexItContainsTrue(:,:) = indexItContainsTrue_temp(1:(k-1),:)
+    deallocate(indexItContainsTrue_temp)
+    
+    
+    allocate(kMut_F_temp(size(indexItContainsTrue(:,1)),2))
+    kMut_F_temp(:,:) = 0
+    allocate(kNonMut_F_temp(size(indexItContainsTrue(:,1)),2))
+    kNonMut_F_temp(:,:) = 0
+    
+    allocate(mask1D(size(indexItContainsTrue(:,1))))
+    mask1D = .false.
+    
+    k1 = 1
+    k2 = 1
+    do i = 1,size(indexItContainsTrue(:,1))
+        
+        mask1D = ((indexItContainsTrue(i,1) .eq. indexItContainsTrue(:,2)) .and. (indexItContainsTrue(i,2) .eq. indexItContainsTrue(:,1)))
+        
+        if (any(mask1D, DIM = 1)) then
+            write (prog_str,'(I10)') (k1)
+            call displayGUIMessage( prog_str )
+            
+            !j = findloc(mask1D(:), VALUE = .true., DIM = 1)
+            kMut_F_temp(k1,:) = [indexItContainsTrue(i,1), indexItContainsTrue(i,2)]
+            k1 = k1+1
+        else 
+            kNonMut_F_temp(k2,:) = [indexItContainsTrue(i,1), indexItContainsTrue(i,2)]
+            k2 = k2+1
+        end if
+        
+    end do
+    deallocate(mask1D)
+    
+    call displayGUIMessage( 'Sjask' )
+            
+    allocate(kMut_F(k1-1,2))
+    kMut_F(:,:) = 0
+    kMut_F(1:(k1-1),:) = kMut_F_temp(1:(k1-1),:)
+    deallocate(kMut_F_temp)   
+    
+    allocate(kNonMut_F(k2-1,2))
+    kNonMut_F(:,:) = 0
+    kNonMut_F(1:(k2-1),:) = kNonMut_F_temp(1:(k2-1),:)
+    deallocate(kNonMut_F_temp)   
+    
+    
+    
+    open(21,file='kMut_F1.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(kMut_F(:,1))
+        write(21,*)  kMut_F(i,1)
+    enddo
+    close(21)
+    
+    open(21,file='kMut_F2.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(kMut_F(:,1))
+        write(21,*)  kMut_F(i,2)
+    enddo
+    close(21)
+    
+    open(21,file='kNonMut_F1.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(kNonMut_F(:,1))
+        write(21,*)  kNonMut_F(i,1)
+    enddo
+    close(21)
+    
+    open(21,file='kNonMut_F2.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(kNonMut_F(:,1))
+        write(21,*)  kNonMut_F(i,2)
+    enddo
+    close(21)
+       
     allocate(ItContains(n_faces, n_faces), ItsContained(n_faces, n_faces), thisBoolean(n_faces, n_faces))
     ItContains = .false.
           
@@ -255,7 +327,7 @@ module UnstructuredMeshAnalysis
     allocate(k2Mut(count(iYes)))
 
     k1Mut = pack(k1Mut_temp,iYes)  
-    k2Mut = pack(k2Mut_temp,iYes) ! rermove only one of the two
+    k2Mut = pack(k2Mut_temp,iYes) ! remove only one of the two
     
     thisBoolean(:,:) = ItContains(:,:)
     do i = 1, n_faces
@@ -288,18 +360,19 @@ module UnstructuredMeshAnalysis
     ! each of the faces being removed has:
     !   kSurv: one or more surviving contained (or equal) faces
     !   one element (nRmv) having the face as one of its 6 original boundaries
-    kRmv = [k1Mut, k1NonMut]
+    kRmv  = [k1Mut, k1NonMut]
     kSurv = [k2Mut, k2NonMut]
-    nRmv = MOD(kRmv-1,Nel)+1
+    nRmv  = MOD(kRmv-1,Nel)+1
     
     TheSigns(nRmv,kSurv) = -1
 
     allocate(mask1D(n_faces))
     mask1D = .true.
     
-    do i=1,size(kRmv)
-        mask1D(kRmv(i)) = .false.
-    end do
+    !do i=1,size(kRmv)
+    !    mask1D(kRmv(i)) = .false.
+    !end do
+    mask1D(kRmv(:)) = .false.
     
     !As there are duplicate entries in kRmv, this is the way to know the unique number of elements
     k = count(mask1D)
@@ -579,6 +652,8 @@ module UnstructuredMeshAnalysis
     close(21)
     
     call displayGUIMessage( 'Mesh analysis done' )
+    
+    stop
     
     ! Use Intel MKL to create sparse matrices (TheSigns, TheTs, TheDs)
     ! Further implementation required to create and fill these sparse matrices using MKL
