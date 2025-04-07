@@ -1,22 +1,23 @@
-import numpy as np
-from magtense.magstatics import Tiles, run_simulation
-
 from pathlib import Path
-from typing import Optional, List
+
+import numpy as np
+
+from magtense.magstatics import Tiles, run_simulation
+from magtense.utils import create_plot
 
 
 def load_COMSOL(
     fname: str,
-    eval_offset: List,
+    eval_offset: list,
     COMSOL_eval_path: Path,
-    model_offset: List,
+    model_offset: list,
     unit: str,
-    pts_special: Optional[np.ndarray] = None,
+    pts_special: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Load reference points from COMSOL calculation
     """
-    with open(Path(COMSOL_eval_path, fname), "r") as file:
+    with Path.open(Path(COMSOL_eval_path, fname), "r") as file:
         T = file.readlines()[8:]
 
     T_split = np.asarray([line.split() for line in T], dtype=np.float64)
@@ -42,7 +43,9 @@ def load_COMSOL(
     return pts, H_norm_COMSOL
 
 
-def test_prism(shape="prism", model_offset=[0, 0, 0], unit: str = ("A/m",)):
+def test_prism(
+    shape: str = "prism", model_offset: tuple = (0, 0, 0), unit: str = ("A/m",)
+) -> None:
     mu0 = 4 * np.pi * 1e-7
     tile = Tiles(
         n=1,
@@ -78,3 +81,55 @@ def test_prism(shape="prism", model_offset=[0, 0, 0], unit: str = ("A/m",)):
 
         print(f"Ten largest errors ({coord}): ", np.sort(abs(H_n_COMSOL - H_n_mt))[-5:])
         assert np.any(np.sort(abs(H_n_COMSOL - H_n_mt))[:-1] < 5e-3)
+
+
+def test_plot_fn() -> None:
+    """
+    Test the plot function
+    """
+    mu0 = 4 * np.pi * 1e-7
+    tiles = Tiles(
+        n=6,
+        M_rem=1.2 / mu0,
+        tile_type=[2, 1, 3, 4, 5, 7],
+        color=[
+            [1, 0, 0],
+            [0, 0, 1],
+            [1, 0.5, 0],
+            [0.3, 0.8, 0.2],
+            [0, 0, 0],
+            [1, 0, 1],
+        ],
+    )
+
+    # 0: Prism
+    tiles.size = ([0.1, 0.3, 0.2], 0)
+    tiles.offset = ([0.1, 0.2, 0.1], 0)
+
+    # 1: Cylindrical Tiles
+    tiles.center_pos = ([1, 0, 0.3], 1)
+    tiles.dev_center = ([0.15, np.pi / 9, 0.3], 1)
+
+    # 2: Circpiece
+    tiles.center_pos = ([0.85, np.pi / 5, 1.2], 2)
+    tiles.dev_center = ([0.15, np.pi / 7, 0.25], 2)
+
+    # 3: Inverted Circpiece
+    tiles.center_pos = ([0.2, np.pi / 6, 0.75], 3)
+    tiles.dev_center = ([0.05, np.pi / 4, 0.4], 3)
+
+    # 4: Tetrahedron
+    tiles.vertices = (
+        np.array(
+            [[0.65, 0.9, 0.5], [0.8, 0.9, 0.7], [0.85, 0.55, 0.25], [0.95, 0.85, 0.15]]
+        ),
+        4,
+    )
+
+    # 5: Prolate Spheroid
+    tiles.size = ([0.1, 0.3, 0.1], 5)
+    tiles.offset = ([0.1, 0.6, 0.7], 5)
+    tiles.rot = ([0, 0, 2], 5)
+
+    # Call the plot function
+    create_plot(tiles)

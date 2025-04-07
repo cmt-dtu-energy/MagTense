@@ -1,22 +1,20 @@
-# %%
-import numpy as np
-import matplotlib.pyplot as plt
-
-from typing import List
-
-from matplotlib.lines import Line2D
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.lines import Line2D
+
 from magtense.micromag import MicromagProblem
 from magtense.utils import plot_M_thin_film
 
 
 def std_prob_4(
-    res: List[int] = [36, 9, 1],
+    res: tuple[int] = (36, 9, 1),
     NIST_field: int = 1,
     cuda: bool = False,
     cvode: bool = False,
     show: bool = True,
-) -> List[float]:
+) -> list[float]:
     mu0 = 4 * np.pi * 1e-7
     grid_L = [500e-9, 125e-9, 3e-9]
 
@@ -26,7 +24,7 @@ def std_prob_4(
     )
     h_ext = np.array([1, 1, 1]) / mu0
 
-    def h_ext_fct(t):
+    def h_ext_fct(t) -> np.ndarray:
         return np.expand_dims(np.where(t < 1e-09, 1e-09 - t, 0), axis=1) * h_ext
 
     _, M_out, _, _, _, _, _ = problem_ini.run_simulation(100e-9, 200, h_ext_fct, 2000)
@@ -49,9 +47,9 @@ def std_prob_4(
     elif NIST_field == 2:
         h_ext_nist = np.array([-35.5, -6.3, 0])
     else:
-        raise NotImplementedError()
+        raise NotImplementedError
 
-    def h_ext_fct(t):
+    def h_ext_fct(t) -> np.ndarray:
         return np.expand_dims(t > -1, axis=1) * (h_ext_nist / 1000 / mu0)
 
     t_dym, M_out, _, _, _, _, _ = problem_dym.run_simulation(1e-9, 200, h_ext_fct, 2000)
@@ -73,7 +71,7 @@ def std_prob_4(
     )
     fname = f"Field_{NIST_field}_NIST_mean_solution.txt"
 
-    with open(Path(mumag_eval_path, fname), "r") as file:
+    with Path.open(Path(mumag_eval_path, fname), "r") as file:
         T = file.readlines()[1:]
 
     M_mumag = np.asarray([line.split() for line in T], dtype=np.float64)
@@ -91,7 +89,7 @@ def std_prob_4(
     ]
 
     if show:
-        fig, ax1 = plt.subplots()
+        _, ax1 = plt.subplots()
 
         ax1.plot(t_dym, Mx, "rx")
         ax1.plot(t_dym, My, "gx")
@@ -142,8 +140,6 @@ def std_prob_4(
 
     return int_error
 
-
-# %%
 
 if __name__ == "__main__":
     int_error = std_prob_4(NIST_field=1, show=True, cuda=True, cvode=False)

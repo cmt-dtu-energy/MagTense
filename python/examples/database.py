@@ -1,33 +1,36 @@
-# %%
 import os
 import sys
+from multiprocessing import Process, cpu_count
+from pathlib import Path
+
 import h5py
 import numpy as np
-
-from pathlib import Path
-from typing import Optional, List
-from multiprocessing import Process, cpu_count
-from magtense.halbach import HalbachCylinder, EvaluationPoints
-from magtense.magstatics import Tiles, grid_config, run_simulation
-
+from db_utils import (
+    calc_demag_field,
+    eval_shimming,
+    gen_s_state,
+    gen_seq,
+    get_shim_mat,
+    load_demag_tensor,
+)
 from tqdm import tqdm
 
-from db_utils import load_demag_tensor, calc_demag_field, eval_shimming
-from db_utils import get_shim_mat, gen_s_state, gen_seq
+from magtense.halbach import EvaluationPoints, HalbachCylinder
+from magtense.magstatics import Tiles, grid_config, run_simulation
 
 
 def db_std_prob_4(
     datapath: Path,
     n_seq: int,
-    res: List,
-    grid_size: List = [500e-9, 500e-9, 3e-9],
+    res: list[int],
+    grid_size: tuple = (500e-9, 500e-9, 3e-9),
     t_steps: int = 500,
     t_per_step: float = 4e-12,
-    h_ext_a: List = [0, 360],
-    h_ext_n: List = [0, 50],
+    h_ext_a: tuple = (0, 360),
+    h_ext_n: tuple = (0, 50),
     seed: int = 0,
-    intv: Optional[List] = None,
-    name: Optional[str] = None,
+    intv: list | None = None,
+    name: str | None = None,
     empty: bool = False,
     cuda: bool = False,
 ) -> None:
@@ -93,7 +96,7 @@ def db_halbach(
     n_mat: int,
     shim_segs: int = 8,
     shim_layers: int = 3,
-    field_res: List[int] = [16, 16, 16],
+    field_res: tuple[int] = (16, 16, 16),
     norm_var: float = 0.05,
     mu_r: float = 100,
     r_probe: float = 0.002,
@@ -102,10 +105,10 @@ def db_halbach(
     seed_pertubation: int = 1,
     action: bool = False,
     no_shim: bool = True,
-    intv: Optional[List] = None,
-    name: Optional[str] = None,
+    intv: list | None = None,
+    name: str | None = None,
     empty: bool = False,
-):
+) -> None:
     """
     Dataset creation.
     Name: '{available spots for shim magnets}_{# halbach configs}_{# shim matrices}.h5'
@@ -275,7 +278,7 @@ def db_halbach(
     db.close()
 
 
-def db_halbach_field_stats(db_path):
+def db_halbach_field_stats(db_path) -> None:
     with h5py.File(db_path, mode="r") as db:
         arr = np.mean(db["field"], axis=(2, 3, 4))
 
@@ -286,12 +289,12 @@ def db_halbach_field_stats(db_path):
 def db_magfield(
     datapath: Path,
     n_samples: int,
-    res: List[int],
-    spots: List = [10, 10, 5],
-    area: List = [1, 1, 0.5],
+    res: list[int],
+    spots: tuple = (10, 10, 5),
+    area: tuple = (1, 1, 0.5),
     gap: float = 0.05,
     seed: int = 0,
-    intv: Optional[List] = None,
+    intv: list | None = None,
     name: str = "magfield",
     empty: bool = False,
 ) -> None:
@@ -376,10 +379,11 @@ def db_magfield(
             xv, yv, zv = np.meshgrid(x_eval, y_eval, z_eval)
 
         else:
-            raise ValueError("Only 2-D and 3-D magnetic field can be generated!")
+            value_err = "Only 2-D and 3-D magnetic field can be generated!"
+            raise ValueError(value_err)
 
         pts_eval = np.hstack([xv.reshape(-1, 1), yv.reshape(-1, 1), zv.reshape(-1, 1)])
-        devnull = open("/dev/null", "w")
+        devnull = Path.open("/dev/null", "w")
         oldstdout_fno = os.dup(sys.stdout.fileno())
         os.dup2(devnull.fileno(), 1)
         _, h_out = run_simulation(tiles, pts_eval)
@@ -400,12 +404,12 @@ def db_magfield(
 def db_magfield_symm(
     datapath: Path,
     n_samples: int,
-    res: List[int],
-    spots: List = [10, 10, 5],
-    area: List = [1, 1, 0.5],
+    res: list[int],
+    spots: tuple = (10, 10, 5),
+    area: tuple = (1, 1, 0.5),
     gap: float = 0.05,
     seed: int = 0,
-    intv: Optional[List] = None,
+    intv: list | None = None,
     name: str = "magfield_symm",
     empty: bool = False,
 ) -> None:
@@ -491,10 +495,11 @@ def db_magfield_symm(
         )
 
         for i, pos in enumerate(filled_pos):
-            pos = np.asarray(pos)
-            if np.greater_equal(pos, spots).any():
-                raise ValueError(f"Desired position {pos} is not in the grid!")
-            tiles.offset = (np.around((pos + 0.5) * tile_size, decimals=9), i)
+            pos_np = np.asarray(pos)
+            if np.greater_equal(pos_np, spots).any():
+                value_err = f"Desired position {pos_np} is not in the grid!"
+                raise ValueError(value_err)
+            tiles.offset = (np.around((pos_np + 0.5) * tile_size, decimals=9), i)
 
         x_eval = np.linspace(s_x + gap, s_y + tile_size[0] - gap, res[0])
         y_eval = np.linspace(s_x + gap, s_y + tile_size[1] - gap, res[1])
@@ -510,10 +515,11 @@ def db_magfield_symm(
             xv, yv, zv = np.meshgrid(x_eval, y_eval, z_eval)
 
         else:
-            raise ValueError("Only 2-D and 3-D magnetic field can be generated!")
+            value_err = "Only 2-D and 3-D magnetic field can be generated!"
+            raise ValueError(value_err)
 
         pts_eval = np.hstack([xv.reshape(-1, 1), yv.reshape(-1, 1), zv.reshape(-1, 1)])
-        devnull = open("/dev/null", "w")
+        devnull = Path.open("/dev/null", "w")
         oldstdout_fno = os.dup(sys.stdout.fileno())
         os.dup2(devnull.fileno(), 1)
         _, h_out = run_simulation(tiles, pts_eval)
@@ -547,7 +553,7 @@ def db_single_magnets(
     height: float = 1,
     area_x: float = 10,
     seed: int = 0,
-    intv: Optional[List] = None,
+    intv: list | None = None,
     name: str = "mags",
     empty: bool = False,
 ) -> None:
@@ -560,9 +566,8 @@ def db_single_magnets(
         fname += f"_{intv[0]}_{intv[1]}"
     n_intv = intv[1] - intv[0]
 
-    if empty:
-        if Path(f"{datapath}/{fname}.h5").is_file():
-            input(f'Overwriting file "{fname}.h5". Press Enter to continue')
+    if empty and Path(f"{datapath}/{fname}.h5").is_file():
+        input(f'Overwriting file "{fname}.h5". Press Enter to continue')
 
     n_params = 6 if dim == 3 else 5
     if M_fixed:
@@ -642,7 +647,7 @@ def db_single_magnets(
             mag_angle=mag_angle,
             color=[1, 0, 0],
         )
-        devnull = open("/dev/null", "w")
+        devnull = Path.open("/dev/null", "w")
         oldstdout_fno = os.dup(sys.stdout.fileno())
         os.dup2(devnull.fileno(), 1)
         _, h_out = run_simulation(tile, pts_eval)
@@ -668,8 +673,8 @@ def db_single_magnets(
 
 def create_db_mp(
     data: str,
-    n_workers: Optional[int] = None,
-    datapath: Optional[Path] = None,
+    n_workers: int | None = None,
+    datapath: Path | None = None,
     **kwargs,
 ) -> None:
     if datapath is None:
@@ -689,7 +694,7 @@ def create_db_mp(
     elif data == "single_magnets":
         target = db_single_magnets
     else:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     db_name, n_tasks = target(**kwargs, empty=True)
 
@@ -731,7 +736,7 @@ def create_db_mp(
             Path(datapath, name).unlink()
 
         Path(datapath, f"{db_name}.h5").unlink()
-        exit(130)
+        sys.exit(130)
 
     path = datapath.glob("**/*")
     fnames = [
@@ -745,14 +750,12 @@ def create_db_mp(
             print(Path(datapath, name))
             with h5py.File(Path(datapath, name), mode="r") as db_s:
                 intv = db_s.attrs["intv"]
-                for key in db_s.keys():
+                for key in db_s:
                     db_t[key][intv[0] : intv[1]] = db_s[key]
             Path(datapath, name).unlink()
 
     print("Database created")
 
-
-# %%
 
 if __name__ == "__main__":
     # db_kwargs = {
@@ -790,5 +793,3 @@ if __name__ == "__main__":
     #     'dim': 3
     # }
     # create_db_mp('single_magnets', n_workers=5, **db_kwargs)
-
-# %%
