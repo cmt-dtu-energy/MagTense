@@ -201,7 +201,7 @@ jobs:
       - name: Compile MEX code using Matlab without CUDA and test
         uses: matlab-actions/run-command@v2
         with:
-          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; buildMagTenseMEX('USE_CUDA',false,'USE_CVODE',true,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','C:\actions-runner\_work\cvode\fortran','cvode_lib','C:\actions-runner\_work\cvode\lib'); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
+          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; buildMagTenseMEX('USE_CUDA',false,'USE_CVODE',true,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib'); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
           
        
       - name: Check created MEX-files
