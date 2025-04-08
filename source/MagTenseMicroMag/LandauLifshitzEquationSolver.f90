@@ -1041,7 +1041,6 @@
             
             !$OMP END PARALLEL DO
             
-            
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
             
             !call displayGUIMessage( 'Constructing the Tensormap' )

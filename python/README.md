@@ -23,6 +23,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
   Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment \
   *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.*
 
+- New conda environment with Python >= 3.12
   ```bash
   conda config --env --add channels nvidia/label/cuda-12.8.1
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
