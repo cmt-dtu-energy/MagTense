@@ -144,7 +144,7 @@ jobs:
       - name: Check files
         shell: bash -el {0}
         run: |
-          dir C:/actions-runner/_work/cvode
+          dir D:/a/MagTense/MagTense/cvode
 
 
       #- name: Setup Miniforge
