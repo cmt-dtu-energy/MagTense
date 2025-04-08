@@ -64,7 +64,6 @@ module UnstructuredMeshAnalysis
     real(dp), allocatable :: UminB(:), UmaxB(:), VminB(:), VmaxB(:)
     integer :: TheJ(3, 2), ThePM(2), TheEE(3, 3), TheNot(3, 2)
     integer, allocatable :: Aindex(:), Bindex(:), indexItContainsTrue(:,:), indexItContainsTrue_temp(:,:)
-    logical, allocatable :: ItContains(:,:), ItsContained(:,:), thisBoolean(:,:)
     real(dp), allocatable :: dimscopy(:,:)
     logical, allocatable :: SamePosAlongDim(:)
     logical, allocatable :: UAcontainsUB(:), VAcontainsVB(:), UBcontainsUA(:), VBcontainsVA(:)
@@ -240,7 +239,6 @@ module UnstructuredMeshAnalysis
             write (prog_str,'(I10)') (k1)
             call displayGUIMessage( prog_str )
             
-            !j = findloc(mask1D(:), VALUE = .true., DIM = 1)
             kMut_F_temp(k1,:) = [indexItContainsTrue(i,1), indexItContainsTrue(i,2)]
             k1 = k1+1
         else 
@@ -250,9 +248,8 @@ module UnstructuredMeshAnalysis
         
     end do
     deallocate(mask1D)
-    
-    call displayGUIMessage( 'Sjask' )
-            
+                
+    !Allocate temporary arrays to reduce the size of the original arrays
     allocate(kMut_F(k1-1,2))
     kMut_F(:,:) = 0
     kMut_F(1:(k1-1),:) = kMut_F_temp(1:(k1-1),:)
@@ -263,115 +260,30 @@ module UnstructuredMeshAnalysis
     kNonMut_F(1:(k2-1),:) = kNonMut_F_temp(1:(k2-1),:)
     deallocate(kNonMut_F_temp)   
     
-    
-    
-    open(21,file='kMut_F1.txt',status='unknown',form='formatted',action='write')
-    do i=1,size(kMut_F(:,1))
-        write(21,*)  kMut_F(i,1)
-    enddo
-    close(21)
-    
-    open(21,file='kMut_F2.txt',status='unknown',form='formatted',action='write')
-    do i=1,size(kMut_F(:,1))
-        write(21,*)  kMut_F(i,2)
-    enddo
-    close(21)
-    
-    open(21,file='kNonMut_F1.txt',status='unknown',form='formatted',action='write')
-    do i=1,size(kNonMut_F(:,1))
-        write(21,*)  kNonMut_F(i,1)
-    enddo
-    close(21)
-    
-    open(21,file='kNonMut_F2.txt',status='unknown',form='formatted',action='write')
-    do i=1,size(kNonMut_F(:,1))
-        write(21,*)  kNonMut_F(i,2)
-    enddo
-    close(21)
-       
-    allocate(ItContains(n_faces, n_faces), ItsContained(n_faces, n_faces), thisBoolean(n_faces, n_faces))
-    ItContains = .false.
-          
-    do i = 1,(indx-1)
-        ItContains(indexItContainsTrue(i,1),indexItContainsTrue(i,2))  = .true.
-    end do
-    
-    ! Remove faces containing other faces
-
-    ItsContained = transpose(ItContains)
+    iYes = kMut_F(:,1) > kMut_F(:,2)
         
-    thisBoolean = ItContains .and. ItsContained
-
-    k = count(thisBoolean)
-    allocate(k1Mut_temp(k))
-    allocate(k2Mut_temp(k))
-    k1Mut_temp(:) = 0
-    k2Mut_temp(:) = 0
-    
-    k = 1;
-    do i = 1,n_faces
-        do j = 1,n_faces
-            if (thisBoolean(j,i)) then
-                k1Mut_temp(k) = j 
-                k2Mut_temp(k) = i
-                k = k+1
-            end if
-        end do
-    end do
-   
-    allocate(iYes(k-1))
-    
-    iYes = k1Mut_temp > k2Mut_temp
-    
     allocate(k1Mut(count(iYes)))
     allocate(k2Mut(count(iYes)))
 
-    k1Mut = pack(k1Mut_temp,iYes)  
-    k2Mut = pack(k2Mut_temp,iYes) ! remove only one of the two
+    k1Mut = pack(kMut_F(:,1),iYes)  
+    k2Mut = pack(kMut_F(:,2),iYes)
     
-    thisBoolean(:,:) = ItContains(:,:)
-    do i = 1, n_faces
-        do j = 1, n_faces
-            if (ItContains(i, j)) then
-                thisBoolean(i, j) = .not. (ItsContained(i, j))
-            end if
-        end do
-    end do
     
-    allocate(k1NonMut(COUNT(thisBoolean)))
-    allocate(k2NonMut(COUNT(thisBoolean)))
-    k1NonMut(:) = 0
-    k2NonMut(:) = 0
-    k = 1
-    do i = 1,n_faces
-        do j = 1,n_faces
-            if (thisBoolean(j,i)) then
-                k1NonMut(k) = j 
-                k2NonMut(k) = i
-                k = k+1
-            end if
-        end do
-    end do
-    
-    allocate(kRmv(size(k1Mut)+size(k1NonMut)))
-    allocate(kSurv(size(k2Mut)+size(k2NonMut)))
-    allocate(nRmv(size(k2Mut)+size(k2NonMut)))
+    allocate(kRmv(size(k1Mut)+size(kNonMut_F(:,1))))
+    allocate(kSurv(size(k2Mut)+size(kNonMut_F(:,2))))
+    allocate(nRmv(size(k2Mut)+size(kNonMut_F(:,2))))
     
     ! each of the faces being removed has:
     !   kSurv: one or more surviving contained (or equal) faces
     !   one element (nRmv) having the face as one of its 6 original boundaries
-    kRmv  = [k1Mut, k1NonMut]
-    kSurv = [k2Mut, k2NonMut]
+    kRmv  = [k1Mut, kNonMut_F(:,1)]
+    kSurv = [k2Mut, kNonMut_F(:,2)]
     nRmv  = MOD(kRmv-1,Nel)+1
     
     TheSigns(nRmv,kSurv) = -1
 
     allocate(mask1D(n_faces))
     mask1D = .true.
-    
-    !do i=1,size(kRmv)
-    !    mask1D(kRmv(i)) = .false.
-    !end do
     mask1D(kRmv(:)) = .false.
     
     !As there are duplicate entries in kRmv, this is the way to know the unique number of elements
