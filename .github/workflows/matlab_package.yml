@@ -35,14 +35,14 @@ jobs:
           release: R2024b    
       
       - name: Use nvcc to build the CUDA file
-        if: ${{ CUDA-compile == 'CUDA' }}
+        if: ${{ matrix.CUDA-compile == 'CUDA' }}
         shell: bash -el {0}
         working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
         run: |
           nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64" -o MagTenseCudaBlas.o
 
       - name: Make the wrapper for the CUDA file using icx in a Developer PowerShell for VS 2022
-        if: ${{ CUDA-compile == 'CUDA' }}
+        if: ${{ matrix.CUDA-compile == 'CUDA' }}
         shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
         run: |
           cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
