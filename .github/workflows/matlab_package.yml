@@ -146,28 +146,6 @@ jobs:
         run: |
           dir D:/a/MagTense/MagTense/cvode
 
-
-      #- name: Setup Miniforge
-      #  uses: conda-incubator/setup-miniconda@v3
-      #  with:
-      #    miniforge-version: latest
-      #    activate-environment: magtense-env
-      #    use-mamba: true
-
-      #- name: Cache conda
-      #  uses: actions/cache@v4
-      #  env:
-      #    # Increase this value to reset cache manually
-      #    cache_number: 0
-      #  with:
-      #    path: ${{ env.CONDA }}\envs
-      #    key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
-      #  id: cache
-
-      #- name: Update environment if needed
-      #  run: conda env update -n magtense-env -f ${{ env.build_file }}
-      #  if: steps.cache.outputs.cache-hit != 'true'
-
       - name: Set up MATLAB R2024b
         uses: matlab-actions/setup-matlab@v2
         with:
@@ -201,7 +179,7 @@ jobs:
       - name: Compile MEX code using Matlab without CUDA and test
         uses: matlab-actions/run-command@v2
         with:
-          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; buildMagTenseMEX('USE_CUDA',false,'USE_CVODE',true,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib'); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
+          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; buildMagTenseMEX('USE_CUDA',false,'USE_CVODE',true,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib'); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false,'USE_CVODE',true); disp(int_error);
           
        
       - name: Check created MEX-files
