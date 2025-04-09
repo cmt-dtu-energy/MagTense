@@ -52,6 +52,9 @@ jobs:
           ls
       
       - name: Build MagTense .o-files with or without CUDA using Developer PowerShell for VS 2022
+        env:
+          CUDA: ${{ matrix.CUDA-compile == 'noCUDA' && '0' || '1' }}
+          CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
         shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
         run: |
           cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
@@ -59,7 +62,7 @@ jobs:
           conda info
           cd ${{ github.workspace }}
           pwd
-          make magnetostatic micromagnetism forceintegrator USE_CUDA=${{ matrix.CUDA-compile }} USE_CVODE=${{ matrix.CVODE-compile }} USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
+          make magnetostatic micromagnetism forceintegrator USE_CUDA=$CUDA USE_CVODE=$CVODE USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
       
       - name: Setup a symbolic link to the ifx compiler so that Matlab's "mex -setup FORTRAN" can find it
         shell: powershell
