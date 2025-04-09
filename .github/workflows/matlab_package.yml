@@ -4,10 +4,15 @@ on: [push, workflow_dispatch]
 
 jobs:
   build-windows:
+    strategy:
+      matrix:
+        CVODE-compile: [CUDA,noCUDA]
+        CUDA-compile: [CVODE,noCVODE]
     runs-on: [windows-latest]
+    needs: [build-cvode]
     env:
       build_file: python/.build/env-312-win.yml
-    steps:
+      steps:
       - uses: actions/checkout@v4
    
       - name: Setup Miniforge
@@ -17,34 +22,36 @@ jobs:
           activate-environment: magtense-env
           environment-file: ${{ env.build_file }}
           use-mamba: true
-
-      #- name: Setup Miniforge
-      #  uses: conda-incubator/setup-miniconda@v3
-      #  with:
-      #    miniforge-version: latest
-      #    activate-environment: magtense-env
-      #    use-mamba: true
-
-      #- name: Cache conda
-      #  uses: actions/cache@v4
-      #  env:
-      #    # Increase this value to reset cache manually
-      #    cache_number: 0
-      #  with:
-      #    path: ${{ env.CONDA }}\envs
-      #    key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
-      #  id: cache
-
-      #- name: Update environment if needed
-      #  run: conda env update -n magtense-env -f ${{ env.build_file }}
-      #  if: steps.cache.outputs.cache-hit != 'true'
+          
+      - name: Download cvode (sundials-7.2.1)
+        uses: actions/download-artifact@v4
+        with:
+          name: cvode-Windows
+          path: ${{ github.workspace }}/cvode/    
 
       - name: Set up MATLAB R2024b
         uses: matlab-actions/setup-matlab@v2
         with:
-          release: R2024b
-          
-      - name: Build MagTense .o-files without CUDA using Developer PowerShell for VS 2022
+          release: R2024b    
+      
+      - name: Use nvcc to build the CUDA file
+        if: ${{ CUDA-compile == '1' }}
+        shell: bash -el {0}
+        working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+        run: |
+          nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64" -o MagTenseCudaBlas.o
+
+      - name: Make the wrapper for the CUDA file using icx in a Developer PowerShell for VS 2022
+        if: ${{ CUDA-compile == '1' }}
+        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+        run: |
+          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
+          .\Launch-VsDevShell.ps1
+          cd ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
+          make wrap
+          ls
+      
+      - name: Build MagTense .o-files with or without CUDA using Developer PowerShell for VS 2022
         shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
         run: |
           cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
@@ -52,8 +59,8 @@ jobs:
           conda info
           cd ${{ github.workspace }}
           pwd
-          make magnetostatic micromagnetism forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
-            
+          make magnetostatic micromagnetism forceintegrator USE_CUDA=${{ matrix.CUDA-compile }} USE_CVODE=${{ matrix.CVODE-compile }} USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
+      
       - name: Setup a symbolic link to the ifx compiler so that Matlab's "mex -setup FORTRAN" can find it
         shell: powershell
         run: |
@@ -63,47 +70,14 @@ jobs:
           mkdir 2024.2 
           cd 2024.2 
           cmd /c mklink /D bin C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\bin 
-          
-      #- name: Check that the symbolic link has been created
-      #  shell: cmd /C CALL {0}
-      #  run: >-
-      #    dir C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\compiler\2024.2
       
       - name: Compile MEX code using Matlab without CUDA and test
+        env:
+          CUDA: ${{ matrix.CUDA-compile == 'noCUDA' && '0' || '1' }}
+          CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
         uses: matlab-actions/run-command@v2
         with:
-          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; buildMagTenseMEX('USE_CUDA',false,'USE_CVODE',false,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64'); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
-          
-      - name: Use nvcc to build the CUDA file
-        shell: bash -el {0}
-        working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
-        run: |
-          nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64" -o MagTenseCudaBlas.o
-
-      - name: Make the wrapper for the CUDA file using icx in a Developer PowerShell for VS 2022
-        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-        run: |
-          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-          .\Launch-VsDevShell.ps1
-          cd ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
-          make wrap
-          ls
-      
-      - name: Build MagTense .o-files with CUDA using Developer PowerShell for VS 2022 (and make clean also)
-        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-        run: |
-          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-          .\Launch-VsDevShell.ps1
-          conda info
-          cd ${{ github.workspace }}
-          pwd
-          make clean
-          make magnetostatic micromagnetism forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
-      
-      - name: Compile MEX code using Matlab with CUDA and test
-        uses: matlab-actions/run-command@v2
-        with:
-          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',false,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64');
+          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64');
        
       - name: Check created MEX-files
         shell: bash -el {0}
@@ -113,79 +87,8 @@ jobs:
       - name: Archive MEX-files
         uses: actions/upload-artifact@v4
         with:
-          name: MEX-Windows
-          path: D:/a/MagTense/MagTense/matlab/MEX_files/*
-          
-          
-          
-          
-  build-windows-CVODE:
-    runs-on: [windows-latest]
-    needs: [build-cvode]
-    env:
-      build_file: python/.build/env-312-win.yml
-    steps:
-      - uses: actions/checkout@v4
-   
-      - name: Setup Miniforge
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: latest
-          activate-environment: magtense-env
-          environment-file: ${{ env.build_file }}
-          use-mamba: true
-
-      - name: Download cvode (sundials-7.2.1)
-        uses: actions/download-artifact@v4
-        with:
-          name: cvode-Windows
-          path: ${{ github.workspace }}/cvode/
-          
-      - name: Check files
-        shell: bash -el {0}
-        run: |
-          dir D:/a/MagTense/MagTense/cvode
-
-      - name: Set up MATLAB R2024b
-        uses: matlab-actions/setup-matlab@v2
-        with:
-          release: R2024b
-          
-      - name: Build MagTense .o-files without CUDA using Developer PowerShell for VS 2022
-        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-        run: |
-          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-          .\Launch-VsDevShell.ps1
-          conda info
-          cd ${{ github.workspace }}
-          pwd
-          make magnetostatic micromagnetism forceintegrator USE_CUDA=0 USE_CVODE=1 USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
-            
-      - name: Setup a symbolic link to the ifx compiler so that Matlab's "mex -setup FORTRAN" can find it
-        shell: powershell
-        run: |
-          cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library 
-          mkdir compiler 
-          cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\compiler
-          mkdir 2024.2 
-          cd 2024.2 
-          cmd /c mklink /D bin C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\bin 
-          
-      #- name: Check that the symbolic link has been created
-      #  shell: cmd /C CALL {0}
-      #  run: >-
-      #    dir C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\compiler\2024.2
-      
-      - name: Compile MEX code using Matlab without CUDA and test
-        uses: matlab-actions/run-command@v2
-        with:
-          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; buildMagTenseMEX('USE_CUDA',false,'USE_CVODE',true,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib'); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false,'USE_CVODE',true); disp(int_error);
-          
-       
-      - name: Check created MEX-files
-        shell: bash -el {0}
-        run: |
-          dir D:/a/MagTense/MagTense/matlab/MEX_files
+          name: MEX-Windows_${{ matrix.CVODE-compile}}_${{ matrix.CUDA-compile}}
+          path: D:/a/MagTense/MagTense/matlab/MEX_files/*         
       
 ###
 
@@ -193,8 +96,16 @@ jobs:
     strategy:
       matrix:
         mat-version: [R2023a,R2023b,R2024a,R2024b]
-        cuda-version: [CUDA,noCUDA]
-    runs-on: [ self-hosted, Windows, "${{ matrix.cuda-version }}"]
+        CUDA-compile: [CUDA,noCUDA]
+        CVODE-compile: [CVODE,noCVODE]
+        CUDA-run: [CUDA,noCUDA]
+        CVODE-run: [CVODE,noCVODE]
+        exclude:
+        - CUDA-compile: noCUDA
+          CUDA-run: CUDA
+        - CVODE-compile: noCVODE
+          CVODE-run: CVODE       
+    runs-on: [ self-hosted, Windows, "${{ matrix.CUDA-run }}"]
     needs: build-windows
     defaults:
       run:
@@ -211,7 +122,7 @@ jobs:
     - name: Download the MEX files as an artifact
       uses: actions/download-artifact@v4
       with:
-        name: MEX-Windows
+        name: MEX-Windows_${{ matrix.CVODE-compile}}_${{ matrix.CUDA-compile}}
         path: ${{ github.workspace }}/matlab/MEX_files
         
     - name: Check that the MEX-files are there    
@@ -221,10 +132,11 @@ jobs:
     
     - name: Run different Matlab versions and test the MEX-files with and without CUDA
       env:
-        CUDA: ${{ matrix.cuda-version == 'noCUDA' && '0' || '1' }} 
+        CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }} 
+        CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }} 
       shell: cmd /C CALL {0}
       run: |
-        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "USE_CUDA = str2num(getenv('CUDA')); cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA)"
+        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE)"
           
   #################################
   
