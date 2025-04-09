@@ -12,7 +12,7 @@ jobs:
     needs: [build-cvode]
     env:
       build_file: python/.build/env-312-win.yml
-      steps:
+    steps:
       - uses: actions/checkout@v4
    
       - name: Setup Miniforge
