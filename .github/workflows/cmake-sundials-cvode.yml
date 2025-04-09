@@ -67,7 +67,7 @@ jobs:
     - name: Build and install
       run: |
         cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --verbose
-        cmake --install ${{github.workspace}}/build --verbose
+        cmake --install ${{github.workspace}}/build --verbose     
 
     - name: Archive cvode libraries
       uses: actions/upload-artifact@v4

@@ -13,8 +13,8 @@ arguments
     options.cuda_root     = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\lib\x64"';
     % options.cvode_include = '"C:\Program Files (x86)\sundials-4.1.0\instdir\fortran"';
     % options.cvode_lib     = '"C:\Program Files (x86)\sundials-4.1.0\instdir\lib"';
-    options.cvode_include = '"D:\Magnetism\MagTense\Sundials_CVODE\sundials-7.2.1\fortran"';
-    options.cvode_lib     = '"D:\Magnetism\MagTense\Sundials_CVODE\sundials-7.2.1\lib"';
+    options.cvode_include = '"C:\Program Files (x86)\SUNDIALS\fortran"';
+    options.cvode_lib     = '"C:\Program Files (x86)\SUNDIALS\lib"';
     
     options.VS_STUDIO {mustBeNumericOrLogical} = false;
 end
@@ -68,8 +68,8 @@ else
     mkl_root = [pre_str '/envs/magtense-env'];
     mkl_lib = [pre_str '/envs/magtense-env/lib'];
     cuda_root = [pre_str '/envs/magtense-env/lib'];
-    cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
-    cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
+    cvode_include = '/home/runner/work/MagTense/MagTense/cvode/fortran';
+    cvode_lib = '/home/runner/work/MagTense/MagTense/cvode/lib';
     mex_suffix = 'a';
 end
 
@@ -101,14 +101,18 @@ else
 end
 
 if (USE_CVODE)
-    CVODE_include = join(['-I' cvode_include], '');
+    CVODE_include = join([' -I' cvode_include ' -I/home/runner/work/MagTense/MagTense/cvode/include/cvode'], '');
     % CVODE = ['-L' cvode_lib ' -lsundials_nvecserial -lsundials_sunmatrixdense -lsundials_sunlinsoldense' ...
     % ' -lsundials_fnvecserial_mod -lsundials_cvode -lsundials_fsunnonlinsolfixedpoint_mod'];
     % CVODE = ['-L' cvode_lib ' -lsundials_nvecserial_static -lsundials_sunmatrixdense_static -lsundials_sunlinsoldense_static' ...
     % ' -lsundials_fnvecserial_mod_static -lsundials_cvode_static -lsundials_fsunnonlinsolfixedpoint_mod_static'];
 
-    CVODE = ['-L' cvode_lib ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static'];
-
+    if (ispc)
+        CVODE = ['-L' cvode_lib ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static'];
+        CVODE = [CVODE ' LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"'];
+    else
+        CVODE = [' -Wl,--start-group ' cvode_lib '/libsundials_core.a ' cvode_lib '/libsundials_cvode.a ' cvode_lib '/libsundials_fcore_mod.a ' cvode_lib '/libsundials_fcvode_mod.a ' cvode_lib '/libsundials_fnvecserial_mod.a ' cvode_lib '/libsundials_fsunmatrixdense_mod.a ' cvode_lib '/libsundials_fsunlinsolspgmr_mod.a' ' -Wl,--end-group'];
+    end
 else
     CVODE_include = '';
     CVODE = '';
@@ -158,10 +162,6 @@ else
                mkl_lib '/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl -static-intel'''];
         MKL = [];
         %INCLUDE = [INCLUDE '/include/intel64/lp64 '];
-        if (USE_CUDA)
-            LIBS = [LIBS(1:(end-1)) ' ' CUDA ''''];
-            CUDA = '';
-        end
     else
         MKL = ['-L' mkl_root '/lib/intel64 -lmkl_rt -lpthread -lm -ldl '];
         if (USE_CUDA)
@@ -172,6 +172,16 @@ else
             INCLUDE = [INCLUDE '/include/intel64/ilp64 '];
             MKL = [MKL '-lmkl_blas95_ilp64'];
         end
+    end
+
+    %Be sure to include the libraries under the ' in the string
+    if (USE_CUDA)
+        LIBS = [LIBS(1:(end-1)) ' ' CUDA ''''];
+        CUDA = '';
+    end
+    if (USE_CVODE)
+        LIBS = [LIBS(1:(end-1)) ' ' CVODE ''''];
+        CVODE = '';
     end
     INCLUDE = [INCLUDE CVODE_include '"'];
     FFLAGS = ['FFLAGS="-O3 -fpp -real-size 64 -fpe0 -fp-model=source -fPIC -nologo -diag-disable 10006"'];
