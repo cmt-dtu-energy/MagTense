@@ -74,13 +74,13 @@ jobs:
           cd 2024.2 
           cmd /c mklink /D bin C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\bin 
       
-      - name: Compile MEX code using Matlab without CUDA and test
+      - name: Compile MEX code using Matlab with or without CUDA
         env:
           CUDA: ${{ matrix.CUDA-compile == 'noCUDA' && '0' || '1' }}
           CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
         uses: matlab-actions/run-command@v2
         with:
-          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib');
+          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_RELEASE',true,'USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib');
        
       - name: Check created MEX-files
         shell: bash -el {0}
@@ -150,6 +150,8 @@ jobs:
       matrix:
         py-version: [312]
         mat-version: [R2024a]
+        CVODE-compile: [CVODE,noCVODE]
+        CUDA-compile: [CUDA,noCUDA]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -194,44 +196,29 @@ jobs:
       with:
         release: R2024b    
 
-    - name: Compile Fortran source code with CUDA including R2024a
+    - name: Compile Fortran source code with CUDA including R2024X
       if: ${{ matrix.mat-version == 'R2024a' }}
+      env:
+          CUDA: ${{ matrix.CUDA-compile == 'noCUDA' && '0' || '1' }}
+          CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
+          MATLAB: ${{ matrix.mat-version == 'R2024a' && '1' || '2' }}
       working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include
-
-    - name: Compile Fortran source code with CUDA including R2024b
-      if: ${{ matrix.mat-version == 'R2024b' }}
-      working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include 
-
+      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=$env:CUDA USE_CVODE=$env:CVODE USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.$env:MATLAB.999/x64/extern/include
+      #MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include for 2024a
+      #MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include for 2024b 
+   
     - name: Compile MEX code using Matlab with CUDA
+      env:
+          CUDA: ${{ matrix.CUDA-compile == 'noCUDA' && '0' || '1' }}
+          CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
       uses: matlab-actions/run-command@v2
       with:
-        command: cd('matlab'); buildMagTenseMEX('USE_RELEASE', true, 'USE_CUDA', true, 'USE_CVODE', false);
-
-    - name: Clean up the source files
-      working-directory: ${{ github.workspace }}
-      run: make clean
-
-    - name: Compile Fortran source code without CUDA using R2024a
-      if: ${{ matrix.mat-version == 'R2024a' }}
-      working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include
-
-    - name: Compile Fortran source code without CUDA using R2024b
-      if: ${{ matrix.mat-version == 'R2024b' }}
-      working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=0 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include
-
-    - name: Compile MEX code using Matlab without CUDA and test
-      uses: matlab-actions/run-command@v2
-      with:
-        command: cd('matlab'); buildMagTenseMEX('USE_RELEASE', true, 'USE_CUDA', false, 'USE_CVODE', false); cd('examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
+        command: cd('matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); buildMagTenseMEX('USE_RELEASE', true, 'USE_CUDA', USE_CUDA, 'USE_CVODE', USE_CVODE);  
 
     - name: Archive MEX-files
       uses: actions/upload-artifact@v4
       with:
-        name: MEX-Linux
+        name: MEX-Linux_${{ matrix.CVODE-compile}}_${{ matrix.CUDA-compile}}
         path: ${{ github.workspace }}/matlab/MEX_files/*
 
 ###
@@ -240,7 +227,18 @@ jobs:
     strategy:
       matrix:
         mat-version: [R2023a,R2023b,R2024a] #Note that R2024b always crashes with segmentation fault
-        os-version: [ubuntu-22.04,ubuntu-latest]
+        os-version: [ubuntu-latest]
+        CUDA-compile: [CUDA,noCUDA]
+        CVODE-compile: [CVODE,noCVODE]
+        CUDA-run: [noCUDA] #[CUDA,noCUDA]
+        CVODE-run: [CVODE,noCVODE]
+        exclude:
+        - CUDA-compile: noCUDA
+          CUDA-run: CUDA
+        - CUDA-compile: CUDA
+          CUDA-run: noCUDA
+        - CVODE-compile: noCVODE
+          CVODE-run: CVODE 
     runs-on: ["${{ matrix.os-version }}"]
     needs: build-linux
     defaults:
@@ -258,7 +256,7 @@ jobs:
     - name: Download the MEX files as an artifact
       uses: actions/download-artifact@v4
       with:
-        name: MEX-Linux
+        name: MEX-Linux_${{ matrix.CVODE-compile}}_${{ matrix.CUDA-compile}}
         path: ${{ github.workspace }}/matlab/MEX_files
 
     - name: Set up MATLAB
@@ -268,8 +266,11 @@ jobs:
 
     - name: Run test script on download MEX-file without CUDA
       uses: matlab-actions/run-command@v2
+      env:
+        CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }} 
+        CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }} 
       with:
-        command: cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',false); disp(int_error);
+        command: USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE); disp(int_error);
 
   build-cvode:
     name: cvode
