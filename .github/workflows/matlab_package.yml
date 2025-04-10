@@ -185,8 +185,8 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
 
     - name: Download cvode (sundials-7.2.1)
-        uses: actions/download-artifact@v4
-        with:
+      uses: actions/download-artifact@v4
+      with:
           name: cvode-Linux
           path: ${{ github.workspace }}/cvode/
 
