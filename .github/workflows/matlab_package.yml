@@ -153,6 +153,7 @@ jobs:
         CVODE-compile: [CVODE,noCVODE]
         CUDA-compile: [CUDA,noCUDA]
     runs-on: ubuntu-latest
+    needs: [build-cvode]
     defaults:
       run:
         shell: bash -el {0}
