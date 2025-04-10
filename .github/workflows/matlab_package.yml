@@ -106,6 +106,8 @@ jobs:
         exclude:
         - CUDA-compile: noCUDA
           CUDA-run: CUDA
+        - CUDA-compile: CUDA
+          CUDA-run: noCUDA
         - CVODE-compile: noCVODE
           CVODE-run: CVODE       
     runs-on: [ self-hosted, Windows, "${{ matrix.CUDA-run }}"]
