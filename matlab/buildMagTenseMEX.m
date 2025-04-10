@@ -13,8 +13,8 @@ arguments
     options.cuda_root     = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\lib\x64"';
     % options.cvode_include = '"C:\Program Files (x86)\sundials-4.1.0\instdir\fortran"';
     % options.cvode_lib     = '"C:\Program Files (x86)\sundials-4.1.0\instdir\lib"';
-    options.cvode_include = '"D:\Magnetism\MagTense\Sundials_CVODE\sundials-7.2.1\fortran"';
-    options.cvode_lib     = '"D:\Magnetism\MagTense\Sundials_CVODE\sundials-7.2.1\lib"';
+    options.cvode_include = '"C:\Program Files (x86)\SUNDIALS\fortran"';
+    options.cvode_lib     = '"C:\Program Files (x86)\SUNDIALS\lib"';
     
     options.VS_STUDIO {mustBeNumericOrLogical} = false;
 end
@@ -107,7 +107,7 @@ if (USE_CVODE)
     % CVODE = ['-L' cvode_lib ' -lsundials_nvecserial_static -lsundials_sunmatrixdense_static -lsundials_sunlinsoldense_static' ...
     % ' -lsundials_fnvecserial_mod_static -lsundials_cvode_static -lsundials_fsunnonlinsolfixedpoint_mod_static'];
 
-    CVODE = ['-L' cvode_lib ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static'];
+    CVODE = ['-L' cvode_lib ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"'];
 
 else
     CVODE_include = '';
