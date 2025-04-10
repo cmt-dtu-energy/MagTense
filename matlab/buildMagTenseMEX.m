@@ -107,8 +107,10 @@ if (USE_CVODE)
     % CVODE = ['-L' cvode_lib ' -lsundials_nvecserial_static -lsundials_sunmatrixdense_static -lsundials_sunlinsoldense_static' ...
     % ' -lsundials_fnvecserial_mod_static -lsundials_cvode_static -lsundials_fsunnonlinsolfixedpoint_mod_static'];
 
-    CVODE = ['-L' cvode_lib ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"'];
-
+    CVODE = ['-L' cvode_lib ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static'];
+    if (ispc)
+        CVODE = [CVODE ' LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"'];
+    end
 else
     CVODE_include = '';
     CVODE = '';
