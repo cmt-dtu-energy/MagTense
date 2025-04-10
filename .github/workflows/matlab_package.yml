@@ -62,7 +62,7 @@ jobs:
           conda info
           cd ${{ github.workspace }}
           pwd
-          make magnetostatic micromagnetism forceintegrator USE_CUDA=$CUDA USE_CVODE=$CVODE USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
+          make magnetostatic micromagnetism forceintegrator USE_CUDA=$env:CUDA USE_CVODE=$env:CVODE USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
       
       - name: Setup a symbolic link to the ifx compiler so that Matlab's "mex -setup FORTRAN" can find it
         shell: powershell
