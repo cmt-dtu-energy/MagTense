@@ -111,7 +111,7 @@ if (USE_CVODE)
         CVODE = ['-L' cvode_lib ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static'];
         CVODE = [CVODE ' LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"'];
     else
-        CVODE = ['-L' cvode_lib ' -lsundials_core -lsundials_cvode -lsundials_fcore_mod -lsundials_fcvode_mod -lsundials_fnvecserial_mod -lsundials_fsunmatrixdense_mod -lsundials_fsunlinsolspgmr_mod'];
+        CVODE = ['-L' cvode_lib ' sundials_core.a sundials_cvode.a sundials_fcore_mod.a sundials_fcvode_mod.a sundials_fnvecserial_mod.a sundials_fsunmatrixdense_mod.a sundials_fsunlinsolspgmr_mod.a'];
     end
 else
     CVODE_include = '';
