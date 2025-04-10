@@ -4,9 +4,24 @@ on: [push]
 
 jobs:
   customized-win-shells:
+    strategy:
+      matrix:
+        CVODE-compile: [CVODE,noCVODE]
+        CUDA-compile: [CUDA,noCUDA]
     runs-on: windows-latest
 
     steps:
+    - name: Test
+        env:
+          CUDA: ${{ matrix.CUDA-compile == 'noCUDA' && '0' || '1' }}
+          CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
+        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+        run: |
+          cd ${{ github.workspace }}
+          pwd
+          $env:CUDA 
+          $env:CVODE
+        
     - name: Dir
       shell: cmd /C CALL {0}
       run: |
