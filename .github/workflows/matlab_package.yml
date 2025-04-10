@@ -80,7 +80,7 @@ jobs:
           CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
         uses: matlab-actions/run-command@v2
         with:
-          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); pwd; dir; USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_RELEASE',true,'USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib');
+          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_RELEASE',true,'USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib');
        
       - name: Check created MEX-files
         shell: bash -el {0}
@@ -203,7 +203,7 @@ jobs:
           CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
           MATLAB: ${{ matrix.mat-version == 'R2024a' && '1' || '2' }}
       working-directory: ${{ github.workspace }}
-      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=$env:CUDA USE_CVODE=$env:CVODE USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.$env:MATLAB.999/x64/extern/include
+      run: make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=$CUDA USE_CVODE=$CVODE USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.$MATLAB.999/x64/extern/include
       #MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include for 2024a
       #MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include for 2024b 
    
