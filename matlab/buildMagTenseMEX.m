@@ -108,7 +108,7 @@ if (USE_CVODE)
     % ' -lsundials_fnvecserial_mod_static -lsundials_cvode_static -lsundials_fsunnonlinsolfixedpoint_mod_static'];
 
     if (ispc)
-        CVODE = ['-L' cvode_lib ' -Wl,--start-group ' ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static' ' -Wl,--end-group'];
+        CVODE = ['-L' cvode_lib ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static'];
         CVODE = [CVODE ' LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"'];
     else
         CVODE = [' -Wl,--start-group ' cvode_lib '/libsundials_core.a ' cvode_lib '/libsundials_cvode.a ' cvode_lib '/libsundials_fcore_mod.a ' cvode_lib '/libsundials_fcvode_mod.a ' cvode_lib '/libsundials_fnvecserial_mod.a ' cvode_lib '/libsundials_fsunmatrixdense_mod.a ' cvode_lib '/libsundials_fsunlinsolspgmr_mod.a' ' -Wl,--end-group'];
@@ -129,6 +129,7 @@ else
     BUILD = ' ';
     BUILD_MagTenseMicroMag = ' ';
 end
+
 
 if (ispc)
     DEFINES = '-R2018a';
