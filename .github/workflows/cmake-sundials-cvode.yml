@@ -72,7 +72,12 @@ jobs:
     - name: Examine
       if: ${{ runner.os == 'Linux' }}
       run: |
-        ls ${{github.workspace}}/install/lib  
+        ls ${{github.workspace}}/install/lib
+        
+    - name: Examine2
+      if: ${{ runner.os == 'Linux' }}
+      run: |
+        nm -g /home/runner/work/MagTense/MagTense/cvode/lib/libsundials_cvode.a | grep CVodeSetMaxHnilWarns        
 
     - name: Archive cvode libraries
       uses: actions/upload-artifact@v4
