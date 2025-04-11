@@ -203,7 +203,7 @@ for i = 1:length(names)
         source = [mex_root names(i) '_mex.f90'];
         orig_name = names(i);
     end
-    mex_str = ['LDFLAGS="-v"' 'mex' DEBUG DEFINES FFLAGS INCLUDE OBJS LIBS MKL CUDA CVODE join(source, '')];
+    mex_str = ['mex' DEBUG DEFINES FFLAGS ' LDFLAGS="-v" ' INCLUDE OBJS LIBS MKL CUDA CVODE join(source, '')];
 
     disp(join(mex_str, ' '))
     eval_MEX(join(mex_str, ' '))
