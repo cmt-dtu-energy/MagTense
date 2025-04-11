@@ -8,8 +8,8 @@ jobs:
       matrix:
         py-version: [312]
         mat-version: [R2024a]
-        CVODE-compile: [CVODE,noCVODE]
-        CUDA-compile: [CUDA,noCUDA]
+        CVODE-compile: [CVODE]
+        CUDA-compile: [noCUDA]
     runs-on: ubuntu-latest
     needs: [build-cvode]
     defaults:
@@ -85,8 +85,8 @@ jobs:
       matrix:
         mat-version: [R2023a,R2023b,R2024a] #Note that R2024b always crashes with segmentation fault
         os-version: [ubuntu-latest]
-        CUDA-compile: [CUDA,noCUDA]
-        CVODE-compile: [CVODE,noCVODE]
+        CUDA-compile: [noCUDA]
+        CVODE-compile: [CVODE]
         CUDA-run: [noCUDA] #[CUDA,noCUDA]
         CVODE-run: [CVODE,noCVODE]
         exclude:
