@@ -36,6 +36,8 @@ ifeq ($(USE_CVODE),0)
 	CVODE_OPT =
 else
 	CVODE_OPT = -I${CVODE_ROOT}/fortran
+	CVODE_OPT2 =  -I${CVODE_ROOT}/include
+	CVODE_OPT3 =  -I${CVODE_ROOT}/include/cvode
 endif
 
 ifeq ($(USE_MATLAB),0)
@@ -55,7 +57,7 @@ clean:
 	-rm -f *${LIB_SUFFIX} *.o *.mod
 
 .f90.o:
-	$(FC) $(FFLAGS) ${OPT} ${CVODE_OPT} ${MATLAB_OPT} -c $< -o $@
+	$(FC) $(FFLAGS) ${OPT} ${CVODE_OPT} ${CVODE_OPT2} ${CVODE_OPT3} ${MATLAB_OPT} -c $< -o $@
 
 ${STATIC_LIB}: ${LIBSRC_OBJECTS}
 	${LIBTOOL}
