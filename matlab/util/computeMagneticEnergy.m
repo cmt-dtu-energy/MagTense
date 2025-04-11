@@ -10,8 +10,7 @@ function [E_dem_red, E_exc_red, E_ani_red, E_ext_red] = computeMagneticEnergy(so
                 m(i,:,j,k) = mu0*Ms.*(Vols'.*solution.M(i,:,j,k));
             end
         end
-    end
-    
+    end  
     
     %--- Calculate the energy terms normalized to the volume elements      
     E_exc = sum((1/2)*(m(:,:,:,1).*solution.H_exc(:,:,:,1) + m(:,:,:,2).*solution.H_exc(:,:,:,2) + m(:,:,:,3).*solution.H_exc(:,:,:,3)),2) ; % [J]       
