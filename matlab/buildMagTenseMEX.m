@@ -101,7 +101,7 @@ else
 end
 
 if (USE_CVODE)
-    CVODE_include = join([' -I' cvode_include ' -I/home/runner/work/MagTense/MagTense/cvode/include'], '');
+    CVODE_include = join([' -I' cvode_include ' -I/home/runner/work/MagTense/MagTense/cvode/include/cvode'], '');
     % CVODE = ['-L' cvode_lib ' -lsundials_nvecserial -lsundials_sunmatrixdense -lsundials_sunlinsoldense' ...
     % ' -lsundials_fnvecserial_mod -lsundials_cvode -lsundials_fsunnonlinsolfixedpoint_mod'];
     % CVODE = ['-L' cvode_lib ' -lsundials_nvecserial_static -lsundials_sunmatrixdense_static -lsundials_sunlinsoldense_static' ...
@@ -111,7 +111,7 @@ if (USE_CVODE)
         CVODE = ['-L' cvode_lib ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static'];
         CVODE = [CVODE ' LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"'];
     else
-        CVODE = [' ' cvode_lib '/libsundials_core.a ' cvode_lib '/libsundials_cvode.a ' cvode_lib '/libsundials_fcore_mod.a ' cvode_lib '/libsundials_fcvode_mod.a ' cvode_lib '/libsundials_fnvecserial_mod.a ' cvode_lib '/libsundials_fsunmatrixdense_mod.a ' cvode_lib '/libsundials_fsunlinsolspgmr_mod.a'];
+        CVODE = [cvode_lib '/libsundials_core.a ' cvode_lib '/libsundials_cvode.a ' cvode_lib '/libsundials_fcore_mod.a ' cvode_lib '/libsundials_fcvode_mod.a ' cvode_lib '/libsundials_fnvecserial_mod.a ' cvode_lib '/libsundials_fsunmatrixdense_mod.a ' cvode_lib '/libsundials_fsunlinsolspgmr_mod.a'];
     end
 else
     CVODE_include = '';
