@@ -101,7 +101,7 @@ else
 end
 
 if (USE_CVODE)
-    CVODE_include = join([' -I' cvode_include], '');
+    CVODE_include = join([' -I' cvode_include ' -I/home/runner/work/MagTense/MagTense/cvode/include'], '');
     % CVODE = ['-L' cvode_lib ' -lsundials_nvecserial -lsundials_sunmatrixdense -lsundials_sunlinsoldense' ...
     % ' -lsundials_fnvecserial_mod -lsundials_cvode -lsundials_fsunnonlinsolfixedpoint_mod'];
     % CVODE = ['-L' cvode_lib ' -lsundials_nvecserial_static -lsundials_sunmatrixdense_static -lsundials_sunlinsoldense_static' ...
