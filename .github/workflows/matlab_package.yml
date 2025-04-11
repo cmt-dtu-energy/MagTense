@@ -72,12 +72,6 @@ jobs:
       with:
         command: cd('matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); buildMagTenseMEX('USE_RELEASE', true, 'USE_CUDA', USE_CUDA, 'USE_CVODE', USE_CVODE);  
 
-
-    - name: Examine2
-      if: ${{ runner.os == 'Linux' }}
-      run: |
-        ldd /home/runner/work/MagTense/MagTense/matlab/MEX_files/MagTenseLandauLifshitzSolverNoCUDA_mex.mexa64
-
     - name: Archive MEX-files
       uses: actions/upload-artifact@v4
       with:

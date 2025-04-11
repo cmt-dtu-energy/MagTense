@@ -67,17 +67,7 @@ jobs:
     - name: Build and install
       run: |
         cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --verbose
-        cmake --install ${{github.workspace}}/build --verbose
-        
-    - name: Examine
-      if: ${{ runner.os == 'Linux' }}
-      run: |
-        ls ${{github.workspace}}/install/lib
-        
-    - name: Examine2
-      if: ${{ runner.os == 'Linux' }}
-      run: |
-        nm -g /home/runner/work/MagTense/MagTense/install/lib/libsundials_cvode.a | grep CVodeSetMaxHnilWarns        
+        cmake --install ${{github.workspace}}/build --verbose     
 
     - name: Archive cvode libraries
       uses: actions/upload-artifact@v4
