@@ -1,6 +1,6 @@
 
 %%This function compares MagTense to a FEM simulations for a single permanent magnet.
-function [int_error] = MagTense_Validation_prism()
+function [rel_int_error] = MagTense_Validation_prism()
 %Return the integrated error, to enable check for consistency
 
 %make sure to source the right path for the generic Matlab routines
@@ -101,17 +101,13 @@ set(h_l,'fontsize',10);
 ylabel('|\mu_0{}H| [T]');
 xlabel('x, y or z [m]');
 
-% Interpolate the MagTense solution to the NIST-published solutions and
-% calculate the difference between the results as an integral.
-FEM_interp(:,1) = interp1(data_FEM_x(:,1),data_FEM_x(:,2),x,'linear','extrap');
-FEM_interp(:,2) = interp1(data_FEM_y(:,1),data_FEM_y(:,2),y,'linear','extrap');
-FEM_interp(:,3) = interp1(data_FEM_z(:,1),data_FEM_z(:,2),z,'linear','extrap');
-int_error(1) = trapz(x,abs(FEM_interp(:,1)-Hnorm_along_x));
-int_error(2) = trapz(y,abs(FEM_interp(:,2)-Hnorm_along_y));
-int_error(3) = trapz(z,abs(FEM_interp(:,3)-Hnorm_along_z));
+% Interpolate the MagTense solution to the FEM solution and calculate the relative error in percent
+rel_int_error(1) = calculate_relative_integral_error(data_FEM_x(:,1),data_FEM_x(:,2),x,Hnorm_along_x);
+rel_int_error(2) = calculate_relative_integral_error(data_FEM_y(:,1),data_FEM_y(:,2),y,Hnorm_along_y);
+rel_int_error(3) = calculate_relative_integral_error(data_FEM_z(:,1),data_FEM_z(:,2),z,Hnorm_along_z);
 
 pointwise_error = [abs(interp1(data_FEM_x(:,1),data_FEM_x(:,2),x,'linear','extrap')'-Hnorm_along_x); abs(interp1(data_FEM_y(:,1),data_FEM_y(:,2),y,'linear','extrap')'-Hnorm_along_y); abs(interp1(data_FEM_z(:,1),data_FEM_z(:,2),z,'linear','extrap')'-Hnorm_along_z)];
 disp(['Mean error between MagTense and FEM = ' num2str(mean(pointwise_error)) '+/-' num2str(std(pointwise_error))])
-disp(['Integrated error between MagTense and FEM is Mx = ' num2str(int_error(1)) ', My = ' num2str(int_error(2)) ', Mz = ' num2str(int_error(3)) ])
+disp(['Relative integrated error between MagTense and FEM is Mx = ' num2str(rel_int_error(1)) ', My = ' num2str(rel_int_error(2)) ', Mz = ' num2str(rel_int_error(3)) ])
 
 end
