@@ -1,8 +1,7 @@
 #=======================================================================
 #                       compiler names and flags
 #=======================================================================
-# FC = ifx
-FC = gfortran
+FC = ifx
 USE_CVODE =
 CVODE_ROOT =
 USE_MATLAB =
@@ -18,7 +17,7 @@ LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
-	LIBTOOL = LIB $? /NOLOGO /OUT:$@
+	LIBTOOL = LIB $? /OUT:$@
 	LIB_SUFFIX = .lib
 	
 else
@@ -36,13 +35,13 @@ STATIC_LIB = libNumericalIntegration${LIB_SUFFIX}
 ifeq ($(USE_CVODE),0)
 	CVODE_OPT =
 else
-	CVODE_OPT = -I"${CVODE_ROOT}"/fortran
+	CVODE_OPT = -I${CVODE_ROOT}/fortran
 endif
 
 ifeq ($(USE_MATLAB),0)
 	MATLAB_OPT =
 else
-	MATLAB_OPT = -I"${MATLAB_INCLUDE}"
+	MATLAB_OPT = -I${MATLAB_INCLUDE}
 endif
 #=======================================================================
 #							Targets

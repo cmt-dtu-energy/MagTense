@@ -1,7 +1,20 @@
+import os
 import shutil
+from pathlib import Path
+
 import numpy as np
 
-from typing import Optional, Union, List
+# Windows only
+if hasattr(os, "add_dll_directory"):
+    mkl_path = Path(__file__).parent / ".." / ".." / ".." / "Library" / "bin"
+    if Path.is_dir(mkl_path):
+        os.add_dll_directory(mkl_path)
+
+    nvidia_path = Path(__file__).parent / ".." / "nvidia"
+    for lib in ["cublas", "cuda_runtime", "cusparse", "nvjitlink"]:
+        if Path.is_dir(nvidia_path / lib / "bin"):
+            os.add_dll_directory(nvidia_path / lib / "bin")
+
 from magtense.lib import magtensesource
 
 
@@ -45,13 +58,13 @@ class MicromagProblem:
 
     def __init__(
         self,
-        res: List[int],
-        grid_L: List[int] = [500e-9, 125e-9, 3e-9],
+        res: list[int],
+        grid_L: tuple[float] = (500e-9, 125e-9, 3e-9),
         grid_nnod: int = 0,
-        grid_type: Optional[str] = "uniform",
-        prob_mode: Optional[str] = "new",
-        solver: Optional[str] = "dynamic",
-        m0: Union[None, int, float, List, np.ndarray] = None,
+        grid_type: str | None = "uniform",
+        prob_mode: str | None = "new",
+        solver: str | None = "dynamic",
+        m0: int | float | list | np.ndarray | None = None,
         A0: float = 1.3e-11,
         Ms: float = 8e5,
         K0: float = 0.0,
@@ -64,7 +77,7 @@ class MicromagProblem:
         thres: float = 1e-6,
         setTimeDis: int = 10,
         dem_thres: float = 0.0,
-        demag_approx: Optional[str] = None,
+        demag_approx: str | None = None,
         CV: float = 0.0,
         ReturnHall: int = 0,
         exch_nval: int = 1,
@@ -74,8 +87,8 @@ class MicromagProblem:
         cvode: bool = False,
         precision: bool = False,
         n_threads: int = 1,
-        N_ave: List[int] = [1, 1, 1],
-        t_alpha: np.ndarray = np.zeros(1),
+        N_ave: tuple[int] = (1, 1, 1),
+        t_alpha: np.ndarray = np.zeros(1),  # noqa: B008
         alpha_fct=lambda t: np.atleast_2d(t).T * 0,
     ) -> None:
         ntot = np.prod(res)
@@ -146,16 +159,17 @@ class MicromagProblem:
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")
 
     @property
-    def m0(self):
+    def m0(self) -> int | float | list | np.ndarray | None:
         return self._m0
 
     @m0.setter
-    def m0(self, val):
+    def m0(self, val: int | None, seed: int = 0) -> None:
         self._m0 = np.zeros(shape=(self.ntot, 3), dtype=np.float64, order="F")
 
-        if isinstance(val, type(None)):
-            theta = np.pi * np.random.rand(self.ntot)
-            phi = 2 * np.pi * np.random.rand(self.ntot)
+        if val is None:
+            rng = np.random.default_rng(seed)
+            theta = np.pi * rng.random(self.ntot)
+            phi = 2 * np.pi * rng.random(self.ntot)
             self._m0[:, 0] = np.sin(theta) * np.cos(phi)
             self._m0[:, 1] = np.sin(theta) * np.sin(phi)
             self._m0[:, 2] = np.cos(theta)
@@ -168,11 +182,11 @@ class MicromagProblem:
             self._m0 = np.asarray(val, dtype=np.float64, order="F")
 
     @property
-    def dem_appr(self):
+    def dem_appr(self) -> int:
         return self._dem_appr
 
     @dem_appr.setter
-    def dem_appr(self, val=None):
+    def dem_appr(self, val: int | None = None) -> None:
         self._dem_appr = {
             None: 1,
             "threshold": 2,
@@ -182,11 +196,11 @@ class MicromagProblem:
         }[val]
 
     @property
-    def grid_type(self):
+    def grid_type(self) -> int:
         return self._grid_type
 
     @grid_type.setter
-    def grid_type(self, val=None):
+    def grid_type(self, val: str | None = None) -> None:
         self._grid_type = {
             None: -1,
             "uniform": 1,
@@ -195,22 +209,22 @@ class MicromagProblem:
         }[val]
 
     @property
-    def prob_mode(self):
+    def prob_mode(self) -> int:
         return self._prob_mode
 
     @prob_mode.setter
-    def prob_mode(self, val=None):
+    def prob_mode(self, val: str | None = None) -> None:
         self._prob_mode = {None: -1, "new": 1, "old": 2}[val]
 
     @property
-    def solver(self):
+    def solver(self) -> int:
         return self._solver
 
     @solver.setter
-    def solver(self, val=None):
+    def solver(self, val: str | None = None) -> None:
         self._solver = {None: -1, "explicit": 1, "dynamic": 2, "implicit": 3}[val]
 
-    def run_simulation(self, t_end, nt, fct_h_ext, nt_h_ext):
+    def run_simulation(self, t_end, nt, fct_h_ext, nt_h_ext) -> list[np.ndarray]:
         t = np.linspace(0, t_end, nt)
         h_ext = np.zeros(shape=(nt_h_ext, 4), dtype=np.float64, order="F")
         h_ext[:, 0] = np.linspace(0, t_end, nt_h_ext)

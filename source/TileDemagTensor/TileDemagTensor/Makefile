@@ -1,8 +1,7 @@
 #=======================================================================
 #                       compiler names and flags
 #=======================================================================
-# FC = ifx
-FC = gfortran
+FC = ifx
 FFLAGS =
 USE_CVODE =
 CVODE_ROOT =
@@ -18,7 +17,7 @@ LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
-	LIBTOOL = LIB $? /NOLOGO /OUT:$@
+	LIBTOOL = LIB $? /OUT:$@
 	LIB_SUFFIX = .lib
 else
 	OPT =
@@ -46,7 +45,7 @@ all: pre-build ${STATIC_LIB}
 	${FC} ${FFLAGS} -I ${NUM_INT_PATH} ${OPT} -c $< -o $@
 
 pre-build:
-	cd ${NUM_INT_PATH} && ${MAKE} FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="${MATLAB_INCLUDE}"
+	cd ${NUM_INT_PATH} && ${MAKE} FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=${MATLAB_INCLUDE}
 
 ${STATIC_LIB}: ${NUM_INT_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}

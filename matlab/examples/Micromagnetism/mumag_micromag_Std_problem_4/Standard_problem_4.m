@@ -1,4 +1,4 @@
-function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( NIST_field, resolution, options )
+function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error] = Standard_problem_4( NIST_field, resolution, options )
 %STANDARD_PROBLEM_4 
 %A function script to setup and simulate mumag standard problem 4
 %
@@ -54,13 +54,16 @@ function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_d
 %   solution_dym : Struct
 %      A struct containing the MagTense solution for the dynamic part of the mumag standard problem 4
 %
+%   int_error : Array
+%      A double array containing the integrated error (the difference between the curves) between the NIST published solutions and the MagTense computed solution. The array is the three components of the average magnetization.
+%
 %Detailed description:
 %-------
 %   The script setups up and runs the mumag standard problem 4 for a prismal mesh.
 %
-%Version: 1.0.0
+%Version: 1.0.1
 %Author:  Rasmus Bjørk
-%Date:    2022.06.21
+%Date:    2025.03.06
 %
 %See also: Benchmark_using_Standard_problem_4
 
@@ -70,7 +73,6 @@ arguments
     options.use_CUDA {mustBeNumericOrLogical}       = true          %--- Use CUDA for the calculations
     options.ShowTheResult {mustBeNumericOrLogical}  = true          %--- Show the result
     options.use_CVODE {mustBeNumericOrLogical}      = false;        %--- Use CVODE for the numerical time evolution
-    options.CV {mustBeNumeric}                      = 0;            %--- Use coefficient of variation to add random noise
 end
 
 mu0 = 4*pi*1e-7;
@@ -87,6 +89,7 @@ problem_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 problem_ini.grid_L = [500e-9,125e-9,3e-9]; %m
 problem_ini.nThreads = int32(8);
 
+% Set specific flags on options
 problem_ini = problem_ini.setMicroMagDemagApproximation('none');
 problem_ini = problem_ini.setUseCuda( options.use_CUDA );
 problem_ini = problem_ini.setUseCVODE( options.use_CVODE );
@@ -111,9 +114,6 @@ problem_ini.setTimeDis = int32(100);
 HystDir = 1/mu0*[1,1,1] ;
 HextFct = @(t) (1e-9-t)' .* HystDir .* (t<1e-9)';
 problem_ini = problem_ini.setHext( HextFct, linspace(0,100e-9,2000) );
-
-% Add random noise to the demag vector
-problem_ini.CV = options.CV;
 
 %% Solve the initial configuration
 % Convert the class obj to a struct so it can be loaded into fortran
@@ -167,41 +167,48 @@ tic
 solution_dym = problem_dym.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_dym );
 elapsedTime_part2 = toc
 
-if (options.ShowTheResult)
-    if (options.ShowTheResult)
-        figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
-    end
-
-    plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,1),2),'rx'); 
-    plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,2),2),'gx'); 
-    plot(fig1,solution_dym.t,mean(solution_dym.M(:,:,3),2),'bx'); 
-end
+[Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution_dym.M);
 
 
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% --------------------------------------------------------------------  mumag ----------------------------------------------------------
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% Compare with published solutions available from mumag webpage
+t=1e-9*linspace(0,1,1000);
+M_mumag = load(['../../../../documentation/examples_mumag_validation/Validation_standard_problem_4/Field_' num2str(NIST_field) '_mumag_mean_solution.txt']);
+
+% Interpolate the MagTense solution to the mumag solution and calculate the relative error in percent
+rel_int_error(1) = calculate_relative_integral_error(t,M_mumag(:,1),solution_dym.t,Mx);
+rel_int_error(2) = calculate_relative_integral_error(t,M_mumag(:,3),solution_dym.t,My);
+rel_int_error(3) = calculate_relative_integral_error(t,M_mumag(:,5),solution_dym.t,Mz);
+
+%% --------------------------------------------------------------------------------------------------------------------------------------
+%% ---------------------------------------------------------------  Plot the results ----------------------------------------------------
+%% --------------------------------------------------------------------------------------------------------------------------------------
 if (options.ShowTheResult)
-    t=linspace(0,1,1000);
-    data = load(['Published_solutions_field' num2str(NIST_field)]);
-    mean_avg=data.mean_avg; err=data.err;
+    figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
+
+    %--- Plot the MagTense magnetization
+    plot(fig1,solution_dym.t,Mx,'rx'); 
+    plot(fig1,solution_dym.t,My,'gx'); 
+    plot(fig1,solution_dym.t,Mz,'bx'); 
+
+    %--- Plot the mumag solutions
     colours = [[1 0 0];[0 1 0];[0 0 1]];
     weak_colours = colours + ~colours*0.75;
     fill_ts=[t,fliplr(t)];  
     for j=1:3
-        std_errors{j}(1:2,:)=[mean_avg(1,:,j)+err(1,:,j);mean_avg(1,:,j)-err(1,:,j)];
-        interval = [std_errors{j}(1,:),fliplr(std_errors{j}(2,:))];
-        plot(fig1,1e-9*t,mean_avg(1,:,j),'color',colours(j,:))
-        fill(fig1,1e-9*fill_ts,interval,weak_colours(j,:),'linestyle','none')
+        std_errors(1:2,:)=[M_mumag(:,(j-1)*2+1)+M_mumag(:,j*2), M_mumag(:,(j-1)*2+1)-M_mumag(:,j*2)]';
+        interval = [std_errors(1,:),fliplr(std_errors(2,:))];
+        plot(fig1,t,M_mumag(:,(j-1)*2+1),'color',colours(j,:))
+        fill(fig1,fill_ts,interval,weak_colours(j,:),'linestyle','none')
     end
 
     legend(fig1,'MagTense M_x','MagTense M_y','MagTense M_z','\mu{}mag <M_x>','\mu{}mag \sigma{}(M_x)','\mu{}mag <M_y>','\mu{}mag \sigma{}(M_y)','\mu{}mag <M_z>','\mu{}mag \sigma{}(M_z)','Location','eastoutside');
     ylabel(fig1,'<M_i>/M_s')
     xlabel(fig1,'Time [ns]')
-
     xlim(fig1,[0 1e-9])
-    figure(figure1)
+    figure(figure1)   
 end
 
 end

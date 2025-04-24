@@ -1,18 +1,16 @@
 import math
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors
-import matplotlib.cm as cm
-
 from pathlib import Path
-from typing import Optional, List
+
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import cm, colors
 from matplotlib.lines import Line2D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
+from mpl_toolkits.mplot3d.art3d import Line3DCollection, Poly3DCollection
 
-from magtense.magstatics import get_rotmat, Tiles, run_simulation
+from magtense.magstatics import Tiles, get_rotmat, run_simulation
 
 
-def plot_cube(axes, size, offset, rotation, M, color):
+def plot_cube(axes, size, offset, rotation, M, color) -> None:
     ax = axes
 
     # Define the vertices of the unit cubic and
@@ -72,7 +70,7 @@ def plot_cube(axes, size, offset, rotation, M, color):
     )
 
 
-def plot_sphere(ax, r, offset, M, color):
+def plot_sphere(ax, r, offset, M, color) -> None:
     # Create meash of surface points
     theta, phi = np.mgrid[0 : np.pi : 20j, 0 : 2 * np.pi : 20j]
     x = r * np.cos(phi) * np.sin(theta) + offset[0]
@@ -130,7 +128,7 @@ def plot_sphere(ax, r, offset, M, color):
     )
 
 
-def plot_spheroid(ax, size, offset, rotation, M, color):
+def plot_spheroid(ax, size, offset, rotation, M, color) -> None:
     # Create meash of surface points
     theta, phi = np.mgrid[0 : np.pi : 20j, 0 : 2 * np.pi : 20j]
     psi = np.linspace(0, 2 * np.pi, 50)
@@ -204,7 +202,7 @@ def plot_spheroid(ax, size, offset, rotation, M, color):
     )
 
 
-def plot_tetrahedron(axes, vertices, M, color):
+def plot_tetrahedron(axes, vertices, M, color) -> None:
     ax = axes
     vert = np.transpose(vertices)
 
@@ -255,7 +253,7 @@ def plot_tetrahedron(axes, vertices, M, color):
     )
 
 
-def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color):
+def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color) -> None:
     ax = axes
     resolution = 100
     r, theta, z = center_pos[:]
@@ -391,7 +389,9 @@ def plot_cylindrical(axes, center_pos, dev_center, offset, rotation, M, color):
     )
 
 
-def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv=False):
+def plot_circpiece(
+    axes, center_pos, dev_center, offset, rotation, M, color, inv=False
+) -> None:
     ax = axes
     resolution = 100
     r_center, theta, z = center_pos[:]
@@ -399,7 +399,8 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
 
     r = r_center + dr / 2
 
-    # Difference between circpiece and circpiece_inv and check in which quadrant the circpiece is
+    # Difference between circpiece and circpiece_inv
+    # Check in which quadrant the circpiece is located
     if (
         (
             0 < theta < math.pi / 2
@@ -521,10 +522,7 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
         abs(math.sin(theta + dtheta / 2) - math.sin(theta - dtheta / 2)),
     )
 
-    if inv:
-        r_M = r + 0.25 * min_side
-    else:
-        r_M = r - 0.5 * min_side
+    r_M = r + 0.25 * min_side if inv else r - 0.5 * min_side
 
     # Plot vector of magnetization in the center of the cube
     ax.quiver(
@@ -541,7 +539,7 @@ def plot_circpiece(axes, center_pos, dev_center, offset, rotation, M, color, inv
     )
 
 
-def plot_field(axes, pts, field):
+def plot_field(axes, pts: list, field: np.ndarray) -> None:
     ax = axes
     cmap = cm.get_cmap("Blues")
     norm = colors.Normalize(vmin=0, vmax=30000)
@@ -573,7 +571,7 @@ def plot_field(axes, pts, field):
     plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax)
 
 
-def plot_grid(ax, spots, area):
+def plot_grid(ax, spots, area) -> None:
     ax.grid(False)
     x = np.linspace(0, area[0], spots[0] + 1)
     y = np.linspace(0, area[1], spots[1] + 1)
@@ -601,8 +599,10 @@ def plot_grid(ax, spots, area):
     ax.add_collection(line_segments)
 
 
-def zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale=0.1):
-    def zoom_scroll(event):
+def zoom_factory(
+    ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale: float = 0.1
+) -> tuple:
+    def zoom_scroll(event) -> None:
         # get the current x and y limits
         cur_xlim = ax.get_xlim()
         cur_ylim = ax.get_ylim()
@@ -630,7 +630,7 @@ def zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale=0.1)
         ax.set_zlim([cur_zlim[0], cur_zlim[0] + cur_lim_range])
         plt.draw()  # force re-draw
 
-    def zoom_onpress(event):
+    def zoom_onpress(event) -> None:
         if event.button != 1:
             return
         mouse_x = event.xdata
@@ -673,11 +673,11 @@ def zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range, scale=0.1)
 
 
 def create_plot(
-    tiles: Optional[Tiles] = None,
-    eval_pts: Optional[np.ndarray] = None,
-    field: Optional[np.ndarray] = None,
-    spots: Optional[List] = None,
-    area: Optional[List] = None,
+    tiles: Tiles | None = None,
+    eval_pts: list[np.ndarray] | None = None,
+    field: np.ndarray | None = None,
+    spots: list | None = None,
+    area: list | None = None,
 ) -> None:
     """
     Creates a plot with the iterated tiles and the calculated magnetic field H at the
@@ -756,14 +756,18 @@ def create_plot(
                 pass
 
             else:
-                raise ValueError("Tile type not supported!")
+                value_err = f"Tile type {tiles.tile_type[i]} not supported!"
+                raise ValueError(value_err)
 
-    if eval_pts is not None and field is not None:
+    if field is not None:
+        if eval_pts is None:
+            eval_pts = [None]
         plot_field(ax, eval_pts, field)
     if spots is not None and area is not None:
         plot_grid(ax, spots, area)
 
-    # Workaround added get_proj function inside site-packages\mpl_toolkits\mplot3d\axes3d.py
+    # Workaround added get_proj function inside:
+    # site-packages\mpl_toolkits\mplot3d\axes3d.py
     # Setting length of each axis individually - currrently not support for axes3d
     # https://stackoverflow.com/questions/10326371/setting-aspect-ratio-of-3d-plot
     # xmin, xmax = np.divide(self.get_xlim3d(), self.pbaspect[0])
@@ -796,7 +800,7 @@ def create_plot(
 
 
 def plot_magfield(
-    field: np.ndarray, magnet: Optional[np.ndarray] = None, vmax: float = 1
+    field: np.ndarray, magnet: np.ndarray | None = None, vmax: float = 1
 ) -> None:
     plt.clf()
     labels = ["Bx-field", "By-field", "Bz-field"]
@@ -819,10 +823,10 @@ def plot_magfield(
             for j, comp in enumerate(field[:, :, :, z]):
                 ax = axes.flat[i * 3 + j]
                 im = ax.imshow(comp, cmap="bwr", norm=norm, origin="lower")
-                ax.set_title(labels[j] + f"@{z+1}")
+                ax.set_title(labels[j] + f"@{z + 1}")
 
     else:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     fig.subplots_adjust(right=0.8)
     cbar_ax = fig.add_axes([0.825, 0.345, 0.015, 0.3])
@@ -833,7 +837,7 @@ def plot_magfield(
         for i in range(magnet.shape[0]):
             params += "\n\n("
             for j in range(magnet.shape[1]):
-                params += f"{magnet[i,j]:.3f}, "
+                params += f"{magnet[i, j]:.3f}, "
             params += ")"
         ax = axes.flat[-3]
         ax.text(0, 0, params, fontsize=20)
@@ -865,9 +869,9 @@ def plot_M_avg_seq(t: np.ndarray, M_seq: np.ndarray) -> None:
 
 def plot_M_thin_film(
     m: np.ndarray,
-    res: List[int],
-    title: Optional[str] = None,
-    scale: Optional[float] = None,
+    res: list[int],
+    title: str | None = None,
+    scale: float | None = None,
     width: float = 0.002,
     headwidth: float = 3,
     headlength: float = 5,
@@ -903,16 +907,16 @@ def plot_M_thin_film(
 
 def load_COMSOL(
     fname: str,
-    eval_offset: List,
+    eval_offset: list,
     COMSOL_eval_path: Path,
-    model_offset: List,
+    model_offset: list,
     unit: str,
-    pts_special: Optional[np.ndarray] = None,
+    pts_special: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Load reference points from COMSOL calculation
     """
-    with open(Path(COMSOL_eval_path, fname), "r") as file:
+    with Path.open(Path(COMSOL_eval_path, fname), "r") as file:
         T = file.readlines()[8:]
 
     T_split = np.asarray([line.split() for line in T], dtype=np.float64)
@@ -941,8 +945,8 @@ def load_COMSOL(
 def validation(
     shape: str,
     tile: Tiles,
-    offset: List,
-    model_offset: List = [0, 0, 0],
+    offset: list,
+    model_offset: tuple = (0, 0, 0),
     plot_COMSOL: bool = True,
     plot_error: bool = False,
     unit: str = "A/m",
@@ -992,8 +996,8 @@ def plot_Halbach(
     X: np.ndarray = None,
     Y: np.ndarray = None,
     center_field: np.ndarray = None,
-    lim: list = [-3, 3],
-):
+    lim: tuple = (-3, 3),
+) -> None:
     _, ax = plt.subplots()
 
     # Cylinders as circles in 2D

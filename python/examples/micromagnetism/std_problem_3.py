@@ -1,22 +1,22 @@
-# %%
-import numpy as np
 import matplotlib.pyplot as plt
-
-from typing import List
+import numpy as np
 
 from magtense.micromag import MicromagProblem
 from magtense.utils import plot_M_avg_seq, plot_M_thin_film
 
 
 def std_prob_3(
-    res: List[int] = [10, 10, 10],
-    L_loop: np.ndarray = np.linspace(8, 9, 10),
+    res: tuple[int] = (10, 10, 10),
+    L_loop: np.ndarray | None = None,
     cuda: bool = False,
+    cvode: bool = False,
     show: bool = True,
     show_details: bool = False,
 ) -> None:
     mu0 = 4 * np.pi * 1e-7
     Ms = 1e6
+    if L_loop is None:
+        L_loop = np.linspace(8, 9, 10)
 
     problem = MicromagProblem(
         res,
@@ -25,12 +25,13 @@ def std_prob_3(
         K0=0.1 * 0.5 * mu0 * Ms**2,
         alpha=1e3,
         cuda=cuda,
+        cvode=cvode,
     )
 
     problem.u_ea[:, 2] = 1
     lex = np.sqrt(problem.A0 / (0.5 * mu0 * Ms**2))
 
-    def Hext_fct(t):
+    def Hext_fct(t) -> np.ndarray:
         return np.atleast_2d(t).T * [0, 0, 0]
 
     E_arr = np.zeros(shape=(4, len(L_loop), 2))
@@ -52,8 +53,8 @@ def std_prob_3(
                 [x, y, z] = np.meshgrid(xv, yv, zv, indexing="ij")
                 xvec = np.sin(np.arctan2(z, x))
                 yvec = -np.cos(np.arctan2(z, x))
-                problem.m0[:, 0] = xvec.swapaxes(0, 2).reshape((-1))
-                problem.m0[:, 2] = yvec.swapaxes(0, 2).reshape((-1))
+                problem.m0[:, 0] = xvec.swapaxes(0, 2).reshape(-1)
+                problem.m0[:, 2] = yvec.swapaxes(0, 2).reshape(-1)
                 problem.m0 = problem.m0 / np.tile(
                     np.expand_dims(np.sqrt(np.sum(problem.m0**2, axis=1)), axis=1),
                     (1, 3),
@@ -131,7 +132,5 @@ def std_prob_3(
         plt.show()
 
 
-# %%
-
 if __name__ == "__main__":
-    std_prob_3(show=False, cuda=False, show_details=True)
+    std_prob_3(show=False, cuda=True, cvode=True, show_details=True)

@@ -1,124 +1,140 @@
-# Usage with Matlab
+# Using MagTense with Matlab
 
-## Compilation with Visual Studio
+Using MagTense with Matlab is as easy as downloading the latest [release](https://github.com/cmt-dtu-energy/MagTense/releases) as this contains MEX-files for both Windows and Linux. All that is required is Matlab 2023a or later and an installation of the CUDA toolkit if you want to run with CUDA. The example scripts provided with the release, also available [here](https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples), shows how to call the MEX-functions from Matlab.
 
-If you want to compile MagTense with a Visual Studio project file for Windows, [MagTense.sln](../MagTense.sln), is available, as well as a Matlab function to build the MEX-files, [buildMagTenseMEX.m](buildMagTenseMEX.m). MagTense utilizes Intel MKL for the micromagnetic simlations and can also utilize CUDA and CVODE. The Visual Studio environment has configuration for Release, Debug as well as for configurations included NO_CUDA and NO_CVODE.
+# Compiling MEX-files for Matlab yourself
 
-## Compilation with make
+If you want to compile your own MEX-files, the guide below shows how to do so. Building the MEX-files is always a two-step procedure. First the Fortran objectives files must be compiled and then the Matlab MEX compiler must be used to build the MEX-files. Included in MagTense is a Matlab function to build the MEX-files, [buildMagTenseMEX.m](buildMagTenseMEX.m). MagTense utilizes Intel MKL for the micromagnetic simlations and can also utilize CUDA and CVODE. 
 
-### Requirements
+## Compilation on Linux 
 
-- [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#inpage-nav-6-undefined) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
+### Using make
+To build the MEX-files on Linux using make (at present without the additional CVODE libraries), one can simply use the python environment provided with MagTense to install all required compilers etc. All that is required is an installation of Matlab present on the machine.
 
-- **Intel® MKL** [directly](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-download.html) or via [conda](https://anaconda.org/intel/mkl-static) | Expected location:
+One starts by doing a clone of the MagTense repository, followed by installing the required linux packages, which are
+```
+sudo apt install make
+sudo apt install gcc
+sudo apt install gfortran
+```
+where gfortran is only required to make Matlab acknowledge that a fortran MEX-compiler exists - otherwise it is not utilized.
 
-  [ Windows ] `C:/Program Files (x86)/Intel/oneAPI/mkl/latest`
+Next Miniconda (or Anaconda) must be installed, after which the MagTense conda environment with all necessary compilers can be created using
 
-  [ Linux + oneapi ] `/opt/intel/oneapi/mkl/latest`
-
-  [ Linux + conda ] `$CONDA_PREFIX/lib/intel64`
-
-- [ Linux + conda ] [Runtime for Intel® Fortran Compiler](https://anaconda.org/intel/intel-fortran-rt)
-
-- [ Windows / MacOS ] **Make** utility installed [directly](https://gnuwin32.sourceforge.net/packages/make.htm) or via [conda](https://anaconda.org/conda-forge/make)
-
-### Optional
-
-- **NVIDIA GPU Computing Toolkit** [directly](https://developer.nvidia.com/cuda-downloads) or via [conda](https://anaconda.org/nvidia) | Expected location:
-
-  [ Windows ] `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\YOUR_VERSION\lib\x64\`
-
-  [ Linux ]  `$CONDA_PREFIX/lib`
-
-- [CVODE](https://computing.llnl.gov/projects/sundials/sundials-software) | Expected location:
-
-  [ Windows ] `C:\Program Files (x86)\sundials-4.1.0\instdir`
-
-  [ Linux ] `/usr/local/sundials-4.1.0/instdir`
-
-  A guide for custom installation of sundials-4.1.0 from this repository can be found [here].(#install-cvode-from-sundials-4.1.0) 
-
-  **Note:** Shared libraries for Fortran modules are not distributed in conda package of [sundials](https://anaconda.org/conda-forge/sundials). CVODE has to be built beforehand locally when linked dynamically. During runtime, path has to be added to LD_LIBRARY_PATH on Linux.
-
-### Compilation
-
-Prepare your terminal, so that ifort compiler can be found:
-
-- [ Windows]
-
-  ```bash
-  "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
-  ```
-
-- [ Linux ]
-
-  ```bash
-  . /opt/intel/oneapi/setvars.sh
-  ```
-
-Set flags and paths in [Makefile](https://github.com/cmt-dtu-energy/MagTense/blob/master/Makefile) corresponding to your setup and then run:
-
-```bash
-cd path/to/MagTense/
-make USE_CUDA=1 USE_CVODE=1 USE_MATLAB=1 CVODE_ROOT=/usr/local/sundials-4.1.0/instdir MATLAB_INCLUDE=/usr/local/MATLAB/R2021b/extern/include MKL_ROOT=/opt/intel/oneapi/mkl/latest
+```
+conda env create -f python/.build/env-313-linux.yml
+conda activate magtense-env
 ```
 
-## Building MEX-files
+Following this compilation of the MagTense Fortran files is as simple as
 
-Prepare your terminal, so that ifort compiler can be found:
+```
+make magnetostatic micromagnetism cuda forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=path_to_matlab/extern/include MKL_ROOT=${CONDA_PREFIX}
+```
+Please set the `path_to_matlab` and set `USE_CUDA=0` if the machine does not have a CUDA-supported GPU.
 
-- [ Windows]
-
-  Configuration of FORTRAN compiler used for mex:
-
-  ```bash
-  mex -setup fortran
-  ```
-
-- [ Linux ]
-
-  ```bash
-  . /opt/intel/oneapi/setvars.sh
-  ```
-
-  For static linking of MKL, the file `mex_FORTRAN_glnxa64.xml` located in `/home/<user>/.matlab/R2021b/` has to be adjusted as follows:
-
-  ```bash
-  LINKLIBS="[...] -Wl,--start-group"
-  CMDLINE2="$LDF $LDFLAGS $LDTYPE $LINKOPTIM $LINKEXPORTVER $OBJS $FLIBS $LINKLIBS -Wl,--end-group -o $EXE"
-  ```
-
-  The reason for that is that Matlab recognizes `-Wl,--end-group` as `Error: Illegal use of reserved keyword "end".`, when running the build script.
+Finally, start up Matlab (If you have installed Intel oneAPI and not used the Conda environment, you will need to do `. /opt/intel/oneapi/setvars.sh` first), and then setup the MEX-compiler using `mex -setup FORTRAN` and then run 
+```
+buildMagTenseMEX('USE_RELEASE', true, 'USE_CUDA', false, 'USE_CVODE', false)
+```
+to build the MEX-files. If you want to build without CUDA, please do `buildMagTenseMEX('USE_RELEASE', false, 'USE_CUDA', false, 'USE_CVODE', false)`
 
 
-Start Matlab via command line and run build script:
+## Compilation on Windows
+On Windows there are two compilation options for building the Fortran objective files - using Visual Studio or using `make` through conda. Both are described below. After either step, the  [buildMagTenseMEX.m](buildMagTenseMEX.m) function must be used to build the MEX-files.
+
+#### Regarding the CUDA objective files
+If you want to compile MagTense with CUDA, an initial step is necessary. In Windows, the CUDA object files cannot be built directly by either Visual Studio or `make`; they must be compiled in two separate steps. The reason for this is that Intel's Fortran Compiler and the PG Fortran compiler (which is used for doing CUDA directly in Fortran) are not compatible. One simply cannot link object files from the two compilers as there is no standard for this. The strategy then is to make the CUDA GPU kernel in C++, compile this with the nvcc compiler (that uses MSVC at the core), output to an object file, and then compile a C++ wrapper with the Intel C++ compiler (icx) that includes and uses the nvcc compiled file. The output here should be an `obj` file that can be called from Fortran (using the Intel Fortran compiler) via the standard way (iso_c_binding) for calling C++ functions from Fortran.
+### Compilation with Visual Studio
+
+#### CUDA step 1
+
+To compile the CUDA objective files, you need an installation of Visual Studio. The commands below assume that you have the Enterprise version of Visual Studio - if you have the free community edition, simply change `Enterprise` to `Community` in the path.
+
+From a standard command prompt navigate to the MagTense dir "MagTense/source/MagTenseFortranCUDA/cuda" and compile with nvcc, using a specific CUDA version and the latest version of Visual Studio: 
 
 ```bash
-cd path/to/MagTense/matlab
-/usr/local/MATLAB/R2021b/bin/matlab -nodisplay -nosplash -nodesktop
-run('buildMagTenseMEX.m')
+"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.XX\bin\nvcc.exe" -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64"
 ```
 
-## Runtime
+#### CUDA step 2
 
-Prepare your terminal, so that ifort compiler and required libraries can be found:
+Start an Intel 64 prompt (Start Menu -> Intel oneAPI 20XX -> Intel oneAPI command prompt for Intel 64 for Visual Studio XX) and compile the C++ wrapper with icx including the cuda stuff:
 
-- [ Linux ]
+```bash
+icx -c MagTenseCudaBlasICLWrapper.cxx
+```
 
-  ```bash
-  . /opt/intel/oneapi/setvars.sh
-  export LD_LIBRARY_PATH=<path_to_CVODE_libs>:<path_to_CUDA_libs>:$LD_LIBRARY_PATH
-  ```
+#### Compiling the objective files
+For compiling MagTense with Visual Studio, we provide a VS project file for Windows, [MagTense.sln](../MagTense.sln). The Visual Studio environment has configuration for Release, Debug as well as for configurations included NO_CUDA and NO_CVODE. Remember to set the correct paths to Matlab and CUDA in `properties` in each project in Visual Studio. An installation of Intel oneAPI is necessary to compile using Visual Studio.
 
-  When MKL is statically linked, having [Runtime for Intel® Fortran Compiler](https://anaconda.org/intel/intel-fortran-rt) is sufficient and no installation of `ifort` or `mkl` is required.
+#### Building the MEX-files
+Once the objective files have been build, start up Matlab, and first setup the MEX-compiler using `mex -setup FORTRAN` and then run 
+```
+buildMagTenseMEX('USE_RELEASE', true, 'USE_CUDA', true, 'USE_CVODE', false)
+```
+to build the MEX-files. If you want to build without CUDA, please do `buildMagTenseMEX('USE_RELEASE', false, 'USE_CUDA', false, 'USE_CVODE', false)`
 
-- Test with standard problem #3
 
-  ```bash
-  cd path/to/MagTense/matlab/
-  /usr/local/MATLAB/R2021b/bin/matlab -nodisplay -nosplash -nodesktop
-  run('examples/Micromagnetism/mumag_micromag_Std_problem_3/Standard_problem_3.m')
-  ```
+### Compilation with make
+
+Compiling with make requires installation of Intels oneAPI compilers and MKL. This can be a cumbersome process, so we therefore provide a conda environment file similar to Linux. Installing this the python environment provided with MagTense to install all required compilers etc. All that is required is an installation of Matlab present on the machine.
+
+First of all Miniconda (or Anaconda) must be installed, after which the MagTense conda environment with all necessary compilers can be created using
+
+```
+conda env create -f python/.build/env-312-win.yml
+conda activate magtense-env
+```
+
+#### CUDA step 1
+
+To compile the CUDA objective files you need an installation of Visual Studio as well. The commands below assume that you have the Enterprise version of Visual Studio - if you have the free community edition, simply change `Enterprise` to `Community` in the path.
+
+Open an Anaconda prompt and activate the MagTense environment. Then navigate to the MagTense dir "MagTense/source/MagTenseFortranCUDA/cuda" and compile with nvcc, using a specific CUDA version and the latest version of Visual Studio: 
+
+```bash
+"nvcc.exe -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64"
+```
+
+#### CUDA step 2
+
+Open a powershell with ExecutionPolicy bypass (`pwsh -NoExit -ExecutionPolicy ByPass`) and then do
+
+```bash
+cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
+.\Launch-VsDevShell.ps1
+cd MagTense/source/MagTenseFortranCUDA/cuda
+make wrap
+```
+
+#### Compiling the objective files
+Compiling the MagTense Fortran objective files is as simple as:
+
+```
+make magnetostatic micromagnetism forceintegrator USE_CUDA=1 USE_CVODE=0 USE_MATLAB=1 MATLAB_INCLUDE=path_to_matlab/extern/include MKL_ROOT=${CONDA_PREFIX}
+```
+Please set the `path_to_matlab` and set `USE_CUDA=0` if the machine does not have a CUDA-supported GPU.
+
+#### Building the MEX-files
+The next step is building the MEX-files. However, if you want to use only the Conda MagTense environment and not install Intel oneAPI, Matlab cannot find the required ifx compiler to build the MEX-files, even though it is present in the Conda environment. This can be remedied by making a symbolic link to the ifx compiler in the Conda enviroment so that Matlab's "mex -setup FORTRAN" can find it. Using a Powershell with the correct `path_to_conda_environments` do:
+
+```bash
+cd path_to_conda_environments\envs\magtense-env\Library 
+mkdir compiler 
+cd path_to_conda_environments\envs\magtense-env\Library\compiler
+mkdir 2024.2 
+cd 2024.2 
+cmd /c mklink /D bin path_to_conda_environments\envs\magtense-env\Library\bin
+```
+
+Now start up Matlab. To find the Intel ifx compiler in the Conda MagTense environment, we set the `ONEAPI_ROOT` environment variable and then configure the MEX-compiler using `mex -setup FORTRAN` and then build the MEX-files specifying where the intel compilers are as options:
+```
+setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library");
+mex -setup FORTRAN;
+cd('MagTense/matlab');
+buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',false,'mkl_include','path_to_conda_environments\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','path_to_conda_environments\envs\magtense-env\Library\lib','mkl_lp64','path_to_conda_environments\envs\magtense-env\Library\include\intel64\lp64');
+```
 
 ## Install CVODE from sundials-4.1.0
 
@@ -222,46 +238,4 @@ Building INSTALL can cause one (strange) warning, MSB8065, which is apparently a
 ```bash
 cd builddir
 cmake --verbose -DCMAKE_INSTALL_PREFIX=/path/to/sundials-4.1.0/instdir -DEXAMPLES_INSTALL_PATH=/path/to/sundials-4.1.0/instdir/examples -DBUILD_ARKODE=OFF -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_CVODE=ON -DBUILD_STATIC_LIBS=ON -DBUILD_TESTING=ON -DCMAKE_Fortran_COMPILER=/opt/intel/oneapi/compiler/latest/linux/bin/intel64/ifort -DEXAMPLES_ENABLE_C=ON -DEXAMPLES_ENABLE_CXX=ON -DEXAMPLES_ENABLE_F77=ON -DEXAMPLES_ENABLE_F90=ON -DF2003_INTERFACE_ENABLE=ON -DF77_INTERFACE_ENABLE=ON -DOPENMP_ENABLE=ON ../srcdir
-```
-
-## Compile changes in CUDA code on Windows with Intel Fortran
-
-Intel's Fortran Compiler and the PG Fortran compiler (which is used for doing CUDA directly in Fortran) are not compatible. One simply cannot link object files from the two compilers as there is no standard for this.
-
-The strategy then is to make the CUDA GPU kernel in C++, compile this with the nvcc compiler (that uses MSVC at the core), output to an object file and then compile a C++ wrapper with Intel C++ compiler (icx) that includes and uses the nvcc compiled file. The output here should be an `obj` file that can be called from Fortran (using the Intel Fortran compiler) via the standard way (iso_c_binding) for calling C++ functions from Fortran.
-
-The following details the required steps if changes has been made to the CUDA code.
-
-### Step 0
-
-- Install VS 2019 with Intel's C++ and Fortran compilers (and MKL as this is used also by MagTense) and with MSVC compiler
-- Install [CUDA SDK](https://developer.nvidia.com/cuda-downloads)
-- Check that the PATH variable is pointing to the latest version of CUDA. This can be set using the registry at Computer\HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Environment\Path
-
-### Step 1
-
-From a standard command prompt, navigate to the MagTense dir "MagTense/source/MagTenseFortranCUDA/cuda" and compile with nvcc, using a specific CUDA version and the latest version of Visual Studio: 
-
-```bash
-"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\bin\nvcc.exe" -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.36.32532\bin\Hostx64\x64"
-```
-
-### Step 2
-
-From the Intel 64 prompt (Start Menu -> Intel oneAPI 20XX -> Intel oneAPI command prompt for Intel 64 for Visual Studio XX) compile the C++ wrapper with icx including the cuda stuff:
-
-```bash
-icx -c MagTenseCudaBlasICLWrapper.cxx
-```
-
-### Step 3
-
-Compile MagTense as usual. There is a project in the MagTense solution that deals with CUDA.
-
-### Step 4. (optional)
-
-Check the dependencies of the compiled MEX-file using the Visual Studio dumpbin utility:
-
-```bash
-"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.36.32532\bin\Hostx64\x64\dumpbin.exe" /dependents MagTenseLandauLifshitzSolver_mex.mexw64
 ```

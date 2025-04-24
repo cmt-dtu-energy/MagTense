@@ -1,6 +1,6 @@
 
 %%This function compares MagTense to a FEM simulations for a single permanent magnet.
-function [] = MagTense_Validation_cylindrical_slice_example_2()
+function [rel_int_error] = MagTense_Validation_cylindrical_slice_example_2()
 
 %make sure to source the right path for the generic Matlab routines
 addpath(genpath('../../../util/'));
@@ -66,7 +66,7 @@ tile.Mrem = 1.2 / mu0;
 %%is reached. Finally, 100 reflects the max. no. of allowed iterations
 tile = IterateMagnetization( tile, [], [], 1e-6, 100 );
 
-%%Now find the field in a set of points
+% Now find the field in a set of points
 % x = -0.2:0.001:1.8;
 % y = -0.8:0.001:1.2;
 % z = -0.2:0.001:1.8;
@@ -82,43 +82,29 @@ pts(1:numel(x),:) = [x; zeros(1,numel(x))+offset(2); zeros(1,numel(x))+offset(3)
 pts((numel(x)+1):(numel(x)+numel(y)),:) = [zeros(1,numel(y))+offset(1); y; zeros(1,numel(y))+offset(3)]';
 pts((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)),:) = [zeros(1,numel(z))+offset(1); zeros(1,numel(z))+offset(2); z]';
 
-%get the field
+% Get the field
 H = getHFromTiles_mex( tile, pts, int32( length(tile) ), int32( length(pts(:,1)) ) );
 N = getNFromTile_mex( tile, pts, int32( length(pts(:,1)) ) );
          
-%Find the norm of the field
+% Find the norm of the field
 Hnorm = squeeze( sqrt( sum(H.^2,2) ) );
 
-% figure2 = figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto');
-% fig2 = axes('Parent',figure2,'Layer','top','FontSize',16);
-% hold all
-% grid on
-% box on
-% 
-% %Plot the solution
-% plot(x,N(1:numel(x),1,1),'r.');
-% plot(y,N((numel(x)+1):(numel(x)+numel(y)),1,1),'g.');
-% plot(z,N((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)),1,1),'b.');
-
-
-%Make a figure
+% Make a figure
 figure1 = figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto');
 fig1 = axes('Parent',figure1,'Layer','top','FontSize',16);
 hold all
 grid on
 box on
 
-%Plot the solution
-plot(x,4*pi*1e-7*Hnorm(1:numel(x)),'r.');
-plot(y,4*pi*1e-7*Hnorm((numel(x)+1):(numel(x)+numel(y))),'g.');
-plot(z,4*pi*1e-7*Hnorm((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z))),'b.');
+% Plot the solution
+Hnorm_along_x = 4*pi*1e-7*Hnorm(1:numel(x));
+Hnorm_along_y = 4*pi*1e-7*Hnorm((numel(x)+1):(numel(x)+numel(y)));
+Hnorm_along_z = 4*pi*1e-7*Hnorm((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)));
+plot(x,Hnorm_along_x,'r.');
+plot(y,Hnorm_along_y,'g.');
+plot(z,Hnorm_along_z,'b.');
 
-
-
-
-
-% %Load comparison data from FEM simulation
-
+% Load comparison data from FEM simulation
 plot(data_FEM_x(:,1),data_FEM_x(:,2),'ro');
 plot(data_FEM_y(:,1),data_FEM_y(:,2),'go');
 plot(data_FEM_z(:,1),data_FEM_z(:,2),'bo');
@@ -127,4 +113,9 @@ h_l = legend('MagTense, x for y,z=offset','MagTense, y for x,z=offset','MagTense
 set(h_l,'fontsize',10);
 ylabel('|\mu_0{}H| [T]');
 xlabel('x, y or z [m]');
+
+% Interpolate the MagTense solution to the FEM solution and calculate the relative error in percent
+rel_int_error(1) = calculate_relative_integral_error(data_FEM_x(:,1),data_FEM_x(:,2),x,Hnorm_along_x);
+rel_int_error(2) = calculate_relative_integral_error(data_FEM_y(:,1),data_FEM_y(:,2),y,Hnorm_along_y);
+rel_int_error(3) = calculate_relative_integral_error(data_FEM_z(:,1),data_FEM_z(:,2),z,Hnorm_along_z);
 end

@@ -50,6 +50,7 @@ matlab/MagTense_matlab_project.prj
 *.pidb
 *.log
 *.scc
+*.swp
 
 # Visual C++ cache files
 ipch/
@@ -58,6 +59,12 @@ ipch/
 *.opensdf
 *.sdf
 *.cachefile
+
+# Visual Studio
+.vs/MagTense/v17/
+.vs/MagTense/CopilotIndices/
+*.vsidx
+source/MagTenseMEX/.vs/
 
 # Visual Studio profiler
 *.psess
@@ -183,18 +190,25 @@ docs/source/_build
 *.o
 *.a
 *.lib
+*.so
+*.pyd
+
+*.whl
 
 *.vtuneproj
 *.prj
 
-*.vsidx
+*.msg
 *.lock
 
 # Notebooks
 nbs/
 
-.vs/MagTense/v17/
+# Virtual environment
+.venv*/
 
-.vs/MagTense/CopilotIndices/
+error.txt
 
-*.msg
+# CVODE downloaded files and folders
+cvode*/
+*tar.gz

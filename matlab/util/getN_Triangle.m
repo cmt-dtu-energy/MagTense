@@ -1,5 +1,3 @@
-
-
 function [N,P] = getN_Triangle( v, r )
 %% Calculates and returns the demag tensor, N, given the four vertices,
 %% v (size 3,4) and at the positions r (size 3,n)) from a triangluar surface

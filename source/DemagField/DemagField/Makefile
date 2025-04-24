@@ -1,8 +1,7 @@
 #=======================================================================
 #                       compiler names and flags
 #=======================================================================
-# FC = ifx
-FC = gfortran
+FC = ifx
 FFLAGS =
 USE_CVODE =
 CVODE_ROOT =
@@ -14,9 +13,11 @@ MATLAB_INCLUDE =
 LIBSRC_SOURCES = DemagFieldGetSolution MagParameters spline IterateMagnetSolution
 
 ifeq ($(USE_MATLAB),1)
+    OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
 	LIBSRC_SOURCES += MagTileIO
-	MATLAB_OPT = -I"${MATLAB_INCLUDE}"
+	MATLAB_OPT = -I${MATLAB_INCLUDE}
 else
+    OPT =
 	MATLAB_OPT =
 endif
 
@@ -24,7 +25,7 @@ LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
-	LIBTOOL = LIB $? /NOLOGO /OUT:$@
+	LIBTOOL = LIB $? /OUT:$@
 	LIB_SUFFIX = .lib
 else
 	OPT =
@@ -55,7 +56,7 @@ all: pre-build ${STATIC_LIB}
 	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} ${OPT} ${MATLAB_OPT} -c $< -o $@
 
 pre-build:
-	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
+	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
 
 ${STATIC_LIB}: ${TILE_DEMAG_TENSOR_LIB} ${LIBSRC_OBJECTS}

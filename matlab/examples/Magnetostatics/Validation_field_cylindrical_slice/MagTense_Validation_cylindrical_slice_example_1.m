@@ -1,6 +1,6 @@
 
 %%This function compares MagTense to a FEM simulations for a single permanent magnet.
-function [] = MagTense_Validation_cylindrical_slice()
+function [rel_int_error] = MagTense_Validation_cylindrical_slice_example_1()
 
 %make sure to source the right path for the generic Matlab routines
 addpath(genpath('../../../util/'));
@@ -112,9 +112,10 @@ y_start = -1;
 z_start = -3;
 
 %Plot the solution
-plot(sqrt((x-x_start).^2+(y-y_start).^2+(z-z_start).^2),H(:,1),'-','linewidth',2);
-plot(sqrt((x-x_start).^2+(y-y_start).^2+(z-z_start).^2),H(:,2),'-','linewidth',2);
-plot(sqrt((x-x_start).^2+(y-y_start).^2+(z-z_start).^2),H(:,3),'-','linewidth',2);
+dist = sqrt((x-x_start).^2+(y-y_start).^2+(z-z_start).^2);
+plot(dist,H(:,1),'-','linewidth',2);
+plot(dist,H(:,2),'-','linewidth',2);
+plot(dist,H(:,3),'-','linewidth',2);
 
 %Load comparison data from FEM simulation
 FEM_dist = sqrt((data_FEM_x(:,1)-x_start).^2+(data_FEM_y(:,1)-y_start).^2+(data_FEM_z(:,1)-z_start).^2);
@@ -127,4 +128,9 @@ set(h_l,'fontsize',10);
 ylabel('H_i [A m^{-1}]');
 xlabel('Distance from [x,y,z] = (2,-1,-3) to (8,5,3) [m]');
 xlim([0 max(FEM_dist)])
+
+% Interpolate the MagTense solution to the FEM solution and calculate the relative error in percent
+rel_int_error(1) = calculate_relative_integral_error(FEM_dist,data_FEM_x(:,2),dist,H(:,1));
+rel_int_error(2) = calculate_relative_integral_error(FEM_dist,data_FEM_y(:,2),dist,H(:,2));
+rel_int_error(3) = calculate_relative_integral_error(FEM_dist,data_FEM_z(:,2),dist,H(:,3));
 end

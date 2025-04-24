@@ -1,40 +1,73 @@
-function buildMagTenseMEX(USE_RELEASE, USE_CUDA, USE_CVODE)
+function buildMagTenseMEX(options)
 %use clear all as this also clears dependencies to the .mex files and thus they can be overwritten
 
 arguments
-    USE_RELEASE {mustBeNumericOrLogical} = true;
-    USE_CUDA {mustBeNumericOrLogical} = true;
-    USE_CVODE {mustBeNumericOrLogical} = true;
+    options.USE_RELEASE {mustBeNumericOrLogical} = true;
+    options.USE_CUDA {mustBeNumericOrLogical}    = true;
+    options.USE_CVODE {mustBeNumericOrLogical}   = true;
+    
+    %--- Set the right include paths on Windows or allow the user to set them manually
+    options.mkl_include   = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include"';
+    options.mkl_lp64      = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\mkl\intel64\lp64"';
+    options.mkl_lib       = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\lib"';
+    options.cuda_root     = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\lib\x64"';
+    options.cvode_include = '"C:\Program Files (x86)\sundials-7.2.1\fortran"';
+    options.cvode_lib     = '"C:\Program Files (x86)\sundials-7.2.1\lib"';
+    
+    options.VS_STUDIO {mustBeNumericOrLogical} = false;
 end
 
+%--- Unpack the options
+USE_RELEASE   = options.USE_RELEASE;
+USE_CUDA      = options.USE_CUDA;
+USE_CVODE     = options.USE_CVODE;
+VS_STUDIO     = options.VS_STUDIO;
+
 pause_time = 1; %Time to wait between making and moving the generated files
-mex_root = '../source/MagTenseMEX/MagTenseMEX/';
-NumericalIntegration_path = '../source/NumericalIntegration/NumericalIntegration';
-DemagField_path = '../source/DemagField/DemagField';
-TileDemagTensor_path = '../source/TileDemagTensor/TileDemagTensor';
-MagTenseMicroMag_path = '../source/MagTenseMicroMag';
-ForceIntegrator_path = '../source/MagneticForceIntegrator/MagneticForceIntegrator';
-FortranCuda_path = '../source/MagTenseFortranCuda/cuda';
+mex_root                    = '../source/MagTenseMEX/MagTenseMEX/';
+NumericalIntegration_path   = '../source/NumericalIntegration/NumericalIntegration';
+DemagField_path             = '../source/DemagField/DemagField';
+TileDemagTensor_path        = '../source/TileDemagTensor/TileDemagTensor';
+MagTenseMicroMag_path       = '../source/MagTenseMicroMag';
+ForceIntegrator_path        = '../source/MagneticForceIntegrator/MagneticForceIntegrator';
+FortranCuda_path            = '../source/MagTenseFortranCuda/cuda';
 
 if (ispc)
-    VS_STUDIO = true;
     MKL_STATIC = true;
-    mkl_include = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include"';
-    mkl_lp64 = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\mkl\intel64\lp64"';
-    mkl_lib = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\lib"';
-    cuda_root = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\lib\x64"';
-    cvode_include = '"C:\Program Files (x86)\sundials-4.1.0\instdir\fortran"';
-    cvode_lib = '"C:\Program Files (x86)\sundials-4.1.0\instdir\lib"';
+    mkl_include   = options.mkl_include;
+    mkl_lp64      = options.mkl_lp64;
+    mkl_lib       = options.mkl_lib;
+    cuda_root     = options.cuda_root;
+    cvode_include = options.cvode_include;
+    cvode_lib     = options.cvode_lib;
     mex_suffix = 'w';
 else
     VS_STUDIO = false;
-    MKL_STATIC = false;
-    compiler_root = '/opt/intel/oneapi/compiler/latest';
-    mkl_root = '/opt/intel/oneapi/mkl/latest';
-    mkl_lib = '/opt/intel/oneapi/mkl/latest/lib/intel64';
-    cuda_root = '/usr/local/cuda-12.3/lib64/';
-    cvode_include = '/usr/local/sundials-4.1.0/instdir/fortran';
-    cvode_lib = '/usr/local/sundials-4.1.0/instdir/lib';
+    MKL_STATIC = true;
+    
+    %--- The CONDA installation directory
+    pre_str = getenv('CONDA_PREFIX');
+
+    if (isempty(pre_str))
+        %--- Check if miniconda is in /usr/share or in the users home
+        share_dir = system('ls /usr/share/miniconda/envs/magtense-env/');
+    
+        if (share_dir == 0)
+            pre_str = '/usr/share/miniconda';
+        else
+            %--- Get the username of the current user, which is where the miniconda is installed
+            [~,username] = system('whoami');
+            user = username(1:(end-1));
+            pre_str = ['/home/' user '/miniconda3'];
+        end
+    end
+
+    compiler_root = [pre_str '/envs/magtense-env'];
+    mkl_root = [pre_str '/envs/magtense-env'];
+    mkl_lib = [pre_str '/envs/magtense-env/lib'];
+    cuda_root = [pre_str '/envs/magtense-env/lib'];
+    cvode_include = '/home/runner/work/MagTense/MagTense/cvode/fortran';
+    cvode_lib = '/home/runner/work/MagTense/MagTense/cvode/lib';
     mex_suffix = 'a';
 end
 
@@ -47,28 +80,40 @@ else
 end
 
 if (USE_CUDA)
-    CUDA = ['-L' cuda_root ' -lcublas -lcudart -lcuda -lcusparse'];
     if (ispc)
+        CUDA = ['-L' cuda_root ' -lcublas -lcudart -lcuda -lcusparse'];
         OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.obj ' FortranCuda_path '/MagTenseCudaBlas.obj" '];
     else
+        CUDA = ['-Wl,-Bdynamic ' '-L' cuda_root ' -lcublas -lcudart -lcusparse'];
         OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.o ' FortranCuda_path '/MagTenseCudaBlas.o" '];
     end
     BUILD_MagTenseMicroMag = BUILD;
 else
     CUDA = '';
     OBJS = '';
-    BUILD_MagTenseMicroMag = [BUILD '_no_CUDA'];
+    if (VS_STUDIO)
+        BUILD_MagTenseMicroMag = [BUILD '_no_CUDA'];
+    else
+        BUILD_MagTenseMicroMag = BUILD;
+    end
 end
 
 if (USE_CVODE)
-    CVODE_include = join(['-I' cvode_include], '');
-    CVODE = ['-L' cvode_lib ' -lsundials_nvecserial -lsundials_sunmatrixdense -lsundials_sunlinsoldense' ...
-    ' -lsundials_fnvecserial_mod -lsundials_cvode -lsundials_fsunnonlinsolfixedpoint_mod'];
+    CVODE_include = join([' -I' cvode_include ' -I/home/runner/work/MagTense/MagTense/cvode/include/cvode'], '');
+    
+    if (ispc)
+        CVODE = ['-L' cvode_lib ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static'];
+        CVODE = [CVODE ' LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"'];
+    else
+        CVODE = [' -Wl,--start-group ' cvode_lib '/libsundials_core.a ' cvode_lib '/libsundials_cvode.a ' cvode_lib '/libsundials_fcore_mod.a ' cvode_lib '/libsundials_fcvode_mod.a ' cvode_lib '/libsundials_fnvecserial_mod.a ' cvode_lib '/libsundials_fsunmatrixdense_mod.a ' cvode_lib '/libsundials_fsunlinsolspgmr_mod.a' ' -Wl,--end-group'];
+    end
 else
     CVODE_include = '';
     CVODE = '';
-    BUILD = [BUILD '_no_CVODE'];
-    BUILD_MagTenseMicroMag = [BUILD_MagTenseMicroMag '_no_CVODE'];
+    if (VS_STUDIO)
+        BUILD = [BUILD '_no_CVODE'];
+        BUILD_MagTenseMicroMag = [BUILD_MagTenseMicroMag '_no_CVODE'];
+    end
 end
 
 if (VS_STUDIO)
@@ -79,10 +124,9 @@ else
     BUILD_MagTenseMicroMag = ' ';
 end
 
-
 if (ispc)
     DEFINES = '-R2018a';
-    FFLAGS = 'COMPFLAGS="$COMPFLAGS /free /O3 /fpp /real-size:64 /Qopenmp /assume:nocc_omp /fpe:0 /fp:source"';
+    FFLAGS = 'COMPFLAGS="$COMPFLAGS /free /nologo /real-size:64 /O2 /assume:nocc_omp /Qopenmp /fpp /fpe:0 /fp:source /fp:precise"';
     if (USE_CUDA)
         FFLAGS = [FFLAGS(1:(end-1)) ' /libs:static"'];
     end
@@ -98,17 +142,19 @@ if (ispc)
         MKL = ['-L' mkl_lib ' -lmkl_rt -lmkl_blas95_lp64'];
     end
 else
-    DEFINES = ['FC="' compiler_root '/bin/ifort" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
-    INCLUDE = ['INCLUDE="$INCLUDE -I' mkl_root '/include -I' NumericalIntegration_path ' -I' DemagField_path ...
-        ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ' -I' ForceIntegrator_path ' -I' mkl_root];
-    LIBS = ['-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' DemagField_path ' -lDemagField -L' ...
-        TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration -L' ...
-        ForceIntegrator_path ' -lMagneticForceIntegrator'];
-    FFLAGS = 'FFLAGS="';
+    DEFINES = ['FC="' compiler_root '/bin/ifx" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
+    INCLUDE = ['INCLUDE="$INCLUDE -I' NumericalIntegration_path ' -I' DemagField_path ...
+        ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ' -I' ForceIntegrator_path ... 
+        ' -I' mkl_root '/include' ' -I' mkl_root '/include/intel64/lp64'];
+    LIBS = ['LINKLIBS=''$LINKLIBS ' '-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' ...
+        ForceIntegrator_path ' -lMagneticForceIntegrator -L' DemagField_path ' -lDemagField -L' ...
+        TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration'''];
     if (MKL_STATIC)
-        MKL = ['-liomp5 -lpthread -lm -ldl LINKLIBS="$LINKLIBS ' mkl_lib '/libmkl_intel_thread.a ' mkl_lib ...
-            '/libmkl_core.a ' mkl_lib '/libmkl_blas95_lp64.a ' mkl_lib '/libmkl_intel_lp64.a"'];
-        INCLUDE = [INCLUDE '/include/intel64/lp64 '];
+        LIBS = [LIBS(1:(end-1)) ' ' mkl_lib '/libmkl_blas95_lp64.a -Wl,--start-group ' ...
+               mkl_lib '/libmkl_intel_lp64.a ' mkl_lib '/libmkl_intel_thread.a ' ...
+               mkl_lib '/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl -static-intel'''];
+        MKL = [];
+        %INCLUDE = [INCLUDE '/include/intel64/lp64 '];
     else
         MKL = ['-L' mkl_root '/lib/intel64 -lmkl_rt -lpthread -lm -ldl '];
         if (USE_CUDA)
@@ -120,8 +166,18 @@ else
             MKL = [MKL '-lmkl_blas95_ilp64'];
         end
     end
+
+    %Be sure to include the libraries under the ' in the string
+    if (USE_CUDA)
+        LIBS = [LIBS(1:(end-1)) ' ' CUDA ''''];
+        CUDA = '';
+    end
+    if (USE_CVODE)
+        LIBS = [LIBS(1:(end-1)) ' ' CVODE ''''];
+        CVODE = '';
+    end
     INCLUDE = [INCLUDE CVODE_include '"'];
-    FFLAGS = [FFLAGS '-O3 -fpp -real-size 64 -qopenmp -assume nocc_omp -fpe0 -fp-model=source -fpic -diag-disable 10006"'];
+    FFLAGS = ['FFLAGS="-O3 -fpp -real-size 64 -fpe0 -fp-model=source -fPIC -nologo -diag-disable 10006"'];
 end
 
 %%------------------------------------------------------------------
