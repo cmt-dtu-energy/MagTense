@@ -5,7 +5,7 @@
 	</Platforms>
 	<Configurations>
 		<Configuration Name="Debug|x64" UseCompiler="ifxCompiler" ConfigurationType="typeStaticLibrary">
-			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2024b\extern\include\;C:\Program Files (x86)\sundials-7.2.1\fortran;C:\Program Files (x86)\sundials-7.2.1\include" PreprocessorDefinitions="USE_CVODE" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2024b\extern\include\;C:\Program Files (x86)\sundials-7.2.1\fortran;C:\Program Files (x86)\sundials-7.2.1\include" PreprocessorDefinitions="USE_CVODE;USE_MATLAB" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
 			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="C:\Program Files (x86)\sundials-7.2.1\lib"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -25,7 +25,7 @@
 			<Tool Name="VFPostBuildEventTool"/>
 		</Configuration>
 		<Configuration Name="Debug_no_CVODE|x64" UseCompiler="ifxCompiler" ConfigurationType="typeStaticLibrary">
-			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2024b\extern\include\;C:\Program Files (x86)\sundials-7.2.1\include;C:\Program Files (x86)\sundials-7.2.1\fortran" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2024b\extern\include\;C:\Program Files (x86)\sundials-7.2.1\include;C:\Program Files (x86)\sundials-7.2.1\fortran" PreprocessorDefinitions="USE_MATLAB" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
 			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="C:\Program Files (x86)\sundials-7.2.1\lib"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -35,7 +35,7 @@
 			<Tool Name="VFPostBuildEventTool"/>
 		</Configuration>
 		<Configuration Name="Release_no_CVODE|x64" UseCompiler="ifxCompiler" ConfigurationType="typeStaticLibrary">
-			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2024b\extern\include\;C:\Program Files (x86)\sundials-7.2.1\include;C:\Program Files (x86)\sundials-7.2.1\fortran" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" RealKIND="realKIND8"/>
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" Preprocess="preprocessYes" AdditionalIncludeDirectories="C:\Program Files\MATLAB\R2024b\extern\include\;C:\Program Files (x86)\sundials-7.2.1\include;C:\Program Files (x86)\sundials-7.2.1\fortran" PreprocessorDefinitions="USE_MATLAB" FixedFormLineLength="fixedLength132" OpenMP="OpenMPParallelCode" RealKIND="realKIND8"/>
 			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="C:\Program Files (x86)\sundials-7.2.1\lib"/>
 			<Tool Name="VFResourceCompilerTool" AdditionalIncludeDirectories="C:\Program Files (x86)\sundials\inst_dir\include"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -70,7 +70,8 @@
 				</FileConfiguration>
 			</File>
 			<File RelativePath=".\IntegrationDataTypes.f90"/>
-			<File RelativePath=".\IOgeneral.f90"/>
+			<File RelativePath=".\IOgeneral.f90">
+			</File>
 			<File RelativePath=".\NumericalIntegrals.f90"/>
 			<File RelativePath=".\ODE_Solvers.f90"/>
 			<File RelativePath=".\quadpack.f90"/>
