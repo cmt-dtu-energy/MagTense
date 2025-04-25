@@ -6,6 +6,8 @@ Using MagTense with Matlab is as easy as downloading the latest [release](https:
 
 If you want to compile your own MEX-files, the guide below shows how to do so. Building the MEX-files is always a two-step procedure. First the Fortran objectives files must be compiled and then the Matlab MEX compiler must be used to build the MEX-files. Included in MagTense is a Matlab function to build the MEX-files, [buildMagTenseMEX.m](buildMagTenseMEX.m). MagTense utilizes Intel MKL for the micromagnetic simlations and can also utilize CUDA and CVODE. 
 
+To build with CVODE an installation of sundials-7.2.1 is required. See the description in the [python build instructions](https://github.com/cmt-dtu-energy/MagTense/edit/master/python/README.md#install-cvode-from-sundials-721) for how to build CVODE.
+
 ## Compilation on Linux 
 
 ### Using make
@@ -59,7 +61,7 @@ From a standard command prompt navigate to the MagTense dir "MagTense/source/Mag
 
 #### CUDA step 2
 
-Start an Intel 64 prompt (Start Menu -> Intel oneAPI 20XX -> Intel oneAPI command prompt for Intel 64 for Visual Studio XX) and compile the C++ wrapper with icx including the cuda stuff:
+Start an "Intel oneAPI command prompt for Intel 64 for Visual Studio" and compile the C++ wrapper with icx including the cuda stuff:
 
 ```bash
 icx -c MagTenseCudaBlasICLWrapper.cxx
@@ -78,7 +80,7 @@ to build the MEX-files. If you want to build without CUDA, please do `buildMagTe
 
 ### Compilation with make
 
-Compiling with make requires installation of Intels oneAPI compilers and MKL. This can be a cumbersome process, so we therefore provide a conda environment file similar to Linux. Installing this the python environment provided with MagTense to install all required compilers etc. All that is required is an installation of Matlab present on the machine.
+Compiling with make requires installation of Intels oneAPI compilers and MKL. This can be a cumbersome process, so we therefore provide a conda environment file similar to Linux. Installing this the python environment provided with MagTense to install all required compilers etc. All that is required is an installation of Matlab present on the machine. In general it is advised to look at the [workflow files](https://github.com/cmt-dtu-energy/MagTense/tree/master/.github/workflows) to modify the commands below to e.g. install with CVODE support.
 
 First of all Miniconda (or Anaconda) must be installed, after which the MagTense conda environment with all necessary compilers can be created using
 
@@ -134,108 +136,4 @@ setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"
 mex -setup FORTRAN;
 cd('MagTense/matlab');
 buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',false,'mkl_include','path_to_conda_environments\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','path_to_conda_environments\envs\magtense-env\Library\lib','mkl_lp64','path_to_conda_environments\envs\magtense-env\Library\include\intel64\lp64');
-```
-
-## Install CVODE from sundials-4.1.0
-
-- Requirements:
-
-  - [cmake](https://cmake.org/)
-
-  - [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
-
-  - [Sundials-4.1.0](https://github.com/LLNL/sundials/releases/tag/v4.1.0)
-
-      ```bash
-      wget https://github.com/LLNL/sundials/releases/download/v4.1.0/sundials-4.1.0.tar.gz
-      tar -xf sundials-4.1.0.tar.gz
-      ```
-
-    Note: It is not possible to get the cmake installer to work if sundials is unzipped in a directory with spaces.
-
-- Rename the unpacked folder `sundials-4.1.0` to `srcdir`
-
-    ```bash
-    mv sundials-4.1.0 srcdir
-    mkdir sundials-4.1.0
-    mv srcdir ./sundials-4.1.0
-    cd sundials-4.1.0
-    mkdir builddir
-    mkdir instdir
-    ```
-
-- Open the file "scrdir\config\SundialsFortran.cmake" and change the following two lines to:
-
-    ```bash
-    214     "FIND_FILE(FLIB flib.f ${FortranTest_DIR})\n"
-    262     "FIND_FILE(FLIB flib.f ${FortranTest_DIR})\n"
-    ```
-
-## Build with cmake on Windows
-
-- Open Visual Studio and open a Developer Command Prompt (Tools/Command Line/Developer Command Prompt)
-
-    ```bash
-    cd builddir
-    "C:\Program Files\CMake\bin\cmake-gui.exe" ../srcdir
-    ```
-
-- Click "Configure"
-
-    Choose Visual Studio 16 2019 (or whatever latest version you have) as generator
-    Write "Intel C++ Compiler 19.0" (or whatever latest version you have) in "Optional toolset to use"
-
-- Set the CMAKE_INSTALL_PREFIX to the full path to the instdir
-- Set the EXAMPLES_INSTALL_PATH to the full path to the instdir/examples
-- Enable only the following settings (if not all settings appear, select the appropriate onces and click "Configure" again):
-
-    ```bash
-    BUILD_CVODE
-    BUILD_STATIC_LIBS
-    BUILD_TESTING
-    EXAMPLES_ENABLE_C
-    EXAMPLES_ENABLE_CXX
-    EXAMPLES_ENABLE_F77
-    EXAMPLES_ENABLE_F90
-    F2003_INTERFACE_ENABLE
-    F77_INTERFACE_ENABLE
-    OPENMP_ENABLE
-    ```
-
-- Click "Generate" in cmake
-
-    Note: If any paths contain spaces or parentheses, escape the offending symbols with \ and generate again. Likely culprit: BLAS libraries.
-
-- Copy [build_rest.bat](build_rest.bat) into builddir
-
-    ```bash
-    cp matlab/build_rest.bat .
-    ```
-
-- In Visual Studio command window run the following commands:
-
-    ```bash
-    msbuild ALL_BUILD.vcxproj -property:Configuration=Debug
-    msbuild INSTALL.vcxproj -property:Configuration=Debug
-
-    msbuild ALL_BUILD.vcxproj -property:Configuration=Release
-    msbuild INSTALL.vcxproj -property:Configuration=Release
-    ```
-
-- CVODE is now installed in the instdir. Move the folder `sundials-4.1.0` to the expected location:
-
-    ```bash
-    cd ..
-    mv sundials-4.1.0 "C:\Program Files (x86)\sundials-4.1.0"
-    ```
-
-Note: The last four instructions *could* be put into the .bat file, but it's easier to isolate warnings / errors if they aren't.
-Building ALL_BUILD causes two linker warnings because SUNDIALS gave compile flags to the linker as well as the compiler.
-Building INSTALL can cause one (strange) warning, MSB8065, which is apparently a [bug](https://gitlab.kitware.com/cmake/cmake/issues/19737) of no consequence.
-
-## Build with cmake on Linux
-
-```bash
-cd builddir
-cmake --verbose -DCMAKE_INSTALL_PREFIX=/path/to/sundials-4.1.0/instdir -DEXAMPLES_INSTALL_PATH=/path/to/sundials-4.1.0/instdir/examples -DBUILD_ARKODE=OFF -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_CVODE=ON -DBUILD_STATIC_LIBS=ON -DBUILD_TESTING=ON -DCMAKE_Fortran_COMPILER=/opt/intel/oneapi/compiler/latest/linux/bin/intel64/ifort -DEXAMPLES_ENABLE_C=ON -DEXAMPLES_ENABLE_CXX=ON -DEXAMPLES_ENABLE_F77=ON -DEXAMPLES_ENABLE_F90=ON -DF2003_INTERFACE_ENABLE=ON -DF77_INTERFACE_ENABLE=ON -DOPENMP_ENABLE=ON ../srcdir
 ```
