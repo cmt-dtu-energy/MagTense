@@ -3,7 +3,7 @@ name: Python - Pip-wheel with conda
 on:
   pull_request:
     branches:
-      - main
+      - master
   workflow_call:
 
 jobs:
