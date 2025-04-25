@@ -172,7 +172,7 @@ python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cuspar
 ### Linux
 
 - Requirements (already present in `.build/env-313-linux`): `cmake`, `ifx`, `icx`
-- Download latest version of `cvode`:
+- Download version 7.2.1 of `cvode`:
 
   ```bash
   wget https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz
@@ -203,37 +203,19 @@ python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cuspar
 
 ### Windows
 
-We recommend using the [associated workflow](../.github/workflows/cmake-sundials-cvode.yml) to create the required static libraries during compilation time.
+Download [sundials-7.2.1](https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz) and unzip it.
 
+To compile the CVODE objective files, you need an installation of Visual Studio and Intel oneAPI for both C++ and Fortran. The commands below assume that you have the Enterprise version of Visual Studio - if you have the free community edition, simply change `Enterprise` to `Community` in the path.
 
-## Read-in customized M-H-curve
+Open a "Intel oneAPI command prompt for Intel 64 for Visual Studio 2022" as administrator and then do:
+ ```
+"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -G "Ninja" -B C:/CVODE_temporary_directory -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_ARKODE=OFF -DBUILD_CVODE=ON -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON
 
-This feature is currently only supported for soft magnetic tiles ([type=2](magtense/magtense.py#L49)).
+cmake --build C:/CVODE_temporary_directory --config RELEASE --verbose
 
-In  [iterate_magnetization()](magtense/magtense.py#L611), an arbitrary number of state functions (M-H-curves) can be defined:
+cmake --install C:/CVODE_temporary_directory --verbose
+  ```
 
-```python
-mu_r = 100
-datapath = f'./magtense/mat/Fe_mur_{mu_r}_Ms_2_1.csv'
+where the `CVODE_temporary_directory` is a temporary directory that can be removed after installation.
 
- ...
-
-data_statefcn = numpy.genfromtxt(datapath, delimiter=';')
-n_statefcn = 1
-```
-
-[Here](magtense/mat), three sample M-H-curves for Fe with different relative permeabilities and a saturation magnetization of 2.1 T are stored as CSV-files. The data format is as follows:
-
-```csv
-0; Temp0; Temp1; ...
-H0-field; M0@Temp0; M0@Temp1;...
-H1-field; M1@Temp0; M1@Temp1;...
-.
-.
-H100-field; M100@Temp0; M100@Temp1; ...
-.
-```
-
-With only one state function given, the same M-H-curve applies to all tiles of type 2.
-
-When the soft tiles differ in their M-H-curves, multiple state function can be combined. In order to match a specific M-H-curve with the corresponding tile, the variable [stfcn_index](magtense/magtense.py#L54) can be set.
+The installed CVODE files will be located in `"C:\Program Files (x86)\SUNDIALS"` but should be moved to `"C:\Program Files (x86)\sundials-7.2.1"` manually, so that MagTense can find it.
