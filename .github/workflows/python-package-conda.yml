@@ -1,7 +1,6 @@
 name: Python - Pip-wheel with conda
 
 on:
-  push:
   pull_request:
     branches:
       - master
@@ -28,6 +27,12 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Get latest tag
+      id: previoustag
+      uses: WyriHaximus/github-action-get-previous-tag@v1
+      with:
+        fallback: 1.0.0
 
     - name: Setup msvc-dev-cmd
       if: ${{ runner.os == 'Windows' }}
@@ -95,6 +100,13 @@ jobs:
         make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
         cp magtensesource.* '${{ github.workspace }}'/python/cu12_libs/
         make clean
+
+    - name: Set version number to latest tag
+      working-directory: ${{ github.workspace }}/python/src/magtense/
+      run: |
+        echo ${{ steps.previoustag.outputs.tag }}
+        echo ${{ github.ref_name }}
+        sed -i 's/1.0.0/${{ steps.previoustag.outputs.tag }}/' __init__.py
 
     - name: Build pip-wheels
       working-directory: ${{ github.workspace }}/python/

@@ -14,15 +14,15 @@ where = ["src"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
+version = {attr = "magtense.__version__"}
 
 [project]
 name = "magtense"
-version = "2.2.2"
 authors = [
   { name="Stefan Pollok", email="spol@dtu.dk" },
 ]
 description = "MagTense - a micromagnetism and magnetostatic framework"
-dynamic = ["dependencies"]
+dynamic = ["dependencies", "version"]
 readme = "README_top.md"
 requires-python = ">=3.12"
 license = "GPL-3.0-or-later"

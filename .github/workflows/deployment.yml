@@ -37,13 +37,26 @@ jobs:
       with:
         name: pip-wheel-py313-cu12-Linux
 
+    - name: Get latest tag
+      id: previoustag
+      uses: WyriHaximus/github-action-get-previous-tag@v1
+
     - name: Move wheels to dist/
       run: |
         mkdir dist/
         mv ${{ github.workspace }}/*.whl dist/
         ls -al dist/
+    
+    - name: Rename wheels with cuda
+      working-directory: dist/
+      run: |
+        mv magtense-${{ steps.previoustag.outputs.tag }}-1-py312-none-win_amd64.whl magtense-${{ steps.previoustag.outputs.tag }}-py312-none-win_amd64.whl
+        mv magtense-${{ steps.previoustag.outputs.tag }}-1-py313-none-win_amd64.whl magtense-${{ steps.previoustag.outputs.tag }}-py313-none-win_amd64.whl
+        mv magtense-${{ steps.previoustag.outputs.tag }}-1-py312-none-manylinux1_x86_64.whl magtense-${{ steps.previoustag.outputs.tag }}-py312-none-manylinux1_x86_64.whl
+        mv magtense-${{ steps.previoustag.outputs.tag }}-1-py313-none-manylinux1_x86_64.whl magtense-${{ steps.previoustag.outputs.tag }}-py313-none-manylinux1_x86_64.whl
 
     - name: Publish package distributions to TestPyPI
       uses: pypa/gh-action-pypi-publish@release/v1
+      # TODO Remove two lines below for publishing to PyPI
       with:
         repository-url: https://test.pypi.org/legacy/
