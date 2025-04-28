@@ -1,7 +1,6 @@
 import argparse
 import itertools
 import subprocess
-import tomllib
 from pathlib import Path
 
 
@@ -26,6 +25,12 @@ def parse_args() -> argparse.Namespace:
         default="win,linux",
         help="Platforms (comma-separated)",
     )
+    parser.add_argument(
+        "--pkg_version",
+        type=str,
+        default="1.0.0",
+        help="Package version",
+    )
     return parser.parse_args()
 
 
@@ -33,14 +38,13 @@ def main(
     py_versions: list[str],
     cu_versions: list[str],
     platforms: list[str],
+    pkg_version: str,
     build_tag: dict | None = None,
 ) -> None:
     if build_tag is None:
         build_tag = {"cpu": 0, "cu12": 1}
     py_folder = Path(__file__).parent.parent
     lib_folder = py_folder / "src" / "magtense" / "lib"
-    with Path.open(py_folder / "pyproject.toml", "rb") as f:
-        mt_version = tomllib.load(f)["project"]["version"]
 
     for platform in platforms:
         suffix = "pyd" if platform == "win" else "so"
@@ -92,8 +96,8 @@ def main(
             subprocess.run(
                 [
                     "mv",
-                    f"{py_folder}/dist/magtense-{mt_version}-py{py[0]}-none-any.whl",
-                    f"{py_folder}/dist/magtense-{mt_version}-{build_tag[cuda]}-py{py}-none-{whl_arch}.whl",
+                    f"{py_folder}/dist/magtense-{pkg_version.removeprefix('v')}-py{py[0]}-none-any.whl",
+                    f"{py_folder}/dist/magtense-{pkg_version.removeprefix('v')}-{build_tag[cuda]}-py{py}-none-{whl_arch}.whl",
                 ],
                 check=False,
             )
@@ -116,7 +120,9 @@ def main(
 
 if __name__ == "__main__":
     args = parse_args()
-    py_versions = args.py_version.split(",")
-    cu_versions = args.cu_version.split(",")
-    platforms = args.platform.split(",")
-    main(py_versions, cu_versions, platforms)
+    main(
+        args.py_version.split(","),
+        args.cu_version.split(","),
+        args.platform.split(","),
+        args.pkg_version,
+    )
