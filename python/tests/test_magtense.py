@@ -132,4 +132,4 @@ def test_plot_fn() -> None:
     tiles.rot = ([0, 0, 2], 5)
 
     # Call the plot function
-    create_plot(tiles)
+    create_plot(tiles, show=False)
