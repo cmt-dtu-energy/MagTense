@@ -48,7 +48,7 @@
     real(dp), intent(in) :: dims(:,:)
     type(MicroMagGridInfo), intent(out) :: GridInfo
 
-    integer :: Nel, K, idim, ipm, j, n, kb, i, k_i, indx, n_faces, i_end, k1, k2, Nalloc_small, Nalloc_large, Ncount
+    integer :: Nel, K, idim, ipm, j, n, kb, i, k_i, n_faces, k1, k2, Nalloc_small, Nalloc_large, Ncount
     real(dp), allocatable :: Xel(:), Yel(:), Zel(:)
     real(dp), allocatable :: Volumes(:)
     real(dp) :: DimsScales(3)
@@ -70,18 +70,17 @@
     logical, allocatable :: AcontainsB(:), BcontainsA(:)
     integer, allocatable :: indxAB(:), indxBA(:)
     integer, allocatable :: firstindx(:), secondindx(:)
-    integer, allocatable :: k1Mut_temp(:), k2Mut_temp(:), k1Mut(:), k2Mut(:), k1NonMut(:), k2NonMut(:)
-    integer, allocatable :: kRmv(:), kSurv(:), nRmv(:), TheSigns(:,:), TheSigns_temp(:,:)
+    integer, allocatable :: k1Mut_temp(:), k2Mut_temp(:), k1Mut(:), k2Mut(:)
+    integer, allocatable :: kRmv(:), kSurv(:), nRmv(:)
     logical, allocatable :: iYes(:), mask1D(:)
     integer, allocatable :: cols(:)
-    real(dp), allocatable ::xVertA(:,:), xVertB(:,:), xVertC(:,:), xVertD(:,:)
-    real(dp), allocatable ::xxMinEl(:,:), xxMaxEl(:,:)
+    real(dp), allocatable :: xVertA(:,:), xVertB(:,:), xVertC(:,:), xVertD(:,:)
+    real(dp), allocatable :: xxMinEl(:,:), xxMaxEl(:,:)
     real(dp), allocatable :: TheseMinXXel(:,:), TheseMaxXXel(:,:)
-    logical, allocatable :: theseA(:),theseB(:),theseC(:),theseD(:)
+    logical, allocatable :: theseA(:), theseB(:), theseC(:), theseD(:)
     integer, allocatable :: iZero(:), count_temp(:,:), count1D(:)
-    integer, allocatable :: theseA_int(:),theseB_int(:),theseC_int(:),theseD_int(:),theseNum(:)
-    logical, allocatable :: TheTs(:,:), TheDs(:,:)
-    integer, allocatable :: thisBoolean_arr(:,:), kMut_F(:,:), kNonMut_F(:,:), kMut_F_temp(:,:), kNonMut_F_temp(:,:)
+    integer, allocatable :: theseA_int(:), theseB_int(:), theseC_int(:), theseD_int(:), theseNum(:)
+    integer, allocatable :: kMut_F(:,:), kNonMut_F(:,:), kMut_F_temp(:,:), kNonMut_F_temp(:,:)
     integer, allocatable :: TheTs_indices_this(:), TheTs_temp(:,:), TheTs_indices(:,:)
     integer, allocatable :: TheDs_indices_this(:), TheDs_temp(:,:), TheDs_indices(:,:)
     integer, allocatable :: TheSigns_indices_pos(:,:), TheSigns_indices_neg(:,:), TheSigns_indices(:,:)
@@ -112,20 +111,6 @@
     n_faces = 6 * Nel
     allocate(fNormX(n_faces), fNormY(n_faces), fNormZ(n_faces), AreaFaces(n_faces), DimsF(n_faces, 3))
     allocate(Xf(n_faces), Yf(n_faces), Zf(n_faces), XXF(n_faces,3))
-    allocate(TheSigns(Nel,n_faces))
-    allocate(TheSigns_indices_pos(6*Nel,2))   
-    TheSigns(:,:) = 0
-
-    !k_i = 1
-    do i=0,5
-        do j=1,Nel
-            TheSigns(j, j+(i*Nel)) = 1
-            
-            !TheSigns_indices_pos(k_i,1) = j
-            !TheSigns_indices_pos(k_i,2) = j+(i*Nel)
-            !k_i = k_i + 1
-        end do
-    end do
     
     ThePM = [-1, 1]
     TheEE = reshape([1, 0, 0, 0, 1, 0, 0, 0, 1], [3, 3])
@@ -154,7 +139,6 @@
     
     ! Check which faces are contained by other faces
     allocate(indexItContainsTrue_temp(n_faces, 2))
-
     allocate(UminA(Nel), UmaxA(Nel), VminA(Nel), VmaxA(Nel))
     allocate(UminB(Nel), UmaxB(Nel), VminB(Nel), VmaxB(Nel))
     allocate(Aindex(Nel), Bindex(Nel))
@@ -198,22 +182,25 @@
         allocate(firstindx(size(indxAB)+size(indxBA)))
         allocate(secondindx(size(indxAB)+size(indxBA)))
         
-        k_i = 1
-        do i = 1,size(indxAB)
-            firstindx(i) = indxAB(i)
-            k_i = k_i+1
-        enddo
-        do i = k_i,k_i+(size(indxBA)-1)
-            firstindx(i) = Bindex(kb)
-        enddo
+        firstindx(1:size(indxAB)) = indxAB
+        firstindx(size(indxAB)+1:size(firstindx)) = Bindex(kb)
+        !k_i = 1
+        !do i = 1,size(indxAB)
+        !    firstindx(i) = indxAB(i)
+        !    k_i = k_i+1
+        !enddo
+        !do i = k_i,k_i+(size(indxBA)-1)
+        !    firstindx(i) = Bindex(kb)
+        !enddo
         
-        k_i = 1
-        do i = 1,size(indxAB)
-            secondindx(i) = Bindex(kb)
-            k_i = k_i+1
-        enddo
-        do i = k_i,k_i+(size(indxBA)-1)
-            secondindx(i) = indxBA(i-(k_i-1))
+        secondindx(1:size(indxAB)) = Bindex(kb)
+        !k_i = 1
+        !do i = 1,size(indxAB)
+        !    secondindx(i) = Bindex(kb)
+        !    k_i = k_i+1
+        !enddo
+        do i = size(indxAB)+1,size(indxAB)+size(indxBA)
+            secondindx(i) = indxBA(i-size(indxAB))
         enddo
         
         do i = 1,size(firstindx)
@@ -282,6 +269,7 @@
     allocate(kRmv(size(k1Mut)+size(kNonMut_F(:,1))))
     allocate(kSurv(size(k2Mut)+size(kNonMut_F(:,2))))
     allocate(nRmv(size(k2Mut)+size(kNonMut_F(:,2))))
+    allocate(TheSigns_indices_pos(6*Nel,2))   
     allocate(TheSigns_indices_neg((size(k2Mut)+size(kNonMut_F(:,2))),2)) 
     
     ! each of the faces being removed has:
@@ -304,8 +292,6 @@
     !The same applies for the positive values except here the y-values are 1:j+(i*Nel)
     k_i = 1
     do i=1,size(nRmv)        
-        TheSigns(nRmv(i),kSurv(i)) = -1
-        
         if (mask1D(kSurv(i))) then
             Ncount = count(mask1D(1:kSurv(i)))
             TheSigns_indices_neg(k_i,1) = nRmv(i)
@@ -343,7 +329,6 @@
     allocate(XXF_temp(k,3),DimsF_temp(k,3))
     allocate(fNormX_temp(k),fNormY_temp(k),fNormZ_temp(k))
     allocate(Xf_temp(k),Yf_temp(k),Zf_temp(k),AreaFaces_temp(k))
-    allocate(TheSigns_temp(Nel,k))
     do i=1,3
         XXF_temp(:,i) = pack(XXf(:,i),mask1D)
         DimsF_temp(:,i) = pack(DimsF(:,i),mask1D)
@@ -355,32 +340,26 @@
     Yf_temp = pack(Yf,mask1D)
     Zf_temp = pack(Zf,mask1D)
     AreaFaces_temp = pack(AreaFaces,mask1D)
-    do i=1,Nel
-        TheSigns_temp(i,:) = pack(TheSigns(i,:),mask1D)
-    end do
         
     !Delete all the temporary arrays and put the values back into the original arrays
     !First deallocate the original arrays
-    deallocate(XXF,DimsF,TheSigns)
+    deallocate(XXF,DimsF)
     deallocate(fNormX,fNormY,fNormZ,Xf,Yf,Zf,AreaFaces)
     deallocate(mask1D)
     
     k = size(Xf_temp)
     allocate(XXF(k,3),DimsF(k,3),DimsF2(k,3))
     allocate(fNormX(k),fNormY(k),fNormZ(k),Xf(k),Yf(k),Zf(k),AreaFaces(k))
-    allocate(TheSigns(Nel,k))
-    XXF(:,:)    = XXF_temp(:,:)
-    DimsF(:,:)  = DimsF_temp(:,:)
-    fNormX(:) = fNormX_temp(:)
-    fNormY(:) = fNormY_temp(:)
-    fNormZ(:) = fNormZ_temp(:)
-    Xf(:) = Xf_temp(:)
-    Yf(:) = Yf_temp(:)
-    Zf(:) = Zf_temp(:)
-    AreaFaces(:) = AreaFaces_temp(:)
-    call move_alloc (TheSigns_temp, TheSigns)
-    deallocate(XXF_temp,DimsF_temp)
-    deallocate(fNormX_temp,fNormY_temp,fNormZ_temp,Xf_temp,Yf_temp,Zf_temp,AreaFaces_temp)
+    !allocate(TheSigns(Nel,k))
+    call move_alloc (XXF_temp,XXF)
+    call move_alloc (DimsF_temp,DimsF)
+    call move_alloc (fNormX_temp,fNormX)
+    call move_alloc (fNormY_temp,fNormY)
+    call move_alloc (fNormZ_temp,fNormZ)
+    call move_alloc (Xf_temp,Xf)
+    call move_alloc (Yf_temp,Yf)
+    call move_alloc (Zf_temp,Zf)
+    call move_alloc (AreaFaces_temp,AreaFaces)
     
     !! Construct T and D matrix
     ! TheTs is a K times Nel sparse matrix
@@ -440,10 +419,6 @@
         count1D(n) = n
     end do
     
-    allocate(TheTs(size(Xf),Nel), TheDs(size(Xf),Nel))
-    TheTs(:,:) = .false.
-    TheDs(:,:) = .false.
-    
     allocate(TheTs_indices(0,2))
     
     do n=1,Nel
@@ -472,8 +447,12 @@
         theseNum = theseA_int + theseB_int + theseC_int + theseD_int
         
         mask1D = (theseNum >= 2)
-        where (mask1D) TheTs(:,n) = .true.
-        
+
+        !Instead of assigning the values to a TheTs matrix, we simply find the indices and save those.
+        !The TheTs matrix would have been assigned as "where (mask1D) TheTs(:,n) = .true."
+        !Instead we use an array going from 1:N and the use the mask1D to find the indices to be saved.
+        !This is done in the temporary array TheTs_indices_this
+        !These are then put into the TheTs_indices full array, which size in expanded in every loop.
         Nalloc_small = size(TheTs_indices,1)
         if (any(mask1D)) then
             TheTs_indices_this = pack(count1D, mask1D)
@@ -486,8 +465,9 @@
         endif
         
         mask1D = (theseNum >= 1)
-        where (mask1D) TheDs(:,n) = .true.
         
+        !The same logic as for TheTs is applied here for the TheDs.
+        !The code mimics "where (mask1D) TheDs(:,n) = .true." but operates only on indices
         Nalloc_small = size(TheDs_indices,1)
         if (any(mask1D)) then
             TheDs_indices_this = pack(count1D, mask1D)
@@ -527,6 +507,9 @@
     GridInfo%Yf = Yf
     GridInfo%Zf = Zf
     GridInfo%DimsF = DimsF
+    GridInfo%TheTs = TheTs_indices
+    GridInfo%TheDs = TheDs_indices
+    GridInfo%TheSigns = TheSigns_indices    
 
     call displayGUIMessage( 'Saving GridInfo to disk' )
     
@@ -613,14 +596,6 @@
         write(21,*)  GridInfo%DimsF(i,3)
     enddo
     close(21)
-        
-    open(21,file='GridInfo_TheTs.txt',status='unknown',form='formatted',action='write')
-    do i=1,Nel 
-        do j=1,size(Xf)        
-            write(21,*)  TheTs(j,i)
-        end do
-    end do
-    close(21)
     
     open(21,file='GridInfo_TheTs_indices.txt',status='unknown',form='formatted',action='write')
     do i=1,size(TheTs_indices(:,1))
@@ -635,37 +610,7 @@
         write(21,*)  TheDs_indices(i,2)
     end do
     close(21)
-    
-    open(21,file='GridInfo_TheDs.txt',status='unknown',form='formatted',action='write')
-    do i=1,Nel 
-        do j=1,size(Xf)        
-            write(21,*)  TheDs(j,i)
-        end do
-    end do
-    close(21)
-    
-    open(21,file='GridInfo_TheSigns.txt',status='unknown',form='formatted',action='write')
-    do i=1,size(Xf) 
-        do j=1,Nel    
-            write(21,*)  TheSigns(j,i)
-        end do
-    end do
-    close(21)
-    
-    open(21,file='GridInfo_TheSigns_indices_pos.txt',status='unknown',form='formatted',action='write')
-    do i=1,size(TheSigns_indices_pos,1)
-            write(21,*)  TheSigns_indices_pos(i,1)
-            write(21,*)  TheSigns_indices_pos(i,2)
-    end do
-    close(21)
-    
-    open(21,file='GridInfo_TheSigns_indices_neg.txt',status='unknown',form='formatted',action='write')
-    do i=1,size(TheSigns_indices_neg,1)
-            write(21,*)  TheSigns_indices_neg(i,1)
-            write(21,*)  TheSigns_indices_neg(i,2)
-    end do
-    close(21)
-    
+   
     open(21,file='GridInfo_TheSigns_indices.txt',status='unknown',form='formatted',action='write')
     do i=1,size(TheSigns_indices,1)
             write(21,*)  TheSigns_indices(i,1)
@@ -678,8 +623,6 @@
     
     stop
     
-    ! Use Intel MKL to create sparse matrices (TheSigns, TheTs, TheDs)
-    ! Further implementation required to create and fill these sparse matrices using MKL
   end subroutine CartesianUnstructuredMeshAnalysis
 
 end module UnstructuredMeshAnalysis

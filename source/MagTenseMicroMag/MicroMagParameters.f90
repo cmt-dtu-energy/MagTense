@@ -76,9 +76,9 @@ include "mkl_dfti.f90"
         real(dp), allocatable :: fNormZ(:)
         real(dp), allocatable :: AreaFaces(:)
         real(dp), allocatable :: Volumes(:)
-        type(sparse_matrix_t) :: TheSigns                                   !> Sparse matrix handle to MKL
-        type(sparse_matrix_t) :: TheTs                                      !> Sparse matrix handle to MKL
-        type(sparse_matrix_t) :: TheDs                                      !> Sparse matrix handle to MKL
+        integer, allocatable  :: TheSigns(:,:)                                   !> Indices that can be supplied to create sparse matrix handle to MKL
+        integer, allocatable  :: TheTs(:,:)                                      !> Indices that can be supplied to create sparse matrix handle to MKL
+        integer, allocatable  :: TheDs(:,:)                                      !> Indices that can be supplied to create sparse matrix handle to MKL
         real(dp), allocatable :: Xel(:)
         real(dp), allocatable :: Yel(:)
         real(dp), allocatable :: Zel(:)
