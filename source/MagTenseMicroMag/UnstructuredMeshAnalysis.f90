@@ -48,7 +48,7 @@
     real(dp), intent(in) :: dims(:,:)
     type(MicroMagGridInfo), intent(out) :: GridInfo
 
-    integer :: Nel, K, idim, ipm, j, n, kb, i, k_i, indx, n_faces, i_end, k1, k2
+    integer :: Nel, K, idim, ipm, j, n, kb, i, k_i, indx, n_faces, i_end, k1, k2, Nalloc_small, Nalloc_large, Ncount
     real(dp), allocatable :: Xel(:), Yel(:), Zel(:)
     real(dp), allocatable :: Volumes(:)
     real(dp) :: DimsScales(3)
@@ -82,6 +82,9 @@
     integer, allocatable :: theseA_int(:),theseB_int(:),theseC_int(:),theseD_int(:),theseNum(:)
     logical, allocatable :: TheTs(:,:), TheDs(:,:)
     integer, allocatable :: thisBoolean_arr(:,:), kMut_F(:,:), kNonMut_F(:,:), kMut_F_temp(:,:), kNonMut_F_temp(:,:)
+    integer, allocatable :: TheTs_indices_this(:), TheTs_temp(:,:), TheTs_indices(:,:)
+    integer, allocatable :: TheDs_indices_this(:), TheDs_temp(:,:), TheDs_indices(:,:)
+    integer, allocatable :: TheSigns_indices_pos(:,:), TheSigns_indices_neg(:,:), TheSigns_indices(:,:)
     character*(40) :: prog_str
 
     call displayGUIMessage( 'Starting mesh analysis' )
@@ -110,11 +113,17 @@
     allocate(fNormX(n_faces), fNormY(n_faces), fNormZ(n_faces), AreaFaces(n_faces), DimsF(n_faces, 3))
     allocate(Xf(n_faces), Yf(n_faces), Zf(n_faces), XXF(n_faces,3))
     allocate(TheSigns(Nel,n_faces))
+    allocate(TheSigns_indices_pos(6*Nel,2))   
     TheSigns(:,:) = 0
 
+    !k_i = 1
     do i=0,5
         do j=1,Nel
             TheSigns(j, j+(i*Nel)) = 1
+            
+            !TheSigns_indices_pos(k_i,1) = j
+            !TheSigns_indices_pos(k_i,2) = j+(i*Nel)
+            !k_i = k_i + 1
         end do
     end do
     
@@ -273,6 +282,7 @@
     allocate(kRmv(size(k1Mut)+size(kNonMut_F(:,1))))
     allocate(kSurv(size(k2Mut)+size(kNonMut_F(:,2))))
     allocate(nRmv(size(k2Mut)+size(kNonMut_F(:,2))))
+    allocate(TheSigns_indices_neg((size(k2Mut)+size(kNonMut_F(:,2))),2)) 
     
     ! each of the faces being removed has:
     !   kSurv: one or more surviving contained (or equal) faces
@@ -281,13 +291,50 @@
     kSurv = [k2Mut, kNonMut_F(:,2)]
     nRmv  = MOD(kRmv-1,Nel)+1
     
-    do i=1,size(nRmv)        
-        TheSigns(nRmv(i),kSurv(i)) = -1
-    end do
-        
     allocate(mask1D(n_faces))
     mask1D = .true.
     mask1D(kRmv(:)) = .false.
+    
+    !To construct TheSigns matrix, we need to remove all the columns indicated by kRmv
+    !This is build into the mask1D array. To then filter the columns, we look at the column value
+    !for each indices pair. For the negative values, the column value in the sparse matrix is given by kSurv(i)
+    !If the mask1D entry for this is column is true (so the column is not removed), then we can add the entry to the TheSigns_indices_neg array
+    !However, to account for the removed columns, its value is no longer kSurv(i), bur rather the number of spaces it is moved to the "left" in the matrix
+    !This is Ncount, which is simply the number of positive entries in the mask1D array up to the column kSurv(i)
+    !The same applies for the positive values except here the y-values are 1:j+(i*Nel)
+    k_i = 1
+    do i=1,size(nRmv)        
+        TheSigns(nRmv(i),kSurv(i)) = -1
+        
+        if (mask1D(kSurv(i))) then
+            Ncount = count(mask1D(1:kSurv(i)))
+            TheSigns_indices_neg(k_i,1) = nRmv(i)
+            TheSigns_indices_neg(k_i,2) = Ncount
+            k_i = k_i + 1
+        endif
+    end do
+    k1 = k_i - 1
+        
+    k_i = 1
+    do i=0,5
+        do j=1,Nel  
+            if (mask1D(j+(i*Nel))) then
+                Ncount = count(mask1D(1:j+(i*Nel)))
+                TheSigns_indices_pos(k_i,1) = j
+                TheSigns_indices_pos(k_i,2) = Ncount
+                k_i = k_i + 1
+            endif
+        end do
+    end do
+    k2 = k_i - 1
+    
+    !Combine the two arrays into the final TheSigns_indices array
+    allocate(TheSigns_indices(k1+k2,3))
+    TheSigns_indices(1:k1,1:2) = TheSigns_indices_neg(1:k1,1:2)
+    TheSigns_indices(1:k1,3) = -1
+    TheSigns_indices(k1+1:k1+k2,1:2) = TheSigns_indices_pos(1:k2,1:2)
+    TheSigns_indices(k1+1:k1+k2,3) = 1
+    
     
     !As there are duplicate entries in kRmv, this is the way to know the unique number of elements
     k = count(mask1D)
@@ -331,8 +378,8 @@
     Yf(:) = Yf_temp(:)
     Zf(:) = Zf_temp(:)
     AreaFaces(:) = AreaFaces_temp(:)
-    TheSigns(:,:) = TheSigns_temp(:,:)
-    deallocate(XXF_temp,DimsF_temp,TheSigns_temp)
+    call move_alloc (TheSigns_temp, TheSigns)
+    deallocate(XXF_temp,DimsF_temp)
     deallocate(fNormX_temp,fNormY_temp,fNormZ_temp,Xf_temp,Yf_temp,Zf_temp,AreaFaces_temp)
     
     !! Construct T and D matrix
@@ -386,16 +433,18 @@
     k = size(Xf)
     allocate(TheseMinXXel(k,3), TheseMaxXXel(k,3))
     allocate(theseA(k),theseB(K),theseC(k),theseD(k),theseA_int(k),theseB_int(k),theseC_int(k),theseD_int(k))
-    allocate(theseNum(Nel),count1D(Nel))
+    allocate(theseNum(k),count1D(k))
     TheseMinXXel(:,:) = 0
     
-    do n=1,Nel
+    do n=1,k
         count1D(n) = n
     end do
     
     allocate(TheTs(size(Xf),Nel), TheDs(size(Xf),Nel))
     TheTs(:,:) = .false.
     TheDs(:,:) = .false.
+    
+    allocate(TheTs_indices(0,2))
     
     do n=1,Nel
         TheseMinXXel(:,1) = xxMinEl(n,1)
@@ -425,8 +474,31 @@
         mask1D = (theseNum >= 2)
         where (mask1D) TheTs(:,n) = .true.
         
+        Nalloc_small = size(TheTs_indices,1)
+        if (any(mask1D)) then
+            TheTs_indices_this = pack(count1D, mask1D)
+            Nalloc_large = Nalloc_small+size(TheTs_indices_this)
+            allocate(TheTs_temp(Nalloc_large,2))
+            TheTs_temp(1:Nalloc_small,:) = TheTs_indices(:,:)
+            TheTs_temp((Nalloc_small+1):Nalloc_large,1) = TheTs_indices_this
+            TheTs_temp((Nalloc_small+1):Nalloc_large,2) = n
+            call move_alloc (TheTs_temp, TheTs_indices) 
+        endif
+        
         mask1D = (theseNum >= 1)
         where (mask1D) TheDs(:,n) = .true.
+        
+        Nalloc_small = size(TheDs_indices,1)
+        if (any(mask1D)) then
+            TheDs_indices_this = pack(count1D, mask1D)
+            Nalloc_large = Nalloc_small+size(TheDs_indices_this)
+            allocate(TheDs_temp(Nalloc_large,2))
+            TheDs_temp(1:Nalloc_small,:) = TheDs_indices(:,:)
+            TheDs_temp((Nalloc_small+1):Nalloc_large,1) = TheDs_indices_this
+            TheDs_temp((Nalloc_small+1):Nalloc_large,2) = n
+            call move_alloc (TheDs_temp, TheDs_indices) 
+        endif
+        
     end do
     
     ! Rescaling (inverse)
@@ -550,6 +622,20 @@
     end do
     close(21)
     
+    open(21,file='GridInfo_TheTs_indices.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(TheTs_indices(:,1))
+        write(21,*)  TheTs_indices(i,1)
+        write(21,*)  TheTs_indices(i,2)
+    end do
+    close(21)
+    
+    open(21,file='GridInfo_TheDs_indices.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(TheDs_indices(:,1))
+        write(21,*)  TheDs_indices(i,1)
+        write(21,*)  TheDs_indices(i,2)
+    end do
+    close(21)
+    
     open(21,file='GridInfo_TheDs.txt',status='unknown',form='formatted',action='write')
     do i=1,Nel 
         do j=1,size(Xf)        
@@ -563,6 +649,28 @@
         do j=1,Nel    
             write(21,*)  TheSigns(j,i)
         end do
+    end do
+    close(21)
+    
+    open(21,file='GridInfo_TheSigns_indices_pos.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(TheSigns_indices_pos,1)
+            write(21,*)  TheSigns_indices_pos(i,1)
+            write(21,*)  TheSigns_indices_pos(i,2)
+    end do
+    close(21)
+    
+    open(21,file='GridInfo_TheSigns_indices_neg.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(TheSigns_indices_neg,1)
+            write(21,*)  TheSigns_indices_neg(i,1)
+            write(21,*)  TheSigns_indices_neg(i,2)
+    end do
+    close(21)
+    
+    open(21,file='GridInfo_TheSigns_indices.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(TheSigns_indices,1)
+            write(21,*)  TheSigns_indices(i,1)
+            write(21,*)  TheSigns_indices(i,2)
+            write(21,*)  TheSigns_indices(i,3)
     end do
     close(21)
     
