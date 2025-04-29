@@ -1,7 +1,7 @@
 # Python Interface
 
 The Fortran code is compiled and wrapped to a module that can be directly called from Python.
-The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/magtense/lib/FortranToPythonIO.f90).
+The tool `f2py` of the NumPy package is used to wrap the [interface file](./FortranToPythonIO.f90).
 
 ## Deployment with Conda (Intel architectures)
 
@@ -10,10 +10,11 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 #### Linux
 
 - New conda environment with Python >= 3.12
+
   ```bash
   conda create -y -n magtense-env && conda activate magtense-env
   conda config --env --add channels conda-forge
-  conda install -y python
+  conda install -y python=3.13
   python3 -m pip install numpy meson ninja charset-normalizer
   ````
 
@@ -23,7 +24,6 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
   Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment \
   *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.*
 
-- New conda environment with Python >= 3.12
   ```bash
   conda config --env --add channels nvidia/label/cuda-12.8.1
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
@@ -38,6 +38,55 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
   conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" "ifx_linux-64"
   ```
 
+- Required modules for `cvode` from sundials-7.2.1
+
+  - Requirements for building `cvode`:
+
+    ```bash
+    conda install -y cmake
+    ```
+
+    Other prerequisite, e.g. `ifx`, `icx`, have already been installed in the previous steps.
+
+  - Download version 7.2.1 of `cvode`:
+
+    ```bash
+    wget https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz
+    tar -xf cvode-7.2.1.tar.gz
+    ```
+
+  - Prepare folder structure
+
+    ```bash
+    mkdir cvode
+    mv cvode-7.2.1 cvode/src
+    ```
+
+  - Run `cmake` and `make`for installation
+
+    ```bash
+    cmake \
+    -B cvode/build \
+    -S cvode/src \
+    -D CMAKE_BUILD_TYPE=Release \
+    -D BUILD_ARKODE=OFF \
+    -D BUILD_CVODE=ON \
+    -D BUILD_CVODES=OFF \
+    -D BUILD_IDA=OFF \
+    -D BUILD_IDAS=OFF \
+    -D BUILD_KINSOL=OFF \
+    -D BUILD_SHARED_LIBS=OFF \
+    -D BUILD_STATIC_LIBS=ON \
+    -D CMAKE_INSTALL_PREFIX=cvode \
+    -D EXAMPLES_INSTALL_PATH=cvode/examples \
+    -D CMAKE_C_COMPILER=$(which icx) \
+    -D CMAKE_Fortran_COMPILER=$(which ifx) \
+    -D BUILD_FORTRAN_MODULE_INTERFACE=ON \
+    -D ENABLE_OPENMP=ON
+    cmake --build cvode/build --config Release --verbose
+    cmake --install cvode/build --verbose
+    ```
+
 - Compile Fortran source files
 
   ```bash
@@ -46,10 +95,10 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
 
 #### Windows
 
-- Conda environment from `env-312-win.yml`
+- Conda environment from `env-313-win.yml`
 
   ```bash
-  conda env create -f python/.build/env-312-win.yml
+  conda env create -f python/.build/env-313-win.yml
   ```
 
   OR
@@ -58,15 +107,39 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
   conda create -y -n magtense-env
   conda activate magtense-env
   conda config --env --add channels conda-forge
-  conda install -y python=3.12
+  conda install -y python=3.13
   python -m pip install numpy meson charset-normalizer
   conda config --env --add channels https://software.repos.intel.com/python/conda/
   conda install -y mkl mkl-devel mkl-static "dpcpp_win-64" intel-fortran-rt "ifx_win-64"
   conda config --env --add channels nvidia/label/cuda-12.8.1
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   conda install -y git make
-  python -m pip install matplotlib notebook h5py tqdm importlib_resources
   ```
+
+- Required modules for `cvode` from sundials-7.2.1
+
+  - Installation of [Visual Studio 2022](https://visualstudio.microsoft.com) (Desktop development with C++ and `cmake`)
+
+  - Installation of [Intel oneAPI](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html) (both C++ and Fortran)
+
+  - Download [sundials-7.2.1](https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz) and unzip it.
+
+  Open a "Intel oneAPI command prompt for Intel 64 for Visual Studio 2022" as administrator and then do:
+  ```bash
+  "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -G "Ninja" -B C:/CVODE_temp -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_ARKODE=OFF -DBUILD_CVODE=ON -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON
+
+  cmake --build C:/CVODE_temp --config RELEASE --verbose
+  cmake --install C:/CVODE_temp --verbose
+  ```
+  where the `CVODE_temp` is a temporary directory that can be removed after installation.
+  *Note: The commands below assume the `Enterprise` version of Visual Studio being installed - if you have the free community edition, simply change `Enterprise` to `Community` in the path.*
+
+  - The installed CVODE files will be located in `"C:\Program Files (x86)\SUNDIALS"` but should be moved to a folder named `cvode` at the top-level of the MagTense repository:
+
+    ```bash
+    mkdir cvode
+    xcopy "C:\Program Files (x86)\SUNDIALS\*" cvode /s /i
+    ```
 
 - Compile Fortran source files
   
@@ -75,6 +148,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
   - Setting up customized versions of `Developer PowerShell` and `x64 Native Tools Command Prompt for VS 2022`:
 
     - In [VS Code](https://code.visualstudio.com), these integrated terminals can be added to your profiles by editing `settings.json`. Further, the Python extension ensures that the correct `conda` environment is activated in all terminals.
+
       ```bash
       "terminal.integrated.profiles.windows": {
           "Developer PowerShell for VS 2022": {
@@ -166,56 +240,3 @@ The `python/.build/` contains requirement-files, which are shipped with the resp
 python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm importlib_resources
 python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cusparse-cu12 nvidia-nvjitlink-cu12 # only required for cuda support
 ```
-
-## Install CVODE from sundials-7.2.1
-
-### Linux
-
-- Requirements (already present in `.build/env-313-linux`): `cmake`, `ifx`, `icx`
-- Download version 7.2.1 of `cvode`:
-
-  ```bash
-  wget https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz
-  tar -xf cvode-7.2.1.tar.gz
-  ```
-
-- Prepare folder structure
-  ```bash
-  mkdir cvode
-  mv cvode-7.2.1 cvode/src
-  mkdir cvode/install
-  ```
-
-- Run `cmake` and `make`for installation
-  ```bash
-  cmake \
-  -B cvode/build \
-  -S cvode/src \
-  -D CMAKE_INSTALL_PREFIX=cvode/install \
-  -D EXAMPLES_INSTALL_PATH=cvode/install/examples \
-  -D CMAKE_C_COMPILER=${CONDA_PREFIX}/bin/icx \
-  -D CMAKE_Fortran_COMPILER=${CONDA_PREFIX}/bin/ifx \
-  -D BUILD_FORTRAN_MODULE_INTERFACE=ON \
-  -D ENABLE_OPENMP=ON
-  cmake --build cvode/build --config Release --verbose
-  cmake --install cvode/build --verbose
-  ```
-
-### Windows
-
-Download [sundials-7.2.1](https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz) and unzip it.
-
-To compile the CVODE objective files, you need an installation of Visual Studio and Intel oneAPI for both C++ and Fortran. The commands below assume that you have the Enterprise version of Visual Studio - if you have the free community edition, simply change `Enterprise` to `Community` in the path.
-
-Open a "Intel oneAPI command prompt for Intel 64 for Visual Studio 2022" as administrator and then do:
- ```
-"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -G "Ninja" -B C:/CVODE_temporary_directory -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_ARKODE=OFF -DBUILD_CVODE=ON -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON
-
-cmake --build C:/CVODE_temporary_directory --config RELEASE --verbose
-
-cmake --install C:/CVODE_temporary_directory --verbose
-  ```
-
-where the `CVODE_temporary_directory` is a temporary directory that can be removed after installation.
-
-The installed CVODE files will be located in `"C:\Program Files (x86)\SUNDIALS"` but should be moved to `"C:\Program Files (x86)\sundials-7.2.1"` manually, so that MagTense can find it.
