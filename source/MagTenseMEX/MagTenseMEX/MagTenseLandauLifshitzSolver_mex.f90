@@ -28,14 +28,14 @@
       integer*4 mxIsDouble, mxIsInt32, mxIsStruct, mxClassIDFromClassName  !>Various MEX functions
       type(MicroMagProblem) :: problem          !> The problem structure
       type(MicroMagSolution) :: solution        !> The solution structure
-      
+      type(MicroMagGridInfo) :: gridinfo        !> The grid information structure
       
     
       !Check the input parameters
       if ( nrhs .ne. 2 ) then
         call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nInput','Two inputs are required.')
-      elseif ( nlhs .ne. 1 ) then
-          call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nOutput','One output is required.')
+      !elseif ( nlhs .ne. 2 ) then
+      !    call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nOutput','One output is required.')
       endif
       
       
@@ -47,11 +47,25 @@
       
       !Load the problem from Matlab into Fortran
       call loadMicroMagProblem( prhs(1), problem )
-            
+      
+      !Analyze the mesh, if needed
+      if ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
+           call CartesianUnstructuredMeshAnalysis(problem%grid%pts, problem%grid%abc, gridinfo)
+      endif
+      
       !Call the ODE solver
       call SolveLandauLifshitzEquation( problem, solution )    
     
       call returnMicroMagSolution( solution, plhs(1) )
+      
+      !Return the mesh, if the user requested it
+      if (nlhs .eq. 2) then
+            if ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
+                call returnMicroMagGrid( gridinfo, plhs(2) )  
+            else
+                call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nOutput','Mesh not analyzed')
+            endif
+      endif
       
       
       

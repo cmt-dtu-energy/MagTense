@@ -27,8 +27,7 @@
     use iso_fortran_env
     use UnstructuredMeshAnalysis
     implicit none
-    
-   
+       
     
     !>Module variables
     type(MicroMagSolution) :: gb_solution
@@ -64,16 +63,6 @@
     gb_problem = prob
     
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
-    
-    
-    call displayGUIMessage( 'Test 1' )
-    if ( gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
-        !> Pure testing code to see if we can analyze the mesh in Fortran
-        call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, GridInfo)
-    endif
-    
-    
-    
     
     call displayGUIMessage( 'Initializing matrices' )
     !Calculate the interaction matrices

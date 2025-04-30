@@ -1,4 +1,4 @@
-function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error,mesh,GridInfo] = Standard_problem_4_unstructured_cart( NIST_field, options )
+function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error,mesh,GridInfo] = Standard_problem_4_unstructured_cart( mumag_field, options )
 %STANDARD_PROBLEM_4_UNSTRUCTURED_CART 
 %A function script to setup and simulate mumag standard problem 4 with an unstructured cartesian mesh loaded from a file
 %
@@ -68,7 +68,7 @@ function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_d
 %See also: Standard_problem_4
 
 arguments
-    NIST_field (1,1) {mustBeInteger}                = 1             %--- Use either field 1 or field 2 from the mumag example
+    mumag_field (1,1) {mustBeInteger}                = 1             %--- Use either field 1 or field 2 from the mumag example
     options.use_CUDA {mustBeNumericOrLogical}       = true          %--- Use CUDA for the calculations
     options.ShowTheResult {mustBeNumericOrLogical}  = true          %--- Show the result
     options.use_CVODE {mustBeNumericOrLogical}      = false;        %--- Use CVODE for the numerical time evolution
@@ -142,6 +142,7 @@ prob_struct = struct(problem_ini);
 
 tic
 solution_ini = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
+[solution_ini, GridInfoFortran] = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
 
 elapsedTime_part1 = toc
 if (options.ShowTheResult)
@@ -164,11 +165,11 @@ problem_dym.setTimeDis = int32(10);
 problem_dym.gamma = 2.21e5 ;
 
 % The external field applied
-if (NIST_field == 1)
+if (mumag_field == 1)
     %field 1
     HystDir = 1/mu0*[-24.6,4.3,0]/1000 ;
 end
-if (NIST_field == 2)
+if (mumag_field == 2)
     %field 2
     HystDir = 1/mu0*[-35.5,-6.3,0]/1000 ;
 end
@@ -194,7 +195,7 @@ elapsedTime_part2 = toc
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% Compare with published solutions available from mumag webpage
 t=1e-9*linspace(0,1,1000);
-M_mumag = load(['../../../../documentation/examples_NIST_validation/Validation_standard_problem_4/Field_' num2str(NIST_field) '_NIST_mean_solution.txt']);
+M_mumag = load(['../../../../documentation/examples_mumag_validation/Validation_standard_problem_4/Field_' num2str(mumag_field) '_mumag_mean_solution.txt']);
 
 % Interpolate the MagTense solution to the mumag solution and calculate the relative error in percent
 rel_int_error(1) = calculate_relative_integral_error(t,M_mumag(:,1),solution_dym.t,Mx);

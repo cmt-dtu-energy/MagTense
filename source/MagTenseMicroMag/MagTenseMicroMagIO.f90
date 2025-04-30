@@ -2,7 +2,8 @@
     
     module MagTenseMicroMagIO
     use MicroMagParameters
-        
+    use IO_GENERAL
+    
     implicit none
     
     contains
@@ -362,7 +363,77 @@
     end subroutine loadMicroMagProblem
     
     
-   !>-----------------------------------------
+    !>-----------------------------------------
+    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
+    !> Returns an array with the names of the fields expected in the MicroMagProblem struct
+    !> @param[inout] fieldnames, array of the names of the fields
+    !> @param[inout] nfields the no. of elements in fieldnames
+    !>-----------------------------------------
+    subroutine getProblemFieldnames( fieldnames, nfields)
+        integer,intent(out) :: nfields        
+        integer,parameter :: nf=51
+        character(len=10),dimension(:),intent(out),allocatable :: fieldnames
+            
+        nfields = nf
+        allocate(fieldnames(nfields))
+        
+        !! Setup the names of the members of the input struct
+        fieldnames(1) = 'grid_n'
+        fieldnames(2) = 'grid_L'
+        fieldnames(3) = 'grid_type'
+        fieldnames(4) = 'u_ea'
+        fieldnames(5) = 'ProblemMode'
+        fieldnames(6) = 'solver'
+        fieldnames(7) = 'A0'
+        fieldnames(8) = 'Ms'
+        fieldnames(9) = 'K0'
+        fieldnames(10) = 'gamma'
+        fieldnames(11) = 'alpha'
+        fieldnames(12) = 'MaxT0'
+        fieldnames(13) = 'nt_Hext'
+        fieldnames(14) = 'Hext'    
+        fieldnames(15) = 'nt'
+        fieldnames(16) = 't'
+        fieldnames(17) = 'm0'
+        fieldnames(18) = 'dem_thres'
+        fieldnames(19) = 'useCuda'
+        fieldnames(20) = 'dem_appr'        
+        fieldnames(21) = 'N_ret'
+        fieldnames(22) = 'N_file_out'
+        fieldnames(23) = 'N_load'
+        fieldnames(24) = 'N_file_in'
+        fieldnames(25) = 'setTimeDis'
+        fieldnames(26) = 'nt_alpha'
+        fieldnames(27) = 'alphat'
+        fieldnames(28) = 'tol'
+        fieldnames(29) = 'thres'
+        fieldnames(30) = 'useCVODE'
+        fieldnames(31) = 'exch_mat'
+        fieldnames(32) = 'nt_conv'
+        fieldnames(33) = 't_conv'
+        fieldnames(34) = 'conv_tol'
+        fieldnames(35) = 'grid_pts'
+        fieldnames(36) = 'grid_ele'
+        fieldnames(37) = 'grid_nod'
+        fieldnames(38) = 'grid_nnod'
+        fieldnames(39) = 'exch_nval'
+        fieldnames(40) = 'exch_nrow'
+        fieldnames(41) = 'exch_val'
+        fieldnames(42) = 'exch_rows'
+        fieldnames(43) = 'exch_rowe'
+        fieldnames(44) = 'exch_col'
+        fieldnames(45) = 'grid_abc'
+        fieldnames(46) = 'usePres'
+        fieldnames(47) = 'nThreads'
+        fieldnames(48) = 'N_ave'
+        fieldnames(49) = 'CV'
+        fieldnames(50) = 'ReturnHall'
+        fieldnames(51) = 'demigstp'
+        
+    end subroutine getProblemFieldnames
+    
+    
+    !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> Returns the solution data struct from Fortran to Matlab
     !> @param[in] solution struct for the internal Fortran represantation of the solution
@@ -486,77 +557,6 @@
     
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
-    !> Returns an array with the names of the fields expected in the MicroMagProblem struct
-    !> @param[inout] fieldnames, array of the names of the fields
-    !> @param[inout] nfields the no. of elements in fieldnames
-    !>-----------------------------------------
-    subroutine getProblemFieldnames( fieldnames, nfields)
-        integer,intent(out) :: nfields        
-        integer,parameter :: nf=51
-        character(len=10),dimension(:),intent(out),allocatable :: fieldnames
-            
-        nfields = nf
-        allocate(fieldnames(nfields))
-        
-        !! Setup the names of the members of the input struct
-        fieldnames(1) = 'grid_n'
-        fieldnames(2) = 'grid_L'
-        fieldnames(3) = 'grid_type'
-        fieldnames(4) = 'u_ea'
-        fieldnames(5) = 'ProblemMode'
-        fieldnames(6) = 'solver'
-        fieldnames(7) = 'A0'
-        fieldnames(8) = 'Ms'
-        fieldnames(9) = 'K0'
-        fieldnames(10) = 'gamma'
-        fieldnames(11) = 'alpha'
-        fieldnames(12) = 'MaxT0'
-        fieldnames(13) = 'nt_Hext'
-        fieldnames(14) = 'Hext'    
-        fieldnames(15) = 'nt'
-        fieldnames(16) = 't'
-        fieldnames(17) = 'm0'
-        fieldnames(18) = 'dem_thres'
-        fieldnames(19) = 'useCuda'
-        fieldnames(20) = 'dem_appr'        
-        fieldnames(21) = 'N_ret'
-        fieldnames(22) = 'N_file_out'
-        fieldnames(23) = 'N_load'
-        fieldnames(24) = 'N_file_in'
-        fieldnames(25) = 'setTimeDis'
-        fieldnames(26) = 'nt_alpha'
-        fieldnames(27) = 'alphat'
-        fieldnames(28) = 'tol'
-        fieldnames(29) = 'thres'
-        fieldnames(30) = 'useCVODE'
-        fieldnames(31) = 'exch_mat'
-        fieldnames(32) = 'nt_conv'
-        fieldnames(33) = 't_conv'
-        fieldnames(34) = 'conv_tol'
-        fieldnames(35) = 'grid_pts'
-        fieldnames(36) = 'grid_ele'
-        fieldnames(37) = 'grid_nod'
-        fieldnames(38) = 'grid_nnod'
-        fieldnames(39) = 'exch_nval'
-        fieldnames(40) = 'exch_nrow'
-        fieldnames(41) = 'exch_val'
-        fieldnames(42) = 'exch_rows'
-        fieldnames(43) = 'exch_rowe'
-        fieldnames(44) = 'exch_col'
-        fieldnames(45) = 'grid_abc'
-        fieldnames(46) = 'usePres'
-        fieldnames(47) = 'nThreads'
-        fieldnames(48) = 'N_ave'
-        fieldnames(49) = 'CV'
-        fieldnames(50) = 'ReturnHall'
-        fieldnames(51) = 'demigstp'
-        
-    end subroutine getProblemFieldnames
-    
-   
-    
-     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> Returns an array with the names of the fields expected in the MicroMagSolution struct
     !> @param[inout] fieldnames, array of the names of the fields
     !> @param[inout] nfields the no. of elements in fieldnames
@@ -569,7 +569,7 @@
         nfields = nf
         allocate(fieldnames(nfields))
         
-        !! Setup the names of the members of the input struct
+        !! Setup the names of the members of the output struct
         fieldnames(1) = 't'
         fieldnames(2) = 'M'
         fieldnames(3) = 'pts'
@@ -578,9 +578,169 @@
         fieldnames(6) = 'H_dem'
         fieldnames(7) = 'H_ani'
         
-        
-        
     end subroutine getSolutionFieldnames
+    
+    
+    
+    !>-----------------------------------------
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2025
+    !> Returns the Micromagnetic grid, e.g. GridInfo, from Fortran to Matlab
+    !> @param[in] solution struct for the internal Fortran represantation of the solution
+    !> @param[in] plhs pointer to the Matlab data struct    
+    !>-----------------------------------------
+    subroutine returnMicroMagGrid( gridinfo, plhs )
+        type(MicroMagGridInfo),intent(in) :: gridinfo           !> The GridInfo is saved in Problem, and is to be copied to Matlab        
+        mwPointer,intent(inout) :: plhs
+    
+        integer :: ComplexFlag,classid,mxClassIDFromClassName
+        mwSize,dimension(1) :: dims
+        mwSize :: s1,s2,sx,ndim
+        mwSize,dimension(4) :: dims_4
+        mwPointer :: ptfNormX,ptfNormY,ptfNormZ,ptAreaFaces,ptVolumes,ptXel,ptYel,ptZel
+        mwPointer :: ptXf,ptYf,ptZf,ptDimsF,ptTheTs,ptTheDs,ptTheSigns
+        mwPointer :: mxCreateStructArray, mxCreateDoubleMatrix,mxGetPr,mxCreateNumericMatrix,mxCreateNumericArray
+        mwIndex :: ind
+        character(len=10),dimension(:),allocatable :: fieldnames    
+        integer :: nfields, nel, nfaces
+    
+        call getGridInfoFieldnames( fieldnames, nfields)
+    
+        nfaces = size(gridinfo%fNormX)
+        nel = size(gridinfo%Xel)       
+        
+        call displayGUIMessage( 'Test 2-1' )
+                
+        ! Load the result back to Matlab      
+        ComplexFlag = 0
+      
+        dims(1) = 1        
+        sx = 1        
+        ! Create the return array of structs      
+        plhs = mxCreateStructArray( sx, dims, nfields, fieldnames)
+      
+        ind = 1
+        
+        s1 = nfaces
+        s2 = 1
+        ptfNormX = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
+        sx = s1 * s2
+        call mxCopyReal8ToPtr( gridinfo%fNormX, mxGetPr( ptfNormX ), sx )
+        call mxSetField( plhs, ind, fieldnames(1), ptfNormX )
+        
+        ptfNormY = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
+        call mxCopyReal8ToPtr( gridinfo%fNormY, mxGetPr( ptfNormY ), sx )
+        call mxSetField( plhs, ind, fieldnames(2), ptfNormY )
+        
+        ptfNormZ = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
+        call mxCopyReal8ToPtr( gridinfo%fNormZ, mxGetPr( ptfNormZ ), sx )
+        call mxSetField( plhs, ind, fieldnames(3), ptfNormZ )
+        
+        ptAreaFaces = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
+        call mxCopyReal8ToPtr( gridinfo%AreaFaces, mxGetPr( ptAreaFaces ), sx )
+        call mxSetField( plhs, ind, fieldnames(4), ptAreaFaces )
+        
+        s1 = nel
+        s2 = 1
+        ptVolumes = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
+        sx = s1 * s2
+        call mxCopyReal8ToPtr( gridinfo%Volumes, mxGetPr( ptVolumes ), sx )
+        call mxSetField( plhs, ind, fieldnames(5), ptVolumes )
+        
+        ptXel = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
+        call mxCopyReal8ToPtr( gridinfo%Xel, mxGetPr( ptXel ), sx )
+        call mxSetField( plhs, ind, fieldnames(6), ptXel )
+        
+        ptYel = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
+        call mxCopyReal8ToPtr( gridinfo%Yel, mxGetPr( ptYel ), sx )
+        call mxSetField( plhs, ind, fieldnames(7), ptYel )
+        
+        ptZel = mxCreateDoubleMatrix(s1,s2,ComplexFlag)
+        call mxCopyReal8ToPtr( gridinfo%Zel, mxGetPr( ptZel ), sx )
+        call mxSetField( plhs, ind, fieldnames(8), ptZel )
+                
+        s1 = nfaces
+        s2 = 1
+        ptXf = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
+        sx = s1 * s2
+        call mxCopyReal8ToPtr( gridinfo%Xf, mxGetPr( ptXf ), sx )
+        call mxSetField( plhs, ind, fieldnames(9), ptXf )
+        
+        ptYf = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
+        call mxCopyReal8ToPtr( gridinfo%Yf, mxGetPr( ptYf ), sx )
+        call mxSetField( plhs, ind, fieldnames(10), ptYf )
+        
+        ptZf = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
+        call mxCopyReal8ToPtr( gridinfo%Zf, mxGetPr( ptZf ), sx )
+        call mxSetField( plhs, ind, fieldnames(11), ptZf )
+                
+        s1 = nfaces
+        s2 = 3
+        ptDimsF = mxCreateDoubleMatrix(s1,s2,ComplexFlag)    
+        sx = s1 * s2
+        call mxCopyReal8ToPtr( gridinfo%DimsF, mxGetPr( ptDimsF ), sx )
+        call mxSetField( plhs, ind, fieldnames(12), ptDimsF )
+        
+        s1 = size(gridinfo%TheTs,1)
+        s2 = size(gridinfo%TheTs,2)
+        ptTheTs = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)
+        sx = s1 * s2
+        call mxCopyInteger4ToPtr( gridinfo%TheTs, mxGetPr( ptTheTs ), sx )
+        call mxSetField( plhs, ind, fieldnames(13), ptTheTs )
+        
+        s1 = size(gridinfo%TheDs,1)
+        s2 = size(gridinfo%TheDs,2)
+        ptTheDs = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)
+        sx = s1 * s2
+        call mxCopyInteger4ToPtr( gridinfo%TheDs, mxGetPr( ptTheDs ), sx )
+        call mxSetField( plhs, ind, fieldnames(14), ptTheDs )
+        
+        s1 = size(gridinfo%TheSigns,1)
+        s2 = size(gridinfo%TheSigns,2)
+        ptTheSigns = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)
+        sx = s1 * s2
+        call mxCopyInteger4ToPtr( gridinfo%TheSigns, mxGetPr( ptTheSigns ), sx )
+        call mxSetField( plhs, ind, fieldnames(15), ptTheSigns )
+        
+        !Clean up
+        deallocate(fieldnames)
+    
+    end subroutine returnMicroMagGrid
+    
+    
+    !>-----------------------------------------
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2025
+    !> Returns an array with the names of the fields expected in the GridInfo struct
+    !> @param[inout] fieldnames, array of the names of the fields
+    !> @param[inout] nfields the no. of elements in fieldnames
+    !>-----------------------------------------
+    subroutine getGridInfoFieldnames( fieldnames, nfields)
+        integer,intent(out) :: nfields
+        integer,parameter :: nf=15
+        character(len=10),dimension(:),intent(out),allocatable :: fieldnames
+            
+        nfields = nf
+        allocate(fieldnames(nfields))
+        
+        !! Setup the names of the members of the output struct
+        fieldnames(1)  = 'fNormX'
+        fieldnames(2)  = 'fNormY'
+        fieldnames(3)  = 'fNormZ'
+        fieldnames(4)  = 'AreaFaces'
+        fieldnames(5)  = 'Volumes'
+        fieldnames(6)  = 'Xel'
+        fieldnames(7)  = 'Yel'
+        fieldnames(8)  = 'Zel'
+        fieldnames(9)  = 'Xf'
+        fieldnames(10) = 'Yf'
+        fieldnames(11) = 'Zf'
+        fieldnames(12) = 'DimsF'
+        fieldnames(13) = 'TheTs'
+        fieldnames(14) = 'TheDs'
+        fieldnames(15) = 'TheSigns'
+        
+    end subroutine getGridInfoFieldnames
+    
+    
     
     !>----------------------------------------
     !> Kaspar K. Nielsen, kasparkn@gmail.com, January 2020

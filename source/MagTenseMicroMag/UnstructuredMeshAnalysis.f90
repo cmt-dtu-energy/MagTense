@@ -621,7 +621,7 @@
     
     call displayGUIMessage( 'Mesh analysis done' )
     
-    stop
+    !stop
     
   end subroutine CartesianUnstructuredMeshAnalysis
 
