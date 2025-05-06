@@ -225,7 +225,7 @@ jobs:
   test-linux:
     strategy:
       matrix:
-        mat-version: [R2023a,R2023b,R2024a,R2024b] 
+        mat-version: [R2023a,R2023b,R2024a]   #Note that R2024b always crashes with segmentation fault
         os-version: [ubuntu-latest,ubuntu_CUDA]
         CVODE-compile: [CVODE,noCVODE]
         CUDA-compile: [CUDA,noCUDA]
@@ -242,8 +242,6 @@ jobs:
           CUDA-compile: noCUDA
         - os-version: ubuntu-latest
           CUDA-compile: CUDA  
-        - os-version: ubuntu-latest    #Note that R2024b always crashes with segmentation fault on githubs runner
-          mat-version: R2024b 
     runs-on: ["${{ matrix.os-version }}"]
     needs: build-linux
     defaults:
