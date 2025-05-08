@@ -30,6 +30,9 @@
       type(MicroMagSolution) :: solution        !> The solution structure
       type(MicroMagGridInfo) :: gridinfo        !> The grid information structure
       
+      character(len=40) :: interpn
+      real(dp) :: weight
+      character(len=40) :: method
     
       !Check the input parameters
       if ( nrhs .ne. 2 ) then
@@ -51,12 +54,17 @@
       !Analyze the mesh, if needed
       if ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
            call CartesianUnstructuredMeshAnalysis(problem%grid%pts, problem%grid%abc, gridinfo)
+           interpn = 'extended'
+           weight = 8.0
+           method = 'DirectLaplacianNeumann'
+           call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo,interpn,weight,method)
+           
       endif
       
       !Call the ODE solver
-      call SolveLandauLifshitzEquation( problem, solution )    
+      !call SolveLandauLifshitzEquation( problem, solution )    
     
-      call returnMicroMagSolution( solution, plhs(1) )
+      !call returnMicroMagSolution( solution, plhs(1) )
       
       !Return the mesh, if the user requested it
       if (nlhs .eq. 2) then
@@ -66,7 +74,5 @@
                 call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nOutput','Mesh not analyzed')
             endif
       endif
-      
-      
       
       end subroutine 
