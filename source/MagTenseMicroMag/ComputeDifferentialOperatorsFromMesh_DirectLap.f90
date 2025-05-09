@@ -34,15 +34,18 @@ contains
         real(dp), dimension(:),allocatable :: NX, NY, NZ, Areas, Volumes, Xel, Yel, Zel, Xf, Yf, Zf
         integer, dimension(:,:),allocatable :: Signs, T, D, el2fa
         real(dp), dimension(:), allocatable :: Aexch_local
-        integer :: i,j,dims, n, k, kk, k_mask1D
+        integer :: i,j,dims, n, k, kk, k_mask1D, counter, k_i, lind, sjask
         real(dp), dimension(:),allocatable :: VolCoeff, AX, AY, AZ, s, w
-        integer, dimension(:),allocatable :: ss, ns, ks, inds1, inds2
+        integer, dimension(:),allocatable :: ss, ns, ks, inds1, inds2, inds2_vals, ks_sorted
         integer, dimension(:),allocatable :: ns_packed
         real(dp), dimension(:), allocatable :: Amat
-        integer, dimension(:), allocatable :: tmp, tmp2
+        integer, dimension(:), allocatable :: tmp, tmp2, ind, Wk
         logical, allocatable :: mask1D(:)
-        real(dp), dimension(:), allocatable :: ddxA, ddyA, ddzA, ddx, ddy, ddz, dx, dy, dz, vx, vy, vz, vw
-        real(dp) :: wm, infinity
+        real(dp), dimension(:), allocatable :: ddxA, ddyA, ddzA, ddx, ddy, ddz, dx, dy, dz, vx, vy, vz, vw, dks, dxk, dyk, dzk, nns
+        real(dp), dimension(:), allocatable :: dxk2, dyk2, dzk2, Wk2, e
+        real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T
+        real(dp) :: wm, infinity, scale, scale_local
+        real(dp), allocatable :: extra(:,:)
         character*(40) :: prog_str
         
         NX = GridInfo%fNormX
@@ -212,6 +215,7 @@ contains
             end if
         end if
 
+        deallocate(mask1D)
         call displayGUIMessage( 'Test 4' )
         
         ! Defaults
@@ -269,7 +273,13 @@ contains
         do i=1,size(ns)
             write(21,*)  ns(i)
         enddo
-        close(21)     
+        close(21)  
+        
+        open(21,file='ks.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks)
+            write(21,*)  ks(i)
+        enddo
+        close(21)
         
             allocate(w(size(ns)))
             if (dims == 1) then
@@ -299,8 +309,33 @@ contains
         !integer, dimension(:) :: inds1, inds2
         !real(wp), dimension(:) :: dx, dy, dz, vw, vx, vy, vz
 
-        !allocate(inds2(size(ns)))
-        call unique_sort(ks, inds2)
+        allocate(mask1D(size(ks)))    
+        mask1D(:) = .true.
+        allocate(ks_sorted(size(ks)))
+        do i = 1, size(ks)
+            ks_sorted(i) = MINVAL(ks,mask1D)
+            mask1D(MINLOC(ks,mask1D)) = .false.
+        end do    
+        deallocate(mask1D)  
+        
+        open(21,file='ks_sorted.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks_sorted)
+            write(21,*)  ks_sorted(i)
+        enddo
+        close(21)
+        
+        allocate(inds2_vals(size(ns)))
+        call unique_sort(ks_sorted, inds2_vals)
+        
+        call displayGUIMessage( 'Before inds2' )
+        
+        allocate(inds2(size(inds2_vals)))
+        do i = 1, size(inds2_vals)
+            inds2(i) = minloc(ks_sorted, 1, mask=ks_sorted .eq. inds2_vals(i), back=.true.)
+        end do
+        
+        call displayGUIMessage( 'After inds2' )
+        
         allocate(inds1(size(inds2)+1))
         inds1(1) = 1
         inds1(2:size(inds1)) = inds2(:) + 1
@@ -317,10 +352,14 @@ contains
         ! Scale weights to avoid ill conditioning of the least squares interpolation.
         !real(wp) :: wm
         
+        allocate(mask1D(size(w)))
+        
         infinity = HUGE(w) 
         mask1D = w < infinity
         wm = maxval(w,mask1D)
         w = w * (wm**(1.0/weight)) / wm
+        
+        deallocate(mask1D)
         
         write (prog_str,'(I20)') (size(ns))
         call displayGUIMessage( prog_str )
@@ -360,43 +399,144 @@ contains
         !real(wp) :: scale
         !real(wp), dimension(:) :: dxk, dyk, dzk, Wk, Gkl1, Gk, Hk, GkRed, HkRed, Wktmp, e, nns
 
-        !counter = 0
-        !do kk = 1, K
-        !    ind = inds1(kk):inds2(kk)
-        !    Wk = w(ind)
-        !    dxk = dx(ind)
-        !    dyk = dy(ind)
-        !    dzk = dz(ind)
-        !    scale = 10.0_wp ** nint(log10(meanval(abs(dxk))))
+        allocate(mask1D(size(Signs(:,1))))
+        
+        call displayGUIMessage( 'Starting ind' )
+        
+        sjask = 0
+        counter = 0
+        do kk = 1, 1!, K
+            allocate(ind(inds2(kk)-inds1(kk)+1))
+            k_i = 1
+            
+            write (prog_str,'(I20)') (inds1(kk))
+            call displayGUIMessage( prog_str )
+            
+            write (prog_str,'(I20)') (inds2(kk))
+            call displayGUIMessage( prog_str )
+                
+            do i = inds1(kk), inds2(kk)
+                write (prog_str,'(I20)') (i)
+                call displayGUIMessage( prog_str )
+        
+                ind(k_i) = i
+                k_i = k_i + 1
+            enddo
+            Wk = w(ind)
+            dxk = dx(ind)
+            dyk = dy(ind)
+            dzk = dz(ind)
+            scale_local = sum(abs(dxk))/size(dxk)
+            scale = 10.0 ** nint(log10(scale_local))
+            
+            if (kk .eq. 1) then
+                open(21,file='ind.txt',status='unknown',form='formatted',action='write')
+                do i=1,size(ind)
+                    write(21,*)  ind(i)
+                enddo
+                close(21)
+                
+                open(21,file='dxk_test.txt',status='unknown',form='formatted',action='write')
+                do i=1,size(dxk)
+                    write(21,*)  dxk(i)
+                enddo
+                close(21)
+            endif
 
-        !    if (dims > 1) then
+            if (dims > 1) then
         !        real(wp), dimension(:) :: dks
-        !        dks = [dxk, dyk]
-        !        scale = 10.0_wp ** nint(log10(meanval(abs(dks))))
-        !        if (dims > 2) then
-        !            dks = [dks, dzk]
-        !            scale = 10.0_wp ** nint(log10(meanval(abs(dks))))
-        !            dzk = dzk / scale
-        !        end if
-        !        dyk = dyk / scale
-        !    end if
-        !    dxk = dxk / scale
+                dks = [dxk, dyk]
+                scale_local = sum(abs(dks))/size(dks)
+                scale = 10.0 ** nint(log10(scale_local))
+                if (dims > 2) then
+                    dks = [dks, dzk]
+                    scale_local = sum(abs(dks))/size(dks)
+                    scale = 10.0 ** nint(log10(scale_local))
+                    dzk = dzk / scale
+                end if
+                dyk = dyk / scale
+            end if
+            dxk = dxk / scale
 
+            mask1D = Signs(:,2) == kk
+
+            write (prog_str,'(I10)') (sum(abs(pack(Signs(:,2),mask1D))))
+            call displayGUIMessage( prog_str )
+            
             ! Mirror trick to enforce Neumann b.c. Creates a set of virtual nodes on the other side of an edge face.
-        !    if (sum(abs(Signs(:,kk))) == 1) then
-        !        counter = counter + 1
-        !        lind = size(ind)
+            if (sum(abs(pack(Signs(:,2),mask1D))) == 1) then
+                call displayGUIMessage( 'Test loop 1' )
+                counter = counter + 1
+                lind = size(ind)
         !        e = ones(2*lind)
-        !        nns = [NX(kk), NY(kk), NZ(kk)]
-        !        if ((dims == 1 .and. nns(1) == 0) .or. (dims == 2 .and. all(nns(1:2) == 0))) cycle
-        !        extra = [dxk, dyk, dzk] - 2.0_wp * nns * transpose([dxk, dyk, dzk]) * nns
-        !        dxk = [dxk, extra(:,1)]
-        !        dyk = [dyk, extra(:,2)]
-        !        dzk = [dzk, extra(:,3)]
-        !        Wk = [Wk, Wk]
-        !        Gkl1 = [e, dxk, dyk, dzk]
-        !        Gk = [Wk * Gkl1, Wk * (dxk * Gkl1), Wk * (dyk * Gkl1), Wk * (dzk * Gkl1)]
-        !        Hk = Wk * transpose(Gkl1)
+                allocate(e(2*lind))
+                e(:) = 1
+                nns = [NX(kk), NY(kk), NZ(kk)]
+                if ((dims == 1 .and. nns(1) == 0) .or. (dims == 2 .and. all(nns(1:2) == 0))) cycle
+                !!!CHECK THAT THE SECOND ARGUMENT HERE IS EQUAL TO prod(~nns(1:2)
+                
+                call displayGUIMessage( 'Test loop 2' )
+                
+                allocate(extra(size(dxk,1),3))
+                !extra = [dxk, dyk, dzk] - 2.0 * nns * [dxk, dyk, dzk] * transpose(nns)
+                extra(:,1) = dxk - 2 * nns(1) * (dxk * nns(1))
+                extra(:,2) = dyk - 2 * nns(2) * (dyk * nns(2))
+                extra(:,3) = dzk - 2 * nns(3) * (dzk * nns(3))
+                dxk2 = [dxk, extra(:,1)]
+                dyk2 = [dyk, extra(:,2)]
+                dzk2 = [dzk, extra(:,3)]
+                Wk2 = [Wk, Wk]
+                allocate(Gkl1(size(e,1),4))
+                Gkl1(:,1) = e
+                Gkl1(:,2) = dxk2
+                Gkl1(:,3) = dyk2
+                Gkl1(:,4) = dzk2
+                allocate(Gk(size(e,1),4))
+                Gk(1,:) = matmul(Wk2, Gkl1)
+                allocate(Gkl1_temp(size(dxk2), size(Gkl1,2)))
+                do i = 1, size(Gkl1, 2)
+                    Gkl1_temp(:,i) = dxk2(:) * Gkl1(:,i)
+                end do
+                Gk(2,:) = matmul(Wk2,Gkl1_temp)
+                
+                if (sjask .eq. 0) then
+                    open(21,file='dxk.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(dxk)
+                        write(21,*)  dxk(i)
+                    enddo
+                    close(21)
+                    
+                    open(21,file='nns.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(nns)
+                        write(21,*)  nns(i)
+                    enddo
+                    close(21)
+                    
+                    open(21,file='Gk.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(Gk,1)
+                        write(21,*)  Gk(i,1)
+                        write(21,*)  Gk(i,2)
+                        write(21,*)  Gk(i,3)
+                        write(21,*)  Gk(i,4)
+                    enddo
+                    close(21)
+                
+                    open(21,file='extra.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(extra,1)
+                        write(21,*)  extra(i,1)
+                        write(21,*)  extra(i,2)
+                        write(21,*)  extra(i,3)
+                    enddo
+                    close(21)
+            
+                    sjask = sjask + 1
+                endif
+        
+                !Gk(3,:) = Wk2 * (dyk2 * Gkl1)
+                !Gk(4,:) = Wk2 * (dzk2 * Gkl1)
+                !Gk = [Wk2 * Gkl1, Wk2 * (dxk2 * Gkl1), Wk2 * (dyk2 * Gkl1), Wk2 * (dzk2 * Gkl1)]
+                !allocate(Hk(4,size(Gkl1,1)))
+                !Hk = matmul(Wk2, transpose(Gkl1))
 
                 ! Pick out only the components used in the face-sum.
                 ! This means e.g. only x gradient of phi if dims == 1 and/or the norm of the face is in the x-direction.
@@ -414,7 +554,7 @@ contains
         !        if (nns(1) /= 0) vx(ind) = (Wktmp(2, 1:lind) + Wktmp(2, lind+1:)) / scale
         !        if (nns(2) /= 0) vy(ind) = (Wktmp(3, 1:lind) + Wktmp(3, lind+1:)) / scale
         !        if (nns(3) /= 0) vz(ind) = (Wktmp(end, 1:lind) + Wktmp(end, lind+1:)) / scale
-
+                deallocate(extra,Gkl1_temp)
         !    else
         !        e = ones(lind)
         !        nns = [NX(kk), NY(kk), NZ(kk)]
@@ -437,8 +577,9 @@ contains
         !        if (nns(2) /= 0) vy(ind) = Wktmp(3, :) / scale
         !        if (nns(3) /= 0) vz(ind) = Wktmp(end, :) / scale
 
-        !    end if
-        !end do
+            end if
+            deallocate(ind)
+        end do
 
         ! Final operation, summing interpolated values according to either ...
         !if (method == "GGNeumann") then

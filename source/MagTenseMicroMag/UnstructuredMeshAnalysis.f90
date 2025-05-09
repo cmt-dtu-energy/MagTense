@@ -233,8 +233,8 @@
         mask1D = ((indexItContainsTrue(i,1) .eq. indexItContainsTrue(:,2)) .and. (indexItContainsTrue(i,2) .eq. indexItContainsTrue(:,1)))
         
         if (any(mask1D, DIM = 1)) then
-            write (prog_str,'(I10)') (k1)
-            call displayGUIMessage( prog_str )
+            !write (prog_str,'(I10)') (k1)
+            !call displayGUIMessage( prog_str )
             
             kMut_F_temp(k1,:) = [indexItContainsTrue(i,1), indexItContainsTrue(i,2)]
             k1 = k1+1
