@@ -34,9 +34,9 @@ contains
         real(dp), dimension(:),allocatable :: NX, NY, NZ, Areas, Volumes, Xel, Yel, Zel, Xf, Yf, Zf
         integer, dimension(:,:),allocatable :: Signs, T, D, el2fa
         real(dp), dimension(:), allocatable :: Aexch_local
-        integer :: i,j,dims, n, k, kk, k_mask1D, counter, k_i, lind, sjask
+        integer :: i,j,dims, n, k, kk, k_mask1D, counter, k_i, lind, sjask, indx
         real(dp), dimension(:),allocatable :: VolCoeff, AX, AY, AZ, s, w
-        integer, dimension(:),allocatable :: ss, ns, ks, inds1, inds2, inds2_vals, ks_sorted
+        integer, dimension(:),allocatable :: ss, ns, ks, inds1, inds2, inds2_vals, ks_sorted, ns_sorted
         integer, dimension(:),allocatable :: ns_packed
         real(dp), dimension(:), allocatable :: Amat
         integer, dimension(:), allocatable :: tmp, tmp2, ind, Wk
@@ -281,16 +281,29 @@ contains
         enddo
         close(21)
         
+        allocate(mask1D(size(ks)))    
+        mask1D(:) = .true.
+        allocate(ks_sorted(size(ks)))
+        allocate(ns_sorted(size(ks)))
+        do i = 1, size(ks)
+            indx = minloc(ks, 1, mask1D)
+            ks_sorted(i) = ks(indx)
+            ns_sorted(i) = ns(indx)
+            !ks_sorted(i) = MINVAL(ks,mask1D)
+            mask1D(MINLOC(ks,mask1D)) = .false.
+        end do    
+        deallocate(mask1D) 
+        
             allocate(w(size(ns)))
             if (dims == 1) then
                 !wm = ((Xel(1) - Xf(1))**2)**(-weight/2)
-                w = ((Xel(ns) - Xf(ks))**2)**(-weight/2)!*(wm**(1.0/weight)) / wm
+                w = ((Xel(ns_sorted) - Xf(ks_sorted))**2)**(-weight/2)!*(wm**(1.0/weight)) / wm
             else if (dims == 2) then
                 !wm = ((Xel(1) - Xf(1))**2 + (Yel(1) - Yf(1))**2)**(-weight/2)
-                w = ((Xel(ns) - Xf(ks))**2 + (Yel(ns) - Yf(ks))**2)**(-weight/2)!*(wm**(1.0/weight)) / wm
+                w = ((Xel(ns_sorted) - Xf(ks_sorted))**2 + (Yel(ns_sorted) - Yf(ks_sorted))**2)**(-weight/2)!*(wm**(1.0/weight)) / wm
             else
                 !wm = ((Xel(1) - Xf(1))**2 + (Yel(1) - Yf(1))**2 + (Zel(1) - Zf(1))**2)**(-weight/2)
-                w = ((Xel(ns) - Xf(ks))**2 + (Yel(ns) - Yf(ks))**2 + (Zel(ns) - Zf(ks))**2)**(-weight/2)!*(wm**(1.0/weight)) / wm
+                w = ((Xel(ns_sorted) - Xf(ks_sorted))**2 + (Yel(ns_sorted) - Yf(ks_sorted))**2 + (Zel(ns_sorted) - Zf(ks_sorted))**2)**(-weight/2)!*(wm**(1.0/weight)) / wm
             end if
         !    W = sparse(ks, ns, w, K, N)
         !else
@@ -309,18 +322,17 @@ contains
         !integer, dimension(:) :: inds1, inds2
         !real(wp), dimension(:) :: dx, dy, dz, vw, vx, vy, vz
 
-        allocate(mask1D(size(ks)))    
-        mask1D(:) = .true.
-        allocate(ks_sorted(size(ks)))
-        do i = 1, size(ks)
-            ks_sorted(i) = MINVAL(ks,mask1D)
-            mask1D(MINLOC(ks,mask1D)) = .false.
-        end do    
-        deallocate(mask1D)  
+         
         
         open(21,file='ks_sorted.txt',status='unknown',form='formatted',action='write')
         do i=1,size(ks_sorted)
             write(21,*)  ks_sorted(i)
+        enddo
+        close(21)
+        
+        open(21,file='ns_sorted.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ns_sorted)
+            write(21,*)  ns_sorted(i)
         enddo
         close(21)
         
@@ -341,12 +353,12 @@ contains
         inds1(2:size(inds1)) = inds2(:) + 1
         !inds2 = [find_nonzero_indices(diff(ks)), size(ns, 1)]
         !inds1 = [1, inds2 + 1]
-        dx = Xel(ns) - Xf(ks)
+        dx = Xel(ns_sorted) - Xf(ks_sorted)
         allocate(vw(size(w)))
         allocate(vx(size(w)))
-        dy = Yel(ns) - Yf(ks)
+        dy = Yel(ns_sorted) - Yf(ks_sorted)
         allocate(vy(size(w)))
-        dz = Zel(ns) - Zf(ks)
+        dz = Zel(ns_sorted) - Zf(ks_sorted)
         allocate(vz(size(w)))
 
         ! Scale weights to avoid ill conditioning of the least squares interpolation.
@@ -498,17 +510,70 @@ contains
                     Gkl1_temp(:,i) = dxk2(:) * Gkl1(:,i)
                 end do
                 Gk(2,:) = matmul(Wk2,Gkl1_temp)
+                do i = 1, size(Gkl1, 2)
+                    Gkl1_temp(:,i) = dyk2(:) * Gkl1(:,i)
+                end do
+                Gk(3,:) = matmul(Wk2,Gkl1_temp)
+                do i = 1, size(Gkl1, 2)
+                    Gkl1_temp(:,i) = dzk2(:) * Gkl1(:,i)
+                end do
+                Gk(4,:) = matmul(Wk2,Gkl1_temp)
                 
                 if (sjask .eq. 0) then
+                    open(21,file='Wk2.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(Wk2)
+                        write(21,*)  Wk2(i)
+                    enddo
+                    close(21)
+                    
                     open(21,file='dxk.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(dxk)
                         write(21,*)  dxk(i)
                     enddo
                     close(21)
                     
+                    open(21,file='dyk.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(dyk)
+                        write(21,*)  dyk(i)
+                    enddo
+                    close(21)
+                    
+                    open(21,file='dzk.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(dzk)
+                        write(21,*)  dzk(i)
+                    enddo
+                    close(21)
+                    
+                    open(21,file='dxk2.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(dxk2)
+                        write(21,*)  dxk2(i)
+                    enddo
+                    close(21)
+                    
+                    open(21,file='dyk2.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(dyk2)
+                        write(21,*)  dyk2(i)
+                    enddo
+                    close(21)
+                    
+                    open(21,file='dzk2.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(dzk2)
+                        write(21,*)  dzk2(i)
+                    enddo
+                    close(21)
+                    
                     open(21,file='nns.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(nns)
                         write(21,*)  nns(i)
+                    enddo
+                    close(21)
+                    
+                    open(21,file='Gkl1.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(Gkl1,1)
+                        write(21,*)  Gkl1(i,1)
+                        write(21,*)  Gkl1(i,2)
+                        write(21,*)  Gkl1(i,3)
+                        write(21,*)  Gkl1(i,4)
                     enddo
                     close(21)
                     
@@ -532,8 +597,6 @@ contains
                     sjask = sjask + 1
                 endif
         
-                !Gk(3,:) = Wk2 * (dyk2 * Gkl1)
-                !Gk(4,:) = Wk2 * (dzk2 * Gkl1)
                 !Gk = [Wk2 * Gkl1, Wk2 * (dxk2 * Gkl1), Wk2 * (dyk2 * Gkl1), Wk2 * (dzk2 * Gkl1)]
                 !allocate(Hk(4,size(Gkl1,1)))
                 !Hk = matmul(Wk2, transpose(Gkl1))
