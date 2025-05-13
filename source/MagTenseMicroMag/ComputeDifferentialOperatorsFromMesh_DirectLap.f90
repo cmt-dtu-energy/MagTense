@@ -34,16 +34,16 @@ contains
         real(dp), dimension(:),allocatable :: NX, NY, NZ, Areas, Volumes, Xel, Yel, Zel, Xf, Yf, Zf
         integer, dimension(:,:),allocatable :: Signs, T, D, el2fa
         real(dp), dimension(:), allocatable :: Aexch_local
-        integer :: i,j,dims, n, k, kk, k_mask1D, counter, k_i, lind, sjask, indx
+        integer :: i,j,dims, n, k, kk, k_mask1D, counter, k_i, lind, sjask, indx, k_j, k_row 
         real(dp), dimension(:),allocatable :: VolCoeff, AX, AY, AZ, s, w
         integer, dimension(:),allocatable :: ss, ns, ks, inds1, inds2, inds2_vals, ks_sorted, ns_sorted
         integer, dimension(:),allocatable :: ns_packed
         real(dp), dimension(:), allocatable :: Amat
         integer, dimension(:), allocatable :: tmp, tmp2, ind, Wk
-        logical, allocatable :: mask1D(:)
+        logical, allocatable :: mask1D(:), mask_int2log(:)
         real(dp), dimension(:), allocatable :: ddxA, ddyA, ddzA, ddx, ddy, ddz, dx, dy, dz, vx, vy, vz, vw, dks, dxk, dyk, dzk, nns
         real(dp), dimension(:), allocatable :: dxk2, dyk2, dzk2, Wk2, e
-        real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T
+        real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T, GkRed, HkRed
         real(dp) :: wm, infinity, scale, scale_local
         real(dp), allocatable :: extra(:,:)
         character*(40) :: prog_str
@@ -519,6 +519,50 @@ contains
                 end do
                 Gk(4,:) = matmul(Wk2,Gkl1_temp)
                 
+                Gkl1_T = transpose(Gkl1)
+                allocate(Hk(size(e,1),4))
+                do i = 1, size(Gkl1, 2)
+                    Hk(i,:) = Wk2(:)*Gkl1_T(i,:)
+                enddo
+                
+                allocate(mask_int2log(size(nns)+1))
+                mask_int2log(1) = .true.
+                do i = 2, size(mask_int2log)
+                    if (nns(i-1) .ne. 0) then
+                        mask_int2log(i) = .true.
+                    else
+                        mask_int2log(i) = .false.
+                    endif
+                enddo
+                
+                allocate(GkRed(count(mask_int2log),count(mask_int2log)))
+                allocate(HkRed(count(mask_int2log),size(Hk,2)))
+                k_i = 1
+                do i = 1, size(mask_int2log)
+                    k_row = 0
+                    k_j = 1
+                    do j = 1, size(mask_int2log)
+                        if (mask_int2log(i) .and. mask_int2log(j)) then
+                                GkRed(k_i,k_j) = Gk(i,j)
+                                k_j = k_j + 1
+                                k_row = 1
+                        end if                       
+                    enddo
+                    if (k_row > 0) then
+                        k_i = k_i + 1
+                    endif 
+                enddo
+                
+                k_i = 1
+                k_j = 1
+                do i = 1, size(mask_int2log)
+                    if (mask_int2log(i)) then
+                        HkRed(k_i,:) = Hk(i, :)
+                        k_i = k_i + 1
+                    endif
+                enddo
+                
+                
                 if (sjask .eq. 0) then
                     open(21,file='Wk2.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(Wk2)
@@ -568,6 +612,12 @@ contains
                     enddo
                     close(21)
                     
+                    open(21,file='mask_int2log.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(mask_int2log)
+                        write(21,*)  mask_int2log(i)
+                    enddo
+                    close(21)
+                    
                     open(21,file='Gkl1.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(Gkl1,1)
                         write(21,*)  Gkl1(i,1)
@@ -585,6 +635,15 @@ contains
                         write(21,*)  Gk(i,4)
                     enddo
                     close(21)
+                    
+                    open(21,file='Hk.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(Hk,1)
+                        write(21,*)  Hk(i,1)
+                        write(21,*)  Hk(i,2)
+                        write(21,*)  Hk(i,3)
+                        write(21,*)  Hk(i,4)
+                    enddo
+                    close(21)
                 
                     open(21,file='extra.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(extra,1)
@@ -593,10 +652,27 @@ contains
                         write(21,*)  extra(i,3)
                     enddo
                     close(21)
+                    
+                    open(21,file='HkRed.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(HkRed,1)
+                        do j=1,size(HkRed,2)
+                            write(21,*)  HkRed(i,j)
+                        enddo
+                    enddo
+                    close(21)
+                    
+                    open(21,file='GkRed.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(GkRed,1)
+                        do j=1,size(GkRed,2)
+                            write(21,*)  GkRed(i,j)
+                        enddo
+                    enddo
+                    close(21)
             
                     sjask = sjask + 1
                 endif
         
+                deallocate(mask_int2log,GkRed,HkRed)
                 !Gk = [Wk2 * Gkl1, Wk2 * (dxk2 * Gkl1), Wk2 * (dyk2 * Gkl1), Wk2 * (dzk2 * Gkl1)]
                 !allocate(Hk(4,size(Gkl1,1)))
                 !Hk = matmul(Wk2, transpose(Gkl1))

@@ -59,6 +59,8 @@
            method = 'DirectLaplacianNeumann'
            call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo,interpn,weight,method)
            
+           !REMOVE CODE BELOW - ONLY FOR TESTING
+           call returnMicroMagGrid( gridinfo, plhs(1) ) 
       endif
       
       !Call the ODE solver
