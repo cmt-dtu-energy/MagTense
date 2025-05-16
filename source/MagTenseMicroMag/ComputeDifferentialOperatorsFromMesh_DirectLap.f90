@@ -1,6 +1,7 @@
 module DifferentialOperators
   use MKL_SPBLAS
   use BLAS95
+  use LAPACK95
   use MicroMagParameters
   use IO_GENERAL
   
@@ -43,11 +44,63 @@ contains
         logical, allocatable :: mask1D(:), mask_int2log(:)
         real(dp), dimension(:), allocatable :: ddxA, ddyA, ddzA, ddx, ddy, ddz, dx, dy, dz, vx, vy, vz, vw, dks, dxk, dyk, dzk, nns
         real(dp), dimension(:), allocatable :: dxk2, dyk2, dzk2, Wk2, e
-        real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T, GkRed, HkRed
+        real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T, GkRed, HkRed, Wktmp
         real(dp) :: wm, infinity, scale, scale_local
         real(dp), allocatable :: extra(:,:)
         character*(40) :: prog_str
         
+        
+          INTEGER          Nmkl, NRHS
+          PARAMETER        ( Nmkl = 5, NRHS = 3 )
+          INTEGER          LDA, LDB
+          PARAMETER        ( LDA = Nmkl, LDB = Nmkl )
+          INTEGER          INFO
+          INTEGER          IPIV( Nmkl )
+          real(dp), allocatable :: A( :, : ), B( :, : )
+          
+          allocate(A(5,5))
+          A(1,:) = [6.80,  -6.05,  -0.45,   8.32,  -9.67]
+          A(2,:) = [-2.11,  -3.30,   2.58,   2.71,  -5.14]
+          A(3,:) = [5.66,   5.36,  -2.70,   4.35,  -7.26]
+          A(4,:) = [5.97,  -4.44,   0.27,  -7.17,   6.08]
+          A(5,:) = [8.23,   1.08,   9.04,   2.14,  -6.87]
+          
+          allocate(B(5,3))
+         B(1,:) = [4.02,  -1.56,   9.81]
+         B(2,:) = [6.19,   4.00,  -4.09]
+         B(3,:) = [-8.22,  -8.67,  -4.57]
+         B(4,:) = [-7.57,   1.75,  -8.61]
+         B(5,:) = [-3.03,   2.86,   8.99]
+         !B(1,:) = [4.02]
+         !B(2,:) = [6.19]
+         !B(3,:) = [-8.22]
+         !B(4,:) = [-7.57]
+         !B(5,:) = [-3.03]
+         
+         CALL DGESV( Nmkl, NRHS, A, LDA, IPIV, B, LDB, INFO )
+        
+         call displayGUIMessage( 'LAPACK' )
+        write (prog_str,'(I10)') (Nmkl)
+        call displayGUIMessage( prog_str )
+        write (prog_str,'(I10)') (NRHS)
+        call displayGUIMessage( prog_str )
+        write (prog_str,'(I10)') (LDA)
+        call displayGUIMessage( prog_str )
+        write (prog_str,'(I10)') (LDB)
+        call displayGUIMessage( prog_str )
+        write (prog_str,'(I10)') (INFO)
+        call displayGUIMessage( prog_str )
+        
+        open(21,file='B.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(B,2)
+            write(21,*)  B(1,i)
+            write(21,*)  B(2,i)
+            write(21,*)  B(3,i)
+            write(21,*)  B(4,i)
+            write(21,*)  B(5,i)
+        enddo
+        close(21)
+     
         NX = GridInfo%fNormX
         NY = GridInfo%fNormY
         NZ = GridInfo%fNormZ
@@ -100,8 +153,10 @@ contains
         call displayGUIMessage( 'Test 2-1' )
         
         ! Dimensions
-        N = size(Signs, 1)  ! Number of tiles
-        K = size(Signs, 2)  ! Number of faces
+        !N = size(Signs, 1)  ! Number of tiles
+        !K = size(Signs, 2)  ! Number of faces
+        N = maxval(Signs(:,1))  ! Number of tiles
+        K = maxval(Signs(:,2))  ! Number of faces
 
         call displayGUIMessage( 'Test 2-2' )
         
@@ -360,7 +415,12 @@ contains
         allocate(vy(size(w)))
         dz = Zel(ns_sorted) - Zf(ks_sorted)
         allocate(vz(size(w)))
-
+        vw(:) = 0
+        vx(:) = 0
+        vy(:) = 0
+        vz(:) = 0
+        
+        
         ! Scale weights to avoid ill conditioning of the least squares interpolation.
         !real(wp) :: wm
         
@@ -415,21 +475,28 @@ contains
         
         call displayGUIMessage( 'Starting ind' )
         
+        write (prog_str,'(I20)') (K)
+        call displayGUIMessage( prog_str )
+               
         sjask = 0
         counter = 0
-        do kk = 1, 1!, K
+        do kk = 1, K
             allocate(ind(inds2(kk)-inds1(kk)+1))
             k_i = 1
             
-            write (prog_str,'(I20)') (inds1(kk))
+            !call displayGUIMessage( 'Doing loop number:' )
+            write (prog_str,'(I20)') (kk)
             call displayGUIMessage( prog_str )
             
-            write (prog_str,'(I20)') (inds2(kk))
-            call displayGUIMessage( prog_str )
+            !write (prog_str,'(I20)') (inds1(kk))
+            !call displayGUIMessage( prog_str )
+            
+            !write (prog_str,'(I20)') (inds2(kk))
+            !call displayGUIMessage( prog_str )
                 
             do i = inds1(kk), inds2(kk)
-                write (prog_str,'(I20)') (i)
-                call displayGUIMessage( prog_str )
+                !write (prog_str,'(I20)') (i)
+                !call displayGUIMessage( prog_str )
         
                 ind(k_i) = i
                 k_i = k_i + 1
@@ -472,22 +539,31 @@ contains
 
             mask1D = Signs(:,2) == kk
 
-            write (prog_str,'(I10)') (sum(abs(pack(Signs(:,2),mask1D))))
-            call displayGUIMessage( prog_str )
+            !write (prog_str,'(I10)') (sum(abs(pack(Signs(:,2),mask1D))))
+            !call displayGUIMessage( prog_str )
             
+            counter = counter + 1
+            nns = [NX(kk), NY(kk), NZ(kk)]
+            
+            if (kk == K) then
+                open(21,file='nns_end.txt',status='unknown',form='formatted',action='write')
+                do i=1,size(nns)
+                    write(21,*)  nns(i)
+                enddo
+                close(21)
+            end if
+            
+            lind = size(ind)
             ! Mirror trick to enforce Neumann b.c. Creates a set of virtual nodes on the other side of an edge face.
             if (sum(abs(pack(Signs(:,2),mask1D))) == 1) then
-                call displayGUIMessage( 'Test loop 1' )
-                counter = counter + 1
-                lind = size(ind)
-        !        e = ones(2*lind)
+                !call displayGUIMessage( 'Test loop 1' )
+                
                 allocate(e(2*lind))
-                e(:) = 1
-                nns = [NX(kk), NY(kk), NZ(kk)]
-                if ((dims == 1 .and. nns(1) == 0) .or. (dims == 2 .and. all(nns(1:2) == 0))) cycle
+                
+                if ((dims == 1 .and. abs(nns(1)) < 1e-15) .or. (dims == 2 .and. all(abs(nns(1:2)) < 1e-15))) cycle
                 !!!CHECK THAT THE SECOND ARGUMENT HERE IS EQUAL TO prod(~nns(1:2)
                 
-                call displayGUIMessage( 'Test loop 2' )
+                !call displayGUIMessage( 'Test loop 2' )
                 
                 allocate(extra(size(dxk,1),3))
                 !extra = [dxk, dyk, dzk] - 2.0 * nns * [dxk, dyk, dzk] * transpose(nns)
@@ -498,77 +574,192 @@ contains
                 dyk2 = [dyk, extra(:,2)]
                 dzk2 = [dzk, extra(:,3)]
                 Wk2 = [Wk, Wk]
-                allocate(Gkl1(size(e,1),4))
-                Gkl1(:,1) = e
-                Gkl1(:,2) = dxk2
-                Gkl1(:,3) = dyk2
-                Gkl1(:,4) = dzk2
-                allocate(Gk(size(e,1),4))
-                Gk(1,:) = matmul(Wk2, Gkl1)
-                allocate(Gkl1_temp(size(dxk2), size(Gkl1,2)))
-                do i = 1, size(Gkl1, 2)
-                    Gkl1_temp(:,i) = dxk2(:) * Gkl1(:,i)
-                end do
-                Gk(2,:) = matmul(Wk2,Gkl1_temp)
-                do i = 1, size(Gkl1, 2)
-                    Gkl1_temp(:,i) = dyk2(:) * Gkl1(:,i)
-                end do
-                Gk(3,:) = matmul(Wk2,Gkl1_temp)
-                do i = 1, size(Gkl1, 2)
-                    Gkl1_temp(:,i) = dzk2(:) * Gkl1(:,i)
-                end do
-                Gk(4,:) = matmul(Wk2,Gkl1_temp)
+            
+                deallocate(extra)
+            else
+                allocate(e(lind))
                 
-                Gkl1_T = transpose(Gkl1)
-                allocate(Hk(size(e,1),4))
-                do i = 1, size(Gkl1, 2)
-                    Hk(i,:) = Wk2(:)*Gkl1_T(i,:)
-                enddo
+                dxk2 = dxk
+                dyk2 = dyk
+                dzk2 = dzk
+                Wk2 = Wk
+            end if
+            
+            e(:) = 1
+            
+            !call displayGUIMessage( 'Sizes:' )
+            
+            !write (prog_str,'(I20)') (size(e,1))
+            !call displayGUIMessage( prog_str )
+            
+            !write (prog_str,'(I20)') (size(Gkl1,1))
+            !call displayGUIMessage( prog_str )
+            
+            !write (prog_str,'(I20)') (size(dxk2,1))
+            !call displayGUIMessage( prog_str )
+
+            !write (prog_str,'(I20)') (size(Gkl1_temp,1))
+            !call displayGUIMessage( prog_str )
+            
+            allocate(Gkl1(size(e,1),4))
+            Gkl1(:,1) = e
+            Gkl1(:,2) = dxk2
+            Gkl1(:,3) = dyk2
+            Gkl1(:,4) = dzk2
+            allocate(Gk(4,4))
+            Gk(1,:) = matmul(Wk2, Gkl1)
+            allocate(Gkl1_temp(size(dxk2), size(Gkl1,2)))
+            do i = 1, size(Gkl1, 2)
+                Gkl1_temp(:,i) = dxk2(:) * Gkl1(:,i)
+            end do
+            Gk(2,:) = matmul(Wk2,Gkl1_temp)
+            do i = 1, size(Gkl1, 2)
+                Gkl1_temp(:,i) = dyk2(:) * Gkl1(:,i)
+            end do
+            Gk(3,:) = matmul(Wk2,Gkl1_temp)
+            do i = 1, size(Gkl1, 2)
+                Gkl1_temp(:,i) = dzk2(:) * Gkl1(:,i)
+            end do
+            Gk(4,:) = matmul(Wk2,Gkl1_temp)
                 
-                allocate(mask_int2log(size(nns)+1))
-                mask_int2log(1) = .true.
-                do i = 2, size(mask_int2log)
-                    if (nns(i-1) .ne. 0) then
-                        mask_int2log(i) = .true.
-                    else
-                        mask_int2log(i) = .false.
-                    endif
-                enddo
+            Gkl1_T = transpose(Gkl1)
+            allocate(Hk(4,size(e,1)))
+            do i = 1, 4
+                Hk(i,:) = Wk2(:)*Gkl1_T(i,:)
+            enddo
                 
-                allocate(GkRed(count(mask_int2log),count(mask_int2log)))
-                allocate(HkRed(count(mask_int2log),size(Hk,2)))
-                k_i = 1
-                do i = 1, size(mask_int2log)
-                    k_row = 0
-                    k_j = 1
-                    do j = 1, size(mask_int2log)
-                        if (mask_int2log(i) .and. mask_int2log(j)) then
-                                GkRed(k_i,k_j) = Gk(i,j)
-                                k_j = k_j + 1
-                                k_row = 1
-                        end if                       
-                    enddo
-                    if (k_row > 0) then
-                        k_i = k_i + 1
-                    endif 
-                enddo
+            allocate(mask_int2log(size(nns)+1))
+            mask_int2log(1) = .true.
+            do i = 2, size(mask_int2log)
+                if (abs(nns(i-1)) > 1e-15) then
+                    mask_int2log(i) = .true.
+                else
+                    mask_int2log(i) = .false.
+                endif
+            enddo
                 
-                k_i = 1
+            allocate(GkRed(count(mask_int2log),count(mask_int2log)))
+            allocate(HkRed(count(mask_int2log),size(Hk,2)))
+            k_i = 1
+            do i = 1, size(mask_int2log)
+                k_row = 0
                 k_j = 1
-                do i = 1, size(mask_int2log)
-                    if (mask_int2log(i)) then
-                        HkRed(k_i,:) = Hk(i, :)
-                        k_i = k_i + 1
-                    endif
+                do j = 1, size(mask_int2log)
+                    if (mask_int2log(i) .and. mask_int2log(j)) then
+                            GkRed(k_i,k_j) = Gk(i,j)
+                            k_j = k_j + 1
+                            k_row = 1
+                    end if                       
                 enddo
+                if (k_row > 0) then
+                    k_i = k_i + 1
+                endif 
+            enddo
                 
+            k_i = 1
+            do i = 1, size(mask_int2log)
+                if (mask_int2log(i)) then
+                    HkRed(k_i,:) = Hk(i, :)
+                    k_i = k_i + 1
+                endif
+            enddo
+         
+                
+!            open(21,file='HkRed.txt',status='unknown',form='formatted',action='write')
+!            do i=1,size(HkRed,1)
+!                do j=1,size(HkRed,2)
+!                    write(21,*)  HkRed(i,j)
+!                enddo
+!            enddo
+!            close(21)
+                    
+            allocate(Wktmp(size(HkRed,1),size(HkRed,2)))
+            Wktmp(:,:) = HkRed(:,:)
+                
+            !call displayGUIMessage( 'Solving linear system' ) 
+            call dgesv( size(GkRed,1), size(Wktmp,2), GkRed, size(GkRed,1), IPIV, Wktmp, size(Wktmp,1), INFO )
+            !call displayGUIMessage( 'System solved' ) 
+         
+            if (sum(abs(pack(Signs(:,2),mask1D))) == 1) then
+                vw(ind) = Wktmp(1,1:lind)+Wktmp(1,lind+1:size(Wktmp,2)) ! Interpolated face values
+                if (abs(nns(1)) > 1e-15) then ! Interpolated x-components of face gradients
+                    vx(ind)=(Wktmp(2,1:lind)+Wktmp(2,lind+1:size(Wktmp,2)))/scale ! rescaled
+                    if (abs(nns(2)) > 1e-15) then ! Interpolated y-components of face gradients
+                        vy(ind) = (Wktmp(3,1:lind)+Wktmp(3,lind+1:size(Wktmp,2)))/scale ! rescaled
+                    endif
+                elseif (abs(nns(2)) > 1e-15) then ! Interpolated y-components of face gradients
+                    vy(ind)=(Wktmp(2,1:lind)+Wktmp(2,lind+1:size(Wktmp,2)))/scale ! rescaled
+                endif
+                if (abs(nns(3)) > 1e-15) then ! Interpolated z-components of face gradients
+                    vz(ind)=(Wktmp(size(Wktmp,1),1:lind)+Wktmp(size(Wktmp,1),lind+1:size(Wktmp,2)))/scale ! rescaled
+                endif
+            else
+                vw(ind) = Wktmp(1,:); ! Interpolated face values
+                if (abs(nns(1)) > 1e-15) then ! Interpolated x-components of face gradients
+                    vx(ind)=Wktmp(2,:)/scale ! rescaled
+                    if (abs(nns(2)) > 1e-15) then ! Interpolated y-components of face gradients
+                        vy(ind) = Wktmp(3,:)/scale ! rescaled
+                    endif
+                elseif (abs(nns(2)) > 1e-15) then ! Interpolated y-components of face gradients
+                    vy(ind)=Wktmp(2,:)/scale ! rescaled
+                endif
+                if (abs(nns(3)) > 1e-15) then ! Interpolated z-components of face gradients
+                    vz(ind)=Wktmp(size(Wktmp,1),:)/scale ! rescaled
+                endif
+            endif
+            
+        
+                 
                 
                 if (sjask .eq. 0) then
+                    call displayGUIMessage( 'Saving files' )
+                    
+                    open(21,file='Wktmp.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(Wktmp,1)
+                        do j=1,size(Wktmp,2)
+                            write(21,*)  Wktmp(i,j)
+                        enddo
+                    enddo
+                    close(21)
+                    
+                    call displayGUIMessage( 'Saving 2' )
+                    
+                    open(21,file='vw1.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(vw)
+                        write(21,*)  vw(i)
+                    enddo
+                    
+                    call displayGUIMessage( 'Saving 3' )
+                    
+                    open(21,file='vx.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(vx)
+                        write(21,*)  vx(i)
+                    enddo
+                    
+                    call displayGUIMessage( 'Saving 4' )
+                    
+                    open(21,file='vy.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(vy)
+                        write(21,*)  vy(i)
+                    enddo
+                    
+                    call displayGUIMessage( 'Saving 5' )
+                    
+                    open(21,file='vz.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(vz)
+                        write(21,*)  vz(i)
+                    enddo
+
+                    call displayGUIMessage( 'Saving 6' )
+                    
+                    close(21)
                     open(21,file='Wk2.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(Wk2)
                         write(21,*)  Wk2(i)
                     enddo
                     close(21)
+                    
+                    call displayGUIMessage( 'Saving 7' )
                     
                     open(21,file='dxk.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(dxk)
@@ -576,11 +767,15 @@ contains
                     enddo
                     close(21)
                     
+                    call displayGUIMessage( 'Saving 8' )
+                    
                     open(21,file='dyk.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(dyk)
                         write(21,*)  dyk(i)
                     enddo
                     close(21)
+                    
+                    call displayGUIMessage( 'Saving 9' )
                     
                     open(21,file='dzk.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(dzk)
@@ -588,11 +783,15 @@ contains
                     enddo
                     close(21)
                     
+                    call displayGUIMessage( 'Saving 10' )
+                    
                     open(21,file='dxk2.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(dxk2)
                         write(21,*)  dxk2(i)
                     enddo
                     close(21)
+                    
+                    call displayGUIMessage( 'Saving 11' )
                     
                     open(21,file='dyk2.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(dyk2)
@@ -600,11 +799,15 @@ contains
                     enddo
                     close(21)
                     
+                    call displayGUIMessage( 'Saving 12' )
+                    
                     open(21,file='dzk2.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(dzk2)
                         write(21,*)  dzk2(i)
                     enddo
                     close(21)
+                    
+                    call displayGUIMessage( 'Saving 13' )
                     
                     open(21,file='nns.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(nns)
@@ -612,11 +815,15 @@ contains
                     enddo
                     close(21)
                     
+                    call displayGUIMessage( 'Saving 14' )
+                    
                     open(21,file='mask_int2log.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(mask_int2log)
                         write(21,*)  mask_int2log(i)
                     enddo
                     close(21)
+                    
+                    call displayGUIMessage( 'Saving 15' )
                     
                     open(21,file='Gkl1.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(Gkl1,1)
@@ -627,6 +834,8 @@ contains
                     enddo
                     close(21)
                     
+                    call displayGUIMessage( 'Saving 16' )
+                    
                     open(21,file='Gk.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(Gk,1)
                         write(21,*)  Gk(i,1)
@@ -635,6 +844,8 @@ contains
                         write(21,*)  Gk(i,4)
                     enddo
                     close(21)
+                    
+                    call displayGUIMessage( 'Saving 17' )
                     
                     open(21,file='Hk.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(Hk,1)
@@ -645,21 +856,17 @@ contains
                     enddo
                     close(21)
                 
-                    open(21,file='extra.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(extra,1)
-                        write(21,*)  extra(i,1)
-                        write(21,*)  extra(i,2)
-                        write(21,*)  extra(i,3)
-                    enddo
-                    close(21)
+                    call displayGUIMessage( 'Saving 18' )
                     
-                    open(21,file='HkRed.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(HkRed,1)
-                        do j=1,size(HkRed,2)
-                            write(21,*)  HkRed(i,j)
-                        enddo
-                    enddo
-                    close(21)
+                    !open(21,file='extra.txt',status='unknown',form='formatted',action='write')
+                    !do i=1,size(extra,1)
+                    !    write(21,*)  extra(i,1)
+                    !    write(21,*)  extra(i,2)
+                    !    write(21,*)  extra(i,3)
+                    !enddo
+                    !close(21)
+                    
+                    call displayGUIMessage( 'Saving 19' )
                     
                     open(21,file='GkRed.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(GkRed,1)
@@ -672,54 +879,40 @@ contains
                     sjask = sjask + 1
                 endif
         
-                deallocate(mask_int2log,GkRed,HkRed)
-                !Gk = [Wk2 * Gkl1, Wk2 * (dxk2 * Gkl1), Wk2 * (dyk2 * Gkl1), Wk2 * (dzk2 * Gkl1)]
-                !allocate(Hk(4,size(Gkl1,1)))
-                !Hk = matmul(Wk2, transpose(Gkl1))
+                            
+                
+                deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)
 
-                ! Pick out only the components used in the face-sum.
-                ! This means e.g. only x gradient of phi if dims == 1 and/or the norm of the face is in the x-direction.
-        !        GkRed = Gk([.true., nns] /= 0, [.true., nns] /= 0)
-        !        HkRed = Hk([.true., nns] /= 0, :)
-
-        !        try
-        !            R = chol(GkRed)
-        !            Wktmp = solve(R, solve(transpose(R), HkRed))
-        !        catch
-        !            Wktmp = solve(GkRed, HkRed)
-        !        end try
-
-        !        vw(ind) = Wktmp(1, 1:lind) + Wktmp(1, lind+1:)
-        !        if (nns(1) /= 0) vx(ind) = (Wktmp(2, 1:lind) + Wktmp(2, lind+1:)) / scale
-        !        if (nns(2) /= 0) vy(ind) = (Wktmp(3, 1:lind) + Wktmp(3, lind+1:)) / scale
-        !        if (nns(3) /= 0) vz(ind) = (Wktmp(end, 1:lind) + Wktmp(end, lind+1:)) / scale
-                deallocate(extra,Gkl1_temp)
-        !    else
-        !        e = ones(lind)
-        !        nns = [NX(kk), NY(kk), NZ(kk)]
-        !        Gkl1 = [e, dxk, dyk, dzk]
-        !        Gk = [Wk * Gkl1, Wk * (dxk * Gkl1), Wk * (dyk * Gkl1), Wk * (dzk * Gkl1)]
-        !        Hk = Wk * transpose(Gkl1)
-
-        !        GkRed = Gk([.true., nns] /= 0, [.true., nns] /= 0)
-        !        HkRed = Hk([.true., nns] /= 0, :)
-
-        !        try
-        !            R = chol(GkRed)
-        !            Wktmp = solve(R, solve(transpose(R), HkRed))
-        !        catch
-        !            Wktmp = solve(GkRed, HkRed)
-        !        end try
-
-        !        vw(ind) = Wktmp(1, :)
-        !        if (nns(1) /= 0) vx(ind) = Wktmp(2, :) / scale
-        !        if (nns(2) /= 0) vy(ind) = Wktmp(3, :) / scale
-        !        if (nns(3) /= 0) vz(ind) = Wktmp(end, :) / scale
-
-            end if
-            deallocate(ind)
+        
         end do
 
+        
+        open(21,file='vw.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(vw)
+            write(21,*)  vw(i)
+        enddo
+                    
+        call displayGUIMessage( 'Saving 3' )
+                    
+        open(21,file='vx.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(vx)
+            write(21,*)  vx(i)
+        enddo
+                    
+        call displayGUIMessage( 'Saving 4' )
+                    
+        open(21,file='vy.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(vy)
+            write(21,*)  vy(i)
+        enddo
+                    
+        call displayGUIMessage( 'Saving 5' )
+                    
+        open(21,file='vz.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(vz)
+            write(21,*)  vz(i)
+        enddo
+                    
         ! Final operation, summing interpolated values according to either ...
         !if (method == "GGNeumann") then
             ! ... the Green-Gauss theorem, yielding an estimate for the gradient
