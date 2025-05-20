@@ -38,16 +38,17 @@ contains
         integer :: i,j,dims, n, k, kk, k_mask1D, counter, k_i, lind, sjask, indx, k_j, k_row 
         real(dp), dimension(:),allocatable :: VolCoeff, AX, AY, AZ, s, w
         integer, dimension(:),allocatable :: ss, ns, ks, inds1, inds2, inds2_vals, ks_sorted, ns_sorted
-        integer, dimension(:),allocatable :: ns_packed
+        integer, dimension(:),allocatable :: ns_packed, k_log
         real(dp), dimension(:), allocatable :: Amat
-        integer, dimension(:), allocatable :: tmp, tmp2, ind, Wk
+        integer, dimension(:), allocatable :: tmp, tmp2, ind
         logical, allocatable :: mask1D(:), mask_int2log(:)
         real(dp), dimension(:), allocatable :: ddxA, ddyA, ddzA, ddx, ddy, ddz, dx, dy, dz, vx, vy, vz, vw, dks, dxk, dyk, dzk, nns
-        real(dp), dimension(:), allocatable :: dxk2, dyk2, dzk2, Wk2, e
+        real(dp), dimension(:), allocatable :: dxk2, dyk2, dzk2, Wk, Wk2, e, sjaskarr
         real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T, GkRed, HkRed, Wktmp
-        real(dp) :: wm, infinity, scale, scale_local
+        real(dp) :: wm, infinity, scale, scale_local, eps_criteria
         real(dp), allocatable :: extra(:,:)
         character*(40) :: prog_str
+        
         
         
           INTEGER          Nmkl, NRHS
@@ -101,6 +102,8 @@ contains
         enddo
         close(21)
      
+        eps_criteria = 1.0e-12
+        
         NX = GridInfo%fNormX
         NY = GridInfo%fNormY
         NZ = GridInfo%fNormZ
@@ -409,11 +412,11 @@ contains
         !inds2 = [find_nonzero_indices(diff(ks)), size(ns, 1)]
         !inds1 = [1, inds2 + 1]
         dx = Xel(ns_sorted) - Xf(ks_sorted)
+        dy = Yel(ns_sorted) - Yf(ks_sorted)
+        dz = Zel(ns_sorted) - Zf(ks_sorted)
         allocate(vw(size(w)))
         allocate(vx(size(w)))
-        dy = Yel(ns_sorted) - Yf(ks_sorted)
         allocate(vy(size(w)))
-        dz = Zel(ns_sorted) - Zf(ks_sorted)
         allocate(vz(size(w)))
         vw(:) = 0
         vx(:) = 0
@@ -480,7 +483,10 @@ contains
                
         sjask = 0
         counter = 0
+        allocate(k_log(K))
+        k_log(:) = 0
         do kk = 1, K
+            
             allocate(ind(inds2(kk)-inds1(kk)+1))
             k_i = 1
             
@@ -537,7 +543,7 @@ contains
             end if
             dxk = dxk / scale
 
-            mask1D = Signs(:,2) == kk
+            mask1D = (kk .eq. Signs(:,2))
 
             !write (prog_str,'(I10)') (sum(abs(pack(Signs(:,2),mask1D))))
             !call displayGUIMessage( prog_str )
@@ -545,26 +551,79 @@ contains
             counter = counter + 1
             nns = [NX(kk), NY(kk), NZ(kk)]
             
+            if (kk == 1) then
+                call displayGUIMessage( 'Sum ind 1' )
+        
+                write (prog_str,'(I20)') (sum(abs(pack(Signs(:,3),mask1D))))
+                call displayGUIMessage( prog_str )
+                
+                allocate(sjaskarr(count(mask1D)))
+                sjaskarr = abs(pack(Signs(:,2),mask1D))
+                
+                open(21,file='sjask_1.txt',status='unknown',form='formatted',action='write')
+                do i=1,size(sjaskarr)
+                    write(21,*)  sjaskarr(i)
+                enddo
+                close(21)
+                
+                deallocate(sjaskarr)
+                
+                open(21,file='mask1D_1.txt',status='unknown',form='formatted',action='write')
+                do i=1,size(mask1D)
+                    write(21,*)  mask1D(i)
+                enddo
+                close(21)
+            end if
+            
             if (kk == K) then
+                call displayGUIMessage( 'Sum ind end' )
+        
+                write (prog_str,'(I20)') (sum(abs(pack(Signs(:,3),mask1D))))
+                call displayGUIMessage( prog_str )
+                
                 open(21,file='nns_end.txt',status='unknown',form='formatted',action='write')
                 do i=1,size(nns)
                     write(21,*)  nns(i)
                 enddo
                 close(21)
+                
+                open(21,file='mask1D_end.txt',status='unknown',form='formatted',action='write')
+                do i=1,size(mask1D)
+                    write(21,*)  mask1D(i)
+                enddo
+                close(21)
+                
+                allocate(sjaskarr(count(mask1D)))
+                sjaskarr = abs(pack(Signs(:,2),mask1D))
+                
+                open(21,file='sjask_end.txt',status='unknown',form='formatted',action='write')
+                do i=1,size(sjaskarr)
+                    write(21,*)  sjaskarr(i)
+                enddo
+                close(21)
+                
+                deallocate(sjaskarr)
+                
             end if
             
             lind = size(ind)
+            
+            k_log(kk) = sum(abs(pack(Signs(:,3),mask1D)))
             ! Mirror trick to enforce Neumann b.c. Creates a set of virtual nodes on the other side of an edge face.
-            if (sum(abs(pack(Signs(:,2),mask1D))) == 1) then
-                !call displayGUIMessage( 'Test loop 1' )
+            if (sum(abs(pack(Signs(:,3),mask1D))) == 1) then
+                call displayGUIMessage( 'Test loop 1' )
+                k_log(kk) = 2
                 
-                allocate(e(2*lind))
-                
-                if ((dims == 1 .and. abs(nns(1)) < 1e-15) .or. (dims == 2 .and. all(abs(nns(1:2)) < 1e-15))) cycle
+                if ((dims .eq. 1 .and. abs(nns(1)) < eps_criteria) .or. (dims .eq. 2 .and. abs(nns(1)) < eps_criteria .and. abs(nns(2)) < eps_criteria)) then
+                    k_log(kk) = 3
+                    deallocate(ind)
+                    cycle
+                endif
                 !!!CHECK THAT THE SECOND ARGUMENT HERE IS EQUAL TO prod(~nns(1:2)
                 
                 !call displayGUIMessage( 'Test loop 2' )
                 
+                allocate(e(2*lind))
                 allocate(extra(size(dxk,1),3))
                 !extra = [dxk, dyk, dzk] - 2.0 * nns * [dxk, dyk, dzk] * transpose(nns)
                 extra(:,1) = dxk - 2 * nns(1) * (dxk * nns(1))
@@ -631,7 +690,7 @@ contains
             allocate(mask_int2log(size(nns)+1))
             mask_int2log(1) = .true.
             do i = 2, size(mask_int2log)
-                if (abs(nns(i-1)) > 1e-15) then
+                if (abs(nns(i-1)) > eps_criteria) then
                     mask_int2log(i) = .true.
                 else
                     mask_int2log(i) = .false.
@@ -680,30 +739,30 @@ contains
             call dgesv( size(GkRed,1), size(Wktmp,2), GkRed, size(GkRed,1), IPIV, Wktmp, size(Wktmp,1), INFO )
             !call displayGUIMessage( 'System solved' ) 
          
-            if (sum(abs(pack(Signs(:,2),mask1D))) == 1) then
+            if (sum(abs(pack(Signs(:,3),mask1D))) == 1) then
                 vw(ind) = Wktmp(1,1:lind)+Wktmp(1,lind+1:size(Wktmp,2)) ! Interpolated face values
-                if (abs(nns(1)) > 1e-15) then ! Interpolated x-components of face gradients
+                if (abs(nns(1)) > eps_criteria) then ! Interpolated x-components of face gradients
                     vx(ind)=(Wktmp(2,1:lind)+Wktmp(2,lind+1:size(Wktmp,2)))/scale ! rescaled
-                    if (abs(nns(2)) > 1e-15) then ! Interpolated y-components of face gradients
+                    if (abs(nns(2)) > eps_criteria) then ! Interpolated y-components of face gradients
                         vy(ind) = (Wktmp(3,1:lind)+Wktmp(3,lind+1:size(Wktmp,2)))/scale ! rescaled
                     endif
-                elseif (abs(nns(2)) > 1e-15) then ! Interpolated y-components of face gradients
+                elseif (abs(nns(2)) > eps_criteria) then ! Interpolated y-components of face gradients
                     vy(ind)=(Wktmp(2,1:lind)+Wktmp(2,lind+1:size(Wktmp,2)))/scale ! rescaled
                 endif
-                if (abs(nns(3)) > 1e-15) then ! Interpolated z-components of face gradients
+                if (abs(nns(3)) > eps_criteria) then ! Interpolated z-components of face gradients
                     vz(ind)=(Wktmp(size(Wktmp,1),1:lind)+Wktmp(size(Wktmp,1),lind+1:size(Wktmp,2)))/scale ! rescaled
                 endif
             else
                 vw(ind) = Wktmp(1,:); ! Interpolated face values
-                if (abs(nns(1)) > 1e-15) then ! Interpolated x-components of face gradients
+                if (abs(nns(1)) > eps_criteria) then ! Interpolated x-components of face gradients
                     vx(ind)=Wktmp(2,:)/scale ! rescaled
-                    if (abs(nns(2)) > 1e-15) then ! Interpolated y-components of face gradients
+                    if (abs(nns(2)) > eps_criteria) then ! Interpolated y-components of face gradients
                         vy(ind) = Wktmp(3,:)/scale ! rescaled
                     endif
-                elseif (abs(nns(2)) > 1e-15) then ! Interpolated y-components of face gradients
+                elseif (abs(nns(2)) > eps_criteria) then ! Interpolated y-components of face gradients
                     vy(ind)=Wktmp(2,:)/scale ! rescaled
                 endif
-                if (abs(nns(3)) > 1e-15) then ! Interpolated z-components of face gradients
+                if (abs(nns(3)) > eps_criteria) then ! Interpolated z-components of face gradients
                     vz(ind)=Wktmp(size(Wktmp,1),:)/scale ! rescaled
                 endif
             endif
@@ -728,6 +787,7 @@ contains
                     do i=1,size(vw)
                         write(21,*)  vw(i)
                     enddo
+                    close(21)
                     
                     call displayGUIMessage( 'Saving 3' )
                     
@@ -735,6 +795,7 @@ contains
                     do i=1,size(vx)
                         write(21,*)  vx(i)
                     enddo
+                    close(21)
                     
                     call displayGUIMessage( 'Saving 4' )
                     
@@ -742,6 +803,7 @@ contains
                     do i=1,size(vy)
                         write(21,*)  vy(i)
                     enddo
+                    close(21)
                     
                     call displayGUIMessage( 'Saving 5' )
                     
@@ -749,7 +811,8 @@ contains
                     do i=1,size(vz)
                         write(21,*)  vz(i)
                     enddo
-
+                    close(21)
+                    
                     call displayGUIMessage( 'Saving 6' )
                     
                     close(21)
@@ -882,37 +945,48 @@ contains
                             
                 
                 deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)
-
+                
         
         end do
 
+        call displayGUIMessage( 'Saving final files' )
+        
+        open(21,file='k_log.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(k_log)
+            write(21,*)  k_log(i)
+        enddo
+        close(21)
         
         open(21,file='vw.txt',status='unknown',form='formatted',action='write')
         do i=1,size(vw)
             write(21,*)  vw(i)
         enddo
-                    
+        close(21)
+        
         call displayGUIMessage( 'Saving 3' )
                     
         open(21,file='vx.txt',status='unknown',form='formatted',action='write')
         do i=1,size(vx)
             write(21,*)  vx(i)
         enddo
-                    
+        close(21)
+        
         call displayGUIMessage( 'Saving 4' )
                     
         open(21,file='vy.txt',status='unknown',form='formatted',action='write')
         do i=1,size(vy)
             write(21,*)  vy(i)
         enddo
-                    
+        close(21)
+        
         call displayGUIMessage( 'Saving 5' )
                     
         open(21,file='vz.txt',status='unknown',form='formatted',action='write')
         do i=1,size(vz)
             write(21,*)  vz(i)
         enddo
-                    
+        close(21)
+        
         ! Final operation, summing interpolated values according to either ...
         !if (method == "GGNeumann") then
             ! ... the Green-Gauss theorem, yielding an estimate for the gradient
