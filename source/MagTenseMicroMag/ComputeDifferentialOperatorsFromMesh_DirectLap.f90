@@ -30,6 +30,7 @@ contains
         real(dp), dimension(:,:), intent(in), optional :: ExtW
         !real(dp), dimension(:,:), intent(out) :: DX, DY, DZ
         !real(dp), dimension(:,:), intent(out) :: W
+        type(sparse_matrix_t) :: W_matrix
 
         ! Unpack the variables
         real(dp), dimension(:),allocatable :: NX, NY, NZ, Areas, Volumes, Xel, Yel, Zel, Xf, Yf, Zf
@@ -37,7 +38,7 @@ contains
         real(dp), dimension(:), allocatable :: Aexch_local
         integer :: i,j,dims, n, k, kk, k_mask1D, counter, k_i, lind, sjask, indx, k_j, k_row 
         real(dp), dimension(:),allocatable :: VolCoeff, AX, AY, AZ, s, w
-        integer, dimension(:),allocatable :: ss, ns, ks, inds1, inds2, inds2_vals, ks_sorted, ns_sorted
+        integer, dimension(:),allocatable :: ss, ns, ks, inds1, inds2, inds2_vals, ks_sorted, ns_sorted, ks_CSC_start, ks_CSC_end, ks_CSC_start_temp, ks_CSC_end_temp
         integer, dimension(:),allocatable :: ns_packed, k_log
         real(dp), dimension(:), allocatable :: Amat
         integer, dimension(:), allocatable :: tmp, tmp2, ind
@@ -47,6 +48,7 @@ contains
         real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T, GkRed, HkRed, Wktmp
         real(dp) :: wm, infinity, scale, scale_local, eps_criteria
         real(dp), allocatable :: extra(:,:)
+        integer :: stat                                   !> Status value for the various sparse matrix operations 
         character*(40) :: prog_str
         
         
@@ -339,6 +341,8 @@ contains
         enddo
         close(21)
         
+        ! Sort the indices of the faces and tiles
+        !!!!! MOVE UP THIS PART SO THAT THE SORTING IS DONE AT THE START OF THE SUBROUTINE!!
         allocate(mask1D(size(ks)))    
         mask1D(:) = .true.
         allocate(ks_sorted(size(ks)))
@@ -380,8 +384,27 @@ contains
         !integer, dimension(:) :: inds1, inds2
         !real(wp), dimension(:) :: dx, dy, dz, vw, vx, vy, vz
 
-         
+       ! Determine the two column arrays needed for the CSC sparse format
+        allocate(ks_CSC_start(size(ks_sorted)),ks_CSC_end(size(ks_sorted)))
+        ks_CSC_start(:) = 0
+        ks_CSC_end(:) = 0
+        ks_CSC_start(1) = 1
+        k_i = 2
+        do i=1,(size(ks_sorted)-1)
+            if (ks_sorted(i) .ne. ks_sorted(i+1)) then
+                ks_CSC_start(k_i) = i+1
+                ks_CSC_end(k_i-1) = i+1
+                k_i = k_i + 1
+            end if
+        enddo
+        ks_CSC_end(k_i-1) = size(ks_sorted)
         
+        allocate(ks_CSC_start_temp(k_i-1),ks_CSC_end_temp(k_i-1))
+        ks_CSC_start_temp(:) = ks_CSC_start(1:(k_i-1))
+        ks_CSC_end_temp(:) = ks_CSC_end(1:(k_i-1))
+        call move_alloc (ks_CSC_start_temp,ks_CSC_start)
+        call move_alloc (ks_CSC_end_temp,ks_CSC_end)
+              
         open(21,file='ks_sorted.txt',status='unknown',form='formatted',action='write')
         do i=1,size(ks_sorted)
             write(21,*)  ks_sorted(i)
@@ -948,7 +971,7 @@ contains
                 
         
         end do
-
+        
         call displayGUIMessage( 'Saving final files' )
         
         open(21,file='k_log.txt',status='unknown',form='formatted',action='write')
@@ -987,6 +1010,50 @@ contains
         enddo
         close(21)
         
+        open(21,file='ks_CSC_start.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks_CSC_start)
+            write(21,*)  ks_CSC_start(i)
+        enddo
+        close(21)
+        
+        open(21,file='ks_CSC_end.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks_CSC_end)
+            write(21,*)  ks_CSC_end(i)
+        enddo
+        close(21)
+        
+        
+        stat = mkl_sparse_d_create_csc (W_matrix, SPARSE_INDEX_BASE_ONE, K, N, ks_CSC_start, ks_CSC_end, ns, vw)
+        
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        call displayGUIMessage( 'POSSIBLE VALUES' )
+        write (prog_str,'(I10)') (SPARSE_STATUS_SUCCESS)
+        call displayGUIMessage( prog_str )
+        
+        write (prog_str,'(I10)') (SPARSE_STATUS_NOT_INITIALIZED)
+        call displayGUIMessage( prog_str )
+        
+        write (prog_str,'(I10)') (SPARSE_STATUS_ALLOC_FAILED)
+        call displayGUIMessage( prog_str )
+        
+        write (prog_str,'(I10)') (SPARSE_STATUS_INVALID_VALUE)
+        call displayGUIMessage( prog_str )
+        
+        write (prog_str,'(I10)') (SPARSE_STATUS_EXECUTION_FAILED)
+        call displayGUIMessage( prog_str )
+        
+        write (prog_str,'(I10)') (SPARSE_STATUS_INTERNAL_ERROR)
+        call displayGUIMessage( prog_str )
+        
+        write (prog_str,'(I10)') (SPARSE_STATUS_NOT_SUPPORTED)
+        call displayGUIMessage( prog_str )
+
+        
+        !stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
+                
         ! Final operation, summing interpolated values according to either ...
         !if (method == "GGNeumann") then
             ! ... the Green-Gauss theorem, yielding an estimate for the gradient
