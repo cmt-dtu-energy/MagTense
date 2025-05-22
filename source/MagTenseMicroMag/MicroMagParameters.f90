@@ -128,8 +128,7 @@ include "mkl_dfti.f90"
         logical,dimension(:,:),allocatable :: tensorMapX, tensorMapY, tensorMapZ   !> The sign of the different components in the demagnetization tensor map
         
         real(DP),dimension(:),allocatable :: Axx,Axy,Axz,Ayy,Ayz,Azz    !> Anisotropy vectors assuming local anisotropy only, i.e. no interaction between grains
-        
-        
+        real(DP),dimension(:,:,:),allocatable :: CrystalCoor, Kfact_arr !> The local crystal coordinates and the local anisotropy constants        
         
         type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H       !> Handle for the FFT MKL stuff
         

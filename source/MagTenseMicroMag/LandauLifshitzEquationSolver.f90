@@ -526,6 +526,7 @@
     
     !real :: prefact                                       !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
+    real(DP),dimension(:),allocatable   :: Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot
     
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
@@ -539,14 +540,68 @@
     !solution%Hkx = prefact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
     !solution%Hky = prefact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
     !solution%Hkz = prefact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
-    solution%Hkx = -2.*solution%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-    solution%Hky = -2.*solution%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-    solution%Hkz = -2.*solution%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
+    if (any(solution%Kfact .ne. 0)) then
+        solution%Hkx = -2.*solution%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
+        solution%Hky = -2.*solution%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
+        solution%Hkz = -2.*solution%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
+    else
+    !!!!!!!
+    !do i = 1:size(solution%Mx)
+        ! 3x3 matrix specifying the local coordinate system
+        !                             [v1_x v2_x v3_x]
+        !problem%CrystalCoor(i,:,:) = [v1_y v2_y v3_y]
+        !                             [v1_z v2_z v3_z]
+        !                             [alpha1_x   alpha1_y   alpha1_z  ]
+        !solution%Kfact_arr(i,:,:) =  [alpha11_x  alpha11_x  alpha11_x ]
+        !                             [alpha12_x  alpha12_y  alpha12_z ]   
+        !                             [alpha111_x alpha111_y alpha111_z]   
+        !                             [alpha112_x alpha112_y alpha112_z]   
+        !                             [alpha123   0          0         ]
+        
+        ! Uniaxial in z = [0 0 Kfact]
+        !                 [0 0 0 ]
+        !                 [0 0 0 ]
+        !                 [0 0 0 ]
+        !                 [0 0 0 ]
+        !                 [0 0 0 ]
+        !
+        ! Cubic in cartesian = [0 0 0]
+        !                      [0 0 0]
+        !                      [Kfact1 Kfact1 Kfact1]  
+        !                      [0 0 0]
+        !                      [0 0 0]
+        !                      [Kfact2 0 0]
+        !
+        ! BELOW CAN BE VECTORIZED!!!
+        !Mx_rot = problem%CrystalCoor(i,1,1)*solution%Mx(i) + problem%CrystalCoor(i,1,2)*solution%My(i) + problem%CrystalCoor(i,1,3)*solution%Mz(i)
+        !My_rot = problem%CrystalCoor(i,2,1)*solution%Mx(i) + problem%CrystalCoor(i,2,2)*solution%My(i) + problem%CrystalCoor(i,2,3)*solution%Mz(i)
+        !Mz_rot = problem%CrystalCoor(i,3,1)*solution%Mx(i) + problem%CrystalCoor(i,3,2)*solution%My(i) + problem%CrystalCoor(i,3,3)*solution%Mz(i)
+                   
+        !Hkx_rot = -(solution%Kfact_arr(i,1,1) * 2. * Mx_rot  + solution%Kfact_arr(i,2,1) * 4. * Mx_rot**3)
+        !Hky_rot = -(solution%Kfact_arr(i,1,2) * 2. * My_rot  + solution%Kfact_arr(i,2,2) * 4. * My_rot**3)
+        !Hkz_rot = -(solution%Kfact_arr(i,1,3) * 2. * Mz_rot  + solution%Kfact_arr(i,2,3) * 4. * Mz_rot**3)
     
-
+        !solution%Hkx(i) = problem%CrystalCoor(i,1,1)*Hkx_rot + problem%CrystalCoor(i,2,1)*Hky_rot + problem%CrystalCoor(i,3,1)*Hkz_rot
+        !solution%Hky(i) = problem%CrystalCoor(i,1,2)*Hkx_rot + problem%CrystalCoor(i,2,2)*Hky_rot + problem%CrystalCoor(i,3,2)*Hkz_rot
+        !solution%Hkz(i) = problem%CrystalCoor(i,1,3)*Hkx_rot + problem%CrystalCoor(i,2,3)*Hky_rot + problem%CrystalCoor(i,3,3)*Hkz_rot
+    !enddo
     
-    end subroutine updateAnisotropy
+        allocate(Mx_rot(size(solution%Mx)), My_rot(size(solution%My)), Mz_rot(size(solution%Mz)))
+        Mx_rot = problem%CrystalCoor(:,1,1)*solution%Mx(:) + problem%CrystalCoor(:,1,2)*solution%My(:) + problem%CrystalCoor(:,1,3)*solution%Mz(:)
+        My_rot = problem%CrystalCoor(:,2,1)*solution%Mx(:) + problem%CrystalCoor(:,2,2)*solution%My(:) + problem%CrystalCoor(:,2,3)*solution%Mz(:)
+        Mz_rot = problem%CrystalCoor(:,3,1)*solution%Mx(:) + problem%CrystalCoor(:,3,2)*solution%My(:) + problem%CrystalCoor(:,3,3)*solution%Mz(:)
+        
+        allocate(Hkx_rot(size(Mx_rot)), Hky_rot(size(My_rot)), Hkz_rot(size(Mz_rot)))
+        Hkx_rot = -(problem%Kfact_arr(:,1,1) * 2. * Mx_rot(:)  + problem%Kfact_arr(:,2,1) * 4. * Mx_rot(:)**3)
+        Hky_rot = -(problem%Kfact_arr(:,1,2) * 2. * My_rot(:)  + problem%Kfact_arr(:,2,2) * 4. * My_rot(:)**3)
+        Hkz_rot = -(problem%Kfact_arr(:,1,3) * 2. * Mz_rot(:)  + problem%Kfact_arr(:,2,3) * 4. * Mz_rot(:)**3)
     
+        solution%Hkx(:) = problem%CrystalCoor(:,1,1)*Hkx_rot(:) + problem%CrystalCoor(:,2,1)*Hky_rot(:) + problem%CrystalCoor(:,3,1)*Hkz_rot(:)
+        solution%Hky(:) = problem%CrystalCoor(:,1,2)*Hkx_rot(:) + problem%CrystalCoor(:,2,2)*Hky_rot(:) + problem%CrystalCoor(:,3,2)*Hkz_rot(:)
+        solution%Hkz(:) = problem%CrystalCoor(:,1,3)*Hkx_rot(:) + problem%CrystalCoor(:,2,3)*Hky_rot(:) + problem%CrystalCoor(:,3,3)*Hkz_rot(:)
+    endif
+    
+    end subroutine updateAnisotropy    
 
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019

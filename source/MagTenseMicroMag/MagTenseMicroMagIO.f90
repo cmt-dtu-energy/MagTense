@@ -34,7 +34,7 @@
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
         mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr
         mwPointer :: usePrecisionPtr, N_aveProblemPtr, useReturnHallProblemPtr
-        mwPointer :: demag_ignore_stepsProblemPtr
+        mwPointer :: demag_ignore_stepsProblemPtr, CrystalCoorProblemPtr, Kfact_arrProblemPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
         real(DP) :: demag_fac, CV
@@ -357,6 +357,27 @@
         demag_ignore_stepsProblemPtr = mxGetField( prhs, i, problemFields(51) )
         call mxCopyPtrToInteger4(mxGetPr(demag_ignore_stepsProblemPtr), problem%demag_ignore_steps, sx )
         
+        
+        ! 3x3 matrix specifying the local coordinate system
+        !                             [v1_x v2_x v3_x]
+        !problem%CrystalCoor(i,:,:) = [v1_y v2_y v3_y]
+        !                             [v1_z v2_z v3_z]
+        sx = ntot * 3 * 3
+        allocate( problem%CrystalCoor(ntot,3,3) )
+        CrystalCoorProblemPtr = mxGetField( prhs, i, problemFields(52) )
+        call mxCopyPtrToReal8(mxGetPr(CrystalCoorProblemPtr), problem%CrystalCoor, sx )
+        
+        !                             [alpha1_x   alpha1_y   alpha1_z  ]
+        !solution%Kfact_arr(i,:,:) =  [alpha11_x  alpha11_x  alpha11_x ]
+        !                             [alpha12_x  alpha12_y  alpha12_z ]   
+        !                             [alpha111_x alpha111_y alpha111_z]   
+        !                             [alpha112_x alpha112_y alpha112_z]   
+        !                             [alpha123   0          0         ]
+        sx = ntot * 6 * 3
+        allocate( problem%Kfact_arr(ntot,6,3) )
+        Kfact_arrProblemPtr = mxGetField( prhs, i, problemFields(52) )
+        call mxCopyPtrToReal8(mxGetPr(Kfact_arrProblemPtr), problem%Kfact_arr, sx )
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -492,7 +513,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=51
+        integer,parameter :: nf=53
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -550,6 +571,8 @@
         fieldnames(49) = 'CV'
         fieldnames(50) = 'ReturnHall'
         fieldnames(51) = 'demigstp'
+        fieldnames(52) = 'CrystalCoor'
+        fieldnames(53) = 'Kfact_arr'
         
     end subroutine getProblemFieldnames
     
