@@ -141,94 +141,95 @@ solution_ini = struct();
 prob_struct = struct(problem_ini);
 
 tic
-solution_ini = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
-[solution_ini, GridInfoFortran] = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
+% solution_ini = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
+% [solution_ini, GridInfoFortran] = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
+[GridInfoFortran] = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
 
-elapsedTime_part1 = toc
-if (options.ShowTheResult)
-    figure; 
-    M_end = squeeze(solution_ini.M(end,:,:)); 
-    quiver(solution_ini.pts(:,1),solution_ini.pts(:,2),M_end(:,1),M_end(:,2)); 
-    axis equal; 
-    title('Starting state of dynamical simulation')
-end
-
-%% Setup problem for the time-dependent solver'
-% Use the initial problem to setup the dynamical part of the simulations
-problem_dym = problem_ini;
-
-% Calculate to 1 ns and save the results in 200 steps
-problem_dym = problem_dym.setTime( linspace(0,1e-9,200) );
-problem_dym.setTimeDis = int32(10);
-
-% Material properties
-problem_dym.gamma = 2.21e5 ;
-
-% The external field applied
-if (mumag_field == 1)
-    %field 1
-    HystDir = 1/mu0*[-24.6,4.3,0]/1000 ;
-end
-if (mumag_field == 2)
-    %field 2
-    HystDir = 1/mu0*[-35.5,-6.3,0]/1000 ;
-end
-HextFct = @(t) (t>-1)' .*HystDir;
-problem_dym = problem_dym.setHext( HextFct, linspace(0,1e-9,2000) );
-
-% Set the starting state to be that found in the initial part of the problem
-problem_dym.m0(:) = solution_ini.M(end,:,:);
-
-%% Solve the dynamic configuration
-% Convert the class obj to a struct so it can be loaded into fortran
-solution_dym = struct();
-prob_struct = struct(problem_dym);
-
-tic
-solution_dym = problem_dym.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_dym );
-elapsedTime_part2 = toc
-
-[Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution_dym.M,GridInfo.Volumes) ;
-
-%% --------------------------------------------------------------------------------------------------------------------------------------
-%% --------------------------------------------------------------------  mumag ----------------------------------------------------------
-%% --------------------------------------------------------------------------------------------------------------------------------------
-%% Compare with published solutions available from mumag webpage
-t=1e-9*linspace(0,1,1000);
-M_mumag = load(['../../../../documentation/examples_mumag_validation/Validation_standard_problem_4/Field_' num2str(mumag_field) '_mumag_mean_solution.txt']);
-
-% Interpolate the MagTense solution to the mumag solution and calculate the relative error in percent
-rel_int_error(1) = calculate_relative_integral_error(t,M_mumag(:,1),solution_dym.t,Mx);
-rel_int_error(2) = calculate_relative_integral_error(t,M_mumag(:,3),solution_dym.t,My);
-rel_int_error(3) = calculate_relative_integral_error(t,M_mumag(:,5),solution_dym.t,Mz);
-
-%% --------------------------------------------------------------------------------------------------------------------------------------
-%% ---------------------------------------------------------------  Plot the results ----------------------------------------------------
-%% --------------------------------------------------------------------------------------------------------------------------------------
-if (options.ShowTheResult)
-    figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
-
-    %--- Plot the MagTense magnetization
-    plot(fig1,solution_dym.t,Mx,'rx');
-    plot(fig1,solution_dym.t,My,'gx');
-    plot(fig1,solution_dym.t,Mz,'bx');
-
-    %--- Plot the mumag solutions
-    colours = [[1 0 0];[0 1 0];[0 0 1]];
-    weak_colours = colours + ~colours*0.75;
-    fill_ts=[t,fliplr(t)];  
-    for j=1:3
-        std_errors(1:2,:)=[M_mumag(:,(j-1)*2+1)+M_mumag(:,j*2), M_mumag(:,(j-1)*2+1)-M_mumag(:,j*2)]';
-        interval = [std_errors(1,:),fliplr(std_errors(2,:))];
-        plot(fig1,t,M_mumag(:,(j-1)*2+1),'color',colours(j,:))
-        fill(fig1,fill_ts,interval,weak_colours(j,:),'linestyle','none')
-    end
-
-    legend(fig1,'MagTense M_x','MagTense M_y','MagTense M_z','\mu{}mag <M_x>','\mu{}mag \sigma{}(M_x)','\mu{}mag <M_y>','\mu{}mag \sigma{}(M_y)','\mu{}mag <M_z>','\mu{}mag \sigma{}(M_z)','Location','eastoutside');
-    ylabel(fig1,'<M_i>/M_s')
-    xlabel(fig1,'Time [ns]')
-    xlim(fig1,[0 1e-9])
-    figure(figure1)
-end
+% elapsedTime_part1 = toc
+% if (options.ShowTheResult)
+%     figure; 
+%     M_end = squeeze(solution_ini.M(end,:,:)); 
+%     quiver(solution_ini.pts(:,1),solution_ini.pts(:,2),M_end(:,1),M_end(:,2)); 
+%     axis equal; 
+%     title('Starting state of dynamical simulation')
+% end
+% 
+% %% Setup problem for the time-dependent solver'
+% % Use the initial problem to setup the dynamical part of the simulations
+% problem_dym = problem_ini;
+% 
+% % Calculate to 1 ns and save the results in 200 steps
+% problem_dym = problem_dym.setTime( linspace(0,1e-9,200) );
+% problem_dym.setTimeDis = int32(10);
+% 
+% % Material properties
+% problem_dym.gamma = 2.21e5 ;
+% 
+% % The external field applied
+% if (mumag_field == 1)
+%     %field 1
+%     HystDir = 1/mu0*[-24.6,4.3,0]/1000 ;
+% end
+% if (mumag_field == 2)
+%     %field 2
+%     HystDir = 1/mu0*[-35.5,-6.3,0]/1000 ;
+% end
+% HextFct = @(t) (t>-1)' .*HystDir;
+% problem_dym = problem_dym.setHext( HextFct, linspace(0,1e-9,2000) );
+% 
+% % Set the starting state to be that found in the initial part of the problem
+% problem_dym.m0(:) = solution_ini.M(end,:,:);
+% 
+% %% Solve the dynamic configuration
+% % Convert the class obj to a struct so it can be loaded into fortran
+% solution_dym = struct();
+% prob_struct = struct(problem_dym);
+% 
+% tic
+% solution_dym = problem_dym.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_dym );
+% elapsedTime_part2 = toc
+% 
+% [Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution_dym.M,GridInfo.Volumes) ;
+% 
+% %% --------------------------------------------------------------------------------------------------------------------------------------
+% %% --------------------------------------------------------------------  mumag ----------------------------------------------------------
+% %% --------------------------------------------------------------------------------------------------------------------------------------
+% %% Compare with published solutions available from mumag webpage
+% t=1e-9*linspace(0,1,1000);
+% M_mumag = load(['../../../../documentation/examples_mumag_validation/Validation_standard_problem_4/Field_' num2str(mumag_field) '_mumag_mean_solution.txt']);
+% 
+% % Interpolate the MagTense solution to the mumag solution and calculate the relative error in percent
+% rel_int_error(1) = calculate_relative_integral_error(t,M_mumag(:,1),solution_dym.t,Mx);
+% rel_int_error(2) = calculate_relative_integral_error(t,M_mumag(:,3),solution_dym.t,My);
+% rel_int_error(3) = calculate_relative_integral_error(t,M_mumag(:,5),solution_dym.t,Mz);
+% 
+% %% --------------------------------------------------------------------------------------------------------------------------------------
+% %% ---------------------------------------------------------------  Plot the results ----------------------------------------------------
+% %% --------------------------------------------------------------------------------------------------------------------------------------
+% if (options.ShowTheResult)
+%     figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
+% 
+%     %--- Plot the MagTense magnetization
+%     plot(fig1,solution_dym.t,Mx,'rx');
+%     plot(fig1,solution_dym.t,My,'gx');
+%     plot(fig1,solution_dym.t,Mz,'bx');
+% 
+%     %--- Plot the mumag solutions
+%     colours = [[1 0 0];[0 1 0];[0 0 1]];
+%     weak_colours = colours + ~colours*0.75;
+%     fill_ts=[t,fliplr(t)];  
+%     for j=1:3
+%         std_errors(1:2,:)=[M_mumag(:,(j-1)*2+1)+M_mumag(:,j*2), M_mumag(:,(j-1)*2+1)-M_mumag(:,j*2)]';
+%         interval = [std_errors(1,:),fliplr(std_errors(2,:))];
+%         plot(fig1,t,M_mumag(:,(j-1)*2+1),'color',colours(j,:))
+%         fill(fig1,fill_ts,interval,weak_colours(j,:),'linestyle','none')
+%     end
+% 
+%     legend(fig1,'MagTense M_x','MagTense M_y','MagTense M_z','\mu{}mag <M_x>','\mu{}mag \sigma{}(M_x)','\mu{}mag <M_y>','\mu{}mag \sigma{}(M_y)','\mu{}mag <M_z>','\mu{}mag \sigma{}(M_z)','Location','eastoutside');
+%     ylabel(fig1,'<M_i>/M_s')
+%     xlabel(fig1,'Time [ns]')
+%     xlim(fig1,[0 1e-9])
+%     figure(figure1)
+% end
 
 end

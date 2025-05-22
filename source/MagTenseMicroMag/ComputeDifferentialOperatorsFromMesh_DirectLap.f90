@@ -36,12 +36,12 @@ contains
         real(dp), dimension(:),allocatable :: NX, NY, NZ, Areas, Volumes, Xel, Yel, Zel, Xf, Yf, Zf
         integer, dimension(:,:),allocatable :: Signs, T, D, el2fa
         real(dp), dimension(:), allocatable :: Aexch_local
-        integer :: i,j,dims, n, k, kk, k_mask1D, counter, k_i, lind, sjask, indx, k_j, k_row 
+        integer :: i,j,dims, n, k, kk, k_mask1D, counter, k_i, lind, sjask, indx, k_j, k_row, info
         real(dp), dimension(:),allocatable :: VolCoeff, AX, AY, AZ, s, w
         integer, dimension(:),allocatable :: ss, ns, ks, inds1, inds2, inds2_vals, ks_sorted, ns_sorted, ks_CSC_start, ks_CSC_end, ks_CSC_start_temp, ks_CSC_end_temp
         integer, dimension(:),allocatable :: ns_packed, k_log
         real(dp), dimension(:), allocatable :: Amat
-        integer, dimension(:), allocatable :: tmp, tmp2, ind
+        integer, dimension(:), allocatable :: tmp, tmp2, ind, IPIV
         logical, allocatable :: mask1D(:), mask_int2log(:)
         real(dp), dimension(:), allocatable :: ddxA, ddyA, ddzA, ddx, ddy, ddz, dx, dy, dz, vx, vy, vz, vw, dks, dxk, dyk, dzk, nns
         real(dp), dimension(:), allocatable :: dxk2, dyk2, dzk2, Wk, Wk2, e, sjaskarr
@@ -53,56 +53,56 @@ contains
         
         
         
-          INTEGER          Nmkl, NRHS
-          PARAMETER        ( Nmkl = 5, NRHS = 3 )
-          INTEGER          LDA, LDB
-          PARAMETER        ( LDA = Nmkl, LDB = Nmkl )
-          INTEGER          INFO
-          INTEGER          IPIV( Nmkl )
-          real(dp), allocatable :: A( :, : ), B( :, : )
+          !INTEGER          Nmkl, NRHS
+          !PARAMETER        ( Nmkl = 5, NRHS = 3 )
+          !INTEGER          LDA, LDB
+          !PARAMETER        ( LDA = Nmkl, LDB = Nmkl )
+          !INTEGER          INFO
+          !INTEGER          IPIV( Nmkl )
+          !real(dp), allocatable :: A( :, : ), B( :, : )
           
-          allocate(A(5,5))
-          A(1,:) = [6.80,  -6.05,  -0.45,   8.32,  -9.67]
-          A(2,:) = [-2.11,  -3.30,   2.58,   2.71,  -5.14]
-          A(3,:) = [5.66,   5.36,  -2.70,   4.35,  -7.26]
-          A(4,:) = [5.97,  -4.44,   0.27,  -7.17,   6.08]
-          A(5,:) = [8.23,   1.08,   9.04,   2.14,  -6.87]
+          !allocate(A(5,5))
+          !A(1,:) = [6.80,  -6.05,  -0.45,   8.32,  -9.67]
+          !A(2,:) = [-2.11,  -3.30,   2.58,   2.71,  -5.14]
+          !A(3,:) = [5.66,   5.36,  -2.70,   4.35,  -7.26]
+          !A(4,:) = [5.97,  -4.44,   0.27,  -7.17,   6.08]
+          !A(5,:) = [8.23,   1.08,   9.04,   2.14,  -6.87]
           
-          allocate(B(5,3))
-         B(1,:) = [4.02,  -1.56,   9.81]
-         B(2,:) = [6.19,   4.00,  -4.09]
-         B(3,:) = [-8.22,  -8.67,  -4.57]
-         B(4,:) = [-7.57,   1.75,  -8.61]
-         B(5,:) = [-3.03,   2.86,   8.99]
-         !B(1,:) = [4.02]
-         !B(2,:) = [6.19]
-         !B(3,:) = [-8.22]
-         !B(4,:) = [-7.57]
-         !B(5,:) = [-3.03]
+          !allocate(B(5,3))
+          !B(1,:) = [4.02,  -1.56,   9.81]
+          !B(2,:) = [6.19,   4.00,  -4.09]
+          !B(3,:) = [-8.22,  -8.67,  -4.57]
+          !B(4,:) = [-7.57,   1.75,  -8.61]
+          !B(5,:) = [-3.03,   2.86,   8.99]
+          !B(1,:) = [4.02]
+          !B(2,:) = [6.19]
+          !B(3,:) = [-8.22]
+          !B(4,:) = [-7.57]
+          !B(5,:) = [-3.03]
          
-         CALL DGESV( Nmkl, NRHS, A, LDA, IPIV, B, LDB, INFO )
+          !CALL DGESV( Nmkl, NRHS, A, LDA, IPIV, B, LDB, INFO )
         
-         call displayGUIMessage( 'LAPACK' )
-        write (prog_str,'(I10)') (Nmkl)
-        call displayGUIMessage( prog_str )
-        write (prog_str,'(I10)') (NRHS)
-        call displayGUIMessage( prog_str )
-        write (prog_str,'(I10)') (LDA)
-        call displayGUIMessage( prog_str )
-        write (prog_str,'(I10)') (LDB)
-        call displayGUIMessage( prog_str )
-        write (prog_str,'(I10)') (INFO)
-        call displayGUIMessage( prog_str )
+          !call displayGUIMessage( 'LAPACK' )
+          !write (prog_str,'(I10)') (Nmkl)
+          !call displayGUIMessage( prog_str )
+          !write (prog_str,'(I10)') (NRHS)
+          !call displayGUIMessage( prog_str )
+          !write (prog_str,'(I10)') (LDA)
+          !call displayGUIMessage( prog_str )
+          !write (prog_str,'(I10)') (LDB)
+          !call displayGUIMessage( prog_str )
+          !write (prog_str,'(I10)') (INFO)
+          !call displayGUIMessage( prog_str )
         
-        open(21,file='B.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(B,2)
-            write(21,*)  B(1,i)
-            write(21,*)  B(2,i)
-            write(21,*)  B(3,i)
-            write(21,*)  B(4,i)
-            write(21,*)  B(5,i)
-        enddo
-        close(21)
+          !open(21,file='B.txt',status='unknown',form='formatted',action='write')
+          !do i=1,size(B,2)
+          !    write(21,*)  B(1,i)
+          !    write(21,*)  B(2,i)
+          !    write(21,*)  B(3,i)
+          !    write(21,*)  B(4,i)
+          !    write(21,*)  B(5,i)
+          !enddo
+          !close(21)
      
         eps_criteria = 1.0e-12
         
@@ -144,8 +144,6 @@ contains
         write (prog_str,'(I10)') (size(Zel))
         call displayGUIMessage( prog_str )
             
-        call displayGUIMessage( 'Test 2-0' )
-        
         ! Determine dimensionality
         if (any(abs(Zel-Zel(1)) .gt. 1e-12)) then
             dims = 3
@@ -158,8 +156,6 @@ contains
         call displayGUIMessage( 'Test 2-1' )
         
         ! Dimensions
-        !N = size(Signs, 1)  ! Number of tiles
-        !K = size(Signs, 2)  ! Number of faces
         N = maxval(Signs(:,1))  ! Number of tiles
         K = maxval(Signs(:,2))  ! Number of faces
 
@@ -173,15 +169,10 @@ contains
         ss = Signs(:,3)
         ns = Signs(:,1)
         ks = Signs(:,2)
-        !ns = pack([(i, i=1, size(Signs, 1))], mask=(Signs/=0))
-        !ks = pack([(j, j=1, size(Signs, 2))], mask=(Signs/=0))
 
         call displayGUIMessage( 'Test 3' )
         
         allocate(mask1D(size(Signs(:,1))))
-        
-        
-        
                     
         ! Constructing summing matrix according to reference
         ! Constructing N times K sparse matrix DDXA: DDXA*dphi(faces) = d2phi(elements)
@@ -231,12 +222,6 @@ contains
                 end if
             end do
 
-            open(21,file='Amat.txt',status='unknown',form='formatted',action='write')
-            do i=1,size(Amat)
-                write(21,*)  Amat(i)
-            enddo
-            close(21)
-            
             ! Having constructed the exchange values for each face/tile pair, we build the summing matrix.
             !real(wp), dimension(:) :: ddxA, ddyA, ddzA
             allocate(ddxA(size(ns)))
@@ -253,11 +238,7 @@ contains
                 end if
             end if
             
-            open(21,file='ddxA.txt',status='unknown',form='formatted',action='write')
-            do i=1,size(ddxA)
-                write(21,*)  ddxA(i)
-            enddo
-            close(21)
+            
 
         else if (method == "GGNeumann") then
             ! Constructing N times K sparse matrix DDX: DDX*phi(faces) = dphi(elements)
@@ -309,37 +290,9 @@ contains
         end select
 
         !! Calculating weights
-        !! Determines which weights are to be used in the first interpolation step
-        !if (.not. present(ExtW)) then
-        !    [ns,ks] = find_nonzero_indices(el2fa)
         ns = el2fa(:,1)
         ks = el2fa(:,2)
-        !    ! Tile volumes may be used, but have not been here. Example:
-        !    ! Volumes(ns).*((Xel(ns)-Xf(ks)).^2+(Yel(ns)-Yf(ks)).^2+(Zel(ns)-Zf(ks)).^2).^(-weight/2)
-        
-        open(21,file='D1.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(D(:,1))
-            write(21,*)  D(i,1)
-        enddo
-        close(21)
-        
-        open(21,file='el2fa1.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(el2fa(:,1))
-            write(21,*)  el2fa(i,1)
-        enddo
-        close(21)     
-        
-        open(21,file='ns.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(ns)
-            write(21,*)  ns(i)
-        enddo
-        close(21)  
-        
-        open(21,file='ks.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(ks)
-            write(21,*)  ks(i)
-        enddo
-        close(21)
+       
         
         ! Sort the indices of the faces and tiles
         !!!!! MOVE UP THIS PART SO THAT THE SORTING IS DONE AT THE START OF THE SUBROUTINE!!
@@ -356,35 +309,7 @@ contains
         end do    
         deallocate(mask1D) 
         
-            allocate(w(size(ns)))
-            if (dims == 1) then
-                !wm = ((Xel(1) - Xf(1))**2)**(-weight/2)
-                w = ((Xel(ns_sorted) - Xf(ks_sorted))**2)**(-weight/2)!*(wm**(1.0/weight)) / wm
-            else if (dims == 2) then
-                !wm = ((Xel(1) - Xf(1))**2 + (Yel(1) - Yf(1))**2)**(-weight/2)
-                w = ((Xel(ns_sorted) - Xf(ks_sorted))**2 + (Yel(ns_sorted) - Yf(ks_sorted))**2)**(-weight/2)!*(wm**(1.0/weight)) / wm
-            else
-                !wm = ((Xel(1) - Xf(1))**2 + (Yel(1) - Yf(1))**2 + (Zel(1) - Zf(1))**2)**(-weight/2)
-                w = ((Xel(ns_sorted) - Xf(ks_sorted))**2 + (Yel(ns_sorted) - Yf(ks_sorted))**2 + (Zel(ns_sorted) - Zf(ks_sorted))**2)**(-weight/2)!*(wm**(1.0/weight)) / wm
-            end if
-        !    W = sparse(ks, ns, w, K, N)
-        !else
-        !    if (associated(ExtW)) then
-        !        [ks,ns] = find_nonzero_indices(el2fa)
-        !        w = ExtW(Xel(ns), Yel(ns), Zel(ns), Xf(ks), Yf(ks), Zf(ks))
-        !        W = sparse(ks, ns, w, K, N)
-        !    else
-        !        [ks,ns] = find_nonzero_indices(ExtW)
-        !        w = nonzeros(ExtW)
-        !        W = ExtW
-        !    end if
-        !end if
-
-        ! Prepare distances for the interpolation.
-        !integer, dimension(:) :: inds1, inds2
-        !real(wp), dimension(:) :: dx, dy, dz, vw, vx, vy, vz
-
-       ! Determine the two column arrays needed for the CSC sparse format
+        ! Determine the two column arrays needed for the CSC sparse format
         allocate(ks_CSC_start(size(ks_sorted)),ks_CSC_end(size(ks_sorted)))
         ks_CSC_start(:) = 0
         ks_CSC_end(:) = 0
@@ -404,19 +329,19 @@ contains
         ks_CSC_end_temp(:) = ks_CSC_end(1:(k_i-1))
         call move_alloc (ks_CSC_start_temp,ks_CSC_start)
         call move_alloc (ks_CSC_end_temp,ks_CSC_end)
-              
-        open(21,file='ks_sorted.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(ks_sorted)
-            write(21,*)  ks_sorted(i)
-        enddo
-        close(21)
         
-        open(21,file='ns_sorted.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(ns_sorted)
-            write(21,*)  ns_sorted(i)
-        enddo
-        close(21)
-        
+       ! Calculating weights
+       ! Determines which weights are to be used in the first interpolation step 
+        allocate(w(size(ns)))
+        if (dims == 1) then
+            w = ((Xel(ns_sorted) - Xf(ks_sorted))**2)**(-weight/2)
+        else if (dims == 2) then
+            w = ((Xel(ns_sorted) - Xf(ks_sorted))**2 + (Yel(ns_sorted) - Yf(ks_sorted))**2)**(-weight/2)
+        else
+            w = ((Xel(ns_sorted) - Xf(ks_sorted))**2 + (Yel(ns_sorted) - Yf(ks_sorted))**2 + (Zel(ns_sorted) - Zf(ks_sorted))**2)**(-weight/2)!
+        end if
+
+        ! Prepare distances for the interpolation.       
         allocate(inds2_vals(size(ns)))
         call unique_sort(ks_sorted, inds2_vals)
         
@@ -432,8 +357,6 @@ contains
         allocate(inds1(size(inds2)+1))
         inds1(1) = 1
         inds1(2:size(inds1)) = inds2(:) + 1
-        !inds2 = [find_nonzero_indices(diff(ks)), size(ns, 1)]
-        !inds1 = [1, inds2 + 1]
         dx = Xel(ns_sorted) - Xf(ks_sorted)
         dy = Yel(ns_sorted) - Yf(ks_sorted)
         dz = Zel(ns_sorted) - Zf(ks_sorted)
@@ -448,44 +371,13 @@ contains
         
         
         ! Scale weights to avoid ill conditioning of the least squares interpolation.
-        !real(wp) :: wm
-        
         allocate(mask1D(size(w)))
-        
         infinity = HUGE(w) 
         mask1D = w < infinity
         wm = maxval(w,mask1D)
         w = w * (wm**(1.0/weight)) / wm
-        
         deallocate(mask1D)
         
-        write (prog_str,'(I20)') (size(ns))
-        call displayGUIMessage( prog_str )
-        
-        write (prog_str,'(I20)') (size(w))
-        call displayGUIMessage( prog_str )
-        
-        write (prog_str,'(f20.6)') (wm)
-        call displayGUIMessage( prog_str )
-        
-        open(21,file='w.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(w)
-            write(21,*)  w(i)
-        enddo
-        close(21)
-        
-        open(21,file='inds2.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(inds2)
-            write(21,*)  inds2(i)
-        enddo
-        close(21)
-        
-        open(21,file='inds1.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(inds1)
-            write(21,*)  inds1(i)
-        enddo
-        close(21)
-
         ! Main loop
         ! The creation of the matrix W for the first step:
         ! W*phi(elements) = phi(faces) [Green Gauss]
@@ -493,14 +385,9 @@ contains
         ! Calculated by solving
         ! Gk * [phi(faces);dphi(faces)]_k = Hk ( * phi(elements) )
         ! for each face, ks. Details can be found in [2].
-        !integer :: kk, ind, lind, counter
-        !real(wp) :: scale
-        !real(wp), dimension(:) :: dxk, dyk, dzk, Wk, Gkl1, Gk, Hk, GkRed, HkRed, Wktmp, e, nns
-
         allocate(mask1D(size(Signs(:,1))))
         
         call displayGUIMessage( 'Starting ind' )
-        
         write (prog_str,'(I20)') (K)
         call displayGUIMessage( prog_str )
                
@@ -513,46 +400,22 @@ contains
             allocate(ind(inds2(kk)-inds1(kk)+1))
             k_i = 1
             
-            !call displayGUIMessage( 'Doing loop number:' )
-            write (prog_str,'(I20)') (kk)
-            call displayGUIMessage( prog_str )
-            
-            !write (prog_str,'(I20)') (inds1(kk))
+            !write (prog_str,'(I20)') (kk)
             !call displayGUIMessage( prog_str )
-            
-            !write (prog_str,'(I20)') (inds2(kk))
-            !call displayGUIMessage( prog_str )
-                
+          
             do i = inds1(kk), inds2(kk)
-                !write (prog_str,'(I20)') (i)
-                !call displayGUIMessage( prog_str )
-        
                 ind(k_i) = i
                 k_i = k_i + 1
             enddo
+          
             Wk = w(ind)
             dxk = dx(ind)
             dyk = dy(ind)
             dzk = dz(ind)
             scale_local = sum(abs(dxk))/size(dxk)
             scale = 10.0 ** nint(log10(scale_local))
-            
-            if (kk .eq. 1) then
-                open(21,file='ind.txt',status='unknown',form='formatted',action='write')
-                do i=1,size(ind)
-                    write(21,*)  ind(i)
-                enddo
-                close(21)
-                
-                open(21,file='dxk_test.txt',status='unknown',form='formatted',action='write')
-                do i=1,size(dxk)
-                    write(21,*)  dxk(i)
-                enddo
-                close(21)
-            endif
-
+          
             if (dims > 1) then
-        !        real(wp), dimension(:) :: dks
                 dks = [dxk, dyk]
                 scale_local = sum(abs(dks))/size(dks)
                 scale = 10.0 ** nint(log10(scale_local))
@@ -567,15 +430,24 @@ contains
             dxk = dxk / scale
 
             mask1D = (kk .eq. Signs(:,2))
-
-            !write (prog_str,'(I10)') (sum(abs(pack(Signs(:,2),mask1D))))
-            !call displayGUIMessage( prog_str )
-            
+           
             counter = counter + 1
             nns = [NX(kk), NY(kk), NZ(kk)]
             
             if (kk == 1) then
                 call displayGUIMessage( 'Sum ind 1' )
+                
+                open(21,file='ind.txt',status='unknown',form='formatted',action='write')
+                do i=1,size(ind)
+                    write(21,*)  ind(i)
+                enddo
+                close(21)
+                
+                open(21,file='dxk_test.txt',status='unknown',form='formatted',action='write')
+                do i=1,size(dxk)
+                    write(21,*)  dxk(i)
+                enddo
+                close(21)
         
                 write (prog_str,'(I20)') (sum(abs(pack(Signs(:,3),mask1D))))
                 call displayGUIMessage( prog_str )
@@ -758,7 +630,15 @@ contains
             allocate(Wktmp(size(HkRed,1),size(HkRed,2)))
             Wktmp(:,:) = HkRed(:,:)
                 
+            !Taken from https://www.intel.com/content/www/us/en/docs/onemkl/code-samples-lapack/2025-0/dgesv-example-fortran.html
             !call displayGUIMessage( 'Solving linear system' ) 
+            if (kk == 1) then
+                allocate(IPIV(size(GkRed,1)))
+            else
+                deallocate(IPIV)
+                allocate(IPIV(size(GkRed,1)))
+            endif
+            
             call dgesv( size(GkRed,1), size(Wktmp,2), GkRed, size(GkRed,1), IPIV, Wktmp, size(Wktmp,1), INFO )
             !call displayGUIMessage( 'System solved' ) 
          
@@ -973,6 +853,72 @@ contains
         end do
         
         call displayGUIMessage( 'Saving final files' )
+        
+        open(21,file='Amat.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Amat)
+            write(21,*)  Amat(i)
+        enddo
+        close(21)
+            
+        open(21,file='ddxA.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ddxA)
+            write(21,*)  ddxA(i)
+        enddo
+        close(21)
+            
+        open(21,file='w.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(w)
+            write(21,*)  w(i)
+        enddo
+        close(21)
+        
+        open(21,file='inds2.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(inds2)
+            write(21,*)  inds2(i)
+        enddo
+        close(21)
+        
+        open(21,file='inds1.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(inds1)
+            write(21,*)  inds1(i)
+        enddo
+        close(21)
+        
+        open(21,file='D1.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(D(:,1))
+            write(21,*)  D(i,1)
+        enddo
+        close(21)
+        
+        open(21,file='el2fa1.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(el2fa(:,1))
+            write(21,*)  el2fa(i,1)
+        enddo
+        close(21)     
+        
+        open(21,file='ns.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ns)
+            write(21,*)  ns(i)
+        enddo
+        close(21)  
+        
+        open(21,file='ks.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks)
+            write(21,*)  ks(i)
+        enddo
+        close(21)
+        
+        open(21,file='ks_sorted.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks_sorted)
+            write(21,*)  ks_sorted(i)
+        enddo
+        close(21)
+        
+        open(21,file='ns_sorted.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ns_sorted)
+            write(21,*)  ns_sorted(i)
+        enddo
+        close(21)  
         
         open(21,file='k_log.txt',status='unknown',form='formatted',action='write')
         do i=1,size(k_log)

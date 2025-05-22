@@ -183,7 +183,7 @@ end
 %%------------------------------------------------------------------
 %%--------------- Build the MEX files ------------------------------
 %%----------------------------------- ------------------------------
-names = ["MagTenseLandauLifshitzSolver", "IterateMagnetization", "getHFromTiles", "getNFromTile", "getMagForce"]; 
+names = ["MagTenseLandauLifshitzSolver"];%, "IterateMagnetization", "getHFromTiles", "getNFromTile", "getMagForce"]; 
 if (~USE_CUDA)
     names(1) = "MagTenseLandauLifshitzSolverNoCUDA";
 end
