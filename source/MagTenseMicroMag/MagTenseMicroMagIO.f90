@@ -2,6 +2,7 @@
     
     module MagTenseMicroMagIO
     use MicroMagParameters
+    use IO_GENERAL
         
     implicit none
     
@@ -34,7 +35,7 @@
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
         mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr
         mwPointer :: usePrecisionPtr, N_aveProblemPtr, useReturnHallProblemPtr
-        mwPointer :: demag_ignore_stepsProblemPtr, CrystalCoorProblemPtr, Kfact_arrProblemPtr
+        mwPointer :: demag_ignore_stepsProblemPtr, CrystalAxisProblemPtr, K0_arrProblemPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
         real(DP) :: demag_fac, CV
@@ -353,31 +354,37 @@
             problem%useReturnHall = useReturnHallFalse
         endif
         
+        call displayGUIMessage( 'Test 1' )
+        
         sx = 1
         demag_ignore_stepsProblemPtr = mxGetField( prhs, i, problemFields(51) )
         call mxCopyPtrToInteger4(mxGetPr(demag_ignore_stepsProblemPtr), problem%demag_ignore_steps, sx )
         
         
+        
+        
+        call displayGUIMessage( 'Test 2' )        
         ! 3x3 matrix specifying the local coordinate system
         !                             [v1_x v2_x v3_x]
-        !problem%CrystalCoor(i,:,:) = [v1_y v2_y v3_y]
+        !problem%CrystalAxis(i,:,:) = [v1_y v2_y v3_y]
         !                             [v1_z v2_z v3_z]
         sx = ntot * 3 * 3
-        allocate( problem%CrystalCoor(ntot,3,3) )
-        CrystalCoorProblemPtr = mxGetField( prhs, i, problemFields(52) )
-        call mxCopyPtrToReal8(mxGetPr(CrystalCoorProblemPtr), problem%CrystalCoor, sx )
+        call displayGUIMessage( 'Test 2-1' )  
+        allocate( problem%CrystalAxis(ntot,3,3) )
+        call displayGUIMessage( 'Test 2-2' )  
+        CrystalAxisProblemPtr = mxGetField( prhs, i, problemFields(52) )
+        call displayGUIMessage( 'Test 2-3' )  
+        call mxCopyPtrToReal8(mxGetPr(CrystalAxisProblemPtr), problem%CrystalAxis, sx )
         
-        !                             [alpha1_x   alpha1_y   alpha1_z  ]
-        !solution%Kfact_arr(i,:,:) =  [alpha11_x  alpha11_x  alpha11_x ]
-        !                             [alpha12_x  alpha12_y  alpha12_z ]   
-        !                             [alpha111_x alpha111_y alpha111_z]   
-        !                             [alpha112_x alpha112_y alpha112_z]   
-        !                             [alpha123   0          0         ]
+        call displayGUIMessage( 'Test 3' )
+        
         sx = ntot * 6 * 3
-        allocate( problem%Kfact_arr(ntot,6,3) )
-        Kfact_arrProblemPtr = mxGetField( prhs, i, problemFields(52) )
-        call mxCopyPtrToReal8(mxGetPr(Kfact_arrProblemPtr), problem%Kfact_arr, sx )
+        allocate( problem%K0_arr(ntot,6,3) )
+        K0_arrProblemPtr = mxGetField( prhs, i, problemFields(53) )
+        call mxCopyPtrToReal8(mxGetPr(K0_arrProblemPtr), problem%K0_arr, sx )
         
+        call displayGUIMessage( 'Test 4' )
+                
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -571,8 +578,8 @@
         fieldnames(49) = 'CV'
         fieldnames(50) = 'ReturnHall'
         fieldnames(51) = 'demigstp'
-        fieldnames(52) = 'CrystalCoor'
-        fieldnames(53) = 'Kfact_arr'
+        fieldnames(52) = 'CrysAxis'
+        fieldnames(53) = 'K0_arr'
         
     end subroutine getProblemFieldnames
     

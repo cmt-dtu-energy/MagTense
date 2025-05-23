@@ -128,7 +128,7 @@ include "mkl_dfti.f90"
         logical,dimension(:,:),allocatable :: tensorMapX, tensorMapY, tensorMapZ   !> The sign of the different components in the demagnetization tensor map
         
         real(DP),dimension(:),allocatable :: Axx,Axy,Axz,Ayy,Ayz,Azz    !> Anisotropy vectors assuming local anisotropy only, i.e. no interaction between grains
-        real(DP),dimension(:,:,:),allocatable :: CrystalCoor, Kfact_arr !> The local crystal coordinates and the local anisotropy constants        
+        real(DP),dimension(:,:,:),allocatable :: CrystalAxis, K0_arr !> The local crystal coordinates and the local anisotropy constants        
         
         type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H       !> Handle for the FFT MKL stuff
         
@@ -159,6 +159,7 @@ include "mkl_dfti.f90"
         
         real(DP),dimension(:),allocatable :: Jfact,Kfact
         real(SP),dimension(:),allocatable :: Mfact
+        real(DP),dimension(:,:,:),allocatable :: Kfact_arr
         
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         

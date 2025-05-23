@@ -54,6 +54,33 @@ properties
     %Anisotropy constant
     K0
 
+    %The local crystal anisotropy directions, specified as a 3x3 vector of
+    %an orthonormal basis
+    CrysAxis
+
+    %The local anisotropy constants, specified as a 6x3 matrix
+    %                             [alpha1_x   alpha1_y   alpha1_z  ]
+    %solution%K0_arr(i,:,:) =     [alpha11_x  alpha11_y  alpha11_z ]
+    %                             [alpha12_x  alpha12_y  alpha12_z ]   
+    %                             [alpha111_x alpha111_y alpha111_z]   
+    %                             [alpha112_x alpha112_y alpha112_z]   
+    %                             [alpha123   0          0         ]
+    %
+    % Uniaxial in z = [0 0 Kfact]
+    %                 [0 0 0 ]
+    %                 [0 0 0 ]
+    %                 [0 0 0 ]
+    %                 [0 0 0 ]
+    %                 [0 0 0 ]
+    %
+    % Cubic in cartesian = [0 0 0]
+    %                      [0 0 0]
+    %                      [Kfact1 Kfact1 Kfact1]  
+    %                      [0 0 0]
+    %                      [0 0 0]
+    %                      [Kfact2 0 0]
+    K0_arr
+
     %precession constant
     gamma
 
@@ -319,7 +346,16 @@ methods
         %set the demag approximation to the default, i.e. use no
         %approximation
         obj = obj.setMicroMagDemagApproximation('none');
-        
+
+        %--- Set the local crystal coordinates to the three Cartesian axis
+        obj.CrysAxis = zeros(obj.ntot,3,3);
+        obj.CrysAxis(:,1,1) = 1; 
+        obj.CrysAxis(:,2,2) = 1;
+        obj.CrysAxis(:,3,3) = 1;
+
+         %--- Set the local anisotropy constants to uniaxial
+         obj.K0_arr = zeros(obj.ntot,6,3);
+             % K0_arr(:,1,3) = 
 
         %--- Set alpha as function of time
         if ~exist('AlphaFct')
