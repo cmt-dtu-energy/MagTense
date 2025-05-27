@@ -24,7 +24,8 @@
         mwSize :: sx
         integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
-        mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
+        mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, K1ProblemPtr, K2ProblemPtr
+        mwPointer :: gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
         mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr, CVThresProblemPtr
@@ -360,31 +361,30 @@
         demag_ignore_stepsProblemPtr = mxGetField( prhs, i, problemFields(51) )
         call mxCopyPtrToInteger4(mxGetPr(demag_ignore_stepsProblemPtr), problem%demag_ignore_steps, sx )
         
-        
-        
-        
-        call displayGUIMessage( 'Test 2' )        
         ! 3x3 matrix specifying the local coordinate system
         !                             [v1_x v2_x v3_x]
         !problem%CrystalAxis(i,:,:) = [v1_y v2_y v3_y]
         !                             [v1_z v2_z v3_z]
         sx = ntot * 3 * 3
-        call displayGUIMessage( 'Test 2-1' )  
         allocate( problem%CrystalAxis(ntot,3,3) )
-        call displayGUIMessage( 'Test 2-2' )  
         CrystalAxisProblemPtr = mxGetField( prhs, i, problemFields(52) )
-        call displayGUIMessage( 'Test 2-3' )  
         call mxCopyPtrToReal8(mxGetPr(CrystalAxisProblemPtr), problem%CrystalAxis, sx )
-        
-        call displayGUIMessage( 'Test 3' )
         
         sx = ntot * 6 * 3
         allocate( problem%K0_arr(ntot,6,3) )
         K0_arrProblemPtr = mxGetField( prhs, i, problemFields(53) )
         call mxCopyPtrToReal8(mxGetPr(K0_arrProblemPtr), problem%K0_arr, sx )
         
-        call displayGUIMessage( 'Test 4' )
-                
+        allocate( problem%K1(ntot) )
+        sx = ntot
+        K1ProblemPtr = mxGetField( prhs, i, problemFields(54) )
+        call mxCopyPtrToReal8(mxGetPr(K1ProblemPtr), problem%K1, sx )
+        
+        allocate( problem%K2(ntot) )
+        sx = ntot
+        K2ProblemPtr = mxGetField( prhs, i, problemFields(55) )
+        call mxCopyPtrToReal8(mxGetPr(K2ProblemPtr), problem%K2, sx )
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -520,7 +520,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=53
+        integer,parameter :: nf=55
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -580,6 +580,8 @@
         fieldnames(51) = 'demigstp'
         fieldnames(52) = 'CrysAxis'
         fieldnames(53) = 'K0_arr'
+        fieldnames(54) = 'K1'
+        fieldnames(55) = 'K2'
         
     end subroutine getProblemFieldnames
     

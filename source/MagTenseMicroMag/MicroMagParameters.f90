@@ -77,28 +77,29 @@ include "mkl_dfti.f90"
         !Below is stuff that needs to be provided by the "user":
         type(MicroMagGrid) :: grid                      !> Grid of the problem
         
-        real(DP),dimension(:,:),allocatable :: u_ea     !> Easy axis vectors that should have the dimensions (n,3) where n is the no. of grid points and thus u_ea(i,3) is the i'th point's z-component
+        real(DP),dimension(:,:),allocatable :: u_ea      !> Easy axis vectors that should have the dimensions (n,3) where n is the no. of grid points and thus u_ea(i,3) is the i'th point's z-component
         
-        integer :: ProblemMode                          !> Defines the problem mode (new or continued from previous solution)
+        integer :: ProblemMode                           !> Defines the problem mode (new or continued from previous solution)
         
-        integer :: solver                               !> Determines what type of solver to use
+        integer :: solver                                !> Determines what type of solver to use
         
-        real(DP) :: A0,gamma,alpha0,MaxT0               !> User defined coefficients determining part of the problem.
-        real(DP) :: tol,thres_value                     !> User defined coefficients for the ODE solver
+        real(DP) :: A0,gamma,alpha0,MaxT0                !> User defined coefficients determining part of the problem.
+        real(DP) :: tol,thres_value                      !> User defined coefficients for the ODE solver
         
-        real(DP),dimension(:,:),allocatable :: Hext     !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
-        real(DP),dimension(:,:),allocatable :: alpha    !> A time dependent dampning parameter, i.e. as a function of time. Size (nt,1).
+        real(DP),dimension(:,:),allocatable :: Hext      !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
+        real(DP),dimension(:,:),allocatable :: alpha     !> A time dependent dampning parameter, i.e. as a function of time. Size (nt,1).
         
-        real(DP),dimension(:),allocatable :: t          !> Time array for the desired output times
-        real(DP),dimension(:),allocatable :: m0         !> Initial value of the magnetization
-        real(DP),dimension(:),allocatable :: Ms,K0      !> User defined coefficients determining part of the problem.
+        real(DP),dimension(:),allocatable :: t           !> Time array for the desired output times
+        real(DP),dimension(:),allocatable :: m0          !> Initial value of the magnetization
+        real(DP),dimension(:),allocatable :: Ms,K0,K1,K2 !> User defined coefficients determining part of the problem.
+        real(DP),dimension(:,:,:),allocatable :: Kfact_arr  !> n,6,3 array specifying the local anisotropy constants. See updateAnisotropy for details
         
-        real(DP),dimension(:),allocatable :: t_conv     !> Time array with the time values where the solution will be checked for convergence compared to the last timestep
-        real(DP) :: conv_tol                            !> Converge criteria on difference between magnetization at different timesteps
+        real(DP),dimension(:),allocatable :: t_conv      !> Time array with the time values where the solution will be checked for convergence compared to the last timestep
+        real(DP) :: conv_tol                             !> Converge criteria on difference between magnetization at different timesteps
         
-        real(SP) :: demag_threshold                     !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
-        real(SP) :: CV                                  !> The coefficient of variation (CV), i.e. the ratio of the standard deviation to the mean, which can be used to add an error to the demag field
-        integer :: demag_ignore_steps                   !> Only compute the demag tensor every demag_ignore_steps'th-step in a calculation using the hysteresis-model. Otherwise the parameter is ignore (i.e. in the dynamic solver)
+        real(SP) :: demag_threshold                      !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
+        real(SP) :: CV                                   !> The coefficient of variation (CV), i.e. the ratio of the standard deviation to the mean, which can be used to add an error to the demag field
+        integer :: demag_ignore_steps                    !> Only compute the demag tensor every demag_ignore_steps'th-step in a calculation using the hysteresis-model. Otherwise the parameter is ignore (i.e. in the dynamic solver)
         
         integer :: setTimeDisplay                               !> Determines how often the timestep is shown in Matlab
         integer :: useCuda                                      !> Defines whether to attempt using CUDA or not
@@ -128,7 +129,7 @@ include "mkl_dfti.f90"
         logical,dimension(:,:),allocatable :: tensorMapX, tensorMapY, tensorMapZ   !> The sign of the different components in the demagnetization tensor map
         
         real(DP),dimension(:),allocatable :: Axx,Axy,Axz,Ayy,Ayz,Azz    !> Anisotropy vectors assuming local anisotropy only, i.e. no interaction between grains
-        real(DP),dimension(:,:,:),allocatable :: CrystalAxis, K0_arr !> The local crystal coordinates and the local anisotropy constants        
+        real(DP),dimension(:,:,:),allocatable :: CrystalAxis, K0_arr !> The local crystal coordinates and the local anisotropy constants. See updateAnisotropy for details        
         
         type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H       !> Handle for the FFT MKL stuff
         
@@ -159,7 +160,6 @@ include "mkl_dfti.f90"
         
         real(DP),dimension(:),allocatable :: Jfact,Kfact
         real(SP),dimension(:),allocatable :: Mfact
-        real(DP),dimension(:,:,:),allocatable :: Kfact_arr
         
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         
