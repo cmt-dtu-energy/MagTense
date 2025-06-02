@@ -354,9 +354,7 @@
         else
             problem%useReturnHall = useReturnHallFalse
         endif
-        
-        call displayGUIMessage( 'Test 1' )
-        
+              
         sx = 1
         demag_ignore_stepsProblemPtr = mxGetField( prhs, i, problemFields(51) )
         call mxCopyPtrToInteger4(mxGetPr(demag_ignore_stepsProblemPtr), problem%demag_ignore_steps, sx )

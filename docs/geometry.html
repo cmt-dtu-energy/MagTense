@@ -3,11 +3,11 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Geometry &mdash; MagTense TechManual  documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=92fd9be5" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/techmanual.css?v=903b4c53" />
 
   
@@ -15,7 +15,7 @@
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=5929fcd5"></script>
-      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
@@ -136,7 +136,8 @@ coordinate system. A tile can be rotated around its local axis with yaw
 (rotation around local z-axis, <span class="math notranslate nohighlight">\(\psi\)</span>), pitch (rotation around local
 y-axis, <span class="math notranslate nohighlight">\(\theta\)</span>) and roll (rotation around local x-axis, <span class="math notranslate nohighlight">\(\phi\)</span>).</p>
 <figure class="align-default" id="id11">
-<a class="reference internal image-reference" href="_images/local_rotations.png"><img alt="Local rotations" src="_images/local_rotations.png" style="width: 400px;" /></a>
+<a class="reference internal image-reference" href="_images/local_rotations.png"><img alt="Local rotations" src="_images/local_rotations.png" style="width: 400px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">Rotations of a tile are performed in its local coordinate system.
 Firstly, the tile is rotated with <span class="math notranslate nohighlight">\(\phi\)</span> around its local x-axis.
@@ -152,7 +153,8 @@ Eventually, the angle <span class="math notranslate nohighlight">\(\psi\)</span>
 <section id="cylindrical-tile">
 <h2>Cylindrical Tile<a class="headerlink" href="#cylindrical-tile" title="Link to this heading"></a></h2>
 <figure class="align-default" id="id12">
-<a class="reference internal image-reference" href="_images/cylindrical_tile.png"><img alt="Cylindrical Tile" src="_images/cylindrical_tile.png" style="width: 400px;" /></a>
+<a class="reference internal image-reference" href="_images/cylindrical_tile.png"><img alt="Cylindrical Tile" src="_images/cylindrical_tile.png" style="width: 400px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">The cylindrical tile is defined in cylindrical coordinates with respect
 to its local coordinate system.
@@ -167,7 +169,8 @@ and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTen
 <section id="prism">
 <h2>Prism<a class="headerlink" href="#prism" title="Link to this heading"></a></h2>
 <figure class="align-default" id="id13">
-<a class="reference internal image-reference" href="_images/prism.png"><img alt="Prism" src="_images/prism.png" style="width: 400px;" /></a>
+<a class="reference internal image-reference" href="_images/prism.png"><img alt="Prism" src="_images/prism.png" style="width: 400px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">The prism is defined by the side lengths <span class="math notranslate nohighlight">\(a, b\)</span> and <span class="math notranslate nohighlight">\(c\)</span>.
 Its center coordinate is <span class="math notranslate nohighlight">\((x_{off}, y_{off}, z_{off})\)</span> in the
@@ -180,7 +183,8 @@ and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTen
 <section id="circular-piece">
 <h2>Circular Piece<a class="headerlink" href="#circular-piece" title="Link to this heading"></a></h2>
 <figure class="align-default" id="id14">
-<a class="reference internal image-reference" href="_images/circpiece.png"><img alt="Circular Piece" src="_images/circpiece.png" style="width: 400px;" /></a>
+<a class="reference internal image-reference" href="_images/circpiece.png"><img alt="Circular Piece" src="_images/circpiece.png" style="width: 400px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">The circular piece is defined by its center point (<span class="math notranslate nohighlight">\(r_0, \theta_0, z_0\)</span>)
 in the local coordinate system.
@@ -196,7 +200,8 @@ In contrast to the cylindrial tile, the inner edges are parallel to the local x-
 <section id="inverted-circular-piece">
 <h2>Inverted Circular Piece<a class="headerlink" href="#inverted-circular-piece" title="Link to this heading"></a></h2>
 <figure class="align-default" id="id15">
-<a class="reference internal image-reference" href="_images/circpiece_inv.png"><img alt="Inverted Circular Piece" src="_images/circpiece_inv.png" style="width: 400px;" /></a>
+<a class="reference internal image-reference" href="_images/circpiece_inv.png"><img alt="Inverted Circular Piece" src="_images/circpiece_inv.png" style="width: 400px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">The midpoint of the inner circular edge is located at
 (<span class="math notranslate nohighlight">\(r_0 + \frac{dr}{2}, \theta_0, z_0\)</span>) in the local coordinate system.
@@ -212,7 +217,8 @@ from a right angle. Therefore, its naming is “inverted circular piece”.</spa
 <section id="tetrahedron">
 <h2>Tetrahedron<a class="headerlink" href="#tetrahedron" title="Link to this heading"></a></h2>
 <figure class="align-default" id="id16">
-<a class="reference internal image-reference" href="_images/tetrahedron.png"><img alt="Tetrahedron" src="_images/tetrahedron.png" style="width: 400px;" /></a>
+<a class="reference internal image-reference" href="_images/tetrahedron.png"><img alt="Tetrahedron" src="_images/tetrahedron.png" style="width: 400px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">A tetrahedron is specified by its four vertices in the global coordinate system.</span><a class="headerlink" href="#id16" title="Link to this image"></a></p>
 </figcaption>
@@ -223,7 +229,8 @@ and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTen
 <section id="sphere">
 <h2>Sphere<a class="headerlink" href="#sphere" title="Link to this heading"></a></h2>
 <figure class="align-default" id="id17">
-<a class="reference internal image-reference" href="_images/sphere.png"><img alt="Sphere" src="_images/sphere.png" style="width: 400px;" /></a>
+<a class="reference internal image-reference" href="_images/sphere.png"><img alt="Sphere" src="_images/sphere.png" style="width: 400px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">A sphere is fully defined by its radius <span class="math notranslate nohighlight">\(a\)</span>.
 Its center coordinate is <span class="math notranslate nohighlight">\((x_{off}, y_{off}, z_{off})\)</span> in the
@@ -236,7 +243,8 @@ and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTen
 <section id="spheroid">
 <h2>Spheroid<a class="headerlink" href="#spheroid" title="Link to this heading"></a></h2>
 <figure class="align-default" id="id18">
-<a class="reference internal image-reference" href="_images/spheroid_oblate.png"><img alt="Oblate Spheroid" src="_images/spheroid_oblate.png" style="width: 400px;" /></a>
+<a class="reference internal image-reference" href="_images/spheroid_oblate.png"><img alt="Oblate Spheroid" src="_images/spheroid_oblate.png" style="width: 400px;" />
+</a>
 <figcaption>
 <p><span class="caption-text">Its center coordinate is <span class="math notranslate nohighlight">\((x_{off}, y_{off}, z_{off})\)</span> in the
 global coordinate system.

@@ -53,6 +53,8 @@ properties
     Ms
     %Anisotropy constant
     K0
+    K1
+    K2
 
     %The local crystal anisotropy directions, specified as a 3x3 vector of
     %an orthonormal basis
@@ -289,8 +291,10 @@ methods
         obj.A0 = 1.3e-11;
         % demag magnetization constant
         obj.Ms = 8e5*ones(obj.ntot,1); %A/m
-        %Anisotropy constant
-        obj.K0 = zeros(obj.ntot,1); 
+        %Anisotropy constant for uniaxial (K0) and cubic (K1,K2)
+        obj.K0 = zeros(obj.ntot,1);
+        obj.K1 = zeros(obj.ntot,1);
+        obj.K2 = zeros(obj.ntot,1);
 
         %precession constant
         obj.gamma = 0; %m/A*s
@@ -353,10 +357,9 @@ methods
         obj.CrysAxis(:,2,2) = 1;
         obj.CrysAxis(:,3,3) = 1;
 
-         %--- Set the local anisotropy constants to uniaxial
+         %--- Set the local anisotropy constants to zero
          obj.K0_arr = zeros(obj.ntot,6,3);
-             % K0_arr(:,1,3) = 
-
+ 
         %--- Set alpha as function of time
         if ~exist('AlphaFct')
             AlphaFct = @(t) (t>=0)' * 0;
@@ -570,6 +573,12 @@ methods
         end
         if length(obj.K0)==1 % Check if K0 is vectorized
             obj.K0=obj.K0*ones(obj.ntot,1);
+        end
+        if length(obj.K1)==1 % Check if K1 is vectorized
+            obj.K1=obj.K1*ones(obj.ntot,1);
+        end
+        if length(obj.K2)==1 % Check if K2 is vectorized
+            obj.K2=obj.K2*ones(obj.ntot,1);
         end
         mnorm=vecnorm(obj.m0,2,2); % Check if input array is normalized
         normcondfail=abs(mnorm-ones(obj.ntot,1)) >= obj.tol;

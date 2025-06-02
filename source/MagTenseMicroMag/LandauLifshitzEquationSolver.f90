@@ -533,61 +533,50 @@
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
        
-    !Notice that the anisotropy matrix is symmetric and so Axy = Ayx etc.
-    !prefact = -2.*solution%Kfact
-    !solution%Hkx = prefact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-    !solution%Hky = prefact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-    !solution%Hkz = prefact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
-    !if (any(solution%Kfact .ne. 0)) then
-    !    solution%Hkx = -2.*solution%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-    !    solution%Hky = -2.*solution%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-    !    solution%Hkz = -2.*solution%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
-    !else
-        ! 3x3 matrix specifying the local coordinate system
-        !                             [v1_x v2_x v3_x]
-        !problem%CrystalAxis(i,:,:) = [v1_y v2_y v3_y]
-        !                             [v1_z v2_z v3_z]
+    ! 3x3 matrix specifying the local coordinate system
+    !                             [v1_x v2_x v3_x]
+    !problem%CrystalAxis(i,:,:) = [v1_y v2_y v3_y]
+    !                             [v1_z v2_z v3_z]
         
-        !The anisotropy matrix is given in the local coordinate system, i.e. the crystal axis,
-        !and is specified according to Eq. (2) in https://doi.org/10.1088/1361-665X/aafff8 but generalized to
-        !independent coordinates.
-        !                             [alpha1_x   alpha1_y   alpha1_z  ]
-        !problem%Kfact_arr(i,:,:) =   [alpha11_x  alpha11_x  alpha11_x ]
-        !                             [alpha12_x  alpha12_y  alpha12_z ]   
-        !                             [alpha111_x alpha111_y alpha111_z]   
-        !                             [alpha112_x alpha112_y alpha112_z]   
-        !                             [alpha123   0          0         ]
-        !
-        ! In the above matrix notation, a uniaxial anisotropy in the z-direction is given by:
-        ! Uniaxial in z = [0 0 Kfact]
-        !                 [0 0 0 ]
-        !                 [0 0 0 ]
-        !                 [0 0 0 ]
-        !                 [0 0 0 ]
-        !                 [0 0 0 ]
-        !
-        ! In the above matrix notation, a cubic anisotropy is given by:
-        ! Cubic in cartesian = [0 0 0]
-        !                      [0 0 0]
-        !                      [Kfact1 Kfact1 Kfact1]  
-        !                      [0 0 0]
-        !                      [0 0 0]
-        !                      [Kfact2 0 0]
+    ! The anisotropy matrix is given in the local coordinate system, i.e. the crystal axis,
+    ! and is specified according to Eq. (2) in https://doi.org/10.1088/1361-665X/aafff8 but generalized to
+    ! independent coordinates:
+    !  problem%Kfact_arr(i,:,:) = [alpha1_x   alpha1_y   alpha1_z  ]
+    !                             [alpha11_x  alpha11_x  alpha11_x ]
+    !                             [alpha12_x  alpha12_y  alpha12_z ]   
+    !                             [alpha111_x alpha111_y alpha111_z]   
+    !                             [alpha112_x alpha112_y alpha112_z]   
+    !                             [alpha123   0          0         ]
+    !
+    ! In the above matrix notation, a uniaxial anisotropy in the z-direction is given by:
+    ! Uniaxial in z = [0 0 Kfact]
+    !                 [0 0 0 ]
+    !                 [0 0 0 ]
+    !                 [0 0 0 ]
+    !                 [0 0 0 ]
+    !                 [0 0 0 ]
+    !
+    ! In the above matrix notation, a cubic anisotropy is given by (http://wpage.unina.it/mdaquino/PhD_thesis/main/node13.html):
+    ! Cubic in cartesian = [0 0 0]
+    !                      [0 0 0]
+    !                      [Kfact1 Kfact1 Kfact1]  
+    !                      [0 0 0]
+    !                      [0 0 0]
+    !                      [Kfact2 0 0]
     
-        allocate(Mx_rot(size(solution%Mx)), My_rot(size(solution%My)), Mz_rot(size(solution%Mz)))
-        Mx_rot = problem%CrystalAxis(:,1,1)*solution%Mx(:) + problem%CrystalAxis(:,1,2)*solution%My(:) + problem%CrystalAxis(:,1,3)*solution%Mz(:)
-        My_rot = problem%CrystalAxis(:,2,1)*solution%Mx(:) + problem%CrystalAxis(:,2,2)*solution%My(:) + problem%CrystalAxis(:,2,3)*solution%Mz(:)
-        Mz_rot = problem%CrystalAxis(:,3,1)*solution%Mx(:) + problem%CrystalAxis(:,3,2)*solution%My(:) + problem%CrystalAxis(:,3,3)*solution%Mz(:)
+    allocate(Mx_rot(size(solution%Mx)), My_rot(size(solution%My)), Mz_rot(size(solution%Mz)))
+    Mx_rot = problem%CrystalAxis(:,1,1)*solution%Mx(:) + problem%CrystalAxis(:,1,2)*solution%My(:) + problem%CrystalAxis(:,1,3)*solution%Mz(:)
+    My_rot = problem%CrystalAxis(:,2,1)*solution%Mx(:) + problem%CrystalAxis(:,2,2)*solution%My(:) + problem%CrystalAxis(:,2,3)*solution%Mz(:)
+    Mz_rot = problem%CrystalAxis(:,3,1)*solution%Mx(:) + problem%CrystalAxis(:,3,2)*solution%My(:) + problem%CrystalAxis(:,3,3)*solution%Mz(:)
         
-        allocate(Hkx_rot(size(Mx_rot)), Hky_rot(size(My_rot)), Hkz_rot(size(Mz_rot)))
-        Hkx_rot = -2*Mx_rot(:)*(problem%Kfact_arr(:,1,1) + 2*problem%Kfact_arr(:,2,1)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,3)*My_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*My_rot(:)**2*Mz_rot(:)**2 )
-        Hky_rot = -2*My_rot(:)*(problem%Kfact_arr(:,1,2) + 2*problem%Kfact_arr(:,2,2)*My_rot(:)**2 + problem%Kfact_arr(:,3,3)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,2)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,2)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*Mz_rot(:)**2 )
-        Hkz_rot = -2*Mz_rot(:)*(problem%Kfact_arr(:,1,3) + 2*problem%Kfact_arr(:,2,3)*Mz_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*My_rot(:)**2 + 3*problem%Kfact_arr(:,4,3)*Mz_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + 2*problem%Kfact_arr(:,5,3)*Mx_rot(:)**2*Mz_rot(:)**2 + 2*problem%Kfact_arr(:,5,3)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*My_rot(:)**2 )
+    allocate(Hkx_rot(size(Mx_rot)), Hky_rot(size(My_rot)), Hkz_rot(size(Mz_rot)))
+    Hkx_rot = -2*Mx_rot(:)*(problem%Kfact_arr(:,1,1) + 2*problem%Kfact_arr(:,2,1)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,3)*My_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*My_rot(:)**2*Mz_rot(:)**2 )
+    Hky_rot = -2*My_rot(:)*(problem%Kfact_arr(:,1,2) + 2*problem%Kfact_arr(:,2,2)*My_rot(:)**2 + problem%Kfact_arr(:,3,3)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,2)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,2)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*Mz_rot(:)**2 )
+    Hkz_rot = -2*Mz_rot(:)*(problem%Kfact_arr(:,1,3) + 2*problem%Kfact_arr(:,2,3)*Mz_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*My_rot(:)**2 + 3*problem%Kfact_arr(:,4,3)*Mz_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + 2*problem%Kfact_arr(:,5,3)*Mx_rot(:)**2*Mz_rot(:)**2 + 2*problem%Kfact_arr(:,5,3)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*My_rot(:)**2 )
     
-        solution%Hkx(:) = problem%CrystalAxis(:,1,1)*Hkx_rot(:) + problem%CrystalAxis(:,2,1)*Hky_rot(:) + problem%CrystalAxis(:,3,1)*Hkz_rot(:)
-        solution%Hky(:) = problem%CrystalAxis(:,1,2)*Hkx_rot(:) + problem%CrystalAxis(:,2,2)*Hky_rot(:) + problem%CrystalAxis(:,3,2)*Hkz_rot(:)
-        solution%Hkz(:) = problem%CrystalAxis(:,1,3)*Hkx_rot(:) + problem%CrystalAxis(:,2,3)*Hky_rot(:) + problem%CrystalAxis(:,3,3)*Hkz_rot(:)
-    !endif
+    solution%Hkx(:) = problem%CrystalAxis(:,1,1)*Hkx_rot(:) + problem%CrystalAxis(:,2,1)*Hky_rot(:) + problem%CrystalAxis(:,3,1)*Hkz_rot(:)
+    solution%Hky(:) = problem%CrystalAxis(:,1,2)*Hkx_rot(:) + problem%CrystalAxis(:,2,2)*Hky_rot(:) + problem%CrystalAxis(:,3,2)*Hkz_rot(:)
+    solution%Hkz(:) = problem%CrystalAxis(:,1,3)*Hkx_rot(:) + problem%CrystalAxis(:,2,3)*Hky_rot(:) + problem%CrystalAxis(:,3,3)*Hkz_rot(:)
     
     end subroutine updateAnisotropy    
 
@@ -1618,6 +1607,7 @@
     problem%Kfact_arr(:,:,:) = 0.0
     
     if (any(problem%K0 .ne. 0)) then !Uniaxial anisotropy
+        call displayGUIMessage( 'Assuming uniaxial anisotropy' )
         do i = 1,size(problem%Ms)
             problem%Kfact_arr(i,1,3) = problem%K0(i) / ( mu0 * problem%Ms(i) )
         enddo
@@ -1628,6 +1618,7 @@
         problem%CrystalAxis(:,3,3) =  problem%u_ea(:,3)
         
     elseif (any(problem%K1 .ne. 0)) then !Cubic anisotropy
+        call displayGUIMessage( 'Assuming cubic anisotropy' )
         do i = 1,size(problem%Ms)
             problem%Kfact_arr(i,3,1) = problem%K1(i) / ( mu0 * problem%Ms(i) )
             problem%Kfact_arr(i,3,2) = problem%K1(i) / ( mu0 * problem%Ms(i) )
@@ -1639,22 +1630,6 @@
             problem%Kfact_arr(i,:,:) = problem%K0_arr(i,:,:) / ( mu0 * problem%Ms(i) )
         enddo
     endif
-    
-    
-        !nx = problem%grid%nx
-        !ny = problem%grid%ny
-        !nz = problem%grid%nz
-        !ntot = nx * ny * nz
-        
-        !Allocate the anisotropy vectors and note that the operation is symmetric so we do not need to store three of the nine components
-        !allocate( problem%Axx(ntot),problem%Axy(ntot),problem%Axz(ntot),problem%Ayy(ntot),problem%Ayz(ntot),problem%Azz(ntot) )
-        
-        !problem%Axx = problem%u_ea(:,1) * problem%u_ea(:,1)
-        !problem%Axy = problem%u_ea(:,1) * problem%u_ea(:,2)
-        !problem%Axz = problem%u_ea(:,1) * problem%u_ea(:,3)
-        !problem%Ayy = problem%u_ea(:,2) * problem%u_ea(:,2)
-        !problem%Ayz = problem%u_ea(:,2) * problem%u_ea(:,3)
-        !problem%Azz = problem%u_ea(:,3) * problem%u_ea(:,3)
     
     end subroutine ComputeAnisotropyTerm3D_General
 

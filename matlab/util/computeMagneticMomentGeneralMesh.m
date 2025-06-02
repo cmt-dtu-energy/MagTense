@@ -2,7 +2,7 @@ function [Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(magnetizationsAl
 
 arguments
     magnetizationsAll   = [];     %--- The magnetizations
-    Vols                = [];     %--- The volumes of theUse CUDA for the calculations
+    Vols                = [];     %--- The volumes of the tiles used in the micromagnetism model
 end
 
 if (isempty(Vols))
@@ -18,23 +18,33 @@ else
     %--- The tiles have different volumes 
     
     sumVol = sum(Vols) ;
-    for k=1:size(magnetizationsAll,1) 
-        Sigma = magnetizationsAll(k,:).' ;
-        NN = round(numel(Sigma)/3) ;
-    
-        SigmaX = Sigma(0*NN+[1:NN]) ;
-        SigmaY = Sigma(1*NN+[1:NN]) ;
-        SigmaZ = Sigma(2*NN+[1:NN]) ;
-   
+
+    if (length(magnetizationsAll(:,1,1,1)) == 2)
+        %--- We have a hysteresis problem
+        for i = 1:length(magnetizationsAll(1,1,:,1))
+            SigmaX(i,:) = magnetizationsAll(end,:,i,1);
+            SigmaY(i,:) = magnetizationsAll(end,:,i,2);
+            SigmaZ(i,:) = magnetizationsAll(end,:,i,3);
+        end
+    else
+        %--- We have a time-varying problem
+        for i = 1:length(magnetizationsAll(:,1,1,1))
+            SigmaX(i,:) = magnetizationsAll(i,:,1,1);
+            SigmaY(i,:) = magnetizationsAll(i,:,1,2);
+            SigmaZ(i,:) = magnetizationsAll(i,:,1,3);
+        end
+    end
+
+    for k=1:size(SigmaX,1) 
         %-- The average magnetization of the system
-        Mx(k) = sum(Vols.*SigmaX)./sumVol ;
-        My(k) = sum(Vols.*SigmaY)./sumVol ;
-        Mz(k) = sum(Vols.*SigmaZ)./sumVol ;
+        Mx(k) = sum(Vols.*SigmaX(k,:)')./sumVol ;
+        My(k) = sum(Vols.*SigmaY(k,:)')./sumVol ;
+        Mz(k) = sum(Vols.*SigmaZ(k,:)')./sumVol ;
         
         %-- The individual relative magnetic moments of the tiles
-        mx(k,:) = (Vols.*SigmaX)./sumVol ;
-        my(k,:) = (Vols.*SigmaY)./sumVol ;
-        mz(k,:) = (Vols.*SigmaZ)./sumVol ;
+        mx(k,:) = (Vols.*SigmaX(k,:)')./sumVol ;
+        my(k,:) = (Vols.*SigmaY(k,:)')./sumVol ;
+        mz(k,:) = (Vols.*SigmaZ(k,:)')./sumVol ;
     end
     Mx = Mx';
     My = My';
