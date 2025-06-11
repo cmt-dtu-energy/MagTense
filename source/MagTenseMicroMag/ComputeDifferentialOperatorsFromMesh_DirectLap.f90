@@ -30,7 +30,7 @@ contains
         real(dp), dimension(:,:), intent(in), optional :: ExtW
         !real(dp), dimension(:,:), intent(out) :: DX, DY, DZ
         !real(dp), dimension(:,:), intent(out) :: W
-        type(sparse_matrix_t) :: W_matrix
+        type(sparse_matrix_t) :: W_matrix, FX_matrix, DDXA_matrix, DX_matrix
 
         ! Unpack the variables
         real(dp), dimension(:),allocatable :: NX, NY, NZ, Areas, Volumes, Xel, Yel, Zel, Xf, Yf, Zf
@@ -39,17 +39,40 @@ contains
         integer :: i,j,dims, n, k, kk, k_mask1D, counter, k_i, lind, sjask, indx, k_j, k_row, info
         real(dp), dimension(:),allocatable :: VolCoeff, AX, AY, AZ, s, w
         integer, dimension(:),allocatable :: ss, ns, ks, inds1, inds2, inds2_vals, ks_sorted, ns_sorted, ks_CSC_start, ks_CSC_end, ks_CSC_start_temp, ks_CSC_end_temp
+        integer, dimension(:),allocatable :: ks_sorted_1, ns_sorted_1, ns_CSC_start, ns_CSC_end, ns_CSC_start_temp, ns_CSC_end_temp
+        integer, dimension(:),allocatable :: ks_sorted_reduced, ns_sorted_reduced, ks_sorted_reduced_vx, ns_sorted_reduced_vx, ks_sorted_non_zeroes, ns_sorted_non_zeroes, ks_sorted_reduced_1, ns_sorted_reduced_1
         integer, dimension(:),allocatable :: ns_packed, k_log
+        integer, dimension(:),allocatable :: ks_non_zeroes
         real(dp), dimension(:), allocatable :: Amat
         integer, dimension(:), allocatable :: tmp, tmp2, ind, IPIV
-        logical, allocatable :: mask1D(:), mask_int2log(:)
+        logical, allocatable :: mask1D(:), mask_int2log(:), mask1D_2(:), mask1D_3(:)
         real(dp), dimension(:), allocatable :: ddxA, ddyA, ddzA, ddx, ddy, ddz, dx, dy, dz, vx, vy, vz, vw, dks, dxk, dyk, dzk, nns
+        real(dp), dimension(:), allocatable :: ddxA_non_zeroes, vx_non_zeroes, ddxA_sorted, ddxA_sorted_reduced, vx_non_zeroes_reduced, vx_sorted_reduced_1
         real(dp), dimension(:), allocatable :: dxk2, dyk2, dzk2, Wk, Wk2, e, sjaskarr
         real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T, GkRed, HkRed, Wktmp
         real(dp) :: wm, infinity, scale, scale_local, eps_criteria
-        real(dp), allocatable :: extra(:,:)
+        real(dp), allocatable :: extra(:,:), DX_matrix_dense(:,:)
         integer :: stat                                   !> Status value for the various sparse matrix operations 
         character*(40) :: prog_str
+        !integer, dimension(:), allocatable :: cols_start(:)
+        integer :: rows, cols, nnz
+        integer, pointer :: row_ind(:) => null()
+        integer, pointer :: col_ind(:) => null()
+        integer, pointer :: cols_start(:) => null()
+        integer, pointer :: cols_end(:) => null()
+        real(dp), pointer :: values(:) => null()
+        integer, dimension(:),allocatable :: A_rows_CSC, A_cols_start_CSC, A_cols_end_CSC, B_rows_CSC, B_cols_start_CSC, B_cols_end_CSC
+        integer, dimension(:),allocatable :: A_cols_CSR, A_rows_start_CSR, A_rows_end_CSR, B_cols_CSR, B_rows_start_CSR, B_rows_end_CSR
+        real(dp), dimension(:),allocatable :: A_values_CSC, B_values_CSC, A_values_CSR, B_values_CSR
+        type(sparse_matrix_t) :: descr
+        type(sparse_matrix_t) :: A_sparse_CSC, A_sparse_CSR, C_sparse_CSC
+        type(sparse_matrix_t) :: B_sparse_CSC, B_sparse_CSR, C_sparse_CSR
+        type(sparse_matrix_t) :: Identity_matrix_K_sparse,Identity_matrix_N_sparse
+        real(dp), dimension(:,:),allocatable :: C_dense_CSC, C_dense_CSR
+        integer, dimension(:),allocatable :: Identity_matrix_K_CSC_start, Identity_matrix_K_CSC_end, Identity_matrix_K_rows, Identity_matrix_N_CSC_start, Identity_matrix_N_CSC_end, Identity_matrix_N_rows
+        real(dp), dimension(:), allocatable :: Identity_matrix_K_values, Identity_matrix_N_values
+        real(dp), dimension(:,:), allocatable :: DDXA_matrix_dense, FX_matrix_dense
+        real(dp) :: alpha, beta
         
         
         
@@ -103,6 +126,116 @@ contains
           !    write(21,*)  B(5,i)
           !enddo
           !close(21)
+        
+        allocate(A_values_CSC(13), A_rows_CSC(13), A_cols_start_CSC(5), A_cols_end_CSC(5))
+        allocate(B_values_CSC(13), B_rows_CSC(13), B_cols_start_CSC(5), B_cols_end_CSC(5))
+        A_values_CSC(:)	=	[1,	-2,	-4,	-1,	5,	8,	4,	2,	-3,	6,	7,	4,	-5]
+        A_rows_CSC(:)	=	[1,	2,	4,	1,	2,	5,	3,	4,	1,	3,	4,	3,	5]
+        A_cols_start_CSC(:)	=	[1,	4,	7,	9,	12]	 	 	 	 	 	 	 	 
+        A_cols_end_CSC(:) =	[4,	7,	9,	12,	14]
+        
+        B_values_CSC(:)	=	[1,	-2,	-4,	-1,	5,	8,	4,	2,	-3,	6,	7,	4,	-5]
+        B_rows_CSC(:)	=	[1,	2,	4,	1,	2,	5,	3,	4,	1,	3,	4,	3,	5]
+        B_cols_start_CSC(:)	=	[1,	4,	7,	9,	12]	 	 	 	 	 	 	 	 
+        B_cols_end_CSC(:) =	[4,	7,	9,	12,	14]
+        
+        N = 5
+        K = 5
+        stat = mkl_sparse_d_create_csc (A_sparse_CSC, SPARSE_INDEX_BASE_ONE, N, K, A_cols_start_CSC, A_cols_end_CSC, A_rows_CSC, A_values_CSC)
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        stat = mkl_sparse_d_create_csc (B_sparse_CSC, SPARSE_INDEX_BASE_ONE, N, K, B_cols_start_CSC, B_cols_end_CSC, B_rows_CSC, B_values_CSC)
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        allocate(C_dense_CSC(N,N))
+        stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, A_sparse_CSC, B_sparse_CSC, SPARSE_LAYOUT_COLUMN_MAJOR, C_dense_CSC, N)
+        
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        open(21,file='C_dense_CSC.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(C_dense_CSC,1)
+            do j=1,size(C_dense_CSC,2)
+                write(21,*)  C_dense_CSC(i,j)
+            enddo
+        enddo
+        close(21)
+       
+        
+        call displayGUIMessage( 'Starting sparse product' )
+        
+        stat = mkl_sparse_spmm (SPARSE_OPERATION_NON_TRANSPOSE, A_sparse_CSC, B_sparse_CSC, C_sparse_CSC)
+        
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        call displayGUIMessage( 'Sparse product done' )
+        
+        
+        
+        allocate(A_values_CSR(13), A_cols_CSR(13), A_rows_start_CSR(5), A_rows_end_CSR(5))
+        allocate(B_values_CSR(13), B_cols_CSR(13), B_rows_start_CSR(5), B_rows_end_CSR(5))
+        A_values_CSR(:)	=	[1,	-1,	-3,	-2,	5,	4,	6,	4,	-4,	2,	7,	8,	-5]
+        A_cols_CSR(:)	=	[1,	2,	4,	1,	2,	3,	4,	5,	1,	3,	4,	2,	5]
+        A_rows_start_CSR(:)	=	[1,	4,	6,	9,	12]	 	 	 	 	 	 	 	 
+        A_rows_end_CSR(:) =	[4,	6,	9,	12,	14]
+        
+        B_values_CSR(:)	=	[1,	-1,	-3,	-2,	5,	4,	6,	4,	-4,	2,	7,	8,	-5]
+        B_cols_CSR(:)	=	[1,	2,	4,	1,	2,	3,	4,	5,	1,	3,	4,	2,	5]
+        B_rows_start_CSR(:)	=	[1,	4,	6,	9,	12]	 	 	 	 	 	 	 	 
+        B_rows_end_CSR(:) =	[4,	6,	9,	12,	14]
+        
+        N = 5
+        K = 5
+        stat = mkl_sparse_d_create_csr (A_sparse_CSR, SPARSE_INDEX_BASE_ONE, N, K, A_rows_start_CSR, A_rows_end_CSR, A_cols_CSR, A_values_CSR)
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        stat = mkl_sparse_d_create_csr (B_sparse_CSR, SPARSE_INDEX_BASE_ONE, N, K, B_rows_start_CSR, B_rows_end_CSR, B_cols_CSR, B_values_CSR)
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        allocate(C_dense_CSR(N,N))
+        stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, A_sparse_CSR, B_sparse_CSR, SPARSE_LAYOUT_COLUMN_MAJOR, C_dense_CSR, N)
+        
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        open(21,file='C_dense_CSR.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(C_dense_CSR,1)
+            do j=1,size(C_dense_CSR,2)
+                write(21,*)  C_dense_CSR(i,j)
+            enddo
+        enddo
+        close(21)
+        
+        
+        call displayGUIMessage( 'Starting sparse product' )
+        
+        stat = mkl_sparse_spmm (SPARSE_OPERATION_NON_TRANSPOSE, A_sparse_CSR, B_sparse_CSR, C_sparse_CSR)
+        
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        call displayGUIMessage( 'Sparse product done' )
+        
+        
+        
+        
+        
+        
+        
+        
      
         eps_criteria = 1.0e-12
         
@@ -171,7 +304,7 @@ contains
         ks = Signs(:,2)
 
         call displayGUIMessage( 'Test 3' )
-        
+
         allocate(mask1D(size(Signs(:,1))))
                     
         ! Constructing summing matrix according to reference
@@ -226,6 +359,123 @@ contains
             !real(wp), dimension(:) :: ddxA, ddyA, ddzA
             allocate(ddxA(size(ns)))
             ddxA = ss * AX(ks) * Amat * VolCoeff(ns)
+            
+                    ! Sort the indices of the faces and tiles
+                    allocate(mask1D_3(size(ns)))    
+                    mask1D_3(:) = .true.
+                    allocate(ks_sorted_1(size(ns)))
+                    allocate(ns_sorted_1(size(ns)))
+                    allocate(ddxA_sorted(size(ns)))
+                    do i = 1, size(ks)
+                        indx = minloc(ks, 1, mask1D_3)
+                        ks_sorted_1(i) = ks(indx)
+                        ns_sorted_1(i) = ns(indx)
+                        ddxA_sorted(i) = ddxA(indx)
+                        mask1D_3(MINLOC(ks,mask1D_3)) = .false.
+                    end do    
+                    deallocate(mask1D_3) 
+        
+                    !Then find the non-zero values of ddxA
+                    allocate(mask1D_3(size(ddxA_sorted)))    
+                    mask1D_3(:) = .false.
+                    mask1D_3 = (abs(ddxA_sorted) .gt. eps_criteria)
+                    
+                    !Then reduce the size of the arrays
+                    ks_sorted_reduced = pack(ks_sorted_1,mask1D_3)
+                    ns_sorted_reduced = pack(ns_sorted_1,mask1D_3)
+                    ddxA_sorted_reduced = pack(ddxA_sorted,mask1D_3)
+                    deallocate(mask1D_3)
+                    
+                    ! Determine the two column arrays needed for the CSC sparse format
+                    !allocate(ns_CSC_start(size(ns_sorted_reduced)),ns_CSC_end(size(ns_sorted_reduced)))
+                    !ns_CSC_start(:) = 0
+                    !ns_CSC_end(:) = 0
+                    !ns_CSC_start(1) = 1
+                    !k_i = 2
+                    !do i=1,(size(ns_sorted_reduced)-1)
+                    !    if (ns_sorted_reduced(i) .ne. ns_sorted_reduced(i+1)) then
+                    !        ns_CSC_start(k_i) = i+1
+                    !        ns_CSC_end(k_i-1) = i+1
+                    !        k_i = k_i + 1
+                    !    end if
+                    !enddo
+                    !ns_CSC_end(k_i-1) = size(ns_sorted_reduced)
+        
+                    !allocate(ns_CSC_start_temp(k_i-1),ns_CSC_end_temp(k_i-1))
+                    !ns_CSC_start_temp(:) = ns_CSC_start(1:(k_i-1))
+                    !ns_CSC_end_temp(:) = ns_CSC_end(1:(k_i-1))
+                    !call move_alloc (ns_CSC_start_temp,ns_CSC_start)
+                    !call move_alloc (ns_CSC_end_temp,ns_CSC_end)
+                    
+                    !stat = mkl_sparse_d_create_csc (DDXA_matrix, SPARSE_INDEX_BASE_ONE, N, K, ns_CSC_start, ns_CSC_end, ks_sorted_reduced, ddxA_sorted_reduced)
+                    
+                    
+                    ! Determine the two column arrays needed for the CSC sparse format
+                    allocate(ks_CSC_start(size(ks_sorted_reduced)),ks_CSC_end(size(ks_sorted_reduced)))
+                    ks_CSC_start(:) = 0
+                    ks_CSC_end(:) = 0
+                    ks_CSC_start(1) = 1
+                    k_i = 2
+                    do i=1,(size(ks_sorted_reduced)-1)
+                        if (ks_sorted_reduced(i) .ne. ks_sorted_reduced(i+1)) then
+                            ks_CSC_start(k_i) = i+1
+                            ks_CSC_end(k_i-1) = i+1
+                            k_i = k_i + 1
+                        end if
+                    enddo
+                    ks_CSC_end(k_i-1) = size(ks_sorted_reduced)+1
+        
+                    allocate(ks_CSC_start_temp(k_i-1),ks_CSC_end_temp(k_i-1))
+                    ks_CSC_start_temp(:) = ks_CSC_start(1:(k_i-1))
+                    ks_CSC_end_temp(:) = ks_CSC_end(1:(k_i-1))
+                    call move_alloc (ks_CSC_start_temp,ks_CSC_start)
+                    call move_alloc (ks_CSC_end_temp,ks_CSC_end)
+                    
+                    
+        
+                    call displayGUIMessage( 'Test 3-1' )
+            
+            !Sort the ns array here
+            !Then sort the ks and ddxA array accordingly
+            !Then find the non-zero values of ddxA
+            !Then reduce the size of the arrays
+            !Then find the CSC start and end indices
+            
+            !allocate(mask1D_2(size(ddxA)))
+            !mask1D_2 = (abs(ddxA) .gt. eps_criteria)
+            !ddxA_non_zeroes = pack(ddxA,mask1D_2)
+            !deallocate(mask1D_2)
+            
+            stat = mkl_sparse_d_create_csc (DDXA_matrix, SPARSE_INDEX_BASE_ONE, N, K, ks_CSC_start, ks_CSC_end, ns_sorted_reduced, ddxA_sorted_reduced)
+        
+            
+            ! Pseudocode plan:
+            ! 1. mkl_sparse_d_export_csr expects pointer arrays for row_start, row_end, col_ind, values.
+            ! 2. These arrays must be declared as pointers and not allocatable.
+            ! 3. The variables must be of the correct type and rank (integer, pointer, 1D for indices; real(dp), pointer, 1D for values).
+            ! 4. Use => NULL() to initialize pointers, then pass them to the export routine.
+            ! 5. After export, the pointers will point to the internal MKL arrays.
+
+            ! Replace the following declarations before the call:
+            ! integer, allocatable :: row_ind(:), col_ind(:), rows_start(:), rows_end(:)
+            ! real(dp), allocatable :: values(:)
+
+            
+
+            ! Then call the export routine as follows:
+            !allocate(cols_start(size(ns_CSC_start)))
+            !stat = mkl_sparse_d_export_csc(DDXA_matrix, SPARSE_INDEX_BASE_ONE, N, K, cols_start, cols_end, row_ind, values)
+
+            !open(99, file='DDXA_matrix_coo.txt', status='unknown', action='write')
+            !do i = 1, nnz
+            !    write(99,*) row_ind(i), values(i)
+            !end do
+            !close(99)
+            !call displayGUIMessage( 'STAT' )
+            !write (prog_str,'(I10)') (stat)
+            !call displayGUIMessage( prog_str )
+            
+            
             !DDXA = sparse(ns, ks, ddxA, N, K)
             if (dims > 1) then
                 allocate(ddyA(size(ns)))
@@ -259,6 +509,83 @@ contains
         deallocate(mask1D)
         call displayGUIMessage( 'Test 4' )
         
+        open(21,file='ks_sorted_reduced_ddxA.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks_sorted_reduced)
+            write(21,*)  ks_sorted_reduced(i)
+        enddo
+        close(21)
+        
+        open(21,file='ks_sorted_1_ddxA.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks_sorted_1)
+            write(21,*)  ks_sorted_1(i)
+        enddo
+        close(21)
+        
+        open(21,file='ns_sorted_reduced_ddxA.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ns_sorted_reduced)
+            write(21,*)  ns_sorted_reduced(i)
+        enddo
+        close(21)
+        
+        open(21,file='ns_sorted_1_ddxA.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ns_sorted_1)
+            write(21,*)  ns_sorted_1(i)
+        enddo
+        close(21)
+        
+        open(21,file='ddxA_sorted_reduced_ddxA.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ddxA_sorted_reduced)
+            write(21,*)  ddxA_sorted_reduced(i)
+        enddo
+        close(21)
+        
+        open(21,file='ddxA_sorted_ddxA.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ddxA_sorted)
+            write(21,*)  ddxA_sorted(i)
+        enddo
+        close(21)
+        
+        open(21,file='ks_1_ddxA.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks)
+            write(21,*)  ks(i)
+        enddo
+        close(21)
+        
+        open(21,file='ns_1_ddxA.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks)
+            write(21,*)  ns(i)
+        enddo
+        close(21)
+        
+        open(21,file='ks_CSC_start_ddxA.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks_CSC_start)
+            write(21,*)  ks_CSC_start(i)
+        enddo
+        close(21)
+        
+        open(21,file='ks_CSC_end_ddxA.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks_CSC_end)
+            write(21,*)  ks_CSC_end(i)
+        enddo
+        close(21)
+        
+        open(21,file='ddxA.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ddxA)
+            write(21,*)  ddxA(i)
+        enddo
+        close(21) 
+        
+        open(21,file='ddxA_non_zeroes.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ddxA_non_zeroes)
+            write(21,*)  ddxA_non_zeroes(i)
+        enddo
+        close(21) 
+        
+        
+        
+        
+        
+        
         ! Defaults
         if (.not. present(interpn)) interpn = 'extended'
         if (.not. present(weight)) then
@@ -290,12 +617,13 @@ contains
         end select
 
         !! Calculating weights
+        deallocate(ns,ks)
+        allocate(ns(size(el2fa,1)),ks(size(el2fa,1)))
         ns = el2fa(:,1)
         ks = el2fa(:,2)
        
         
         ! Sort the indices of the faces and tiles
-        !!!!! MOVE UP THIS PART SO THAT THE SORTING IS DONE AT THE START OF THE SUBROUTINE!!
         allocate(mask1D(size(ks)))    
         mask1D(:) = .true.
         allocate(ks_sorted(size(ks)))
@@ -309,26 +637,7 @@ contains
         end do    
         deallocate(mask1D) 
         
-        ! Determine the two column arrays needed for the CSC sparse format
-        allocate(ks_CSC_start(size(ks_sorted)),ks_CSC_end(size(ks_sorted)))
-        ks_CSC_start(:) = 0
-        ks_CSC_end(:) = 0
-        ks_CSC_start(1) = 1
-        k_i = 2
-        do i=1,(size(ks_sorted)-1)
-            if (ks_sorted(i) .ne. ks_sorted(i+1)) then
-                ks_CSC_start(k_i) = i+1
-                ks_CSC_end(k_i-1) = i+1
-                k_i = k_i + 1
-            end if
-        enddo
-        ks_CSC_end(k_i-1) = size(ks_sorted)
         
-        allocate(ks_CSC_start_temp(k_i-1),ks_CSC_end_temp(k_i-1))
-        ks_CSC_start_temp(:) = ks_CSC_start(1:(k_i-1))
-        ks_CSC_end_temp(:) = ks_CSC_end(1:(k_i-1))
-        call move_alloc (ks_CSC_start_temp,ks_CSC_start)
-        call move_alloc (ks_CSC_end_temp,ks_CSC_end)
         
        ! Calculating weights
        ! Determines which weights are to be used in the first interpolation step 
@@ -506,7 +815,7 @@ contains
             k_log(kk) = sum(abs(pack(Signs(:,3),mask1D)))
             ! Mirror trick to enforce Neumann b.c. Creates a set of virtual nodes on the other side of an edge face.
             if (sum(abs(pack(Signs(:,3),mask1D))) == 1) then
-                call displayGUIMessage( 'Test loop 1' )
+                !call displayGUIMessage( 'Test loop 1' )
                 k_log(kk) = 2
                 
                 if ((dims .eq. 1 .and. abs(nns(1)) < eps_criteria) .or. (dims .eq. 2 .and. abs(nns(1)) < eps_criteria .and. abs(nns(2)) < eps_criteria)) then
@@ -514,13 +823,9 @@ contains
                     deallocate(ind)
                     cycle
                 endif
-                !!!CHECK THAT THE SECOND ARGUMENT HERE IS EQUAL TO prod(~nns(1:2)
-                
-                !call displayGUIMessage( 'Test loop 2' )
                 
                 allocate(e(2*lind))
                 allocate(extra(size(dxk,1),3))
-                !extra = [dxk, dyk, dzk] - 2.0 * nns * [dxk, dyk, dzk] * transpose(nns)
                 extra(:,1) = dxk - 2 * nns(1) * (dxk * nns(1))
                 extra(:,2) = dyk - 2 * nns(2) * (dyk * nns(2))
                 extra(:,3) = dzk - 2 * nns(3) * (dzk * nns(3))
@@ -540,20 +845,6 @@ contains
             end if
             
             e(:) = 1
-            
-            !call displayGUIMessage( 'Sizes:' )
-            
-            !write (prog_str,'(I20)') (size(e,1))
-            !call displayGUIMessage( prog_str )
-            
-            !write (prog_str,'(I20)') (size(Gkl1,1))
-            !call displayGUIMessage( prog_str )
-            
-            !write (prog_str,'(I20)') (size(dxk2,1))
-            !call displayGUIMessage( prog_str )
-
-            !write (prog_str,'(I20)') (size(Gkl1_temp,1))
-            !call displayGUIMessage( prog_str )
             
             allocate(Gkl1(size(e,1),4))
             Gkl1(:,1) = e
@@ -618,15 +909,7 @@ contains
                 endif
             enddo
          
-                
-!            open(21,file='HkRed.txt',status='unknown',form='formatted',action='write')
-!            do i=1,size(HkRed,1)
-!                do j=1,size(HkRed,2)
-!                    write(21,*)  HkRed(i,j)
-!                enddo
-!            enddo
-!            close(21)
-                    
+                                   
             allocate(Wktmp(size(HkRed,1),size(HkRed,2)))
             Wktmp(:,:) = HkRed(:,:)
                 
@@ -674,7 +957,15 @@ contains
                  
                 
                 if (sjask .eq. 0) then
-                    call displayGUIMessage( 'Saving files' )
+                    call displayGUIMessage( 'Saving files 0' )
+                    
+                    open(21,file='HkRed.txt',status='unknown',form='formatted',action='write')
+                    do i=1,size(HkRed,1)
+                        do j=1,size(HkRed,2)
+                            write(21,*)  HkRed(i,j)
+                        enddo
+                    enddo
+                    close(21)
                     
                     open(21,file='Wktmp.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(Wktmp,1)
@@ -683,32 +974,24 @@ contains
                         enddo
                     enddo
                     close(21)
-                    
-                    call displayGUIMessage( 'Saving 2' )
-                    
+                                        
                     open(21,file='vw1.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(vw)
                         write(21,*)  vw(i)
                     enddo
                     close(21)
-                    
-                    call displayGUIMessage( 'Saving 3' )
-                    
+                                        
                     open(21,file='vx.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(vx)
                         write(21,*)  vx(i)
                     enddo
                     close(21)
                     
-                    call displayGUIMessage( 'Saving 4' )
-                    
                     open(21,file='vy.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(vy)
                         write(21,*)  vy(i)
                     enddo
                     close(21)
-                    
-                    call displayGUIMessage( 'Saving 5' )
                     
                     open(21,file='vz.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(vz)
@@ -815,10 +1098,9 @@ contains
                     
                     open(21,file='Hk.txt',status='unknown',form='formatted',action='write')
                     do i=1,size(Hk,1)
-                        write(21,*)  Hk(i,1)
-                        write(21,*)  Hk(i,2)
-                        write(21,*)  Hk(i,3)
-                        write(21,*)  Hk(i,4)
+                        do j=1,size(Hk,2)
+                            write(21,*)  Hk(i,j)
+                        enddo
                     enddo
                     close(21)
                 
@@ -956,20 +1238,90 @@ contains
         enddo
         close(21)
         
-        open(21,file='ks_CSC_start.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(ks_CSC_start)
-            write(21,*)  ks_CSC_start(i)
+        
+        
+        
+        !stat = mkl_sparse_d_create_csc (W_matrix, SPARSE_INDEX_BASE_ONE, K, N, ks_CSC_start, ks_CSC_end, ns, vw)
+        allocate(mask1D_2(size(vx)))
+        mask1D_2 = (abs(vx) .gt. eps_criteria)
+        vx_non_zeroes = pack(vx,mask1D_2)
+        ks_sorted_non_zeroes = pack(ks_sorted,mask1D_2)
+        ns_sorted_non_zeroes = pack(ns_sorted,mask1D_2)
+        deallocate(mask1D_2)
+            
+        open(21,file='vx_non_zeroes.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(vx_non_zeroes)
+            write(21,*)  vx_non_zeroes(i)
         enddo
         close(21)
         
-        open(21,file='ks_CSC_end.txt',status='unknown',form='formatted',action='write')
-        do i=1,size(ks_CSC_end)
-            write(21,*)  ks_CSC_end(i)
+        
+        !Then find the non-zero values of ddxA
+        allocate(mask1D_3(size(vx_non_zeroes)))    
+        mask1D_3(:) = .false.
+        mask1D_3 = (abs(vx_non_zeroes) .gt. eps_criteria)
+                    
+        !Then reduce the size of the arrays
+        ks_sorted_reduced = pack(ks_sorted_non_zeroes,mask1D_3)
+        ns_sorted_reduced = pack(ns_sorted_non_zeroes,mask1D_3)
+        vx_non_zeroes_reduced = pack(vx_non_zeroes,mask1D_3)
+        deallocate(mask1D_3)
+        
+        
+        
+        ! Sort the indices of the faces and tiles
+        allocate(mask1D_3(size(ns)))    
+        mask1D_3(:) = .true.
+        allocate(ks_sorted_reduced_1(size(ks_sorted_reduced)))
+        allocate(ns_sorted_reduced_1(size(ks_sorted_reduced)))
+        allocate(vx_sorted_reduced_1(size(ks_sorted_reduced)))
+        do i = 1, size(ns_sorted_reduced_1)
+            indx = minloc(ns_sorted_reduced, 1, mask1D_3)
+            ks_sorted_reduced_1(i) = ks_sorted_reduced(indx)
+            ns_sorted_reduced_1(i) = ns_sorted_reduced(indx)
+            vx_sorted_reduced_1(i) = vx_non_zeroes_reduced(indx)
+            mask1D_3(MINLOC(ns_sorted_reduced,mask1D_3)) = .false.
+        end do    
+        deallocate(mask1D_3) 
+        
+        
+        !Sort the ks array here
+        !Then sort the ns and vx array accordingly
+        !Then find the non-zero values of vx
+        !Then reduce the size of the arrays
+        !Then find the CSC start and end indices
+        
+        
+        
+        
+        
+        
+        
+        
+        ! Determine the two column arrays needed for the CSC sparse format
+        !deallocate(ns_CSC_start,ns_CSC_end)
+        allocate(ns_CSC_start(size(ns_sorted_reduced_1)),ns_CSC_end(size(ns_sorted_reduced_1)))
+        ns_CSC_start(:) = 0
+        ns_CSC_end(:) = 0
+        ns_CSC_start(1) = 1
+        k_i = 2
+        do i=1,(size(ns_sorted_reduced_1)-1)
+            if (ns_sorted_reduced_1(i) .ne. ns_sorted_reduced_1(i+1)) then
+                ns_CSC_start(k_i) = i+1
+                ns_CSC_end(k_i-1) = i+1
+                k_i = k_i + 1
+            end if
         enddo
-        close(21)
+        ns_CSC_end(k_i-1) = size(ns_sorted_reduced_1)+1
+        
+        allocate(ns_CSC_start_temp(k_i-1),ns_CSC_end_temp(k_i-1))
+        ns_CSC_start_temp(:) = ns_CSC_start(1:(k_i-1))
+        ns_CSC_end_temp(:) = ns_CSC_end(1:(k_i-1))
+        call move_alloc (ns_CSC_start_temp,ns_CSC_start)
+        call move_alloc (ns_CSC_end_temp,ns_CSC_end)
         
         
-        stat = mkl_sparse_d_create_csc (W_matrix, SPARSE_INDEX_BASE_ONE, K, N, ks_CSC_start, ks_CSC_end, ns, vw)
+        stat = mkl_sparse_d_create_csc (FX_matrix, SPARSE_INDEX_BASE_ONE, K, N, ns_CSC_start, ns_CSC_end, ks_sorted_reduced_1, vx_sorted_reduced_1)
         
         call displayGUIMessage( 'STAT' )
         write (prog_str,'(I10)') (stat)
@@ -996,7 +1348,193 @@ contains
         
         write (prog_str,'(I10)') (SPARSE_STATUS_NOT_SUPPORTED)
         call displayGUIMessage( prog_str )
+        
+        open(21,file='ns_CSC_start_vx.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ns_CSC_start)
+            write(21,*)  ns_CSC_start(i)
+        enddo
+        close(21)
+        
+        open(21,file='ns_CSC_end_vx.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ns_CSC_end)
+            write(21,*)  ns_CSC_end(i)
+        enddo
+        close(21)
+        
+        open(21,file='ks_sorted_reduced_vx.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ks_sorted_reduced_1)
+            write(21,*)  ks_sorted_reduced_1(i)
+        enddo
+        close(21)
+        
+        open(21,file='ns_sorted_reduced_vx.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(ns_sorted_reduced_1)
+            write(21,*)  ns_sorted_reduced_1(i)
+        enddo
+        close(21)
+        
+        open(21,file='vx_non_zeroes_reduced.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(vx_sorted_reduced_1)
+            write(21,*)  vx_sorted_reduced_1(i)
+        enddo
+        close(21)
 
+        call displayGUIMessage( 'Starting dense product' )
+        allocate(DX_matrix_dense(N,N))
+        stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_matrix, FX_matrix, SPARSE_LAYOUT_COLUMN_MAJOR, DX_matrix_dense, N)
+        
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        call displayGUIMessage( 'Dense product done' )
+        
+        open(21,file='DX_matrix_dense.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(DX_matrix_dense,1)
+            do j=1,size(DX_matrix_dense,2)
+                write(21,*)  DX_matrix_dense(i,j)
+            enddo
+        enddo
+        close(21)
+        
+        !alpha = 1.0
+        !beta = 0.0
+        !stat = mkl_sparse_d_sp2md (SPARSE_OPERATION_NON_TRANSPOSE, SPARSE_MATRIX_TYPE_GENERAL, DDXA_matrix, SPARSE_OPERATION_NON_TRANSPOSE, SPARSE_MATRIX_TYPE_GENERAL, FX_matrix, alpha, beta, DX_matrix_dense, SPARSE_LAYOUT_COLUMN_MAJOR, N )
+        
+        !allocate(DX_matrix_dense(N, N))
+        call displayGUIMessage( 'Starting sparse product' )
+        
+        stat = mkl_sparse_spmm (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_matrix, FX_matrix, DX_matrix)
+
+        !stat = mkl_sparse_sp2m (SPARSE_OPERATION_NON_TRANSPOSE, SPARSE_MATRIX_TYPE_GENERAL, DDXA_matrix, SPARSE_OPERATION_NON_TRANSPOSE, SPARSE_MATRIX_TYPE_GENERAL, FX_matrix, SPARSE_STAGE_FULL_MULT, DX_matrix)
+        
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        call displayGUIMessage( 'Sparse product done' )
+
+        !allocate(DX_matrix_dense(N, N))
+        
+        
+        
+        allocate(Identity_matrix_K_CSC_start(K), Identity_matrix_K_CSC_end(K), Identity_matrix_K_rows(K), Identity_matrix_K_values(K))
+        do i = 1, K
+            Identity_matrix_K_CSC_start(i) = i
+            Identity_matrix_K_CSC_end(i) = i+1
+            Identity_matrix_K_rows(i) = i
+            Identity_matrix_K_values(i) = 1.0
+        enddo
+        
+        open(21,file='Identity_matrix_K_CSC_start.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Identity_matrix_K_CSC_start)
+            write(21,*)  Identity_matrix_K_CSC_start(i)
+        enddo
+        close(21)
+        
+        open(21,file='Identity_matrix_K_CSC_end.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Identity_matrix_K_CSC_end)
+            write(21,*)  Identity_matrix_K_CSC_end(i)
+        enddo
+        close(21)
+        
+        open(21,file='Identity_matrix_K_rows.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Identity_matrix_K_rows)
+            write(21,*)  Identity_matrix_K_rows(i)
+        enddo
+        close(21)
+        
+        open(21,file='Identity_matrix_K_values.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Identity_matrix_K_values)
+            write(21,*)  Identity_matrix_K_values(i)
+        enddo
+        close(21)
+        
+        
+        stat = mkl_sparse_d_create_csc (Identity_matrix_K_sparse, SPARSE_INDEX_BASE_ONE, K, K, Identity_matrix_K_CSC_start, Identity_matrix_K_CSC_end, Identity_matrix_K_rows, Identity_matrix_K_values)
+        
+        
+        allocate(Identity_matrix_N_CSC_start(N), Identity_matrix_N_CSC_end(N), Identity_matrix_N_rows(N), Identity_matrix_N_values(N))
+        do i = 1, N
+            Identity_matrix_N_CSC_start(i) = i
+            Identity_matrix_N_CSC_end(i) = i+1
+            Identity_matrix_N_rows(i) = i
+            Identity_matrix_N_values(i) = 1.0
+        enddo
+        
+        stat = mkl_sparse_d_create_csc (Identity_matrix_N_sparse, SPARSE_INDEX_BASE_ONE, N, N, Identity_matrix_N_CSC_start, Identity_matrix_N_CSC_end, Identity_matrix_N_rows, Identity_matrix_N_values)
+        
+        open(21,file='Identity_matrix_N_CSC_start.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Identity_matrix_N_CSC_start)
+            write(21,*)  Identity_matrix_N_CSC_start(i)
+        enddo
+        close(21)
+        
+        open(21,file='Identity_matrix_N_CSC_end.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Identity_matrix_N_CSC_end)
+            write(21,*)  Identity_matrix_N_CSC_end(i)
+        enddo
+        close(21)
+        
+        open(21,file='Identity_matrix_N_rows.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Identity_matrix_N_rows)
+            write(21,*)  Identity_matrix_N_rows(i)
+        enddo
+        close(21)
+        
+        open(21,file='Identity_matrix_N_values.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(Identity_matrix_N_values)
+            write(21,*)  Identity_matrix_N_values(i)
+        enddo
+        close(21)
+        
+        
+        call displayGUIMessage( 'Starting dense product 1' )
+        allocate(FX_matrix_dense(K,N))
+        stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, FX_matrix, Identity_matrix_N_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, FX_matrix_dense, K)
+        
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        open(21,file='FX_matrix_dense.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(FX_matrix_dense,1)
+            do j=1,size(FX_matrix_dense,2)
+                write(21,*)  FX_matrix_dense(i,j)
+            enddo
+        enddo
+        close(21)
+        
+        call displayGUIMessage( 'Dense product done 1' )
+        
+        
+        call displayGUIMessage( 'Starting dense product 2' )
+        
+        allocate(DDXA_matrix_dense(N,K))
+        stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_matrix, Identity_matrix_K_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DDXA_matrix_dense, N)
+        
+        !WORKS
+        !allocate(DDXA_matrix_dense(K,K))
+        !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_TRANSPOSE, DDXA_matrix, DDXA_matrix, SPARSE_LAYOUT_COLUMN_MAJOR, DDXA_matrix_dense, K)
+        
+        !allocate(DDXA_matrix_dense(K,K))
+        !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, Identity_matrix_K_sparse, Identity_matrix_K_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DDXA_matrix_dense, K)
+        
+        
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
+        
+        call displayGUIMessage( 'Dense product done 2' )
+        
+        open(21,file='DDXA_matrix_dense.txt',status='unknown',form='formatted',action='write')
+        do i=1,size(DDXA_matrix_dense,1)
+            do j=1,size(DDXA_matrix_dense,2)
+                write(21,*)  DDXA_matrix_dense(i,j)
+            enddo
+        enddo
+        close(21)
+        
         
         !stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
                 
