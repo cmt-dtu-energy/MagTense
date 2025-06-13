@@ -76,9 +76,10 @@ contains
         integer, dimension(:),allocatable :: D_rows_start_CSR, D_rows_end_CSR, D_cols_CSR
         real(dp), dimension(:),allocatable :: D_values_CSR
         type(sparse_matrix_t) :: D_sparse_CSR
+        type(sparse_matrix_t) :: E_sparse_COO, E_sparse_CSR
         type(sparse_matrix_t) :: Identity_matrix_K_sparse_CSR
-        integer, dimension(:),allocatable :: Identity_matrix_K_rows_start_CSR, Identity_matrix_K_rows_end_CSR, Identity_matrix_K_cols
-        real(dp), dimension(:), allocatable :: Identity_matrix_K_values_CSR
+        integer, dimension(:),allocatable :: Identity_matrix_K_rows_start_CSR, Identity_matrix_K_rows_end_CSR, Identity_matrix_K_cols, ks_reduced_COO, ns_reduced_COO
+        real(dp), dimension(:), allocatable :: Identity_matrix_K_values_CSR, ddxA_reduced_COO
         real(dp) :: alpha, beta
         
         
@@ -530,13 +531,43 @@ contains
         write (prog_str,'(I10)') (stat)
         call displayGUIMessage( prog_str )
         
+        
+        
+        deallocate(mask1D)
+        
+        
+        
+         !Then find the non-zero values of ddxA
+        allocate(mask1D(size(ddxA)))    
+        mask1D(:) = .false.
+        mask1D = (abs(ddxA) .gt. eps_criteria)
+        
+        !Then reduce the size of the arrays
+        ks_reduced_COO    = pack(ks,mask1D)
+        ns_reduced_COO = pack(ns,mask1D)
+        ddxA_reduced_COO  = pack(ddxA,mask1D)
+        deallocate(mask1D)
+     
+        nnz = size(ddxA_reduced_COO)
+        stat = mkl_sparse_d_create_coo (E_sparse_COO, SPARSE_INDEX_BASE_ONE, N, K, nnz, ns_reduced_COO, ks_reduced_COO, ddxA_reduced_COO)
+        
+        stat = mkl_sparse_convert_csr (E_sparse_COO, SPARSE_OPERATION_NON_TRANSPOSE, E_sparse_CSR)
+        
+        
+        
+        
+        
+        
+        
+        
             
             call displayGUIMessage( 'Starting DDXA dense product' )
         
             allocate(DDXA_matrix_dense(N,K))
             DDXA_matrix_dense(:,:) = 0.0
             !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, D_sparse_CSR, Identity_matrix_K_sparse_CSR, SPARSE_LAYOUT_COLUMN_MAJOR, DDXA_matrix_dense, N)
-            stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_matrix, Identity_matrix_K_sparse_CSR, SPARSE_LAYOUT_COLUMN_MAJOR, DDXA_matrix_dense, N)
+            !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_matrix, Identity_matrix_K_sparse_CSR, SPARSE_LAYOUT_COLUMN_MAJOR, DDXA_matrix_dense, N)
+            stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, E_sparse_CSR, Identity_matrix_K_sparse_CSR, SPARSE_LAYOUT_COLUMN_MAJOR, DDXA_matrix_dense, N)
             
             call displayGUIMessage( 'STAT' )
             write (prog_str,'(I10)') (stat)
@@ -618,7 +649,7 @@ contains
             end if
         end if
 
-        deallocate(mask1D)
+        !deallocate(mask1D)
         call displayGUIMessage( 'Test 4' )
         
        
