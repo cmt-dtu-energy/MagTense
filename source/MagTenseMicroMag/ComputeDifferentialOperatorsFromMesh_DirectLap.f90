@@ -74,12 +74,14 @@ contains
         real(dp), dimension(:), allocatable :: Identity_matrix_K_values, Identity_matrix_N_values
         real(dp), dimension(:,:), allocatable :: DDXA_matrix_dense, FX_matrix_dense
         integer, dimension(:),allocatable :: D_rows_start_CSR, D_rows_end_CSR, D_cols_CSR
-        real(dp), dimension(:),allocatable :: D_values_CSR
+        real(dp), dimension(:),allocatable :: D_values_CSR, vx_reduced_COO
         type(sparse_matrix_t) :: D_sparse_CSR
-        type(sparse_matrix_t) :: E_sparse_COO, E_sparse_CSR
-        type(sparse_matrix_t) :: Identity_matrix_K_sparse_CSR
+        type(sparse_matrix_t) :: DDXA_sparse_COO, DDXA_sparse_CSR, FX_sparse_COO, FX_sparse_CSR
+        type(sparse_matrix_t) :: Identity_matrix_K_sparse_CSR, Identity_matrix_N_sparse_CSR
         integer, dimension(:),allocatable :: Identity_matrix_K_rows_start_CSR, Identity_matrix_K_rows_end_CSR, Identity_matrix_K_cols, ks_reduced_COO, ns_reduced_COO
         real(dp), dimension(:), allocatable :: Identity_matrix_K_values_CSR, ddxA_reduced_COO
+        integer, dimension(:),allocatable :: Identity_matrix_N_rows_start_CSR, Identity_matrix_N_rows_end_CSR, Identity_matrix_N_cols
+        real(dp), dimension(:), allocatable :: Identity_matrix_N_values_CSR
         real(dp) :: alpha, beta
         
         
@@ -531,6 +533,19 @@ contains
         write (prog_str,'(I10)') (stat)
         call displayGUIMessage( prog_str )
         
+        ! Create identity matrices for N
+        allocate(Identity_matrix_N_rows_start_CSR(N), Identity_matrix_N_rows_end_CSR(N), Identity_matrix_N_cols(N), Identity_matrix_N_values_CSR(N))
+        do i = 1, N
+            Identity_matrix_N_rows_start_CSR(i) = i
+            Identity_matrix_N_rows_end_CSR(i) = i+1
+            Identity_matrix_N_cols(i) = i
+            Identity_matrix_N_values_CSR(i) = 1.0
+        enddo
+        
+        stat = mkl_sparse_d_create_csr (Identity_matrix_N_sparse_CSR, SPARSE_INDEX_BASE_ONE, N, N, Identity_matrix_N_rows_start_CSR, Identity_matrix_N_rows_end_CSR, Identity_matrix_N_cols, Identity_matrix_N_values_CSR)
+        call displayGUIMessage( 'STAT' )
+        write (prog_str,'(I10)') (stat)
+        call displayGUIMessage( prog_str )
         
         
         deallocate(mask1D)
@@ -549,9 +564,9 @@ contains
         deallocate(mask1D)
      
         nnz = size(ddxA_reduced_COO)
-        stat = mkl_sparse_d_create_coo (E_sparse_COO, SPARSE_INDEX_BASE_ONE, N, K, nnz, ns_reduced_COO, ks_reduced_COO, ddxA_reduced_COO)
+        stat = mkl_sparse_d_create_coo (DDXA_sparse_COO, SPARSE_INDEX_BASE_ONE, N, K, nnz, ns_reduced_COO, ks_reduced_COO, ddxA_reduced_COO)
         
-        stat = mkl_sparse_convert_csr (E_sparse_COO, SPARSE_OPERATION_NON_TRANSPOSE, E_sparse_CSR)
+        stat = mkl_sparse_convert_csr (DDXA_sparse_COO, SPARSE_OPERATION_NON_TRANSPOSE, DDXA_sparse_CSR)
         
         
         
@@ -567,7 +582,7 @@ contains
             DDXA_matrix_dense(:,:) = 0.0
             !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, D_sparse_CSR, Identity_matrix_K_sparse_CSR, SPARSE_LAYOUT_COLUMN_MAJOR, DDXA_matrix_dense, N)
             !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_matrix, Identity_matrix_K_sparse_CSR, SPARSE_LAYOUT_COLUMN_MAJOR, DDXA_matrix_dense, N)
-            stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, E_sparse_CSR, Identity_matrix_K_sparse_CSR, SPARSE_LAYOUT_COLUMN_MAJOR, DDXA_matrix_dense, N)
+            stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_sparse_CSR, Identity_matrix_K_sparse_CSR, SPARSE_LAYOUT_COLUMN_MAJOR, DDXA_matrix_dense, N)
             
             call displayGUIMessage( 'STAT' )
             write (prog_str,'(I10)') (stat)
@@ -1355,6 +1370,47 @@ contains
         ! enddo
         ! close(21)
         !         
+        
+        
+        
+        deallocate(mask1D)
+         !Then find the non-zero values of ddxA
+        allocate(mask1D(size(vx)))    
+        mask1D(:) = .false.
+        mask1D = (abs(vx) .gt. eps_criteria)
+        
+        !Then reduce the size of the arrays
+        ns_reduced_COO = pack(ns_sorted,mask1D)
+        ks_reduced_COO = pack(ks_sorted,mask1D)
+        vx_reduced_COO = pack(vx,mask1D)
+        deallocate(mask1D)
+        
+        nnz = size(vx_reduced_COO)
+        stat = mkl_sparse_d_create_coo (FX_sparse_COO, SPARSE_INDEX_BASE_ONE, K, N, nnz, ks_reduced_COO, ns_reduced_COO, vx_reduced_COO)
+        
+        stat = mkl_sparse_convert_csr (FX_sparse_COO, SPARSE_OPERATION_NON_TRANSPOSE, FX_sparse_CSR)
+        
+         call displayGUIMessage( 'Starting FX dense product' )
+        
+            allocate(FX_matrix_dense(K,N))
+            FX_matrix_dense(:,:) = 0.0
+            stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, FX_sparse_CSR, Identity_matrix_N_sparse_CSR, SPARSE_LAYOUT_COLUMN_MAJOR, FX_matrix_dense, K)
+            
+            call displayGUIMessage( 'STAT' )
+            write (prog_str,'(I10)') (stat)
+            call displayGUIMessage( prog_str )
+        
+            call displayGUIMessage( 'Ending FX dense product' )
+        
+            open(21,file='FX_matrix_dense.txt',status='unknown',form='formatted',action='write')
+            do i=1,size(FX_matrix_dense,1)
+                do j=1,size(FX_matrix_dense,2)
+                    write(21,*)  FX_matrix_dense(i,j)
+                enddo
+            enddo
+            close(21)
+        
+        
         ! 
         ! call displayGUIMessage( 'Starting FX_matrix dense product' )
         ! allocate(FX_matrix_dense(K,N))
@@ -1383,24 +1439,24 @@ contains
         ! 
         ! 
         ! 
-        ! call displayGUIMessage( 'Starting dense product' )
-        ! allocate(DX_matrix_dense(N,N))
-        ! stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_matrix, FX_matrix, SPARSE_LAYOUT_COLUMN_MAJOR, DX_matrix_dense, N)
-        ! 
-        ! call displayGUIMessage( 'STAT' )
-        ! write (prog_str,'(I10)') (stat)
-        ! call displayGUIMessage( prog_str )
-        ! 
-        ! call displayGUIMessage( 'Dense product done' )
-        ! 
-        ! open(21,file='DX_matrix_dense.txt',status='unknown',form='formatted',action='write')
-        ! do i=1,size(DX_matrix_dense,1)
-        !     do j=1,size(DX_matrix_dense,2)
-        !         write(21,*)  DX_matrix_dense(i,j)
-        !     enddo
-        ! enddo
-        ! close(21)
-        ! 
+         call displayGUIMessage( 'Starting dense product' )
+         allocate(DX_matrix_dense(N,N))
+         stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_sparse_CSR, FX_sparse_CSR, SPARSE_LAYOUT_COLUMN_MAJOR, DX_matrix_dense, N)
+         
+         call displayGUIMessage( 'STAT' )
+         write (prog_str,'(I10)') (stat)
+         call displayGUIMessage( prog_str )
+         
+         call displayGUIMessage( 'Dense product done' )
+         
+         open(21,file='DX_matrix_dense.txt',status='unknown',form='formatted',action='write')
+         do i=1,size(DX_matrix_dense,1)
+             do j=1,size(DX_matrix_dense,2)
+                 write(21,*)  DX_matrix_dense(i,j)
+             enddo
+         enddo
+         close(21)
+         
         ! !alpha = 1.0
         ! !beta = 0.0
         ! !stat = mkl_sparse_d_sp2md (SPARSE_OPERATION_NON_TRANSPOSE, SPARSE_MATRIX_TYPE_GENERAL, DDXA_matrix, SPARSE_OPERATION_NON_TRANSPOSE, SPARSE_MATRIX_TYPE_GENERAL, FX_matrix, alpha, beta, DX_matrix_dense, SPARSE_LAYOUT_COLUMN_MAJOR, N )
