@@ -128,9 +128,10 @@ ifeq ($(USE_CUDA),0)
 	CUDA =
 else
 	COMPILE_CUDA = cuda
-	CUDA = -L${CUDA_ROOT} -lcublas -lcudart -lcuda -lcusparse
+	CUDA = -L${CUDA_ROOT} -lcublas -lcudart -lcusparse
 	CP_LIB += && cp ${FORTRAN_CUDA_PATH}/libCuda${LIB_SUFFIX} .
 	ifeq ($(OS),Windows_NT)
+		CUDA += -lcuda
 		LIB_OPT += -llibCuda
 	else
 		LIB_OPT += -lCuda
