@@ -9,7 +9,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
 #### Linux
 
-- New conda environment from [yml-file](./.build/env-313-linux.yml)
+- New Conda environment from [yml-file](./.build/env-313-linux.yml)
 
   ```bash
   conda env create -n magtense-env -f python/.build/env-313-linux.yml
@@ -62,6 +62,14 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
   ```bash
   make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
   ```
+
+
+  **Note:** In case the error `meson.build:1:0: ERROR: Executables created by fortran compiler ifx are not runnable.` shows up, most probably, some shared object dependencies from the Conda environment cannot be found.
+  A temporary solution to this is adding the library path manually to `LD_LIBRARY_PATH`:
+
+    ```bash
+    export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
+    ```
 
 #### Windows
 
@@ -117,7 +125,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
   - Setting up customized versions of `Developer PowerShell` and `x64 Native Tools Command Prompt for VS 2022`:
 
-    - In [VS Code](https://code.visualstudio.com), these integrated terminals can be added to your profiles by editing `settings.json`. Further, the Python extension ensures that the correct `conda` environment is activated in all terminals.
+    - In [VS Code](https://code.visualstudio.com), these integrated terminals can be added to your profiles by editing `settings.json`. Further, the Python extension ensures that the correct Conda environment is activated in all terminals.
 
       ```bash
       "terminal.integrated.profiles.windows": {
@@ -168,7 +176,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
     make
     ```
 
-    - **Note:** In case the error `nvcc fatal   : Could not set up the environment for Microsoft Visual Studio [...]` shows up, the environment path in the active conda environment prevents `nvcc` to work correctly. A quick fix to compile `MagTenseCudaBlas` is to initialize a `x64 Native Tools Command Prompt for VS 2022` without `conda`:
+    - **Note:** In case the error `nvcc fatal   : Could not set up the environment for Microsoft Visual Studio [...]` shows up, the environment path in the active Conda environment prevents `nvcc` to work correctly. A quick fix to compile `MagTenseCudaBlas` is to initialize a `x64 Native Tools Command Prompt for VS 2022` without `conda`:
 
       ```bash
       "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin\nvcc.exe" -c MagTenseCudaBlas.cu -o MagTenseCudaBlas.o
@@ -188,7 +196,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
     make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
     ```
 
-    - **Note:** In case error `meson.build:1:0: ERROR: Unknown compiler(s): [['ifx']]` shows up, it should help to reinitialize your conda environment to ensure having the correct environment path:
+    - **Note:** In case error `meson.build:1:0: ERROR: Unknown compiler(s): [['ifx']]` shows up, it should help to reinitialize your Conda environment to ensure having the correct environment path:
 
       ```bash
       conda deactivate
