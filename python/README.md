@@ -60,16 +60,8 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 - Compile Fortran source files
 
   ```bash
-  make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
+  LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
   ```
-
-
-  **Note:** In case the error `meson.build:1:0: ERROR: Executables created by fortran compiler ifx are not runnable.` shows up, most probably, some shared object dependencies from the Conda environment cannot be found.
-  A temporary solution to this is adding the library path manually to `LD_LIBRARY_PATH`:
-
-    ```bash
-    export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
-    ```
 
 #### Windows
 
