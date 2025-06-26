@@ -36,6 +36,10 @@ properties
     exch_rows
     exch_rowe
     exch_col
+
+    exch_weigh
+    exch_meth
+    exch_intpn   
     
     %defines the grid type which currently only supports "uniform"
     grid_type
@@ -257,6 +261,10 @@ methods
         obj = obj.setMicroMagProblemMode( 'new' );
         %solver type ('Explicit', 'Implicit' or 'Dynamic')
         obj = obj.setMicroMagSolver( 'Dynamic' );
+
+        obj.exch_weigh = 8.0;
+        obj = obj.setMicroMagExchMethod( 'DirectLaplacianNeumann' );
+        obj = obj.setMicroMagExchInterpn( 'Extended' ); 
 
         % Exchange term constant
         obj.A0 = 1.3e-11;
@@ -526,6 +534,29 @@ methods
             
     end
 
+    function obj = setMicroMagExchMethod( obj, type_var  )
+    %the following maps from naming to internal (fortran) representation of the exchange calculation type
+        
+        switch type_var
+            case 'DirectLaplacianNeumann'
+                obj.exch_meth = int32(1);
+            case 'GGNeumann'
+                obj.exch_meth = int32(2);
+        end
+            
+    end
+
+    function obj = setMicroMagExchInterpn( obj, type_var  )
+    %the following maps from naming to internal (fortran) representation of the exchange interpolation type
+        
+        switch type_var
+            case 'Extended'
+                obj.exch_intpn = int32(1);
+            case 'Compact'
+                obj.exch_intpn = int32(2);
+        end
+            
+    end
     
     %Override struct function for a final check before handing to Fortran
     function obj2 = struct(obj)

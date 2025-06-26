@@ -54,10 +54,10 @@
       !Analyze the mesh, if needed
       if ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
            call CartesianUnstructuredMeshAnalysis(problem%grid%pts, problem%grid%abc, gridinfo)
-           interpn = 'extended'
-           weight = 8.0
-           method = 'DirectLaplacianNeumann'
-           call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo,interpn,weight,method)
+           !interpn = 'extended'
+           !weight = 8.0
+           !method = 'DirectLaplacianNeumann'
+           call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method)
            
            !REMOVE CODE BELOW - ONLY FOR TESTING
            call returnMicroMagGrid( gridinfo, plhs(1) ) 

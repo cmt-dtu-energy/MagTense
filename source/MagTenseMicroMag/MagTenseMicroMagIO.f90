@@ -24,6 +24,7 @@
         mwSize :: sx
         integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
+        mwPointer :: exch_weightProblemPtr, exch_methodProblemPtr, exch_interpnProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
@@ -39,10 +40,10 @@
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
         real(DP) :: demag_fac, CV
-    
+            
         !Get the expected names of the fields
         call getProblemFieldnames( problemFields, nFieldsProblem)
-                   
+                           
         sx = 3
         i = 1
         nGridPtr = mxGetField( prhs, i, problemFields(1) )
@@ -118,22 +119,22 @@
         endif
                 
         !Finished loading the grid------------------------------------------
-        
+                
         !Start loading the problem
         !Allocate memory for the easy axis vectors
         allocate( problem%u_ea(ntot,3) )
         ueaProblemPtr = mxGetField(prhs,i,problemFields(4))
         sx = ntot * 3
         call mxCopyPtrToReal8(mxGetPr(ueaProblemPtr), problem%u_ea, sx )
-        
+                
         sx = 1
         modeProblemPtr = mxGetField( prhs, i, problemFields(5) )
         call mxCopyPtrToInteger4(mxGetPr(modeProblemPtr), problem%ProblemMode, sx )
-        
+                
         sx = 1
         solverProblemPtr = mxGetField( prhs, i, problemFields(6) )
         call mxCopyPtrToInteger4(mxGetPr(solverProblemPtr), problem%solver, sx )
-        
+                 
         sx = 1
         A0ProblemPtr = mxGetField( prhs, i, problemFields(7) )
         call mxCopyPtrToReal8(mxGetPr(A0ProblemPtr), problem%A0, sx )
@@ -147,7 +148,7 @@
         sx = ntot
         K0ProblemPtr = mxGetField( prhs, i, problemFields(9) )
         call mxCopyPtrToReal8(mxGetPr(K0ProblemPtr), problem%K0, sx )
-        
+                
         sx = 1
         gammaProblemPtr = mxGetField( prhs, i, problemFields(10) )
         call mxCopyPtrToReal8(mxGetPr(gammaProblemPtr), problem%gamma, sx )
@@ -158,8 +159,8 @@
         
         sx = 1
         MaxT0ProblemPtr = mxGetField( prhs, i, problemFields(12) )
-        call mxCopyPtrToReal8(mxGetPr(MaxT0ProblemPtr), problem%MaxT0, sx )                
-        
+        call mxCopyPtrToReal8(mxGetPr(MaxT0ProblemPtr), problem%MaxT0, sx )       
+                
         !load the no. of time steps in the applied field
         sx = 1
         ntHextProblemPtr = mxGetField( prhs, i, problemFields(13) )
@@ -358,6 +359,18 @@
         demag_ignore_stepsProblemPtr = mxGetField( prhs, i, problemFields(51) )
         call mxCopyPtrToInteger4(mxGetPr(demag_ignore_stepsProblemPtr), problem%demag_ignore_steps, sx )
         
+        sx = 1
+        exch_weightProblemPtr = mxGetField( prhs, i, problemFields(52) )
+        call mxCopyPtrToReal8(mxGetPr(exch_weightProblemPtr), problem%exch_weight, sx )
+        
+        sx = 1
+        exch_methodProblemPtr = mxGetField( prhs, i, problemFields(53) )
+        call mxCopyPtrToInteger4(mxGetPr(exch_methodProblemPtr), problem%exch_method, sx )
+        
+        sx = 1
+        exch_interpnProblemPtr = mxGetField( prhs, i, problemFields(54) )
+        call mxCopyPtrToInteger4(mxGetPr(exch_interpnProblemPtr), problem%exch_interpn, sx )
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -371,7 +384,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=51
+        integer,parameter :: nf=54
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -429,6 +442,9 @@
         fieldnames(49) = 'CV'
         fieldnames(50) = 'ReturnHall'
         fieldnames(51) = 'demigstp'
+        fieldnames(52) = 'exch_weigh'
+        fieldnames(53) = 'exch_meth'
+        fieldnames(54) = 'exch_intpn'
         
     end subroutine getProblemFieldnames
     
@@ -607,9 +623,7 @@
     
         nfaces = size(gridinfo%fNormX)
         nel = size(gridinfo%Xel)       
-        
-        call displayGUIMessage( 'Test 2-1' )
-                
+                        
         ! Load the result back to Matlab      
         ComplexFlag = 0
       

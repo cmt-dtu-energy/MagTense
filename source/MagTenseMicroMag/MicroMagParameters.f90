@@ -102,6 +102,10 @@ include "mkl_dfti.f90"
         
         integer :: solver                               !> Determines what type of solver to use
         
+        real(DP) :: exch_weight                          !> Sets the weight for the exchange operator calculation
+        integer  :: exch_method                          !> Determines what type of exchange operator method to use
+        integer  :: exch_interpn                         !> Determines what type of exchange interpolation method to use
+    
         real(DP) :: A0,gamma,alpha0,MaxT0               !> User defined coefficients determining part of the problem.
         real(DP) :: tol,thres_value                     !> User defined coefficients for the ODE solver
         
@@ -193,6 +197,8 @@ include "mkl_dfti.f90"
     integer,parameter :: gridTypeUniform=1,gridTypeTetrahedron=2,gridTypeUnstructuredPrisms=3
     integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
     integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverImplicit=3
+    integer,parameter :: MicroMagExchMethodDirectLaplacianNeumann=1,MicroMagExchMethodGGNeumann=2
+    integer,parameter :: MicroMagExchInterpnExtended=1,MicroMagExchInterpnCompact=2
     integer,parameter :: useCudaTrue=1,useCudaFalse=0
     integer,parameter :: DemagApproximationNothing=1,DemagApproximationThreshold=2,DemagApproximationFFTThreshold=3,DemagApproximationThresholdFraction=4,DemagApproximationFFTThresholdFraction=5
     integer,parameter :: DemagTensorReturnNot=1,DemagTensorReturnMemory=2
