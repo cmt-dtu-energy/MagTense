@@ -9,7 +9,7 @@ module DifferentialOperators
 
 contains
 
-    subroutine computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, interpn, weight, method, Aexch, ExtW)
+    subroutine computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, interpn, weight, method, Aexch, A2)
         ! Subroutine to compute differential operators from mesh using Direct Laplacian method
         ! Inputs:
         ! GridInfo - Contains mesh information
@@ -17,7 +17,6 @@ contains
         ! weight - Weighting scheme
         ! method - Calculation method
         ! Aexch - Exchange interaction strength
-        ! ExtW - Optional external weights
         ! Outputs:
         ! DX, DY, DZ - Sparse matrices for derivatives
         ! W - Sparse matrix for averages over faces
@@ -26,10 +25,10 @@ contains
         integer, intent(in) :: interpn
         integer, intent(in) :: method
         !character(len=*), intent(inout), optional :: interpn
-        real(dp), intent(inout), optional :: weight
+        real(dp), intent(inout) :: weight
         !character(len=*), intent(inout), optional :: method
-        real(dp), dimension(:), intent(in), optional :: Aexch
-        real(dp), dimension(:,:), intent(in), optional :: ExtW
+        real(dp), dimension(:), intent(in) :: Aexch
+        type(sparse_matrix_t),intent(out) :: A2
         type(sparse_matrix_t) :: DX_matrix, DY_matrix, DZ_matrix
 
         ! Unpack the variables
@@ -46,7 +45,7 @@ contains
         real(dp), dimension(:), allocatable :: ddxA, ddyA, ddzA, ddx, ddy, ddz, dx, dy, dz, vx, vy, vz, vw, dks, dxk, dyk, dzk, nns
         real(dp), dimension(:), allocatable :: dxk2, dyk2, dzk2, Wk, Wk2, e
         real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T, GkRed, HkRed, Wktmp
-        real(dp) :: wm, infinity, scale, scale_local, eps_criteria
+        real(dp) :: wm, infinity, scale, scale_local, eps_criteria, const
         real(dp), allocatable :: extra(:,:), DX_matrix_dense(:,:), DY_matrix_dense(:,:), DZ_matrix_dense(:,:)
         integer :: stat                                   !> Status value for the various sparse matrix operations 
         character*(40) :: prog_str
@@ -61,6 +60,7 @@ contains
         real(dp), dimension(:), allocatable :: Identity_matrix_N_values_CSR
         
         eps_criteria = 1.0e-12
+        const = 1.
         
         NX = GridInfo%fNormX
         NY = GridInfo%fNormY
@@ -78,19 +78,19 @@ contains
         Signs = GridInfo%TheSigns
         
         ! Initialize Aexch if not provided
-        if (.not. present(Aexch)) then
-            allocate(Aexch_local(size(Xel)))
-            Aexch_local = 1.0
-        else
-            Aexch_local = Aexch
-        end if
+        !if (.not. present(Aexch)) then
+        !    allocate(Aexch_local(size(Xel)))
+        !    Aexch_local = 1.0
+        !else
+        Aexch_local = Aexch
+        !end if
 
         ! Error checking
-        if (size(Aexch_local) /= size(Xel)) then
-            error stop 'Aexch must have length ns, where ns is the number of tiles'
-        end if
+        !if (size(Aexch_local) /= size(Xel)) then
+        !    error stop 'Aexch must have length ns, where ns is the number of tiles'
+        !end if
 
-        if (method == "GGNeumann" .and. any(Aexch_local /= 1.0)) then
+        if (method == MicroMagExchMethodGGNeumann .and. ((maxval(Aexch_local)-minval(Aexch_local))/maxval(Aexch_local)) > 1e-6) then
             error stop 'Green-Gauss method not available for heterogeneous exchange stiffness'
         end if
 
@@ -853,9 +853,13 @@ contains
                         enddo
                     enddo
                     close(21)
-                
+                    
                 !DY = DDYA * FY
                 stat = mkl_sparse_spmm (SPARSE_OPERATION_NON_TRANSPOSE, DDYA_sparse, FY_sparse, DY_matrix)
+                
+                
+                stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, DX_matrix, const, DY_matrix, A2)
+                
                 if (dims > 2) then
                     !FZ = sparse(ks, ns, vz, K, N)
                     call create_CSR_matrix(ks_sorted, ns_sorted, vz, K, N, eps_criteria, FZ_sparse)
@@ -968,7 +972,7 @@ contains
             write(21,*)  vz(i)
         enddo
         close(21)
-        
+                
         
     end subroutine computeDifferentialOperatorsFromMesh_DirectLap
 

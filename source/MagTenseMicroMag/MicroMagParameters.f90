@@ -106,7 +106,7 @@ include "mkl_dfti.f90"
         integer  :: exch_method                          !> Determines what type of exchange operator method to use
         integer  :: exch_interpn                         !> Determines what type of exchange interpolation method to use
     
-        real(DP) :: A0,gamma,alpha0,MaxT0               !> User defined coefficients determining part of the problem.
+        real(DP) :: gamma,alpha0,MaxT0               !> User defined coefficients determining part of the problem.
         real(DP) :: tol,thres_value                     !> User defined coefficients for the ODE solver
         
         real(DP),dimension(:,:),allocatable :: Hext     !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
@@ -114,7 +114,7 @@ include "mkl_dfti.f90"
         
         real(DP),dimension(:),allocatable :: t          !> Time array for the desired output times
         real(DP),dimension(:),allocatable :: m0         !> Initial value of the magnetization
-        real(DP),dimension(:),allocatable :: Ms,K0      !> User defined coefficients determining part of the problem.
+        real(DP),dimension(:),allocatable :: Ms,K0,A0   !> User defined coefficients determining part of the problem.
         
         real(DP),dimension(:),allocatable :: t_conv     !> Time array with the time values where the solution will be checked for convergence compared to the last timestep
         real(DP) :: conv_tol                            !> Converge criteria on difference between magnetization at different timesteps

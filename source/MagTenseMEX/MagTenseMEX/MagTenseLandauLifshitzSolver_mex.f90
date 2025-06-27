@@ -54,19 +54,16 @@
       !Analyze the mesh, if needed
       if ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
            call CartesianUnstructuredMeshAnalysis(problem%grid%pts, problem%grid%abc, gridinfo)
-           !interpn = 'extended'
-           !weight = 8.0
-           !method = 'DirectLaplacianNeumann'
-           call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method)
+           call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, problem%A0 / ( mu0 * problem%Ms ), problem%A_exch)
            
            !REMOVE CODE BELOW - ONLY FOR TESTING
-           call returnMicroMagGrid( gridinfo, plhs(1) ) 
+           !call returnMicroMagGrid( gridinfo, plhs(1) ) 
       endif
       
       !Call the ODE solver
-      !call SolveLandauLifshitzEquation( problem, solution )    
+      call SolveLandauLifshitzEquation( problem, solution )    
     
-      !call returnMicroMagSolution( solution, plhs(1) )
+      call returnMicroMagSolution( solution, plhs(1) )
       
       !Return the mesh, if the user requested it
       if (nlhs .eq. 2) then

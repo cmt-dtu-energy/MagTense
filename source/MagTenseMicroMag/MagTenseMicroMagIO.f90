@@ -134,8 +134,9 @@
         sx = 1
         solverProblemPtr = mxGetField( prhs, i, problemFields(6) )
         call mxCopyPtrToInteger4(mxGetPr(solverProblemPtr), problem%solver, sx )
-                 
-        sx = 1
+        
+        allocate( problem%A0(ntot) )
+        sx = ntot
         A0ProblemPtr = mxGetField( prhs, i, problemFields(7) )
         call mxCopyPtrToReal8(mxGetPr(A0ProblemPtr), problem%A0, sx )
         

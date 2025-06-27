@@ -566,6 +566,9 @@ methods
         if length(obj.K0)==1 % Check if K0 is vectorized
             obj.K0=obj.K0*ones(obj.ntot,1);
         end
+        if length(obj.A0)==1 % Check if A0 is vectorized
+            obj.A0=obj.A0*ones(obj.ntot,1);
+        end
         mnorm=vecnorm(obj.m0,2,2); % Check if input array is normalized
         normcondfail=abs(mnorm-ones(obj.ntot,1)) >= obj.tol;
         if any(normcondfail)
