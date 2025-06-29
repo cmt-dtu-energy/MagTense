@@ -4,6 +4,7 @@ module DifferentialOperators
   use LAPACK95
   use MicroMagParameters
   use IO_GENERAL
+  use ISO_C_BINDING
   
   implicit none
 
@@ -767,6 +768,9 @@ contains
             ! ... the divergence theorem, yielding an estimate for the Laplacian          
             !    FX = sparse(ks, ns, vx, K, N)
             call create_CSR_matrix(ks_sorted, ns_sorted, vx, K, N, eps_criteria, FX_sparse)
+            
+            !i = 0
+            !stat = mkl_sparse_copy (FX_sparse, i, FY_sparse)
         
                     !Debug code to output the matrices
                     call displayGUIMessage( 'Starting DDXA dense product' )
@@ -859,6 +863,8 @@ contains
                 
                 
                 stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, DX_matrix, const, DY_matrix, A2)
+                
+                call create_COO_values_from_CSR(DX_matrix)
                 
                 if (dims > 2) then
                     !FZ = sparse(ks, ns, vz, K, N)
@@ -1046,5 +1052,58 @@ subroutine create_CSR_matrix(rows, columns, values, K, N, eps_criteria, CSR_matr
     stat = mkl_sparse_destroy(COO_matrix)
         
 end subroutine create_CSR_matrix
+
+
+subroutine create_COO_values_from_CSR(CSR_matrix)
+    implicit none
+
+    type(sparse_matrix_t), intent(inout) :: CSR_matrix
+    type(sparse_matrix_t) :: CSR_copy_matrix
+    type(sparse_matrix_t) :: COO_matrix
+    !integer, dimension(:), allocatable :: rows(:), cols(:)
+    !real(dp), dimension(:), allocatable :: values(:)
+    integer :: N_rows, N_cols, N, i, K, indx, stat, nnz, indexing
+    type(MATRIX_DESCR) :: descr
+    type(C_PTR)    :: rows_c, cols_c, values_c
+    integer, POINTER :: rows(:), cols(:)
+    real(dp), POINTER :: values(:)
+
+    descr%type = SPARSE_MATRIX_TYPE_GENERAL 
+
+    stat = mkl_sparse_copy (CSR_matrix, descr, CSR_copy_matrix)
+    
+    stat = mkl_sparse_convert_coo (CSR_copy_matrix, SPARSE_OPERATION_NON_TRANSPOSE, COO_matrix)
+    
+    stat = mkl_sparse_destroy (CSR_copy_matrix)
+    
+    stat = mkl_sparse_d_export_coo (COO_matrix, indexing, K, N, nnz, rows_c, cols_c, values_c)
+    
+    stat = mkl_sparse_destroy (COO_matrix)
+    
+!   Converting C into Fortran pointers
+    call C_F_POINTER(rows_c  , rows  , [nnz])
+    call C_F_POINTER(cols_c  , cols  , [nnz])
+    call C_F_POINTER(values_c    , values    , [nnz])
+    
+    open(21,file='rows.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(rows(:))
+        write(21,*)  rows(i)
+    enddo
+    close(21)
+    
+    open(21,file='cols.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(cols(:))
+        write(21,*)  cols(i)
+    enddo
+    close(21)
+    
+    open(21,file='values.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(values(:))
+        write(21,*)  values(i)
+    enddo
+    close(21)
+            
+end subroutine create_COO_values_from_CSR
+
 
 end module DifferentialOperators
