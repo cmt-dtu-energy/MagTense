@@ -29,6 +29,7 @@ include "mkl_dfti.f90"
         integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
         integer :: nvalues                                              !> the number of elements in values
         integer :: nrows                                                !> the number of elements in the row arrays
+        integer :: ncols                                                !> the number of columns
     end type MagTenseSparse
     
     !Double version
@@ -40,6 +41,7 @@ include "mkl_dfti.f90"
         integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
         integer :: nvalues                                              !> the number of elements in values
         integer :: nrows                                                !> the number of elements in the row arrays
+        integer :: ncols                                                !> the number of columns
     end type MagTenseSparse_d
     
     !Complex version
@@ -51,6 +53,7 @@ include "mkl_dfti.f90"
         integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
         integer :: nvalues                                              !> the number of elements in values
         integer :: nrows                                                !> the number of elements in the row arrays
+        integer :: ncols                                                !> the number of columns
     end type MagTenseSparse_c
     
     !The grid information
@@ -86,6 +89,11 @@ include "mkl_dfti.f90"
         real(dp), allocatable :: Yf(:)
         real(dp), allocatable :: Zf(:)
         real(dp), allocatable :: DimsF(:,:)
+        integer :: Exch_mat_nr                   !> Number of rows in the exchange coupling matrix
+        integer :: Exch_mat_nc                   !> Number of columns in the exchange coupling matrix
+        integer, allocatable  :: Exch_mat_r(:)   !> Row indices for the exchange coupling matrix
+        integer, allocatable  :: Exch_mat_c(:)   !> Column indices for the exchange coupling matrix
+        real(dp), allocatable :: Exch_mat_v(:)   !> Values for the exchange coupling matrix
      end type MicroMagGridInfo
      
     !>-----------------
@@ -106,8 +114,10 @@ include "mkl_dfti.f90"
         integer  :: exch_method                          !> Determines what type of exchange operator method to use
         integer  :: exch_interpn                         !> Determines what type of exchange interpolation method to use
     
-        real(DP) :: gamma,alpha0,MaxT0               !> User defined coefficients determining part of the problem.
-        real(DP) :: tol,thres_value                     !> User defined coefficients for the ODE solver
+        real(DP) :: gamma,alpha0,MaxT0                   !> User defined coefficients determining part of the problem.
+        real(DP) :: tol,thres_value                      !> User defined coefficients for the ODE solver
+        real(DP),dimension(:),allocatable :: Jfact,Kfact
+        real(SP),dimension(:),allocatable :: Mfact
         
         real(DP),dimension(:,:),allocatable :: Hext     !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
         real(DP),dimension(:,:),allocatable :: alpha    !> A time dependent dampning parameter, i.e. as a function of time. Size (nt,1).
@@ -128,6 +138,7 @@ include "mkl_dfti.f90"
         integer :: useCVODE                                     !> Defines whether to attempt using CVODE or not
         integer :: usePrecision                                 !> Defines whether to use single (false) or double precision (true)
         integer :: useReturnHall                                !> Defines whether to return all the specific H-fields (exchange, demag) ´(true) or not (false)
+        integer :: passExch                                     !> Defines whether the exchange matrix is passed from Matlab/Python (true) or calculated localled (false).
         integer :: demag_approximation                          !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         integer :: demagTensorReturnState                       !> Flag describing how or if the demag tensor should be returned
         integer :: demagTensorLoadState                         !> Flag describing how or if to load the demag tensor (from disk e.g.)
@@ -181,9 +192,6 @@ include "mkl_dfti.f90"
         
         real(DP),dimension(:,:),allocatable :: pts          !> n,3 array with the points (x,y,z) of the centers of the tiles
         
-        real(DP),dimension(:),allocatable :: Jfact,Kfact
-        real(SP),dimension(:),allocatable :: Mfact
-        
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
@@ -204,6 +212,7 @@ include "mkl_dfti.f90"
     integer,parameter :: DemagTensorReturnNot=1,DemagTensorReturnMemory=2
     !!@todo Do NOT have useCVODETrue/-False variables both here and in IntegrationDataTypes.
     integer,parameter :: useCVODETrue=1,useCVODEFalse=0
+    integer,parameter :: passExchTrue=1,passExchFalse=0
     integer,parameter :: usePrecisionTrue=1,usePrecisionFalse=0
     integer,parameter :: useReturnHallTrue=1,useReturnHallFalse=0
     

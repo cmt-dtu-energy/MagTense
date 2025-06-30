@@ -10,14 +10,14 @@ module DifferentialOperators
 
 contains
 
-    subroutine computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, interpn, weight, method, Aexch, A2)
+    subroutine computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, interpn, weight, method, Jfact_local, Aexch_matrix)
         ! Subroutine to compute differential operators from mesh using Direct Laplacian method
         ! Inputs:
         ! GridInfo - Contains mesh information
         ! interpn - Interpolation scheme
         ! weight - Weighting scheme
         ! method - Calculation method
-        ! Aexch - Exchange interaction strength
+        ! Jfact_local - Exchange interaction strength
         ! Outputs:
         ! DX, DY, DZ - Sparse matrices for derivatives
         ! W - Sparse matrix for averages over faces
@@ -25,12 +25,10 @@ contains
         type(MicroMagGridInfo), intent(inout) :: GridInfo
         integer, intent(in) :: interpn
         integer, intent(in) :: method
-        !character(len=*), intent(inout), optional :: interpn
         real(dp), intent(inout) :: weight
-        !character(len=*), intent(inout), optional :: method
-        real(dp), dimension(:), intent(in) :: Aexch
-        type(sparse_matrix_t),intent(out) :: A2
-        type(sparse_matrix_t) :: DX_matrix, DY_matrix, DZ_matrix
+        real(dp), dimension(:), intent(in) :: Jfact_local
+        type(sparse_matrix_t),intent(out) :: Aexch_matrix
+        type(sparse_matrix_t) :: DX_matrix, DY_matrix, DZ_matrix, A2
 
         ! Unpack the variables
         real(dp), dimension(:),allocatable :: NX, NY, NZ, Areas, Volumes, Xel, Yel, Zel, Xf, Yf, Zf
@@ -51,6 +49,7 @@ contains
         integer :: stat                                   !> Status value for the various sparse matrix operations 
         character*(40) :: prog_str
         type(sparse_matrix_t) :: descr
+        type(MATRIX_DESCR) :: descr_copy
         real(dp), dimension(:,:), allocatable :: DDXA_matrix_dense, FX_matrix_dense
         type(sparse_matrix_t) :: DDXA_sparse, FX_sparse, DDYA_sparse, FY_sparse, DDZA_sparse, FZ_sparse
         type(sparse_matrix_t) :: DDX_sparse, DDY_sparse, DDZ_sparse, W_sparse
@@ -78,19 +77,9 @@ contains
         D = GridInfo%TheDs
         Signs = GridInfo%TheSigns
         
-        ! Initialize Aexch if not provided
-        !if (.not. present(Aexch)) then
-        !    allocate(Aexch_local(size(Xel)))
-        !    Aexch_local = 1.0
-        !else
-        Aexch_local = Aexch
-        !end if
-
-        ! Error checking
-        !if (size(Aexch_local) /= size(Xel)) then
-        !    error stop 'Aexch must have length ns, where ns is the number of tiles'
-        !end if
-
+        
+        Aexch_local = Jfact_local
+        
         if (method == MicroMagExchMethodGGNeumann .and. ((maxval(Aexch_local)-minval(Aexch_local))/maxval(Aexch_local)) > 1e-6) then
             error stop 'Green-Gauss method not available for heterogeneous exchange stiffness'
         end if
@@ -141,7 +130,7 @@ contains
         
         ! Constructing summing matrix according to reference
         ! Constructing N times K sparse matrix DDXA: DDXA*dphi(faces) = d2phi(elements)
-        ! This takes the exchange stiffness Aexch into account to form the second part of the operator div(A grad(phi))
+        ! This takes the exchange stiffness Jfact_local into account to form the second part of the operator div(A grad(phi))
         if ( method .eq. MicroMagExchMethodDirectLaplacianNeumann ) then
         !if (method == "DirectLaplacianNeumann") then
             ! Setting up exchange interaction strength matrix for heterogeneous materials. Also works for homogeneous materials. [2]
@@ -368,48 +357,6 @@ contains
            
             nns = [NX(kk), NY(kk), NZ(kk)]
             
-            if (kk == 1) then
-                call displayGUIMessage( 'Saving temporary files, loop 1' )
-                
-                open(21,file='ind_1.txt',status='unknown',form='formatted',action='write')
-                do i=1,size(ind)
-                    write(21,*)  ind(i)
-                enddo
-                close(21)
-                
-                open(21,file='dxk_test_1.txt',status='unknown',form='formatted',action='write')
-                do i=1,size(dxk)
-                    write(21,*)  dxk(i)
-                enddo
-                close(21)
-                
-                open(21,file='mask1D_1.txt',status='unknown',form='formatted',action='write')
-                do i=1,size(mask1D)
-                    write(21,*)  mask1D(i)
-                enddo
-                close(21)
-            end if
-            
-            if (kk == K) then
-                call displayGUIMessage( 'Saving temporary files, loop end' )
-        
-                !write (prog_str,'(I20)') (sum(abs(pack(Signs(:,3),mask1D))))
-                !call displayGUIMessage( prog_str )
-                
-                open(21,file='nns_end.txt',status='unknown',form='formatted',action='write')
-                do i=1,size(nns)
-                    write(21,*)  nns(i)
-                enddo
-                close(21)
-                
-                open(21,file='mask1D_end.txt',status='unknown',form='formatted',action='write')
-                do i=1,size(mask1D)
-                    write(21,*)  mask1D(i)
-                enddo
-                close(21)
-                                
-            end if
-            
             lind = size(ind)
             
             k_log(kk) = sum(abs(pack(Signs(:,3),mask1D)))
@@ -553,149 +500,8 @@ contains
                     vz(ind)=Wktmp(size(Wktmp,1),:)/scale ! rescaled
                 endif
             endif
-            
-        
-                 
                 
-                if (sjask .eq. 0) then
-                    call displayGUIMessage( 'Saving files 0' )
-                    
-                    open(21,file='HkRed_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(HkRed,1)
-                        do j=1,size(HkRed,2)
-                            write(21,*)  HkRed(i,j)
-                        enddo
-                    enddo
-                    close(21)
-                    
-                    open(21,file='Wktmp_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(Wktmp,1)
-                        do j=1,size(Wktmp,2)
-                            write(21,*)  Wktmp(i,j)
-                        enddo
-                    enddo
-                    close(21)
-                                        
-                    open(21,file='vw_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(vw)
-                        write(21,*)  vw(i)
-                    enddo
-                    close(21)
-                                        
-                    open(21,file='vx_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(vx)
-                        write(21,*)  vx(i)
-                    enddo
-                    close(21)
-                    
-                    open(21,file='vy_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(vy)
-                        write(21,*)  vy(i)
-                    enddo
-                    close(21)
-                    
-                    open(21,file='vz_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(vz)
-                        write(21,*)  vz(i)
-                    enddo
-                    close(21)
-                    
-                    close(21)
-                    open(21,file='Wk2_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(Wk2)
-                        write(21,*)  Wk2(i)
-                    enddo
-                    close(21)
-                    
-                    open(21,file='dxk_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(dxk)
-                        write(21,*)  dxk(i)
-                    enddo
-                    close(21)
-                    
-                    open(21,file='dyk_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(dyk)
-                        write(21,*)  dyk(i)
-                    enddo
-                    close(21)
-                    
-                    open(21,file='dzk_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(dzk)
-                        write(21,*)  dzk(i)
-                    enddo
-                    close(21)
-                    
-                    open(21,file='dxk2_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(dxk2)
-                        write(21,*)  dxk2(i)
-                    enddo
-                    close(21)
-                    
-                    open(21,file='dyk2_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(dyk2)
-                        write(21,*)  dyk2(i)
-                    enddo
-                    close(21)
-                    
-                    open(21,file='dzk2_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(dzk2)
-                        write(21,*)  dzk2(i)
-                    enddo
-                    close(21)
-                    
-                    open(21,file='nns_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(nns)
-                        write(21,*)  nns(i)
-                    enddo
-                    close(21)
-                    
-                    open(21,file='mask_int2log_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(mask_int2log)
-                        write(21,*)  mask_int2log(i)
-                    enddo
-                    close(21)
-                    
-                    open(21,file='Gkl1_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(Gkl1,1)
-                        write(21,*)  Gkl1(i,1)
-                        write(21,*)  Gkl1(i,2)
-                        write(21,*)  Gkl1(i,3)
-                        write(21,*)  Gkl1(i,4)
-                    enddo
-                    close(21)
-                                        
-                    open(21,file='Gk_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(Gk,1)
-                        write(21,*)  Gk(i,1)
-                        write(21,*)  Gk(i,2)
-                        write(21,*)  Gk(i,3)
-                        write(21,*)  Gk(i,4)
-                    enddo
-                    close(21)
-                                        
-                    open(21,file='Hk_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(Hk,1)
-                        do j=1,size(Hk,2)
-                            write(21,*)  Hk(i,j)
-                        enddo
-                    enddo
-                    close(21)
-                                   
-                    open(21,file='GkRed_1.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(GkRed,1)
-                        do j=1,size(GkRed,2)
-                            write(21,*)  GkRed(i,j)
-                        enddo
-                    enddo
-                    close(21)
-            
-                    sjask = sjask + 1
-                endif
-        
-                            
-                
-                deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)
-                
+            deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)        
         
         end do
                 
@@ -710,57 +516,54 @@ contains
             stat = mkl_sparse_spmm (SPARSE_OPERATION_NON_TRANSPOSE, DDX_sparse, W_sparse, DX_matrix)
             
                     !Debug code to output the matrices
-                    call displayGUIMessage( 'Starting DX dense product' )
-                    allocate(DX_matrix_dense(N,N))
-                    stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDX_sparse, W_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DX_matrix_dense, N)
-         
-                    call displayGUIMessage( 'Ending DX dense product' )
-         
-                    open(21,file='DX_matrix_dense.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(DX_matrix_dense,1)
-                        do j=1,size(DX_matrix_dense,2)
-                            write(21,*)  DX_matrix_dense(i,j)
-                        enddo
-                    enddo
-                    close(21)
+                    !call displayGUIMessage( 'Starting DX dense product' )
+                    !allocate(DX_matrix_dense(N,N))
+                    !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDX_sparse, W_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DX_matrix_dense, N)
+                    !call displayGUIMessage( 'Ending DX dense product' )
+                    !
+                    !open(21,file='DX_matrix_dense.txt',status='unknown',form='formatted',action='write')
+                    !do i=1,size(DX_matrix_dense,1)
+                    !    do j=1,size(DX_matrix_dense,2)
+                    !        write(21,*)  DX_matrix_dense(i,j)
+                    !    enddo
+                    !enddo
+                    !close(21)
             
             if (dims > 1) then
                 !    DY = DDY * W
                 stat = mkl_sparse_spmm (SPARSE_OPERATION_NON_TRANSPOSE, DDY_sparse, W_sparse, DY_matrix)
                 
                         !Debug code to output the matrices
-                        call displayGUIMessage( 'Starting DY dense product' )
-                        allocate(DY_matrix_dense(N,N))
-                        stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDY_sparse, W_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DY_matrix_dense, N)
-         
-                        call displayGUIMessage( 'Ending DY dense product' )
-         
-                        open(21,file='DY_matrix_dense.txt',status='unknown',form='formatted',action='write')
-                        do i=1,size(DY_matrix_dense,1)
-                            do j=1,size(DY_matrix_dense,2)
-                                write(21,*)  DY_matrix_dense(i,j)
-                            enddo
-                        enddo
-                        close(21)
+                        !call displayGUIMessage( 'Starting DY dense product' )
+                        !allocate(DY_matrix_dense(N,N))
+                        !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDY_sparse, W_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DY_matrix_dense, N)
+                        !call displayGUIMessage( 'Ending DY dense product' )
+                        !
+                        !open(21,file='DY_matrix_dense.txt',status='unknown',form='formatted',action='write')
+                        !do i=1,size(DY_matrix_dense,1)
+                        !    do j=1,size(DY_matrix_dense,2)
+                        !        write(21,*)  DY_matrix_dense(i,j)
+                        !    enddo
+                        !enddo
+                        !close(21)
                 
                 if (dims > 2) then
                     !    DZ = DDZ * W
                     stat = mkl_sparse_spmm (SPARSE_OPERATION_NON_TRANSPOSE, DDZ_sparse, W_sparse, DZ_matrix)
                     
                             !Debug code to output the matrices
-                            call displayGUIMessage( 'Starting DZ dense product' )
-                            allocate(DZ_matrix_dense(N,N))
-                            stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDZ_sparse, W_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DZ_matrix_dense, N)
-         
-                            call displayGUIMessage( 'Ending DZ dense product' )
-         
-                            open(21,file='DZ_matrix_dense.txt',status='unknown',form='formatted',action='write')
-                            do i=1,size(DZ_matrix_dense,1)
-                                do j=1,size(DZ_matrix_dense,2)
-                                    write(21,*)  DZ_matrix_dense(i,j)
-                                enddo
-                            enddo
-                            close(21)
+                            !call displayGUIMessage( 'Starting DZ dense product' )
+                            !allocate(DZ_matrix_dense(N,N))
+                            !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDZ_sparse, W_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DZ_matrix_dense, N)
+                            !call displayGUIMessage( 'Ending DZ dense product' )
+                            !
+                            !open(21,file='DZ_matrix_dense.txt',status='unknown',form='formatted',action='write')
+                            !do i=1,size(DZ_matrix_dense,1)
+                            !    do j=1,size(DZ_matrix_dense,2)
+                            !        write(21,*)  DZ_matrix_dense(i,j)
+                            !    enddo
+                            !enddo
+                            !close(21)
                 end if
             end if
         else if ( method .eq. MicroMagExchMethodDirectLaplacianNeumann ) then
@@ -772,11 +575,11 @@ contains
             !i = 0
             !stat = mkl_sparse_copy (FX_sparse, i, FY_sparse)
         
-                    !Debug code to output the matrices
-                    call displayGUIMessage( 'Starting DDXA dense product' )
-        
                     ! For debugging, save the sparse matrix as a dense by multiplying it with the identity matrix
                     ! See https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-fortran/2024-0/mkl-sparse-spmmd.html
+                
+                    !Debug code to output the matrices
+                    !call displayGUIMessage( 'Starting DDXA dense product' )
                     !allocate(DDXA_matrix_dense(N,K))
                     !DDXA_matrix_dense(:,:) = 0.0
                     !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_sparse, Identity_matrix_K_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DDXA_matrix_dense, N)
@@ -809,30 +612,25 @@ contains
                     !close(21)
         
         
-                    call displayGUIMessage( 'Starting DX dense product' )
-                    allocate(DX_matrix_dense(N,N))
-                    stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_sparse, FX_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DX_matrix_dense, N)
-         
-                    !call displayGUIMessage( 'STAT' )
-                    !write (prog_str,'(I10)') (stat)
-                    !call displayGUIMessage( prog_str )
-         
-                    call displayGUIMessage( 'Ending DX dense product' )
-         
-                    open(21,file='DX_matrix_dense.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(DX_matrix_dense,1)
-                        do j=1,size(DX_matrix_dense,2)
-                            write(21,*)  DX_matrix_dense(i,j)
-                        enddo
-                    enddo
-                    close(21)
+                    !call displayGUIMessage( 'Starting DX dense product' )
+                    !allocate(DX_matrix_dense(N,N))
+                    !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_sparse, FX_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DX_matrix_dense, N)
+                    !call displayGUIMessage( 'Ending DX dense product' )
+                    !
+                    !open(21,file='DX_matrix_dense.txt',status='unknown',form='formatted',action='write')
+                    !do i=1,size(DX_matrix_dense,1)
+                    !    do j=1,size(DX_matrix_dense,2)
+                    !        write(21,*)  DX_matrix_dense(i,j)
+                    !    enddo
+                    !enddo
+                    !close(21)
                     
                     
             !    DX = DDXA * FX
             ! Compute the matrix product of two sparse matrices
             ! See https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-fortran/2025-1/mkl-sparse-spmm.html
             stat = mkl_sparse_spmm (SPARSE_OPERATION_NON_TRANSPOSE, DDXA_sparse, FX_sparse, DX_matrix)
-        
+            
             !call displayGUIMessage( 'STAT' )
             !write (prog_str,'(I10)') (stat)
             !call displayGUIMessage( prog_str )
@@ -844,46 +642,39 @@ contains
                 call create_CSR_matrix(ks_sorted, ns_sorted, vy, K, N, eps_criteria, FY_sparse)
                 
                     !Debug code to output the matrices
-                    call displayGUIMessage( 'Starting DY dense product' )
-                    allocate(DY_matrix_dense(N,N))
-                    stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDYA_sparse, FY_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DY_matrix_dense, N)
-         
-                    call displayGUIMessage( 'Ending DY dense product' )
-         
-                    open(21,file='DY_matrix_dense.txt',status='unknown',form='formatted',action='write')
-                    do i=1,size(DY_matrix_dense,1)
-                        do j=1,size(DY_matrix_dense,2)
-                            write(21,*)  DY_matrix_dense(i,j)
-                        enddo
-                    enddo
-                    close(21)
+                    !call displayGUIMessage( 'Starting DY dense product' )
+                    !allocate(DY_matrix_dense(N,N))
+                    !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDYA_sparse, FY_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DY_matrix_dense, N)
+                    !call displayGUIMessage( 'Ending DY dense product' )
+                    !
+                    !open(21,file='DY_matrix_dense.txt',status='unknown',form='formatted',action='write')
+                    !do i=1,size(DY_matrix_dense,1)
+                    !    do j=1,size(DY_matrix_dense,2)
+                    !        write(21,*)  DY_matrix_dense(i,j)
+                    !    enddo
+                    !enddo
+                    !close(21)
                     
                 !DY = DDYA * FY
                 stat = mkl_sparse_spmm (SPARSE_OPERATION_NON_TRANSPOSE, DDYA_sparse, FY_sparse, DY_matrix)
-                
-                
-                stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, DX_matrix, const, DY_matrix, A2)
-                
-                call create_COO_values_from_CSR(DX_matrix)
-                
+                                
                 if (dims > 2) then
                     !FZ = sparse(ks, ns, vz, K, N)
                     call create_CSR_matrix(ks_sorted, ns_sorted, vz, K, N, eps_criteria, FZ_sparse)
                     
                         !Debug code to output the matrices
-                        call displayGUIMessage( 'Starting DZ dense product' )
-                        allocate(DZ_matrix_dense(N,N))
-                        stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDZA_sparse, FZ_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DZ_matrix_dense, N)
-         
-                        call displayGUIMessage( 'Ending DZ dense product' )
-         
-                        open(21,file='DZ_matrix_dense.txt',status='unknown',form='formatted',action='write')
-                        do i=1,size(DZ_matrix_dense,1)
-                            do j=1,size(DZ_matrix_dense,2)
-                                write(21,*)  DZ_matrix_dense(i,j)
-                            enddo
-                        enddo
-                        close(21)
+                        !call displayGUIMessage( 'Starting DZ dense product' )
+                        !allocate(DZ_matrix_dense(N,N))
+                        !stat = mkl_sparse_d_spmmd (SPARSE_OPERATION_NON_TRANSPOSE, DDZA_sparse, FZ_sparse, SPARSE_LAYOUT_COLUMN_MAJOR, DZ_matrix_dense, N)
+                        !call displayGUIMessage( 'Ending DZ dense product' )
+                        !
+                        !open(21,file='DZ_matrix_dense.txt',status='unknown',form='formatted',action='write')
+                        !do i=1,size(DZ_matrix_dense,1)
+                        !    do j=1,size(DZ_matrix_dense,2)
+                        !        write(21,*)  DZ_matrix_dense(i,j)
+                        !    enddo
+                        !enddo
+                        !close(21)
                     
                     !DZ = DDZA * FZ
                     stat = mkl_sparse_spmm (SPARSE_OPERATION_NON_TRANSPOSE, DDZA_sparse, FZ_sparse, DZ_matrix)
@@ -891,8 +682,26 @@ contains
             end if
         end if
 
+        if (dims == 1) then
+            descr_copy%type = SPARSE_MATRIX_TYPE_GENERAL 
+
+            stat = mkl_sparse_copy (DX_matrix, descr_copy, Aexch_matrix)
+        endif
+        if (dims == 2) then
+            stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, DX_matrix, const, DY_matrix, Aexch_matrix)
+            stat = mkl_sparse_destroy(DY_matrix)
+        endif
+        if (dims == 3) then
+            stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, DX_matrix, const, DY_matrix, A2)
+            stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, A2, const, DZ_matrix, Aexch_matrix)
+            stat = mkl_sparse_destroy(A2)
+            stat = mkl_sparse_destroy(DY_matrix)
+            stat = mkl_sparse_destroy(DZ_matrix)
+        endif
         
+        call create_COO_values_from_CSR(Aexch_matrix,GridInfo)
         
+        stat = mkl_sparse_destroy(DX_matrix)
         
         !Debug code to output the files
         call displayGUIMessage( 'Saving final files' )
@@ -983,7 +792,18 @@ contains
     end subroutine computeDifferentialOperatorsFromMesh_DirectLap
 
 
+subroutine passDifferentialOperators(problem)
+    implicit none
+    type(MicroMagProblem),intent(inout) :: problem     !> The problem data structure
+    real(dp) :: eps_criteria
     
+    eps_criteria = 1.0e-12
+    call displayGUIMessage( 'Creating Exchange matrix start' )
+    call create_CSR_matrix(problem%grid%A_exch_load%rows_start, problem%grid%A_exch_load%cols, problem%grid%A_exch_load%values, problem%grid%A_exch_load%nrows, problem%grid%A_exch_load%ncols, eps_criteria, problem%A_exch)
+    call displayGUIMessage( 'Creating Exchange matrix end' )
+    
+end subroutine passDifferentialOperators
+
     
 subroutine unique_sort(val, unique_val, n_unique)
     implicit none
@@ -1054,10 +874,11 @@ subroutine create_CSR_matrix(rows, columns, values, K, N, eps_criteria, CSR_matr
 end subroutine create_CSR_matrix
 
 
-subroutine create_COO_values_from_CSR(CSR_matrix)
+subroutine create_COO_values_from_CSR(CSR_matrix, GridInfo)
     implicit none
 
     type(sparse_matrix_t), intent(inout) :: CSR_matrix
+    type(MicroMagGridInfo), intent(inout) :: GridInfo
     type(sparse_matrix_t) :: CSR_copy_matrix
     type(sparse_matrix_t) :: COO_matrix
     !integer, dimension(:), allocatable :: rows(:), cols(:)
@@ -1085,9 +906,22 @@ subroutine create_COO_values_from_CSR(CSR_matrix)
     call C_F_POINTER(cols_c  , cols  , [nnz])
     call C_F_POINTER(values_c    , values    , [nnz])
     
+    allocate(GridInfo%Exch_mat_r(nnz),GridInfo%Exch_mat_c(nnz),GridInfo%Exch_mat_v(nnz))
+    GridInfo%Exch_mat_nr = K
+    GridInfo%Exch_mat_nc = N
+    GridInfo%Exch_mat_r(:) = rows(:)
+    GridInfo%Exch_mat_c(:) = cols(:)
+    GridInfo%Exch_mat_v(:) = values(:)
+    
     open(21,file='rows.txt',status='unknown',form='formatted',action='write')
     do i=1,size(rows(:))
         write(21,*)  rows(i)
+    enddo
+    close(21)
+    
+    open(21,file='rows2.txt',status='unknown',form='formatted',action='write')
+    do i=1,size(GridInfo%Exch_mat_r(:))
+        write(21,*)  GridInfo%Exch_mat_r(i)
     enddo
     close(21)
     

@@ -22,11 +22,11 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall, passExch
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: exch_weightProblemPtr, exch_methodProblemPtr, exch_interpnProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
-        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr
+        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr, usePassExchPtr
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
         mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr, CVThresProblemPtr
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
@@ -34,12 +34,13 @@
         mwPointer :: exch_matProblemPtr, irPtr, jcPtr
         mwPointer :: genericProblemPtr
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
-        mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr
+        mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr, nColsSparsePtr
         mwPointer :: usePrecisionPtr, N_aveProblemPtr, useReturnHallProblemPtr
         mwPointer :: demag_ignore_stepsProblemPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
-        real(DP) :: demag_fac, CV
+        real(DP) :: demag_fac, CV, mu0, pi
+        character*(40) :: prog_str
             
         !Get the expected names of the fields
         call getProblemFieldnames( problemFields, nFieldsProblem)
@@ -273,36 +274,89 @@
             problem%useCVODE = useCVODEFalse
         endif
         
+        sx = 1
+        usePassExchPtr = mxGetField( prhs, i, problemFields(55) )
+        call mxCopyPtrToInteger4(mxGetPr(usePassExchPtr), passExch, sx )
+        if ( passExch .eq. 1 ) then
+            problem%passExch = passExchTrue
+        else
+            problem%passExch = passExchFalse
+        endif
+        
+        
         !File for loading the sparse exchange tensor from Matlab (for non-uniform grids)
         if (( problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
-            ! Load the CSR sparse information from Matlab
-            sx = 1
-            nValuesSparsePtr = mxGetField( prhs, i, problemFields(39) )
-            call mxCopyPtrToInteger4(mxGetPr(nValuesSparsePtr), problem%grid%A_exch_load%nvalues, sx )
+            if (problem%passExch .eq. passExchTrue ) then
+                call displayGUIMessage( 'A' )
+                sx = 1
+                nRowsSparsePtr = mxGetField( prhs, i, problemFields(40) )
+                call mxCopyPtrToInteger4(mxGetPr(nRowsSparsePtr), problem%grid%A_exch_load%nrows, sx )
+                
+                call displayGUIMessage( 'B' )
+                sx = 1
+                nColsSparsePtr = mxGetField( prhs, i, problemFields(56) )
+                call mxCopyPtrToInteger4(mxGetPr(nColsSparsePtr), problem%grid%A_exch_load%ncols, sx )
+                
+                call displayGUIMessage( 'C' )
+                sx = 1
+                nValuesSparsePtr = mxGetField( prhs, i, problemFields(39) )
+                call mxCopyPtrToInteger4(mxGetPr(nValuesSparsePtr), problem%grid%A_exch_load%nvalues, sx )
+                
+                call displayGUIMessage( 'D' )
+                nvalues = problem%grid%A_exch_load%nvalues
+
+                
+                allocate( problem%grid%A_exch_load%values(nvalues), problem%grid%A_exch_load%rows_start(nvalues) , problem%grid%A_exch_load%cols(nvalues) )
+                
+                sx = nvalues
+                
+                write (prog_str,'(I10)') (nvalues)
+                call displayGUIMessage( prog_str )
+                
+                valuesPtr = mxGetField( prhs, i, problemFields(41) )
+                call mxCopyPtrToReal8(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
+            
+                call displayGUIMessage( 'E' )
+                sx = nvalues
+                rows_startPtr = mxGetField( prhs, i, problemFields(42) )
+                call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), problem%grid%A_exch_load%rows_start, sx )
+        
+                call displayGUIMessage( 'F' )
+                sx = nvalues
+                colsPtr = mxGetField( prhs, i, problemFields(44) )
+                call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )
+                
+            else
+                !REMOVE THIS CODE IN A FUTURE UPDATE
+                ! Load the CSR sparse information from Matlab
+                sx = 1
+                nValuesSparsePtr = mxGetField( prhs, i, problemFields(39) )
+                call mxCopyPtrToInteger4(mxGetPr(nValuesSparsePtr), problem%grid%A_exch_load%nvalues, sx )
        
-            sx = 1
-            nRowsSparsePtr = mxGetField( prhs, i, problemFields(40) )
-            call mxCopyPtrToInteger4(mxGetPr(nRowsSparsePtr), problem%grid%A_exch_load%nrows, sx )
+                sx = 1
+                nRowsSparsePtr = mxGetField( prhs, i, problemFields(40) )
+                call mxCopyPtrToInteger4(mxGetPr(nRowsSparsePtr), problem%grid%A_exch_load%nrows, sx )
             
-            nvalues = problem%grid%A_exch_load%nvalues
-            nrows = problem%grid%A_exch_load%nrows
-            allocate( problem%grid%A_exch_load%values(nvalues), problem%grid%A_exch_load%rows_start(nrows) , problem%grid%A_exch_load%rows_end(nrows) , problem%grid%A_exch_load%cols(nvalues) )
+                nvalues = problem%grid%A_exch_load%nvalues
+                nrows = problem%grid%A_exch_load%nrows
+                allocate( problem%grid%A_exch_load%values(nvalues), problem%grid%A_exch_load%rows_start(nrows) , problem%grid%A_exch_load%rows_end(nrows) , problem%grid%A_exch_load%cols(nvalues) )
              
-            sx = nvalues
-            valuesPtr = mxGetField( prhs, i, problemFields(41) )
-            call mxCopyPtrToReal8(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
+                sx = nvalues
+                valuesPtr = mxGetField( prhs, i, problemFields(41) )
+                call mxCopyPtrToReal8(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
             
-            sx = nrows
-            rows_startPtr = mxGetField( prhs, i, problemFields(42) )
-            call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), problem%grid%A_exch_load%rows_start, sx )
+                sx = nrows
+                rows_startPtr = mxGetField( prhs, i, problemFields(42) )
+                call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), problem%grid%A_exch_load%rows_start, sx )
         
-            sx = nrows
-            rows_endPtr = mxGetField( prhs, i, problemFields(43) )
-            call mxCopyPtrToInteger4(mxGetPr(rows_endPtr), problem%grid%A_exch_load%rows_end, sx )
+                sx = nrows
+                rows_endPtr = mxGetField( prhs, i, problemFields(43) )
+                call mxCopyPtrToInteger4(mxGetPr(rows_endPtr), problem%grid%A_exch_load%rows_end, sx )
         
-            sx = nvalues
-            colsPtr = mxGetField( prhs, i, problemFields(44) )
-            call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )
+                sx = nvalues
+                colsPtr = mxGetField( prhs, i, problemFields(44) )
+                call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )
+            endif
         endif
           
         !Load the no. of time steps in the time convergence array
@@ -372,6 +426,18 @@
         exch_interpnProblemPtr = mxGetField( prhs, i, problemFields(54) )
         call mxCopyPtrToInteger4(mxGetPr(exch_interpnProblemPtr), problem%exch_interpn, sx )
         
+        !>-----------------------------------------
+        !Calculate the local scaled coefficients for the LLG equation
+        !"J" : exchange term
+        pi = 3.141592653589793
+        mu0 = 4*pi*1e-7
+        problem%Jfact = problem%A0 / ( mu0 * problem%Ms )
+        !"M" : demagnetization term
+        problem%Mfact = problem%Ms
+        !"K" : anisotropy term
+        problem%Kfact = problem%K0 / ( mu0 * problem%Ms )
+        
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -385,7 +451,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=54
+        integer,parameter :: nf=56
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -446,6 +512,8 @@
         fieldnames(52) = 'exch_weigh'
         fieldnames(53) = 'exch_meth'
         fieldnames(54) = 'exch_intpn'
+        fieldnames(55) = 'passExch'
+        fieldnames(56) = 'exch_ncol'
         
     end subroutine getProblemFieldnames
     
@@ -616,6 +684,7 @@
         mwPointer :: ptfNormX,ptfNormY,ptfNormZ,ptAreaFaces,ptVolumes,ptXel,ptYel,ptZel
         mwPointer :: ptXf,ptYf,ptZf,ptDimsF,ptTheTs,ptTheDs,ptTheSigns
         mwPointer :: mxCreateStructArray, mxCreateDoubleMatrix,mxGetPr,mxCreateNumericMatrix,mxCreateNumericArray
+        mwPointer :: ptExch_mat_r, ptExch_mat_c, ptExch_mat_v, ptExch_mat_nr, ptExch_mat_nc
         mwIndex :: ind
         character(len=10),dimension(:),allocatable :: fieldnames    
         integer :: nfields, nel, nfaces
@@ -716,6 +785,32 @@
         call mxCopyInteger4ToPtr( gridinfo%TheSigns, mxGetPr( ptTheSigns ), sx )
         call mxSetField( plhs, ind, fieldnames(15), ptTheSigns )
         
+        s1 = size(gridinfo%Exch_mat_r,1)
+        s2 = 1
+        ptExch_mat_r = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)    
+        sx = s1 * s2
+        call mxCopyInteger4ToPtr( gridinfo%Exch_mat_r, mxGetPr( ptExch_mat_r ), sx )
+        call mxSetField( plhs, ind, fieldnames(16), ptExch_mat_r )
+        
+        ptExch_mat_c = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)    
+        call mxCopyInteger4ToPtr( gridinfo%Exch_mat_c, mxGetPr( ptExch_mat_c ), sx )
+        call mxSetField( plhs, ind, fieldnames(17), ptExch_mat_c )
+        
+        ptExch_mat_v = mxCreateDoubleMatrix(s1, s2, ComplexFlag)    
+        call mxCopyReal8ToPtr( gridinfo%Exch_mat_v, mxGetPr( ptExch_mat_v ), sx )
+        call mxSetField( plhs, ind, fieldnames(18), ptExch_mat_v )
+        
+        s1 = 1
+        s2 = 1
+        sx = s1 * s2
+        ptExch_mat_nr = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)   
+        call mxCopyInteger4ToPtr( gridinfo%Exch_mat_nr, mxGetPr( ptExch_mat_nr ), sx )
+        call mxSetField( plhs, ind, fieldnames(19), ptExch_mat_nr )
+        
+        ptExch_mat_nc = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)    
+        call mxCopyInteger4ToPtr( gridinfo%Exch_mat_nc, mxGetPr( ptExch_mat_nc ), sx )
+        call mxSetField( plhs, ind, fieldnames(20), ptExch_mat_nc )
+        
         !Clean up
         deallocate(fieldnames)
     
@@ -730,7 +825,7 @@
     !>-----------------------------------------
     subroutine getGridInfoFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=15
+        integer,parameter :: nf=20
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -752,6 +847,11 @@
         fieldnames(13) = 'TheTs'
         fieldnames(14) = 'TheDs'
         fieldnames(15) = 'TheSigns'
+        fieldnames(16) = 'ExchMat_r'
+        fieldnames(17) = 'ExchMat_c'
+        fieldnames(18) = 'ExchMat_v'
+        fieldnames(19) = 'ExchMat_nr'
+        fieldnames(20) = 'ExchMat_nc'
         
     end subroutine getGridInfoFieldnames
     

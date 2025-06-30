@@ -53,11 +53,13 @@
       
       !Analyze the mesh, if needed
       if ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
-           call CartesianUnstructuredMeshAnalysis(problem%grid%pts, problem%grid%abc, gridinfo)
-           call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, problem%A0 / ( mu0 * problem%Ms ), problem%A_exch)
-           
-           !REMOVE CODE BELOW - ONLY FOR TESTING
-           !call returnMicroMagGrid( gridinfo, plhs(1) ) 
+           if ( problem%passExch .eq. passExchTrue) then
+               call displayGUIMessage( 'Starting' )
+               call passDifferentialOperators(problem)
+          else    
+               call CartesianUnstructuredMeshAnalysis(problem%grid%pts, problem%grid%abc, gridinfo)
+               call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, problem%Jfact, problem%A_exch)
+           endif
       endif
       
       !Call the ODE solver

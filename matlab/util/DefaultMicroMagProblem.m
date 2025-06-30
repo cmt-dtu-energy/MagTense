@@ -32,6 +32,7 @@ properties
     
     exch_nval
     exch_nrow
+    exch_ncol
     exch_val
     exch_rows
     exch_rowe
@@ -214,6 +215,9 @@ properties (SetAccess=private,GetAccess=public)
     
     %defines which solver to use in Matlab
     SolverType
+
+    %defines if the exchange matrix is passed to Fortran or computed there
+    passExch
     
     
 end
@@ -265,6 +269,7 @@ methods
         obj.exch_weigh = 8.0;
         obj = obj.setMicroMagExchMethod( 'DirectLaplacianNeumann' );
         obj = obj.setMicroMagExchInterpn( 'Extended' ); 
+        obj.passExch = int32(0);
 
         % Exchange term constant
         obj.A0 = 1.3e-11;
@@ -465,8 +470,20 @@ methods
         obj.exch_rows = int32(rs);
         obj.exch_rowe = int32(re);
         obj.exch_col  = int32(c);
+        obj.exch_ncol = int32(0);
 
         disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(2^30)) ' Gb'])
+    end
+
+    function obj = setExchangeMatrixCOO( obj, nrows, ncols, rows, cols, values )
+    % Pass the Exchange matrix to Fortran in COO format
+        obj = obj.setMicroMagpassExch( true );
+        obj.exch_nrow = int32(nrows);
+        obj.exch_ncol = int32(ncols);
+        obj.exch_nval = int32(numel(rows));
+        obj.exch_val  = double(values);
+        obj.exch_rows = int32(rows);
+        obj.exch_col  = int32(cols);
     end
 
     function obj = setMicroMagDemagApproximation( obj, type_var )
@@ -556,6 +573,16 @@ methods
                 obj.exch_intpn = int32(2);
         end
             
+    end
+
+    function obj = setMicroMagpassExch( obj, enabled )
+    % maps the grid type from name to internal int value
+        
+        if enabled
+           obj.passExch = int32(1);
+        else
+           obj.passExch = int32(0);
+        end
     end
     
     %Override struct function for a final check before handing to Fortran

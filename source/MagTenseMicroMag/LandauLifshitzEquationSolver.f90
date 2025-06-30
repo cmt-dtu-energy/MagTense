@@ -57,7 +57,6 @@
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
     real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
     character*(100) :: prog_str 
-    type(MicroMagGridInfo) :: GridInfo
     
     !Save internal representation of the problem and the solution
     gb_solution = sol
@@ -412,16 +411,6 @@
         
         
     endif
-
-    !"J" : exchange term
-    solution%Jfact = problem%A0 / ( mu0 * problem%Ms )
-    !call displayGUIMessage( trim(prog_str) )
-    !"H" : external field term (b.c. user input is in Tesla)
-    !solution%Hfact = 1./mu0
-    !"M" : demagnetization term
-    solution%Mfact = problem%Ms
-    !"K" : anisotropy term
-    solution%Kfact = problem%K0 / ( mu0 * problem%Ms )
     
     !If a random noise is present initialize the random vectors
     if (problem%CV > 0) then
@@ -463,7 +452,7 @@
     stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, beta, temp )
     !If we have an unstructued grid, the exchange matrix already includes Jfact
     if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then  
-        solution%HjX = temp * solution%Jfact
+        solution%HjX = temp * problem%Jfact
     else
         solution%HjX = temp
     endif
@@ -471,7 +460,7 @@
     !Effective field in the Y-direction
     stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, beta, temp )
     if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then 
-        solution%HjY = temp * solution%Jfact
+        solution%HjY = temp * problem%Jfact
     else
         solution%HjY = temp
     endif
@@ -479,7 +468,7 @@
     !Effective field in the Z-direction
     stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, beta, temp )
     if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then 
-        solution%HjZ = temp * solution%Jfact
+        solution%HjZ = temp * problem%Jfact
     else
         solution%HjZ = temp
     endif
@@ -554,9 +543,9 @@
     !solution%Hkx = prefact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
     !solution%Hky = prefact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
     !solution%Hkz = prefact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
-    solution%Hkx = -2.*solution%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-    solution%Hky = -2.*solution%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-    solution%Hkz = -2.*solution%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
+    solution%Hkx = -2.*problem%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
+    solution%Hky = -2.*problem%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
+    solution%Hkz = -2.*problem%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
     
 
     
@@ -603,9 +592,9 @@
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My_s, beta, temp )
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz_s, beta, temp )
         
-            solution%HmX = temp * ( solution%Mfact )
+            solution%HmX = temp * ( problem%Mfact )
             !ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
-            !call vsmul( ntot, solution%HmX, -solution%Mfact, solution%HmX )
+            !call vsmul( ntot, solution%HmX, -problem%Mfact, solution%HmX )
             
             beta = 0.
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx_s, beta, temp )
@@ -613,8 +602,8 @@
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My_s, beta, temp )
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz_s, beta, temp )
         
-            solution%HmY = temp * ( solution%Mfact )
-            !call vsmul( ntot, solution%HmY, -solution%Mfact, solution%HmY )
+            solution%HmY = temp * ( problem%Mfact )
+            !call vsmul( ntot, solution%HmY, -problem%Mfact, solution%HmY )
           
             beta = 0.
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx_s, beta, temp )
@@ -622,18 +611,18 @@
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My_s, beta, temp )
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz_s, beta, temp )
         
-            solution%HmZ = temp * ( solution%Mfact )
-            !call vsmul( ntot, solution%HmZ, -solution%Mfact, solution%HmZ )
+            solution%HmZ = temp * ( problem%Mfact )
+            !call vsmul( ntot, solution%HmZ, -problem%Mfact, solution%HmZ )
         else
 #if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
-            pref = sngl(-1 )!* solution%Mfact)                                
+            pref = sngl(-1 )!* problem%Mfact)                                
             call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
-            temp = solution%HmX * solution%Mfact
+            temp = solution%HmX * problem%Mfact
             solution%HmX = temp
-            temp = solution%HmY * solution%Mfact
+            temp = solution%HmY * problem%Mfact
             solution%HmY = temp
-            temp = solution%HmZ * solution%Mfact
+            temp = solution%HmZ * problem%Mfact
             solution%HmZ = temp
 #endif
         endif
@@ -680,8 +669,8 @@
             stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmX_C )
         
             !Get the field
-            solution%HmX = -solution%Mfact * real(solution%HmX_c)
-            !call vsmul( ntot, real(solution%HmX_c), -solution%Mfact, solution%HmX )
+            solution%HmX = -problem%Mfact * real(solution%HmX_c)
+            !call vsmul( ntot, real(solution%HmX_c), -problem%Mfact, solution%HmX )
         
         
             !Second Hy = Kyx * Mx + Kyy * My + Kyz * Mz        
@@ -695,8 +684,8 @@
             stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmY_c )
         
             !Get the field        
-            solution%HmY = -solution%Mfact * real(solution%HmY_c)
-            !call vsmul( ntot, real(solution%HmY_c), -solution%Mfact, solution%HmY )
+            solution%HmY = -problem%Mfact * real(solution%HmY_c)
+            !call vsmul( ntot, real(solution%HmY_c), -problem%Mfact, solution%HmY )
         
         
             !Third Hz = Kzx * Mx + Kzy * My + Kzz * Mz        
@@ -709,8 +698,8 @@
             !Fourier transform backwards to get the field
             stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmZ_c )
             !finally, get the field out        
-            solution%HmZ = -solution%Mfact * real(solution%HmZ_c)
-            !call vsmul( ntot, real(solution%HmZ_c), -solution%Mfact, solution%HmZ )
+            solution%HmZ = -problem%Mfact * real(solution%HmZ_c)
+            !call vsmul( ntot, real(solution%HmZ_c), -problem%Mfact, solution%HmZ )
         
         else
             !!No CUDA support for this part yet
@@ -723,11 +712,11 @@
         if ( problem%useCuda .eq. useCudaFalse ) then
             !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
             !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
-            !solution%HmX = - solution%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
-            !solution%HmY = - solution%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
-            !solution%HmZ = - solution%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
+            !solution%HmX = - problem%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
+            !solution%HmY = - problem%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
+            !solution%HmZ = - problem%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
             
-            alpha = -1.! * solution%Mfact
+            alpha = -1.! * problem%Mfact
             beta = 0.0
             !Hmx = Kxx * Mx
             call gemv( problem%Kxx, solution%Mx_s, solution%HmX, alpha, beta )
@@ -761,22 +750,22 @@
             !HmZ = HmZ + Kzz * Mz
             call gemv( problem%Kzz, solution%Mz_s, solution%HmZ, alpha, beta )
             
-            temp = solution%HmX * solution%Mfact
+            temp = solution%HmX * problem%Mfact
             solution%HmX = temp
-            temp = solution%HmY * solution%Mfact
+            temp = solution%HmY * problem%Mfact
             solution%HmY = temp
-            temp = solution%HmZ * solution%Mfact
+            temp = solution%HmZ * problem%Mfact
             solution%HmZ = temp
             
         else
-            pref = sngl(-1)! * solution%Mfact)
+            pref = sngl(-1)! * problem%Mfact)
 #if USE_CUDA
             call cudaMatrVecMult( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
-            temp = solution%HmX * solution%Mfact
+            temp = solution%HmX * problem%Mfact
             solution%HmX = temp
-            temp = solution%HmY * solution%Mfact
+            temp = solution%HmY * problem%Mfact
             solution%HmY = temp
-            temp = solution%HmZ * solution%Mfact
+            temp = solution%HmZ * problem%Mfact
             solution%HmZ = temp
 #endif
         endif 
