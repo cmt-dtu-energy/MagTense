@@ -287,45 +287,32 @@
         !File for loading the sparse exchange tensor from Matlab (for non-uniform grids)
         if (( problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
             if (problem%passExch .eq. passExchTrue ) then
-                call displayGUIMessage( 'A' )
                 sx = 1
                 nRowsSparsePtr = mxGetField( prhs, i, problemFields(40) )
                 call mxCopyPtrToInteger4(mxGetPr(nRowsSparsePtr), problem%grid%A_exch_load%nrows, sx )
                 
-                call displayGUIMessage( 'B' )
                 sx = 1
                 nColsSparsePtr = mxGetField( prhs, i, problemFields(56) )
                 call mxCopyPtrToInteger4(mxGetPr(nColsSparsePtr), problem%grid%A_exch_load%ncols, sx )
                 
-                call displayGUIMessage( 'C' )
                 sx = 1
                 nValuesSparsePtr = mxGetField( prhs, i, problemFields(39) )
                 call mxCopyPtrToInteger4(mxGetPr(nValuesSparsePtr), problem%grid%A_exch_load%nvalues, sx )
                 
-                call displayGUIMessage( 'D' )
                 nvalues = problem%grid%A_exch_load%nvalues
-
-                
                 allocate( problem%grid%A_exch_load%values(nvalues), problem%grid%A_exch_load%rows_start(nvalues) , problem%grid%A_exch_load%cols(nvalues) )
-                
+               
                 sx = nvalues
-                
-                write (prog_str,'(I10)') (nvalues)
-                call displayGUIMessage( prog_str )
-                
                 valuesPtr = mxGetField( prhs, i, problemFields(41) )
                 call mxCopyPtrToReal8(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
             
-                call displayGUIMessage( 'E' )
                 sx = nvalues
                 rows_startPtr = mxGetField( prhs, i, problemFields(42) )
                 call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), problem%grid%A_exch_load%rows_start, sx )
         
-                call displayGUIMessage( 'F' )
                 sx = nvalues
                 colsPtr = mxGetField( prhs, i, problemFields(44) )
-                call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )
-                
+                call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )                
             else
                 !REMOVE THIS CODE IN A FUTURE UPDATE
                 ! Load the CSR sparse information from Matlab
@@ -390,9 +377,7 @@
         N_aveProblemPtr = mxGetField( prhs, i, problemFields(48) )
         call mxCopyPtrToInteger4(mxGetPr(N_aveProblemPtr), problem%N_ave, sx )
         
-        !Coefficient of variation value
-        problem%CV = 0
-        
+        !Coefficient of variation value       
         sx = 1
         CVThresProblemPtr = mxGetField(prhs,i,problemFields(49))
         call mxCopyPtrToReal8(mxGetPr(CVThresProblemPtr), CV, sx )

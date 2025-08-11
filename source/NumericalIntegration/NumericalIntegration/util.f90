@@ -85,4 +85,44 @@ subroutine locate(xx,n,x,j)
 end subroutine locate
 
 
+!>-----------------------------------------
+!> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2025
+!> @brief
+!> unique_sort sorts a 1D array and returns only the unique values
+!> 
+!> @param[in] val - the values that should be sorted and made unique
+!> @param[out] unique_val - the unique values from val
+!> @param[out] n_unique - the number of unique values in val, i.e. the length of unique_val
+!---------------------------------------------------------------------------
+subroutine unique_sort(val, unique_val, n_unique)
+    implicit none
+    integer :: i, min_val, max_val
+    integer, dimension(:), intent(in) :: val 
+    integer, dimension(:), intent(out) :: unique_val
+    integer, intent(out) :: n_unique
+    integer, dimension(:), allocatable :: unique
+    logical, allocatable :: mask1D(:)
+      
+    allocate(unique(size(val)))
+    min_val = minval(val)-1
+    max_val = maxval(val)
+    
+    allocate(mask1D(size(val)))
+    
+    i = 0
+    do while (min_val < max_val)
+        i = i+1
+        mask1D = (val > min_val)
+        min_val = minval(val, mask1D)
+        unique(i) = min_val
+    enddo
+    unique_val(1:i) = unique(1:i)
+    
+    n_unique = i
+    
+    deallocate(unique,mask1D)
+    
+end subroutine unique_sort
+
+
 end module UTIL_CALL

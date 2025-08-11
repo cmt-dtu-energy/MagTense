@@ -91,7 +91,7 @@
     ! Initialize some variables
     Nel = size(pos, 1)
     Volumes = dims(:,1) * dims(:,2) * dims(:,3)
-
+    
     ! Rescaling
     DimsScales = minval(dims, dim=1) / 2.0_dp
     
@@ -232,10 +232,7 @@
         
         mask1D = ((indexItContainsTrue(i,1) .eq. indexItContainsTrue(:,2)) .and. (indexItContainsTrue(i,2) .eq. indexItContainsTrue(:,1)))
         
-        if (any(mask1D, DIM = 1)) then
-            !write (prog_str,'(I10)') (k1)
-            !call displayGUIMessage( prog_str )
-            
+        if (any(mask1D, DIM = 1)) then            
             kMut_F_temp(k1,:) = [indexItContainsTrue(i,1), indexItContainsTrue(i,2)]
             k1 = k1+1
         else 
@@ -511,117 +508,7 @@
     GridInfo%TheDs = TheDs_indices
     GridInfo%TheSigns = TheSigns_indices    
 
-    !call displayGUIMessage( 'Saving GridInfo to disk' )
-    
-    !open(21,file='GridInfo_fNormX.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%fNormX)
-    !    write(21,*)  GridInfo%fNormX(i)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_fNormY.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%fNormY)
-    !    write(21,*)  GridInfo%fNormY(i)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_fNormZ.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%fNormZ)
-    !    write(21,*)  GridInfo%fNormZ(i)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_AreaFaces.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%AreaFaces)
-    !    write(21,*)  GridInfo%AreaFaces(i)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_Volumes.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%Volumes)
-    !    write(21,*)  GridInfo%Volumes(i)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_Xel.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%Xel)
-    !    write(21,*)  GridInfo%Xel(i)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_Yel.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%Yel)
-    !    write(21,*)  GridInfo%Yel(i)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_Zel.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%Zel)
-    !    write(21,*)  GridInfo%Zel(i)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_Xf.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%Xf)
-    !    write(21,*)  GridInfo%Xf(i)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_Yf.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%Yf)
-    !    write(21,*)  GridInfo%Yf(i)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_Zf.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%Zf)
-    !    write(21,*)  GridInfo%Zf(i)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_DimsF1.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%DimsF(:,1))
-    !    write(21,*)  GridInfo%DimsF(i,1)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_DimsF2.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%DimsF(:,2))
-    !    write(21,*)  GridInfo%DimsF(i,2)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_DimsF3.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(GridInfo%DimsF(:,3))
-    !    write(21,*)  GridInfo%DimsF(i,3)
-    !enddo
-    !close(21)
-    
-    !open(21,file='GridInfo_TheTs_indices.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(TheTs_indices(:,1))
-    !    write(21,*)  TheTs_indices(i,1)
-    !    write(21,*)  TheTs_indices(i,2)
-    !end do
-    !close(21)
-    
-    !open(21,file='GridInfo_TheDs_indices.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(TheDs_indices(:,1))
-    !    write(21,*)  TheDs_indices(i,1)
-    !    write(21,*)  TheDs_indices(i,2)
-    !end do
-    !close(21)
-   
-    !open(21,file='GridInfo_TheSigns_indices.txt',status='unknown',form='formatted',action='write')
-    !do i=1,size(TheSigns_indices,1)
-    !        write(21,*)  TheSigns_indices(i,1)
-    !        write(21,*)  TheSigns_indices(i,2)
-    !        write(21,*)  TheSigns_indices(i,3)
-    !end do
-    !close(21)
-    
     call displayGUIMessage( 'Mesh analysis done' )
-    
-    !stop
     
   end subroutine CartesianUnstructuredMeshAnalysis
 

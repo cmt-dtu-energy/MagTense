@@ -111,18 +111,16 @@
 		<Filter Name="Header Files" Filter="fi;fd;h;inc"/>
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
-			<File RelativePath=".\ComputeDifferentialOperatorsFromMesh_DirectLap.f90">
+			<File RelativePath=".\ComputeDifferentialOperatorsFromMesh.f90">
 				<FileConfiguration Name="Release_no_CVODE|x64" ExcludedFromBuild="true">
 				</FileConfiguration>
 			</File>
 			<File RelativePath=".\DemagAuxFunctions.f90"/>
 			<File RelativePath=".\FortranCuda.f90"/>
 			<File RelativePath=".\LandauLifshitzEquationSolver.f90"/>
-			<File RelativePath=".\MagTenseMicroMagIO.f90">
-			</File>
+			<File RelativePath=".\MagTenseMicroMagIO.f90"/>
 			<File RelativePath=".\MicroMagParameters.f90"/>
-			<File RelativePath=".\UnstructuredMeshAnalysis.f90">
-			</File>
+			<File RelativePath=".\UnstructuredMeshAnalysis.f90"/>
 			<File RelativePath=".\util_micromag.f90"/>
 		</Filter>
 	</Files>
