@@ -65,9 +65,9 @@ class MicromagProblem:
         prob_mode: str | None = "new",
         solver: str | None = "dynamic",
         m0: int | float | list | np.ndarray | None = None,
-        A0: float = 1.3e-11,
-        Ms: float = 8e5,
-        K0: float = 0.0,
+        A0: int | float | list | np.ndarray | None = None,
+        Ms: int | float | list | np.ndarray | None = None,
+        K0: int | float | list | np.ndarray | None = None,
         alpha: float = 0.02,
         gamma: float = 0.0,
         max_T0: float = 2.0,
@@ -78,10 +78,16 @@ class MicromagProblem:
         setTimeDis: int = 10,
         dem_thres: float = 0.0,
         demag_approx: str | None = None,
-        CV: float = 0.0,
-        ReturnHall: int = 0,
+        cv: float = 0.0,
         exch_nval: int = 1,
         exch_nrow: int = 1,
+        exch_ncols: int = 1,
+        exch_intpn: str | None = "extended",
+        exch_meth: str | None = "directlaplacianneumann",
+        exch_weigh: float = 8,
+        demigstp: int = 0,
+        passexch: int = 0,
+        usereturnhall: int = 0,
         filename: str = "t",
         cuda: bool = False,
         cvode: bool = False,
@@ -97,7 +103,14 @@ class MicromagProblem:
         self.nt_conv = nt_conv
         self.exch_nval = exch_nval
         self.exch_nrow = exch_nrow
-
+        self.exch_ncols = exch_ncols
+        self.exch_intpn = exch_intpn
+        self.exch_meth = exch_meth
+        self.exch_weigh = exch_weigh
+        self.passexch = passexch
+        self.demigstp = demigstp
+        self.usereturnhall = usereturnhall
+        
         self.grid_n = np.array(res, dtype=np.int32, order="F")
         self.grid_L = np.array(grid_L, dtype=np.float64, order="F")
         self.grid_pts = np.zeros(shape=(ntot, 3), dtype=np.float64, order="F")
@@ -111,7 +124,6 @@ class MicromagProblem:
         self.solver = solver
 
         self.m0 = m0
-
         self.A0 = A0
         self.Ms = Ms
         self.K0 = K0
@@ -129,8 +141,7 @@ class MicromagProblem:
 
         self.dem_thres = dem_thres
         self.dem_appr = demag_approx
-        self.CV = CV
-        self.ReturnHall = ReturnHall
+        self.cv = cv
 
         self.nt_alpha = len(t_alpha)
         self.alphat = np.zeros(shape=(self.nt_alpha, 2), dtype=np.float64, order="F")
@@ -157,6 +168,54 @@ class MicromagProblem:
         self.precision = int(precision)
         self.n_threads = n_threads
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")
+
+    @property
+    def A0(self) -> int | float | list | np.ndarray | None:
+        return self._A0
+
+    @A0.setter
+    def A0(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._A0 = 1.3e-11 + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
+
+        elif isinstance(val, (int, float)):
+            self._A0 = val + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
+
+        else:
+            assert np.asarray(val).shape == (self.ntot, 1)
+            self._A0 = np.asarray(val, dtype=np.float64, order="F")
+
+    @property
+    def Ms(self) -> int | float | list | np.ndarray | None:
+        return self._Ms
+
+    @Ms.setter
+    def Ms(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._Ms = 8e5 + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
+
+        elif isinstance(val, (int, float)):
+            self._Ms = val + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
+
+        else:
+            assert np.asarray(val).shape == (self.ntot, 1)
+            self._Ms = np.asarray(val, dtype=np.float64, order="F")
+
+    @property
+    def K0(self) -> int | float | list | np.ndarray | None:
+        return self._K0
+
+    @K0.setter
+    def K0(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._K0 = 0.0 + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
+
+        elif isinstance(val, (int, float)):
+            self._K0 = val + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
+
+        else:
+            assert np.asarray(val).shape == (self.ntot, 1)
+            self._K0 = np.asarray(val, dtype=np.float64, order="F")
 
     @property
     def m0(self) -> int | float | list | np.ndarray | None:
@@ -206,6 +265,30 @@ class MicromagProblem:
             "uniform": 1,
             "tetrahedron": 2,
             "unstructuredPrisms": 3,
+        }[val]
+        
+    @property
+    def exch_intpn(self) -> int:
+        return self._exch_intpn
+
+    @exch_intpn.setter
+    def exch_intpn(self, val: str | None = None) -> None:
+        self._exch_intpn = {
+            None: -1,
+            "extended": 1,
+            "compact": 2,
+        }[val]
+
+    @property
+    def exch_meth(self) -> int:
+        return self._exch_meth
+
+    @exch_meth.setter
+    def exch_meth(self, val: str | None = None) -> None:
+        self._exch_meth = {
+            None: -1,
+            "directlaplacianneumann": 1,
+            "ggneumann": 2,
         }[val]
 
     @property
@@ -279,4 +362,12 @@ class MicromagProblem:
             useprecision=self.precision,
             nthreadsmatlab=self.n_threads,
             n_ave=self.N_ave,
+            cv=self.cv,
+            usereturnhall=self.usereturnhall,
+            demigstp=self.demigstp,
+            exch_weigh=self.exch_weigh,
+            exch_meth=self.exch_meth,
+            exch_intpn=self.exch_intpn,
+            passexch=self.passexch,
+            exch_ncols=self.exch_ncols,
         )

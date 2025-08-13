@@ -10,9 +10,11 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
     N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-    exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, problem )
+    exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
+	CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn, &
+	passExch, exch_ncols, problem )
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
-    integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow
+    integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols
     integer(4),dimension(3),intent(in) :: grid_n
     real(8),dimension(3),intent(in) :: grid_L
     real(8),dimension(ntot, 3),intent(in) :: grid_pts
@@ -29,10 +31,13 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     integer(4),dimension(exch_nval),intent(in) :: exch_col
     real(8),dimension(nt_conv),intent(in) :: t_conv
     integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
-    integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE
-    real(8),intent(in) :: A0, Ms, K0, gamma, alpha, MaxT0, tol, thres, conv_tol, dem_thres
+    integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch
+    real(8),intent(in) :: gamma, alpha, MaxT0, tol, thres, conv_tol, dem_thres
+	real(8),dimension(ntot),intent(in) :: A0, Ms, K0
     integer(4), dimension(3) :: N_ave
-    real(8) :: demag_fac
+    real(8) :: demag_fac, pi, mu0
+	real(8), intent(in) :: CV, exch_weigh
+	
     character*256,intent(in) :: N_file_in, N_file_out
 
     type(MicroMagProblem),intent(inout) :: problem
@@ -160,22 +165,43 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     else
         problem%useCVODE = useCVODEFalse
     endif
+	
+	if ( passExch .eq. 1 ) then
+		problem%passExch = passExchTrue
+	else
+		problem%passExch = passExchFalse
+	endif
 
-    !File for loading the sparse exchange tensor from Matlab (for non-uniform grids)
+    !Loading the sparse exchange tensor from python (for non-uniform grids)
     if (( problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
-        ! Load the CSR sparse information from Matlab
-        problem%grid%A_exch_load%nvalues = exch_nval
-        problem%grid%A_exch_load%nrows = exch_nrow
-        
-        allocate( problem%grid%A_exch_load%values(exch_nval) )
-        allocate( problem%grid%A_exch_load%rows_start(exch_nrow) )
-        allocate( problem%grid%A_exch_load%rows_end(exch_nrow) )
-        allocate( problem%grid%A_exch_load%cols(exch_nval) )
-            
-        problem%grid%A_exch_load%values = exch_val
-        problem%grid%A_exch_load%rows_start = exch_rows
-        problem%grid%A_exch_load%rows_end = exch_rowe
-        problem%grid%A_exch_load%cols = exch_col
+        if (problem%passExch .eq. passExchTrue ) then
+			problem%grid%A_exch_load%nvalues = exch_nval
+			problem%grid%A_exch_load%nrows = exch_nrow
+			problem%grid%A_exch_load%ncols = exch_ncols
+			
+			allocate( problem%grid%A_exch_load%values(exch_nval))
+			allocate(problem%grid%A_exch_load%rows_start(exch_nval))
+			allocate(problem%grid%A_exch_load%cols(exch_nval))
+
+			problem%grid%A_exch_load%values = exch_val
+			problem%grid%A_exch_load%rows_start = exch_rows
+			problem%grid%A_exch_load%cols = exch_col
+			
+		else
+			! Load the CSR sparse information from Matlab
+			problem%grid%A_exch_load%nvalues = exch_nval
+			problem%grid%A_exch_load%nrows = exch_nrow
+			
+			allocate( problem%grid%A_exch_load%values(exch_nval) )
+			allocate( problem%grid%A_exch_load%rows_start(exch_nrow) )
+			allocate( problem%grid%A_exch_load%rows_end(exch_nrow) )
+			allocate( problem%grid%A_exch_load%cols(exch_nval) )
+				
+			problem%grid%A_exch_load%values = exch_val
+			problem%grid%A_exch_load%rows_start = exch_rows
+			problem%grid%A_exch_load%rows_end = exch_rowe
+			problem%grid%A_exch_load%cols = exch_col
+		endif
     endif
         
     !Load the no. of time steps in the time convergence array        
@@ -191,6 +217,30 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     
     problem%nThreadsMatlab = nThreadsMatlab
     problem%N_ave = N_ave
+	
+	problem%CV = sngl(CV)
+        
+	if ( useReturnHall .eq. 1 ) then
+		problem%useReturnHall = useReturnHallTrue
+	else
+		problem%useReturnHall = useReturnHallFalse
+	endif
+	
+	problem%demag_ignore_steps = demigstp
+	problem%exch_weight = exch_weigh
+	problem%exch_method = exch_meth
+	problem%exch_interpn = exch_intpn
+        
+	!>-----------------------------------------
+	!Calculate the local scaled coefficients for the LLG equation
+	!"J" : exchange term
+	pi = 3.141592653589793
+	mu0 = 4*pi*1e-7
+	problem%Jfact = problem%A0 / ( mu0 * problem%Ms )
+	!"M" : demagnetization term
+	problem%Mfact = problem%Ms
+	!"K" : anisotropy term
+	problem%Kfact = problem%K0 / ( mu0 * problem%Ms )
 
 end subroutine loadMicroMagProblem
 
@@ -211,6 +261,53 @@ subroutine returnMicroMagSolutionPy( solution, nt, ntot, ndim, t, M, pts, H_exc,
     H_ani = solution%H_ani
 
 end subroutine returnMicroMagSolutionPy
+
+
+subroutine returnMicroMagGrid( gridinfo, n_faces, n_ele, n_ele_Ds, n_ele_Ts, n_ele_Signs, n_tot_Exch, fNormX, fNormY, fNormZ, AreaFaces, Volumes, Xel, Yel,	Zel, Xf, Yf, Zf, DimsF,	TheTs, TheDs, TheSigns, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc )
+    type(MicroMagGridInfo),intent(in) :: gridinfo
+    integer,intent(in) :: n_faces, n_ele, n_ele_Ds, n_ele_Ts, n_ele_Signs, n_tot_Exch
+	real(dp),dimension(n_faces),intent(out) :: fNormX(:)
+	real(dp),dimension(n_faces),intent(out) :: fNormY(:)
+	real(dp),dimension(n_faces),intent(out) :: fNormZ(:)
+	real(dp),dimension(n_faces),intent(out) :: AreaFaces(:)
+	real(dp),dimension(n_ele),intent(out) :: Volumes(:)
+	integer,dimension(n_ele_Ts, 2),intent(out)  :: TheTs(:,:)
+	integer,dimension(n_ele_Ds, 2),intent(out)  :: TheDs(:,:)
+	integer,dimension(n_ele_Signs, 3),intent(out)  :: TheSigns(:,:)
+	real(dp),dimension(n_ele),intent(out) :: Xel(:)
+	real(dp),dimension(n_ele),intent(out) :: Yel(:)
+	real(dp),dimension(n_ele),intent(out) :: Zel(:)
+	real(dp),dimension(n_faces),intent(out) :: Xf(:)
+	real(dp),dimension(n_faces),intent(out) :: Yf(:)
+	real(dp),dimension(n_faces),intent(out) :: Zf(:)
+	real(dp),dimension(n_faces,3),intent(out) :: DimsF(:,:)
+	integer,intent(out) :: ExchMat_nr,ExchMat_nc
+	integer,dimension(n_tot_Exch),intent(out)  :: ExchMat_r(:)
+	integer,dimension(n_tot_Exch),intent(out)  :: ExchMat_c(:)
+	real(dp),dimension(n_tot_Exch),intent(out) :: ExchMat_v(:)
+
+	fNormX    = gridinfo%fNormX
+	fNormY    = gridinfo%fNormY
+	fNormZ    = gridinfo%fNormZ
+	AreaFaces = gridinfo%AreaFaces
+	Volumes   = gridinfo%Volumes
+	Xel = gridinfo%Xel
+	Yel = gridinfo%Yel
+	Zel = gridinfo%Zel
+	Xf  = gridinfo%Xf
+	Yf  = gridinfo%Yf
+	Zf  = gridinfo%Zf
+	DimsF      = gridinfo%DimsF
+	TheTs      = gridinfo%TheTs
+	TheDs      = gridinfo%TheDs
+	TheSigns   = gridinfo%TheSigns
+	ExchMat_r  = gridinfo%Exch_mat_r
+	ExchMat_c  = gridinfo%Exch_mat_c
+	ExchMat_v  = gridinfo%Exch_mat_v
+	ExchMat_nr = gridinfo%Exch_mat_nr
+	ExchMat_nc = gridinfo%Exch_mat_nc
+	
+end subroutine returnMicroMagGrid
 
 
 !>----------------------------------------

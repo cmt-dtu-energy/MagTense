@@ -430,9 +430,10 @@ module FortranToPythonIO
         gamma, alpha_mm, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
         N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-        exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani)
+        exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, demigstp, & 
+		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani)
 
-        integer(4),intent(in) :: ntot, nt_Hext, nt, nt_alpha, nt_conv, grid_nnod, exch_nval, exch_nrow
+        integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols
         integer(4),dimension(3),intent(in) :: grid_n, N_ave
         real(8),dimension(3),intent(in) :: grid_L
         real(8),dimension(ntot,3),intent(in) :: grid_pts
@@ -445,10 +446,12 @@ module FortranToPythonIO
         integer(4),dimension(exch_nval),intent(in) :: exch_val, exch_col
         integer(4),dimension(exch_nrow),intent(in) :: exch_rows, exch_rowe
         real(8),dimension(nt_conv),intent(in) :: t_conv
-        integer(4),intent(in) :: ProblemMode, solver, grid_type, dem_appr, usePrecision, nThreadsMatlab
-        integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCuda, useCVODE
-        real(8),intent(in) :: A0, Ms, K0, gamma, alpha_mm, MaxT0, tol, thres, conv_tol, dem_thres
+		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
+		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch
+        real(8),intent(in) :: gamma, alpha_mm, MaxT0, tol, thres, conv_tol, dem_thres
+		real(8),dimension(ntot),intent(in) :: A0, Ms, K0
         character*256,intent(in) :: N_file_in, N_file_out
+		real(8), intent(in) :: CV, exch_weigh
 
         real(8),dimension(nt),intent(in) :: t
         real(8),dimension(nt),intent(out) :: t_out
@@ -464,7 +467,8 @@ module FortranToPythonIO
             gamma, alpha_mm, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-            exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, problem )
+            exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
+			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, problem )
 
         call SolveLandauLifshitzEquation( problem, solution )
 

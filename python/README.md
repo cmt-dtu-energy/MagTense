@@ -152,11 +152,12 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./src/
       ```
 
 ### Install local editable magtense package
-
+To install the compiled MagTense package locally, so that simulations can be run, do
 ```bash
-cp python/.build/requirements-py3-dev.txt python/requirements.txt
-python3 -m pip install -e ./python
+cp python/.build/requirements-py3-dev_ENV.txt python/requirements.txt
+python -m pip install -e ./python
 ```
+where `ENV` is either `linux` or `win`.
 
 ### Required packages at runtime
 
