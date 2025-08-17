@@ -142,4 +142,4 @@ def std_prob_4(
 
 
 if __name__ == "__main__":
-    int_error = std_prob_4(NIST_field=1, show=True, cuda=True, cvode=False)
+    int_error = std_prob_4(NIST_field=1, show=False, cuda=True, cvode=True)

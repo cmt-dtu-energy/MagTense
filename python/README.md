@@ -9,31 +9,28 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
 #### Linux
 
-- New conda environment with Python >= 3.12
+- New Conda environment from [yml-file](./.build/env-313-linux.yml)
+
+  ```bash
+  conda env create -n magtense-env -f python/.build/env-313-linux.yml
+  conda activate magtense-env
+  ```
+
+  OR
+  
+  Make your own enviroment with the required python packages for CUDA, Intel compilers, MKL and cmake
+  *Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda) *
+  *Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment *
+  *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.*
+  *More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran) *
 
   ```bash
   conda create -y -n magtense-env && conda activate magtense-env
   conda config --env --add channels conda-forge
   conda install -y python=3.13
   python3 -m pip install numpy meson ninja charset-normalizer
-  ````
-
-- Required python packages for CUDA
-
-  Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda) \
-  Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment \
-  *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.*
-
-  ```bash
   conda config --env --add channels nvidia/label/cuda-12.8.1
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
-  ```
-
-- Required python packages for Intel compilers, MKL and cmake
-
-  More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
-
-  ```bash
   conda config --env --add channels https://software.repos.intel.com/python/conda/
   conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" "ifx_linux-64"
   conda install -y cmake
@@ -84,7 +81,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 - Compile Fortran source files
 
   ```bash
-  make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
+  LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
   ```
 
 #### Windows
@@ -142,7 +139,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
   - Setting up customized versions of `Developer PowerShell` and `x64 Native Tools Command Prompt for VS 2022`:
 
-    - In [VS Code](https://code.visualstudio.com), these integrated terminals can be added to your profiles by editing `settings.json`. Further, the Python extension ensures that the correct `conda` environment is activated in all terminals.
+    - In [VS Code](https://code.visualstudio.com), these integrated terminals can be added to your profiles by editing `settings.json`. Further, the Python extension ensures that the correct Conda environment is activated in all terminals.
 
       ```bash
       "terminal.integrated.profiles.windows": {
@@ -193,7 +190,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
     make
     ```
 
-    - **Note:** In case the error `nvcc fatal   : Could not set up the environment for Microsoft Visual Studio [...]` shows up, the environment path in the active conda environment prevents `nvcc` to work correctly. A quick fix to compile `MagTenseCudaBlas` is to initialize a `x64 Native Tools Command Prompt for VS 2022` without `conda`:
+    - **Note:** In case the error `nvcc fatal   : Could not set up the environment for Microsoft Visual Studio [...]` shows up, the environment path in the active Conda environment prevents `nvcc` to work correctly. A quick fix to compile `MagTenseCudaBlas` is to initialize a `x64 Native Tools Command Prompt for VS 2022` without `conda`:
 
       ```bash
       "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin\nvcc.exe" -c MagTenseCudaBlas.cu -o MagTenseCudaBlas.o
@@ -213,7 +210,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
     make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
     ```
 
-    - **Note:** In case error `meson.build:1:0: ERROR: Unknown compiler(s): [['ifx']]` shows up, it should help to reinitialize your conda environment to ensure having the correct environment path:
+    - **Note:** In case error `meson.build:1:0: ERROR: Unknown compiler(s): [['ifx']]` shows up, it should help to reinitialize your Conda environment to ensure having the correct environment path:
 
       ```bash
       conda deactivate
@@ -236,3 +233,25 @@ The `python/.build/` contains requirement-files, which are shipped with the resp
 python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm importlib_resources
 python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cusparse-cu12 nvidia-nvjitlink-cu12 # only required for cuda support
 ```
+
+### Latest versions of required packages
+
+- CUDA
+
+  Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda) \
+  Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment \
+  *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.*
+
+  ```bash
+  conda config --env --add channels nvidia/label/cuda-12.9.1
+  conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
+  ```
+
+- Intel compilers and MKL
+
+  More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
+
+  ```bash
+  conda config --env --add channels https://software.repos.intel.com/python/conda/
+  conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" "ifx_linux-64"
+  ```
