@@ -59,7 +59,7 @@ class MicromagProblem:
     def __init__(
         self,
         res: list[int],
-        grid_L: tuple[float] = (500e-9, 125e-9, 3e-9),
+        grid_L: list[float] = (500e-9, 125e-9, 3e-9),
         grid_nnod: int = 0,
         grid_type: str | None = "uniform",
         prob_mode: str | None = "new",
@@ -79,14 +79,20 @@ class MicromagProblem:
         dem_thres: float = 0.0,
         demag_approx: str | None = None,
         cv: float = 0.0,
-        exch_nval: int = 1,
-        exch_nrow: int = 1,
-        exch_ncols: int = 1,
+        grid_pts: list | np.ndarray | None = None,
+        grid_abc: list | np.ndarray | None = None,
+        exch_val: list | np.ndarray | None = None,
+        exch_rows: list | np.ndarray | None = None,
+        exch_col: list | np.ndarray | None = None,
+        exch_nval: int | None = None,
+        exch_nrow: int | None = None,
+        exch_ncols: int | None = None,
         exch_intpn: str | None = "extended",
         exch_meth: str | None = "directlaplacianneumann",
         exch_weigh: float = 8,
+        exch_presize: int = 12,
         demigstp: int = 0,
-        passexch: int = 0,
+        passexch: int | None = None,
         usereturnhall: int = 0,
         filename: str = "t",
         cuda: bool = False,
@@ -110,13 +116,14 @@ class MicromagProblem:
         self.passexch = passexch
         self.demigstp = demigstp
         self.usereturnhall = usereturnhall
+        self.exch_presize = exch_presize
         
         self.grid_n = np.array(res, dtype=np.int32, order="F")
         self.grid_L = np.array(grid_L, dtype=np.float64, order="F")
-        self.grid_pts = np.zeros(shape=(ntot, 3), dtype=np.float64, order="F")
+        self.grid_pts = grid_pts
         self.grid_ele = np.zeros(shape=(4, ntot), dtype=np.float64, order="F")
         self.grid_nod = np.zeros(shape=(grid_nnod, 3), dtype=np.float64, order="F")
-        self.grid_abc = np.zeros(shape=(ntot, 3), dtype=np.float64, order="F")
+        self.grid_abc = grid_abc
         self.u_ea = np.zeros(shape=(ntot, 3), dtype=np.float64, order="F")
 
         self.grid_type = grid_type
@@ -148,10 +155,10 @@ class MicromagProblem:
         self.alphat[:, 0] = t_alpha
         self.alphat[:, 1] = alpha_fct(t_alpha)
 
-        self.exch_val = np.zeros(shape=(exch_nval), dtype=np.int32, order="F")
-        self.exch_rows = np.zeros(shape=(exch_nrow), dtype=np.int32, order="F")
+        self.exch_val = exch_val
+        self.exch_rows = exch_rows
         self.exch_rowe = np.zeros(shape=(exch_nrow), dtype=np.int32, order="F")
-        self.exch_col = np.zeros(shape=(exch_nval), dtype=np.int32, order="F")
+        self.exch_col = exch_col
 
         self.N_load = len(filename)
         self.N_file_in = filename
@@ -168,6 +175,112 @@ class MicromagProblem:
         self.precision = int(precision)
         self.n_threads = n_threads
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")
+
+    @property
+    def passexch(self) -> int | None:
+        return self._passexch
+
+    @passexch.setter
+    def passexch(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._passexch = 0
+        else:
+            self._passexch = val
+
+    @property
+    def exch_nval(self) -> int | None:
+        return self._exch_nval
+
+    @exch_nval.setter
+    def exch_nval(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._exch_nval = 1
+        else:
+            self._exch_nval = val
+
+    @property
+    def exch_ncols(self) -> int | None:
+        return self._exch_ncols
+
+    @exch_ncols.setter
+    def exch_ncols(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._exch_ncols = 1
+        else:
+            self._exch_ncols = val
+
+    @property
+    def exch_nrow(self) -> int | None:
+        return self._exch_nrow
+
+    @exch_nrow.setter
+    def exch_nrow(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._exch_nrow = 1
+        else:
+            self._exch_nrow = val
+
+    @property
+    def exch_val(self) -> list | np.ndarray | None:
+        return self._exch_val
+
+    @exch_val.setter
+    def exch_val(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._exch_val = np.zeros(shape=(self.exch_nval,), dtype=np.float64, order="F")
+        else:
+            assert np.asarray(val).shape == (self.exch_nval,)
+            self._exch_val  = np.asarray(val, dtype=np.float64, order="F")
+
+    @property
+    def exch_rows(self) -> list | np.ndarray | None:
+        return self._exch_rows
+
+    @exch_rows.setter
+    def exch_rows(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._exch_rows = np.zeros(shape=(self.exch_nval,), dtype=np.int32, order="F")
+        else:
+            assert np.asarray(val).shape == (self.exch_nval,)
+            self._exch_rows = np.asarray(val, dtype=np.int32, order="F")
+
+    @property
+    def exch_col(self) -> list | np.ndarray | None:
+        return self._exch_col
+
+    @exch_col.setter
+    def exch_col(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._exch_col = np.zeros(shape=(self.exch_nval,), dtype=np.int32, order="F")
+        else:
+            assert np.asarray(val).shape == (self.exch_nval,)
+            self._exch_col = np.asarray(val, dtype=np.int32, order="F")
+
+    @property
+    def grid_pts(self) -> list | np.ndarray | None:
+        return self._grid_pts
+
+    @grid_pts.setter
+    def grid_pts(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._grid_pts = np.zeros(shape=(self.ntot, 3), dtype=np.float64, order="F")
+        else:
+            assert np.asarray(val).shape == (self.ntot, 3)
+            self._grid_pts = np.asarray(val, dtype=np.float64, order="F")
+
+    @property
+    def grid_abc(self) -> list | np.ndarray | None:
+        return self._grid_abc
+
+    @grid_abc.setter
+    def grid_abc(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._grid_abc = np.zeros(shape=(self.ntot, 3), dtype=np.float64, order="F")
+
+        else:
+            assert np.asarray(val).shape == (self.ntot, 3)
+            self._grid_abc = np.asarray(val, dtype=np.float64, order="F")
+
 
     @property
     def A0(self) -> int | float | list | np.ndarray | None:
@@ -313,7 +426,7 @@ class MicromagProblem:
         h_ext[:, 0] = np.linspace(0, t_end, nt_h_ext)
         h_ext[:, 1:4] = fct_h_ext(np.linspace(0, t_end, nt_h_ext))
 
-        return magtensesource.fortrantopythonio.runmicromagsimulation(
+        result = magtensesource.fortrantopythonio.runmicromagsimulation(
             ntot=self.ntot,
             grid_n=self.grid_n,
             grid_l=self.grid_L,
@@ -370,4 +483,13 @@ class MicromagProblem:
             exch_intpn=self.exch_intpn,
             passexch=self.passexch,
             exch_ncols=self.exch_ncols,
+            exch_presize=self.exch_presize,
         )
+
+        n_tot_Exch = result[7]
+        result = list(result)
+        result[8] = result[8][:n_tot_Exch] #ExchMat_r
+        result[9] = result[9][:n_tot_Exch] #ExchMat_r
+        result[10] = result[10][:n_tot_Exch] #ExchMat_v
+
+        return result

@@ -1,4 +1,4 @@
-function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error,mesh,GridInfo] = Standard_problem_4_unstructured_cart( mumag_field, options )
+function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error,mesh,GridInfo] = Standard_problem_4_unstructured_cart_new( mumag_field, options )
 %STANDARD_PROBLEM_4_UNSTRUCTURED_CART 
 %A function script to setup and simulate mumag standard problem 4 with an unstructured cartesian mesh loaded from a file
 %
@@ -113,19 +113,6 @@ problem_ini.exch_weigh = 8;
 problem_ini = problem_ini.setMicroMagExchMethod( 'DirectLaplacianNeumann'  );
 problem_ini = problem_ini.setMicroMagExchInterpn( 'Extended'  ); 
 
-%--- Calculate the exchange matrix
-InteractionMatrices.GridInfo = GridInfo;
-InteractionMatrices.X = GridInfo.Xel ;
-InteractionMatrices.Y = GridInfo.Yel ;
-InteractionMatrices.Z = GridInfo.Zel ;
-
-[D2X,D2Y] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann", problem_ini.A0./( mu0 * problem_ini.Ms));
-% [D2X,D2Y] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann");
-InteractionMatrices.A2 = D2X + D2Y ;
-
-%--- Convert the exchange matrix to sparse
-problem_ini = problem_ini.setExchangeMatrixSparse( InteractionMatrices.A2 );
-
 % Initial magnetization
 problem_ini.m0(:,1) = 1/sqrt(3);
 problem_ini.m0(:,2) = 1/sqrt(3);
@@ -146,9 +133,7 @@ solution_ini = struct();
 prob_struct = struct(problem_ini);
 
 tic
-% solution_ini = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
 [solution_ini, GridInfoFortran] = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
-% [GridInfoFortran] = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
 
 elapsedTime_part1 = toc
 if (options.ShowTheResult)
@@ -162,6 +147,10 @@ end
 %% Setup problem for the time-dependent solver'
 % Use the initial problem to setup the dynamical part of the simulations
 problem_dym = problem_ini;
+
+% Pass the previously calculated exchange matrix to the dynamic problem
+problem_dym = problem_dym.setExchangeMatrixCOO( GridInfoFortran.ExchMat_nr, GridInfoFortran.ExchMat_nc ...
+                                    , GridInfoFortran.ExchMat_r, GridInfoFortran.ExchMat_c, GridInfoFortran.ExchMat_v );
 
 % Calculate to 1 ns and save the results in 200 steps
 problem_dym = problem_dym.setTime( linspace(0,1e-9,200) );

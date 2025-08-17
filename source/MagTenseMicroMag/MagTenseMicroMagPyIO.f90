@@ -27,7 +27,8 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     real(8),dimension(3*ntot),intent(in) :: m0
     real(8),dimension(nt_alpha,2),intent(in) :: alphat
     integer(4),dimension(exch_nval),intent(in) :: exch_val
-    integer(4),dimension(exch_nrow),intent(in) :: exch_rows, exch_rowe
+    integer(4),dimension(exch_nval),intent(in) :: exch_rows
+	integer(4),dimension(exch_nrow),intent(in) :: exch_rowe
     integer(4),dimension(exch_nval),intent(in) :: exch_col
     real(8),dimension(nt_conv),intent(in) :: t_conv
     integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
@@ -175,6 +176,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     !Loading the sparse exchange tensor from python (for non-uniform grids)
     if (( problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
         if (problem%passExch .eq. passExchTrue ) then
+			! Pass the exchange matrix in COO sparse information
 			problem%grid%A_exch_load%nvalues = exch_nval
 			problem%grid%A_exch_load%nrows = exch_nrow
 			problem%grid%A_exch_load%ncols = exch_ncols
@@ -188,12 +190,12 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 			problem%grid%A_exch_load%cols = exch_col
 			
 		else
-			! Load the CSR sparse information from Matlab
+			! Pass the exchange matrix in CSR sparse information - deprecated feature
 			problem%grid%A_exch_load%nvalues = exch_nval
 			problem%grid%A_exch_load%nrows = exch_nrow
 			
 			allocate( problem%grid%A_exch_load%values(exch_nval) )
-			allocate( problem%grid%A_exch_load%rows_start(exch_nrow) )
+			allocate( problem%grid%A_exch_load%rows_start(exch_nval) )
 			allocate( problem%grid%A_exch_load%rows_end(exch_nrow) )
 			allocate( problem%grid%A_exch_load%cols(exch_nval) )
 				
@@ -243,71 +245,6 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 	problem%Kfact = problem%K0 / ( mu0 * problem%Ms )
 
 end subroutine loadMicroMagProblem
-
-
-subroutine returnMicroMagSolutionPy( solution, nt, ntot, ndim, t, M, pts, H_exc, H_ext, H_dem, H_ani )
-    type(MicroMagSolution),intent(in) :: solution
-    real(8),dimension(nt),intent(out) :: t
-    real(8),dimension(nt,ntot,ndim,3),intent(out) :: M, H_exc, H_ext, H_dem, H_ani
-    real(8),dimension(ntot,nt),intent(out) :: pts
-    integer,intent(in) :: ntot, nt, ndim
-
-    t = solution%t_out
-    M = solution%M_out
-    pts = solution%pts
-    H_exc = solution%H_exc
-    H_ext = solution%H_ext
-    H_dem = solution%H_dem
-    H_ani = solution%H_ani
-
-end subroutine returnMicroMagSolutionPy
-
-
-subroutine returnMicroMagGrid( gridinfo, n_faces, n_ele, n_ele_Ds, n_ele_Ts, n_ele_Signs, n_tot_Exch, fNormX, fNormY, fNormZ, AreaFaces, Volumes, Xel, Yel,	Zel, Xf, Yf, Zf, DimsF,	TheTs, TheDs, TheSigns, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc )
-    type(MicroMagGridInfo),intent(in) :: gridinfo
-    integer,intent(in) :: n_faces, n_ele, n_ele_Ds, n_ele_Ts, n_ele_Signs, n_tot_Exch
-	real(dp),dimension(n_faces),intent(out) :: fNormX(:)
-	real(dp),dimension(n_faces),intent(out) :: fNormY(:)
-	real(dp),dimension(n_faces),intent(out) :: fNormZ(:)
-	real(dp),dimension(n_faces),intent(out) :: AreaFaces(:)
-	real(dp),dimension(n_ele),intent(out) :: Volumes(:)
-	integer,dimension(n_ele_Ts, 2),intent(out)  :: TheTs(:,:)
-	integer,dimension(n_ele_Ds, 2),intent(out)  :: TheDs(:,:)
-	integer,dimension(n_ele_Signs, 3),intent(out)  :: TheSigns(:,:)
-	real(dp),dimension(n_ele),intent(out) :: Xel(:)
-	real(dp),dimension(n_ele),intent(out) :: Yel(:)
-	real(dp),dimension(n_ele),intent(out) :: Zel(:)
-	real(dp),dimension(n_faces),intent(out) :: Xf(:)
-	real(dp),dimension(n_faces),intent(out) :: Yf(:)
-	real(dp),dimension(n_faces),intent(out) :: Zf(:)
-	real(dp),dimension(n_faces,3),intent(out) :: DimsF(:,:)
-	integer,intent(out) :: ExchMat_nr,ExchMat_nc
-	integer,dimension(n_tot_Exch),intent(out)  :: ExchMat_r(:)
-	integer,dimension(n_tot_Exch),intent(out)  :: ExchMat_c(:)
-	real(dp),dimension(n_tot_Exch),intent(out) :: ExchMat_v(:)
-
-	fNormX    = gridinfo%fNormX
-	fNormY    = gridinfo%fNormY
-	fNormZ    = gridinfo%fNormZ
-	AreaFaces = gridinfo%AreaFaces
-	Volumes   = gridinfo%Volumes
-	Xel = gridinfo%Xel
-	Yel = gridinfo%Yel
-	Zel = gridinfo%Zel
-	Xf  = gridinfo%Xf
-	Yf  = gridinfo%Yf
-	Zf  = gridinfo%Zf
-	DimsF      = gridinfo%DimsF
-	TheTs      = gridinfo%TheTs
-	TheDs      = gridinfo%TheDs
-	TheSigns   = gridinfo%TheSigns
-	ExchMat_r  = gridinfo%Exch_mat_r
-	ExchMat_c  = gridinfo%Exch_mat_c
-	ExchMat_v  = gridinfo%Exch_mat_v
-	ExchMat_nr = gridinfo%Exch_mat_nr
-	ExchMat_nc = gridinfo%Exch_mat_nc
-	
-end subroutine returnMicroMagGrid
 
 
 !>----------------------------------------

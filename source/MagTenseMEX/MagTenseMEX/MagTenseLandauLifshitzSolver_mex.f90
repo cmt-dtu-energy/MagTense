@@ -51,17 +51,6 @@
       !Load the problem from Matlab into Fortran
       call loadMicroMagProblem( prhs(1), problem )
       
-      !Analyze the mesh, if needed
-      if ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
-           if ( problem%passExch .eq. passExchTrue) then
-               call displayGUIMessage( 'Starting' )
-               call passDifferentialOperators(problem)
-          else    
-               call CartesianUnstructuredMeshAnalysis(problem%grid%pts, problem%grid%abc, gridinfo)
-               call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, problem%Jfact, problem%A_exch)
-           endif
-      endif
-      
       !Call the ODE solver
       call SolveLandauLifshitzEquation( problem, solution )    
     
@@ -70,7 +59,7 @@
       !Return the mesh, if the user requested it
       if (nlhs .eq. 2) then
             if ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
-                call returnMicroMagGrid( gridinfo, plhs(2) )  
+                call returnMicroMagGrid( solution%gridinfo, plhs(2) )  
             else
                 call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nOutput','Mesh not analyzed')
             endif

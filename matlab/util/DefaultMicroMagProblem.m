@@ -270,6 +270,13 @@ methods
         obj = obj.setMicroMagExchMethod( 'DirectLaplacianNeumann' );
         obj = obj.setMicroMagExchInterpn( 'Extended' ); 
         obj.passExch = int32(0);
+        obj.exch_nval = 0;
+        obj.exch_nrow = 0;
+        obj.exch_ncol = 0;
+        obj.exch_val = 0;
+        obj.exch_rows = 0;
+        obj.exch_rowe = 0;
+        obj.exch_col = 0;
 
         % Exchange term constant
         obj.A0 = 1.3e-11;

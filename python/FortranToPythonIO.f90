@@ -431,9 +431,10 @@ module FortranToPythonIO
         N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
         exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, demigstp, & 
-		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani)
+		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, &
+		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc)
 
-        integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols
+        integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
         integer(4),dimension(3),intent(in) :: grid_n, N_ave
         real(8),dimension(3),intent(in) :: grid_L
         real(8),dimension(ntot,3),intent(in) :: grid_pts
@@ -444,7 +445,8 @@ module FortranToPythonIO
         real(8),dimension(3*ntot),intent(in) :: m0
         real(8),dimension(nt_alpha,2),intent(in) :: alphat
         integer(4),dimension(exch_nval),intent(in) :: exch_val, exch_col
-        integer(4),dimension(exch_nrow),intent(in) :: exch_rows, exch_rowe
+        integer(4),dimension(exch_nval),intent(in) :: exch_rows
+		integer(4),dimension(exch_nrow),intent(in) :: exch_rowe
         real(8),dimension(nt_conv),intent(in) :: t_conv
 		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
 		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch
@@ -458,6 +460,12 @@ module FortranToPythonIO
         real(8),dimension(nt,ntot,1,3),intent(out) :: M_mm
         real(8),dimension(nt,ntot,1,3),intent(out) :: H_exc, H_ext, H_dem, H_ani
         real(8),dimension(ntot,3),intent(out) :: pts
+		
+		integer,intent(out) :: n_tot_Exch
+		integer,intent(out) :: ExchMat_nr,ExchMat_nc
+		integer,dimension(exch_presize*ntot),intent(out)  :: ExchMat_r
+		integer,dimension(exch_presize*ntot),intent(out)  :: ExchMat_c
+		real(8),dimension(exch_presize*ntot),intent(out)  :: ExchMat_v
 
 #if USE_MICROMAG
         type(MicroMagProblem) :: problem
@@ -479,6 +487,26 @@ module FortranToPythonIO
         H_ext = solution%H_ext
         H_dem = solution%H_dem
         H_ani = solution%H_ani
+		
+		n_tot_Exch = solution%gridinfo%Exch_mat_ntot
+		if (exch_presize*ntot < n_tot_Exch) then
+            write(*,*) 'ExchMat_presize is too small to copy all exchange matrix values. It is set to ', exch_presize*ntot, ' but the exchange matrix has ', n_tot_Exch, ' entries.'
+            write(*,*) 'Please increase the value of exch_presize to at least ', n_tot_Exch/ntot, ' in the Python script.'
+            write(*,*) 'Returning zeros for exchange matrix.'
+            ExchMat_r = 0
+            ExchMat_c = 0
+            ExchMat_v = 0.
+        else
+            ExchMat_r(1:n_tot_Exch) = solution%gridinfo%Exch_mat_r
+            ExchMat_c(1:n_tot_Exch) = solution%gridinfo%Exch_mat_c
+            ExchMat_v(1:n_tot_Exch) = solution%gridinfo%Exch_mat_v
+        end if
+
+        ExchMat_nr = solution%gridinfo%Exch_mat_nr
+		ExchMat_nc = solution%gridinfo%Exch_mat_nc
+		
+		write(*,*) 'Done saving returned variables'
+		
 #else
         write(*,*) 'Compiled without micromagnetic part. Returning zeros.'
         t_out = 0.

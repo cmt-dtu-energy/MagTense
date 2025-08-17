@@ -52,6 +52,7 @@
     !DEC$ ATTRIBUTES ALIAS:"solvelandaulifshitzequation_" :: SolveLandauLifshitzEquation
     type(MicroMagProblem),intent(inout) :: prob     !> The problem data structure
     type(MicroMagSolution),intent(inout) :: sol     !> The solution data structure    
+    type(MicroMagGridInfo) :: gridinfo              !> The grid information structure
     integer :: ntot,i,j,k,ind,nt,nt_Hext,stat       !> total no. of tiles
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
@@ -64,6 +65,18 @@
     
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     
+    !Analyze the mesh, if needed
+    if ( gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
+        if ( gb_problem%passExch .eq. passExchTrue) then
+            call displayGUIMessage( 'Passing exchange matrix' )
+            call passDifferentialOperators(gb_problem)
+        else    
+            call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gridinfo)
+            call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo, gb_problem%exch_interpn, gb_problem%exch_weight, gb_problem%exch_method, gb_problem%Jfact, gb_problem%A_exch)
+            gb_solution%gridinfo = gridinfo
+        endif
+    endif
+      
     call displayGUIMessage( 'Initializing matrices' )
     !Calculate the interaction matrices
     call initializeInteractionMatrices( gb_problem )
@@ -124,6 +137,7 @@
         
     
     call displayGUIMessage( 'Running solution' )
+    
     !Do the solution
     fct => dmdt_fct
     cb_fct => displayGUIProgressMessage

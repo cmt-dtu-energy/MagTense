@@ -647,7 +647,7 @@ module DifferentialOperators
         type(C_PTR)    :: rows_c, cols_c, values_c
         integer, POINTER :: rows(:), cols(:)
         real(dp), POINTER :: values(:)
-
+        
         descr%type = SPARSE_MATRIX_TYPE_GENERAL 
 
         !Copy the CSR matrix, convert it to COO, then export this
@@ -670,6 +670,7 @@ module DifferentialOperators
         allocate(GridInfo%Exch_mat_r(nnz),GridInfo%Exch_mat_c(nnz),GridInfo%Exch_mat_v(nnz))
         GridInfo%Exch_mat_nr = K
         GridInfo%Exch_mat_nc = N
+        GridInfo%Exch_mat_ntot = size(rows)
         GridInfo%Exch_mat_r(:) = rows(:)
         GridInfo%Exch_mat_c(:) = cols(:)
         GridInfo%Exch_mat_v(:) = values(:)

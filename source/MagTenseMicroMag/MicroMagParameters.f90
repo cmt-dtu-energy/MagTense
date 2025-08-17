@@ -91,6 +91,7 @@ include "mkl_dfti.f90"
         real(dp), allocatable :: DimsF(:,:)
         integer :: Exch_mat_nr                   !> Number of rows in the exchange coupling matrix
         integer :: Exch_mat_nc                   !> Number of columns in the exchange coupling matrix
+        integer :: Exch_mat_ntot                 !> Number of elements in the exchange coupling matrix
         integer, allocatable  :: Exch_mat_r(:)   !> Row indices for the exchange coupling matrix
         integer, allocatable  :: Exch_mat_c(:)   !> Column indices for the exchange coupling matrix
         real(dp), allocatable :: Exch_mat_v(:)   !> Values for the exchange coupling matrix
@@ -174,6 +175,8 @@ include "mkl_dfti.f90"
     !> The design intention is such that a problem may be restarted given the information stored in this struct
     !>-----------------
     type MicroMagSolution
+        type(MicroMagGridInfo) :: gridinfo                                 !> GridInfo of the problem
+        
         real(DP),dimension(:),allocatable :: HjX,HjY,HjZ                   !> Effective fields for the exchange term (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: HhX,HhY,HhZ                   !> Effective fields for the external field (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: HkX,HkY,HkZ                   !> Effective fields for the anisotropy energy term (X,Y and Z-directions, respectively)        
