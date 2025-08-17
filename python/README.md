@@ -29,24 +29,18 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   ```
 
-- Required python packages for Intel compilers and MKL
+- Required python packages for Intel compilers, MKL and cmake
 
   More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
   ```bash
   conda config --env --add channels https://software.repos.intel.com/python/conda/
   conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" "ifx_linux-64"
+  conda install -y cmake
   ```
 
 - Required modules for `cvode` from sundials-7.2.1
-
-  - Requirements for building `cvode`:
-
-    ```bash
-    conda install -y cmake
-    ```
-
-    Other prerequisite, e.g. `ifx`, `icx`, have already been installed in the previous steps.
+    Prerequisites, e.g. `ifx`, `icx` and `cmake`, have already been installed in the previous steps.
 
   - Download version 7.2.1 of `cvode`:
 
@@ -115,6 +109,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   conda install -y git make
   ```
+  and then `conda env export | grep -v "^prefix: " > env-313-win.yml` to create a new environment file
 
 - Required modules for `cvode` from sundials-7.2.1
 
