@@ -116,6 +116,7 @@ jobs:
       working-directory: ${{ github.workspace }}/python/
       run: |
         sed -i 's/1.0.0/${{ steps.previoustag.outputs.tag }}/' src/magtense/__init__.py
+        python -m pip install build
         python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --platform ${{ matrix.sys.name }} --pkg_version ${{ steps.previoustag.outputs.tag }}
 
     - name: Deployment - Build pip-wheels
