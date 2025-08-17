@@ -117,8 +117,16 @@
 			</File>
 			<File RelativePath=".\DemagAuxFunctions.f90"/>
 			<File RelativePath=".\FortranCuda.f90"/>
+			<File RelativePath="..\..\python\FortranToPythonIO.f90">
+				<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+			</File>
 			<File RelativePath=".\LandauLifshitzEquationSolver.f90"/>
 			<File RelativePath=".\MagTenseMicroMagIO.f90"/>
+			<File RelativePath=".\MagTenseMicroMagPyIO.f90">
+				<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+			</File>
 			<File RelativePath=".\MicroMagParameters.f90"/>
 			<File RelativePath=".\UnstructuredMeshAnalysis.f90"/>
 			<File RelativePath=".\util_micromag.f90"/>

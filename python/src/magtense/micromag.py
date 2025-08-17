@@ -68,8 +68,8 @@ class MicromagProblem:
         A0: int | float | list | np.ndarray | None = None,
         Ms: int | float | list | np.ndarray | None = None,
         K0: int | float | list | np.ndarray | None = None,
-        K1: np.ndarray | None = None,
-        K2: np.ndarray | None = None,
+        K1: int | float | list | np.ndarray | None = None,
+        K2: int | float | list | np.ndarray | None = None,
         K0_arr: np.ndarray | None = None,
         CrysAxis: np.ndarray | None = None,
         alpha: float = 0.02,
@@ -138,15 +138,12 @@ class MicromagProblem:
         self.A0 = A0
         self.Ms = Ms
         self.K0 = K0
-        self.K1 = 0.0 + np.zeros(shape=(ntot, 1), dtype=np.float64, order="F")
-        self.K2 = 0.0 + np.zeros(shape=(ntot, 1), dtype=np.float64, order="F")
-        self.K0_arr = 0.0 + np.zeros(shape=(ntot, 6, 3), dtype=np.float64, order="F")
+        self.K1 = K1
+        self.K2 = K2
+        self.K0_arr = K0_arr
 
         #--- Set the local crystal coordinates to the three Cartesian axis
-        self.CrysAxis = 0.0 + np.zeros(shape=(ntot, 3, 3), dtype=np.float64, order="F")
-        self.CrysAxis[:, 0, 0] = 1
-        self.CrysAxis[:, 1, 1] = 1
-        self.CrysAxis[:, 2, 2] = 1
+        self.CrysAxis = CrysAxis
 
         self.alpha_mm = alpha
         self.gamma = gamma
@@ -343,6 +340,66 @@ class MicromagProblem:
         else:
             assert np.asarray(val).shape == (self.ntot, 1)
             self._K0 = np.asarray(val, dtype=np.float64, order="F")
+
+    @property
+    def K1(self) -> int | float | list | np.ndarray | None:
+        return self._K1
+
+    @K1.setter
+    def K1(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._K1 = 0.0 + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
+
+        elif isinstance(val, (int, float)):
+            self._K1 = val + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
+
+        else:
+            assert np.asarray(val).shape == (self.ntot, 1)
+            self._K1 = np.asarray(val, dtype=np.float64, order="F")
+
+    @property
+    def K2(self) -> int | float | list | np.ndarray | None:
+        return self._K2
+
+    @K2.setter
+    def K2(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._K2 = 0.0 + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
+
+        elif isinstance(val, (int, float)):
+            self._K2 = val + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
+
+        else:
+            assert np.asarray(val).shape == (self.ntot, 1)
+            self._K2 = np.asarray(val, dtype=np.float64, order="F")
+
+    @property
+    def K0_arr(self) -> int | float | list | np.ndarray | None:
+        return self._K0_arr
+
+    @K0_arr.setter
+    def K0_arr(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._K0_arr = 0.0 + np.zeros(shape=(self.ntot, 6, 3), dtype=np.float64, order="F")
+
+        else:
+            assert np.asarray(val).shape == (self.ntot, 6, 3)
+            self._K0_arr = np.asarray(val, dtype=np.float64, order="F")
+
+    @property
+    def CrysAxis(self) -> int | float | list | np.ndarray | None:
+        return self._CrysAxis
+
+    @CrysAxis.setter
+    def CrysAxis(self, val: int | None, seed: int = 0) -> None:
+        if val is None:
+            self._CrysAxis = 0.0 + np.zeros(shape=(self.ntot, 3, 3), dtype=np.float64, order="F")
+            self._CrysAxis[:, 0, 0] = 1
+            self._CrysAxis[:, 1, 1] = 1
+            self._CrysAxis[:, 2, 2] = 1
+        else:
+            assert np.asarray(val).shape == (self.ntot, 3, 3)
+            self._CrysAxis = np.asarray(val, dtype=np.float64, order="F")
 
     @property
     def m0(self) -> int | float | list | np.ndarray | None:

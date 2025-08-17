@@ -1,6 +1,6 @@
 h5py>=3.13.0
 importlib_resources>=6.5.2
-intel-fortran-rt==2025.0.5
+intel-fortran-rt==2025.2.0
 matplotlib>=3.10.1
 mkl==2025.0.1
 notebook>=7.3.2
