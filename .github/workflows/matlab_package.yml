@@ -11,7 +11,7 @@ jobs:
     runs-on: [windows-latest]
     needs: [build-cvode]
     env:
-      build_file: python/.build/env-312-win.yml
+      build_file: python/.build/env-313-win.yml
     steps:
       - uses: actions/checkout@v4
    
@@ -39,7 +39,7 @@ jobs:
         shell: bash -el {0}
         working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
         run: |
-          nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.43.34808\bin\Hostx64\x64" -o MagTenseCudaBlas.o
+          nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64" -o MagTenseCudaBlas.o
 
       - name: Make the wrapper for the CUDA file using icx in a Developer PowerShell for VS 2022
         if: ${{ matrix.CUDA-compile == 'CUDA' }}
@@ -148,7 +148,7 @@ jobs:
   build-linux:
     strategy:
       matrix:
-        py-version: [312]
+        py-version: [313]
         mat-version: [R2024a]
         CVODE-compile: [CVODE,noCVODE]
         CUDA-compile: [CUDA,noCUDA]
