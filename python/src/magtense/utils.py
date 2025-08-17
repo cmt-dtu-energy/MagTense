@@ -678,6 +678,7 @@ def create_plot(
     field: np.ndarray | None = None,
     spots: list | None = None,
     area: list | None = None,
+    show: bool = True,
 ) -> None:
     """
     Creates a plot with the iterated tiles and the calculated magnetic field H at the
@@ -796,7 +797,8 @@ def create_plot(
     ax.set_zlabel("Z")
 
     zoom_factory(ax, data_xlim, data_ylim, data_zlim, data_lim_range)
-    plt.show()
+    if show:
+        plt.show()
 
 
 def plot_magfield(

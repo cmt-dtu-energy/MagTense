@@ -1,10 +1,10 @@
-import importlib.metadata
-import pathlib
-import tomllib
+from importlib import metadata
+from pathlib import Path
 
-toml_location = pathlib.Path(__file__).parent.parent.parent
-if (toml_location / "pyproject.toml").exists():
-    with open(toml_location / "pyproject.toml", "rb") as f:
-        __version__ = tomllib.load(f)["project"]["version"]
+if (Path(__file__).parent.parent.parent / "pyproject.toml").exists():
+    # Set dynamically in .github/workflows/python-package-conda.yml
+    # Fallback if not set
+    v = "1.0.0"
+    __version__ = v.removeprefix("v")
 else:
-    __version__ = importlib.metadata.version("magtense")
+    __version__ = metadata.version("magtense")

@@ -101,11 +101,11 @@ dependencies:
   - umf=0.9.1=intel_6
   - zstd=1.5.7=hb8e6e7a_2
   - pip:
-      - build==1.2.2.post1
-      - charset-normalizer==3.4.1
-      - meson==1.7.0
-      - ninja==1.11.1.3
+      - build>=1.2.2.post1
+      - charset-normalizer>=3.4.1
+      - meson>=1.7.0
+      - ninja>=1.11.1.3
       - numpy==2.2.3
-      - packaging==24.2
-      - patchelf==0.17.2.1
-      - pyproject-hooks==1.2.0
+      - packaging>=24.2
+      - patchelf>=0.17.2.1
+      - pyproject-hooks>=1.2.0

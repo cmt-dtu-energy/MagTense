@@ -6,6 +6,8 @@ jobs:
   build-and-testing:
     name: Build and test pip-wheels
     uses: ./.github/workflows/python-package-conda.yml
+    with:
+      tag: ${{ github.event.release.tag_name }}
   
   pypi-publish:
     name: Upload release to PyPI
@@ -41,9 +43,9 @@ jobs:
       run: |
         mkdir dist/
         mv ${{ github.workspace }}/*.whl dist/
-        ls -al dist/
-
+    
     - name: Publish package distributions to TestPyPI
       uses: pypa/gh-action-pypi-publish@release/v1
+      # TODO Remove two lines below for publishing to PyPI
       with:
         repository-url: https://test.pypi.org/legacy/

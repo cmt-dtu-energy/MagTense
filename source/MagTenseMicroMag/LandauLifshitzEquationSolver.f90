@@ -374,8 +374,9 @@
     subroutine initializeSolution( problem, solution )
     type(MicroMagProblem),intent(in) :: problem
     type(MicroMagSolution),intent(inout) :: solution
+    character*(100) :: prog_str 
     
-    integer :: ntot
+    integer :: ntot, i
     !character(50) :: prog_str
     
     if ( problem%problemMode .eq. ProblemModeNew ) then
@@ -532,9 +533,9 @@
     end subroutine updateExternalField
     
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2025
     !> @brief
-    !> Calculates and returns the effective field from the anisotropy
+    !> Calculates and returns the effective field from the anisotropy for a general crystal anisotropy
     !> @param[in] problem, the struct containing the current problem
     !> @param[inout] solution, struct containing the current solution        
     !>-----------------------------------------
@@ -542,29 +543,60 @@
     type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     
-    !real :: prefact                                       !> Multiplicative scalar factor
+    !real :: prefact                                    !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
-    
+    real(DP),dimension(:),allocatable   :: Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
+       
+    ! 3x3 matrix specifying the local coordinate system
+    !                             [v1_x v2_x v3_x]
+    !problem%CrystalAxis(i,:,:) = [v1_y v2_y v3_y]
+    !                             [v1_z v2_z v3_z]
+        
+    ! The anisotropy matrix is given in the local coordinate system, i.e. the crystal axis,
+    ! and is specified according to Eq. (2) in https://doi.org/10.1088/1361-665X/aafff8 but generalized to
+    ! independent coordinates:
+    !  problem%Kfact_arr(i,:,:) = [alpha1_x   alpha1_y   alpha1_z  ]
+    !                             [alpha11_x  alpha11_x  alpha11_x ]
+    !                             [alpha12_x  alpha12_y  alpha12_z ]   
+    !                             [alpha111_x alpha111_y alpha111_z]   
+    !                             [alpha112_x alpha112_y alpha112_z]   
+    !                             [alpha123   0          0         ]
+    !
+    ! In the above matrix notation, a uniaxial anisotropy in the z-direction is given by:
+    ! Uniaxial in z = [0 0 Kfact]
+    !                 [0 0 0 ]
+    !                 [0 0 0 ]
+    !                 [0 0 0 ]
+    !                 [0 0 0 ]
+    !                 [0 0 0 ]
+    !
+    ! In the above matrix notation, a cubic anisotropy is given by (http://wpage.unina.it/mdaquino/PhD_thesis/main/node13.html):
+    ! Cubic in cartesian = [0 0 0]
+    !                      [0 0 0]
+    !                      [Kfact1 Kfact1 Kfact1]  
+    !                      [0 0 0]
+    !                      [0 0 0]
+    !                      [Kfact2 0 0]
     
+    allocate(Mx_rot(size(solution%Mx)), My_rot(size(solution%My)), Mz_rot(size(solution%Mz)))
+    Mx_rot = problem%CrystalAxis(:,1,1)*solution%Mx(:) + problem%CrystalAxis(:,1,2)*solution%My(:) + problem%CrystalAxis(:,1,3)*solution%Mz(:)
+    My_rot = problem%CrystalAxis(:,2,1)*solution%Mx(:) + problem%CrystalAxis(:,2,2)*solution%My(:) + problem%CrystalAxis(:,2,3)*solution%Mz(:)
+    Mz_rot = problem%CrystalAxis(:,3,1)*solution%Mx(:) + problem%CrystalAxis(:,3,2)*solution%My(:) + problem%CrystalAxis(:,3,3)*solution%Mz(:)
+        
+    allocate(Hkx_rot(size(Mx_rot)), Hky_rot(size(My_rot)), Hkz_rot(size(Mz_rot)))
+    Hkx_rot = -2*Mx_rot(:)*(problem%Kfact_arr(:,1,1) + 2*problem%Kfact_arr(:,2,1)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,3)*My_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*My_rot(:)**2*Mz_rot(:)**2 )
+    Hky_rot = -2*My_rot(:)*(problem%Kfact_arr(:,1,2) + 2*problem%Kfact_arr(:,2,2)*My_rot(:)**2 + problem%Kfact_arr(:,3,3)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,2)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,2)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*Mz_rot(:)**2 )
+    Hkz_rot = -2*Mz_rot(:)*(problem%Kfact_arr(:,1,3) + 2*problem%Kfact_arr(:,2,3)*Mz_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*My_rot(:)**2 + 3*problem%Kfact_arr(:,4,3)*Mz_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + 2*problem%Kfact_arr(:,5,3)*Mx_rot(:)**2*Mz_rot(:)**2 + 2*problem%Kfact_arr(:,5,3)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*My_rot(:)**2 )
     
-    !prefact = -2.*solution%Kfact
+    solution%Hkx(:) = problem%CrystalAxis(:,1,1)*Hkx_rot(:) + problem%CrystalAxis(:,2,1)*Hky_rot(:) + problem%CrystalAxis(:,3,1)*Hkz_rot(:)
+    solution%Hky(:) = problem%CrystalAxis(:,1,2)*Hkx_rot(:) + problem%CrystalAxis(:,2,2)*Hky_rot(:) + problem%CrystalAxis(:,3,2)*Hkz_rot(:)
+    solution%Hkz(:) = problem%CrystalAxis(:,1,3)*Hkx_rot(:) + problem%CrystalAxis(:,2,3)*Hky_rot(:) + problem%CrystalAxis(:,3,3)*Hkz_rot(:)
     
-    !Notice that the anisotropy matrix is symmetric and so Axy = Ayx etc.
-    !solution%Hkx = prefact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-    !solution%Hky = prefact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-    !solution%Hkz = prefact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
-    solution%Hkx = -2.*problem%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-    solution%Hky = -2.*problem%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-    solution%Hkz = -2.*problem%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
-    
-
-    
-    end subroutine updateAnisotropy
-    
+    end subroutine updateAnisotropy    
 
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
@@ -1581,23 +1613,38 @@
     subroutine ComputeAnisotropyTerm3D_General( problem )
     type(MicroMagProblem),intent(inout) :: problem             !> Struct containing the problem
     
+    integer :: nx,ny,nz,ntot, i
     
-    integer :: nx,ny,nz,ntot
+    !--- We use the general formulation introduced in updateAnisotropy
+    !--- If the user has specified a value for the uniaxial anisotropy or the cubic anisotropy, we use transform
+    !--- those to the general matrix formulation
+    allocate(problem%Kfact_arr(size(problem%Ms),6,3))
+    problem%Kfact_arr(:,:,:) = 0.0
     
-        nx = problem%grid%nx
-        ny = problem%grid%ny
-        nz = problem%grid%nz
-        ntot = nx * ny * nz
+    if (any(problem%K0 .ne. 0)) then !Uniaxial anisotropy
+        call displayGUIMessage( 'Assuming uniaxial anisotropy' )
+        do i = 1,size(problem%Ms)
+            problem%Kfact_arr(i,1,3) = problem%K0(i) / ( mu0 * problem%Ms(i) )
+        enddo
         
-        !Allocate the anisotropy vectors and note that the operation is symmetric so we do not need to store three of the nine components
-        allocate( problem%Axx(ntot),problem%Axy(ntot),problem%Axz(ntot),problem%Ayy(ntot),problem%Ayz(ntot),problem%Azz(ntot) )
+        !Set the crystal axis as the user only specified u_ea
+        problem%CrystalAxis(:,1,3) =  problem%u_ea(:,1)
+        problem%CrystalAxis(:,2,3) =  problem%u_ea(:,2)
+        problem%CrystalAxis(:,3,3) =  problem%u_ea(:,3)
         
-        problem%Axx = problem%u_ea(:,1) * problem%u_ea(:,1)
-        problem%Axy = problem%u_ea(:,1) * problem%u_ea(:,2)
-        problem%Axz = problem%u_ea(:,1) * problem%u_ea(:,3)
-        problem%Ayy = problem%u_ea(:,2) * problem%u_ea(:,2)
-        problem%Ayz = problem%u_ea(:,2) * problem%u_ea(:,3)
-        problem%Azz = problem%u_ea(:,3) * problem%u_ea(:,3)
+    elseif (any(problem%K1 .ne. 0)) then !Cubic anisotropy
+        call displayGUIMessage( 'Assuming cubic anisotropy' )
+        do i = 1,size(problem%Ms)
+            problem%Kfact_arr(i,3,1) = problem%K1(i) / ( mu0 * problem%Ms(i) )
+            problem%Kfact_arr(i,3,2) = problem%K1(i) / ( mu0 * problem%Ms(i) )
+            problem%Kfact_arr(i,3,3) = problem%K1(i) / ( mu0 * problem%Ms(i) )
+            problem%Kfact_arr(i,6,1) = problem%K2(i) / ( mu0 * problem%Ms(i) )
+        enddo
+    else !General anisotropy
+        do i = 1,size(problem%Ms)
+            problem%Kfact_arr(i,:,:) = problem%K0_arr(i,:,:) / ( mu0 * problem%Ms(i) )
+        enddo
+    endif
     
     end subroutine ComputeAnisotropyTerm3D_General
 

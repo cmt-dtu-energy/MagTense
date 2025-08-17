@@ -25,8 +25,9 @@
         integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall, passExch
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: exch_weightProblemPtr, exch_methodProblemPtr, exch_interpnProblemPtr
-        mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
+        mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, K1ProblemPtr, K2ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
         mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr, usePassExchPtr
+        mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
         mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr, CVThresProblemPtr
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
@@ -36,7 +37,7 @@
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
         mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr, nColsSparsePtr
         mwPointer :: usePrecisionPtr, N_aveProblemPtr, useReturnHallProblemPtr
-        mwPointer :: demag_ignore_stepsProblemPtr
+        mwPointer :: demag_ignore_stepsProblemPtr, CrystalAxisProblemPtr, K0_arrProblemPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
         real(DP) :: demag_fac, CV, mu0, pi
@@ -394,10 +395,34 @@
         else
             problem%useReturnHall = useReturnHallFalse
         endif
-        
+              
         sx = 1
         demag_ignore_stepsProblemPtr = mxGetField( prhs, i, problemFields(51) )
         call mxCopyPtrToInteger4(mxGetPr(demag_ignore_stepsProblemPtr), problem%demag_ignore_steps, sx )
+        
+        ! 3x3 matrix specifying the local coordinate system
+        !                             [v1_x v2_x v3_x]
+        !problem%CrystalAxis(i,:,:) = [v1_y v2_y v3_y]
+        !                             [v1_z v2_z v3_z]
+        sx = ntot * 3 * 3
+        allocate( problem%CrystalAxis(ntot,3,3) )
+        CrystalAxisProblemPtr = mxGetField( prhs, i, problemFields(57) )
+        call mxCopyPtrToReal8(mxGetPr(CrystalAxisProblemPtr), problem%CrystalAxis, sx )
+        
+        sx = ntot * 6 * 3
+        allocate( problem%K0_arr(ntot,6,3) )
+        K0_arrProblemPtr = mxGetField( prhs, i, problemFields(58) )
+        call mxCopyPtrToReal8(mxGetPr(K0_arrProblemPtr), problem%K0_arr, sx )
+        
+        allocate( problem%K1(ntot) )
+        sx = ntot
+        K1ProblemPtr = mxGetField( prhs, i, problemFields(59) )
+        call mxCopyPtrToReal8(mxGetPr(K1ProblemPtr), problem%K1, sx )
+        
+        allocate( problem%K2(ntot) )
+        sx = ntot
+        K2ProblemPtr = mxGetField( prhs, i, problemFields(60) )
+        call mxCopyPtrToReal8(mxGetPr(K2ProblemPtr), problem%K2, sx )
         
         sx = 1
         exch_weightProblemPtr = mxGetField( prhs, i, problemFields(52) )
@@ -499,6 +524,10 @@
         fieldnames(54) = 'exch_intpn'
         fieldnames(55) = 'passExch'
         fieldnames(56) = 'exch_ncol'
+        fieldnames(57) = 'CrysAxis'
+        fieldnames(58) = 'K0_arr'
+        fieldnames(59) = 'K1'
+        fieldnames(60) = 'K2'
         
     end subroutine getProblemFieldnames
     
@@ -653,7 +682,7 @@
     
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2025
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2025
     !> Returns the Micromagnetic grid, e.g. GridInfo, from Fortran to Matlab
     !> @param[in] solution struct for the internal Fortran represantation of the solution
     !> @param[in] plhs pointer to the Matlab data struct    
@@ -803,7 +832,7 @@
     
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2025
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2025
     !> Returns an array with the names of the fields expected in the GridInfo struct
     !> @param[inout] fieldnames, array of the names of the fields
     !> @param[inout] nfields the no. of elements in fieldnames

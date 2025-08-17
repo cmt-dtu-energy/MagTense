@@ -67,27 +67,27 @@ module DemagAuxFunctions
         k_zz = 1
         do i=1,nx_K
             do j=1,ny_K
-                if (mask_xx(i,j) .eqv. .true.) then
+                if (mask_xx(i,j)) then
                     Kxx_abs(k_xx) = problem%Kxx(i,j) 
                     k_xx = k_xx + 1
                 endif
-                if (mask_xy(i,j) .eqv. .true.) then
+                if (mask_xy(i,j)) then
                     Kxy_abs(k_xy) = problem%Kxy(i,j) 
                     k_xy = k_xy + 1
                 endif
-                if (mask_xz(i,j) .eqv. .true.) then
+                if (mask_xz(i,j)) then
                     Kxz_abs(k_xz) = problem%Kxz(i,j) 
                     k_xz = k_xz + 1
                 endif
-                if (mask_yy(i,j) .eqv. .true.) then
+                if (mask_yy(i,j)) then
                     Kyy_abs(k_yy) = problem%Kyy(i,j) 
                     k_yy = k_yy + 1
                 endif
-                if (mask_yz(i,j) .eqv. .true.) then
+                if (mask_yz(i,j)) then
                     Kyz_abs(k_yz) = problem%Kyz(i,j) 
                     k_yz = k_yz + 1
                 endif
-                if (mask_zz(i,j) .eqv. .true.) then
+                if (mask_zz(i,j)) then
                     Kzz_abs(k_zz) = problem%Kzz(i,j) 
                     k_zz = k_zz + 1
                 endif

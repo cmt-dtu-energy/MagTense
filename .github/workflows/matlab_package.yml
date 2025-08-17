@@ -225,11 +225,11 @@ jobs:
   test-linux:
     strategy:
       matrix:
-        mat-version: [R2023a,R2023b,R2024a] #Note that R2024b always crashes with segmentation fault
-        os-version: [ubuntu-latest]
+        mat-version: [R2023a,R2023b,R2024a]   #Note that R2024b always crashes with segmentation fault
+        os-version: [ubuntu-latest,ubuntu_CUDA]
         CVODE-compile: [CVODE,noCVODE]
         CUDA-compile: [CUDA,noCUDA]
-        CUDA-run: [noCUDA] #[CUDA,noCUDA]
+        CUDA-run: [CUDA,noCUDA]
         CVODE-run: [CVODE,noCVODE]
         exclude:
         - CUDA-compile: noCUDA
@@ -237,7 +237,11 @@ jobs:
         - CUDA-compile: CUDA
           CUDA-run: noCUDA
         - CVODE-compile: noCVODE
-          CVODE-run: CVODE 
+          CVODE-run: CVODE
+        - os-version: ubuntu_CUDA
+          CUDA-compile: noCUDA
+        - os-version: ubuntu-latest
+          CUDA-compile: CUDA  
     runs-on: ["${{ matrix.os-version }}"]
     needs: build-linux
     defaults:
@@ -259,17 +263,28 @@ jobs:
         path: ${{ github.workspace }}/matlab/MEX_files
 
     - name: Set up MATLAB
+      if: ${{ matrix.os-version == 'ubuntu-latest' }}
       uses: matlab-actions/setup-matlab@v2
       with:
         release: "${{ matrix.mat-version }}"
 
     - name: Run test script on download MEX-file without CUDA
+      if: ${{ matrix.os-version == 'ubuntu-latest' }}
       uses: matlab-actions/run-command@v2
       env:
         CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }} 
         CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }} 
       with:
         command: USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE); disp(int_error);
+
+    - name: Run test script on download MEX-file with CUDA
+      if: ${{ matrix.os-version == 'ubuntu_CUDA' }}
+      env:
+        CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }} 
+        CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }} 
+      run: |
+        /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE)"
+
 
   build-cvode:
     name: cvode

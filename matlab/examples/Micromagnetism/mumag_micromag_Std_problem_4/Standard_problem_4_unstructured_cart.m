@@ -5,22 +5,22 @@ function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_d
 %Syntax:
 %------
 %   Standard_problem_4_unstructured_cart()
-%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,mesh,GridInfo] = Standard_problem_4( NIST_field, options)
+%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,mesh,GridInfo] = Standard_problem_4( mumag_field, options)
 %
 %Description of syntax:
 %------
 %   Standard_problem_4_unstructured_cart() 
 %       Uses the default parameters to solve mumag problem 4 and displays the results on screen
 %
-%   Standard_problem_4_unstructured_cart( NIST_field, options)
+%   Standard_problem_4_unstructured_cart( mumag_field, options)
 %       Takes 1 input argument which specifies the applied field. Additional options can also be specified
 %
-%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,mesh,GridInfo] = Standard_problem_4_unstructured_cart( NIST_field, options)
+%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,mesh,GridInfo] = Standard_problem_4_unstructured_cart( mumag_field, options)
 %       As above but also returns the computation times, the problem setup file and the solution for both the initial and dynamical part of the problem as well as the mesh information
 %
 %Input arguments:
 %------
-%   NIST_field : Either 1 or 2
+%   mumag_field : Either 1 or 2
 %       Determines if the first or second applied field specified in the mumag problem description is used (Default value is 1)
 %
 %Options:

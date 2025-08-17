@@ -3,11 +3,11 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Micromagnetism &mdash; MagTense TechManual  documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=92fd9be5" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/techmanual.css?v=903b4c53" />
 
   
@@ -15,7 +15,7 @@
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=5929fcd5"></script>
-      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
@@ -52,6 +52,7 @@
 <li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Micromagnetism</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#basic-input">Basic input</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#anisotropy-constants">Anisotropy constants</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#dynamic-simulations">Dynamic simulations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#hysteresis-loop-simulation">Hysteresis loop simulation</a></li>
 </ul>
@@ -89,13 +90,68 @@
 <p>The common parameters are:</p>
 <ul class="simple">
 <li><p>Grid resolution</p></li>
-<li><p>Gird size</p></li>
-<li><p>Exchange term constant</p></li>
+<li><p>Grid size</p></li>
+<li><p>Exchange constant</p></li>
 <li><p>Saturation magnetization</p></li>
 <li><p>Anisotropy constant</p></li>
 <li><p>Damping constant, <span class="math notranslate nohighlight">\(\alpha\)</span></p></li>
 <li><p>Precession constant, <span class="math notranslate nohighlight">\(\gamma\)</span></p></li>
 </ul>
+</section>
+<section id="anisotropy-constants">
+<h2>Anisotropy constants<a class="headerlink" href="#anisotropy-constants" title="Link to this heading"></a></h2>
+<p>The anisotropy can be specified as a local uniaxial anisotropy, <span class="math notranslate nohighlight">\(problem.K_0(i)\)</span> at every grid point along with an anisotropy vector, <span class="math notranslate nohighlight">\(problem.u_{ea}(i,:)=[easyX(i),easyY(i),easyZ(i)]\)</span> in matlab notation. The anisotropy can also be specified as a cubic anisotropy with <span class="math notranslate nohighlight">\(problem.K_1(i)\)</span> and <span class="math notranslate nohighlight">\(problem.K_2(i)\)</span> at every grid point along with a local coordinate system:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}problem.CrystalAxis(i,:,:)
+=
+\begin{pmatrix}
+x_1 &amp;  x_2 &amp;  x_3 \\
+    y_1 &amp;  y_2 &amp;  y_3 \\
+    z_1 &amp;  z_2 &amp;  z_3
+\end{pmatrix}\end{split}\]</div>
+<p>However, if the anisotropy is not uniaxial, a general matrix formulation with the anisotropy energy density given by [following Eq. (2) in <a class="reference external" href="https://doi.org/10.1088/1361-665X/aafff8">https://doi.org/10.1088/1361-665X/aafff8</a>]:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}f_{an}(\mathbf{m}) = \alpha_{1,x}m_x^2 +  \alpha_{1,y}m_y^2 +  \alpha_{1,z}m_z^2 + \alpha_{11,x}m_x^4 + \alpha_{11,y}m_y^4 + \alpha_{11,z}m_z^4 \\
+    + \alpha_{12,x}m_y^2m_z^2 + \alpha_{12,y}m_z^2m_x^2 + \alpha_{12,z}m_x^2m_y^2 + \alpha_{111,x}m_x^6 + \alpha_{111,y}m_y^6 + \alpha_{111,z}m_z^6 \\
+    + \alpha_{112,x}m_x^4(m_y^2 + m_z^2) + \alpha_{112,y}m_y^4(m_z^2 + m_x^2) + \alpha_{112,z}m_z^4(m_x^2 + m_y^2) \\
+    + \alpha_{123}(m_x^2m_y^2m_z^2)\end{split}\]</div>
+<p>In this case the anisotropy constants are specified locally at each grid point in a 6x3 matrix as</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}K_{0,arr}
+=
+\begin{pmatrix}
+\alpha_{1,x} &amp;   \alpha_{1,y} &amp;   \alpha_{1,z} \\
+    \alpha_{11,x} &amp;  \alpha_{11,y} &amp;  \alpha_{11,z} \\
+    \alpha_{12,x} &amp;  \alpha_{12,y} &amp;  \alpha_{12,z} \\
+    \alpha_{111,x} &amp;  \alpha_{111,y} &amp;  \alpha_{111,z} \\
+    \alpha_{112,x} &amp;  \alpha_{112,y} &amp;  \alpha_{112,z} \\
+    \alpha_{123,x} &amp;  0 &amp;  0
+\end{pmatrix}\end{split}\]</div>
+<p>In the above matrix notation, a uniaxial anisotropy in the z-direction is given by:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}K_{0,arr}
+ =
+     \begin{pmatrix}
+     0 &amp; 0 &amp; K_0 \\
+ 0 &amp; 0 &amp; 0  \\
+ 0 &amp; 0 &amp; 0  \\
+ 0 &amp; 0 &amp; 0  \\
+ 0 &amp; 0 &amp; 0  \\
+ 0 &amp; 0 &amp; 0
+ \end{pmatrix}\end{split}\]</div>
+<p>and a cubic anisotropy is given by:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}K_{0,arr}
+ =
+     \begin{pmatrix}
+ 0 &amp; 0 &amp; 0 \\
+ 0 &amp; 0 &amp; 0  \\
+ K_1 &amp; K_1 &amp; K_1 \\
+ 0 &amp; 0 &amp; 0 \\
+ 0 &amp; 0 &amp; 0 \\
+ K_2 &amp; 0 &amp; 0
+ \end{pmatrix}\end{split}\]</div>
+<p>For the general anisotropy the crystal axis must also be specified in a format similar to the cubic anisotropy.</p>
 </section>
 <section id="dynamic-simulations">
 <h2>Dynamic simulations<a class="headerlink" href="#dynamic-simulations" title="Link to this heading"></a></h2>
