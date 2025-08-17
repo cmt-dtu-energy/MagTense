@@ -1,6 +1,15 @@
-name: Building and testing Matlab MEX files on Windows and Linux
+name: Matlab MEX files build and test on Windows and Linux
 
-on: [push, workflow_dispatch]
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_call:
+    inputs:
+      tag:
+        required: false
+        type: string
+  workflow_dispatch:
 
 jobs:
   build-windows:
