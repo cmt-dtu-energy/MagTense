@@ -1,4 +1,4 @@
-name: magtense-env12
+name: magtense-env
 channels:
   - https://software.repos.intel.com/python/conda
   - nvidia/label/cuda-12.8.1
