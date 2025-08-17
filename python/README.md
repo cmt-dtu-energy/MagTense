@@ -18,11 +18,11 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
   OR
   
-  Make your own enviroment with the required python packages for CUDA, Intel compilers, MKL and cmake
-  *Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda) *
-  *Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment *
-  *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.*
-  *More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran) *
+  Make your own enviroment with the required python packages for CUDA, Intel compilers, MKL and cmake \
+  *Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda)* \
+  *Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment* \
+  *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.* \
+  *More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)*
 
   ```bash
   conda create -y -n magtense-env && conda activate magtense-env
