@@ -12,7 +12,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
     exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
 	CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn, &
-	passExch, exch_ncols, problem )
+	passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem )
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
     integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols
     integer(4),dimension(3),intent(in) :: grid_n
@@ -34,7 +34,9 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
     integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch
     real(8),intent(in) :: gamma, alpha, MaxT0, tol, thres, conv_tol, dem_thres
-	real(8),dimension(ntot),intent(in) :: A0, Ms, K0
+	real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2
+	real(8),dimension(ntot,6,3),intent(in) :: K0_arr
+	real(8),dimension(ntot,3,3),intent(in):: crysaxis
     integer(4), dimension(3) :: N_ave
     real(8) :: demag_fac, pi, mu0
 	real(8), intent(in) :: CV, exch_weigh
@@ -232,6 +234,15 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 	problem%exch_weight = exch_weigh
 	problem%exch_method = exch_meth
 	problem%exch_interpn = exch_intpn
+	
+	! 3x3 matrix specifying the local coordinate system
+	!                             [v1_x v2_x v3_x]
+	!problem%CrystalAxis(i,:,:) = [v1_y v2_y v3_y]
+	!                             [v1_z v2_z v3_z]
+	problem%CrystalAxis =  crysaxis
+    problem%K0_arr = k0_arr
+    problem%K1 = k1	
+    problem%K2 = k2
         
 	!>-----------------------------------------
 	!Calculate the local scaled coefficients for the LLG equation

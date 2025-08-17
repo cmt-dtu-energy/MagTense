@@ -427,11 +427,12 @@ module FortranToPythonIO
 
 
     subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-        gamma, alpha_mm, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+        K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
         N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
         exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, demigstp, & 
-		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, &
+		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
+        t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc)
 
         integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
@@ -451,7 +452,9 @@ module FortranToPythonIO
 		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
 		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch
         real(8),intent(in) :: gamma, alpha_mm, MaxT0, tol, thres, conv_tol, dem_thres
-		real(8),dimension(ntot),intent(in) :: A0, Ms, K0
+		real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2
+        real(8),dimension(ntot,6,3),intent(in) :: K0_arr
+        real(8),dimension(ntot,3,3),intent(in):: CrysAxis
         character*256,intent(in) :: N_file_in, N_file_out
 		real(8), intent(in) :: CV, exch_weigh
 
@@ -476,7 +479,8 @@ module FortranToPythonIO
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
             exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
-			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, problem )
+			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
+            CrysAxis, K0_arr, K1, K2, problem )
 
         call SolveLandauLifshitzEquation( problem, solution )
 

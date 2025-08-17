@@ -68,6 +68,10 @@ class MicromagProblem:
         A0: int | float | list | np.ndarray | None = None,
         Ms: int | float | list | np.ndarray | None = None,
         K0: int | float | list | np.ndarray | None = None,
+        K1: np.ndarray | None = None,
+        K2: np.ndarray | None = None,
+        K0_arr: np.ndarray | None = None,
+        CrysAxis: np.ndarray | None = None,
         alpha: float = 0.02,
         gamma: float = 0.0,
         max_T0: float = 2.0,
@@ -134,6 +138,16 @@ class MicromagProblem:
         self.A0 = A0
         self.Ms = Ms
         self.K0 = K0
+        self.K1 = 0.0 + np.zeros(shape=(ntot, 1), dtype=np.float64, order="F")
+        self.K2 = 0.0 + np.zeros(shape=(ntot, 1), dtype=np.float64, order="F")
+        self.K0_arr = 0.0 + np.zeros(shape=(ntot, 6, 3), dtype=np.float64, order="F")
+
+        #--- Set the local crystal coordinates to the three Cartesian axis
+        self.CrysAxis = 0.0 + np.zeros(shape=(ntot, 3, 3), dtype=np.float64, order="F")
+        self.CrysAxis[:, 0, 0] = 1
+        self.CrysAxis[:, 1, 1] = 1
+        self.CrysAxis[:, 2, 2] = 1
+
         self.alpha_mm = alpha
         self.gamma = gamma
         self.max_T0 = max_T0
@@ -437,6 +451,10 @@ class MicromagProblem:
             a0=self.A0,
             ms=self.Ms,
             k0=self.K0,
+            k1=self.K1,
+            k2=self.K2,
+            k0_arr=self.K0_arr,
+            crysaxis = self.CrysAxis,
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
             maxt0=self.max_T0,
