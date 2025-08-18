@@ -16,8 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-testing
     environment:
-      name: testpypi
-      url: https://test.pypi.org/project/magtense/
+      name: pypi
+      url: https://pypi.org/project/magtense/
     permissions:
       id-token: write
     steps:
@@ -46,8 +46,5 @@ jobs:
         mkdir dist/
         mv ${{ github.workspace }}/*.whl dist/
     
-    - name: Publish package distributions to TestPyPI
+    - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-      # TODO Remove two lines below for publishing to PyPI
-      with:
-        repository-url: https://test.pypi.org/legacy/
