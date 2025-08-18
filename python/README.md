@@ -19,11 +19,8 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
   OR
   
   Make your own enviroment with the required python packages for CUDA, Intel compilers (`ifx` and `icx`), `mkl` and `cmake`:
-  - Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda)
-  - Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment
-  - More information about the Intel Compilers:
-    - [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html)
-    - [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
+  - Available [CUDA versions](https://anaconda.org/nvidia/cuda) and location of corresponding [pip-wheels](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels) (deployment)
+  - More information about [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
   ```bash
   conda create -y -n magtense-env && conda activate magtense-env
@@ -179,7 +176,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
   - Open a `Developer PowerShell` and run:
 
     ```bash
-	  conda activate magtense-env
+    conda activate magtense-env
     make magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
     ```
 
@@ -236,21 +233,14 @@ python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cuspar
 
 ### Latest versions of required packages
 
-- CUDA
-
-  - Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda)
-  - Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment 
+- CUDA - Available [CUDA versions](https://anaconda.org/nvidia/cuda) and location of corresponding [pip-wheels](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels) (deployment)
 
   ```bash
   conda config --env --add channels nvidia/label/cuda-12.9.1
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   ```
 
-- Intel compilers and MKL
-
-  More information about the Intel Compilers:
-  - [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html)
-  - [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
+- Intel compilers and `mkl` - More information about [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
   ```bash
   conda config --env --add channels https://software.repos.intel.com/python/conda/
