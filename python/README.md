@@ -9,7 +9,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
 #### Linux
 
-- New Conda environment from [yml-file](./.build/env-313-linux.yml)
+- New Conda environment from [env-313-linux.yml](./.build/env-313-linux.yml)
 
   ```bash
   conda env create -n magtense-env -f python/.build/env-313-linux.yml
@@ -18,18 +18,19 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
   OR
   
-  Make your own enviroment with the required python packages for CUDA, Intel compilers, MKL and cmake \
-  *Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda)* \
-  *Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment* \
-  *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.* \
-  *More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)*
+  Make your own enviroment with the required python packages for CUDA, Intel compilers (`ifx` and `icx`), `mkl` and `cmake`:
+  - Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda)
+  - Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment
+  - More information about the Intel Compilers:
+    - [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html)
+    - [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
   ```bash
   conda create -y -n magtense-env && conda activate magtense-env
   conda config --env --add channels conda-forge
   conda install -y python=3.13
-  python3 -m pip install numpy meson ninja charset-normalizer
-  conda config --env --add channels nvidia/label/cuda-12.8.1
+  python3 -m pip install numpy meson ninja charset-normalizer build
+  conda config --env --add channels nvidia/label/cuda-12.9.1
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   conda config --env --add channels https://software.repos.intel.com/python/conda/
   conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" "ifx_linux-64"
@@ -99,10 +100,10 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
   conda activate magtense-env
   conda config --env --add channels conda-forge
   conda install -y python=3.13
-  python -m pip install numpy meson charset-normalizer
+  python -m pip install numpy meson charset-normalizer build
   conda config --env --add channels https://software.repos.intel.com/python/conda/
   conda install -y mkl mkl-devel mkl-static "dpcpp_win-64" intel-fortran-rt "ifx_win-64"
-  conda config --env --add channels nvidia/label/cuda-12.8.1
+  conda config --env --add channels nvidia/label/cuda-12.9.1
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   conda install -y git make
   ```
@@ -220,10 +221,9 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 ### Install local editable magtense package
 To install the compiled MagTense package locally, so that simulations can be run, do
 ```bash
-cp python/.build/requirements-py3-dev_ENV.txt python/requirements.txt
+cp python/.build/requirements-py3-dev.txt python/requirements.txt
 python -m pip install -e ./python
 ```
-where `ENV` is either `linux` or `win`.
 
 ### Required packages at runtime
 
@@ -238,9 +238,8 @@ python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cuspar
 
 - CUDA
 
-  Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda) \
-  Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment \
-  *Note: Use `nvcc --version` or `nvidia-smi` to detect the correct CUDA version for your system.*
+  - Available CUDA versions can be found here: [https://anaconda.org/nvidia/cuda](https://anaconda.org/nvidia/cuda)
+  - Location of corresponding [https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels](pip-wheels) for deployment 
 
   ```bash
   conda config --env --add channels nvidia/label/cuda-12.9.1
@@ -249,7 +248,9 @@ python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cuspar
 
 - Intel compilers and MKL
 
-  More information about the Intel Compilers: [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
+  More information about the Intel Compilers:
+  - [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html)
+  - [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
 
   ```bash
   conda config --env --add channels https://software.repos.intel.com/python/conda/

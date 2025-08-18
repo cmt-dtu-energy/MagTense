@@ -1,10 +1,10 @@
-h5py>=3.13.0
+h5py>=3.14.0
 importlib_resources>=6.5.2
 intel-fortran-rt==2025.2.0
-matplotlib>=3.10.1
+matplotlib>=3.10.5
 mkl==2025.2.0
-notebook>=7.3.2
-numpy==2.2.3
+notebook>=7.4.5
+numpy==2.3.2
 nvidia-cublas-cu12==12.*
 nvidia-cuda-runtime-cu12==12.*
 nvidia-cusparse-cu12==12.*

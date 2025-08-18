@@ -83,11 +83,21 @@ def main(
             subprocess.run(
                 [
                     "cp",
-                    f"{py_folder}/.build/requirements-py{py[0]}-{cuda}.txt",
+                    f"{py_folder}/.build/requirements-py{py[0]}.txt",
                     f"{py_folder}/requirements.txt",
                 ],
                 check=False,
             )
+            if cuda == "cpu":
+                subprocess.run(
+                    [
+                        "sed",
+                        "-i",
+                        "'/^nvidia-/d'",
+                        f"{py_folder}/requirements.txt",
+                    ],
+                    check=False,
+                )
             subprocess.run(
                 ["python", "-m", "build", "--wheel"],
                 cwd=py_folder,

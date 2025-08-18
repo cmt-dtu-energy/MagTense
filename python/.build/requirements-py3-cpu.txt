@@ -1,8 +1,0 @@
-h5py>=3.13.0
-importlib_resources>=6.5.2
-intel-fortran-rt==2025.2.0
-matplotlib>=3.10.1
-mkl==2025.2.0
-notebook>=7.3.2
-numpy==2.2.3
-tqdm>=4.67.1

@@ -24,10 +24,10 @@ def std_prob_4(
     )
     h_ext = np.array([1, 1, 1]) / mu0
 
-    def h_ext_fct(t) -> np.ndarray:
+    def h_ext_fct_init(t) -> np.ndarray:
         return np.expand_dims(np.where(t < 1e-09, 1e-09 - t, 0), axis=1) * h_ext
 
-    _, M_out, _, _, _, _, _, _, _, _, _, _, _ = problem_ini.run_simulation(100e-9, 200, h_ext_fct, 2000)
+    M_out = problem_ini.run_simulation(100e-9, 200, h_ext_fct_init, 2000)[1]
     M_sq_ini = np.squeeze(M_out, axis=2)
 
     ### Time-dependent solver
@@ -52,7 +52,9 @@ def std_prob_4(
     def h_ext_fct(t) -> np.ndarray:
         return np.expand_dims(t > -1, axis=1) * (h_ext_nist / 1000 / mu0)
 
-    t_dym, M_out, _, _, _, _, _, _, _, _, _, _, _ = problem_dym.run_simulation(1e-9, 200, h_ext_fct, 2000)
+    t_dym, M_out, _, _, _, _, _, _, _, _, _, _, _ = problem_dym.run_simulation(
+        1e-9, 200, h_ext_fct, 2000
+    )
 
     M_sq_dym = np.squeeze(M_out, axis=2)
     Mx = np.mean(M_sq_dym[:, :, 0], axis=1)

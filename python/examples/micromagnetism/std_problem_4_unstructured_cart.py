@@ -5,16 +5,9 @@ import numpy as np
 from matplotlib.lines import Line2D
 
 from magtense.micromag import MicromagProblem
-from magtense.utils import plot_M_thin_film
 
-# Load unstructured mesh points and grain data
-mesh_file = "Std_prob_4_unstructured_mesh_grains_6_res_80_20_ref_2.txt"
-mesh_data = np.loadtxt(mesh_file)
-grid_pts = np.array(mesh_data[:, :3])
-grid_abc = np.array(mesh_data[:, 3:])
 
-def std_prob_4(
-    res: list[int] = (len(grid_pts), 1, 1),
+def std_prob_4_unstructured(
     NIST_field: int = 1,
     cuda: bool = False,
     cvode: bool = False,
@@ -23,24 +16,45 @@ def std_prob_4(
     mu0 = 4 * np.pi * 1e-7
     grid_L = [500e-9, 125e-9, 3e-9]
 
+    # Load unstructured mesh points and grain data
+    mesh_file = "Std_prob_4_unstructured_mesh_grains_6_res_80_20_ref_2.txt"
+    mesh_data = np.loadtxt(Path(__file__).parent.absolute() / mesh_file)
+    grid_pts = np.array(mesh_data[:, :3])
+    grid_abc = np.array(mesh_data[:, 3:])
+    res = (len(grid_pts), 1, 1)
+
     ### Magnetization to s-state
     problem_ini = MicromagProblem(
         res=res,
         grid_L=grid_L,
         m0=1 / np.sqrt(3),
         alpha=4.42e3,
-        grid_type = "unstructuredPrisms",
-        grid_pts = grid_pts,
-        grid_abc = grid_abc,
+        grid_type="unstructuredPrisms",
+        grid_pts=grid_pts,
+        grid_abc=grid_abc,
         cuda=cuda,
-        cvode=cvode
+        cvode=cvode,
     )
     h_ext = np.array([1, 1, 1]) / mu0
 
-    def h_ext_fct(t) -> np.ndarray:
+    def h_ext_fct_init(t) -> np.ndarray:
         return np.expand_dims(np.where(t < 1e-09, 1e-09 - t, 0), axis=1) * h_ext
 
-    _, M_out, _, _, _, _, _, n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc  = problem_ini.run_simulation(100e-9, 200, h_ext_fct, 2000)
+    (
+        _,
+        M_out,
+        _,
+        _,
+        _,
+        _,
+        _,
+        n_tot_Exch,
+        ExchMat_r,
+        ExchMat_c,
+        ExchMat_v,
+        ExchMat_nr,
+        ExchMat_nc,
+    ) = problem_ini.run_simulation(100e-9, 200, h_ext_fct_init, 2000)
     M_sq_ini = np.squeeze(M_out, axis=2)
 
     ### Time-dependent solver
@@ -51,12 +65,12 @@ def std_prob_4(
         m0=M_sq_ini[-1],
         alpha=4.42e3,
         gamma=2.21e5,
-        grid_type = "unstructuredPrisms",
-        grid_pts = grid_pts,
-        grid_abc = grid_abc,
+        grid_type="unstructuredPrisms",
+        grid_pts=grid_pts,
+        grid_abc=grid_abc,
         cuda=cuda,
         cvode=cvode,
-        passexch= 1,
+        passexch=1,
         exch_rows=ExchMat_r,
         exch_col=ExchMat_c,
         exch_val=ExchMat_v,
@@ -76,7 +90,21 @@ def std_prob_4(
     def h_ext_fct(t) -> np.ndarray:
         return np.expand_dims(t > -1, axis=1) * (h_ext_nist / 1000 / mu0)
 
-    t_dym, M_out, _, _, _, _, _, n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc = problem_dym.run_simulation(1e-9, 200, h_ext_fct, 2000)
+    (
+        t_dym,
+        M_out,
+        _,
+        _,
+        _,
+        _,
+        _,
+        n_tot_Exch,
+        ExchMat_r,
+        ExchMat_c,
+        ExchMat_v,
+        ExchMat_nr,
+        ExchMat_nc,
+    ) = problem_dym.run_simulation(1e-9, 200, h_ext_fct, 2000)
 
     M_sq_dym = np.squeeze(M_out, axis=2)
     Mx = np.mean(M_sq_dym[:, :, 0], axis=1)
@@ -159,11 +187,11 @@ def std_prob_4(
         plt.title(f"Standard problem 4, Field {NIST_field}")
         plt.show()
 
-        #plot_M_thin_film(M_sq_dym[0], res, "Start state")
-        #plot_M_thin_film(M_sq_dym[-1], res, "Final state")
+        # plot_M_thin_film(M_sq_dym[0], res, "Start state")
+        # plot_M_thin_film(M_sq_dym[-1], res, "Final state")
 
     return int_error
 
 
 if __name__ == "__main__":
-    int_error = std_prob_4(NIST_field=1, show=True, cuda=True, cvode=False)
+    int_error = std_prob_4_unstructured(NIST_field=1, show=True, cuda=True, cvode=False)
