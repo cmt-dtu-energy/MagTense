@@ -6,7 +6,7 @@ from magtense.utils import plot_M_avg_seq, plot_M_thin_film
 
 
 def std_prob_3(
-    res: tuple[int] = (10, 10, 10),
+    res: tuple[int, int, int] = (10, 10, 10),
     L_loop: np.ndarray | None = None,
     cuda: bool = False,
     cvode: bool = False,
@@ -14,25 +14,27 @@ def std_prob_3(
     show_details: bool = False,
 ) -> None:
     mu0 = 4 * np.pi * 1e-7
+    A0 = 1.74532925199e-10
     Ms = 1e6
     if L_loop is None:
         L_loop = np.linspace(8, 9, 10)
 
     problem = MicromagProblem(
-        res,
-        A0=1.74532925199e-10,
+        res=res,
+        A0=A0,
         Ms=Ms,
         K0=0.1 * 0.5 * mu0 * Ms**2,
         alpha=1e3,
+        exch_nrow=0,
         cuda=cuda,
         cvode=cvode,
     )
 
     problem.u_ea[:, 2] = 1
-    lex = np.sqrt(problem.A0 / (0.5 * mu0 * Ms**2))
+    lex = np.sqrt(A0 / (0.5 * mu0 * Ms**2))
 
-    def Hext_fct(t) -> np.ndarray:
-        return np.atleast_2d(t).T * [0, 0, 0]
+    def h_ext_fct(t) -> np.ndarray:
+        return np.atleast_2d(t).T * np.array([0, 0, 0])
 
     E_arr = np.zeros(shape=(4, len(L_loop), 2))
 
@@ -45,7 +47,7 @@ def std_prob_3(
                 problem.m0[:, 2] = 1
                 t_end = 10e-9
 
-            elif j == 1:
+            else:
                 print("Vortex state")
                 xv = np.linspace(-1, 1, res[0])
                 yv = np.linspace(-1, 1, res[1])
@@ -62,8 +64,8 @@ def std_prob_3(
                 t_end = 200e-9
 
             problem.grid_L = np.array([lex, lex, lex]) * L_loop[i]
-            t, M_out, _, H_exc, H_ext, H_dem, H_ani = problem.run_simulation(
-                t_end, 50, Hext_fct, 2
+            t, M_out, _, H_exc, H_ext, H_dem, H_ani, _, _, _, _, _, _ = (
+                problem.run_simulation(t_end, 50, h_ext_fct, 2)
             )
 
             if show_details:

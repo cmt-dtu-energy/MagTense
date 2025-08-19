@@ -20,7 +20,13 @@ def std_prob_4(
 
     ### Magnetization to s-state
     problem_ini = MicromagProblem(
-        res=res, grid_L=grid_L, m0=1 / np.sqrt(3), alpha=4.42e3, cuda=cuda, cvode=cvode
+        res=res,
+        grid_L=grid_L,
+        m0=1 / np.sqrt(3),
+        alpha=4.42e3,
+        exch_nrow=0,
+        cuda=cuda,
+        cvode=cvode,
     )
     h_ext = np.array([1, 1, 1]) / mu0
 
@@ -37,6 +43,7 @@ def std_prob_4(
         m0=M_sq_ini[-1],
         alpha=4.42e3,
         gamma=2.21e5,
+        exch_nrow=0,
         cuda=cuda,
         cvode=cvode,
     )

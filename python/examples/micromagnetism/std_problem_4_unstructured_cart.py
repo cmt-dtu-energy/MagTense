@@ -32,6 +32,7 @@ def std_prob_4_unstructured(
         grid_type="unstructuredPrisms",
         grid_pts=grid_pts,
         grid_abc=grid_abc,
+        exch_nrow=0,
         cuda=cuda,
         cvode=cvode,
     )

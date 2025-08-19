@@ -36,7 +36,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: cvode-Windows
-          path: ${{ github.workspace }}/cvode/    
+          path: ${{ github.workspace }}/cvode/
 
       - name: Set up MATLAB R2024b
         uses: matlab-actions/setup-matlab@v2

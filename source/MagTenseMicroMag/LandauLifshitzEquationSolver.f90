@@ -175,7 +175,7 @@
         gb_solution%H_dem(:,:,:,:) = 0
         gb_solution%H_ani(:,:,:,:) = 0
     endif
-    
+
     !loop over the range of applied fields
     do i=1,nt_Hext
         !Applied field
@@ -185,9 +185,9 @@
             write(prog_str,'(A20, I5.2, A8, I5.2, A6, F6.2, A7)') 'External Field nr.: ', i, ' out of ', nt_Hext, ' i.e. ', real(i)/real(nt_Hext)*100,'% done'
             call displayGUIMessage( trim(prog_str) )
         endif
+
+        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )  
         
-        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )          
-            
         !The initial state of the next solution is the previous solution result
         gb_problem%m0 = M_out(:,nt,i)
         
@@ -199,7 +199,7 @@
         call StoreHeffComponents ( gb_problem, gb_solution )
             
     enddo
-    
+
     !clean up
     deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
     

@@ -34,21 +34,21 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
   conda install -y cmake
   ```
 
-- Required modules for `cvode` from sundials-7.2.1
+- Required modules for `cvode` from sundials-7.4.0
     Prerequisites, e.g. `ifx`, `icx` and `cmake`, have already been installed in the previous steps.
 
-  - Download version 7.2.1 of `cvode`:
+  - Download version 7.4.0 of `cvode`:
 
     ```bash
-    wget https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz
-    tar -xf cvode-7.2.1.tar.gz
+    wget https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz
+    tar -xf cvode-7.4.0.tar.gz
     ```
 
   - Prepare folder structure
 
     ```bash
     mkdir cvode
-    mv cvode-7.2.1 cvode/src
+    mv cvode-7.4.0 cvode/src
     ```
 
   - Run `cmake` and `make`for installation
@@ -106,13 +106,14 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
   ```
   and then `conda env export | grep -v "^prefix: " > env-313-win.yml` to create a new environment file
 
-- Required modules for `cvode` from sundials-7.2.1
+- Required modules for `cvode` from sundials-7.4.0
 
   - Installation of [Visual Studio 2022](https://visualstudio.microsoft.com) (Desktop development with C++ and `cmake`)
 
   - Installation of [Intel oneAPI](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html) (both C++ and Fortran)
 
-  - Download [sundials-7.2.1](https://github.com/LLNL/sundials/releases/download/v7.2.1/cvode-7.2.1.tar.gz) and unzip it.
+  - Download [sundials-7.4.0](https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz) and unzip it.
+  
 
   Open a "Intel oneAPI command prompt for Intel 64 for Visual Studio 2022" as administrator and then do:
   ```bash
