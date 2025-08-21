@@ -56,10 +56,6 @@ module ODE_Solvers
         neq = size(y0)
         nt = size(t)
         nt_conv = size(t_conv)
-
-        !Allocate the derivative output array
-        allocate(yderiv_out(neq, nt))
-        yderiv_out(:,:) = 0
         
         !useCVODE defaults to true. Inelegant but functional.
         if ( present(useCVODE) ) then
@@ -71,9 +67,16 @@ module ODE_Solvers
         !Call the solver
         if ( solver_flag .eq. useCVODEFalse ) then
 
+            !Allocate the derivative output array
+            allocate(yderiv_out(neq, nt))
+            yderiv_out(:,:) = 0
+
             !Call the solver
             call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol )
-        
+            
+            !clean-up
+            deallocate(yderiv_out)
+
         else if ( solver_flag .eq. useCVODETrue ) then
 #if USE_CVODE
             !Do the magic for CVODE
@@ -91,9 +94,6 @@ module ODE_Solvers
             stop
 #endif    
         endif
-        
-        !clean-up
-        deallocate(yderiv_out)
 
     end subroutine MagTense_ODE
     
@@ -299,7 +299,6 @@ module ODE_Solvers
     
     ! create a serial vector
     sunvec_y => FN_VMake_Serial(neq, y_cur, ctx)
-    ! sunvec_y = FN_VMake_Serial(neq, y_cur, ctx)
     if (.not. associated(sunvec_y)) then
         print *, 'ERROR: sunvec = NULL'
         stop 1
@@ -460,12 +459,6 @@ module ODE_Solvers
             
             ! and reinitialize solution vector ...
             y_cur = y_cur / y_norm
-            sunvec_y => FN_VMake_Serial(neq, y_cur, ctx)
-            if (.not. associated(sunvec_y)) then
-                call CVODE_error('Reinitialization of solution vector after rescaling failed', -1, callback )
-                stop
-            endif
-
             ierr = FCVodeReInit(cvode_mem, t(outstep), sunvec_y)
             if (ierr /= 0) then
 	            call CVODE_error('Error in FCVodeReInit, ierr = ', ierr, callback )
@@ -508,32 +501,24 @@ module ODE_Solvers
 
         ! pointers to data in SUNDAILS vectors
         integer(c_long) :: i, neq
-        real(c_double), pointer, dimension(:) :: yvec(:)
-        real(c_double), pointer, dimension(:) :: fvec(:)
+        real(c_double), pointer :: yvec(:)
+        real(c_double), pointer :: fvec(:)
 
         neq = transfer(user_data, neq)
-        allocate(yvec(neq))
-        allocate(fvec(neq))
 
         ! get data arrays from SUNDIALS vectors
-        ! call FN_VGetData_Serial(sunvec_y, yvec)
-        ! call FN_VGetData_Serial(sunvec_f, fvec)
-        yvec(1:neq) => FN_VGetArrayPointer(sunvec_y)
-        fvec(1:neq) => FN_VGetArrayPointer(sunvec_f)
+        yvec => FN_VGetArrayPointer(sunvec_y)
+        fvec => FN_VGetArrayPointer(sunvec_f)
 
         !copy the yvec
-        do i = 1, neq
-            MTy_out(i) = yvec(i)
-        enddo
+        MTy_out(1:neq) = yvec(1:neq)
         
         ! fill RHS vector
         ! fvec(1) = lamda * yvec(1) + 1.0 / (1.0 + tn * tn) - lamda * atan(tn);
         call MTdmdt( real(tn), MTy_out, MTf_vec )  
 
         !copy the result back
-        do i = 1, neq
-            fvec(i) = MTf_vec(i)
-        enddo
+        fvec(1:neq) = MTf_vec(1:neq)
         
         ! return success
         ierr = 0
