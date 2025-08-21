@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import cm, colors
 from matplotlib.lines import Line2D
+from matplotlib.patches import Circle
 from mpl_toolkits.mplot3d.art3d import Line3DCollection, Poly3DCollection
 
 from magtense.magstatics import Tiles, get_rotmat, run_simulation
@@ -674,7 +675,7 @@ def zoom_factory(
 
 def create_plot(
     tiles: Tiles | None = None,
-    eval_pts: list[np.ndarray] | None = None,
+    eval_pts: list[np.ndarray | None] | None = None,
     field: np.ndarray | None = None,
     spots: list | None = None,
     area: list | None = None,
@@ -850,7 +851,12 @@ def plot_magfield(
     plt.show()
 
 
-def plot_M_avg_seq(t: np.ndarray, M_seq: np.ndarray) -> None:
+def plot_M_avg_seq(
+    t: np.ndarray,
+    M_seq: np.ndarray,
+    title: str | None = None,
+    figpath: Path | None = None,
+) -> None:
     plt.clf()
     plt.plot(t, np.mean(M_seq[:, :, 0], axis=1), "rx")
     plt.plot(t, np.mean(M_seq[:, :, 1], axis=1), "gx")
@@ -866,7 +872,13 @@ def plot_M_avg_seq(t: np.ndarray, M_seq: np.ndarray) -> None:
 
     plt.xlabel("Time [s]", fontsize="14")
     plt.ylabel(r"$m_i$" + " [-]", fontsize="14")
-    plt.show()
+    if title:
+        plt.title(title)
+    if figpath is None:
+        plt.show()
+    else:
+        figpath.mkdir(parents=True, exist_ok=True)
+        plt.savefig(f"{figpath}/M_avg_{title}.png")
 
 
 def plot_M_thin_film(
@@ -877,6 +889,7 @@ def plot_M_thin_film(
     width: float = 0.002,
     headwidth: float = 3,
     headlength: float = 5,
+    figpath: Path | None = None,
 ) -> None:
     k = np.moveaxis(m.reshape(res[1], res[0], res[2], 3).swapaxes(0, 1), -1, 0)[
         :, :, :, 0
@@ -904,7 +917,11 @@ def plot_M_thin_film(
 
     if title:
         plt.title(title)
-    plt.show()
+    if figpath is None:
+        plt.show()
+    else:
+        figpath.mkdir(parents=True, exist_ok=True)
+        plt.savefig(f"{figpath}/M_thin_film_{title}.png")
 
 
 def load_COMSOL(
@@ -1005,7 +1022,7 @@ def plot_Halbach(
     # Cylinders as circles in 2D
     for i in range(tiles.n):
         x, y, _ = tiles.offset[i]
-        circle = plt.Circle(
+        circle = Circle(
             (x, y),
             tiles.dev_center[i, 0],
             fill=False,

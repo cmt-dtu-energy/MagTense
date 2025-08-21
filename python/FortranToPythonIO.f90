@@ -465,10 +465,10 @@ module FortranToPythonIO
         real(8),dimension(ntot,3),intent(out) :: pts
 		
 		integer,intent(out) :: n_tot_Exch
-		integer,intent(out) :: ExchMat_nr,ExchMat_nc
 		integer,dimension(exch_presize*ntot),intent(out)  :: ExchMat_r
 		integer,dimension(exch_presize*ntot),intent(out)  :: ExchMat_c
 		real(8),dimension(exch_presize*ntot),intent(out)  :: ExchMat_v
+		integer,intent(out) :: ExchMat_nr,ExchMat_nc
 
 #if USE_MICROMAG
         type(MicroMagProblem) :: problem

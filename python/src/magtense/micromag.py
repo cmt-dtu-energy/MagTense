@@ -1,5 +1,6 @@
 import os
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -88,15 +89,15 @@ class MicromagProblem:
         exch_val: list | np.ndarray | None = None,
         exch_rows: list | np.ndarray | None = None,
         exch_col: list | np.ndarray | None = None,
-        exch_nval: int | None = None,
-        exch_nrow: int | None = None,
-        exch_ncols: int | None = None,
+        exch_nval: int = 1,
+        exch_nrow: int = 1,
+        exch_ncols: int = 1,
         exch_intpn: str | None = "extended",
         exch_meth: str | None = "directlaplacianneumann",
         exch_weigh: float = 8,
         exch_presize: int = 12,
         demigstp: int = 0,
-        passexch: int | None = None,
+        passexch: int = 0,
         usereturnhall: int = 0,
         filename: str = "t",
         cuda: bool = False,
@@ -121,7 +122,7 @@ class MicromagProblem:
         self.demigstp = demigstp
         self.usereturnhall = usereturnhall
         self.exch_presize = exch_presize
-        
+
         self.grid_n = np.array(res, dtype=np.int32, order="F")
         self.grid_L = np.array(grid_L, dtype=np.float64, order="F")
         self.grid_pts = grid_pts
@@ -142,7 +143,7 @@ class MicromagProblem:
         self.K2 = K2
         self.K0_arr = K0_arr
 
-        #--- Set the local crystal coordinates to the three Cartesian axis
+        # --- Set the local crystal coordinates to the three Cartesian axis
         self.CrysAxis = CrysAxis
 
         self.alpha_mm = alpha
@@ -168,7 +169,7 @@ class MicromagProblem:
 
         self.exch_val = exch_val
         self.exch_rows = exch_rows
-        self.exch_rowe = np.zeros(shape=(exch_nrow), dtype=np.int32, order="F")
+        self.exch_rowe = np.zeros(shape=(self.exch_nrow), dtype=np.int32, order="F")
         self.exch_col = exch_col
 
         self.N_load = len(filename)
@@ -192,65 +193,57 @@ class MicromagProblem:
         return self._passexch
 
     @passexch.setter
-    def passexch(self, val: int | None, seed: int = 0) -> None:
-        if val is None:
-            self._passexch = 0
-        else:
-            self._passexch = val
+    def passexch(self, val: int) -> None:
+        self._passexch = val
 
     @property
     def exch_nval(self) -> int | None:
         return self._exch_nval
 
     @exch_nval.setter
-    def exch_nval(self, val: int | None, seed: int = 0) -> None:
-        if val is None:
-            self._exch_nval = 1
-        else:
-            self._exch_nval = val
+    def exch_nval(self, val: int) -> None:
+        self._exch_nval = val
 
     @property
     def exch_ncols(self) -> int | None:
         return self._exch_ncols
 
     @exch_ncols.setter
-    def exch_ncols(self, val: int | None, seed: int = 0) -> None:
-        if val is None:
-            self._exch_ncols = 1
-        else:
-            self._exch_ncols = val
+    def exch_ncols(self, val: int) -> None:
+        self._exch_ncols = val
 
     @property
     def exch_nrow(self) -> int | None:
         return self._exch_nrow
 
     @exch_nrow.setter
-    def exch_nrow(self, val: int | None, seed: int = 0) -> None:
-        if val is None:
-            self._exch_nrow = 1
-        else:
-            self._exch_nrow = val
+    def exch_nrow(self, val: int) -> None:
+        self._exch_nrow = val
 
     @property
     def exch_val(self) -> list | np.ndarray | None:
         return self._exch_val
 
     @exch_val.setter
-    def exch_val(self, val: int | None, seed: int = 0) -> None:
+    def exch_val(self, val: int | None) -> None:
         if val is None:
-            self._exch_val = np.zeros(shape=(self.exch_nval,), dtype=np.float64, order="F")
+            self._exch_val = np.zeros(
+                shape=(self.exch_nval,), dtype=np.float64, order="F"
+            )
         else:
             assert np.asarray(val).shape == (self.exch_nval,)
-            self._exch_val  = np.asarray(val, dtype=np.float64, order="F")
+            self._exch_val = np.asarray(val, dtype=np.float64, order="F")
 
     @property
     def exch_rows(self) -> list | np.ndarray | None:
         return self._exch_rows
 
     @exch_rows.setter
-    def exch_rows(self, val: int | None, seed: int = 0) -> None:
+    def exch_rows(self, val: list | np.ndarray | None) -> None:
         if val is None:
-            self._exch_rows = np.zeros(shape=(self.exch_nval,), dtype=np.int32, order="F")
+            self._exch_rows = np.zeros(
+                shape=(self.exch_nval,), dtype=np.int32, order="F"
+            )
         else:
             assert np.asarray(val).shape == (self.exch_nval,)
             self._exch_rows = np.asarray(val, dtype=np.int32, order="F")
@@ -260,9 +253,11 @@ class MicromagProblem:
         return self._exch_col
 
     @exch_col.setter
-    def exch_col(self, val: int | None, seed: int = 0) -> None:
+    def exch_col(self, val: list | np.ndarray | None) -> None:
         if val is None:
-            self._exch_col = np.zeros(shape=(self.exch_nval,), dtype=np.int32, order="F")
+            self._exch_col = np.zeros(
+                shape=(self.exch_nval,), dtype=np.int32, order="F"
+            )
         else:
             assert np.asarray(val).shape == (self.exch_nval,)
             self._exch_col = np.asarray(val, dtype=np.int32, order="F")
@@ -272,7 +267,7 @@ class MicromagProblem:
         return self._grid_pts
 
     @grid_pts.setter
-    def grid_pts(self, val: int | None, seed: int = 0) -> None:
+    def grid_pts(self, val: list | np.ndarray | None) -> None:
         if val is None:
             self._grid_pts = np.zeros(shape=(self.ntot, 3), dtype=np.float64, order="F")
         else:
@@ -284,7 +279,7 @@ class MicromagProblem:
         return self._grid_abc
 
     @grid_abc.setter
-    def grid_abc(self, val: int | None, seed: int = 0) -> None:
+    def grid_abc(self, val: list | np.ndarray | None) -> None:
         if val is None:
             self._grid_abc = np.zeros(shape=(self.ntot, 3), dtype=np.float64, order="F")
 
@@ -292,15 +287,16 @@ class MicromagProblem:
             assert np.asarray(val).shape == (self.ntot, 3)
             self._grid_abc = np.asarray(val, dtype=np.float64, order="F")
 
-
     @property
     def A0(self) -> int | float | list | np.ndarray | None:
         return self._A0
 
     @A0.setter
-    def A0(self, val: int | None, seed: int = 0) -> None:
+    def A0(self, val: int | float | list | np.ndarray | None) -> None:
         if val is None:
-            self._A0 = 1.3e-11 + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
+            self._A0 = 1.3e-11 + np.zeros(
+                shape=(self.ntot, 1), dtype=np.float64, order="F"
+            )
 
         elif isinstance(val, (int, float)):
             self._A0 = val + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
@@ -314,7 +310,7 @@ class MicromagProblem:
         return self._Ms
 
     @Ms.setter
-    def Ms(self, val: int | None, seed: int = 0) -> None:
+    def Ms(self, val: int | float | list | np.ndarray | None) -> None:
         if val is None:
             self._Ms = 8e5 + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
 
@@ -330,7 +326,7 @@ class MicromagProblem:
         return self._K0
 
     @K0.setter
-    def K0(self, val: int | None, seed: int = 0) -> None:
+    def K0(self, val: int | float | list | np.ndarray | None) -> None:
         if val is None:
             self._K0 = 0.0 + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
 
@@ -346,7 +342,7 @@ class MicromagProblem:
         return self._K1
 
     @K1.setter
-    def K1(self, val: int | None, seed: int = 0) -> None:
+    def K1(self, val: int | float | list | np.ndarray | None) -> None:
         if val is None:
             self._K1 = 0.0 + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
 
@@ -362,7 +358,7 @@ class MicromagProblem:
         return self._K2
 
     @K2.setter
-    def K2(self, val: int | None, seed: int = 0) -> None:
+    def K2(self, val: int | float | list | np.ndarray | None) -> None:
         if val is None:
             self._K2 = 0.0 + np.zeros(shape=(self.ntot, 1), dtype=np.float64, order="F")
 
@@ -378,22 +374,26 @@ class MicromagProblem:
         return self._K0_arr
 
     @K0_arr.setter
-    def K0_arr(self, val: int | None, seed: int = 0) -> None:
+    def K0_arr(self, val: np.ndarray | None) -> None:
         if val is None:
-            self._K0_arr = 0.0 + np.zeros(shape=(self.ntot, 6, 3), dtype=np.float64, order="F")
+            self._K0_arr = 0.0 + np.zeros(
+                shape=(self.ntot, 6, 3), dtype=np.float64, order="F"
+            )
 
         else:
             assert np.asarray(val).shape == (self.ntot, 6, 3)
             self._K0_arr = np.asarray(val, dtype=np.float64, order="F")
 
     @property
-    def CrysAxis(self) -> int | float | list | np.ndarray | None:
+    def CrysAxis(self) -> np.ndarray | None:
         return self._CrysAxis
 
     @CrysAxis.setter
-    def CrysAxis(self, val: int | None, seed: int = 0) -> None:
+    def CrysAxis(self, val: np.ndarray | None) -> None:
         if val is None:
-            self._CrysAxis = 0.0 + np.zeros(shape=(self.ntot, 3, 3), dtype=np.float64, order="F")
+            self._CrysAxis = 0.0 + np.zeros(
+                shape=(self.ntot, 3, 3), dtype=np.float64, order="F"
+            )
             self._CrysAxis[:, 0, 0] = 1
             self._CrysAxis[:, 1, 1] = 1
             self._CrysAxis[:, 2, 2] = 1
@@ -406,7 +406,7 @@ class MicromagProblem:
         return self._m0
 
     @m0.setter
-    def m0(self, val: int | None, seed: int = 0) -> None:
+    def m0(self, val: int | float | list | np.ndarray | None, seed: int = 0) -> None:
         self._m0 = np.zeros(shape=(self.ntot, 3), dtype=np.float64, order="F")
 
         if val is None:
@@ -429,7 +429,7 @@ class MicromagProblem:
         return self._dem_appr
 
     @dem_appr.setter
-    def dem_appr(self, val: int | None = None) -> None:
+    def dem_appr(self, val: str | None = None) -> None:
         self._dem_appr = {
             None: 1,
             "threshold": 2,
@@ -450,7 +450,7 @@ class MicromagProblem:
             "tetrahedron": 2,
             "unstructuredPrisms": 3,
         }[val]
-        
+
     @property
     def exch_intpn(self) -> int:
         return self._exch_intpn
@@ -491,8 +491,35 @@ class MicromagProblem:
     def solver(self, val: str | None = None) -> None:
         self._solver = {None: -1, "explicit": 1, "dynamic": 2, "implicit": 3}[val]
 
-    def run_simulation(self, t_end, nt, fct_h_ext, nt_h_ext) -> list[np.ndarray]:
-        t = np.linspace(0, t_end, nt)
+    def run_simulation(
+        self, t_end: float, nt: int, fct_h_ext: Callable, nt_h_ext: int
+    ) -> list[np.ndarray | int]:
+        """
+        Run the micromagnetic simulation.
+
+        Params:
+            t_end: End time of the simulation.
+            nt: Number of timesteps.
+            fct_h_ext: Function to calculate the external field at each timestep.
+            nt_h_ext: Number of timesteps for the external field.
+
+        Outputs:
+            A list containing the simulation results.
+            [0] t_out (np.ndarray): Time output array.
+            [1] M_out (np.ndarray): Magnetization output array.
+            [2] pts (np.ndarray): Points output array.
+            [3] H_exc (np.ndarray): Exchange field output array.
+            [4] H_ext (np.ndarray): External field output array.
+            [5] H_dem (np.ndarray): Demagnetizing field output array.
+            [6] H_ani (np.ndarray): Anisotropy field output array.
+            [7] Exch_mat_ntot (int): Total number of exchange matrix elements.
+            [8] Exch_mat_r (np.ndarray): Exchange matrix row indices.
+            [9] Exch_mat_c (np.ndarray): Exchange matrix column indices.
+            [10] Exch_mat_v (np.ndarray): Exchange matrix values.
+            [11] Exch_mat_nr (int): Number of rows in the exchange matrix.
+            [12] Exch_mat_nc (int): Number of columns in the exchange matrix.
+
+        """
         h_ext = np.zeros(shape=(nt_h_ext, 4), dtype=np.float64, order="F")
         h_ext[:, 0] = np.linspace(0, t_end, nt_h_ext)
         h_ext[:, 1:4] = fct_h_ext(np.linspace(0, t_end, nt_h_ext))
@@ -511,14 +538,14 @@ class MicromagProblem:
             k1=self.K1,
             k2=self.K2,
             k0_arr=self.K0_arr,
-            crysaxis = self.CrysAxis,
+            crysaxis=self.CrysAxis,
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
             maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             hext=h_ext,
             nt=nt,
-            t=t,
+            t=np.linspace(0, t_end, nt),
             m0=np.concatenate((self.m0[:, 0], self.m0[:, 1], self.m0[:, 2]), axis=None),
             dem_thres=self.dem_thres,
             usecuda=self.cuda,
@@ -563,8 +590,8 @@ class MicromagProblem:
 
         n_tot_Exch = result[7]
         result = list(result)
-        result[8] = result[8][:n_tot_Exch] #ExchMat_r
-        result[9] = result[9][:n_tot_Exch] #ExchMat_r
-        result[10] = result[10][:n_tot_Exch] #ExchMat_v
+        result[8] = result[8][:n_tot_Exch]  # ExchMat_r
+        result[9] = result[9][:n_tot_Exch]  # ExchMat_c
+        result[10] = result[10][:n_tot_Exch]  # ExchMat_v
 
         return result

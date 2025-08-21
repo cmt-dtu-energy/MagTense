@@ -113,7 +113,7 @@ def spheroid() -> None:
     updated_tiles, H_out = magstatics.run_simulation(spheroids, points)
     create_plot(updated_tiles, points, H_out)
 
-    norm = [np.linalg.norm(H_point) * mu0 for H_point in H_out]
+    norm = np.linalg.norm(np.asarray(H_out), axis=1) * mu0
 
     print(f"Average magnetic field: {sum(norm) / len(norm):.3f}")
     print(f"Peak to peak: {max(norm) - min(norm):.3f}")
@@ -150,14 +150,17 @@ def prism_grid() -> None:
         n_pts=[10, 10, 5],
     )
     _, H_out = magstatics.run_simulation(tiles, points)
-    norm = [np.linalg.norm(H_point) * mu0 for H_point in H_out]
+    norm = np.linalg.norm(np.asarray(H_out), axis=1) * mu0
 
     print(f"Average magnetic field: {sum(norm) / len(norm):.3f}")
     print(f"Peak to peak: {max(norm) - min(norm):.3f}")
 
 
 def prism_multiple(
-    n_mag: int = 1, soft: int | None = None, res: int = 16, max_val: tuple = (1, 1, 1)
+    n_mag: int = 1,
+    soft: list[int] | int | None = None,
+    res: int = 16,
+    max_val: tuple = (1, 1, 1),
 ) -> None:
     if soft is None:
         soft = [0 for _ in range(n_mag)]
@@ -214,6 +217,6 @@ def halbach_prism() -> None:
         tiles.set_easy_axis([np.pi / 2, azimuth_opt], i)
 
     _, H_out = magstatics.run_simulation(tiles, points)
-    norm = [np.linalg.norm(H_point) * mu0 for H_point in H_out]
+    norm = np.linalg.norm(np.asarray(H_out), axis=1) * mu0
     print(f"Average magnetic field: {sum(norm) / len(norm):.3f}")
     print(f"Peak to peak: {max(norm) - min(norm):.3f}")

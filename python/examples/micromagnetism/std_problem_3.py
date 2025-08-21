@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -10,8 +12,9 @@ def std_prob_3(
     L_loop: np.ndarray | None = None,
     cuda: bool = False,
     cvode: bool = False,
-    show: bool = True,
-    show_details: bool = False,
+    plotting: bool = True,
+    figpath: Path | None = None,
+    plot_details: bool = False,
 ) -> None:
     mu0 = 4 * np.pi * 1e-7
     A0 = 1.74532925199e-10
@@ -25,7 +28,6 @@ def std_prob_3(
         Ms=Ms,
         K0=0.1 * 0.5 * mu0 * Ms**2,
         alpha=1e3,
-        exch_nrow=0,
         cuda=cuda,
         cvode=cvode,
     )
@@ -64,15 +66,17 @@ def std_prob_3(
                 t_end = 200e-9
 
             problem.grid_L = np.array([lex, lex, lex]) * L_loop[i]
-            t, M_out, _, H_exc, H_ext, H_dem, H_ani, _, _, _, _, _, _ = (
-                problem.run_simulation(t_end, 50, h_ext_fct, 2)
-            )
+            t, M_out, _, H_exc, H_ext, H_dem, H_ani = (
+                problem.run_simulation(
+                    t_end=t_end, nt=50, fct_h_ext=h_ext_fct, nt_h_ext=2
+                )
+            )[:7]
 
-            if show_details:
+            if plot_details:
                 M_sq = np.squeeze(M_out, axis=2)
-                plot_M_avg_seq(t, M_sq)
-                plot_M_thin_film(M_sq[0], res)
-                plot_M_thin_film(M_sq[-1], res)
+                plot_M_avg_seq(t, M_sq, figpath=figpath)
+                plot_M_thin_film(M_sq[0], res, title="3_start", figpath=figpath)
+                plot_M_thin_film(M_sq[-1], res, title="3_end", figpath=figpath)
 
             # Calculate the energy terms
             E_exc = np.sum(
@@ -116,23 +120,37 @@ def std_prob_3(
                 [E_exc[-1], E_ext[-1], E_dem[-1], E_ani[-1]]
             )
 
-            if show_details:
+            if plot_details:
                 plt.clf()
                 for E_x in [E_exc, E_ext, E_dem, E_ani]:
                     plt.plot(t, mu0 * E_x - mu0 * E_x[0], ".")
                 plt.xlabel("Time [s]")
                 plt.ylabel("Energy [-]")
                 plt.legend([r"$E_{exc}$", r"$E_{ext}$", r"$E_{dem}$", r"$E_{ani}$"])
-                plt.show()
+                if figpath is None:
+                    plt.show()
+                else:
+                    figpath.mkdir(parents=True, exist_ok=True)
+                    plt.savefig(figpath / "3_details.png")
 
-    if show:
+    if plotting:
         plt.clf()
         plt.plot(L_loop, np.sum(E_arr[:, :, 0], axis=0), ".")
         plt.plot(L_loop, np.sum(E_arr[:, :, 1], axis=0), "o")
         plt.xlabel("L [l_ex]")
         plt.ylabel("Energy [-]")
-        plt.show()
+        if figpath is None:
+            plt.show()
+        else:
+            figpath.mkdir(parents=True, exist_ok=True)
+            plt.savefig(figpath / "3_solution.png")
 
 
 if __name__ == "__main__":
-    std_prob_3(show=False, cuda=True, cvode=True, show_details=True)
+    std_prob_3(
+        cuda=True,
+        cvode=False,
+        plotting=True,
+        plot_details=True,
+        figpath=Path(__file__).parent.absolute().joinpath("..", "figs"),
+    )

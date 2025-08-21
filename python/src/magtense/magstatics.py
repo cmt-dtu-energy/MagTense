@@ -527,9 +527,9 @@ class Tiles:
         elif isinstance(val, tuple):
             self._M_rel[val[1]] = val[0]
         elif isinstance(val, (int, float)):
-            self._M_rel = [val for _ in range(self.n)]
+            self._M_rel = np.array([val for _ in range(self.n)])
         elif len(val) == self.n:
-            self._M_rel = val
+            self._M_rel = np.array(val)
 
     @property
     def use_sym(self) -> np.ndarray:
@@ -780,7 +780,7 @@ def get_rotmat(rot: np.ndarray) -> np.ndarray:
 def grid_config(
     spots: list | np.ndarray,
     area: list | np.ndarray,
-    filled_pos: list | None = None,
+    filled_pos: list | np.ndarray | None = None,
     n_pts: tuple = (20, 20, 1),
     mode: str = "uniform",
     n_tiles: int | None = None,
@@ -817,7 +817,7 @@ def grid_config(
 
     if filled_pos is None:
         if n_tiles is None:
-            n_tiles = 1 + rng.integers(np.prod(spots))
+            n_tiles = int(1 + rng.integers(np.prod(spots)))
         elif n_tiles < 1 or n_tiles > np.prod(spots):
             value_err = f"n_tiles out of range! {n_tiles} > {np.prod(spots)}"
             raise ValueError(value_err)
