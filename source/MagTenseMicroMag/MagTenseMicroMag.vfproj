@@ -118,13 +118,45 @@
 			<File RelativePath=".\DemagAuxFunctions.f90"/>
 			<File RelativePath=".\FortranCuda.f90"/>
 			<File RelativePath="..\..\python\FortranToPythonIO.f90">
+				<FileConfiguration Name="Release_no_CVODE|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Release_no_CUDA_no_CVODE|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Debug_no_CUDA_no_CVODE|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Release_no_CUDA|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
 				<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Release_Standalone_exe|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Debug_no_CUDA|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Debug_no_CVODE|x64" ExcludedFromBuild="true">
 				</FileConfiguration>
 			</File>
 			<File RelativePath=".\LandauLifshitzEquationSolver.f90"/>
 			<File RelativePath=".\MagTenseMicroMagIO.f90"/>
 			<File RelativePath=".\MagTenseMicroMagPyIO.f90">
+				<FileConfiguration Name="Release_no_CVODE|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Release_no_CUDA_no_CVODE|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Debug_no_CUDA_no_CVODE|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Release_no_CUDA|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Release|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
 				<FileConfiguration Name="Debug|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Release_Standalone_exe|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Debug_no_CUDA|x64" ExcludedFromBuild="true">
+				</FileConfiguration>
+				<FileConfiguration Name="Debug_no_CVODE|x64" ExcludedFromBuild="true">
 				</FileConfiguration>
 			</File>
 			<File RelativePath=".\MicroMagParameters.f90"/>

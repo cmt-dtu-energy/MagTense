@@ -1,4 +1,4 @@
-function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error,mesh,GridInfo] = Standard_problem_4_unstructured_cart_new( mumag_field, options )
+function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error,mesh,GridInfo] = Standard_problem_4_unstructured_cart( mumag_field, options )
 %STANDARD_PROBLEM_4_UNSTRUCTURED_CART 
 %A function script to setup and simulate mumag standard problem 4 with an unstructured cartesian mesh loaded from a file
 %
@@ -68,7 +68,7 @@ function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_d
 %See also: Standard_problem_4
 
 arguments
-    mumag_field (1,1) {mustBeInteger}                = 1             %--- Use either field 1 or field 2 from the mumag example
+    mumag_field (1,1) {mustBeInteger}                = 1            %--- Use either field 1 or field 2 from the mumag example
     options.use_CUDA {mustBeNumericOrLogical}       = true          %--- Use CUDA for the calculations
     options.ShowTheResult {mustBeNumericOrLogical}  = true          %--- Show the result
     options.use_CVODE {mustBeNumericOrLogical}      = false;        %--- Use CVODE for the numerical time evolution
