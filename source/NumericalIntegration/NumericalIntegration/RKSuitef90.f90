@@ -28,6 +28,7 @@ module rksuite_90
 !
 use rksuite_90_prec, only:wp
 use integrationDataTypes
+use IO_GENERAL
 
 implicit none
 
@@ -3014,6 +3015,7 @@ logical :: ok, on, range_call
 !
 integer, parameter :: fatal=911, catastrophe=912, just_fine=1
 logical, parameter :: tell=.false.
+character*(500) :: prog_str 
 !
 !  Check where the call came from - if it is an indirect call from 
 !  RANGE_INTEGRATE the run is not STOPped.
@@ -3031,39 +3033,46 @@ ok = (srname=="STEP_INTEGRATE" .or. srname=="RANGE_INTEGRATE") .and. &
 on = get_stop_on_fatal_r1(comm)
 !
 if ((comm%print_message.and.ier>just_fine) .or. ier>=fatal) then
-   write (comm%outch,"(/a)") " **"
-   write (comm%outch,"(a)") comm%rec(1:nrec)
+   !write (comm%outch,"(/a)") " **"
+   !write (comm%outch,"(a)") comm%rec(1:nrec)
    if (ier>=fatal) then
-      write (comm%outch,"(a/a,a,a/a/)") &
+       write (prog_str,"(a/a,a,a/a/)") &
 " **",&
 " ** Catastrophic error detected in ", srname, ".",&
 " **"
+      call displayGUIMessage( trim(prog_str) )
       if ((.not.range_call.and.on.and.ier==fatal) .or. ier==catastrophe) then
-         write (comm%outch,"(a/a/a)") &
+         write (prog_str,"(a/a/a)") &
 " **",&
 " ** Execution of your program is being terminated.",&
 " **"
+         call displayGUIMessage( trim(prog_str) )
          stop
       end if
    else 
       if (ok) then
-         write (comm%outch,"(a/a,a,a,i2,a/a/a)")  &
-" **", &
-" ** Warning from routine ", srname, " with flag set ",ier, ".",&
-" ** You can continue integrating this problem.",&
-" **"
+         write(prog_str,'(A21, A, A15, I2, A44)') 'Warning from routine ', srname, ' with flag set ', ier, '. You can continue integrating this problem.'
+            
+          !write (prog_str,"(a/a,a,a,i2,a/a/a)")  &
+!" **", &
+!" ** Warning from routine ", srname, " with flag set ",ier, ".",&
+!" ** You can continue integrating this problem.",&
+!" **"
+         call displayGUIMessage( trim(prog_str) )
       else
-         write (comm%outch,"(a/a,a,a,i2,a/a/a)")  &
+         write (prog_str,"(a/a,a,a,i2,a/a/a)")  &
 " **", &
 " ** Warning from routine ", srname, " with flag set ",ier, ".", &
 " ** You cannot continue integrating this problem.", &
 " **"
+        call displayGUIMessage( trim(prog_str) )
       end if
       if (.not.present(flag)) then
-         write (comm%outch,"(a/a/a)") &
+         write (prog_str,"(a/a/a)") &
 " **",&
 " ** Execution of your program is being terminated.",&
 " **"
+         call displayGUIMessage( trim(prog_str) )
          stop
       end if
    end if
