@@ -234,7 +234,7 @@ jobs:
   test-linux:
     strategy:
       matrix:
-        mat-version: [R2023a,R2023b,R2024a,R2025a,R2025b]   #Note that R2024b always crashes with segmentation fault
+        mat-version: [R2023a,R2023b,R2024a]   #Note that R2024b, R2025a and R2025b always crashes with segmentation fault
         os-version: [ubuntu-latest,ubuntu_CUDA]
         CVODE-compile: [CVODE,noCVODE]
         CUDA-compile: [CUDA,noCUDA]
