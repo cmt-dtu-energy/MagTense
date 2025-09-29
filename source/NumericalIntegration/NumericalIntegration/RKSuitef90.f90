@@ -3036,43 +3036,51 @@ if ((comm%print_message.and.ier>just_fine) .or. ier>=fatal) then
    !write (comm%outch,"(/a)") " **"
    !write (comm%outch,"(a)") comm%rec(1:nrec)
    if (ier>=fatal) then
-       write (prog_str,"(a/a,a,a/a/)") &
-" **",&
-" ** Catastrophic error detected in ", srname, ".",&
-" **"
-      call displayGUIMessage( trim(prog_str) )
+       write(prog_str,'(A31, A)') 'Catastrophic error detected in ', srname
+       call displayGUIMessage( trim(prog_str) )
+       
+       !write (prog_str,"(a/a,a,a/a/)") &
+       !" **",&
+       !" ** Catastrophic error detected in ", srname, ".",&
+       !" **"
       if ((.not.range_call.and.on.and.ier==fatal) .or. ier==catastrophe) then
-         write (prog_str,"(a/a/a)") &
-" **",&
-" ** Execution of your program is being terminated.",&
-" **"
+         write(prog_str,'(A46)') 'Execution of your program is being terminated.'
          call displayGUIMessage( trim(prog_str) )
+          
+         !write (prog_str,"(a/a/a)") &
+         !" **",&
+         !" ** Execution of your program is being terminated.",&
+         !" **"
          stop
       end if
    else 
       if (ok) then
          write(prog_str,'(A21, A, A15, I2, A44)') 'Warning from routine ', srname, ' with flag set ', ier, '. You can continue integrating this problem.'
-            
-          !write (prog_str,"(a/a,a,a,i2,a/a/a)")  &
-!" **", &
-!" ** Warning from routine ", srname, " with flag set ",ier, ".",&
-!" ** You can continue integrating this problem.",&
-!" **"
-         call displayGUIMessage( trim(prog_str) )
+         call displayGUIMessage( trim(prog_str) )   
+         
+         !write (prog_str,"(a/a,a,a,i2,a/a/a)")  &
+         !" **", &
+         !" ** Warning from routine ", srname, " with flag set ",ier, ".",&
+         !" ** You can continue integrating this problem.",&
+         !" **"  
       else
-         write (prog_str,"(a/a,a,a,i2,a/a/a)")  &
-" **", &
-" ** Warning from routine ", srname, " with flag set ",ier, ".", &
-" ** You cannot continue integrating this problem.", &
-" **"
-        call displayGUIMessage( trim(prog_str) )
+         write(prog_str,'(A21, A, A15, I2, A47)') 'Warning from routine ', srname, ' with flag set ', ier, '. You cannot continue integrating this problem.'
+         call displayGUIMessage( trim(prog_str) ) 
+         
+         !write (prog_str,"(a/a,a,a,i2,a/a/a)")  &
+         !" **", &
+         !" ** Warning from routine ", srname, " with flag set ",ier, ".", &
+         !" ** You cannot continue integrating this problem.", &
+         !" **"
       end if
       if (.not.present(flag)) then
-         write (prog_str,"(a/a/a)") &
-" **",&
-" ** Execution of your program is being terminated.",&
-" **"
+         write(prog_str,'(A46)') 'Execution of your program is being terminated.'
          call displayGUIMessage( trim(prog_str) )
+         
+         !write (prog_str,"(a/a/a)") &
+         !" **",&
+         !" ** Execution of your program is being terminated.",&
+         !" **"
          stop
       end if
    end if
