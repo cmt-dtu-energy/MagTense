@@ -1065,3 +1065,55 @@ def get_H_field(
     )
 
     return H_out
+
+
+def get_H_field_fmm(
+    tiles, pts, demag_tensor=None, eps=1e-6
+) -> np.ndarray:
+    """
+    FMM-backed H-field, test version.
+    Mirrors get_H_field(...) but calls the Fortran FMM routine.
+
+    Notes:
+      - Currently uses a single dipole per tile (centre + moment).
+      - 'demag_tensor' is ignored here (no tensor reuse in this FMM path).
+      - 'eps' controls FMM accuracy.
+    """
+    # Maintain the same demag_tensor logic & shape for compatibility,
+    # but it is unused by the FMM routine. Keep it to preserve the API.
+    if demag_tensor is None:
+        useN = False
+        demag_tensor = np.zeros((tiles.n, len(pts), 3, 3), dtype=np.float64, order="F")
+    else:
+        useN = True
+
+    H_out = magtensesource.fortrantopythonio.gethfromtilesfmm(
+        centerpos=tiles.center_pos,
+        dev_center=tiles.dev_center,
+        tile_size=tiles.size,
+        vertices=tiles.vertices,
+        mag=tiles.M,
+        u_ea=tiles.u_ea,
+        u_oa1=tiles.u_oa1,
+        u_oa2=tiles.u_oa2,
+        mu_r_ea=tiles.mu_r_ea,
+        mu_r_oa=tiles.mu_r_oa,
+        mrem=tiles.M_rem,
+        tiletype=tiles.tile_type,
+        offset=tiles.offset,
+        rotangles=tiles.rot,
+        color=tiles.color,
+        magnettype=tiles.magnet_type,
+        statefunctionindex=tiles.stfcn_index,
+        includeiniteration=tiles.incl_it,
+        exploitsymmetry=tiles.use_sym,
+        symmetryops=tiles.sym_op,
+        mrel=tiles.M_rel,
+        pts=pts,
+        n_tiles=np.int32(tiles.n),
+        n_pts=np.int32(len(pts)),
+        n=demag_tensor,          # ignored in this routine, kept for compat
+        usestoredn=useN,         # ignored, kept for compat
+        eps=np.float64(eps),     # FMM precision
+    )
+    return H_out
