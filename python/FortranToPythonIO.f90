@@ -222,6 +222,116 @@ module FortranToPythonIO
 
     end subroutine getHFromTiles
 
+ 
+
+!----------------------------------------------------------------------------------
+! Test FMM-backed H-field using FMM3D Laplace dipoles
+! Approximates each tile as a single dipole located at its centre, with
+! dipole moment = Mag(i,:) * Volume(i).
+! Currently volume is estimated from tile_size for prisms; other shapes use a crude
+! fallback volume from the geometric mean of tile_size. Refine as needed.
+!
+subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+    mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, N, useStoredN, eps )
+
+    implicit none
+    ! --- arguments (unchanged) ---
+    integer(4),intent(in) :: n_tiles, n_pts
+    real(8),dimension(n_tiles,3),intent(in) :: centerPos, dev_center
+    real(8),dimension(n_tiles,3),intent(in) :: tile_size
+    real(8),dimension(n_tiles,3,4),intent(in) :: vertices
+    real(8),dimension(n_tiles,3),intent(in) :: Mag, u_ea, u_oa1, u_oa2
+    real(8),dimension(n_tiles),intent(in) :: mu_r_ea, mu_r_oa, Mrem
+    integer(4),dimension(n_tiles),intent(in) :: tileType, magnetType, stateFunctionIndex
+    integer(4),dimension(n_tiles),intent(in) :: includeInIteration, exploitSymmetry
+    real(8),dimension(n_tiles,3),intent(in) :: offset, rotAngles, color, symmetryOps
+    real(8),dimension(n_tiles),intent(in) :: Mrel
+    real(8),dimension(n_pts,3),intent(in) :: pts
+    real(8),dimension(n_pts,3),intent(out) :: H
+    real(8),dimension(n_tiles,n_pts,3,3),intent(inout) :: N
+    logical,intent(in) :: useStoredN
+    real(8),intent(in),optional :: eps
+    real(8) :: fourpi
+
+#if USE_FMM3D
+    ! ---------- real implementation when USE_FMM3D=1 ----------
+    integer(8) :: nd, nsrc8, ntgt8, ier
+    real(8) :: fmm_eps, vol_i
+    real(8),allocatable :: source(:,:), targ(:,:), dipvec(:,:,:), pottarg(:,:), gradtarg(:,:,:)
+    integer :: i, j
+
+    interface
+      subroutine lfmm3d_t_d_g_vec(nd,eps,nsource,source,dipvec,ntarg,targ,pottarg,gradtarg,ier)
+        implicit none
+        integer(8), intent(in) :: nd, nsource, ntarg
+        real(8),    intent(in) :: eps
+        real(8) :: source(3,nsource), dipvec(nd,3,nsource), targ(3,ntarg)
+        real(8) :: pottarg(nd,ntarg), gradtarg(nd,3,ntarg)
+        integer(8) :: ier
+      end subroutine lfmm3d_t_d_g_vec
+    end interface
+
+    fourpi = 12.566370614359172d0
+    fmm_eps = merge(eps, 1.0d-6, present(eps))
+
+    allocate(source(3,n_tiles), dipvec(1,3,n_tiles))
+    allocate(targ(3,n_pts), pottarg(1,n_pts), gradtarg(1,3,n_pts))
+
+    do j = 1, n_pts
+      targ(1,j)=pts(j,1)
+      targ(2,j)=pts(j,2)
+      targ(3,j)=pts(j,3)
+    end do
+
+    do i = 1, n_tiles
+      source(1,i) = offset(i,1)
+      source(2,i) = offset(i,2)
+      source(3,i) = offset(i,3)
+
+
+      vol_i = tile_size(i,1)*tile_size(i,2)*tile_size(i,3)
+      !if (tileType(i) == 2) then
+      !  vol_i = max(0d0,tile_size(i,1))*max(0d0,tile_size(i,2))*max(0d0,tile_size(i,3))
+      !else
+      !  vol_i = (max(0d0,tile_size(i,1))*max(0d0,tile_size(i,2))*max(0d0,tile_size(i,3)))**(1d0/3d0)
+      !  vol_i = vol_i**3
+      !end if
+
+      dipvec(1,1,i) = Mag(i,1)*vol_i !* mu0
+      dipvec(1,2,i) = Mag(i,2)*vol_i !* mu0
+      dipvec(1,3,i) = Mag(i,3)*vol_i !* mu0
+    end do
+
+    nd=1_8; nsrc8=int(n_tiles,8); ntgt8=int(n_pts,8)
+    call lfmm3d_t_d_g_vec(nd,fmm_eps,nsrc8,source,dipvec,ntgt8,targ,pottarg,gradtarg,ier)
+
+    do j = 1, n_pts
+      H(j,1) = -gradtarg(1,1,j)
+      H(j,2) = -gradtarg(1,2,j)
+      H(j,3) = -gradtarg(1,3,j)
+    end do
+
+    !----------- scale to match MagTense conventions -----------
+    H = H / fourpi
+    !----------------------------------------------------------
+
+    deallocate(source, dipvec, targ, pottarg, gradtarg)
+#else 
+    ! ---------- stub when built without FMM3D ----------
+    ! You can either:
+    !  (a) return zeros, or
+    !  (b) call the classic kernel, or
+    !  (c) stop with a clear message.
+    print *, "WARNING: getHFromTilesFMM called but MagTense built without FMM3D support. - Returning zero field." 
+    H(:,:) = 0.0d0
+    return
+#endif
+
+end subroutine getHFromTilesFMM
+
+
+
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !< Function IterateTiles
     !! @param tileType - defines whether the tile is cylindrical, a prism, an ellipsoid and so on
