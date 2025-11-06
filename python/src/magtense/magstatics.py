@@ -1068,7 +1068,7 @@ def get_H_field(
 
 
 def get_H_field_fmm(
-    tiles, pts, demag_tensor=None, eps=1e-6
+    tiles, pts, eps=1e-6
 ) -> np.ndarray:
     """
     FMM-backed H-field, test version.
@@ -1079,13 +1079,6 @@ def get_H_field_fmm(
       - 'demag_tensor' is ignored here (no tensor reuse in this FMM path).
       - 'eps' controls FMM accuracy.
     """
-    # Maintain the same demag_tensor logic & shape for compatibility,
-    # but it is unused by the FMM routine. Keep it to preserve the API.
-    if demag_tensor is None:
-        useN = False
-        demag_tensor = np.zeros((tiles.n, len(pts), 3, 3), dtype=np.float64, order="F")
-    else:
-        useN = True
 
     H_out = magtensesource.fortrantopythonio.gethfromtilesfmm(
         centerpos=tiles.center_pos,
@@ -1112,8 +1105,6 @@ def get_H_field_fmm(
         pts=pts,
         n_tiles=np.int32(tiles.n),
         n_pts=np.int32(len(pts)),
-        n=demag_tensor,          # ignored in this routine, kept for compat
-        usestoredn=useN,         # ignored, kept for compat
         eps=np.float64(eps),     # FMM precision
     )
     return H_out

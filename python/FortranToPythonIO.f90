@@ -233,7 +233,7 @@ module FortranToPythonIO
 !
 subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
     mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
-    includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, N, useStoredN, eps )
+    includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, eps )
     implicit none
     integer(4),intent(in) :: n_tiles, n_pts
     real(8),dimension(n_tiles,3),intent(in) :: centerPos, dev_center
@@ -247,8 +247,6 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
     real(8),dimension(n_tiles),intent(in) :: Mrel
     real(8),dimension(n_pts,3),intent(in) :: pts
     real(8),dimension(n_pts,3),intent(out) :: H
-    real(8),dimension(n_tiles,n_pts,3,3),intent(inout) :: N
-    logical,intent(in) :: useStoredN
     real(8),intent(in),optional :: eps
     real(8) :: fourpi
 
