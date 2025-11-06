@@ -79,8 +79,13 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 - Compile Fortran source files
 
   ```bash
-  LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
+  LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0
   ```
+
+- Compiling with FMM3D backend
+
+To compile with FMM3D `$(MagTense-Folder)/external/FMM3D/local` must be in the `LD_Library_PATH` (replace MagTense-Folder with the actual path to the MagTense destiation).
+After this compile as above but with `USE_FMM3D=1`
 
 #### Windows
 
