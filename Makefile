@@ -14,6 +14,39 @@ FC = ifx
 MKFILE_PATH := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CVODE_ROOT = ${MKFILE_PATH}/cvode
 
+#=======================================================================
+#                    FMM3D integration (upstream Makefile)
+#=======================================================================
+USE_FMM3D ?= 1
+
+# Submodule location
+FMM3D_DIR      ?= external/FMM3D
+
+# Absolute paths to headers and static archive
+FMM3D_ROOT     := $(abspath $(FMM3D_DIR))
+FMM3D_LIB      := $(FMM3D_ROOT)/local
+
+# Build FMM3D via its own Makefile
+.PHONY: fmm3d
+fmm3d:
+ifeq ($(USE_FMM3D),1)
+	@echo "==> FMM3D: building via upstream makefile (install)"
+	@cd "$(FMM3D_DIR)" && \
+	  $(MAKE) clean && $(MAKE) install PREFIX=$(abspath $(FMM3D_DIR)/local) FC=$(FC)
+else
+	@echo "USE_FMM3D=0 -> skipping FMM3D build"
+endif
+
+# Make high-level targets depend on FMM only when enabled
+ifeq ($(USE_FMM3D),1)
+ALL_DEPS := fmm3d
+PY_DEPS  := fmm3d
+else
+ALL_DEPS :=
+PY_DEPS  :=
+endif
+#=======================================================================
+
 ifeq (${UNAME}, Darwin)
 	FC = gfortran
 	USE_CUDA = 0
@@ -26,16 +59,16 @@ ifeq (${FC}, ifx)
 	ifeq ($(OS),Windows_NT)
 		FFLAGS = /O3 /fpp /real-size:64 /Qopenmp /assume:nocc_omp /fpe:0 \
 			/fp:source /nologo /DUSE_CVODE=${USE_CVODE} /DUSE_MATLAB=${USE_MATLAB} \
-			/DUSE_CUDA=${USE_CUDA} /DUSE_MICROMAG=${USE_MICROMAG}
+			/DUSE_CUDA=${USE_CUDA} /DUSE_MICROMAG=${USE_MICROMAG} /DUSE_FFM3D=${USE_FMM3D}
 	else
 		FFLAGS = -O3 -fpp -real-size 64 -qopenmp -assume nocc_omp -fpe0 \
 			-fp-model=source -fpic -nologo -DUSE_CVODE=${USE_CVODE} \
 			-DUSE_MATLAB=${USE_MATLAB} -DUSE_CUDA=${USE_CUDA} \
-			-DUSE_MICROMAG=${USE_MICROMAG}
+			-DUSE_MICROMAG=${USE_MICROMAG} -DUSE_FMM3D=${USE_FMM3D}
 	endif
 else ifeq (${FC}, gfortran)
 	FFLAGS = -O3 -fdefault-real-8 -fopenmp -ffree-line-length-512 -cpp -fPIC \
-		-DUSE_MICROMAG=0 -DUSE_CVODE=${USE_CVODE}
+		-DUSE_MICROMAG=0 -DUSE_CVODE=${USE_CVODE} -DUSE_FMM3D=${USE_FMM3D}
 endif
 
 PYTHON_MODN = magtensesource
@@ -116,6 +149,15 @@ else
 	endif
 endif
 
+#===================== FMM3D Integration ===========================
+ifeq ($(USE_FMM3D),0)
+  	FMM3D = 
+	else
+	  FMM3D = -L${FMM3D_LIB} -lfmm3d
+	  CP_LIB += && cp ${FMM3D_LIB}/libfmm3d${LIB_SUFFIX} .
+endif
+#===================================================================
+
 ifeq ($(USE_MATLAB),0)
 	FORCEINTEGRATOR =
 else
@@ -159,15 +201,16 @@ PYTHON_MODN_ALL = _${PYTHON_MODN}${PY_MOD_SUFFIX}
 #=======================================================================
 .PHONY: all clean
 
-all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR}
+all: $(ALL_DEPS) magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR}
 
 standalone: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} standalone
 
-python: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
+python: $(PY_DEPS) magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
 
 python-win: ${PYTHON_MODN_ALL}
 
 clean:
+	cd ${FMM3D_DIR} && ${MAKE} clean
 	cd ${NUM_INT_PATH} && ${MAKE} clean
 	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} clean
 	cd ${DEMAG_FIELD_PATH} && ${MAKE} clean
@@ -206,5 +249,5 @@ ${PYTHON_MODN_ALL}:
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
 		python -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} \
-		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE}
+		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${FMM3D}
 	cp *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/
