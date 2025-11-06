@@ -17,7 +17,7 @@ CVODE_ROOT = ${MKFILE_PATH}/cvode
 #=======================================================================
 #                    FMM3D integration (upstream Makefile)
 #=======================================================================
-USE_FMM3D ?= 1
+USE_FMM3D ?= 0
 
 # Submodule location
 FMM3D_DIR      ?= external/FMM3D
