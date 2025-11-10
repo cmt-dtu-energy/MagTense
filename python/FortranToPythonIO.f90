@@ -336,6 +336,112 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
 
 end subroutine getHFromTilesFMM
 
+!----------------------------------------------------------------------------------
+! FMM-backed H-field AT SOURCE POSITIONS using FMM3D (dipoles-only, src->src)
+! Each tile i is a dipole at its centre with moment m_i = M_i * Volume_i.
+! Returns H on the tile centres (n_tiles,3).
+!
+subroutine getHOnSourcesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+    mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
+    includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, H_src, eps )
+  implicit none
+  !---------------- args ----------------
+  integer(4),intent(in) :: n_tiles
+  real(8),dimension(n_tiles,3),intent(in) :: centerPos, dev_center
+  real(8),dimension(n_tiles,3),intent(in) :: tile_size
+  real(8),dimension(n_tiles,3,4),intent(in) :: vertices
+  real(8),dimension(n_tiles,3),intent(in) :: Mag, u_ea, u_oa1, u_oa2
+  real(8),dimension(n_tiles),intent(in) :: mu_r_ea, mu_r_oa, Mrem
+  integer(4),dimension(n_tiles),intent(in) :: tileType, magnetType, stateFunctionIndex
+  integer(4),dimension(n_tiles),intent(in) :: includeInIteration, exploitSymmetry
+  real(8),dimension(n_tiles,3),intent(in) :: offset, rotAngles, color, symmetryOps
+  real(8),dimension(n_tiles),intent(in) :: Mrel
+  real(8),dimension(n_tiles,3),intent(out) :: H_src
+  real(8),intent(in),optional :: eps
+
+  real(8) :: fourpi
+#if USE_FMM3D
+  !-------------- locals --------------
+  integer :: i, ier4
+  integer :: nd4, nsrc4
+  real(8) :: fmm_eps, vol_i
+  real(8),allocatable :: source(:,:)          ! (3, n_tiles)
+  real(8),allocatable :: dipvec(:,:,:)        ! (1, 3, n_tiles)
+  real(8),allocatable :: pot(:,:)             ! (1, n_tiles)
+  real(8),allocatable :: grad(:,:,:)          ! (1, 3, n_tiles)
+
+  interface
+    subroutine lfmm3d_s_d_g_vec(nd,eps,nsource,source,dipvec,pot,grad,ier)
+      implicit none
+      integer, intent(in) :: nd, nsource
+      double precision, intent(in) :: eps
+      double precision :: source(3,nsource)
+      double precision :: dipvec(nd,3,nsource)
+      double precision :: pot(nd,nsource)
+      double precision :: grad(nd,3,nsource)
+      integer :: ier
+    end subroutine lfmm3d_s_d_g_vec
+  end interface
+
+  fourpi  = 12.566370614359172d0
+  fmm_eps = merge(eps, 1.0d-6, present(eps))
+
+  allocate(source(3,n_tiles), dipvec(1,3,n_tiles))
+  allocate(pot(1,n_tiles), grad(1,3,n_tiles))
+
+  ! Pack sources (tile centres) and dipole moments (M*V)
+  do i = 1, n_tiles
+    ! Use offset as the global tile centre; adjust if your pipeline prefers centerPos+dev_center
+    source(1,i) = offset(i,1)
+    source(2,i) = offset(i,2)
+    source(3,i) = offset(i,3)
+
+    ! Volume estimate: exact for prisms; crude fallback for others
+    if (tileType(i) == 2) then
+      vol_i = max(0d0,tile_size(i,1))*max(0d0,tile_size(i,2))*max(0d0,tile_size(i,3))
+    else
+      vol_i = (max(0d0,tile_size(i,1))*max(0d0,tile_size(i,2))*max(0d0,tile_size(i,3)))**(1d0/3d0)
+      vol_i = vol_i**3
+    end if
+
+    dipvec(1,1,i) = Mag(i,1) * vol_i
+    dipvec(1,2,i) = Mag(i,2) * vol_i
+    dipvec(1,3,i) = Mag(i,3) * vol_i
+  end do
+
+  nd4   = 1
+  nsrc4 = n_tiles
+  call lfmm3d_s_d_g_vec(nd4, fmm_eps, nsrc4, source, dipvec, pot, grad, ier4)
+  if (ier4 /= 0) then
+    write(*,*) 'FMM3D error in getHOnSourcesFMM: ier =', ier4
+  end if
+
+  ! Map ∇u -> H: H = -grad / (4π)
+  do i = 1, n_tiles
+    H_src(i,1) = -grad(1,1,i) / fourpi
+    H_src(i,2) = -grad(1,2,i) / fourpi
+    H_src(i,3) = -grad(1,3,i) / fourpi
+  end do
+
+
+  call add_self_field(  H_src, centerPos, dev_center, tile_size, vertices, &
+                        Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, &
+                        offset, rotAngles, color, magnetType, stateFunctionIndex,   &
+                        includeInIteration, exploitSymmetry, symmetryOps, Mrel)
+
+
+    call add_neighbour_corrections(H_src, centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
+                                mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType,     &
+                                stateFunctionIndex, includeInIteration, exploitSymmetry, symmetryOps, Mrel, &
+                                radius_cells = 2)
+
+  deallocate(source, dipvec, pot, grad)
+#else
+  fourpi = 12.566370614359172d0
+  H_src(:,:) = 0.0d0
+  print *, "WARNING: getHOnSourcesFMM called without FMM3D support; returning zeros."
+#endif
+end subroutine getHOnSourcesFMM
 
 
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -629,6 +735,13 @@ end subroutine getHFromTilesFMM
 		
 #else
         write(*,*) 'Compiled without micromagnetic part. Returning zeros.'
+        n_tot_Exch = 0
+        ExchMat_r = 0
+        ExchMat_c = 0
+        ExchMat_v = 0.
+        ExchMat_nr = 0
+        ExchMat_nc = 0
+        
         t_out = 0.
         M_mm(:,:,:,:) = 0.
         pts(:,:) = 0.
@@ -639,5 +752,206 @@ end subroutine getHFromTilesFMM
 #endif
 
     end subroutine RunMicroMagSimulation
+
+
+
+
+
+
+
+
+
+
+
+
+
+    !================== Helper functions for FMM correction ==========================================
+
+        !---------------- for getting self field correction ----------------------------------------
+
+    subroutine add_self_field(H_fmm, centerPos, dev_center, tile_size, vertices, &
+                          Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, &
+                          offset, rotAngles, color, magnetType, stateFunctionIndex, &
+                          includeInIteration, exploitSymmetry, symmetryOps, Mrel)
+        implicit none
+        ! ---- dummy arguments (assumed-shape everywhere) ----
+        real(8), intent(inout) :: H_fmm(:,:)               ! (N,3)
+        real(8), intent(in)    :: centerPos(:,:), dev_center(:,:), tile_size(:,:), vertices(:,:,:)
+        real(8), intent(in)    :: Mag(:,:), u_ea(:,:), u_oa1(:,:), u_oa2(:,:)
+        real(8), intent(in)    :: mu_r_ea(:), mu_r_oa(:), Mrem(:)
+        integer(4), intent(in) :: tileType(:), magnetType(:), stateFunctionIndex(:)
+        real(8), intent(in)    :: offset(:,:), rotAngles(:,:), color(:,:), symmetryOps(:,:), Mrel(:)
+        integer(4), intent(in) :: includeInIteration(:), exploitSymmetry(:)
+
+        ! ---- locals ----
+        integer(4) :: n_all, t
+        real(8)    :: pts(1,3)
+        real(8)    :: Ktt(1,1,3,3)
+        real(8)    :: Kloc(3,3)
+
+        ! optional sanity (defensive): ensure second dim==3 for relevant arrays
+        ! if (size(H_fmm,2) /= 3) stop 'add_self_field: H_fmm second dim must be 3'
+        ! if (size(Mag,2)   /= 3) stop 'add_self_field: Mag second dim must be 3'
+
+        n_all = size(H_fmm,1)
+
+        do t = 1, n_all
+            pts(1,:) = offset(t,:)  ! evaluate at tile t centre
+
+            call getNFromTiles( centerPos(t:t,:), dev_center(t:t,:), tile_size(t:t,:), vertices(t:t,:,:), &
+                                Mag(t:t,:), u_ea(t:t,:), u_oa1(t:t,:), u_oa2(t:t,:),                       &
+                                mu_r_ea(t:t), mu_r_oa(t:t), Mrem(t:t), tileType(t:t),                      &
+                                offset(t:t,:), rotAngles(t:t,:), color(t:t,:), magnetType(t:t),            &
+                                stateFunctionIndex(t:t), includeInIteration(t:t),                          &
+                                exploitSymmetry(t:t), symmetryOps(t:t,:), Mrel(t:t),                       &
+                                pts, n_tiles=1, n_pts=1, N=Ktt )
+
+            ! Slice directly: Ktt(1,1,:,:) is already 3x3 (no RESHAPE needed)
+            Kloc      = Ktt(1,1,:,:)
+            H_fmm(t,:) = H_fmm(t,:) + matmul(Kloc, Mag(t,:))
+        end do
+    end subroutine add_self_field
+        !------------------------------------------------------------------------------------------------
+
+        !------------------- for getting near-field correction ------------------------------------------
+    pure subroutine dipole_tensor_3x3(Rvec, Kdip)
+        implicit none
+        ! Kdip = (1/(4π r^3)) * (3 r̂ r̂^T - I), mapping M -> H (SI)
+        real(8), intent(in)  :: Rvec(3)
+        real(8), intent(out) :: Kdip(3,3)
+        real(8), parameter   :: fourpi = 12.56637061435917295385d0
+        real(8), parameter   :: epsR   = 1.0d-15
+        real(8) :: r2, rmag, invR3, ux, uy, uz
+
+        r2  = Rvec(1)*Rvec(1) + Rvec(2)*Rvec(2) + Rvec(3)*Rvec(3)
+        rmag = sqrt(r2)
+
+        if (rmag <= epsR) then
+            Kdip = 0.0d0
+            return
+        end if
+
+        invR3 = 1.0d0 / (fourpi * r2 * rmag)
+        ux = Rvec(1)/rmag
+        uy = Rvec(2)/rmag
+        uz = Rvec(3)/rmag
+
+        Kdip(1,1) = (3.0d0*ux*ux - 1.0d0) * invR3
+        Kdip(1,2) = (3.0d0*ux*uy)         * invR3
+        Kdip(1,3) = (3.0d0*ux*uz)         * invR3
+        Kdip(2,1) = Kdip(1,2)
+        Kdip(2,2) = (3.0d0*uy*uy - 1.0d0) * invR3
+        Kdip(2,3) = (3.0d0*uy*uz)         * invR3
+        Kdip(3,1) = Kdip(1,3)
+        Kdip(3,2) = Kdip(2,3)
+        Kdip(3,3) = (3.0d0*uz*uz - 1.0d0) * invR3
+    end subroutine dipole_tensor_3x3
+
+    pure logical function is_neighbour(idx_t, idx_s, offset, size, pitch, rad_cells) result(mask)
+        implicit none
+        integer(4), intent(in) :: idx_t, idx_s, rad_cells
+        real(8),   intent(in) :: offset(:,:), size(:,:), pitch(3)
+        real(8) :: dx, dy, dz, tx, ty, tz
+
+        if (idx_t == idx_s) then
+            mask = .false.
+            return
+        end if
+
+        dx = abs(offset(idx_s,1) - offset(idx_t,1))
+        dy = abs(offset(idx_s,2) - offset(idx_t,2))
+        dz = abs(offset(idx_s,3) - offset(idx_t,3))
+
+        tx = rad_cells * pitch(1) + 0.5d0*(size(idx_s,1) + size(idx_t,1))
+        ty = rad_cells * pitch(2) + 0.5d0*(size(idx_s,2) + size(idx_t,2))
+        tz = rad_cells * pitch(3) + 0.5d0*(size(idx_s,3) + size(idx_t,3))
+
+        mask = (dx <= tx) .and. (dy <= ty) .and. (dz <= tz)
+    end function is_neighbour
+
+subroutine add_neighbour_corrections(H_fmm, centerPos, dev_center, tile_size, vertices, &
+                                     Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, &
+                                     offset, rotAngles, color, magnetType, stateFunctionIndex,   &
+                                     includeInIteration, exploitSymmetry, symmetryOps, Mrel,     &
+                                     radius_cells)
+  implicit none
+  ! in/out
+  real(8), intent(inout) :: H_fmm(:,:)                 ! (N,3)
+
+  ! inputs
+  real(8), intent(in)    :: centerPos(:,:), dev_center(:,:), tile_size(:,:), vertices(:,:,:)
+  real(8), intent(in)    :: Mag(:,:), u_ea(:,:), u_oa1(:,:), u_oa2(:,:)
+  real(8), intent(in)    :: mu_r_ea(:), mu_r_oa(:), Mrem(:)
+  integer(4), intent(in) :: tileType(:), magnetType(:), stateFunctionIndex(:)
+  real(8), intent(in)    :: offset(:,:), rotAngles(:,:), color(:,:), symmetryOps(:,:), Mrel(:)
+  integer(4), intent(in) :: includeInIteration(:), exploitSymmetry(:)
+  integer(4), intent(in) :: radius_cells
+
+  ! locals
+  integer(4) :: N, t, j, jj, n_nbr
+  integer(4), allocatable :: nbr_idx(:)
+  real(8) :: pitch(3), pts(1,3)
+  real(8), allocatable :: Ktn(:,:,:,:)   ! (1, n_nbr, 3, 3)
+  real(8) :: Rvec(3), Kdip(3,3), Kloc(3,3), Vol_j
+  real(8) :: dH(3)
+
+  N = size(H_fmm,1)
+
+  ! simple pitch estimate (mean size per axis)
+  pitch(1) = sum(tile_size(:,1))/real(N,8)
+  pitch(2) = sum(tile_size(:,2))/real(N,8)
+  pitch(3) = sum(tile_size(:,3))/real(N,8)
+
+  do t = 1, N
+    ! ---- pass 1: count neighbours ----
+    n_nbr = 0
+    do j = 1, N
+      if ( is_neighbour(t, j, offset, tile_size, pitch, radius_cells) ) n_nbr = n_nbr + 1
+    end do
+    if (n_nbr == 0) cycle
+
+    ! ---- pass 2: allocate and fill index list exactly ----
+    allocate(nbr_idx(n_nbr))
+    n_nbr = 0
+    do j = 1, N
+      if ( is_neighbour(t, j, offset, tile_size, pitch, radius_cells) ) then
+        n_nbr = n_nbr + 1
+        nbr_idx(n_nbr) = j
+      end if
+    end do
+
+    allocate(Ktn(1, n_nbr, 3, 3))
+
+    ! exact prism tensors for these neighbours at target centre
+    pts(1,:) = offset(t,:)
+    call getNFromTiles( centerPos(nbr_idx,:), dev_center(nbr_idx,:), tile_size(nbr_idx,:), vertices(nbr_idx,:,:), &
+                        Mag(nbr_idx,:), u_ea(nbr_idx,:), u_oa1(nbr_idx,:), u_oa2(nbr_idx,:),                       &
+                        mu_r_ea(nbr_idx), mu_r_oa(nbr_idx), Mrem(nbr_idx), tileType(nbr_idx),                      &
+                        offset(nbr_idx,:), rotAngles(nbr_idx,:), color(nbr_idx,:), magnetType(nbr_idx),            &
+                        stateFunctionIndex(nbr_idx), includeInIteration(nbr_idx),                                   &
+                        exploitSymmetry(nbr_idx), symmetryOps(nbr_idx,:), Mrel(nbr_idx),                           &
+                        pts, n_tiles = n_nbr, n_pts = 1, N = Ktn )
+
+    ! accumulate correction ΔH_t = Σ (K_prism - K_dip*V) @ M_j
+    dH = 0.0d0
+    do jj = 1, n_nbr
+      j      = nbr_idx(jj)
+      Rvec   = pts(1,:) - offset(j,:)                   ! source -> target
+      call dipole_tensor_3x3(Rvec, Kdip)                ! per-unit-M
+      Vol_j  = tile_size(j,1) * tile_size(j,2) * tile_size(j,3)
+      Kdip   = Kdip * Vol_j                             ! FMM used m = M * V
+      Kloc   = Ktn(1, jj, :, :)                         ! exact prism tensor
+      dH     = dH + matmul( Kloc - Kdip, Mag(j,:) )
+    end do
+
+    H_fmm(t,:) = H_fmm(t,:) + dH
+
+    deallocate(Ktn)
+    deallocate(nbr_idx)
+  end do
+end subroutine add_neighbour_corrections
+
+        !------------------------------------------------------------------------------------------------
+    !============================================================================================================
 
 end module FortranToPythonIO
