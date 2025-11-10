@@ -1108,3 +1108,39 @@ def get_H_field_fmm(
         eps=np.float64(eps),     # FMM precision
     )
     return H_out
+
+
+def get_H_on_sources_fmm(tiles, eps=1e-6) -> np.ndarray:
+    """
+    H field evaluated at tile centres using FMM (dipoles-only, sources->sources).
+
+    Returns:
+        H_src: (n_tiles, 3) ndarray, field at each tile centre.
+    """
+    H_src = magtensesource.fortrantopythonio.gethonsourcesfmm(
+        centerpos=tiles.center_pos,
+        dev_center=tiles.dev_center,
+        tile_size=tiles.size,
+        vertices=tiles.vertices,
+        mag=tiles.M,
+        u_ea=tiles.u_ea,
+        u_oa1=tiles.u_oa1,
+        u_oa2=tiles.u_oa2,
+        mu_r_ea=tiles.mu_r_ea,
+        mu_r_oa=tiles.mu_r_oa,
+        mrem=tiles.M_rem,
+        tiletype=tiles.tile_type,
+        offset=tiles.offset,
+        rotangles=tiles.rot,
+        color=tiles.color,
+        magnettype=tiles.magnet_type,
+        statefunctionindex=tiles.stfcn_index,
+        includeiniteration=tiles.incl_it,
+        exploitsymmetry=tiles.use_sym,
+        symmetryops=tiles.sym_op,
+        mrel=tiles.M_rel,
+        n_tiles=np.int32(tiles.n),
+        eps=np.float64(eps),
+    )
+    return H_src
+
