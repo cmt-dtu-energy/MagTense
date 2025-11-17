@@ -850,10 +850,6 @@ module fmm3d_tree_mod
         double precision, pointer :: chargesort(:,:)
         double precision, pointer :: dipvecsort(:,:,:)
         double precision, pointer :: potsort(:,:),gradsort(:,:,:)
-        double precision, pointer :: hesssort(:,:,:)
-        double precision, pointer :: pottargsort(:,:)
-        double precision, pointer :: gradtargsort(:,:,:)
-        double precision, pointer :: hesstargsort(:,:,:)
         integer ifpgh,ifpghtarg, nsource,ntarg,nd
         !------------------------------------------------
 
@@ -863,9 +859,6 @@ module fmm3d_tree_mod
         dipvecsort => self%dipvecsort
         potsort => self%potsort
         gradsort => self%gradsort
-        hesssort => self%hesssort
-        pottargsort => self%pottargsort
-        gradtargsort => self%gradtargsort
 
         ifpgh = self%ifpgh
         ifpghtarg = self%ifpghtarg
@@ -873,17 +866,7 @@ module fmm3d_tree_mod
         ntarg = self%ntarg
         nd = self%nd
 
-        if(ifpgh.eq.1) then
-    !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,idim)
-            do i=1,nsource
-            do idim=1,nd
-                potsort(idim,i) = 0
-            enddo
-            enddo
-    !$OMP END PARALLEL DO
-        endif
 
-        if(ifpgh.eq.2) then
     !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,idim)
 
             do i=1,nsource
@@ -895,75 +878,9 @@ module fmm3d_tree_mod
             enddo
             enddo
     !$OMP END PARALLEL DO
-        endif
-
-
-        if(ifpgh.eq.3) then
-    !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,idim)
-            do i=1,nsource
-            do idim=1,nd
-                potsort(idim,i) = 0
-                gradsort(idim,1,i) = 0
-                gradsort(idim,2,i) = 0
-                gradsort(idim,3,i) = 0
-                hesssort(idim,1,i) = 0
-                hesssort(idim,2,i) = 0
-                hesssort(idim,3,i) = 0
-                hesssort(idim,4,i) = 0
-                hesssort(idim,5,i) = 0
-                hesssort(idim,6,i) = 0
-            enddo
-            enddo
-    !$OMP END PARALLEL DO
-        endif
 
 
 
-    !
-    !c       initialize potential and gradient  at targ
-    !        locations
-    !
-        if(ifpghtarg.eq.1) then
-    !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,idim)
-            do i=1,ntarg
-            do idim=1,nd
-                pottargsort(idim,i) = 0
-            enddo
-            enddo
-    !$OMP END PARALLEL DO
-        endif
-
-        if(ifpghtarg.eq.2) then
-    !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,idim)
-            do i=1,ntarg
-            do idim=1,nd
-                pottargsort(idim,i) = 0
-                gradtargsort(idim,1,i) = 0
-                gradtargsort(idim,2,i) = 0
-                gradtargsort(idim,3,i) = 0
-            enddo
-            enddo
-    !$OMP END PARALLEL DO
-        endif
-
-        if(ifpghtarg.eq.3) then
-    !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,idim)
-            do i=1,ntarg
-            do idim=1,nd
-                pottargsort(idim,i) = 0
-                gradtargsort(idim,1,i) = 0
-                gradtargsort(idim,2,i) = 0
-                gradtargsort(idim,3,i) = 0
-                hesstargsort(idim,1,i) = 0
-                hesstargsort(idim,2,i) = 0
-                hesstargsort(idim,3,i) = 0
-                hesstargsort(idim,4,i) = 0
-                hesstargsort(idim,5,i) = 0
-                hesstargsort(idim,6,i) = 0
-            enddo
-            enddo
-    !$OMP END PARALLEL DO
-        endif
 
     end subroutine reset_sort_arg
 
