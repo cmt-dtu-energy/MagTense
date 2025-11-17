@@ -752,6 +752,33 @@ module fmm3d_tree_mod
       allocate(self%iboxsubcenters(3,8,self%nthd))
       allocate(self%iboxfl(2,8,self%nthd))
 
+    !  figure out allocations needed for iboxsrc,iboxsrcind,iboxpot
+
+      nmaxt = 0
+    !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
+    !$OMP REDUCTION(max:nmaxt)
+          do ibox=1,self%nboxes
+            if(self%nlist3(ibox).gt.0) then
+              istart = self%isrcse(1,ibox)
+              iend = self%isrcse(2,ibox)
+              npts = iend-istart+1
+              if(npts.gt.nmaxt) nmaxt = npts
+
+              istart = self%itargse(1,ibox)
+              iend = self%itargse(2,ibox)
+              npts = iend - istart + 1
+              if(npts.gt.nmaxt) nmaxt = npts
+            endif
+          enddo
+    !$OMP END PARALLEL DO
+
+      allocate(self%iboxsrcind(nmaxt,self%nthd))
+      allocate(self%iboxsrc(3,nmaxt,self%nthd))
+      allocate(self%iboxpot(self%nd,nmaxt,self%nthd))
+      allocate(self%iboxgrad(self%nd,3,nmaxt,self%nthd))
+      allocate(self%iboxhess(self%nd,6,nmaxt,self%nthd))
+
+
 
 
     end subroutine build2
@@ -1380,6 +1407,13 @@ module fmm3d_tree_mod
         iboxsubcenters => self%iboxsubcenters
         iboxfl => self%iboxfl
 
+
+        iboxsrcind => self%iboxsrcind
+        iboxsrc => self%iboxsrc
+        iboxpot => self%iboxpot
+        iboxgrad => self%iboxgrad
+        iboxhess => self%iboxhess
+
     !------------------------------------------------
 
 
@@ -1775,21 +1809,21 @@ module fmm3d_tree_mod
          enddo
 !$OMP END PARALLEL DO
       enddo
-      deallocate(gboxfl,gboxsubcenters,gboxwexp,gboxcgsort)
-      deallocate(gboxdpsort,gboxind,gboxsort)
+      !deallocate(gboxfl,gboxsubcenters,gboxwexp,gboxcgsort)
+      !deallocate(gboxdpsort,gboxind,gboxsort)
 
-      call cpu_time(time2)
+      !call cpu_time(time2)
 !$    time2=omp_get_wtime()
-      if(ifprint.ge.1) print *,"mexp list4 time:",time2-time1
-      timeinfo(3)=time2-time1
+      !if(ifprint.ge.1) print *,"mexp list4 time:",time2-time1
+      !timeinfo(3)=time2-time1
 !     end of count number of boxes are in list4
 !
 
 !
 !
-      if(ifprint .ge. 1)  &
-     &   call prinf('=== STEP 1 (form mp) ====*',i,0)
-        call cpu_time(time1)
+    !   if(ifprint .ge. 1)  &
+    !  &   call prinf('=== STEP 1 (form mp) ====*',i,0)
+    !     call cpu_time(time1)
 !$        time1=omp_get_wtime()
 !
 !       ... step 1, locate all charges, assign them to boxes, and
@@ -1946,29 +1980,29 @@ module fmm3d_tree_mod
 !  figure out allocations needed for iboxsrc,iboxsrcind,iboxpot
 !  and so on
 !
-      nmaxt = 0
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
-!$OMP REDUCTION(max:nmaxt)
-      do ibox=1,nboxes
-        if(nlist3(ibox).gt.0) then
-          istart = isrcse(1,ibox)
-          iend = isrcse(2,ibox)
-          npts = iend-istart+1
-          if(npts.gt.nmaxt) nmaxt = npts
+!       nmaxt = 0
+! !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
+! !$OMP REDUCTION(max:nmaxt)
+!       do ibox=1,nboxes
+!         if(nlist3(ibox).gt.0) then
+!           istart = isrcse(1,ibox)
+!           iend = isrcse(2,ibox)
+!           npts = iend-istart+1
+!           if(npts.gt.nmaxt) nmaxt = npts
 
-          istart = itargse(1,ibox)
-          iend = itargse(2,ibox)
-          npts = iend - istart + 1
-          if(npts.gt.nmaxt) nmaxt = npts
-        endif
-      enddo
-!$OMP END PARALLEL DO
+!           istart = itargse(1,ibox)
+!           iend = itargse(2,ibox)
+!           npts = iend - istart + 1
+!           if(npts.gt.nmaxt) nmaxt = npts
+!         endif
+!       enddo
+! !$OMP END PARALLEL DO
 
-      allocate(iboxsrcind(nmaxt,nthd))
-      allocate(iboxsrc(3,nmaxt,nthd))
-      allocate(iboxpot(nd,nmaxt,nthd))
-      allocate(iboxgrad(nd,3,nmaxt,nthd))
-      allocate(iboxhess(nd,6,nmaxt,nthd))
+!       allocate(iboxsrcind(nmaxt,nthd))
+!       allocate(iboxsrc(3,nmaxt,nthd))
+!       allocate(iboxpot(nd,nmaxt,nthd))
+!       allocate(iboxgrad(nd,3,nmaxt,nthd))
+!       allocate(iboxhess(nd,6,nmaxt,nthd))
 
       do ilev=2,nlevels
         allocate(iboxlexp(nd*(nterms(ilev)+1)* &
@@ -2449,23 +2483,23 @@ module fmm3d_tree_mod
         deallocate(iboxlexp)  
       enddo
 
-      deallocate(iboxsrcind,iboxsrc,iboxpot,iboxgrad,iboxhess)
-      deallocate(iboxsubcenters,iboxfl)
-      deallocate(uall,dall,nall,sall,eall,wall)
-      deallocate(u1234,d5678,n1256,s3478)
-      deallocate(e1357,w2468,n12,n56,s34,s78)
-      deallocate(e13,e57,w24,w68)
-      deallocate(e1,e3,e5,e7,w2,w4,w6,w8)
-      deallocate(tmp,mptmp)
-      call cpu_time(time2)
+      ! deallocate(iboxsrcind,iboxsrc,iboxpot,iboxgrad,iboxhess)
+      ! deallocate(iboxsubcenters,iboxfl)
+      ! deallocate(uall,dall,nall,sall,eall,wall)
+      ! deallocate(u1234,d5678,n1256,s3478)
+      ! deallocate(e1357,w2468,n12,n56,s34,s78)
+      ! deallocate(e13,e57,w24,w68)
+      ! deallocate(e1,e3,e5,e7,w2,w4,w6,w8)
+      ! deallocate(tmp,mptmp)
+      ! call cpu_time(time2)
 !$        time2=omp_get_wtime()
-      timeinfo(3) = timeinfo(3) + time2-time1
+      ! timeinfo(3) = timeinfo(3) + time2-time1
 
 
-      if(ifprint.ge.1) &
-     &    call prinf('=== Step 4 (split loc) ===*',i,0)
+    !   if(ifprint.ge.1) &
+    !  &    call prinf('=== Step 4 (split loc) ===*',i,0)
 
-      call cpu_time(time1)
+    !   call cpu_time(time1)
 !$        time1=omp_get_wtime()
       do ilev = 2,nlevels-1
 
@@ -2505,18 +2539,18 @@ module fmm3d_tree_mod
          enddo
 !$OMP END PARALLEL DO
       enddo
-      call cpu_time(time2)
+      ! call cpu_time(time2)
 !$        time2=omp_get_wtime()
-      timeinfo(4) = time2-time1
+      ! timeinfo(4) = time2-time1
 
 
-      if(ifprint.ge.1) &
-     &    call prinf('=== step 5 (eval lo) ===*',i,0)
+    !   if(ifprint.ge.1) &
+    !  &    call prinf('=== step 5 (eval lo) ===*',i,0)
 
 !     ... step 6, evaluate all local expansions
 !
 
-      call cpu_time(time1)
+      ! call cpu_time(time1)
 !$        time1=omp_get_wtime()
 !
 
@@ -2545,6 +2579,11 @@ module fmm3d_tree_mod
          enddo
 !$OMP END PARALLEL DO
       enddo
+
+
+
+
+
 
 !
 !c        evaluate local expansion at source and target
@@ -2666,14 +2705,14 @@ module fmm3d_tree_mod
       enddo
 
     
-      call cpu_time(time2)
+      ! call cpu_time(time2)
 !$        time2=omp_get_wtime()
-      timeinfo(5) = time2 - time1
+      ! timeinfo(5) = time2 - time1
 
 
-      if(ifprint .ge. 1) &
-     &     call prinf('=== STEP 6 (direct) =====*',i,0)
-      call cpu_time(time1)
+    !   if(ifprint .ge. 1) &
+    !  &     call prinf('=== STEP 6 (direct) =====*',i,0)
+    !   call cpu_time(time1)
 !$        time1=omp_get_wtime()
 
       if(ifnear.eq.0) goto 1000
