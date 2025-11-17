@@ -171,6 +171,9 @@ module fmm3d_tree_mod
           procedure :: build2
           procedure :: lfmm3dmain_tree
           procedure :: reset_expansion_coeff
+
+          procedure :: eval_local
+          procedure :: eval_direct
       end type FMM3DTree
     contains 
 
@@ -269,7 +272,13 @@ module fmm3d_tree_mod
             &   self%ifpghtarg,self%pottargsort,self%gradtargsort,self%hesstargsort,self%ntj, &
             &   self%texpssort,self%scjsort,self%ifnear,self%timeinfo,self%ier)
 
-        print *, "self%ipointer(1) ", self%ipointer
+
+        !call self%reset_sort_arg()
+
+        call self%eval_local()
+        call self%eval_direct()
+
+        !print *, "self%ipointer(1) ", self%ipointer
 
         ! call lfmm3dmain_tree_old(self%nd,self%eps, &
         !     &   self%nsource,self%sourcesort, &
@@ -1419,250 +1428,6 @@ module fmm3d_tree_mod
     !------------------------------------------------
 
 
-
-      !  print *, " self%nmax=",self%nmax
-    !   nmax = 0
-    !   do i=0,nlevels
-    !      if(nmax.lt.nterms(i)) nmax = nterms(i)
-    !   enddo
-
-    !  ! print *, " nmax=",nmax
-    !     nmaxt = nmax
-    !   allocate(rscpow(0:nmax))
-    !   allocate(carray(4*nmax+1,4*nmax+1))
-    !   allocate(dc(0:4*nmax,0:4*nmax))
-    !   allocate(rdplus(0:nmax,0:nmax,-nmax:nmax))
-    !   allocate(rdminus(0:nmax,0:nmax,-nmax:nmax))
-    !   allocate(rdsq3(0:nmax,0:nmax,-nmax:nmax))
-    !   allocate(rdmsq3(0:nmax,0:nmax,-nmax:nmax))
-    !   allocate(rlsc(0:nmax,0:nmax,nlams))
-
-
-!     generate rotation matrices and carray
-     ! call getpwrotmat(nmax,carray,rdplus,rdminus,rdsq3,rdmsq3,dc)
-
-
-!     generate rlams and weights (these are the nodes
-!     and weights for the lambda integral)
-
-     ! call vwts(rlams,whts,nlams)
-
-
-!     generate the number of fourier modes required to represent the
-!     moment function in fourier space
-
-      !call numthetahalf(nfourier,nlams)
- 
-!     generate the number of fourier modes in physical space
-!     required for the exponential representation
-     ! call numthetafour(nphysical,nlams)
-
-!     Generate powers of lambda for the exponential basis
-     ! call rlscini(rlsc,nlams,rlams,nmax)
-
-!
-!
-!
-    !   nn = 10*(nmax+2)**2
-    !   allocate(scarray(nn,0:nlevels))
-    !   do ilev=0,nlevels
-    !     call l3dtaevalhessdini(nterms(ilev),scarray(1,ilev))
-    !   enddo
-
-!     Compute total number of plane waves
-    !   nexptotp = 0
-    !   nexptot = 0
-    !   nthmax = 0
-    !   nphmax = 0
-    !   nn = 0
-    !   do i=1,nlams
-    !      nexptot = nexptot + nfourier(i)
-    !      nexptotp = nexptotp + nphysical(i)
-    !      if(nfourier(i).gt.nthmax) nthmax = nfourier(i)
-    !      if(nphysical(i).gt.nphmax) nphmax = nphysical(i)
-    !      nn = nn + nphysical(i)*nfourier(i)
-    !   enddo
-
-
-    !   allocate(fexpe(nn),fexpo(nn),fexpback(nn))
-    !   allocate(tmp(nd,0:nmax,-nmax:nmax,nthd))
-    !   allocate(mptmp(lmptemp,nthd))
-
-    !   allocate(xshift(-5:5,nexptotp))
-    !   allocate(yshift(-5:5,nexptotp))
-    !   allocate(zshift(5,nexptotp))
-
-    !   allocate(mexpf1(nd,nexptot,nthd),mexpf2(nd,nexptot,nthd), &
-    !  &    mexpp1(nd,nexptotp,nthd))
-    !   allocate(mexpp2(nd,nexptotp,nthd),mexppall(nd,nexptotp,16,nthd))
-
-!
-!c      NOTE: there can be some memory savings here
-!
-      ! bigint = 0
-      ! bigint = nboxes
-      ! bigint = bigint*6
-      ! bigint = bigint*nexptotp*nd
-
-      ! if(ifprint.ge.1) print *, "mexp memory=",bigint/1.0d9
-
-      ! allocate(mexp(nd,nexptotp,nboxes,6),stat=iert)
-      ! if(iert.ne.0) then
-      !   print *, "Cannot allocate pw expansion workspace"
-      !   print *, "bigint=", bigint
-      !   ier = 8
-      !   return
-      ! endif
-
-      ! allocate(list4ct(nboxes))
-      ! allocate(ilist4(nboxes))
-      ! do i=1,nboxes
-      !   list4ct(i)=0
-      !   ilist4(i)=0
-      ! enddo
-      ! cntlist4=0
-
-!     Precompute table for shifting exponential coefficients in 
-!     physical domain
-!      call mkexps(rlams,nlams,nphysical,nexptotp,xshift,yshift,zshift)
-
-!     Precompute table of exponentials for mapping from
-!     fourier to physical domain
-!      call mkfexp(nlams,nfourier,nphysical,fexpe,fexpo,fexpback)
-      
-!
-!c    compute array of factorials
-
-     
-      ! nmax2 = 2*nmax
-      ! allocate(fact(0:nmax2),cs(0:nmax,-nmax:nmax))
-      
-      ! d = 1
-      ! fact(0) = d
-      ! do i=1,nmax2
-      !   d=d*sqrt(i+0.0d0)
-      !   fact(i) = d
-      ! enddo
-
-      ! cs(0,0) = 1.0d0
-      ! do l=1,nmax
-      !   do m=0,l
-      !     cs(l,m) = ((-1)**l)/(fact(l-m)*fact(l+m))
-      !     cs(l,-m) = cs(l,m)
-      !   enddo
-      ! enddo
-      
-!       if(ifprint.ge.1)  &
-!      &    call prin2('end of generating plane wave info*',i,0)
-! !
-!
-!     ... set the expansion coefficients to zero
-!
-! !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,j,k,idim)
-!       do i=1,nexpc
-!         do k=-ntj,ntj
-!           do j = 0,ntj
-!             do idim=1,nd
-!               tsort(idim,j,k,i)=0
-!             enddo
-!           enddo
-!         enddo
-!       enddo
-! !$OMP END PARALLEL DO
-
-!       
-      ! do i=1,6
-      !   timeinfo(i)=0
-      ! enddo
-
-!
-!       ... set all multipole and local expansions to zero
-!
-
-!       do ilev = 0,nlevels
-! !$OMP PARALLEL DO DEFAULT(SHARED) &
-! !$OMP PRIVATE(ibox)
-!         do ibox=laddr(1,ilev),laddr(2,ilev)
-!           call mpzero(nd,rmlexp(iaddr(1,ibox)),nterms(ilev))
-!           call mpzero(nd,rmlexp(iaddr(2,ibox)),nterms(ilev))
-!         enddo
-! !$OMP END PARALLEL DO
-!       enddo
-
-!
-!      set scjsort
-!
-!       do ilev=0,nlevels
-! !$OMP PARALLEL DO DEFAULT(SHARED) &
-! !$OMP PRIVATE(ibox,nchild,istart,iend,i)
-!          do ibox=laddr(1,ilev),laddr(2,ilev)
-!             nchild = itree(ipointer(4)+ibox-1)
-!             if(nchild.gt.0) then
-!                istart = iexpcse(1,ibox)
-!                iend = iexpcse(2,ibox) 
-!                do i=istart,iend
-!                   scjsort(i) = rscales(ilev)
-!                enddo
-!             endif
-!          enddo
-! !$OMP END PARALLEL DO
-!       enddo
-
-
-!    initialize legendre function evaluation routines
-      ! nlege = 100
-      ! lw7 = 40000
-      ! call ylgndrfwini(nlege,wlege,lw7,lused7)
-
-!
-!     count number of boxes are in list4
-     ! lca = 4*nmax
-    !   if(ifprint.ge.1) &
-    !  &   call prinf('=== STEP 0 list4===*',i,0)
-    !   call cpu_time(time1)
-!$    time1=omp_get_wtime()
-      ! do ilev=1,nlevels-1
-      !    do ibox=laddr(1,ilev),laddr(2,ilev)
-      !       if(nlist3(ibox).gt.0) then
-      !         cntlist4=cntlist4+1
-      !         list4ct(ibox)=cntlist4
-      !         ilist4(cntlist4)=ibox
-      !       endif
-      !    enddo
-      ! enddo
-      ! if(ifprint.ge.1) print *,"nboxes:",nboxes,"cntlist4:",cntlist4
-    !   allocate(pgboxwexp(nd,nexptotp,cntlist4,6))
-    !   allocate(gboxmexp(nd*(nterms(nlevels)+1)* &
-    !  &    (2*nterms(nlevels)+1),8,cntlist4))
-
-
-
-    !   allocate(gboxsubcenters(3,8,nthd))
-    !   allocate(gboxfl(2,8,nthd))
-
-!       nmaxt = 0
-! !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
-! !$OMP REDUCTION(max:nmaxt)
-!       do ibox=1,nboxes
-!         if(list4ct(ibox).gt.0) then
-!           istart = isrcse(1,ibox)
-!           iend = isrcse(2,ibox)
-!           npts = iend-istart+1
-!           if(npts.gt.nmaxt) nmaxt = npts
-!         endif
-!       enddo
-! !$OMP END PARALLEL DO
-
-!       allocate(gboxind(nmaxt,nthd))
-!       allocate(gboxsort(3,nmaxt,nthd))
-!       allocate(gboxwexp(nd,nexptotp,6,8,nthd))
-!       allocate(gboxcgsort(nd,nmaxt,nthd))
-!       allocate(gboxdpsort(nd,3,nmaxt,nthd))
-
-! !   note gboxmexp is an array not scalar
-!       pgboxwexp=0d0
-!       gboxmexp=0d0
-
 !     form mexp for all list4 type box at first ghost box center
       do ilev=1,nlevels-1
 
@@ -1790,27 +1555,12 @@ module fmm3d_tree_mod
          enddo
 !$OMP END PARALLEL DO
       enddo
-      !deallocate(gboxfl,gboxsubcenters,gboxwexp,gboxcgsort)
-      !deallocate(gboxdpsort,gboxind,gboxsort)
 
-      !call cpu_time(time2)
-!$    time2=omp_get_wtime()
-      !if(ifprint.ge.1) print *,"mexp list4 time:",time2-time1
-      !timeinfo(3)=time2-time1
-!     end of count number of boxes are in list4
-!
 
-!
-!
-    !   if(ifprint .ge. 1)  &
-    !  &   call prinf('=== STEP 1 (form mp) ====*',i,0)
-    !     call cpu_time(time1)
-!$        time1=omp_get_wtime()
-!
+
+!------------------ step 1 ??? -----------------------------------------------------------------
 !       ... step 1, locate all charges, assign them to boxes, and
 !       form multipole expansions
-
-
       do ilev=2,nlevels
 !$OMP PARALLEL DO DEFAULT(SHARED) &
 !$OMP PRIVATE(ibox,npts,istart,iend,nchild)
@@ -1831,25 +1581,12 @@ module fmm3d_tree_mod
                endif
             enddo
 !$OMP END PARALLEL DO
-
       enddo
-      if(ifprint.ge.1) print *,"nboxes:",nboxes,"leaf:",cntlist4
+
+      !----------------------------------------------------------------------------------------------------
 
 
 
-      call cpu_time(time2)
-!$    time2=omp_get_wtime()
-      timeinfo(1)=time2-time1
-
-      lca = 4*nmax
-
-
-!       
-      if(ifprint .ge. 1) &
-     &      call prinf('=== STEP 2 (merge mp) ====*',i,0)
-      call cpu_time(time1)
-!$    time1=omp_get_wtime()
-!
       do ilev=nlevels-1,0,-1
 !$OMP PARALLEL DO DEFAULT(SHARED) &
 !$OMP PRIVATE(ibox,i,jbox,istart,iend,npts)
@@ -1872,74 +1609,8 @@ module fmm3d_tree_mod
 !$OMP END PARALLEL DO
       enddo
 
-      call cpu_time(time2)
-!$    time2=omp_get_wtime()
-      timeinfo(2)=time2-time1
 
-      if(ifprint.ge.1) &
-     &    call prinf('=== Step 3 (mp to loc+formta+mpeval) ===*',i,0)
-!      ... step 3, convert multipole expansions into local
-!       expansions
-
-      call cpu_time(time1)
-!$        time1=omp_get_wtime()
-
-!
-!c     zero out mexp
-! 
-
-! !$OMP PARALLEL DO DEFAULT(SHARED) &
-! !$OMP PRIVATE(i,j,k,idim)
-!       do k=1,6
-!         do i=1,nboxes
-!           do j=1,nexptotp
-!             do idim=1,nd
-!               mexp(idim,j,i,k) = 0.0d0
-!             enddo
-!           enddo
-!         enddo
-!       enddo
-! !$OMP END PARALLEL DO
-
-!     init uall,dall,...,etc arrays
-      ! allocate(uall(200,nthd),dall(200,nthd),nall(120,nthd))
-      ! allocate(sall(120,nthd),eall(72,nthd),wall(72,nthd))
-      ! allocate(u1234(36,nthd),d5678(36,nthd),n1256(24,nthd))
-      ! allocate(s3478(24,nthd))
-      ! allocate(e1357(16,nthd),w2468(16,nthd),n12(20,nthd))
-      ! allocate(n56(20,nthd),s34(20,nthd),s78(20,nthd))
-      ! allocate(e13(20,nthd),e57(20,nthd),w24(20,nthd),w68(20,nthd))
-      ! allocate(e1(20,nthd),e3(5,nthd),e5(5,nthd),e7(5,nthd))
-      ! allocate(w2(5,nthd),w4(5,nthd),w6(5,nthd),w8(5,nthd))
-      ! allocate(iboxsubcenters(3,8,nthd))
-      ! allocate(iboxfl(2,8,nthd))
-!
-!  figure out allocations needed for iboxsrc,iboxsrcind,iboxpot
-!  and so on
-!
-!       nmaxt = 0
-! !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
-! !$OMP REDUCTION(max:nmaxt)
-!       do ibox=1,nboxes
-!         if(nlist3(ibox).gt.0) then
-!           istart = isrcse(1,ibox)
-!           iend = isrcse(2,ibox)
-!           npts = iend-istart+1
-!           if(npts.gt.nmaxt) nmaxt = npts
-
-!           istart = itargse(1,ibox)
-!           iend = itargse(2,ibox)
-!           npts = iend - istart + 1
-!           if(npts.gt.nmaxt) nmaxt = npts
-!         endif
-!       enddo
-! !$OMP END PARALLEL DO
-
-!       allocate(iboxsrcind(nmaxt,nthd))
-!       allocate(iboxsrc(3,nmaxt,nthd))
-!       allocate(iboxpot(nd,nmaxt,nthd))
-!       allocate(iboxgrad(nd,3,nmaxt,nthd))
-!       allocate(iboxhess(nd,6,nmaxt,nthd))
+!-----------
 
       do ilev=2,nlevels
         allocate(iboxlexp(nd*(nterms(ilev)+1)* &
@@ -2051,11 +1722,6 @@ module fmm3d_tree_mod
 !$         ithd=omp_get_thread_num()
            ithd = ithd + 1
            npts = 0
-          !  if(ifpghtarg.gt.0) then
-          !    istart = itargse(1,ibox)
-          !    iend = itargse(2,ibox) 
-          !    npts = npts + iend-istart+1
-          !  endif
 
            istart = iexpcse(1,ibox) 
            iend = iexpcse(2,ibox) 
@@ -2063,11 +1729,10 @@ module fmm3d_tree_mod
 
            nchild = itree(ipointer(4)+ibox-1)
 
-           !if(ifpgh.gt.0) then
-             istart = isrcse(1,ibox) 
-             iend = isrcse(2,ibox) 
-             npts = npts + iend-istart+1
-           !endif
+            istart = isrcse(1,ibox) 
+            iend = isrcse(2,ibox) 
+            npts = npts + iend-istart+1
+           
 
 
            if(npts.gt.0.and.nchild.gt.0) then
@@ -2155,6 +1820,7 @@ module fmm3d_tree_mod
             endif
 
             if(nlist3(ibox).gt.0.and.npts.gt.0) then
+
               call getlist3pwlistall(ibox,boxsize(ilev),nboxes, &
      &    nlist3(ibox),list3(1,ibox),isep, &
      &    centers,nuall,uall(1,ithd),ndall,dall(1,ithd), &
@@ -2235,24 +1901,15 @@ module fmm3d_tree_mod
         deallocate(iboxlexp)  
       enddo
 
-      ! deallocate(iboxsrcind,iboxsrc,iboxpot,iboxgrad,iboxhess)
-      ! deallocate(iboxsubcenters,iboxfl)
-      ! deallocate(uall,dall,nall,sall,eall,wall)
-      ! deallocate(u1234,d5678,n1256,s3478)
-      ! deallocate(e1357,w2468,n12,n56,s34,s78)
-      ! deallocate(e13,e57,w24,w68)
-      ! deallocate(e1,e3,e5,e7,w2,w4,w6,w8)
-      ! deallocate(tmp,mptmp)
-      ! call cpu_time(time2)
-!$        time2=omp_get_wtime()
-      ! timeinfo(3) = timeinfo(3) + time2-time1
+      !----------------------------------------------------
 
 
-    !   if(ifprint.ge.1) &
-    !  &    call prinf('=== Step 4 (split loc) ===*',i,0)
 
-    !   call cpu_time(time1)
-!$        time1=omp_get_wtime()
+
+
+
+      !------------- local to local translations ---------
+
       do ilev = 2,nlevels-1
 
 !$OMP PARALLEL DO DEFAULT(SHARED) &
@@ -2291,83 +1948,72 @@ module fmm3d_tree_mod
          enddo
 !$OMP END PARALLEL DO
       enddo
-      ! call cpu_time(time2)
-!$        time2=omp_get_wtime()
-      ! timeinfo(4) = time2-time1
+
+      !--------------------------------------------------------------------
+
+      end
 
 
-    !   if(ifprint.ge.1) &
-    !  &    call prinf('=== step 5 (eval lo) ===*',i,0)
+      subroutine eval_local(self)
+        class(FMM3DTree), intent(inout) :: self
+        !--------------------------------------------
+        integer :: ilev,ibox,istart,iend,i,npts
+        integer :: nchild
+        !--------------------------------------------
 
-!     ... step 6, evaluate all local expansions
-!
 
-      ! call cpu_time(time1)
-!$        time1=omp_get_wtime()
-!
-
-!
-!c       shift local expansion to local epxanion at expansion centers
-!        (note: this part is not relevant for particle codes.
-!        it is relevant only for qbx codes)
-
-      do ilev = 0,nlevels
-
-!
-!c        evaluate local expansion at source and target
-!         locations
-!
-!$OMP PARALLEL DO DEFAULT(SHARED) &
-!$OMP PRIVATE(ibox,nchild,istart,iend,i,npts) &
-!$OMP SCHEDULE(DYNAMIC)
-          do ibox = laddr(1,ilev),laddr(2,ilev)
-            nchild=itree(ipointer(4)+ibox-1)
+        do ilev = 0,self%nlevels
+          !$OMP PARALLEL DO DEFAULT(SHARED) &
+          !$OMP PRIVATE(ibox,nchild,istart,iend,i,npts) &
+          !$OMP SCHEDULE(DYNAMIC)
+          do ibox = self%laddr(1,ilev),self%laddr(2,ilev)
+            nchild=self%itree(self%ipointer(4)+ibox-1)
             if(nchild.eq.0) then 
-              istart = isrcse(1,ibox) 
-              iend = isrcse(2,ibox)
+              istart = self%isrcse(1,ibox) 
+              iend = self%isrcse(2,ibox)
               npts = iend-istart+1
-              call l3dtaevalg(nd,rscales(ilev),centers(1,ibox), &
-     &    rmlexp(iaddr(2,ibox)),nterms(ilev),sourcesort(1,istart), &
-     &    npts,pot(1,istart),grad(1,1,istart),wlege,nlege)
+              call l3dtaevalg(self%nd,self%scales(ilev),self%centers(1,ibox), &
+     &    self%rmlexp(self%iaddr(2,ibox)),self%nterms(ilev),self%sourcesort(1,istart), &
+     &    npts,self%potsort(1,istart),self%gradsort(1,1,istart),self%wlege,self%nlege)
             endif
           enddo
-!$OMP END PARALLEL DO
+          !$OMP END PARALLEL DO
       enddo
 
-  
-      if(ifnear.eq.0) goto 1000
-!
-!c        directly evaluate potential at sources and targets 
-!         due to sources in list1
+      end subroutine eval_local
 
-      do ilev=0,nlevels
-!
-!c           evaluate at the sources
-!
-!$OMP PARALLEL DO DEFAULT(SHARED) &
-!$OMP PRIVATE(ibox,istarts,iends,npts0,i,jbox,jstart,jend,npts) &
-!$OMP SCHEDULE(DYNAMIC)
-            do ibox = laddr(1,ilev),laddr(2,ilev)
-              istarts = isrcse(1,ibox)
-              iends = isrcse(2,ibox)
+
+      subroutine eval_direct(self)
+        class(FMM3DTree), intent(inout) :: self
+        !--------------------------------------------
+        integer :: ilev,ibox,istarts,iends,npts0,i
+        integer :: jbox,jstart,jend,npts
+        !--------------------------------------------
+        do ilev=0,self%nlevels
+            !$OMP PARALLEL DO DEFAULT(SHARED) &
+            !$OMP PRIVATE(ibox,istarts,iends,npts0,i,jbox,jstart,jend,npts) &
+            !$OMP SCHEDULE(DYNAMIC)
+            do ibox = self%laddr(1,ilev),self%laddr(2,ilev)
+              istarts = self%isrcse(1,ibox)
+              iends = self%isrcse(2,ibox)
               npts0 = iends-istarts+1
               
-              do i=1,nlist1(ibox)
-                jbox = list1(i,ibox)
-                jstart = isrcse(1,jbox)
-                jend = isrcse(2,jbox)
+              do i=1,self%nlist1(ibox)
+                jbox = self%list1(i,ibox)
+                jstart = self%isrcse(1,jbox)
+                jend = self%isrcse(2,jbox)
                 npts = jend-jstart+1
-                call l3ddirectdg(nd,sourcesort(1,jstart), &
-     &    dipvecsort(1,1,jstart),npts,sourcesort(1,istarts), &
-     &    npts0,pot(1,istarts),grad(1,1,istarts),thresh)     
+                call l3ddirectdg(self%nd,self%sourcesort(1,jstart), &
+     &    self%dipvecsort(1,1,jstart),npts,self%sourcesort(1,istarts), &
+     &    npts0,self%potsort(1,istarts),self%gradsort(1,1,istarts),self%thresh)     
               enddo
             enddo
-!$OMP END PARALLEL DO
+            !$OMP END PARALLEL DO
       enddo
- 1000 continue      
+      end subroutine eval_direct
 
-      return
-      end
+
+
 !------------------------------------------------
       subroutine lfmm3dexpc_direct_tree(nd,istart,iend,jstart,jend, &
      &     source,ifcharge,charge,ifdipole, &
