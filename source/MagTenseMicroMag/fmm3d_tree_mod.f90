@@ -1,6 +1,10 @@
 module fmm3d_tree_mod
+    use omp_lib
         implicit none
       type :: FMM3DTree
+            logical :: is_built = .false.
+            logical :: keep_tree = .true.
+
             integer :: nlmax = 51
             integer :: nlevels = 0
             integer :: nboxes = 0
@@ -44,7 +48,7 @@ module fmm3d_tree_mod
             integer :: iexpc
             integer, contiguous, pointer :: itree(:)
             double precision, contiguous, pointer :: boxsize(:), treecenters(:,:), centers(:,:)
-            integer, contiguous, pointer :: isrcse(:,:),itargse(:,:),iexpcse(:,:)
+            integer, contiguous, pointer :: isrcse(:,:),iexpcse(:,:)
             integer, contiguous, pointer :: isrc(:),itarg(:)
             !-----------------------------------------
             double precision b0,b0inv,b0inv2,b0inv3
@@ -165,8 +169,66 @@ module fmm3d_tree_mod
 
           procedure :: eval_local
           procedure :: eval_direct
+
+          procedure :: build_tree
+          procedure :: make_and_eval
+          procedure :: reorder_dipvec
       end type FMM3DTree
     contains 
+
+
+      subroutine build_tree(self, source, eps, ier)
+        class(FMM3DTree), intent(inout) :: self
+        double precision, contiguous, pointer :: source(:,:)
+        double precision eps
+        integer ier
+        !------------------------------------------------
+
+        if (self%is_built) then
+            return
+        end if
+
+        print *, " building fmm tree"
+
+        self%source => source
+        self%nsource = size(source,2)
+        self%eps = eps
+        self%nd = 1
+        self%ier = ier
+        self%ntarg = 0
+
+        !$omp parallel
+        !$omp single
+        self%nthd = omp_get_num_threads()
+        !$omp end single
+        !$omp end parallel
+
+        print *, " number of threads for fmm tree build: ", self%nthd
+        
+
+        call self%build1()
+        call self%build2()
+
+        self%is_built = .true.
+      end subroutine 
+
+      subroutine make_and_eval(self, dipvec, grad)
+        class(FMM3DTree), intent(inout) :: self
+        double precision, contiguous, pointer :: dipvec(:,:,:)
+        double precision, contiguous, pointer :: grad(:,:,:)
+        !------------------------------------------------
+
+
+        self%grad => grad
+        self%dipvec => dipvec
+
+        call self%lfmm3dmain_tree()
+        call self%eval_local()
+        call self%eval_direct()
+
+        call dreorderi(3*self%nd,self%nsource,self%gradsort,self%grad,self%isrc)
+        call drescale(self%nd*3*self%nsource,self%grad,self%b0inv)
+      end subroutine make_and_eval
 
 
     subroutine full_fmm(self,nd,eps,nsource,source, &
@@ -224,7 +286,7 @@ module fmm3d_tree_mod
         tb1 = omp_get_wtime() - t1
 
         t1 = omp_get_wtime()
-        self%laddr(1:2,0:self%nlevels) => self%itree(self%ipointer(1) : self%ipointer(1)+(self%nlevels + 1)*2-1)
+        !self%laddr(1:2,0:self%nlevels) => self%itree(self%ipointer(1) : self%ipointer(1)+(self%nlevels + 1)*2-1)
         call self%build2()
         tb2 = omp_get_wtime() - t1
         
@@ -279,17 +341,12 @@ module fmm3d_tree_mod
         !----------------
         integer, contiguous, pointer :: itree(:)
         double precision, contiguous, pointer :: boxsize(:), treecenters(:,:)
-        integer, contiguous, pointer :: isrcse(:,:),itargse(:,:),iexpcse(:,:)
+        integer, contiguous, pointer :: isrcse(:,:),iexpcse(:,:)
         integer, contiguous, pointer :: isrc(:),itarg(:)
         !--------------------------------
-        double precision, contiguous, pointer :: sourcesort(:,:),targsort(:,:)
-        double precision, contiguous, pointer :: chargesort(:,:) 
+        double precision, contiguous, pointer :: sourcesort(:,:)
         double precision, contiguous, pointer :: dipvecsort(:,:,:)
-        double precision, contiguous, pointer :: potsort(:,:),gradsort(:,:,:)
-        double precision, contiguous, pointer :: hesssort(:,:,:)
-        double precision, contiguous, pointer :: pottargsort(:,:)
-        double precision, contiguous, pointer :: gradtargsort(:,:,:)
-        double precision, contiguous, pointer :: hesstargsort(:,:,:)
+        double precision, contiguous, pointer :: gradsort(:,:,:)
         !----------------
         integer, contiguous, pointer :: nterms(:)
         integer(8), contiguous, pointer :: iaddr(:,:)
@@ -360,7 +417,6 @@ module fmm3d_tree_mod
         print *, " allocating sorted arrays "
 
         allocate(sourcesort(3,self%nsource))
-        allocate(targsort(3,self%ntarg))
 
         allocate(dipvecsort(self%nd,3,self%nsource))
 
@@ -373,7 +429,6 @@ module fmm3d_tree_mod
         self%dipvecsort => dipvecsort
         self%gradsort => gradsort
         !--------------------------------------------------------
-        call self%reset_sort_arg()
 
         allocate(nterms(0:self%nlevels))
 
@@ -385,14 +440,11 @@ module fmm3d_tree_mod
         self%nterms => nterms
 !       
 
-        call dreorderf(3,self%nsource,self%source,self%sourcesort,self%isrc)
+      call dreorderf(3,self%nsource,self%source,self%sourcesort,self%isrc)
 
       call drescale(3*self%nsource,self%sourcesort,self%b0inv)
 
 
-        call dreorderf(3*self%nd,self%nsource,self%dipvec,self%dipvecsort, &
-    &    self%isrc)
-        call drescale(3*self%nd*self%nsource,self%dipvecsort,self%b0inv2)
 
 
 
@@ -421,9 +473,19 @@ module fmm3d_tree_mod
         enddo
         self%scales => scales
 
+
+        self%laddr(1:2,0:self%nlevels) => self%itree(self%ipointer(1) : self%ipointer(1)+(self%nlevels + 1)*2-1)
+
         print *, " done with build1 "
 
     end subroutine build1
+
+    subroutine reorder_dipvec(self)
+        class(FMM3DTree), intent(inout) :: self
+        !------------------------------------------------   
+        call dreorderf(3*self%nd,self%nsource,self%dipvec,self%dipvecsort, self%isrc)
+        call drescale(3*self%nd*self%nsource,self%dipvecsort,self%b0inv2)
+    end subroutine reorder_dipvec
 
 
     subroutine build2(self)
@@ -918,7 +980,7 @@ module fmm3d_tree_mod
       data ima/(0.0d0,1.0d0)/
 
       integer nthd,ithd
-      integer omp_get_max_threads,omp_get_thread_num
+      !integer omp_get_max_threads,omp_get_thread_num
 
 
 
@@ -1045,7 +1107,9 @@ module fmm3d_tree_mod
 
         lca = self%lca
 
+        call self%reset_sort_arg()
         call self%reset_expansion_coeff()
+        call self%reorder_dipvec()
 
 
         pgboxwexp => self%pgboxwexp
@@ -1112,8 +1176,8 @@ module fmm3d_tree_mod
 !$OMP PRIVATE(ibox,istart,iend,jbox,jstart,jend,npts,npts0,i) &
 !$OMP PRIVATE(ithd)
          do ibox=laddr(1,ilev),laddr(2,ilev)
-            ithd = 0
-!$          ithd=omp_get_thread_num()
+            !ithd = 0
+           ithd=omp_get_thread_num()
             ithd = ithd + 1
             if(list4ct(ibox).gt.0) then
               istart=isrcse(1,ibox)
@@ -1297,8 +1361,8 @@ module fmm3d_tree_mod
 !$OMP PRIVATE(ibox,istart,iend,npts) &
 !$OMP PRIVATE(ithd)
          do ibox=laddr(1,ilev),laddr(2,ilev)
-            ithd = 0
-!$          ithd=omp_get_thread_num()
+            !ithd = 0
+            ithd=omp_get_thread_num()
             ithd = ithd + 1
             istart = isrcse(1,ibox) 
             iend = isrcse(2,ibox)
@@ -1389,8 +1453,8 @@ module fmm3d_tree_mod
 !$OMP PRIVATE(npts0,ctmp,jstart,jend,i) &
 !$OMP PRIVATE(ithd)
          do ibox = laddr(1,ilev-1),laddr(2,ilev-1)
-           ithd = 0
-!$         ithd=omp_get_thread_num()
+           !ithd = 0
+           ithd=omp_get_thread_num()
            ithd = ithd + 1
            npts = 0
 
