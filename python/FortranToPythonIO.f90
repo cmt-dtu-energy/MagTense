@@ -813,62 +813,6 @@ end subroutine getHOnSourcesFMM
     end subroutine add_self_field
         !------------------------------------------------------------------------------------------------
 
-        !------------------- for getting near-field correction ------------------------------------------
-    pure subroutine dipole_tensor_3x3(Rvec, Kdip)
-        implicit none
-        ! Kdip = (1/(4π r^3)) * (3 r̂ r̂^T - I), mapping M -> H (SI)
-        real(8), intent(in)  :: Rvec(3)
-        real(8), intent(out) :: Kdip(3,3)
-        real(8), parameter   :: fourpi = 12.56637061435917295385d0
-        real(8), parameter   :: epsR   = 1.0d-15
-        real(8) :: r2, rmag, invR3, ux, uy, uz
-
-        r2  = Rvec(1)*Rvec(1) + Rvec(2)*Rvec(2) + Rvec(3)*Rvec(3)
-        rmag = sqrt(r2)
-
-        if (rmag <= epsR) then
-            Kdip = 0.0d0
-            return
-        end if
-
-        invR3 = 1.0d0 / (fourpi * r2 * rmag)
-        ux = Rvec(1)/rmag
-        uy = Rvec(2)/rmag
-        uz = Rvec(3)/rmag
-
-        Kdip(1,1) = (3.0d0*ux*ux - 1.0d0) * invR3
-        Kdip(1,2) = (3.0d0*ux*uy)         * invR3
-        Kdip(1,3) = (3.0d0*ux*uz)         * invR3
-        Kdip(2,1) = Kdip(1,2)
-        Kdip(2,2) = (3.0d0*uy*uy - 1.0d0) * invR3
-        Kdip(2,3) = (3.0d0*uy*uz)         * invR3
-        Kdip(3,1) = Kdip(1,3)
-        Kdip(3,2) = Kdip(2,3)
-        Kdip(3,3) = (3.0d0*uz*uz - 1.0d0) * invR3
-    end subroutine dipole_tensor_3x3
-
-    pure logical function is_neighbour(idx_t, idx_s, offset, size, pitch, rad_cells) result(mask)
-        implicit none
-        integer(4), intent(in) :: idx_t, idx_s, rad_cells
-        real(8),   intent(in) :: offset(:,:), size(:,:), pitch(3)
-        real(8) :: dx, dy, dz, tx, ty, tz
-
-        if (idx_t == idx_s) then
-            mask = .false.
-            return
-        end if
-
-        dx = abs(offset(idx_s,1) - offset(idx_t,1))
-        dy = abs(offset(idx_s,2) - offset(idx_t,2))
-        dz = abs(offset(idx_s,3) - offset(idx_t,3))
-
-        tx = rad_cells * pitch(1) + 0.5d0*(size(idx_s,1) + size(idx_t,1))
-        ty = rad_cells * pitch(2) + 0.5d0*(size(idx_s,2) + size(idx_t,2))
-        tz = rad_cells * pitch(3) + 0.5d0*(size(idx_s,3) + size(idx_t,3))
-
-        mask = (dx <= tx) .and. (dy <= ty) .and. (dz <= tz)
-    end function is_neighbour
-
 subroutine add_neighbour_corrections(H_fmm, centerPos, dev_center, tile_size, vertices, &
                                      Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, &
                                      offset, rotAngles, color, magnetType, stateFunctionIndex,   &
