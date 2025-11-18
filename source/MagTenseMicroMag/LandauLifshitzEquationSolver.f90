@@ -27,6 +27,8 @@
     use iso_fortran_env
     use UnstructuredMeshAnalysis
     use DifferentialOperators
+
+    use fmm3d_tree_mod
     implicit none
        
     
@@ -80,6 +82,7 @@
     call displayGUIMessage( 'Initializing matrices' )
     !Calculate the interaction matrices
     call initializeInteractionMatrices( gb_problem )
+    
     
     !write(prog_str,'(A37, F8.4, A5)') 'Demagnetization tensor memory usage: ', 6*storage_size(gb_problem%Kxx)*ntot/(8*2**30), ' gigabytes'
     !call displayGUIMessage( trim(prog_str) )    
@@ -240,7 +243,11 @@
 
         !---- locals ----
         integer :: ntot
-        
+        real(DP),dimension(:),allocatable :: hmx_before, hmy_before, hmz_before
+        real(DP),dimension(:),allocatable :: hmx_fmm, hmy_fmm, hmz_fmm
+        real(DP),dimension(:),allocatable :: hmx_MT, hmy_MT, hmz_MT
+
+
 #if USE_TIMING
         !------------------ Timing ---------------------
         real(DP) :: t0, t1
@@ -302,9 +309,55 @@
         t1 = walltime()
 #endif
         !-------------- add demagnetization field --------------------
-        call updateDemagfieldFMM( gb_problem, gb_solution )
-        ! call updateDemagfield( gb_problem, gb_solution )
+
+        ! allocate( hmx_before(ntot), hmy_before(ntot), hmz_before(ntot) )
+        ! allocate( hmx_fmm(ntot), hmy_fmm(ntot), hmz_fmm(ntot) )
+        ! allocate( hmx_MT(ntot), hmy_MT(ntot), hmz_MT(ntot) )
+
+        ! hmx_before = gb_solution%HmX(:)
+        ! hmy_before = gb_solution%HmY(:)
+        ! hmz_before = gb_solution%HmZ(:)
+#if USE_FMM3D
+        !call updateDemagfieldFMM( gb_problem, gb_solution )
+        call updateDemagfieldFMM_old( gb_problem, gb_solution )
+        ! hmx_fmm = gb_solution%HmX(:)
+        ! hmy_fmm = gb_solution%HmY(:)
+        ! hmz_fmm = gb_solution%HmZ(:)
+
+
+        ! gb_solution%HmX(:) = hmx_before
+        ! gb_solution%HmY(:) = hmy_before
+        ! gb_solution%HmZ(:) = hmz_before
+#else
+         call updateDemagfield( gb_problem, gb_solution )
+        ! hmx_MT = gb_solution%HmX(:)
+        ! hmy_MT = gb_solution%HmY(:)
+        ! hmz_MT = gb_solution%HmZ(:)
+
+
+        ! print *, " before"
+        ! print *, hmx_before(1:10)
+        ! print *, hmy_before(1:10)
+        ! print *, hmz_before(1:10)
+        ! print *, " FMM3D "
+        ! print *, hmx_fmm(1:10)
+        ! print *, hmy_fmm(1:10)
+        ! print *, hmz_fmm(1:10)
+        ! print *, " MagTense "
+        ! print *, hmx_MT(1:10)
+        ! print *, hmy_MT(1:10)
+        ! print *, hmz_MT(1:10)
+
+        ! error stop " test "
+        
+#endif
         !-------------------------------------------------------------
+
+
+
+
+
+
 #if USE_TIMING
         acc_demag = acc_demag + (walltime() - t1)
         t1 = walltime()
@@ -364,6 +417,9 @@
             acc_cross    = 0.0_DP
             acc_double   = 0.0_DP
             acc_assemble = 0.0_DP
+
+            error stop " test stop after timing "
+
         end if
             !----------------------------------------------------------
 #endif
@@ -429,8 +485,11 @@
         !Anisotropy term
         call updateAnisotropy(  gb_problem, gb_solution )
         !Demag. field
-        !call updateDemagfield( gb_problem, gb_solution )
+#if USE_FMM3D
         call updateDemagfieldFMM( gb_problem, gb_solution )
+#else
+        call updateDemagfield( gb_problem, gb_solution )
+#endif
 
     
         if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
@@ -720,11 +779,16 @@ subroutine updateDemagfieldFMM(problem, solution)
   integer :: ntot, i
   real(DP) :: fourpi
   integer :: nd, ier
-  double precision , allocatable :: source(:,:), dipvec(:,:,:)
-  double precision , allocatable :: pot(:,:), grad(:,:,:)
+  double precision , contiguous, pointer :: source(:,:), dipvec(:,:,:)
+  double precision , contiguous, pointer :: pot(:,:), grad(:,:,:)
+!   double precision , pointer :: source(:,:), dipvec(:,:)
+!   double precision , pointer :: pot(:,:), grad(:,:)
   double precision :: vol_i
   double precision :: mx, my, mz
   double precision :: eps_fmm
+
+  class(FMM3DTree), pointer :: fmm_tree
+  logical :: built_tree
   !------------------------------------------------
   interface
     subroutine lfmm3d_s_d_g_vec(nd,eps,nsource,source,dipvec,pot,grad,ier)
@@ -747,6 +811,7 @@ subroutine updateDemagfieldFMM(problem, solution)
 
   ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
 
+  ier = 0
   
 #if USE_TIMING
   t1 = walltime()
@@ -764,22 +829,40 @@ subroutine updateDemagfieldFMM(problem, solution)
   t1 = walltime()
 #endif
   !------------------ Allocate FMM work arrays ------------------
-  allocate(source(3, ntot))
-  allocate(dipvec(1, 3, ntot))
+    built_tree = .false.
+    if (.not. associated(solution%fmm_tree)) then
+        allocate(solution%fmm_tree)
+        built_tree = .true.
+        allocate(source(3, ntot))
+    end if
+    fmm_tree => solution%fmm_tree
+
   allocate(pot(1, ntot))
+  allocate(dipvec(1, 3, ntot))
   allocate(grad(1, 3, ntot))
+!   allocate(dipvec(3, ntot))
+!   allocate(grad(3, ntot))
   !------------------------------------------------------------
 #if USE_TIMING
   acc_alloc = acc_alloc + (walltime() - t1)
   t1 = walltime()
 #endif
   !------------------ Pack sources and dipoles ------------------
+    if (built_tree) then
+        do i = 1, ntot
+            !------------------ positions -> FMM (3, N) ------------------
+            source(1,i) = real(problem%grid%pts(i,1), DP)
+            source(2,i) = real(problem%grid%pts(i,2), DP)
+            source(3,i) = real(problem%grid%pts(i,3), DP)
+            !------------------------------------------------------------
+        end do
+    end if
   do i = 1, ntot
-    !------------------ positions -> FMM (3, N) ------------------
-    source(1,i) = real(problem%grid%pts(i,1), DP)
-    source(2,i) = real(problem%grid%pts(i,2), DP)
-    source(3,i) = real(problem%grid%pts(i,3), DP)
-    !------------------------------------------------------------
+    !!------------------ positions -> FMM (3, N) ------------------
+    !source(1,i) = real(problem%grid%pts(i,1), DP)
+    !source(2,i) = real(problem%grid%pts(i,2), DP)
+    !source(3,i) = real(problem%grid%pts(i,3), DP)
+    !!------------------------------------------------------------
     !------------- get cell volume ------------------------------
     ! TODO - implement non-uniform and non-cubic grids here
     vol_i = real(problem%grid%dx, DP) * &
@@ -796,6 +879,9 @@ subroutine updateDemagfieldFMM(problem, solution)
     dipvec(1,1,i) = mx
     dipvec(1,2,i) = my
     dipvec(1,3,i) = mz
+    ! dipvec(1,i) = mx
+    ! dipvec(2,i) = my
+    ! dipvec(3,i) = mz
     !------------------------------------------------------------
   end do
     !--------------------------------------------------------------
@@ -805,7 +891,20 @@ subroutine updateDemagfieldFMM(problem, solution)
 #endif
   !------------------ Call FMM (sources->sources) ------------------
   nd = 1
-  call lfmm3d_s_d_g_vec( nd, eps_fmm, ntot, source, dipvec, pot, grad, ier )
+  !call lfmm3d_s_d_g_vec( nd, eps_fmm, ntot, source, dipvec, pot, grad, ier )
+
+
+!call fmm_tree%full_fmm(source, dipvec, grad, eps_fmm)
+
+  !call fmm_tree%full_fmm(nd, eps_fmm, ntot, source, dipvec, pot, grad, ier)
+
+   call fmm_tree%build_tree( source, eps_fmm , ier)
+   call fmm_tree%make_and_eval(dipvec, grad)
+
+
+  !print *, " done with tree"
+
+
   if (ier /= 0) then
     write(*,*) 'FMM3D returned error code in updateDemagfieldFMM: ier =', ier
     stop " FMM3D error"
@@ -822,6 +921,9 @@ subroutine updateDemagfieldFMM(problem, solution)
     solution%HmX(i) = real( grad(1,1,i) / fourpi, SP )
     solution%HmY(i) = real( grad(1,2,i) / fourpi, SP )
     solution%HmZ(i) = real( grad(1,3,i) / fourpi, SP )
+    ! solution%HmX(i) = real( grad(1,i) / fourpi, SP )
+    ! solution%HmY(i) = real( grad(2,i) / fourpi, SP )
+    ! solution%HmZ(i) = real( grad(3,i) / fourpi, SP )
   end do
   !-----------------------------------------------------------------
 #if USE_TIMING
@@ -846,21 +948,19 @@ subroutine updateDemagfieldFMM(problem, solution)
     t1 = walltime()
 #endif
     !------------------ Cleanup -------------------------------------
-  deallocate(source, dipvec, pot, grad)
+  if (.not. fmm_tree%keep_tree) then
+      call fmm_tree%dealloc()
+      deallocate( fmm_tree )
+      nullify(solution%fmm_tree)
+  end if
+  if (built_tree) then
+      deallocate( source )
+  end if
+  deallocate(dipvec, grad)
     !--------------------------------------------------------------
 #if USE_TIMING
   acc_cleanup = acc_cleanup + (walltime() - t1)
 #endif
-
-#else
-  integer :: ntot
-  ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
-  solution%HmX(1:ntot) = 0.0_SP
-  solution%HmY(1:ntot) = 0.0_SP
-  solution%HmZ(1:ntot) = 0.0_SP
-  print *, 'WARNING: updateDemagfieldFMM called but built without FMM3D; returning zero field.'
-#endif
-
   !------------------ Optional field noise (CV) --------------------
 #if USE_TIMING
   t1 = walltime()
@@ -892,11 +992,231 @@ subroutine updateDemagfieldFMM(problem, solution)
       acc_neigh     = 0.0_DP
       acc_cleanup   = 0.0_DP
       acc_noise     = 0.0_DP
+
   end if
 #endif
 
+#endif
 end subroutine updateDemagfieldFMM
 
+
+subroutine updateDemagfieldFMM_old(problem, solution)
+  implicit none
+  !------------------ Arguments ------------------
+  type(MicroMagProblem),  intent(inout) :: problem
+  type(MicroMagSolution), intent(inout) :: solution
+
+#if USE_FMM3D
+  !------------------ Timing ---------------------
+#if USE_TIMING
+  integer,          save :: call_count_fmm = 0
+  integer, parameter     :: NPRINT = 200  ! output cadence  
+  real(DP), save :: acc_total_fmm = 0.0_DP
+  real(DP), save :: acc_cast      = 0.0_DP
+  real(DP), save :: acc_alloc     = 0.0_DP
+  real(DP), save :: acc_pack      = 0.0_DP
+  real(DP), save :: acc_fmm       = 0.0_DP
+  real(DP), save :: acc_map       = 0.0_DP
+  real(DP), save :: acc_self      = 0.0_DP
+  real(DP), save :: acc_neigh     = 0.0_DP
+  real(DP), save :: acc_cleanup   = 0.0_DP
+  real(DP), save :: acc_noise     = 0.0_DP
+  real(DP) :: t0, t1
+#endif
+  !------------------ Locals ---------------------
+  integer :: ntot, i
+  real(DP) :: fourpi
+  integer :: nd, ier
+  double precision , contiguous, pointer :: source(:,:), dipvec(:,:,:)
+  double precision , contiguous, pointer :: pot(:,:), grad(:,:,:)
+!   double precision , pointer :: source(:,:), dipvec(:,:)
+!   double precision , pointer :: pot(:,:), grad(:,:)
+  double precision :: vol_i
+  double precision :: mx, my, mz
+  double precision :: eps_fmm
+
+  class(FMM3DTree), pointer :: fmm_tree
+  logical :: built_tree
+  !------------------------------------------------
+  interface
+    subroutine lfmm3d_s_d_g_vec(nd,eps,nsource,source,dipvec,pot,grad,ier)
+      implicit none
+      integer, intent(in) :: nd, nsource
+      double precision, intent(in) :: eps
+      double precision :: source(3,nsource)
+      double precision :: dipvec(nd,3,nsource)
+      double precision :: pot(nd,nsource)
+      double precision :: grad(nd,3,nsource)
+      integer :: ier
+    end subroutine lfmm3d_s_d_g_vec
+  end interface
+
+#if USE_TIMING
+  t0 = walltime()
+#endif
+  fourpi  = 12.566370614359172D0
+  eps_fmm = 1.0D-4
+
+  ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+
+  ier = 0
+  
+#if USE_TIMING
+  t1 = walltime()
+#endif
+
+  !----------- cast Mx,My,Mz to single precision -----------
+  solution%Mx_s = real(solution%Mx, SP)
+  solution%My_s = real(solution%My, SP)
+  solution%Mz_s = real(solution%Mz, SP)
+  !--------------------------------------------------------------
+
+
+#if USE_TIMING
+  acc_cast = acc_cast + (walltime() - t1)
+  t1 = walltime()
+#endif
+  !------------------ Allocate FMM work arrays ------------------
+allocate(source(3, ntot))
+  allocate(pot(1, ntot))
+  allocate(dipvec(1, 3, ntot))
+  allocate(grad(1, 3, ntot))
+!   allocate(dipvec(3, ntot))
+!   allocate(grad(3, ntot))
+  !------------------------------------------------------------
+#if USE_TIMING
+  acc_alloc = acc_alloc + (walltime() - t1)
+  t1 = walltime()
+#endif
+  !------------------ Pack sources and dipoles ------------------
+        do i = 1, ntot
+            !------------------ positions -> FMM (3, N) ------------------
+            source(1,i) = real(problem%grid%pts(i,1), DP)
+            source(2,i) = real(problem%grid%pts(i,2), DP)
+            source(3,i) = real(problem%grid%pts(i,3), DP)
+            !------------------------------------------------------------
+        end do
+  do i = 1, ntot
+    !!------------------ positions -> FMM (3, N) ------------------
+    !source(1,i) = real(problem%grid%pts(i,1), DP)
+    !source(2,i) = real(problem%grid%pts(i,2), DP)
+    !source(3,i) = real(problem%grid%pts(i,3), DP)
+    !!------------------------------------------------------------
+    !------------- get cell volume ------------------------------
+    ! TODO - implement non-uniform and non-cubic grids here
+    vol_i = real(problem%grid%dx, DP) * &
+            real(problem%grid%dy, DP) * &
+            real(problem%grid%dz, DP)
+    !------------------------------------------------------------
+    !--------- conert to dipole moment m = M * ΔV --------------
+    ! TODO - is Ms the correct scaling here?
+    mx = real(solution%Mx_s(i), DP) * vol_i * problem%Ms(i)
+    my = real(solution%My_s(i), DP) * vol_i * problem%Ms(i)
+    mz = real(solution%Mz_s(i), DP) * vol_i * problem%Ms(i)
+    !------------------------------------------------------------
+    !-------------- pack dipole vector ---------------------------
+    dipvec(1,1,i) = mx
+    dipvec(1,2,i) = my
+    dipvec(1,3,i) = mz
+    ! dipvec(1,i) = mx
+    ! dipvec(2,i) = my
+    ! dipvec(3,i) = mz
+    !------------------------------------------------------------
+  end do
+    !--------------------------------------------------------------
+#if USE_TIMING
+  acc_pack = acc_pack + (walltime() - t1)
+  t1 = walltime()
+#endif
+  !------------------ Call FMM (sources->sources) ------------------
+  nd = 1
+  call lfmm3d_s_d_g_vec( nd, eps_fmm, ntot, source, dipvec, pot, grad, ier )
+
+  if (ier /= 0) then
+    write(*,*) 'FMM3D returned error code in updateDemagfieldFMM: ier =', ier
+    stop " FMM3D error"
+  end if
+  !-----------------------------------------------------------------
+#if USE_TIMING
+  acc_fmm = acc_fmm + (walltime() - t1)
+  t1 = walltime()
+#endif
+
+  !------------------ Map grad -> H (and to single) ----------------
+  ! include factor 4pi to match Magtense units
+  do i = 1, ntot
+    solution%HmX(i) = real( grad(1,1,i) / fourpi, SP )
+    solution%HmY(i) = real( grad(1,2,i) / fourpi, SP )
+    solution%HmZ(i) = real( grad(1,3,i) / fourpi, SP )
+    ! solution%HmX(i) = real( grad(1,i) / fourpi, SP )
+    ! solution%HmY(i) = real( grad(2,i) / fourpi, SP )
+    ! solution%HmZ(i) = real( grad(3,i) / fourpi, SP )
+  end do
+  !-----------------------------------------------------------------
+#if USE_TIMING
+  acc_map = acc_map + (walltime() - t1)
+  t1 = walltime()
+#endif
+  !--------------- Add correction from the tiles themselves -------------------
+  call add_self_correction(problem, solution)
+  !--------------------------------------------------------------------------
+#if USE_TIMING
+  acc_self = acc_self + (walltime() - t1)
+  t1 = walltime()
+#endif
+  !------------- add correction from neighbouring tiles ---------------------
+  call add_neighbour_correction(problem, solution)
+  !--------------------------------------------------------------------------
+#if USE_TIMING
+  acc_neigh = acc_neigh + (walltime() - t1)
+#endif
+
+#if USE_TIMING
+    t1 = walltime()
+#endif
+    !------------------ Cleanup -------------------------------------
+  deallocate(dipvec, grad, pot, source)
+    !--------------------------------------------------------------
+#if USE_TIMING
+  acc_cleanup = acc_cleanup + (walltime() - t1)
+#endif
+  !------------------ Optional field noise (CV) --------------------
+#if USE_TIMING
+  t1 = walltime()
+#endif
+  if (problem%CV > 0) then
+      solution%HmX = solution%HmX + solution%HmX*problem%CV*sqrt(-2d0*log(solution%u1))*cos(2d0*pi*solution%u2)
+      solution%HmY = solution%HmY + solution%HmY*problem%CV*sqrt(-2d0*log(solution%u3))*cos(2d0*pi*solution%u4)
+      solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
+  end if
+#if USE_TIMING
+  acc_noise = acc_noise + (walltime() - t1)
+  !------------------ Final accounting/print -----------------------
+  acc_total_fmm = acc_total_fmm + (walltime() - t0)
+  call_count_fmm = call_count_fmm + 1
+  if (mod(call_count_fmm, NPRINT) == 0) then
+      write(*,'(A,I0,A,1X, A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6)') &
+           'updateDemagfieldFMM timing (last ', NPRINT, ' calls) ', &
+           'total=',  acc_total_fmm, ' cast=',   acc_cast,    ' alloc=',  acc_alloc,  ' pack=',  acc_pack, &
+           ' fmm=',   acc_fmm,       ' map=',    acc_map,     ' self=',   acc_self,   ' neigh=', acc_neigh, &
+           ' free=',  acc_cleanup,   ' noise=',  acc_noise
+
+      acc_total_fmm = 0.0_DP
+      acc_cast      = 0.0_DP
+      acc_alloc     = 0.0_DP
+      acc_pack      = 0.0_DP
+      acc_fmm       = 0.0_DP
+      acc_map       = 0.0_DP
+      acc_self      = 0.0_DP
+      acc_neigh     = 0.0_DP
+      acc_cleanup   = 0.0_DP
+      acc_noise     = 0.0_DP
+
+  end if
+#endif
+
+#endif
+end subroutine updateDemagfieldFMM_old
 
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
@@ -1143,8 +1463,11 @@ end subroutine updateDemagfieldFMM
     call setupGrid( problem%grid )
     
     !Demagnetization tensor matrix
-    !call ComputeDemagfieldTensor( problem )
+#if USE_FMM3D
     call BuildNeighbourDemagTensor( problem, 2) ! hardcode 2 levels of neighbour cells for now
+#else
+    call ComputeDemagfieldTensor( problem )
+#endif
 
     !Anisotropy matrix
     call ComputeAnisotropyTerm3D( problem )
@@ -1262,9 +1585,11 @@ end subroutine updateDemagfieldFMM
     nz_ave = problem%N_ave(3)
     
     !Demag tensor components
+    call displayGUIMessage( ' Start alloc:' )
     allocate( problem%Kxx(ntot,ntot), problem%Kxy(ntot,ntot), problem%Kxz(ntot,ntot) )
     allocate( problem%Kyy(ntot,ntot), problem%Kyz(ntot,ntot) )
     allocate( problem%Kzz(ntot,ntot) )
+    call displayGUIMessage( ' End alloc:' )
         
         
     if ( problem%demagTensorLoadState .gt. DemagTensorReturnMemory ) then
@@ -1275,7 +1600,8 @@ end subroutine updateDemagfieldFMM
  
         !call mkl_set_num_threads(problem%nThreadsMatlab)
         !call omp_set_num_threads(problem%nThreadsMatlab)
-        call omp_set_num_threads(1)
+        !call omp_set_num_threads(1)
+        !print *, " we are here"
                
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
             
@@ -1283,7 +1609,7 @@ end subroutine updateDemagfieldFMM
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
         
-            !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout, k, j, i)
+            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout, k, j, i) default(none)
         
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do k=1,nz
@@ -1487,13 +1813,13 @@ end subroutine updateDemagfieldFMM
         CALL SYSTEM_CLOCK(c2)
 
         !Display the time to compute the demag tensor and its first entry
-        !call displayGUIMessage( 'Time demag tensor:' )
-        !write (prog_str,'(f10.3)') (c2 - c1)/rate
-        !call displayGUIMessage( prog_str )
+        call displayGUIMessage( 'Time demag tensor:' )
+        write (prog_str,'(f10.3)') (c2 - c1)/rate
+        call displayGUIMessage( prog_str )
         
-        !call displayGUIMessage( 'Kxx(1,1):' )
-        !write (prog_str,'(f10.3)') problem%Kxx(1,1)
-        !call displayGUIMessage( prog_str )      
+        call displayGUIMessage( 'Kxx(1,1):' )
+        write (prog_str,'(f10.3)') problem%Kxx(1,1)
+        call displayGUIMessage( prog_str )      
         
         !Write the demag tensors to disk if asked to do so            
         if ( problem%demagTensorReturnState .gt. DemagTensorReturnMemory ) then
