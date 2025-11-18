@@ -30,7 +30,7 @@ module fmm3d_tree_mod
             double precision, contiguous, pointer ::  charge(:,:)
             double precision, contiguous, pointer ::  dipvec(:,:,:)
             double precision, contiguous, pointer ::  pot(:,:),grad(:,:,:),hess(:,:,:)
-            double precision, contiguous, pointer ::  pottarg(:,:),gradtarg(:,:,:),hesstarg(:,:,:)
+            !double precision, contiguous, pointer ::  pottarg(:,:),gradtarg(:,:,:),hesstarg(:,:,:)
             double precision, contiguous, pointer :: sourcesort(:,:),targsort(:,:)
             double precision, contiguous, pointer :: chargesort(:,:)
             double precision, contiguous, pointer :: dipvecsort(:,:,:)
@@ -68,7 +68,7 @@ module fmm3d_tree_mod
 
             double precision expcsort(3)
             double precision scjsort(1),radexp
-            double complex texpssort(100)
+            double complex, contiguous, pointer :: texpssort(:)
             double precision timeinfo(6)
 
 
@@ -152,9 +152,9 @@ module fmm3d_tree_mod
         !----------- list 3 variables 
         double complex, contiguous, pointer :: iboxlexp(:,:,:)
         double precision, contiguous, pointer :: iboxsubcenters(:,:,:)
-        double precision, contiguous, pointer :: iboxpot(:,:,:)
+        !double precision, contiguous, pointer :: iboxpot(:,:,:)
         double precision, contiguous, pointer :: iboxgrad(:,:,:,:)
-        double precision, contiguous, pointer :: iboxhess(:,:,:,:)
+        !double precision, contiguous, pointer :: iboxhess(:,:,:,:)
         double precision, contiguous, pointer :: iboxsrc(:,:,:)
         integer, contiguous, pointer :: iboxsrcind(:,:)
         integer, contiguous, pointer :: iboxfl(:,:,:)
@@ -180,6 +180,7 @@ module fmm3d_tree_mod
 
     subroutine full_fmm(self,nd,eps,nsource,source, &
             dipvec,pot,grad,ier)
+        use omp_lib, only: omp_get_wtime
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------
         double precision eps
@@ -193,11 +194,13 @@ module fmm3d_tree_mod
         double precision, target :: dipvec(nd,3,nsource)
 
         double precision, target :: pot(nd,nsource),grad(nd,3,nsource)
-        double precision, target :: pottarg(nd,1),gradtarg(nd,3,1)
-        double precision, target :: hess(nd,6,1),hesstarg(nd,6,1)
+        !double precision, target :: pottarg(nd,1),gradtarg(nd,3,1)
+        !double precision, target :: hess(nd,6,1),hesstarg(nd,6,1)
 
 
         integer, contiguous, pointer ::  laddr(:,:)
+
+        real(kind=8) :: t1, tb1, tb2, tmain, teloc, tdir, t_reorder, t_dealloc
 
       ifcharge = 0
       ifdipole = 1
@@ -225,10 +228,10 @@ module fmm3d_tree_mod
         self%targ => targ
         self%ifpgh = ifpgh
         self%ifpghtarg = ifpghtarg
-        self%pottarg => pottarg
-        self%gradtarg => gradtarg
-        self%hess => hess
-        self%hesstarg => hesstarg
+        !self%pottarg => pottarg
+        !self%gradtarg => gradtarg
+        !self%hess => hess
+        !self%hesstarg => hesstarg
         !--------------------------------------------------
 
 
@@ -240,10 +243,16 @@ module fmm3d_tree_mod
         !self%nthd = omp_get_num_threads()
 
 
+
+        t1 = omp_get_wtime()
         call self%build1()
+
+        tb1 = omp_get_wtime() - t1
+
+        t1 = omp_get_wtime()
         self%laddr(1:2,0:self%nlevels) => self%itree(self%ipointer(1) : self%ipointer(1)+(self%nlevels + 1)*2-1)
         call self%build2()
-
+        tb2 = omp_get_wtime() - t1
         
         
         !print *, " laddr ", laddr
@@ -259,70 +268,61 @@ module fmm3d_tree_mod
 
 
 
-        call self%lfmm3dmain_tree(self%nd,self%eps, &
-            &   self%nsource,self%sourcesort, &
-            &   self%ifcharge,self%chargesort, &
-            &   self%ifdipole,self%dipvecsort, &
-            &   self%ntarg,self%targsort,self%nexpc,self%expcsort, &
-            &   self%iaddr,self%rmlexp,self%lmptot,self%mptemp,self%mptemp2,self%lmptemp, &
-            &   self%itree,self%ltree,self%ipointer,self%ndiv,self%nlevels, & 
-            &   self%nboxes,self%iper,self%boxsize,self%treecenters,self%isrcse,self%itargse,self%iexpcse, &
-            &   self%scales,self%laddr,self%nterms, &
-            &   self%ifpgh,self%potsort,self%gradsort,self%hesssort, &
-            &   self%ifpghtarg,self%pottargsort,self%gradtargsort,self%hesstargsort,self%ntj, &
-            &   self%texpssort,self%scjsort,self%ifnear,self%timeinfo,self%ier)
-
-
-        !call self%reset_sort_arg()
-
-        call self%eval_local()
-        call self%eval_direct()
-
-        !print *, "self%ipointer(1) ", self%ipointer
-
-        ! call lfmm3dmain_tree_old(self%nd,self%eps, &
+        ! call self%lfmm3dmain_tree(self%nd,self%eps, &
         !     &   self%nsource,self%sourcesort, &
         !     &   self%ifcharge,self%chargesort, &
         !     &   self%ifdipole,self%dipvecsort, &
         !     &   self%ntarg,self%targsort,self%nexpc,self%expcsort, &
         !     &   self%iaddr,self%rmlexp,self%lmptot,self%mptemp,self%mptemp2,self%lmptemp, &
-        !     &   self%itree,self%ltree,self%ipointer,self%ndiv,self%nlevels, &
+        !     &   self%itree,self%ltree,self%ipointer,self%ndiv,self%nlevels, & 
         !     &   self%nboxes,self%iper,self%boxsize,self%treecenters,self%isrcse,self%itargse,self%iexpcse, &
-        !     &   self%scales,self%itree(self%ipointer(1)),self%nterms, &
+        !     &   self%scales,self%laddr,self%nterms, &
         !     &   self%ifpgh,self%potsort,self%gradsort,self%hesssort, &
         !     &   self%ifpghtarg,self%pottargsort,self%gradtargsort,self%hesstargsort,self%ntj, &
         !     &   self%texpssort,self%scjsort,self%ifnear,self%timeinfo,self%ier)
 
-        if(self%ifpgh.ge.1) then
-            call dreorderi(self%nd,self%nsource,self%potsort,self%pot,self%isrc)
-        endif
-        if(self%ifpgh.ge.2) then 
-            call dreorderi(3*self%nd,self%nsource,self%gradsort,self%grad,self%isrc)
-            call drescale(self%nd*3*self%nsource,self%grad,self%b0inv)
-        endif
+        t1 = omp_get_wtime()
+        call self%lfmm3dmain_tree()
 
-        if(self%ifpgh.ge.3) then 
-            call dreorderi(6*self%nd,self%nsource,self%hesssort,self%hess,self%isrc)
-            call drescale(self%nd*6*self%nsource,self%hess,self%b0inv2)
-        endif
+        tmain = omp_get_wtime() - t1
+
+        !call self%reset_sort_arg()
+
+        t1 = omp_get_wtime()
+
+        call self%eval_local()
+        teloc = omp_get_wtime() - t1
+        t1 = omp_get_wtime()
+        call self%eval_direct()
+        tdir = omp_get_wtime() - t1
 
 
-        if(self%ifpghtarg.ge.1) then
-            call dreorderi(self%nd,self%ntarg,self%pottargsort,self%pottarg,self%itarg)
-        endif
 
-        if(self%ifpghtarg.ge.2) then
-            call dreorderi(3*self%nd,self%ntarg,self%gradtargsort,self%gradtarg,self%itarg)
-            call drescale(self%nd*3*self%ntarg,self%gradtarg,self%b0inv)
-        endif
+        t1 = omp_get_wtime()
+  
+        call dreorderi(3*self%nd,self%nsource,self%gradsort,self%grad,self%isrc)
+        call drescale(self%nd*3*self%nsource,self%grad,self%b0inv)
 
-        if(self%ifpghtarg.ge.3) then
-            call dreorderi(6*self%nd,self%ntarg,self%hesstargsort,self%hesstarg,self%itarg)
-            call drescale(self%nd*6*self%ntarg,self%hesstarg,self%b0inv2)
-        endif
 
+
+        t_reorder = omp_get_wtime() - t1
+
+        t1 = omp_get_wtime()
 
             call self%dealloc()
+        t_dealloc = omp_get_wtime() - t1
+
+
+
+        print *, " FMM3DTree timings: "
+        print *, "  build1 time = ", tb1
+        print *, "  build2 time = ", tb2
+        print *, "  main fmm time = ", tmain
+        print *, "  local eval time = ", teloc
+        print *, "  direct eval time = ", tdir
+        print *, "  reorder time = ", t_reorder
+        print *, "  dealloc time = ", t_dealloc
+        print *, "  total time = ", tb1 + tb2 + tmain + teloc + tdir + t_reorder + t_dealloc
     end subroutine full_fmm
 
 
@@ -356,6 +356,9 @@ module fmm3d_tree_mod
         integer :: i, ilev
         !------------------------------------------------
         print *, " starting tree build "
+
+
+        allocate(self%texpssort(100))
     
         call lndiv(self%eps,self%nsource,self%ntarg,self%ifcharge,self%ifdipole,self%ifpgh, &
                 &    self%ifpghtarg,self%ndiv,self%idivflag) 
@@ -425,32 +428,34 @@ module fmm3d_tree_mod
             allocate(dipvecsort(self%nd,3,self%nsource))
         endif
 
-        if(self%ifpgh.eq.1) then 
-            allocate(potsort(self%nd,self%nsource),gradsort(self%nd,3,1),hesssort(self%nd,6,1))
-        else if(self%ifpgh.eq.2) then
-            allocate(potsort(self%nd,self%nsource),gradsort(self%nd,3,self%nsource), &
-        &    hesssort(self%nd,6,1))
-        else if(self%ifpgh.eq.3) then
-            allocate(potsort(self%nd,self%nsource),gradsort(self%nd,3,self%nsource), &
-        &    hesssort(self%nd,6,self%nsource))
-        else
-            allocate(potsort(self%nd,1),gradsort(self%nd,3,1),hesssort(self%nd,6,1))
-        endif
-        print *, " halfway"
 
-        if(self%ifpghtarg.eq.1) then
-            allocate(pottargsort(self%nd,self%ntarg),gradtargsort(self%nd,3,1), &
-        &    hesstargsort(self%nd,6,1))
-        else if(self%ifpghtarg.eq.2) then
-            allocate(pottargsort(self%nd,self%ntarg),gradtargsort(self%nd,3,self%ntarg), &
-        &    hesstargsort(self%nd,6,1))
-        else if(self%ifpghtarg.eq.3) then
-            allocate(pottargsort(self%nd,self%ntarg),gradtargsort(self%nd,3,self%ntarg), &
-        &    hesstargsort(self%nd,6,self%ntarg))
-        else
-            allocate(pottargsort(self%nd,1),gradtargsort(self%nd,3,1), &
-        &    hesstargsort(self%nd,6,1))
-        endif
+        allocate(gradsort(self%nd,3,self%nsource))
+        !if(self%ifpgh.eq.1) then 
+        !    allocate(potsort(self%nd,self%nsource),gradsort(self%nd,3,1),hesssort(self%nd,6,1))
+        !else if(self%ifpgh.eq.2) then
+        !    allocate(potsort(self%nd,self%nsource),gradsort(self%nd,3,self%nsource), &
+        !&    hesssort(self%nd,6,1))
+        !else if(self%ifpgh.eq.3) then
+        !    allocate(potsort(self%nd,self%nsource),gradsort(self%nd,3,self%nsource), &
+        !&    hesssort(self%nd,6,self%nsource))
+        !else
+        !    allocate(potsort(self%nd,1),gradsort(self%nd,3,1),hesssort(self%nd,6,1))
+        !endif
+        !print *, " halfway"
+
+        !if(self%ifpghtarg.eq.1) then
+        !    allocate(pottargsort(self%nd,self%ntarg),gradtargsort(self%nd,3,1), &
+        !&    hesstargsort(self%nd,6,1))
+        !else if(self%ifpghtarg.eq.2) then
+        !    allocate(pottargsort(self%nd,self%ntarg),gradtargsort(self%nd,3,self%ntarg), &
+        !&    hesstargsort(self%nd,6,1))
+        !else if(self%ifpghtarg.eq.3) then
+        !    allocate(pottargsort(self%nd,self%ntarg),gradtargsort(self%nd,3,self%ntarg), &
+        !&    hesstargsort(self%nd,6,self%ntarg))
+        !else
+        !    allocate(pottargsort(self%nd,1),gradtargsort(self%nd,3,1), &
+        !&    hesstargsort(self%nd,6,1))
+        !endif
             !------------------------------------------------------
 
 
@@ -458,12 +463,12 @@ module fmm3d_tree_mod
         self%targsort => targsort
         self%chargesort => chargesort
         self%dipvecsort => dipvecsort
-        self%potsort => potsort
+        !self%potsort => potsort
         self%gradsort => gradsort
-        self%hesssort => hesssort
-        self%pottargsort => pottargsort
-        self%gradtargsort => gradtargsort
-        self%hesstargsort => hesstargsort
+        !self%hesssort => hesssort
+        !self%pottargsort => pottargsort
+        !self%gradtargsort => gradtargsort
+        !self%hesstargsort => hesstargsort
         !--------------------------------------------------------
         call self%reset_sort_arg()
 
@@ -783,9 +788,9 @@ module fmm3d_tree_mod
 
       allocate(self%iboxsrcind(nmaxt,self%nthd))
       allocate(self%iboxsrc(3,nmaxt,self%nthd))
-      allocate(self%iboxpot(self%nd,nmaxt,self%nthd))
+      !allocate(self%iboxpot(self%nd,nmaxt,self%nthd))
       allocate(self%iboxgrad(self%nd,3,nmaxt,self%nthd))
-      allocate(self%iboxhess(self%nd,6,nmaxt,self%nthd))
+      !allocate(self%iboxhess(self%nd,6,nmaxt,self%nthd))
 
 
 
@@ -857,7 +862,7 @@ module fmm3d_tree_mod
         targsort => self%targsort
         chargesort => self%chargesort
         dipvecsort => self%dipvecsort
-        potsort => self%potsort
+        !potsort => self%potsort
         gradsort => self%gradsort
 
         ifpgh = self%ifpgh
@@ -871,7 +876,7 @@ module fmm3d_tree_mod
 
             do i=1,nsource
             do idim=1,nd
-                potsort(idim,i) = 0
+                !potsort(idim,i) = 0
                 gradsort(idim,1,i) = 0
                 gradsort(idim,2,i) = 0
                 gradsort(idim,3,i) = 0
@@ -917,18 +922,19 @@ module fmm3d_tree_mod
 
 
 
-     subroutine lfmm3dmain_tree(self,nd,eps, &
-     &     nsource,sourcesort, &
-     &     ifcharge,chargesort, &
-     &     ifdipole,dipvecsort, &
-     &     ntarg,targsort,nexpc,expcsort, &
-     &     iaddr,rmlexp,lmptot,mptemp,mptemp2,lmptemp, &
-     &     itree,ltree,ipointer,ndiv,nlevels,  &
-     &     nboxes,iper,boxsize,centers,isrcse,itargse,iexpcse, &
-     &     rscales,laddr,nterms, &
-     &     ifpgh,pot,grad,hess, &
-     &     ifpghtarg,pottarg,gradtarg,hesstarg,ntj, &
-     &     tsort,scjsort,ifnear,timeinfo,ier)
+     subroutine lfmm3dmain_tree(self) !, nd, &
+     !&     nd,eps, &
+     !&     nsource,sourcesort, &
+     !&     ifcharge,chargesort, &
+     !&     ifdipole,dipvecsort, &
+     !&     ntarg,targsort,nexpc,expcsort, &
+     !&     iaddr,rmlexp,lmptot,mptemp,mptemp2,lmptemp, &
+     !&     itree,ltree,ipointer,ndiv,nlevels,  &
+     !&     nboxes,iper,boxsize,centers,isrcse,itargse,iexpcse, &
+     !&     rscales,laddr,nterms, &
+     !&     ifpgh,pot,grad,hess, &
+     !&     ifpghtarg,pottarg,gradtarg,hesstarg,ntj, &
+     !&     tsort,scjsort,ifnear,timeinfo,ier)
       implicit none
         class(FMM3DTree), intent(inout) :: self
       integer nd
@@ -940,47 +946,70 @@ module fmm3d_tree_mod
       integer ifcharge,ifdipole
       integer ifpgh,ifpghtarg
 
-      double precision sourcesort(3,nsource)
+      !double precision sourcesort(3,nsource)
+      double precision, contiguous, pointer :: sourcesort(:,:)
+      double precision, contiguous, pointer :: chargesort(:,:)
+      double precision, contiguous, pointer :: dipvecsort(:,:,:)
 
-      double precision chargesort(nd,*)
-      double precision dipvecsort(nd,3,*)
 
-      double precision targsort(3,ntarg)
+      !double precision chargesort(nd,*)
+      !double precision dipvecsort(nd,3,*)
 
-      double precision pot(nd,*),grad(nd,3,*),hess(nd,6,*)
-      double precision pottarg(nd,*),gradtarg(nd,3,*),hesstarg(nd,6,*)
+      !double precision targsort(3,ntarg)
+      double precision, contiguous, pointer :: targsort(:,:)
+
+      !double precision pot(nd,*),grad(nd,3,*),hess(nd,6,*)
+      !double precision pottarg(nd,*),gradtarg(nd,3,*),hesstarg(nd,6,*)
+
+
+      double precision, contiguous, pointer ::  pot(:,:),grad(:,:,:),hess(:,:,:)
+      double precision, contiguous, pointer ::  pottarg(:,:),gradtarg(:,:,:),hesstarg(:,:,:)
 
       integer ntj
       integer ifnear
-      double precision expcsort(3,nexpc)
-      double complex tsort(nd,0:ntj,-ntj:ntj,nexpc)
-      double precision scjsort(nexpc)
+      double precision expcsort(3,self%nexpc)
+
+      !double precision, contiguous, pointer :: expcsort(:,:)
+      !double complex tsort(nd,0:self%ntj,-self%ntj:self%ntj,self%nexpc)
+      double complex, contiguous, pointer ::  tsort(:,:,:,:)
+      double precision scjsort(self%nexpc)
+      !double precision,  contiguous, pointer ::  scjsort(:)
 
       integer nboxes
-      integer *8 iaddr(2,nboxes), lmptot
+      !integer *8 iaddr(2,nboxes), lmptot
+      integer(kind=8) lmptot
+      integer(kind=8), contiguous, pointer ::  iaddr(:,:)
+
+
+
       integer lmptemp
-      double precision rmlexp(lmptot)
-      double precision mptemp(lmptemp)
-      double precision mptemp2(lmptemp)
+      ! double precision rmlexp(self%lmptot)
+      ! double precision mptemp(self%lmptemp)
+      ! double precision mptemp2(self%lmptemp)
+      double precision, contiguous, pointer ::  rmlexp(:)
+      double precision, contiguous, pointer ::  mptemp(:)
+      double precision, contiguous, pointer ::  mptemp2(:)
 
       double precision thresh
        
       double precision timeinfo(6)
-      double precision centers(3,nboxes)
+      !double precision centers(3,nboxes)
+      double precision, contiguous, pointer :: centers(:,:)
 
       integer isep,iper
-      integer laddr(2,0:nlevels)
-      integer nterms(0:nlevels)
-      integer *8 ipointer(8),ltree
-      integer itree(ltree)
+      ! integer laddr(2,0:self%nlevels)
+      ! integer nterms(0:self%nlevels)
+      integer, contiguous, pointer ::  laddr(:,:)
+      integer, contiguous, pointer ::  nterms(:)
+      integer(kind=8) ipointer(8),ltree
+      !integer itree(ltree)
+      integer, contiguous, pointer ::  itree(:)
       !double precision rscales(0:nlevels)
       double precision, contiguous, pointer :: rscales(:)
-      double precision boxsize(0:nlevels)
-      integer isrcse(2,nboxes),itargse(2,nboxes),iexpcse(2,nboxes)
-    !   integer, allocatable :: nlist1(:),list1(:,:)
-    !   integer, allocatable :: nlist2(:),list2(:,:)
-    !   integer, allocatable :: nlist3(:),list3(:,:)
-    !   integer, allocatable :: nlist4(:),list4(:,:)
+      !double precision boxsize(0:self%nlevels)
+      !integer isrcse(2,nboxes),itargse(2,nboxes),iexpcse(2,nboxes)
+      double precision, contiguous, pointer :: boxsize(:)
+      integer, contiguous, pointer :: isrcse(:,:),itargse(:,:),iexpcse(:,:)
 
       integer, contiguous, pointer :: nlist1(:),list1(:,:)
       integer, contiguous, pointer :: nlist2(:),list2(:,:)
@@ -991,16 +1020,6 @@ module fmm3d_tree_mod
       integer nu1234,nd5678,nn1256,ns3478,ne1357,nw2468
       integer nn12,nn56,ns34,ns78,ne13,ne57,nw24,nw68
       integer ne1,ne3,ne5,ne7,nw2,nw4,nw6,nw8
-
-      ! integer, allocatable :: uall(:,:),dall(:,:),nall(:,:)
-      ! integer, allocatable :: sall(:,:),eall(:,:),wall(:,:)
-      ! integer, allocatable :: u1234(:,:),d5678(:,:)
-      ! integer, allocatable :: n1256(:,:),s3478(:,:)
-      ! integer, allocatable :: e1357(:,:),w2468(:,:)
-      ! integer, allocatable :: n12(:,:),n56(:,:),s34(:,:),s78(:,:)
-      ! integer, allocatable :: e13(:,:),e57(:,:),w24(:,:),w68(:,:)
-      ! integer, allocatable :: e1(:,:),e3(:,:),e5(:,:),e7(:,:)
-      ! integer, allocatable :: w2(:,:),w4(:,:),w6(:,:),w8(:,:)
 
       integer, contiguous, pointer :: uall(:,:),dall(:,:),nall(:,:)
       integer, contiguous, pointer :: sall(:,:),eall(:,:),wall(:,:)
@@ -1085,7 +1104,7 @@ module fmm3d_tree_mod
       !double precision wlege(40000)
 
       double precision, contiguous, pointer :: wlege(:)
-      integer nterms_eval(4,0:nlevels)
+      integer nterms_eval(4,0:self%nlevels)
 
       integer mnlist1, mnlist2,mnlist3,mnlist4,mnbors
       double complex eye, ztmp
@@ -1099,14 +1118,6 @@ module fmm3d_tree_mod
       double precision ctmp(3)
 
 !     list 3 variables
-      ! double complex, allocatable :: iboxlexp(:,:,:)
-      ! double precision, allocatable :: iboxsubcenters(:,:,:)
-      ! double precision, allocatable :: iboxpot(:,:,:)
-      ! double precision, allocatable :: iboxgrad(:,:,:,:)
-      ! double precision, allocatable :: iboxhess(:,:,:,:)
-      ! double precision, allocatable :: iboxsrc(:,:,:)
-      ! integer, allocatable :: iboxsrcind(:,:)
-      ! integer, allocatable :: iboxfl(:,:,:)
       double complex, contiguous, pointer :: iboxlexp(:,:,:)
       double precision, contiguous, pointer :: iboxsubcenters(:,:,:)
       double precision, contiguous, pointer :: iboxpot(:,:,:)
@@ -1118,19 +1129,7 @@ module fmm3d_tree_mod
 !     end of list 3 variables
 !     list 4 variables
       integer cntlist4
-      !integer, allocatable :: list4ct(:),ilist4(:)
       integer, contiguous, pointer :: list4ct(:),ilist4(:)
-      ! double complex, allocatable :: gboxmexp(:,:,:)
-      ! double complex, allocatable :: gboxwexp(:,:,:,:,:)
-      ! double complex, allocatable :: pgboxwexp(:,:,:,:)
-      ! double precision, allocatable :: gboxsubcenters(:,:,:)
-      ! double precision, allocatable :: gboxsort(:,:,:)
-      ! integer, allocatable :: gboxind(:,:)
-      ! integer, allocatable :: gboxfl(:,:,:)
-      ! double precision, allocatable :: gboxcgsort(:,:,:)
-      ! double precision, allocatable :: gboxdpsort(:,:,:,:)
-
-
       double complex, contiguous, pointer :: gboxmexp(:,:,:)
       double complex, contiguous, pointer :: gboxwexp(:,:,:,:,:)
       double complex, contiguous, pointer :: pgboxwexp(:,:,:,:)
@@ -1145,7 +1144,6 @@ module fmm3d_tree_mod
 !
 !   hessian variables
 !
-      !double precision, allocatable :: scarray(:,:)
       double precision, contiguous, pointer :: scarray(:,:)
       integer *8 bigint
       integer iert
@@ -1153,69 +1151,77 @@ module fmm3d_tree_mod
 
       integer nthd,ithd
       integer omp_get_max_threads,omp_get_thread_num
+
+
+
+
+
+      !--------
       nthd = 1
-!$    nthd=omp_get_max_threads()
-
-!       pi = 4.0d0*atan(1.0d0)
-
-!       thresh = 2.0d0**(-51)*boxsize(0)
-
-
-! !     ifprint is an internal information printing flag. 
-! !     Suppressed if ifprint=0.
-! !     Prints timing breakdown and other things if ifprint=1.
-! !     Prints timing breakdown, list information, 
-! !     and other things if ifprint=2.
-! !       
        ifprint=0
-      
-! !
-! !   initialize various tree lists
-! !
-!       mnlist1 = 0
-!       mnlist2 = 0
-!       mnlist3 = 0
-!       mnlist4 = 0
-!       mnbors = 27
 
-!       isep = 1
-      
-!       call computemnlists(nlevels,nboxes,itree(ipointer(1)),boxsize, &
-!      &    centers,itree(ipointer(3)),itree(ipointer(4)), &
-!      &    itree(ipointer(5)),isep,itree(ipointer(6)),mnbors, &
-!      &    itree(ipointer(7)),iper,mnlist1,mnlist2,mnlist3,mnlist4)
-      
-!       allocate(list1(mnlist1,nboxes),nlist1(nboxes))
-!       allocate(list2(mnlist2,nboxes),nlist2(nboxes))
-!       allocate(list3(mnlist3,nboxes),nlist3(nboxes))
-!       allocate(list4(mnlist4,nboxes),nlist4(nboxes))
+      !--------- load self variables... replacement of argument list -----
+      nd = self%nd
+      eps = self%eps
+      nsource = self%nsource
+      sourcesort => self%sourcesort
+      ifcharge = self%ifcharge
+      chargesort => self%chargesort
+      ifdipole = self%ifdipole
+      dipvecsort => self%dipvecsort
 
-!       call computelists(nlevels,nboxes,itree(ipointer(1)),boxsize, &
-!      &    centers,itree(ipointer(3)),itree(ipointer(4)), &
-!      &    itree(ipointer(5)),isep,itree(ipointer(6)),mnbors, &
-!      &    itree(ipointer(7)),iper,nlist1,mnlist1,list1,nlist2, &
-!      &    mnlist2,list2,nlist3,mnlist3,list3, &
-!      &    nlist4,mnlist4,list4)
-      
+      ntarg = self%ntarg
+      targsort => self%targsort
+      nexpc = self%nexpc
+      expcsort(:,1) = self%expcsort(:)
 
-! !     Initialize routines for plane wave mp loc translation
- 
-!       if(isep.eq.1) then
-!          if(eps.ge.0.5d-2) nlams = 12
-!          if(eps.lt.0.5d-2.and.eps.ge.0.5d-3) nlams = 12
-!          if(eps.lt.0.5d-3.and.eps.ge.0.5d-6) nlams = 20
-!          if(eps.lt.0.5d-6.and.eps.ge.0.5d-9) nlams = 29
-!          if(eps.lt.0.5d-9) nlams = 37
-!       endif
-!       if(isep.eq.2) then
-!          if(eps.ge.0.5d-3) nlams = 9
-!          if(eps.lt.0.5d-3.and.eps.ge.0.5d-6) nlams = 15
-!          if(eps.lt.0.5d-6.and.eps.ge.0.5d-9) nlams = 22
-!          if(eps.lt.0.5d-9) nlams = 29
-!       endif
-!       allocate(rlams(nlams),whts(nlams))
-!       allocate(nphysical(nlams),nfourier(nlams))
 
+
+      iaddr => self%iaddr
+      rmlexp => self%rmlexp
+      lmptot = self%lmptot
+      mptemp => self%mptemp
+      mptemp2 => self%mptemp2
+      lmptemp = self%lmptemp
+
+      itree => self%itree
+      ltree = self%ltree
+      ipointer = self%ipointer
+      ndiv = self%ndiv
+      nlevels = self%nlevels
+
+      nboxes = self%nboxes
+      iper = self%iper
+      boxsize => self%boxsize
+      centers => self%treecenters
+      isrcse => self%isrcse
+      itargse => self%itargse
+      iexpcse => self%iexpcse
+
+      rscales => self%scales 
+      laddr => self%laddr
+      nterms => self%nterms
+
+      ifpgh = self%ifpgh
+      pot => self%potsort
+      grad => self%gradsort
+      hess => self%hesssort
+
+      ifpghtarg = self%ifpghtarg
+      pottarg => self%pottargsort
+      gradtarg => self%gradtargsort
+      hesstarg => self%hesstargsort
+      ntj = self%ntj
+
+      !tsort => self%texpssort
+      tsort(1:self%nd, 0:self%ntj, -self%ntj:self%ntj, 1:self%nexpc) => self%texpssort
+
+      scjsort = self%scjsort
+      ifnear = self%ifnear
+      timeinfo = self%timeinfo
+      ier = self%ier
+
+      !--------------------------------------------------------------------
 
       !--------------- load self variables into local variables -------
         thresh = self%thresh
@@ -1282,8 +1288,6 @@ module fmm3d_tree_mod
         ilist4 => self%ilist4
         cntlist4 = self%cntlist4
 
-        rscales => self%scales
-
 
         wlege => self%wlege
 
@@ -1336,9 +1340,9 @@ module fmm3d_tree_mod
 
         iboxsrcind => self%iboxsrcind
         iboxsrc => self%iboxsrc
-        iboxpot => self%iboxpot
+        !iboxpot => self%iboxpot
         iboxgrad => self%iboxgrad
-        iboxhess => self%iboxhess
+        !iboxhess => self%iboxhess
 
         nlege = self%nlege
 
@@ -1787,8 +1791,8 @@ module fmm3d_tree_mod
      &    iboxsubcenters(1,1,ithd))
                   call dreorderf(3,npts,sourcesort(1,istart), &
      &    iboxsrc(1,1,ithd),iboxsrcind(1,ithd))
-                  call dreorderf(nd,npts,pot(1,istart), &
-     &    iboxpot(1,1,ithd),iboxsrcind(1,ithd))
+    !              call dreorderf(nd,npts,pot(1,istart), &
+    ! &    iboxpot(1,1,ithd),iboxsrcind(1,ithd))
                   call dreorderf(3*nd,npts,grad(1,1,istart), &
      &    iboxgrad(1,1,1,ithd),iboxsrcind(1,ithd))
                   do i=1,8
@@ -1797,16 +1801,22 @@ module fmm3d_tree_mod
                       jend=iboxfl(2,i,ithd)
                       npts0=jend-jstart+1
                       if(npts0.gt.0) then
-                        call l3dtaevalg(nd,rscales(ilev), &
+    !                    call l3dtaevalg(nd,rscales(ilev), &
+    ! &    iboxsubcenters(1,i,ithd),iboxlexp(1,i,ithd), &
+    ! &    nterms(ilev),iboxsrc(1,jstart,ithd),npts0, &
+    ! &    iboxpot(1,jstart,ithd), &
+    ! &    iboxgrad(1,1,jstart,ithd),wlege,nlege)
+
+
+                        call l3dtaevalg_grad(nd,rscales(ilev), &
      &    iboxsubcenters(1,i,ithd),iboxlexp(1,i,ithd), &
      &    nterms(ilev),iboxsrc(1,jstart,ithd),npts0, &
-     &    iboxpot(1,jstart,ithd), &
      &    iboxgrad(1,1,jstart,ithd),wlege,nlege)
                       endif
                     endif
                   enddo
-                  call dreorderi(nd,npts,iboxpot(1,1,ithd), &
-     &    pot(1,istart),iboxsrcind(1,ithd))
+     !             call dreorderi(nd,npts,iboxpot(1,1,ithd), &
+     !&    pot(1,istart),iboxsrcind(1,ithd))
                   call dreorderi(3*nd,npts,iboxgrad(1,1,1,ithd), &
      &    grad(1,1,istart),iboxsrcind(1,ithd))
                 endif
@@ -1889,9 +1899,14 @@ module fmm3d_tree_mod
               istart = self%isrcse(1,ibox) 
               iend = self%isrcse(2,ibox)
               npts = iend-istart+1
-              call l3dtaevalg(self%nd,self%scales(ilev),self%centers(1,ibox), &
+    !           call l3dtaevalg(self%nd,self%scales(ilev),self%centers(1,ibox), &
+    !  &    self%rmlexp(self%iaddr(2,ibox)),self%nterms(ilev),self%sourcesort(1,istart), &
+    !  &    npts,self%potsort(1,istart),self%gradsort(1,1,istart),self%wlege,self%nlege)
+
+
+              call l3dtaevalg_grad(self%nd,self%scales(ilev),self%centers(1,ibox), &
      &    self%rmlexp(self%iaddr(2,ibox)),self%nterms(ilev),self%sourcesort(1,istart), &
-     &    npts,self%potsort(1,istart),self%gradsort(1,1,istart),self%wlege,self%nlege)
+     &    npts,self%gradsort(1,1,istart),self%wlege,self%nlege)
             endif
           enddo
           !$OMP END PARALLEL DO
@@ -1920,9 +1935,14 @@ module fmm3d_tree_mod
                 jstart = self%isrcse(1,jbox)
                 jend = self%isrcse(2,jbox)
                 npts = jend-jstart+1
-                call l3ddirectdg(self%nd,self%sourcesort(1,jstart), &
+    !             call l3ddirectdg(self%nd,self%sourcesort(1,jstart), &
+    !  &    self%dipvecsort(1,1,jstart),npts,self%sourcesort(1,istarts), &
+    !  &    npts0,self%potsort(1,istarts),self%gradsort(1,1,istarts),self%thresh)     
+
+
+                call l3ddirectdg_grad_vec(self%nd,self%sourcesort(1,jstart), &
      &    self%dipvecsort(1,1,jstart),npts,self%sourcesort(1,istarts), &
-     &    npts0,self%potsort(1,istarts),self%gradsort(1,1,istarts),self%thresh)     
+     &    npts0,self%gradsort(1,1,istarts),self%thresh)     
               enddo
             enddo
             !$OMP END PARALLEL DO
@@ -1931,128 +1951,362 @@ module fmm3d_tree_mod
 
 
 
-!------------------------------------------------
-      subroutine lfmm3dexpc_direct_tree(nd,istart,iend,jstart,jend, &
-     &     source,ifcharge,charge,ifdipole, &
-     &     dipvec,expc,texps,scj,ntj,wlege,nlege)
-!--------------------------------------------------------------------
-!     This subroutine adds the local expansions due to sources
-!     istart to iend in the source array at the expansion centers
-!     jstart to jend in the expansion center array to the existing 
-!     local expansions at the corresponding expansion centers.
-!
-!     INPUT arguments
-!-------------------------------------------------------------------
-!     nd           in: integer
-!                  number of charge densities
-!
-!     istart       in:Integer
-!                  Starting index in source array whose expansions
-!                  we wish to add
-!
-!     iend         in:Integer
-!                  Last index in source array whose expansions
-!                  we wish to add
-!
-!     jstart       in: Integer
-!                  First index in the expansion center array at 
-!                  which we  wish to compute the expansions
-! 
-!     jend         in:Integer
-!                  Last index in expansion center array at 
-!                  which we wish to compute the expansions
-! 
-!     scjsort      in: double precision(*)
-!                  Scale of expansions formed at the expansion centers
-!
-!     source       in: double precision(3,ns)
-!                  Source locations
-!
-!     ifcharge     in: Integer
-!                  flag for including expansions due to charges
-!                  The expansion due to charges will be included
-!                  if ifcharge == 1
-!
-!     charge       in: double precision
-!                  Charge at the source locations
-!
-!     ifdipole     in: Integer
-!                 flag for including expansions due to dipoles
-!                 The expansion due to dipoles will be included
-!                 if ifdipole == 1
-!
-!     dipvec      in: double precision(3,ns)
-!                 Dipole orientation vector at the source locations
-!
-!     expc        in: double precision(3,nexpc)
-!                 Expansion center locations
-!
-!     ntj         in: Integer
-!                 Number of terms in expansion
-!
-!     wlege       in: double precision(0:nlege,0:nlege)
-!                 precomputed array of recurrence relation
-!                 coeffs for Ynm calculation.
-!
-!    nlege        in: integer
-!                 dimension parameter for wlege
-!------------------------------------------------------------
-!     OUTPUT
-!
-!   Updated expansions at the targs
-!   texps       out: double complex(0:ntj,-ntj:ntj,expc) 
-!                 coeffs for local expansions
-!-------------------------------------------------------               
-        implicit none
-!
-        integer istart,iend,jstart,jend,ns,j, nlege
-        integer ifcharge,ifdipole,ier,nd
-        double precision source(3,*)
-        double precision scj(*)
-        double precision wlege(*)
-        double precision charge(nd,*)
-        double precision dipvec(nd,3,*)
-        double precision expc(3,*)
-
-        integer nlevels,ntj
-!
-        double complex texps(nd,0:ntj,-ntj:ntj,*)
-        
-!
-        ns = iend - istart + 1
-        if(ifcharge.eq.1.and.ifdipole.eq.0) then
-          do j=jstart,jend
-            call l3dformtac(nd,scj(j), &
-     &    source(1,istart),charge(1,istart),ns, &
-     &    expc(1,j),ntj,texps(1,0,-ntj,j),wlege,nlege)
-           enddo
-         endif
-
-         if(ifcharge.eq.0.and.ifdipole.eq.1) then
-          do j=jstart,jend
-            call l3dformtad(nd,scj(j), &
-     &    source(1,istart), &
-     &    dipvec(1,1,istart),ns,expc(1,j),ntj,texps(1,0,-ntj,j), &
-     &    wlege,nlege)
-           enddo
-         endif
-
-         if(ifcharge.eq.1.and.ifdipole.eq.1) then
-          do j=jstart,jend
-            call l3dformtacd(nd,scj(j), &
-     &    source(1,istart),charge(1,istart), &
-     &    dipvec(1,1,istart),ns,expc(1,j),ntj,texps(1,0,-ntj,j), &
-     &    wlege,nlege)
-           enddo
-         endif
-
-!
-        return
-        end
-
-
 end module fmm3d_tree_mod
+
+
+
+!***********************************************************************
+      subroutine l3ddirectdg_grad_vec(nd,sources, &
+                 dipvec,ns,ztarg,nt,grad,thresh)
+!**********************************************************************
 !
+!     This subroutine evaluates the potential and gradient due to a 
+!     collection of sources and adds to existing quantities.
+!
+!     pot(x) = pot(x) + sum  d_{j} \nabla 1/|x-x_{j}| \cdot v_{j}
+!                        j
+!   
+!     grad(x) = grad(x) + Gradient( sum  
+!                                    j
+!
+!                            \nabla 1|/|x-x_{j}| \cdot v_{j}
+!                            )
+!                                   
+!      where v_{j} is the dipole orientation vector, 
+!      \nabla denotes the gradient is with respect to the x_{j} 
+!      variable, and Gradient denotes the gradient with respect to
+!      the x variable
+!      If |r| < thresh 
+!          then the subroutine does not update the potential
+!          (recommended value = |boxsize(0)|*machine precision
+!           for boxsize(0) is the size of the computational domain) 
+!
+!
+!-----------------------------------------------------------------------
+!     INPUT:
+!
+!     nd     :    number of charge and dipole densities
+!     sources:    source locations
+!     dipvec :    dipole orientation vector
+!     ns     :    number of sources
+!     ztarg  :    target locations
+!     ntarg  :    number of targets
+!     thresh :    threshold for updating potential,
+!                 potential at target won't be updated if
+!                 |t - s| <= thresh, where t is the target
+!                 location and, and s is the source location 
+!                 
+!-----------------------------------------------------------------------
+!     OUTPUT:
+!
+!     pot    :    updated potential at ztarg 
+!     grad   :    updated gradient at ztarg 
+!
+!-----------------------------------------------------------------------
+      implicit none
+!f2py intent(in) nd,sources,dipvec,ns,ztarg,nt,thresh
+!f2py intent(out) pot,grad
+!
+!c      calling sequence variables
+!  
+      integer ns,nt,nd
+      real *8 sources(3,ns),ztarg(3,nt),dipvec(nd,3,ns)
+      real *8 grad(nd,3,nt)
+      real *8 thresh
+      
+
+      call l3ddirectdg_cpp_grad(nd,sources, &
+                 dipvec,ns,ztarg,nt,grad,thresh)
+
+      return
+      end
+
+
+
+!**********************************************************************
+      subroutine l3dtaevalg_grad(nd,rscale,center,mpole,nterms, &
+     		ztarg,ntarg,grad,wlege,nlege)
+!**********************************************************************
+!
+!
+!     this subroutine evaluates the potentials and gradients due to  
+!     an incoming local expansion and increments inputs accordingly:
+!
+!     grad =  grad + 
+!              Gradient( sum sum mpole(n,m)r^{n}Y_nm(theta,phi)/sqrt(2n+1))
+!                         n   m
+!-----------------------------------------------------------------------
+!     INPUT:
+!
+!     nd     :    number of multipole expansions
+!     rscale :    scaling parameter 
+!     center :    expansion center
+!     mpole  :    local expansion 
+!     nterms :    order of the multipole expansion
+!     ztarg  :    target location
+!     ntarg  :    number of target locations
+!     wlege  :    precomputed array of scaling coeffs for Pnm
+!     nlege  :    dimension parameter for wlege
+!-----------------------------------------------------------------------
+!     OUTPUT:
+!
+!     pot    :   updated potentials at targets
+!     grad   :   updated gradients at targets 
+!----------------------------------------------------------------------
+      implicit none
+!
+!c     calling sequence variables
+!
+      integer nterms,nlege,ntarg,nd
+      real *8 rscale,center(3),ztarg(3,ntarg)
+      real *8 grad(nd,3,ntarg)
+      complex *16 mpole(nd,0:nterms,-nterms:nterms)
+      real *8 wlege(0:nlege,0:nlege)
+!
+!c     temporary variables
+!
+      integer idim
+      real *8, allocatable :: ynm(:,:),ynmd(:,:),fr(:),frder(:)
+      complex *16, allocatable :: ephi(:)
+      integer i,j,k,l,m,n,itarg
+      real *8 done,r,theta,phi,zdiff(3)
+      real *8 ctheta,stheta,cphi,sphi
+      real *8 d,rx,ry,rz,thetax,thetay,thetaz,phix,phiy,phiz,rs
+      real *8 rtmp1,rtmp2,rtmp3,rtmp4,rtmp5,rtmp6
+      complex *16 ephi1
+      real *8 ur(nd),utheta(nd),uphi(nd)
+!
+      complex *16 eye
+      complex *16 ztmp1,ztmp2,ztmp3,ztmpsum,z
+      real *8 rscaleinv
+!
+      data eye/(0.0d0,1.0d0)/
+!
+      done=1.0d0
+      allocate(ephi(0:nterms+1))
+      allocate(fr(0:nterms+1),frder(0:nterms))
+      allocate(ynm(0:nterms,0:nterms))
+      allocate(ynmd(0:nterms,0:nterms))
+!
+      do itarg=1,ntarg
+        zdiff(1)=ztarg(1,itarg)-center(1)
+        zdiff(2)=ztarg(2,itarg)-center(2)
+        zdiff(3)=ztarg(3,itarg)-center(3)
+!
+        call cart2polar(zdiff,r,theta,phi)
+
+        ctheta = dcos(theta)
+        stheta = dsin(theta)
+        cphi = dcos(phi)
+        sphi = dsin(phi)
+        ephi1 = dcmplx(cphi,sphi)
+!
+!     compute exp(eye*m*phi) array
+!
+        ephi(0)=done
+        ephi(1)=ephi1
+        d = r/rscale
+        fr(0) = 1.0d0
+        fr(1) = fr(0)*d
+        do i=2,nterms+1
+          fr(i) = fr(i-1)*d
+          ephi(i)=ephi(i-1)*ephi1
+        enddo
+        frder(0) = 0
+        do i=1,nterms
+          frder(i) = i*fr(i-1)/rscale
+        enddo
+!
+!    get the associated Legendre functions:
+!
+        call ylgndr2sfw(nterms,ctheta,ynm,ynmd,wlege,nlege)
+        do l = 0,nterms
+          rs = sqrt(1.0d0/(2*l+1))
+          do m=0,l
+            ynm(l,m) = ynm(l,m)*rs
+            ynmd(l,m) = ynmd(l,m)*rs
+          enddo
+        enddo
+!
+!     compute coefficients in change of variables from spherical
+!     to Cartesian gradients. In phix, phiy, we leave out the 
+!     1/sin(theta) contribution, since we use values of Ynm (which
+!     multiplies phix and phiy) that are scaled by 
+!     1/sin(theta).
+!
+!
+!     NOTE: sphereical derivative needs to be fixed for r=0
+!
+
+        rscaleinv = 1.0d0/rscale
+        rx = stheta*cphi
+        thetax = ctheta*cphi*rscaleinv
+        phix = -sphi*rscaleinv
+        ry = stheta*sphi
+        thetay = ctheta*sphi*rscaleinv
+        phiy = cphi*rscaleinv
+        rz = ctheta
+        thetaz = -stheta*rscaleinv
+        phiz = 0.0d0
+!
+        do idim=1,nd
+          ur(idim) = real(mpole(idim,0,0))*frder(0)
+          utheta(idim) = 0.0d0
+          uphi(idim) = 0.0d0
+        enddo
+!
+        do n=1,nterms
+          rtmp1 = fr(n)*ynm(n,0)
+          rtmp2 = frder(n)*ynm(n,0)
+          rtmp3 = -fr(n-1)*ynmd(n,0)*stheta
+          do idim=1,nd
+            ur(idim)=ur(idim)+real(mpole(idim,n,0))*rtmp2
+            utheta(idim)=utheta(idim)+real(mpole(idim,n,0))*rtmp3
+          enddo
+!
+	      do m=1,n
+            rtmp1 = fr(n)*ynm(n,m)*stheta
+            rtmp4 = frder(n)*ynm(n,m)*stheta
+            rtmp5 = -fr(n-1)*ynmd(n,m)
+            rtmp6 = -m*fr(n-1)*ynm(n,m)
+
+            do idim=1,nd
+              rtmp2 = 2*real(mpole(idim,n,m)*ephi(m)) 
+
+              ur(idim) = ur(idim) + rtmp4*rtmp2
+              utheta(idim) = utheta(idim)+rtmp5*rtmp2
+              rtmp2 = 2*dimag(mpole(idim,n,m)*ephi(m))
+              uphi(idim) = uphi(idim) + rtmp6*rtmp2
+            enddo
+          enddo
+        enddo
+!
+        do idim=1,nd
+          grad(idim,1,itarg)=grad(idim,1,itarg)+ur(idim)*rx+ &
+               utheta(idim)*thetax+uphi(idim)*phix
+          grad(idim,2,itarg)=grad(idim,2,itarg)+ur(idim)*ry+ &
+               utheta(idim)*thetay+uphi(idim)*phiy
+          grad(idim,3,itarg)=grad(idim,3,itarg)+ur(idim)*rz+ &
+               utheta(idim)*thetaz+uphi(idim)*phiz
+        enddo
+ 1000 continue
+      enddo
+      return
+      end
+
+
+
+
+!***********************************************************************
+      subroutine l3ddirectdg_grad(nd,sources, &
+                 dipvec,ns,ztarg,nt,grad,thresh)
+!**********************************************************************
+!
+!     This subroutine evaluates the potential and gradient due to a 
+!     collection of sources and adds to existing quantities.
+!
+!   
+!     grad(x) = grad(x) + Gradient( sum  
+!                                    j
+!
+!                            \nabla 1|/|x-x_{j}| \cdot v_{j}
+!                            )
+!                                   
+!      where v_{j} is the dipole orientation vector, 
+!      \nabla denotes the gradient is with respect to the x_{j} 
+!      variable, and Gradient denotes the gradient with respect to
+!      the x variable
+!      If |r| < thresh 
+!          then the subroutine does not update the potential
+!          (recommended value = |boxsize(0)|*machine precision
+!           for boxsize(0) is the size of the computational domain) 
+!
+!
+!-----------------------------------------------------------------------
+!     INPUT:
+!
+!     nd     :    number of charge and dipole densities
+!     sources:    source locations
+!     dipvec :    dipole orientation vector
+!     ns     :    number of sources
+!     ztarg  :    target locations
+!     ntarg  :    number of targets
+!     thresh :    threshold for updating potential,
+!                 potential at target won't be updated if
+!                 |t - s| <= thresh, where t is the target
+!                 location and, and s is the source location 
+!                 
+!-----------------------------------------------------------------------
+!     OUTPUT:
+!
+!     pot    :    updated potential at ztarg 
+!     grad   :    updated gradient at ztarg 
+!
+!-----------------------------------------------------------------------
+      implicit none
+!cf2py intent(in) nd,sources,dipvec,ns,ztarg,nt,thresh
+!cf2py intent(out) pot,grad
+      intent(in) nd,sources,dipvec,ns,ztarg,nt,thresh
+      intent(out) grad
+!c
+!cc      calling sequence variables
+!c  
+      integer ns,nt,nd
+      real *8 sources(3,ns),ztarg(3,nt),dipvec(nd,3,ns)
+      real *8 grad(nd,3,nt)
+      real *8 thresh
+      
+!c
+!cc     temporary variables
+!c
+      real *8 zdiff(3),dd,d,dinv,dinv2,dotprod
+      real *8 cd,cd2,cd3,cd4
+      real *8 threshsq
+      integer i,j,idim
+
+      threshsq = thresh**2
+      do i=1,nt
+
+      !$omp parallel do default(none) schedule(static) &
+      !$omp private(j,zdiff, dd, dinv,dinv2,dotprod,cd,cd2,cd3,cd4,idim) &
+      !$omp shared(i, nd,ns,sources,ztarg,dipvec,grad,threshsq)
+        do j=1,ns
+          zdiff(1) = ztarg(1,i)-sources(1,j)
+          zdiff(2) = ztarg(2,i)-sources(2,j)
+          zdiff(3) = ztarg(3,i)-sources(3,j)
+
+          dd = zdiff(1)**2 + zdiff(2)**2 + zdiff(3)**2
+          if(dd.lt.threshsq) goto 1000
+
+          dinv2 = 1/dd
+          dinv = sqrt(dinv2)
+          cd = dinv
+          cd2 = -cd*dinv2
+          cd3 = -3*cd*dinv2*dinv2
+
+          do idim=1,nd
+          
+            dotprod = zdiff(1)*dipvec(idim,1,j)+ &
+                    zdiff(2)*dipvec(idim,2,j)+ &
+                    zdiff(3)*dipvec(idim,3,j)
+            cd4 = cd3*dotprod
+
+            grad(idim,1,i) = grad(idim,1,i) + (cd4*zdiff(1) - &
+              cd2*dipvec(idim,1,j))
+            grad(idim,2,i) = grad(idim,2,i) + (cd4*zdiff(2) - &
+              cd2*dipvec(idim,2,j))
+            grad(idim,3,i) = grad(idim,3,i) + (cd4*zdiff(3) - &
+              cd2*dipvec(idim,3,j))
+          enddo
+ 1000     continue
+        enddo
+      enddo
+
+
+      return
+      end
+
+
        subroutine lfmm3d_tree(nd,eps,nsource,source,ifcharge, &
      &    charge,ifdipole,dipvec,iper,ifpgh,pot,grad,hess,ntarg, &
      &    targ,ifpghtarg,pottarg,gradtarg,hesstarg,ier)
