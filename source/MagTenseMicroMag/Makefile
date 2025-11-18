@@ -10,7 +10,8 @@ MATLAB_INCLUDE =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
-LIBSRC_SOURCES = MicroMagParameters util_micromag DemagAuxFunctions FortranCuda ComputeDifferentialOperatorsFromMesh UnstructuredMeshAnalysis
+
+LIBSRC_SOURCES = fmm3d_tree_mod MicroMagParameters util_micromag DemagAuxFunctions FortranCuda ComputeDifferentialOperatorsFromMesh UnstructuredMeshAnalysis
 
 ifeq (${USE_MATLAB},1)
     OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
@@ -21,6 +22,7 @@ else
 	LIBSRC_SOURCES += MagTenseMicroMagPyIO
 	MATLAB_OPT =
 endif
+
 
 LIBSRC_SOURCES += LandauLifshitzEquationSolver
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
@@ -56,6 +58,8 @@ DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
 .PHONY: all clean
 
 all: pre-build ${STATIC_LIB}
+# Ignore .mod files as targets
+%.o : %.mod
 
 .f90.o:
 	${FC} ${FFLAGS} -I${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} ${OPT} ${MATLAB_OPT} ${OPT} -c $< -o $@
