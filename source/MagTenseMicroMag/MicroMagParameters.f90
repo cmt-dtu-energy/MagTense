@@ -4,6 +4,8 @@ include "mkl_dfti.f90"
     module MicroMagParameters
     use MKL_SPBLAS
     Use MKL_DFTI
+    use fmm3d_tree_mod
+
     INTEGER, PARAMETER :: SP = SELECTED_REAL_KIND(6, 37)
     INTEGER, PARAMETER :: DP = SELECTED_REAL_KIND(15, 307)
     
@@ -167,6 +169,14 @@ include "mkl_dfti.f90"
         real(DP),dimension(:,:,:),allocatable :: CrystalAxis, K0_arr !> The local crystal coordinates and the local anisotropy constants. See updateAnisotropy for details        
         
         type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H       !> Handle for the FFT MKL stuff
+
+
+
+
+
+        !--------------- demag tensor neighbour stuff ---------------
+        integer, dimension(:,:), pointer :: nbr_idx(:,:)
+        real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:)
         
     end type MicroMagProblem
     
@@ -198,6 +208,9 @@ include "mkl_dfti.f90"
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
+
+        class(FMM3DTree), pointer :: fmm_tree => null()    !> FMM tree for computing the demag field using FMM
+
     end type MicroMagSolution
     
     
