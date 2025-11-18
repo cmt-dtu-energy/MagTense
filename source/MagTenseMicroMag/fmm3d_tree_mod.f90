@@ -188,7 +188,7 @@ module fmm3d_tree_mod
             return
         end if
 
-        print *, " building fmm tree"
+        !print *, " building fmm tree"
 
         self%source => source
         self%nsource = size(source,2)
@@ -203,7 +203,7 @@ module fmm3d_tree_mod
         !$omp end single
         !$omp end parallel
 
-        print *, " number of threads for fmm tree build: ", self%nthd
+        !print *, " number of threads for fmm tree build: ", self%nthd
         
 
         call self%build1()
@@ -232,7 +232,7 @@ module fmm3d_tree_mod
 
 
     subroutine full_fmm(self,nd,eps,nsource,source, &
-            dipvec,pot,grad,ier)
+            dipvec,grad,ier)
         use omp_lib, only: omp_get_wtime
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------
@@ -246,7 +246,7 @@ module fmm3d_tree_mod
         
         double precision, target :: dipvec(nd,3,nsource)
 
-        double precision, target :: pot(nd,nsource),grad(nd,3,nsource)
+        double precision, target :: grad(nd,3,nsource)
 
 
         integer, contiguous, pointer ::  laddr(:,:)
@@ -271,7 +271,7 @@ module fmm3d_tree_mod
         !--------------------------------------------------
 
 
-      print *, " calling fmm tree "
+      !print *, " calling fmm tree "
 
 
 
@@ -400,7 +400,7 @@ module fmm3d_tree_mod
 
         !-------- end of tree build --------------------
 
-        print *, " finished tree build "
+        !print *, " finished tree build "
         !------ set scaling 
 
         self%b0 = self%boxsize(0)
@@ -414,7 +414,7 @@ module fmm3d_tree_mod
 
         !-------------- allocate sorted source and targ arrays------
 
-        print *, " allocating sorted arrays "
+        !print *, " allocating sorted arrays "
 
         allocate(sourcesort(3,self%nsource))
 
@@ -476,7 +476,7 @@ module fmm3d_tree_mod
 
         self%laddr(1:2,0:self%nlevels) => self%itree(self%ipointer(1) : self%ipointer(1)+(self%nlevels + 1)*2-1)
 
-        print *, " done with build1 "
+        !print *, " done with build1 "
 
     end subroutine build1
 
@@ -548,7 +548,7 @@ module fmm3d_tree_mod
       do i=0,self%nlevels
          if(self%nmax.lt.self%nterms(i)) self%nmax = self%nterms(i)
       enddo
-      print *, " FMM3DTree: max number of terms = ", self%nmax
+      !print *, " FMM3DTree: max number of terms = ", self%nmax
 
 
        allocate(self%rscpow(0:self%nmax))
@@ -602,7 +602,7 @@ module fmm3d_tree_mod
      &    self%mexpp1(self%nd,self%nexptotp,self%nthd))
       allocate(self%mexpp2(self%nd,self%nexptotp,self%nthd),self%mexppall(self%nd,self%nexptotp,16,self%nthd))
 
-      print *, " done with build2 "
+      !print *, " done with build2 "
 
 
       !
