@@ -318,8 +318,8 @@
         ! hmy_before = gb_solution%HmY(:)
         ! hmz_before = gb_solution%HmZ(:)
 #if USE_FMM3D
-        !call updateDemagfieldFMM( gb_problem, gb_solution )
-        call updateDemagfieldFMM_old( gb_problem, gb_solution )
+        call updateDemagfieldFMM( gb_problem, gb_solution )
+        !call updateDemagfieldFMM_old( gb_problem, gb_solution )
         ! hmx_fmm = gb_solution%HmX(:)
         ! hmy_fmm = gb_solution%HmY(:)
         ! hmz_fmm = gb_solution%HmZ(:)
