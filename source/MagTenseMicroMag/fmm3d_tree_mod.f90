@@ -26,21 +26,26 @@ module fmm3d_tree_mod
             integer :: nthd = 1
 
             !------------------- pointer to input and output 
-            double precision, contiguous, pointer ::  source(:,:),targ(:,:)
-            double precision, contiguous, pointer ::  charge(:,:)
+            !double precision, contiguous, pointer ::  targ(:,:)
+            double precision :: targ(3,1)
+            double precision, contiguous, pointer ::  source(:,:)
+            !double precision, contiguous, pointer ::  charge(:,:)
             double precision, contiguous, pointer ::  dipvec(:,:,:)
-            double precision, contiguous, pointer ::  pot(:,:),grad(:,:,:),hess(:,:,:)
+            !double precision, contiguous, pointer ::  pot(:,:),grad(:,:,:),hess(:,:,:)
+            double precision, contiguous, pointer ::  grad(:,:,:)
             !double precision, contiguous, pointer ::  pottarg(:,:),gradtarg(:,:,:),hesstarg(:,:,:)
-            double precision, contiguous, pointer :: sourcesort(:,:),targsort(:,:)
-            double precision, contiguous, pointer :: chargesort(:,:)
+            !double precision, contiguous, pointer :: targsort(:,:)
+            double precision, contiguous, pointer :: sourcesort(:,:)
+            !double precision, contiguous, pointer :: chargesort(:,:)
             double precision, contiguous, pointer :: dipvecsort(:,:,:)
-            double precision, contiguous, pointer :: potsort(:,:),gradsort(:,:,:)
-            double precision, contiguous, pointer :: hesssort(:,:,:)
-            double precision, contiguous, pointer :: pottargsort(:,:)
-            double precision, contiguous, pointer :: gradtargsort(:,:,:)
-            double precision, contiguous, pointer :: hesstargsort(:,:,:)
+           ! double precision, contiguous, pointer :: potsort(:,:)
+            double precision, contiguous, pointer :: gradsort(:,:,:)
+            !double precision, contiguous, pointer :: hesssort(:,:,:)
+            !double precision, contiguous, pointer :: pottargsort(:,:)
+            !double precision, contiguous, pointer :: gradtargsort(:,:,:)
+            !double precision, contiguous, pointer :: hesstargsort(:,:,:)
             !-----------------------------------------
-            integer nsource,ntarg,ifcharge,ifdipole,ifpgh,ifpghtarg
+            integer nsource,ntarg !,ifcharge,ifdipole,ifpgh,ifpghtarg
             integer nd,ier
             double precision eps
             !-----------------------------------------
@@ -68,7 +73,7 @@ module fmm3d_tree_mod
 
             double precision expcsort(3)
             double precision scjsort(1),radexp
-            double complex, contiguous, pointer :: texpssort(:)
+           ! double complex, contiguous, pointer :: texpssort(:)
             double precision timeinfo(6)
 
 
@@ -185,10 +190,10 @@ module fmm3d_tree_mod
         !------------------------------------------------
         double precision eps
 
-        integer nsource,ntarg,ifcharge,ifdipole,ifpgh,ifpghtarg
+        integer nsource,ntarg !,ifcharge,ifdipole,ifpgh,ifpghtarg
         integer nd,iper,ier
         
-        double precision, target :: source(3,nsource),targ(3,1)
+        double precision, target :: source(3,nsource)!,targ(3,1)
         double precision, target :: charge(nd,1)
         
         double precision, target :: dipvec(nd,3,nsource)
@@ -202,11 +207,10 @@ module fmm3d_tree_mod
 
         real(kind=8) :: t1, tb1, tb2, tmain, teloc, tdir, t_reorder, t_dealloc
 
-      ifcharge = 0
-      ifdipole = 1
-      
-      ifpgh = 2
-      ifpghtarg = 0
+      !ifcharge = 0
+      !ifdipole = 1
+      !ifpgh = 2
+      !ifpghtarg = 0
 
       ntarg = 0
 
@@ -217,17 +221,17 @@ module fmm3d_tree_mod
         self%nsource = nsource
         self%dipvec => dipvec
 
-        self%pot => pot
+        !self%pot => pot
         self%grad => grad
         self%eps = eps
         self%nd = nd
         self%ier = ier
-        self%ifcharge = ifcharge
-        self%ifdipole = ifdipole
+        !self%ifcharge = ifcharge
+        !self%ifdipole = ifdipole
         self%ntarg = ntarg
-        self%targ => targ
-        self%ifpgh = ifpgh
-        self%ifpghtarg = ifpghtarg
+        !self%targ => targ
+        !self%ifpgh = ifpgh
+        !self%ifpghtarg = ifpghtarg
         !self%pottarg => pottarg
         !self%gradtarg => gradtarg
         !self%hess => hess
@@ -358,13 +362,13 @@ module fmm3d_tree_mod
         print *, " starting tree build "
 
 
-        allocate(self%texpssort(100))
+       ! allocate(self%texpssort(100))
     
-        call lndiv(self%eps,self%nsource,self%ntarg,self%ifcharge,self%ifdipole,self%ifpgh, &
-                &    self%ifpghtarg,self%ndiv,self%idivflag) 
+        call lndiv(self%eps,self%nsource,0,0,1,2, &
+                &    0,self%ndiv,self%idivflag) 
 
 
-        call pts_tree_mem(self%source,self%nsource,self%targ,self%ntarg,self%idivflag,self%ndiv,self%nlmin, &
+        call pts_tree_mem(self%source,self%nsource,self%targ,0,self%idivflag,self%ndiv,self%nlmin, &
             &    self%nlmax,self%iper,self%ifunif,self%nlevels,self%nboxes,self%ltree)
 
 
@@ -378,14 +382,15 @@ module fmm3d_tree_mod
         &    treecenters,boxsize)
     
 
-        allocate(isrcse(2,self%nboxes),itargse(2,self%nboxes),iexpcse(2,self%nboxes))
+        !allocate(isrcse(2,self%nboxes),itargse(2,self%nboxes),iexpcse(2,self%nboxes))
+        allocate(isrcse(2,self%nboxes),iexpcse(2,self%nboxes))
         allocate(isrc(self%nsource),itarg(self%ntarg))
 
         call pts_tree_sort(self%nsource,self%source,itree,self%ltree,self%nboxes,self%nlevels, &
         &    self%ipointer,treecenters,isrc,isrcse)
         
-        call pts_tree_sort(self%ntarg,self%targ,itree,self%ltree,self%nboxes,self%nlevels, &
-        &    self%ipointer,treecenters,itarg,itargse)
+        !call pts_tree_sort(self%ntarg,self%targ,itree,self%ltree,self%nboxes,self%nlevels, &
+        !&    self%ipointer,treecenters,itarg,itargse)
         
         call pts_tree_sort(self%nexpc,self%expc,itree,self%ltree,self%nboxes,self%nlevels, &
         &    self%ipointer,treecenters,self%iexpc,iexpcse)
@@ -395,7 +400,7 @@ module fmm3d_tree_mod
         self%treecenters => treecenters
         self%centers => treecenters ! same 
         self%isrcse => isrcse
-        self%itargse => itargse
+        !self%itargse => itargse
         self%iexpcse => iexpcse
         self%isrc => isrc
         self%itarg => itarg
@@ -422,11 +427,11 @@ module fmm3d_tree_mod
         allocate(targsort(3,self%ntarg))
 
         print *, " source and targ"
-        if(self%ifcharge.eq.1) allocate(chargesort(self%nd,self%nsource))
+        !charge.eq.1) allocate(chargesort(self%nd,self%nsource))
 
-        if(self%ifdipole.eq.1) then
+        !if(self%ifdipole.eq.1) then
             allocate(dipvecsort(self%nd,3,self%nsource))
-        endif
+        !endif
 
 
         allocate(gradsort(self%nd,3,self%nsource))
@@ -460,8 +465,8 @@ module fmm3d_tree_mod
 
 
         self%sourcesort => sourcesort
-        self%targsort => targsort
-        self%chargesort => chargesort
+        !self%targsort => targsort
+        !self%chargesort => chargesort
         self%dipvecsort => dipvecsort
         !self%potsort => potsort
         self%gradsort => gradsort
@@ -492,21 +497,21 @@ module fmm3d_tree_mod
       call drescale(3*self%nsource,self%sourcesort,self%b0inv)
 
 
-        if(self%ifcharge.eq.1) then
-            call dreorderf(self%nd,self%nsource,self%charge,self%chargesort, &
-        &    self%isrc)
-            call drescale(self%nd*self%nsource,self%chargesort,self%b0inv)
-        endif
+        !if(self%ifcharge.eq.1) then
+        !    call dreorderf(self%nd,self%nsource,self%charge,self%chargesort, &
+        !&    self%isrc)
+        !    call drescale(self%nd*self%nsource,self%chargesort,self%b0inv)
+        !endif
 
 
-        if(self%ifdipole.eq.1) then
+        !if(self%ifdipole.eq.1) then
             call dreorderf(3*self%nd,self%nsource,self%dipvec,self%dipvecsort, &
         &    self%isrc)
             call drescale(3*self%nd*self%nsource,self%dipvecsort,self%b0inv2)
-        endif
+        !endif
 
-        call dreorderf(3,self%ntarg,self%targ,self%targsort,self%itarg)
-        call drescale(3*self%ntarg,self%targsort,self%b0inv)
+       !call dreorderf(3,self%ntarg,self%targ,self%targsort,self%itarg)
+       !call drescale(3*self%ntarg,self%targsort,self%b0inv)
 
 
 
@@ -778,10 +783,10 @@ module fmm3d_tree_mod
               npts = iend-istart+1
               if(npts.gt.nmaxt) nmaxt = npts
 
-              istart = self%itargse(1,ibox)
-              iend = self%itargse(2,ibox)
-              npts = iend - istart + 1
-              if(npts.gt.nmaxt) nmaxt = npts
+              ! istart = self%itargse(1,ibox)
+              ! iend = self%itargse(2,ibox)
+              ! npts = iend - istart + 1
+              !if(npts.gt.nmaxt) nmaxt = npts
             endif
           enddo
     !$OMP END PARALLEL DO
@@ -809,7 +814,7 @@ module fmm3d_tree_mod
 
         !------- reset texpssort to zero --------------
         ! NOTO - tsort in lfmm3dmain_tree
-        self%texpssort = 0.0d0
+       ! self%texpssort = 0.0d0
         !-------------------------------------------
 
 
@@ -851,42 +856,15 @@ module fmm3d_tree_mod
         !------------------------------------------------
         integer i,idim
         !------------------------------------------------
-        double precision, pointer :: sourcesort(:,:),targsort(:,:)
-        double precision, pointer :: chargesort(:,:)
-        double precision, pointer :: dipvecsort(:,:,:)
-        double precision, pointer :: potsort(:,:),gradsort(:,:,:)
-        integer ifpgh,ifpghtarg, nsource,ntarg,nd
-        !------------------------------------------------
-
-        sourcesort => self%sourcesort
-        targsort => self%targsort
-        chargesort => self%chargesort
-        dipvecsort => self%dipvecsort
-        !potsort => self%potsort
-        gradsort => self%gradsort
-
-        ifpgh = self%ifpgh
-        ifpghtarg = self%ifpghtarg
-        nsource = self%nsource
-        ntarg = self%ntarg
-        nd = self%nd
-
-
     !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,idim)
-
-            do i=1,nsource
-            do idim=1,nd
-                !potsort(idim,i) = 0
-                gradsort(idim,1,i) = 0
-                gradsort(idim,2,i) = 0
-                gradsort(idim,3,i) = 0
+            do i=1,self%nsource
+            do idim=1,self%nd
+                self%gradsort(idim,1,i) = 0
+                self%gradsort(idim,2,i) = 0
+                self%gradsort(idim,3,i) = 0
             enddo
             enddo
     !$OMP END PARALLEL DO
-
-
-
-
     end subroutine reset_sort_arg
 
 
@@ -899,20 +877,20 @@ module fmm3d_tree_mod
         if (associated(self%boxsize)) deallocate(self%boxsize)
         if (associated(self%treecenters)) deallocate(self%treecenters)
         if (associated(self%isrcse)) deallocate(self%isrcse)
-        if (associated(self%itargse)) deallocate(self%itargse)
+        !if (associated(self%itargse)) deallocate(self%itargse)
         if (associated(self%iexpcse)) deallocate(self%iexpcse)
         if (associated(self%isrc)) deallocate(self%isrc)
-        if (associated(self%itarg)) deallocate(self%itarg)
+        !if (associated(self%itarg)) deallocate(self%itarg)
         if (associated(self%sourcesort)) deallocate(self%sourcesort)
-        if (associated(self%targsort)) deallocate(self%targsort)
-        if (associated(self%chargesort)) deallocate(self%chargesort)
+        !if (associated(self%targsort)) deallocate(self%targsort)
+        !if (associated(self%chargesort)) deallocate(self%chargesort)
         if (associated(self%dipvecsort)) deallocate(self%dipvecsort)
-        if (associated(self%potsort)) deallocate(self%potsort)
+        !if (associated(self%potsort)) deallocate(self%potsort)
         if (associated(self%gradsort)) deallocate(self%gradsort)
-        if (associated(self%hesssort)) deallocate(self%hesssort)
-        if (associated(self%pottargsort)) deallocate(self%pottargsort)
-        if (associated(self%gradtargsort)) deallocate(self%gradtargsort)
-        if (associated(self%hesstargsort)) deallocate(self%hesstargsort)
+        !if (associated(self%hesssort)) deallocate(self%hesssort)
+        !if (associated(self%pottargsort)) deallocate(self%pottargsort)
+        !if (associated(self%gradtargsort)) deallocate(self%gradtargsort)
+        !if (associated(self%hesstargsort)) deallocate(self%hesstargsort)
         if (associated(self%nterms)) deallocate(self%nterms)
         if (associated(self%iaddr)) deallocate(self%iaddr)
         if (associated(self%mptemp)) deallocate(self%mptemp)
@@ -943,12 +921,12 @@ module fmm3d_tree_mod
       integer nsource,ntarg,nexpc
       integer ndiv,nlevels
 
-      integer ifcharge,ifdipole
-      integer ifpgh,ifpghtarg
+      !integer ifcharge,ifdipole
+      !integer ifpgh,ifpghtarg
 
       !double precision sourcesort(3,nsource)
       double precision, contiguous, pointer :: sourcesort(:,:)
-      double precision, contiguous, pointer :: chargesort(:,:)
+      !double precision, contiguous, pointer :: chargesort(:,:)
       double precision, contiguous, pointer :: dipvecsort(:,:,:)
 
 
@@ -956,7 +934,7 @@ module fmm3d_tree_mod
       !double precision dipvecsort(nd,3,*)
 
       !double precision targsort(3,ntarg)
-      double precision, contiguous, pointer :: targsort(:,:)
+      !double precision, contiguous, pointer :: targsort(:,:)
 
       !double precision pot(nd,*),grad(nd,3,*),hess(nd,6,*)
       !double precision pottarg(nd,*),gradtarg(nd,3,*),hesstarg(nd,6,*)
@@ -1009,7 +987,8 @@ module fmm3d_tree_mod
       !double precision boxsize(0:self%nlevels)
       !integer isrcse(2,nboxes),itargse(2,nboxes),iexpcse(2,nboxes)
       double precision, contiguous, pointer :: boxsize(:)
-      integer, contiguous, pointer :: isrcse(:,:),itargse(:,:),iexpcse(:,:)
+      !integer, contiguous, pointer :: isrcse(:,:),itargse(:,:),iexpcse(:,:)
+      integer, contiguous, pointer :: isrcse(:,:),iexpcse(:,:)
 
       integer, contiguous, pointer :: nlist1(:),list1(:,:)
       integer, contiguous, pointer :: nlist2(:),list2(:,:)
@@ -1158,20 +1137,20 @@ module fmm3d_tree_mod
 
       !--------
       nthd = 1
-       ifprint=0
+      ifprint=0
 
       !--------- load self variables... replacement of argument list -----
       nd = self%nd
       eps = self%eps
       nsource = self%nsource
       sourcesort => self%sourcesort
-      ifcharge = self%ifcharge
-      chargesort => self%chargesort
-      ifdipole = self%ifdipole
+      !ifcharge = self%ifcharge
+      !chargesort => self%chargesort
+      !ifdipole = self%ifdipole
       dipvecsort => self%dipvecsort
 
       ntarg = self%ntarg
-      targsort => self%targsort
+      !targsort => self%targsort
       nexpc = self%nexpc
       expcsort(:,1) = self%expcsort(:)
 
@@ -1195,26 +1174,26 @@ module fmm3d_tree_mod
       boxsize => self%boxsize
       centers => self%treecenters
       isrcse => self%isrcse
-      itargse => self%itargse
+      !itargse => self%itargse
       iexpcse => self%iexpcse
 
       rscales => self%scales 
       laddr => self%laddr
       nterms => self%nterms
 
-      ifpgh = self%ifpgh
-      pot => self%potsort
+      !ifpgh = self%ifpgh
+      !pot => self%potsort
       grad => self%gradsort
-      hess => self%hesssort
+      !hess => self%hesssort
 
-      ifpghtarg = self%ifpghtarg
-      pottarg => self%pottargsort
-      gradtarg => self%gradtargsort
-      hesstarg => self%hesstargsort
+      !ifpghtarg = self%ifpghtarg
+      !pottarg => self%pottargsort
+      !gradtarg => self%gradtargsort
+      !hesstarg => self%hesstargsort
       ntj = self%ntj
 
       !tsort => self%texpssort
-      tsort(1:self%nd, 0:self%ntj, -self%ntj:self%ntj, 1:self%nexpc) => self%texpssort
+      !tsort(1:self%nd, 0:self%ntj, -self%ntj:self%ntj, 1:self%nexpc) => self%texpssort
 
       scjsort = self%scjsort
       ifnear = self%ifnear
@@ -1845,21 +1824,15 @@ module fmm3d_tree_mod
 
             npts = 0
 
-            if(ifpghtarg.gt.0) then
-               istart = itargse(1,ibox)
-               iend = itargse(2,ibox) 
-               npts = npts + iend-istart+1
-            endif
-
             istart = iexpcse(1,ibox) 
             iend = iexpcse(2,ibox) 
             npts = npts + iend-istart+1
 
-            if(ifpgh.gt.0) then
+            !if(ifpgh.gt.0) then
                istart = isrcse(1,ibox)
                iend = isrcse(2,ibox) 
                npts = npts + iend-istart+1
-            endif
+            !endif
 
             if(npts.gt.0) then
                do i=1,8
@@ -1962,9 +1935,6 @@ end module fmm3d_tree_mod
 !
 !     This subroutine evaluates the potential and gradient due to a 
 !     collection of sources and adds to existing quantities.
-!
-!     pot(x) = pot(x) + sum  d_{j} \nabla 1/|x-x_{j}| \cdot v_{j}
-!                        j
 !   
 !     grad(x) = grad(x) + Gradient( sum  
 !                                    j
