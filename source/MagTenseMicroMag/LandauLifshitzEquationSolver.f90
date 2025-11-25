@@ -2555,6 +2555,113 @@ problem%Nnbr    => Nnbr
 end subroutine BuildNeighbourDemagTensor
 
 
+subroutine BuildNeighbourList(offset, size_cell, pitch, rad_cells, nbr_idx, nneigh_max)
+  !---------------------------------------------------------------
+  ! Build symmetric neighbour index list based on geometric test.
+  !
+  ! Inputs:
+  !   offset(ntot,3)    : centres of all tiles/cells
+  !   size_cell(ntot,3) : sizes (a,b,c) of all tiles/cells
+  !   pitch(3)          : nominal grid pitch in each direction
+  !   rad_cells         : neighbour "radius" in cell units
+  !
+  ! Outputs:
+  !   nbr_idx(ntot, nneigh_max) : linear indices of neighbours
+  !                               (-1 if no neighbour in that slot)
+  !   nneigh_max                : maximum number of neighbours
+  !                               any cell has
+  !
+  ! Neighbour relation is enforced symmetric:
+  !   if s is neighbour of t, then t is neighbour of s.
+  !
+  ! Requires:
+  !   pure logical function is_neighbour(idx_t, idx_s, offset, size, pitch, rad_cells)
+  !---------------------------------------------------------------
+  implicit none
+
+  ! Arguments
+  real(DP),   contiguous, pointer, intent(in)  :: offset(:,:)      ! (ntot, 3)
+  real(DP),   contiguous, pointer, intent(in)  :: size_cell(:,:)   ! (ntot, 3)
+  real(DP),   contiguous, pointer, intent(in)  :: pitch(3)
+  integer,    intent(in)  :: rad_cells
+  integer,    contiguous, pointer, intent(out) :: nbr_idx(:,:)
+  integer,    intent(out) :: nneigh_max
+
+  ! Locals
+  integer :: ntot
+  integer, contiguous, pointer :: m_count(:)   ! neighbour counts per cell
+  integer, contiguous, pointer :: m_fill(:)    ! fill counters per cell
+  integer :: t, s
+
+  !-------- number of tiles/cells --------
+  ntot = size(offset, dim=1)
+  !-------------------------------------------
+  !--------- first pass to count neighbours ----------
+  allocate(m_count(ntot))
+  m_count = 0
+  do t = 1, ntot
+    do s = t+1, ntot
+      if (is_neighbour(t, s, offset, size_cell, pitch, rad_cells)) then
+        !--------- sinnce is_neighbohr is symmetric, we can just count both here -----
+        m_count(t) = m_count(t) + 1
+        m_count(s) = m_count(s) + 1
+        !-----------------------------------------------------------------------------
+      end if
+    end do
+  end do
+  !-----------------------------------------------
+  !----------- find maximum neighbour count -------------- 
+  nneigh_max = maxval(m_count)
+  !-------------------------------------------------------
+
+  ! Degenerate case: no neighbours at all
+  if (nneigh_max <= 0) then
+    deallocate(m_count)
+    error stop 'BuildNeighbourList: no neighbours found.'
+    return
+  end if
+
+  !--------- allocate neighbour index array --------------
+  allocate(nbr_idx(ntot, nneigh_max))
+  nbr_idx = -1 ! initialize to -1 (no neighbour)
+  !-------------------------------------------------------
+
+  !----------- allocate m_fill (number of filled neighbours) counters --------------
+  allocate(m_fill(ntot))
+  m_fill = 0
+  !---------------------------------------------------
+
+  !-------- second pass to fill neighbour indices ----------
+  do t = 1, ntot
+    do s = t+1, ntot
+      if (is_neighbour(t, s, offset, size_cell, pitch, rad_cells)) then
+
+        ! Add s to t's list
+        m_fill(t) = m_fill(t) + 1
+        nbr_idx(t, m_fill(t)) = s
+
+        ! Add t to s's list
+        m_fill(s) = m_fill(s) + 1
+        nbr_idx(s, m_fill(s)) = t
+      end if
+    end do
+  end do
+  !-----------------------------------------------------------
+
+  !----------------------- cleanup -----------------------
+  deallocate(m_count)
+  deallocate(m_fill)
+  !-------------------------------------------------------
+
+end subroutine BuildNeighbourList
+
+
+
+
+
+
+
+
 subroutine add_neighbour_correction(problem, solution)
   ! Finite-size neighbour patch for FMM demag field:
   ! H += sum_m ( Nnbr(t,m) - Kdip(R_tj)*V ) * M_j
