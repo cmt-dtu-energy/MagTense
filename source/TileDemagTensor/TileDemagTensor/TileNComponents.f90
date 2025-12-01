@@ -622,6 +622,15 @@ module TileNComponents
     
     end subroutine getN_circPiece_Inv
     
+    ! Emma:
+    ! Calculates averaged N from expressions in Fukushima paper
+    subroutine getAVGN_prism_3D(prism, pos, N_out) !add additional argument
+    type(MagTile),intent(in) :: prism
+    real,intent(in),dimension(3) :: pos
+    real,intent(inout),dimension(3,3) :: N_out
+    
+    end subroutine
+
     
     !::Calculates N from the analytical expression in 3D
     !::Given the prism tile (prism) and the position vector to it (pos = (x,y,z) )
