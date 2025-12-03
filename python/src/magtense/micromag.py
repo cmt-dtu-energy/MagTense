@@ -491,6 +491,15 @@ class MicromagProblem:
     def solver(self, val: str | None = None) -> None:
         self._solver = {None: -1, "explicit": 1, "dynamic": 2, "implicit": 3}[val]
 
+
+    @property
+    def usereturnhall(self) -> int | None:
+        return self._usereturnhall
+
+    @usereturnhall.setter
+    def usereturnhall(self, val: bool | None = None) -> None:
+        self._usereturnhall = 1 if val else 0
+
     def run_simulation(
         self, t_end: float, nt: int, fct_h_ext: Callable, nt_h_ext: int
     ) -> list[np.ndarray | int]:
@@ -546,6 +555,109 @@ class MicromagProblem:
             hext=h_ext,
             nt=nt,
             t=np.linspace(0, t_end, nt),
+            m0=np.concatenate((self.m0[:, 0], self.m0[:, 1], self.m0[:, 2]), axis=None),
+            dem_thres=self.dem_thres,
+            usecuda=self.cuda,
+            dem_appr=self.dem_appr,
+            n_ret=self.N_ret,
+            n_file_out=self.N_file_out,
+            n_load=self.N_load,
+            n_file_in=self.N_file_in,
+            settimedis=self.setTimeDis,
+            nt_alpha=self.nt_alpha,
+            alphat=self.alphat,
+            tol=self.tol,
+            thres=self.thres,
+            usecvode=self.cvode,
+            nt_conv=self.nt_conv,
+            t_conv=self.t_conv,
+            conv_tol=self.conv_tol,
+            grid_pts=self.grid_pts,
+            grid_ele=self.grid_ele,
+            grid_nod=self.grid_nod,
+            grid_nnod=self.grid_nnod,
+            exch_nval=self.exch_nval,
+            exch_nrow=self.exch_nrow,
+            exch_val=self.exch_val,
+            exch_rows=self.exch_rows,
+            exch_rowe=self.exch_rowe,
+            exch_col=self.exch_col,
+            grid_abc=self.grid_abc,
+            useprecision=self.precision,
+            nthreadsmatlab=self.n_threads,
+            n_ave=self.N_ave,
+            cv=self.cv,
+            usereturnhall=self.usereturnhall,
+            demigstp=self.demigstp,
+            exch_weigh=self.exch_weigh,
+            exch_meth=self.exch_meth,
+            exch_intpn=self.exch_intpn,
+            passexch=self.passexch,
+            exch_ncols=self.exch_ncols,
+            exch_presize=self.exch_presize,
+        )
+
+        n_tot_Exch = result[7]
+        result = list(result)
+        result[8] = result[8][:n_tot_Exch]  # ExchMat_r
+        result[9] = result[9][:n_tot_Exch]  # ExchMat_c
+        result[10] = result[10][:n_tot_Exch]  # ExchMat_v
+
+        return result
+    
+
+    def run_hysteresis(
+        self, H_ext : np.ndarray
+    ) -> list[np.ndarray | int]:
+        """
+        Run the micromagnetic hysteresis simulation.
+
+        Params:
+            t_end: End time of the simulation.
+            nt: Number of timesteps.
+            fct_h_ext: Function to calculate the external field at each timestep.
+            nt_h_ext: Number of timesteps for the external field.
+
+        Outputs:
+            A list containing the simulation results.
+            [0] t_out (np.ndarray): Time output array.
+            [1] M_out (np.ndarray): Magnetization output array.
+            [2] pts (np.ndarray): Points output array.
+            [3] H_exc (np.ndarray): Exchange field output array.
+            [4] H_ext (np.ndarray): External field output array.
+            [5] H_dem (np.ndarray): Demagnetizing field output array.
+            [6] H_ani (np.ndarray): Anisotropy field output array.
+            [7] Exch_mat_ntot (int): Total number of exchange matrix elements.
+            [8] Exch_mat_r (np.ndarray): Exchange matrix row indices.
+            [9] Exch_mat_c (np.ndarray): Exchange matrix column indices.
+            [10] Exch_mat_v (np.ndarray): Exchange matrix values.
+            [11] Exch_mat_nr (int): Number of rows in the exchange matrix.
+            [12] Exch_mat_nc (int): Number of columns in the exchange matrix.
+
+        """
+        nt_h_ext = H_ext.shape[0]
+        result = magtensesource.fortrantopythonio.runmicromagsimulation(
+            ntot=self.ntot,
+            grid_n=self.grid_n,
+            grid_l=self.grid_L,
+            grid_type=self.grid_type,
+            u_ea=self.u_ea,
+            problemmode=self.prob_mode,
+            solver=self.solver,
+            a0=self.A0,
+            ms=self.Ms,
+            k0=self.K0,
+            k1=self.K1,
+            k2=self.K2,
+            k0_arr=self.K0_arr,
+            crysaxis=self.CrysAxis,
+            gamma=self.gamma,
+            alpha_mm=self.alpha_mm,
+            maxt0=self.max_T0,
+            nt_hext=nt_h_ext,
+            hext=H_ext,
+            nt=self.nt,
+            t=self.t,
             m0=np.concatenate((self.m0[:, 0], self.m0[:, 1], self.m0[:, 2]), axis=None),
             dem_thres=self.dem_thres,
             usecuda=self.cuda,
