@@ -175,8 +175,10 @@ include "mkl_dfti.f90"
 
 
         !--------------- demag tensor neighbour stuff ---------------
-        integer, dimension(:,:), pointer :: nbr_idx(:,:)
-        real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:)
+        integer, dimension(:,:), pointer :: nbr_idx(:,:) => null()    !> Neighbour indices for each target cell
+        integer, dimension(:), pointer :: n_nbors(:) => null()
+        real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:) => null()
+
         
     end type MicroMagProblem
     
