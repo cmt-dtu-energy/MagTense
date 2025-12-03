@@ -987,7 +987,8 @@ module fmm3d_tree_mod
 
 
       !--------
-      nthd = 1
+      !nthd = 1
+      nthd = self%nthd
       ifprint=0
 
       !--------- load self variables... replacement of argument list -----
