@@ -30,7 +30,22 @@
 
     use fmm3d_tree_mod
     implicit none
-       
+    !===============================
+    ! Linked list types
+    !===============================
+    type :: ListNode
+        integer(4) :: value = 0
+        type(ListNode), pointer :: next => null()
+    end type ListNode
+    type :: IntList
+        type(ListNode), pointer :: head => null()
+        type(ListNode), pointer :: tail => null()
+        integer(omp_lock_kind) :: lock            ! OpenMP lock
+        logical :: lock_initialized = .false.     ! track init/destroy
+        integer(4) :: n = 0
+    end type IntList
+    !===============================
+          
     
     !>Module variables
     type(MicroMagSolution) :: gb_solution
@@ -807,7 +822,7 @@ subroutine updateDemagfieldFMM(problem, solution)
   t0 = walltime()
 #endif
   fourpi  = 12.566370614359172D0
-  eps_fmm = 1.0D-4
+  eps_fmm = 1.0D-6
 
   ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
 
@@ -898,8 +913,12 @@ subroutine updateDemagfieldFMM(problem, solution)
 
   !call fmm_tree%full_fmm(nd, eps_fmm, ntot, source, dipvec, pot, grad, ier)
 
+!print *, " before build tree"
+
    call fmm_tree%build_tree( source, eps_fmm , ier)
+ !   print *, " after build tree"
    call fmm_tree%make_and_eval(dipvec, grad)
+  !print *, " after make and eval"
 
 
   !print *, " done with tree"
@@ -931,6 +950,7 @@ subroutine updateDemagfieldFMM(problem, solution)
   t1 = walltime()
 #endif
   !--------------- Add correction from the tiles themselves -------------------
+!print *, " before self correction"
   call add_self_correction(problem, solution)
   !--------------------------------------------------------------------------
 #if USE_TIMING
@@ -938,7 +958,8 @@ subroutine updateDemagfieldFMM(problem, solution)
   t1 = walltime()
 #endif
   !------------- add correction from neighbouring tiles ---------------------
-  call add_neighbour_correction(problem, solution)
+!print *, " before neighbour correction"
+ call add_neighbour_correction(problem, solution)
   !--------------------------------------------------------------------------
 #if USE_TIMING
   acc_neigh = acc_neigh + (walltime() - t1)
@@ -997,6 +1018,7 @@ subroutine updateDemagfieldFMM(problem, solution)
 #endif
 
 #endif
+!print *, " end of update demagfield"
 end subroutine updateDemagfieldFMM
 
 
@@ -1464,7 +1486,7 @@ end subroutine updateDemagfieldFMM_old
     
     !Demagnetization tensor matrix
 #if USE_FMM3D
-    call BuildNeighbourDemagTensor( problem, 2) ! hardcode 2 levels of neighbour cells for now
+    call BuildNeighbourDemagTensor( problem, 1) ! hardcode 2 levels of neighbour cells for now
 #else
     call ComputeDemagfieldTensor( problem )
 #endif
@@ -1959,7 +1981,7 @@ end subroutine updateDemagfieldFMM_old
     stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
     
     
-    !----------------------------------d^2dx^2 ends -----------------------------!
+    !----------------------------------d^2dx^2 ends ---------------------------- -!
     
     
     !----------------------------------d^2dy^2 begins ----------------------------!
@@ -2302,8 +2324,15 @@ end subroutine updateDemagfieldFMM_old
         real(DP) :: dHx, dHy, dHz, dH(3)
         real(DP) :: dx, dy, dz
 
+
+
+
+        if (problem%grid%gridType .eq. 1) then
+
+        !print *, " add_self_correction for grid type 1 - uniform cartesian grid"
+          ! Implementation for uniform cartesian grid
         ! --- grid sizes & count ---
-        ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+        ntot = size(problem%grid%pts, dim=1)
         dx = real(problem%grid%dx, DP)
         dy = real(problem%grid%dy, DP)
         dz = real(problem%grid%dz, DP)
@@ -2325,26 +2354,57 @@ end subroutine updateDemagfieldFMM_old
         pts(1,2) = 0.0_DP
         pts(1,3) = 0.0_DP
 
-       ! print *, " Adding self-demag correction to FMM demag field..."
-
         ! --- get the 3x3 self demag tensor once ---
         call getFieldFromTiles( tile, H_dummy, pts, 1, 1, Nout, .false. )
         Nloc(:,:) = Nout(1,1,:,:)
-
-        ! --- apply H += -Nloc * M for every cell (in place) ---
-        !$omp parallel do private(i,dH) shared(problem,solution,Nloc,ntot) default(none)
+       !$omp parallel do private(dH) shared(problem,solution,Nloc,ntot) default(none)
         do i = 1, ntot
-            !dHx = -( Nloc(1,1)*real(solution%Mx_s(i),DP) + Nloc(1,2)*real(solution%My_s(i),DP) + Nloc(1,3)*real(solution%Mz_s(i),DP) )
-            !dHy = -( Nloc(2,1)*real(solution%Mx_s(i),DP) + Nloc(2,2)*real(solution%My_s(i),DP) + Nloc(2,3)*real(solution%Mz_s(i),DP) )
-            !dHz = -( Nloc(3,1)*real(solution%Mx_s(i),DP) + Nloc(3,2)*real(solution%My_s(i),DP) + Nloc(3,3)*real(solution%Mz_s(i),DP) )
-
             dH = matmul(Nloc, [solution%Mx_s(i), solution%My_s(i),solution%Mz_s(i)] ) * problem%Ms(i)
-
             solution%HmX(i) = solution%HmX(i) - real(dH(1), SP)
             solution%HmY(i) = solution%HmY(i) - real(dH(2), SP)
             solution%HmZ(i) = solution%HmZ(i) - real(dH(3), SP)
         end do
-        !$omp end parallel do
+       !$omp end parallel do
+      elseif (problem%grid%gridType .eq. 3) then
+
+        !print *, " add_self_correction for grid type 3 - nonuniform cartesian grid"
+          ! Implementation for non-uniform cartesian grid
+        ! --- grid sizes & count ---
+        ntot = size(problem%grid%pts, dim=1)
+        ! evaluate at the tile's centre (same point)
+        pts(1,1) = 0.0_DP
+        pts(1,2) = 0.0_DP
+        pts(1,3) = 0.0_DP
+
+
+       !$omp parallel do private(dH,tile, Nout, Nloc, H_dummy) shared(problem,solution,ntot, pts) default(none)
+        do i = 1, ntot
+
+            ! --- build a single prism tile identical to a voxel ---
+            tile(1)%tileType         = 2                 ! prism
+            tile(1)%a                = problem%grid%abc(i,1)     
+            tile(1)%b                = problem%grid%abc(i,2)
+            tile(1)%c                = problem%grid%abc(i,3)
+            tile(1)%exploitSymmetry  = 0                 ! critical: no symmetry tricks
+            tile(1)%rotAngles(:)     = 0.0_DP            ! axis-aligned
+            tile(1)%M(:)             = 0.0_DP            ! not used; we just want the tensor
+            tile(1)%offset(1)        = 0.0_DP            ! centre arbitrarily at origin
+            tile(1)%offset(2)        = 0.0_DP
+            tile(1)%offset(3)        = 0.0_DP
+            call getFieldFromTiles( tile, H_dummy, pts, 1, 1, Nout, .false. )
+            Nloc(:,:) = Nout(1,1,:,:)
+
+            dH = matmul(Nloc, [solution%Mx_s(i), solution%My_s(i),solution%Mz_s(i)] ) * problem%Ms(i)
+            solution%HmX(i) = solution%HmX(i) - real(dH(1), SP)
+            solution%HmY(i) = solution%HmY(i) - real(dH(2), SP)
+            solution%HmZ(i) = solution%HmZ(i) - real(dH(3), SP)
+
+            deallocate(Nout) ! is this needed? 
+        end do
+       !$omp end parallel do
+      else
+        error stop " add self correction not supported for grid type"
+      end if  
     end subroutine add_self_correction
 
 
@@ -2433,7 +2493,11 @@ subroutine BuildNeighbourDemagTensor(problem, radius_cells)
  integer :: mj
   ! --- only uniform prism grids in this first pass ---
   if (problem%grid%gridType /= gridTypeUniform) then
-    stop 'BuildNeighbourDemagTensor: only gridTypeUniform supported in this routine.'
+    call displayGUIMessage("BuildNeighbourDemagTensor: non-uniform grids not supported in this routine; calling non-uniform version.")
+    call BuildNeighbourDemagTensorNonUniform(problem, radius_cells)
+    call displayGUIMessage("BuildNeighbourDemagTensor: returned from non-uniform version.")
+    return
+    !stop 'BuildNeighbourDemagTensor: only gridTypeUniform supported in this routine.'
   end if
 
 
@@ -2471,9 +2535,9 @@ problem%Nnbr    => Nnbr
   allocate(H_dummy(1,3))
 
   ! OpenMP-friendly outer loop over target cells
-  !$omp parallel do collapse(3) default(none) &
-  !$omp shared(nx,ny,nz,ntot,r,nneigh_max,problem,nbr_idx,Nnbr,dx,dy,dz) &
-  !$omp private(i,j,k,lin_t,ii,jj,kk,di,dj,dk,m,lin_s,tiles,pts_t,H_dummy,Nout) schedule(static)
+ !$omp parallel do collapse(3) default(none) &
+ !$omp shared(nx,ny,nz,ntot,r,nneigh_max,problem,nbr_idx,Nnbr,dx,dy,dz) &
+ !$omp private(mj,lin_t,ii,jj,kk,di,dj,dk,m,lin_s,tiles,pts_t,H_dummy,Nout) schedule(static)
   do k = 1, nz
     do j = 1, ny
       do i = 1, nx
@@ -2530,6 +2594,7 @@ problem%Nnbr    => Nnbr
 
           ! Small temporaries for the call
           allocate(Nout(m,1,3,3))
+          Nout = 0.0_DP
 
           call getFieldFromTiles( tiles, H_dummy, pts_t, m, 1, Nout, .false. )
 
@@ -2544,7 +2609,7 @@ problem%Nnbr    => Nnbr
         end do
     end do
     end do
-    !$omp end parallel do
+   !$omp end parallel do
     deallocate(H_dummy)
 
       !print *, " finished BuildNeighbourDemagTensor with radius_cells = ", radius_cells
@@ -2554,109 +2619,665 @@ problem%Nnbr    => Nnbr
     !problem%Nnbr => Nnbr
 end subroutine BuildNeighbourDemagTensor
 
+pure logical function is_touching(idx_t, idx_s, offset, size) result(mask)
+    implicit none
+    integer(4), intent(in) :: idx_t, idx_s
+    real(8),   intent(in) :: offset(:,:), size(:,:)
+    real(8) :: dx, dy, dz
+    real(8) :: tx, ty, tz
+    real(8) :: tolx, toly, tolz
+    real(8), parameter :: rel_tol = 1.0d-6   ! tolerance relative to local cell size
 
-subroutine BuildNeighbourList(offset, size_cell, pitch, rad_cells, nbr_idx, nneigh_max)
-  !---------------------------------------------------------------
-  ! Build symmetric neighbour index list based on geometric test.
+    ! Self is never neighbour
+    if (idx_t == idx_s) then
+        mask = .false.
+        return
+    end if
+
+    ! Centre-to-centre distances
+    dx = abs(offset(idx_s,1) - offset(idx_t,1))
+    dy = abs(offset(idx_s,2) - offset(idx_t,2))
+    dz = abs(offset(idx_s,3) - offset(idx_t,3))
+
+    ! Half-size sums (exact touching threshold)
+    tx = 0.5d0 * (size(idx_s,1) + size(idx_t,1))
+    ty = 0.5d0 * (size(idx_s,2) + size(idx_t,2))
+    tz = 0.5d0 * (size(idx_s,3) + size(idx_t,3))
+
+    ! Small symmetric tolerance per axis
+    tolx = rel_tol * min(size(idx_s,1), size(idx_t,1))
+    toly = rel_tol * min(size(idx_s,2), size(idx_t,2))
+    tolz = rel_tol * min(size(idx_s,3), size(idx_t,3))
+
+    ! Overlap/touch test with tolerance
+    mask = (dx <= tx + tolx) .and. &
+           (dy <= ty + toly) .and. &
+           (dz <= tz + tolz)
+end function is_touching
+
+
+    !-------------------------------
+    ! Initialise lock for a list
+    !-------------------------------
+  subroutine list_init(list)
+      type(IntList), intent(inout) :: list
+
+      if (.not. list%lock_initialized) then
+          ! Full reset the first time
+          list%n = 0
+          nullify(list%head)
+          nullify(list%tail)
+          call omp_init_lock(list%lock)
+          list%lock_initialized = .true.
+      end if
+  end subroutine list_init
+
+
+    !-------------------------------
+    ! Free nodes AND destroy lock
+    !-------------------------------
+    subroutine list_finalize(list)
+        type(IntList), intent(inout) :: list
+
+        if (list%lock_initialized) then
+            call omp_destroy_lock(list%lock)
+            list%lock_initialized = .false.
+        end if
+
+        call list_free(list)
+    end subroutine list_finalize
+
+    !-------------------------------
+    ! Append value at end of list (thread-safe if lock initialised)
+    !-------------------------------
+    subroutine list_append(list, value)
+        type(IntList), intent(inout) :: list
+        integer(4),    intent(in)    :: value
+        type(ListNode), pointer :: node
+
+        
+        allocate(node)
+        node%value = value
+        node%next  => null()
+        
+        if (list%lock_initialized) call omp_set_lock(list%lock)
+        if (.not. associated(list%head)) then
+            list%head => node
+            list%tail => node
+        else
+            list%tail%next => node
+            list%tail      => node
+        end if
+
+        list%n = list%n + 1
+        if (list%lock_initialized) call omp_unset_lock(list%lock)
+
+    end subroutine list_append
+
+    !-------------------------------
+    ! Free all nodes in the list
+    !-------------------------------
+    subroutine list_free(list)
+        type(IntList), intent(inout) :: list
+        type(ListNode), pointer :: p, q
+
+        
+        if (list%lock_initialized) call omp_set_lock(list%lock)
+        p => list%head
+        do while (associated(p))
+            q => p%next
+            deallocate(p)
+            p => q
+        end do
+
+        nullify(list%head)
+        nullify(list%tail)
+        list%n = 0
+        if (list%lock_initialized) call omp_unset_lock(list%lock)
+    end subroutine list_free
+
+    !-------------------------------
+    ! Check if list already contains value
+    ! (used in serial contexts – lock is optional)
+    !-------------------------------
+    logical function list_contains(list, value) result(found)
+        type(IntList), intent(in) :: list
+        integer(4),    intent(in) :: value
+        type(ListNode), pointer :: p
+
+        found = .false.
+
+        ! Usually called in serial / per-thread context; no lock needed.
+        p => list%head
+        do while (associated(p))
+            if (p%value == value) then
+                found = .true.
+                return
+            end if
+            p => p%next
+        end do
+    end function list_contains
+
+
+subroutine list_debug_print(id, list)
+    implicit none
+    integer(4), intent(in) :: id
+    type(IntList), intent(in) :: list
+
+    type(ListNode), pointer :: p
+    integer(4), allocatable :: seen(:)
+    integer(4) :: count, k, val
+    logical :: contains_id
+    integer(4) :: repetitions
+
+    print *, "==== list_debug_print for ID = ", id, " ===="
+
+    !----------------------------------------------
+    ! 1. Count total elements
+    !----------------------------------------------
+    count = list%n
+    print *, "Number of entries in list:", count
+
+    !----------------------------------------------
+    ! 2. Check if list contains ID
+    !----------------------------------------------
+    contains_id = list_contains(list, id)
+    print *, "Contains ID? ", contains_id
+
+    !----------------------------------------------
+    ! 3. Count repetitions
+    !----------------------------------------------
+    repetitions = 0
+    if (count > 0) then
+        allocate(seen(count))
+        seen = 0
+
+        k = 0
+        p => list%head
+        do while (associated(p))
+            k = k + 1
+            val = p%value
+            seen(k) = val
+            p => p%next
+        end do
+
+        ! Now check for duplicates by brute force
+        do k = 1, count
+            do val = k+1, count
+                if (seen(k) == seen(val)) repetitions = repetitions + 1
+            end do
+        end do
+
+        deallocate(seen)
+    end if
+
+    print *, "Number of repeated entries:", repetitions
+
+    print *, "==== end list_debug_print for ID = ", id, " ===="
+
+end subroutine list_debug_print
+
+
+    !===========================================================
+    ! BuildNeighbourList using linked lists and OpenMP locks
+    !===========================================================
+    subroutine BuildNeighbourList(offset, size_cell, rad_cells, nbr_idx, nneigh_max, n_nbors)
+      !------------------------------------------------------------------
+      ! Build neighbour list with graph-radius semantics using linked lists.
+      !
+      ! Step 1: Base loop (possibly large O(ntot^2)):
+      !         For each pair (t,s), t < s, if is_touching(t,s) then
+      !         add s to base(t) and t to base(s). This is parallelised
+      !         with OpenMP; each base(i) list is protected by its lock.
+      !
+      ! Step 2: neigh(:) := base(:) (radius = 1 neighbours).
+      !
+      ! Step 3: For depth = 2..rad_cells:
+      !         - For each tile i, create neigh_next(i) that includes:
+      !              * all neighbours currently in neigh(i)
+      !              * all touching neighbours of those neighbours,
+      !                skipping duplicates and i itself.
+      !         - Replace neigh(:) with neigh_next(:).
+      !
+      ! Step 4: Flatten neigh(:) into nbr_idx(ntot, nneigh_max), padding
+      !         unused slots with -1.
+      !
+      ! Inputs:
+      !   offset   (ntot,3) : centres of all tiles/cells
+      !   size_cell(ntot,3) : sizes (a,b,c) of all tiles/cells
+      !   rad_cells         : integer graph radius (>= 1)
+      !
+      ! Outputs:
+      !   nbr_idx  (ntot, nneigh_max) : neighbour indices (−1 if none)
+      !   nneigh_max                  : max number of neighbours per tile
+      !
+      ! Requires:
+      !   pure logical function is_touching(idx_t, idx_s, offset, size_cell)
+      !------------------------------------------------------------------
+      implicit none
+
+      ! Arguments
+      real(8),   intent(in)  :: offset(:,:)      ! (ntot,3)
+      real(8),   intent(in)  :: size_cell(:,:)   ! (ntot,3)
+      integer(4),intent(in)  :: rad_cells
+      integer(4), contiguous, pointer, intent(out) :: nbr_idx(:,:)
+      integer(4), contiguous, pointer, intent(out) :: n_nbors(:)
+      integer(4),intent(out) :: nneigh_max
+
+      ! Locals
+      integer(4) :: ntot
+      integer(4) :: rad_eff
+      integer(4) :: t, s, depth, m, max_neigh
+      integer(4) :: v, w
+      type(IntList), allocatable :: base(:)      ! touching neighbours (radius 1)
+      type(IntList), allocatable :: neigh(:)     ! neighbours within current radius
+      type(IntList), allocatable :: neigh_next(:)! temp lists for next radius
+      type(ListNode), pointer :: p, q
+
+      !------------------------------
+      ! 1. Sizes and radius
+      !------------------------------
+      ntot = size(offset, dim=1)
+
+      if (ntot <= 0) then
+        nneigh_max = 0
+        allocate(nbr_idx(0,0))
+        return
+      end if
+
+      rad_eff = max(1, rad_cells)
+      allocate(n_nbors(ntot))
+      allocate(base(ntot))
+      allocate(neigh(ntot))
+
+      n_nbors = 0 ! initialize
+
+      !print *, " init lists"
+      !------------------------------
+      ! 2. Init locks for base lists
+      !------------------------------
+     !$omp parallel do shared(ntot,base, neigh) default(none) schedule(static)
+      do t = 1, ntot
+        call list_init(base(t))
+        call list_init(neigh(t))
+      end do
+     !$omp end parallel do
+
+      !print *, " build touching adjacency"
+      !------------------------------
+      ! 3. Base loop: build touching adjacency (parallel)
+      !------------------------------
+     !$omp parallel do private(s) shared(ntot,offset,size_cell,base,n_nbors) default(none) schedule(static)
+      do t = 1, ntot
+        do s = t+1, ntot
+          if (is_touching(t, s, offset, size_cell)) then
+#if USE_DEBUG_STATEMENTS
+            print *, " ========== Found touching pair =========="
+            print *, " touching pair: ", t, s
+            print *, " offset t /1e-9: ", offset(t,:) / 1e-9
+            print *, " offset s /1e-9: ", offset(s,:) / 1e-9
+            print *, " sizes  t/ 1e-9: ", size_cell(t,:) / 1e-9
+            print *, " sizes  s/ 1e-9: ", size_cell(s,:) / 1e-9
+#endif
+            call list_append(base(t), s)
+            call list_append(base(s), t)
+           !$ompatomic
+            n_nbors(t) = n_nbors(t) + 1
+           !$ompatomic
+            n_nbors(s) = n_nbors(s) + 1
+          end if
+        end do
+      end do
+     !$omp end parallel do
+
+      !-------- for debug only 
+#if USE_DEBUG_STATEMENTS
+      do t = 1, ntot
+        call list_debug_print(t, base(t))
+      end do
+#endif
+      !-------- end debug
+
+      ! After this, base(:) contains radius-1 neighbours.
+
+
+     ! print *, " adding neighbohrs based on 1-touching"
+      !------------------------------
+      ! 4. Initial neighbours = touching neighbours (radius = 1)
+      !    (serial; each neigh(t) used by only one thread later)
+      !------------------------------
+     !$omp parallel do private(p) shared(ntot,base,neigh) default(none) schedule(static)
+      do t = 1, ntot
+        p => base(t)%head
+        do while (associated(p))
+          call list_append(neigh(t), p%value)
+          p => p%next
+        end do
+      end do
+     !$omp end parallel do
+
+
+      !print *, " expanding neighbour lists to radius ", rad_eff
+      !------------------------------
+      ! 5. Expand to larger graph radius if rad_eff > 1
+      !------------------------------
+      if (rad_eff > 1) then
+        do depth = 2, rad_eff
+          allocate(neigh_next(ntot))
+
+         !$omp parallel do private(p,v,q,w) shared(ntot,neigh,neigh_next, base) default(none) schedule(static)
+          do t = 1, ntot
+            call list_init(neigh_next(t))
+            ! Copy current neighbours of t into neigh_next(t)
+            p => neigh(t)%head
+            do while (associated(p))
+              call list_append(neigh_next(t), p%value)
+              p => p%next
+            end do
+
+            ! For each current neighbour v of t,
+            ! add all touching neighbours w of v (from base lists)
+            p => neigh(t)%head
+            do while (associated(p))
+              v = p%value
+
+              q => base(v)%head
+              do while (associated(q))
+                w = q%value
+                if (w /= t) then
+                  if (.not. list_contains(neigh_next(t), w)) then
+                    call list_append(neigh_next(t), w)
+                  end if
+                end if
+                q => q%next
+              end do
+
+              p => p%next
+            end do
+          end do
+         !$omp end parallel do
+
+          ! Replace neigh with neigh_next: free old lists, move pointers
+         !$omp parallel do private(p) shared(ntot,neigh,neigh_next) default(none) schedule(static)
+          do t = 1, ntot
+            call list_free(neigh(t))    ! free only old nodes, no locks used
+            !neigh(t) = neigh_next(t)    ! shallow copy of head/tail/n
+
+            !--------- full copy of nodes --------------
+            p => neigh_next(t)%head
+            do while (associated(p))
+              call list_append(neigh(t), p%value)
+              p => p%next
+            end do
+            !-------------------------------------------
+            !-------- deallocate lock and free nodes -----
+            call list_finalize(neigh_next(t))
+            !-------------------------------------------
+          end do
+         !$omp end parallel do
+          deallocate(neigh_next)
+        end do
+      end if
+
+
+      !print *, " flattening neighbour lists"
+      !------------------------------
+      ! 6. Flatten lists into nbr_idx(ntot, nneigh_max)
+      !------------------------------
+      max_neigh = 0
+      n_nbors = 0 ! initialize
+     !$omp parallel do default(none) shared(neigh,ntot) reduction(max: max_neigh) schedule(static)
+      do t = 1, ntot
+        max_neigh = max(max_neigh, neigh(t)%n)
+      end do
+     !$omp end parallel do
+   !$omp parallel do default(none) shared(ntot, n_nbors, neigh) schedule(static)
+      do t = 1, ntot
+        n_nbors(t) = neigh(t)%n
+      end do
+     !$omp end parallel do
+
+#if USE_DEBUG_STATEMENTS
+      print *, "================================ Neighbour counts =================="
+      do t = 1, ntot
+        call list_debug_print(t, neigh(t))
+      end do
+#endif
+
+      nneigh_max = max_neigh
+
+      !if (allocated(nbr_idx)) deallocate(nbr_idx)
+
+      !print *, " allocating nbr_idx with nneigh_max = ", nneigh_max
+      if (nneigh_max > 0) then
+        allocate(nbr_idx(ntot, nneigh_max))
+        nbr_idx = -1
+       !$omp parallel do private(m,p) shared(ntot,neigh,nbr_idx) default(none) schedule(static)
+        do t = 1, ntot
+          m = 0
+          p => neigh(t)%head
+          do while (associated(p))
+            m = m + 1
+            nbr_idx(t, m) = p%value
+            p => p%next
+          end do
+        end do
+       !$omp end parallel do
+      else
+        allocate(nbr_idx(ntot, 0))
+      end if
+
+
+      !print *, " cleaning up lists"
+      !------------------------------
+      ! 7. Cleanup lists (and locks)
+      !------------------------------
+     !$omp parallel do shared(ntot,base,neigh) default(none) schedule(static)
+      do t = 1, ntot
+        call list_finalize(base(t))   ! destroys lock + frees nodes
+        call list_finalize(neigh(t))  ! no lock used here, just frees nodes
+      end do
+     !$omp end parallel do
+      
+      !print *, " deallocating "
+      deallocate(base, neigh)
+
+
+      !error stop " BuildNeighbourList complete - test "
+
+    end subroutine BuildNeighbourList
+
+
+
+
+subroutine BuildNeighbourDemagTensorNonUniform(problem, radius_cells)
+  !-----------------------------------------------------------------
+  ! Construct exact prism demag tensors for near neighbours of
+  ! every cell, for a (possibly) non-uniform grid.
+  !
+  ! Neighbours are defined geometrically via is_neighbour(), which
+  ! uses:
+  !   - cell centres: offset(ℓ,1:3)  = problem%grid%pts(ℓ,1:3)
+  !   - cell sizes:   size_cell(ℓ,1:3) = problem%grid%abc(ℓ,1:3)
+  !                   (for uniform grids, we fall back to dx,dy,dz)
+  !   - nominal pitch: pitch(1:3)
+  !   - radius_cells
   !
   ! Inputs:
-  !   offset(ntot,3)    : centres of all tiles/cells
-  !   size_cell(ntot,3) : sizes (a,b,c) of all tiles/cells
-  !   pitch(3)          : nominal grid pitch in each direction
-  !   rad_cells         : neighbour "radius" in cell units
+  !   problem        : MicroMagProblem (owns grid & output storage)
+  !   radius_cells   : neighbour "radius" in cell units
   !
-  ! Outputs:
-  !   nbr_idx(ntot, nneigh_max) : linear indices of neighbours
-  !                               (-1 if no neighbour in that slot)
-  !   nneigh_max                : maximum number of neighbours
-  !                               any cell has
+  ! Outputs (attached to problem):
+  !   problem%nbr_idx(ntot, nneigh_max)
+  !   problem%Nnbr   (ntot, nneigh_max, 3, 3)
   !
-  ! Neighbour relation is enforced symmetric:
-  !   if s is neighbour of t, then t is neighbour of s.
-  !
-  ! Requires:
-  !   pure logical function is_neighbour(idx_t, idx_s, offset, size, pitch, rad_cells)
-  !---------------------------------------------------------------
+  ! Neighbour relation is symmetric by construction.
+  !-----------------------------------------------------------------
   implicit none
 
-  ! Arguments
-  real(DP),   contiguous, pointer, intent(in)  :: offset(:,:)      ! (ntot, 3)
-  real(DP),   contiguous, pointer, intent(in)  :: size_cell(:,:)   ! (ntot, 3)
-  real(DP),   contiguous, pointer, intent(in)  :: pitch(3)
-  integer,    intent(in)  :: rad_cells
-  integer,    contiguous, pointer, intent(out) :: nbr_idx(:,:)
-  integer,    intent(out) :: nneigh_max
+  type(MicroMagProblem), intent(inout) :: problem
+  integer,               intent(in)    :: radius_cells
 
-  ! Locals
+  ! Local aliases / pointers to problem fields
+  integer,  dimension(:,:),   pointer :: nbr_idx_p
+  real(SP), dimension(:,:,:,:), pointer :: Nnbr_p
+
+  ! Grid-related locals
   integer :: ntot
-  integer, contiguous, pointer :: m_count(:)   ! neighbour counts per cell
-  integer, contiguous, pointer :: m_fill(:)    ! fill counters per cell
-  integer :: t, s
+  real(DP), contiguous, pointer :: offset(:,:)      ! (ntot,3)
+  real(DP), contiguous, pointer :: size_cell(:,:)   ! (ntot,3)
+  real(DP) :: pitch(3)
+  integer  :: nneigh_max
 
-  !-------- number of tiles/cells --------
-  ntot = size(offset, dim=1)
-  !-------------------------------------------
-  !--------- first pass to count neighbours ----------
-  allocate(m_count(ntot))
-  m_count = 0
-  do t = 1, ntot
-    do s = t+1, ntot
-      if (is_neighbour(t, s, offset, size_cell, pitch, rad_cells)) then
-        !--------- sinnce is_neighbohr is symmetric, we can just count both here -----
-        m_count(t) = m_count(t) + 1
-        m_count(s) = m_count(s) + 1
-        !-----------------------------------------------------------------------------
-      end if
-    end do
+  ! Temp neighbour list
+  integer, contiguous, pointer  :: nbr_idx_loc(:,:)
+  integer, contiguous, pointer  :: n_nbors(:)
+
+  ! Demag construction locals
+  integer :: t, m, q, s
+  type(MagTile), allocatable :: tiles(:)
+  real(DP), dimension(1,3) :: pts_t
+  real(DP), allocatable :: H_dummy(:,:)
+  real(DP), allocatable :: Nout(:,:,:,:)  ! (m, 1, 3, 3)
+  integer :: d
+
+  !---------------------------------------
+  ! 1. Determine ntot from pts array
+  !---------------------------------------
+  ntot = size(problem%grid%pts, dim=1)
+
+
+
+  !offset(:,:) => problem%grid%pts(1:ntot, 1:3)
+  !size_cell(:,:) => problem%grid%abc(1:ntot, 1:3)
+
+
+  allocate(offset(ntot,3))
+  allocate(size_cell(ntot,3))
+  offset(:,:) = problem%grid%pts(:,:)
+  size_cell(:,:) = problem%grid%abc(:,:)
+
+  ! Nominal pitch: for uniform, dx,dy,dz; for non-uniform, use mean cell size
+  do d = 1, 3
+    pitch(d) = sum(size_cell(:,d)) / real(ntot, DP)
   end do
-  !-----------------------------------------------
-  !----------- find maximum neighbour count -------------- 
-  nneigh_max = maxval(m_count)
-  !-------------------------------------------------------
 
-  ! Degenerate case: no neighbours at all
+  !---------------------------------------
+  ! 2. Clean up any existing neighbour data
+  !---------------------------------------
+  if (associated(problem%nbr_idx)) deallocate(problem%nbr_idx)
+  if (associated(problem%Nnbr))    deallocate(problem%Nnbr)
+
+  !----------- build neighbour list --------------
+  !call BuildNeighbourList(offset, size_cell, pitch, radius_cells, &
+  !                        nbr_idx_loc, nneigh_max)
+
+ call BuildNeighbourList(offset, size_cell, radius_cells, &
+                          nbr_idx_loc, nneigh_max, n_nbors)
+  !-----------------------------------------------
+
+  !print *, " Non-uniform neighbour demag: nneigh_max = ", nneigh_max
+  ! Attach neighbour indices to problem: allocate and copy
+  ! allocate(problem%nbr_idx(ntot, max(1, nneigh_max)))
+
+  problem%n_nbors => n_nbors
+  problem%nbr_idx => nbr_idx_loc
+  ! print *, "done allocating nbr_idx"
+  ! print *, " shape nbr_idx_loc", size(nbr_idx_loc,1), size(nbr_idx_loc,2), " shape problem%nbr_idx", size(problem%nbr_idx,1), size(problem%nbr_idx,2)
+  ! problem%nbr_idx(:,:) = -1
+  ! print *, " after setting "
+  ! if (nneigh_max > 0) then
+  !   !problem%nbr_idx(:, 1:nneigh_max) = nbr_idx_loc(:,:)
+  !   problem%nbr_idx(:, :) = nbr_idx_loc(:,:)
+  ! end if
+  ! print *, " after copying "
+  nbr_idx_p => problem%nbr_idx
+  !print *, " done copying nbr_idx"
+
+  ! If no neighbours at all, allocate empty Nnbr and bail
   if (nneigh_max <= 0) then
-    deallocate(m_count)
-    error stop 'BuildNeighbourList: no neighbours found.'
+    allocate(problem%Nnbr(ntot, 0, 3, 3))
+    problem%Nnbr = 0.0_SP
+    deallocate(offset, size_cell)!, nbr_idx_loc)
     return
   end if
 
-  !--------- allocate neighbour index array --------------
-  allocate(nbr_idx(ntot, nneigh_max))
-  nbr_idx = -1 ! initialize to -1 (no neighbour)
-  !-------------------------------------------------------
 
-  !----------- allocate m_fill (number of filled neighbours) counters --------------
-  allocate(m_fill(ntot))
-  m_fill = 0
-  !---------------------------------------------------
+  !print *, " allocate neighbour demag tensors"
+  !---------------------------------------
+  ! 4. Allocate Nnbr pointer and attach to problem
+  !---------------------------------------
+  allocate(Nnbr_p(ntot, nneigh_max, 3, 3))
+  Nnbr_p = 0.0_SP
+  problem%Nnbr => Nnbr_p
 
-  !-------- second pass to fill neighbour indices ----------
+  ! H_dummy is just a 1x3 placeholder for getFieldFromTiles
+  allocate(H_dummy(1,3))
+  H_dummy = 0.0_DP
+
+  !print *, " looping over target cells to build demag tensors"
+  !---------------------------------------
+  ! 5. Loop over target cells and build demag tensors
+  !---------------------------------------
+ !$omp parallel do default(none) &
+ !$omp shared(ntot, problem, nbr_idx_p, Nnbr_p, offset, size_cell, H_dummy) &
+ !$omp private(m, t, q, s, tiles, pts_t, Nout) schedule(static)
   do t = 1, ntot
-    do s = t+1, ntot
-      if (is_neighbour(t, s, offset, size_cell, pitch, rad_cells)) then
 
-        ! Add s to t's list
-        m_fill(t) = m_fill(t) + 1
-        nbr_idx(t, m_fill(t)) = s
+    ! Number of neighbours for this target
+    m = problem%n_nbors(t)
+    !m = count(nbr_idx_p(t,:) > 0)   ! since we use -1 for "no neighbour"
 
-        ! Add t to s's list
-        m_fill(s) = m_fill(s) + 1
-        nbr_idx(s, m_fill(s)) = t
-      end if
+    if (m <= 0) cycle
+
+    ! Build MagTile array for these m neighbours
+    allocate(tiles(m))
+    allocate(Nout(m,1,3,3))
+    Nout = 0.0_DP
+
+    do q = 1, m
+      s = nbr_idx_p(t, q)
+
+      tiles(q)%tileType        = 2           ! prism
+      tiles(q)%a               = size_cell(s,1)
+      tiles(q)%b               = size_cell(s,2)
+      tiles(q)%c               = size_cell(s,3)
+      tiles(q)%exploitSymmetry = 0
+      tiles(q)%rotAngles(:)    = 0.0_DP
+      tiles(q)%M(:)            = 0.0_DP
+
+      tiles(q)%offset(1)       = offset(s,1)
+      tiles(q)%offset(2)       = offset(s,2)
+      tiles(q)%offset(3)       = offset(s,3)
     end do
+
+    ! Target point is the centre of the target tile
+    pts_t(1,1) = offset(t,1)
+    pts_t(1,2) = offset(t,2)
+    pts_t(1,3) = offset(t,3)
+
+    ! Compute demag tensors from all neighbour tiles at this target
+    call getFieldFromTiles( tiles, H_dummy, pts_t, m, 1, Nout, .false. )
+
+    ! Store tensors in (t, neighbour-slot, 3, 3)
+    Nnbr_p(t, 1:m, :, :) = real(Nout(:,1,:,:), SP)
+
+    deallocate(Nout)
+    deallocate(tiles)
+
   end do
-  !-----------------------------------------------------------
+  !$omp end parallel do
 
-  !----------------------- cleanup -----------------------
-  deallocate(m_count)
-  deallocate(m_fill)
-  !-------------------------------------------------------
+  !print *, " cleanup temporaries"
+  !---------------------------------------
+  ! 6. Clean up temporaries
+  !---------------------------------------
+  deallocate(H_dummy)
+  deallocate(offset, size_cell)
+  !deallocate(nbr_idx_loc)
+  !print *, "done building nonuniform demag tensor"
 
-end subroutine BuildNeighbourList
-
-
-
+end subroutine BuildNeighbourDemagTensorNonUniform
 
 
 
@@ -2676,6 +3297,7 @@ subroutine add_neighbour_correction(problem, solution)
   real(DP) :: dH(3)
   real(DP) :: Mj(3)
 
+
   ! --- guards ---
   if (.not. associated(problem%nbr_idx)) stop 'add_neighbour_correction: nbr_idx not associated'
   if (.not. associated(problem%Nnbr))    stop 'add_neighbour_correction: Nnbr not associated'
@@ -2683,17 +3305,18 @@ subroutine add_neighbour_correction(problem, solution)
 
   !print *, " Adding neighbour-demag correction to FMM demag field..."
 
-  ntot       = problem%grid%nx * problem%grid%ny * problem%grid%nz
+  !ntot       = problem%grid%nx * problem%grid%ny * problem%grid%nz
+  ntot = size(problem%grid%pts, dim=1)
+  !print *, " ntot = ", ntot, " ntot before was", problem%grid%nx * problem%grid%ny * problem%grid%nz
   nneigh_max = size(problem%nbr_idx, 2)
-
   dx = real(problem%grid%dx, DP)
   dy = real(problem%grid%dy, DP)
   dz = real(problem%grid%dz, DP)
-  volj = dx * dy * dz
+  !volj = dx * dy * dz
 
-  !$omp parallel do default(none) &
-  !$omp shared(solution, problem, nneigh_max, volj, ntot)  &
-  !$omp private(t,m,jidx,xt,yt,zt,xj,yj,zj,Rvec,Kdip,Kloc,dH,Mj)
+ !$omp parallel do default(none) &
+ !$omp shared(solution, problem, nneigh_max, ntot, dx, dy, dz)  &
+ !$omp private(m,jidx,xt,yt,zt,xj,yj,zj,Rvec,Kdip,Kloc,dH,Mj, volj)
   do t = 1, ntot
     dH = 0.0_DP
 
@@ -2702,7 +3325,8 @@ subroutine add_neighbour_correction(problem, solution)
     yt = real(problem%grid%pts(t,2), DP)
     zt = real(problem%grid%pts(t,3), DP)
 
-    do m = 1, nneigh_max
+    !TODO - we could optimize by also storing number of neighbohrs for each and only loop until that 
+    do m = 1, problem%n_nbors(t)  
       jidx = problem%nbr_idx(t, m)
       if (jidx < 0) cycle   ! empty slot (boundary)
 
@@ -2722,6 +3346,14 @@ subroutine add_neighbour_correction(problem, solution)
       Rvec(2) = yt - yj
       Rvec(3) = zt - zj
       call dipole_tensor_3x3(Rvec, Kdip)
+
+      ! Inside loop, use:
+      if (problem%grid%gridType .eq. gridTypeUniform) then
+          volj = dx * dy * dz
+      else
+          volj = problem%grid%abc(jidx,1) * problem%grid%abc(jidx,2) * problem%grid%abc(jidx,3)
+      endif
+
       Kdip = Kdip * volj
 
       ! accumulate (Kloc - Kdip) * Mj
@@ -2733,7 +3365,7 @@ subroutine add_neighbour_correction(problem, solution)
     solution%HmY(t) = solution%HmY(t) - real(dH(2), kind=SP)
     solution%HmZ(t) = solution%HmZ(t) - real(dH(3), kind=SP)
   end do
-  !$omp end parallel do
+ !$omp end parallel do
 
 end subroutine add_neighbour_correction
 
