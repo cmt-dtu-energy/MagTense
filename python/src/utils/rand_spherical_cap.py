@@ -6,8 +6,8 @@ from typing import Optional
 
 def rand_spherical_cap(
     cone_angle_degree: float,
-    cone_dir: Optional[ArrayLike] = None,
     N: int = 1,
+    cone_dir: Optional[ArrayLike] = None,
     rng: Optional[np.random.Generator] = None
 ) -> NDArray[np.float64]:
     """
@@ -52,7 +52,7 @@ def rand_spherical_cap(
 
     # If aligned with +z, return directly
     if np.allclose(cone_dir_arr, np.array([0.0, 0.0, 1.0], dtype=np.float64)):
-        return r
+        return r.T
 
     # Normalised vectors
     north = np.array([0.0, 0.0, 1.0], dtype=np.float64)
@@ -68,7 +68,7 @@ def rand_spherical_cap(
         R = np.array([[1.0,  0.0,  0.0],
                       [0.0, -1.0,  0.0],
                       [0.0,  0.0, -1.0]], dtype=np.float64)
-        return R @ r
+        return (R @ r).T
 
     u = u / u_norm
     rot = np.arccos(np.clip(np.dot(n_cone, north), -1.0, 1.0))
@@ -85,4 +85,4 @@ def rand_spherical_cap(
         + (1.0 - np.cos(rot)) * np.outer(u, u)
     )
 
-    return R @ r
+    return (R @ r).T 
