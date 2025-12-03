@@ -6,6 +6,9 @@
 *.user
 *.sln.docstates
 
+# private files for MagTense
+MagTense_private/
+
 # Build results
 
 [Dd]ebug/
