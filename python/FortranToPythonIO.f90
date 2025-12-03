@@ -682,8 +682,8 @@ end subroutine getHOnSourcesFMM
 
         real(8),dimension(nt),intent(in) :: t
         real(8),dimension(nt),intent(out) :: t_out
-        real(8),dimension(nt,ntot,1,3),intent(out) :: M_mm
-        real(8),dimension(nt,ntot,1,3),intent(out) :: H_exc, H_ext, H_dem, H_ani
+        real(8),dimension(nt,ntot,nt_Hext,3),intent(out) :: M_mm
+        real(8),dimension(nt,ntot,nt_Hext,3),intent(out) :: H_exc, H_ext, H_dem, H_ani
         real(8),dimension(ntot,3),intent(out) :: pts
 		
 		integer,intent(out) :: n_tot_Exch
