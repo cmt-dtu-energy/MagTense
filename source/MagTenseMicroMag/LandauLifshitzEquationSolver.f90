@@ -261,13 +261,13 @@
         real(DP),dimension(:),allocatable :: hmx_before, hmy_before, hmz_before
         real(DP),dimension(:),allocatable :: hmx_fmm, hmy_fmm, hmz_fmm
         real(DP),dimension(:),allocatable :: hmx_MT, hmy_MT, hmz_MT
-
-
+        real(DP) :: mx_mean, my_mean, mz_mean, volume_total
+        integer :: i
 #if USE_TIMING
         !------------------ Timing ---------------------
         real(DP) :: t0, t1
         integer,          save :: call_count = 0
-        integer, parameter     :: NPRINT = 200   ! output cadence
+        integer, parameter     :: NPRINT = 100   ! output cadence
 
         real(DP), save :: acc_total    = 0.0_DP
         real(DP), save :: acc_exch     = 0.0_DP
@@ -333,6 +333,7 @@
         ! hmy_before = gb_solution%HmY(:)
         ! hmz_before = gb_solution%HmZ(:)
 #if USE_FMM3D
+
         call updateDemagfieldFMM( gb_problem, gb_solution )
         !call updateDemagfieldFMM_old( gb_problem, gb_solution )
         ! hmx_fmm = gb_solution%HmX(:)
@@ -422,6 +423,23 @@
                 ' aniso=',   acc_aniso,    ' demag=',  acc_demag,  ' heff=',    acc_heff, &
                 ' mxh=',     acc_cross,    ' m×(mxh)=',acc_double, ' asmb=',    acc_assemble
 
+
+            mx_mean = 0.0
+            my_mean = 0.0
+            mz_mean = 0.0
+            !ntot = size(problem%grid%pts, dim=1)
+            do i=1,ntot
+                mx_mean = mx_mean + gb_solution%Mx_s(i) * gb_problem%Ms(i) * (gb_problem%grid%abc(i,1) * gb_problem%grid%abc(i,2) * gb_problem%grid%abc(i,3))
+                my_mean = my_mean + gb_solution%My_s(i) * gb_problem%Ms(i) * (gb_problem%grid%abc(i,1) * gb_problem%grid%abc(i,2) * gb_problem%grid%abc(i,3))
+                mz_mean = mz_mean + gb_solution%Mz_s(i) * gb_problem%Ms(i) * (gb_problem%grid%abc(i,1) * gb_problem%grid%abc(i,2) * gb_problem%grid%abc(i,3))
+            enddo
+            volume_total = sum( gb_problem%grid%abc(:,1) * gb_problem%grid%abc(:,2) * gb_problem%grid%abc(:,3) )
+            mx_mean = mx_mean / volume_total
+            my_mean = my_mean / volume_total
+            mz_mean = mz_mean / volume_total
+            write(*,'(A,1X,ES14.3,1X,A,1X,ES14.3,1X,A,1X,ES14.3)') &
+                '  <mx>=', mx_mean, ' <my>=', my_mean, ' <mz>=', mz_mean
+
             ! reset accumulators for next block
             acc_total    = 0.0_DP
             acc_exch     = 0.0_DP
@@ -433,7 +451,7 @@
             acc_double   = 0.0_DP
             acc_assemble = 0.0_DP
 
-            error stop " test stop after timing "
+            !error stop " test stop after timing "
 
         end if
             !----------------------------------------------------------
@@ -502,6 +520,7 @@
         !Demag. field
 #if USE_FMM3D
         call updateDemagfieldFMM( gb_problem, gb_solution )
+        !call updateDemagfieldFMM_old( gb_problem, gb_solution )
 #else
         call updateDemagfield( gb_problem, gb_solution )
 #endif
@@ -777,7 +796,7 @@ subroutine updateDemagfieldFMM(problem, solution)
   !------------------ Timing ---------------------
 #if USE_TIMING
   integer,          save :: call_count_fmm = 0
-  integer, parameter     :: NPRINT = 200  ! output cadence  
+  integer, parameter     :: NPRINT = 100  ! output cadence  
   real(DP), save :: acc_total_fmm = 0.0_DP
   real(DP), save :: acc_cast      = 0.0_DP
   real(DP), save :: acc_alloc     = 0.0_DP
@@ -822,10 +841,10 @@ subroutine updateDemagfieldFMM(problem, solution)
   t0 = walltime()
 #endif
   fourpi  = 12.566370614359172D0
-  eps_fmm = 1.0D-6
+  eps_fmm = 1.0e-4!1.0D-6
 
-  ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
-
+  !ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+  ntot = size(problem%grid%pts, dim=1)
   ier = 0
   
 #if USE_TIMING
@@ -880,15 +899,26 @@ subroutine updateDemagfieldFMM(problem, solution)
     !!------------------------------------------------------------
     !------------- get cell volume ------------------------------
     ! TODO - implement non-uniform and non-cubic grids here
+    if (problem%grid%gridType /= gridTypeUniform) then
+      vol_i = real(problem%grid%abc(i,1), DP) * &
+              real(problem%grid%abc(i,2), DP) * &
+              real(problem%grid%abc(i,3), DP)
+        !write(*,*) 'Error in updateDemagfieldFMM: FMM3D only supports uniform grids currently.'
+        !stop ' FMM3D error'
+    else
     vol_i = real(problem%grid%dx, DP) * &
             real(problem%grid%dy, DP) * &
             real(problem%grid%dz, DP)
+    end if
     !------------------------------------------------------------
     !--------- conert to dipole moment m = M * ΔV --------------
     ! TODO - is Ms the correct scaling here?
-    mx = real(solution%Mx_s(i), DP) * vol_i * problem%Ms(i)
-    my = real(solution%My_s(i), DP) * vol_i * problem%Ms(i)
-    mz = real(solution%Mz_s(i), DP) * vol_i * problem%Ms(i)
+    !mx = real(solution%Mx_s(i), DP) * vol_i * problem%Ms(i)
+    !my = real(solution%My_s(i), DP) * vol_i * problem%Ms(i)
+    !mz = real(solution%Mz_s(i), DP) * vol_i * problem%Ms(i)
+    mx = solution%Mx(i) * vol_i * problem%Ms(i)
+    my = solution%My(i) * vol_i * problem%Ms(i)
+    mz = solution%Mz(i) * vol_i * problem%Ms(i)
     !------------------------------------------------------------
     !-------------- pack dipole vector ---------------------------
     dipvec(1,1,i) = mx
@@ -936,6 +966,7 @@ subroutine updateDemagfieldFMM(problem, solution)
 
   !------------------ Map grad -> H (and to single) ----------------
   ! include factor 4pi to match Magtense units
+  !$omp parallel do default(shared)
   do i = 1, ntot
     solution%HmX(i) = real( grad(1,1,i) / fourpi, SP )
     solution%HmY(i) = real( grad(1,2,i) / fourpi, SP )
@@ -944,6 +975,7 @@ subroutine updateDemagfieldFMM(problem, solution)
     ! solution%HmY(i) = real( grad(2,i) / fourpi, SP )
     ! solution%HmZ(i) = real( grad(3,i) / fourpi, SP )
   end do
+  !$omp end parallel do
   !-----------------------------------------------------------------
 #if USE_TIMING
   acc_map = acc_map + (walltime() - t1)
@@ -1126,9 +1158,17 @@ allocate(source(3, ntot))
     !!------------------------------------------------------------
     !------------- get cell volume ------------------------------
     ! TODO - implement non-uniform and non-cubic grids here
+    if (problem%grid%gridType /= gridTypeUniform) then
+      vol_i = real(problem%grid%abc(i,1), DP) * &
+              real(problem%grid%abc(i,2), DP) * &
+              real(problem%grid%abc(i,3), DP)
+        !write(*,*) 'Error in updateDemagfieldFMM: FMM3D only supports uniform grids currently.'
+        !stop ' FMM3D error'
+    else
     vol_i = real(problem%grid%dx, DP) * &
             real(problem%grid%dy, DP) * &
             real(problem%grid%dz, DP)
+    end if
     !------------------------------------------------------------
     !--------- conert to dipole moment m = M * ΔV --------------
     ! TODO - is Ms the correct scaling here?
@@ -1486,7 +1526,7 @@ end subroutine updateDemagfieldFMM_old
     
     !Demagnetization tensor matrix
 #if USE_FMM3D
-    call BuildNeighbourDemagTensor( problem, 1) ! hardcode 2 levels of neighbour cells for now
+    call BuildNeighbourDemagTensor( problem, 2) ! hardcode 2 levels of neighbour cells for now
 #else
     call ComputeDemagfieldTensor( problem )
 #endif
@@ -1514,7 +1554,7 @@ end subroutine updateDemagfieldFMM_old
     
     !Setup the grid depending on which type of grid it is
     if ( grid%gridType .eq. gridTypeUniform ) then
-        
+         
         !Allocate the grid
         allocate( grid%x(grid%nx,grid%ny,grid%nz),grid%y(grid%nx,grid%ny,grid%nz),grid%z(grid%nx,grid%ny,grid%nz) )
         allocate( grid%dV( grid%nx * grid%ny * grid%nz ) )
@@ -2365,6 +2405,7 @@ end subroutine updateDemagfieldFMM_old
             solution%HmZ(i) = solution%HmZ(i) - real(dH(3), SP)
         end do
        !$omp end parallel do
+        deallocate(Nout)
       elseif (problem%grid%gridType .eq. 3) then
 
         !print *, " add_self_correction for grid type 3 - nonuniform cartesian grid"
@@ -2391,6 +2432,7 @@ end subroutine updateDemagfieldFMM_old
             tile(1)%offset(1)        = 0.0_DP            ! centre arbitrarily at origin
             tile(1)%offset(2)        = 0.0_DP
             tile(1)%offset(3)        = 0.0_DP
+            !TODO - change Nout to be shared, but with multiple thread indices 
             call getFieldFromTiles( tile, H_dummy, pts, 1, 1, Nout, .false. )
             Nloc(:,:) = Nout(1,1,:,:)
 
@@ -2481,6 +2523,7 @@ subroutine BuildNeighbourDemagTensor(problem, radius_cells)
   type(MicroMagProblem), intent(inout)  :: problem
   integer,               intent(in)  :: radius_cells
   integer, dimension(:,:), pointer :: nbr_idx(:,:)
+  integer, dimension(:), pointer :: n_nbors(:)
   real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:)
   ! --- locals ---
   integer :: nx, ny, nz, ntot, r, nneigh_max
@@ -2521,11 +2564,14 @@ subroutine BuildNeighbourDemagTensor(problem, radius_cells)
   ! Allocate outputs
   if (associated(problem%nbr_idx)) deallocate(problem%nbr_idx)
   if (associated(problem%Nnbr))    deallocate(problem%Nnbr)
+  if (associated(problem%n_nbors))    deallocate(problem%n_nbors)
   allocate(nbr_idx(ntot, nneigh_max))
   allocate(Nnbr(   ntot, nneigh_max, 3, 3))
+  allocate(n_nbors(ntot))
 
   problem%nbr_idx => nbr_idx
-problem%Nnbr    => Nnbr
+  problem%Nnbr    => Nnbr
+  problem%n_nbors => n_nbors
 
 
 
@@ -2536,7 +2582,7 @@ problem%Nnbr    => Nnbr
 
   ! OpenMP-friendly outer loop over target cells
  !$omp parallel do collapse(3) default(none) &
- !$omp shared(nx,ny,nz,ntot,r,nneigh_max,problem,nbr_idx,Nnbr,dx,dy,dz) &
+ !$omp shared(nx,ny,nz,ntot,r,nneigh_max,problem,nbr_idx,Nnbr, n_nbors,dx,dy,dz) &
  !$omp private(mj,lin_t,ii,jj,kk,di,dj,dk,m,lin_s,tiles,pts_t,H_dummy,Nout) schedule(static)
   do k = 1, nz
     do j = 1, ny
@@ -2562,6 +2608,7 @@ problem%Nnbr    => Nnbr
           end do
         end do
 
+        n_nbors(lin_t) = m
         if (m > 0) then
           ! Build MagTile array for these m neighbours
           allocate(tiles(m))
@@ -2921,9 +2968,9 @@ end subroutine list_debug_print
 #endif
             call list_append(base(t), s)
             call list_append(base(s), t)
-           !$ompatomic
+           !$omp atomic
             n_nbors(t) = n_nbors(t) + 1
-           !$ompatomic
+           !$omp atomic
             n_nbors(s) = n_nbors(s) + 1
           end if
         end do
@@ -3282,7 +3329,7 @@ end subroutine BuildNeighbourDemagTensorNonUniform
 
 
 
-
+!TODO - make a GPU version of the neighbour correction later!
 subroutine add_neighbour_correction(problem, solution)
   ! Finite-size neighbour patch for FMM demag field:
   ! H += sum_m ( Nnbr(t,m) - Kdip(R_tj)*V ) * M_j
