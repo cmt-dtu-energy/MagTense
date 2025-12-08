@@ -183,7 +183,8 @@ module fmm3d_tree_mod
         double precision eps
         integer ier
         !------------------------------------------------
-
+        integer :: i
+        !-----------------
         if (self%is_built) then
             return
         end if
@@ -208,6 +209,13 @@ module fmm3d_tree_mod
 
         call self%build1()
         call self%build2()
+
+
+        print *, " built tree with ", self%nlevels, " levels and ", self%nboxes, " boxes "
+        print *, "Number of boxes per level:"
+        do i = 0, self%nlevels
+            print *, "Level ", i, ": ", self%laddr(2, i) - self%laddr(1, i) + 1, " boxes"
+        enddo
 
         self%is_built = .true.
       end subroutine 
@@ -674,7 +682,7 @@ module fmm3d_tree_mod
       allocate(self%pgboxwexp(self%nd,self%nexptotp,self%cntlist4,6))
       allocate(self%gboxmexp(self%nd*(self%nterms(self%nlevels)+1)*(2*self%nterms(self%nlevels)+1) &
                         ,8,self%cntlist4))
-      allocate(self%gboxsubcenters(3,8,self%nthd))
+      allocate(self%gboxsubcenters(3,8,self%nthd)) 
       allocate(self%gboxfl(2,8,self%nthd))
 
       self%pgboxwexp=0d0
@@ -785,9 +793,9 @@ module fmm3d_tree_mod
     !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,idim)
             do i=1,self%nsource
             do idim=1,self%nd
-                self%gradsort(idim,1,i) = 0
-                self%gradsort(idim,2,i) = 0
-                self%gradsort(idim,3,i) = 0
+                self%gradsort(idim,1,i) = 0.0
+                self%gradsort(idim,2,i) = 0.0
+                self%gradsort(idim,3,i) = 0.0
             enddo
             enddo
     !$OMP END PARALLEL DO
@@ -1115,6 +1123,9 @@ module fmm3d_tree_mod
 
         pgboxwexp => self%pgboxwexp
         gboxmexp => self%gboxmexp
+        pgboxwexp=0d0
+        gboxmexp=0d0
+        
         gboxsubcenters => self%gboxsubcenters
         gboxfl => self%gboxfl
         gboxind => self%gboxind
@@ -1465,9 +1476,9 @@ module fmm3d_tree_mod
 
            nchild = itree(ipointer(4)+ibox-1)
 
-            istart = isrcse(1,ibox) 
-            iend = isrcse(2,ibox) 
-            npts = npts + iend-istart+1
+          istart = isrcse(1,ibox) 
+          iend = isrcse(2,ibox) 
+          npts = npts + iend-istart+1
            
 
 
