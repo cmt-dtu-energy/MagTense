@@ -84,6 +84,69 @@ def grain_hysteresis(
     Ms = 1.61 / mu0   # [A/m]
     K0 = 4.3e6        # [J/m^3]
 
+
+    h_ext_base = Hyst_dir / mu0
+    steps = np.arange(1.0, -7.1, -0.1)
+    #steps = np.arange(1.0, 0.8, -0.1)
+
+    H_ext = np.zeros((len(steps), 4))
+    H_ext[:, 0] = steps
+    H_ext[:, 1:4] = steps[:, np.newaxis] * h_ext_base
+
+
+
+
+
+    exma_file = mesh_file[:-4] + "_exMa.npz"
+    if not Path(exma_file).exists():
+        print("File {} does not exist.".format(exma_file))
+        print("Generating exchange matrix and saving to file...")
+        rng = np.random.default_rng(42)
+        problem_ini = setup_grain_problem_from_matfile(
+            fname=mesh_file,
+            cuda=cuda,
+            cvode=cvode,
+            t_end=40e-9,
+            nt=2,
+            Hyst_dir=Hyst_dir,
+            rng=rng,
+        )
+        problem_ini.exch_presize = 3 * problem_ini.nt * len(steps)
+        problem_ini.dummy_run = 1
+        #def h_ext_fct_init(t) -> np.ndarray:
+        #    return np.expand_dims(np.where(t < 1e-09, 1e-09 - t, 0), axis=1) * Hyst_dir*mu0
+        #problem_ini.exch_presize = 22
+        res_ini = problem_ini.run_hysteresis(H_ext=H_ext)
+        #res_ini = problem_ini.run_simulation(
+        #    t_end=40e-9,
+        #    nt=2,
+        #    fct_h_ext=h_ext_fct_init,
+        #    nt_h_ext=len(steps),
+        #)
+        exch_nval, ExchMat_r, ExchMat_c, ExchMat_v, exch_nrow, exch_ncols = res_ini[7:]
+        print("storing setup...")
+        print("exch_nval = ", exch_nval)
+        print("exch_nrow = ", exch_nrow)
+        print("exch_ncols = ", exch_ncols)
+        print("shape ExchMat_r", ExchMat_r.shape)
+        print("shape ExchMat_c", ExchMat_c.shape)
+        print("shape ExchMat_v", ExchMat_v.shape)
+        print("ExchMat_v[:10] = ", ExchMat_v[:10])
+        np.savez(
+            exma_file,
+            exch_nval=exch_nval,
+            ExchMat_r=ExchMat_r,
+            ExchMat_c=ExchMat_c,
+            ExchMat_v=ExchMat_v,
+            exch_nrow=exch_nrow,
+            exch_ncols=exch_ncols
+        )   
+        print(f"Saved exchange matrix to {exma_file}")
+    exch_nval, ExchMat_r, ExchMat_c, ExchMat_v, exch_nrow, exch_ncols = np.load(
+        exma_file, allow_pickle=True
+    ).values()
+
+
     rng = np.random.default_rng(42)
     problem = setup_grain_problem_from_matfile(
         fname=mesh_file,
@@ -93,16 +156,16 @@ def grain_hysteresis(
         nt=2,
         Hyst_dir=Hyst_dir,
         rng=rng,
+        exch_val=ExchMat_v,
+        exch_rows=ExchMat_r,
+        exch_col=ExchMat_c,
+        exch_nval=exch_nval,
+        exch_nrow=exch_nrow,
+        exch_ncols=exch_ncols,
+        passexch=1
     )
-
-    h_ext_base = Hyst_dir / mu0
-    steps = np.arange(1.0, -7.1, -0.1)
-
-    H_ext = np.zeros((len(steps), 4))
-    H_ext[:, 0] = steps
-    H_ext[:, 1:4] = steps[:, np.newaxis] * h_ext_base
-
     problem.exch_presize = 3 * problem.nt * len(steps)
+    problem.dummy_run = 0
 
     start_time = time.time()
     res = problem.run_hysteresis(H_ext=H_ext)
@@ -137,15 +200,24 @@ def grain_hysteresis(
         * mu0
     )
 
-    f = interp1d(M, H)     # H as function of M
-    Hc = float(f(0.0))
+    try:
+        f = interp1d(M, H)     # H as function of M
+        Hc = float(f(0.0))
+    except Exception:
+        Hc = np.nan
 
     # try:
     #     Hc = float(np.interp(0.0, M, H))
     # except Exception:
     #     Hc = np.nan
 
-    BH_max, H_star, B_star, M_star = max_energy_product(H, M, mu0=mu0)
+    try:
+        BH_max, H_star, B_star, M_star = max_energy_product(H, M, mu0=mu0)
+    except ValueError:
+        BH_max = np.nan
+        H_star = np.nan
+        B_star = np.nan
+        M_star = np.nan
 
     print("BH_max = {:.2e} kJ/m^3".format(BH_max / 1e3))
     print("H*     = {:.3e} A/m".format(H_star))
@@ -210,8 +282,11 @@ if __name__ == "__main__":
     grain_hysteresis(
         cuda=False,
         cvode=False,
-        #mesh_file="Grid_rasBase_5_nGrains_5_nRef_3_dG_5e-09.mat",
-        mesh_file="Grid_rasBase_5_nGrains_5_nRef_4_dG_3.75e-09.mat",
+        mesh_file="Grid_rasBase_5_nGrains_5_nRef_3_dG_5e-09.mat",
+        #mesh_file="Grid_rasBase_5_nGrains_25_nRef_3_dG_3.75e-09.mat",
+        #mesh_file="Grid_rasBase_5_nGrains_25_nRef_4_dG_3.75e-09.mat",
+        #mesh_file="Grid_rasBase_5_nGrains_5_nRef_4_dG_3.75e-09.mat",
+        #mesh_file="Grid_rasBase_6_nGrains_25_nRef_4_dG_3.75e-09.mat",
         plotting=True,
         figpath=default_figpath,
     )
