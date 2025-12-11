@@ -13,7 +13,13 @@ def setup_grain_problem_from_matfile(
                     nt : int = 2,                               # number of time steps for each hysteresis step
                     Hyst_dir : np.ndarray = np.array([0,0,1]),  # hysteresis direction
                     rng: Optional[np.random.Generator] = None,  #
-
+                    exch_val: list | np.ndarray | None = None,
+                    exch_rows: list | np.ndarray | None = None,
+                    exch_col: list | np.ndarray | None = None,
+                    exch_nval: int = 1,
+                    exch_nrow: int = 1,
+                    exch_ncols: int = 1,
+                    passexch : int = 0
                     ) -> MicromagProblem:
     
 
@@ -67,6 +73,13 @@ def setup_grain_problem_from_matfile(
         grid_type=grid_type,
         cuda=cuda,
         cvode=cvode,
+        exch_val=exch_val,
+        exch_rows=exch_rows,
+        exch_col=exch_col,
+        exch_nval=exch_nval,
+        exch_nrow=exch_nrow,
+        exch_ncols=exch_ncols,
+        passexch=passexch
     )
     #-------------------------------------------------------------
 
