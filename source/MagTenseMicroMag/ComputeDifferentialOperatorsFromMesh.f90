@@ -659,9 +659,7 @@ module DifferentialOperators
         stat = mkl_sparse_destroy (CSR_copy_matrix)
     
         stat = mkl_sparse_d_export_coo (COO_matrix, indexing, K, N, nnz, rows_c, cols_c, values_c)
-    
-        stat = mkl_sparse_destroy (COO_matrix)
-    
+        
         !   Converting C into Fortran pointers
         call C_F_POINTER(rows_c  , rows  , [nnz])
         call C_F_POINTER(cols_c  , cols  , [nnz])
