@@ -195,46 +195,49 @@
     endif
 
     !loop over the range of applied fields
-    do i=1,nt_Hext
-        !Applied field
-        gb_solution%HextInd = i
-        
-        if (gb_problem%solver .eq. MicroMagSolverExplicit) then               
-            write(prog_str,'(A20, I5.2, A8, I5.2, A6, F6.2, A7)') 'External Field nr.: ', i, ' out of ', nt_Hext, ' i.e. ', real(i)/real(nt_Hext)*100,'% done'
-            call displayGUIMessage( trim(prog_str) )
-        endif
+    if ( gb_problem%dummy_run .eq. 1) then
+       call displayGUIMessage( 'Performing dummy run - skipping time evolution ' )
+    else 
+      do i=1,nt_Hext
+          !Applied field
+          gb_solution%HextInd = i
+          
+          if (gb_problem%solver .eq. MicroMagSolverExplicit) then               
+              write(prog_str,'(A20, I5.2, A8, I5.2, A6, F6.2, A7)') 'External Field nr.: ', i, ' out of ', nt_Hext, ' i.e. ', real(i)/real(nt_Hext)*100,'% done'
+              call displayGUIMessage( trim(prog_str) )
+          endif
 
-        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )  
-        
-        !The initial state of the next solution is the previous solution result
-        gb_problem%m0 = M_out(:,nt,i)
-        
-        !Store the solution
-        gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
-        gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
-        gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
-            
-        call StoreHeffComponents ( gb_problem, gb_solution )
-            
-    enddo
+          call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )  
+          
+          !The initial state of the next solution is the previous solution result
+          gb_problem%m0 = M_out(:,nt,i)
+          
+          !Store the solution
+          gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
+          gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
+          gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
+              
+          call StoreHeffComponents ( gb_problem, gb_solution )
+              
+      enddo
 
-    !clean up
-    deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
+      !clean up
+      deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
+      
+      !clean up
+      if (gb_problem%CV > 0) then
+          deallocate(gb_solution%u1, gb_solution%u2, gb_solution%u3, gb_solution%u4, gb_solution%u5, gb_solution%u6)
+      endif
+      
+      !clean-up
+      stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
     
-    !clean up
-    if (gb_problem%CV > 0) then
-        deallocate(gb_solution%u1, gb_solution%u2, gb_solution%u3, gb_solution%u4, gb_solution%u5, gb_solution%u6)
-    endif
-    
-    !clean-up
-    stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
-   
-#if USE_CUDA
-    if ( gb_problem%useCuda .eqv. useCudaTrue ) then
-        call cudaDestroy()
-    endif
-#endif
-    
+  #if USE_CUDA
+      if ( gb_problem%useCuda .eqv. useCudaTrue ) then
+          call cudaDestroy()
+      endif
+  #endif
+  end if
     !Return the correct state
     sol = gb_solution
     prob = gb_problem

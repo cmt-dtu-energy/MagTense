@@ -179,6 +179,9 @@ include "mkl_dfti.f90"
         integer, dimension(:), pointer :: n_nbors(:) => null()
         real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:) => null()
 
+
+        integer :: dummy_run = 0    !> Flag to indicate whether the demag tensor neighbour test setup has been done
+
         
     end type MicroMagProblem
     

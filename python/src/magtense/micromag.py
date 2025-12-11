@@ -106,7 +106,7 @@ class MicromagProblem:
         n_threads: int = 1,
         N_ave: tuple[int] = (1, 1, 1),
         t_alpha: np.ndarray = np.zeros(1),  # noqa: B008
-        alpha_fct=lambda t: np.atleast_2d(t).T * 0,
+        alpha_fct=lambda t: np.atleast_2d(t).T * 0
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -187,6 +187,9 @@ class MicromagProblem:
         self.precision = int(precision)
         self.n_threads = n_threads
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")
+
+
+        self.dummy_run = 0
 
     @property
     def passexch(self) -> int | None:
@@ -533,6 +536,8 @@ class MicromagProblem:
         h_ext[:, 0] = np.linspace(0, t_end, nt_h_ext)
         h_ext[:, 1:4] = fct_h_ext(np.linspace(0, t_end, nt_h_ext))
 
+        print("dummy run in python = ", self.dummy_run)
+
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
             ntot=self.ntot,
             grid_n=self.grid_n,
@@ -595,6 +600,7 @@ class MicromagProblem:
             passexch=self.passexch,
             exch_ncols=self.exch_ncols,
             exch_presize=self.exch_presize,
+            dummy_run=self.dummy_run
         )
 
         n_tot_Exch = result[7]
@@ -698,6 +704,7 @@ class MicromagProblem:
             passexch=self.passexch,
             exch_ncols=self.exch_ncols,
             exch_presize=self.exch_presize,
+            dummy_run=self.dummy_run
         )
 
         n_tot_Exch = result[7]

@@ -655,7 +655,7 @@ end subroutine getHOnSourcesFMM
         exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, demigstp, & 
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, &
-		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc)
+		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run)
 
         integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
         integer(4),dimension(3),intent(in) :: grid_n, N_ave
@@ -691,6 +691,8 @@ end subroutine getHOnSourcesFMM
 		integer,dimension(exch_presize*ntot),intent(out)  :: ExchMat_c
 		real(8),dimension(exch_presize*ntot),intent(out)  :: ExchMat_v
 		integer,intent(out) :: ExchMat_nr,ExchMat_nc
+        
+        integer, intent(in) :: dummy_run
 
 #if USE_MICROMAG
         type(MicroMagProblem) :: problem
@@ -702,7 +704,7 @@ end subroutine getHOnSourcesFMM
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
             exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
 			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
-            CrysAxis, K0_arr, K1, K2, problem )
+            CrysAxis, K0_arr, K1, K2, problem, dummy_run )
 
         call SolveLandauLifshitzEquation( problem, solution )
 
@@ -730,9 +732,6 @@ end subroutine getHOnSourcesFMM
 
         ExchMat_nr = solution%gridinfo%Exch_mat_nr
 		ExchMat_nc = solution%gridinfo%Exch_mat_nc
-		
-		write(*,*) 'Done saving returned variables'
-		
 #else
         write(*,*) 'Compiled without micromagnetic part. Returning zeros.'
         n_tot_Exch = 0
