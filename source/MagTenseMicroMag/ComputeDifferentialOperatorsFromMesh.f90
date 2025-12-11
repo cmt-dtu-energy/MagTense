@@ -12,8 +12,8 @@ module DifferentialOperators
     contains
 
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2025
-    !> Original Matlab implementation by Emil Jørgensen
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2025
+    !> Original Matlab implementation by Emil Jï¿½rgensen
     !> @brief
     !> computeDifferentialOperatorsFromMesh_DirectLap computes the exchange operator for an unstructured mesh
     !> 
@@ -610,6 +610,7 @@ module DifferentialOperators
         logical, allocatable :: mask1D(:)
         type(sparse_matrix_t) :: COO_matrix
     
+
         !Find the non-zero values of values
         allocate(mask1D(size(values)))    
         mask1D(:) = .false.
@@ -674,6 +675,9 @@ module DifferentialOperators
         GridInfo%Exch_mat_r(:) = rows(:)
         GridInfo%Exch_mat_c(:) = cols(:)
         GridInfo%Exch_mat_v(:) = values(:)
+
+        stat = mkl_sparse_destroy (COO_matrix)
+
             
     end subroutine create_COO_values_from_CSR
 
