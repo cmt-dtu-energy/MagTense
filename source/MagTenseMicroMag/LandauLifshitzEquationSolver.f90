@@ -994,7 +994,8 @@ subroutine updateDemagfieldFMM(problem, solution)
 #endif
   !------------- add correction from neighbouring tiles ---------------------
 !print *, " before neighbour correction"
- call add_neighbour_correction(problem, solution)
+ !call add_neighbour_correction(problem, solution)
+ call add_neighbour_correction_precomp(problem, solution)
   !--------------------------------------------------------------------------
 #if USE_TIMING
   acc_neigh = acc_neigh + (walltime() - t1)
@@ -2541,6 +2542,7 @@ subroutine BuildNeighbourDemagTensor(problem, radius_cells)
   if (problem%grid%gridType /= gridTypeUniform) then
     call displayGUIMessage("BuildNeighbourDemagTensor: non-uniform grids not supported in this routine; calling non-uniform version.")
     call BuildNeighbourDemagTensorNonUniform(problem, radius_cells)
+    call convert_Nnbr_to_diffTens(problem)
     call displayGUIMessage("BuildNeighbourDemagTensor: returned from non-uniform version.")
     return
     !stop 'BuildNeighbourDemagTensor: only gridTypeUniform supported in this routine.'
@@ -2661,6 +2663,10 @@ subroutine BuildNeighbourDemagTensor(problem, radius_cells)
     end do
    !$omp end parallel do
     deallocate(H_dummy)
+
+
+
+    call convert_Nnbr_to_diffTens(problem)
 
       !print *, " finished BuildNeighbourDemagTensor with radius_cells = ", radius_cells
 
@@ -3132,7 +3138,6 @@ end subroutine list_debug_print
       !print *, " deallocating "
       deallocate(base, neigh)
 
-
       !error stop " BuildNeighbourList complete - test "
 
     end subroutine BuildNeighbourList
@@ -3329,7 +3334,54 @@ subroutine BuildNeighbourDemagTensorNonUniform(problem, radius_cells)
 
 end subroutine BuildNeighbourDemagTensorNonUniform
 
+subroutine convert_Nnbr_to_diffTens(problem)
+  implicit none
+  type(MicroMagProblem),  intent(inout)    :: problem
+  !---------------------------------------
+  integer :: ntot, t, m, jidx
+  real(DP) :: dx, dy, dz, volj
+  real(DP) :: xt, yt, zt, xj, yj, zj
+  real(DP) :: Rvec(3), Kdip(3,3), Kloc(3,3)
+  real(SP), contiguous, pointer :: diffTens(:,:,:,:)
+  !---------------------------------------
 
+  ntot = size(problem%grid%pts,1)
+  dx = real(problem%grid%dx, DP)
+  dy = real(problem%grid%dy, DP)
+  dz = real(problem%grid%dz, DP)
+
+
+  allocate(diffTens(size(problem%Nnbr,1), size(problem%Nnbr,2), size(problem%Nnbr,3), size(problem%Nnbr,4)))
+  diffTens(:,:,:,:) = 0.0_SP
+  problem%diffTens => diffTens
+
+  do t = 1, ntot 
+    xt = real(problem%grid%pts(t,1),DP)
+    yt = real(problem%grid%pts(t,2),DP)
+    zt = real(problem%grid%pts(t,3),DP)
+    do m=1, problem%n_nbors(t)
+      jidx = problem%nbr_idx(t,m)
+      if (jidx < 0) cycle   ! empty slot (boundary)
+      xj = real(problem%grid%pts(jidx,1),DP)
+      yj = real(problem%grid%pts(jidx,2),DP)
+      zj = real(problem%grid%pts(jidx,3),DP)
+
+
+      Kloc(:,:) = real(problem%Nnbr(t,m,:,:), DP)
+      Rvec(1) = xt - xj
+      Rvec(2) = yt - yj
+      Rvec(3) = zt - zj
+      call dipole_tensor_3x3(Rvec, Kdip)
+      if (problem%grid%gridType .eq. gridTypeUniform) then
+          volj = dx * dy * dz
+      else
+          volj = problem%grid%abc(jidx,1) * problem%grid%abc(jidx,2) * problem%grid%abc(jidx,3)
+      endif
+      problem%diffTens(t, m, :,:) = Kloc - Kdip * volj
+    end do
+  end do
+  
+end subroutine convert_Nnbr_to_diffTens
 
 
 !TODO - make a GPU version of the neighbour correction later!
@@ -3405,7 +3457,6 @@ subroutine add_neighbour_correction(problem, solution)
       endif
 
       Kdip = Kdip * volj
-
       ! accumulate (Kloc - Kdip) * Mj
       dH = dH + matmul( Kloc - Kdip, Mj * problem%Ms(jidx) )
     end do
@@ -3420,6 +3471,64 @@ subroutine add_neighbour_correction(problem, solution)
 end subroutine add_neighbour_correction
 
 
+subroutine add_neighbour_correction_precomp(problem, solution)
+  ! Finite-size neighbour patch for FMM demag field:
+  ! H += sum_m ( Nnbr(t,m) - Kdip(R_tj)*V ) * M_j
+  implicit none
+  type(MicroMagProblem),  intent(in)    :: problem
+  type(MicroMagSolution), intent(inout) :: solution
+
+  integer  :: ntot, nneigh_max, t, m, jidx
+  real(DP) :: dx, dy, dz, volj
+  real(DP) :: xt, yt, zt, xj, yj, zj
+  real(DP) :: Rvec(3), Kdip(3,3), Kloc(3,3)
+  real(DP) :: dH(3)
+  real(DP) :: Mj(3)
+
+
+  ! --- guards ---
+  if (.not. associated(problem%nbr_idx)) stop 'add_neighbour_correction: nbr_idx not associated'
+  if (.not. associated(problem%Nnbr))    stop 'add_neighbour_correction: Nnbr not associated'
+
+
+  !print *, " Adding neighbour-demag correction to FMM demag field..."
+
+  !ntot       = problem%grid%nx * problem%grid%ny * problem%grid%nz
+  ntot = size(problem%grid%pts, dim=1)
+  !print *, " ntot = ", ntot, " ntot before was", problem%grid%nx * problem%grid%ny * problem%grid%nz
+  nneigh_max = size(problem%nbr_idx, 2)
+  dx = real(problem%grid%dx, DP)
+  dy = real(problem%grid%dy, DP)
+  dz = real(problem%grid%dz, DP)
+  !volj = dx * dy * dz
+
+ !$omp parallel do default(none) &
+ !$omp shared(solution, problem, ntot)  &
+ !$omp private(m,jidx,dH,Mj)
+  do t = 1, ntot
+    dH = 0.0_DP
+
+    !TODO - we could optimize by also storing number of neighbohrs for each and only loop until that 
+    do m = 1, problem%n_nbors(t)  
+      jidx = problem%nbr_idx(t, m) 
+      if (jidx < 0) cycle   ! empty slot (boundary)
+
+      ! neighbour j magnetisation (single -> double)
+      Mj(1) = real(solution%Mx_s(jidx), DP)
+      Mj(2) = real(solution%My_s(jidx), DP)
+      Mj(3) = real(solution%Mz_s(jidx), DP)
+
+      dH = dH + matmul( problem%diffTens(t,m,:,:), Mj * problem%Ms(jidx) )
+    end do
+
+    ! add correction in place (double -> single)
+    solution%HmX(t) = solution%HmX(t) - real(dH(1), kind=SP)
+    solution%HmY(t) = solution%HmY(t) - real(dH(2), kind=SP)
+    solution%HmZ(t) = solution%HmZ(t) - real(dH(3), kind=SP)
+  end do
+ !$omp end parallel do
+
+end subroutine add_neighbour_correction_precomp
 
         !------------------------------------------------------------------------------------------------
     !============================================================================================================

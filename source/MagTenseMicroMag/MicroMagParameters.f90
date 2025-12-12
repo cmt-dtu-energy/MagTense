@@ -178,6 +178,7 @@ include "mkl_dfti.f90"
         integer, dimension(:,:), pointer :: nbr_idx(:,:) => null()    !> Neighbour indices for each target cell
         integer, dimension(:), pointer :: n_nbors(:) => null()
         real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:) => null()
+        real(SP),dimension(:,:,:,:), pointer:: diffTens(:,:,:,:) => null()
 
 
         integer :: dummy_run = 0    !> Flag to indicate whether the demag tensor neighbour test setup has been done
