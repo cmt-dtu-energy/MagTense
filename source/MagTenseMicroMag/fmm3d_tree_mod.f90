@@ -232,7 +232,7 @@ module fmm3d_tree_mod
 
         call self%lfmm3dmain_tree()
         call self%eval_local()
-        call self%eval_direct()
+        !call self%eval_direct()
 
         call dreorderi(3*self%nd,self%nsource,self%gradsort,self%grad,self%isrc)
         call drescale(self%nd*3*self%nsource,self%grad,self%b0inv)
@@ -354,7 +354,7 @@ module fmm3d_tree_mod
         !--------------------------------
         double precision, contiguous, pointer :: sourcesort(:,:)
         double precision, contiguous, pointer :: dipvecsort(:,:,:)
-        double precision, contiguous, pointer :: gradsort(:,:,:)
+        double precision, contiguous, pointer :: gradsort(:,:,:) 
         !----------------
         integer, contiguous, pointer :: nterms(:)
         integer(8), contiguous, pointer :: iaddr(:,:)
@@ -369,9 +369,11 @@ module fmm3d_tree_mod
         !------------------------------------------------
 
     
-        call lndiv(self%eps,self%nsource,0,0,1,2, &
-                &    0,self%ndiv,self%idivflag) 
+        !call lndiv(self%eps,self%nsource,0,0,1,2, &
+        !        &    0,self%ndiv,self%idivflag) 
 
+
+        self%ndiv = 1000
 
         call pts_tree_mem(self%source,self%nsource,self%targ,0,self%idivflag,self%ndiv,self%nlmin, &
             &    self%nlmax,self%iper,self%ifunif,self%nlevels,self%nboxes,self%ltree)
