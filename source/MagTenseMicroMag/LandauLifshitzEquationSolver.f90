@@ -975,16 +975,22 @@ subroutine updateDemagfieldFMM(problem, solution)
 
   !------------------ Map grad -> H (and to single) ----------------
   ! include factor 4pi to match Magtense units
-  !$omp parallel do default(shared)
-  do i = 1, ntot
-    solution%HmX(i) = real( grad(1,1,i) / fourpi, SP )
-    solution%HmY(i) = real( grad(1,2,i) / fourpi, SP )
-    solution%HmZ(i) = real( grad(1,3,i) / fourpi, SP )
-    ! solution%HmX(i) = real( grad(1,i) / fourpi, SP )
-    ! solution%HmY(i) = real( grad(2,i) / fourpi, SP )
-    ! solution%HmZ(i) = real( grad(3,i) / fourpi, SP )
-  end do
-  !$omp end parallel do
+   if (fmm_tree%nboxes > 9) then 
+    !$omp parallel do default(shared)
+    do i = 1, ntot
+      solution%HmX(i) = real( grad(1,1,i) / fourpi, SP )
+      solution%HmY(i) = real( grad(1,2,i) / fourpi, SP )
+      solution%HmZ(i) = real( grad(1,3,i) / fourpi, SP )
+      ! solution%HmX(i) = real( grad(1,i) / fourpi, SP )
+      ! solution%HmY(i) = real( grad(2,i) / fourpi, SP )
+      ! solution%HmZ(i) = real( grad(3,i) / fourpi, SP )
+    end do
+    !$omp end parallel do
+  else
+    solution%HmX = 0.0_SP
+    solution%HmY = 0.0_SP
+    solution%HmZ = 0.0_SP
+  end if
   !-----------------------------------------------------------------
 #if USE_TIMING
   acc_map = acc_map + (walltime() - t1)
@@ -992,7 +998,7 @@ subroutine updateDemagfieldFMM(problem, solution)
 #endif
   !--------------- Add correction from the tiles themselves -------------------
 !print *, " before self correction"
-  call add_self_correction(problem, solution)
+  !call add_self_correction(problem, solution)
   !--------------------------------------------------------------------------
 #if USE_TIMING
   acc_self = acc_self + (walltime() - t1)
@@ -1002,11 +1008,12 @@ subroutine updateDemagfieldFMM(problem, solution)
 !print *, " before neighbour correction"
  !call add_neighbour_correction(problem, solution)
  !call add_neighbour_correction_precomp(problem, solution)
-#if USE_CUDA
-  call add_neighbour_correction_cuda(problem, solution)
-#else
- call add_neighbour_correction_mklsparse(problem, solution)
-#endif
+call add_near_field(problem, solution)
+! #if USE_CUDA
+!   call add_neighbour_correction_cuda(problem, solution)
+! #else
+!  call add_neighbour_correction_mklsparse(problem, solution)
+! #endif
   !--------------------------------------------------------------------------
 #if USE_TIMING
   acc_neigh = acc_neigh + (walltime() - t1)
@@ -3212,12 +3219,13 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
     end do
   end do
 
-  nneigh_max = maxval(problem%n_nbors)
+  nneigh_max = maxval(problem%n_nbors) 
+  nneigh_max = nneigh_max + 1 ! To include self 
 
   ! Allocate / reset nbr_idx
   if (associated(problem%nbr_idx)) nullify(problem%nbr_idx)
   allocate(problem%nbr_idx(ntot, nneigh_max))
-  problem%nbr_idx = -1
+  !problem%nbr_idx = -1
 
   !===========================
   ! Pass 2: fill neighbour ids
@@ -3241,7 +3249,7 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
 
           do p_s = jstart, jend
             j_idx = tree%isrc(p_s)
-            if (j_idx == t_idx) cycle   ! exclude self
+            !if (j_idx == t_idx) cycle   ! exclude self
             cnt = cnt + 1
             if (cnt <= nneigh_max) then
               problem%nbr_idx(t_idx, cnt) = j_idx
@@ -3254,7 +3262,7 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
         ! overwrite with exact count (robust, avoids relying on the "-1 if jbox==ibox" assumption)
         problem%n_nbors(t_idx) = cnt
 
-      end do
+      end do 
     end do
   end do
 
@@ -3518,7 +3526,6 @@ subroutine convert_Nnbr_to_diffTens(problem)
       else
           volj = problem%grid%abc(jidx,1) * problem%grid%abc(jidx,2) * problem%grid%abc(jidx,3)
       endif
-
 
 
       !problem%diffTens(t, m, :,:) = Kloc - Kdip * volj  ! correction compared to dipole 
