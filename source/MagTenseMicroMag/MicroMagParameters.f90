@@ -180,6 +180,10 @@ include "mkl_dfti.f90"
         real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:) => null()
         real(SP),dimension(:,:,:,:), pointer:: diffTens(:,:,:,:) => null()
 
+        type(MagTenseSparse), dimension(6) :: K_nbrcorr
+        logical :: K_nbrcorr_built = .false.
+        type(matrix_descr) :: K_nbrcorr_descr
+
 
         integer :: dummy_run = 0    !> Flag to indicate whether the demag tensor neighbour test setup has been done
 
