@@ -106,17 +106,21 @@
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
         call displayGUIMessage( 'Copying to CUDA' )
 #if USE_CUDA
+#if USE_FMM3D
+        call displayGUIMessage( 'copying nbr_corr for FMM nbor correction')  
+        call cudaInit_sparse( gb_problem%K_nbrcorr )        
+        !TODO maybe move this 
+#else
         !Initialize the Cuda arrays and load the demag tensors into the GPU memory
         if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
-           
             !If the matrices are sparse
             call cudaInit_sparse( gb_problem%K_s )        
             
         else
             !if the matrices are dense
             call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
-            
         endif
+#endif
 #else
         call displayGUIMessage( 'MagTense not compiled with CUDA - exiting!' )
         stop
@@ -877,6 +881,7 @@ subroutine updateDemagfieldFMM(problem, solution)
   allocate(pot(1, ntot))
   allocate(dipvec(1, 3, ntot))
   allocate(grad(1, 3, ntot))
+  grad(:,:,:) = 0.0_DP 
 !   allocate(dipvec(3, ntot))
 !   allocate(grad(3, ntot))
   !------------------------------------------------------------
@@ -950,11 +955,12 @@ subroutine updateDemagfieldFMM(problem, solution)
 
    call fmm_tree%build_tree( source, eps_fmm , ier)
  !   print *, " after build tree"
-   call fmm_tree%make_and_eval(dipvec, grad)
-  !print *, " after make and eval"
 
+   !------- only run if number of boxes > 9 -----------
+   if (fmm_tree%nboxes > 9) then
+       call fmm_tree%make_and_eval(dipvec, grad)
+   end if
 
-  !print *, " done with tree"
 
 
   if (ier /= 0) then
@@ -995,7 +1001,12 @@ subroutine updateDemagfieldFMM(problem, solution)
   !------------- add correction from neighbouring tiles ---------------------
 !print *, " before neighbour correction"
  !call add_neighbour_correction(problem, solution)
- call add_neighbour_correction_precomp(problem, solution)
+ !call add_neighbour_correction_precomp(problem, solution)
+#if USE_CUDA
+  call add_neighbour_correction_cuda(problem, solution)
+#else
+ call add_neighbour_correction_mklsparse(problem, solution)
+#endif
   !--------------------------------------------------------------------------
 #if USE_TIMING
   acc_neigh = acc_neigh + (walltime() - t1)
@@ -1007,6 +1018,7 @@ subroutine updateDemagfieldFMM(problem, solution)
     !------------------ Cleanup -------------------------------------
   if (.not. fmm_tree%keep_tree) then
       call fmm_tree%dealloc()
+
       deallocate( fmm_tree )
       nullify(solution%fmm_tree)
   end if
@@ -2267,7 +2279,7 @@ end subroutine updateDemagfieldFMM_old
     !> Converts the loaded information from Matlab in CSR 
     !> format to a CSR MKL type
     !---------------------------------------------------------------------------   
-    subroutine ConvertExchangeTerm3D_NonUniform(grid, A)
+    subroutine ConvertExchangeTerm3D_NonUniform(grid, A) 
     type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
     type(sparse_matrix_t),intent(out) :: A            !> The returned matrix from the sparse matrix creator
                 
@@ -3143,6 +3155,113 @@ end subroutine list_debug_print
     end subroutine BuildNeighbourList
 
 
+subroutine BuildNeighbourList_FromTree(problem, tree)
+  use fmm3d_tree_mod, only: FMM3DTree
+  implicit none
+  type(MicroMagProblem), intent(inout) :: problem
+  type(FMM3DTree),       intent(in)    :: tree
+
+  integer :: ntot, nneigh_max
+  integer :: ilev, ibox, i, jbox
+  integer :: istarts, iends, jstart, jend
+  integer :: p_t, p_s, t_idx, j_idx
+  integer :: nb, cnt
+
+  ! --- basic sanity ---
+  if (.not. tree%is_built) stop "BuildNeighbourList_FromTree: tree not built"
+  if (.not. associated(tree%laddr))  stop "BuildNeighbourList_FromTree: tree%laddr not associated"
+  if (.not. associated(tree%isrcse)) stop "BuildNeighbourList_FromTree: tree%isrcse not associated"
+  if (.not. associated(tree%isrc))   stop "BuildNeighbourList_FromTree: tree%isrc not associated"
+  if (.not. associated(tree%nlist1)) stop "BuildNeighbourList_FromTree: tree%nlist1 not associated"
+  if (.not. associated(tree%list1))  stop "BuildNeighbourList_FromTree: tree%list1 not associated"
+
+  ntot = tree%nsource   ! should match size(problem%grid%pts,1) in your usage
+
+  ! Allocate / reset n_nbors
+  if (associated(problem%n_nbors)) nullify(problem%n_nbors)
+  allocate(problem%n_nbors(ntot))
+  problem%n_nbors = 0
+
+  !===========================
+  ! Pass 1: count neighbours
+  !===========================
+  do ilev = 0, tree%nlevels
+    do ibox = tree%laddr(1,ilev), tree%laddr(2,ilev)
+
+      istarts = tree%isrcse(1,ibox)
+      iends   = tree%isrcse(2,ibox)
+      if (iends < istarts) cycle
+
+      ! number of sources in all list1 boxes (same for all targets in this ibox),
+      ! minus 1 for self if ibox is included in its own list1.
+      nb = 0
+      do i = 1, tree%nlist1(ibox)
+        jbox   = tree%list1(i,ibox)
+        jstart = tree%isrcse(1,jbox)
+        jend   = tree%isrcse(2,jbox)
+        if (jend >= jstart) nb = nb + (jend - jstart + 1)
+        if (jbox == ibox)   nb = nb - 1
+      end do
+      if (nb < 0) nb = 0
+
+      do p_t = istarts, iends
+        t_idx = tree%isrc(p_t)          ! original index for this target
+        problem%n_nbors(t_idx) = nb
+      end do
+
+    end do
+  end do
+
+  nneigh_max = maxval(problem%n_nbors)
+
+  ! Allocate / reset nbr_idx
+  if (associated(problem%nbr_idx)) nullify(problem%nbr_idx)
+  allocate(problem%nbr_idx(ntot, nneigh_max))
+  problem%nbr_idx = -1
+
+  !===========================
+  ! Pass 2: fill neighbour ids
+  !===========================
+  do ilev = 0, tree%nlevels
+    do ibox = tree%laddr(1,ilev), tree%laddr(2,ilev)
+
+      istarts = tree%isrcse(1,ibox)
+      iends   = tree%isrcse(2,ibox)
+      if (iends < istarts) cycle
+
+      do p_t = istarts, iends
+        t_idx = tree%isrc(p_t)
+        cnt   = 0
+
+        do i = 1, tree%nlist1(ibox)
+          jbox   = tree%list1(i,ibox)
+          jstart = tree%isrcse(1,jbox)
+          jend   = tree%isrcse(2,jbox)
+          if (jend < jstart) cycle
+
+          do p_s = jstart, jend
+            j_idx = tree%isrc(p_s)
+            if (j_idx == t_idx) cycle   ! exclude self
+            cnt = cnt + 1
+            if (cnt <= nneigh_max) then
+              problem%nbr_idx(t_idx, cnt) = j_idx
+            else
+              stop "BuildNeighbourList_FromTree: cnt exceeded nneigh_max (unexpected)"
+            end if
+          end do
+        end do
+
+        ! overwrite with exact count (robust, avoids relying on the "-1 if jbox==ibox" assumption)
+        problem%n_nbors(t_idx) = cnt
+
+      end do
+    end do
+  end do
+
+end subroutine BuildNeighbourList_FromTree
+
+
+
 
 
 subroutine BuildNeighbourDemagTensorNonUniform(problem, radius_cells)
@@ -3196,6 +3315,13 @@ subroutine BuildNeighbourDemagTensorNonUniform(problem, radius_cells)
   real(DP), allocatable :: Nout(:,:,:,:)  ! (m, 1, 3, 3)
   integer :: d
 
+
+  !-----------
+  integer :: ier, i 
+  type(FMM3DTree), pointer :: fmm_tree
+  real(DP), contiguous, pointer :: sources(:,:)
+  real(DP) :: eps_fmm
+
   !---------------------------------------
   ! 1. Determine ntot from pts array
   !---------------------------------------
@@ -3227,27 +3353,42 @@ subroutine BuildNeighbourDemagTensorNonUniform(problem, radius_cells)
   !call BuildNeighbourList(offset, size_cell, pitch, radius_cells, &
   !                        nbr_idx_loc, nneigh_max)
 
- call BuildNeighbourList(offset, size_cell, radius_cells, &
-                          nbr_idx_loc, nneigh_max, n_nbors)
-  !-----------------------------------------------
 
-  !print *, " Non-uniform neighbour demag: nneigh_max = ", nneigh_max
-  ! Attach neighbour indices to problem: allocate and copy
-  ! allocate(problem%nbr_idx(ntot, max(1, nneigh_max)))
 
-  problem%n_nbors => n_nbors
-  problem%nbr_idx => nbr_idx_loc
-  ! print *, "done allocating nbr_idx"
-  ! print *, " shape nbr_idx_loc", size(nbr_idx_loc,1), size(nbr_idx_loc,2), " shape problem%nbr_idx", size(problem%nbr_idx,1), size(problem%nbr_idx,2)
-  ! problem%nbr_idx(:,:) = -1
-  ! print *, " after setting "
-  ! if (nneigh_max > 0) then
-  !   !problem%nbr_idx(:, 1:nneigh_max) = nbr_idx_loc(:,:)
-  !   problem%nbr_idx(:, :) = nbr_idx_loc(:,:)
-  ! end if
-  ! print *, " after copying "
+  !------------------- built neighbour list based on list1 in tree --------------
+  !        first builts a temporary tree to get the list
+  !        then stores all points in list 1 for each tile as a neighbour list
+  allocate(fmm_tree)
+  allocate(sources(3,ntot))
+  do i = 1, ntot
+      !------------------ positions -> FMM (3, N) ------------------
+      sources(1,i) = real(problem%grid%pts(i,1), DP)
+      sources(2,i) = real(problem%grid%pts(i,2), DP)
+      sources(3,i) = real(problem%grid%pts(i,3), DP)
+      !------------------------------------------------------------
+  end do
+  eps_fmm = 1.0e-4_DP
+  call fmm_tree%build_tree( sources, eps_fmm , ier)
+  call BuildNeighbourList_FromTree(problem, fmm_tree)
+  nneigh_max = maxval(problem%n_nbors) 
+  !print *, " nbor list built  from tree has ", sum(problem%n_nbors), " total nbor"
+  !print *, " max nbor = ", maxval(problem%n_nbors)
+  deallocate(fmm_tree)
+  deallocate(sources)
+  !---------------------------------------------------------------------------------
+
+
+  !------------- built neighbour list based on geometry ----------------------------
+  !            first finds all "touching" tiles
+  !            then iteratively adds all nbors nbors 'radius_cell'-times to get full nbor list
+!  call BuildNeighbourList(offset, size_cell, radius_cells, &
+!                           nbr_idx_loc, nneigh_max, n_nbors)
+!   print *, " nbor list built from geometric has ", sum(n_nbors), " total nbor"
+!   print *, " max nbor = ", nneigh_max
+  ! problem%n_nbors => n_nbors
+  ! problem%nbr_idx => nbr_idx_loc
+  !--------------------------------------------------------------------------------
   nbr_idx_p => problem%nbr_idx
-  !print *, " done copying nbr_idx"
 
   ! If no neighbours at all, allocate empty Nnbr and bail
   if (nneigh_max <= 0) then
@@ -3377,10 +3518,16 @@ subroutine convert_Nnbr_to_diffTens(problem)
       else
           volj = problem%grid%abc(jidx,1) * problem%grid%abc(jidx,2) * problem%grid%abc(jidx,3)
       endif
-      problem%diffTens(t, m, :,:) = Kloc - Kdip * volj
+
+
+
+      !problem%diffTens(t, m, :,:) = Kloc - Kdip * volj  ! correction compared to dipole 
+      problem%diffTens(t, m, :,:) = Kloc  ! full tensor - if eval_direct is never called 
     end do
   end do
-  
+
+
+  call build_nbrcorr_sparse_from_diffTens(problem)
 end subroutine convert_Nnbr_to_diffTens
 
 
@@ -3529,6 +3676,332 @@ subroutine add_neighbour_correction_precomp(problem, solution)
  !$omp end parallel do
 
 end subroutine add_neighbour_correction_precomp
+
+
+subroutine build_nbrcorr_sparse_from_diffTens(problem)
+  implicit none
+  type(MicroMagProblem), intent(inout) :: problem
+
+  integer :: ntot, t, m, j, row
+  integer :: nb_valid, nnz_total
+  integer :: pos
+  integer :: stat, idx
+
+  real(SP) :: v_xx, v_xy, v_xz, v_yy, v_yz, v_zz
+
+  ! Guards
+  if (.not. associated(problem%nbr_idx))   stop "build_nbrcorr_sparse_from_diffTens: nbr_idx not associated"
+  if (.not. associated(problem%n_nbors))  stop "build_nbrcorr_sparse_from_diffTens: n_nbors not associated"
+  if (.not. associated(problem%diffTens)) stop "build_nbrcorr_sparse_from_diffTens: diffTens not associated"
+
+  ntot = size(problem%grid%pts, dim=1)
+
+  ! Destroy if already built
+  if (problem%K_nbrcorr_built) call destroy_nbrcorr_sparse(problem)
+
+  ! Count nnz: one scalar entry per valid neighbour link
+  nnz_total = 0
+  do t = 1, ntot
+    do m = 1, problem%n_nbors(t)
+      j = problem%nbr_idx(t,m)
+      if (j < 0) cycle
+      nnz_total = nnz_total + 1
+    end do
+  end do
+
+  ! Allocate all 6 matrices
+  do idx = 1, 6
+    problem%K_nbrcorr(idx)%nrows   = ntot
+    problem%K_nbrcorr(idx)%ncols   = ntot
+    problem%K_nbrcorr(idx)%nvalues = nnz_total
+
+    allocate(problem%K_nbrcorr(idx)%rows_start(ntot))
+    allocate(problem%K_nbrcorr(idx)%rows_end(ntot))
+    allocate(problem%K_nbrcorr(idx)%cols(nnz_total))
+    allocate(problem%K_nbrcorr(idx)%values(nnz_total))
+
+    problem%K_nbrcorr(idx)%rows_start = 0
+    problem%K_nbrcorr(idx)%rows_end   = 0
+    problem%K_nbrcorr(idx)%cols       = 0
+    problem%K_nbrcorr(idx)%values     = 0.0_SP
+    !problem%K_nbrcorr(idx)%A          = SPARSE_MATRIX_T_NULL
+  end do
+
+  ! Build row pointers (rows_start/rows_end) – identical for all 6
+  pos = 1
+  do t = 1, ntot
+    nb_valid = 0
+    do m = 1, problem%n_nbors(t)
+      if (problem%nbr_idx(t,m) >= 0) nb_valid = nb_valid + 1
+    end do
+
+    ! row t has nb_valid entries
+    do idx = 1, 6
+      problem%K_nbrcorr(idx)%rows_start(t) = pos
+      problem%K_nbrcorr(idx)%rows_end(t)   = pos + nb_valid   ! one-past-end
+    end do
+
+    pos = pos + nb_valid
+  end do
+
+  if (pos /= nnz_total + 1) stop "build_nbrcorr_sparse_from_diffTens: nnz mismatch"
+
+  ! Fill cols + values
+  do t = 1, ntot
+    pos = problem%K_nbrcorr(1)%rows_start(t)
+
+    do m = 1, problem%n_nbors(t)
+      j = problem%nbr_idx(t,m)
+      if (j < 0) cycle
+
+      ! Column index is source cell index
+      do idx = 1, 6
+        problem%K_nbrcorr(idx)%cols(pos) = j
+      end do
+
+      ! Extract the 6 unique components from diffTens(t,m,:,:)
+      v_xx = problem%diffTens(t,m,1,1)
+      v_xy = problem%diffTens(t,m,1,2)
+      v_xz = problem%diffTens(t,m,1,3)
+      v_yy = problem%diffTens(t,m,2,2)
+      v_yz = problem%diffTens(t,m,2,3)
+      v_zz = problem%diffTens(t,m,3,3)
+
+      problem%K_nbrcorr(1)%values(pos) = v_xx
+      problem%K_nbrcorr(2)%values(pos) = v_xy
+      problem%K_nbrcorr(3)%values(pos) = v_xz
+      problem%K_nbrcorr(4)%values(pos) = v_yy
+      problem%K_nbrcorr(5)%values(pos) = v_yz
+      problem%K_nbrcorr(6)%values(pos) = v_zz
+
+      pos = pos + 1
+    end do
+
+    if (pos /= problem%K_nbrcorr(1)%rows_end(t)) stop "build_nbrcorr_sparse_from_diffTens: row fill mismatch"
+  end do
+
+  ! Create MKL handles
+  do idx = 1, 6
+    stat = mkl_sparse_s_create_csr( problem%K_nbrcorr(idx)%A, SPARSE_INDEX_BASE_ONE, &
+                                   ntot, ntot, &
+                                   problem%K_nbrcorr(idx)%rows_start, problem%K_nbrcorr(idx)%rows_end, &
+                                   problem%K_nbrcorr(idx)%cols, problem%K_nbrcorr(idx)%values )
+    if (stat /= SPARSE_STATUS_SUCCESS) stop "build_nbrcorr_sparse_from_diffTens: mkl_sparse_s_create_csr failed"
+
+    stat = mkl_sparse_optimize(problem%K_nbrcorr(idx)%A)
+    if (stat /= SPARSE_STATUS_SUCCESS) stop "build_nbrcorr_sparse_from_diffTens: mkl_sparse_optimize failed"
+  end do
+
+  ! Descriptor (GENERAL) – store once in problem for reuse
+  problem%K_nbrcorr_descr%type = SPARSE_MATRIX_TYPE_GENERAL
+
+  problem%K_nbrcorr_built = .true.
+
+end subroutine build_nbrcorr_sparse_from_diffTens
+
+
+subroutine destroy_nbrcorr_sparse(problem)
+  implicit none
+  type(MicroMagProblem), intent(inout) :: problem
+
+  integer :: idx, stat
+
+  do idx = 1, 6
+    ! if (problem%K_nbrcorr(idx)%A .ne. SPARSE_MATRIX_T_NULL) then
+    !   stat = mkl_sparse_destroy(problem%K_nbrcorr(idx)%A)
+    !   problem%K_nbrcorr(idx)%A = SPARSE_MATRIX_T_NULL
+    ! end if
+
+    if (allocated(problem%K_nbrcorr(idx)%rows_start)) deallocate(problem%K_nbrcorr(idx)%rows_start)
+    if (allocated(problem%K_nbrcorr(idx)%rows_end))   deallocate(problem%K_nbrcorr(idx)%rows_end)
+    if (allocated(problem%K_nbrcorr(idx)%cols))       deallocate(problem%K_nbrcorr(idx)%cols)
+    if (allocated(problem%K_nbrcorr(idx)%values))     deallocate(problem%K_nbrcorr(idx)%values)
+
+    problem%K_nbrcorr(idx)%nrows   = 0
+    problem%K_nbrcorr(idx)%ncols   = 0
+    problem%K_nbrcorr(idx)%nvalues = 0
+  end do
+
+  problem%K_nbrcorr_built = .false.
+
+end subroutine destroy_nbrcorr_sparse
+
+
+
+subroutine add_neighbour_correction_mklsparse(problem, solution)
+  implicit none
+  type(MicroMagProblem),  intent(in)    :: problem
+  type(MicroMagSolution), intent(inout) :: solution
+
+  integer :: ntot, stat
+  real(SP) :: alpha, beta
+  real(SP), allocatable :: mxm(:), mym(:), mzm(:)
+  real(SP), allocatable :: temp(:)
+
+  if (.not. problem%K_nbrcorr_built) stop "add_neighbour_correction_mklsparse: K_nbrcorr not built"
+
+  ntot = size(problem%grid%pts, dim=1)
+
+  allocate(mxm(ntot), mym(ntot), mzm(ntot))
+  allocate(temp(ntot))
+
+  ! Pre-scale magnetisation by Ms (as you do for CUDA)
+  mxm = solution%Mx_s * real(problem%Ms, SP)
+  mym = solution%My_s * real(problem%Ms, SP)
+  mzm = solution%Mz_s * real(problem%Ms, SP)
+
+  alpha = 1.0_SP
+
+  ! ---------------- Hx correction = xx*Mx + xy*My + xz*Mz ----------------
+  beta = 0.0_SP
+  stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(1)%A, problem%K_nbrcorr_descr, mxm, beta, temp)
+  beta = 1.0_SP
+  stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(2)%A, problem%K_nbrcorr_descr, mym, beta, temp)
+  stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(3)%A, problem%K_nbrcorr_descr, mzm, beta, temp)
+
+  solution%HmX = solution%HmX - temp
+
+  ! ---------------- Hy correction = xy*Mx + yy*My + yz*Mz ----------------
+  beta = 0.0_SP
+  stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(2)%A, problem%K_nbrcorr_descr, mxm, beta, temp)
+  beta = 1.0_SP
+  stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(4)%A, problem%K_nbrcorr_descr, mym, beta, temp)
+  stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(5)%A, problem%K_nbrcorr_descr, mzm, beta, temp)
+
+  solution%HmY = solution%HmY - temp
+
+  ! ---------------- Hz correction = xz*Mx + yz*My + zz*Mz ----------------
+  beta = 0.0_SP
+  stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(3)%A, problem%K_nbrcorr_descr, mxm, beta, temp)
+  beta = 1.0_SP
+  stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(5)%A, problem%K_nbrcorr_descr, mym, beta, temp)
+  stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(6)%A, problem%K_nbrcorr_descr, mzm, beta, temp)
+
+  solution%HmZ = solution%HmZ - temp
+
+  deallocate(mxm, mym, mzm, temp)
+
+end subroutine add_neighbour_correction_mklsparse
+
+
+
+
+!>======================================================================
+!> Add demagnitization field from nearfield 
+!> uses K_nbrcorr, which depending on the setup contains either
+!>      1. The correction tensors (Nnbr - Kdip*V) stored in sparse format
+!>      2. The demagnetization tensor Nnbr stored in sparse format
+!> adds computed field to the existing solution%H
+!>======================================================================
+subroutine add_near_field(problem, solution)
+  implicit none
+  type(MicroMagProblem),  intent(in)    :: problem
+  type(MicroMagSolution), intent(inout) :: solution
+
+  !-----------------------------------------------------------------------------
+  real(SP), contiguous, pointer :: mxm(:), mym(:), mzm(:)
+  real(SP), contiguous, pointer :: hx_tmp(:), hy_tmp(:), hz_tmp(:), tmp(:)
+  integer :: ntot
+  real(SP) :: pref
+  integer :: stat
+  real(SP) :: alpha, beta
+
+
+  ntot = size(problem%grid%pts, dim=1)
+
+#if USE_CUDA
+  allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) , mxm(ntot), mym (ntot), mzm (ntot) )
+    mxm = solution%Mx_s * real(problem%Ms, SP)
+    mym = solution%My_s * real(problem%Ms, SP)
+    mzm = solution%Mz_s * real(problem%Ms, SP)
+    hx_tmp = 0.0_SP
+    hy_tmp = 0.0_SP
+    hz_tmp = 0.0_SP
+
+    pref = sngl(-1)
+    call cudaMatrVecMult_sparse( mxm , mym , mzm , hx_tmp, hy_tmp, hz_tmp, pref )
+
+    solution%HmX = solution%HmX - hx_tmp
+    solution%HmY = solution%HmY - hy_tmp
+    solution%HmZ = solution%HmZ - hz_tmp
+
+    deallocate(hx_tmp, hy_tmp, hz_tmp, mxm, mym, mzm)
+#else
+      allocate(mxm(ntot), mym(ntot), mzm(ntot))
+    allocate(temp(ntot))
+
+    ! Pre-scale magnetisation by Ms (as you do for CUDA)
+    mxm = solution%Mx_s * real(problem%Ms, SP)
+    mym = solution%My_s * real(problem%Ms, SP)
+    mzm = solution%Mz_s * real(problem%Ms, SP)
+
+    alpha = 1.0_SP
+    ! ---------------- Hx correction = xx*Mx + xy*My + xz*Mz ----------------
+    beta = 0.0_SP
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(1)%A, problem%K_nbrcorr_descr, mxm, beta, temp)
+    beta = 1.0_SP
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(2)%A, problem%K_nbrcorr_descr, mym, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(3)%A, problem%K_nbrcorr_descr, mzm, beta, temp)
+
+    solution%HmX = solution%HmX - temp
+    ! ---------------- Hy correction = xy*Mx + yy*My + yz*Mz ----------------
+    beta = 0.0_SP
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(2)%A, problem%K_nbrcorr_descr, mxm, beta, temp)
+    beta = 1.0_SP
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(4)%A, problem%K_nbrcorr_descr, mym, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(5)%A, problem%K_nbrcorr_descr, mzm, beta, temp)
+
+    solution%HmY = solution%HmY - temp
+    ! ---------------- Hz correction = xz*Mx + yz*My + zz*Mz ----------------
+    beta = 0.0_SP
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(3)%A, problem%K_nbrcorr_descr, mxm, beta, temp)
+    beta = 1.0_SP
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(5)%A, problem%K_nbrcorr_descr, mym, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(6)%A, problem%K_nbrcorr_descr, mzm, beta, temp)
+
+    solution%HmZ = solution%HmZ - temp
+    deallocate(mxm, mym, mzm, temp)
+#endif
+
+end subroutine add_near_field
+
+
+subroutine add_neighbour_correction_cuda(problem, solution)
+  implicit none
+  type(MicroMagProblem),  intent(in)    :: problem
+  type(MicroMagSolution), intent(inout) :: solution
+
+  !-----------------------------------------------------------------------------
+  real(SP), contiguous, pointer :: mxm(:), mym(:), mzm(:)
+  real(SP), contiguous, pointer :: hx_tmp(:), hy_tmp(:), hz_tmp(:)
+  integer :: ntot
+  real(SP) :: pref
+  ! --- TO DO: implement GPU version of neighbour correction ---
+
+
+  ntot = size(problem%grid%pts, dim=1)
+
+
+  allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) , mxm(ntot), mym (ntot), mzm (ntot) )
+  mxm = solution%Mx_s * real(problem%Ms, SP)
+  mym = solution%My_s * real(problem%Ms, SP)
+  mzm = solution%Mz_s * real(problem%Ms, SP)
+  hx_tmp = 0.0_SP
+  hy_tmp = 0.0_SP
+  hz_tmp = 0.0_SP
+
+  pref = sngl(-1)
+  call cudaMatrVecMult_sparse( mxm , mym , mzm , hx_tmp, hy_tmp, hz_tmp, pref )
+
+
+  solution%HmX = solution%HmX - hx_tmp
+  solution%HmY = solution%HmY - hy_tmp
+  solution%HmZ = solution%HmZ - hz_tmp
+
+  deallocate(hx_tmp, hy_tmp, hz_tmp, mxm, mym, mzm)
+
+end subroutine add_neighbour_correction_cuda
+
 
         !------------------------------------------------------------------------------------------------
     !============================================================================================================
