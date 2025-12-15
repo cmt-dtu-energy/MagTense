@@ -373,7 +373,7 @@ module fmm3d_tree_mod
         !        &    0,self%ndiv,self%idivflag) 
 
 
-        self%ndiv = 1000
+        self%ndiv = 200
 
         call pts_tree_mem(self%source,self%nsource,self%targ,0,self%idivflag,self%ndiv,self%nlmin, &
             &    self%nlmax,self%iper,self%ifunif,self%nlevels,self%nboxes,self%ltree)
