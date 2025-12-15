@@ -47,6 +47,8 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 
     integer, intent(in) :: dummy_run
 
+    logical :: ex
+
 
     problem%dummy_run = dummy_run
 
@@ -149,11 +151,17 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     
     !flag whether the demag tensor should be loaded
     problem%demagTensorLoadState = N_load
-    
     !File for loading the demag tensor to a file on disk (has to have length>2)
     if ( problem%demagTensorLoadState .gt. 2 ) then
-        !Length of the file name
-        problem%demagTensorFileIn = N_file_in
+
+        inquire(file=trim(N_file_in), exist=ex)
+        if (.not. ex ) then
+            problem%demagTensorLoadState = 0
+        else
+            !Length of the file name
+            problem%demagTensorFileIn = N_file_in
+
+        end if 
     endif
     
     problem%setTimeDisplay = 100
