@@ -60,6 +60,7 @@ def max_energy_product(
 
 
 def grain_hysteresis(
+    use_fmm: bool = True,
     cuda: bool = False,
     cvode: bool = False,
     mesh_file: str = "Grid_rasBase_5_nGrains_5_nRef_3_dG_5e-09.mat",
@@ -77,6 +78,9 @@ def grain_hysteresis(
     """
 
     print("Loading data from ", mesh_file)
+
+    fmm_eps = 1e-4
+    fmm_cells_per_node = 50 if use_fmm else 0
 
     mu0 = 4 * np.pi * 1e-7
     Hyst_dir = np.array([0.0, 0.0, 1.0])
@@ -98,31 +102,44 @@ def grain_hysteresis(
 
 
     exma_file = mesh_file[:-4] + "_exMa.npz"
+    demag_file = mesh_file[:-4] + "_demag.bin"
     if not Path(exma_file).exists():
         print("File {} does not exist.".format(exma_file))
         print("Generating exchange matrix and saving to file...")
         rng = np.random.default_rng(42)
-        problem_ini = setup_grain_problem_from_matfile(
-            fname=mesh_file,
-            cuda=cuda,
-            cvode=cvode,
-            t_end=40e-9,
-            nt=2,
-            Hyst_dir=Hyst_dir,
-            rng=rng,
-        )
+        if cuda:
+            problem_ini = setup_grain_problem_from_matfile(
+                fname=mesh_file,
+                cuda=cuda,
+                cvode=cvode,
+                t_end=40e-9,
+                nt=2,
+                Hyst_dir=Hyst_dir,
+                rng=rng,
+                input_file_name=demag_file,
+            )
+        else:
+            problem_ini = setup_grain_problem_from_matfile(
+                fname=mesh_file,
+                cuda=cuda,
+                cvode=cvode,
+                t_end=40e-9,
+                nt=2,
+                Hyst_dir=Hyst_dir,
+                rng=rng,
+            )
+
+
+
         problem_ini.exch_presize = 3 * problem_ini.nt * len(steps)
         problem_ini.dummy_run = 1
-        #def h_ext_fct_init(t) -> np.ndarray:
-        #    return np.expand_dims(np.where(t < 1e-09, 1e-09 - t, 0), axis=1) * Hyst_dir*mu0
-        #problem_ini.exch_presize = 22
+        problem_ini.fmm_cells_per_node = fmm_cells_per_node if use_fmm else 0
+        problem_ini.fmm_eps = fmm_eps
+
+
+
         res_ini = problem_ini.run_hysteresis(H_ext=H_ext)
-        #res_ini = problem_ini.run_simulation(
-        #    t_end=40e-9,
-        #    nt=2,
-        #    fct_h_ext=h_ext_fct_init,
-        #    nt_h_ext=len(steps),
-        #)
+   
         exch_nval, ExchMat_r, ExchMat_c, ExchMat_v, exch_nrow, exch_ncols = res_ini[7:]
         print("storing setup...")
         print("exch_nval = ", exch_nval)
@@ -142,30 +159,57 @@ def grain_hysteresis(
             exch_ncols=exch_ncols
         )   
         print(f"Saved exchange matrix to {exma_file}")
+    else:
+        print(f"Loading exchange matrix from {exma_file}...")
+
+    
     exch_nval, ExchMat_r, ExchMat_c, ExchMat_v, exch_nrow, exch_ncols = np.load(
         exma_file, allow_pickle=True
     ).values()
-
+        
 
     rng = np.random.default_rng(42)
-    problem = setup_grain_problem_from_matfile(
-        fname=mesh_file,
-        cuda=cuda,
-        cvode=cvode,
-        t_end=40e-9,
-        nt=2,
-        Hyst_dir=Hyst_dir,
-        rng=rng,
-        exch_val=ExchMat_v,
-        exch_rows=ExchMat_r,
-        exch_col=ExchMat_c,
-        exch_nval=exch_nval,
-        exch_nrow=exch_nrow,
-        exch_ncols=exch_ncols,
-        passexch=1
-    )
+
+    if cuda:
+        problem = setup_grain_problem_from_matfile(
+            fname=mesh_file,
+            cuda=cuda,
+            cvode=cvode,
+            t_end=40e-9,
+            nt=2,
+            Hyst_dir=Hyst_dir,
+            rng=rng,
+            exch_val=ExchMat_v,
+            exch_rows=ExchMat_r,
+            exch_col=ExchMat_c,
+            exch_nval=exch_nval,
+            exch_nrow=exch_nrow,
+            exch_ncols=exch_ncols,
+            passexch=1,
+            input_file_name=demag_file,
+        )
+    else:
+        problem = setup_grain_problem_from_matfile(
+            fname=mesh_file,
+            cuda=cuda,
+            cvode=cvode,
+            t_end=40e-9,
+            nt=2,
+            Hyst_dir=Hyst_dir,
+            rng=rng,
+            exch_val=ExchMat_v,
+            exch_rows=ExchMat_r,
+            exch_col=ExchMat_c,
+            exch_nval=exch_nval,
+            exch_nrow=exch_nrow,
+            exch_ncols=exch_ncols,
+            passexch=1,
+        )
+
     problem.exch_presize = 3 * problem.nt * len(steps)
     problem.dummy_run = 0
+    problem.fmm_cells_per_node = fmm_cells_per_node if use_fmm else 0
+    problem.fmm_eps = fmm_eps
 
     start_time = time.time()
     res = problem.run_hysteresis(H_ext=H_ext)
@@ -228,7 +272,9 @@ def grain_hysteresis(
 
     mesh_path = Path(mesh_file)
     stem = mesh_path.stem
-    backend_tag = "_cuda" if cuda else "_fmm"
+    #backend_tag = "_cuda" if cuda else "_fmm"
+    backend_tag = "_fmm" if use_fmm else "_cuda"
+
     root_name = stem + backend_tag
 
     # Use figpath (default ../figs relative to this file)
@@ -280,7 +326,8 @@ if __name__ == "__main__":
     default_figpath = Path(__file__).parent.absolute().joinpath("..", "figs")
 
     grain_hysteresis(
-        cuda=False,
+        use_fmm=True,
+        cuda=True, #NOTE - with new FMM implementation that uses CUDA for near field we have to set CUDA true...
         cvode=False,
         mesh_file="Grid_rasBase_5_nGrains_5_nRef_3_dG_5e-09.mat",
         #mesh_file="Grid_rasBase_5_nGrains_25_nRef_3_dG_3.75e-09.mat",
