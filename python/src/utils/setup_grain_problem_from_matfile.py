@@ -19,7 +19,8 @@ def setup_grain_problem_from_matfile(
                     exch_nval: int = 1,
                     exch_nrow: int = 1,
                     exch_ncols: int = 1,
-                    passexch : int = 0
+                    passexch : int = 0,
+                    input_file_name : str = "t"
                     ) -> MicromagProblem:
     
 
@@ -79,7 +80,8 @@ def setup_grain_problem_from_matfile(
         exch_nval=exch_nval,
         exch_nrow=exch_nrow,
         exch_ncols=exch_ncols,
-        passexch=passexch
+        passexch=passexch,
+        filename=input_file_name,
     )
     #-------------------------------------------------------------
 
