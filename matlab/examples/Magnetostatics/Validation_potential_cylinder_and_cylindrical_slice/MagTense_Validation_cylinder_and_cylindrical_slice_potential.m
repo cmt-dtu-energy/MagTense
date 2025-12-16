@@ -1,4 +1,4 @@
-function [Psi_tot, Psi_z_arr, Psi_r_arr, Psi_phi_arr] = MagTense_Validation_cylinder_and_clyndrical_slice_potential(Ro, Ri, phi1, phi2, z1, z2, M, r_arr, phi_arr, z_arr, slice, info)
+function [Psi_tot, Psi_z_arr, Psi_r_arr, Psi_phi_arr] = MagTense_Validation_cylinder_and_cylindrical_slice_potential(Ro, Ri, phi1, phi2, z1, z2, M, r_arr, phi_arr, z_arr, slice, info)
 
 % Input parameters
 % Ro      The outer radius of the cylinder slice or full cylinder
