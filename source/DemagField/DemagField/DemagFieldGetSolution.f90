@@ -68,7 +68,12 @@
             !Make sure to allocate H_tmp on the heap and for each thread
             ! $OMP CRITICAL
             H_tmp(:,:) = 0.        
-        
+            
+            !Hard-code tile choice for debugging:
+            !tiles(i)%tileType = tileTypeAvgPrism
+
+
+            
             ! $OMP END CRITICAL
             !! Here a selection of which subroutine to use should be done, i.e. whether the tile
             !! is cylindrical, a prism or an ellipsoid or another geometry
@@ -84,6 +89,12 @@
                     call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
                 else
                     call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele )
+                endif
+            case (tileTypeAvgPrism)
+                if ( present(Nout) ) then
+                    call getAvgFieldFromRPT( tiles(i),  H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+                else 
+                    call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_ele )
                 endif
             case (tileTypeSphere)
                 if ( present(Nout) ) then
@@ -227,6 +238,39 @@
         !H = -1. * H
     
     end subroutine getFieldFromRectangularPrismTile      
+
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the magnetic field from a rectangular prism using averaged demag tensor
+    !! RPT = rectangular prism tile
+    !!
+
+    subroutine getAvgFieldFromRPT( prismTile, H, pts, n_ele, N_out, useStoredN )
+        !DEC$ ATTRIBUTES ALIAS:"getavgfieldfromrpt_" :: getAvgFieldFromRPT
+        type(MagTile),intent(in) :: prismTile
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
+        logical,intent(in),optional :: useStoredN
+    
+        !print *, "test test test"
+        procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
+        N_tensor => getAvgN_prism_3D
+        
+        !! Check to see if we should use symmetry
+        if ( prismTile%exploitSymmetry .eq. 1 ) then        
+            call getFieldFromTile_symm(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN )        
+        else        
+            call getFieldFromTile(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN )       
+        endif
+    
+        !!@todo Can this be removed?
+        !! The minus sign comes from the definition of the demag tensor (the demagfield is assumed negative)
+        !! Change in the tensor subroutine in order to make the behavior of the tensor components of the various geometries conform
+        !H = -1. * H
+    
+    end subroutine getAvgFieldFromRPT   
         
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>

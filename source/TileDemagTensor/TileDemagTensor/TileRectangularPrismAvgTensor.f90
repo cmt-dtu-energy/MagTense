@@ -1,4 +1,4 @@
-module TileRectanagularPrismAvgTensor
+module TileRectangularPrismAvgTensor
 
     implicit none
     
@@ -98,5 +98,5 @@ module TileRectanagularPrismAvgTensor
         end function definite_integral
     
     
-end module TileRectanagularPrismAvgTensor
+end module TileRectangularPrismAvgTensor
     

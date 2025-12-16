@@ -1,4 +1,4 @@
-module TileRectanagularPrismTensor
+module TileRectangularPrismTensor
 
     implicit none
     

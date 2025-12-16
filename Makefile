@@ -67,7 +67,7 @@ ifeq ($(OS),Windows_NT)
 		OPT = ${CONDA_PATH}/Library/include \
 			-I${CONDA_PATH}/Library/include/intel64/lp64 \
 			-I${CONDA_PATH}/opt/compiler/include/intel64
-		LIB_OPT = -llibDemagField
+		LIB_OPT = -llibDemagField -llibTileDemagTensor -llibNumericalIntegration
 	endif
 else
  	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
@@ -104,8 +104,12 @@ ifeq ($(USE_MICROMAG),0)
 else
 	MICROMAG = micromagnetism
 	ifeq ($(OS),Windows_NT)
-		LIB_OPT = -llibMagTenseMicroMag
-		CP_LIB = cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
+		LIB_OPT += -llibMagTenseMicroMag
+		CP_LIB = cp ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX} .
+		CP_LIB += && cp ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX} .
+		CP_LIB += && cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
+		CP_LIB += && cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
+		
 		
 	else
 		LIB_OPT += -lMagTenseMicroMag
@@ -200,6 +204,19 @@ standalone:
 	cd $(STANDALONE_PATH) && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}'
 	mkdir build
 	cp $(STANDALONE_PATH)/MagTense.x build/MagTense.x
+
+info:
+	@echo Using Fortran compiler: $(FC)
+	@echo Fortran flags: $(FFLAGS)
+	@echo Linker flags: $(LDFLAGS)
+	@echo MKL flags: $(MKL)
+	@echo CUDA enabled: $(USE_CUDA)
+	@echo CVODE enabled: $(USE_CVODE)
+	@echo Micromagnetics enabled: $(USE_MICROMAG)
+	@echo FMM3D enabled: $(USE_FMM3D)
+	@echo MATLAB enabled: $(USE_MATLAB)
+	@echo Include paths: -I$(INCLUDE_OBJ)
+	@echo Libraries: -L${MKFILE_PATH} $(LIB_OPT)
 
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}

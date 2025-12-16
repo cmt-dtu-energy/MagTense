@@ -159,6 +159,10 @@
                     case(tileTypePrism)
                         !! No rotation is needed as the offset of the prism is with respect to the center of the prism
                         pts = tiles(i)%offset      
+                    
+                    case(tileTypeAvgPrism)
+                        !! No rotation is needed as the offset of the prism is with respect to the center of the prism
+                        pts = tiles(i)%offset  
                         
                     case(tileTypeSphere)
                         !! No rotation is possible, as the tile is a sphere

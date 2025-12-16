@@ -69,7 +69,7 @@ class Tiles:
         mu_r_oa: Relative permeability in other axis.
         M_rem: Remanent magnetization.
         tile_type: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
-                   5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
+                   5 = tetrahedron, 6 = sphere, 7 = spheroid, 8 = avg prism, 10 = ellipsoid
         offset: Offset of global coordinates.
         rot: Rotation in local coordinate system.
         color: Color in visualization.

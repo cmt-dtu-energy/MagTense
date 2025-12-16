@@ -1,6 +1,5 @@
 module TileNComponents
     use TileCylPieceTensor
-    use TileRectanagularPrismTensor
     use TileCircPieceTensor
     use TilePlanarCoilTensor
     implicit none
@@ -12,7 +11,6 @@ module TileNComponents
         
         !::Specific for a rectangular prism
         real :: a, b, c
-        
         !::Generel variables, shared among all tile types
         real,dimension(3) :: M
         real,dimension(3) :: u_ea,u_oa1,u_oa2    

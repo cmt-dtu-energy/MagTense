@@ -72,6 +72,8 @@
           call getFieldFromCircPieceInvertedTile( tile(1), H, pts, n_ele, N, .false. )
       else if (tile(1)%tileType .eq. tileTypePrism ) then          
           call getFieldFromRectangularPrismTile( tile(1), H, pts, n_ele, N, .false. )
+      else if (tile(1)%tileType .eq. tileTypeAvgPrism ) then          
+          call getAvgFieldFromRPT( tile(1), H, pts, n_ele, N, .false. )
       else if (tile(1)%tileType .eq. tileTypeTetrahedron ) then          
           call getFieldFromTetrahedronTile( tile(1), H, pts, n_ele, N, .false. )
       else if (tile(1)%tileType .eq. tileTypeSphere ) then          

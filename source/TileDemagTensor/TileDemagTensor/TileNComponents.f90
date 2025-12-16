@@ -1,9 +1,11 @@
 module TileNComponents
     use TileCylPieceTensor
-    use TileRectanagularPrismTensor
+    use TileRectangularPrismTensor
+    use TileRectangularPrismAvgTensor
     use TileCircPieceTensor
     use TilePlanarCoilTensor
     use TileTriangle
+
     implicit none
     
     !::General base-type for alle the different tile types
@@ -13,6 +15,9 @@ module TileNComponents
         
         !::Specific for a rectangular prism
         real :: a, b, c
+        
+        !::Specific for avg rectangular prism, size of receiving tile, used when averaging demagnetisation tensor
+        !real :: a1, b1, c1
         
         !::Generel variables, shared among all tile types
         real,dimension(3) :: M
@@ -55,7 +60,7 @@ module TileNComponents
       end subroutine N_tensor_subroutine
     end interface
     
-    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeSphere=6,tileTypeSpheroid=7,tileTypePlanarCoil=101
+    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeSphere=6,tileTypeSpheroid=7,tileTypeAvgPrism=8,tileTypePlanarCoil=101
     integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2,magnetTypeSoftConstPerm=3
     integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     
@@ -623,13 +628,93 @@ module TileNComponents
     end subroutine getN_circPiece_Inv
     
     ! Emma:
-    ! Calculates averaged N from expressions in Fukushima paper
-    subroutine getAVGN_prism_3D(prism, pos, N_out) !add additional argument
-    type(MagTile),intent(in) :: prism
+    ! Calculates averaged N from expressions in Fukushima paper using the Avgprism tile
+    subroutine getAvgN_prism_3D(Avgprism, pos, N_out)
+    type(MagTile),intent(in) :: Avgprism 
     real,intent(in),dimension(3) :: pos
+    !real,intent(in),dimension(3) :: size !not implemented yet
     real,intent(inout),dimension(3,3) :: N_out
+    integer :: i, j, k !for internal looping
+
+    real :: a,b,c,x,y,z,a1,b1,c1
+    real :: source_coords(6), obs_coords(6)
+    real :: X1, X2, Y1, Y2, Z1, Z2, vol
+
+    !Lengths of source tile in x,y,z dimensions
+    a = Avgprism%a
+    b = Avgprism%b
+    c = Avgprism%c
+
+    !Lengths of receiving (observer) tile in x,y,z dimensions now same as lengths of source
+    a1 = Avgprism%a
+    b1 = Avgprism%b
+    c1 = Avgprism%c
     
-    end subroutine
+    ! coordinates from center of source tile to center of receiving tile
+    x = pos(1)
+    y = pos(2)
+    z = pos(3)
+
+    !Find coordinates for corners
+    source_coords = (/ -a,  a,  -b,  b,  -c,  c /)
+    obs_coords    = (/ x-a1, x+a1, y-b1, y+b1, z-c1, z+c1 /)
+    vol = (obs_coords(2)-obs_coords(1)) * (obs_coords(4)-obs_coords(3)) * (obs_coords(6)-obs_coords(5))
+
+    !Calculating tensor elements
+    N_out(1,1) = 0.0d0
+    N_out(2,2) = 0.0d0
+    N_out(3,3) = 0.0d0
+    N_out(1,2) = 0.0d0
+    N_out(1,3) = 0.0d0
+    N_out(2,1) = 0.0d0
+    N_out(2,3) = 0.0d0
+    N_out(3,1) = 0.0d0
+    N_out(3,2) = 0.0d0
+    do i = 0, 1
+                do j = 0, 1
+                    do k = 0, 1
+                        !Define distances for integration
+                        X1 = obs_coords(1) - source_coords(1+i)
+                        X2 = obs_coords(2) - source_coords(1+i)
+                        Y1 = obs_coords(3) - source_coords(3+j)
+                        Y2 = obs_coords(4) - source_coords(3+j)
+                        Z1 = obs_coords(5) - source_coords(5+k)
+                        Z2 = obs_coords(6) - source_coords(5+k)
+
+                        !Integrate over receiving volume
+                        N_out(1,1) = N_out(1,1) + (-1.0d0)**(i+j+k) * definite_integral(F1, X1, X2, Y1, Y2, Z1, Z2)
+                        N_out(2,2) = N_out(2,2) + (-1.0d0)**(i+j+k) * definite_integral(F1, Y1, Y2, Z1, Z2, X1, X2)
+                        N_out(3,3) = N_out(3,3) + (-1.0d0)**(i+j+k) * definite_integral(F1, Z1, Z2, X1, X2, Y1, Y2)
+                        N_out(1,2) = N_out(1,2) + (-1.0d0)**(i+j+k) * definite_integral(F2, X1, X2, Y1, Y2, Z1, Z2)
+                        N_out(2,3) = N_out(2,3) + (-1.0d0)**(i+j+k) * definite_integral(F2, Y1, Y2, Z1, Z2, X1, X2)
+                        N_out(3,1) = N_out(3,1) + (-1.0d0)**(i+j+k) * definite_integral(F2, Z1, Z2, X1, X2, Y1, Y2)
+                    end do
+                end do
+            end do
+            !Scaling and using symmetry
+            N_out(1,1) = N_out(1,1) / vol
+            N_out(2,2) = N_out(2,2) / vol
+            N_out(3,3) = N_out(3,3) / vol
+            N_out(1,2) = N_out(1,2) / vol
+            N_out(2,1) = N_out(1,2)
+            N_out(2,3) = N_out(2,3) / vol
+            N_out(3,2) = N_out(2,3)
+            N_out(3,1) = N_out(3,1)  / vol
+            N_out(1,3) = N_out(3,1)
+
+    !print *, "N_out(1,1) =", N_out(1,1)
+    !print *, "N_out(1,2) =", N_out(1,2)
+    !print *, "N_out(1,3) =", N_out(1,3)
+    !print *, "N_out(2,1) =", N_out(2,1)
+    !print *, "N_out(2,2) =", N_out(2,2)
+    !print *, "N_out(2,3) =", N_out(2,3)
+    !print *, "N_out(3,1) =", N_out(3,1)
+    !print *, "N_out(3,2) =", N_out(3,2)
+    !print *, "N_out(3,3) =", N_out(3,3)
+    print *, "testprint"
+    print *, x,y,z
+    print *, N_out
+    end subroutine getAvgN_prism_3D
 
     
     !::Calculates N from the analytical expression in 3D

@@ -1,5 +1,5 @@
 module FortranToPythonIO
-
+    use TileNComponents
     use MagParameters
     use DemagFieldGetSolution
     use IterateMagnetSolution
@@ -73,6 +73,8 @@ module FortranToPythonIO
                 call getFieldFromCylTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case ( tileTypePrism )
                 call getFieldFromRectangularPrismTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+            case ( tileTypeAvgPrism )
+                call getAvgFieldFromRPT( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case ( tileTypeSphere )
                 call getFieldFromSphereTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case ( tileTypeSpheroid )
@@ -171,6 +173,12 @@ module FortranToPythonIO
                     call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
                 else
                     call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts )
+                endif
+            case ( tileTypeAvgPrism )
+                if ( useStoredN .eqv. .true. ) then
+                    call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
+                else
+                    call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_pts )
                 endif
             case ( tileTypeSphere )
                 if ( useStoredN .eqv. .true. ) then
@@ -308,7 +316,6 @@ module FortranToPythonIO
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, n_stateFcn, nT, nH, &
         data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out )
-
         integer(4),intent(in) :: n_tiles, n_pts, n_stateFcn, nT, nH
 
         !::Specific for a cylindrical tile piece
@@ -355,17 +362,15 @@ module FortranToPythonIO
 
         !!@todo no support for resuming iterations at the moment
         resumeIteration = 0
-
         !::initialise MagTile with specified parameters
         call loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
             mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
             includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
-
         !::load state function from table
         call loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
 
         if ( iterateSolution .eqv. .true. ) then
-            write(*,*) 'Doing iteration'
+            write(*,*) 'Doing iteration, recompiled yo'
             call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, resumeIteration )
 
             do i=1,n_tiles
@@ -387,6 +392,7 @@ module FortranToPythonIO
                 H_tmp(:,:) = 0.
                 ! $OMP END CRITICAL
 
+
                 !! Here a selection of which subroutine to use should be done, i.e. whether the tile
                 !! is cylindrical, a prism or an ellipsoid or another geometry
                 select case (tiles(i)%tileType )
@@ -394,6 +400,8 @@ module FortranToPythonIO
                     call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts )
                 case (tileTypePrism)
                     call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts )
+                case (tileTypeAvgPrism)
+                    call getAvgFieldFromRPT(tiles(i), H_tmp, pts, n_pts )
                 case (tileTypeSphere)
                     call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts )
                 case (tileTypeSpheroid)
