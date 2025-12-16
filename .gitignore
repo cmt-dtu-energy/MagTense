@@ -9,6 +9,11 @@
 # private files for MagTense
 MagTense_private/
 
+# data files
+*.mat
+*.bin
+*.npz
+
 # Build results
 
 [Dd]ebug/
