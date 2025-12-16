@@ -12,7 +12,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
     exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
 	CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn, &
-	passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem , dummy_run)
+	passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem , dummy_run, fmm_cells_per_node, eps_fmm)
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
     integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols
     integer(4),dimension(3),intent(in) :: grid_n
@@ -46,11 +46,15 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     type(MicroMagProblem),intent(inout) :: problem
 
     integer, intent(in) :: dummy_run
+    integer(4), intent(in) :: fmm_cells_per_node
+    real(8), intent(in) :: eps_fmm
 
     logical :: ex
 
 
     problem%dummy_run = dummy_run
+    problem%fmm_cells_per_node = fmm_cells_per_node
+    problem%fmm_eps = eps_fmm
 
     problem%grid%nx = grid_n(1)
     problem%grid%ny = grid_n(2)

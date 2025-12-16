@@ -42,7 +42,8 @@ module fmm3d_tree_mod
             integer nd,ier
             double precision eps
             !-----------------------------------------
-            integer ndiv, idivflag
+            integer :: ndiv = 0 
+            integer :: idivflag
             integer(8), dimension(8) :: ipointer
             double precision expc(3)
             integer :: iexpc
@@ -177,16 +178,22 @@ module fmm3d_tree_mod
     contains 
 
 
-      subroutine build_tree(self, source, eps, ier)
+      subroutine build_tree(self, source, eps, ndiv, ier)
         class(FMM3DTree), intent(inout) :: self
         double precision, contiguous, pointer :: source(:,:)
         double precision eps
+        integer ndiv
         integer ier
         !------------------------------------------------
         integer :: i
         !-----------------
         if (self%is_built) then
             return
+        end if
+
+
+        if (ndiv .gt.0) then
+          self%ndiv = ndiv 
         end if
 
         !print *, " building fmm tree"
@@ -369,11 +376,11 @@ module fmm3d_tree_mod
         !------------------------------------------------
 
     
-        !call lndiv(self%eps,self%nsource,0,0,1,2, &
-        !        &    0,self%ndiv,self%idivflag) 
+        if (self%ndiv .eq. 0) then
+          call lndiv(self%eps,self%nsource,0,0,1,2, &
+                  &    0,self%ndiv,self%idivflag) 
+        end if
 
-
-        self%ndiv = 200
 
         call pts_tree_mem(self%source,self%nsource,self%targ,0,self%idivflag,self%ndiv,self%nlmin, &
             &    self%nlmax,self%iper,self%ifunif,self%nlevels,self%nboxes,self%ltree)

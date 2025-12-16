@@ -11,7 +11,7 @@ MATLAB_INCLUDE =
 #       List all source files required for the project
 #=======================================================================
 
-LIBSRC_SOURCES = fmm3d_tree_mod MicroMagParameters util_micromag DemagAuxFunctions FortranCuda ComputeDifferentialOperatorsFromMesh UnstructuredMeshAnalysis
+LIBSRC_SOURCES = fmm3d_tree_mod MicroMagParameters fmm_nbor_tensor_mod util_micromag DemagAuxFunctions FortranCuda ComputeDifferentialOperatorsFromMesh UnstructuredMeshAnalysis
 
 ifeq (${USE_MATLAB},1)
     OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64

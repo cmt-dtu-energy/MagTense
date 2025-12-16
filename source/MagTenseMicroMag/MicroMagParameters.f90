@@ -175,16 +175,20 @@ include "mkl_dfti.f90"
 
 
         !--------------- demag tensor neighbour stuff ---------------
+        integer :: fmm_cells_per_node
+        real(DP) :: fmm_eps 
         integer, dimension(:,:), pointer :: nbr_idx(:,:) => null()    !> Neighbour indices for each target cell
         integer, dimension(:), pointer :: n_nbors(:) => null()
         real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:) => null()
         real(SP),dimension(:,:,:,:), pointer:: diffTens(:,:,:,:) => null()
 
-        type(MagTenseSparse), dimension(6) :: K_nbrcorr
-        logical :: K_nbrcorr_built = .false.
-        type(matrix_descr) :: K_nbrcorr_descr
+        type(MagTenseSparse), dimension(6) :: K_fmm_s
+        logical :: K_fmm_built = .false.
+        type(matrix_descr) :: K_fmm_descr_s
 
-
+        real(SP),dimension(:,:), contiguous, pointer :: Kxx_fmm,Kxy_fmm,Kxz_fmm  !> Demag field tensor split out into the nine symmetric components
+        real(SP),dimension(:,:), contiguous, pointer :: Kyy_fmm,Kyz_fmm      !> Demag field tensor split out into the nine symmetric components
+        real(SP),dimension(:,:), contiguous, pointer :: Kzz_fmm          !> Demag field tensor split out into the nine symmetric components
         integer :: dummy_run = 0    !> Flag to indicate whether the demag tensor neighbour test setup has been done
 
         
