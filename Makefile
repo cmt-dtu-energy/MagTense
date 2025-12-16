@@ -256,6 +256,19 @@ standalone:
 	mkdir build
 	cp $(STANDALONE_PATH)/MagTense.x build/MagTense.x
 
+info:
+	@echo Using Fortran compiler: $(FC)
+	@echo Fortran flags: $(FFLAGS)
+	@echo Linker flags: $(LDFLAGS)
+	@echo MKL flags: $(MKL)
+	@echo CUDA enabled: $(USE_CUDA)
+	@echo CVODE enabled: $(USE_CVODE)
+	@echo Micromagnetics enabled: $(USE_MICROMAG)
+	@echo FMM3D enabled: $(USE_FMM3D)
+	@echo MATLAB enabled: $(USE_MATLAB)
+	@echo Include paths: -I$(INCLUDE_OBJ)
+	@echo Libraries: -L${MKFILE_PATH} ${LIB_OPT}
+
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS='${LDFLAGS}' \
