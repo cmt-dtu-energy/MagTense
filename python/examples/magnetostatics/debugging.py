@@ -28,21 +28,22 @@ from magtense.utils import create_plot, validation, run_simulation
 
 mu0 = 4 * np.pi * 1e-7
 tiles = Tiles(
-    n=2,
+    n=1,
     M_rem=1 / mu0,
-    tile_type=[8, 2],
-    color=[[1, 0, 0], [0, 0, 1]]
+    tile_type=[2],
+    color=[[1, 0, 0]]
 )
 
 # 0: Prism 1
-tiles.size = ([0.1, 0.3, 0.2], 0)
+tiles.size = ([0.1, 0.1, 0.1], 0)
 tiles.offset = ([0.0, 0.0, 0.0], 0)
 
 # 1: Prism 2
-tiles.size = ([0.1, 0.3, 0.2], 1)
-tiles.offset = ([1.0, 1.0, 1.0], 1)
+#tiles.size = ([0.1, 0.3, 0.2], 1)
+#tiles.offset = ([1.0, 1.0, 1.0], 1)
 
-pts = np.array([[1.0, 1.0, 1.0]], dtype=np.float64, order='F')
+pts = np.array([[3.0, 2.0, 2.0], [2.0,2.0,2.0]], dtype=np.float64, order='F')
+obs_size = np.array([1.0,1.0,1.0])
 # n_points = [10, 100, 80]
 # seg = [0.9, 1, 0.8] / np.asarray(n_points)
 # pts = [[(i + 0.5) * seg[0], (j + 0.5) * seg[1], (k + 0.5) * seg[2]]
@@ -51,6 +52,6 @@ pts = np.array([[1.0, 1.0, 1.0]], dtype=np.float64, order='F')
 #         for k in range(n_points[2])]
 # pts = np.asarray(pts, dtype=np.float64, order='F')
 
-updated_tiles, H_demag = run_simulation(tiles, pts)
+updated_tiles, H_demag = run_simulation(tiles, pts, obs_size=obs_size)
 
 print(H_demag)

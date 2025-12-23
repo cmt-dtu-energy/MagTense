@@ -245,7 +245,7 @@
     !! RPT = rectangular prism tile
     !!
 
-    subroutine getAvgFieldFromRPT( prismTile, H, pts, n_ele, N_out, useStoredN )
+    subroutine getAvgFieldFromRPT( prismTile, H, pts, n_ele, N_out, useStoredN, Obs_size )
         !DEC$ ATTRIBUTES ALIAS:"getavgfieldfromrpt_" :: getAvgFieldFromRPT
         type(MagTile),intent(in) :: prismTile
         real(8),dimension(n_ele,3),intent(inout) :: H
@@ -253,16 +253,26 @@
         integer(4),intent(in) :: n_ele
         real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
         logical,intent(in),optional :: useStoredN
+        real,intent(in),dimension(3), optional :: Obs_size
+
     
         !print *, "test test test"
         procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
         N_tensor => getAvgN_prism_3D
         
         !! Check to see if we should use symmetry
-        if ( prismTile%exploitSymmetry .eq. 1 ) then        
-            call getFieldFromTile_symm(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN )        
-        else        
-            call getFieldFromTile(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN )       
+        if ( prismTile%exploitSymmetry .eq. 1 ) then 
+            if (present(Obs_size)) then       
+                call getFieldFromTile_symm(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN, Obs_size )
+            else
+                call getFieldFromTile_symm(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN)
+            endif
+        else
+            if (present(Obs_size)) then       
+                call getFieldFromTile(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN, Obs_size )     
+            else
+                call getFieldFromTile(prismTile, H, pts, N_ele, N_tensor, N_out, useStoredN)  
+            endif
         endif
     
         !!@todo Can this be removed?
@@ -726,7 +736,7 @@
     !>
     !!Calculates the actual field from a tile of a given geometry
     !!
-    subroutine getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+    subroutine getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN, Obs_size )
         type(MagTile),intent(in) :: tile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3),intent(in) :: pts
@@ -737,7 +747,8 @@
             
         real(8),dimension(3,3) :: rotMat,rotMatInv,N
         integer(4) :: i
-        real(8),dimension(3) :: diffPos,dotProd        
+        real(8),dimension(3) :: diffPos,dotProd   
+        real,intent(in),dimension(3), optional :: Obs_size     
     
         !! get the rotation matrices
         call getRotationMatrices( tile, rotMat, rotMatInv)
@@ -785,7 +796,7 @@
     !! @N_out the resulting demag tensor for each of the points in question 
     !! @ useStoredN logical. If true then use the values in N_out else calculate the tensor
     !!
-    subroutine getFieldFromTile_symm(tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+    subroutine getFieldFromTile_symm(tile, H, pts, n_ele, N_tensor, N_out, useStoredN, Obs_size )
         type(MagTile),intent(in) :: tile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3),intent(in) :: pts
@@ -801,6 +812,7 @@
         real(8),dimension(8,3,3) :: symm_op_M, symm_op_H
         !!@todo Why is this temporary variable used instead of just useStoredN
         logical :: useStoredN_tmp
+        real,intent(in),dimension(3), optional :: Obs_size
     
         !! get the rotation matrices for the tile
         call getRotationMatrices( tile, rotMat, rotMatInv)

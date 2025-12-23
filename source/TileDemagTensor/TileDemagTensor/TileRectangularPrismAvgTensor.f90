@@ -58,24 +58,38 @@ module TileRectangularPrismAvgTensor
         function F2(X,Y,Z) result(res)
             real(8), intent(in) :: X,Y,Z
             real(8) :: res
-            real(8) :: Xv,Yv,Zv,D
+            real(8) :: Xv,Yv,Zv,D,A,B,C
 
             Xv = X
             Yv = Y
             Zv = Z
-            D = dist(Xv,Yv,Zv)
+            
+            if(Xv == 0.0d0) Xv = 1.0d-12
+            if(Yv == 0.0d0) Yv = 1.0d-12
+            if(Zv == 0.0d0) Zv = 1.0d-12
 
-            if(Xv == 0.0d0) Xv = 1.0d-5
-            if(Yv == 0.0d0) Yv = 1.0d-5
-            if(Zv == 0.0d0) Zv = 1.0d-5
+            !D = dist(Xv,Yv,Zv)
+            D = sqrt(Xv**2+Yv**2+Zv**2)
 
-            res = -Xv*Yv*Zv*log(abs(D+Zv)) &
-                  + (1.0d0/6.0d0)*Yv*(Yv**2 - 3.0d0*Zv**2)*log(abs(D+Xv)) &
-                  + (1.0d0/6.0d0)*Xv*(Xv**2 - 3.0d0*Zv**2)*log(abs(D+Yv)) &
+            if(D == 0.0d0) D = 1.0d-12
+
+            A = D + Xv
+            B = D + Yv
+            C = D + Zv
+
+            if(abs(A) == 0.0d0) A = 1.0d-12
+            if(abs(B) == 0.0d0) B = 1.0d-12
+            if(abs(C) == 0.0d0) C = 1.0d-12
+
+            res = -Xv*Yv*Zv*log(abs(C)) &
+                  + (1.0d0/6.0d0)*Yv*(Yv**2 - 3.0d0*Zv**2)*log(abs(A)) &
+                  + (1.0d0/6.0d0)*Xv*(Xv**2 - 3.0d0*Zv**2)*log(abs(B)) &
                   + 0.5d0*Xv**2*Zv*atan(Yv*Zv/(Xv*D)) &
                   + 0.5d0*Yv**2*Zv*atan(Xv*Zv/(Yv*D)) &
                   + (1.0d0/6.0d0)*Zv**3*atan(Xv*Yv/(Zv*D)) &
                   + (1.0d0/3.0d0)*Xv*Yv*D
+
+            if (abs(res)>100) print *, res
         end function F2
         
         !Function definite_integral corresponding to eq. 13 in The Fukushima paper:

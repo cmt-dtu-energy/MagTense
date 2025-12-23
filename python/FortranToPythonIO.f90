@@ -24,7 +24,7 @@ module FortranToPythonIO
     !!
     subroutine getNFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
-        includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, N )
+        includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, N , Obs_size)
 
         integer(4),intent(in) :: n_tiles, n_pts
 
@@ -55,6 +55,7 @@ module FortranToPythonIO
         real(8),dimension(n_pts,3),intent(in) :: pts
         real(8),dimension(n_pts,3) :: H
         real(8),dimension(n_tiles,n_pts,3,3),intent(out) :: N
+        real,intent(in),dimension(3), optional :: Obs_size
         type(MagTile),dimension(n_tiles) :: tiles
         integer :: i
 
@@ -74,7 +75,11 @@ module FortranToPythonIO
             case ( tileTypePrism )
                 call getFieldFromRectangularPrismTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case ( tileTypeAvgPrism )
-                call getAvgFieldFromRPT( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+                if (present(Obs_size)) then
+                    call getAvgFieldFromRPT(tiles(i), H, pts, n_pts, N(i,:,:,:), .false., Obs_size)
+                else
+                    call getAvgFieldFromRPT(tiles(i), H, pts, n_pts, N(i,:,:,:), .false.)
+                end if
             case ( tileTypeSphere )
                 call getFieldFromSphereTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case ( tileTypeSpheroid )
@@ -107,7 +112,7 @@ module FortranToPythonIO
     !!
     subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
-        includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, N, useStoredN )
+        includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, N, useStoredN, Obs_size )
 
         integer(4),intent(in) :: n_tiles, n_pts
 
@@ -140,6 +145,7 @@ module FortranToPythonIO
         real(8),dimension(n_pts,3) :: H_tmp
         real(8),dimension(n_tiles,n_pts,3,3),intent(inout) :: N
         logical,intent(in) :: useStoredN
+        real,intent(in),dimension(3), optional :: Obs_size
 
         type(MagTile),dimension(n_tiles) :: tiles
         integer :: i
@@ -175,11 +181,19 @@ module FortranToPythonIO
                     call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts )
                 endif
             case ( tileTypeAvgPrism )
-                if ( useStoredN .eqv. .true. ) then
-                    call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
-                else
-                    call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_pts )
-                endif
+                    if (useStoredN) then
+                        if (present(Obs_size)) then
+                            call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN=useStoredN, Obs_size=Obs_size )
+                        else
+                            call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN=useStoredN )
+                        end if
+                    else
+                        if (present(Obs_size)) then
+                            call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_pts, Obs_size=Obs_size )
+                        else
+                            call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_pts )
+                        end if
+                    end if
             case ( tileTypeSphere )
                 if ( useStoredN .eqv. .true. ) then
                     call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
@@ -315,7 +329,7 @@ module FortranToPythonIO
     subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, n_stateFcn, nT, nH, &
-        data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out )
+        data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out, Obs_size )
         integer(4),intent(in) :: n_tiles, n_pts, n_stateFcn, nT, nH
 
         !::Specific for a cylindrical tile piece
@@ -355,6 +369,7 @@ module FortranToPythonIO
         real(8),dimension(n_pts,3),intent(in) :: pts
         real(8),dimension(n_pts,3),intent(out) :: H
         real(8),dimension(n_pts,3) :: H_tmp
+        real,intent(in),dimension(3), optional :: Obs_size
         type(MagTile),dimension(n_tiles) :: tiles
         integer :: i
 
@@ -370,7 +385,6 @@ module FortranToPythonIO
         call loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
 
         if ( iterateSolution .eqv. .true. ) then
-            write(*,*) 'Doing iteration, recompiled yo'
             call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, resumeIteration )
 
             do i=1,n_tiles
@@ -401,7 +415,11 @@ module FortranToPythonIO
                 case (tileTypePrism)
                     call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts )
                 case (tileTypeAvgPrism)
-                    call getAvgFieldFromRPT(tiles(i), H_tmp, pts, n_pts )
+                    if (present(Obs_size)) then
+                        call getAvgFieldFromRPT(tiles(i), H_tmp, pts, n_pts, Obs_size=Obs_size)
+                    else
+                        call getAvgFieldFromRPT(tiles(i), H_tmp, pts, n_pts)
+                    end if
                 case (tileTypeSphere)
                     call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts )
                 case (tileTypeSpheroid)

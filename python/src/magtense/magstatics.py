@@ -854,6 +854,7 @@ def grid_config(
 def run_simulation(
     tiles: Tiles,
     pts: np.ndarray,
+    obs_size: np.ndarray,
     max_error: float = 1e-5,
     max_it: int = 500,
     T: float = 300.0,
@@ -907,6 +908,7 @@ def run_simulation(
         nitemax=max_it,
         iteratesolution=True,
         returnsolution=True,
+        obs_size=obs_size
     )
 
     tiles.M = M_out
