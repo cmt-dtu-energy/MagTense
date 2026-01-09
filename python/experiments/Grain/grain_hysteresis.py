@@ -61,6 +61,8 @@ def max_energy_product(
 
 def grain_hysteresis(
     use_fmm: bool = True,
+    fmm_eps : float = 1e-4,
+    fmm_cells_per_node: int = 50,
     cuda: bool = False,
     cvode: bool = False,
     mesh_file: str = "Grid_rasBase_5_nGrains_5_nRef_3_dG_5e-09.mat",
@@ -78,9 +80,6 @@ def grain_hysteresis(
     """
 
     print("Loading data from ", mesh_file)
-
-    fmm_eps = 1e-4
-    fmm_cells_per_node = 50 if use_fmm else 0
 
     mu0 = 4 * np.pi * 1e-7
     Hyst_dir = np.array([0.0, 0.0, 1.0])
@@ -206,6 +205,11 @@ def grain_hysteresis(
             passexch=1,
         )
 
+    #-------- for testing
+    #problem.dem_appr = "threshold"
+    #problem.thres = 1e-10
+    #-------- modify material parameters
+
     problem.exch_presize = 3 * problem.nt * len(steps)
     problem.dummy_run = 0
     problem.fmm_cells_per_node = fmm_cells_per_node if use_fmm else 0
@@ -274,6 +278,8 @@ def grain_hysteresis(
     stem = mesh_path.stem
     #backend_tag = "_cuda" if cuda else "_fmm"
     backend_tag = "_fmm" if use_fmm else "_cuda"
+    if use_fmm: 
+        backend_tag += f"_eps{fmm_eps:.2e}_cpn{fmm_cells_per_node}"
 
     root_name = stem + backend_tag
 
@@ -327,11 +333,13 @@ if __name__ == "__main__":
 
     grain_hysteresis(
         use_fmm=True,
+        fmm_eps=1e-4,
+        fmm_cells_per_node=660,
         cuda=True, #NOTE - with new FMM implementation that uses CUDA for near field we have to set CUDA true...
         cvode=False,
-        mesh_file="Grid_rasBase_5_nGrains_5_nRef_3_dG_5e-09.mat",
+        #mesh_file="Grid_rasBase_5_nGrains_5_nRef_3_dG_5e-09.mat",
         #mesh_file="Grid_rasBase_5_nGrains_25_nRef_3_dG_3.75e-09.mat",
-        #mesh_file="Grid_rasBase_5_nGrains_25_nRef_4_dG_3.75e-09.mat",
+        mesh_file="Grid_rasBase_5_nGrains_25_nRef_4_dG_3.75e-09.mat",
         #mesh_file="Grid_rasBase_5_nGrains_5_nRef_4_dG_3.75e-09.mat",
         #mesh_file="Grid_rasBase_6_nGrains_25_nRef_4_dG_3.75e-09.mat",
         plotting=True,
