@@ -20,7 +20,8 @@ def setup_grain_problem_from_matfile(
                     exch_nrow: int = 1,
                     exch_ncols: int = 1,
                     passexch : int = 0,
-                    input_file_name : str = "t"
+                    input_file_name : str = "t",
+                    grid_type : str = "unstructuredPrisms"
                     ) -> MicromagProblem:
     
 
@@ -29,7 +30,7 @@ def setup_grain_problem_from_matfile(
     mesh_cart, GridInfo, mesh_params, iIn = load_matlab_struct(fname)
     #---------------------------------------------------------------
     #---------------- Setup problem parameters ----------------
-    grid_type = "unstructuredPrisms"
+    #grid_type = "unstructuredPrisms"
     N_grains = mesh_params["nGrains"][0][0]
     mu0 = 4 * np.pi * 1e-7
     alpha = 4000.0
