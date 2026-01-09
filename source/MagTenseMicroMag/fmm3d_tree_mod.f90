@@ -11,7 +11,7 @@ module fmm3d_tree_mod
             integer(8) :: ltree = 0
             integer :: nlmin = 0
             integer :: iper = 0
-            integer :: ifunif = 0
+            integer :: ifunif = 1
 
             integer :: ifnear = 1
             integer :: nexpc = 0
