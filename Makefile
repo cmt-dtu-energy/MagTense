@@ -68,9 +68,11 @@ ifeq (${FC}, ifx)
 			/DUSE_CUDA=${USE_CUDA} /DUSE_MICROMAG=${USE_MICROMAG} /DUSE_FMM3D=${USE_FMM3D} /DUSE_TIMING=${USE_TIMING} /DUSE_DEBUG_STATEMENTS=${USE_DEBUG_STATEMENTS}
 	else
 		FFLAGS = -O3 -fpp -real-size 64 -qopenmp -assume nocc_omp -fpe0 \
+			-heap-arrays 1024 -traceback \
 			-fp-model=source -fpic -nologo -DUSE_CVODE=${USE_CVODE} \
 			-DUSE_MATLAB=${USE_MATLAB} -DUSE_CUDA=${USE_CUDA} \
 			-DUSE_MICROMAG=${USE_MICROMAG} -DUSE_FMM3D=${USE_FMM3D} -DUSE_TIMING=${USE_TIMING} -DUSE_DEBUG_STATEMENTS=${USE_DEBUG_STATEMENTS}
+
 	endif
 else ifeq (${FC}, gfortran)
 	FFLAGS = -O3 -fdefault-real-8 -fopenmp -ffree-line-length-512 -cpp -fPIC \
@@ -222,6 +224,17 @@ python: $(PY_DEPS) magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
 python-win: ${PYTHON_MODN_ALL}
 
 clean:
+	cd ${NUM_INT_PATH} && ${MAKE} clean
+	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} clean
+	cd ${DEMAG_FIELD_PATH} && ${MAKE} clean
+	cd ${MICROMAG_PATH} && ${MAKE} clean
+	cd ${FORTRAN_CUDA_PATH} && ${MAKE} clean
+	cd $(STANDALONE_PATH) && ${MAKE} clean
+	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
+	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
+	rm -rf ${PYTHON_LIBPATH}/build
+
+clean_full:
 	cd ${FMM3D_DIR} && ${MAKE} clean
 	cd ${NUM_INT_PATH} && ${MAKE} clean
 	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} clean
@@ -232,6 +245,7 @@ clean:
 	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
 	rm -rf ${PYTHON_LIBPATH}/build
+
 
 clean-build:
 	rm -f ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
