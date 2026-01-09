@@ -177,6 +177,7 @@ include "mkl_dfti.f90"
         !--------------- demag tensor neighbour stuff ---------------
         integer :: fmm_cells_per_node
         real(DP) :: fmm_eps 
+        logical :: use_fmm = .true.
         integer, dimension(:,:), pointer :: nbr_idx(:,:) => null()    !> Neighbour indices for each target cell
         integer, dimension(:), pointer :: n_nbors(:) => null()
         real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:) => null()
