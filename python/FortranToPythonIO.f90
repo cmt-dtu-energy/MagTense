@@ -1,5 +1,4 @@
 module FortranToPythonIO
-
     use MagParameters
     use DemagFieldGetSolution
     use IterateMagnetSolution
@@ -842,6 +841,7 @@ subroutine add_neighbour_corrections(H_fmm, centerPos, dev_center, tile_size, ve
   real(8), allocatable :: Ktn(:,:,:,:)   ! (1, n_nbr, 3, 3)
   real(8) :: Rvec(3), Kdip(3,3), Kloc(3,3), Vol_j
   real(8) :: dH(3)
+#if USE_FMM3D
 
   N = size(H_fmm,1)
 
@@ -897,6 +897,7 @@ subroutine add_neighbour_corrections(H_fmm, centerPos, dev_center, tile_size, ve
     deallocate(Ktn)
     deallocate(nbr_idx)
   end do
+#endif
 end subroutine add_neighbour_corrections
 
         !------------------------------------------------------------------------------------------------
