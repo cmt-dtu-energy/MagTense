@@ -144,6 +144,16 @@ module MagneticForce
           call surface_integral_carth( surf, dat_arr, handleError, F, ier, neval )
        end select
     
+
+
+       !------- make sure to deallocate the dat_arr members -------
+        do i = 1, size(dat_arr)
+            if (associated(dat_arr(i)%dat)) then
+                deallocate(dat_arr(i)%dat)
+                nullify(dat_arr(i)%dat)
+            endif
+        enddo
+       !----------------------------------------------------------
     
     end subroutine getForce
     
