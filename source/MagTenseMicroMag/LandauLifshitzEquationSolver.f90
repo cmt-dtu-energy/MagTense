@@ -28,8 +28,10 @@
     use UnstructuredMeshAnalysis
     use DifferentialOperators
 
+#if USE_FMM3D
     use fmm3d_tree_mod
     use fmm_nbor_tensor_mod
+#endif
     implicit none          
 
     !>Module variables
@@ -60,6 +62,14 @@
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
     real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
     character*(100) :: prog_str 
+    real :: rate
+    integer :: c1,c2,cr,cm
+    
+    ! First initialize the system_clock
+    call system_clock(count_rate=cr)
+    call system_clock(count_max=cm)
+    rate = REAL(cr)
+    
     
     !Save internal representation of the problem and the solution
     gb_solution = sol
@@ -89,20 +99,38 @@
     
     !Copy the demag tensor to CUDA
     if ( gb_problem%useCuda .eq. useCudaTrue ) then
-        call displayGUIMessage( 'Copying to CUDA' )
+        call displayGUIMessage( 'Copying to CUDA' ) 
 #if USE_CUDA
-#if USE_FMM3D
-        call displayGUIMessage( 'copying nbr_corr for FMM nbor correction')  
-        call cudaInit_sparse( gb_problem%K_fmm_s )        
-        !TODO maybe move this 
+#if USE_FMM3D 
+        !if ( gb_problem%use_fmm) then
+          call displayGUIMessage( 'copying nbr_corr for FMM nbor correction')  
+          !call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+         
+          call cudaInit_sparse( gb_problem%K_fmm_s )    
+
+        !else 
+        !  !Initialize the Cuda arrays and load the demag tensors into the GPU memory
+        !  if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
+        !      !If the matrices are sparse
+        !      call cudaInit_sparse( gb_problem%K_s )            
+        !  else
+        !      !if the matrices are dense 
+        !      call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+        !  endif
+        !end if
 #else
         !Initialize the Cuda arrays and load the demag tensors into the GPU memory
         if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
             !If the matrices are sparse
+            call displayGUIMessage( 'Initializing sparse matrices on CUDA' )
+
+            print *, " size of valeus array k_s(1)", size(gb_problem%K_s(1)%values) 
+
+
             call cudaInit_sparse( gb_problem%K_s )        
-            
+             
         else
-            !if the matrices are dense
+            !if the matrices are dense 
             call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
         endif
 #endif
@@ -187,6 +215,9 @@
     if ( gb_problem%dummy_run .eq. 1) then
        call displayGUIMessage( 'Performing dummy run - skipping time evolution ' )
     else 
+
+        CALL SYSTEM_CLOCK(c1)
+
       do i=1,nt_Hext
           !Applied field
           gb_solution%HextInd = i
@@ -205,10 +236,31 @@
           gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
           gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
           gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
+
+
+          
               
           call StoreHeffComponents ( gb_problem, gb_solution )
+
+
+
+            ! open (11, file="sparse_CUDA_H.bin",  &
+            !         status='unknown', form='unformatted', &
+            !         access='direct', recl=1*ntot*ntot)
+            ! write(11,rec=1) gb_solution%HmX 
+            ! write(11,rec=2) gb_solution%HmY
+            ! write(11,rec=3) gb_solution%HmZ
+            ! close(11)
+            ! error stop " test stop after cuda sparse"
               
       enddo
+
+      
+        CALL SYSTEM_CLOCK(c2)
+        call displayGUIMessage( 'Time simulation time integration:' )
+        write (prog_str,'(f10.3)') (c2 - c1)/rate
+        call displayGUIMessage( prog_str )
+
 
       !clean up
       deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
@@ -220,13 +272,13 @@
       
       !clean-up
       stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
-    
-  #if USE_CUDA
+  end if
+
+    #if USE_CUDA
       if ( gb_problem%useCuda .eqv. useCudaTrue ) then
           call cudaDestroy()
       endif
-  #endif
-  end if
+    #endif
     !Return the correct state
     sol = gb_solution
     prob = gb_problem
@@ -290,7 +342,7 @@
         gb_solution%My = m(ntot+1:2*ntot)
         gb_solution%Mz = m(2*ntot+1:3*ntot)
         !-------------------------------------------------------------
-#if USE_TIMING
+#if USE_TIMING 
         acc_assemble = acc_assemble + (walltime() - t1)
         t1 = walltime()
 #endif
@@ -325,9 +377,12 @@
         ! hmy_before = gb_solution%HmY(:)
         ! hmz_before = gb_solution%HmZ(:)
 #if USE_FMM3D
-
-        call updateDemagfieldFMM( gb_problem, gb_solution )
-        !call updateDemagfieldFMM_old( gb_problem, gb_solution )
+        !if ( gb_problem%use_fmm)  then
+          call updateDemagfieldFMM( gb_problem, gb_solution )
+        !else
+        !   call updateDemagfield( gb_problem, gb_solution )
+        !end if
+            !call updateDemagfieldFMM_old( gb_problem, gb_solution )
         ! hmx_fmm = gb_solution%HmX(:)
         ! hmy_fmm = gb_solution%HmY(:)
         ! hmz_fmm = gb_solution%HmZ(:)
@@ -511,8 +566,11 @@
         call updateAnisotropy(  gb_problem, gb_solution )
         !Demag. field
 #if USE_FMM3D
-        call updateDemagfieldFMM( gb_problem, gb_solution )
-        !call updateDemagfieldFMM_old( gb_problem, gb_solution )
+        !if ( gb_problem%use_fmm)  then
+          call updateDemagfieldFMM( gb_problem, gb_solution )
+        !else
+        !   call updateDemagfield( gb_problem, gb_solution )
+        !end if
 #else
         call updateDemagfield( gb_problem, gb_solution )
 #endif
@@ -862,7 +920,7 @@ subroutine updateDemagfieldFMM(problem, solution)
     end if
     fmm_tree => solution%fmm_tree
 
-  allocate(pot(1, ntot))
+  !allocate(pot(1, ntot))
   allocate(dipvec(1, 3, ntot))
   allocate(grad(1, 3, ntot))
   grad(:,:,:) = 0.0_DP 
@@ -920,8 +978,6 @@ subroutine updateDemagfieldFMM(problem, solution)
    if (fmm_tree%nboxes > 9) then
        call fmm_tree%make_and_eval(dipvec, grad)
    end if
-
-
 
   if (ier /= 0) then
     write(*,*) 'FMM3D returned error code in updateDemagfieldFMM: ier =', ier
@@ -1085,6 +1141,7 @@ end subroutine updateDemagfieldFMM
         else
 #if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
+            !call displayGUIMessage( ' runing cuda demag sparse matrix multiplication' )
             pref = sngl(-1 )!* problem%Mfact)                                
             call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
             temp = solution%HmX * problem%Mfact
@@ -1093,6 +1150,15 @@ end subroutine updateDemagfieldFMM
             solution%HmY = temp
             temp = solution%HmZ * problem%Mfact
             solution%HmZ = temp
+
+            ! open (11, file="sparse_CUDA_H.bin",  &
+            !         status='unknown', form='unformatted', &
+            !         access='direct', recl=1*ntot)
+            ! write(11,rec=1) solution%HmX 
+            ! write(11,rec=2) solution%HmY
+            ! write(11,rec=3) solution%HmZ
+            ! close(11)
+            ! error stop " test stop after cuda sparse"
 #endif
         endif
         
@@ -1236,6 +1302,18 @@ end subroutine updateDemagfieldFMM
             solution%HmY = temp
             temp = solution%HmZ * problem%Mfact
             solution%HmZ = temp
+
+
+
+            ! open (11, file="dense_CUDA_H.bin",  &
+            !         status='unknown', form='unformatted', &
+            !         access='direct', recl=1*ntot)
+            ! write(11,rec=1) solution%HmX 
+            ! write(11,rec=2) solution%HmY
+            ! write(11,rec=3) solution%HmZ
+            ! close(11)
+            ! error stop " test stop after cuda dense"
+
 #endif
         endif 
     endif
@@ -1249,6 +1327,11 @@ end subroutine updateDemagfieldFMM
         solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
     endif
     
+
+
+
+
+
     end subroutine updateDemagfield
     
     
@@ -1268,8 +1351,10 @@ end subroutine updateDemagfieldFMM
     !Demagnetization tensor matrix
 #if USE_FMM3D
     !call BuildNeighbourDemagTensor( problem, 2) ! hardcode 2 levels of neighbour cells for now
-    call BuildNeighbourDemagTensor( problem) ! hardcode 2 levels of neighbour cells for now
-
+call BuildNeighbourDemagTensor( problem) ! hardcode 2 levels of neighbour cells for now
+    !if ( .not. problem%use_fmm) then
+    !   call ComputeDemagfieldTensor( problem )
+    !end if
 #else
     call ComputeDemagfieldTensor( problem )
 #endif
@@ -1527,7 +1612,6 @@ end subroutine updateDemagfieldFMM
             !call displayGUIMessage( 'Constructing the Tensormap' )
             !call ConstructDemagTensorMap( problem )
             !call displayGUIMessage( 'Done constructing the Tensormap' )
-            
             !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout,Noutave,dx,dy,dz,pts_arr)
             
             !for each element find the tensor for all evaluation points (i.e. all elements)
@@ -1640,7 +1724,21 @@ end subroutine updateDemagfieldFMM
     elseif ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
         call ApplyThresholdFFT( problem )
     endif
-    
+
+
+
+    !-------------- for debug write the dense matrices to binary files --------------
+    !  open (11, file="dense_std_MT.bin",  &
+    !       status='unknown', form='unformatted', &
+    !       access='direct', recl=1*ntot*ntot)
+    ! write(11,rec=1) problem%Kxx
+    ! write(11,rec=2) problem%Kxy
+    ! write(11,rec=3) problem%Kxz
+    ! write(11,rec=4) problem%Kyy
+    ! write(11,rec=5) problem%Kyz
+    ! write(11,rec=6) problem%Kzz
+    ! close(11)
+    !-------------- end debug write the dense matrices to binary files --------------
     
     end subroutine ComputeDemagfieldTensor
     
@@ -2113,22 +2211,38 @@ subroutine add_near_field(problem, solution)
 
   !TODO - These matrices are not actually that sparse. May consider using dense instead
 #if USE_CUDA
-  allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) , mxm(ntot), mym (ntot), mzm (ntot) )
-    mxm = solution%Mx_s * real(problem%Ms, SP)
-    mym = solution%My_s * real(problem%Ms, SP)
-    mzm = solution%Mz_s * real(problem%Ms, SP)
+    !allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) , mxm(ntot), mym (ntot), mzm (ntot) )
+    allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) )
+
+    !mxm = solution%Mx_s * real(problem%Ms, SP)
+    !mym = solution%My_s * real(problem%Ms, SP)
+    !mzm = solution%Mz_s * real(problem%Ms, SP)
     hx_tmp = 0.0_SP
     hy_tmp = 0.0_SP
     hz_tmp = 0.0_SP
 
     pref = sngl(-1)
-    call cudaMatrVecMult_sparse( mxm , mym , mzm , hx_tmp, hy_tmp, hz_tmp, pref )
+    call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
 
-    solution%HmX = solution%HmX - hx_tmp
-    solution%HmY = solution%HmY - hy_tmp
-    solution%HmZ = solution%HmZ - hz_tmp
+    solution%HmX = solution%HmX - hx_tmp  * problem%Mfact
+    solution%HmY = solution%HmY - hy_tmp  * problem%Mfact
+    solution%HmZ = solution%HmZ - hz_tmp  * problem%Mfact
 
-    deallocate(hx_tmp, hy_tmp, hz_tmp, mxm, mym, mzm)
+  
+    ! hx_tmp = 0.0_SP
+    ! hy_tmp = 0.0_SP
+    ! hz_tmp = 0.0_SP
+
+    ! pref = sngl(-1)
+    ! call cudaMatrVecMult( solution%Mx_s, solution%My_s, solution%Mz_s, hx_tmp, hy_tmp, hz_tmp, pref )
+
+
+    ! solution%HmX = solution%HmX + hx_tmp * problem%Mfact
+    ! solution%HmY = solution%HmY + hy_tmp * problem%Mfact
+    ! solution%HmZ = solution%HmZ + hz_tmp * problem%Mfact
+    !deallocate(hx_tmp, hy_tmp, hz_tmp, mxm, mym, mzm)
+    deallocate(hx_tmp, hy_tmp, hz_tmp)
+
 #else
     allocate(mxm(ntot), mym(ntot), mzm(ntot))
     allocate(temp(ntot))
