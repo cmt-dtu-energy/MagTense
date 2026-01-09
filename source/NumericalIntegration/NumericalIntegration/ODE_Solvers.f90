@@ -223,9 +223,10 @@ module ODE_Solvers
                 k = k+1
             endif
         enddo
-        
         !Clean up
         deallocate(thres)
+        deallocate(t_comb_unique, ind)
+        call collect_garbage(setup_comm)
     
     end subroutine MagTense_ODE_RKSuite
     
