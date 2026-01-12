@@ -211,5 +211,6 @@ if __name__ == "__main__":
         cvode=False,
         unstructured=True,
         plotting=True,
-        figpath=Path(__file__).parent.absolute().joinpath("..", "figs"),
+        #figpath=Path(__file__).parent.absolute().joinpath("..", "figs"),
+        figpath=None,
     )

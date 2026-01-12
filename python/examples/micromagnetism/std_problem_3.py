@@ -5,7 +5,7 @@ import numpy as np
 
 from magtense.micromag import MicromagProblem
 from magtense.utils import plot_M_avg_seq, plot_M_thin_film
-
+from magtense.computeMagneticEnergy import compute_magnetic_energy
 
 def std_prob_3(
     res: tuple[int, int, int] = (10, 10, 10),
@@ -30,6 +30,7 @@ def std_prob_3(
         alpha=1e3,
         cuda=cuda,
         cvode=cvode,
+        usereturnhall=True ,
     )
 
     problem.u_ea[:, 2] = 1
@@ -66,6 +67,8 @@ def std_prob_3(
                 t_end = 200e-9
 
             problem.grid_L = np.array([lex, lex, lex]) * L_loop[i]
+            tile_volumes = np.full(int(np.prod(res)), np.prod(problem.grid_L) / np.prod(res))
+
             t, M_out, _, H_exc, H_ext, H_dem, H_ani = (
                 problem.run_simulation(
                     t_end=t_end, nt=50, fct_h_ext=h_ext_fct, nt_h_ext=2
@@ -79,46 +82,11 @@ def std_prob_3(
                 plot_M_thin_film(M_sq[-1], res, title="3_end", figpath=figpath)
 
             # Calculate the energy terms
-            E_exc = np.sum(
-                (1 / 2)
-                * (
-                    M_out[:, :, 0, 0] * H_exc[:, :, 0, 0]
-                    + M_out[:, :, 0, 1] * H_exc[:, :, 0, 1]
-                    + M_out[:, :, 0, 2] * H_exc[:, :, 0, 2]
-                ),
-                axis=1,
+            E_exc, E_ext, E_dem, E_ani = compute_magnetic_energy(
+                M=M_out, H_exc=H_exc, H_ext=H_ext, H_dem=H_dem, H_ani=H_ani, Vols=tile_volumes, problem=problem, Ms=Ms
             )
 
-            E_ext = np.sum(
-                M_out[:, :, 0, 0] * H_ext[:, :, 0, 0]
-                + M_out[:, :, 0, 1] * H_ext[:, :, 0, 1]
-                + M_out[:, :, 0, 2] * H_ext[:, :, 0, 2],
-                axis=1,
-            )
-
-            E_dem = np.sum(
-                (1 / 2)
-                * (
-                    M_out[:, :, 0, 0] * H_dem[:, :, 0, 0]
-                    + M_out[:, :, 0, 1] * H_dem[:, :, 0, 1]
-                    + M_out[:, :, 0, 2] * H_dem[:, :, 0, 2]
-                ),
-                axis=1,
-            )
-
-            E_ani = np.sum(
-                (1 / 2)
-                * (
-                    M_out[:, :, 0, 0] * H_ani[:, :, 0, 0]
-                    + M_out[:, :, 0, 1] * H_ani[:, :, 0, 1]
-                    + M_out[:, :, 0, 2] * H_ani[:, :, 0, 2]
-                ),
-                axis=1,
-            )
-
-            E_arr[:, i, j] = mu0 * np.array(
-                [E_exc[-1], E_ext[-1], E_dem[-1], E_ani[-1]]
-            )
+            E_arr[:, i, j] = np.array([E_exc[-1].item(), E_ext[-1].item(), E_dem[-1].item(), E_ani[-1].item()])
 
             if plot_details:
                 plt.clf()
@@ -135,8 +103,8 @@ def std_prob_3(
 
     if plotting:
         plt.clf()
-        plt.plot(L_loop, np.sum(E_arr[:, :, 0], axis=0), ".")
-        plt.plot(L_loop, np.sum(E_arr[:, :, 1], axis=0), "o")
+        plt.plot(L_loop, np.sum(E_arr[:, :, 0], axis=0), ".", color="blue", markersize=8)
+        plt.plot(L_loop, np.sum(E_arr[:, :, 1], axis=0), ".", color="orange", markersize=8)
         plt.xlabel("L [l_ex]")
         plt.ylabel("Energy [-]")
         if figpath is None:
@@ -151,6 +119,7 @@ if __name__ == "__main__":
         cuda=True,
         cvode=False,
         plotting=True,
-        plot_details=True,
-        figpath=Path(__file__).parent.absolute().joinpath("..", "figs"),
+        plot_details=False,
+        #figpath=Path(__file__).parent.absolute().joinpath("..", "figs"),
+        figpath=None,
     )
