@@ -587,7 +587,7 @@ subroutine BuildNeighbourDemagTensor(problem)
     sources(3,i) = real(problem%grid%pts(i,3), DP)
   end do
 
-  call fmm_tree%build_tree(sources, problem%fmm_eps, problem%fmm_cells_per_node, ier)
+  call fmm_tree%build_tree(sources, problem%fmm_eps, problem%fmm_cells_per_node, ier, problem%ifunif)
   if (ier /= 0) stop "BuildNeighbourDemagTensor: fmm_tree%build_tree failed"
 
   call BuildNeighbourList_FromTree(problem, fmm_tree)

@@ -192,6 +192,7 @@ class MicromagProblem:
         self.dummy_run = 0
         self.fmm_cells_per_node = 100
         self.eps_fmm = 1e-4
+        self.ifunif = 1
 
     @property
     def passexch(self) -> int | None:
@@ -605,6 +606,7 @@ class MicromagProblem:
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.eps_fmm,
+            ifunif=self.ifunif,
         )
 
         n_tot_Exch = result[7]
@@ -710,7 +712,8 @@ class MicromagProblem:
             exch_presize=self.exch_presize,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
-            eps_fmm=self.eps_fmm
+            eps_fmm=self.eps_fmm,
+            ifunif=self.ifunif,
         )
 
         n_tot_Exch = result[7]
