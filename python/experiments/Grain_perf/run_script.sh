@@ -13,7 +13,7 @@ MESH_TEMPLATE="Grid_rasBase_%d_nGrains_25_nRef_1_dG_3.75e-09.mat"
 #BASES=(31)
 #BASES=(10 13 16 20 25 31)
 #BASES=(31 25 20 16 13 10)
-BASES=(40)
+BASES=(46)
 LEVELS=(3)
 #LEVELS=(1 2 3)
 
