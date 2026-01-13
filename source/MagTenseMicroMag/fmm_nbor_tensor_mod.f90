@@ -587,7 +587,7 @@ subroutine BuildNeighbourDemagTensor(problem)
     sources(3,i) = real(problem%grid%pts(i,3), DP)
   end do
 
-  call fmm_tree%build_tree(sources, problem%fmm_eps, problem%fmm_cells_per_node, ier, problem%ifunif)
+  call fmm_tree%build_tree(sources, problem%fmm_eps, problem%fmm_cells_per_node, ier, problem%ifunif, problem%nlmin, problem%nlmax)
   if (ier /= 0) stop "BuildNeighbourDemagTensor: fmm_tree%build_tree failed"
 
   call BuildNeighbourList_FromTree(problem, fmm_tree)
@@ -598,8 +598,6 @@ subroutine BuildNeighbourDemagTensor(problem)
 
   deallocate(fmm_tree)
   deallocate(sources)
-
-
 
   !TODO - add again option to 'short circuit' FMM and just use standard CUDA
 

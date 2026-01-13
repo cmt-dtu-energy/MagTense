@@ -194,13 +194,13 @@ module fmm3d_tree_mod
     contains 
 
 
-      subroutine build_tree(self, source, eps, ndiv, ier, ifunif)
+      subroutine build_tree(self, source, eps, ndiv, ier, ifunif, nlmin, nlmax)
         class(FMM3DTree), intent(inout) :: self
         double precision, contiguous, pointer :: source(:,:)
         double precision eps
         integer ndiv
         integer ier
-        integer :: ifunif
+        integer :: ifunif, nlmin, nlmax
         !------------------------------------------------
         integer :: i
         !-----------------
@@ -222,6 +222,8 @@ module fmm3d_tree_mod
         self%ier = ier
         self%ntarg = 0
         self%ifunif = ifunif
+        self%nlmin = nlmin
+        self%nlmax = nlmax
 
         !$omp parallel
         !$omp single
@@ -431,7 +433,7 @@ module fmm3d_tree_mod
         double precision, contiguous, pointer :: rmlexp(:)
          integer :: iert
         double precision, contiguous, pointer :: scales(:)
-
+ 
         !----------------
         integer :: i, ilev
         !------------------------------------------------
@@ -443,7 +445,7 @@ module fmm3d_tree_mod
         end if
 
 
-        call pts_tree_mem(self%source,self%nsource,self%targ,0,self%idivflag,self%ndiv,self%nlmin, &
+        call pts_tree_mem(self%source,self%nsource,self%targ,0,self%idivflag,self%ndiv,self%nlmin, & 
             &    self%nlmax,self%iper,self%ifunif,self%nlevels,self%nboxes,self%ltree)
 
 
@@ -1251,7 +1253,7 @@ module fmm3d_tree_mod
 
 #if USE_TIMING
       self%setup_time = self%setup_time + (walltime() - self%t1)
-      self%t1 = walltime()
+      self%t1 = walltime() 
 #endif   
 
         !call self%reset_sort_arg()

@@ -178,6 +178,8 @@ include "mkl_dfti.f90"
         integer :: fmm_cells_per_node
         real(DP) :: fmm_eps 
         integer :: ifunif = 1 
+        integer :: nlmin = 0
+        integer :: nlmax = 5
         logical :: use_fmm = .true.
         integer, dimension(:,:), pointer :: nbr_idx(:,:) => null()    !> Neighbour indices for each target cell
         integer, dimension(:), pointer :: n_nbors(:) => null()

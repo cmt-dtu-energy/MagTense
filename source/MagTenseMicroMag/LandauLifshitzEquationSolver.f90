@@ -952,10 +952,10 @@ subroutine updateDemagfieldFMM(problem, solution)
     mz = solution%Mz(i) * vol_i * problem%Ms(i)
     !------------------------------------------------------------
     !-------------- pack dipole vector ---------------------------
-    dipvec(1,1,i) = mx
+    dipvec(1,1,i) = mx 
     dipvec(1,2,i) = my
     dipvec(1,3,i) = mz
-    !------------------------------------------------------------
+    !------------------------------------------------------------ 
   end do
     !--------------------------------------------------------------
 #if USE_TIMING
@@ -964,7 +964,7 @@ subroutine updateDemagfieldFMM(problem, solution)
 #endif
   !------------------ Call FMM (sources->sources) ------------------
   nd = 1
-   call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif)
+   call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif, problem%nlmin, problem%nlmax)
  !   print *, " after build tree"
 
    !------- only run if number of boxes > 9 -----------
