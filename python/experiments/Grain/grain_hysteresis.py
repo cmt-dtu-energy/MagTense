@@ -72,6 +72,8 @@ def grain_hysteresis(
     ifunif: int = 1,
     nlmin: int = 1,
     nlmax: int = 5,
+    allow_fmm_short_circuit: int = 0,
+    fmm_min_n: int = 20000
 ) -> None:
     """
     Run a hysteresis simulation for a given grain mesh, compute diagnostics,
@@ -93,7 +95,7 @@ def grain_hysteresis(
 
 
     h_ext_base = Hyst_dir / mu0
-    #steps = np.arange(1.0, -7.1, -0.1)
+    steps = np.arange(1.0, -7.1, -0.1)
     steps = np.arange(1.0, 0.8, -0.1)
 
     H_ext = np.zeros((len(steps), 4))
@@ -143,6 +145,8 @@ def grain_hysteresis(
         problem_ini.ifunif = ifunif
         problem_ini.nlmin = nlmin
         problem_ini.nlmax = nlmax
+        problem_ini.allow_fmm_short_circuit = allow_fmm_short_circuit
+        problem_ini.fmm_min_n = fmm_min_n
 
 
 
@@ -232,6 +236,8 @@ def grain_hysteresis(
     problem.ifunif = ifunif
     problem.nlmin = nlmin
     problem.nlmax = nlmax
+    problem.allow_fmm_short_circuit = allow_fmm_short_circuit
+    problem.fmm_min_n = fmm_min_n
 
     start_time = time.time()
     res = problem.run_hysteresis(H_ext=H_ext)
@@ -385,6 +391,13 @@ if __name__ == "__main__":
 
     parser.add_argument("--nlmax", type=int, default=5,
                         help="Maximum level for adaptive FMM tree")
+    
+
+    parser.add_argument("--allow-fmm-short-circuit", type=int, default=0,
+                        help="Allow FMM short circuit")
+
+    parser.add_argument("--fmm-min-n", type=int, default=20000,
+                        help="Minimum number of elements for FMM short circuit")
 
     args = parser.parse_args()
     
@@ -401,6 +414,8 @@ if __name__ == "__main__":
     print(f"  ifunif = {args.ifunif}")
     print(f"  nlmin = {args.nlmin}")
     print(f"  nlmax = {args.nlmax}")
+    print(f"  allow_fmm_short_circuit = {args.allow_fmm_short_circuit}")
+    print(f"  fmm_min_n = {args.fmm_min_n}")
 
     grain_hysteresis(
         use_fmm=args.use_fmm,
@@ -414,5 +429,7 @@ if __name__ == "__main__":
         ifunif=args.ifunif,
         nlmin=args.nlmin,
         nlmax=args.nlmax,
+        allow_fmm_short_circuit=args.allow_fmm_short_circuit,
+        fmm_min_n=args.fmm_min_n
     )
 

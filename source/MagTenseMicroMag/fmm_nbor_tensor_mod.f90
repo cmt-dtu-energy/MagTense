@@ -599,6 +599,17 @@ subroutine BuildNeighbourDemagTensor(problem)
   deallocate(fmm_tree)
   deallocate(sources)
 
+
+  if (problem%allow_fmm_short_circuit .eq. 1 .and. ntot < problem%fmm_min_n) then
+    print *, " Short circuiting FMM - disabling FMM"
+    call dealloc_fmm_arrays(problem)
+    problem%use_fmm = .false.
+    return
+  end if 
+
+
+
+
   !TODO - add again option to 'short circuit' FMM and just use standard CUDA
 
 

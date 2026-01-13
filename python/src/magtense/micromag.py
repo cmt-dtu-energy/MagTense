@@ -195,6 +195,8 @@ class MicromagProblem:
         self.ifunif = 1
         self.nlmin = 1
         self.nlmax = 5
+        self.allow_fmm_short_circuit = 1
+        self.fmm_min_n = 20_000
 
     @property
     def passexch(self) -> int | None:
@@ -611,6 +613,8 @@ class MicromagProblem:
             ifunif=self.ifunif,
             nlmin=self.nlmin,
             nlmax=self.nlmax,
+            allow_fmm_short_circuit=self.allow_fmm_short_circuit,
+            fmm_min_n=self.fmm_min_n
         )
 
         n_tot_Exch = result[7]
@@ -720,6 +724,8 @@ class MicromagProblem:
             ifunif=self.ifunif,
             nlmin=self.nlmin,
             nlmax=self.nlmax,
+            allow_fmm_short_circuit=self.allow_fmm_short_circuit,
+            fmm_min_n=self.fmm_min_n
         )
 
         n_tot_Exch = result[7]

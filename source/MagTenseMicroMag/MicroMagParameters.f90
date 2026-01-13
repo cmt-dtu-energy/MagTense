@@ -181,6 +181,9 @@ include "mkl_dfti.f90"
         integer :: nlmin = 0
         integer :: nlmax = 5
         logical :: use_fmm = .true.
+        integer :: allow_fmm_short_circuit = 0
+        integer :: fmm_min_n = 20000    !> Minimum number of cells to use FMM
+
         integer, dimension(:,:), pointer :: nbr_idx(:,:) => null()    !> Neighbour indices for each target cell
         integer, dimension(:), pointer :: n_nbors(:) => null()
         real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:) => null()

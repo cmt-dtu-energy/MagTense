@@ -102,22 +102,20 @@
         call displayGUIMessage( 'Copying to CUDA' ) 
 #if USE_CUDA
 #if USE_FMM3D 
-        !if ( gb_problem%use_fmm) then
+        if ( gb_problem%use_fmm) then
           call displayGUIMessage( 'copying nbr_corr for FMM nbor correction')  
           !call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
-         
           call cudaInit_sparse( gb_problem%K_fmm_s )    
-
-        !else 
-        !  !Initialize the Cuda arrays and load the demag tensors into the GPU memory
-        !  if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
-        !      !If the matrices are sparse
-        !      call cudaInit_sparse( gb_problem%K_s )            
-        !  else
-        !      !if the matrices are dense 
-        !      call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
-        !  endif
-        !end if
+        else 
+          !Initialize the Cuda arrays and load the demag tensors into the GPU memory
+          if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
+              !If the matrices are sparse
+              call cudaInit_sparse( gb_problem%K_s )            
+          else
+              !if the matrices are dense 
+              call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+          endif
+        end if
 #else
         !Initialize the Cuda arrays and load the demag tensors into the GPU memory
         if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
@@ -377,11 +375,11 @@
         ! hmy_before = gb_solution%HmY(:)
         ! hmz_before = gb_solution%HmZ(:)
 #if USE_FMM3D
-        !if ( gb_problem%use_fmm)  then
+        if ( gb_problem%use_fmm)  then
           call updateDemagfieldFMM( gb_problem, gb_solution )
-        !else
-        !   call updateDemagfield( gb_problem, gb_solution )
-        !end if
+        else
+           call updateDemagfield( gb_problem, gb_solution )
+        end if
             !call updateDemagfieldFMM_old( gb_problem, gb_solution )
         ! hmx_fmm = gb_solution%HmX(:)
         ! hmy_fmm = gb_solution%HmY(:)
@@ -559,11 +557,11 @@
         call updateAnisotropy(  gb_problem, gb_solution )
         !Demag. field
 #if USE_FMM3D
-        !if ( gb_problem%use_fmm)  then
+        if ( gb_problem%use_fmm)  then
           call updateDemagfieldFMM( gb_problem, gb_solution )
-        !else
-        !   call updateDemagfield( gb_problem, gb_solution )
-        !end if
+        else
+           call updateDemagfield( gb_problem, gb_solution )
+        end if
 #else
         call updateDemagfield( gb_problem, gb_solution )
 #endif
@@ -1344,10 +1342,10 @@ end subroutine updateDemagfieldFMM
     !Demagnetization tensor matrix
 #if USE_FMM3D
     !call BuildNeighbourDemagTensor( problem, 2) ! hardcode 2 levels of neighbour cells for now
-call BuildNeighbourDemagTensor( problem) ! hardcode 2 levels of neighbour cells for now
-    !if ( .not. problem%use_fmm) then
-    !   call ComputeDemagfieldTensor( problem )
-    !end if
+    call BuildNeighbourDemagTensor( problem) ! hardcode 2 levels of neighbour cells for now
+    if (.not. problem%use_fmm) then
+       call ComputeDemagfieldTensor( problem )
+    end if
 #else
     call ComputeDemagfieldTensor( problem )
 #endif
