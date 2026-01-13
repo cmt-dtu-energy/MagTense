@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -90,8 +89,8 @@ def grain_hysteresis(
 
 
     h_ext_base = Hyst_dir / mu0
-    #steps = np.arange(1.0, -7.1, -0.1)
-    steps = np.arange(1.0, 0.8, -0.1)
+    steps = np.arange(1.0, -7.1, -0.1)
+    #steps = np.arange(1.0, 0.8, -0.1)
 
     H_ext = np.zeros((len(steps), 4))
     H_ext[:, 0] = steps
@@ -131,9 +130,7 @@ def grain_hysteresis(
 
 
 
-        #problem_ini.exch_presize = 10 * problem_ini.nt * len(steps)
-        nnbor = 27 # assmue 27 nearest neighbors for exchange
-        problem_ini.exch_presize = problem_ini.nt * (nnbor+1)
+        problem_ini.exch_presize = 3 * problem_ini.nt * len(steps)
         problem_ini.dummy_run = 1
         problem_ini.fmm_cells_per_node = fmm_cells_per_node if use_fmm else 0
         problem_ini.fmm_eps = fmm_eps
@@ -205,7 +202,7 @@ def grain_hysteresis(
             exch_nval=exch_nval,
             exch_nrow=exch_nrow,
             exch_ncols=exch_ncols,
-            passexch=0,
+            passexch=1,
         )
 
     #-------- for testing
@@ -213,10 +210,7 @@ def grain_hysteresis(
     #problem.thres = 1e-10
     #-------- modify material parameters
 
-    #problem.exch_presize = 10 * problem.nt * len(steps)
-    nnbor = 27 # assmue 27 nearest neighbors for exchange
-    problem.exch_presize = problem.nt * (nnbor+1)
-
+    problem.exch_presize = 3 * problem.nt * len(steps)
     problem.dummy_run = 0
     problem.fmm_cells_per_node = fmm_cells_per_node if use_fmm else 0
     problem.fmm_eps = fmm_eps
@@ -335,57 +329,19 @@ def grain_hysteresis(
         print(f"Saved figure to: {fig_path}")
 
 if __name__ == "__main__":
-    default_figpath = Path(__file__).parent.absolute().joinpath("..", "figs_perf")
-
-    parser = argparse.ArgumentParser(
-        description="Run grain hysteresis experiment"
-    )
-
-    parser.add_argument("--use-fmm", action="store_true",
-                        help="Enable FMM demagnetisation")
-
-    parser.add_argument("--fmm-eps", type=float, default=1e-4,
-                        help="FMM accuracy parameter")
-
-    parser.add_argument("--fmm-cpn", type=int, default=660,
-                        help="Cells per FMM tree node")
-
-    parser.add_argument("--cuda", action="store_true",
-                        help="Enable CUDA acceleration")
-
-    parser.add_argument("--cvode", action="store_true",
-                        help="Enable CVODE time integration")
-
-    parser.add_argument("--mesh-file", type=str, required=True,
-                        help="Input mesh .mat file")
-
-    parser.add_argument("--do-plot", action="store_true",
-                        help="Enable plotting")
-
-    parser.add_argument("--figpath", type=Path, default=default_figpath,
-                        help="Output directory for figures")
-
-    args = parser.parse_args()
-    
-
-    print("Running grain hysteresis experiment with parameters:")
-    print(f"  use_fmm = {args.use_fmm}")
-    print(f"  fmm_eps = {args.fmm_eps}")
-    print(f"  fmm_cpn = {args.fmm_cpn}")
-    print(f"  cuda = {args.cuda}")
-    print(f"  cvode = {args.cvode}")
-    print(f"  mesh_file = {args.mesh_file}")
-    print(f"  do_plot = {args.do_plot}")
-    print(f"  figpath = {args.figpath}")
+    default_figpath = Path(__file__).parent.absolute().joinpath("..", "figs")
 
     grain_hysteresis(
-        use_fmm=args.use_fmm,
-        fmm_eps=args.fmm_eps,
-        fmm_cells_per_node=args.fmm_cpn,
-        cuda=args.cuda,
-        cvode=args.cvode,
-        mesh_file=args.mesh_file,
-        plotting=args.do_plot,
-        figpath=args.figpath,
+        use_fmm=True,
+        fmm_eps=1e-4,
+        fmm_cells_per_node=660,
+        cuda=True, #NOTE - with new FMM implementation that uses CUDA for near field we have to set CUDA true...
+        cvode=False,
+        #mesh_file="Grid_rasBase_5_nGrains_5_nRef_3_dG_5e-09.mat",
+        #mesh_file="Grid_rasBase_5_nGrains_25_nRef_3_dG_3.75e-09.mat",
+        mesh_file="Grid_rasBase_5_nGrains_25_nRef_4_dG_3.75e-09.mat",
+        #mesh_file="Grid_rasBase_5_nGrains_5_nRef_4_dG_3.75e-09.mat",
+        #mesh_file="Grid_rasBase_6_nGrains_25_nRef_4_dG_3.75e-09.mat",
+        plotting=True,
+        figpath=default_figpath,
     )
-
