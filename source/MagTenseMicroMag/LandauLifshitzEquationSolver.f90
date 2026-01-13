@@ -63,7 +63,7 @@
     real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
     character*(100) :: prog_str 
     real :: rate
-    integer :: c1,c2,cr,cm
+    integer :: c1,c2,cr,cm 
     
     ! First initialize the system_clock
     call system_clock(count_rate=cr)
@@ -504,13 +504,6 @@
             !----------------------------------------------------------
 #endif
     end subroutine dmdt_fct
-
-    !>-----------------------------------------
-    !> Calculates the wall time using omp_get_wtime
-    real(8) function walltime()
-        use omp_lib, only: omp_get_wtime
-        walltime = omp_get_wtime()
-    end function walltime
 
     
     !>--------------------------
@@ -971,7 +964,7 @@ subroutine updateDemagfieldFMM(problem, solution)
 #endif
   !------------------ Call FMM (sources->sources) ------------------
   nd = 1
-   call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier)
+   call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif)
  !   print *, " after build tree"
 
    !------- only run if number of boxes > 9 -----------
