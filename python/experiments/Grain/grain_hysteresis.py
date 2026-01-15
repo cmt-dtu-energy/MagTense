@@ -96,7 +96,7 @@ def grain_hysteresis(
 
     h_ext_base = Hyst_dir / mu0
     steps = np.arange(1.0, -7.1, -0.1)
-    steps = np.arange(1.0, 0.8, -0.1)
+    #steps = np.arange(1.0, 0.8, -0.1)
 
     H_ext = np.zeros((len(steps), 4))
     H_ext[:, 0] = steps
@@ -301,6 +301,8 @@ def grain_hysteresis(
     mesh_path = Path(mesh_file)
     stem = mesh_path.stem
     #backend_tag = "_cuda" if cuda else "_fmm"
+
+    #TODO - add some info about level etc.
     backend_tag = "_fmm" if use_fmm else "_cuda"
     if use_fmm: 
         backend_tag += f"_eps{fmm_eps:.2e}_cpn{fmm_cells_per_node}"
@@ -353,7 +355,7 @@ def grain_hysteresis(
         print(f"Saved figure to: {fig_path}")
 
 if __name__ == "__main__":
-    default_figpath = Path(__file__).parent.absolute().joinpath("..", "figs_perf")
+    default_figpath = Path(__file__).parent.absolute().joinpath("..", "figs")
 
     parser = argparse.ArgumentParser(
         description="Run grain hysteresis experiment"
