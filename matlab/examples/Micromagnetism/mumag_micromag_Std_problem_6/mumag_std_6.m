@@ -34,14 +34,15 @@ HPs=containers.Map({'akj','ak','aj','a','kj','k','j',''},[1.568,1.089,1.206,0.83
 if ~exist('settings','var')
     settings='akj';
 end
-solver='CVODE';
-if ~exist('useCVODE','var')
+solver='RK';
+if (strcmp(solver,'CVODE'))
     useCVODE=true;
-elseif ~useCVODE
+else
+    useCVODE=false;
     solver='RK';
 end
 if ~exist('tsteps','var')
-    tsteps=401; % Overkill, but gives RK a fighting chance.
+    tsteps=201; % Overkill, but gives RK a fighting chance.
 end
 T_HP=HPs(settings); % Theoretical pinning field in our case.
 title_str=['"',settings,'" -- ',solver, ', ', num2str(tsteps),' steps, theoretical pinning field: ',num2str(T_HP),' T'];
@@ -83,6 +84,7 @@ problem.dem_thres = dem_thres;                                  % turn off demag
 problem = problem.setMicroMagGridType('unstructuredPrisms');
 problem = problem.setSolverType( 'UseDynamicSolver' );
 problem = problem.setMicroMagSolver( 'Dynamic' );
+problem.ReturnHall = int32(1);
 
 problem.grid_pts = mesh_cart.pos_out ;
 problem.grid_abc = mesh_cart.dims_out ;
@@ -93,7 +95,7 @@ problem.alpha = alpha;
 problem.gamma = gamma;
 problem.Ms = Ms*ones(prod(resolution),1);
 problem.K0 = K0*ones(prod(resolution),1);
-problem.A0 = A0;
+problem.A0 = A0*ones(prod(resolution),1);
 
 %% Grain anisotropies
 easyX = 1 ;
@@ -119,29 +121,30 @@ Aexch=ones(numel(GridInfo.Xel),1);
 if contains(settings,'a')% soft exchange stiffness in left phase
     for i=1:nGrains/2 	 % This corresponds to the first half of the grains
         Aexch(mesh_cart.iIn{i})= A0_soft/A0 ; % Hack so exchange strength varies
+        problem.A0(mesh_cart.iIn{i}) = A0_soft;
     end
 end
-if ~useFinDif
-    % Direct Laplacian
-    if numel(unique(GridInfo.Zel))-1
-        [D2X,D2Y,D2Z] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
-        InteractionMatrices.A2 = D2X + D2Y + D2Z ;
-    elseif numel(unique(GridInfo.Yel))-1
-        [D2X,D2Y] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
-        InteractionMatrices.A2 = D2X + D2Y ;
-    else
-        [D2X] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
-        InteractionMatrices.A2 = D2X ;
-    end
-
-    %--- Convert the exchange matrix to sparse
-    problem = problem.setExchangeMatrixSparse( InteractionMatrices.A2 );
-
-else
-    % Finite difference stencil
-    D2A = computeDifferentialOperatorsFromMesh_Neumann_FiniteDifference(GridInfo,Aexch);
-    problem = problem.setExchangeMatrixSparse( D2A );
-end
+% if ~useFinDif
+%     % Direct Laplacian
+%     if numel(unique(GridInfo.Zel))-1
+%         [D2X,D2Y,D2Z] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
+%         InteractionMatrices.A2 = D2X + D2Y + D2Z ;
+%     elseif numel(unique(GridInfo.Yel))-1
+%         [D2X,D2Y] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
+%         InteractionMatrices.A2 = D2X + D2Y ;
+%     else
+%         [D2X] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
+%         InteractionMatrices.A2 = D2X ;
+%     end
+% 
+%     %--- Convert the exchange matrix to sparse
+%     problem = problem.setExchangeMatrixSparse( InteractionMatrices.A2 );
+% 
+% else
+%     % Finite difference stencil
+%     D2A = computeDifferentialOperatorsFromMesh_Neumann_FiniteDifference(GridInfo,Aexch);
+%     problem = problem.setExchangeMatrixSparse( D2A );
+% end
 
 %% Applied Field
 HystDir = normalize([easyX,easyY,easyZ],'norm') ;
@@ -224,8 +227,8 @@ if runFortranPart
     ylabel('\langle m_x \rangle')
     title(title_str)
     Hp = min(H(MxMean2>1-1e-3));
-    save(['Std_prob_6\',fnameSave,solver,extra,'SolutionSetting',settings,'_',num2str(tsteps),'_tsteps.mat'],'solution','Hp','H','M') ;
-    savefig(['Std_prob_6\',solver,extra,'_',num2str(tsteps),'_',settings,'_no_precond'])
+    save([fnameSave,solver,extra,'SolutionSetting',settings,'_',num2str(tsteps),'_tsteps.mat'],'solution','Hp','H','M') ;
+    savefig([solver,extra,'_',num2str(tsteps),'_',settings,'_no_precond'])
 end
-close all
+
 end

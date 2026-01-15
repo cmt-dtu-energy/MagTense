@@ -49,6 +49,7 @@ for i = 1:length(L_loop)
     problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
     problem = problem.setUseCuda( options.use_CUDA );
     problem = problem.setUseCVODE( options.use_CVODE );
+    problem.ReturnHall = int32(1);
     problem = problem.setMicroMagGridType('unstructuredPrisms');
 
     %--- Save the parameters
@@ -65,18 +66,6 @@ for i = 1:length(L_loop)
     problem.grid_abc    = mesh.dims_out;
     lex = sqrt(problem.A0/(1/2*mu0*Ms^2));
     thisGridL = [lex,lex,lex]*L_loop(i); %m
-
-    %--- Calculate the exchange matrix
-    InteractionMatrices.GridInfo = GridInfo;
-    InteractionMatrices.X = GridInfo.Xel ;
-    InteractionMatrices.Y = GridInfo.Yel ;
-    InteractionMatrices.Z = GridInfo.Zel ;
-
-    [D2X,D2Y,D2Z] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',6,"DirectLaplacianNeumann");
-    InteractionMatrices.A2 = D2X + D2Y + D2Z ;
-
-    %--- Convert the exchange matrix to sparse
-    problem = problem.setExchangeMatrixSparse( InteractionMatrices.A2 );
 
     problem.setTimeDis = int32(10);
     HextFct = @(t) (t)' .* [0,0,0];
@@ -150,8 +139,8 @@ end
 elapsedTime = toc
 
 if (options.ShowTheResult)
-    plot(fig10,L_loop,sum(E_arr(:,:,1),1),'.')
-    plot(fig10,L_loop,sum(E_arr(:,:,2),1),'.')
+    plot(fig10,L_loop,sum(E_arr(:,:,1),1),'.','MarkerSize',20)
+    plot(fig10,L_loop,sum(E_arr(:,:,2),1),'.','MarkerSize',20)
     xlabel(fig10,'L [l_{ex}]')
     ylabel(fig10,'E [-]')
     legend(fig10,'Flower state','Vortex state');

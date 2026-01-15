@@ -13,7 +13,7 @@ function tiles = IterateMagnetization( tiles, stateFunction, T, max_err, nIte )
 
     if isempty( stateFunction )
         %%Make a default stateFunction
-        stateFunction = getStateFunctionSoftIron();
+        stateFunction = MagTenseTilesUtil.getStateFunctionSoftIron();
     end
     
     if isempty(T)
@@ -26,6 +26,9 @@ function tiles = IterateMagnetization( tiles, stateFunction, T, max_err, nIte )
             [clr,tiles(i).color] = colornames('Matlab',tiles(i).color);
         end
     end
-
+    
+    if ~isstruct(tiles)
+        tiles = struct(tiles);
+    end
     tiles = IterateMagnetization_mex( tiles, int32(length(tiles)), stateFunction, int32(length(stateFunction)), T, max_err, int32(nIte));
 end

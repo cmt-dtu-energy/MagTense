@@ -509,7 +509,7 @@ methods
 
     function obj = setExchangeMatrixSparse( obj, ExchangeMatrix )
     % Convert the Exchange matrix to CSR and store it in the problem statement
-        [v,c,rs,re]   = convertToCSR(ExchangeMatrix);
+        [v,c,rs,re]   = DefaultMicroMagProblem.convertToCSR(ExchangeMatrix);
         obj.exch_nval = int32(numel(v));
         obj.exch_nrow = int32(numel(rs));
         obj.exch_val  = double(v);
@@ -663,5 +663,15 @@ methods
         warning('on','MATLAB:structOnObject')
     end
     
+end
+
+methods (Static)
+    function [v,c,rs,re] = convertToCSR(B)
+        [c,r,v] = find(B');
+        dr = diff(r);
+        rtmp = repelem(find(dr > 0)+1,dr(dr>0));
+        rs = [1; rtmp];
+        re = [rtmp; length(r)+1];
+    end
 end
 end
