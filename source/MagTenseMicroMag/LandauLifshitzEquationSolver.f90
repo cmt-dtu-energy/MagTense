@@ -2200,14 +2200,8 @@ subroutine add_near_field(problem, solution)
   ntot = size(problem%grid%pts, dim=1)
 
 
-  !TODO - These matrices are not actually that sparse. May consider using dense instead
 #if USE_CUDA
-    !allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) , mxm(ntot), mym (ntot), mzm (ntot) )
     allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) )
-
-    !mxm = solution%Mx_s * real(problem%Ms, SP)
-    !mym = solution%My_s * real(problem%Ms, SP)
-    !mzm = solution%Mz_s * real(problem%Ms, SP)
     hx_tmp = 0.0_SP
     hy_tmp = 0.0_SP
     hz_tmp = 0.0_SP
@@ -2219,19 +2213,6 @@ subroutine add_near_field(problem, solution)
     solution%HmY = solution%HmY - hy_tmp  * problem%Mfact
     solution%HmZ = solution%HmZ - hz_tmp  * problem%Mfact
 
-  
-    ! hx_tmp = 0.0_SP
-    ! hy_tmp = 0.0_SP
-    ! hz_tmp = 0.0_SP
-
-    ! pref = sngl(-1)
-    ! call cudaMatrVecMult( solution%Mx_s, solution%My_s, solution%Mz_s, hx_tmp, hy_tmp, hz_tmp, pref )
-
-
-    ! solution%HmX = solution%HmX + hx_tmp * problem%Mfact
-    ! solution%HmY = solution%HmY + hy_tmp * problem%Mfact
-    ! solution%HmZ = solution%HmZ + hz_tmp * problem%Mfact
-    !deallocate(hx_tmp, hy_tmp, hz_tmp, mxm, mym, mzm)
     deallocate(hx_tmp, hy_tmp, hz_tmp)
 
 #else
