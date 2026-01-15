@@ -10,20 +10,19 @@ addpath('../../../MEX_files/');
 mu0 = 4*pi*1e-7;
 
 %%Get a default tile from MagTense
-tile = getDefaultMagTile();
+tile = DefaultMagTile();
     
 %ensure the tile is a permanent magnet
-tile.magnetType = getMagnetType('hard');
+tile = tile.setMagnetType('hard');
 
 %set the geometry to be a rectangular prism
-tile.tileType = getMagTileType('prism');
+tile = tile.setMagTileType('prism');
 
 %set the dimensions of the prism
 tile.abc = [0.6,0.1,0.3];
 
 %set the center position of the prism (centered at Origo)
 tile.offset = [0.5,0.4,0.1];
-% tile.offset = [0,0,0];
 
 %set the rotation of the prism (centered at Origo)
 %the rotation is such that there is first rotation around the z-axis (last
@@ -67,6 +66,7 @@ pts((numel(x)+1):(numel(x)+numel(y)),:) = [zeros(1,numel(x))+tile.offset(1); y; 
 pts((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)),:) = [zeros(1,numel(x))+tile.offset(1); zeros(1,numel(y))+tile.offset(2); z]';
 
 %get the field
+tile = struct(tile);
 H = getHFromTiles_mex( tile, pts, int32( length(tile) ), int32( length(pts(:,1)) ) );
          
 %Find the norm of the field

@@ -18,13 +18,13 @@ mu0 = 4*pi*1e-7;
 Ms = 20.1;
 
 %%Get a default tile from MagTense
-tile = getDefaultMagTile();
+tile = DefaultMagTile();
     
 %ensure the tile is a permanent magnet
-tile.magnetType = getMagnetType('hard');
+tile = tile.setMagnetType('hard');
 
 %set the geometry to be a rectangular prism
-tile.tileType = getMagTileType('prism');
+tile = tile.setMagTileType('prism');
 
 %set the dimensions of the prism (5 mm on either side)
 d = 0.005;
@@ -58,9 +58,9 @@ tiles(3).u_oa1 = [0,1,0];
 tiles(3).u_oa1 = [0,0,1];
 
 if (fe_type == 2)
-    tiles(2).magnetType = getMagnetType('soft_const_mur');
+    tiles(2) = tiles(2).setMagnetType('soft_const_mur');
 else
-    tiles(2).magnetType = getMagnetType('soft');
+    tiles(2) = tiles(2).setMagnetType('soft');
 end
 tiles(2).offset(2) = 2*d;
 tiles(2).Mrem = 0;
@@ -101,7 +101,7 @@ for i=1:1%length(mur)
     if (fe_type == 2)
         tiles = IterateMagnetization( tiles, [], [], 1e-6, 1000 );
     else
-        stFcn=MakeMH_Fe_const_mur( mur, Ms );
+        stFcn = MagTenseTilesUtil.MakeMH_Fe_const_mur( mur, Ms );
         tiles = IterateMagnetization( tiles, stFcn, 300, 1e-6, 1000 );
     end
     
@@ -169,32 +169,4 @@ z = [z_t z_e];
 
 %Plot the solution in a contour map
 figure; quiver(x',y',H(:,1)./sqrt(sum(H(:,:).^2,2)),H(:,2)./sqrt(sum(H(:,:).^2,2)));
-
-Hx_c = load(['Hx_' num2str(mur) '.txt']);
-Hy_c = load(['Hy_' num2str(mur) '.txt']);
-
-Hx_c(:,3) = mu0*Hx_c(:,3);
-Hy_c(:,3) = mu0*Hy_c(:,3);
-
-Fx_c = scatteredInterpolant(Hx_c(:,1),Hx_c(:,2),Hx_c(:,3));
-Hx_c = Fx_c(x,y);
-
-Fy_c = scatteredInterpolant(Hy_c(:,1),Hy_c(:,2),Hy_c(:,3));
-Hy_c = Fy_c(x,y);
-
-figure; quiver(x,y,Hx_c./sqrt(Hx_c.^2+Hy_c.^2),Hy_c./sqrt(Hx_c.^2+Hy_c.^2));
-
-figure; plot3(x,y,H(:,1),'.'); hold all; plot3(x,y,Hx_c,'o');
-figure; plot3(x,y,H(:,2),'.'); hold all; plot3(x,y,Hy_c,'o');
-% figure; plot3(x,y,(H(:,1)-Hx_c')./Hx_c','.');
-
-x2 = linspace( 1.30*d,2.70*d, 101);
-y2 = linspace( -0.70*d,0.70*d, 101);
-[x2,y2,z2] = meshgrid(x2,y2,0);
-
-vqx = griddata(x,y,(H(:,1)-Hx_c')./Hx_c',x2,y2);
-vqy = griddata(x,y,(H(:,2)-Hy_c')./Hy_c',x2,y2);
-
-figure; surf(x2,y2,vqx,'linestyle','none'); shading interp;
-figure; surf(x2,y2,vqy,'linestyle','none'); shading interp;
 end

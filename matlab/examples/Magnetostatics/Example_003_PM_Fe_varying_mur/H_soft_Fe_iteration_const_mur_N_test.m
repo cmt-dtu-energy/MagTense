@@ -22,7 +22,7 @@ for i=1:n-1
     Hy(i+1) = Happ + N * (mur-1) * Hy(i);
 end
 
-getFigure();
+figure; hold all;
 plot(Hy,'-o','linewidth',2);
 plot([0,n],[Hy_a Hy_a],'--','linewidth',2)
 %ylim([-1,4])

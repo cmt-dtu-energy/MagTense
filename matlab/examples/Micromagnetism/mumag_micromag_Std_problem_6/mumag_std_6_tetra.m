@@ -83,6 +83,7 @@ problem = problem.setMicroMagDemagApproximation(demag_approx);  % turn off demag
 problem.dem_thres = dem_thres;                                  % turn off demag field
 problem = problem.setSolverType( 'UseDynamicSolver' );
 problem = problem.setMicroMagSolver( 'Dynamic' );
+problem.ReturnHall = int32(1);
 
 %--- Information on the grid
 problem.grid_pts    = [GridInfo.Xel, GridInfo.Yel, GridInfo.Zel] ;
@@ -122,16 +123,16 @@ if contains(settings,'a') % soft exchange stiffness in left phase
     Aexch(left_region)= A0_soft/A0 ; % Hack so exchange strength varies
 end
 
-if numel(unique(GridInfo.Zel))-1
-    [D2X,D2Y,D2Z] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
-    InteractionMatrices.A2 = D2X + D2Y + D2Z ;
-elseif numel(unique(GridInfo.Yel))-1
-    [D2X,D2Y] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
-    InteractionMatrices.A2 = D2X + D2Y ;
-else
-    [D2X] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
-    InteractionMatrices.A2 = D2X ;
-end
+% if numel(unique(GridInfo.Zel))-1
+%     [D2X,D2Y,D2Z] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
+%     InteractionMatrices.A2 = D2X + D2Y + D2Z ;
+% elseif numel(unique(GridInfo.Yel))-1
+%     [D2X,D2Y] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
+%     InteractionMatrices.A2 = D2X + D2Y ;
+% else
+%     [D2X] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo,'extended',8,"DirectLaplacianNeumann",Aexch);
+%     InteractionMatrices.A2 = D2X ;
+% end
 
 %--- Convert the exchange matrix to sparse
 problem = problem.setExchangeMatrixSparse( InteractionMatrices.A2 );
@@ -218,5 +219,5 @@ if runFortranPart
     savefig(['Std_prob_6\',solver,extra,'_',num2str(tsteps),'_',settings,'_no_precond'])
 end
 
-close all
+
 end

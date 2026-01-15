@@ -284,7 +284,7 @@
     !This is build into the mask1D array. To then filter the columns, we look at the column value
     !for each indices pair. For the negative values, the column value in the sparse matrix is given by kSurv(i)
     !If the mask1D entry for this is column is true (so the column is not removed), then we can add the entry to the TheSigns_indices_neg array
-    !However, to account for the removed columns, its value is no longer kSurv(i), bur rather the number of spaces it is moved to the "left" in the matrix
+    !However, to account for the removed columns, its value is no longer kSurv(i), but rather the number of spaces it is moved to the "left" in the matrix
     !This is Ncount, which is simply the number of positive entries in the mask1D array up to the column kSurv(i)
     !The same applies for the positive values except here the y-values are 1:j+(i*Nel)
     k_i = 1

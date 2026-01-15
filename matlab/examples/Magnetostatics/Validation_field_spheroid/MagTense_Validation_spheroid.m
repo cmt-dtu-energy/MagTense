@@ -13,16 +13,17 @@ use_existing_FEM_oblate  = 0;
 %make sure to source the right path for the generic Matlab routines
 addpath(genpath('../../../util/'));
 addpath('../../../MEX_files/');
+addpath('../../../../documentation/examples_FEM_validation/');
 
 %% Geometric parameters
 %%Get a default tile from MagTense
-tile = getDefaultMagTile();
+tile = DefaultMagTile();
 
 %ensure the tile is a permanent magnet
-tile.magnetType = getMagnetType('hard');
+tile = tile.setMagnetType('hard');
 
 %set the geometry to be a rectangular prism
-tile.tileType = getMagTileType('spheroid');
+tile = tile.setMagTileType('spheroid');
 
 %use existing FEM data or run a random model in Comsol to compare against
 if use_existing_FEM_prolate
