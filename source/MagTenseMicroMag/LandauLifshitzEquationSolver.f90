@@ -56,12 +56,24 @@
     integer :: ntot,i,j,k,ind,nt,nt_Hext,stat       !> total no. of tiles
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
-    real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
+    real(DP),dimension(:,:,:),allocatable :: M_out  !> Internal buffer for the solution (M) on the form (3*ntot,nt)
+    real(DP),dimension(:),allocatable :: A0_normalized  !> Normalized A0 for unstructured mesh
+    real(DP) :: mu0,pi
     character*(100) :: prog_str 
-    
+        
     !Save internal representation of the problem and the solution
     gb_solution = sol
     gb_problem = prob
+    
+    !Calculate the local scaled coefficients for the LLG equation
+    !"J" : exchange term
+    pi = 3.141592653589793
+    mu0 = 4*pi*1e-7
+    gb_problem%Jfact = maxval(gb_problem%A0) / ( mu0 * gb_problem%Ms )   ! Normalized the largest exchange factor by Ms, as this is needed in the exchange calculation for the unstructured meshed
+    !"M" : demagnetization term
+    gb_problem%Mfact = gb_problem%Ms
+    !"K" : anisotropy term
+    gb_problem%Kfact = gb_problem%K0 / ( mu0 * gb_problem%Ms )
     
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     
@@ -72,7 +84,9 @@
             call passDifferentialOperators(gb_problem)
         else    
             call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gridinfo)
-            call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo, gb_problem%exch_interpn, gb_problem%exch_weight, gb_problem%exch_method, gb_problem%Jfact, gb_problem%A_exch)
+            allocate( A0_normalized(size(gb_problem%A0)) )  
+            A0_normalized = gb_problem%A0 / ( maxval(gb_problem%A0) )   ! Normalized the largest exchange factor by Ms, as this is needed in the exchange calculation for the unstructured meshed
+            call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo, gb_problem%exch_interpn, gb_problem%exch_weight, gb_problem%exch_method, A0_normalized, gb_problem%A_exch)
             gb_solution%gridinfo = gridinfo
         endif
     endif
@@ -465,28 +479,15 @@
     !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
     !y = alpha * (A_exch * Mx )
     stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, beta, temp )
-    !If we have an unstructued grid, the exchange matrix already includes Jfact
-    if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then  
-        solution%HjX = temp * problem%Jfact
-    else
-        solution%HjX = temp
-    endif
+    solution%HjX = temp * problem%Jfact
     
     !Effective field in the Y-direction
     stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, beta, temp )
-    if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then 
-        solution%HjY = temp * problem%Jfact
-    else
-        solution%HjY = temp
-    endif
+    solution%HjY = temp * problem%Jfact
     
     !Effective field in the Z-direction
     stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, beta, temp )
-    if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then 
-        solution%HjZ = temp * problem%Jfact
-    else
-        solution%HjZ = temp
-    endif
+    solution%HjZ = temp * problem%Jfact
     
     deallocate(temp)
     
@@ -586,7 +587,7 @@
     Mx_rot = problem%CrystalAxis(:,1,1)*solution%Mx(:) + problem%CrystalAxis(:,1,2)*solution%My(:) + problem%CrystalAxis(:,1,3)*solution%Mz(:)
     My_rot = problem%CrystalAxis(:,2,1)*solution%Mx(:) + problem%CrystalAxis(:,2,2)*solution%My(:) + problem%CrystalAxis(:,2,3)*solution%Mz(:)
     Mz_rot = problem%CrystalAxis(:,3,1)*solution%Mx(:) + problem%CrystalAxis(:,3,2)*solution%My(:) + problem%CrystalAxis(:,3,3)*solution%Mz(:)
-        
+    
     allocate(Hkx_rot(size(Mx_rot)), Hky_rot(size(My_rot)), Hkz_rot(size(Mz_rot)))
     Hkx_rot = -2*Mx_rot(:)*(problem%Kfact_arr(:,1,1) + 2*problem%Kfact_arr(:,2,1)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,3)*My_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*My_rot(:)**2*Mz_rot(:)**2 )
     Hky_rot = -2*My_rot(:)*(problem%Kfact_arr(:,1,2) + 2*problem%Kfact_arr(:,2,2)*My_rot(:)**2 + problem%Kfact_arr(:,3,3)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,2)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,2)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*Mz_rot(:)**2 )
@@ -1628,8 +1629,8 @@
         enddo
         
         !Set the crystal axis as the user only specified u_ea
-        problem%CrystalAxis(:,1,3) =  problem%u_ea(:,1)
-        problem%CrystalAxis(:,2,3) =  problem%u_ea(:,2)
+        problem%CrystalAxis(:,3,1) =  problem%u_ea(:,1)
+        problem%CrystalAxis(:,3,2) =  problem%u_ea(:,2)
         problem%CrystalAxis(:,3,3) =  problem%u_ea(:,3)
         
     elseif (any(problem%K1 .ne. 0)) then !Cubic anisotropy
