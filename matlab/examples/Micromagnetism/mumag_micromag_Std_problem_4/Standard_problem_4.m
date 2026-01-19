@@ -1,26 +1,26 @@
-function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error] = Standard_problem_4( NIST_field, resolution, options )
+function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error] = Standard_problem_4( mumag_field, resolution, options )
 %STANDARD_PROBLEM_4 
 %A function script to setup and simulate mumag standard problem 4
 %
 %Syntax:
 %------
 %   Standard_problem_4()
-%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( NIST_field, resolution, options)
+%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( mumag_field, resolution, options)
 %
 %Description of syntax:
 %------
 %   Standard_problem_4() 
 %       Uses the default parameters to solve mumag problem 4 and displays the results on screen
 %
-%   Standard_problem_4( NIST_field, resolution, options)
+%   Standard_problem_4( mumag_field, resolution, options)
 %       Takes 1 or 2 input argument which specifies the applied field and the resolution of the problem. Additional options can also be specified
 %
-%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( NIST_field, resolution, options)
+%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( mumag_field, resolution, options)
 %       As above but also returns the computation times, the problem setup file and the solution for both the initial and dynamical part of the problem
 %
 %Input arguments:
 %------
-%   NIST_field : Either 1 or 2
+%   mumag_field : Either 1 or 2
 %       Determines if the first or second applied field specified in the mumag problem description is used (Default value is 1)
 %
 %   resolution : Array of size 1x3 (Default value is [36,9,1])
@@ -68,7 +68,7 @@ function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_d
 %See also: Benchmark_using_Standard_problem_4
 
 arguments
-    NIST_field (1,1) {mustBeInteger}                = 1             %--- Use either field 1 or field 2 from the mumag example
+    mumag_field (1,1) {mustBeInteger}                = 1            %--- Use either field 1 or field 2 from the mumag example
     resolution (1,3) {mustBeInteger}                = [36,9,1];     %--- [nx,ny,nz] of the grid
     options.use_CUDA {mustBeNumericOrLogical}       = true          %--- Use CUDA for the calculations
     options.ShowTheResult {mustBeNumericOrLogical}  = true          %--- Show the result
@@ -144,11 +144,11 @@ problem_dym.setTimeDis = int32(10);
 problem_dym.gamma = 2.21e5 ;
 
 % The external field applied
-if (NIST_field == 1)
+if (mumag_field == 1)
     %field 1
     HystDir = 1/mu0*[-24.6,4.3,0]/1000 ;
 end
-if (NIST_field == 2)
+if (mumag_field == 2)
     %field 2
     HystDir = 1/mu0*[-35.5,-6.3,0]/1000 ;
 end
@@ -175,7 +175,7 @@ elapsedTime_part2 = toc
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% Compare with published solutions available from mumag webpage
 t=1e-9*linspace(0,1,1000);
-M_mumag = load(['../../../../documentation/examples_mumag_validation/Validation_standard_problem_4/Field_' num2str(NIST_field) '_mumag_mean_solution.txt']);
+M_mumag = load(['../../../../documentation/examples_mumag_validation/Validation_standard_problem_4/Field_' num2str(mumag_field) '_mumag_mean_solution.txt']);
 
 % Interpolate the MagTense solution to the mumag solution and calculate the relative error in percent
 rel_int_error(1) = calculate_relative_integral_error(t,M_mumag(:,1),solution_dym.t,Mx);

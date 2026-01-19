@@ -99,9 +99,9 @@ module UTIL_MICROMAG
     mask = abs(D) .gt. threshold
     
     nnonzero = count( mask )
-    call displayGUIMessage( 'Number of nonzero demag elements:' )
-    write (prog_str,'(I10.9)') nnonzero
-    call displayGUIMessage( prog_str )
+    !call displayGUIMessage( 'Number of nonzero demag elements:' )
+    !write (prog_str,'(I10.9)') nnonzero
+    !call displayGUIMessage( prog_str )
     
     allocate( K%values(nnonzero),K%cols(nnonzero))
     allocate( K%rows_start(nx), K%rows_end(nx), colInds(ny) )

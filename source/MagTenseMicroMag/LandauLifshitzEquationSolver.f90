@@ -1239,7 +1239,6 @@
         call ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
     elseif (( grid%gridType .eq. gridTypeTetrahedron ) .or. (grid%gridType .eq. gridTypeUnstructuredPrisms)) then
         call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, problem%A_exch)
-        !gb_solution%gridinfo = gridinfo    
     endif
 
     
@@ -1247,10 +1246,12 @@
     
         
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2026
     !> @brief
     !> Calculates the exhange term matrix on a uniform grid
     !> which means it produces the differential operator d^2/dx^2 + d^2/dy^2 + d^2/dz^2 and returns this in the sparse matrix A
+    !> Includes position dependent exchange stiffness A0 through the modified stencil described in 
+    !> Heistracher et al. "Proposal for a micromagnetic standard problem: Domain wall pinning at phase boundaries", DOI: 10.1016/j.jmmm.2021.168875
     !---------------------------------------------------------------------------   
     subroutine ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
     type(MicroMagGrid),intent(in) :: grid              !> Struct containing the grid information    
@@ -1364,14 +1365,14 @@
         do k=1,nz
             !The bottom boundary
             do i=1,nx
-                d2dy2%values(ind) = -1.*problem%A0_map(i,1,k)
+                d2dy2%values(ind) = -1.
                 d2dy2%cols(ind) = colInd
                 d2dy2%rows_start(rowInd) = ind
             
                 !increment to next element
                 ind = ind + 1
             
-                d2dy2%values(ind) = 1.*problem%A0_map(i,1,k)
+                d2dy2%values(ind) = 1.
                 d2dy2%cols(ind) = colInd + nx
                 d2dy2%rows_end(rowInd) = ind+1
                 rowInd = rowInd + 1
@@ -1419,7 +1420,7 @@
             !The top boundary    
             do i=1,nx
                 !lower element
-                d2dy2%values(ind) = 1.*problem%A0_map(i,ny,k)
+                d2dy2%values(ind) = 1.
                 d2dy2%cols(ind) = colInd - nx
                 d2dy2%rows_start(rowInd) = ind
             
@@ -1427,7 +1428,7 @@
                 ind = ind + 1            
             
                 !central element
-                d2dy2%values(ind) = -1.*problem%A0_map(i,ny,k)
+                d2dy2%values(ind) = -1.
                 d2dy2%cols(ind) = colInd
                 d2dy2%rows_end(rowInd) = ind + 1
                 rowInd = rowInd + 1
@@ -1462,7 +1463,7 @@
         do j=1,ny
             do i=1,nx
                 !central value
-                d2dz2%values(ind) = -1.*problem%A0_map(i,j,1)
+                d2dz2%values(ind) = -1.
                 d2dz2%cols(ind) = colInd
                 d2dz2%rows_start(rowInd) = ind
             
@@ -1470,7 +1471,7 @@
                 ind = ind + 1
             
                 !right-most value
-                d2dz2%values(ind) = 1.*problem%A0_map(i,j,1)
+                d2dz2%values(ind) = 1.
                 d2dz2%cols(ind) = nx * ny + colInd
                 d2dz2%rows_end(rowInd) = ind + 1
                 rowInd = rowInd + 1
@@ -1519,7 +1520,7 @@
             do i=1,nx
                 
                 !left-most value
-                d2dz2%values(ind) = 1.*problem%A0_map(i,j,nz)
+                d2dz2%values(ind) = 1.
                 d2dz2%cols(ind) = colInd - nx * ny
                 d2dz2%rows_start(rowInd) = ind
             
@@ -1527,7 +1528,7 @@
                 ind = ind + 1
             
                 !central value
-                d2dz2%values(ind) = -1.*problem%A0_map(i,j,nz)
+                d2dz2%values(ind) = -1.
                 d2dz2%cols(ind) = colInd
                 d2dz2%rows_end(rowInd) = ind + 1
                 rowInd = rowInd + 1
@@ -1566,13 +1567,13 @@
             
             if ( nz .gt. 1) then
                 !nx+ny+nz
-                call displayGUIMessage( 'Exchange in nx,ny,nz' )
+                call displayGUIMessage( 'Exchange in x,y,z' )
                 stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, const, tmp, A)       
                 deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
                 stat = mkl_sparse_destroy (d2dz2%A)
             else
                 !nx+ny
-                call displayGUIMessage( 'Exchange in nx,ny' )
+                call displayGUIMessage( 'Exchange in x,y' )
                 descr%type = SPARSE_MATRIX_TYPE_GENERAL
                 descr%mode = SPARSE_FILL_MODE_FULL
                 descr%diag = SPARSE_DIAG_NON_UNIT
@@ -1582,13 +1583,13 @@
         else
             if ( nz .gt. 1) then
                 !nx+nz
-                call displayGUIMessage( 'Exchange in nx,nz' )
+                call displayGUIMessage( 'Exchange in x,z' )
                 stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dz2%A, A)  
                 deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
                 stat = mkl_sparse_destroy (d2dz2%A)
             else
                 !nx
-                call displayGUIMessage( 'Exchange in nx' )
+                call displayGUIMessage( 'Exchange in x' )
                 descr%type = SPARSE_MATRIX_TYPE_GENERAL
                 descr%mode = SPARSE_FILL_MODE_FULL
                 descr%diag = SPARSE_DIAG_NON_UNIT
@@ -1601,13 +1602,13 @@
         if ( ny .gt. 1) then
             if ( nz .gt. 1) then
                 !ny+nz
-                call displayGUIMessage( 'Exchange in ny,nz' )
+                call displayGUIMessage( 'Exchange in y,z' )
                 stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dy2%A, const, d2dz2%A, A) 
                 deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
                 stat = mkl_sparse_destroy (d2dz2%A)
             else
                 !ny
-                call displayGUIMessage( 'Exchange in ny' )
+                call displayGUIMessage( 'Exchange in y' )
                 descr%type = SPARSE_MATRIX_TYPE_GENERAL
                 descr%mode = SPARSE_FILL_MODE_FULL
                 descr%diag = SPARSE_DIAG_NON_UNIT
@@ -1618,7 +1619,7 @@
         else
             if ( nz .gt. 1) then
                 !nz
-                call displayGUIMessage( 'Exchange in nz' )
+                call displayGUIMessage( 'Exchange in z' )
                 descr%type = SPARSE_MATRIX_TYPE_GENERAL
                 descr%mode = SPARSE_FILL_MODE_FULL
                 descr%diag = SPARSE_DIAG_NON_UNIT
@@ -1642,23 +1643,10 @@
     !>-----------------------------------------
     !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
     !> @brief
-    !> Calculates the anisotropy term sparse matrix assuming the effective field anisotropy is linear in m    
-    !> @param[inout] problem the data structure containing the problem
-    !---------------------------------------------------------------------------   
-    subroutine ComputeAnisotropyTerm3D( problem )
-    type(MicroMagProblem),intent(inout) :: problem       !> Struct containing the problem
-    
-    call ComputeAnisotropyTerm3D_General( problem )
-    
-    end subroutine ComputeAnisotropyTerm3D
-    
-    !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
-    !> @brief
     !> Calculates the anisotropy term matrix on any grid  
     !> @param[inout] problem the data structure containing the problem
     !---------------------------------------------------------------------------   
-    subroutine ComputeAnisotropyTerm3D_General( problem )
+    subroutine ComputeAnisotropyTerm3D( problem )
     type(MicroMagProblem),intent(inout) :: problem             !> Struct containing the problem
     
     integer :: nx,ny,nz,ntot, i
@@ -1694,7 +1682,7 @@
         enddo
     endif
     
-    end subroutine ComputeAnisotropyTerm3D_General
+    end subroutine ComputeAnisotropyTerm3D
 
     
 end module LandauLifshitzSolution

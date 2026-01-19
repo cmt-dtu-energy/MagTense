@@ -37,8 +37,6 @@
       !Check the input parameters
       if ( nrhs .ne. 2 ) then
         call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nInput','Two inputs are required.')
-      !elseif ( nlhs .ne. 2 ) then
-      !    call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nOutput','One output is required.')
       endif
       
       
@@ -58,11 +56,7 @@
       
       !Return the mesh, if the user requested it
       if (nlhs .eq. 2) then
-            if ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
-                call returnMicroMagGrid( solution%gridinfo, plhs(2) )  
-            else
-                call mexErrMsgIdAndTxt ('MATLAB:MagTensePDE:nOutput','Mesh not analyzed')
-            endif
+            call returnMicroMagGrid( solution%gridinfo, plhs(2) )  
       endif
       
       end subroutine 
