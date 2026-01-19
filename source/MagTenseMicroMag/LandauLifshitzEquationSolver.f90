@@ -57,8 +57,7 @@
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
     real(DP),dimension(:,:,:),allocatable :: M_out  !> Internal buffer for the solution (M) on the form (3*ntot,nt)
-    real(DP),dimension(:),allocatable :: A0_normalized  !> Normalized A0 for unstructured mesh
-    real(DP) :: mu0,pi
+    real(DP) :: A0_max
     character*(100) :: prog_str 
         
     !Save internal representation of the problem and the solution
@@ -67,15 +66,20 @@
     
     !Calculate the local scaled coefficients for the LLG equation
     !"J" : exchange term
-    pi = 3.141592653589793
-    mu0 = 4*pi*1e-7
-    gb_problem%Jfact = maxval(gb_problem%A0) / ( mu0 * gb_problem%Ms )   ! Normalized the largest exchange factor by Ms, as this is needed in the exchange calculation for the unstructured meshed
+    if (( gb_problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
+        A0_max = maxval( gb_problem%A0 )
+        gb_problem%Jfact = A0_max / ( mu0 * gb_problem%Ms )   ! Normalized by the largest exchange factor, as this is needed in the exchange calculation for the unstructured meshed
+    else
+        gb_problem%Jfact = gb_problem%A0 / ( mu0 * gb_problem%Ms )
+    endif
+    
     !"M" : demagnetization term
     gb_problem%Mfact = gb_problem%Ms
     !"K" : anisotropy term
-    gb_problem%Kfact = gb_problem%K0 / ( mu0 * gb_problem%Ms )
+    !gb_problem%Kfact = gb_problem%K0 / ( mu0 * gb_problem%Ms )
     
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+    allocate( gb_solution%pts(ntot,3) )
     
     !Analyze the mesh, if needed
     if ( gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
@@ -83,17 +87,42 @@
             call displayGUIMessage( 'Passing exchange matrix' )
             call passDifferentialOperators(gb_problem)
         else    
-            call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gridinfo)
-            allocate( A0_normalized(size(gb_problem%A0)) )  
-            A0_normalized = gb_problem%A0 / ( maxval(gb_problem%A0) )   ! Normalized the largest exchange factor by Ms, as this is needed in the exchange calculation for the unstructured meshed
-            call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo, gb_problem%exch_interpn, gb_problem%exch_weight, gb_problem%exch_method, A0_normalized, gb_problem%A_exch)
-            gb_solution%gridinfo = gridinfo
+            call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gb_solution%gridinfo)
+        endif
+    endif
+    if (( gb_problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
+        do i=1,gb_problem%grid%nx
+            gb_solution%pts( i, 1 ) = gb_problem%grid%pts( i, 1 )
+            gb_solution%pts( i, 2 ) = gb_problem%grid%pts( i, 2 )
+            gb_solution%pts( i, 3 ) = gb_problem%grid%pts( i, 3 )
+        enddo
+    endif   
+    
+    if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then
+        !Setup the grid
+        call setupGrid( gb_problem%grid )
+        
+        !Set up the mesh for an uniform grid
+        allocate( gb_problem%A0_map(gb_problem%grid%nx,gb_problem%grid%ny,gb_problem%grid%nz) )
+        if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then   
+            do k=1,gb_problem%grid%nz
+                do j=1,gb_problem%grid%ny            
+                    do i=1,gb_problem%grid%nx
+                        ind = i + (j-1) * gb_problem%grid%nx + (k-1) * gb_problem%grid%nx * gb_problem%grid%ny
+                        gb_solution%pts(ind,1) = gb_problem%grid%x(i,j,k)
+                        gb_solution%pts(ind,2) = gb_problem%grid%y(i,j,k)
+                        gb_solution%pts(ind,3) = gb_problem%grid%z(i,j,k)
+                    
+                        gb_problem%A0_map(i,j,k) = gb_problem%A0(ind)
+                    enddo
+                enddo
+            enddo
         endif
     endif
       
     call displayGUIMessage( 'Initializing matrices' )
     !Calculate the interaction matrices
-    call initializeInteractionMatrices( gb_problem )
+    call initializeInteractionMatrices( gb_problem, gb_solution )
     
     !write(prog_str,'(A37, F8.4, A5)') 'Demagnetization tensor memory usage: ', 6*storage_size(gb_problem%Kxx)*ntot/(8*2**30), ' gigabytes'
     !call displayGUIMessage( trim(prog_str) )    
@@ -119,28 +148,6 @@
 #endif
     endif
    
-    allocate( gb_solution%pts(ntot,3) )
-    if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then   
-        do k=1,gb_problem%grid%nz
-            do j=1,gb_problem%grid%ny            
-                do i=1,gb_problem%grid%nx
-                    ind = i + (j-1) * gb_problem%grid%nx + (k-1) * gb_problem%grid%nx * gb_problem%grid%ny
-                    gb_solution%pts(ind,1) = gb_problem%grid%x(i,j,k)
-                    gb_solution%pts(ind,2) = gb_problem%grid%y(i,j,k)
-                    gb_solution%pts(ind,3) = gb_problem%grid%z(i,j,k)
-                enddo
-            enddo
-        enddo
-    endif
-    
-    if (( gb_problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
-        do i=1,gb_problem%grid%nx
-            gb_solution%pts( i, 1 ) = gb_problem%grid%pts( i, 1 )
-            gb_solution%pts( i, 2 ) = gb_problem%grid%pts( i, 2 )
-            gb_solution%pts( i, 3 ) = gb_problem%grid%pts( i, 3 )
-        enddo
-    endif    
-    
     
     call displayGUIMessage( 'Initializing solution' )
     !Initialize the solution, i.e. allocate various arrays
@@ -836,12 +843,9 @@
     !> Initializes the interaction matrices
     !> @param[inout] problem struct containing the problem information    
     !---------------------------------------------------------------------------   
-    subroutine initializeInteractionMatrices( problem )
+    subroutine initializeInteractionMatrices( problem, solution )
     type(MicroMagProblem), intent(inout) :: problem         !> Struct containing the grid information
-    
-    
-    !Setup the grid
-    call setupGrid( problem%grid )
+    type(MicroMagSolution),intent(inout) :: solution        !> Solution data structure
     
     !Demagnetization tensor matrix
     call ComputeDemagfieldTensor( problem )
@@ -850,7 +854,7 @@
     call ComputeAnisotropyTerm3D( problem )
     
     !Exhange term matrix
-    call ComputeExchangeTerm3D( problem%grid, problem%A_exch )
+    call ComputeExchangeTerm3D( problem%grid, problem%A_exch, problem, solution )
     
     
     end subroutine initializeInteractionMatrices
@@ -1221,14 +1225,21 @@
     !> Calculates the exhange term matrix
     !> which means it produces the differential operator d^2/dx^2 + d^2/dy^2 + d^2/dz^2 and returns this in the sparse matrix A
     !---------------------------------------------------------------------------   
-    subroutine ComputeExchangeTerm3D( grid, A )
-    type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
-    type(sparse_matrix_t),intent(inout) :: A          !> The returned matrix from the sparse matrix creator
-    
+    subroutine ComputeExchangeTerm3D( grid, A, problem, solution )
+    type(MicroMagGrid),intent(in) :: grid               !> Struct containing the grid information    
+    type(sparse_matrix_t),intent(inout) :: A            !> The returned matrix from the sparse matrix creator
+    type(MicroMagProblem),intent(inout) :: problem      !> Problem data structure    
+    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+    real(DP),dimension(:),allocatable :: A0_normalized  !> Normalized A0 for uneven anisotropy
+        
+    allocate( A0_normalized(size(problem%A0)) )  
+    A0_normalized = problem%A0 / ( maxval(problem%A0) )   ! Normalized by the largest exchange factor
+        
     if ( grid%gridType .eq. gridTypeUniform ) then
-        call ComputeExchangeTerm3D_Uniform( grid, A )
+        call ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
     elseif (( grid%gridType .eq. gridTypeTetrahedron ) .or. (grid%gridType .eq. gridTypeUnstructuredPrisms)) then
-        !call ConvertExchangeTerm3D_NonUniform( grid, A )
+        call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, problem%A_exch)
+        !gb_solution%gridinfo = gridinfo    
     endif
 
     
@@ -1241,17 +1252,20 @@
     !> Calculates the exhange term matrix on a uniform grid
     !> which means it produces the differential operator d^2/dx^2 + d^2/dy^2 + d^2/dz^2 and returns this in the sparse matrix A
     !---------------------------------------------------------------------------   
-    subroutine ComputeExchangeTerm3D_Uniform( grid, A )
-    type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
+    subroutine ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
+    type(MicroMagGrid),intent(in) :: grid              !> Struct containing the grid information    
     type(sparse_matrix_t),intent(inout) :: A           !> The returned matrix from the sparse matrix creator
+    type(MicroMagProblem),intent(inout) :: problem      !> Problem data structure 
+    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
         
-    integer :: stat                                   !> Status value for the various sparse matrix operations        
-    type(MagTenseSparse_d) :: d2dx2, d2dy2, d2dz2       !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
-    type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
-    integer :: ind, ntot,colInd,rowInd                !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
-    integer :: i,j,k,nx,ny,nz                         !> For-loop counters
-    type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
+    integer :: stat                                    !> Status value for the various sparse matrix operations        
+    type(MagTenseSparse_d) :: d2dx2, d2dy2, d2dz2      !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
+    type(sparse_matrix_t) :: tmp                       !> Temporary sparse matrices used for internal calculations
+    integer :: ind, ntot,colInd,rowInd                 !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
+    integer :: i,j,k,nx,ny,nz                          !> For-loop counters
+    type(matrix_descr) :: descr                        !> Describes a sparse matrix operation
     real(DP) :: const
+    character*(100) :: prog_str 
     
     !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
@@ -1261,171 +1275,175 @@
     nz = grid%nz
     
     !----------------------------------d^2dx^2 begins -----------------------------!
-    !Make the d^2/dx^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz
-    ntot = nz * ( ny * 4 + ny * (nx-2)*3 )
-    allocate(d2dx2%values(ntot),d2dx2%cols(ntot),d2dx2%rows_start(nx*ny*nz),d2dx2%rows_end(nx*ny*nz))
+    if ( nx .gt. 1 ) then
+        !Make the d^2/dx^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz
+        ntot = nz * ( ny * 4 + ny * (nx-2)*3 )
+        allocate(d2dx2%values(ntot),d2dx2%cols(ntot),d2dx2%rows_start(nx*ny*nz),d2dx2%rows_end(nx*ny*nz))
     
-    ind = 1
-    rowInd = 1
-    colInd = 1
+        ind = 1
+        rowInd = 1
+        colInd = 1
     
-    do k=1,nz
-        do j=1,ny
+        do k=1,nz
+            do j=1,ny
             
-            !The left boundary
-            d2dx2%values(ind) = -1.
-            d2dx2%cols(ind) = colInd
-            d2dx2%rows_start(rowInd) = ind            
-            ind = ind + 1
-            
-            d2dx2%values(ind) = 1.
-            d2dx2%cols(ind) = colInd + 1
-            d2dx2%rows_end(rowInd) = ind+1
-            rowInd = rowInd + 1
-            ind = ind + 1
-            
-            
-            !Go through one row at a time
-            do i=2,nx-1
-                            
-                !Left-most point
-                d2dx2%values( ind ) = 1.
+                !The left boundary
+                d2dx2%values(ind) = -1.
                 d2dx2%cols(ind) = colInd
-                !update where the row starts
-                d2dx2%rows_start(rowInd) = ind                           
+                d2dx2%rows_start(rowInd) = ind            
                 ind = ind + 1
-                
-                !Center point
-                d2dx2%values( ind ) = -2.
+            
+                d2dx2%values(ind) = 1.
                 d2dx2%cols(ind) = colInd + 1
-                ind = ind + 1
-                
-                !Right-most point
-                d2dx2%values( ind ) = 1.
-                d2dx2%cols(ind) = colInd + 2
                 d2dx2%rows_end(rowInd) = ind+1
                 rowInd = rowInd + 1
                 ind = ind + 1
+            
+            
+                !Go through one row at a time
+                do i=2,nx-1
+                            
+                    !Left-most point
+                    d2dx2%values( ind ) = problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))
+                    d2dx2%cols(ind) = colInd
+                    !update where the row starts
+                    d2dx2%rows_start(rowInd) = ind                           
+                    ind = ind + 1
                 
-                colInd = colInd + 1
-            enddo            
-            !The right boundary
-            d2dx2%values(ind) = 1.
-            d2dx2%cols(ind) = colInd
-            !update where the row starts
-            d2dx2%rows_start(rowInd) = ind            
-            ind = ind + 1
+                    !Center point
+                    d2dx2%values( ind ) = -(problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))+problem%A0_map(i+1,j,k)/(problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k)))
+                    d2dx2%cols(ind) = colInd + 1
+                    ind = ind + 1
+                
+                    !Right-most point
+                    d2dx2%values( ind ) = problem%A0_map(i+1,j,k)/(problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k))
+                    d2dx2%cols(ind) = colInd + 2
+                    d2dx2%rows_end(rowInd) = ind+1
+                    rowInd = rowInd + 1
+                    ind = ind + 1
+                
+                    colInd = colInd + 1
+                enddo            
+                !The right boundary
+                d2dx2%values(ind) = 1.
+                d2dx2%cols(ind) = colInd
+                !update where the row starts
+                d2dx2%rows_start(rowInd) = ind            
+                ind = ind + 1
             
-            d2dx2%values(ind) = -1.
-            d2dx2%cols(ind) = colInd+1
-            d2dx2%rows_end(rowInd) = ind+1
-            rowInd = rowInd + 1
-            ind = ind + 1     
+                d2dx2%values(ind) = -1.
+                d2dx2%cols(ind) = colInd+1
+                d2dx2%rows_end(rowInd) = ind+1
+                rowInd = rowInd + 1
+                ind = ind + 1     
             
-            colInd = colInd + 2
+                colInd = colInd + 2
+            enddo
         enddo
-    enddo
     
-    !Multiply by the discretization
-    d2dx2%values = d2dx2%values * 1./grid%dx**2
+        !Multiply by the discretization
+        d2dx2%values = d2dx2%values * 2./grid%dx**2
         
-    !Create the sparse matrix for the d^2dx^2
-    stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
+        !Create the sparse matrix for the d^2dx^2
+        stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
     
+    endif
     
     !----------------------------------d^2dx^2 ends -----------------------------!
     
     
     !----------------------------------d^2dy^2 begins ----------------------------!
-    ntot = nz * ( nx * 2 + (ny-2) * nx * 3 + nx * 2 )
-    !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2
-    allocate(d2dy2%values(ntot),d2dy2%cols(ntot),d2dy2%rows_start(nx*ny*nz),d2dy2%rows_end(nx*ny*nz))
+    if ( ny .gt. 1 ) then
+        ntot = nz * ( nx * 2 + (ny-2) * nx * 3 + nx * 2 )
+        !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2
+        allocate(d2dy2%values(ntot),d2dy2%cols(ntot),d2dy2%rows_start(nx*ny*nz),d2dy2%rows_end(nx*ny*nz))
     
-    ind = 1
-    rowInd = 1
-    colInd = 1
-    do k=1,nz
-        !The bottom boundary
-        do i=1,nx
-            d2dy2%values(ind) = -1.
-            d2dy2%cols(ind) = colInd
-            d2dy2%rows_start(rowInd) = ind
-            
-            !increment to next element
-            ind = ind + 1
-            
-            d2dy2%values(ind) = 1.
-            d2dy2%cols(ind) = colInd + nx
-            d2dy2%rows_end(rowInd) = ind+1
-            rowInd = rowInd + 1
-            
-            !increment to next element
-            ind = ind + 1
-            
-            colInd = colInd + 1
-        enddo
-        
-        !Everything in between
-        do j=2,ny-1
-                    
-            
+        ind = 1
+        rowInd = 1
+        colInd = 1
+        do k=1,nz
+            !The bottom boundary
             do i=1,nx
-                
-                !lower value
-                d2dy2%values(ind) = 1.
-                d2dy2%cols(ind) = colInd-nx
-                d2dy2%rows_start(rowInd) = ind
-                !increment to next element
-                ind = ind + 1  
-                
-                !central value
-                d2dy2%values(ind) = -2.
+                d2dy2%values(ind) = -1.*problem%A0_map(i,1,k)
                 d2dy2%cols(ind) = colInd
+                d2dy2%rows_start(rowInd) = ind
             
                 !increment to next element
                 ind = ind + 1
             
-                !upper value
-                d2dy2%values(ind) = 1.
+                d2dy2%values(ind) = 1.*problem%A0_map(i,1,k)
                 d2dy2%cols(ind) = colInd + nx
                 d2dy2%rows_end(rowInd) = ind+1
                 rowInd = rowInd + 1
-                
+            
                 !increment to next element
                 ind = ind + 1
+            
                 colInd = colInd + 1
             enddo
+        
+            !Everything in between
+            do j=2,ny-1
+                    
+            
+                do i=1,nx
+                
+                    !lower value
+                    d2dy2%values(ind) = problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))
+                    d2dy2%cols(ind) = colInd-nx
+                    d2dy2%rows_start(rowInd) = ind
+                    !increment to next element
+                    ind = ind + 1  
+                
+                    !central value
+                    d2dy2%values(ind) = -(problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))+problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k)))
+                    d2dy2%cols(ind) = colInd
+            
+                    !increment to next element
+                    ind = ind + 1
+            
+                    !upper value
+                    d2dy2%values(ind) = problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k))
+                    d2dy2%cols(ind) = colInd + nx
+                    d2dy2%rows_end(rowInd) = ind+1
+                    rowInd = rowInd + 1
+                
+                    !increment to next element
+                    ind = ind + 1
+                    colInd = colInd + 1
+                enddo
                         
         
-        enddo
+            enddo
         
-        !The top boundary    
-        do i=1,nx
-            !lower element
-            d2dy2%values(ind) = 1.
-            d2dy2%cols(ind) = colInd - nx
-            d2dy2%rows_start(rowInd) = ind
+            !The top boundary    
+            do i=1,nx
+                !lower element
+                d2dy2%values(ind) = 1.*problem%A0_map(i,ny,k)
+                d2dy2%cols(ind) = colInd - nx
+                d2dy2%rows_start(rowInd) = ind
             
-            !increment to next element
-            ind = ind + 1            
+                !increment to next element
+                ind = ind + 1            
             
-            !central element
-            d2dy2%values(ind) = -1.
-            d2dy2%cols(ind) = colInd
-            d2dy2%rows_end(rowInd) = ind + 1
-            rowInd = rowInd + 1
+                !central element
+                d2dy2%values(ind) = -1.*problem%A0_map(i,ny,k)
+                d2dy2%cols(ind) = colInd
+                d2dy2%rows_end(rowInd) = ind + 1
+                rowInd = rowInd + 1
             
-            ind = ind + 1
-            colInd = colInd + 1
+                ind = ind + 1
+                colInd = colInd + 1
             
+            enddo
         enddo
-    enddo
     
-    !Multiply by the discretization
-    d2dy2%values = d2dy2%values * 1./grid%dy**2
+        !Multiply by the discretization
+        d2dy2%values = d2dy2%values * 2./grid%dy**2
         
-    !Create the sparse matrix for the d^2dy^2
-    stat = mkl_sparse_d_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
+        !Create the sparse matrix for the d^2dy^2
+        stat = mkl_sparse_d_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
+    endif
     
     !----------------------------------d^2dy^2 ends ----------------------------!
     
@@ -1444,7 +1462,7 @@
         do j=1,ny
             do i=1,nx
                 !central value
-                d2dz2%values(ind) = -1.
+                d2dz2%values(ind) = -1.*problem%A0_map(i,j,1)
                 d2dz2%cols(ind) = colInd
                 d2dz2%rows_start(rowInd) = ind
             
@@ -1452,7 +1470,7 @@
                 ind = ind + 1
             
                 !right-most value
-                d2dz2%values(ind) = 1.
+                d2dz2%values(ind) = 1.*problem%A0_map(i,j,1)
                 d2dz2%cols(ind) = nx * ny + colInd
                 d2dz2%rows_end(rowInd) = ind + 1
                 rowInd = rowInd + 1
@@ -1467,7 +1485,7 @@
             do j=1,ny
                 do i=1,nx
                     !left-most value
-                    d2dz2%values(ind) = 1.
+                    d2dz2%values(ind) = problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))
                     d2dz2%cols(ind) = colInd - nx * ny
                     d2dz2%rows_start(rowInd) = ind
             
@@ -1475,14 +1493,14 @@
                     ind = ind + 1
                 
                     !central value
-                    d2dz2%values(ind) = -2.
+                    d2dz2%values(ind) = -(problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))+problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k)))
                     d2dz2%cols(ind) = colInd
                             
                     !increment position
                     ind = ind + 1
                 
                     !right-most value
-                    d2dz2%values(ind) = 1.
+                    d2dz2%values(ind) = problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k))
                     d2dz2%cols(ind) = colInd + nx * ny
                     d2dz2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
@@ -1501,7 +1519,7 @@
             do i=1,nx
                 
                 !left-most value
-                d2dz2%values(ind) = 1.
+                d2dz2%values(ind) = 1.*problem%A0_map(i,j,nz)
                 d2dz2%cols(ind) = colInd - nx * ny
                 d2dz2%rows_start(rowInd) = ind
             
@@ -1509,7 +1527,7 @@
                 ind = ind + 1
             
                 !central value
-                d2dz2%values(ind) = -1.
+                d2dz2%values(ind) = -1.*problem%A0_map(i,j,nz)
                 d2dz2%cols(ind) = colInd
                 d2dz2%rows_end(rowInd) = ind + 1
                 rowInd = rowInd + 1
@@ -1523,7 +1541,7 @@
     
     
         !Multiply by the discretization
-        d2dz2%values = d2dz2%values * 1./grid%dz**2
+        d2dz2%values = d2dz2%values * 2./grid%dz**2
         
         !Create the sparse matrix for the d^2dz^2
         stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
@@ -1539,59 +1557,88 @@
     !call writeSparseMatrixToDisk( d2dy2%A, nx*ny*nz, 'd2dy2.dat' )
     
     const = 1.
-    stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dy2%A, tmp)    
+    
+    if ( nx .gt. 1) then
+        if ( ny .gt. 1) then
+            stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dy2%A, tmp)  
+            deallocate(d2dy2%values,d2dy2%cols,d2dy2%rows_start,d2dy2%rows_end)
+            stat = mkl_sparse_destroy (d2dy2%A)
+            
+            if ( nz .gt. 1) then
+                !nx+ny+nz
+                call displayGUIMessage( 'Exchange in nx,ny,nz' )
+                stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, const, tmp, A)       
+                deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
+                stat = mkl_sparse_destroy (d2dz2%A)
+            else
+                !nx+ny
+                call displayGUIMessage( 'Exchange in nx,ny' )
+                descr%type = SPARSE_MATRIX_TYPE_GENERAL
+                descr%mode = SPARSE_FILL_MODE_FULL
+                descr%diag = SPARSE_DIAG_NON_UNIT
+                stat = mkl_sparse_copy ( tmp, descr, A )
+                stat = mkl_sparse_destroy (tmp)
+            endif
+        else
+            if ( nz .gt. 1) then
+                !nx+nz
+                call displayGUIMessage( 'Exchange in nx,nz' )
+                stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dz2%A, A)  
+                deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
+                stat = mkl_sparse_destroy (d2dz2%A)
+            else
+                !nx
+                call displayGUIMessage( 'Exchange in nx' )
+                descr%type = SPARSE_MATRIX_TYPE_GENERAL
+                descr%mode = SPARSE_FILL_MODE_FULL
+                descr%diag = SPARSE_DIAG_NON_UNIT
+                stat = mkl_sparse_copy ( d2dx2%A, descr, A )
+            endif
+        endif
+        deallocate(d2dx2%values,d2dx2%cols,d2dx2%rows_start,d2dx2%rows_end)
+        stat = mkl_sparse_destroy (d2dx2%A)
+    else
+        if ( ny .gt. 1) then
+            if ( nz .gt. 1) then
+                !ny+nz
+                call displayGUIMessage( 'Exchange in ny,nz' )
+                stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dy2%A, const, d2dz2%A, A) 
+                deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
+                stat = mkl_sparse_destroy (d2dz2%A)
+            else
+                !ny
+                call displayGUIMessage( 'Exchange in ny' )
+                descr%type = SPARSE_MATRIX_TYPE_GENERAL
+                descr%mode = SPARSE_FILL_MODE_FULL
+                descr%diag = SPARSE_DIAG_NON_UNIT
+                stat = mkl_sparse_copy ( d2dy2%A, descr, A )
+            endif
+            deallocate(d2dy2%values,d2dy2%cols,d2dy2%rows_start,d2dy2%rows_end)
+            stat = mkl_sparse_destroy (d2dy2%A)
+        else
+            if ( nz .gt. 1) then
+                !nz
+                call displayGUIMessage( 'Exchange in nz' )
+                descr%type = SPARSE_MATRIX_TYPE_GENERAL
+                descr%mode = SPARSE_FILL_MODE_FULL
+                descr%diag = SPARSE_DIAG_NON_UNIT
+                stat = mkl_sparse_copy ( d2dz2%A, descr, A )
+            else
+                !no exchange terms
+            endif
+            deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
+            stat = mkl_sparse_destroy (d2dz2%A)
+        endif
+    endif
     
     !call writeSparseMatrixToDisk( tmp, nx*ny*nz, 'A_exch.dat' )
     
-    if ( nz .gt. 1 ) then    
-        stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, const, tmp, A)
-        !clean up        
-        deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
-        stat = mkl_sparse_destroy (d2dz2%A)
-    else
-        descr%type = SPARSE_MATRIX_TYPE_GENERAL
-        descr%mode = SPARSE_FILL_MODE_FULL
-        descr%diag = SPARSE_DIAG_NON_UNIT
-        stat = mkl_sparse_copy ( tmp, descr, A )
-        stat = mkl_sparse_destroy (tmp)
-    endif
-    
-    !call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_total.dat' )
-    
-    !clean up
-    deallocate(d2dx2%values,d2dx2%cols,d2dx2%rows_start,d2dx2%rows_end)
-    deallocate(d2dy2%values,d2dy2%cols,d2dy2%rows_start,d2dy2%rows_end)
-    
-    stat = mkl_sparse_destroy (d2dx2%A)
-    stat = mkl_sparse_destroy (d2dy2%A)
-    
     !call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_exch.dat' )
+    
+    call create_COO_values_from_CSR(A,solution%gridinfo)
     
     end subroutine ComputeExchangeTerm3D_Uniform
        
-    !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
-    !> @brief
-    !> Converts the loaded information from Matlab in CSR 
-    !> format to a CSR MKL type
-    !---------------------------------------------------------------------------   
-    subroutine ConvertExchangeTerm3D_NonUniform(grid, A)
-    type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
-    type(sparse_matrix_t),intent(out) :: A            !> The returned matrix from the sparse matrix creator
-                
-    integer :: stat                                   !> Status value for the various sparse matrix operations        
-    integer :: nx,ny,nz                               !> Dimensions
-    type(matrix_descr) :: descr                       !> Describes a sparse matrix operation
-    
-    nx = grid%nx
-    ny = grid%ny
-    nz = grid%nz
-    
-    stat = mkl_sparse_d_create_csr ( A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, grid%A_exch_load%rows_start, grid%A_exch_load%rows_end, grid%A_exch_load%cols, grid%A_exch_load%values)
-        
-    end subroutine ConvertExchangeTerm3D_NonUniform
-    
-    
     !>-----------------------------------------
     !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
     !> @brief
