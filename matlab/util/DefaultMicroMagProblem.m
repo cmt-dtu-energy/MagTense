@@ -186,6 +186,16 @@ properties
 
     %The number of threads used by OpenMP for building the demag tensor
     nThreads = int32(1);
+
+    %FMM parameters
+    fmm_cells
+    fmm_eps
+    ifunif
+    nlmin
+    nlmax
+    use_fmm
+    fmm_short
+    fmm_min_n
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -401,6 +411,15 @@ methods
         obj.MeshType = '' ;
         obj.ExternalMeshFileName = '' ;
         obj.DemagTensorFileName = 0 ;
+
+        obj.fmm_cells = int32(100);
+        obj.fmm_eps = 1e-4;
+        obj.ifunif = int32(1);
+        obj.nlmin = int32(1);
+        obj.nlmax = int32(5);
+        obj.use_fmm = int32(0);
+        obj.fmm_short = int32(1);
+        obj.fmm_min_n = int32(20000);
     end
     
     %%Calculates the applied field as a function of time on the time grid

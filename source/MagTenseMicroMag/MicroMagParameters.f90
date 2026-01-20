@@ -4,8 +4,9 @@ include "mkl_dfti.f90"
     module MicroMagParameters
     use MKL_SPBLAS
     Use MKL_DFTI
+#if USE_FMM3D
     use fmm3d_tree_mod
-
+#endif
     INTEGER, PARAMETER :: SP = SELECTED_REAL_KIND(6, 37)
     INTEGER, PARAMETER :: DP = SELECTED_REAL_KIND(15, 307)
     
@@ -231,8 +232,9 @@ include "mkl_dfti.f90"
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
 
+#if USE_FMM3D
         class(FMM3DTree), pointer :: fmm_tree => null()    !> FMM tree for computing the demag field using FMM
-
+#endif
     end type MicroMagSolution
     
     
@@ -253,5 +255,6 @@ include "mkl_dfti.f90"
     integer,parameter :: passExchTrue=1,passExchFalse=0
     integer,parameter :: usePrecisionTrue=1,usePrecisionFalse=0
     integer,parameter :: useReturnHallTrue=1,useReturnHallFalse=0
+    integer,parameter :: useFMMTrue=1,useFMMFalse=0
     
 end module MicroMagParameters    

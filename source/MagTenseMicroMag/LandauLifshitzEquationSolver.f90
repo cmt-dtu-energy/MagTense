@@ -1437,7 +1437,7 @@ end subroutine updateDemagfieldFMM
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
         
-            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout, k, j, i) default(none)
+            !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout, k, j, i)
         
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do k=1,nz
