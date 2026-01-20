@@ -1752,6 +1752,9 @@ end subroutine updateDemagfieldFMM
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     real(DP),dimension(:),allocatable :: A0_normalized  !> Normalized A0 for uneven anisotropy
         
+
+    if ( gb_problem%passExch .eq. passExchTrue) return ! Skip this if the exchange has already been passed from outside
+
     allocate( A0_normalized(size(problem%A0)) )  
     A0_normalized = problem%A0 / ( maxval(problem%A0) )   ! Normalized by the largest exchange factor
         
@@ -2202,7 +2205,7 @@ end subroutine updateDemagfieldFMM
         enddo
     endif
     
-    end subroutine ComputeAnisotropyTerm3D_General
+    end subroutine ComputeAnisotropyTerm3D
 
     
 
