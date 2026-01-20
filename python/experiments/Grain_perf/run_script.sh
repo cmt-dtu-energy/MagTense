@@ -14,18 +14,18 @@ PY_SCRIPT="grain_hysteresis_perf.py"
 USE_FMM=1
 USE_CUDA=1
 # Optional label per run (for human readability in tags)
-LABEL_LIST=("case1")
+LABEL_LIST=("case0" "case1")
 
 # Mesh parameter per run (uniform grid perf: rasBase only)
-BASES_LIST=(10)
+BASES_LIST=(20 20 )
 
 # FMM controls per run
-CPN_LIST=(200)
-IFUNIF_LIST=(1)                 # 1 uniform, 0 adaptive
-NLMIN_LIST=(1)
-NLMAX_LIST=(2)
-ALLOW_FMM_SHORT_CIRCUIT_LIST=(1)  # 0/1 (int-style)
-FMM_MIN_N_LIST=(20000)
+CPN_LIST=(100 100)
+IFUNIF_LIST=(1 1)                 # 1 uniform, 0 adaptive
+NLMIN_LIST=(1 1)
+NLMAX_LIST=(2 2)
+ALLOW_FMM_SHORT_CIRCUIT_LIST=(0 1)  # 0/1 (int-style)
+FMM_MIN_N_LIST=(8500 8500)
 
 # Mesh file naming (uniform perf naming)
 MESH_TEMPLATE="Grid_rasBase_%d_nGrains_25_nRef_1_dG_3.75e-09.mat"
