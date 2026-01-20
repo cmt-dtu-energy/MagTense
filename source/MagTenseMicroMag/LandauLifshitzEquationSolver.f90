@@ -144,10 +144,12 @@
         call displayGUIMessage( 'Copying to CUDA' ) 
 #if USE_CUDA
 #if USE_FMM3D 
+        !------------- if use_fmm then copy sparse nbr_corr tensor else copy normal demag tensor --------------
         if ( gb_problem%use_fmm) then
           call displayGUIMessage( 'copying nbr_corr for FMM nbor correction')  
-          !call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
           call cudaInit_sparse( gb_problem%K_fmm_s )    
+        !----------------------------------------------------------------------------------------------
+        !------------ else copy the normal demag tensor ------------------------------------------------
         else 
           !Initialize the Cuda arrays and load the demag tensors into the GPU memory
           if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
@@ -158,15 +160,12 @@
               call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
           endif
         end if
+        !----------------------------------------------------------------------------------------------
 #else
         !Initialize the Cuda arrays and load the demag tensors into the GPU memory
         if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
             !If the matrices are sparse
             call displayGUIMessage( 'Initializing sparse matrices on CUDA' )
-
-            print *, " size of valeus array k_s(1)", size(gb_problem%K_s(1)%values) 
-
-
             call cudaInit_sparse( gb_problem%K_s )        
              
         else
@@ -320,9 +319,6 @@
 
         !---- locals ----
         integer :: ntot
-        real(DP),dimension(:),allocatable :: hmx_before, hmy_before, hmz_before
-        real(DP),dimension(:),allocatable :: hmx_fmm, hmy_fmm, hmz_fmm
-        real(DP),dimension(:),allocatable :: hmx_MT, hmy_MT, hmz_MT
         real(DP) :: mx_mean, my_mean, mz_mean, volume_total
         integer :: i
 #if USE_TIMING
@@ -386,51 +382,16 @@
         t1 = walltime()
 #endif
         !-------------- add demagnetization field --------------------
-
-        ! allocate( hmx_before(ntot), hmy_before(ntot), hmz_before(ntot) )
-        ! allocate( hmx_fmm(ntot), hmy_fmm(ntot), hmz_fmm(ntot) )
-        ! allocate( hmx_MT(ntot), hmy_MT(ntot), hmz_MT(ntot) )
-
-        ! hmx_before = gb_solution%HmX(:)
-        ! hmy_before = gb_solution%HmY(:)
-        ! hmz_before = gb_solution%HmZ(:)
 #if USE_FMM3D
+        !-------------------- if use_fmm then use FMM otherwise shortcircuit to normal demag field --------------
         if ( gb_problem%use_fmm)  then
           call updateDemagfieldFMM( gb_problem, gb_solution )
         else
            call updateDemagfield( gb_problem, gb_solution )
         end if
-            !call updateDemagfieldFMM_old( gb_problem, gb_solution )
-        ! hmx_fmm = gb_solution%HmX(:)
-        ! hmy_fmm = gb_solution%HmY(:)
-        ! hmz_fmm = gb_solution%HmZ(:)
-
-
-        ! gb_solution%HmX(:) = hmx_before
-        ! gb_solution%HmY(:) = hmy_before
-        ! gb_solution%HmZ(:) = hmz_before
+        !--------------------------------------------------------------------------------------------------------------
 #else
          call updateDemagfield( gb_problem, gb_solution )
-        ! hmx_MT = gb_solution%HmX(:)
-        ! hmy_MT = gb_solution%HmY(:)
-        ! hmz_MT = gb_solution%HmZ(:)
-
-
-        ! print *, " before"
-        ! print *, hmx_before(1:10)
-        ! print *, hmy_before(1:10)
-        ! print *, hmz_before(1:10)
-        ! print *, " FMM3D "
-        ! print *, hmx_fmm(1:10)
-        ! print *, hmy_fmm(1:10)
-        ! print *, hmz_fmm(1:10)
-        ! print *, " MagTense "
-        ! print *, hmx_MT(1:10)
-        ! print *, hmy_MT(1:10)
-        ! print *, hmz_MT(1:10)
-
-        ! error stop " test "
-        
 #endif
         !-------------------------------------------------------------
 
@@ -515,9 +476,6 @@
             acc_cross    = 0.0_DP
             acc_double   = 0.0_DP
             acc_assemble = 0.0_DP
-
-            !error stop " test stop after timing "
-
         end if
             !----------------------------------------------------------
 #endif
@@ -872,31 +830,13 @@ subroutine updateDemagfieldFMM(problem, solution)
   class(FMM3DTree), pointer :: fmm_tree
   logical :: built_tree
   !------------------------------------------------
-  interface
-    subroutine lfmm3d_s_d_g_vec(nd,eps,nsource,source,dipvec,pot,grad,ier)
-      implicit none
-      integer, intent(in) :: nd, nsource
-      double precision, intent(in) :: eps
-      double precision :: source(3,nsource)
-      double precision :: dipvec(nd,3,nsource)
-      double precision :: pot(nd,nsource)
-      double precision :: grad(nd,3,nsource)
-      integer :: ier
-    end subroutine lfmm3d_s_d_g_vec
-  end interface
-
 #if USE_TIMING
   t0 = walltime()
-#endif
-  fourpi  = 12.566370614359172D0
-  !eps_fmm = 1.0e-4!1.0D-6
-
-  ntot = size(problem%grid%pts, dim=1)
-  ier = 0
-  
-#if USE_TIMING
   t1 = walltime()
 #endif
+  fourpi  = 12.566370614359172D0
+  ntot = size(problem%grid%pts, dim=1)
+  ier = 0
 
   !----------- cast Mx,My,Mz to single precision -----------
   solution%Mx_s = real(solution%Mx, SP)
@@ -970,12 +910,12 @@ subroutine updateDemagfieldFMM(problem, solution)
   !------------------ Call FMM (sources->sources) ------------------
   nd = 1
    call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif, problem%nlmin, problem%nlmax)
- !   print *, " after build tree"
-
    !------- only run if number of boxes > 9 -----------
+   !--- NOTE - if nboxes <= 9 then we have all-to-all and the is no need for FMM ---
    if (fmm_tree%nboxes > 9) then
        call fmm_tree%make_and_eval(dipvec, grad)
    end if
+   !--------------------------------------------------
 
   if (ier /= 0) then
     write(*,*) 'FMM3D returned error code in updateDemagfieldFMM: ier =', ier
@@ -1345,11 +1285,14 @@ end subroutine updateDemagfieldFMM
     
     !Demagnetization tensor matrix
 #if USE_FMM3D
-    !call BuildNeighbourDemagTensor( problem, 2) ! hardcode 2 levels of neighbour cells for now
-    call BuildNeighbourDemagTensor( problem) ! hardcode 2 levels of neighbour cells for now
+    !------------- build neighbour demag tensor -------------------------------------------------------------------
+    call BuildNeighbourDemagTensor( problem)
+        !---------- if BuildNeighbourDemagTensor sets use_fmm to false then compute the demag tensor normally -----
     if (.not. problem%use_fmm) then
        call ComputeDemagfieldTensor( problem )
     end if
+        !-----------------------------------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------------------------------------
 #else
     call ComputeDemagfieldTensor( problem )
 #endif
