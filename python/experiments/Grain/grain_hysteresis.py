@@ -302,10 +302,13 @@ def grain_hysteresis(
     stem = mesh_path.stem
     #backend_tag = "_cuda" if cuda else "_fmm"
 
-    #TODO - add some info about level etc.
-    backend_tag = "_fmm" if use_fmm else "_cuda"
-    if use_fmm: 
+    if use_fmm and allow_fmm_short_circuit == 1 and len(problem.Ms) < fmm_min_n:
+        backend_tag = "_cuda_fmmsc"
+    elif use_fmm:
+        backend_tag = "_fmm"
         backend_tag += f"_eps{fmm_eps:.2e}_cpn{fmm_cells_per_node}"
+    else:
+        backend_tag = "_cuda"
 
     root_name = stem + backend_tag
 
