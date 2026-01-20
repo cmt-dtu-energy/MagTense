@@ -62,14 +62,20 @@ def max_energy_product(
 
 def grain_hysteresis(
     use_fmm: bool = True,
-    fmm_eps : float = 1e-4,
+    fmm_eps: float = 1e-4,
     fmm_cells_per_node: int = 50,
     cuda: bool = False,
     cvode: bool = False,
     mesh_file: str = "Grid_rasBase_5_nGrains_5_nRef_3_dG_5e-09.mat",
     plotting: bool = True,
     figpath: Path | None = Path(__file__).parent.absolute().joinpath("..", "figs"),
+    ifunif: int = 1,
+    nlmin: int = 1,
+    nlmax: int = 5,
+    allow_fmm_short_circuit: int = 0,
+    fmm_min_n: int = 20000,
 ) -> None:
+
     """
     Run a hysteresis simulation for a given grain mesh, compute diagnostics,
     save the full result object `res` plus final scalars, and optionally plot.
@@ -137,6 +143,11 @@ def grain_hysteresis(
         problem_ini.dummy_run = 1
         problem_ini.fmm_cells_per_node = fmm_cells_per_node if use_fmm else 0
         problem_ini.fmm_eps = fmm_eps
+        problem_ini.ifunif = ifunif
+        problem_ini.nlmin = nlmin
+        problem_ini.nlmax = nlmax
+        problem_ini.allow_fmm_short_circuit = allow_fmm_short_circuit
+        problem_ini.fmm_min_n = fmm_min_n
 
 
 
@@ -220,6 +231,11 @@ def grain_hysteresis(
     problem.dummy_run = 0
     problem.fmm_cells_per_node = fmm_cells_per_node if use_fmm else 0
     problem.fmm_eps = fmm_eps
+    problem.ifunif = ifunif
+    problem.nlmin = nlmin
+    problem.nlmax = nlmax
+    problem.allow_fmm_short_circuit = allow_fmm_short_circuit
+    problem.fmm_min_n = fmm_min_n
 
     start_time = time.time()
     res = problem.run_hysteresis(H_ext=H_ext)
@@ -283,9 +299,19 @@ def grain_hysteresis(
     mesh_path = Path(mesh_file)
     stem = mesh_path.stem
     #backend_tag = "_cuda" if cuda else "_fmm"
-    backend_tag = "_fmm" if use_fmm else "_cuda"
-    if use_fmm: 
+
+
+    if use_fmm and allow_fmm_short_circuit == 1 and len(problem.Ms) < fmm_min_n:
+        backend_tag = "_cuda_fmmsc"
+    elif use_fmm:
+        backend_tag = "_fmm"
         backend_tag += f"_eps{fmm_eps:.2e}_cpn{fmm_cells_per_node}"
+    else:
+        backend_tag = "_cuda"
+
+    #backend_tag = "_fmm" if use_fmm else "_cuda"
+    #if use_fmm: 
+    #    backend_tag += f"_eps{fmm_eps:.2e}_cpn{fmm_cells_per_node}"
 
     root_name = stem + backend_tag
 
@@ -365,6 +391,22 @@ if __name__ == "__main__":
     parser.add_argument("--figpath", type=Path, default=default_figpath,
                         help="Output directory for figures")
 
+    parser.add_argument("--ifunif", type=int, default=1,
+                        help="Uniform FMM tree if 1, else adaptive")
+
+    parser.add_argument("--nlmin", type=int, default=1,
+                        help="Minimum level for adaptive FMM tree")
+
+    parser.add_argument("--nlmax", type=int, default=5,
+                        help="Maximum level for adaptive FMM tree")
+
+    parser.add_argument("--allow-fmm-short-circuit", type=int, default=0,
+                        help="Allow FMM short circuit (0/1)")
+
+    parser.add_argument("--fmm-min-n", type=int, default=20000,
+                        help="Minimum number of elements for FMM short circuit")
+
+
     args = parser.parse_args()
     
 
@@ -377,6 +419,11 @@ if __name__ == "__main__":
     print(f"  mesh_file = {args.mesh_file}")
     print(f"  do_plot = {args.do_plot}")
     print(f"  figpath = {args.figpath}")
+    print(f"  ifunif = {args.ifunif}")
+    print(f"  nlmin = {args.nlmin}")
+    print(f"  nlmax = {args.nlmax}")
+    print(f"  allow_fmm_short_circuit = {args.allow_fmm_short_circuit}")
+    print(f"  fmm_min_n = {args.fmm_min_n}")
 
     grain_hysteresis(
         use_fmm=args.use_fmm,
@@ -387,5 +434,11 @@ if __name__ == "__main__":
         mesh_file=args.mesh_file,
         plotting=args.do_plot,
         figpath=args.figpath,
+        ifunif=args.ifunif,
+        nlmin=args.nlmin,
+        nlmax=args.nlmax,
+        allow_fmm_short_circuit=args.allow_fmm_short_circuit,
+        fmm_min_n=args.fmm_min_n,
     )
+
 
