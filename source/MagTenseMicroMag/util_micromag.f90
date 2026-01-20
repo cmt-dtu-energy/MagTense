@@ -227,9 +227,13 @@ module UTIL_MICROMAG
         values_reduced_COO  = pack(values,mask1D)
         deallocate(mask1D)
 
+
+    
+
         ! Create a sparse matrix in COO format from the reduced arrays
         ! See https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-fortran/2023-1/mkl-sparse-create-coo.html
         nnz = size(values_reduced_COO)
+
         stat = mkl_sparse_d_create_coo (COO_matrix, SPARSE_INDEX_BASE_ONE, K, N, nnz, rows_reduced_COO, columns_reduced_COO, values_reduced_COO)
 
         ! Create a sparse matrix in CSR format from COO format
@@ -264,9 +268,7 @@ module UTIL_MICROMAG
         stat = mkl_sparse_destroy (CSR_copy_matrix)
     
         stat = mkl_sparse_d_export_coo (COO_matrix, indexing, K, N, nnz, rows_c, cols_c, values_c)
-    
-        stat = mkl_sparse_destroy (COO_matrix)
-    
+        
         !   Converting C into Fortran pointers
         call C_F_POINTER(rows_c  , rows  , [nnz])
         call C_F_POINTER(cols_c  , cols  , [nnz])
@@ -280,6 +282,9 @@ module UTIL_MICROMAG
         GridInfo%Exch_mat_r(:) = rows(:)
         GridInfo%Exch_mat_c(:) = cols(:)
         GridInfo%Exch_mat_v(:) = values(:)
+
+        stat = mkl_sparse_destroy (COO_matrix)
+
             
     end subroutine create_COO_values_from_CSR
 
