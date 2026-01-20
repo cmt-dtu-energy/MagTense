@@ -14,19 +14,19 @@ USE_FMM=1
 USE_CUDA=1
 
 # ZIPPED combinations (must have same length)
-BASES=(5 5)
-CPN_LIST=(200 200)
-NGRAINS_LIST=(25 25)
-NREF_LIST=(4 4)
-DG_LIST=("3.75e-09" "3.75e-09")
+BASES=(5)
+CPN_LIST=(200)
+NGRAINS_LIST=(25)
+NREF_LIST=(4)
+DG_LIST=("3.75e-09")
 
-IFUNIF_LIST=(1 1)   # 1 = uniform tree
-NLMIN_LIST=(1 1)    # min tree level
-NLMAX_LIST=(2 2)    # max tree level
+IFUNIF_LIST=(1)   # 1 = uniform tree
+NLMIN_LIST=(1)    # min tree level
+NLMAX_LIST=(3)    # max tree level
 
 # New: FMM short-circuit controls (zipped)
-ALLOW_FMM_SHORT_CIRCUIT_LIST=(0 1)  # 1=enable flag, 0=do not pass flag
-FMM_MIN_N_LIST=(20000 25000)                # integer threshold (meaning depends on your code)
+ALLOW_FMM_SHORT_CIRCUIT_LIST=(0)  # 1=enable flag, 0=do not pass flag
+FMM_MIN_N_LIST=(20000)                # integer threshold (meaning depends on your code)
 
 MESH_TEMPLATE="Grid_rasBase_%d_nGrains_%d_nRef_%d_dG_%s.mat"
 
