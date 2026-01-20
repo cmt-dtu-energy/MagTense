@@ -39,7 +39,7 @@
         mwPointer :: demag_ignore_stepsProblemPtr, CrystalAxisProblemPtr, K0_arrProblemPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
-        real(DP) :: demag_fac, CV, mu0, pi
+        real(DP) :: demag_fac, CV
         character*(40) :: prog_str
             
         !Get the expected names of the fields
@@ -434,18 +434,6 @@
         sx = 1
         exch_interpnProblemPtr = mxGetField( prhs, i, problemFields(54) )
         call mxCopyPtrToInteger4(mxGetPr(exch_interpnProblemPtr), problem%exch_interpn, sx )
-        
-        !>-----------------------------------------
-        !Calculate the local scaled coefficients for the LLG equation
-        !"J" : exchange term
-        pi = 3.141592653589793
-        mu0 = 4*pi*1e-7
-        problem%Jfact = problem%A0 / ( mu0 * problem%Ms )
-        !"M" : demagnetization term
-        problem%Mfact = problem%Ms
-        !"K" : anisotropy term
-        problem%Kfact = problem%K0 / ( mu0 * problem%Ms )
-        
         
         !Clean-up 
         deallocate(problemFields)

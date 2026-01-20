@@ -38,7 +38,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 	real(8),dimension(ntot,6,3),intent(in) :: K0_arr
 	real(8),dimension(ntot,3,3),intent(in):: crysaxis
     integer(4), dimension(3) :: N_ave
-    real(8) :: demag_fac, pi, mu0
+    real(8) :: demag_fac
 	real(8), intent(in) :: CV, exch_weigh
 	
     character*256,intent(in) :: N_file_in, N_file_out
@@ -270,17 +270,6 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     problem%K0_arr = k0_arr
     problem%K1 = k1	
     problem%K2 = k2
-        
-	!>-----------------------------------------
-	!Calculate the local scaled coefficients for the LLG equation
-	!"J" : exchange term
-	pi = 3.141592653589793
-	mu0 = 4*pi*1e-7
-	problem%Jfact = problem%A0 / ( mu0 * problem%Ms )
-	!"M" : demagnetization term
-	problem%Mfact = problem%Ms
-	!"K" : anisotropy term
-	problem%Kfact = problem%K0 / ( mu0 * problem%Ms )
 
 end subroutine loadMicroMagProblem
 

@@ -6,6 +6,7 @@ module DifferentialOperators
   use IO_GENERAL
   use ISO_C_BINDING
   use UTIL_CALL
+  use UTIL_MICROMAG
   
   implicit none
 
@@ -597,87 +598,7 @@ module DifferentialOperators
     end subroutine passDifferentialOperators
 
     
-    subroutine create_CSR_matrix(rows, columns, values, K, N, eps_criteria, CSR_matrix)
-        implicit none
-        integer, dimension(:), intent(in) :: rows, columns
-        real(dp), dimension(:), intent(in) :: values
-        integer, intent(in) :: K, N
-        real(dp), intent(in) :: eps_criteria
-        type(sparse_matrix_t), intent(out) :: CSR_matrix
-        integer :: nnz, stat
-        integer, dimension(:), allocatable :: rows_reduced_COO, columns_reduced_COO
-        real(dp), dimension(:), allocatable :: values_reduced_COO
-        logical, allocatable :: mask1D(:)
-        type(sparse_matrix_t) :: COO_matrix
     
-
-        !Find the non-zero values of values
-        allocate(mask1D(size(values)))    
-        mask1D(:) = .false.
-        mask1D = (abs(values) .gt. eps_criteria)
-        
-        !Then reduce the size of the arrays
-        rows_reduced_COO    = pack(rows,mask1D)
-        columns_reduced_COO = pack(columns,mask1D)
-        values_reduced_COO  = pack(values,mask1D)
-        deallocate(mask1D)
-
-        ! Create a sparse matrix in COO format from the reduced arrays
-        ! See https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-fortran/2023-1/mkl-sparse-create-coo.html
-        nnz = size(values_reduced_COO)
-        stat = mkl_sparse_d_create_coo (COO_matrix, SPARSE_INDEX_BASE_ONE, K, N, nnz, rows_reduced_COO, columns_reduced_COO, values_reduced_COO)
-
-        ! Create a sparse matrix in CSR format from COO format
-        ! See https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-fortran/2025-1/mkl-sparse-convert-csr.html
-        stat = mkl_sparse_convert_csr (COO_matrix, SPARSE_OPERATION_NON_TRANSPOSE, CSR_matrix)
-    
-        stat = mkl_sparse_destroy(COO_matrix)
-        
-    end subroutine create_CSR_matrix
-
-
-    subroutine create_COO_values_from_CSR(CSR_matrix, GridInfo)
-        implicit none
-
-        type(sparse_matrix_t), intent(inout) :: CSR_matrix
-        type(MicroMagGridInfo), intent(inout) :: GridInfo
-        type(sparse_matrix_t) :: CSR_copy_matrix
-        type(sparse_matrix_t) :: COO_matrix
-        integer :: N, K, stat, nnz, indexing
-        type(MATRIX_DESCR) :: descr
-        type(C_PTR)    :: rows_c, cols_c, values_c
-        integer, POINTER :: rows(:), cols(:)
-        real(dp), POINTER :: values(:)
-        
-        descr%type = SPARSE_MATRIX_TYPE_GENERAL 
-
-        !Copy the CSR matrix, convert it to COO, then export this
-        stat = mkl_sparse_copy (CSR_matrix, descr, CSR_copy_matrix)
-    
-        stat = mkl_sparse_convert_coo (CSR_copy_matrix, SPARSE_OPERATION_NON_TRANSPOSE, COO_matrix)
-    
-        stat = mkl_sparse_destroy (CSR_copy_matrix)
-    
-        stat = mkl_sparse_d_export_coo (COO_matrix, indexing, K, N, nnz, rows_c, cols_c, values_c)
-        
-        !   Converting C into Fortran pointers
-        call C_F_POINTER(rows_c  , rows  , [nnz])
-        call C_F_POINTER(cols_c  , cols  , [nnz])
-        call C_F_POINTER(values_c    , values    , [nnz])
-    
-        ! Save the COO matrix in GridInfo
-        allocate(GridInfo%Exch_mat_r(nnz),GridInfo%Exch_mat_c(nnz),GridInfo%Exch_mat_v(nnz))
-        GridInfo%Exch_mat_nr = K
-        GridInfo%Exch_mat_nc = N
-        GridInfo%Exch_mat_ntot = size(rows)
-        GridInfo%Exch_mat_r(:) = rows(:)
-        GridInfo%Exch_mat_c(:) = cols(:)
-        GridInfo%Exch_mat_v(:) = values(:)
-
-        stat = mkl_sparse_destroy (COO_matrix)
-
-            
-    end subroutine create_COO_values_from_CSR
 
     
     ! For debugging, save the sparse matrix as a dense by multiplying it with the identity matrix
