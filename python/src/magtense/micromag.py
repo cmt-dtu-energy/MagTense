@@ -196,7 +196,7 @@ class MicromagProblem:
         self.nlmin = 1
         self.nlmax = 5
         self.allow_fmm_short_circuit = 1
-        self.fmm_min_n = 20_000
+        self.fmm_min_n = 20000
 
     @property
     def passexch(self) -> int | None:
@@ -543,6 +543,11 @@ class MicromagProblem:
         h_ext[:, 0] = np.linspace(0, t_end, nt_h_ext)
         h_ext[:, 1:4] = fct_h_ext(np.linspace(0, t_end, nt_h_ext))
 
+        if self.solver == 2: # dynamic solver
+            nt_h_ext_out = 1
+        else:
+            nt_h_ext_out = nt_h_ext 
+
         print("dummy run in python = ", self.dummy_run)
 
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
@@ -564,6 +569,7 @@ class MicromagProblem:
             alpha_mm=self.alpha_mm,
             maxt0=self.max_T0,
             nt_hext=nt_h_ext,
+            nt_hext_out = nt_h_ext_out,
             hext=h_ext,
             nt=nt,
             t=np.linspace(0, t_end, nt),
@@ -655,7 +661,12 @@ class MicromagProblem:
             [12] Exch_mat_nc (int): Number of columns in the exchange matrix.
 
         """
+
+        
+        #----------- we always run hysteresis with explicit solver so no need to check here
         nt_h_ext = H_ext.shape[0]
+        nt_h_ext_out = nt_h_ext
+
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
             ntot=self.ntot,
             grid_n=self.grid_n,
@@ -675,6 +686,7 @@ class MicromagProblem:
             alpha_mm=self.alpha_mm,
             maxt0=self.max_T0,
             nt_hext=nt_h_ext,
+            nt_hext_out = nt_h_ext_out,
             hext=H_ext,
             nt=self.nt,
             t=self.t,
