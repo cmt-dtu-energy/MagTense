@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <cusparse.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
@@ -508,4 +509,42 @@ void freeSparseMatrix( CUSparse* mat )
 		checkCudaErrors(cudaFree( mat->rows ));
 		mat->rows = NULL;
 	}
+}
+
+
+
+void cu_dumpDemagMatrices_dense(const char* filename)
+{
+    if (!filename) return;
+    if (!d_Kxx || !d_Kxy || !d_Kxz || !d_Kyy || !d_Kyz || !d_Kzz) return;
+    if (n_K <= 0) return;
+
+    const size_t n = (size_t)n_K;
+    const size_t nElem  = n * n;
+    const size_t nBytes = nElem * sizeof(float);
+
+    FILE* fp = fopen(filename, "wb");
+    if (!fp) return;
+
+    float* h = (float*)malloc(nBytes);
+    if (!h) { fclose(fp); return; }
+
+    auto dump_one = [&](const float* d_mat, int rec_idx) {
+        // record index 1..6, same as your Fortran rec=1..6
+        const long long offset = (long long)(rec_idx - 1) * (long long)nBytes;
+        if (fseeko(fp, (off_t)offset, SEEK_SET) != 0) return;
+        checkCudaErrors(cudaMemcpy(h, d_mat, nBytes, cudaMemcpyDeviceToHost));
+        fwrite(h, sizeof(float), nElem, fp);
+        fflush(fp);
+    };
+
+    dump_one(d_Kxx, 1);
+    dump_one(d_Kxy, 2);
+    dump_one(d_Kxz, 3);
+    dump_one(d_Kyy, 4);
+    dump_one(d_Kyz, 5);
+    dump_one(d_Kzz, 6);
+
+    free(h);
+    fclose(fp);
 }
