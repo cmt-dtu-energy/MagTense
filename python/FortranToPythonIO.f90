@@ -716,32 +716,16 @@ end subroutine getHOnSourcesFMM
 			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
             CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n)
 
-        print *, " starting SolveLandauLifshitzEquation "
         call SolveLandauLifshitzEquation( problem, solution )
-        print *, " finished SolveLandauLifshitzEquation "
-
-        print *, " NT, NTOT, NT_HEXT, NT_HEXT_OUT", NT, ntot, nt_Hext, nt_Hext_out
-        print *, " t out = ", size(solution%t_out)
         t_out = solution%t_out
-        print *, " M_mm", shape(M_mm)
-        print *, " M_mm size", shape(solution%M_out)
         M_mm = solution%M_out
-        print *, " pts ", shape(pts)
-        print *, " pts size", shape(solution%pts)
         pts = solution%pts
-        print *, " H_exc size", shape(solution%H_exc)
         H_exc = solution%H_exc
-        print *, " H_ext size", shape(solution%H_ext)
         H_ext = solution%H_ext
-        print *, " H_dem size", shape(solution%H_dem)
         H_dem = solution%H_dem
-        print *, " H_ani size", shape(solution%H_ani)
         H_ani = solution%H_ani
-		
-        print *, " n_tot_Exch = ", solution%gridinfo%Exch_mat_ntot
-		n_tot_Exch = solution%gridinfo%Exch_mat_ntot
+				n_tot_Exch = solution%gridinfo%Exch_mat_ntot
 
-        print *, " before exch_presize stuff "
 		if (exch_presize*ntot < n_tot_Exch) then
             write(*,*) 'ExchMat_presize is too small to copy all exchange matrix values. It is set to ', exch_presize*ntot, ' but the exchange matrix has ', n_tot_Exch, ' entries.'
             write(*,*) 'Please increase the value of exch_presize to at least ', n_tot_Exch/ntot, ' in the Python script.'
@@ -774,8 +758,6 @@ end subroutine getHOnSourcesFMM
         H_dem(:,:,:,:) = 0.
         H_ani(:,:,:,:) = 0.
 #endif
-
-    print *, " Finished RunMicroMagSimulation "
 
     end subroutine RunMicroMagSimulation
 
