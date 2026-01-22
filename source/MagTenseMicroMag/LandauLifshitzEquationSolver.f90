@@ -71,6 +71,8 @@
     call system_clock(count_max=cm)
     rate = REAL(cr)
     
+    write(prog_str,'(A37, A8, A12)') 'MagTense version 2.3.0, compiled on: ', __TIME__, __DATE__ 
+    call displayGUIMessage( trim(prog_str) ) 
     
     !Save internal representation of the problem and the solution
     gb_solution = sol
@@ -1437,7 +1439,7 @@ end subroutine updateDemagfieldFMM
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
         
-            !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout, k, j, i)
+            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout, k, j, i) default(none)
         
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do k=1,nz
@@ -1461,7 +1463,9 @@ end subroutine updateDemagfieldFMM
                         allocate(Nout(1,ntot,3,3))
                         allocate(H(ntot,3))
                         
+                        !$OMP CRITICAL
                         call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                        !$OMP END CRITICAL
                         
                         !Copy Nout into the proper structure used by the micro mag model
                         ind = (k-1) * nx * ny + (j-1) * nx + i
@@ -2171,7 +2175,7 @@ subroutine add_near_field(problem, solution)
 
   !-----------------------------------------------------------------------------
   real(SP), contiguous, pointer :: mxm(:), mym(:), mzm(:)
-  real(SP), contiguous, pointer :: hx_tmp(:), hy_tmp(:), hz_tmp(:), tmp(:)
+  real(SP), contiguous, pointer :: hx_tmp(:), hy_tmp(:), hz_tmp(:), temp(:)
   integer :: ntot
   real(SP) :: pref
   integer :: stat
@@ -2208,26 +2212,26 @@ subroutine add_near_field(problem, solution)
     alpha = 1.0_SP
     ! ---------------- Hx correction = xx*Mx + xy*My + xz*Mz ----------------
     beta = 0.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(1)%A, problem%K_fmm_descr_s, mxm, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(1)%A, problem%K_fmm_descr_s, mxm, beta, temp)
     beta = 1.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(2)%A, problem%K_fmm_descr_s, mym, beta, temp)
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(3)%A, problem%K_fmm_descr_s, mzm, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(2)%A, problem%K_fmm_descr_s, mym, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(3)%A, problem%K_fmm_descr_s, mzm, beta, temp)
 
     solution%HmX = solution%HmX - temp
     ! ---------------- Hy correction = xy*Mx + yy*My + yz*Mz ----------------
     beta = 0.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(2)%A, problem%K_fmm_descr_s, mxm, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(2)%A, problem%K_fmm_descr_s, mxm, beta, temp)
     beta = 1.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(4)%A, problem%K_fmm_descr_s, mym, beta, temp)
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(5)%A, problem%K_fmm_descr_s, mzm, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(4)%A, problem%K_fmm_descr_s, mym, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(5)%A, problem%K_fmm_descr_s, mzm, beta, temp)
 
     solution%HmY = solution%HmY - temp
     ! ---------------- Hz correction = xz*Mx + yz*My + zz*Mz ----------------
     beta = 0.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(3)%A, problem%K_fmm_descr_s, mxm, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(3)%A, problem%K_fmm_descr_s, mxm, beta, temp)
     beta = 1.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(5)%A, problem%K_fmm_descr_s, mym, beta, temp)
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(6)%A, problem%K_fmm_descr_s, mzm, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(5)%A, problem%K_fmm_descr_s, mym, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(6)%A, problem%K_fmm_descr_s, mzm, beta, temp)
 
     solution%HmZ = solution%HmZ - temp
     deallocate(mxm, mym, mzm, temp)

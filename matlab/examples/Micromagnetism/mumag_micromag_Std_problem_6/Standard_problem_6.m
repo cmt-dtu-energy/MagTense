@@ -1,4 +1,4 @@
-function Switching_field = mumag_std_6_Rasmus(settings, x_steps, field_steps, cart_dir, options)
+function Switching_field = Standard_problem_6(settings, x_steps, field_steps, cart_dir, options)
 %STANDARD_PROBLEM_6 
 %A function script to setup and simulate proposed standard problem 6
 %The problem is described in "Proposal for a micromagnetic standard problem: domain wall pinning at phase boundaries" (2022), Heistracher et al. [https://arxiv.org/abs/2107.07855] 
