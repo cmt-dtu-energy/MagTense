@@ -154,9 +154,11 @@
           !Initialize the Cuda arrays and load the demag tensors into the GPU memory
           if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
               !If the matrices are sparse
+            call displayGUIMessage( 'Initializing sparse matrices on CUDA' )
               call cudaInit_sparse( gb_problem%K_s )            
           else
               !if the matrices are dense 
+            call displayGUIMessage( 'Initializing dense matrices on CUDA' )
               call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
           endif
         end if
@@ -170,7 +172,13 @@
              
         else
             !if the matrices are dense 
+            call displayGUIMessage( 'Initializing dense matrices on CUDA' )
+
             call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+
+            !TODO - make this as option depending on flag/use input
+            !call cudaDumpDemagDense("CUDA_dense_K_matrices.bin")
+
         endif
 #endif
 #else
@@ -298,8 +306,7 @@
     #endif
     !Return the correct state
     sol = gb_solution
-    prob = gb_problem
-    
+    prob = gb_problem    
     end subroutine SolveLandauLifshitzEquation
 
     !>-----------------------------------------
@@ -1240,18 +1247,6 @@ end subroutine updateDemagfieldFMM
             solution%HmY = temp
             temp = solution%HmZ * problem%Mfact
             solution%HmZ = temp
-
-
-
-            ! open (11, file="dense_CUDA_H.bin",  &
-            !         status='unknown', form='unformatted', &
-            !         access='direct', recl=1*ntot)
-            ! write(11,rec=1) solution%HmX 
-            ! write(11,rec=2) solution%HmY
-            ! write(11,rec=3) solution%HmZ
-            ! close(11)
-            ! error stop " test stop after cuda dense"
-
 #endif
         endif 
     endif
@@ -1428,18 +1423,17 @@ end subroutine updateDemagfieldFMM
  
         !call mkl_set_num_threads(problem%nThreadsMatlab)
         !call omp_set_num_threads(problem%nThreadsMatlab)
-        !call omp_set_num_threads(1)
-        !print *, " we are here"
-               
+        !call omp_set_num_threads(1)               
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
             
             if (nx_ave*ny_ave*nz_ave > 1) then
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
         
-            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout, k, j, i) default(none)
-        
-            !for each element find the tensor for all evaluation points (i.e. all elements)
+            !for each element find the tensor for all evaluation points (i.e. all elements)    
+            !======== NOTE ===============
+            ! this parallelization seem to give issues when compiled with matlab in debug mode
+            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout) default(none)
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx
@@ -1487,8 +1481,8 @@ end subroutine updateDemagfieldFMM
                     enddo
                 enddo
             enddo
-            
             !$OMP END PARALLEL DO
+
             
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
         
@@ -1666,7 +1660,8 @@ end subroutine updateDemagfieldFMM
 
 
     !-------------- for debug write the dense matrices to binary files --------------
-    !  open (11, file="dense_std_MT.bin",  &
+    ! TODO - add option to control this and maybe an "auxiliary" module to do this
+    !open (11, file="dense_std_ref_nocuda.bin",  &
     !       status='unknown', form='unformatted', &
     !       access='direct', recl=1*ntot*ntot)
     ! write(11,rec=1) problem%Kxx
@@ -1676,6 +1671,7 @@ end subroutine updateDemagfieldFMM
     ! write(11,rec=5) problem%Kyz
     ! write(11,rec=6) problem%Kzz
     ! close(11)
+    !error stop " test stop after writing dense ref"
     !-------------- end debug write the dense matrices to binary files --------------
     
     end subroutine ComputeDemagfieldTensor
@@ -2171,7 +2167,7 @@ subroutine add_near_field(problem, solution)
 
   !-----------------------------------------------------------------------------
   real(SP), contiguous, pointer :: mxm(:), mym(:), mzm(:)
-  real(SP), contiguous, pointer :: hx_tmp(:), hy_tmp(:), hz_tmp(:), tmp(:)
+  real(SP), contiguous, pointer :: hx_tmp(:), hy_tmp(:), hz_tmp(:), temp(:)
   integer :: ntot
   real(SP) :: pref
   integer :: stat
@@ -2208,26 +2204,26 @@ subroutine add_near_field(problem, solution)
     alpha = 1.0_SP
     ! ---------------- Hx correction = xx*Mx + xy*My + xz*Mz ----------------
     beta = 0.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(1)%A, problem%K_fmm_descr_s, mxm, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(1)%A, problem%K_fmm_descr_s, mxm, beta, temp)
     beta = 1.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(2)%A, problem%K_fmm_descr_s, mym, beta, temp)
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(3)%A, problem%K_fmm_descr_s, mzm, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(2)%A, problem%K_fmm_descr_s, mym, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(3)%A, problem%K_fmm_descr_s, mzm, beta, temp)
 
     solution%HmX = solution%HmX - temp
     ! ---------------- Hy correction = xy*Mx + yy*My + yz*Mz ----------------
     beta = 0.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(2)%A, problem%K_fmm_descr_s, mxm, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(2)%A, problem%K_fmm_descr_s, mxm, beta, temp)
     beta = 1.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(4)%A, problem%K_fmm_descr_s, mym, beta, temp)
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(5)%A, problem%K_fmm_descr_s, mzm, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(4)%A, problem%K_fmm_descr_s, mym, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(5)%A, problem%K_fmm_descr_s, mzm, beta, temp)
 
     solution%HmY = solution%HmY - temp
     ! ---------------- Hz correction = xz*Mx + yz*My + zz*Mz ----------------
     beta = 0.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(3)%A, problem%K_fmm_descr_s, mxm, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(3)%A, problem%K_fmm_descr_s, mxm, beta, temp)
     beta = 1.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(5)%A, problem%K_fmm_descr_s, mym, beta, temp)
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_nbrcorr(6)%A, problem%K_fmm_descr_s, mzm, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(5)%A, problem%K_fmm_descr_s, mym, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(6)%A, problem%K_fmm_descr_s, mzm, beta, temp)
 
     solution%HmZ = solution%HmZ - temp
     deallocate(mxm, mym, mzm, temp)
