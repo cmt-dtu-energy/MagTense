@@ -13,13 +13,13 @@ MODULE timer_mod
 
   !---------------------- Per-thread timer state ------------------------------
   type :: timer_thread_t
-    integer(8), allocatable :: calls(:)   ! number of calls per timer id
-    real(8),    allocatable :: total(:)   ! accumulated exclusive time per timer id
+    integer(8), allocatable :: calls(:)            ! number of calls per timer id
+    real(8),    allocatable :: total(:)            ! accumulated exclusive time per timer id
 
-    integer :: depth = 0                   ! nesting depth (per thread)
-    integer :: stack_id(MAX_DEPTH) = 0     ! active timer ids (per thread)
-    real(8) :: stack_t0(MAX_DEPTH) = 0.0d0 ! start time for each stack level
-    real(8) :: child_acc(MAX_DEPTH) = 0.0d0 ! accumulated child time for level
+    integer :: depth = 0                           ! nesting depth (per thread)
+    integer :: stack_id(MAX_DEPTH) = 0             ! active timer ids (per thread)
+    real(8) :: stack_t0(MAX_DEPTH) = 0.0d0         ! start time for each stack level
+    real(8) :: child_acc(MAX_DEPTH) = 0.0d0        ! accumulated child time for level
   end type timer_thread_t
   !----------------------------------------------------------------------------
 
@@ -38,13 +38,13 @@ MODULE timer_mod
   !-----------------------------------------------------------------------------
 
   !-------------------- Window snapshot (for delta printing) -------------------
-  integer(8), allocatable, save :: win_prev_calls(:)  ! previous snapshot calls
-  real(8),    allocatable, save :: win_prev_total(:)  ! previous snapshot totals
-  logical, save :: win_snap_initialized = .false.      ! snapshot initialised?
+  integer(8), allocatable, save :: win_prev_calls(:)         ! previous snapshot calls
+  real(8),    allocatable, save :: win_prev_total(:)         ! previous snapshot totals
+  logical, save :: win_snap_initialized = .false.             ! snapshot initialised?
   !-----------------------------------------------------------------------------
 
-  !-------------------- Per-thread timer storage (threadprivate array) ---------
-  type(timer_thread_t), allocatable, save :: timers(:)  ! timers(tid)
+  !-------------------- Per-thread timer storage -------------------------------
+  type(timer_thread_t), allocatable, save :: timers(:)       ! timers(tid)
   !-----------------------------------------------------------------------------
 
   !----------------------------- Public timer object ---------------------------
@@ -60,8 +60,7 @@ MODULE timer_mod
     real(8) :: window_interval = 30.0d0   ! seconds between dumps
     real(8) :: next_dump_time  = 0.0d0    ! wallclock time threshold for next dump
 
-    real(8) :: t_ref         = 0.0d0      ! reference wallclock (set in reset)
-    real(8) :: last_dump_rel = 0.0d0      ! last dump time relative to t_ref
+    real(8) :: last_dump_time  = 0.0d0    ! wallclock of last window dump
 
   contains
     procedure, nopass :: init
@@ -144,10 +143,11 @@ CONTAINS
 
 
 !=============================================================================
-!> Reset all timer counters and stacks (safe to call inside/outside parallel)
+!> Reset all timer counters and stacks (keeps registry)
 !=============================================================================
   subroutine reset()
     integer :: tid
+    real(8) :: tnow
 
     if (.not. allocated(timers)) call timer%init()
 
@@ -163,21 +163,30 @@ CONTAINS
     end if
     !---------------------------------------------------------------------------
 
-    !-------------------- Reset window snapshot state --------------------------
+    !-------------------- Reset window snapshot/time base ----------------------
     call log_lock%lock()
 
-      win_snap_initialized = .true.
-      if (allocated(win_prev_calls)) win_prev_calls = 0_8
-      if (allocated(win_prev_total)) win_prev_total = 0.0d0
+      tnow = wallclock()
 
-      timer%t_ref          = wallclock()
-      timer%last_dump_rel  = 0.0d0
-      timer%next_dump_time = timer%t_ref + timer%window_interval
+      !----------------- Initialise delta baseline at t = now ------------------
+      ! This makes the first dump print "last window_interval seconds" instead
+      ! of using the first trigger to initialise the snapshot.
+      if (.not. allocated(win_prev_calls)) then
+        allocate(win_prev_calls(timer%capacity), win_prev_total(timer%capacity))
+      end if
+      win_prev_calls = 0_8
+      win_prev_total = 0.0d0
+      win_snap_initialized = .true.
+      !---------------------------------------------------------------------------
+
+      timer%last_dump_time = tnow
+      timer%next_dump_time = tnow + timer%window_interval
 
     call log_lock%unlock()
     !---------------------------------------------------------------------------
 
   end subroutine reset
+
 
 
 !=============================================================================
@@ -232,8 +241,8 @@ CONTAINS
     timers(tid)%depth = timers(tid)%depth + 1
     if (timers(tid)%depth > MAX_DEPTH) error stop "timer_mod: MAX_DEPTH exceeded."
 
-    timers(tid)%stack_id(timers(tid)%depth) = id
-    timers(tid)%stack_t0(timers(tid)%depth) = tnow
+    timers(tid)%stack_id(timers(tid)%depth)  = id
+    timers(tid)%stack_t0(timers(tid)%depth)  = tnow
     timers(tid)%child_acc(timers(tid)%depth) = 0.0d0
     !---------------------------------------------------------------------------
 
@@ -297,59 +306,7 @@ CONTAINS
 
 
 !=============================================================================
-!> Print cumulative timer summary (tid=0 only or SUM across threads)
-!> unit : output unit (default = stdout)
-!> tid  : thread id to print (optional; if absent -> aggregate SUM over threads)
-!=============================================================================
-  subroutine print(unit, tid)
-    integer, intent(in), optional :: unit
-    integer, intent(in), optional :: tid
-
-    integer :: u, i, nthreads, t, tsel
-    integer(8), allocatable :: calls(:)
-    real(8),    allocatable :: total(:)
-
-    u = 6
-    if (present(unit)) u = unit
-    if (.not. allocated(timers)) call timer%init()
-
-    nthreads = size(timers)
-
-    allocate(calls(timer%capacity), total(timer%capacity))
-    calls = 0_8
-    total = 0.0d0
-
-    !------------------ Select aggregation mode --------------------------------
-    if (present(tid)) then
-      tsel = tid
-      if (tsel < 0 .or. tsel > nthreads-1) then
-        error stop "timer_mod: print() called with invalid tid."
-      end if
-
-      do i = 1, ntimer
-        calls(i) = timers(tsel)%calls(i)
-        total(i) = timers(tsel)%total(i)
-      end do
-
-      call print_from_arrays(unit=u, calls=calls, total=total, title="Timer summary (exclusive wall time, tid=0)", show_total=.true.)
-    else
-      do t = 0, nthreads-1
-        do i = 1, ntimer
-          calls(i) = calls(i) + timers(t)%calls(i)
-          total(i) = total(i) + timers(t)%total(i)
-        end do
-      end do
-
-      call print_from_arrays(unit=u, calls=calls, total=total, title="Timer summary (exclusive wall time, SUM over threads)", show_total=.true.)
-    end if
-    !---------------------------------------------------------------------------
-
-    deallocate(calls, total)
-  end subroutine print
-
-
-!=============================================================================
-!> Initialise timing log file (fresh)
+!> Initialise timing log file (fresh) + reset omp_timer offset for this run
 !> filename       : log filename (default "timing.log")
 !> unit           : Fortran unit (default 98)
 !> flush_each     : flush after each dump (slow)
@@ -364,7 +321,6 @@ CONTAINS
     real(8),          intent(in), optional :: window_interval
 
     character(len=256) :: fn
-    real(8) :: tnow
     logical :: log_unit_open
 
     if (.not. allocated(timers)) call timer%init()
@@ -384,39 +340,36 @@ CONTAINS
     timer%window_interval = 30.0d0
     if (present(window_interval)) timer%window_interval = window_interval
 
+    !------------------- Reset wallclock zero point for this run ---------------
+    call omp_timer%init()
+    !---------------------------------------------------------------------------
+
     !----------------------- Open timing log (fresh) ---------------------------
     call log_lock%lock()
 
-    !---------------- Close unit if already connected (Python may call twice) ----------------
-    inquire(unit=timer%log_unit, opened=log_unit_open)
-    if (log_unit_open) close(timer%log_unit)
-    !---------------------------------------------------------------------------------------
+      inquire(unit=timer%log_unit, opened=log_unit_open)
+      if (log_unit_open) close(timer%log_unit)
 
-    open(timer%log_unit, file=trim(fn), status="replace", action="write")
+      open(timer%log_unit, file=trim(fn), status="replace", action="write")
+      timer%log_enabled = .true.
 
-    timer%log_enabled = .true.
+      win_snap_initialized = .false.
+      if (allocated(win_prev_calls)) deallocate(win_prev_calls)
+      if (allocated(win_prev_total)) deallocate(win_prev_total)
+      allocate(win_prev_calls(timer%capacity), win_prev_total(timer%capacity))
+      win_prev_calls = 0_8
+      win_prev_total = 0.0d0
 
-    win_snap_initialized = .false.
-    if (allocated(win_prev_calls)) deallocate(win_prev_calls)
-    if (allocated(win_prev_total)) deallocate(win_prev_total)
-    allocate(win_prev_calls(timer%capacity), win_prev_total(timer%capacity))
-    win_prev_calls = 0_8
-    win_prev_total = 0.0d0
-
-    tnow = wallclock()
-
-    !----------- Reference time is set/reset in timer%reset (per-run) -----------
-    if (timer%t_ref <= 0.0d0) timer%t_ref = tnow
-    timer%last_dump_rel  = 0.0d0
-    timer%next_dump_time = timer%t_ref + timer%window_interval
-    !---------------------------------------------------------------------------
-
-    write(timer%log_unit,'(a)') "============================================================"
-    write(timer%log_unit,'(a)') "TIMING LOG START"
-    write(timer%log_unit,'(a)') "============================================================"
-    if (timer%log_flush_each) flush(timer%log_unit)
+      write(timer%log_unit,'(a)') "============================================================"
+      write(timer%log_unit,'(a)') "TIMING LOG START"
+      write(timer%log_unit,'(a)') "============================================================"
+      if (timer%log_flush_each) flush(timer%log_unit)
 
     call log_lock%unlock()
+    !---------------------------------------------------------------------------
+
+    !------------------------ Reset counters + window base ---------------------
+    call timer%reset()
     !---------------------------------------------------------------------------
 
   end subroutine log_init
@@ -429,21 +382,20 @@ CONTAINS
     if (.not. timer%log_enabled) return
 
     call log_lock%lock()
-
-    write(timer%log_unit,'(a)') ""
-    write(timer%log_unit,'(a)') "--------------------- FINAL TIMER SUMMARY -------------------"
+      write(timer%log_unit,'(a)') ""
+      write(timer%log_unit,'(a)') "--------------------- FINAL TIMER SUMMARY -------------------"
     call log_lock%unlock()
 
     call timer%print(unit=timer%log_unit, tid=0)
 
     call log_lock%lock()
-    write(timer%log_unit,'(a)') "============================================================"
-    write(timer%log_unit,'(a)') "TIMING LOG END"
-    write(timer%log_unit,'(a)') "============================================================"
-    if (timer%log_flush_each) flush(timer%log_unit)
-    close(timer%log_unit)
-    timer%log_enabled = .false.
-    timer%log_unit    = -1
+      write(timer%log_unit,'(a)') "============================================================"
+      write(timer%log_unit,'(a)') "TIMING LOG END"
+      write(timer%log_unit,'(a)') "============================================================"
+      if (timer%log_flush_each) flush(timer%log_unit)
+      close(timer%log_unit)
+      timer%log_enabled = .false.
+      timer%log_unit    = -1
     call log_lock%unlock()
 
   end subroutine log_finalize
@@ -465,7 +417,7 @@ CONTAINS
     tnow = wallclock()
     if (tnow < timer%next_dump_time) return
 
-    timer%next_dump_time = timer%next_dump_time + timer%window_interval
+    timer%next_dump_time = tnow + timer%window_interval
     call dump_window(tnow)
 
   end subroutine maybe_window_dump
@@ -502,35 +454,36 @@ CONTAINS
     !---------------------- Compute delta since previous snapshot --------------
     call log_lock%lock()
 
-    if (.not. win_snap_initialized) then
+      if (.not. win_snap_initialized) then
+        win_prev_calls = cur_calls
+        win_prev_total = cur_total
+        win_snap_initialized = .true.
+
+        call log_lock%unlock()
+        deallocate(cur_calls, cur_total, del_calls, del_total)
+        timer%last_dump_time = tnow
+        return
+      end if
+
+      do i = 1, ntimer
+        del_calls(i) = cur_calls(i) - win_prev_calls(i)
+        del_total(i) = cur_total(i) - win_prev_total(i)
+      end do
+
       win_prev_calls = cur_calls
       win_prev_total = cur_total
-      win_snap_initialized = .true.
-
-      call log_lock%unlock()
-      deallocate(cur_calls, cur_total, del_calls, del_total)
-      return
-    end if
-
-    do i = 1, ntimer
-      del_calls(i) = cur_calls(i) - win_prev_calls(i)
-      del_total(i) = cur_total(i) - win_prev_total(i)
-    end do
-
-    win_prev_calls = cur_calls
-    win_prev_total = cur_total
 
     call log_lock%unlock()
     !---------------------------------------------------------------------------
 
     !---------------------- Compute window times -------------------------------
-    t_rel   = tnow - timer%t_ref
+    t_rel   = tnow
     t_rel_r = dble(nint(10.0d0*t_rel))/10.0d0
 
-    dt   = t_rel - timer%last_dump_rel
+    dt   = tnow - timer%last_dump_time
     dt_r = dble(nint(10.0d0*dt))/10.0d0
 
-    timer%last_dump_rel = t_rel
+    timer%last_dump_time = tnow
 
     other_time = max(0.0d0, dt - sum(del_total(1:ntimer)))
 
@@ -551,6 +504,93 @@ CONTAINS
 
     deallocate(cur_calls, cur_total, del_calls, del_total)
   end subroutine dump_window
+
+
+!=============================================================================
+!> Print cumulative timer summary
+!> unit : output unit (default = stdout)
+!> tid  : if present -> print this tid only, else SUM over threads
+!=============================================================================
+  subroutine print(unit, tid)
+    integer, intent(in), optional :: unit
+    integer, intent(in), optional :: tid
+
+    integer :: u, i, nthreads, t, tsel
+    integer(8), allocatable :: calls(:)
+    real(8),    allocatable :: total(:)
+
+    u = 6
+    if (present(unit)) u = unit
+    if (.not. allocated(timers)) call timer%init()
+
+    nthreads = size(timers)
+
+    allocate(calls(timer%capacity), total(timer%capacity))
+    calls = 0_8
+    total = 0.0d0
+
+    !------------------ Select aggregation mode --------------------------------
+    if (present(tid)) then
+      tsel = tid
+      if (tsel < 0 .or. tsel > nthreads-1) then
+        error stop "timer_mod: print() called with invalid tid."
+      end if
+
+      do i = 1, ntimer
+        calls(i) = timers(tsel)%calls(i)
+        total(i) = timers(tsel)%total(i)
+      end do
+
+      call print_from_arrays(unit=u, calls=calls, total=total, title="Timer summary (exclusive wall time, tid = 0)", show_total=.true.)
+    else
+      do t = 0, nthreads-1
+        do i = 1, ntimer
+          calls(i) = calls(i) + timers(t)%calls(i)
+          total(i) = total(i) + timers(t)%total(i)
+        end do
+      end do
+
+      call print_from_arrays(unit=u, calls=calls, total=total, title="Timer summary (exclusive wall time, SUM over threads)", show_total=.true.)
+    end if
+    !---------------------------------------------------------------------------
+
+    deallocate(calls, total)
+  end subroutine print
+
+
+!=============================================================================
+!> Register timer name, returning id (1..capacity)
+!=============================================================================
+  integer function get_timer_id(name) result(id)
+    character(len=*), intent(in) :: name
+    integer :: i
+
+    call reg_lock%lock()
+
+    !---------------------- Lookup existing name ------------------------------
+    do i = 1, ntimer
+      if (trim(names(i)) == trim(name)) then
+        id = i
+        call reg_lock%unlock()
+        return
+      end if
+    end do
+    !---------------------------------------------------------------------------
+
+    !---------------------- Register new timer --------------------------------
+    ntimer = ntimer + 1
+    if (ntimer > timer%capacity) then
+      call reg_lock%unlock()
+      error stop "timer_mod: capacity exceeded."
+    end if
+
+    names(ntimer) = trim(name)
+    id = ntimer
+    !---------------------------------------------------------------------------
+
+    call reg_lock%unlock()
+
+  end function get_timer_id
 
 
 !=============================================================================
@@ -636,6 +676,7 @@ CONTAINS
         write(unit,'(a,es14.6)') "  total[s] = ", total_sum
       end if
 
+      write(unit,'(a)') "------------------------------------------------------------"
       write(unit,'(a)') "  name                               total[s]       avg[s]      %     calls"
       write(unit,'(a)') "------------------------------------------------------------"
 
@@ -698,41 +739,6 @@ CONTAINS
 
     deallocate(pct, idx, keep, calls_w, total_w, names_w)
   end subroutine print_from_arrays
-
-
-!=============================================================================
-!> Register timer name, returning id (1..capacity)
-!=============================================================================
-  integer function get_timer_id(name) result(id)
-    character(len=*), intent(in) :: name
-    integer :: i
-
-    call reg_lock%lock()
-
-    !---------------------- Lookup existing name ------------------------------
-    do i = 1, ntimer
-      if (trim(names(i)) == trim(name)) then
-        id = i
-        call reg_lock%unlock()
-        return
-      end if
-    end do
-    !---------------------------------------------------------------------------
-
-    !---------------------- Register new timer --------------------------------
-    ntimer = ntimer + 1
-    if (ntimer > timer%capacity) then
-      call reg_lock%unlock()
-      error stop "timer_mod: capacity exceeded."
-    end if
-
-    names(ntimer) = trim(name)
-    id = ntimer
-    !---------------------------------------------------------------------------
-
-    call reg_lock%unlock()
-
-  end function get_timer_id
 
 
 !=============================================================================

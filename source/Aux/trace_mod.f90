@@ -81,14 +81,17 @@ CONTAINS
     if (allocated(trace%t)) deallocate(trace%t)
 
     trace%nthreads = omp%max_threads
+
     allocate(trace%t(0:trace%nthreads-1))
     trace%t(:)%level = 0
     !---------------------------------------------------------------------------
 
     !---------------------------- Open log file --------------------------------
     if (trace%enabled) then
-      open(trace%unit, file=trim(fn), status="replace", action="write")
+      open(trace%unit, file=trim(fn), status="replace", action="write", position="append")
+
       call trace_write_line("INFO ", "TRACE START", force_master=.true.)
+
       if (trace%flush_each) flush(trace%unit)
     end if
     !---------------------------------------------------------------------------
@@ -99,10 +102,18 @@ CONTAINS
 
 
 !=============================================================================
-!> Finalise trace logging (closes file)
+!> Finalise trace logging (writes timer summary and closes file)
 !=============================================================================
   subroutine finalize()
     if (.not. trace%initialized) return
+
+    !---------------------- Write timer summary -------------------------------
+    if (trace%enabled .and. trace%unit > 0) then
+      call trace_write_line("INFO ", "TIMER SUMMARY", force_master=.true.)
+      call timer%print(unit=trace%unit, tid=0)
+      if (trace%flush_each) flush(trace%unit)
+    end if
+    !---------------------------------------------------------------------------
 
     !-------------------------- Close down safely ------------------------------
     if (trace%enabled .and. trace%unit > 0) then
@@ -120,7 +131,7 @@ CONTAINS
     call trace%io_lock%destroy()
 
     trace%nthreads     = 1
-    trace%initialized  = .false.
+    trace%initialized = .false.
 
   end subroutine finalize
 
@@ -138,10 +149,10 @@ CONTAINS
 !=============================================================================
 !> Begin a traced region (thread-safe)
 !> id     : region label
-!> itimer : optional timer id (0 = auto-register)
+!> itimer : optional timer id for aggregation (0 = auto-register)
 !=============================================================================
   subroutine begin(id, itimer)
-    character(len=*), intent(in) :: id
+    character(len=*), intent(in)              :: id
     integer,          intent(inout), optional :: itimer
 
     integer :: tid
@@ -155,11 +166,11 @@ CONTAINS
     lab = ""
     lab(1:min(len_trim(id), ID_LEN)) = id(1:min(len_trim(id), ID_LEN))
 
-    !----------------------------- Timer coupling --------------------------------
+    !----------------------------- Timer coupling ------------------------------
     if (present(itimer)) then
       call timer%begin(lab, itimer)
     end if
-    !-----------------------------------------------------------------------------
+    !---------------------------------------------------------------------------
 
     !---------------------- Update per-thread stack ----------------------------
     trace%t(tid)%level = trace%t(tid)%level + 1
@@ -169,8 +180,9 @@ CONTAINS
 
     if (.not. trace%enabled) return
 
-    msg = trim(lab)
-    call trace_write_line(indent_string(trace%t(tid)%level-1)//"BEGIN", msg)
+    msg = indent_string(trace%t(tid)%level-1) // trim(lab)
+
+    call trace_write_line("BEGIN", msg)
 
   end subroutine begin
 
@@ -178,11 +190,11 @@ CONTAINS
 !=============================================================================
 !> End a traced region (thread-safe, enforces proper nesting)
 !> id     : region label (must match last begin on this thread)
-!> itimer : optional timer id
+!> itimer : optional timer id for aggregation
 !=============================================================================
   subroutine end(id, itimer)
-    character(len=*), intent(in) :: id
-    integer,          intent(in), optional :: itimer
+    character(len=*), intent(in)            :: id
+    integer,          intent(in), optional  :: itimer
 
     integer :: tid
     character(len=ID_LEN) :: lab, want
@@ -195,11 +207,11 @@ CONTAINS
     lab = ""
     lab(1:min(len_trim(id), ID_LEN)) = id(1:min(len_trim(id), ID_LEN))
 
-    !----------------------------- Timer coupling --------------------------------
+    !----------------------------- Timer coupling ------------------------------
     if (present(itimer)) then
       call timer%end(itimer)
     end if
-    !-----------------------------------------------------------------------------
+    !---------------------------------------------------------------------------
 
     !------------------------ Check nesting correctness ------------------------
     if (trace%t(tid)%level <= 0) then
@@ -213,8 +225,8 @@ CONTAINS
     !---------------------------------------------------------------------------
 
     if (trace%enabled) then
-      msg = trim(lab)
-      call trace_write_line(indent_string(trace%t(tid)%level-1)//"END  ", msg)
+      msg = indent_string(trace%t(tid)%level-1) // trim(lab)
+      call trace_write_line("END  ", msg)
     end if
 
     trace%t(tid)%level = trace%t(tid)%level - 1
@@ -231,6 +243,7 @@ CONTAINS
 
     integer :: tid
     character(len=ID_LEN) :: msg
+    character(len=:), allocatable :: line
 
     if (.not. trace%initialized) call trace%init(enabled=.false.)
     if (.not. trace%enabled) return
@@ -240,7 +253,9 @@ CONTAINS
     msg = ""
     msg(1:min(len_trim(message), ID_LEN)) = message(1:min(len_trim(message), ID_LEN))
 
-    call trace_write_line(indent_string(trace%t(tid)%level)//"TAG  ", trim(msg))
+    line = indent_string(trace%t(tid)%level) // trim(msg)
+
+    call trace_write_line("TAG  ", line)
 
   end subroutine tag
 
@@ -262,8 +277,8 @@ CONTAINS
 
 !=============================================================================
 !> Write one trace line (serialised with io_lock)
-!> kind         : kind string (may include indentation)
-!> text         : message text
+!> kind         : 5-char code ("BEGIN","END  ","TAG  ","INFO ")
+!> text         : message text (already indented)
 !> force_master : if true, use tid=0 in output
 !=============================================================================
   subroutine trace_write_line(kind, text, force_master)
@@ -279,19 +294,16 @@ CONTAINS
     fm = .false.
     if (present(force_master)) fm = force_master
 
-    if (fm) then
-      tid = 0
-    else
-      tid = omp%thread_id()
-    end if
+    tid = omp%thread_id()
+    if (fm) tid = 0
 
     !------------------------ Serialize file output ----------------------------
     call trace%io_lock%lock()
 
-    write(trace%unit,'(es14.6,1x,"tid=",i0,3x,a,1x,a)') &
-        wallclock(), tid, kind, text
+      write(trace%unit,'(es14.6,1x,"tid=",i0,3x,a,1x,a)') &
+        wallclock(), tid, adjustl(kind), text
 
-    if (trace%flush_each) flush(trace%unit)
+      if (trace%flush_each) flush(trace%unit)
 
     call trace%io_lock%unlock()
     !---------------------------------------------------------------------------
