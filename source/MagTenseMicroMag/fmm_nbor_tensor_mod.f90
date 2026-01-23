@@ -6,7 +6,7 @@ module fmm_nbor_tensor_mod
     use TileNComponents
     use DemagFieldGetSolution
     use IO_GENERAL
-
+    use trace_mod
   implicit none
 contains 
 
@@ -76,6 +76,9 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
   integer :: istarts, iends, jstart, jend
   integer :: p_t, p_s, t_idx, j_idx
   integer :: nb, cnt
+  integer, save :: itimer = 0
+
+  call trace%begin( "BuildNeighbourList_FromTree", itimer=itimer )
 
   ! --- basic sanity ---
   if (.not. tree%is_built) stop "BuildNeighbourList_FromTree: tree not built"
@@ -182,6 +185,9 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
   !  call simple_nbor_sort(problem%nbr_idx(i, 1:problem%n_nbors(i)))
   !end do
 
+
+  call trace%end( "BuildNeighbourList_FromTree", itimer=itimer )
+
 end subroutine BuildNeighbourList_FromTree
 
 
@@ -284,6 +290,9 @@ subroutine BuildNeighbourDemagTensor(problem)
   type(TileWS),  allocatable :: tiles_thr(:)
   type(NoutWS),  allocatable :: nout_thr(:)
   type(HdummyWS),allocatable :: hdum_thr(:)
+
+  integer, save :: itimer = 0
+  call trace%begin( "BuildNeighbourDemagTensor", itimer=itimer )
 
 
   ier = 0
@@ -450,6 +459,8 @@ subroutine BuildNeighbourDemagTensor(problem)
   problem%diffTens => problem%Nnbr
   call build_FMM_sparse_nborTensor_opt(problem)
 
+
+  call trace%end( "BuildNeighbourDemagTensor", itimer=itimer )
 end subroutine BuildNeighbourDemagTensor
 
 
@@ -464,7 +475,9 @@ subroutine convert_Nnbr_to_diffTens(problem)
   real(DP) :: xt, yt, zt, xj, yj, zj
   real(DP) :: Rvec(3), Kdip(3,3), Kloc(3,3)
   real(SP), contiguous, pointer :: diffTens(:,:,:,:)
+  integer, save :: itimer = 0
   !---------------------------------------
+  call trace%begin( "convert_Nnbr_to_diffTens", itimer=itimer )
 
   ntot = size(problem%grid%pts,1)
   dx = real(problem%grid%dx, DP)
@@ -503,6 +516,8 @@ subroutine convert_Nnbr_to_diffTens(problem)
       problem%diffTens(t, m, :,:) = Kloc  ! full tensor - if eval_direct is never called 
     end do
   end do
+
+  call trace%end( "convert_Nnbr_to_diffTens", itimer=itimer )
 end subroutine convert_Nnbr_to_diffTens
 
 subroutine build_fmm_sparse_nborTensor_opt(problem)
@@ -519,6 +534,8 @@ subroutine build_fmm_sparse_nborTensor_opt(problem)
   integer :: clk_start, clk_end, clk_rate
   real(SP) :: t_sec
   character(len=128) :: msg
+  integer, save :: itimer = 0
+  call trace%begin( "build_fmm_sparse_nborTensor_opt", itimer=itimer )
 
 
   !-------- optimized not fully tested - use with caution.
@@ -677,6 +694,9 @@ subroutine build_fmm_sparse_nborTensor_opt(problem)
 
   call displayGUIMessage(" Finished FMM sparse nbor build (opt)")
 
+
+  call trace%end( "build_fmm_sparse_nborTensor_opt", itimer=itimer )
+
 end subroutine build_fmm_sparse_nborTensor_opt
 
 
@@ -691,6 +711,8 @@ subroutine build_FMM_sparse_nborTensor(problem)
   integer :: stat, idx
 
   real(SP) :: v_xx, v_xy, v_xz, v_yy, v_yz, v_zz
+  integer, save :: itimer = 0
+  call trace%begin( "build_FMM_sparse_nborTensor", itimer=itimer )
 
   !TODO - this could be optimized by parralizing
 
@@ -813,6 +835,8 @@ subroutine build_FMM_sparse_nborTensor(problem)
   problem%K_fmm_descr_s%type = SPARSE_MATRIX_TYPE_GENERAL
 
   problem%K_fmm_built = .true.
+
+  call trace%end( "build_FMM_sparse_nborTensor", itimer=itimer )
 
 end subroutine build_FMM_sparse_nborTensor
 

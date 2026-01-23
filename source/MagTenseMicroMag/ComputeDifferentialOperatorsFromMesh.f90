@@ -123,6 +123,9 @@ module DifferentialOperators
         type(MATRIX_DESCR) :: descr_copy
         type(sparse_matrix_t) :: DDXA_sparse, FX_sparse, DDYA_sparse, FY_sparse, DDZA_sparse, FZ_sparse
         type(sparse_matrix_t) :: DDX_sparse, DDY_sparse, DDZ_sparse, W_sparse        
+        integer, save :: itimer=0
+
+        call trace%begin( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
         eps_criteria = 1.0e-12
         const = 1.
@@ -581,6 +584,9 @@ module DifferentialOperators
         
         stat = mkl_sparse_destroy(DX_matrix)
                 
+
+
+        call trace%end( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
     end subroutine computeDifferentialOperatorsFromMesh_DirectLap
 

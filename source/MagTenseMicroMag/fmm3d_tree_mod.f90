@@ -1,5 +1,6 @@
 module fmm3d_tree_mod
     use omp_lib
+    use trace_mod
         implicit none
       type :: FMM3DTree
             logical :: is_built = .false.
@@ -203,8 +204,13 @@ module fmm3d_tree_mod
         integer :: ifunif, nlmin, nlmax
         !------------------------------------------------
         integer :: i
+        integer, save :: itimer = 0
         !-----------------
+
+        call trace%begin( "FMM3DTree_build_tree", itimer=itimer )
+
         if (self%is_built) then
+            call trace%end( "FMM3DTree_build_tree", itimer=itimer )
             return
         end if
 
@@ -245,13 +251,16 @@ module fmm3d_tree_mod
         enddo
 
         self%is_built = .true.
+        call trace%end( "FMM3DTree_build_tree", itimer=itimer )
       end subroutine 
 
       subroutine make_and_eval(self, dipvec, grad)
         class(FMM3DTree), intent(inout) :: self
         double precision, contiguous, pointer :: dipvec(:,:,:)
         double precision, contiguous, pointer :: grad(:,:,:)
+        integer, save :: itimer = 0
         !------------------------------------------------
+        call trace%begin( "FMM3DTree_make_and_eval", itimer=itimer )
 
 
         self%grad => grad
@@ -304,6 +313,9 @@ module fmm3d_tree_mod
 
         end if
 #endif
+
+
+      call trace%end( "FMM3DTree_make_and_eval", itimer=itimer )
 
 
       end subroutine make_and_eval
@@ -1072,6 +1084,9 @@ module fmm3d_tree_mod
       data ima/(0.0d0,1.0d0)/
 
       integer nthd,ithd
+      integer, save :: itimer = 0
+
+      call trace%begin("FMM3DTree:lfmm3dmain_tree", itimer=itimer)
       !integer omp_get_max_threads,omp_get_thread_num
 
 
@@ -1808,7 +1823,9 @@ module fmm3d_tree_mod
 
       !--------------------------------------------------------------------
 
-      end
+      call trace%end('FMM3DTree:lfmm3dmain_tree', itimer=itimer)
+      
+    end subroutine lfmm3dmain_tree
 
 
       subroutine eval_local(self)
@@ -1816,8 +1833,10 @@ module fmm3d_tree_mod
         !--------------------------------------------
         integer :: ilev,ibox,istart,iend,i,npts
         integer :: nchild
+        integer, save :: itimer = 0
         !--------------------------------------------
 
+        call trace%begin('FMM3DTree:eval_local', itimer=itimer)
 
         do ilev = 0,self%nlevels
           !$OMP PARALLEL DO DEFAULT(SHARED) &
@@ -1842,6 +1861,8 @@ module fmm3d_tree_mod
       self%l2p_time = self%l2p_time + (walltime() - self%t1)
       self%t1 = walltime()
 #endif 
+
+      call trace%end('FMM3DTree:eval_local', itimer=itimer)
 
       end subroutine eval_local
 

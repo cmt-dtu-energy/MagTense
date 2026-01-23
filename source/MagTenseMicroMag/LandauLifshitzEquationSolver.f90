@@ -67,6 +67,8 @@
     character*(100) :: prog_str 
     real :: rate
     integer :: c1,c2,cr,cm 
+    integer, save :: itimer = 0
+    call trace%begin( "SolveLandauLifshitzEquation", itimer=itimer )
     
     ! First initialize the system_clock
     call system_clock(count_rate=cr)
@@ -309,6 +311,9 @@
     !Return the correct state
     sol = gb_solution
     prob = gb_problem    
+
+
+    call trace%end( "SolveLandauLifshitzEquation", itimer=itimer )
     end subroutine SolveLandauLifshitzEquation
 
     !>-----------------------------------------
@@ -506,6 +511,7 @@
     real(DP),intent(in) :: t
     type(MicroMagProblem),intent(in) :: problem
     
+    
     if ( problem%alpha0 .eq. 0 ) then
         !Interpolate to get the applied field at time t
         call interp1_MagTense( problem%alpha(:,1), problem%alpha(:,2), t, size(problem%alpha(:,1)), alpha )
@@ -530,6 +536,8 @@
     type(MicroMagProblem),intent(in) :: problem
     type(MicroMagSolution),intent(inout) :: solution
     integer :: i,j,nt
+    integer, save :: itimer = 0
+    call trace%begin( "StoreHeffComponents", itimer=itimer )
     
     i = gb_solution%HextInd       
     nt = size( gb_problem%t ) 
@@ -578,6 +586,7 @@
         endif
     enddo
     
+    call trace%end( "StoreHeffComponents", itimer=itimer )
     end subroutine StoreHeffComponents
     
     
@@ -594,6 +603,9 @@
     character*(100) :: prog_str 
     
     integer :: ntot, i
+    integer, save :: itimer = 0
+    call trace%begin( "initializeSolution", itimer=itimer )
+
     !character(50) :: prog_str
     
     if ( problem%problemMode .eq. ProblemModeNew ) then
@@ -649,7 +661,7 @@
         call AddUncertaintyToDemagField( problem, solution)
     endif
     
-    
+    call trace%end( "initializeSolution", itimer=itimer )
     end subroutine initializeSolution
     
     
@@ -856,7 +868,10 @@ subroutine updateDemagfieldFMM(problem, solution)
 
   class(FMM3DTree), pointer :: fmm_tree
   logical :: built_tree
+  integer, save :: itimer = 0
   !------------------------------------------------
+
+    call trace%begin( "updateDemagfieldFMM", itimer=itimer )
 #if USE_TIMING
   t0 = walltime()
   t1 = walltime()
@@ -1037,7 +1052,9 @@ call add_near_field(problem, solution)
   end if
 #endif
 
+    call trace%end( "updateDemagfieldFMM", itimer=itimer )
 #endif
+
 end subroutine updateDemagfieldFMM
 
 
@@ -1339,6 +1356,8 @@ end subroutine updateDemagfieldFMM
     subroutine setupGrid( grid )
     type(MicroMagGrid),intent(inout) :: grid            !> Grid information to be generated
     integer :: i,j,k,ind
+    integer, save :: itimer = 0
+    call trace%begin( "setupGrid", itimer=itimer )
     
     !Setup the grid depending on which type of grid it is
     if ( grid%gridType .eq. gridTypeUniform ) then
@@ -1392,7 +1411,7 @@ end subroutine updateDemagfieldFMM
             enddo
         enddo
     endif
-    
+    call trace%end( "setupGrid", itimer=itimer )
     end subroutine setupGrid
     
     
@@ -1760,6 +1779,8 @@ end subroutine updateDemagfieldFMM
     type(matrix_descr) :: descr                        !> Describes a sparse matrix operation
     real(DP) :: const
     character*(100) :: prog_str 
+    integer, save :: itimer = 0
+    call trace%begin( "ComputeExchangeTerm3D_Uniform", itimer=itimer )
     
     !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
@@ -2131,6 +2152,8 @@ end subroutine updateDemagfieldFMM
     
     call create_COO_values_from_CSR(A,solution%gridinfo)
     
+
+    call trace%end( "ComputeExchangeTerm3D_Uniform", itimer=itimer )
     end subroutine ComputeExchangeTerm3D_Uniform
        
     !>-----------------------------------------
@@ -2143,7 +2166,10 @@ end subroutine updateDemagfieldFMM
     type(MicroMagProblem),intent(inout) :: problem             !> Struct containing the problem
     
     integer :: nx,ny,nz,ntot, i
+    integer, save :: itimer = 0
     
+
+    call trace%begin( "ComputeAnisotropyTerm3D", itimer=itimer )
     !--- We use the general formulation introduced in updateAnisotropy
     !--- If the user has specified a value for the uniaxial anisotropy or the cubic anisotropy, we use transform
     !--- those to the general matrix formulation
@@ -2174,6 +2200,8 @@ end subroutine updateDemagfieldFMM
             problem%Kfact_arr(i,:,:) = problem%K0_arr(i,:,:) / ( mu0 * problem%Ms(i) )
         enddo
     endif
+
+    call trace%end( "ComputeAnisotropyTerm3D", itimer=itimer )
     
     end subroutine ComputeAnisotropyTerm3D
 
@@ -2203,6 +2231,8 @@ subroutine add_near_field(problem, solution)
   real(SP) :: pref
   integer :: stat
   real(SP) :: alpha, beta
+  integer, save :: itimer = 0
+  call trace%begin( "add_near_field", itimer=itimer )
 
 
   ntot = size(problem%grid%pts, dim=1)
@@ -2260,6 +2290,7 @@ subroutine add_near_field(problem, solution)
     deallocate(mxm, mym, mzm, temp)
 #endif
 
+    call trace%end( "add_near_field", itimer=itimer )
 end subroutine add_near_field
 
         !------------------------------------------------------------------------------------------------

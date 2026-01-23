@@ -3,6 +3,7 @@
   use BLAS95
   use MicroMagParameters
   use IO_GENERAL
+  use trace_mod
   
   implicit none
 
@@ -85,7 +86,10 @@
     integer, allocatable :: TheDs_indices_this(:), TheDs_temp(:,:), TheDs_indices(:,:)
     integer, allocatable :: TheSigns_indices_pos(:,:), TheSigns_indices_neg(:,:), TheSigns_indices(:,:)
     character*(40) :: prog_str
-
+    integer, save :: itimer=0
+    
+    call trace%begin( "CartesianUnstructuredMeshAnalysis", itimer=itimer )
+    
     call displayGUIMessage( 'Starting mesh analysis' )
     
     ! Initialize some variables
@@ -509,6 +513,8 @@
     GridInfo%TheSigns = TheSigns_indices    
 
     call displayGUIMessage( 'Mesh analysis done' )
+
+    call trace%end( "CartesianUnstructuredMeshAnalysis", itimer=itimer )
     
   end subroutine CartesianUnstructuredMeshAnalysis
 
