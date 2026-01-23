@@ -734,9 +734,7 @@ end subroutine getHOnSourcesFMM
             CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n)
         call trace%end("loadMicroMagProblem",itimer=itimer1)
 
-        call trace%begin("SolveLandauLifshitzEquation", itimer=itimer2)
         call SolveLandauLifshitzEquation( problem, solution )
-        call trace%end("SolveLandauLifshitzEquation",itimer=itimer2) !, itimer=itimer2)
 
         call trace%begin("EndSim", itimer=itimer3)
 
