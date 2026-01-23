@@ -81,7 +81,6 @@ CONTAINS
     if (allocated(trace%t)) deallocate(trace%t)
 
     trace%nthreads = omp%max_threads
-
     allocate(trace%t(0:trace%nthreads-1))
     trace%t(:)%level = 0
     !---------------------------------------------------------------------------
@@ -90,7 +89,7 @@ CONTAINS
     if (trace%enabled) then
       open(trace%unit, file=trim(fn), status="replace", action="write", position="append")
 
-      call trace_write_line("INFO ", "TRACE START", force_master=.true.)
+      call trace_write_line("INFO ", "TRACE START", 0, force_master=.true.)
 
       if (trace%flush_each) flush(trace%unit)
     end if
@@ -109,7 +108,7 @@ CONTAINS
 
     !---------------------- Write timer summary -------------------------------
     if (trace%enabled .and. trace%unit > 0) then
-      call trace_write_line("INFO ", "TIMER SUMMARY", force_master=.true.)
+      call trace_write_line("INFO ", "TIMER SUMMARY", 0, force_master=.true.)
       call timer%print(unit=trace%unit, tid=0)
       if (trace%flush_each) flush(trace%unit)
     end if
@@ -117,7 +116,7 @@ CONTAINS
 
     !-------------------------- Close down safely ------------------------------
     if (trace%enabled .and. trace%unit > 0) then
-      call trace_write_line("INFO ", "TRACE END", force_master=.true.)
+      call trace_write_line("INFO ", "TRACE END", 0, force_master=.true.)
       if (trace%flush_each) flush(trace%unit)
       close(trace%unit)
     end if
@@ -157,7 +156,6 @@ CONTAINS
 
     integer :: tid
     character(len=ID_LEN) :: lab
-    character(len=:), allocatable :: msg
 
     if (.not. trace%initialized) call trace%init(enabled=.false.)
 
@@ -180,9 +178,8 @@ CONTAINS
 
     if (.not. trace%enabled) return
 
-    msg = indent_string(trace%t(tid)%level-1) // trim(lab)
-
-    call trace_write_line("BEGIN", msg)
+    ! Indent is one level less than current depth (children are deeper).
+    call trace_write_line("BEGIN", lab, trace%t(tid)%level-1)
 
   end subroutine begin
 
@@ -193,12 +190,11 @@ CONTAINS
 !> itimer : optional timer id for aggregation
 !=============================================================================
   subroutine end(id, itimer)
-    character(len=*), intent(in)            :: id
-    integer,          intent(in), optional  :: itimer
+    character(len=*), intent(in)           :: id
+    integer,          intent(in), optional :: itimer
 
     integer :: tid
     character(len=ID_LEN) :: lab, want
-    character(len=:), allocatable :: msg
 
     if (.not. trace%initialized) call trace%init(enabled=.false.)
 
@@ -225,8 +221,7 @@ CONTAINS
     !---------------------------------------------------------------------------
 
     if (trace%enabled) then
-      msg = indent_string(trace%t(tid)%level-1) // trim(lab)
-      call trace_write_line("END  ", msg)
+      call trace_write_line("END  ", lab, trace%t(tid)%level-1)
     end if
 
     trace%t(tid)%level = trace%t(tid)%level - 1
@@ -243,7 +238,6 @@ CONTAINS
 
     integer :: tid
     character(len=ID_LEN) :: msg
-    character(len=:), allocatable :: line
 
     if (.not. trace%initialized) call trace%init(enabled=.false.)
     if (.not. trace%enabled) return
@@ -253,38 +247,23 @@ CONTAINS
     msg = ""
     msg(1:min(len_trim(message), ID_LEN)) = message(1:min(len_trim(message), ID_LEN))
 
-    line = indent_string(trace%t(tid)%level) // trim(msg)
-
-    call trace_write_line("TAG  ", line)
+    call trace_write_line("TAG  ", msg, trace%t(tid)%level)
 
   end subroutine tag
 
 
 !=============================================================================
-!> Create indentation string (2 spaces per level)
-!> level : indentation level
-!=============================================================================
-  pure function indent_string(level) result(s)
-    integer, intent(in) :: level
-    character(len=:), allocatable :: s
-    integer :: n
-
-    n = max(0, level)
-    allocate(character(len=2*n) :: s)
-    if (2*n > 0) s = repeat("  ", n)
-  end function indent_string
-
-
-!=============================================================================
 !> Write one trace line (serialised with io_lock)
 !> kind         : 5-char code ("BEGIN","END  ","TAG  ","INFO ")
-!> text         : message text (already indented)
+!> label        : message text (not indented)
+!> level        : indentation level (2 spaces per level)
 !> force_master : if true, use tid=0 in output
 !=============================================================================
-  subroutine trace_write_line(kind, text, force_master)
+  subroutine trace_write_line(kind, label, level, force_master)
     character(len=*), intent(in) :: kind
-    character(len=*), intent(in) :: text
-    logical, intent(in), optional :: force_master
+    character(len=*), intent(in) :: label
+    integer,          intent(in) :: level
+    logical,          intent(in), optional :: force_master
 
     integer :: tid
     logical :: fm
@@ -300,8 +279,8 @@ CONTAINS
     !------------------------ Serialize file output ----------------------------
     call trace%io_lock%lock()
 
-      write(trace%unit,'(es14.6,1x,"tid=",i0,3x,a,1x,a)') &
-        wallclock(), tid, adjustl(kind), text
+      write(trace%unit,'(es14.6,1x,"tid=",i0,3x,a,a,1x,a)') &
+          wallclock(), tid, repeat("  ", max(0,level)), adjustl(kind), trim(label)
 
       if (trace%flush_each) flush(trace%unit)
 
