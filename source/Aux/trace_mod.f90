@@ -51,7 +51,7 @@ CONTAINS
 !> filename   : output filename (default "trace.log")
 !> enabled    : enable/disable tracing
 !> unit       : Fortran unit (default 97)
-!> flush_each : flush after each line (slow but safe)
+!> flush_each : flush file after each line (slow but safe)
 !=============================================================================
   subroutine init(filename, enabled, unit, flush_each)
     character(len=*), intent(in), optional :: filename
@@ -88,13 +88,7 @@ CONTAINS
     !---------------------------- Open log file --------------------------------
     if (trace%enabled) then
       open(trace%unit, file=trim(fn), status="replace", action="write")
-
-      !------------------------- Reset timers for this run --------------------------
-      call timer%reset()
-      !-----------------------------------------------------------------------------
-
       call trace_write_line("INFO ", "TRACE START", force_master=.true.)
-
       if (trace%flush_each) flush(trace%unit)
     end if
     !---------------------------------------------------------------------------
@@ -105,18 +99,10 @@ CONTAINS
 
 
 !=============================================================================
-!> Finalise trace logging (writes timer summary and closes file)
+!> Finalise trace logging (closes file)
 !=============================================================================
   subroutine finalize()
     if (.not. trace%initialized) return
-
-    !---------------------- Write timer summary -------------------------------
-    if (trace%enabled .and. trace%unit > 0) then
-      call trace_write_line("INFO ", "TIMER SUMMARY", force_master=.true.)
-      call timer%print(unit=trace%unit, tid=0)
-      if (trace%flush_each) flush(trace%unit)
-    end if
-    !---------------------------------------------------------------------------
 
     !-------------------------- Close down safely ------------------------------
     if (trace%enabled .and. trace%unit > 0) then
@@ -152,10 +138,10 @@ CONTAINS
 !=============================================================================
 !> Begin a traced region (thread-safe)
 !> id     : region label
-!> itimer : optional timer id for aggregation (0 = auto-register)
+!> itimer : optional timer id (0 = auto-register)
 !=============================================================================
   subroutine begin(id, itimer)
-    character(len=*), intent(in)              :: id
+    character(len=*), intent(in) :: id
     integer,          intent(inout), optional :: itimer
 
     integer :: tid
@@ -169,11 +155,11 @@ CONTAINS
     lab = ""
     lab(1:min(len_trim(id), ID_LEN)) = id(1:min(len_trim(id), ID_LEN))
 
-    !----------------------------- Timer coupling ------------------------------
+    !----------------------------- Timer coupling --------------------------------
     if (present(itimer)) then
       call timer%begin(lab, itimer)
     end if
-    !---------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------
 
     !---------------------- Update per-thread stack ----------------------------
     trace%t(tid)%level = trace%t(tid)%level + 1
@@ -192,11 +178,11 @@ CONTAINS
 !=============================================================================
 !> End a traced region (thread-safe, enforces proper nesting)
 !> id     : region label (must match last begin on this thread)
-!> itimer : optional timer id for aggregation
+!> itimer : optional timer id
 !=============================================================================
   subroutine end(id, itimer)
-    character(len=*), intent(in)            :: id
-    integer,          intent(in), optional  :: itimer
+    character(len=*), intent(in) :: id
+    integer,          intent(in), optional :: itimer
 
     integer :: tid
     character(len=ID_LEN) :: lab, want
@@ -209,11 +195,11 @@ CONTAINS
     lab = ""
     lab(1:min(len_trim(id), ID_LEN)) = id(1:min(len_trim(id), ID_LEN))
 
-    !----------------------------- Timer coupling ------------------------------
+    !----------------------------- Timer coupling --------------------------------
     if (present(itimer)) then
       call timer%end(itimer)
     end if
-    !---------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------
 
     !------------------------ Check nesting correctness ------------------------
     if (trace%t(tid)%level <= 0) then
@@ -293,13 +279,11 @@ CONTAINS
     fm = .false.
     if (present(force_master)) fm = force_master
 
-    !--------------------------- Decide tid to print ---------------------------
     if (fm) then
       tid = 0
     else
       tid = omp%thread_id()
     end if
-    !---------------------------------------------------------------------------
 
     !------------------------ Serialize file output ----------------------------
     call trace%io_lock%lock()
