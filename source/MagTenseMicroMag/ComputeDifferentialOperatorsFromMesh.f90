@@ -123,7 +123,7 @@ module DifferentialOperators
         type(MATRIX_DESCR) :: descr_copy
         type(sparse_matrix_t) :: DDXA_sparse, FX_sparse, DDYA_sparse, FY_sparse, DDZA_sparse, FZ_sparse
         type(sparse_matrix_t) :: DDX_sparse, DDY_sparse, DDZ_sparse, W_sparse        
-        integer, save :: itimer=0
+        integer, save :: itimer=0, itimer_DD_matrix=0, itimer_mid_loop=0, itimer_k_loop=0
 
         call trace%begin( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
@@ -172,6 +172,9 @@ module DifferentialOperators
         ns = Signs(:,1)
         ks = Signs(:,2)
 
+
+
+        call trace%begin("CDOFM_DL:SetupDD_matrix", itimer=itimer_DD_matrix)
         !>-----------------------------------------
         ! Constructing summing matrix according to reference
         ! Constructing N times K sparse matrix DDXA: DDXA*dphi(faces) = d2phi(elements)
@@ -246,6 +249,9 @@ module DifferentialOperators
             el2fa = Signs
             call displayGUIMessage( 'Warning: untested method: compact' )
         endif
+
+        call trace%end("CDOFM_DL:SetupDD_matrix", itimer=itimer_DD_matrix)
+        call trace%begin("CDOFM_DL:mid_loop", itimer=itimer_mid_loop)
 
         !>-----------------------------------------
         ! Calculating weights
@@ -331,6 +337,9 @@ module DifferentialOperators
         ! for each face, ks. Details can be found in [2].
         allocate(mask1D(size(Signs(:,1))))
         
+        call trace%end("CDOFM_DL:mid_loop", itimer=itimer_mid_loop)
+        call trace%begin("CDOFM_DL:K_loop", itimer=itimer_k_loop)
+
         do kk = 1, K
             
             allocate(ind(inds2(kk)-inds1(kk)+1))
@@ -511,6 +520,8 @@ module DifferentialOperators
             deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)        
         
         end do
+
+        call trace%end( "CDOFM_DL:K_loop", itimer=itimer_k_loop )
                 
         ! Final operation, summing interpolated values according to either ...
         if ( method .eq. MicroMagExchMethodGGNeumann ) then
