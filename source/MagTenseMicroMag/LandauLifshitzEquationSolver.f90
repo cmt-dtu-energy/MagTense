@@ -32,6 +32,8 @@
     use fmm3d_tree_mod
     use fmm_nbor_tensor_mod
 #endif
+
+    use trace_mod
     implicit none          
 
     !>Module variables
@@ -328,6 +330,7 @@
         integer :: ntot
         real(DP) :: mx_mean, my_mean, mz_mean, volume_total
         integer :: i
+        integer, save :: itimer = 0
 #if USE_TIMING
         !------------------ Timing ---------------------
         real(DP) :: t0, t1
@@ -346,6 +349,7 @@
         !------------------------------------------
 #endif
 
+        call trace%begin( "dmdt_fct", itimer )
         !------------------------------------------
         ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
 
@@ -486,6 +490,8 @@
         end if
             !----------------------------------------------------------
 #endif
+
+        call trace%end("dmdt_fct", itimer=itimer )
     end subroutine dmdt_fct
 
     
@@ -662,6 +668,9 @@
     type(MATRIX_DESCR) :: descr
     real(DP) :: alpha, beta
     real(DP), dimension(:), allocatable :: temp
+    integer, save :: itimer = 0 
+
+    call trace%begin( "updateExchangeTerms", itimer=itimer )
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -688,6 +697,8 @@
     
     deallocate(temp)
     
+
+    call trace%end( "updateExchangeTerms", itimer=itimer  )
     end subroutine updateExchangeTerms
 
     
@@ -705,6 +716,9 @@
     real(DP),intent(in) :: t
     
     real(DP) :: HextX,HextY,HextZ
+    integer, save :: itimer = 0 
+
+    call trace%begin( "updateExternalField", itimer=itimer )
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
          !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
@@ -727,7 +741,8 @@
         !not implemented yet
     endif
     
-    
+    call trace%end( "updateExternalField", itimer=itimer )
+
     end subroutine updateExternalField
     
     !>-----------------------------------------
@@ -744,6 +759,9 @@
     !real :: prefact                                    !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
     real(DP),dimension(:),allocatable   :: Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot
+    integer, save :: itimer = 0
+
+    call trace%begin( "updateAnisotropy", itimer=itimer )
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -795,6 +813,8 @@
     solution%Hkz(:) = problem%CrystalAxis(:,1,3)*Hkx_rot(:) + problem%CrystalAxis(:,2,3)*Hky_rot(:) + problem%CrystalAxis(:,3,3)*Hkz_rot(:)
     
     deallocate(Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot)
+
+    call trace%end( "updateAnisotropy", itimer=itimer )
 
     end subroutine updateAnisotropy    
 
@@ -1038,6 +1058,8 @@ end subroutine updateDemagfieldFMM
     complex(kind=4) :: alpha_c, beta_c
     real(SP), dimension(:), allocatable :: temp
     character*(100) :: prog_str 
+    integer, save :: itimer = 0
+    call trace%begin( "updateDemagfield", itimer=itimer )
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -1264,6 +1286,7 @@ end subroutine updateDemagfieldFMM
 
 
 
+    call trace%end( "updateDemagfield", itimer=itimer )
 
     end subroutine updateDemagfield
     
@@ -1277,6 +1300,9 @@ end subroutine updateDemagfieldFMM
     subroutine initializeInteractionMatrices( problem, solution )
     type(MicroMagProblem), intent(inout) :: problem         !> Struct containing the grid information
     type(MicroMagSolution),intent(inout) :: solution        !> Solution data structure
+
+    integer, save :: itimer = 0
+    call trace%begin( "initializeInteractionMatrices", itimer=itimer )
     
     !Demagnetization tensor matrix
 #if USE_FMM3D
@@ -1299,6 +1325,7 @@ end subroutine updateDemagfieldFMM
     call ComputeExchangeTerm3D( problem%grid, problem%A_exch, problem, solution )
     
     
+    call trace%end( "initializeInteractionMatrices", itimer=itimer )
     end subroutine initializeInteractionMatrices
     
     
@@ -1391,6 +1418,8 @@ end subroutine updateDemagfieldFMM
     real :: rate
     integer :: c1,c2,cr,cm
     character(10) :: prog_str
+    integer, save :: itimer = 0
+    call trace%begin( "ComputeDemagfieldTensor", itimer=itimer )
     
     ! First initialize the system_clock
     call system_clock(count_rate=cr)
@@ -1673,6 +1702,8 @@ end subroutine updateDemagfieldFMM
     ! close(11)
     !error stop " test stop after writing dense ref"
     !-------------- end debug write the dense matrices to binary files --------------
+
+    call trace%end( "ComputeDemagfieldTensor", itimer=itimer )
     
     end subroutine ComputeDemagfieldTensor
     
