@@ -718,10 +718,10 @@ end subroutine getHOnSourcesFMM
         !---------------------- initiaize auxiliary modules -----------------------------
         call omp%init()
         call omp%info()
-        call timer%log_init("timing.log", window_enabled=.true., window_interval=5.0d0)    
-        call timer%reset()         
-        call trace%init("trace.log", enabled=.false., unit=97, flush_each=.true.)    
+        call timer%log_init("timing.log", window_enabled=.true., window_interval=5.0d0)
+        call trace%init("trace.log", enabled=.true., unit=97, flush_each=.true.)
         !---------------------------------------------------------------------------------
+
 
 
         call trace%begin("loadMicroMagProblem", itimer=itimer1)
