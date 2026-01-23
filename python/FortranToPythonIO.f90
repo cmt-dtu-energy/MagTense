@@ -1,4 +1,7 @@
 module FortranToPythonIO
+    use omp_mod
+    use timer_mod
+    use trace_mod
     use MagParameters
     use DemagFieldGetSolution
     use IterateMagnetSolution
@@ -704,10 +707,24 @@ end subroutine getHOnSourcesFMM
         integer(4), intent(in) :: allow_fmm_short_circuit
         integer(4), intent(in) :: fmm_min_n
 
+        integer,save :: itimer1=0, itimer2=0, itimer3=0
+
 #if USE_MICROMAG
         type(MicroMagProblem) :: problem
         type(MicroMagSolution) :: solution
 
+
+
+        !---------------------- initiaize auxiliary modules -----------------------------
+        call omp%init()
+        call omp%info()
+        call timer%log_init("timing.log", window_enabled=.true., window_interval=5.0d0)    
+        call timer%reset()         
+        call trace%init("trace.log", enabled=.false., unit=97, flush_each=.true.)    
+        !---------------------------------------------------------------------------------
+
+
+        call trace%begin("loadMicroMagProblem", itimer=itimer1)
         call loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
             gamma, alpha_mm, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
@@ -715,8 +732,14 @@ end subroutine getHOnSourcesFMM
             exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
 			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
             CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n)
+        call trace%end("loadMicroMagProblem",itimer=itimer1)
 
+        call trace%begin("SolveLandauLifshitzEquation", itimer=itimer2)
         call SolveLandauLifshitzEquation( problem, solution )
+        call trace%end("SolveLandauLifshitzEquation",itimer=itimer2) !, itimer=itimer2)
+
+        call trace%begin("EndSim", itimer=itimer3)
+
         t_out = solution%t_out
         M_mm = solution%M_out
         pts = solution%pts
@@ -758,6 +781,14 @@ end subroutine getHOnSourcesFMM
         H_dem(:,:,:,:) = 0.
         H_ani(:,:,:,:) = 0.
 #endif
+
+    call trace%end("EndSim",itimer=itimer3)
+
+
+    !---------------------- finalize auxiliary modules -----------------------------
+    call trace%finalize()
+    call timer%log_finalize()
+    !---------------------------------------------------------------------------------
 
     end subroutine RunMicroMagSimulation
 
