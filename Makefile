@@ -298,6 +298,19 @@ info:
 	@echo Include paths: -I$(INCLUDE_OBJ)
 	@echo Libraries: -L${MKFILE_PATH} ${LIB_OPT}
 
+
+
+.PHONY: test
+test:
+	@command -v fpm >/dev/null 2>&1 || (echo "ERROR: fpm not found. Install with: conda install -c conda-forge fpm" && exit 1)
+	@echo "==> Cleaning all fpm test build directories"
+	@find tests -mindepth 2 -maxdepth 2 -type d -name build -exec rm -rf {} +
+	@echo "==> Running all fpm test harnesses"
+	cd tests && FPM_FC=$(FC) FPM_FFLAGS='$(FFLAGS)' bash run_all_fpm_tests.sh
+
+
+
+
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS='${LDFLAGS}' \
