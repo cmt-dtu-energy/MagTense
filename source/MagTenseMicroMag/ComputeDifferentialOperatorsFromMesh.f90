@@ -125,7 +125,7 @@ module DifferentialOperators
         type(MATRIX_DESCR) :: descr_copy
         type(sparse_matrix_t) :: DDXA_sparse, FX_sparse, DDYA_sparse, FY_sparse, DDZA_sparse, FZ_sparse
         type(sparse_matrix_t) :: DDX_sparse, DDY_sparse, DDZ_sparse, W_sparse        
-        integer, save :: itimer=0, itimer_DD_matrix=0, itimer_mid_loop=0, itimer_k_loop=0, itimer_unique_and_inds2=0, itimer_sort_1=0, itimer_sort_2=0
+        integer, save :: itimer=0
         integer, dimension(:), allocatable :: sorted_indices
         integer :: u 
 
@@ -177,8 +177,6 @@ module DifferentialOperators
         ks = Signs(:,2)
 
 
-
-        call trace%begin("CDOFM_DL:SetupDD_matrix", itimer=itimer_DD_matrix)
         !>-----------------------------------------
         ! Constructing summing matrix according to reference
         ! Constructing N times K sparse matrix DDXA: DDXA*dphi(faces) = d2phi(elements)
@@ -254,9 +252,6 @@ module DifferentialOperators
             call displayGUIMessage( 'Warning: untested method: compact' )
         endif
 
-        call trace%end("CDOFM_DL:SetupDD_matrix", itimer=itimer_DD_matrix)
-        call trace%begin("CDOFM_DL:sort_1", itimer=itimer_sort_1)
-
         ! !>-----------------------------------------
         ! ! Calculating weights
         deallocate(ns,ks)
@@ -271,10 +266,7 @@ module DifferentialOperators
         call apply_perm(ks, sorted_indices, ks_sorted)
         call apply_perm(ns, sorted_indices, ns_sorted)
         deallocate(sorted_indices)
-        call trace%end("CDOFM_DL:sort_1", itimer=itimer_sort_1)
-        
 
-        call trace%begin("CDOFM_DL:unique_and_inds2", itimer=itimer_unique_and_inds2)
        ! Determines which weights are to be used in the first interpolation step 
         allocate(w(size(ns)))
         if (dims == 1) then
@@ -319,9 +311,6 @@ module DifferentialOperators
             inds2(u) = size(ks_sorted)
         end if
 
-        call trace%end("CDOFM_DL:unique_and_inds2", itimer=itimer_unique_and_inds2)
-
-        call trace%begin("CDOFM_DL:mid_loop", itimer=itimer_mid_loop)
         allocate(inds1(size(inds2)+1))
         inds1(1) = 1
         inds1(2:size(inds1)) = inds2(:) + 1
@@ -364,8 +353,6 @@ module DifferentialOperators
         ! for each face, ks. Details can be found in [2].
         allocate(mask1D(size(Signs(:,1))))
         
-        call trace%end("CDOFM_DL:mid_loop", itimer=itimer_mid_loop)
-        call trace%begin("CDOFM_DL:K_loop", itimer=itimer_k_loop)
 
         do kk = 1, K
             
@@ -547,8 +534,6 @@ module DifferentialOperators
             deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)        
         
         end do
-
-        call trace%end( "CDOFM_DL:K_loop", itimer=itimer_k_loop )
                 
         ! Final operation, summing interpolated values according to either ...
         if ( method .eq. MicroMagExchMethodGGNeumann ) then
