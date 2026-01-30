@@ -2,6 +2,7 @@
     module DemagFieldGetSolution
     
     use TileNComponents
+    use trace_mod
 
     implicit none
       
@@ -35,6 +36,9 @@
         real(8),dimension(3) :: mur                !>The permeability tensor
         real(8) :: Happ_nrm,Hnorm
         real(8),dimension(3) :: Happ_un,NHapp,v1,v2
+        integer, save :: itimer = 0
+
+        call trace%begin("getFieldFromTiles", itimer=itimer, verbose=4)
             
         !set to false by default and update later
         localFieldSoft = .false.
@@ -189,6 +193,8 @@
         !!@todo Should this function not only be called if tileTypeCylPiece?
         call SubtractMFromCylindricalTiles( H, tiles, pts, n_tiles, n_ele)
 
+
+        call trace%end("getFieldFromTiles", itimer=itimer, verbose=4)
     end subroutine getFieldFromTiles
     
     
