@@ -188,10 +188,10 @@ module fmm3d_tree_mod
         integer, save :: itimer = 0
         !-----------------
 
-        call trace%begin( "FMM3DTree_build_tree", itimer=itimer )
+        call trace%begin( "FMM3DTree_build_tree", itimer=itimer, verbose=2 )
 
         if (self%is_built) then
-            call trace%end( "FMM3DTree_build_tree", itimer=itimer )
+            call trace%end( "FMM3DTree_build_tree", itimer=itimer, verbose=2 )
             return
         end if
 
@@ -232,7 +232,7 @@ module fmm3d_tree_mod
         enddo
 
         self%is_built = .true.
-        call trace%end( "FMM3DTree_build_tree", itimer=itimer )
+        call trace%end( "FMM3DTree_build_tree", itimer=itimer, verbose=2 )
       end subroutine 
 
       subroutine make_and_eval(self, dipvec, grad)
@@ -241,7 +241,7 @@ module fmm3d_tree_mod
         double precision, contiguous, pointer :: grad(:,:,:)
         integer, save :: itimer = 0
         !------------------------------------------------
-        call trace%begin( "FMM3DTree_make_and_eval", itimer=itimer )
+        call trace%begin( "FMM3DTree_make_and_eval", itimer=itimer, verbose=2 )
 
 
         self%grad => grad
@@ -255,7 +255,7 @@ module fmm3d_tree_mod
         call dreorderi(3*self%nd,self%nsource,self%gradsort,self%grad,self%isrc)
         call drescale(self%nd*3*self%nsource,self%grad,self%b0inv)
 
-      call trace%end( "FMM3DTree_make_and_eval", itimer=itimer )
+      call trace%end( "FMM3DTree_make_and_eval", itimer=itimer, verbose=2 )
 
 
       end subroutine make_and_eval
@@ -1026,7 +1026,7 @@ module fmm3d_tree_mod
       integer nthd,ithd
       integer, save :: itimer = 0
 
-      call trace%begin("FMM3DTree:lfmm3dmain_tree", itimer=itimer)
+      call trace%begin("FMM3DTree:lfmm3dmain_tree", itimer=itimer, verbose=3)
       !integer omp_get_max_threads,omp_get_thread_num
 
 
@@ -1722,7 +1722,7 @@ module fmm3d_tree_mod
 
       !--------------------------------------------------------------------
 
-      call trace%end('FMM3DTree:lfmm3dmain_tree', itimer=itimer)
+      call trace%end('FMM3DTree:lfmm3dmain_tree', itimer=itimer, verbose=3)
       
     end subroutine lfmm3dmain_tree
 
@@ -1735,7 +1735,7 @@ module fmm3d_tree_mod
         integer, save :: itimer = 0
         !--------------------------------------------
 
-        call trace%begin('FMM3DTree:eval_local', itimer=itimer)
+        call trace%begin('FMM3DTree:eval_local', itimer=itimer, verbose=3)
 
         do ilev = 0,self%nlevels
           !$OMP PARALLEL DO DEFAULT(SHARED) &
@@ -1756,7 +1756,7 @@ module fmm3d_tree_mod
           !$OMP END PARALLEL DO
       enddo
 
-      call trace%end('FMM3DTree:eval_local', itimer=itimer)
+      call trace%end('FMM3DTree:eval_local', itimer=itimer, verbose=3)
 
       end subroutine eval_local
 
