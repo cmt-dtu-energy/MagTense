@@ -189,6 +189,7 @@ class MicromagProblem:
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")
 
 
+        #--------- default FMM parameters -----------------
         self.dummy_run = 0
         self.fmm_cells_per_node = 100
         self.eps_fmm = 1e-4
@@ -197,6 +198,18 @@ class MicromagProblem:
         self.nlmax = 5
         self.allow_fmm_short_circuit = 1
         self.fmm_min_n = 20000
+        #--------------------------------------------------
+
+        #---------- timer and trace parameters ----------
+        self.log_dir = "logs"
+        self.timer_log_file = "timing.log"
+        self.trace_log_file = "trace.log"
+        self.window_enabled = 1
+        self.window_interval = 30.0
+        self.trace_enabled = 0
+        self.flush_each = 1
+        self.trace_verbose = 1
+        #-----------------------------------------------
 
     @property
     def passexch(self) -> int | None:
@@ -620,7 +633,15 @@ class MicromagProblem:
             nlmin=self.nlmin,
             nlmax=self.nlmax,
             allow_fmm_short_circuit=self.allow_fmm_short_circuit,
-            fmm_min_n=self.fmm_min_n
+            fmm_min_n=self.fmm_min_n,
+            log_dir=self.log_dir,
+            timer_log_file=self.timer_log_file,
+            trace_log_file=self.trace_log_file,
+            window_enabled=self.window_enabled,
+            window_interval=self.window_interval,
+            trace_enabled=self.trace_enabled,
+            flush_each=self.flush_each,
+            trace_verbose=self.trace_verbose
         )
 
         n_tot_Exch = result[7]
@@ -737,7 +758,15 @@ class MicromagProblem:
             nlmin=self.nlmin,
             nlmax=self.nlmax,
             allow_fmm_short_circuit=self.allow_fmm_short_circuit,
-            fmm_min_n=self.fmm_min_n
+            fmm_min_n=self.fmm_min_n,
+            log_dir=self.log_dir,
+            timer_log_file=self.timer_log_file,
+            trace_log_file=self.trace_log_file,
+            window_enabled=self.window_enabled,
+            window_interval=self.window_interval,
+            trace_enabled=self.trace_enabled,
+            flush_each=self.flush_each,
+            trace_verbose=self.trace_verbose
         )
 
         n_tot_Exch = result[7]

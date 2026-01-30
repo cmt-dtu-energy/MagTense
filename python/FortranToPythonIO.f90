@@ -660,7 +660,8 @@ end subroutine getHOnSourcesFMM
         exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, demigstp, & 
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, &
-		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n )
+		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, &
+        log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose )
 
         integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
         integer(4), intent(in) :: nt_Hext_out
@@ -707,7 +708,15 @@ end subroutine getHOnSourcesFMM
         integer(4), intent(in) :: allow_fmm_short_circuit
         integer(4), intent(in) :: fmm_min_n
 
-        integer,save :: itimer1=0, itimer2=0, itimer3=0
+        !-------------------- timer and trace modules --------------------------------------
+        character*256,intent(in) :: timer_log_file, trace_log_file, log_dir
+        integer, intent(in) :: window_enabled, trace_enabled, flush_each
+        real(8), intent(in) :: window_interval
+        integer, intent(in) :: trace_verbose
+        
+        logical :: window_enabled_l, trace_enabled_l, flush_each_l
+
+        !-----------------------------------------------------------------------------------
 
 #if USE_MICROMAG
         type(MicroMagProblem) :: problem
@@ -718,13 +727,21 @@ end subroutine getHOnSourcesFMM
         !---------------------- initiaize auxiliary modules -----------------------------
         call omp%init()
         call omp%info()
-        call timer%log_init("timing.log", window_enabled=.true., window_interval=30.0d0)
-        call trace%init("trace.log", enabled=.false., unit=97, flush_each=.true.)
+
+
+        window_enabled_l = merge(.true., .false., window_enabled /= 0)
+        trace_enabled_l = merge(.true., .false., trace_enabled /= 0)
+        flush_each_l = merge(.true., .false., flush_each /= 0)
+
+        call timer%log_init(trim(log_dir), trim(timer_log_file), window_enabled=window_enabled_l, window_interval=window_interval)
+        call trace%init(trim(log_dir), trim(trace_log_file), enabled=trace_enabled_l, unit=97, flush_each=flush_each_l, verbose=trace_verbose)
+        
+        !call timer%log_init("timing.log", window_enabled=.true., window_interval=30.0d0)
+        !call trace%init("trace.log", enabled=.false., unit=97, flush_each=.true.)
         !---------------------------------------------------------------------------------
 
 
 
-        call trace%begin("loadMicroMagProblem", itimer=itimer1)
         call loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
             gamma, alpha_mm, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
@@ -732,11 +749,9 @@ end subroutine getHOnSourcesFMM
             exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
 			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
             CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n)
-        call trace%end("loadMicroMagProblem",itimer=itimer1)
 
         call SolveLandauLifshitzEquation( problem, solution )
 
-        call trace%begin("EndSim", itimer=itimer3)
 
         t_out = solution%t_out
         M_mm = solution%M_out
@@ -779,8 +794,6 @@ end subroutine getHOnSourcesFMM
         H_dem(:,:,:,:) = 0.
         H_ani(:,:,:,:) = 0.
 #endif
-
-    call trace%end("EndSim",itimer=itimer3)
 
 
     !---------------------- finalize auxiliary modules -----------------------------
