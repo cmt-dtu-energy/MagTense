@@ -68,7 +68,7 @@
     real :: rate
     integer :: c1,c2,cr,cm 
     integer, save :: itimer = 0
-    call trace%begin( "SolveLandauLifshitzEquation", itimer=itimer )
+    call trace%begin( "SolveLandauLifshitzEquation", itimer=itimer, verbose=1 )
     
     ! First initialize the system_clock
     call system_clock(count_rate=cr)
@@ -313,7 +313,7 @@
     prob = gb_problem    
 
 
-    call trace%end( "SolveLandauLifshitzEquation", itimer=itimer )
+    call trace%end( "SolveLandauLifshitzEquation", itimer=itimer, verbose=1 )
     end subroutine SolveLandauLifshitzEquation
 
     !>-----------------------------------------
@@ -336,7 +336,7 @@
         real(DP) :: mx_mean, my_mean, mz_mean, volume_total
         integer :: i
         integer, save :: itimer = 0
-        call trace%begin( "dmdt_fct", itimer )
+        call trace%begin( "dmdt_fct", itimer=itimer, verbose=1 )
         !------------------------------------------
         ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
 
@@ -394,7 +394,7 @@
         dmdt(ntot+1:2*ntot)        = -gb_problem%gamma * crossY - alpha(t,gb_problem) * HeffY2
         dmdt(2*ntot+1:3*ntot)      = -gb_problem%gamma * crossZ - alpha(t,gb_problem) * HeffZ2
         !---------------------------------------------------------------------
-        call trace%end("dmdt_fct", itimer=itimer )
+        call trace%end("dmdt_fct", itimer=itimer, verbose=1 )
     end subroutine dmdt_fct
 
     
@@ -435,7 +435,7 @@
     type(MicroMagSolution),intent(inout) :: solution
     integer :: i,j,nt
     integer, save :: itimer = 0
-    call trace%begin( "StoreHeffComponents", itimer=itimer )
+    call trace%begin( "StoreHeffComponents", itimer=itimer, verbose=1 )
     
     i = gb_solution%HextInd       
     nt = size( gb_problem%t ) 
@@ -484,7 +484,7 @@
         endif
     enddo
     
-    call trace%end( "StoreHeffComponents", itimer=itimer )
+    call trace%end( "StoreHeffComponents", itimer=itimer, verbose=1 )
     end subroutine StoreHeffComponents
     
     
@@ -502,7 +502,7 @@
     
     integer :: ntot, i
     integer, save :: itimer = 0
-    call trace%begin( "initializeSolution", itimer=itimer )
+    call trace%begin( "initializeSolution", itimer=itimer, verbose=1 )
 
     !character(50) :: prog_str
     
@@ -559,7 +559,7 @@
         call AddUncertaintyToDemagField( problem, solution)
     endif
     
-    call trace%end( "initializeSolution", itimer=itimer )
+    call trace%end( "initializeSolution", itimer=itimer, verbose=1 )
     end subroutine initializeSolution
     
     
@@ -580,7 +580,7 @@
     real(DP), dimension(:), allocatable :: temp
     integer, save :: itimer = 0 
 
-    call trace%begin( "updateExchangeTerms", itimer=itimer )
+    call trace%begin( "updateExchangeTerms", itimer=itimer, verbose=1 )
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -608,7 +608,7 @@
     deallocate(temp)
     
 
-    call trace%end( "updateExchangeTerms", itimer=itimer  )
+    call trace%end( "updateExchangeTerms", itimer=itimer, verbose=1 )
     end subroutine updateExchangeTerms
 
     
@@ -628,7 +628,7 @@
     real(DP) :: HextX,HextY,HextZ
     integer, save :: itimer = 0 
 
-    call trace%begin( "updateExternalField", itimer=itimer )
+    call trace%begin( "updateExternalField", itimer=itimer, verbose=1 )
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
          !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
@@ -651,7 +651,7 @@
         !not implemented yet
     endif
     
-    call trace%end( "updateExternalField", itimer=itimer )
+    call trace%end( "updateExternalField", itimer=itimer, verbose=1 )
 
     end subroutine updateExternalField
     
@@ -671,7 +671,7 @@
     real(DP),dimension(:),allocatable   :: Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot
     integer, save :: itimer = 0
 
-    call trace%begin( "updateAnisotropy", itimer=itimer )
+    call trace%begin( "updateAnisotropy", itimer=itimer, verbose=1 )
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -724,7 +724,7 @@
     
     deallocate(Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot)
 
-    call trace%end( "updateAnisotropy", itimer=itimer )
+    call trace%end( "updateAnisotropy", itimer=itimer, verbose=1 )
 
     end subroutine updateAnisotropy    
 
@@ -754,7 +754,7 @@ subroutine updateDemagfieldFMM(problem, solution)
   integer, save :: itimer = 0
   !------------------------------------------------
 
-    call trace%begin( "updateDemagfieldFMM", itimer=itimer )
+    call trace%begin( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
 
   fourpi  = 12.566370614359172D0
   ntot = size(problem%grid%pts, dim=1)
@@ -871,7 +871,7 @@ call add_near_field(problem, solution)
       solution%HmY = solution%HmY + solution%HmY*problem%CV*sqrt(-2d0*log(solution%u3))*cos(2d0*pi*solution%u4)
       solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
   end if
-    call trace%end( "updateDemagfieldFMM", itimer=itimer )
+    call trace%end( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
 #endif
 
 end subroutine updateDemagfieldFMM
@@ -895,7 +895,7 @@ end subroutine updateDemagfieldFMM
     real(SP), dimension(:), allocatable :: temp
     character*(100) :: prog_str 
     integer, save :: itimer = 0
-    call trace%begin( "updateDemagfield", itimer=itimer )
+    call trace%begin( "updateDemagfield", itimer=itimer, verbose=1 )
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -1122,7 +1122,7 @@ end subroutine updateDemagfieldFMM
 
 
 
-    call trace%end( "updateDemagfield", itimer=itimer )
+    call trace%end( "updateDemagfield", itimer=itimer, verbose=1 )
 
     end subroutine updateDemagfield
     
@@ -1138,7 +1138,7 @@ end subroutine updateDemagfieldFMM
     type(MicroMagSolution),intent(inout) :: solution        !> Solution data structure
 
     integer, save :: itimer = 0
-    call trace%begin( "initializeInteractionMatrices", itimer=itimer )
+    call trace%begin( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     
     !Demagnetization tensor matrix
 #if USE_FMM3D
@@ -1161,7 +1161,7 @@ end subroutine updateDemagfieldFMM
     call ComputeExchangeTerm3D( problem%grid, problem%A_exch, problem, solution )
     
     
-    call trace%end( "initializeInteractionMatrices", itimer=itimer )
+    call trace%end( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     end subroutine initializeInteractionMatrices
     
     
@@ -1176,7 +1176,7 @@ end subroutine updateDemagfieldFMM
     type(MicroMagGrid),intent(inout) :: grid            !> Grid information to be generated
     integer :: i,j,k,ind
     integer, save :: itimer = 0
-    call trace%begin( "setupGrid", itimer=itimer )
+    call trace%begin( "setupGrid", itimer=itimer, verbose=1 )
     
     !Setup the grid depending on which type of grid it is
     if ( grid%gridType .eq. gridTypeUniform ) then
@@ -1230,7 +1230,7 @@ end subroutine updateDemagfieldFMM
             enddo
         enddo
     endif
-    call trace%end( "setupGrid", itimer=itimer )
+    call trace%end( "setupGrid", itimer=itimer, verbose=1 )
     end subroutine setupGrid
     
     
@@ -1257,7 +1257,7 @@ end subroutine updateDemagfieldFMM
     integer :: c1,c2,cr,cm
     character(10) :: prog_str
     integer, save :: itimer = 0
-    call trace%begin( "ComputeDemagfieldTensor", itimer=itimer )
+    call trace%begin( "ComputeDemagfieldTensor", itimer=itimer, verbose=1 )
     
     ! First initialize the system_clock
     call system_clock(count_rate=cr)
@@ -1541,7 +1541,7 @@ end subroutine updateDemagfieldFMM
     !error stop " test stop after writing dense ref"
     !-------------- end debug write the dense matrices to binary files --------------
 
-    call trace%end( "ComputeDemagfieldTensor", itimer=itimer )
+    call trace%end( "ComputeDemagfieldTensor", itimer=itimer, verbose=1 )
     
     end subroutine ComputeDemagfieldTensor
     
@@ -1599,7 +1599,7 @@ end subroutine updateDemagfieldFMM
     real(DP) :: const
     character*(100) :: prog_str 
     integer, save :: itimer = 0
-    call trace%begin( "ComputeExchangeTerm3D_Uniform", itimer=itimer )
+    call trace%begin( "ComputeExchangeTerm3D_Uniform", itimer=itimer, verbose=1 )
     
     !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
@@ -1972,7 +1972,7 @@ end subroutine updateDemagfieldFMM
     call create_COO_values_from_CSR(A,solution%gridinfo)
     
 
-    call trace%end( "ComputeExchangeTerm3D_Uniform", itimer=itimer )
+    call trace%end( "ComputeExchangeTerm3D_Uniform", itimer=itimer, verbose=1 )
     end subroutine ComputeExchangeTerm3D_Uniform
        
     !>-----------------------------------------
@@ -1988,7 +1988,7 @@ end subroutine updateDemagfieldFMM
     integer, save :: itimer = 0
     
 
-    call trace%begin( "ComputeAnisotropyTerm3D", itimer=itimer )
+    call trace%begin( "ComputeAnisotropyTerm3D", itimer=itimer, verbose=1 )
     !--- We use the general formulation introduced in updateAnisotropy
     !--- If the user has specified a value for the uniaxial anisotropy or the cubic anisotropy, we use transform
     !--- those to the general matrix formulation
@@ -2020,7 +2020,7 @@ end subroutine updateDemagfieldFMM
         enddo
     endif
 
-    call trace%end( "ComputeAnisotropyTerm3D", itimer=itimer )
+    call trace%end( "ComputeAnisotropyTerm3D", itimer=itimer, verbose=1 )
     
     end subroutine ComputeAnisotropyTerm3D
 
@@ -2051,7 +2051,7 @@ subroutine add_near_field(problem, solution)
   integer :: stat
   real(SP) :: alpha, beta
   integer, save :: itimer = 0
-  call trace%begin( "add_near_field", itimer=itimer )
+  call trace%begin( "add_near_field", itimer=itimer, verbose=1 )
 
 
   ntot = size(problem%grid%pts, dim=1)
@@ -2109,7 +2109,7 @@ subroutine add_near_field(problem, solution)
     deallocate(mxm, mym, mzm, temp)
 #endif
 
-    call trace%end( "add_near_field", itimer=itimer )
+    call trace%end( "add_near_field", itimer=itimer, verbose=1 )
 end subroutine add_near_field
 
         !------------------------------------------------------------------------------------------------
