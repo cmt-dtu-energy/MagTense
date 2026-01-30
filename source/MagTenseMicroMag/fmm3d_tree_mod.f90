@@ -157,25 +157,6 @@ module fmm3d_tree_mod
         integer, contiguous, pointer :: iboxfl(:,:,:)
         !-------- 
 
-
-!---------------- Timing variables ---------------------------
-      real(8) :: t0, t1
-      integer :: call_count = 0 
-      integer :: NPRINT = 100
-
-      real(8) :: total_time = 0.0
-      real(8) :: mexp_time = 0.0
-      real(8) :: p2m_time = 0.0
-      real(8) :: m2m_time = 0.0
-      real(8) :: l2l_time = 0.0
-      real(8) :: l2p_time = 0.0
-      real(8) :: reorder_time = 0.0
-      real(8) :: setup_time = 0.0
-      real(8) :: reset_time = 0.0
-      real(8) :: reorder_dipvec_time = 0.0
-      real(8) :: rescale_and_exp_time = 0.0
-!-------------------------------------------------------------
-
         contains
           procedure :: full_fmm
           procedure :: build1
@@ -266,12 +247,6 @@ module fmm3d_tree_mod
         self%grad => grad
         self%dipvec => dipvec
 
-
-#if USE_TIMING
-        self%t0 = walltime()
-        self%t1 = walltime()
-#endif    
-
         call self%lfmm3dmain_tree()
         call self%eval_local()
         !call self%eval_direct()
@@ -279,41 +254,6 @@ module fmm3d_tree_mod
 
         call dreorderi(3*self%nd,self%nsource,self%gradsort,self%grad,self%isrc)
         call drescale(self%nd*3*self%nsource,self%grad,self%b0inv)
-
-#if USE_TIMING
-      self%reorder_time = self%reorder_time + (walltime() - self%t1)
-      self%t1 = walltime()
-#endif   
-
-#if USE_TIMING
-        self%total_time = self%total_time + (walltime() - self%t0)
-
-        self%call_count = self%call_count + 1
-
-        if (mod(self%call_count,self%NPRINT).eq.0) then
-            print *, " FMM3DTree timing info after ", self%call_count, " calls: "
-            write(*,'(A, I0, A, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6)') &
-              'Timing (last ', self%NPRINT, ' calls):', &
-              ' Total=',    self%total_time,    ' Setup=',  self%setup_time, ' reset=', self%reset_time, ' reorder dipvec=', self%reorder_dipvec_time, &
-              ' Mexp=',   self%mexp_time,   ' P2M=',     self%p2m_time, &
-              ' M2M=',      self%m2m_time,      ' L2L=',    self%l2l_time,    ' L2P=',     self%l2p_time, &
-              ' Reorder=',  self%reorder_time,   ' RescaleAndExp=', self%rescale_and_exp_time
-
-              self%total_time = 0.0
-              self%mexp_time = 0.0
-              self%p2m_time = 0.0
-              self%m2m_time = 0.0
-              self%l2l_time = 0.0
-              self%l2p_time = 0.0
-              self%reorder_time = 0.0
-              self%setup_time = 0.0
-              self%reset_time = 0.0
-              self%reorder_dipvec_time = 0.0
-              self%rescale_and_exp_time = 0.0
-
-        end if
-#endif
-
 
       call trace%end( "FMM3DTree_make_and_eval", itimer=itimer )
 
@@ -1266,11 +1206,6 @@ module fmm3d_tree_mod
 
         nlege = self%nlege
 
-#if USE_TIMING
-      self%setup_time = self%setup_time + (walltime() - self%t1)
-      self%t1 = walltime() 
-#endif   
-
         !call self%reset_sort_arg()
         self%gradsort = 0.0
         
@@ -1281,17 +1216,7 @@ module fmm3d_tree_mod
 
     !-----------------------------------------------
 
-#if USE_TIMING
-      self%reset_time = self%reset_time + (walltime() - self%t1)
-      self%t1 = walltime()
-#endif   
-
       call self%reorder_dipvec()
-
-#if USE_TIMING
-      self%reorder_dipvec_time = self%reorder_dipvec_time + (walltime() - self%t1)
-      self%t1 = walltime()
-#endif  
 
 !     form mexp for all list4 type box at first ghost box center
       do ilev=1,nlevels-1
@@ -1421,10 +1346,6 @@ module fmm3d_tree_mod
 !$OMP END PARALLEL DO
       enddo
 
-#if USE_TIMING
-      self%mexp_time = self%mexp_time + (walltime() - self%t1)
-      self%t1 = walltime()
-#endif   
 
 !------------------ step 1 ??? -----------------------------------------------------------------
 !       ... step 1, locate all charges, assign them to boxes, and
@@ -1453,11 +1374,6 @@ module fmm3d_tree_mod
 
       !----------------------------------------------------------------------------------------------------
 
-#if USE_TIMING
-      self%p2m_time = self%p2m_time + (walltime() - self%t1)
-      self%t1 = walltime()
-#endif   
-
       do ilev=nlevels-1,0,-1
 !$OMP PARALLEL DO DEFAULT(SHARED) &
 !$OMP PRIVATE(ibox,i,jbox,istart,iend,npts)
@@ -1479,11 +1395,6 @@ module fmm3d_tree_mod
          enddo
 !$OMP END PARALLEL DO
       enddo
-
-#if USE_TIMING
-      self%m2m_time = self%m2m_time + (walltime() - self%t1)
-      self%t1 = walltime()
-#endif  
 
 
 !-----------
@@ -1775,13 +1686,6 @@ module fmm3d_tree_mod
 
       !----------------------------------------------------
 
-#if USE_TIMING
-      self%rescale_and_exp_time = self%rescale_and_exp_time + (walltime() - self%t1)
-      self%t1 = walltime()
-#endif  
-
-
-
 
       !------------- local to local translations ---------
 
@@ -1815,11 +1719,6 @@ module fmm3d_tree_mod
          enddo
 !$OMP END PARALLEL DO
       enddo
-
-#if USE_TIMING
-      self%l2l_time = self%l2l_time + (walltime() - self%t1)
-      self%t1 = walltime()
-#endif  
 
       !--------------------------------------------------------------------
 
@@ -1856,11 +1755,6 @@ module fmm3d_tree_mod
           enddo
           !$OMP END PARALLEL DO
       enddo
-
-#if USE_TIMING
-      self%l2p_time = self%l2p_time + (walltime() - self%t1)
-      self%t1 = walltime()
-#endif 
 
       call trace%end('FMM3DTree:eval_local', itimer=itimer)
 

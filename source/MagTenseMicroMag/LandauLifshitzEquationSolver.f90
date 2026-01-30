@@ -336,24 +336,6 @@
         real(DP) :: mx_mean, my_mean, mz_mean, volume_total
         integer :: i
         integer, save :: itimer = 0
-#if USE_TIMING
-        !------------------ Timing ---------------------
-        real(DP) :: t0, t1
-        integer,          save :: call_count = 0
-        integer, parameter     :: NPRINT = 100   ! output cadence
-
-        real(DP), save :: acc_total    = 0.0_DP
-        real(DP), save :: acc_exch     = 0.0_DP
-        real(DP), save :: acc_ext      = 0.0_DP
-        real(DP), save :: acc_aniso    = 0.0_DP
-        real(DP), save :: acc_demag    = 0.0_DP
-        real(DP), save :: acc_heff     = 0.0_DP
-        real(DP), save :: acc_cross    = 0.0_DP
-        real(DP), save :: acc_double   = 0.0_DP
-        real(DP), save :: acc_assemble = 0.0_DP
-        !------------------------------------------
-#endif
-
         call trace%begin( "dmdt_fct", itimer )
         !------------------------------------------
         ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
@@ -363,40 +345,22 @@
             allocate( HeffX(ntot), HeffY(ntot), HeffZ(ntot) )
             allocate( HeffX2(ntot), HeffY2(ntot), HeffZ2(ntot) )
         endif
-#if USE_TIMING
-        t0 = walltime()
-        t1 = walltime()
-#endif
+
         !------------- Update magnetisation (load from m)-------------
         gb_solution%Mx = m(1:ntot)
         gb_solution%My = m(ntot+1:2*ntot)
         gb_solution%Mz = m(2*ntot+1:3*ntot)
         !-------------------------------------------------------------
-#if USE_TIMING 
-        acc_assemble = acc_assemble + (walltime() - t1)
-        t1 = walltime()
-#endif
+
         !------------ add exchange term -----------------------------
         call updateExchangeTerms( gb_problem, gb_solution )
         !-------------------------------------------------------------
-#if USE_TIMING
-        acc_exch = acc_exch + (walltime() - t1)
-        t1 = walltime()
-#endif
         !-------------- add external field ---------------------------
         call updateExternalField( gb_problem, gb_solution, t )
         !-------------------------------------------------------------
-#if USE_TIMING
-        acc_ext = acc_ext + (walltime() - t1)
-        t1 = walltime()
-#endif
         !-------------- add anisotropy term --------------------------
         call updateAnisotropy(  gb_problem, gb_solution )
         !-------------------------------------------------------------
-#if USE_TIMING
-        acc_aniso = acc_aniso + (walltime() - t1)
-        t1 = walltime()
-#endif
         !-------------- add demagnetization field --------------------
 #if USE_FMM3D
         !-------------------- if use_fmm then use FMM otherwise shortcircuit to normal demag field --------------
@@ -410,92 +374,26 @@
          call updateDemagfield( gb_problem, gb_solution )
 #endif
         !-------------------------------------------------------------
-
-
-
-
-
-
-#if USE_TIMING
-        acc_demag = acc_demag + (walltime() - t1)
-        t1 = walltime()
-#endif
         !--------------- combine to get effective field, Heff -------------
         HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
         HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY
         HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ
         !-------------------------------------------------------------
-#if USE_TIMING
-        acc_heff = acc_heff + (walltime() - t1)
-        t1 = walltime()
-#endif
         !--------------- calculate precession term: m x Heff -------------
         crossX = -1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
         crossY = -1.0_DP * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
         crossZ = -1.0_DP * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
         !-------------------------------------------------------------
-#if USE_TIMING
-        acc_cross = acc_cross + (walltime() - t1)
-        t1 = walltime()
-#endif
         !--------------- calculate damping term: m x (m x Heff) -------------
         HeffX2 = gb_solution%My * crossZ - gb_solution%Mz * crossY
         HeffY2 = gb_solution%Mz * crossX - gb_solution%Mx * crossZ
         HeffZ2 = gb_solution%Mx * crossY - gb_solution%My * crossX
         !-------------------------------------------------------------
-#if USE_TIMING
-        acc_double = acc_double + (walltime() - t1)
-        t1 = walltime()
-#endif
         !--------------- assemble dm/dt -------------------------------------
         dmdt(1:ntot)               = -gb_problem%gamma * crossX - alpha(t,gb_problem) * HeffX2
         dmdt(ntot+1:2*ntot)        = -gb_problem%gamma * crossY - alpha(t,gb_problem) * HeffY2
         dmdt(2*ntot+1:3*ntot)      = -gb_problem%gamma * crossZ - alpha(t,gb_problem) * HeffZ2
         !---------------------------------------------------------------------
-#if USE_TIMING
-        !---------------- Print timing --------------------------------------
-        acc_assemble = acc_assemble + (walltime() - t1)
-        acc_total = acc_total + (walltime() - t0)
-        call_count = call_count + 1
-        if (mod(call_count, NPRINT) == 0) then
-            ! Compact one-liner per category (seconds over last NPRINT calls)
-            write(*,'(A, I0, A, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6)') &
-                'dmdt_fct timing (last ', NPRINT, ' calls)  ', &
-                'total=',    acc_total,    ' exch=',   acc_exch,   ' ext=',     acc_ext, &
-                ' aniso=',   acc_aniso,    ' demag=',  acc_demag,  ' heff=',    acc_heff, &
-                ' mxh=',     acc_cross,    ' m×(mxh)=',acc_double, ' asmb=',    acc_assemble
-
-
-            mx_mean = 0.0
-            my_mean = 0.0
-            mz_mean = 0.0
-            !ntot = size(problem%grid%pts, dim=1)
-            do i=1,ntot
-                mx_mean = mx_mean + gb_solution%Mx_s(i) * gb_problem%Ms(i) * (gb_problem%grid%abc(i,1) * gb_problem%grid%abc(i,2) * gb_problem%grid%abc(i,3))
-                my_mean = my_mean + gb_solution%My_s(i) * gb_problem%Ms(i) * (gb_problem%grid%abc(i,1) * gb_problem%grid%abc(i,2) * gb_problem%grid%abc(i,3))
-                mz_mean = mz_mean + gb_solution%Mz_s(i) * gb_problem%Ms(i) * (gb_problem%grid%abc(i,1) * gb_problem%grid%abc(i,2) * gb_problem%grid%abc(i,3))
-            enddo
-            volume_total = sum( gb_problem%grid%abc(:,1) * gb_problem%grid%abc(:,2) * gb_problem%grid%abc(:,3) )
-            mx_mean = mx_mean / volume_total
-            my_mean = my_mean / volume_total
-            mz_mean = mz_mean / volume_total
-            write(*,'(A,1X,ES14.3,1X,A,1X,ES14.3,1X,A,1X,ES14.3)') &
-                '  <mx>=', mx_mean, ' <my>=', my_mean, ' <mz>=', mz_mean
-
-            ! reset accumulators for next block
-            acc_total    = 0.0_DP
-            acc_exch     = 0.0_DP
-            acc_ext      = 0.0_DP
-            acc_aniso    = 0.0_DP
-            acc_demag    = 0.0_DP
-            acc_heff     = 0.0_DP
-            acc_cross    = 0.0_DP
-            acc_double   = 0.0_DP
-            acc_assemble = 0.0_DP
-        end if
-            !----------------------------------------------------------
-#endif
-
         call trace%end("dmdt_fct", itimer=itimer )
     end subroutine dmdt_fct
 
@@ -839,21 +737,6 @@ subroutine updateDemagfieldFMM(problem, solution)
 
 #if USE_FMM3D
   !------------------ Timing ---------------------
-#if USE_TIMING
-  integer,          save :: call_count_fmm = 0
-  integer, parameter     :: NPRINT = 100  ! output cadence  
-  real(DP), save :: acc_total_fmm = 0.0_DP
-  real(DP), save :: acc_cast      = 0.0_DP
-  real(DP), save :: acc_alloc     = 0.0_DP
-  real(DP), save :: acc_pack      = 0.0_DP
-  real(DP), save :: acc_fmm       = 0.0_DP
-  real(DP), save :: acc_map       = 0.0_DP
-  real(DP), save :: acc_self      = 0.0_DP
-  real(DP), save :: acc_neigh     = 0.0_DP
-  real(DP), save :: acc_cleanup   = 0.0_DP
-  real(DP), save :: acc_noise     = 0.0_DP
-  real(DP) :: t0, t1
-#endif
   !------------------ Locals ---------------------
   integer :: ntot, i
   real(DP) :: fourpi
@@ -872,10 +755,7 @@ subroutine updateDemagfieldFMM(problem, solution)
   !------------------------------------------------
 
     call trace%begin( "updateDemagfieldFMM", itimer=itimer )
-#if USE_TIMING
-  t0 = walltime()
-  t1 = walltime()
-#endif
+
   fourpi  = 12.566370614359172D0
   ntot = size(problem%grid%pts, dim=1)
   ier = 0
@@ -886,11 +766,6 @@ subroutine updateDemagfieldFMM(problem, solution)
   solution%Mz_s = real(solution%Mz, SP)
   !--------------------------------------------------------------
 
-
-#if USE_TIMING
-  acc_cast = acc_cast + (walltime() - t1)
-  t1 = walltime()
-#endif
   !------------------ Allocate FMM work arrays ------------------
     built_tree = .false.
     if (.not. associated(solution%fmm_tree)) then
@@ -905,10 +780,6 @@ subroutine updateDemagfieldFMM(problem, solution)
   allocate(grad(1, 3, ntot))
   grad(:,:,:) = 0.0_DP 
   !------------------------------------------------------------
-#if USE_TIMING
-  acc_alloc = acc_alloc + (walltime() - t1)
-  t1 = walltime()
-#endif
   !------------------ Pack sources and dipoles ------------------
     if (built_tree) then
         do i = 1, ntot
@@ -945,10 +816,6 @@ subroutine updateDemagfieldFMM(problem, solution)
     !------------------------------------------------------------ 
   end do
     !--------------------------------------------------------------
-#if USE_TIMING
-  acc_pack = acc_pack + (walltime() - t1)
-  t1 = walltime()
-#endif
   !------------------ Call FMM (sources->sources) ------------------
   nd = 1
    call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif, problem%nlmin, problem%nlmax)
@@ -964,11 +831,6 @@ subroutine updateDemagfieldFMM(problem, solution)
     stop " FMM3D error"
   end if
   !-----------------------------------------------------------------
-#if USE_TIMING
-  acc_fmm = acc_fmm + (walltime() - t1)
-  t1 = walltime()
-#endif
-
   !------------------ Map grad -> H (and to single) ----------------
   ! include factor 4pi to match Magtense units
    if (fmm_tree%nboxes > 9) then 
@@ -988,20 +850,9 @@ subroutine updateDemagfieldFMM(problem, solution)
     solution%HmZ = 0.0_SP
   end if
   !-----------------------------------------------------------------
-#if USE_TIMING
-  acc_map = acc_map + (walltime() - t1)
-  t1 = walltime()
-#endif
   !------------- add correction from neighbouring tiles ---------------------
 call add_near_field(problem, solution)
   !--------------------------------------------------------------------------
-#if USE_TIMING
-  acc_neigh = acc_neigh + (walltime() - t1)
-#endif
-
-#if USE_TIMING
-    t1 = walltime()
-#endif
     !------------------ Cleanup -------------------------------------
   if (.not. fmm_tree%keep_tree) then
       call fmm_tree%dealloc()
@@ -1014,44 +865,12 @@ call add_near_field(problem, solution)
   end if
   deallocate(dipvec, grad)
     !--------------------------------------------------------------
-#if USE_TIMING
-  acc_cleanup = acc_cleanup + (walltime() - t1)
-#endif
   !------------------ Optional field noise (CV) --------------------
-#if USE_TIMING
-  t1 = walltime()
-#endif
   if (problem%CV > 0) then
       solution%HmX = solution%HmX + solution%HmX*problem%CV*sqrt(-2d0*log(solution%u1))*cos(2d0*pi*solution%u2)
       solution%HmY = solution%HmY + solution%HmY*problem%CV*sqrt(-2d0*log(solution%u3))*cos(2d0*pi*solution%u4)
       solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
   end if
-#if USE_TIMING
-  acc_noise = acc_noise + (walltime() - t1)
-  !------------------ Final accounting/print -----------------------
-  acc_total_fmm = acc_total_fmm + (walltime() - t0)
-  call_count_fmm = call_count_fmm + 1
-  if (mod(call_count_fmm, NPRINT) == 0) then
-      write(*,'(A,I0,A,1X, A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6)') &
-           'updateDemagfieldFMM timing (last ', NPRINT, ' calls) ', &
-           'total=',  acc_total_fmm, ' cast=',   acc_cast,    ' alloc=',  acc_alloc,  ' pack=',  acc_pack, &
-           ' fmm=',   acc_fmm,       ' map=',    acc_map,     ' self=',   acc_self,   ' neigh=', acc_neigh, &
-           ' free=',  acc_cleanup,   ' noise=',  acc_noise
-
-      acc_total_fmm = 0.0_DP
-      acc_cast      = 0.0_DP
-      acc_alloc     = 0.0_DP
-      acc_pack      = 0.0_DP
-      acc_fmm       = 0.0_DP
-      acc_map       = 0.0_DP
-      acc_self      = 0.0_DP
-      acc_neigh     = 0.0_DP
-      acc_cleanup   = 0.0_DP
-      acc_noise     = 0.0_DP
-
-  end if
-#endif
-
     call trace%end( "updateDemagfieldFMM", itimer=itimer )
 #endif
 
