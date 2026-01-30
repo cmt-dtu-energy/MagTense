@@ -24,6 +24,7 @@ MODULE trace_mod
     logical :: enabled    = .false.              ! master on/off switch
     integer :: unit       = -1                   ! file unit used for trace output
     logical :: flush_each = .false.              ! flush after each write
+    integer :: verbose   = 0                   ! verbosity level (not used yet)
 
     integer :: nthreads = 1                      ! number of threads (cached)
     type(trace_thread_t), allocatable :: t(:)    ! per-thread state (0..nthreads-1)
@@ -53,12 +54,15 @@ CONTAINS
 !> unit       : Fortran unit (default 97)
 !> flush_each : flush file after each line (slow but safe)
 !=============================================================================
-  subroutine init(filename, enabled, unit, flush_each)
+  subroutine init(log_dir, filename, enabled, unit, flush_each, verbose)
+    character(len=*), intent(in), optional :: log_dir
     character(len=*), intent(in), optional :: filename
     logical,          intent(in), optional :: enabled
     integer,          intent(in), optional :: unit
     logical,          intent(in), optional :: flush_each
-
+    integer,          intent(in), optional :: verbose
+    character(len=256) :: dir
+    character(len=256) :: full_fn
     character(len=256) :: fn
 
     trace%enabled = .false.
@@ -72,6 +76,12 @@ CONTAINS
 
     fn = "trace.log"
     if (present(filename)) fn = filename
+
+    if (present(verbose)) trace%verbose = verbose
+
+    dir = "logs"
+    if (present(log_dir)) dir = log_dir
+    full_fn = trim(dir)//"/"//trim(fn)
 
     !------------------------- Initialise locks once ---------------------------
     call trace%io_lock%init()
@@ -87,7 +97,7 @@ CONTAINS
 
     !---------------------------- Open log file --------------------------------
     if (trace%enabled) then
-      open(trace%unit, file=trim(fn), status="replace", action="write", position="append")
+      open(trace%unit, file=trim(full_fn), status="replace", action="write", position="append")
 
       call trace_write_line("INFO ", "TRACE START", 0, force_master=.true.)
 
@@ -96,7 +106,6 @@ CONTAINS
     !---------------------------------------------------------------------------
 
     trace%initialized = .true.
-
   end subroutine init
 
 
@@ -149,15 +158,29 @@ CONTAINS
 !> Begin a traced region (thread-safe)
 !> id     : region label
 !> itimer : optional timer id for aggregation (0 = auto-register)
+!> verbose : optional verbose level
 !=============================================================================
-  subroutine begin(id, itimer)
+  subroutine begin(id, itimer, verbose)
     character(len=*), intent(in)              :: id
     integer,          intent(inout), optional :: itimer
+    integer,          intent(in), optional    :: verbose
+    integer :: verbose_in
 
     integer :: tid
     character(len=ID_LEN) :: lab
 
     if (.not. trace%initialized) call trace%init(enabled=.false.)
+    
+    !--------------------------- Verbosity check ------------------------------
+    ! only proceed if the message verbosity is less than or equal to the trace verbosity
+    if (present(verbose)) then
+      verbose_in = verbose
+    else
+      verbose_in = 1
+    end if
+    if (verbose_in > trace%verbose) return
+    !---------------------------------------------------------------------------
+
 
     tid = omp%thread_id()
 
@@ -188,15 +211,29 @@ CONTAINS
 !> End a traced region (thread-safe, enforces proper nesting)
 !> id     : region label (must match last begin on this thread)
 !> itimer : optional timer id for aggregation
+!> verbose : optional verbose level
 !=============================================================================
-  subroutine end(id, itimer)
+  subroutine end(id, itimer, verbose)
     character(len=*), intent(in)           :: id
     integer,          intent(in), optional :: itimer
-
+    integer,          intent(in), optional :: verbose
+    integer :: verbose_in
     integer :: tid
     character(len=ID_LEN) :: lab, want
 
     if (.not. trace%initialized) call trace%init(enabled=.false.)
+
+   !--------------------------- Verbosity check ------------------------------
+    ! only proceed if the message verbosity is less than or equal to the trace verbosity
+    if (present(verbose)) then
+      verbose_in = verbose
+    else
+      verbose_in = 1
+    end if
+    if (verbose_in > trace%verbose) return
+
+    !---------------------------------------------------------------------------
+
 
     tid = omp%thread_id()
 

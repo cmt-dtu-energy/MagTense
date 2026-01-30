@@ -313,13 +313,15 @@ CONTAINS
 !> window_enabled : enable periodic window dumps
 !> window_interval: seconds between window dumps
 !=============================================================================
-  subroutine log_init(filename, unit, flush_each, window_enabled, window_interval)
+  subroutine log_init(log_dir, filename, unit, flush_each, window_enabled, window_interval)
+    character(len=*), intent(in), optional :: log_dir
     character(len=*), intent(in), optional :: filename
     integer,          intent(in), optional :: unit
     logical,          intent(in), optional :: flush_each
     logical,          intent(in), optional :: window_enabled
     real(8),          intent(in), optional :: window_interval
-
+    character(len=256) :: dir
+    character(len=256) :: full_fn
     character(len=256) :: fn
     logical :: log_unit_open
 
@@ -340,6 +342,17 @@ CONTAINS
     timer%window_interval = 30.0d0
     if (present(window_interval)) timer%window_interval = window_interval
 
+    dir = "logs"
+    if (present(log_dir)) dir = log_dir
+
+    !---------------------------- Ensure log dir --------------------------------
+    call ensure_dir_exists(trim(dir))
+    !---------------------------------------------------------------------------
+
+    full_fn = trim(dir)//"/"//trim(fn)
+
+
+
     !------------------- Reset wallclock zero point for this run ---------------
     call omp_timer%init()
     !---------------------------------------------------------------------------
@@ -350,7 +363,7 @@ CONTAINS
       inquire(unit=timer%log_unit, opened=log_unit_open)
       if (log_unit_open) close(timer%log_unit)
 
-      open(timer%log_unit, file=trim(fn), status="replace", action="write")
+      open(timer%log_unit, file=trim(full_fn), status="replace", action="write")
       timer%log_enabled = .true.
 
       win_snap_initialized = .false.
@@ -373,6 +386,21 @@ CONTAINS
     !---------------------------------------------------------------------------
 
   end subroutine log_init
+
+
+subroutine ensure_dir_exists(d)
+  use iso_fortran_env, only: error_unit
+  implicit none
+  character(len=*), intent(in) :: d
+  integer :: stat
+
+  if (len_trim(d) == 0) return
+
+  call execute_command_line('mkdir -p "'//trim(d)//'"', exitstat=stat)
+  if (stat /= 0) then
+    write(error_unit,'(a,i0)') 'TRACE: failed to create log directory, exitstat=', stat
+  end if
+end subroutine ensure_dir_exists
 
 
 !=============================================================================
