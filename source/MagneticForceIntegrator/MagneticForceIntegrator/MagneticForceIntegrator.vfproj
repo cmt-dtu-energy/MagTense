@@ -5,7 +5,7 @@
 	</Platforms>
 	<Configurations>
 		<Configuration Name="Debug|x64" UseCompiler="ifxCompiler" ConfigurationType="typeStaticLibrary">
-			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../TileDemagTensor/TileDemagTensor/x64/debug/;../../NumericalIntegration/NumericalIntegration/x64/debug/;../../DemagField/DemagField/x64/debug/;C:\Program Files\MATLAB\R2024b\extern\include\" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../TileDemagTensor/TileDemagTensor/x64/Debug/;../../NumericalIntegration/NumericalIntegration/x64/Debug/;../../DemagField/DemagField/x64/Debug/;C:\Program Files\MATLAB\R2025b\extern\include\" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebugDLL"/>
 			<Tool Name="VFLibrarianTool"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -61,9 +61,12 @@
 		<Filter Name="Header Files" Filter="fi;fd"/>
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
-			<File RelativePath=".\MagForceIO.f90"/>
-			<File RelativePath=".\MagForceMaxwellStressTensor.f90"/>
-			<File RelativePath=".\MagneticForce.f90"/>
+			<File RelativePath=".\MagForceIO.f90">
+			</File>
+			<File RelativePath=".\MagForceMaxwellStressTensor.f90">
+			</File>
+			<File RelativePath=".\MagneticForce.f90">
+			</File>
 		</Filter>
 	</Files>
 	<Globals/>

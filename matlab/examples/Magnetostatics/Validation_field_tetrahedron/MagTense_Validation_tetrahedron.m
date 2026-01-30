@@ -1,6 +1,5 @@
-
 %%This function compares MagTense to a FEM simulations for a single permanent magnet.
-function [] = MagTense_Validation_tetrahedron()
+function [rel_int_error] = MagTense_Validation_tetrahedron()
 
 %Make a figure
 figure1 = figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto');
@@ -81,4 +80,12 @@ set(h_l,'fontsize',9);
 ylabel('|\mu_0{}H| [T]');
 xlabel('x, y or z [m]');
 ylim([0 1.2]);
+
+% Interpolate the MagTense solution to the FEM solution and calculate the relative error in percent
+rel_int_error(1) = calculate_relative_integral_error(data_FEM_x(:,1),data_FEM_x(:,2),x,4*pi*1e-7*Hnorm(1:numel(x)));
+rel_int_error(2) = calculate_relative_integral_error(data_FEM_y(:,1),data_FEM_y(:,2),y,4*pi*1e-7*Hnorm((numel(x)+1):(numel(x)+numel(y))));
+rel_int_error(3) = calculate_relative_integral_error(data_FEM_z(:,1),data_FEM_z(:,2),z,4*pi*1e-7*Hnorm((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z))));
+
+disp(['Relative integrated error between MagTense and FEM is Mx = ' num2str(rel_int_error(1)) ', My = ' num2str(rel_int_error(2)) ', Mz = ' num2str(rel_int_error(3)) ])
+
 end

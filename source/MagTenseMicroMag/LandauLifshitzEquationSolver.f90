@@ -1439,7 +1439,7 @@ end subroutine updateDemagfieldFMM
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
         
-            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout, k, j, i) default(none)
+            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout, pts_arr) default(none)
         
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do k=1,nz
@@ -1463,9 +1463,12 @@ end subroutine updateDemagfieldFMM
                         allocate(Nout(1,ntot,3,3))
                         allocate(H(ntot,3))
                         
-                        !$OMP CRITICAL
-                        call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
-                        !$OMP END CRITICAL
+                        allocate(pts_arr(ntot,3))
+                        pts_arr(:,1) =  problem%grid%pts(:,1)
+                        pts_arr(:,2) =  problem%grid%pts(:,2)
+                        pts_arr(:,3) =  problem%grid%pts(:,3)
+                        
+                        call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
                         
                         !Copy Nout into the proper structure used by the micro mag model
                         ind = (k-1) * nx * ny + (j-1) * nx + i
@@ -1486,6 +1489,7 @@ end subroutine updateDemagfieldFMM
                         problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
                     
                         !Clean up
+                        deallocate(pts_arr)
                         deallocate(Nout)
                         deallocate(H)
                     enddo
@@ -1493,6 +1497,14 @@ end subroutine updateDemagfieldFMM
             enddo
             
             !$OMP END PARALLEL DO
+            
+            open(21,file='Kxx.txt',status='unknown',form='formatted',action='write')
+            do i=1,size(problem%Kxx,1)
+                do j=1,size(problem%Kxx,2)
+                    write(21,*)  problem%Kxx(i,j)
+                enddo
+            enddo
+            close(21)
             
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
         

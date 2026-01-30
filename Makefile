@@ -285,7 +285,7 @@ info:
 
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
-	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS='${LDFLAGS}' \
+	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
 		python -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} \
 		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${FMM3D}

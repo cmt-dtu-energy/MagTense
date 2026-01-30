@@ -5,7 +5,7 @@
 	</Platforms>
 	<Configurations>
 		<Configuration Name="Debug|x64" UseCompiler="ifxCompiler" ConfigurationType="typeStaticLibrary">
-			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../NumericalIntegration/NumericalIntegration/x64/Debug/;" WarnInterfaces="true" RealKIND="realKIND8" FloatingPointExceptionHandling="fpe0" FloatingPointModel="strict" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../NumericalIntegration/NumericalIntegration/x64/Debug/;" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" FloatingPointExceptionHandling="fpe0" FloatingPointModel="strict" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
 			<Tool Name="VFLibrarianTool"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -15,7 +15,7 @@
 			<Tool Name="VFPostBuildEventTool"/>
 		</Configuration>
 		<Configuration Name="Release|x64" UseCompiler="ifxCompiler" ConfigurationType="typeStaticLibrary">
-			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" AdditionalIncludeDirectories="../../NumericalIntegration/NumericalIntegration/x64/release/;" OpenMPConditionalCompilation="false" EnableEnhancedInstructionSet="codeArchSSE3" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" FloatingPointModel="precise"/>
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" AdditionalIncludeDirectories="../../NumericalIntegration/NumericalIntegration/x64/Release/;" OpenMPConditionalCompilation="false" EnableEnhancedInstructionSet="codeArchSSE3" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" FloatingPointModel="precise"/>
 			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="../../NumericalIntegration/NumericalIntegration/x64/release/;"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
@@ -25,7 +25,7 @@
 			<Tool Name="VFPostBuildEventTool"/>
 		</Configuration>
 		<Configuration Name="Debug_no_CVODE|x64" UseCompiler="ifxCompiler" ConfigurationType="typeStaticLibrary">
-			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../NumericalIntegration/NumericalIntegration/x64/Debug_no_CVODE/;" WarnInterfaces="true" RealKIND="realKIND8" FloatingPointExceptionHandling="fpe0" FloatingPointModel="strict" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="../../NumericalIntegration/NumericalIntegration/x64/Debug_no_CVODE/;" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" FloatingPointExceptionHandling="fpe0" FloatingPointModel="strict" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
 			<Tool Name="VFLinkerTool" SuppressStartupBanner="true"/>
 			<Tool Name="VFLibrarianTool"/>
 			<Tool Name="VFResourceCompilerTool"/>
@@ -47,7 +47,7 @@
 			<Tool Name="VFPostBuildEventTool"/>
 		</Configuration>
 		<Configuration Name="Release_Standalone_exe|x64" UseCompiler="ifortCompiler" ConfigurationType="typeStaticLibrary">
-			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" AdditionalIncludeDirectories="../../NumericalIntegration/NumericalIntegration/x64/release_Standalone_exe/;" OpenMPConditionalCompilation="false" EnableEnhancedInstructionSet="codeArchSSE3" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" FloatingPointModel="precise"/>
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" AdditionalIncludeDirectories="../../NumericalIntegration/NumericalIntegration/x64/Release_Standalone_exe/;" OpenMPConditionalCompilation="false" EnableEnhancedInstructionSet="codeArchSSE3" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" FloatingPointModel="precise"/>
 			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="../../NumericalIntegration/NumericalIntegration/x64/release/;"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
