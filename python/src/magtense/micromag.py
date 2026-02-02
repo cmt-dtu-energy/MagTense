@@ -55,6 +55,8 @@ class MicromagProblem:
         N_ave:
         t_alpha:
         alpha_fct:
+        n_macro: How many copies of the simulated domain to have along x, y and z to represent the macrogeometry
+        shiftVec: How far to shift domain copies along x, y and z when constructing the macrogeometry
     """
 
     def __init__(
@@ -106,7 +108,11 @@ class MicromagProblem:
         n_threads: int = 1,
         N_ave: tuple[int] = (1, 1, 1),
         t_alpha: np.ndarray = np.zeros(1),  # noqa: B008
-        alpha_fct=lambda t: np.atleast_2d(t).T * 0
+        alpha_fct=lambda t: np.atleast_2d(t).T * 0,
+        n_macro: list | np.ndarray | None = np.zeros(3),
+        shiftVec: list | np.ndarray | None = np.zeros(3, dtype=np.float64),
+        macroShape: list | np.ndarray | None = None,
+        sampleShape: list | np.ndarray | None = None,
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -130,6 +136,12 @@ class MicromagProblem:
         self.grid_nod = np.zeros(shape=(grid_nnod, 3), dtype=np.float64, order="F")
         self.grid_abc = grid_abc
         self.u_ea = np.zeros(shape=(ntot, 3), dtype=np.float64, order="F")
+
+        # Set macrogeometry
+        self.n_macro = n_macro
+        self.shiftVec = shiftVec
+        self.macroShape = macroShape
+        self.sampleShape = sampleShape
 
         self.grid_type = grid_type
         self.prob_mode = prob_mode
@@ -501,6 +513,61 @@ class MicromagProblem:
     def solver(self, val: str | None = None) -> None:
         self._solver = {None: -1, "explicit": 1, "dynamic": 2, "implicit": 3}[val]
 
+    @property
+    def n_macro(self) -> list | np.ndarray | None:
+        return self._n_macro
+
+    @n_macro.setter
+    def n_macro(self, val: list | np.ndarray | None) -> None:
+        self._n_macro = np.zeros(shape=3, dtype=np.int32, order="F")
+
+        if val is None:
+            pass
+
+        elif isinstance(val, (list, np.ndarray)):
+            self._n_macro[:] = val
+
+    @property
+    def shiftVec(self) -> list | np.ndarray | None:
+        return self._shiftVec
+
+    @shiftVec.setter
+    def shiftVec(self, val: list | np.ndarray | None) -> None:
+        self._shiftVec = np.zeros(shape=3, dtype=np.float64, order="F")
+
+        if val is None:
+            pass
+
+        elif isinstance(val, (list, np.ndarray)):
+            self._shiftVec[:] = val
+
+    @property
+    def macroShape(self) -> list | np.ndarray | None:
+        return self._macroShape
+
+    @macroShape.setter
+    def macroShape(self, val: list | np.ndarray | None) -> None:
+        self._macroShape = np.ones(shape=3, dtype=np.float64, order="F")
+
+        if val is None:
+            pass
+
+        elif isinstance(val, (list, np.ndarray)):
+            self._macroShape[:] = val
+
+    @property
+    def sampleShape(self) -> list | np.ndarray | None:
+        return self._sampleShape
+
+    @sampleShape.setter
+    def sampleShape(self, val: list | np.ndarray | None) -> None:
+        self._sampleShape = np.ones(shape=3, dtype=np.float64, order="F")
+
+        if val is None:
+            pass
+
+        elif isinstance(val, (list, np.ndarray)):
+            self._sampleShape[:] = val
 
     @property
     def usereturnhall(self) -> int | None:
@@ -607,6 +674,10 @@ class MicromagProblem:
             passexch=self.passexch,
             exch_ncols=self.exch_ncols,
             exch_presize=self.exch_presize,
+            n_macro=self.n_macro,
+            shiftvec=self.shiftVec,
+            macroshape=self.macroShape,
+            sampleshape=self.sampleShape,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.eps_fmm,

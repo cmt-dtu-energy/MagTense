@@ -1032,7 +1032,8 @@ end subroutine updateDemagfieldFMM
     real(SP) :: pref,alpha,beta
     complex(kind=4) :: alpha_c, beta_c
     real(SP), dimension(:), allocatable :: temp
-    character*(100) :: prog_str 
+    character*(100) :: prog_str
+    real(SP),dimension(3) :: Mavg_s
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -1041,11 +1042,16 @@ end subroutine updateDemagfieldFMM
     ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
     allocate(temp(ntot))
     
-    ! Convert the magnetization to single before the demag calculation
+    ! Convert the magnetization to single precision before the demag calculation
     solution%Mx_s = real(solution%Mx, SP)
     solution%My_s = real(solution%My, SP)
     solution%Mz_s = real(solution%Mz, SP)
-    
+
+    ! Get average magnetisation
+    Mavg_s(1) = sum(solution%Mx_s)/ntot
+    Mavg_s(2) = sum(solution%My_s)/ntot
+    Mavg_s(3) = sum(solution%Mz_s)/ntot
+
     
     if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
         if ( problem%useCuda .eq. useCudaFalse ) then
@@ -1224,7 +1230,15 @@ end subroutine updateDemagfieldFMM
             
             !HmZ = HmZ + Kzz * Mz
             call gemv( problem%Kzz, solution%Mz_s, solution%HmZ, alpha, beta )
-            
+
+            !Apply shape correction (untested)
+            solution%HmX = solution%HmX + problem%Kxx_shape * Mavg_s(1) &
+                    + problem%Kxy_shape * Mavg_s(2) + problem%Kxz_shape * Mavg_s(3)
+            solution%HmY = solution%HmY + problem%Kxy_shape * Mavg_s(1) &
+                    + problem%Kyy_shape * Mavg_s(2) + problem%Kyz_shape * Mavg_s(3)
+            solution%HmZ = solution%HmX + problem%Kxz_shape * Mavg_s(1) &
+                    + problem%Kyz_shape * Mavg_s(2) + problem%Kzz_shape * Mavg_s(3)
+
             temp = solution%HmX * problem%Mfact
             solution%HmX = temp
             temp = solution%HmY * problem%Mfact
@@ -1298,6 +1312,9 @@ end subroutine updateDemagfieldFMM
 #else
     call ComputeDemagfieldTensor( problem )
 #endif
+
+    !Shape correction tensor
+    call ComputeShapeCorrectionTensor( problem )
 
     !Anisotropy matrix
     call ComputeAnisotropyTerm3D( problem )
@@ -1398,7 +1415,10 @@ end subroutine updateDemagfieldFMM
     real :: rate
     integer :: c1,c2,cr,cm
     character(10) :: prog_str
-    
+
+    integer(4),dimension(3) :: n_macro
+    real(8),dimension(3) :: shiftVec
+
     ! First initialize the system_clock
     call system_clock(count_rate=cr)
     call system_clock(count_max=cm)
@@ -1413,7 +1433,11 @@ end subroutine updateDemagfieldFMM
     nx_ave = problem%N_ave(1)
     ny_ave = problem%N_ave(2)
     nz_ave = problem%N_ave(3)
-    
+
+    !Macrogeometry info (added by F. Durhuus)
+    n_macro = problem%macrogrid%n_macro
+    shiftVec = problem%macrogrid%shiftVec
+
     !Demag tensor components
     call displayGUIMessage( ' Start alloc:' )
     allocate( problem%Kxx(ntot,ntot), problem%Kxy(ntot,ntot), problem%Kxz(ntot,ntot) )
@@ -1462,13 +1486,19 @@ end subroutine updateDemagfieldFMM
                         
                         allocate(Nout(1,ntot,3,3))
                         allocate(H(ntot,3))
-                        
+
                         allocate(pts_arr(ntot,3))
                         pts_arr(:,1) =  problem%grid%pts(:,1)
                         pts_arr(:,2) =  problem%grid%pts(:,2)
                         pts_arr(:,3) =  problem%grid%pts(:,3)
                         
-                        call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
+                                                if (all(n_macro == 0.0)) then
+                            call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                        else
+                            write(*,*) "get field from tiles : PBC version"
+                            call getFieldFromTiles_PBC( tile, H, problem%grid%pts, 1, ntot, n_macro, &
+                            shiftVec, Nout, .false. )
+                        end if
                         
                         !Copy Nout into the proper structure used by the micro mag model
                         ind = (k-1) * nx * ny + (j-1) * nx + i
@@ -1695,8 +1725,64 @@ end subroutine updateDemagfieldFMM
     !-------------- end debug write the dense matrices to binary files --------------
     
     end subroutine ComputeDemagfieldTensor
-    
-    
+
+    !>-----------------------------------------
+    !> @author Frederik L. Durhuus, fladu@dtu.dk, DTU, 2025
+    !> Calculates and returns the shape correction tensor,
+    !> which ensures that the correct sample shape is used
+    !> for computing the demagnetisation field
+    !> @param[inout] problem, the struct containing the problem
+    !>-----------------------------------------
+    subroutine ComputeShapeCorrectionTensor( problem )
+    type(MicroMagProblem),intent(inout) :: problem                !> Grid data structure
+
+    integer :: nx,ny,nz,ntot                                      !> Internal counters and index variables
+    real(DP), dimension(:,:),allocatable :: pts                   !> Evaluation points
+    real(DP),dimension(:,:,:),allocatable :: Nshape               !> Temporary storage for the demag tensor
+    real(DP),allocatable :: aMacro,bMacro,cMacro                  !> Macrogeometry shape parameters
+    real(DP),allocatable :: aSample,bSample,cSample               !> Macrogeometry shape parameters
+
+    ! Get number of elements
+    nx = problem%grid%nx
+    ny = problem%grid%ny
+    nz = problem%grid%nz
+    ntot = nx * ny * nz
+
+    ! Get macrogeometry shape parameters (approximated by rectangular prism)
+    aMacro = problem%macrogrid%macroShape(1)
+    bMacro = problem%macrogrid%macroShape(2)
+    cMacro = problem%macrogrid%macroShape(3)
+    ! Get sample shape parameters (approximated by rectangular prism)
+    aSample = problem%macrogrid%sampleShape(1)
+    bSample = problem%macrogrid%sampleShape(2)
+    cSample = problem%macrogrid%sampleShape(3)
+    ! Get array of points to evaluate tensor at
+    pts = problem%grid%pts
+
+    allocate(Nshape(ntot,3,3))
+    call getShapeTensor(pts, ntot, aMacro, bMacro, cMacro, aSample, bSample, cSample, Nshape)
+
+    ! Tensor components for shape correction tensor
+    allocate( problem%Kxx_shape(ntot), problem%Kxy_shape(ntot), problem%Kxz_shape(ntot) )
+    allocate( problem%Kyy_shape(ntot), problem%Kyz_shape(ntot) )
+    allocate( problem%Kzz_shape(ntot) )
+
+    ! Copy Nshape into the proper structure used by the micro mag model
+    problem%Kxx_shape = Nshape(:,1,1)
+    problem%Kxy_shape = Nshape(:,1,2)
+    problem%Kxz_shape = Nshape(:,1,3)
+
+    ! By symmetry Kxy = Kyx
+    problem%Kyy_shape = Nshape(:,2,2)
+    problem%Kyz_shape = Nshape(:,2,3)
+
+    ! By symmetry Kxz = Kzx and Kyz = Kzy
+    problem%Kzz_shape = Nshape(:,3,3)
+
+    ! Clean up
+    deallocate(Nshape)
+
+    end subroutine ComputeShapeCorrectionTensor
     
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019

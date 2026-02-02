@@ -99,7 +99,18 @@ include "mkl_dfti.f90"
         integer, allocatable  :: Exch_mat_c(:)   !> Column indices for the exchange coupling matrix
         real(dp), allocatable :: Exch_mat_v(:)   !> Values for the exchange coupling matrix
      end type MicroMagGridInfo
-     
+
+    !Additional information about the macrogeometry and sample shape
+    ! used for computing the demagnetisation field
+    !Note that current version approximates the overall shape of sample and macrogeometry by rectangular prisms
+    type MicroMagMacrogeometry
+        !> Number of copies on both sides of the intial domain which together form the macrogeometry
+        integer,allocatable :: n_macro(:)
+        real(dp),allocatable :: shiftVec(:)    !> How far to shift neighbouring domain copies along x, y, z
+        real(dp),allocatable :: macroShape(:)  !> Sidelengths of macrogeometry prism
+        real(dp),allocatable :: sampleShape(:) !> Sidelengths of sample prism
+    end type MicroMagMacrogeometry
+
     !>-----------------
     !> Overall data structure for a micro magnetism problem.
     !> The design intention is such that a problem may be restarted given the information stored in this struct
@@ -162,7 +173,11 @@ include "mkl_dfti.f90"
         real(SP),dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
         real(SP),dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
         real(SP),dimension(:,:),allocatable :: Kzz          !> Demag field tensor split out into the nine symmetric components
-        
+
+        real(SP),dimension(:),allocatable :: Kxx_shape,Kxy_shape,Kxz_shape  !> Shape correction tensor components
+        real(SP),dimension(:),allocatable :: Kyy_shape,Kyz_shape            !> Shape correction tensor components
+        real(SP),dimension(:),allocatable :: Kzz_shape                      !> Shape correction tensor components
+
         integer,dimension(:,:),allocatable :: tensorMap     !> A map of the unique entries in the demagnetization tensor
         logical,dimension(:,:),allocatable :: tensorMapX, tensorMapY, tensorMapZ   !> The sign of the different components in the demagnetization tensor map
         
