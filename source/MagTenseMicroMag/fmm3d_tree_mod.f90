@@ -1782,7 +1782,11 @@ module fmm3d_tree_mod
                 jend = self%isrcse(2,jbox)
                 npts = jend-jstart+1
 
-                call l3ddirectdg_grad_vec(self%nd,self%sourcesort(1,jstart), &
+    !            call l3ddirectdg_grad_vec(self%nd,self%sourcesort(1,jstart), &
+    ! &    self%dipvecsort(1,1,jstart),npts,self%sourcesort(1,istarts), &
+    ! &    npts0,self%gradsort(1,1,istarts),self%thresh)     
+
+                     call l3ddirectdg_grad(self%nd,self%sourcesort(1,jstart), &
      &    self%dipvecsort(1,1,jstart),npts,self%sourcesort(1,istarts), &
      &    npts0,self%gradsort(1,1,istarts),self%thresh)     
               enddo
@@ -1800,68 +1804,76 @@ module fmm3d_tree_mod
 
 end module fmm3d_tree_mod
 
-!***********************************************************************
-      subroutine l3ddirectdg_grad_vec(nd,sources, &
-                 dipvec,ns,ztarg,nt,grad,thresh)
-!**********************************************************************
-!
-!     This subroutine evaluates the potential and gradient due to a 
-!     collection of sources and adds to existing quantities.
-!   
-!     grad(x) = grad(x) + Gradient( sum  
-!                                    j
-!
-!                            \nabla 1|/|x-x_{j}| \cdot v_{j}
-!                            )
-!                                   
-!      where v_{j} is the dipole orientation vector, 
-!      \nabla denotes the gradient is with respect to the x_{j} 
-!      variable, and Gradient denotes the gradient with respect to
-!      the x variable
-!      If |r| < thresh 
-!          then the subroutine does not update the potential
-!          (recommended value = |boxsize(0)|*machine precision
-!           for boxsize(0) is the size of the computational domain) 
-!
-!
-!-----------------------------------------------------------------------
-!     INPUT:
-!
-!     nd     :    number of charge and dipole densities
-!     sources:    source locations
-!     dipvec :    dipole orientation vector
-!     ns     :    number of sources
-!     ztarg  :    target locations
-!     ntarg  :    number of targets
-!     thresh :    threshold for updating potential,
-!                 potential at target won't be updated if
-!                 |t - s| <= thresh, where t is the target
-!                 location and, and s is the source location 
-!                 
-!-----------------------------------------------------------------------
-!     OUTPUT:
-!
-!     pot    :    updated potential at ztarg 
-!     grad   :    updated gradient at ztarg 
-!
-!-----------------------------------------------------------------------
-      implicit none
-!f2py intent(in) nd,sources,dipvec,ns,ztarg,nt,thresh
-!f2py intent(out) pot,grad
-!
-!c      calling sequence variables
-!  
-      integer ns,nt,nd
-      real *8 sources(3,ns),ztarg(3,nt),dipvec(nd,3,ns)
-      real *8 grad(nd,3,nt)
-      real *8 thresh
-      
 
-      call l3ddirectdg_cpp_grad(nd,sources, &
-                 dipvec,ns,ztarg,nt,grad,thresh)
 
-      return
-      end
+!------------_ IMPORTANT NOTE ----------------
+! the below l3ddirectdg_grad_vec function calls a c++ version to do direct evaluation of dipole gradients
+! but, direct evaluation should be done with MagTense CUDA
+! therefore it is commented out so the fast FMM kernels does not need to be compiled
+! This should make linking easier. 
+!------------------------------------------------------------------------------------------
+
+
+! !***********************************************************************
+!       subroutine l3ddirectdg_grad_vec(nd,sources, &
+!                  dipvec,ns,ztarg,nt,grad,thresh)
+! !**********************************************************************
+! !
+! !     This subroutine evaluates the potential and gradient due to a 
+! !     collection of sources and adds to existing quantities.
+! !   
+! !     grad(x) = grad(x) + Gradient( sum  
+! !                                    j
+! !
+! !                            \nabla 1|/|x-x_{j}| \cdot v_{j}
+! !                            )
+! !                                   
+! !      where v_{j} is the dipole orientation vector, 
+! !      \nabla denotes the gradient is with respect to the x_{j} 
+! !      variable, and Gradient denotes the gradient with respect to
+! !      the x variable
+! !      If |r| < thresh 
+! !          then the subroutine does not update the potential
+! !          (recommended value = |boxsize(0)|*machine precision
+! !           for boxsize(0) is the size of the computational domain) 
+! !
+! !
+! !-----------------------------------------------------------------------
+! !     INPUT:
+! !
+! !     nd     :    number of charge and dipole densities
+! !     sources:    source locations
+! !     dipvec :    dipole orientation vector
+! !     ns     :    number of sources
+! !     ztarg  :    target locations
+! !     ntarg  :    number of targets
+! !     thresh :    threshold for updating potential,
+! !                 potential at target won't be updated if
+! !                 |t - s| <= thresh, where t is the target
+! !                 location and, and s is the source location 
+! !                 
+! !-----------------------------------------------------------------------
+! !     OUTPUT:
+! !
+! !     pot    :    updated potential at ztarg 
+! !     grad   :    updated gradient at ztarg 
+! !
+! !-----------------------------------------------------------------------
+!       implicit none
+! !f2py intent(in) nd,sources,dipvec,ns,ztarg,nt,thresh
+! !f2py intent(out) pot,grad
+! !
+! !c      calling sequence variables
+! !  
+!       integer ns,nt,nd
+!       real *8 sources(3,ns),ztarg(3,nt),dipvec(nd,3,ns)
+!       real *8 grad(nd,3,nt)
+!       real *8 thresh
+!       call l3ddirectdg_cpp_grad(nd,sources, &
+!                  dipvec,ns,ztarg,nt,grad,thresh)
+
+!       return
+!       end
 
 
 
