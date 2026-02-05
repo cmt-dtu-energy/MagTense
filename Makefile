@@ -159,15 +159,20 @@ endif
 ifeq ($(USE_FMM3D),0)
   FMM3D =
 else
-  # TODO - should there be some windows-specic handling here?
-  #          fx. should it be -llibffm3d instead???
+  ifeq ($(OS),Windows_NT)
+    # Link with full path to the static library (most robust with MS link.exe)
+    FMM3D = "$(FMM3D_LIB)/libfmm3d.lib"
+  else
+    # TODO - should there be some windows-specic handling here?
+    #          fx. should it be -llibffm3d instead???
 
-  # tell linker where to find libfmm3d.so
-  FMM3D = -L${FMM3D_LIB} -lfmm3d
-  # ensure python finds it at runtime
-  LDFLAGS += -Wl,-rpath,${FMM3D_LIB}
-  # still copy it locally for convenience
-  CP_LIB += && cp ${FMM3D_LIB}/libfmm3d${LIB_SUFFIX} .
+    # tell linker where to find libfmm3d.so
+    FMM3D = -L${FMM3D_LIB} -lfmm3d
+    # ensure python finds it at runtime
+    LDFLAGS += -Wl,-rpath,${FMM3D_LIB}
+    # still copy it locally for convenience
+    CP_LIB += && cp ${FMM3D_LIB}/libfmm3d${LIB_SUFFIX} .
+  endif
 endif
 #===================================================================
 
