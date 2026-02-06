@@ -32,7 +32,7 @@ else
 	endif
 endif
 
-STATIC_LIB = libAux${LIB_SUFFIX}
+STATIC_LIB = libAuxMT${LIB_SUFFIX}
 
 ifeq ($(USE_CVODE),0)
 	CVODE_OPT =

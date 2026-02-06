@@ -76,7 +76,7 @@ endif
 PYTHON_MODN = magtensesource
 PYTHON_LIBPATH = python/src/magtense/lib
 
-AUX_PATH = source/Aux
+AUXMT_PATH = source/AuxMT
 NUM_INT_PATH = source/NumericalIntegration/NumericalIntegration
 TILE_DEMAG_TENSOR_PATH = source/TileDemagTensor/TileDemagTensor
 DEMAG_FIELD_PATH = source/DemagField/DemagField
@@ -85,7 +85,7 @@ FORTRAN_CUDA_PATH = source/MagTenseFortranCuda/cuda
 STANDALONE_PATH = source/MagTense_StandAlone/MagTense_StandAlone
 FORCEINTEGRATOR_PATH = source/MagneticForceIntegrator/MagneticForceIntegrator
 
-VPATH = ${AUX_PATH}:${NUM_INT_PATH}:${TILE_DEMAG_TENSOR_PATH}:${DEMAG_FIELD_PATH}:\
+VPATH = ${AUXMT_PATH}:${NUM_INT_PATH}:${TILE_DEMAG_TENSOR_PATH}:${DEMAG_FIELD_PATH}:\
 ${MICROMAG_PATH}:${FORTRAN_CUDA_PATH}:${STANDALONE_PATH}:${FORCEINTEGRATOR_PATH}
 
 ifeq ($(OS),Windows_NT)
@@ -134,7 +134,7 @@ ifeq ($(USE_MICROMAG),0)
 	ifeq ($(OS),Windows_NT)
 		CP_LIB = cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
 	else
-		CP_LIB = cp ${AUX_PATH}/libAux${LIB_SUFFIX} .
+		CP_LIB = cp ${AUXMT_PATH}/libAuxMT${LIB_SUFFIX} .
 		CP_LIB += && cp ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX} .
 		CP_LIB += && cp ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX} .
 		CP_LIB += && cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
@@ -147,7 +147,7 @@ else
 		
 	else
 		LIB_OPT += -lMagTenseMicroMag
-		CP_LIB = cp ${AUX_PATH}/libAux${LIB_SUFFIX} .
+		CP_LIB = cp ${AUXMT_PATH}/libAuxMT${LIB_SUFFIX} .
 		CP_LIB += && cp ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX} .
 		CP_LIB += && cp ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX} .
 		CP_LIB += && cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
@@ -163,8 +163,6 @@ else
     # Link with full path to the static library (most robust with MS link.exe)
     FMM3D = "$(FMM3D_LIB)/libfmm3d.lib"
   else
-    # TODO - should there be some windows-specic handling here?
-    #          fx. should it be -llibffm3d instead???
 
     # tell linker where to find libfmm3d.so
     FMM3D = -L${FMM3D_LIB} -lfmm3d
@@ -176,11 +174,11 @@ else
 endif
 #===================================================================
 
-AUX = aux
+AUXMT = auxmt
 ifeq ($(OS),Windows_NT)
-	LIB_OPT += -llibAux
+	LIB_OPT += -llibAuxMT
 else
-	LIB_OPT += -lAux
+	LIB_OPT += -lAuxMT
 endif
 
 
@@ -214,7 +212,7 @@ else
 		-lsundials_fsunmatrixdense_mod${CVODE_SUFFIX} -lsundials_fsunlinsolspgmr_mod${CVODE_SUFFIX}
 endif
 
-INCLUDE_OBJ = ${MKFILE_PATH}/${AUX_PATH} \
+INCLUDE_OBJ = ${MKFILE_PATH}/${AUXMT_PATH} \
 	-I${MKFILE_PATH}/${NUM_INT_PATH} \
 	-I${MKFILE_PATH}/${TILE_DEMAG_TENSOR_PATH} \
 	-I${MKFILE_PATH}/${DEMAG_FIELD_PATH} \
@@ -228,16 +226,16 @@ PYTHON_MODN_ALL = _${PYTHON_MODN}${PY_MOD_SUFFIX}
 #=======================================================================
 .PHONY: all clean
 
-all: $(ALL_DEPS) ${AUX} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} 
+all: $(ALL_DEPS) ${AUXMT} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} 
 
 standalone: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} standalone
 
-python: $(PY_DEPS) ${AUX} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
+python: $(PY_DEPS) ${AUXMT} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
 
 python-win: ${PYTHON_MODN_ALL}
 
 clean:
-	cd ${AUX_PATH} && ${MAKE} clean
+	cd ${AUXMT_PATH} && ${MAKE} clean
 	cd ${NUM_INT_PATH} && ${MAKE} clean
 	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} clean
 	cd ${DEMAG_FIELD_PATH} && ${MAKE} clean
@@ -250,7 +248,7 @@ clean:
 
 clean_full:
 	cd ${FMM3D_DIR} && ${MAKE} clean
-	cd ${AUX_PATH} && ${MAKE} clean
+	cd ${AUXMT_PATH} && ${MAKE} clean
 	cd ${NUM_INT_PATH} && ${MAKE} clean
 	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} clean
 	cd ${DEMAG_FIELD_PATH} && ${MAKE} clean
@@ -261,8 +259,8 @@ clean_full:
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
 	rm -rf ${PYTHON_LIBPATH}/build
 
-aux:
-	cd ${AUX_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
+auxmt:
+	cd ${AUXMT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
 
 clean-build:
 	rm -f ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}

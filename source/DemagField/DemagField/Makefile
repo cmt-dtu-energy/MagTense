@@ -45,8 +45,8 @@ NUM_INT_LIB = ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX}
 TILE_DEMAG_TENSOR_PATH = ../../TileDemagTensor/TileDemagTensor
 TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX}
 
-AUX_PATH = ../../Aux
-AUX_LIB = ${AUX_PATH}/libAux${LIB_SUFFIX}
+AUXMT_PATH = ../../AuxMT
+AUXMT_LIB = ${AUXMT_PATH}/libAuxMT${LIB_SUFFIX}
 
 #=======================================================================
 #							Targets
@@ -57,7 +57,7 @@ AUX_LIB = ${AUX_PATH}/libAux${LIB_SUFFIX}
 all: pre-build ${STATIC_LIB}
 
 .f90.o:
-	$(FC) $(FFLAGS) -I${AUX_PATH} -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} ${OPT} ${MATLAB_OPT} -c $< -o $@
+	$(FC) $(FFLAGS) -I${AUXMT_PATH} -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} ${OPT} ${MATLAB_OPT} -c $< -o $@
 
 pre-build:
 	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
