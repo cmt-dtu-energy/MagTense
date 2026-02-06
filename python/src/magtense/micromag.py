@@ -192,7 +192,7 @@ class MicromagProblem:
         #--------- default FMM parameters -----------------
         self.dummy_run = 0
         self.fmm_cells_per_node = 100
-        self.eps_fmm = 1e-4
+        self.fmm_eps = 1e-4
         self.ifunif = 1
         self.nlmin = 1
         self.nlmax = 5
@@ -628,7 +628,7 @@ class MicromagProblem:
             exch_presize=self.exch_presize,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
-            eps_fmm=self.eps_fmm,
+            eps_fmm=self.fmm_eps,
             ifunif=self.ifunif,
             nlmin=self.nlmin,
             nlmax=self.nlmax,
@@ -753,7 +753,7 @@ class MicromagProblem:
             exch_presize=self.exch_presize,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
-            eps_fmm=self.eps_fmm,
+            eps_fmm=self.fmm_eps,
             ifunif=self.ifunif,
             nlmin=self.nlmin,
             nlmax=self.nlmax,
