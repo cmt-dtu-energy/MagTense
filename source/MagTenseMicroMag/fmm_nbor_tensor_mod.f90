@@ -366,6 +366,8 @@ subroutine BuildNeighbourDemagTensor(problem)
     print *, " Short circuiting FMM - disabling FMM"
     call dealloc_fmm_arrays(problem)
     problem%use_fmm = .false.
+    call trace%end( "BuildNeighbourDemagTensor", itimer=itimer, verbose=2 )
+
     return
   end if 
 
@@ -374,12 +376,9 @@ subroutine BuildNeighbourDemagTensor(problem)
 
   nbr_idx_p => problem%nbr_idx
 
-  ! If no neighbours at all, allocate empty Nnbr and bail
+  ! If no neighbours at all - error 
   if (nneigh_max <= 0) then
-    allocate(problem%Nnbr(ntot, 0, 3, 3))
-    problem%Nnbr = 0.0_SP
-    deallocate(offset, size_cell)
-    return
+    error stop "BuildNeighbourDemagTensor: no neighbours found in FMM tree lists - check tree construction and parameters"
   end if
 
   !---------------------------------------
