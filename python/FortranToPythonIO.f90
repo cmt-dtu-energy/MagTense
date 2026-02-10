@@ -734,7 +734,7 @@ end subroutine getHOnSourcesFMM
         flush_each_l = merge(.true., .false., flush_each /= 0)
 
         call timer%log_init(trim(log_dir), trim(timer_log_file), window_enabled=window_enabled_l, window_interval=window_interval)
-        call trace%init(trim(log_dir), trim(trace_log_file), enabled=trace_enabled_l, unit=97, flush_each=flush_each_l, verbose=trace_verbose)
+        call trace%trace_init(trim(log_dir), trim(trace_log_file), enabled=trace_enabled_l, unit=97, flush_each=flush_each_l, verbose=trace_verbose)
         
         !call timer%log_init("timing.log", window_enabled=.true., window_interval=30.0d0)
         !call trace%init("trace.log", enabled=.false., unit=97, flush_each=.true.)
@@ -750,15 +750,25 @@ end subroutine getHOnSourcesFMM
 			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
             CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n)
 
+        print *, " starting SolveLandauLifshitzEquation "
         call SolveLandauLifshitzEquation( problem, solution )
+        print *, " finished SolveLandauLifshitzEquation "
 
 
         t_out = solution%t_out
+        print *, " M_mm", shape(M_mm)
+        print *, " M_mm size", shape(solution%M_out)
         M_mm = solution%M_out
+        print *, " pts ", shape(pts)
+        print *, " pts size", shape(solution%pts)
         pts = solution%pts
+        print *, " H_exc size", shape(solution%H_exc)
         H_exc = solution%H_exc
+        print *, " H_ext size", shape(solution%H_ext)
         H_ext = solution%H_ext
+        print *, " H_dem size", shape(solution%H_dem)
         H_dem = solution%H_dem
+        print *, " H_ani size", shape(solution%H_ani)
         H_ani = solution%H_ani
 				n_tot_Exch = solution%gridinfo%Exch_mat_ntot
 

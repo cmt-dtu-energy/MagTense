@@ -32,7 +32,7 @@ MODULE trace_mod
     type(omp_lock_t) :: io_lock                  ! lock protecting file writes
     logical :: initialized = .false.             ! has init() been called?
   contains
-    procedure, nopass :: init
+    procedure, nopass :: trace_init
     procedure, nopass :: finalize
     procedure, nopass :: set_enabled
     procedure, nopass :: begin
@@ -54,7 +54,8 @@ CONTAINS
 !> unit       : Fortran unit (default 97)
 !> flush_each : flush file after each line (slow but safe)
 !=============================================================================
-  subroutine init(log_dir, filename, enabled, unit, flush_each, verbose)
+  subroutine trace_init(log_dir, filename, enabled, unit, flush_each, verbose)
+    !DEC$ ATTRIBUTES ALIAS:"trace_init_" :: trace_init
     character(len=*), intent(in), optional :: log_dir
     character(len=*), intent(in), optional :: filename
     logical,          intent(in), optional :: enabled
@@ -106,13 +107,14 @@ CONTAINS
     !---------------------------------------------------------------------------
 
     trace%initialized = .true.
-  end subroutine init
+  end subroutine trace_init
 
 
 !=============================================================================
 !> Finalise trace logging (writes timer summary and closes file)
 !=============================================================================
   subroutine finalize()
+    !DEC$ ATTRIBUTES ALIAS:"finalize_" :: finalize
     if (.not. trace%initialized) return
 
     !---------------------- Write timer summary -------------------------------
@@ -169,7 +171,7 @@ CONTAINS
     integer :: tid
     character(len=ID_LEN) :: lab
 
-    if (.not. trace%initialized) call trace%init(enabled=.false.)
+    if (.not. trace%initialized) call trace%trace_init(enabled=.false.)
     
     !--------------------------- Verbosity check ------------------------------
     ! only proceed if the message verbosity is less than or equal to the trace verbosity
@@ -221,7 +223,7 @@ CONTAINS
     integer :: tid
     character(len=ID_LEN) :: lab, want
 
-    if (.not. trace%initialized) call trace%init(enabled=.false.)
+    if (.not. trace%initialized) call trace%trace_init(enabled=.false.)
 
    !--------------------------- Verbosity check ------------------------------
     ! only proceed if the message verbosity is less than or equal to the trace verbosity
@@ -276,7 +278,7 @@ CONTAINS
     integer :: tid
     character(len=ID_LEN) :: msg
 
-    if (.not. trace%initialized) call trace%init(enabled=.false.)
+    if (.not. trace%initialized) call trace%trace_init(enabled=.false.)
     if (.not. trace%enabled) return
 
     tid = omp%thread_id()

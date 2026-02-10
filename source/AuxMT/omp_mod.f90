@@ -42,6 +42,7 @@ MODULE omp_mod
 CONTAINS
 
   subroutine init()
+    !DEC$ ATTRIBUTES ALIAS:"init_" :: init
     integer :: nthreads, tid_local
     integer :: k, c
 
@@ -89,6 +90,7 @@ CONTAINS
   end subroutine init
 
   subroutine info(unit)
+    !DEC$ ATTRIBUTES ALIAS:"info_" :: info
     integer, intent(in), optional :: unit
     integer :: u
     u = 6

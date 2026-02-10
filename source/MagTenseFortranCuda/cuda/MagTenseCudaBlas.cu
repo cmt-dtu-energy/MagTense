@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <wchar.h>
 #include <stdint.h>
 #include <cusparse.h>
 #include <cuda_runtime.h>
@@ -512,30 +513,48 @@ void freeSparseMatrix( CUSparse* mat )
 }
 
 
+// --- CROSS-PLATFORM 64-BIT FILE SETUP ---
+#if defined(_WIN32) || defined(_WIN64)
+    #define FSEEK64 _fseeki64
+    typedef __int64 file_offset_t;
+#else
+    // Ensure 64-bit offsets on Linux (must be defined before certain system headers)
+    #ifndef _FILE_OFFSET_BITS
+        #define _FILE_OFFSET_BITS 64
+    #endif
+    #include <sys/types.h>
+    #define FSEEK64 fseeko
+    typedef off_t file_offset_t;
+#endif
+// ----------------------------------------
+
 
 void cu_dumpDemagMatrices_dense(const char* filename)
 {
-    if (!filename) return;
+    if (!filename || n_K <= 0) return;
     if (!d_Kxx || !d_Kxy || !d_Kxz || !d_Kyy || !d_Kyz || !d_Kzz) return;
-    if (n_K <= 0) return;
 
-    const size_t n = (size_t)n_K;
-    const size_t nElem  = n * n;
+    const size_t nElem  = (size_t)n_K * (size_t)n_K;
     const size_t nBytes = nElem * sizeof(float);
 
     FILE* fp = fopen(filename, "wb");
     if (!fp) return;
 
     float* h = (float*)malloc(nBytes);
-    if (!h) { fclose(fp); return; }
+    if (!h) { 
+        fclose(fp); 
+        return; 
+    }
 
-    auto dump_one = [&](const float* d_mat, int rec_idx) {
-        // record index 1..6, same as your Fortran rec=1..6
-        const long long offset = (long long)(rec_idx - 1) * (long long)nBytes;
-        if (fseeko(fp, (off_t)offset, SEEK_SET) != 0) return;
+    // Helper lambda for dumping individual matrices
+    auto dump_one = [&](float* d_mat, int rec_idx) {
+        file_offset_t offset = (file_offset_t)(rec_idx - 1) * (file_offset_t)nBytes;
+        
+        if (FSEEK64(fp, offset, SEEK_SET) != 0) return;
+        
         checkCudaErrors(cudaMemcpy(h, d_mat, nBytes, cudaMemcpyDeviceToHost));
+        
         fwrite(h, sizeof(float), nElem, fp);
-        fflush(fp);
     };
 
     dump_one(d_Kxx, 1);
@@ -545,6 +564,7 @@ void cu_dumpDemagMatrices_dense(const char* filename)
     dump_one(d_Kyz, 5);
     dump_one(d_Kzz, 6);
 
+    fflush(fp);
     free(h);
     fclose(fp);
 }

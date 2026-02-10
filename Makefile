@@ -93,7 +93,15 @@ ifeq ($(OS),Windows_NT)
 	CUDA_ROOT = ${CONDA_PATH}/Library/lib
 	MKL = -L${CONDA_PATH}/Library/lib -lmkl_intel_lp64_dll -lmkl_intel_thread_dll \
 		-lmkl_core_dll -lmkl_blas95_lp64 -llibiomp5md
-	LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib'
+		
+	AUXMT_PATH_ROOT     := $(abspath $(AUXMT_PATH))
+	
+	ifeq ($(USE_FMM3D),0)	
+		LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib'
+	else
+		LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib /LIBPATH:${FMM3D_LIB}'
+	endif
+	
 	LIB_SUFFIX = .lib
 	PY_MOD_SUFFIX = .pyd
 	CVODE_SUFFIX = _static
@@ -129,6 +137,14 @@ ifeq ($(USE_MKL),0)
 	MKL =
 endif
 
+
+AUXMT = auxmt
+ifeq ($(OS),Windows_NT)
+	LIB_OPT += -llibAuxMT
+else
+	LIB_OPT += -lAuxMT
+endif
+
 ifeq ($(USE_MICROMAG),0)
 	MICROMAG =
 	ifeq ($(OS),Windows_NT)
@@ -142,8 +158,12 @@ ifeq ($(USE_MICROMAG),0)
 else
 	MICROMAG = micromagnetism
 	ifeq ($(OS),Windows_NT)
-		LIB_OPT = -llibMagTenseMicroMag
-		CP_LIB = cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
+		LIB_OPT = -llibAuxMT
+		CP_LIB = cp ${AUXMT_PATH}/libAuxMT${LIB_SUFFIX} .
+		
+		LIB_OPT += -llibMagTenseMicroMag
+		#CP_LIB = cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
+		CP_LIB += && cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
 		
 	else
 		LIB_OPT += -lMagTenseMicroMag
@@ -160,10 +180,11 @@ ifeq ($(USE_FMM3D),0)
   FMM3D =
 else
   ifeq ($(OS),Windows_NT)
-    # Link with full path to the static library (most robust with MS link.exe)
-    FMM3D = "$(FMM3D_LIB)/libfmm3d.lib"
+    # tell linker where to find libfmm3d.so
+    FMM3D = -L${FMM3D_LIB} -lfmm3d
+    # still copy it locally for convenience
+    CP_LIB += && cp ${FMM3D_LIB}/libfmm3d${LIB_SUFFIX} .
   else
-
     # tell linker where to find libfmm3d.so
     FMM3D = -L${FMM3D_LIB} -lfmm3d
     # ensure python finds it at runtime
@@ -174,12 +195,6 @@ else
 endif
 #===================================================================
 
-AUXMT = auxmt
-ifeq ($(OS),Windows_NT)
-	LIB_OPT += -llibAuxMT
-else
-	LIB_OPT += -lAuxMT
-endif
 
 
 ifeq ($(USE_MATLAB),0)

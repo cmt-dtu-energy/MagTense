@@ -58,55 +58,55 @@ class MicromagProblem:
     """
 
     def __init__(
-        self,
-        res: list[int],
-        grid_L: list[float] = (500e-9, 125e-9, 3e-9),
-        grid_nnod: int = 0,
-        grid_type: str | None = "uniform",
-        prob_mode: str | None = "new",
-        solver: str | None = "dynamic",
-        m0: int | float | list | np.ndarray | None = None,
-        A0: int | float | list | np.ndarray | None = None,
-        Ms: int | float | list | np.ndarray | None = None,
-        K0: int | float | list | np.ndarray | None = None,
-        K1: int | float | list | np.ndarray | None = None,
-        K2: int | float | list | np.ndarray | None = None,
-        K0_arr: np.ndarray | None = None,
-        CrysAxis: np.ndarray | None = None,
-        alpha: float = 0.02,
-        gamma: float = 0.0,
-        max_T0: float = 2.0,
-        nt_conv: int = 1,
-        conv_tol: float = 1e-4,
-        tol: float = 1e-4,
-        thres: float = 1e-6,
-        setTimeDis: int = 10,
-        dem_thres: float = 0.0,
-        demag_approx: str | None = None,
-        cv: float = 0.0,
-        grid_pts: list | np.ndarray | None = None,
-        grid_abc: list | np.ndarray | None = None,
-        exch_val: list | np.ndarray | None = None,
-        exch_rows: list | np.ndarray | None = None,
-        exch_col: list | np.ndarray | None = None,
-        exch_nval: int = 1,
-        exch_nrow: int = 1,
-        exch_ncols: int = 1,
-        exch_intpn: str | None = "extended",
-        exch_meth: str | None = "directlaplacianneumann",
-        exch_weigh: float = 8,
-        exch_presize: int = 12,
-        demigstp: int = 0,
-        passexch: int = 0,
-        usereturnhall: int = 0,
-        filename: str = "t",
-        cuda: bool = False,
-        cvode: bool = False,
-        precision: bool = False,
-        n_threads: int = 1,
-        N_ave: tuple[int] = (1, 1, 1),
-        t_alpha: np.ndarray = np.zeros(1),  # noqa: B008
-        alpha_fct=lambda t: np.atleast_2d(t).T * 0
+            self,
+            res: list[int],
+            grid_L: list[float] = (500e-9, 125e-9, 3e-9),
+            grid_nnod: int = 0,
+            grid_type: str | None = "uniform",
+            prob_mode: str | None = "new",
+            solver: str | None = "dynamic",
+            m0: int | float | list | np.ndarray | None = None,
+            A0: int | float | list | np.ndarray | None = None,
+            Ms: int | float | list | np.ndarray | None = None,
+            K0: int | float | list | np.ndarray | None = None,
+            K1: int | float | list | np.ndarray | None = None,
+            K2: int | float | list | np.ndarray | None = None,
+            K0_arr: np.ndarray | None = None,
+            CrysAxis: np.ndarray | None = None,
+            alpha: float = 0.02,
+            gamma: float = 0.0,
+            max_T0: float = 2.0,
+            nt_conv: int = 1,
+            conv_tol: float = 1e-4,
+            tol: float = 1e-4,
+            thres: float = 1e-6,
+            setTimeDis: int = 10,
+            dem_thres: float = 0.0,
+            demag_approx: str | None = None,
+            cv: float = 0.0,
+            grid_pts: list | np.ndarray | None = None,
+            grid_abc: list | np.ndarray | None = None,
+            exch_val: list | np.ndarray | None = None,
+            exch_rows: list | np.ndarray | None = None,
+            exch_col: list | np.ndarray | None = None,
+            exch_nval: int = 1,
+            exch_nrow: int = 1,
+            exch_ncols: int = 1,
+            exch_intpn: str | None = "extended",
+            exch_meth: str | None = "directlaplacianneumann",
+            exch_weigh: float = 8,
+            exch_presize: int = 12,
+            demigstp: int = 0,
+            passexch: int = 0,
+            usereturnhall: int = 0,
+            filename: str = "t",
+            cuda: bool = False,
+            cvode: bool = False,
+            precision: bool = False,
+            n_threads: int = 1,
+            N_ave: tuple[int] = (1, 1, 1),
+            t_alpha: np.ndarray = np.zeros(1),  # noqa: B008
+            alpha_fct=lambda t: np.atleast_2d(t).T * 0
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -514,7 +514,6 @@ class MicromagProblem:
     def solver(self, val: str | None = None) -> None:
         self._solver = {None: -1, "explicit": 1, "dynamic": 2, "implicit": 3}[val]
 
-
     @property
     def usereturnhall(self) -> int | None:
         return self._usereturnhall
@@ -524,7 +523,7 @@ class MicromagProblem:
         self._usereturnhall = 1 if val else 0
 
     def run_simulation(
-        self, t_end: float, nt: int, fct_h_ext: Callable, nt_h_ext: int
+            self, t_end: float, nt: int, fct_h_ext: Callable, nt_h_ext: int
     ) -> list[np.ndarray | int]:
         """
         Run the micromagnetic simulation.
@@ -651,10 +650,9 @@ class MicromagProblem:
         result[10] = result[10][:n_tot_Exch]  # ExchMat_v
 
         return result
-    
 
     def run_hysteresis(
-        self, H_ext : np.ndarray
+            self, H_ext: np.ndarray
     ) -> list[np.ndarray | int]:
         """
         Run the micromagnetic hysteresis simulation.

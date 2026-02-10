@@ -63,7 +63,7 @@ MODULE timer_mod
     real(8) :: last_dump_time  = 0.0d0    ! wallclock of last window dump
 
   contains
-    procedure, nopass :: init
+    procedure, nopass :: timer_init
     procedure, nopass :: begin
     procedure, nopass :: end
     procedure, nopass :: reset
@@ -84,7 +84,7 @@ CONTAINS
 !=============================================================================
 !> Initialise timer module (allocates thread storage, registry, locks)
 !=============================================================================
-  subroutine init()
+  subroutine timer_init()
     integer :: nthreads, tid
 
     if (initialized) return
@@ -129,7 +129,7 @@ CONTAINS
 
     initialized = .true.
 
-  end subroutine init
+  end subroutine timer_init
 
 
 !=============================================================================
@@ -149,7 +149,7 @@ CONTAINS
     integer :: tid
     real(8) :: tnow
 
-    if (.not. allocated(timers)) call timer%init()
+    if (.not. allocated(timers)) call timer%timer_init()
 
     !-------------------- Reset per-thread state -------------------------------
     if (omp%in_parallel()) then
@@ -220,7 +220,7 @@ CONTAINS
     real(8) :: tnow
 
     if (.not. timer%enabled) return
-    if (.not. allocated(timers)) call timer%init()
+    if (.not. allocated(timers)) call timer%timer_init()
 
     tid = omp%thread_id()
 
@@ -260,7 +260,7 @@ CONTAINS
     real(8) :: tnow, dt, excl
 
     if (.not. timer%enabled) return
-    if (.not. allocated(timers)) call timer%init()
+    if (.not. allocated(timers)) call timer%timer_init()
 
     tid = omp%thread_id()
     id  = itimer
@@ -314,6 +314,7 @@ CONTAINS
 !> window_interval: seconds between window dumps
 !=============================================================================
   subroutine log_init(log_dir, filename, unit, flush_each, window_enabled, window_interval)
+    !DEC$ ATTRIBUTES ALIAS:"log_init_" :: log_init
     character(len=*), intent(in), optional :: log_dir
     character(len=*), intent(in), optional :: filename
     integer,          intent(in), optional :: unit
@@ -325,7 +326,7 @@ CONTAINS
     character(len=256) :: fn
     logical :: log_unit_open
 
-    if (.not. allocated(timers)) call timer%init()
+    if (.not. allocated(timers)) call timer%timer_init()
 
     fn = "timing.log"
     if (present(filename)) fn = filename
@@ -407,6 +408,7 @@ end subroutine ensure_dir_exists
 !> Finalise timing log (final summary + close)
 !=============================================================================
   subroutine log_finalize()
+    !DEC$ ATTRIBUTES ALIAS:"log_finalize_" :: log_finalize
     if (.not. timer%log_enabled) return
 
     call log_lock%lock()
@@ -549,7 +551,7 @@ end subroutine ensure_dir_exists
 
     u = 6
     if (present(unit)) u = unit
-    if (.not. allocated(timers)) call timer%init()
+    if (.not. allocated(timers)) call timer%timer_init()
 
     nthreads = size(timers)
 
