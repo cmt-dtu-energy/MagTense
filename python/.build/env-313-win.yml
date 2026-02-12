@@ -39,7 +39,7 @@ dependencies:
   - intel-cmplr-lib-ur=2025.2.0=intel_756
   - intel-cmplr-lic-rt=2025.2.0=intel_756
   - intel-fortran-rt=2025.2.0=intel_756
-  - intel-opencl-rt=2025.2.0=intel_756
+  - intel-opencl-rt
   - intel-openmp=2025.2.0=intel_756
   - intel-sycl-rt=2025.2.0=intel_756
   - libcublas=12.8.4.1=0
