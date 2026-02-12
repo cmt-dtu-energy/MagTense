@@ -394,10 +394,24 @@ subroutine ensure_dir_exists(d)
   implicit none
   character(len=*), intent(in) :: d
   integer :: stat
+  logical :: is_dir
 
   if (len_trim(d) == 0) return
 
+  inquire(file=trim(d), exist=is_dir)
+  if (is_dir) return
+
+
+  !----------------------- Attempt to create directory ---------------------------
+  !          different commands for Windows vs Unix-like; use execute_command_line to avoid warnings/errors
+#ifdef _WIN32
+  call execute_command_line('if not exist "'//trim(d)//'" mkdir "'//trim(d)//'"', exitstat=stat)
+#else
   call execute_command_line('mkdir -p "'//trim(d)//'"', exitstat=stat)
+#endif
+  !---------------------------------------------------------------------------
+
+
   if (stat /= 0) then
     write(error_unit,'(a,i0)') 'TRACE: failed to create log directory, exitstat=', stat
   end if
