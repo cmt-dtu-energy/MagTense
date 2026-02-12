@@ -209,7 +209,9 @@ jobs:
       id: cache
 
     - name: Update environment
-      run: conda env update -f ${{ env.build_file }}
+      shell: cmd
+      run: conda env update -f %build_file%
+      #run: conda env update -f ${{ env.build_file }}
       if: steps.cache.outputs.cache-hit != 'true'
 
   
