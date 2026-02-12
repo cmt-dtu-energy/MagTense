@@ -181,7 +181,7 @@ jobs:
     strategy:
       matrix:
         py-version: [312, 313]
-    runs-on: windows-latest
+    runs-on: windows-2019
     env:
       build_file: python/.build/env-${{ matrix.py-version }}-win.yml
 
@@ -209,9 +209,7 @@ jobs:
       id: cache
 
     - name: Update environment
-      shell: cmd
-      run: conda env update -f %build_file%
-      #run: conda env update -f ${{ env.build_file }}
+      run: conda env update -f ${{ env.build_file }}
       if: steps.cache.outputs.cache-hit != 'true'
 
   
