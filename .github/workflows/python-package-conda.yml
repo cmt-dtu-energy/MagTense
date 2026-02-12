@@ -57,6 +57,11 @@ jobs:
         activate-environment: magtense-env
         use-mamba: true
 
+    # Install compiler into base
+    - name: Install compiler in base (Linux)
+      if: runner.os == 'Linux'
+      run: conda install -n base -c conda-forge gxx_linux-64 -y
+
     - name: Cache conda
       uses: actions/cache@v4
       env:
