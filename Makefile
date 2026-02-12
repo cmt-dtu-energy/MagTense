@@ -173,23 +173,24 @@ else
 		CP_LIB += && cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
 		CP_LIB += && cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
 	endif
-endif
 
+
+
+endif
 #===================== FMM3D Integration ===========================
 ifeq ($(USE_FMM3D),0)
   FMM3D =
 else
   ifeq ($(OS),Windows_NT)
-    # tell linker where to find libfmm3d.so
-    FMM3D = -L${FMM3D_LIB} -lfmm3d
-    # still copy it locally for convenience
-    CP_LIB += && cp ${FMM3D_LIB}/libfmm3d${LIB_SUFFIX} .
+    # 1. Use the standard linker flag (-lfmm3d looks for fmm3d.lib)
+    FMM3D = -L"${FMM3D_LIB}" -lfmm3d
+    
+    # 2. Use 'cp' (since your shell is sh) and RENAME the file during copy
+    # This creates fmm3d.lib in your root so the linker finds it easily
+    CP_LIB += && cp "${FMM3D_LIB}/libfmm3d.lib" ./fmm3d.lib
   else
-    # tell linker where to find libfmm3d.so
     FMM3D = -L${FMM3D_LIB} -lfmm3d
-    # ensure python finds it at runtime
     LDFLAGS += -Wl,-rpath,${FMM3D_LIB}
-    # still copy it locally for convenience
     CP_LIB += && cp ${FMM3D_LIB}/libfmm3d${LIB_SUFFIX} .
   endif
 endif
