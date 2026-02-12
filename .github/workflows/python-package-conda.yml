@@ -18,7 +18,7 @@ jobs:
         py-version: [312, 313]
         cvode: [1]
         sys:
-          - { os: windows-latest, name: win, whl-arch: win_amd64}
+          - { os: windows-2022, name: win, whl-arch: win_amd64}
           - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
     runs-on: ${{ matrix.sys.os }}
     # Workaround: Issue with msvc-dev-cmd and new conda installation
@@ -181,7 +181,7 @@ jobs:
     strategy:
       matrix:
         py-version: [312, 313]
-    runs-on: windows-latest
+    runs-on: windows-2022
     env:
       build_file: python/.build/env-${{ matrix.py-version }}-win.yml
 
