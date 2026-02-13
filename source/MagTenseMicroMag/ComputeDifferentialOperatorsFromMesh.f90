@@ -9,6 +9,7 @@ module DifferentialOperators
   use UTIL_MICROMAG
 
   use sort_mod
+  use trace_mod
   
   implicit none
 

@@ -25,6 +25,7 @@ VS_STUDIO     = options.VS_STUDIO;
 
 pause_time = 1; %Time to wait between making and moving the generated files
 mex_root                    = '../source/MagTenseMEX/MagTenseMEX/';
+AuxMT_path                  = '../source/AuxMT';
 NumericalIntegration_path   = '../source/NumericalIntegration/NumericalIntegration';
 DemagField_path             = '../source/DemagField/DemagField';
 TileDemagTensor_path        = '../source/TileDemagTensor/TileDemagTensor';
@@ -79,6 +80,8 @@ else
     BUILD = '/x64/Debug';
 end
 
+BUILD_AuxMT = BUILD;
+
 if (USE_CUDA)
     if (ispc)
         CUDA = ['-L' cuda_root ' -lcublas -lcudart -lcuda -lcusparse'];
@@ -103,7 +106,6 @@ if (USE_CVODE)
     
     if (ispc)
         CVODE = ['-L' cvode_lib ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static'];
-        CVODE = [CVODE ' LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"'];
     else
         CVODE = [' -Wl,--start-group ' cvode_lib '/libsundials_core.a ' cvode_lib '/libsundials_cvode.a ' cvode_lib '/libsundials_fcore_mod.a ' cvode_lib '/libsundials_fcvode_mod.a ' cvode_lib '/libsundials_fnvecserial_mod.a ' cvode_lib '/libsundials_fsunmatrixdense_mod.a ' cvode_lib '/libsundials_fsunlinsolspgmr_mod.a' ' -Wl,--end-group'];
     end
@@ -130,10 +132,11 @@ if (ispc)
     if (USE_CUDA)
         FFLAGS = [FFLAGS(1:(end-1)) ' /libs:static"'];
     end
-    INCLUDE = ['-I' mkl_include ' -I' mkl_lp64 ' -I' NumericalIntegration_path BUILD '-I' DemagField_path BUILD '-I' TileDemagTensor_path ...
+    INCLUDE = ['-I' mkl_include ' -I' mkl_lp64 ' -I' NumericalIntegration_path BUILD ' -I' AuxMT_path BUILD_AuxMT ' -I' DemagField_path BUILD '-I' TileDemagTensor_path ...
         BUILD '-I' MagTenseMicroMag_path BUILD_MagTenseMicroMag '-I' ForceIntegrator_path BUILD CVODE_include];
     LIBS = ['-L' MagTenseMicroMag_path BUILD_MagTenseMicroMag '-lMagTenseMicroMag -L' DemagField_path BUILD ...
-        ' -lDemagField -L' TileDemagTensor_path BUILD ' -lTileDemagTensor -L' NumericalIntegration_path BUILD ...
+        ' -lDemagField -L' TileDemagTensor_path BUILD ' -lTileDemagTensor -L' AuxMT_path BUILD_AuxMT ...
+        ' -lAuxMT -L' NumericalIntegration_path BUILD ...
         ' -lNumericalIntegration -L' ForceIntegrator_path BUILD ' -lMagneticForceIntegrator'];
     
     if (MKL_STATIC)
@@ -143,12 +146,13 @@ if (ispc)
     end
 else
     DEFINES = ['FC="' compiler_root '/bin/ifx" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
-    INCLUDE = ['INCLUDE="$INCLUDE -I' NumericalIntegration_path ' -I' DemagField_path ...
+    INCLUDE = ['INCLUDE="$INCLUDE -I' AuxMT_path ' -I'  NumericalIntegration_path ' -I' DemagField_path ...
         ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ' -I' ForceIntegrator_path ... 
         ' -I' mkl_root '/include' ' -I' mkl_root '/include/intel64/lp64'];
     LIBS = ['LINKLIBS=''$LINKLIBS ' '-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' ...
         ForceIntegrator_path ' -lMagneticForceIntegrator -L' DemagField_path ' -lDemagField -L' ...
-        TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration'''];
+        TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration' ...
+        AuxMT_path ' -lAuxMT'''];
     if (MKL_STATIC)
         LIBS = [LIBS(1:(end-1)) ' ' mkl_lib '/libmkl_blas95_lp64.a -Wl,--start-group ' ...
                mkl_lib '/libmkl_intel_lp64.a ' mkl_lib '/libmkl_intel_thread.a ' ...
@@ -180,6 +184,8 @@ else
     FFLAGS = ['FFLAGS="-O3 -fpp -real-size 64 -fpe0 -fp-model=source -fPIC -nologo -diag-disable 10006"'];
 end
 
+LINKFLAGS = ' LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"';
+
 %%------------------------------------------------------------------
 %%--------------- Build the MEX files ------------------------------
 %%----------------------------------- ------------------------------
@@ -196,7 +202,7 @@ for i = 1:length(names)
         source = [mex_root names(i) '_mex.f90'];
         orig_name = names(i);
     end
-    mex_str = ['mex' DEBUG DEFINES FFLAGS INCLUDE OBJS LIBS MKL CUDA CVODE join(source, '')];
+    mex_str = ['mex' DEBUG DEFINES FFLAGS INCLUDE OBJS LIBS MKL CUDA CVODE LINKFLAGS join(source, '')];
 
     disp(join(mex_str, ' '))
     eval_MEX(join(mex_str, ' '))
