@@ -208,3 +208,33 @@ ${PYTHON_MODN_ALL}:
 		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} \
 		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE}
 	cp *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/
+
+
+build-env:
+	conda env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-313-linux.yml
+
+build-cvode:
+	wget https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz
+	tar -xf cvode-7.4.0.tar.gz
+	mkdir -p ${CVODE_ROOT}
+	mv ${MKFILE_PATH}/cvode-7.4.0 ${CVODE_ROOT}/src
+	cmake \
+	-B ${CVODE_ROOT}/build \
+	-S ${CVODE_ROOT}/src \
+	-D CMAKE_BUILD_TYPE=Release \
+	-D BUILD_ARKODE=OFF \
+	-D BUILD_CVODE=ON \
+	-D BUILD_CVODES=OFF \
+	-D BUILD_IDA=OFF \
+	-D BUILD_IDAS=OFF \
+	-D BUILD_KINSOL=OFF \
+	-D BUILD_SHARED_LIBS=OFF \
+	-D BUILD_STATIC_LIBS=ON \
+	-D CMAKE_INSTALL_PREFIX=${CVODE_ROOT} \
+	-D EXAMPLES_INSTALL_PATH=${CVODE_ROOT}/examples \
+	-D CMAKE_C_COMPILER=$$(which icx) \
+	-D CMAKE_Fortran_COMPILER=$$(which ifx) \
+	-D BUILD_FORTRAN_MODULE_INTERFACE=ON \
+	-D ENABLE_OPENMP=ON
+	cmake --build ${CVODE_ROOT}/build --config Release --verbose
+	cmake --install ${CVODE_ROOT}/build --verbose
