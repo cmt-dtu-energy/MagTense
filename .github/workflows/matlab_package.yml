@@ -71,6 +71,7 @@ jobs:
           conda info
           cd ${{ github.workspace }}
           pwd
+          where link
           make auxmt magnetostatic micromagnetism forceintegrator USE_CUDA=$env:CUDA USE_CVODE=$env:CVODE USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
       
       - name: Setup a symbolic link to the ifx compiler so that Matlab's "mex -setup FORTRAN" can find it
@@ -89,7 +90,7 @@ jobs:
           CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
         uses: matlab-actions/run-command@v2
         with:
-          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_RELEASE',true,'USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib');
+          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN -v; cd('D:/a/MagTense/MagTense/matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_RELEASE',true,'USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib');
        
       - name: Check created MEX-files
         shell: bash -el {0}
