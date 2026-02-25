@@ -61,12 +61,16 @@ else
             user = username(1:(end-1));
             pre_str = ['/home/' user '/miniconda3'];
         end
+    else
+        if isempty(strfind(pre_str,'magtense-env'))
+            pre_str = [pre_str '/envs/magtense-env'];
+        end
     end
 
-    compiler_root = [pre_str '/envs/magtense-env'];
-    mkl_root = [pre_str '/envs/magtense-env'];
-    mkl_lib = [pre_str '/envs/magtense-env/lib'];
-    cuda_root = [pre_str '/envs/magtense-env/lib'];
+    compiler_root = pre_str;
+    mkl_root = pre_str;
+    mkl_lib = [pre_str '/lib'];
+    cuda_root = [pre_str '/lib'];
     cvode_include = '/home/runner/work/MagTense/MagTense/cvode/fortran';
     cvode_lib = '/home/runner/work/MagTense/MagTense/cvode/lib';
     mex_suffix = 'a';
@@ -151,7 +155,7 @@ else
         ' -I' mkl_root '/include' ' -I' mkl_root '/include/intel64/lp64'];
     LIBS = ['LINKLIBS=''$LINKLIBS ' '-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' ...
         ForceIntegrator_path ' -lMagneticForceIntegrator -L' DemagField_path ' -lDemagField -L' ...
-        TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration' ...
+        TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration -L' ...
         AuxMT_path ' -lAuxMT'''];
     if (MKL_STATIC)
         LIBS = [LIBS(1:(end-1)) ' ' mkl_lib '/libmkl_blas95_lp64.a -Wl,--start-group ' ...

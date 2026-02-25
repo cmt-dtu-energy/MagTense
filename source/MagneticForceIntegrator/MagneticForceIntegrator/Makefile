@@ -26,6 +26,7 @@ else
 endif
 
 STATIC_LIB = libMagneticForceIntegrator${LIB_SUFFIX}
+AUXMT_PATH = ../../AuxMT
 NUM_INT_PATH = ../../NumericalIntegration/NumericalIntegration
 TILE_DEMAG_TENSOR_PATH = ../../TileDemagTensor/TileDemagTensor
 DEMAG_FIELD_PATH = ../../DemagField/DemagField
@@ -39,7 +40,7 @@ DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
 all: ${STATIC_LIB}
 
 .f90.o:
-	$(FC) $(FFLAGS) -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I${MATLAB_INCLUDE} ${OPT} -c $< -o $@
+	$(FC) $(FFLAGS) -I${AUXMT_PATH} -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -I${MATLAB_INCLUDE} ${OPT} -c $< -o $@
 
 ${STATIC_LIB}: ${DEMAG_FIELD_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
