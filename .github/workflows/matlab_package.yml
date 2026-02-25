@@ -71,7 +71,6 @@ jobs:
           conda info
           cd ${{ github.workspace }}
           pwd
-          where link
           make auxmt magnetostatic micromagnetism forceintegrator USE_CUDA=$env:CUDA USE_CVODE=$env:CVODE USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
       
       - name: Setup a symbolic link to the ifx compiler so that Matlab's "mex -setup FORTRAN" can find it
@@ -83,6 +82,21 @@ jobs:
           mkdir 2024.2 
           cd 2024.2 
           cmd /c mklink /D bin C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\bin 
+
+      - name: Test link
+        env:
+          CUDA: ${{ matrix.CUDA-compile == 'noCUDA' && '0' || '1' }}
+          CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
+        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+        run: |
+          where link
+          pwd
+
+      - name: Test link 2
+        shell: bash -el {0}
+        run: |
+          where link
+          pwd
       
       - name: Compile MEX code using Matlab with or without CUDA
         env:
