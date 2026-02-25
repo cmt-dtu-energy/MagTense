@@ -54,12 +54,12 @@ else
         share_dir = system('ls /usr/share/miniconda/envs/magtense-env/');
     
         if (share_dir == 0)
-            pre_str = '/usr/share/miniconda';
+            pre_str = '/usr/share/miniconda/envs/magtense-env';
         else
             %--- Get the username of the current user, which is where the miniconda is installed
             [~,username] = system('whoami');
             user = username(1:(end-1));
-            pre_str = ['/home/' user '/miniconda3'];
+            pre_str = ['/home/' user '/miniconda3/envs/magtense-env'];
         end
     else
         if isempty(strfind(pre_str,'magtense-env'))
