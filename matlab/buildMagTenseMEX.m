@@ -84,8 +84,6 @@ else
     BUILD = '/x64/Debug';
 end
 
-BUILD_AuxMT = BUILD;
-
 if (USE_CUDA)
     if (ispc)
         CUDA = ['-L' cuda_root ' -lcublas -lcudart -lcuda -lcusparse'];
@@ -125,9 +123,11 @@ end
 if (VS_STUDIO)
     BUILD = [BUILD ' '];
     BUILD_MagTenseMicroMag = [BUILD_MagTenseMicroMag ' '];
+    BUILD_AuxMT = [BUILD ' '];
 else
     BUILD = ' ';
     BUILD_MagTenseMicroMag = ' ';
+    BUILD_AuxMT = ' ';
 end
 
 if (ispc)
