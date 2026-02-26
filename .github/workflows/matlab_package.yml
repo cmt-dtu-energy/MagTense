@@ -93,6 +93,13 @@ jobs:
           cd 2024.2 
           cmd /c mklink /D bin C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\bin 
 
+      - name: Remove the GNU linker and setup a symbolic link to the VS linker instead
+        shell: powershell
+        run: |
+          cd "C:\Program Files\Git\usr\bin\"
+          rm link.exe
+          cmd /c mklink link.exe "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\link.exe" 
+          
       - name: Test link
         env:
           CUDA: ${{ matrix.CUDA-compile == 'noCUDA' && '0' || '1' }}
