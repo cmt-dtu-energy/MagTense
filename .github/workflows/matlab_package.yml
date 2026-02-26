@@ -33,9 +33,14 @@ jobs:
           use-mamba: true
 
       - name: Check the directory of Visual Studio
-        shell: bash -el {0}
+        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
         run: |
           dir "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\"
+          
+      - name: Check the directory of Visual Studio 2
+        shell: bash -el {0}
+        run: |
+          dir 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\'
                 
       - name: Download cvode (sundials-7.2.1)
         uses: actions/download-artifact@v4
