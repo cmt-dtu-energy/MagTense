@@ -31,7 +31,17 @@ jobs:
           activate-environment: magtense-env
           environment-file: ${{ env.build_file }}
           use-mamba: true
+
+      - name: Check the directory of Visual Studio
+        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+        run: |
+          dir "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\"
           
+      - name: Check the directory of Visual Studio 2
+        shell: bash -el {0}
+        run: |
+          dir 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\'
+                
       - name: Download cvode (sundials-7.2.1)
         uses: actions/download-artifact@v4
         with:
@@ -82,6 +92,13 @@ jobs:
           mkdir 2024.2 
           cd 2024.2 
           cmd /c mklink /D bin C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\bin 
+
+      - name: Remove the GNU linker and setup a symbolic link to the VS linker instead
+        shell: powershell
+        run: |
+          cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\usr
+          move bin bin_renamed
+          cmd /c mklink /D bin "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\" 
       
       - name: Compile MEX code using Matlab with or without CUDA
         env:
@@ -89,7 +106,7 @@ jobs:
           CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
         uses: matlab-actions/run-command@v2
         with:
-          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_RELEASE',true,'USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib');
+          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); vslink = 'C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64'; setenv('PATH', [vslink ';' getenv('PATH')]); system('echo %PATH%'); getenv('PATH'); mex -setup FORTRAN; system('echo %PATH%'); getenv('PATH'); system('where link'); cd('D:/a/MagTense/MagTense/matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_RELEASE',true,'USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib');
        
       - name: Check created MEX-files
         shell: bash -el {0}
