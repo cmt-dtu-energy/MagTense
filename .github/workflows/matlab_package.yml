@@ -31,7 +31,12 @@ jobs:
           activate-environment: magtense-env
           environment-file: ${{ env.build_file }}
           use-mamba: true
-          
+
+      - name: Check the directory of Visual Studio
+        shell: bash -el {0}
+        run: |
+          dir "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\"
+                
       - name: Download cvode (sundials-7.2.1)
         uses: actions/download-artifact@v4
         with:
