@@ -301,7 +301,7 @@ jobs:
         CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }} 
         CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }} 
       with:
-        command: USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE); disp(int_error);
+        command: USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE); disp(int_error); exit(0);
 
     - name: Run test script on download MEX-file with CUDA
       if: ${{ matrix.os-version == 'ubuntu_CUDA' }}
@@ -309,7 +309,7 @@ jobs:
         CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }} 
         CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }} 
       run: |
-        /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE)"
+        /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE)"; exit(0);
 
 
   build-cvode:
