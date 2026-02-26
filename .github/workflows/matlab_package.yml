@@ -99,6 +99,9 @@ jobs:
           cd "C:\Program Files\Git\usr\bin\"
           rm link.exe
           cmd /c mklink link.exe "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\link.exe" 
+          cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\usr\bin\
+          rm link.exe
+          cmd /c mklink link.exe "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\link.exe" 
           
       - name: Test link
         env:
