@@ -100,7 +100,7 @@ jobs:
           rm link.exe
           cmd /c mklink /H link.exe "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\link.exe" 
           cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\usr
-          rmdir /s /q bin
+          move bin bin_renamed
           cmd /c mklink /D bin "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\" 
           #cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\usr\bin\
           #rm link.exe
