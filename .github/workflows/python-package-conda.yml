@@ -197,10 +197,9 @@ jobs:
         sparse-checkout: |
           python/.build/
 
-    - name: Setup MSVC
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
+    - name: Install VS2017 build tools
+      run: |
+        choco install visualstudio2017buildtools -y
       
     - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v3
