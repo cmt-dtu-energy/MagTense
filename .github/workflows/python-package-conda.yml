@@ -197,6 +197,11 @@ jobs:
         sparse-checkout: |
           python/.build/
 
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+      
     - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v3
       with:
