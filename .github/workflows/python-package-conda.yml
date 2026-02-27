@@ -186,7 +186,7 @@ jobs:
     strategy:
       matrix:
         py-version: [312, 313]
-    runs-on: windows-2019
+    runs-on: windows-latest
     env:
       build_file: python/.build/env-${{ matrix.py-version }}-win.yml
 
