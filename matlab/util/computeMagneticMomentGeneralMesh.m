@@ -7,9 +7,22 @@ end
 
 if (isempty(Vols))
     %--- The tiles all have the same volume, so we just return the mean
-    Mx = mean(magnetizationsAll(:,:,1),2);
-    My = mean(magnetizationsAll(:,:,2),2);
-    Mz = mean(magnetizationsAll(:,:,3),2);
+
+    if (length(magnetizationsAll(:,1,1,1)) == 2)
+        %--- We have a hysteresis problem
+        for i = 1:length(magnetizationsAll(1,1,:,1))
+            Mx(i) = mean(magnetizationsAll(end,:,i,1));
+            My(i) = mean(magnetizationsAll(end,:,i,2));
+            Mz(i) = mean(magnetizationsAll(end,:,i,3));
+        end
+    else
+        %--- We have a time-varying problem
+        for i = 1:length(magnetizationsAll(:,1,1,1))
+            Mx(i) = mean(magnetizationsAll(i,:,1,1));
+            My(i) = mean(magnetizationsAll(i,:,1,2));
+            Mz(i) = mean(magnetizationsAll(i,:,1,3));
+        end
+    end
 
     mx = [];
     my = [];
