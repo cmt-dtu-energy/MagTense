@@ -1285,11 +1285,9 @@ end subroutine updateDemagfieldFMM
     nz_ave = problem%N_ave(3)
     
     !Demag tensor components
-    call displayGUIMessage( ' Start alloc:' )
     allocate( problem%Kxx(ntot,ntot), problem%Kxy(ntot,ntot), problem%Kxz(ntot,ntot) )
     allocate( problem%Kyy(ntot,ntot), problem%Kyz(ntot,ntot) )
     allocate( problem%Kzz(ntot,ntot) )
-    call displayGUIMessage( ' End alloc:' )
         
         
     if ( problem%demagTensorLoadState .gt. DemagTensorReturnMemory ) then
@@ -1511,13 +1509,13 @@ end subroutine updateDemagfieldFMM
         CALL SYSTEM_CLOCK(c2)
 
         !Display the time to compute the demag tensor and its first entry
-        call displayGUIMessage( 'Time demag tensor:' )
-        write (prog_str,'(f10.3)') (c2 - c1)/rate
-        call displayGUIMessage( prog_str )
+        !call displayGUIMessage( 'Time demag tensor:' )
+        !write (prog_str,'(f10.3)') (c2 - c1)/rate
+        !call displayGUIMessage( prog_str )
         
-        call displayGUIMessage( 'Kxx(1,1):' )
-        write (prog_str,'(f10.3)') problem%Kxx(1,1)
-        call displayGUIMessage( prog_str )      
+        !call displayGUIMessage( 'Kxx(1,1):' )
+        !write (prog_str,'(f10.3)') problem%Kxx(1,1)
+        !call displayGUIMessage( prog_str )      
         
         !Write the demag tensors to disk if asked to do so            
         if ( problem%demagTensorReturnState .gt. DemagTensorReturnMemory ) then
