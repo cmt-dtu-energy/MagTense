@@ -14,6 +14,10 @@ FC = ifx
 MKFILE_PATH := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CVODE_ROOT = ${MKFILE_PATH}/cvode
 
+# Location where Miniconda will be installed
+CONDA_DIR := $(HOME)/miniconda3
+CONDA_BIN := $(CONDA_DIR)/bin/conda
+
 ifeq (${UNAME}, Darwin)
 	FC = gfortran
 	USE_CUDA = 0
@@ -157,7 +161,7 @@ PYTHON_MODN_ALL = _${PYTHON_MODN}${PY_MOD_SUFFIX}
 #=======================================================================
 #							Targets
 #=======================================================================
-.PHONY: all clean
+.PHONY: all clean install-miniconda build-env build-cvode
 
 all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR}
 
@@ -209,9 +213,21 @@ ${PYTHON_MODN_ALL}:
 		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE}
 	cp *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/
 
+# Rule that installs Miniconda only if "conda" is not found
+install-miniconda:
+	@if command -v conda >/dev/null 2>&1 || [ -x "$(CONDA_BIN)" ]; then \
+			echo "Conda already installed."; \
+	else \
+			echo "Conda not found. Installing Miniconda..."; \
+			curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o miniconda.sh; \
+			bash miniconda.sh -b -p $(CONDA_DIR); \
+			rm miniconda.sh; \
+			echo "Miniconda installed at $(CONDA_DIR)."; \
+	fi
 
-build-env:
-	conda env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-313-linux.yml
+
+build-env: install-miniconda
+	$(CONDA_BIN) env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-313-linux.yml
 
 build-cvode:
 	wget https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz
@@ -238,3 +254,8 @@ build-cvode:
 	-D ENABLE_OPENMP=ON
 	cmake --build ${CVODE_ROOT}/build --config Release --verbose
 	cmake --install ${CVODE_ROOT}/build --verbose
+
+build-python-interface:
+	$(CONDA_BIN) run -n magtense-env $(MAKE) python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
+	cp python/.build/requirements-py3-dev.txt python/requirements.txt
+	$(CONDA_BIN) run -n magtense-env -- python -m pip install -e ./python
