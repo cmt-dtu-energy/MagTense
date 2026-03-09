@@ -229,12 +229,20 @@ install-miniconda:
 build-env: install-miniconda
 	$(CONDA_BIN) env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-313-linux.yml
 
-build-cvode:
+rm-env:
+	$(CONDA_BIN) env remove -n magtense-env
+
+CMAKE = $(CONDA_BIN) run -n magtense-env -- cmake
+IFX = $(CONDA_BIN) run -n magtense-env which ifx
+ICX = $(CONDA_BIN) run -n magtense-env which icx
+
+build-cvode: build-env
 	wget https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz
 	tar -xf cvode-7.4.0.tar.gz
+	rm -rf ${CVODE_ROOT}
 	mkdir -p ${CVODE_ROOT}
 	mv ${MKFILE_PATH}/cvode-7.4.0 ${CVODE_ROOT}/src
-	cmake \
+	$(CMAKE) \
 	-B ${CVODE_ROOT}/build \
 	-S ${CVODE_ROOT}/src \
 	-D CMAKE_BUILD_TYPE=Release \
@@ -248,14 +256,17 @@ build-cvode:
 	-D BUILD_STATIC_LIBS=ON \
 	-D CMAKE_INSTALL_PREFIX=${CVODE_ROOT} \
 	-D EXAMPLES_INSTALL_PATH=${CVODE_ROOT}/examples \
-	-D CMAKE_C_COMPILER=$$(which icx) \
-	-D CMAKE_Fortran_COMPILER=$$(which ifx) \
+	-D CMAKE_C_COMPILER=$$($(ICX)) \
+	-D CMAKE_Fortran_COMPILER=$$($(IFX)) \
 	-D BUILD_FORTRAN_MODULE_INTERFACE=ON \
 	-D ENABLE_OPENMP=ON
-	cmake --build ${CVODE_ROOT}/build --config Release --verbose
-	cmake --install ${CVODE_ROOT}/build --verbose
+	$(CMAKE) --build ${CVODE_ROOT}/build --config Release --verbose
+	$(CMAKE) --install ${CVODE_ROOT}/build --verbose
 
-build-python-interface:
+build-python-interface: build-cvode
 	$(CONDA_BIN) run -n magtense-env $(MAKE) python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
 	cp python/.build/requirements-py3-dev.txt python/requirements.txt
 	$(CONDA_BIN) run -n magtense-env -- python -m pip install -e ./python
+
+test-python-interface:
+	$(CONDA_BIN) run -n magtense-env -- python python/examples/micromagnetism/std_problem_3.py
