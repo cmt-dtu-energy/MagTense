@@ -1,8 +1,9 @@
-﻿module UnstructuredMeshAnalysis
+module UnstructuredMeshAnalysis
   use MKL_SPBLAS
   use BLAS95
   use MicroMagParameters
   use IO_GENERAL
+  use trace_mod
   
   implicit none
 
@@ -48,7 +49,7 @@
     real(dp), intent(in) :: dims(:,:)
     type(MicroMagGridInfo), intent(out) :: GridInfo
 
-    integer :: Nel, K, idim, ipm, j, n, kb, i, k_i, n_faces, k1, k2, Nalloc_small, Nalloc_large, Ncount
+    integer :: Nel, k, idim, ipm, j, n, kb, i, k_i, n_faces, k1, k2, Nalloc_small, Nalloc_large, Ncount
     real(dp), allocatable :: Xel(:), Yel(:), Zel(:)
     real(dp), allocatable :: Volumes(:)
     real(dp) :: DimsScales(3)
@@ -85,11 +86,15 @@
     integer, allocatable :: TheDs_indices_this(:), TheDs_temp(:,:), TheDs_indices(:,:)
     integer, allocatable :: TheSigns_indices_pos(:,:), TheSigns_indices_neg(:,:), TheSigns_indices(:,:)
     character*(40) :: prog_str
-
+    integer, save :: itimer=0
+    
+    call trace%begin( "CartesianUnstructuredMeshAnalysis", itimer=itimer )
+    
     call displayGUIMessage( 'Starting mesh analysis' )
     
     ! Initialize some variables
     Nel = size(pos, 1)
+    allocate(Volumes(Nel)) 
     Volumes = dims(:,1) * dims(:,2) * dims(:,3)
     
     ! Rescaling
@@ -97,9 +102,13 @@
     
     allocate(Xel(Nel), Yel(Nel), Zel(Nel))
     
-    Xel = (pos(:,1) / DimsScales(1))
-    Yel = (pos(:,2) / DimsScales(2))
-    Zel = (pos(:,3) / DimsScales(3))
+    Xel = anint(pos(:,1) / DimsScales(1))
+    Yel = anint(pos(:,2) / DimsScales(2))
+    Zel = anint(pos(:,3) / DimsScales(3))
+    
+   
+    
+    allocate(XXel(Nel,3)) 
     XXel = reshape([Xel, Yel, Zel], [Nel, 3])
     
     allocate(dimscopy(Nel, 3))
@@ -138,7 +147,7 @@
     XXF(:,3) = Zf
     
     ! Check which faces are contained by other faces
-    allocate(indexItContainsTrue_temp(n_faces, 2))
+    allocate(indexItContainsTrue_temp(6 * Nel * Nel, 2))
     allocate(UminA(Nel), UmaxA(Nel), VminA(Nel), VmaxA(Nel))
     allocate(UminB(Nel), UmaxB(Nel), VminB(Nel), VmaxB(Nel))
     allocate(Aindex(Nel), Bindex(Nel))
@@ -176,6 +185,8 @@
         AcontainsB = (SamePosAlongDim .and. UAcontainsUB .and. VAcontainsVB)
         BcontainsA = (SamePosAlongDim .and. UBcontainsUA .and. VBcontainsVA)
         
+        allocate(indxAB(count(AcontainsB)))
+        allocate(indxBA(count(BcontainsA)))
         indxAB = pack(Aindex, AcontainsB)
         indxBA = pack(Aindex, BcontainsA)
         
@@ -210,6 +221,7 @@
         enddo
                 
         deallocate(firstindx, secondindx)
+        deallocate(indxAB,indxBA)
       end do               
     end do
     
@@ -254,6 +266,7 @@
     kNonMut_F(1:(k2-1),:) = kNonMut_F_temp(1:(k2-1),:)
     deallocate(kNonMut_F_temp)   
     
+    allocate(iYes(size(kMut_F,1)))
     iYes = kMut_F(:,1) > kMut_F(:,2)
         
     allocate(k1Mut(count(iYes)))
@@ -265,7 +278,6 @@
     
     allocate(kRmv(size(k1Mut)+size(kNonMut_F(:,1))))
     allocate(kSurv(size(k2Mut)+size(kNonMut_F(:,2))))
-    allocate(nRmv(size(k2Mut)+size(kNonMut_F(:,2))))
     allocate(TheSigns_indices_pos(6*Nel,2))   
     allocate(TheSigns_indices_neg((size(k2Mut)+size(kNonMut_F(:,2))),2)) 
     
@@ -274,6 +286,7 @@
     !   one element (nRmv) having the face as one of its 6 original boundaries
     kRmv  = [k1Mut, kNonMut_F(:,1)]
     kSurv = [k2Mut, kNonMut_F(:,2)]
+    allocate(nRmv(size(kRmv)))
     nRmv  = MOD(kRmv-1,Nel)+1
     
     allocate(mask1D(n_faces))
@@ -359,7 +372,7 @@
     call move_alloc (AreaFaces_temp,AreaFaces)
     
     !! Construct T and D matrix
-    ! TheTs is a K times Nel sparse matrix
+    ! TheTs is a k times Nel sparse matrix
     ! The entry TheTs(k,n) is 1 if the n-th element shares at least one edge
     ! (i.e. two points) with the k-th face
     ! The entry TheDs(k,n) is 1 if the n-th element shares at least one vertex
@@ -369,12 +382,13 @@
     !    xp in [xel-dim(1)/2,xel+dim(1)/2]
     !    yp in [yel-dim(2)/2,yel+dim(2)/2]
     !    zp in [zel-dim(3)/2,zel+dim(3)/2]
-    ! TheTs = sparse(K,Nel) ;
-    ! TheDs = sparse(K,Nel) ;
-    K = size(Xf)
-    allocate(xVertA(K,3), xVertB(K,3), xVertC(K,3), xVertD(K,3))
+    ! TheTs = sparse(k,Nel) ;
+    ! TheDs = sparse(k,Nel) ;
+    
+    !k = size(Xf)
+    allocate(xVertA(k,3), xVertB(k,3), xVertC(k,3), xVertD(k,3))
     allocate(xxMinEl(Nel,3), xxMaxEl(Nel,3))
-    allocate(iZero(K), count_temp(K,3))
+    allocate(iZero(k), count_temp(k,3))
     
     xVertA = XXf(:,:)+DimsF(:,:)/2.0
     xVertC = XXf(:,:)-DimsF(:,:)/2.0
@@ -384,7 +398,7 @@
     count_temp(:,2) = 2;
     count_temp(:,3) = 3;
     
-    allocate(mask1D(K))
+    allocate(mask1D(k))
     mask1D = .false.
     
     iZero(:) = 0
@@ -417,6 +431,7 @@
     end do
     
     allocate(TheTs_indices(0,2))
+    allocate(TheDs_indices(0,2))
     
     do n=1,Nel
         TheseMinXXel(:,1) = xxMinEl(n,1)
@@ -509,6 +524,8 @@
     GridInfo%TheSigns = TheSigns_indices    
 
     call displayGUIMessage( 'Mesh analysis done' )
+
+    call trace%end( "CartesianUnstructuredMeshAnalysis", itimer=itimer )
     
   end subroutine CartesianUnstructuredMeshAnalysis
 

@@ -1,3 +1,5 @@
+
+
 module fmm_nbor_tensor_mod
     use MKL_SPBLAS
     use MKL_DFTI
@@ -6,11 +8,18 @@ module fmm_nbor_tensor_mod
     use TileNComponents
     use DemagFieldGetSolution
     use IO_GENERAL
-
+    use trace_mod
   implicit none
 contains 
 
-        !------------------- for getting near-field correction ------------------------------------------
+!=====================================================================
+!> Compute dipole tensor Kdip for vector Rvec
+!!  Kdip = (1/(4π r^3)) * (3 r̂ r̂^T - I), mapping M -> H (SI)
+!! 
+!!  arguments:
+!!   Rvec  - (3) vector from source to target
+!!   Kdip  - (3,3) dipole tensor output
+!=====================================================================
     pure subroutine dipole_tensor_3x3(Rvec, Kdip)
         implicit none
         ! Kdip = (1/(4π r^3)) * (3 r̂ r̂^T - I), mapping M -> H (SI)
@@ -44,6 +53,19 @@ contains
         Kdip(3,3) = (3.0d0*uz*uz - 1.0d0) * invR3
     end subroutine dipole_tensor_3x3
 
+
+
+!=====================================================================
+!> Check if two cells are neighbours based on their positions and sizes
+!!  NOTE - not currently used - kept for reference. Replaced by FMM tree-based neighbour list.
+!!
+!!  arguments:
+!!   idx_t     - target cell index
+!!   idx_s     - source cell index
+!!   offset    - (ntot,3) array of cell positions
+!!   size      - (ntot,3) array of cell sizes
+!!   pitch     - (3) array of cell pitches
+!!   rad_cells - radius [in cells] to consider neighbours. fx. 1 = immediate neighbours, 2 = next-nearest, etc.
     pure logical function is_neighbour(idx_t, idx_s, offset, size, pitch, rad_cells) result(mask)
         implicit none
         integer(4), intent(in) :: idx_t, idx_s, rad_cells
@@ -66,6 +88,16 @@ contains
         mask = (dx <= tx) .and. (dy <= ty) .and. (dz <= tz)
     end function is_neighbour
 
+
+
+
+!=====================================================================
+!> Build neighbour list from FMM tree's list1 (near-field) boxes
+!!
+!!  arguments:
+!!   problem  - MicroMagProblem object to fill n_nbors and nbr_idx
+!!   tree     - FMM3DTree object from which to extract neighbour info
+!=====================================================================
 subroutine BuildNeighbourList_FromTree(problem, tree)
   implicit none
   type(MicroMagProblem), intent(inout) :: problem
@@ -76,6 +108,9 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
   integer :: istarts, iends, jstart, jend
   integer :: p_t, p_s, t_idx, j_idx
   integer :: nb, cnt
+  integer, save :: itimer = 0
+
+  call trace%begin( "BuildNeighbourList_FromTree", itimer=itimer, verbose=1 )
 
   ! --- basic sanity ---
   if (.not. tree%is_built) stop "BuildNeighbourList_FromTree: tree not built"
@@ -174,33 +209,18 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
   end do
 
 
-  !print *, " sorting neighbour lists ..."
-  !===========================
-  ! Sort each row of nbr_idx
-  !===========================
-  !do i = 1, ntot
-  !  call simple_nbor_sort(problem%nbr_idx(i, 1:problem%n_nbors(i)))
-  !end do
+  call trace%end( "BuildNeighbourList_FromTree", itimer=itimer, verbose=1 )
 
 end subroutine BuildNeighbourList_FromTree
 
 
-  pure subroutine simple_nbor_sort(arr)
-    implicit none
-    integer, intent(inout) :: arr(:)
-    integer :: i, j, temp
-
-    do i = 1, size(arr) - 1
-      do j = i + 1, size(arr)
-        if (arr(i) > arr(j)) then
-          temp = arr(i)
-          arr(i) = arr(j)
-          arr(j) = temp
-        end if
-      end do
-    end do
-  end subroutine simple_nbor_sort
-
+!=====================================================================
+!> Build dense neighbour list (all-to-all)
+!! Not currently used - for testing purposes only.
+!!
+!!  arguments:
+!!   problem  - MicroMagProblem object to fill n_nbors and nbr_idx
+!=====================================================================
 subroutine BuildNeighbourList_Dense(problem)
   implicit none
   type(MicroMagProblem), intent(inout) :: problem
@@ -224,7 +244,12 @@ subroutine BuildNeighbourList_Dense(problem)
 
 end subroutine BuildNeighbourList_Dense
 
-
+!=====================================================================
+!> Build neighbour list from FMM tree's list1 (near-field) boxes
+!!
+!!  arguments:
+!!   problem  - MicroMagProblem object to fill n_nbors and nbr_idx
+!=====================================================================
 subroutine BuildNeighbourDemagTensor(problem)
   !-----------------------------------------------------------------
   ! Construct exact prism demag tensors for near neighbours of
@@ -285,6 +310,9 @@ subroutine BuildNeighbourDemagTensor(problem)
   type(NoutWS),  allocatable :: nout_thr(:)
   type(HdummyWS),allocatable :: hdum_thr(:)
 
+  integer, save :: itimer = 0
+  call trace%begin( "BuildNeighbourDemagTensor", itimer=itimer, verbose=2 )
+
 
   ier = 0
 
@@ -338,6 +366,8 @@ subroutine BuildNeighbourDemagTensor(problem)
     print *, " Short circuiting FMM - disabling FMM"
     call dealloc_fmm_arrays(problem)
     problem%use_fmm = .false.
+    call trace%end( "BuildNeighbourDemagTensor", itimer=itimer, verbose=2 )
+
     return
   end if 
 
@@ -346,12 +376,9 @@ subroutine BuildNeighbourDemagTensor(problem)
 
   nbr_idx_p => problem%nbr_idx
 
-  ! If no neighbours at all, allocate empty Nnbr and bail
+  ! If no neighbours at all - error 
   if (nneigh_max <= 0) then
-    allocate(problem%Nnbr(ntot, 0, 3, 3))
-    problem%Nnbr = 0.0_SP
-    deallocate(offset, size_cell)
-    return
+    error stop "BuildNeighbourDemagTensor: no neighbours found in FMM tree lists - check tree construction and parameters"
   end if
 
   !---------------------------------------
@@ -450,11 +477,20 @@ subroutine BuildNeighbourDemagTensor(problem)
   problem%diffTens => problem%Nnbr
   call build_FMM_sparse_nborTensor_opt(problem)
 
+
+  call trace%end( "BuildNeighbourDemagTensor", itimer=itimer, verbose=2 )
 end subroutine BuildNeighbourDemagTensor
 
 
 
 
+!=====================================================================
+!> Convert Nnbr to diffTens by subtracting dipole tensor contribution
+!!  Note - not currently used - kept for reference.
+!! 
+!!
+!!  arguments:
+!!   problem  - MicroMagProblem object containing Nnbr; diffTens will be allocated here
 subroutine convert_Nnbr_to_diffTens(problem)
   implicit none
   type(MicroMagProblem),  intent(inout)    :: problem
@@ -464,7 +500,9 @@ subroutine convert_Nnbr_to_diffTens(problem)
   real(DP) :: xt, yt, zt, xj, yj, zj
   real(DP) :: Rvec(3), Kdip(3,3), Kloc(3,3)
   real(SP), contiguous, pointer :: diffTens(:,:,:,:)
+  integer, save :: itimer = 0
   !---------------------------------------
+  call trace%begin( "convert_Nnbr_to_diffTens", itimer=itimer, verbose=2 )
 
   ntot = size(problem%grid%pts,1)
   dx = real(problem%grid%dx, DP)
@@ -499,12 +537,22 @@ subroutine convert_Nnbr_to_diffTens(problem)
           volj = problem%grid%abc(jidx,1) * problem%grid%abc(jidx,2) * problem%grid%abc(jidx,3)
       endif
 
-      !problem%diffTens(t, m, :,:) = Kloc - Kdip * volj  ! correction compared to dipole 
-      problem%diffTens(t, m, :,:) = Kloc  ! full tensor - if eval_direct is never called 
+      problem%diffTens(t, m, :,:) = Kloc - Kdip * volj  ! correction compared to dipole 
+      !problem%diffTens(t, m, :,:) = Kloc  ! full tensor - if eval_direct is never called 
     end do
   end do
+
+  call trace%end( "convert_Nnbr_to_diffTens", itimer=itimer, verbose=2 )
 end subroutine convert_Nnbr_to_diffTens
 
+
+
+!=====================================================================
+!> Build sparse neighbour correction tensors in CSR format
+!! NOTE - optimized version - faster than build_FMM_sparse_nborTensor, but more complex
+!! 
+!!  arguments:
+!!   problem  - MicroMagProblem object containing nbr_idx, n_nbors, diffTens
 subroutine build_fmm_sparse_nborTensor_opt(problem)
   implicit none
   type(MicroMagProblem), intent(inout) :: problem
@@ -519,6 +567,8 @@ subroutine build_fmm_sparse_nborTensor_opt(problem)
   integer :: clk_start, clk_end, clk_rate
   real(SP) :: t_sec
   character(len=128) :: msg
+  integer, save :: itimer = 0
+  call trace%begin( "build_fmm_sparse_nborTensor_opt", itimer=itimer, verbose=2 )
 
 
   !-------- optimized not fully tested - use with caution.
@@ -677,10 +727,21 @@ subroutine build_fmm_sparse_nborTensor_opt(problem)
 
   call displayGUIMessage(" Finished FMM sparse nbor build (opt)")
 
+
+  call trace%end( "build_fmm_sparse_nborTensor_opt", itimer=itimer, verbose=2 )
+
 end subroutine build_fmm_sparse_nborTensor_opt
 
 
 
+!=====================================================================
+!> Build sparse neighbour correction tensors in CSR format
+!! NOTE - semi-deprecated - use build_fmm_sparse_nborTensor_opt instead
+!!        code is kept as it is simpler to read/understand - but is slower. 
+!!
+!!  arguments:
+!!   problem  - MicroMagProblem object containing nbr_idx, n_nbors, diffTens
+!=====================================================================
 subroutine build_FMM_sparse_nborTensor(problem)
   implicit none
   type(MicroMagProblem), intent(inout) :: problem
@@ -691,6 +752,8 @@ subroutine build_FMM_sparse_nborTensor(problem)
   integer :: stat, idx
 
   real(SP) :: v_xx, v_xy, v_xz, v_yy, v_yz, v_zz
+  integer, save :: itimer = 0
+  call trace%begin( "build_FMM_sparse_nborTensor", itimer=itimer, verbose=2 )
 
   !TODO - this could be optimized by parralizing
 
@@ -814,9 +877,17 @@ subroutine build_FMM_sparse_nborTensor(problem)
 
   problem%K_fmm_built = .true.
 
+  call trace%end( "build_FMM_sparse_nborTensor", itimer=itimer, verbose=2 )
+
 end subroutine build_FMM_sparse_nborTensor
 
 
+!=====================================================================
+!> Destroy FMM neighbour correction sparse matrices
+!!
+!!  arguments:
+!!   problem  - MicroMagProblem object to deallocate FMM sparse matrices from
+!=====================================================================
 subroutine destroy_nbrcorr_sparse(problem)
   implicit none
   type(MicroMagProblem), intent(inout) :: problem
@@ -844,7 +915,12 @@ subroutine destroy_nbrcorr_sparse(problem)
 end subroutine destroy_nbrcorr_sparse
 
 
-
+!=====================================================================
+!> Deallocate FMM neighbour tensor arrays
+!!
+!!  arguments:
+!!   problem  - MicroMagProblem object to deallocate FMM arrays from
+!=====================================================================
 subroutine dealloc_fmm_arrays(problem)
   implicit none
   type(MicroMagProblem), intent(inout) :: problem

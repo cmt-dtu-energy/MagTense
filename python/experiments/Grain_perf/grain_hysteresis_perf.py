@@ -149,6 +149,14 @@ def grain_hysteresis(
         problem_ini.allow_fmm_short_circuit = allow_fmm_short_circuit
         problem_ini.fmm_min_n = fmm_min_n
 
+        problem_ini.log_dir = "timer_logs"
+        problem_ini.timer_log_file = mesh_file[:-4] + "_timer_ini.log"
+        problem_ini.trace_log_file = mesh_file[:-4] + "_trace_ini.log"
+        problem_ini.window_enabled = 1
+        problem_ini.window_interval = 30.0
+        problem_ini.trace_enabled = 0
+        problem_ini.flush_each = 1
+        problem_ini.trace_verbose = 1
 
 
         res_ini = problem_ini.run_hysteresis(H_ext=H_ext)
@@ -180,6 +188,7 @@ def grain_hysteresis(
         exma_file, allow_pickle=True
     ).values()
         
+
 
     rng = np.random.default_rng(42)
 
@@ -236,6 +245,16 @@ def grain_hysteresis(
     problem.nlmax = nlmax
     problem.allow_fmm_short_circuit = allow_fmm_short_circuit
     problem.fmm_min_n = fmm_min_n
+
+    problem.log_dir = "timer_logs"
+    problem.timer_log_file = mesh_file[:-4] + "_timer.log"
+    problem.trace_log_file = mesh_file[:-4] + "_trace.log"
+    problem.window_enabled = 1
+    problem.window_interval = 30.0
+    problem.trace_enabled = 0
+    problem.flush_each = 1
+    problem.trace_verbose = 1
+
 
     start_time = time.time()
     res = problem.run_hysteresis(H_ext=H_ext)

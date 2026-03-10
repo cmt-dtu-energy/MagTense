@@ -32,6 +32,8 @@
     use fmm3d_tree_mod
     use fmm_nbor_tensor_mod
 #endif
+
+    use trace_mod
     implicit none          
 
     !>Module variables
@@ -65,6 +67,8 @@
     character*(100) :: prog_str 
     real :: rate
     integer :: c1,c2,cr,cm 
+    integer, save :: itimer = 0
+    call trace%begin( "SolveLandauLifshitzEquation", itimer=itimer, verbose=1 )
     
     ! First initialize the system_clock
     call system_clock(count_rate=cr)
@@ -90,7 +94,8 @@
     !"M" : demagnetization term
     gb_problem%Mfact = gb_problem%Ms
     !"K" : anisotropy term
-    !gb_problem%Kfact = gb_problem%K0 / ( mu0 * gb_problem%Ms )
+    !TODO - is this correct or should it be allocated first????
+    gb_problem%Kfact = gb_problem%K0 / ( mu0 * gb_problem%Ms )
     
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     allocate( gb_solution%pts(ntot,3) )
@@ -156,9 +161,11 @@
           !Initialize the Cuda arrays and load the demag tensors into the GPU memory
           if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
               !If the matrices are sparse
+            call displayGUIMessage( 'Initializing sparse matrices on CUDA' )
               call cudaInit_sparse( gb_problem%K_s )            
           else
               !if the matrices are dense 
+            call displayGUIMessage( 'Initializing dense matrices on CUDA' )
               call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
           endif
         end if
@@ -172,7 +179,13 @@
              
         else
             !if the matrices are dense 
+            call displayGUIMessage( 'Initializing dense matrices on CUDA' )
+
             call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+
+            !TODO - make this as option depending on flag/use input
+            !call cudaDumpDemagDense("CUDA_dense_K_matrices.bin")
+
         endif
 #endif
 #else
@@ -300,8 +313,10 @@
     #endif
     !Return the correct state
     sol = gb_solution
-    prob = gb_problem
-    
+    prob = gb_problem    
+
+
+    call trace%end( "SolveLandauLifshitzEquation", itimer=itimer, verbose=1 )
     end subroutine SolveLandauLifshitzEquation
 
     !>-----------------------------------------
@@ -323,24 +338,8 @@
         integer :: ntot
         real(DP) :: mx_mean, my_mean, mz_mean, volume_total
         integer :: i
-#if USE_TIMING
-        !------------------ Timing ---------------------
-        real(DP) :: t0, t1
-        integer,          save :: call_count = 0
-        integer, parameter     :: NPRINT = 100   ! output cadence
-
-        real(DP), save :: acc_total    = 0.0_DP
-        real(DP), save :: acc_exch     = 0.0_DP
-        real(DP), save :: acc_ext      = 0.0_DP
-        real(DP), save :: acc_aniso    = 0.0_DP
-        real(DP), save :: acc_demag    = 0.0_DP
-        real(DP), save :: acc_heff     = 0.0_DP
-        real(DP), save :: acc_cross    = 0.0_DP
-        real(DP), save :: acc_double   = 0.0_DP
-        real(DP), save :: acc_assemble = 0.0_DP
-        !------------------------------------------
-#endif
-
+        integer, save :: itimer = 0
+        call trace%begin( "dmdt_fct", itimer=itimer, verbose=1 )
         !------------------------------------------
         ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
 
@@ -349,40 +348,22 @@
             allocate( HeffX(ntot), HeffY(ntot), HeffZ(ntot) )
             allocate( HeffX2(ntot), HeffY2(ntot), HeffZ2(ntot) )
         endif
-#if USE_TIMING
-        t0 = walltime()
-        t1 = walltime()
-#endif
+
         !------------- Update magnetisation (load from m)-------------
         gb_solution%Mx = m(1:ntot)
         gb_solution%My = m(ntot+1:2*ntot)
         gb_solution%Mz = m(2*ntot+1:3*ntot)
         !-------------------------------------------------------------
-#if USE_TIMING 
-        acc_assemble = acc_assemble + (walltime() - t1)
-        t1 = walltime()
-#endif
+
         !------------ add exchange term -----------------------------
         call updateExchangeTerms( gb_problem, gb_solution )
         !-------------------------------------------------------------
-#if USE_TIMING
-        acc_exch = acc_exch + (walltime() - t1)
-        t1 = walltime()
-#endif
         !-------------- add external field ---------------------------
         call updateExternalField( gb_problem, gb_solution, t )
         !-------------------------------------------------------------
-#if USE_TIMING
-        acc_ext = acc_ext + (walltime() - t1)
-        t1 = walltime()
-#endif
         !-------------- add anisotropy term --------------------------
         call updateAnisotropy(  gb_problem, gb_solution )
         !-------------------------------------------------------------
-#if USE_TIMING
-        acc_aniso = acc_aniso + (walltime() - t1)
-        t1 = walltime()
-#endif
         !-------------- add demagnetization field --------------------
 #if USE_FMM3D
         !-------------------- if use_fmm then use FMM otherwise shortcircuit to normal demag field --------------
@@ -396,91 +377,27 @@
          call updateDemagfield( gb_problem, gb_solution )
 #endif
         !-------------------------------------------------------------
-
-
-
-
-
-
-#if USE_TIMING
-        acc_demag = acc_demag + (walltime() - t1)
-        t1 = walltime()
-#endif
         !--------------- combine to get effective field, Heff -------------
         HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
         HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY
         HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ
         !-------------------------------------------------------------
-#if USE_TIMING
-        acc_heff = acc_heff + (walltime() - t1)
-        t1 = walltime()
-#endif
         !--------------- calculate precession term: m x Heff -------------
         crossX = -1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
         crossY = -1.0_DP * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
         crossZ = -1.0_DP * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
         !-------------------------------------------------------------
-#if USE_TIMING
-        acc_cross = acc_cross + (walltime() - t1)
-        t1 = walltime()
-#endif
         !--------------- calculate damping term: m x (m x Heff) -------------
         HeffX2 = gb_solution%My * crossZ - gb_solution%Mz * crossY
         HeffY2 = gb_solution%Mz * crossX - gb_solution%Mx * crossZ
         HeffZ2 = gb_solution%Mx * crossY - gb_solution%My * crossX
         !-------------------------------------------------------------
-#if USE_TIMING
-        acc_double = acc_double + (walltime() - t1)
-        t1 = walltime()
-#endif
         !--------------- assemble dm/dt -------------------------------------
         dmdt(1:ntot)               = -gb_problem%gamma * crossX - alpha(t,gb_problem) * HeffX2
         dmdt(ntot+1:2*ntot)        = -gb_problem%gamma * crossY - alpha(t,gb_problem) * HeffY2
         dmdt(2*ntot+1:3*ntot)      = -gb_problem%gamma * crossZ - alpha(t,gb_problem) * HeffZ2
         !---------------------------------------------------------------------
-#if USE_TIMING
-        !---------------- Print timing --------------------------------------
-        acc_assemble = acc_assemble + (walltime() - t1)
-        acc_total = acc_total + (walltime() - t0)
-        call_count = call_count + 1
-        if (mod(call_count, NPRINT) == 0) then
-            ! Compact one-liner per category (seconds over last NPRINT calls)
-            write(*,'(A, I0, A, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6, 1X, A, F10.6)') &
-                'dmdt_fct timing (last ', NPRINT, ' calls)  ', &
-                'total=',    acc_total,    ' exch=',   acc_exch,   ' ext=',     acc_ext, &
-                ' aniso=',   acc_aniso,    ' demag=',  acc_demag,  ' heff=',    acc_heff, &
-                ' mxh=',     acc_cross,    ' m×(mxh)=',acc_double, ' asmb=',    acc_assemble
-
-
-            mx_mean = 0.0
-            my_mean = 0.0
-            mz_mean = 0.0
-            !ntot = size(problem%grid%pts, dim=1)
-            do i=1,ntot
-                mx_mean = mx_mean + gb_solution%Mx_s(i) * gb_problem%Ms(i) * (gb_problem%grid%abc(i,1) * gb_problem%grid%abc(i,2) * gb_problem%grid%abc(i,3))
-                my_mean = my_mean + gb_solution%My_s(i) * gb_problem%Ms(i) * (gb_problem%grid%abc(i,1) * gb_problem%grid%abc(i,2) * gb_problem%grid%abc(i,3))
-                mz_mean = mz_mean + gb_solution%Mz_s(i) * gb_problem%Ms(i) * (gb_problem%grid%abc(i,1) * gb_problem%grid%abc(i,2) * gb_problem%grid%abc(i,3))
-            enddo
-            volume_total = sum( gb_problem%grid%abc(:,1) * gb_problem%grid%abc(:,2) * gb_problem%grid%abc(:,3) )
-            mx_mean = mx_mean / volume_total
-            my_mean = my_mean / volume_total
-            mz_mean = mz_mean / volume_total
-            write(*,'(A,1X,ES14.3,1X,A,1X,ES14.3,1X,A,1X,ES14.3)') &
-                '  <mx>=', mx_mean, ' <my>=', my_mean, ' <mz>=', mz_mean
-
-            ! reset accumulators for next block
-            acc_total    = 0.0_DP
-            acc_exch     = 0.0_DP
-            acc_ext      = 0.0_DP
-            acc_aniso    = 0.0_DP
-            acc_demag    = 0.0_DP
-            acc_heff     = 0.0_DP
-            acc_cross    = 0.0_DP
-            acc_double   = 0.0_DP
-            acc_assemble = 0.0_DP
-        end if
-            !----------------------------------------------------------
-#endif
+        call trace%end("dmdt_fct", itimer=itimer, verbose=1 )
     end subroutine dmdt_fct
 
     
@@ -494,6 +411,7 @@
     real(DP) :: alpha
     real(DP),intent(in) :: t
     type(MicroMagProblem),intent(in) :: problem
+    
     
     if ( problem%alpha0 .eq. 0 ) then
         !Interpolate to get the applied field at time t
@@ -519,6 +437,8 @@
     type(MicroMagProblem),intent(in) :: problem
     type(MicroMagSolution),intent(inout) :: solution
     integer :: i,j,nt
+    integer, save :: itimer = 0
+    call trace%begin( "StoreHeffComponents", itimer=itimer, verbose=1 )
     
     i = gb_solution%HextInd       
     nt = size( gb_problem%t ) 
@@ -567,6 +487,7 @@
         endif
     enddo
     
+    call trace%end( "StoreHeffComponents", itimer=itimer, verbose=1 )
     end subroutine StoreHeffComponents
     
     
@@ -583,6 +504,9 @@
     character*(100) :: prog_str 
     
     integer :: ntot, i
+    integer, save :: itimer = 0
+    call trace%begin( "initializeSolution", itimer=itimer, verbose=1 )
+
     !character(50) :: prog_str
     
     if ( problem%problemMode .eq. ProblemModeNew ) then
@@ -638,7 +562,7 @@
         call AddUncertaintyToDemagField( problem, solution)
     endif
     
-    
+    call trace%end( "initializeSolution", itimer=itimer, verbose=1 )
     end subroutine initializeSolution
     
     
@@ -657,6 +581,9 @@
     type(MATRIX_DESCR) :: descr
     real(DP) :: alpha, beta
     real(DP), dimension(:), allocatable :: temp
+    integer, save :: itimer = 0 
+
+    call trace%begin( "updateExchangeTerms", itimer=itimer, verbose=1 )
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -683,6 +610,8 @@
     
     deallocate(temp)
     
+
+    call trace%end( "updateExchangeTerms", itimer=itimer, verbose=1 )
     end subroutine updateExchangeTerms
 
     
@@ -700,6 +629,9 @@
     real(DP),intent(in) :: t
     
     real(DP) :: HextX,HextY,HextZ
+    integer, save :: itimer = 0 
+
+    call trace%begin( "updateExternalField", itimer=itimer, verbose=1 )
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
          !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
@@ -722,7 +654,8 @@
         !not implemented yet
     endif
     
-    
+    call trace%end( "updateExternalField", itimer=itimer, verbose=1 )
+
     end subroutine updateExternalField
     
     !>-----------------------------------------
@@ -739,6 +672,9 @@
     !real :: prefact                                    !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
     real(DP),dimension(:),allocatable   :: Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot
+    integer, save :: itimer = 0, itimer1 = 0, itimer2 = 0
+
+    call trace%begin( "updateAnisotropy", itimer=itimer, verbose=1 )
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -775,21 +711,32 @@
     !                      [0 0 0]
     !                      [Kfact2 0 0]
     
-    allocate(Mx_rot(size(solution%Mx)), My_rot(size(solution%My)), Mz_rot(size(solution%Mz)))
-    Mx_rot = problem%CrystalAxis(:,1,1)*solution%Mx(:) + problem%CrystalAxis(:,1,2)*solution%My(:) + problem%CrystalAxis(:,1,3)*solution%Mz(:)
-    My_rot = problem%CrystalAxis(:,2,1)*solution%Mx(:) + problem%CrystalAxis(:,2,2)*solution%My(:) + problem%CrystalAxis(:,2,3)*solution%Mz(:)
-    Mz_rot = problem%CrystalAxis(:,3,1)*solution%Mx(:) + problem%CrystalAxis(:,3,2)*solution%My(:) + problem%CrystalAxis(:,3,3)*solution%Mz(:)
-    
-    allocate(Hkx_rot(size(Mx_rot)), Hky_rot(size(My_rot)), Hkz_rot(size(Mz_rot)))
-    Hkx_rot = -2*Mx_rot(:)*(problem%Kfact_arr(:,1,1) + 2*problem%Kfact_arr(:,2,1)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,3)*My_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*My_rot(:)**2*Mz_rot(:)**2 )
-    Hky_rot = -2*My_rot(:)*(problem%Kfact_arr(:,1,2) + 2*problem%Kfact_arr(:,2,2)*My_rot(:)**2 + problem%Kfact_arr(:,3,3)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,2)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,2)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*Mz_rot(:)**2 )
-    Hkz_rot = -2*Mz_rot(:)*(problem%Kfact_arr(:,1,3) + 2*problem%Kfact_arr(:,2,3)*Mz_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*My_rot(:)**2 + 3*problem%Kfact_arr(:,4,3)*Mz_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + 2*problem%Kfact_arr(:,5,3)*Mx_rot(:)**2*Mz_rot(:)**2 + 2*problem%Kfact_arr(:,5,3)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*My_rot(:)**2 )
-    
-    solution%Hkx(:) = problem%CrystalAxis(:,1,1)*Hkx_rot(:) + problem%CrystalAxis(:,2,1)*Hky_rot(:) + problem%CrystalAxis(:,3,1)*Hkz_rot(:)
-    solution%Hky(:) = problem%CrystalAxis(:,1,2)*Hkx_rot(:) + problem%CrystalAxis(:,2,2)*Hky_rot(:) + problem%CrystalAxis(:,3,2)*Hkz_rot(:)
-    solution%Hkz(:) = problem%CrystalAxis(:,1,3)*Hkx_rot(:) + problem%CrystalAxis(:,2,3)*Hky_rot(:) + problem%CrystalAxis(:,3,3)*Hkz_rot(:)
-    
-    deallocate(Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot)
+    if (any(problem%K0 .ne. 0)) then
+        solution%Hkx = -2. * problem%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
+        solution%Hky = -2. * problem%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
+        solution%Hkz = -2. * problem%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
+    else 
+        call trace%begin( "updateAnisotropy_alloc", itimer=itimer1, verbose=2 )
+        allocate(Mx_rot(size(solution%Mx)), My_rot(size(solution%My)), Mz_rot(size(solution%Mz)))
+        allocate(Hkx_rot(size(Mx_rot)), Hky_rot(size(My_rot)), Hkz_rot(size(Mz_rot)))
+        call trace%end( "updateAnisotropy_alloc", itimer=itimer1, verbose=2 )
+        call trace%begin( "updateAnisotropy_calc", itimer=itimer2, verbose=2 )
+        Mx_rot = problem%CrystalAxis(:,1,1)*solution%Mx(:) + problem%CrystalAxis(:,1,2)*solution%My(:) + problem%CrystalAxis(:,1,3)*solution%Mz(:)
+        My_rot = problem%CrystalAxis(:,2,1)*solution%Mx(:) + problem%CrystalAxis(:,2,2)*solution%My(:) + problem%CrystalAxis(:,2,3)*solution%Mz(:)
+        Mz_rot = problem%CrystalAxis(:,3,1)*solution%Mx(:) + problem%CrystalAxis(:,3,2)*solution%My(:) + problem%CrystalAxis(:,3,3)*solution%Mz(:)
+        
+        Hkx_rot = -2*Mx_rot(:)*(problem%Kfact_arr(:,1,1) + 2*problem%Kfact_arr(:,2,1)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,3)*My_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*My_rot(:)**2*Mz_rot(:)**2 )
+        Hky_rot = -2*My_rot(:)*(problem%Kfact_arr(:,1,2) + 2*problem%Kfact_arr(:,2,2)*My_rot(:)**2 + problem%Kfact_arr(:,3,3)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,2)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,2)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*Mz_rot(:)**2 )
+        Hkz_rot = -2*Mz_rot(:)*(problem%Kfact_arr(:,1,3) + 2*problem%Kfact_arr(:,2,3)*Mz_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*My_rot(:)**2 + 3*problem%Kfact_arr(:,4,3)*Mz_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + 2*problem%Kfact_arr(:,5,3)*Mx_rot(:)**2*Mz_rot(:)**2 + 2*problem%Kfact_arr(:,5,3)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*My_rot(:)**2 )
+        call trace%end( "updateAnisotropy_calc", itimer=itimer2, verbose=2 )
+
+        solution%Hkx(:) = problem%CrystalAxis(:,1,1)*Hkx_rot(:) + problem%CrystalAxis(:,2,1)*Hky_rot(:) + problem%CrystalAxis(:,3,1)*Hkz_rot(:)
+        solution%Hky(:) = problem%CrystalAxis(:,1,2)*Hkx_rot(:) + problem%CrystalAxis(:,2,2)*Hky_rot(:) + problem%CrystalAxis(:,3,2)*Hkz_rot(:)
+        solution%Hkz(:) = problem%CrystalAxis(:,1,3)*Hkx_rot(:) + problem%CrystalAxis(:,2,3)*Hky_rot(:) + problem%CrystalAxis(:,3,3)*Hkz_rot(:)
+        
+        deallocate(Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot)
+    end if 
+    call trace%end( "updateAnisotropy", itimer=itimer, verbose=1 )
 
     end subroutine updateAnisotropy    
 
@@ -802,21 +749,6 @@ subroutine updateDemagfieldFMM(problem, solution)
 
 #if USE_FMM3D
   !------------------ Timing ---------------------
-#if USE_TIMING
-  integer,          save :: call_count_fmm = 0
-  integer, parameter     :: NPRINT = 100  ! output cadence  
-  real(DP), save :: acc_total_fmm = 0.0_DP
-  real(DP), save :: acc_cast      = 0.0_DP
-  real(DP), save :: acc_alloc     = 0.0_DP
-  real(DP), save :: acc_pack      = 0.0_DP
-  real(DP), save :: acc_fmm       = 0.0_DP
-  real(DP), save :: acc_map       = 0.0_DP
-  real(DP), save :: acc_self      = 0.0_DP
-  real(DP), save :: acc_neigh     = 0.0_DP
-  real(DP), save :: acc_cleanup   = 0.0_DP
-  real(DP), save :: acc_noise     = 0.0_DP
-  real(DP) :: t0, t1
-#endif
   !------------------ Locals ---------------------
   integer :: ntot, i
   real(DP) :: fourpi
@@ -831,11 +763,11 @@ subroutine updateDemagfieldFMM(problem, solution)
 
   class(FMM3DTree), pointer :: fmm_tree
   logical :: built_tree
+  integer, save :: itimer = 0
   !------------------------------------------------
-#if USE_TIMING
-  t0 = walltime()
-  t1 = walltime()
-#endif
+
+    call trace%begin( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
+
   fourpi  = 12.566370614359172D0
   ntot = size(problem%grid%pts, dim=1)
   ier = 0
@@ -846,11 +778,6 @@ subroutine updateDemagfieldFMM(problem, solution)
   solution%Mz_s = real(solution%Mz, SP)
   !--------------------------------------------------------------
 
-
-#if USE_TIMING
-  acc_cast = acc_cast + (walltime() - t1)
-  t1 = walltime()
-#endif
   !------------------ Allocate FMM work arrays ------------------
     built_tree = .false.
     if (.not. associated(solution%fmm_tree)) then
@@ -865,10 +792,6 @@ subroutine updateDemagfieldFMM(problem, solution)
   allocate(grad(1, 3, ntot))
   grad(:,:,:) = 0.0_DP 
   !------------------------------------------------------------
-#if USE_TIMING
-  acc_alloc = acc_alloc + (walltime() - t1)
-  t1 = walltime()
-#endif
   !------------------ Pack sources and dipoles ------------------
     if (built_tree) then
         do i = 1, ntot
@@ -905,10 +828,6 @@ subroutine updateDemagfieldFMM(problem, solution)
     !------------------------------------------------------------ 
   end do
     !--------------------------------------------------------------
-#if USE_TIMING
-  acc_pack = acc_pack + (walltime() - t1)
-  t1 = walltime()
-#endif
   !------------------ Call FMM (sources->sources) ------------------
   nd = 1
    call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif, problem%nlmin, problem%nlmax)
@@ -924,11 +843,6 @@ subroutine updateDemagfieldFMM(problem, solution)
     stop " FMM3D error"
   end if
   !-----------------------------------------------------------------
-#if USE_TIMING
-  acc_fmm = acc_fmm + (walltime() - t1)
-  t1 = walltime()
-#endif
-
   !------------------ Map grad -> H (and to single) ----------------
   ! include factor 4pi to match Magtense units
    if (fmm_tree%nboxes > 9) then 
@@ -948,20 +862,9 @@ subroutine updateDemagfieldFMM(problem, solution)
     solution%HmZ = 0.0_SP
   end if
   !-----------------------------------------------------------------
-#if USE_TIMING
-  acc_map = acc_map + (walltime() - t1)
-  t1 = walltime()
-#endif
   !------------- add correction from neighbouring tiles ---------------------
 call add_near_field(problem, solution)
   !--------------------------------------------------------------------------
-#if USE_TIMING
-  acc_neigh = acc_neigh + (walltime() - t1)
-#endif
-
-#if USE_TIMING
-    t1 = walltime()
-#endif
     !------------------ Cleanup -------------------------------------
   if (.not. fmm_tree%keep_tree) then
       call fmm_tree%dealloc()
@@ -974,45 +877,15 @@ call add_near_field(problem, solution)
   end if
   deallocate(dipvec, grad)
     !--------------------------------------------------------------
-#if USE_TIMING
-  acc_cleanup = acc_cleanup + (walltime() - t1)
-#endif
   !------------------ Optional field noise (CV) --------------------
-#if USE_TIMING
-  t1 = walltime()
-#endif
   if (problem%CV > 0) then
       solution%HmX = solution%HmX + solution%HmX*problem%CV*sqrt(-2d0*log(solution%u1))*cos(2d0*pi*solution%u2)
       solution%HmY = solution%HmY + solution%HmY*problem%CV*sqrt(-2d0*log(solution%u3))*cos(2d0*pi*solution%u4)
       solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
   end if
-#if USE_TIMING
-  acc_noise = acc_noise + (walltime() - t1)
-  !------------------ Final accounting/print -----------------------
-  acc_total_fmm = acc_total_fmm + (walltime() - t0)
-  call_count_fmm = call_count_fmm + 1
-  if (mod(call_count_fmm, NPRINT) == 0) then
-      write(*,'(A,I0,A,1X, A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6,1X,A,F10.6)') &
-           'updateDemagfieldFMM timing (last ', NPRINT, ' calls) ', &
-           'total=',  acc_total_fmm, ' cast=',   acc_cast,    ' alloc=',  acc_alloc,  ' pack=',  acc_pack, &
-           ' fmm=',   acc_fmm,       ' map=',    acc_map,     ' self=',   acc_self,   ' neigh=', acc_neigh, &
-           ' free=',  acc_cleanup,   ' noise=',  acc_noise
-
-      acc_total_fmm = 0.0_DP
-      acc_cast      = 0.0_DP
-      acc_alloc     = 0.0_DP
-      acc_pack      = 0.0_DP
-      acc_fmm       = 0.0_DP
-      acc_map       = 0.0_DP
-      acc_self      = 0.0_DP
-      acc_neigh     = 0.0_DP
-      acc_cleanup   = 0.0_DP
-      acc_noise     = 0.0_DP
-
-  end if
+    call trace%end( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
 #endif
 
-#endif
 end subroutine updateDemagfieldFMM
 
 
@@ -1033,6 +906,8 @@ end subroutine updateDemagfieldFMM
     complex(kind=4) :: alpha_c, beta_c
     real(SP), dimension(:), allocatable :: temp
     character*(100) :: prog_str 
+    integer, save :: itimer = 0
+    call trace%begin( "updateDemagfield", itimer=itimer, verbose=1 )
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -1242,18 +1117,6 @@ end subroutine updateDemagfieldFMM
             solution%HmY = temp
             temp = solution%HmZ * problem%Mfact
             solution%HmZ = temp
-
-
-
-            ! open (11, file="dense_CUDA_H.bin",  &
-            !         status='unknown', form='unformatted', &
-            !         access='direct', recl=1*ntot)
-            ! write(11,rec=1) solution%HmX 
-            ! write(11,rec=2) solution%HmY
-            ! write(11,rec=3) solution%HmZ
-            ! close(11)
-            ! error stop " test stop after cuda dense"
-
 #endif
         endif 
     endif
@@ -1271,6 +1134,7 @@ end subroutine updateDemagfieldFMM
 
 
 
+    call trace%end( "updateDemagfield", itimer=itimer, verbose=1 )
 
     end subroutine updateDemagfield
     
@@ -1284,6 +1148,9 @@ end subroutine updateDemagfieldFMM
     subroutine initializeInteractionMatrices( problem, solution )
     type(MicroMagProblem), intent(inout) :: problem         !> Struct containing the grid information
     type(MicroMagSolution),intent(inout) :: solution        !> Solution data structure
+
+    integer, save :: itimer = 0
+    call trace%begin( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     
     !Demagnetization tensor matrix
 #if USE_FMM3D
@@ -1306,6 +1173,7 @@ end subroutine updateDemagfieldFMM
     call ComputeExchangeTerm3D( problem%grid, problem%A_exch, problem, solution )
     
     
+    call trace%end( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     end subroutine initializeInteractionMatrices
     
     
@@ -1319,6 +1187,8 @@ end subroutine updateDemagfieldFMM
     subroutine setupGrid( grid )
     type(MicroMagGrid),intent(inout) :: grid            !> Grid information to be generated
     integer :: i,j,k,ind
+    integer, save :: itimer = 0
+    call trace%begin( "setupGrid", itimer=itimer, verbose=1 )
     
     !Setup the grid depending on which type of grid it is
     if ( grid%gridType .eq. gridTypeUniform ) then
@@ -1372,7 +1242,7 @@ end subroutine updateDemagfieldFMM
             enddo
         enddo
     endif
-    
+    call trace%end( "setupGrid", itimer=itimer, verbose=1 )
     end subroutine setupGrid
     
     
@@ -1398,6 +1268,8 @@ end subroutine updateDemagfieldFMM
     real :: rate
     integer :: c1,c2,cr,cm
     character(10) :: prog_str
+    integer, save :: itimer = 0
+    call trace%begin( "ComputeDemagfieldTensor", itimer=itimer, verbose=1 )
     
     ! First initialize the system_clock
     call system_clock(count_rate=cr)
@@ -1415,11 +1287,9 @@ end subroutine updateDemagfieldFMM
     nz_ave = problem%N_ave(3)
     
     !Demag tensor components
-    call displayGUIMessage( ' Start alloc:' )
     allocate( problem%Kxx(ntot,ntot), problem%Kxy(ntot,ntot), problem%Kxz(ntot,ntot) )
     allocate( problem%Kyy(ntot,ntot), problem%Kyz(ntot,ntot) )
     allocate( problem%Kzz(ntot,ntot) )
-    call displayGUIMessage( ' End alloc:' )
         
         
     if ( problem%demagTensorLoadState .gt. DemagTensorReturnMemory ) then
@@ -1430,18 +1300,17 @@ end subroutine updateDemagfieldFMM
  
         !call mkl_set_num_threads(problem%nThreadsMatlab)
         !call omp_set_num_threads(problem%nThreadsMatlab)
-        !call omp_set_num_threads(1)
-        !print *, " we are here"
-               
+        !call omp_set_num_threads(1)               
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
             
             if (nx_ave*ny_ave*nz_ave > 1) then
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
         
-            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout, pts_arr) default(none)
-        
-            !for each element find the tensor for all evaluation points (i.e. all elements)
+            !for each element find the tensor for all evaluation points (i.e. all elements)    
+            !======== NOTE ===============
+            ! this parallelization seem to give issues when compiled with matlab in debug mode
+            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout) default(none)
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx
@@ -1495,8 +1364,8 @@ end subroutine updateDemagfieldFMM
                     enddo
                 enddo
             enddo
-            
             !$OMP END PARALLEL DO
+
             
             open(21,file='Kxx.txt',status='unknown',form='formatted',action='write')
             do i=1,size(problem%Kxx,1)
@@ -1656,13 +1525,13 @@ end subroutine updateDemagfieldFMM
         CALL SYSTEM_CLOCK(c2)
 
         !Display the time to compute the demag tensor and its first entry
-        call displayGUIMessage( 'Time demag tensor:' )
-        write (prog_str,'(f10.3)') (c2 - c1)/rate
-        call displayGUIMessage( prog_str )
+        !call displayGUIMessage( 'Time demag tensor:' )
+        !write (prog_str,'(f10.3)') (c2 - c1)/rate
+        !call displayGUIMessage( prog_str )
         
-        call displayGUIMessage( 'Kxx(1,1):' )
-        write (prog_str,'(f10.3)') problem%Kxx(1,1)
-        call displayGUIMessage( prog_str )      
+        !call displayGUIMessage( 'Kxx(1,1):' )
+        !write (prog_str,'(f10.3)') problem%Kxx(1,1)
+        !call displayGUIMessage( prog_str )      
         
         !Write the demag tensors to disk if asked to do so            
         if ( problem%demagTensorReturnState .gt. DemagTensorReturnMemory ) then
@@ -1682,7 +1551,8 @@ end subroutine updateDemagfieldFMM
 
 
     !-------------- for debug write the dense matrices to binary files --------------
-    !  open (11, file="dense_std_MT.bin",  &
+    ! TODO - add option to control this and maybe an "auxiliary" module to do this
+    !open (11, file="dense_std_ref_nocuda.bin",  &
     !       status='unknown', form='unformatted', &
     !       access='direct', recl=1*ntot*ntot)
     ! write(11,rec=1) problem%Kxx
@@ -1692,7 +1562,10 @@ end subroutine updateDemagfieldFMM
     ! write(11,rec=5) problem%Kyz
     ! write(11,rec=6) problem%Kzz
     ! close(11)
+    !error stop " test stop after writing dense ref"
     !-------------- end debug write the dense matrices to binary files --------------
+
+    call trace%end( "ComputeDemagfieldTensor", itimer=itimer, verbose=1 )
     
     end subroutine ComputeDemagfieldTensor
     
@@ -1749,6 +1622,8 @@ end subroutine updateDemagfieldFMM
     type(matrix_descr) :: descr                        !> Describes a sparse matrix operation
     real(DP) :: const
     character*(100) :: prog_str 
+    integer, save :: itimer = 0
+    call trace%begin( "ComputeExchangeTerm3D_Uniform", itimer=itimer, verbose=1 )
     
     !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
@@ -2120,6 +1995,8 @@ end subroutine updateDemagfieldFMM
     
     call create_COO_values_from_CSR(A,solution%gridinfo)
     
+
+    call trace%end( "ComputeExchangeTerm3D_Uniform", itimer=itimer, verbose=1 )
     end subroutine ComputeExchangeTerm3D_Uniform
        
     !>-----------------------------------------
@@ -2132,7 +2009,11 @@ end subroutine updateDemagfieldFMM
     type(MicroMagProblem),intent(inout) :: problem             !> Struct containing the problem
     
     integer :: nx,ny,nz,ntot, i
+    integer, save :: itimer = 0
     
+    ntot = size(problem%Ms)
+
+    call trace%begin( "ComputeAnisotropyTerm3D", itimer=itimer, verbose=1 )
     !--- We use the general formulation introduced in updateAnisotropy
     !--- If the user has specified a value for the uniaxial anisotropy or the cubic anisotropy, we use transform
     !--- those to the general matrix formulation
@@ -2149,6 +2030,18 @@ end subroutine updateDemagfieldFMM
         problem%CrystalAxis(:,3,1) =  problem%u_ea(:,1)
         problem%CrystalAxis(:,3,2) =  problem%u_ea(:,2)
         problem%CrystalAxis(:,3,3) =  problem%u_ea(:,3)
+
+        allocate(problem%Axx(ntot),problem%Axy(ntot),problem%Axz(ntot), &
+                 problem%Ayy(ntot),problem%Ayz(ntot),problem%Azz(ntot))
+        problem%Axx = problem%u_ea(:,1) * problem%u_ea(:,1)
+        problem%Axy = problem%u_ea(:,1) * problem%u_ea(:,2)
+        problem%Axz = problem%u_ea(:,1) * problem%u_ea(:,3)
+        problem%Ayy = problem%u_ea(:,2) * problem%u_ea(:,2)
+        problem%Ayz = problem%u_ea(:,2) * problem%u_ea(:,3)
+        problem%Azz = problem%u_ea(:,3) * problem%u_ea(:,3)
+
+
+        
         
     elseif (any(problem%K1 .ne. 0)) then !Cubic anisotropy
         call displayGUIMessage( 'Assuming cubic anisotropy' )
@@ -2163,6 +2056,8 @@ end subroutine updateDemagfieldFMM
             problem%Kfact_arr(i,:,:) = problem%K0_arr(i,:,:) / ( mu0 * problem%Ms(i) )
         enddo
     endif
+
+    call trace%end( "ComputeAnisotropyTerm3D", itimer=itimer, verbose=1 )
     
     end subroutine ComputeAnisotropyTerm3D
 
@@ -2192,6 +2087,8 @@ subroutine add_near_field(problem, solution)
   real(SP) :: pref
   integer :: stat
   real(SP) :: alpha, beta
+  integer, save :: itimer = 0
+  call trace%begin( "add_near_field", itimer=itimer, verbose=1 )
 
 
   ntot = size(problem%grid%pts, dim=1)
@@ -2249,6 +2146,7 @@ subroutine add_near_field(problem, solution)
     deallocate(mxm, mym, mzm, temp)
 #endif
 
+    call trace%end( "add_near_field", itimer=itimer, verbose=1 )
 end subroutine add_near_field
 
         !------------------------------------------------------------------------------------------------

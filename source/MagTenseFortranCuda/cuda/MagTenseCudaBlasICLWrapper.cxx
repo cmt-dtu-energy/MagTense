@@ -9,6 +9,7 @@ void cu_initDemagMatrices( const float*, const float*, const float*, const float
 void cu_MVMult_GetH( const float*, const float*, const float*, float*, float*, float*, int*, float* );
 void cu_destroy();
 void cu_test( const float*, int* n);
+void cu_dumpDemagMatrices_dense(const char* filename);
 
  extern "C" {
 	 
@@ -24,6 +25,8 @@ void cu_test( const float*, int* n);
 	void icl_destroy();
 	
 	void icl_test( const float* K, int* n);
+
+	void icl_dumpDemagMatrices_dense(const char* filename);
 }
 
 void icl_initDemagMatrices_sparse( int* n, int* nnz, int* mat_no, float* values, int* colInds, int* rowInds )
@@ -47,7 +50,6 @@ void icl_MVMult_GetH( const float* Mx, const float* My, const float* Mz, float* 
 }
 
 
-
 void icl_destroy()
 {
 	cu_destroy();
@@ -58,3 +60,7 @@ void icl_destroy()
 	 cu_test(K, n);
  }
  
+ void icl_dumpDemagMatrices_dense(const char* filename)
+ {
+	cu_dumpDemagMatrices_dense(filename);
+ }

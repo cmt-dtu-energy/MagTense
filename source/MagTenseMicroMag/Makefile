@@ -51,6 +51,9 @@ TILE_DEMAG_TENSOR_PATH = ../TileDemagTensor/TileDemagTensor
 DEMAG_FIELD_PATH = ../DemagField/DemagField
 DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
 
+AUXMT_PATH = ../AuxMT
+AUXMT_LIB = ${AUXMT_PATH}/libAuxMT${LIB_SUFFIX}
+
 #=======================================================================
 #							Targets
 #=======================================================================
@@ -62,7 +65,7 @@ all: pre-build ${STATIC_LIB}
 %.o : %.mod
 
 .f90.o:
-	${FC} ${FFLAGS} -I${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} ${OPT} ${MATLAB_OPT} ${OPT} -c $< -o $@
+	${FC} ${FFLAGS} -I${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 -I${AUXMT_PATH} -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} ${OPT} ${MATLAB_OPT} ${OPT} -c $< -o $@
 
 pre-build:
 	cd ${NUM_INT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"

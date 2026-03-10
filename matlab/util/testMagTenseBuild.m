@@ -15,6 +15,7 @@ for i = 1:length(USE_CVODE_arr)
         USE_CVODE_var = USE_CVODE_arr(j);
         USE_RELEASE_var = USE_RELEASE_arr(k);
         
+        disp(['Using USE_CUDA: ' num2str(USE_CUDA_var) ', USE_CVODE: ' num2str(USE_CVODE_var) ',USE_RELEASE:' num2str(USE_RELEASE_var)])
         cd(util_dir)
         cd '..'
         buildMagTenseMEX('USE_CUDA',USE_CUDA_var,'USE_CVODE',USE_CVODE_var,'VS_STUDIO',true,'USE_RELEASE',USE_RELEASE_var)
@@ -28,5 +29,3 @@ for i = 1:length(USE_CVODE_arr)
         end
     end
 end
-
-

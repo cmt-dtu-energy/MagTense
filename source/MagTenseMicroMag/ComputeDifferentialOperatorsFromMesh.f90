@@ -7,6 +7,9 @@ module DifferentialOperators
   use ISO_C_BINDING
   use UTIL_CALL
   use UTIL_MICROMAG
+
+  use sort_mod
+  use trace_mod
   
   implicit none
 
@@ -123,6 +126,11 @@ module DifferentialOperators
         type(MATRIX_DESCR) :: descr_copy
         type(sparse_matrix_t) :: DDXA_sparse, FX_sparse, DDYA_sparse, FY_sparse, DDZA_sparse, FZ_sparse
         type(sparse_matrix_t) :: DDX_sparse, DDY_sparse, DDZ_sparse, W_sparse        
+        integer, save :: itimer=0
+        integer, dimension(:), allocatable :: sorted_indices
+        integer :: u 
+
+        call trace%begin( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
         eps_criteria = 1.0e-12
         const = 1.
@@ -168,6 +176,7 @@ module DifferentialOperators
         ss = Signs(:,3)
         ns = Signs(:,1)
         ks = Signs(:,2)
+
 
         !>-----------------------------------------
         ! Constructing summing matrix according to reference
@@ -244,26 +253,21 @@ module DifferentialOperators
             call displayGUIMessage( 'Warning: untested method: compact' )
         endif
 
-        !>-----------------------------------------
-        ! Calculating weights
+        ! !>-----------------------------------------
+        ! ! Calculating weights
         deallocate(ns,ks)
         allocate(ns(size(el2fa,1)),ks(size(el2fa,1)))
-        ns = el2fa(:,1)
-        ks = el2fa(:,2)
-               
-        ! Sort the indices of the faces and tiles
-        allocate(mask1D(size(ks)))    
-        mask1D(:) = .true.
         allocate(ks_sorted(size(ks)))
         allocate(ns_sorted(size(ks)))
-        do i = 1, size(ks)
-            indx = minloc(ks, 1, mask1D)
-            ks_sorted(i) = ks(indx)
-            ns_sorted(i) = ns(indx)
-            mask1D(MINLOC(ks,mask1D)) = .false.
-        end do    
-        deallocate(mask1D) 
-        
+        ns = el2fa(:,1)
+        ks = el2fa(:,2)
+
+        allocate(sorted_indices(size(ks)))
+        call argsort(ks, sorted_indices, algo="quicksort")
+        call apply_perm(ks, sorted_indices, ks_sorted)
+        call apply_perm(ns, sorted_indices, ns_sorted)
+        deallocate(sorted_indices)
+
        ! Determines which weights are to be used in the first interpolation step 
         allocate(w(size(ns)))
         if (dims == 1) then
@@ -274,18 +278,40 @@ module DifferentialOperators
             w = ((Xel(ns_sorted) - Xf(ks_sorted))**2 + (Yel(ns_sorted) - Yf(ks_sorted))**2 + (Zel(ns_sorted) - Zf(ks_sorted))**2)**(-weight/2.0)
         end if
         
+
+        
         !>-----------------------------------------
         ! Prepare distances for the interpolation.       
-        allocate(inds2_vals_temp(size(ns)))
-        call unique_sort(ks_sorted, inds2_vals_temp, n_unique)
-        allocate(inds2_vals, source=inds2_vals_temp(1:n_unique))
-        deallocate(inds2_vals_temp)
-             
-        allocate(inds2(size(inds2_vals)))
-        do i = 1, size(inds2_vals)
-            inds2(i) = minloc(ks_sorted, 1, mask=ks_sorted .eq. inds2_vals(i), back=.true.)
-        end do    
-        
+        !-------------------------------------------------------------------------------------------
+        ! Count unique values
+        !-------------------------------------------------------------------------------------------
+        n_unique = 0
+        if (size(ks_sorted) > 0) then
+            n_unique = 1
+            do i = 2, size(ks_sorted)
+                if (ks_sorted(i) /= ks_sorted(i-1)) n_unique = n_unique + 1
+            end do
+        end if
+        !-------------------------------------------------------------------------------------------
+        allocate(inds2_vals(n_unique))
+        allocate(inds2(n_unique))
+        !-------------------------------------------------------------------------------------------
+        ! Fill unique values and record the last index for each (equivalent to minloc(..., back=.true.))
+        !-------------------------------------------------------------------------------------------
+        if (n_unique > 0) then
+            u = 1
+            inds2_vals(u) = ks_sorted(1)
+
+            do i = 2, size(ks_sorted)
+                if (ks_sorted(i) /= ks_sorted(i-1)) then
+                    inds2(u) = i - 1
+                    u = u + 1
+                    inds2_vals(u) = ks_sorted(i)
+                end if
+            end do
+            inds2(u) = size(ks_sorted)
+        end if
+
         allocate(inds1(size(inds2)+1))
         inds1(1) = 1
         inds1(2:size(inds1)) = inds2(:) + 1
@@ -328,6 +354,7 @@ module DifferentialOperators
         ! for each face, ks. Details can be found in [2].
         allocate(mask1D(size(Signs(:,1))))
         
+
         do kk = 1, K
             
             allocate(ind(inds2(kk)-inds1(kk)+1))
@@ -581,6 +608,9 @@ module DifferentialOperators
         
         stat = mkl_sparse_destroy(DX_matrix)
                 
+
+
+        call trace%end( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
     end subroutine computeDifferentialOperatorsFromMesh_DirectLap
 

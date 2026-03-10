@@ -1,5 +1,6 @@
 module MagTenseMicroMagPyIO
 use MicroMagParameters
+use trace_mod
     
 implicit none
 
@@ -55,7 +56,9 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     integer(4), intent(in) :: fmm_min_n
 
     logical :: ex
+    integer, save :: itimer = 0
 
+    call trace%begin("loadMicroMagProblem", itimer=itimer, verbose=1)
 
     problem%dummy_run = dummy_run
     problem%fmm_cells_per_node = fmm_cells_per_node
@@ -134,7 +137,6 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     !Applied field as a function of time evaluated at the timesteps specified in nt_Hext
     !problem%Hext(:,1) is the time grid while problem%Hext(:,2:4) are the x-,y- and z-components of the applied field
     problem%Hext = Hext
-    
     allocate( problem%t(nt) )
     problem%t = t
     
@@ -271,6 +273,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     problem%K1 = k1	
     problem%K2 = k2
 
+    call trace%end("loadMicroMagProblem", itimer=itimer, verbose=1)
 end subroutine loadMicroMagProblem
 
 

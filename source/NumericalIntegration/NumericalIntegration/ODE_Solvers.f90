@@ -537,15 +537,15 @@ module ODE_Solvers
         !FILE *fp;
         
         call callback(msg, ierr)
-        inquire(file="error.txt", exist=exist)
-        if(exist) then
-            open(12,file='error.txt',status='old',access='append',form='formatted',action='write')    
-        else
-            open(12,file='error.txt',status='new',form='formatted',action='write')
-        end if
-        write(12,*) msg
-        write(12,*) ierr
-        close(12)
+        !inquire(file="error.txt", exist=exist)
+        !if(exist) then
+        !    open(12,file='error.txt',status='old',access='append',form='formatted',action='write')    
+        !else
+        !    open(12,file='error.txt',status='new',form='formatted',action='write')
+        !end if
+        !write(12,*) msg
+        !write(12,*) ierr
+        !close(12)
     end subroutine CVODE_error
 
     subroutine Norm_error(neq, y_cur, y_norm, max_norm_dev)

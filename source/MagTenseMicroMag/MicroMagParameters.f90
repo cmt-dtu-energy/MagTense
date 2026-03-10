@@ -4,7 +4,7 @@ include "mkl_dfti.f90"
     module MicroMagParameters
     use MKL_SPBLAS
     Use MKL_DFTI
-#if USE_FMM3D
+#if USE_FMM3D    
     use fmm3d_tree_mod
 #endif
     INTEGER, PARAMETER :: SP = SELECTED_REAL_KIND(6, 37)
@@ -231,8 +231,7 @@ include "mkl_dfti.f90"
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
-
-#if USE_FMM3D
+#if USE_FMM3D   
         class(FMM3DTree), pointer :: fmm_tree => null()    !> FMM tree for computing the demag field using FMM
 #endif
     end type MicroMagSolution

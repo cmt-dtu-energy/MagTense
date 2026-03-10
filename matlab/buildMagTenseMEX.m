@@ -25,6 +25,7 @@ VS_STUDIO     = options.VS_STUDIO;
 
 pause_time = 1; %Time to wait between making and moving the generated files
 mex_root                    = '../source/MagTenseMEX/MagTenseMEX/';
+AuxMT_path                  = '../source/AuxMT';
 NumericalIntegration_path   = '../source/NumericalIntegration/NumericalIntegration';
 DemagField_path             = '../source/DemagField/DemagField';
 TileDemagTensor_path        = '../source/TileDemagTensor/TileDemagTensor';
@@ -53,19 +54,23 @@ else
         share_dir = system('ls /usr/share/miniconda/envs/magtense-env/');
     
         if (share_dir == 0)
-            pre_str = '/usr/share/miniconda';
+            pre_str = '/usr/share/miniconda/envs/magtense-env';
         else
             %--- Get the username of the current user, which is where the miniconda is installed
             [~,username] = system('whoami');
             user = username(1:(end-1));
-            pre_str = ['/home/' user '/miniconda3'];
+            pre_str = ['/home/' user '/miniconda3/envs/magtense-env'];
+        end
+    else
+        if isempty(strfind(pre_str,'magtense-env'))
+            pre_str = [pre_str '/envs/magtense-env'];
         end
     end
 
-    compiler_root = [pre_str '/envs/magtense-env'];
-    mkl_root = [pre_str '/envs/magtense-env'];
-    mkl_lib = [pre_str '/envs/magtense-env/lib'];
-    cuda_root = [pre_str '/envs/magtense-env/lib'];
+    compiler_root = pre_str;
+    mkl_root = pre_str;
+    mkl_lib = [pre_str '/lib'];
+    cuda_root = [pre_str '/lib'];
     cvode_include = '/home/runner/work/MagTense/MagTense/cvode/fortran';
     cvode_lib = '/home/runner/work/MagTense/MagTense/cvode/lib';
     mex_suffix = 'a';
@@ -79,10 +84,20 @@ else
     BUILD = '/x64/Debug';
 end
 
+if (VS_STUDIO)
+    BUILD_AuxMT = [BUILD ' '];
+else
+    BUILD_AuxMT = ' ';
+end
+
 if (USE_CUDA)
     if (ispc)
         CUDA = ['-L' cuda_root ' -lcublas -lcudart -lcuda -lcusparse'];
-        OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.obj ' FortranCuda_path '/MagTenseCudaBlas.obj" '];
+        if (VS_STUDIO)
+            OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.obj ' FortranCuda_path '/MagTenseCudaBlas.obj" '];
+        else
+            OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.o ' FortranCuda_path '/MagTenseCudaBlas.o" '];
+        end
     else
         CUDA = ['-Wl,-Bdynamic ' '-L' cuda_root ' -lcublas -lcudart -lcusparse'];
         OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.o ' FortranCuda_path '/MagTenseCudaBlas.o" '];
@@ -129,10 +144,11 @@ if (ispc)
     if (USE_CUDA)
         FFLAGS = [FFLAGS(1:(end-1)) ' /libs:static"'];
     end
-    INCLUDE = ['-I' mkl_include ' -I' mkl_lp64 ' -I' NumericalIntegration_path BUILD '-I' DemagField_path BUILD '-I' TileDemagTensor_path ...
+    INCLUDE = ['-I' mkl_include ' -I' mkl_lp64 ' -I' NumericalIntegration_path BUILD ' -I' AuxMT_path BUILD_AuxMT ' -I' DemagField_path BUILD '-I' TileDemagTensor_path ...
         BUILD '-I' MagTenseMicroMag_path BUILD_MagTenseMicroMag '-I' ForceIntegrator_path BUILD CVODE_include];
     LIBS = ['-L' MagTenseMicroMag_path BUILD_MagTenseMicroMag '-lMagTenseMicroMag -L' DemagField_path BUILD ...
-        ' -lDemagField -L' TileDemagTensor_path BUILD ' -lTileDemagTensor -L' NumericalIntegration_path BUILD ...
+        ' -lDemagField -L' TileDemagTensor_path BUILD ' -lTileDemagTensor -L' AuxMT_path BUILD_AuxMT ...
+        ' -lAuxMT -L' NumericalIntegration_path BUILD ...
         ' -lNumericalIntegration -L' ForceIntegrator_path BUILD ' -lMagneticForceIntegrator'];
     
     if (MKL_STATIC)
@@ -142,12 +158,13 @@ if (ispc)
     end
 else
     DEFINES = ['FC="' compiler_root '/bin/ifx" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
-    INCLUDE = ['INCLUDE="$INCLUDE -I' NumericalIntegration_path ' -I' DemagField_path ...
+    INCLUDE = ['INCLUDE="$INCLUDE -I' AuxMT_path ' -I'  NumericalIntegration_path ' -I' DemagField_path ...
         ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ' -I' ForceIntegrator_path ... 
         ' -I' mkl_root '/include' ' -I' mkl_root '/include/intel64/lp64'];
     LIBS = ['LINKLIBS=''$LINKLIBS ' '-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' ...
         ForceIntegrator_path ' -lMagneticForceIntegrator -L' DemagField_path ' -lDemagField -L' ...
-        TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration'''];
+        TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration -L' ...
+        AuxMT_path ' -lAuxMT'''];
     if (MKL_STATIC)
         LIBS = [LIBS(1:(end-1)) ' ' mkl_lib '/libmkl_blas95_lp64.a -Wl,--start-group ' ...
                mkl_lib '/libmkl_intel_lp64.a ' mkl_lib '/libmkl_intel_thread.a ' ...
