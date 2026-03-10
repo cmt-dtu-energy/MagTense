@@ -34,7 +34,7 @@
         mwPointer :: exch_matProblemPtr, irPtr, jcPtr
         mwPointer :: genericProblemPtr
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
-        mwPointer :: valuesPtr, rows_startPtr, rows_endPtr,  colsPtr, nValuesSparsePtr, nRowsSparsePtr, nColsSparsePtr
+        mwPointer :: valuesPtr, rowsPtr, colsPtr, nValuesSparsePtr, nRowsSparsePtr, nColsSparsePtr
         mwPointer :: usePrecisionPtr, N_aveProblemPtr, useReturnHallProblemPtr
         mwPointer :: demag_ignore_stepsProblemPtr, CrystalAxisProblemPtr, K0_arrProblemPtr
         mwPointer :: fmm_cellsProblemPtr,fmm_epsProblemPtr,ifunifProblemPtr,nlminProblemPtr,nlmaxProblemPtr,use_fmmlProblemPtr,fmm_shortProblemPtr,fmm_min_nProblemPtr
@@ -301,49 +301,19 @@
                 call mxCopyPtrToInteger4(mxGetPr(nValuesSparsePtr), problem%grid%A_exch_load%nvalues, sx )
                 
                 nvalues = problem%grid%A_exch_load%nvalues
-                allocate( problem%grid%A_exch_load%values(nvalues), problem%grid%A_exch_load%rows_start(nvalues) , problem%grid%A_exch_load%cols(nvalues) )
+                allocate( problem%grid%A_exch_load%values(nvalues), problem%grid%A_exch_load%rows(nvalues) , problem%grid%A_exch_load%cols(nvalues) )
                
                 sx = nvalues
                 valuesPtr = mxGetField( prhs, i, problemFields(41) )
                 call mxCopyPtrToReal8(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
             
                 sx = nvalues
-                rows_startPtr = mxGetField( prhs, i, problemFields(42) )
-                call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), problem%grid%A_exch_load%rows_start, sx )
+                rowsPtr = mxGetField( prhs, i, problemFields(42) )
+                call mxCopyPtrToInteger4(mxGetPr(rowsPtr), problem%grid%A_exch_load%rows, sx )
         
                 sx = nvalues
                 colsPtr = mxGetField( prhs, i, problemFields(44) )
-                call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )                
-            else
-                !REMOVE THIS CODE IN A FUTURE UPDATE
-                ! Load the CSR sparse information from Matlab
-                sx = 1
-                nValuesSparsePtr = mxGetField( prhs, i, problemFields(39) )
-                call mxCopyPtrToInteger4(mxGetPr(nValuesSparsePtr), problem%grid%A_exch_load%nvalues, sx )
-       
-                sx = 1
-                nRowsSparsePtr = mxGetField( prhs, i, problemFields(40) )
-                call mxCopyPtrToInteger4(mxGetPr(nRowsSparsePtr), problem%grid%A_exch_load%nrows, sx )
-            
-                nvalues = problem%grid%A_exch_load%nvalues
-                nrows = problem%grid%A_exch_load%nrows
-                allocate( problem%grid%A_exch_load%values(nvalues), problem%grid%A_exch_load%rows_start(nrows) , problem%grid%A_exch_load%rows_end(nrows) , problem%grid%A_exch_load%cols(nvalues) )
-             
-                sx = nvalues
-                valuesPtr = mxGetField( prhs, i, problemFields(41) )
-                call mxCopyPtrToReal8(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
-            
-                sx = nrows
-                rows_startPtr = mxGetField( prhs, i, problemFields(42) )
-                call mxCopyPtrToInteger4(mxGetPr(rows_startPtr), problem%grid%A_exch_load%rows_start, sx )
-        
-                sx = nrows
-                rows_endPtr = mxGetField( prhs, i, problemFields(43) )
-                call mxCopyPtrToInteger4(mxGetPr(rows_endPtr), problem%grid%A_exch_load%rows_end, sx )
-        
-                sx = nvalues
-                colsPtr = mxGetField( prhs, i, problemFields(44) )
-                call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )
+                call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )       
             endif
         endif
           
@@ -535,8 +505,8 @@
         fieldnames(40) = 'exch_nrow'
         fieldnames(41) = 'exch_val'
         fieldnames(42) = 'exch_rows'
-        fieldnames(43) = 'exch_rowe'
-        fieldnames(44) = 'exch_col'
+        fieldnames(43) = 'UNUSED'       ! Unused field name
+        fieldnames(44) = 'exch_cols'
         fieldnames(45) = 'grid_abc'
         fieldnames(46) = 'usePres'
         fieldnames(47) = 'nThreads'

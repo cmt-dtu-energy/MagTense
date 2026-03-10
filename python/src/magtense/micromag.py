@@ -88,7 +88,7 @@ class MicromagProblem:
             grid_abc: list | np.ndarray | None = None,
             exch_val: list | np.ndarray | None = None,
             exch_rows: list | np.ndarray | None = None,
-            exch_col: list | np.ndarray | None = None,
+            exch_cols: list | np.ndarray | None = None,
             exch_nval: int = 1,
             exch_nrow: int = 1,
             exch_ncols: int = 1,
@@ -169,8 +169,7 @@ class MicromagProblem:
 
         self.exch_val = exch_val
         self.exch_rows = exch_rows
-        self.exch_rowe = np.zeros(shape=(self.exch_nrow), dtype=np.int32, order="F")
-        self.exch_col = exch_col
+        self.exch_cols = exch_cols
 
         self.N_load = len(filename)
         self.N_file_in = filename
@@ -272,18 +271,18 @@ class MicromagProblem:
             self._exch_rows = np.asarray(val, dtype=np.int32, order="F")
 
     @property
-    def exch_col(self) -> list | np.ndarray | None:
-        return self._exch_col
+    def exch_cols(self) -> list | np.ndarray | None:
+        return self._exch_cols
 
-    @exch_col.setter
-    def exch_col(self, val: list | np.ndarray | None) -> None:
+    @exch_cols.setter
+    def exch_cols(self, val: list | np.ndarray | None) -> None:
         if val is None:
-            self._exch_col = np.zeros(
+            self._exch_cols = np.zeros(
                 shape=(self.exch_nval,), dtype=np.int32, order="F"
             )
         else:
             assert np.asarray(val).shape == (self.exch_nval,)
-            self._exch_col = np.asarray(val, dtype=np.int32, order="F")
+            self._exch_cols = np.asarray(val, dtype=np.int32, order="F")
 
     @property
     def grid_pts(self) -> list | np.ndarray | None:
@@ -610,8 +609,7 @@ class MicromagProblem:
             exch_nrow=self.exch_nrow,
             exch_val=self.exch_val,
             exch_rows=self.exch_rows,
-            exch_rowe=self.exch_rowe,
-            exch_col=self.exch_col,
+            exch_cols=self.exch_cols,
             grid_abc=self.grid_abc,
             useprecision=self.precision,
             nthreadsmatlab=self.n_threads,
@@ -734,8 +732,7 @@ class MicromagProblem:
             exch_nrow=self.exch_nrow,
             exch_val=self.exch_val,
             exch_rows=self.exch_rows,
-            exch_rowe=self.exch_rowe,
-            exch_col=self.exch_col,
+            exch_cols=self.exch_cols,
             grid_abc=self.grid_abc,
             useprecision=self.precision,
             nthreadsmatlab=self.n_threads,

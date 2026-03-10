@@ -82,7 +82,7 @@ def std_prob_4(
         grid_abc=grid_abc,
         grid_type=grid_type,
         exch_rows=ExchMat_r,
-        exch_col=ExchMat_c,
+        exch_cols=ExchMat_c,
         exch_val=ExchMat_v,
         exch_nval=exch_nval,
         exch_nrow=exch_nrow,

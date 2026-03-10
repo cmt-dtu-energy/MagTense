@@ -10,17 +10,9 @@ MATLAB_INCLUDE =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
-LIBSRC_SOURCES = DemagFieldGetSolution MagParameters spline IterateMagnetSolution
-
-ifeq ($(USE_MATLAB),1)
-    OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
-	LIBSRC_SOURCES += MagTileIO
-	MATLAB_OPT = -I${MATLAB_INCLUDE}
-else
-    OPT =
-	MATLAB_OPT =
-endif
-
+LIBSRC_SOURCES = TileTensorHelperFunctions TileCylPieceTensor \
+	TileRectangularPrismTensor TilePlanarCoilTensor TileTriangle \
+	TileCircPieceTensor TileNComponents
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
@@ -38,16 +30,9 @@ else
 	endif
 endif
 
-STATIC_LIB = libDemagField${LIB_SUFFIX}
-NUM_INT_PATH = ../../NumericalIntegration/NumericalIntegration
+STATIC_LIB = libTileDemagTensor${LIB_SUFFIX}
+NUM_INT_PATH = ../NumericalIntegration
 NUM_INT_LIB = ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX}
-
-TILE_DEMAG_TENSOR_PATH = ../../TileDemagTensor/TileDemagTensor
-TILE_DEMAG_TENSOR_LIB = ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX}
-
-AUXMT_PATH = ../../AuxMT
-AUXMT_LIB = ${AUXMT_PATH}/libAuxMT${LIB_SUFFIX}
-
 #=======================================================================
 #							Targets
 #=======================================================================
@@ -57,14 +42,14 @@ AUXMT_LIB = ${AUXMT_PATH}/libAuxMT${LIB_SUFFIX}
 all: pre-build ${STATIC_LIB}
 
 .f90.o:
-	$(FC) $(FFLAGS) -I${AUXMT_PATH} -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} ${OPT} ${MATLAB_OPT} -c $< -o $@
+	${FC} ${FFLAGS} -I ${NUM_INT_PATH} ${OPT} -c $< -o $@
 
 pre-build:
-	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
-	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
+	cd ${NUM_INT_PATH} && ${MAKE} FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=${MATLAB_INCLUDE}
 
-${STATIC_LIB}: ${AUXMT_LIB} ${TILE_DEMAG_TENSOR_LIB} ${LIBSRC_OBJECTS}
+${STATIC_LIB}: ${NUM_INT_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
 clean:
 	-rm -f *${LIB_SUFFIX} *.o *.mod
+	

@@ -29,7 +29,8 @@ include "mkl_dfti.f90"
         real(SP),dimension(:),allocatable :: values                     !> the non-zero values
         integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
         integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
-        integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
+        integer,dimension(:),allocatable :: rows                        !> array of same length as values containing the row no. of the i'th value
+        integer,dimension(:),allocatable :: cols                        !> array of same length as values containing the column no. of the i'th value
         integer :: nvalues                                              !> the number of elements in values
         integer :: nrows                                                !> the number of elements in the row arrays
         integer :: ncols                                                !> the number of columns
@@ -41,6 +42,7 @@ include "mkl_dfti.f90"
         real(DP),dimension(:),allocatable :: values                     !> the non-zero values
         integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
         integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
+        integer,dimension(:),allocatable :: rows                        !> array of same length as values containing the row no. of the i'th value
         integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
         integer :: nvalues                                              !> the number of elements in values
         integer :: nrows                                                !> the number of elements in the row arrays
@@ -53,6 +55,7 @@ include "mkl_dfti.f90"
         complex(kind=4),dimension(:),allocatable :: values              !> the non-zero values
         integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
         integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
+        integer,dimension(:),allocatable :: rows                        !> array of same length as values containing the row no. of the i'th value
         integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
         integer :: nvalues                                              !> the number of elements in values
         integer :: nrows                                                !> the number of elements in the row arrays

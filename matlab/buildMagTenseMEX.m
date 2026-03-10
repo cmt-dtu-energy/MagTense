@@ -24,13 +24,13 @@ USE_CVODE     = options.USE_CVODE;
 VS_STUDIO     = options.VS_STUDIO;
 
 pause_time = 1; %Time to wait between making and moving the generated files
-mex_root                    = '../source/MagTenseMEX/MagTenseMEX/';
+mex_root                    = '../source/MagTenseMEX/';
 AuxMT_path                  = '../source/AuxMT';
-NumericalIntegration_path   = '../source/NumericalIntegration/NumericalIntegration';
-DemagField_path             = '../source/DemagField/DemagField';
-TileDemagTensor_path        = '../source/TileDemagTensor/TileDemagTensor';
+NumericalIntegration_path   = '../source/NumericalIntegration';
+DemagField_path             = '../source/DemagField';
+TileDemagTensor_path        = '../source/TileDemagTensor';
 MagTenseMicroMag_path       = '../source/MagTenseMicroMag';
-ForceIntegrator_path        = '../source/MagneticForceIntegrator/MagneticForceIntegrator';
+ForceIntegrator_path        = '../source/MagneticForceIntegrator';
 FortranCuda_path            = '../source/MagTenseFortranCuda/cuda';
 
 if (ispc)

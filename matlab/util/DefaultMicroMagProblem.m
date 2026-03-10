@@ -35,8 +35,7 @@ properties
     exch_ncol
     exch_val
     exch_rows
-    exch_rowe
-    exch_col
+    exch_cols
 
     exch_weigh
     exch_meth
@@ -314,8 +313,7 @@ methods
         obj.exch_ncol = 0;
         obj.exch_val = 0;
         obj.exch_rows = 0;
-        obj.exch_rowe = 0;
-        obj.exch_col = 0;
+        obj.exch_cols = 0;
 
         % Exchange term constant
         obj.A0 = 1.3e-11;
@@ -526,20 +524,6 @@ methods
         end
     end
 
-    function obj = setExchangeMatrixSparse( obj, ExchangeMatrix )
-    % Convert the Exchange matrix to CSR and store it in the problem statement
-        [v,c,rs,re]   = DefaultMicroMagProblem.convertToCSR(ExchangeMatrix);
-        obj.exch_nval = int32(numel(v));
-        obj.exch_nrow = int32(numel(rs));
-        obj.exch_val  = double(v);
-        obj.exch_rows = int32(rs);
-        obj.exch_rowe = int32(re);
-        obj.exch_col  = int32(c);
-        obj.exch_ncol = int32(0);
-
-        disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(2^30)) ' Gb'])
-    end
-
     function obj = setExchangeMatrixCOO( obj, nrows, ncols, rows, cols, values )
     % Pass the Exchange matrix to Fortran in COO format
         obj = obj.setMicroMagpassExch( true );
@@ -548,7 +532,7 @@ methods
         obj.exch_nval = int32(numel(rows));
         obj.exch_val  = double(values);
         obj.exch_rows = int32(rows);
-        obj.exch_col  = int32(cols);
+        obj.exch_cols  = int32(cols);
     end
 
     function obj = setMicroMagDemagApproximation( obj, type_var )
@@ -677,6 +661,7 @@ methods
                 obj.m0=obj.m0./mnorm;
             end
         end
+        disp(['The demag tensor will require around ' num2str(((3*numel(obj.m0)*(3*numel(obj.m0) + 1)/2))*4/(2^30)) ' Gb'])
         warning('off','MATLAB:structOnObject')
         obj2=builtin('struct',obj); % Actual struct conversion
         warning('on','MATLAB:structOnObject')

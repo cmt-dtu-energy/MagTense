@@ -11,7 +11,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
     N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-    exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
+    exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
 	CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn, &
 	passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n )
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
@@ -27,10 +27,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     real(8),dimension(nt),intent(in) :: t
     real(8),dimension(3*ntot),intent(in) :: m0
     real(8),dimension(nt_alpha,2),intent(in) :: alphat
-    integer(4),dimension(exch_nval),intent(in) :: exch_val
-    integer(4),dimension(exch_nval),intent(in) :: exch_rows
-	integer(4),dimension(exch_nrow),intent(in) :: exch_rowe
-    integer(4),dimension(exch_nval),intent(in) :: exch_col
+    integer(4),dimension(exch_nval),intent(in) :: exch_val, exch_rows, exch_cols
     real(8),dimension(nt_conv),intent(in) :: t_conv
     integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
     integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch
@@ -213,28 +210,13 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 			problem%grid%A_exch_load%ncols = exch_ncols
 			
 			allocate( problem%grid%A_exch_load%values(exch_nval))
-			allocate(problem%grid%A_exch_load%rows_start(exch_nval))
+			allocate(problem%grid%A_exch_load%rows(exch_nval))
 			allocate(problem%grid%A_exch_load%cols(exch_nval))
 
 			problem%grid%A_exch_load%values = exch_val
-			problem%grid%A_exch_load%rows_start = exch_rows
-			problem%grid%A_exch_load%cols = exch_col
-			
-		else
-			! Pass the exchange matrix in CSR sparse information - deprecated feature
-			problem%grid%A_exch_load%nvalues = exch_nval
-			problem%grid%A_exch_load%nrows = exch_nrow
-			
-			allocate( problem%grid%A_exch_load%values(exch_nval) )
-			allocate( problem%grid%A_exch_load%rows_start(exch_nval) )
-			allocate( problem%grid%A_exch_load%rows_end(exch_nrow) )
-			allocate( problem%grid%A_exch_load%cols(exch_nval) )
-				
-			problem%grid%A_exch_load%values = exch_val
-			problem%grid%A_exch_load%rows_start = exch_rows
-			problem%grid%A_exch_load%rows_end = exch_rowe
-			problem%grid%A_exch_load%cols = exch_col
-		endif
+			problem%grid%A_exch_load%rows = exch_rows
+			problem%grid%A_exch_load%cols = exch_cols
+        endif
     endif
         
     !Load the no. of time steps in the time convergence array        

@@ -1310,7 +1310,7 @@ end subroutine updateDemagfieldFMM
             !for each element find the tensor for all evaluation points (i.e. all elements)    
             !======== NOTE ===============
             ! this parallelization seem to give issues when compiled with matlab in debug mode
-            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout) default(none)
+            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout, pts_arr) default(none)
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx

@@ -16,9 +16,9 @@ else
 	LIB_SUFFIX = .a
 endif
 
-NUM_INT_PATH = ../../NumericalIntegration/NumericalIntegration
-TILE_DEMAG_TENSOR_PATH = ../../TileDemagTensor/TileDemagTensor
-DEMAG_FIELD_PATH = ../../DemagField/DemagField
+NUM_INT_PATH = ../NumericalIntegration
+TILE_DEMAG_TENSOR_PATH = ../TileDemagTensor
+DEMAG_FIELD_PATH = ../DemagField
 DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libTileDemagTensor${LIB_SUFFIX}
 #=======================================================================
 #							Targets
