@@ -269,4 +269,4 @@ build-python-interface: build-cvode
 	$(CONDA_BIN) run -n magtense-env -- python -m pip install -e ./python
 
 test-python-interface:
-	$(CONDA_BIN) run -n magtense-env -- python python/examples/micromagnetism/std_problem_3.py
+	$(CONDA_BIN) run -n magtense-env -- pytest
