@@ -161,7 +161,7 @@ PYTHON_MODN_ALL = _${PYTHON_MODN}${PY_MOD_SUFFIX}
 #=======================================================================
 #							Targets
 #=======================================================================
-.PHONY: all clean install-miniconda build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL}
+.PHONY: all clean install-miniconda build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL} rm-conda rm-env
 
 all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR}
 
@@ -223,9 +223,12 @@ install-miniconda:
 			echo "Miniconda installed at $(CONDA_DIR)."; \
 	fi
 
+rm-conda:
+	rm -rf $(CONDA_DIR)
+
 build-env: install-miniconda
 # Check if the "magtense-env" environment already exists before creating it
-	@if ! conda env list  | grep -q "magtense-env"; then \
+	@if ! $(CONDA_BIN) env list  | grep -q "magtense-env"; then \
 		$(CONDA_BIN) env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-313-linux.yml; \
 	else \
 		echo "magtense-env environment already exists."; \
