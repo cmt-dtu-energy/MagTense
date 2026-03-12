@@ -219,13 +219,18 @@ install-miniconda:
 	else \
 			echo "Conda not found. Installing Miniconda..."; \
 			curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o miniconda.sh; \
-			bash miniconda.sh -b -p $(CONDA_DIR); \
-			rm miniconda.sh; \
+			bash miniconda.sh -b -p $(CONDA_DIR) && rm miniconda.sh; \
 			echo "Miniconda installed at $(CONDA_DIR)."; \
 	fi
 
 build-env: install-miniconda
-	$(CONDA_BIN) env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-313-linux.yml
+# Check if the "magtense-env" environment already exists before creating it
+	@if ! conda env list  | grep -q "magtense-env"; then \
+		$(CONDA_BIN) env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-313-linux.yml; \
+	else \
+		echo "magtense-env environment already exists."; \
+	fi
+
 
 rm-env:
 	$(CONDA_BIN) env remove -n magtense-env
@@ -266,8 +271,8 @@ build-cvode: build-env
 	mv ${MKFILE_PATH}/cvode-7.4.0 ${CVODE_ROOT}/src
 	$(run-cmake-cvode)
 
-python: 
-	if [ ! -d "${CVODE_ROOT}/build" ] || [ -z "$$(ls -A ${CVODE_ROOT}/build)" ]; then \
+python: build-env
+	@if [ ! -d "${CVODE_ROOT}/build" ] || [ -z "$$(ls -A ${CVODE_ROOT}/build)" ]; then \
 		$(MAKE) build-cvode; \
 	fi
 	$(CONDA_BIN) run -n magtense-env $(MAKE) python_ USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
