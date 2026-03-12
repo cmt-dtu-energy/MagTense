@@ -161,17 +161,17 @@ PYTHON_MODN_ALL = _${PYTHON_MODN}${PY_MOD_SUFFIX}
 #=======================================================================
 #							Targets
 #=======================================================================
-.PHONY: all clean install-miniconda build-env build-cvode
+.PHONY: all clean install-miniconda build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL}
 
 all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR}
 
-standalone: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} standalone
+standalone: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR}
 
-python: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
+python_: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
 
 python-win: ${PYTHON_MODN_ALL}
 
-clean:
+define clean-subdirs
 	cd ${NUM_INT_PATH} && ${MAKE} clean
 	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} clean
 	cd ${DEMAG_FIELD_PATH} && ${MAKE} clean
@@ -179,6 +179,10 @@ clean:
 	cd ${FORTRAN_CUDA_PATH} && ${MAKE} clean
 	cd $(STANDALONE_PATH) && ${MAKE} clean
 	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
+endef
+
+clean:
+	$(clean-subdirs)
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
 	rm -rf ${PYTHON_LIBPATH}/build
 
@@ -200,11 +204,6 @@ cuda:
 forceintegrator:
 	cd $(FORCEINTEGRATOR_PATH) && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 
-standalone:
-	cd $(STANDALONE_PATH) && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}'
-	mkdir build
-	cp $(STANDALONE_PATH)/MagTense.x build/MagTense.x
-
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
@@ -225,7 +224,6 @@ install-miniconda:
 			echo "Miniconda installed at $(CONDA_DIR)."; \
 	fi
 
-
 build-env: install-miniconda
 	$(CONDA_BIN) env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-313-linux.yml
 
@@ -236,12 +234,8 @@ CMAKE = $(CONDA_BIN) run -n magtense-env -- cmake
 IFX = $(CONDA_BIN) run -n magtense-env which ifx
 ICX = $(CONDA_BIN) run -n magtense-env which icx
 
-build-cvode: build-env
-	wget https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz
-	tar -xf cvode-7.4.0.tar.gz
-	rm -rf ${CVODE_ROOT}
-	mkdir -p ${CVODE_ROOT}
-	mv ${MKFILE_PATH}/cvode-7.4.0 ${CVODE_ROOT}/src
+
+define run-cmake-cvode
 	$(CMAKE) \
 	-B ${CVODE_ROOT}/build \
 	-S ${CVODE_ROOT}/src \
@@ -262,11 +256,23 @@ build-cvode: build-env
 	-D ENABLE_OPENMP=ON
 	$(CMAKE) --build ${CVODE_ROOT}/build --config Release --verbose
 	$(CMAKE) --install ${CVODE_ROOT}/build --verbose
+endef
 
-build-python-interface: build-cvode
-	$(CONDA_BIN) run -n magtense-env $(MAKE) python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
+build-cvode: build-env
+	wget https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz
+	tar -xf cvode-7.4.0.tar.gz
+	rm -rf ${CVODE_ROOT}
+	mkdir -p ${CVODE_ROOT}
+	mv ${MKFILE_PATH}/cvode-7.4.0 ${CVODE_ROOT}/src
+	$(run-cmake-cvode)
+
+python: 
+	if [ ! -d "${CVODE_ROOT}/build" ] || [ -z "$$(ls -A ${CVODE_ROOT}/build)" ]; then \
+		$(MAKE) build-cvode; \
+	fi
+	$(CONDA_BIN) run -n magtense-env $(MAKE) python_ USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
 	cp python/.build/requirements-py3-dev.txt python/requirements.txt
 	$(CONDA_BIN) run -n magtense-env -- python -m pip install -e ./python
 
-test-python-interface:
+test:
 	$(CONDA_BIN) run -n magtense-env -- pytest
