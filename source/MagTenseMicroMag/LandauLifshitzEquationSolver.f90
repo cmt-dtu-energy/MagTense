@@ -977,6 +977,7 @@
         call omp_set_num_threads(1)
                
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
+            print *, "calling getfieldfromtiles in line 1010"
             
             if (nx_ave*ny_ave*nz_ave > 1) then
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
@@ -988,8 +989,13 @@
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx
+                        !Setup average N template tile
+                        if (gb_problem%useAvgN .eq. useAvgNTrue) then
+                        tile(1)%tileType = 8 !(for avgPrism)
+                        else
                         !Setup template tile
                         tile(1)%tileType = 2 !(for prism)
+                        endif
                         !dimensions of the tile
                         tile(1)%a = problem%grid%dx
                         tile(1)%b = problem%grid%dy
@@ -1100,8 +1106,13 @@
             
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do i=1,ntot
+                !Setup average N template tile
+                if (gb_problem%useAvgN .eq. useAvgNTrue) then
+                tile(1)%tileType = 8 !(for avgPrism)
+                else
                 !Setup template tile
                 tile(1)%tileType = 2 !(for prism)
+                endif
                 tile(1)%exploitSymmetry = 0 !0 for no and this is important
                 tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
                 tile(1)%M(:) = 0.
@@ -1133,6 +1144,7 @@
                 dx = problem%grid%abc(:,1)/(nx_ave+1)
                 dy = problem%grid%abc(:,2)/(ny_ave+1)
                 dz = problem%grid%abc(:,3)/(nz_ave+1)
+                print *, "calling getfieldfromtiles in line 1146"
                 do k_a=1,nz_ave
                     do j_a=1,ny_ave                
                         do i_a=1,nx_ave

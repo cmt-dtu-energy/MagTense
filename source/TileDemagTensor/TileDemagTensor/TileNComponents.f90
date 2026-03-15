@@ -633,17 +633,21 @@ module TileNComponents
     
     ! Emma:
     ! Calculates averaged N from expressions in Fukushima paper using the Avgprism tile
-    subroutine getAvgN_prism_3D(Avgprism, pos, N_out, Obs_size)
+    subroutine getAvgN_prism_3D(Avgprism, pos, N_out, Obs_size_ele)
     type(MagTile),intent(in) :: Avgprism 
-    real,intent(in),dimension(3) :: pos
-    real,intent(in),dimension(3), optional :: Obs_size
-    real,intent(inout),dimension(3,3) :: N_out
+    real(8),intent(in),dimension(3) :: pos
+    real(8),intent(in),dimension(3), optional :: Obs_size_ele
+    real(8),intent(inout),dimension(3,3) :: N_out
     integer :: i, j, k !for internal looping
 
-    real :: a,b,c,x,y,z,a1,b1,c1
-    real :: source_coords(6), obs_coords(6)
-    real :: X1, X2, Y1, Y2, Z1, Z2, vol
+    real(8) :: a,b,c,x,y,z,a1,b1,c1
+    real(8) :: source_coords(6), obs_coords(6)
+    real(8) :: X1, X2, Y1, Y2, Z1, Z2, vol, min_vol
     real(8), parameter :: eps = 1.0d-12
+    real(8) :: pi
+    integer :: unit
+
+    pi = 4.0_8 * atan(1.0_8)
 
     !Lengths of source tile in x,y,z dimensions
     a = Avgprism%a
@@ -651,11 +655,13 @@ module TileNComponents
     c = Avgprism%c
 
     !Lengths of receiving (observer) tile in x,y,z dimensions, if provided, else same as lengths of source
-    if (present(Obs_size)) then
-        a1 = Obs_size(1)
-        b1 = Obs_size(2)
-        c1 = Obs_size(3)
+    if (present(Obs_size_ele).and. all(abs(Obs_size_ele) > 0.0)) then
+        !print *, "Using specified obs_size:", Obs_size_ele
+        a1 = Obs_size_ele(1)
+        b1 = Obs_size_ele(2)
+        c1 = Obs_size_ele(3)
     else
+        !print *, "Using hard coded obs_size"
         a1 = Avgprism%a
         b1 = Avgprism%b
         c1 = Avgprism%c
@@ -669,8 +675,10 @@ module TileNComponents
     !Find coordinates for corners
     source_coords = (/ -a,  a,  -b,  b,  -c,  c /)
     obs_coords    = (/ x-a1, x+a1, y-b1, y+b1, z-c1, z+c1 /)
-    vol = (obs_coords(2)-obs_coords(1)) * (obs_coords(4)-obs_coords(3)) * (obs_coords(6)-obs_coords(5))
-
+    !vol = (obs_coords(2)-obs_coords(1)) * (obs_coords(4)-obs_coords(3)) * (obs_coords(6)-obs_coords(5))
+    vol = 8.0d0 * a1 * b1 * c1 !more stable version of the same volume as above
+    !min_vol = 1e-18 !something else?
+    !vol = max(vol,min_vol)
     !Calculating tensor elements
     N_out(1,1) = 0.0d0
     N_out(2,2) = 0.0d0
@@ -713,15 +721,17 @@ module TileNComponents
                 end do
             end do
             !Scaling and using symmetry
-            N_out(1,1) = -N_out(1,1) * 1.0d-7 / vol
-            N_out(2,2) = -N_out(2,2) * 1.0d-7 / vol
-            N_out(3,3) = -N_out(3,3) * 1.0d-7 / vol
-            N_out(1,2) = -N_out(1,2) * 1.0d-7 / vol
+            N_out(1,1) = -N_out(1,1) / (4*pi*vol)
+            N_out(2,2) = -N_out(2,2) / (4*pi*vol)
+            N_out(3,3) = -N_out(3,3) / (4*pi*vol)
+            N_out(1,2) = -N_out(1,2) / (4*pi*vol)
             N_out(2,1) = N_out(1,2)
-            N_out(2,3) = -N_out(2,3) * 1.0d-7 / vol
+            N_out(2,3) = -N_out(2,3) / (4*pi*vol)
             N_out(3,2) = N_out(2,3)
-            N_out(3,1) = -N_out(3,1) * 1.0d-7 / vol
+            N_out(3,1) = -N_out(3,1) / (4*pi*vol)
             N_out(1,3) = N_out(3,1)
+
+            !N_out=N_out*1.0d5 !scaling to see if we can get correct field
 
     !print *, "N_out(1,1) =", N_out(1,1)
     !print *, "N_out(1,2) =", N_out(1,2)
@@ -732,11 +742,24 @@ module TileNComponents
     !print *, "N_out(3,1) =", N_out(3,1)
     !print *, "N_out(3,2) =", N_out(3,2)
     !print *, "N_out(3,3) =", N_out(3,3)
-    print *, "testprint avg"
-    print *, x,y,z
-    print *, a,b,c
-    print *, a1,b1,c1
-    print *, N_out
+    
+    
+    !print *, "testprint avg"
+    !print '(A,3ES14.6)', "x, y, z: ", x, y, z
+    !print '(A,3ES14.6)', "a, b, c: ", a, b, c
+    !print '(A,3ES14.6)', "a1, b1, c1: ", a1, b1, c1
+    !print *, "N_out: ", N_out
+    
+    
+
+    !unit = 10
+    !open(unit=unit, file="demag_avg_output.txt", position="append", action="write")
+    !write(unit,'(A,3ES14.6)') "x, y, z: ", x, y, z
+    !write(unit,'(A,3ES14.6)') "a, b, c: ", a, b, c
+    !write(unit,'(A,3ES14.6)') "a1, b1, c1: ", a1, b1, c1
+    !write(unit,*) "N_out: ", N_out
+
+    !close(unit)
     end subroutine getAvgN_prism_3D
 
     
@@ -752,6 +775,7 @@ module TileNComponents
     real :: nom,denom,nom_l,nom_h,denom_l,denom_h    
     real,parameter :: lim_scl_h=1.01,lim_scl_l=0.98
     real :: xl,xh,yl,yh,zl,zh,al,ah,bl,bh,cl,ch,lim
+    integer :: unit
     
     a = prism%a
     b = prism%b
@@ -838,10 +862,19 @@ module TileNComponents
     !!Change the sign so that the output tensor follows the same definition as all the other tensors
     N_out = -1.* N_out
 
-    print *, "testprint regular"
-    print *, x,y,z
-    print *, a,b,c
-    print *, N_out
+    !print *, "testprint regular"
+    !print *, "x, y, z: ",x,y,z
+    !print *, "a, b, c: ", a,b,c
+    !print *, "N_out: ", N_out
+    
+    !unit = 11
+    !open(unit=unit, file="demag_point_output.txt", position="append", action="write")
+    !write(unit,'(A,3ES14.6)') "x, y, z: ", x, y, z
+    !write(unit,'(A,3ES14.6)') "a, b, c: ", a, b, c
+    !write(unit,*) "N_out: ", N_out
+
+    !close(unit)
+    
     
     end subroutine
     

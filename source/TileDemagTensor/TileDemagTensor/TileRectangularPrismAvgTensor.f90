@@ -28,22 +28,25 @@ module TileRectangularPrismAvgTensor
             real(8), intent(in) :: X,Y,Z
             real(8) :: res
             real(8) :: Xv,Yv,Zv,D
+            real(8) :: eps
+
+            eps = 10d-8
 
             Xv = X
             Yv = Y
             Zv = Z
             D = dist(Xv,Yv,Zv)
 
-            if(Xv == 0.0d0) Xv = 1.0d-5
-            if(Yv == 0.0d0) Yv = 1.0d-5
-            if(Zv == 0.0d0) Zv = 1.0d-5
+            if(Xv == 0.0d0) Xv = eps
+            if(Yv == 0.0d0) Yv = eps
+            if(Zv == 0.0d0) Zv = eps
             if(D-Yv == 0.0d0) then
                 !print *, 'D-Y=0'
-                Yv = Yv + 1.0d-5
+                Yv = Yv + eps
             end if
             if(D-Zv == 0.0d0) then
                 !print *, 'D-Z=0 D=', D, ' Z=', Zv, ' X=', Xv, ' Y=', Yv
-                Zv = Zv + 1.0d-5
+                Zv = Zv + eps
             end if
 
             res = Xv*Yv*Zv*atan(Yv*Zv/(Xv*D)) &
@@ -59,27 +62,30 @@ module TileRectangularPrismAvgTensor
             real(8), intent(in) :: X,Y,Z
             real(8) :: res
             real(8) :: Xv,Yv,Zv,D,A,B,C
+            real(8) :: eps
+
+            eps = 1.0d-8
 
             Xv = X
             Yv = Y
             Zv = Z
             
-            if(Xv == 0.0d0) Xv = 1.0d-12
-            if(Yv == 0.0d0) Yv = 1.0d-12
-            if(Zv == 0.0d0) Zv = 1.0d-12
+            if(Xv == 0.0d0) Xv = eps
+            if(Yv == 0.0d0) Yv = eps
+            if(Zv == 0.0d0) Zv = eps
 
             !D = dist(Xv,Yv,Zv)
             D = sqrt(Xv**2+Yv**2+Zv**2)
 
-            if(D == 0.0d0) D = 1.0d-12
+            if(D == 0.0d0) D = eps
 
             A = D + Xv
             B = D + Yv
             C = D + Zv
 
-            if(abs(A) == 0.0d0) A = 1.0d-12
-            if(abs(B) == 0.0d0) B = 1.0d-12
-            if(abs(C) == 0.0d0) C = 1.0d-12
+            if(abs(A) == 0.0d0) A = eps
+            if(abs(B) == 0.0d0) B = eps
+            if(abs(C) == 0.0d0) C = eps
 
             res = -Xv*Yv*Zv*log(abs(C)) &
                   + (1.0d0/6.0d0)*Yv*(Yv**2 - 3.0d0*Zv**2)*log(abs(A)) &
@@ -89,7 +95,7 @@ module TileRectangularPrismAvgTensor
                   + (1.0d0/6.0d0)*Zv**3*atan(Xv*Yv/(Zv*D)) &
                   + (1.0d0/3.0d0)*Xv*Yv*D
 
-            if (abs(res)>100) print *, res
+            !if (abs(res)>100) print *, res
         end function F2
         
         !Function definite_integral corresponding to eq. 13 in The Fukushima paper:

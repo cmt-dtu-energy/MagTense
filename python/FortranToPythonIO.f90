@@ -55,7 +55,7 @@ module FortranToPythonIO
         real(8),dimension(n_pts,3),intent(in) :: pts
         real(8),dimension(n_pts,3) :: H
         real(8),dimension(n_tiles,n_pts,3,3),intent(out) :: N
-        real,intent(in),dimension(3), optional :: Obs_size
+        real(8),dimension(n_pts,3),intent(in), optional :: Obs_size
         type(MagTile),dimension(n_tiles) :: tiles
         integer :: i
 
@@ -145,7 +145,7 @@ module FortranToPythonIO
         real(8),dimension(n_pts,3) :: H_tmp
         real(8),dimension(n_tiles,n_pts,3,3),intent(inout) :: N
         logical,intent(in) :: useStoredN
-        real,intent(in),dimension(3), optional :: Obs_size
+        real,intent(in),dimension(n_pts,3), optional :: Obs_size
 
         type(MagTile),dimension(n_tiles) :: tiles
         integer :: i
@@ -369,7 +369,7 @@ module FortranToPythonIO
         real(8),dimension(n_pts,3),intent(in) :: pts
         real(8),dimension(n_pts,3),intent(out) :: H
         real(8),dimension(n_pts,3) :: H_tmp
-        real,intent(in),dimension(3), optional :: Obs_size
+        real(8),dimension(n_pts,3),intent(in), optional :: Obs_size
         type(MagTile),dimension(n_tiles) :: tiles
         integer :: i
 
@@ -381,8 +381,12 @@ module FortranToPythonIO
         call loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
             mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
             includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
+        !print *, "After loadtiles, M:", tiles(1)%M
+        !print *, "Mrem: ", Mrem
         !::load state function from table
         call loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
+        !print *, "After loadstatefunction, M:", tiles(1)%M
+        !print *, "Mrem: ", Mrem
 
         if ( iterateSolution .eqv. .true. ) then
             call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, resumeIteration )
@@ -392,6 +396,8 @@ module FortranToPythonIO
                 Mrel_out(i) = tiles(i)%Mrel
             enddo
         endif
+        !print *, "After iterateMagnetization, M:", tiles(1)%M
+        !print *, "Mrem: ", Mrem
 
         if ( returnSolution .eqv. .true. ) then
             write(*,*) 'Finding solution at requested points'
@@ -415,7 +421,10 @@ module FortranToPythonIO
                 case (tileTypePrism)
                     call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts )
                 case (tileTypeAvgPrism)
+                    !write(*,*)  "TileType avgPrism detected"
                     if (present(Obs_size)) then
+                        !write(*,*)  "This is what we want!"
+                       ! print *, "Obs_size = ", Obs_size
                         call getAvgFieldFromRPT(tiles(i), H_tmp, pts, n_pts, Obs_size=Obs_size)
                     else
                         call getAvgFieldFromRPT(tiles(i), H_tmp, pts, n_pts)
@@ -456,7 +465,7 @@ module FortranToPythonIO
         K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
         N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-        exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, demigstp, & 
+        exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, useAvgN, demigstp, & 
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc)
@@ -476,7 +485,7 @@ module FortranToPythonIO
 		integer(4),dimension(exch_nrow),intent(in) :: exch_rowe
         real(8),dimension(nt_conv),intent(in) :: t_conv
 		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
-		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch
+		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, useAvgN,demigstp, exch_meth, exch_intpn, passExch
         real(8),intent(in) :: gamma, alpha_mm, MaxT0, tol, thres, conv_tol, dem_thres
 		real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2
         real(8),dimension(ntot,6,3),intent(in) :: K0_arr
@@ -505,7 +514,7 @@ module FortranToPythonIO
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
             exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
-			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
+			CV, useReturnHall, useAvgN ,demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
             CrysAxis, K0_arr, K1, K2, problem )
 
         call SolveLandauLifshitzEquation( problem, solution )

@@ -226,7 +226,7 @@
                             tiles(i)%excludeFromSummation = .true.
                         endif
                         
-                        call getFieldFromTiles( tiles, H(i,:), pts, n, 1, Nstore(i)%N )     !< Get the field in the i'th tile from all tiles           
+                        call getFieldFromTiles( tiles, H(i,:), pts, n, 1, Nstore(i)%N)     !< Get the field in the i'th tile from all tiles           
                     
                         
                         !! When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is dampened

@@ -854,7 +854,7 @@ def grid_config(
 def run_simulation(
     tiles: Tiles,
     pts: np.ndarray,
-    obs_size: np.ndarray,
+    obs_size: np.ndarray = None,
     max_error: float = 1e-5,
     max_it: int = 500,
     T: float = 300.0,
@@ -910,9 +910,10 @@ def run_simulation(
         returnsolution=True,
         obs_size=obs_size
     )
-
+   
     tiles.M = M_out
     tiles.M_rel = Mrel_out
+    #print("obs_size:", obs_size, type(obs_size))
 
     return tiles, H_out
 
@@ -976,13 +977,14 @@ def iterate_magnetization(
     return tiles
 
 
-def get_demag_tensor(tiles: Tiles, pts: np.ndarray) -> np.ndarray:
+def get_demag_tensor(tiles: Tiles, pts: np.ndarray,obs_size: np.ndarray = None) -> np.ndarray:
     """
     Get demagnetization tensor of tiles and the specified evaluation points.
 
     Args:
         tiles: Magnetic tiles to produce magnetic field.
         pts: Evaluation points.
+        obs_size : optional, used for averaging
 
     Returns:
         Demagnetization tensor.
@@ -1010,6 +1012,7 @@ def get_demag_tensor(tiles: Tiles, pts: np.ndarray) -> np.ndarray:
         symmetryops=tiles.sym_op,
         mrel=tiles.M_rel,
         pts=pts,
+        obs_size=obs_size
     )
 
     return demag_tensor
