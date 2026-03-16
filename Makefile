@@ -161,7 +161,7 @@ PYTHON_MODN_ALL = _${PYTHON_MODN}${PY_MOD_SUFFIX}
 #=======================================================================
 #							Targets
 #=======================================================================
-.PHONY: all clean install-miniconda build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL}
+.PHONY: all clean install-miniconda build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL} rm-conda rm-env
 
 all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR}
 
@@ -222,6 +222,9 @@ install-miniconda:
 			bash miniconda.sh -b -p $(CONDA_DIR) && rm miniconda.sh; \
 			echo "Miniconda installed at $(CONDA_DIR)."; \
 	fi
+
+rm-conda:
+	rm -rf $(CONDA_DIR)
 
 build-env: install-miniconda
 # Check if the "magtense-env" environment already exists before creating it

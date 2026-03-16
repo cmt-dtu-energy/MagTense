@@ -37,19 +37,57 @@ Examples of how to calculate magnetostatic and micromagnetic problems using the 
 
 ## Building from source
 
-If you want to build MagTense yourself this is certainly also an option. If you want to compile MagTense on Linux we provide a Makefile, which also works on Windows, where we also provide a Visual Studio project file, [MagTense.sln](MagTense.sln).
+If you want to build MagTense yourself this is certainly also an option.
 
-For Python you can find detailed instructions for building the Python interface with the Fortran core [here](/python/README.md).
+If you want to compile the MagTense core on Linux we provide a Makefile, which also works on Windows, where we also provide a Visual Studio project file, [MagTense.sln](MagTense.sln).
+
+For the higher-level interfaces, the instructions depend on which one you want to build.
+
+### Python interface
+
+On Linux, provided you already have `make` installed, you can simply run
+
+```shell
+make python
+```
+
+This will:
+
+- Download [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main) if you don't have it already (by default it assumes the installation lives at `~/miniconda3`);
+- Create the conda environment `magtense-env` with all the dependencies for building the Python interface;
+- Build the MagTense Fortran core and the CVODE library;
+- Build the Python interface and install it in the `magtense-env` conda environment
+
+There are also Make targets `rm-env` and `rm-conda` to clean up your installation. The Make rules should be smart enough to not do unnecessary work; for instance, if you modify some part of the Python interface, `make python` will re-build the wheel and re-install it on the environment, without re-downloading Miniconda. In case of errors, the simplest first step probably is to run `make rm-env` and `make rm-conda` to start from a clean slate.
+
+To test if the interface was built correctly, run `make test`.
+
+Note that all automated commands are run by subshells managed by Make. To actually use conda and explore the Python files, you have to first initialize conda in your current shell:
+
+```shell
+$HOME/miniconda3/bin/conda init --all
+```
+
+Then, *create a new shell*, and activate the `magtense-env` conda environment:
+
+```shell
+conda activate magtense-env
+```
+
+As a starting point, you can run the example scripts in [python/examples/](./python/examples/).
+
+### MATLAB interface
 
 For Matlab MEX-files, we provide a Matlab function called [buildMagTenseMEX.m](matlab/buildMagTenseMEX.m) that works on both OS. You can find more information [here](/matlab/README.md).
 
 ## Further documentation
 
-The webpage of the code is available at https://www.magtense.org.
+The webpage of the code is available at <https://www.magtense.org>.
 
-The TechManual on the code is available at https://cmt-dtu-energy.github.io/MagTense.
+The TechManual on the code is available at <https://cmt-dtu-energy.github.io/MagTense>.
 
 ## Citation
+
 If you use this package in a publication, or simply want to refer to it, please cite the paper below:
 
 ```bibtex
