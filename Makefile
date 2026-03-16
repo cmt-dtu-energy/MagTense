@@ -226,7 +226,7 @@ install-miniconda:
 build-env: install-miniconda
 # Check if the "magtense-env" environment already exists before creating it
 	@if ! conda env list  | grep -q "magtense-env"; then \
-		$(CONDA_BIN) env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-313-linux.yml; \
+		$(CONDA_BIN) env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-314-linux.yml; \
 	else \
 		echo "magtense-env environment already exists."; \
 	fi
@@ -278,6 +278,7 @@ python: build-env
 	$(CONDA_BIN) run -n magtense-env $(MAKE) python_ USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
 	cp python/.build/requirements-py3-dev.txt python/requirements.txt
 	$(CONDA_BIN) run -n magtense-env -- python -m pip install -e ./python
+
 
 test:
 	$(CONDA_BIN) run -n magtense-env -- pytest
