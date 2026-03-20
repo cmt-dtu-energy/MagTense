@@ -48,7 +48,7 @@ For the higher-level interfaces, the instructions depend on which one you want t
 On Linux, provided you already have `make` installed, you can simply run
 
 ```shell
-make python
+make python-interface
 ```
 
 This will:

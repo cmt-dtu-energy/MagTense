@@ -167,7 +167,7 @@ all: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR}
 
 standalone: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR}
 
-python_: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
+python: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
 
 python-win: ${PYTHON_MODN_ALL}
 
@@ -277,7 +277,7 @@ build-cvode: build-env
 
 ENV_NAME := magtense-env
 
-python: build-env
+python-interface: build-env
 	@if [ ! -d "${CVODE_ROOT}/build" ] || [ -z "$$(ls -A ${CVODE_ROOT}/build)" ]; then \
 		$(MAKE) build-cvode; \
 	fi
