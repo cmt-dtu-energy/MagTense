@@ -15,7 +15,7 @@ jobs:
   build-wheel:
     strategy:
       matrix:
-        py-version: [312, 313]
+        py-version: [312, 313, 314]
         cvode: [1]
         sys:
           - { os: windows-latest, name: win, whl-arch: win_amd64}
@@ -145,6 +145,7 @@ jobs:
         py-version:
           - { name: 312, id: "3.12" }
           - { name: 313, id: "3.13" }
+          - { name: 314, id: "3.14" }
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     needs: build-wheel
