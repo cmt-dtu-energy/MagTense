@@ -275,13 +275,22 @@ build-cvode: build-env
 	mv ${MKFILE_PATH}/cvode-7.4.0 ${CVODE_ROOT}/src
 	$(run-cmake-cvode)
 
+ENV_NAME := magtense-env
+
 python: build-env
 	@if [ ! -d "${CVODE_ROOT}/build" ] || [ -z "$$(ls -A ${CVODE_ROOT}/build)" ]; then \
 		$(MAKE) build-cvode; \
 	fi
-	$(CONDA_BIN) run -n magtense-env $(MAKE) python_ USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
 	cp python/.build/requirements-py3-dev.txt python/requirements.txt
-	$(CONDA_BIN) run -n magtense-env -- python -m pip install -e ./python
+	
+	@if [ "$$CONDA_DEFAULT_ENV" = "$(ENV_NAME)" ]; then \
+		$(MAKE) python_ USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 && \
+		python -m pip install -e ./python; \
+	else \
+		$(CONDA_BIN) run -n magtense-env $(MAKE) python_ USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 && \
+		$(CONDA_BIN) run -n magtense-env -- python -m pip install -e ./python; \
+	fi
+
 
 
 test:
