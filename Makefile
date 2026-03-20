@@ -237,7 +237,7 @@ build-env: install-miniconda
 
 
 rm-env:
-	$(CONDA_BIN) env remove -n magtense-env
+	$(CONDA_BIN) env remove -n magtense-env -y
 
 CMAKE = $(CONDA_BIN) run -n magtense-env -- cmake
 IFX = $(CONDA_BIN) run -n magtense-env which ifx
