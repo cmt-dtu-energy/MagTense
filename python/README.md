@@ -117,7 +117,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
   Open a "Intel oneAPI command prompt for Intel 64 for Visual Studio 2022" as administrator and then do:
   ```bash
-  "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -G "Ninja" -B C:/CVODE_temp -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_ARKODE=OFF -DBUILD_CVODE=ON -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON
+  "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -G "Ninja" -B C:/CVODE_temp -S C:\sundials-7.4.0 -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_ARKODE=OFF -DBUILD_CVODE=ON -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON
 
   cmake --build C:/CVODE_temp --config RELEASE --verbose
   cmake --install C:/CVODE_temp --verbose
@@ -174,7 +174,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
       Further, `conda` has to be initialized in these terminals to have access to the `make` executable and other necessary packages.
 
-  - Open a `Developer PowerShell` and run:
+  - Open a `Developer PowerShell` and run from the MagTense directory:
 
     ```bash
     conda activate magtense-env
@@ -202,7 +202,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
       make wrap
       ```
 
-  - Linking and wrapping libraries with `f2py` needs to be run in `x64 Native Tools Command Prompt for VS 2022` to make `ifx` compiler available for `meson`:
+  - Linking and wrapping libraries with `f2py` needs to be run in `x64 Native Tools Command Prompt for VS 2022` from the MagTense directory to make `ifx` compiler available for `meson`:
 
     ```bash
 	  conda activate magtense-env
@@ -225,11 +225,11 @@ python -m pip install -e ./python
 
 ### Required packages at runtime
 
-The `python/.build/` contains requirement-files, which are shipped with the respective pip-wheel.
+The `python/.build/` contains requirement-files, which are shipped with the respective pip-wheel. Install within the magtense-env:
 
 ```bash
-python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm importlib_resources
-python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cusparse-cu12 nvidia-nvjitlink-cu12 # only required for cuda support
+python -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm importlib_resources
+python -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cusparse-cu12 nvidia-nvjitlink-cu12 # only required for cuda support
 ```
 
 ### Latest versions of required packages
