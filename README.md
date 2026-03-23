@@ -45,7 +45,9 @@ For the higher-level interfaces, the instructions depend on which one you want t
 
 ### Python interface
 
-On Linux, provided you already have `make` installed, you can simply run
+#### Linux
+
+Provided you already have `make` installed, you can simply run
 
 ```shell
 make python-interface
@@ -75,6 +77,19 @@ conda activate magtense-env
 ```
 
 As a starting point, you can run the example scripts in [python/examples/](./python/examples/).
+
+#### Windows
+
+Install the prerequisites:
+
+- [The Anaconda distribution](https://www.anaconda.com/download)
+- [Visual Studio 2022](https://visualstudio.microsoft.com/vs/older-downloads/#visual-studio-2022-and-other-products) - select the option for desktop development with C++ and `cmake`
+
+On modern windows distributions, this should create a new profile on the Windows Terminal app, with Anaconda set up. *All commands below should be issued from this terminal, and in the MagTense directory (where you cloned the repo)*.
+
+```shell
+conda env create -f python/.build/env-314-win.yml
+```
 
 ### MATLAB interface
 
