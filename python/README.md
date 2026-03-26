@@ -40,6 +40,11 @@ conda activate magtense-env
 
 As a starting point, you can run the example scripts in [python/examples/](./python/examples/).
 
+**Note: Compiling with FMM3D backend**
+
+To compile with FMM3D `$(MagTense-Folder)/external/FMM3D/local` must be in the `LD_Library_PATH` (replace MagTense-Folder with the actual path to the MagTense repo).
+After this modify the Makefile to replace `USE_FMM3D=0` with `USE_FMM3D=1`.
+
 #### Windows
 
 Installation on Windows is a but more contrived because of the way Windows handles environments, so the user has to do more steps manually.

@@ -1,6 +1,5 @@
-
 %%This function compares MagTense to a FEM simulations for a single permanent magnet.
-function [] = MagTense_Validation_tetrahedron()
+function [rel_int_error] = MagTense_Validation_tetrahedron()
 
 %Make a figure
 figure1 = figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto');
@@ -17,13 +16,13 @@ addpath('../../../MEX_files/');
 mu0 = 4*pi*1e-7;
 
 %%Get a default tile from MagTense
-tile = getDefaultMagTile();
+tile = DefaultMagTile();
     
 %ensure the tile is a permanent magnet
-tile.magnetType = getMagnetType('hard');
+tile = tile.setMagnetType('hard');
 
 %set the geometry to be a rectangular prism
-tile.tileType = getMagTileType('tetrahedron');
+tile = tile.setMagTileType('tetrahedron');
 
 %set the dimensions of the prism
 tile.vertices = [[2.5,3,1];[2,1,4];[1.5,4,3];[4.5,5,2]]';
@@ -56,9 +55,8 @@ pts((numel(x)+1):(numel(x)+numel(y)),:) = [zeros(1,numel(y))+offset(1); y; zeros
 pts((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)),:) = [zeros(1,numel(z))+offset(1); zeros(1,numel(z))+offset(2); z]';
 
 %get the field from the Fortran implementation
-tic
+tile = struct(tile);
 H = getHFromTiles_mex( tile, pts, int32(length(tile)), int32(length(pts(:,1))) );
-toc
 
 %Find the norm of the field
 Hnorm = squeeze( sqrt( sum(H.^2,2) ) );
@@ -67,21 +65,6 @@ Hnorm = squeeze( sqrt( sum(H.^2,2) ) );
 plot(x,4*pi*1e-7*Hnorm(1:numel(x)),'r.');
 plot(y,4*pi*1e-7*Hnorm((numel(x)+1):(numel(x)+numel(y))),'g.');
 plot(z,4*pi*1e-7*Hnorm((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z))),'b.');
-
-
-%get the field from the Matlab inplementation
-tic
-H = getHTetrahedron_Matlab( pts', tile.vertices, tile.M )';
-toc
-
-%Find the norm of the field
-Hnorm = squeeze( sqrt( sum(H.^2,2) ) );
-
-%Plot the solution
-plot(x,4*pi*1e-7*Hnorm(1:numel(x)),'rd','Markersize',5);
-plot(y,4*pi*1e-7*Hnorm((numel(x)+1):(numel(x)+numel(y))),'gd','Markersize',5);
-plot(z,4*pi*1e-7*Hnorm((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z))),'bd','Markersize',5);
-
 
 %Load comparison data from FEM simulation
 data_FEM_x = load('..\..\..\..\documentation\examples_FEM_validation\Validation_tetrahedron\Validation_tetrahedron_normH_x.txt');
@@ -92,9 +75,17 @@ plot(data_FEM_x(:,1),data_FEM_x(:,2),'ro');
 plot(data_FEM_y(:,1),data_FEM_y(:,2),'go');
 plot(data_FEM_z(:,1),data_FEM_z(:,2),'bo');
 
-h_l = legend('MagTense, x for y,z=offset','MagTense, y for x,z=offset','MagTense, z for x,y=offset','MagTense Matlab, x for y,z=offset','MagTense Matlab, y for x,z=offset','MagTense Matlab, z for x,y=offset','FEM, x for y,z=offset','FEM, y for x,z=offset','FEM, z for x,y=offset','Location','NorthWest');
+h_l = legend('MagTense, x for y,z=offset','MagTense, y for x,z=offset','MagTense, z for x,y=offset','FEM, x for y,z=offset','FEM, y for x,z=offset','FEM, z for x,y=offset','Location','NorthWest');
 set(h_l,'fontsize',9);
 ylabel('|\mu_0{}H| [T]');
 xlabel('x, y or z [m]');
 ylim([0 1.2]);
+
+% Interpolate the MagTense solution to the FEM solution and calculate the relative error in percent
+rel_int_error(1) = calculate_relative_integral_error(data_FEM_x(:,1),data_FEM_x(:,2),x,4*pi*1e-7*Hnorm(1:numel(x)));
+rel_int_error(2) = calculate_relative_integral_error(data_FEM_y(:,1),data_FEM_y(:,2),y,4*pi*1e-7*Hnorm((numel(x)+1):(numel(x)+numel(y))));
+rel_int_error(3) = calculate_relative_integral_error(data_FEM_z(:,1),data_FEM_z(:,2),z,4*pi*1e-7*Hnorm((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z))));
+
+disp(['Relative integrated error between MagTense and FEM is Mx = ' num2str(rel_int_error(1)) ', My = ' num2str(rel_int_error(2)) ', Mz = ' num2str(rel_int_error(3)) ])
+
 end

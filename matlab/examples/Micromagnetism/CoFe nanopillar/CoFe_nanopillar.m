@@ -48,11 +48,23 @@ mu0 = 4*pi*1e-7;
 Ms = 1.44*10^6 ;     % A/m
 A0 = 1.3*10^(-11) ; % J/m3
 
-[mesh_cart,GridInfo,mesh_params] = CreateHexagonCartesianMesh_R_h_phi(dimensions, resolution);
+% ---- Load the tiles of the nanopiller from a file
+% ---- Curently only a file with the default dimensions and resolution is provided
+geometry_data = load(['Nanopiller_geometry_' sprintf('%03.3i',dimensions(1)) '_' ...
+                sprintf('%03.3i',dimensions(2)) '_' ...
+                sprintf('%03.3i',dimensions(3)) '_' ...
+                sprintf('%03.3i',resolution(1)) '_' ...
+                sprintf('%03.3i',resolution(2)) '_' ...
+                sprintf('%03.3i',resolution(3)) '.txt']);
+
+pos_out  = geometry_data(:,1:3);
+dims_out = geometry_data(:,4:6);
+mesh_params.thisGridL = [dimensions(1), dimensions(2), dimensions(3)];
+mesh_params.NNs = resolution;
 
 %% Problem structure creation
 
-problem = DefaultMicroMagProblem(mesh_params.resolution(1),mesh_params.resolution(2),mesh_params.resolution(3));
+problem = DefaultMicroMagProblem(length(pos_out(:,1)),1,1);
 problem = problem.setUseCuda( options.use_CUDA );
 problem = problem.setUseCVODE( options.use_CVODE );
 problem = problem.setMicroMagDemagApproximation('none');
@@ -60,8 +72,8 @@ problem = problem.setMicroMagGridType('unstructuredPrisms');
 problem = problem.setSolverType( 'UseExplicitSolver' );
 problem = problem.setMicroMagSolver( 'Explicit' );
 
-problem.grid_pts = mesh_cart.pos_out;
-problem.grid_abc = mesh_cart.dims_out;
+problem.grid_pts = pos_out;
+problem.grid_abc = dims_out;
 
 problem.nThreads = int32(8);
 
@@ -74,20 +86,6 @@ problem.K0 = 0;
 problem.K1 = 2.7*10^3; % J/m3
 problem.K2 = 2.7*10^3; % J/m3
 problem.A0 = A0;
-
-%% Exchange matrix
-
-InteractionMatrices.GridInfo = GridInfo;
-InteractionMatrices.X = GridInfo.Xel ;
-InteractionMatrices.Y = GridInfo.Yel ;
-InteractionMatrices.Z = GridInfo.Zel ;
-
-% Generate Laplace operator:
-[D2X,D2Y,D2Z] = computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, 'extended',6,"DirectLaplacianNeumann");
-InteractionMatrices.A2 = D2X + D2Y + D2Z ;
-
-%--- Convert the exchange matrix to sparse
-problem = problem.setExchangeMatrixSparse( InteractionMatrices.A2 );
 
 %% Applied field
 problem.m0(:,1) = HystDir(1) ;
@@ -108,13 +106,13 @@ Hvalues = sort(unique([1:-0.05:-1]),'descend') ; % [T]
 problem = problem.setHext( HextFct, Hvalues );
 
 %% RUN !!
-save([fnameSave,'_Problem.mat'],'problem','GridInfo','mesh_cart','mesh_params','info','-v7.3')
+save([fnameSave,'_Problem.mat'],'problem','mesh_params','info','-v7.3')
 
 tic
 solution = struct();
 prob_struct = struct(problem);  %convert the class obj to a struct so it can be loaded into fortran
 
-solution = problem.MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+[solution, GridInfo] = problem.MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
 
 elapsedTime = toc
 
@@ -133,7 +131,7 @@ solution = rmfield(solution,'H_dem');
 solution = rmfield(solution,'H_ani');
 
 try  Hc = interp1(M,H,0) ; catch ; Hc = nan ; end
-save([fnameSave,'_Solution.mat'],'problem','solution','Hc','H','M','-v7.3') ;
+save([fnameSave,'_Solution.mat'],'problem','solution','Hc','H','M','GridInfo','-v7.3') ;
 
 %% Plot
 figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
@@ -148,13 +146,13 @@ pts = zeros( numel(z), 3 );
 pts(:,3) = z;
 
 %%Get a default tile from MagTense
-tile = getDefaultMagTile();
+tile = DefaultMagTile();
     
 %ensure the tile is a permanent magnet
-tile.magnetType = getMagnetType('hard');
+tile = tile.setMagnetType('hard');
 
 %set the geometry to be a rectangular prism
-tile.tileType = getMagTileType('prism');
+tile = tile.setMagTileType('prism');
 
 figure2= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig2 = axes('Parent',figure2,'Layer','top','FontSize',16); hold on; grid on; box on
 figure3= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig3 = axes('Parent',figure3,'Layer','top','FontSize',16); hold on; grid on; box on
@@ -162,14 +160,15 @@ color_arr = turbo(length(solution.M(end,1,:,1)));
 
 for j = 1:length(solution.M(end,1,:,1))
     clear tiles
-    for i = 1:length(mesh_cart.pos_out(:,1))
+    for i = 1:length(pos_out(:,1))
         tiles(i) = tile;
-        tiles(i).abc = mesh_cart.dims_out(i,:);
-        tiles(i).offset = mesh_cart.pos_out(i,:);
+        tiles(i).abc = dims_out(i,:);
+        tiles(i).offset = pos_out(i,:);
         tiles(i).M = problem.Ms.*solution.M(end,i,j,:);
     end
     
     %get the field
+    tiles = struct(tiles);
     H = getHFromTiles_mex( tiles, pts, int32( length(tiles) ), int32( length(pts(:,1)) ) );
     plot(fig2,z-dimensions(2)/2,4*pi*1e-7*H(:,3)+Hvalues(j),'.','color',color_arr(j,:))
     

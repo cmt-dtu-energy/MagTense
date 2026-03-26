@@ -27,9 +27,15 @@
     use iso_fortran_env
     use UnstructuredMeshAnalysis
     use DifferentialOperators
-    implicit none
-       
-    
+
+#if USE_FMM3D
+    use fmm3d_tree_mod
+    use fmm_nbor_tensor_mod
+#endif
+
+    use trace_mod
+    implicit none          
+
     !>Module variables
     type(MicroMagSolution) :: gb_solution
     type(MicroMagProblem) :: gb_problem
@@ -56,14 +62,43 @@
     integer :: ntot,i,j,k,ind,nt,nt_Hext,stat       !> total no. of tiles
     procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
     procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
-    real(DP),dimension(:,:,:),allocatable :: M_out        !> Internal buffer for the solution (M) on the form (3*ntot,nt)
+    real(DP),dimension(:,:,:),allocatable :: M_out  !> Internal buffer for the solution (M) on the form (3*ntot,nt)
+    real(DP) :: A0_max
     character*(100) :: prog_str 
+    real :: rate
+    integer :: c1,c2,cr,cm 
+    integer, save :: itimer = 0
+    call trace%begin( "SolveLandauLifshitzEquation", itimer=itimer, verbose=1 )
+    
+    ! First initialize the system_clock
+    call system_clock(count_rate=cr)
+    call system_clock(count_max=cm)
+    rate = REAL(cr)
+    
+    write(prog_str,'(A37, A8, A12)') 'MagTense version 2.3.0, compiled on: ', __TIME__, __DATE__ 
+    call displayGUIMessage( trim(prog_str) ) 
     
     !Save internal representation of the problem and the solution
     gb_solution = sol
     gb_problem = prob
     
+    !Calculate the local scaled coefficients for the LLG equation
+    !"J" : exchange term
+    if (( gb_problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
+        A0_max = maxval( gb_problem%A0 )
+        gb_problem%Jfact = A0_max / ( mu0 * gb_problem%Ms )   ! Normalized by the largest exchange factor, as this is needed in the exchange calculation for the unstructured meshed
+    else
+        gb_problem%Jfact = gb_problem%A0 / ( mu0 * gb_problem%Ms )
+    endif
+    
+    !"M" : demagnetization term
+    gb_problem%Mfact = gb_problem%Ms
+    !"K" : anisotropy term
+    !TODO - is this correct or should it be allocated first????
+    gb_problem%Kfact = gb_problem%K0 / ( mu0 * gb_problem%Ms )
+    
     ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+    allocate( gb_solution%pts(ntot,3) )
     
     !Analyze the mesh, if needed
     if ( gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
@@ -71,62 +106,94 @@
             call displayGUIMessage( 'Passing exchange matrix' )
             call passDifferentialOperators(gb_problem)
         else    
-            call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gridinfo)
-            call computeDifferentialOperatorsFromMesh_DirectLap(gridinfo, gb_problem%exch_interpn, gb_problem%exch_weight, gb_problem%exch_method, gb_problem%Jfact, gb_problem%A_exch)
-            gb_solution%gridinfo = gridinfo
+            call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gb_solution%gridinfo)
         endif
     endif
-      
-    call displayGUIMessage( 'Initializing matrices' )
-    !Calculate the interaction matrices
-    call initializeInteractionMatrices( gb_problem )
-    
-    !write(prog_str,'(A37, F8.4, A5)') 'Demagnetization tensor memory usage: ', 6*storage_size(gb_problem%Kxx)*ntot/(8*2**30), ' gigabytes'
-    !call displayGUIMessage( trim(prog_str) )    
-    
-    !Copy the demag tensor to CUDA
-    if ( gb_problem%useCuda .eq. useCudaTrue ) then
-        call displayGUIMessage( 'Copying to CUDA' )
-#if USE_CUDA
-        !Initialize the Cuda arrays and load the demag tensors into the GPU memory
-        if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
-           
-            !If the matrices are sparse
-            call cudaInit_sparse( gb_problem%K_s )        
-            
-        else
-            !if the matrices are dense
-            call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
-            
-        endif
-#else
-        call displayGUIMessage( 'MagTense not compiled with CUDA - exiting!' )
-        stop
-#endif
-    endif
-   
-    allocate( gb_solution%pts(ntot,3) )
-    if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then   
-        do k=1,gb_problem%grid%nz
-            do j=1,gb_problem%grid%ny            
-                do i=1,gb_problem%grid%nx
-                    ind = i + (j-1) * gb_problem%grid%nx + (k-1) * gb_problem%grid%nx * gb_problem%grid%ny
-                    gb_solution%pts(ind,1) = gb_problem%grid%x(i,j,k)
-                    gb_solution%pts(ind,2) = gb_problem%grid%y(i,j,k)
-                    gb_solution%pts(ind,3) = gb_problem%grid%z(i,j,k)
-                enddo
-            enddo
-        enddo
-    endif
-    
     if (( gb_problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
         do i=1,gb_problem%grid%nx
             gb_solution%pts( i, 1 ) = gb_problem%grid%pts( i, 1 )
             gb_solution%pts( i, 2 ) = gb_problem%grid%pts( i, 2 )
             gb_solution%pts( i, 3 ) = gb_problem%grid%pts( i, 3 )
         enddo
-    endif    
+    endif   
     
+    if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then
+        !Setup the grid
+        call setupGrid( gb_problem%grid )
+        
+        !Set up the mesh for an uniform grid
+        allocate( gb_problem%A0_map(gb_problem%grid%nx,gb_problem%grid%ny,gb_problem%grid%nz) )
+        if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then   
+            do k=1,gb_problem%grid%nz
+                do j=1,gb_problem%grid%ny            
+                    do i=1,gb_problem%grid%nx
+                        ind = i + (j-1) * gb_problem%grid%nx + (k-1) * gb_problem%grid%nx * gb_problem%grid%ny
+                        gb_solution%pts(ind,1) = gb_problem%grid%x(i,j,k)
+                        gb_solution%pts(ind,2) = gb_problem%grid%y(i,j,k)
+                        gb_solution%pts(ind,3) = gb_problem%grid%z(i,j,k)
+                    
+                        gb_problem%A0_map(i,j,k) = gb_problem%A0(ind)
+                    enddo
+                enddo
+            enddo
+        endif
+    endif
+      
+    call displayGUIMessage( 'Initializing matrices' )
+    !Calculate the interaction matrices
+    call initializeInteractionMatrices( gb_problem, gb_solution )
+    
+    !write(prog_str,'(A37, F8.4, A5)') 'Demagnetization tensor memory usage: ', 6*storage_size(gb_problem%Kxx)*ntot/(8*2**30), ' gigabytes'
+    !call displayGUIMessage( trim(prog_str) )    
+    
+    !Copy the demag tensor to CUDA
+    if ( gb_problem%useCuda .eq. useCudaTrue ) then
+        call displayGUIMessage( 'Copying to CUDA' ) 
+#if USE_CUDA
+#if USE_FMM3D 
+        !------------- if use_fmm then copy sparse nbr_corr tensor else copy normal demag tensor --------------
+        if ( gb_problem%use_fmm) then
+          call displayGUIMessage( 'copying nbr_corr for FMM nbor correction')  
+          call cudaInit_sparse( gb_problem%K_fmm_s )    
+        !----------------------------------------------------------------------------------------------
+        !------------ else copy the normal demag tensor ------------------------------------------------
+        else 
+          !Initialize the Cuda arrays and load the demag tensors into the GPU memory
+          if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
+              !If the matrices are sparse
+            call displayGUIMessage( 'Initializing sparse matrices on CUDA' )
+              call cudaInit_sparse( gb_problem%K_s )            
+          else
+              !if the matrices are dense 
+            call displayGUIMessage( 'Initializing dense matrices on CUDA' )
+              call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+          endif
+        end if
+        !----------------------------------------------------------------------------------------------
+#else
+        !Initialize the Cuda arrays and load the demag tensors into the GPU memory
+        if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
+            !If the matrices are sparse
+            call displayGUIMessage( 'Initializing sparse matrices on CUDA' )
+            call cudaInit_sparse( gb_problem%K_s )        
+             
+        else
+            !if the matrices are dense 
+            call displayGUIMessage( 'Initializing dense matrices on CUDA' )
+
+            call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+
+            !TODO - make this as option depending on flag/use input
+            !call cudaDumpDemagDense("CUDA_dense_K_matrices.bin")
+
+        endif
+#endif
+#else
+        call displayGUIMessage( 'MagTense not compiled with CUDA - exiting!' )
+        stop
+#endif
+    endif
+   
     
     call displayGUIMessage( 'Initializing solution' )
     !Initialize the solution, i.e. allocate various arrays
@@ -177,50 +244,79 @@
     endif
 
     !loop over the range of applied fields
-    do i=1,nt_Hext
-        !Applied field
-        gb_solution%HextInd = i
-        
-        if (gb_problem%solver .eq. MicroMagSolverExplicit) then               
-            write(prog_str,'(A20, I5.2, A8, I5.2, A6, F6.2, A7)') 'External Field nr.: ', i, ' out of ', nt_Hext, ' i.e. ', real(i)/real(nt_Hext)*100,'% done'
-            call displayGUIMessage( trim(prog_str) )
-        endif
+    if ( gb_problem%dummy_run .eq. 1) then
+       call displayGUIMessage( 'Performing dummy run - skipping time evolution ' )
+    else 
 
-        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )  
-        
-        !The initial state of the next solution is the previous solution result
-        gb_problem%m0 = M_out(:,nt,i)
-        
-        !Store the solution
-        gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
-        gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
-        gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
-            
-        call StoreHeffComponents ( gb_problem, gb_solution )
-            
-    enddo
+        CALL SYSTEM_CLOCK(c1)
 
-    !clean up
-    deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
-    
-    !clean up
-    if (gb_problem%CV > 0) then
-        deallocate(gb_solution%u1, gb_solution%u2, gb_solution%u3, gb_solution%u4, gb_solution%u5, gb_solution%u6)
-    endif
-    
-    !clean-up
-    stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
-   
-#if USE_CUDA
-    if ( gb_problem%useCuda .eqv. useCudaTrue ) then
-        call cudaDestroy()
-    endif
-#endif
-    
+      do i=1,nt_Hext
+          !Applied field
+          gb_solution%HextInd = i
+          
+          if (gb_problem%solver .eq. MicroMagSolverExplicit) then               
+              write(prog_str,'(A20, I5.2, A8, I5.2, A6, F6.2, A7)') 'External Field nr.: ', i, ' out of ', nt_Hext, ' i.e. ', real(i)/real(nt_Hext)*100,'% done'
+              call displayGUIMessage( trim(prog_str) )
+          endif
+
+          call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )  
+          
+          !The initial state of the next solution is the previous solution result
+          gb_problem%m0 = M_out(:,nt,i)
+          
+          !Store the solution
+          gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
+          gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
+          gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
+
+
+          
+              
+          call StoreHeffComponents ( gb_problem, gb_solution )
+
+
+
+            ! open (11, file="sparse_CUDA_H.bin",  &
+            !         status='unknown', form='unformatted', &
+            !         access='direct', recl=1*ntot*ntot)
+            ! write(11,rec=1) gb_solution%HmX 
+            ! write(11,rec=2) gb_solution%HmY
+            ! write(11,rec=3) gb_solution%HmZ
+            ! close(11)
+            ! error stop " test stop after cuda sparse"
+              
+      enddo
+
+      
+        CALL SYSTEM_CLOCK(c2)
+        call displayGUIMessage( 'Time simulation time integration:' )
+        write (prog_str,'(f10.3)') (c2 - c1)/rate
+        call displayGUIMessage( prog_str )
+
+
+      !clean up
+      deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
+      
+      !clean up
+      if (gb_problem%CV > 0) then
+          deallocate(gb_solution%u1, gb_solution%u2, gb_solution%u3, gb_solution%u4, gb_solution%u5, gb_solution%u6)
+      endif
+      
+      !clean-up
+      stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
+  end if
+
+    #if USE_CUDA
+      if ( gb_problem%useCuda .eqv. useCudaTrue ) then
+          call cudaDestroy()
+      endif
+    #endif
     !Return the correct state
     sol = gb_solution
-    prob = gb_problem
-    
+    prob = gb_problem    
+
+
+    call trace%end( "SolveLandauLifshitzEquation", itimer=itimer, verbose=1 )
     end subroutine SolveLandauLifshitzEquation
 
     !>-----------------------------------------
@@ -232,60 +328,78 @@
     !> @param[in] m array size n holding the m_i values corresponding to the time t
     !> @param[inout] dmdt array size n for the derivatives at the time t
     !---------------------------------------------------------------------------    
-    subroutine dmdt_fct ( t, m, dmdt )  
-    real(DP),intent(in) :: t
-    real(DP),dimension(:),intent(in) :: m
-    real(DP),dimension(:),intent(inout) :: dmdt
-    integer :: ntot
-    
-    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
-    if ( .not. allocated(crossX) ) then
-        allocate( crossX(ntot), crossY(ntot), crossZ(ntot) )
-        allocate( HeffX(ntot), HeffY(ntot), HeffZ(ntot) )
-        allocate( HeffX2(ntot), HeffY2(ntot), HeffZ2(ntot) )
-    endif
-        
-    !Update the magnetization
-    gb_solution%Mx = m(1:ntot)
-    gb_solution%My = m(ntot+1:2*ntot)
-    gb_solution%Mz = m(2*ntot+1:3*ntot)
-        
-    !Exchange term    
-    call updateExchangeTerms( gb_problem, gb_solution )
-    
-    !External field
-    call updateExternalField( gb_problem, gb_solution, t )
-    
-    !Anisotropy term
-    call updateAnisotropy(  gb_problem, gb_solution )
-    
-    !Demag. field
-    call updateDemagfield( gb_problem, gb_solution )
-    
-    !Effective field
-    HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
-    HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY
-    HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ
-    
-    !Compute m x heff (Precession term)    
-    crossX = -1. * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
-    crossY = -1. * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
-    crossZ = -1. * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
-    
-    !Compute m x m x heff (Damping term)
-    HeffX2 = gb_solution%My * crossZ - gb_solution%Mz * crossY
-    HeffY2 = gb_solution%Mz * crossX - gb_solution%Mx * crossZ
-    HeffZ2 = gb_solution%Mx * crossY - gb_solution%My * crossX
-    
-    !Compute the time derivative of m
-    !dMxdt
-    dmdt(1:ntot) = -gb_problem%gamma * crossX - alpha(t,gb_problem) * HeffX2 
-    !dMydt
-    dmdt(ntot+1:2*ntot) = -gb_problem%gamma * crossY - alpha(t,gb_problem) * HeffY2 
-    !dMzdt
-    dmdt(2*ntot+1:3*ntot) = -gb_problem%gamma * crossZ - alpha(t,gb_problem) * HeffZ2 
+    subroutine dmdt_fct ( t, m, dmdt )
+        !---- inputs/outputs ----
+        real(DP),intent(in)              :: t
+        real(DP),dimension(:),intent(in) :: m
+        real(DP),dimension(:),intent(inout) :: dmdt
 
+        !---- locals ----
+        integer :: ntot
+        real(DP) :: mx_mean, my_mean, mz_mean, volume_total
+        integer :: i
+        integer, save :: itimer = 0
+        call trace%begin( "dmdt_fct", itimer=itimer, verbose=1 )
+        !------------------------------------------
+        ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+
+        if ( .not. allocated(crossX) ) then
+            allocate( crossX(ntot), crossY(ntot), crossZ(ntot) )
+            allocate( HeffX(ntot), HeffY(ntot), HeffZ(ntot) )
+            allocate( HeffX2(ntot), HeffY2(ntot), HeffZ2(ntot) )
+        endif
+
+        !------------- Update magnetisation (load from m)-------------
+        gb_solution%Mx = m(1:ntot)
+        gb_solution%My = m(ntot+1:2*ntot)
+        gb_solution%Mz = m(2*ntot+1:3*ntot)
+        !-------------------------------------------------------------
+
+        !------------ add exchange term -----------------------------
+        call updateExchangeTerms( gb_problem, gb_solution )
+        !-------------------------------------------------------------
+        !-------------- add external field ---------------------------
+        call updateExternalField( gb_problem, gb_solution, t )
+        !-------------------------------------------------------------
+        !-------------- add anisotropy term --------------------------
+        call updateAnisotropy(  gb_problem, gb_solution )
+        !-------------------------------------------------------------
+        !-------------- add demagnetization field --------------------
+#if USE_FMM3D
+        !-------------------- if use_fmm then use FMM otherwise shortcircuit to normal demag field --------------
+        if ( gb_problem%use_fmm)  then
+          call updateDemagfieldFMM( gb_problem, gb_solution )
+        else
+           call updateDemagfield( gb_problem, gb_solution )
+        end if
+        !--------------------------------------------------------------------------------------------------------------
+#else
+         call updateDemagfield( gb_problem, gb_solution )
+#endif
+        !-------------------------------------------------------------
+        !--------------- combine to get effective field, Heff -------------
+        HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
+        HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY
+        HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ
+        !-------------------------------------------------------------
+        !--------------- calculate precession term: m x Heff -------------
+        crossX = -1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
+        crossY = -1.0_DP * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
+        crossZ = -1.0_DP * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
+        !-------------------------------------------------------------
+        !--------------- calculate damping term: m x (m x Heff) -------------
+        HeffX2 = gb_solution%My * crossZ - gb_solution%Mz * crossY
+        HeffY2 = gb_solution%Mz * crossX - gb_solution%Mx * crossZ
+        HeffZ2 = gb_solution%Mx * crossY - gb_solution%My * crossX
+        !-------------------------------------------------------------
+        !--------------- assemble dm/dt -------------------------------------
+        dmdt(1:ntot)               = -gb_problem%gamma * crossX - alpha(t,gb_problem) * HeffX2
+        dmdt(ntot+1:2*ntot)        = -gb_problem%gamma * crossY - alpha(t,gb_problem) * HeffY2
+        dmdt(2*ntot+1:3*ntot)      = -gb_problem%gamma * crossZ - alpha(t,gb_problem) * HeffZ2
+        !---------------------------------------------------------------------
+        call trace%end("dmdt_fct", itimer=itimer, verbose=1 )
     end subroutine dmdt_fct
+
     
     !>--------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
@@ -297,6 +411,7 @@
     real(DP) :: alpha
     real(DP),intent(in) :: t
     type(MicroMagProblem),intent(in) :: problem
+    
     
     if ( problem%alpha0 .eq. 0 ) then
         !Interpolate to get the applied field at time t
@@ -322,6 +437,8 @@
     type(MicroMagProblem),intent(in) :: problem
     type(MicroMagSolution),intent(inout) :: solution
     integer :: i,j,nt
+    integer, save :: itimer = 0
+    call trace%begin( "StoreHeffComponents", itimer=itimer, verbose=1 )
     
     i = gb_solution%HextInd       
     nt = size( gb_problem%t ) 
@@ -339,7 +456,16 @@
         !Anisotropy term
         call updateAnisotropy(  gb_problem, gb_solution )
         !Demag. field
+#if USE_FMM3D
+        if ( gb_problem%use_fmm)  then
+          call updateDemagfieldFMM( gb_problem, gb_solution )
+        else
+           call updateDemagfield( gb_problem, gb_solution )
+        end if
+#else
         call updateDemagfield( gb_problem, gb_solution )
+#endif
+
     
         if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
             !Store the components of the effective field
@@ -361,6 +487,7 @@
         endif
     enddo
     
+    call trace%end( "StoreHeffComponents", itimer=itimer, verbose=1 )
     end subroutine StoreHeffComponents
     
     
@@ -377,6 +504,9 @@
     character*(100) :: prog_str 
     
     integer :: ntot, i
+    integer, save :: itimer = 0
+    call trace%begin( "initializeSolution", itimer=itimer, verbose=1 )
+
     !character(50) :: prog_str
     
     if ( problem%problemMode .eq. ProblemModeNew ) then
@@ -432,7 +562,7 @@
         call AddUncertaintyToDemagField( problem, solution)
     endif
     
-    
+    call trace%end( "initializeSolution", itimer=itimer, verbose=1 )
     end subroutine initializeSolution
     
     
@@ -451,6 +581,9 @@
     type(MATRIX_DESCR) :: descr
     real(DP) :: alpha, beta
     real(DP), dimension(:), allocatable :: temp
+    integer, save :: itimer = 0 
+
+    call trace%begin( "updateExchangeTerms", itimer=itimer, verbose=1 )
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -465,31 +598,20 @@
     !Effective field in the X-direction. Note that the scalar alpha is multiplied on from the left, such that
     !y = alpha * (A_exch * Mx )
     stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mx, beta, temp )
-    !If we have an unstructued grid, the exchange matrix already includes Jfact
-    if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then  
-        solution%HjX = temp * problem%Jfact
-    else
-        solution%HjX = temp
-    endif
+    solution%HjX = temp * problem%Jfact
     
     !Effective field in the Y-direction
     stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%My, beta, temp )
-    if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then 
-        solution%HjY = temp * problem%Jfact
-    else
-        solution%HjY = temp
-    endif
+    solution%HjY = temp * problem%Jfact
     
     !Effective field in the Z-direction
     stat = mkl_sparse_d_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%A_exch, descr, solution%Mz, beta, temp )
-    if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then 
-        solution%HjZ = temp * problem%Jfact
-    else
-        solution%HjZ = temp
-    endif
+    solution%HjZ = temp * problem%Jfact
     
     deallocate(temp)
     
+
+    call trace%end( "updateExchangeTerms", itimer=itimer, verbose=1 )
     end subroutine updateExchangeTerms
 
     
@@ -507,6 +629,9 @@
     real(DP),intent(in) :: t
     
     real(DP) :: HextX,HextY,HextZ
+    integer, save :: itimer = 0 
+
+    call trace%begin( "updateExternalField", itimer=itimer, verbose=1 )
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
          !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
@@ -529,7 +654,8 @@
         !not implemented yet
     endif
     
-    
+    call trace%end( "updateExternalField", itimer=itimer, verbose=1 )
+
     end subroutine updateExternalField
     
     !>-----------------------------------------
@@ -546,6 +672,9 @@
     !real :: prefact                                    !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
     real(DP),dimension(:),allocatable   :: Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot
+    integer, save :: itimer = 0, itimer1 = 0, itimer2 = 0
+
+    call trace%begin( "updateAnisotropy", itimer=itimer, verbose=1 )
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -582,21 +711,184 @@
     !                      [0 0 0]
     !                      [Kfact2 0 0]
     
-    allocate(Mx_rot(size(solution%Mx)), My_rot(size(solution%My)), Mz_rot(size(solution%Mz)))
-    Mx_rot = problem%CrystalAxis(:,1,1)*solution%Mx(:) + problem%CrystalAxis(:,1,2)*solution%My(:) + problem%CrystalAxis(:,1,3)*solution%Mz(:)
-    My_rot = problem%CrystalAxis(:,2,1)*solution%Mx(:) + problem%CrystalAxis(:,2,2)*solution%My(:) + problem%CrystalAxis(:,2,3)*solution%Mz(:)
-    Mz_rot = problem%CrystalAxis(:,3,1)*solution%Mx(:) + problem%CrystalAxis(:,3,2)*solution%My(:) + problem%CrystalAxis(:,3,3)*solution%Mz(:)
+    if (any(problem%K0 .ne. 0)) then
+        solution%Hkx = -2. * problem%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
+        solution%Hky = -2. * problem%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
+        solution%Hkz = -2. * problem%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
+    else 
+        call trace%begin( "updateAnisotropy_alloc", itimer=itimer1, verbose=2 )
+        allocate(Mx_rot(size(solution%Mx)), My_rot(size(solution%My)), Mz_rot(size(solution%Mz)))
+        allocate(Hkx_rot(size(Mx_rot)), Hky_rot(size(My_rot)), Hkz_rot(size(Mz_rot)))
+        call trace%end( "updateAnisotropy_alloc", itimer=itimer1, verbose=2 )
+        call trace%begin( "updateAnisotropy_calc", itimer=itimer2, verbose=2 )
+        Mx_rot = problem%CrystalAxis(:,1,1)*solution%Mx(:) + problem%CrystalAxis(:,1,2)*solution%My(:) + problem%CrystalAxis(:,1,3)*solution%Mz(:)
+        My_rot = problem%CrystalAxis(:,2,1)*solution%Mx(:) + problem%CrystalAxis(:,2,2)*solution%My(:) + problem%CrystalAxis(:,2,3)*solution%Mz(:)
+        Mz_rot = problem%CrystalAxis(:,3,1)*solution%Mx(:) + problem%CrystalAxis(:,3,2)*solution%My(:) + problem%CrystalAxis(:,3,3)*solution%Mz(:)
         
-    allocate(Hkx_rot(size(Mx_rot)), Hky_rot(size(My_rot)), Hkz_rot(size(Mz_rot)))
-    Hkx_rot = -2*Mx_rot(:)*(problem%Kfact_arr(:,1,1) + 2*problem%Kfact_arr(:,2,1)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,3)*My_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*My_rot(:)**2*Mz_rot(:)**2 )
-    Hky_rot = -2*My_rot(:)*(problem%Kfact_arr(:,1,2) + 2*problem%Kfact_arr(:,2,2)*My_rot(:)**2 + problem%Kfact_arr(:,3,3)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,2)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,2)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*Mz_rot(:)**2 )
-    Hkz_rot = -2*Mz_rot(:)*(problem%Kfact_arr(:,1,3) + 2*problem%Kfact_arr(:,2,3)*Mz_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*My_rot(:)**2 + 3*problem%Kfact_arr(:,4,3)*Mz_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + 2*problem%Kfact_arr(:,5,3)*Mx_rot(:)**2*Mz_rot(:)**2 + 2*problem%Kfact_arr(:,5,3)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*My_rot(:)**2 )
-    
-    solution%Hkx(:) = problem%CrystalAxis(:,1,1)*Hkx_rot(:) + problem%CrystalAxis(:,2,1)*Hky_rot(:) + problem%CrystalAxis(:,3,1)*Hkz_rot(:)
-    solution%Hky(:) = problem%CrystalAxis(:,1,2)*Hkx_rot(:) + problem%CrystalAxis(:,2,2)*Hky_rot(:) + problem%CrystalAxis(:,3,2)*Hkz_rot(:)
-    solution%Hkz(:) = problem%CrystalAxis(:,1,3)*Hkx_rot(:) + problem%CrystalAxis(:,2,3)*Hky_rot(:) + problem%CrystalAxis(:,3,3)*Hkz_rot(:)
-    
+        Hkx_rot = -2*Mx_rot(:)*(problem%Kfact_arr(:,1,1) + 2*problem%Kfact_arr(:,2,1)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,3)*My_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*My_rot(:)**2*Mz_rot(:)**2 )
+        Hky_rot = -2*My_rot(:)*(problem%Kfact_arr(:,1,2) + 2*problem%Kfact_arr(:,2,2)*My_rot(:)**2 + problem%Kfact_arr(:,3,3)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,2)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,2)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*Mz_rot(:)**2 )
+        Hkz_rot = -2*Mz_rot(:)*(problem%Kfact_arr(:,1,3) + 2*problem%Kfact_arr(:,2,3)*Mz_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*My_rot(:)**2 + 3*problem%Kfact_arr(:,4,3)*Mz_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + 2*problem%Kfact_arr(:,5,3)*Mx_rot(:)**2*Mz_rot(:)**2 + 2*problem%Kfact_arr(:,5,3)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*My_rot(:)**2 )
+        call trace%end( "updateAnisotropy_calc", itimer=itimer2, verbose=2 )
+
+        solution%Hkx(:) = problem%CrystalAxis(:,1,1)*Hkx_rot(:) + problem%CrystalAxis(:,2,1)*Hky_rot(:) + problem%CrystalAxis(:,3,1)*Hkz_rot(:)
+        solution%Hky(:) = problem%CrystalAxis(:,1,2)*Hkx_rot(:) + problem%CrystalAxis(:,2,2)*Hky_rot(:) + problem%CrystalAxis(:,3,2)*Hkz_rot(:)
+        solution%Hkz(:) = problem%CrystalAxis(:,1,3)*Hkx_rot(:) + problem%CrystalAxis(:,2,3)*Hky_rot(:) + problem%CrystalAxis(:,3,3)*Hkz_rot(:)
+        
+        deallocate(Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot)
+    end if 
+    call trace%end( "updateAnisotropy", itimer=itimer, verbose=1 )
+
     end subroutine updateAnisotropy    
+
+
+subroutine updateDemagfieldFMM(problem, solution)
+  implicit none
+  !------------------ Arguments ------------------
+  type(MicroMagProblem),  intent(inout) :: problem
+  type(MicroMagSolution), intent(inout) :: solution
+
+#if USE_FMM3D
+  !------------------ Timing ---------------------
+  !------------------ Locals ---------------------
+  integer :: ntot, i
+  real(DP) :: fourpi
+  integer :: nd, ier
+  double precision , contiguous, pointer :: source(:,:), dipvec(:,:,:)
+  double precision , contiguous, pointer :: pot(:,:), grad(:,:,:)
+!   double precision , pointer :: source(:,:), dipvec(:,:)
+!   double precision , pointer :: pot(:,:), grad(:,:)
+  double precision :: vol_i
+  double precision :: mx, my, mz
+  double precision :: eps_fmm
+
+  class(FMM3DTree), pointer :: fmm_tree
+  logical :: built_tree
+  integer, save :: itimer = 0
+  !------------------------------------------------
+
+    call trace%begin( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
+
+  fourpi  = 12.566370614359172D0
+  ntot = size(problem%grid%pts, dim=1)
+  ier = 0
+
+  !----------- cast Mx,My,Mz to single precision -----------
+  solution%Mx_s = real(solution%Mx, SP)
+  solution%My_s = real(solution%My, SP)
+  solution%Mz_s = real(solution%Mz, SP)
+  !--------------------------------------------------------------
+
+  !------------------ Allocate FMM work arrays ------------------
+    built_tree = .false.
+    if (.not. associated(solution%fmm_tree)) then
+        allocate(solution%fmm_tree)
+        built_tree = .true.
+        allocate(source(3, ntot))
+    end if
+    fmm_tree => solution%fmm_tree
+
+  !allocate(pot(1, ntot))
+  allocate(dipvec(1, 3, ntot))
+  allocate(grad(1, 3, ntot))
+  grad(:,:,:) = 0.0_DP 
+  !------------------------------------------------------------
+  !------------------ Pack sources and dipoles ------------------
+    if (built_tree) then
+        do i = 1, ntot
+            !------------------ positions -> FMM (3, N) ------------------
+            source(1,i) = real(problem%grid%pts(i,1), DP)
+            source(2,i) = real(problem%grid%pts(i,2), DP)
+            source(3,i) = real(problem%grid%pts(i,3), DP)
+            !------------------------------------------------------------
+        end do
+    end if
+  do i = 1, ntot
+    !------------- get cell volume ------------------------------
+    ! TODO - implement non-uniform and non-cubic grids here
+    if (problem%grid%gridType /= gridTypeUniform) then
+      vol_i = real(problem%grid%abc(i,1), DP) * &
+              real(problem%grid%abc(i,2), DP) * &
+              real(problem%grid%abc(i,3), DP)
+    else
+    vol_i = real(problem%grid%dx, DP) * &
+            real(problem%grid%dy, DP) * &
+            real(problem%grid%dz, DP)
+    end if
+    !------------------------------------------------------------
+    !--------- conert to dipole moment m = M * ΔV --------------
+    ! TODO - is Ms the correct scaling here?
+    mx = solution%Mx(i) * vol_i * problem%Ms(i)
+    my = solution%My(i) * vol_i * problem%Ms(i)
+    mz = solution%Mz(i) * vol_i * problem%Ms(i)
+    !------------------------------------------------------------
+    !-------------- pack dipole vector ---------------------------
+    dipvec(1,1,i) = mx 
+    dipvec(1,2,i) = my
+    dipvec(1,3,i) = mz
+    !------------------------------------------------------------ 
+  end do
+    !--------------------------------------------------------------
+  !------------------ Call FMM (sources->sources) ------------------
+  nd = 1
+   call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif, problem%nlmin, problem%nlmax)
+   !------- only run if number of boxes > 9 -----------
+   !--- NOTE - if nboxes <= 9 then we have all-to-all and the is no need for FMM ---
+   if (fmm_tree%nboxes > 9) then
+       call fmm_tree%make_and_eval(dipvec, grad)
+   end if
+   !--------------------------------------------------
+
+  if (ier /= 0) then
+    write(*,*) 'FMM3D returned error code in updateDemagfieldFMM: ier =', ier
+    stop " FMM3D error"
+  end if
+  !-----------------------------------------------------------------
+  !------------------ Map grad -> H (and to single) ----------------
+  ! include factor 4pi to match Magtense units
+   if (fmm_tree%nboxes > 9) then 
+    !$omp parallel do default(shared)
+    do i = 1, ntot
+      solution%HmX(i) = real( grad(1,1,i) / fourpi, SP )
+      solution%HmY(i) = real( grad(1,2,i) / fourpi, SP )
+      solution%HmZ(i) = real( grad(1,3,i) / fourpi, SP )
+      ! solution%HmX(i) = real( grad(1,i) / fourpi, SP )
+      ! solution%HmY(i) = real( grad(2,i) / fourpi, SP )
+      ! solution%HmZ(i) = real( grad(3,i) / fourpi, SP )
+    end do
+    !$omp end parallel do
+  else
+    solution%HmX = 0.0_SP
+    solution%HmY = 0.0_SP
+    solution%HmZ = 0.0_SP
+  end if
+  !-----------------------------------------------------------------
+  !------------- add correction from neighbouring tiles ---------------------
+call add_near_field(problem, solution)
+  !--------------------------------------------------------------------------
+    !------------------ Cleanup -------------------------------------
+  if (.not. fmm_tree%keep_tree) then
+      call fmm_tree%dealloc()
+
+      deallocate( fmm_tree )
+      nullify(solution%fmm_tree)
+  end if
+  if (built_tree) then
+      deallocate( source )
+  end if
+  deallocate(dipvec, grad)
+    !--------------------------------------------------------------
+  !------------------ Optional field noise (CV) --------------------
+  if (problem%CV > 0) then
+      solution%HmX = solution%HmX + solution%HmX*problem%CV*sqrt(-2d0*log(solution%u1))*cos(2d0*pi*solution%u2)
+      solution%HmY = solution%HmY + solution%HmY*problem%CV*sqrt(-2d0*log(solution%u3))*cos(2d0*pi*solution%u4)
+      solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
+  end if
+    call trace%end( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
+#endif
+
+end subroutine updateDemagfieldFMM
+
+
 
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
@@ -614,6 +906,8 @@
     complex(kind=4) :: alpha_c, beta_c
     real(SP), dimension(:), allocatable :: temp
     character*(100) :: prog_str 
+    integer, save :: itimer = 0
+    call trace%begin( "updateDemagfield", itimer=itimer, verbose=1 )
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -662,6 +956,7 @@
         else
 #if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
+            !call displayGUIMessage( ' runing cuda demag sparse matrix multiplication' )
             pref = sngl(-1 )!* problem%Mfact)                                
             call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
             temp = solution%HmX * problem%Mfact
@@ -670,6 +965,15 @@
             solution%HmY = temp
             temp = solution%HmZ * problem%Mfact
             solution%HmZ = temp
+
+            ! open (11, file="sparse_CUDA_H.bin",  &
+            !         status='unknown', form='unformatted', &
+            !         access='direct', recl=1*ntot)
+            ! write(11,rec=1) solution%HmX 
+            ! write(11,rec=2) solution%HmY
+            ! write(11,rec=3) solution%HmZ
+            ! close(11)
+            ! error stop " test stop after cuda sparse"
 #endif
         endif
         
@@ -826,6 +1130,12 @@
         solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
     endif
     
+
+
+
+
+    call trace%end( "updateDemagfield", itimer=itimer, verbose=1 )
+
     end subroutine updateDemagfield
     
     
@@ -835,23 +1145,35 @@
     !> Initializes the interaction matrices
     !> @param[inout] problem struct containing the problem information    
     !---------------------------------------------------------------------------   
-    subroutine initializeInteractionMatrices( problem )
+    subroutine initializeInteractionMatrices( problem, solution )
     type(MicroMagProblem), intent(inout) :: problem         !> Struct containing the grid information
-    
-    
-    !Setup the grid
-    call setupGrid( problem%grid )
+    type(MicroMagSolution),intent(inout) :: solution        !> Solution data structure
+
+    integer, save :: itimer = 0
+    call trace%begin( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     
     !Demagnetization tensor matrix
+#if USE_FMM3D
+    !------------- build neighbour demag tensor -------------------------------------------------------------------
+    call BuildNeighbourDemagTensor( problem)
+        !---------- if BuildNeighbourDemagTensor sets use_fmm to false then compute the demag tensor normally -----
+    if (.not. problem%use_fmm) then
+       call ComputeDemagfieldTensor( problem )
+    end if
+        !-----------------------------------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------------------------------------
+#else
     call ComputeDemagfieldTensor( problem )
-    
+#endif
+
     !Anisotropy matrix
     call ComputeAnisotropyTerm3D( problem )
     
     !Exhange term matrix
-    call ComputeExchangeTerm3D( problem%grid, problem%A_exch )
+    call ComputeExchangeTerm3D( problem%grid, problem%A_exch, problem, solution )
     
     
+    call trace%end( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     end subroutine initializeInteractionMatrices
     
     
@@ -865,10 +1187,12 @@
     subroutine setupGrid( grid )
     type(MicroMagGrid),intent(inout) :: grid            !> Grid information to be generated
     integer :: i,j,k,ind
+    integer, save :: itimer = 0
+    call trace%begin( "setupGrid", itimer=itimer, verbose=1 )
     
     !Setup the grid depending on which type of grid it is
     if ( grid%gridType .eq. gridTypeUniform ) then
-        
+         
         !Allocate the grid
         allocate( grid%x(grid%nx,grid%ny,grid%nz),grid%y(grid%nx,grid%ny,grid%nz),grid%z(grid%nx,grid%ny,grid%nz) )
         allocate( grid%dV( grid%nx * grid%ny * grid%nz ) )
@@ -918,7 +1242,7 @@
             enddo
         enddo
     endif
-    
+    call trace%end( "setupGrid", itimer=itimer, verbose=1 )
     end subroutine setupGrid
     
     
@@ -944,6 +1268,8 @@
     real :: rate
     integer :: c1,c2,cr,cm
     character(10) :: prog_str
+    integer, save :: itimer = 0
+    call trace%begin( "ComputeDemagfieldTensor", itimer=itimer, verbose=1 )
     
     ! First initialize the system_clock
     call system_clock(count_rate=cr)
@@ -974,17 +1300,17 @@
  
         !call mkl_set_num_threads(problem%nThreadsMatlab)
         !call omp_set_num_threads(problem%nThreadsMatlab)
-        call omp_set_num_threads(1)
-               
+        !call omp_set_num_threads(1)               
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
             
             if (nx_ave*ny_ave*nz_ave > 1) then
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
         
-            !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout, k, j, i)
-        
-            !for each element find the tensor for all evaluation points (i.e. all elements)
+            !for each element find the tensor for all evaluation points (i.e. all elements)    
+            !======== NOTE ===============
+            ! this parallelization seem to give issues when compiled with matlab in debug mode
+            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout, pts_arr) default(none)
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx
@@ -1006,7 +1332,12 @@
                         allocate(Nout(1,ntot,3,3))
                         allocate(H(ntot,3))
                         
-                        call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                        allocate(pts_arr(ntot,3))
+                        pts_arr(:,1) =  problem%grid%pts(:,1)
+                        pts_arr(:,2) =  problem%grid%pts(:,2)
+                        pts_arr(:,3) =  problem%grid%pts(:,3)
+                        
+                        call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
                         
                         !Copy Nout into the proper structure used by the micro mag model
                         ind = (k-1) * nx * ny + (j-1) * nx + i
@@ -1027,13 +1358,22 @@
                         problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
                     
                         !Clean up
+                        deallocate(pts_arr)
                         deallocate(Nout)
                         deallocate(H)
                     enddo
                 enddo
             enddo
-            
             !$OMP END PARALLEL DO
+
+            
+            open(21,file='Kxx.txt',status='unknown',form='formatted',action='write')
+            do i=1,size(problem%Kxx,1)
+                do j=1,size(problem%Kxx,2)
+                    write(21,*)  problem%Kxx(i,j)
+                enddo
+            enddo
+            close(21)
             
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
         
@@ -1095,7 +1435,6 @@
             !call displayGUIMessage( 'Constructing the Tensormap' )
             !call ConstructDemagTensorMap( problem )
             !call displayGUIMessage( 'Done constructing the Tensormap' )
-            
             !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout,Noutave,dx,dy,dz,pts_arr)
             
             !for each element find the tensor for all evaluation points (i.e. all elements)
@@ -1208,7 +1547,25 @@
     elseif ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
         call ApplyThresholdFFT( problem )
     endif
-    
+
+
+
+    !-------------- for debug write the dense matrices to binary files --------------
+    ! TODO - add option to control this and maybe an "auxiliary" module to do this
+    !open (11, file="dense_std_ref_nocuda.bin",  &
+    !       status='unknown', form='unformatted', &
+    !       access='direct', recl=1*ntot*ntot)
+    ! write(11,rec=1) problem%Kxx
+    ! write(11,rec=2) problem%Kxy
+    ! write(11,rec=3) problem%Kxz
+    ! write(11,rec=4) problem%Kyy
+    ! write(11,rec=5) problem%Kyz
+    ! write(11,rec=6) problem%Kzz
+    ! close(11)
+    !error stop " test stop after writing dense ref"
+    !-------------- end debug write the dense matrices to binary files --------------
+
+    call trace%end( "ComputeDemagfieldTensor", itimer=itimer, verbose=1 )
     
     end subroutine ComputeDemagfieldTensor
     
@@ -1220,14 +1577,23 @@
     !> Calculates the exhange term matrix
     !> which means it produces the differential operator d^2/dx^2 + d^2/dy^2 + d^2/dz^2 and returns this in the sparse matrix A
     !---------------------------------------------------------------------------   
-    subroutine ComputeExchangeTerm3D( grid, A )
-    type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
-    type(sparse_matrix_t),intent(inout) :: A          !> The returned matrix from the sparse matrix creator
-    
+    subroutine ComputeExchangeTerm3D( grid, A, problem, solution )
+    type(MicroMagGrid),intent(in) :: grid               !> Struct containing the grid information    
+    type(sparse_matrix_t),intent(inout) :: A            !> The returned matrix from the sparse matrix creator
+    type(MicroMagProblem),intent(inout) :: problem      !> Problem data structure    
+    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+    real(DP),dimension(:),allocatable :: A0_normalized  !> Normalized A0 for uneven anisotropy
+        
+
+    if ( gb_problem%passExch .eq. passExchTrue) return ! Skip this if the exchange has already been passed from outside
+
+    allocate( A0_normalized(size(problem%A0)) )  
+    A0_normalized = problem%A0 / ( maxval(problem%A0) )   ! Normalized by the largest exchange factor
+        
     if ( grid%gridType .eq. gridTypeUniform ) then
-        call ComputeExchangeTerm3D_Uniform( grid, A )
+        call ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
     elseif (( grid%gridType .eq. gridTypeTetrahedron ) .or. (grid%gridType .eq. gridTypeUnstructuredPrisms)) then
-        !call ConvertExchangeTerm3D_NonUniform( grid, A )
+        call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, problem%A_exch)
     endif
 
     
@@ -1235,22 +1601,29 @@
     
         
     !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2026
     !> @brief
     !> Calculates the exhange term matrix on a uniform grid
     !> which means it produces the differential operator d^2/dx^2 + d^2/dy^2 + d^2/dz^2 and returns this in the sparse matrix A
+    !> Includes position dependent exchange stiffness A0 through the modified stencil described in 
+    !> Heistracher et al. "Proposal for a micromagnetic standard problem: Domain wall pinning at phase boundaries", DOI: 10.1016/j.jmmm.2021.168875
     !---------------------------------------------------------------------------   
-    subroutine ComputeExchangeTerm3D_Uniform( grid, A )
-    type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
+    subroutine ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
+    type(MicroMagGrid),intent(in) :: grid              !> Struct containing the grid information    
     type(sparse_matrix_t),intent(inout) :: A           !> The returned matrix from the sparse matrix creator
+    type(MicroMagProblem),intent(inout) :: problem      !> Problem data structure 
+    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
         
-    integer :: stat                                   !> Status value for the various sparse matrix operations        
-    type(MagTenseSparse_d) :: d2dx2, d2dy2, d2dz2       !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
-    type(sparse_matrix_t) :: tmp                      !> Temporary sparse matrices used for internal calculations
-    integer :: ind, ntot,colInd,rowInd                !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
-    integer :: i,j,k,nx,ny,nz                         !> For-loop counters
-    type(matrix_descr) :: descr                         !> Describes a sparse matrix operation
+    integer :: stat                                    !> Status value for the various sparse matrix operations        
+    type(MagTenseSparse_d) :: d2dx2, d2dy2, d2dz2      !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
+    type(sparse_matrix_t) :: tmp                       !> Temporary sparse matrices used for internal calculations
+    integer :: ind, ntot,colInd,rowInd                 !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
+    integer :: i,j,k,nx,ny,nz                          !> For-loop counters
+    type(matrix_descr) :: descr                        !> Describes a sparse matrix operation
     real(DP) :: const
+    character*(100) :: prog_str 
+    integer, save :: itimer = 0
+    call trace%begin( "ComputeExchangeTerm3D_Uniform", itimer=itimer, verbose=1 )
     
     !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
@@ -1260,171 +1633,175 @@
     nz = grid%nz
     
     !----------------------------------d^2dx^2 begins -----------------------------!
-    !Make the d^2/dx^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz
-    ntot = nz * ( ny * 4 + ny * (nx-2)*3 )
-    allocate(d2dx2%values(ntot),d2dx2%cols(ntot),d2dx2%rows_start(nx*ny*nz),d2dx2%rows_end(nx*ny*nz))
+    if ( nx .gt. 1 ) then
+        !Make the d^2/dx^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz
+        ntot = nz * ( ny * 4 + ny * (nx-2)*3 )
+        allocate(d2dx2%values(ntot),d2dx2%cols(ntot),d2dx2%rows_start(nx*ny*nz),d2dx2%rows_end(nx*ny*nz))
     
-    ind = 1
-    rowInd = 1
-    colInd = 1
+        ind = 1
+        rowInd = 1
+        colInd = 1
     
-    do k=1,nz
-        do j=1,ny
+        do k=1,nz
+            do j=1,ny
             
-            !The left boundary
-            d2dx2%values(ind) = -1.
-            d2dx2%cols(ind) = colInd
-            d2dx2%rows_start(rowInd) = ind            
-            ind = ind + 1
-            
-            d2dx2%values(ind) = 1.
-            d2dx2%cols(ind) = colInd + 1
-            d2dx2%rows_end(rowInd) = ind+1
-            rowInd = rowInd + 1
-            ind = ind + 1
-            
-            
-            !Go through one row at a time
-            do i=2,nx-1
-                            
-                !Left-most point
-                d2dx2%values( ind ) = 1.
+                !The left boundary
+                d2dx2%values(ind) = -1.
                 d2dx2%cols(ind) = colInd
-                !update where the row starts
-                d2dx2%rows_start(rowInd) = ind                           
+                d2dx2%rows_start(rowInd) = ind            
                 ind = ind + 1
-                
-                !Center point
-                d2dx2%values( ind ) = -2.
+            
+                d2dx2%values(ind) = 1.
                 d2dx2%cols(ind) = colInd + 1
-                ind = ind + 1
-                
-                !Right-most point
-                d2dx2%values( ind ) = 1.
-                d2dx2%cols(ind) = colInd + 2
                 d2dx2%rows_end(rowInd) = ind+1
                 rowInd = rowInd + 1
                 ind = ind + 1
+            
+            
+                !Go through one row at a time
+                do i=2,nx-1
+                            
+                    !Left-most point
+                    d2dx2%values( ind ) = problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))
+                    d2dx2%cols(ind) = colInd
+                    !update where the row starts
+                    d2dx2%rows_start(rowInd) = ind                           
+                    ind = ind + 1
                 
-                colInd = colInd + 1
-            enddo            
-            !The right boundary
-            d2dx2%values(ind) = 1.
-            d2dx2%cols(ind) = colInd
-            !update where the row starts
-            d2dx2%rows_start(rowInd) = ind            
-            ind = ind + 1
+                    !Center point
+                    d2dx2%values( ind ) = -(problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))+problem%A0_map(i+1,j,k)/(problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k)))
+                    d2dx2%cols(ind) = colInd + 1
+                    ind = ind + 1
+                
+                    !Right-most point
+                    d2dx2%values( ind ) = problem%A0_map(i+1,j,k)/(problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k))
+                    d2dx2%cols(ind) = colInd + 2
+                    d2dx2%rows_end(rowInd) = ind+1
+                    rowInd = rowInd + 1
+                    ind = ind + 1
+                
+                    colInd = colInd + 1
+                enddo            
+                !The right boundary
+                d2dx2%values(ind) = 1.
+                d2dx2%cols(ind) = colInd
+                !update where the row starts
+                d2dx2%rows_start(rowInd) = ind            
+                ind = ind + 1
             
-            d2dx2%values(ind) = -1.
-            d2dx2%cols(ind) = colInd+1
-            d2dx2%rows_end(rowInd) = ind+1
-            rowInd = rowInd + 1
-            ind = ind + 1     
+                d2dx2%values(ind) = -1.
+                d2dx2%cols(ind) = colInd+1
+                d2dx2%rows_end(rowInd) = ind+1
+                rowInd = rowInd + 1
+                ind = ind + 1     
             
-            colInd = colInd + 2
+                colInd = colInd + 2
+            enddo
         enddo
-    enddo
     
-    !Multiply by the discretization
-    d2dx2%values = d2dx2%values * 1./grid%dx**2
+        !Multiply by the discretization
+        d2dx2%values = d2dx2%values * 2./grid%dx**2
         
-    !Create the sparse matrix for the d^2dx^2
-    stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
+        !Create the sparse matrix for the d^2dx^2
+        stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
     
+    endif
     
-    !----------------------------------d^2dx^2 ends -----------------------------!
+    !----------------------------------d^2dx^2 ends ---------------------------- -!
     
     
     !----------------------------------d^2dy^2 begins ----------------------------!
-    ntot = nz * ( nx * 2 + (ny-2) * nx * 3 + nx * 2 )
-    !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2
-    allocate(d2dy2%values(ntot),d2dy2%cols(ntot),d2dy2%rows_start(nx*ny*nz),d2dy2%rows_end(nx*ny*nz))
+    if ( ny .gt. 1 ) then
+        ntot = nz * ( nx * 2 + (ny-2) * nx * 3 + nx * 2 )
+        !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2
+        allocate(d2dy2%values(ntot),d2dy2%cols(ntot),d2dy2%rows_start(nx*ny*nz),d2dy2%rows_end(nx*ny*nz))
     
-    ind = 1
-    rowInd = 1
-    colInd = 1
-    do k=1,nz
-        !The bottom boundary
-        do i=1,nx
-            d2dy2%values(ind) = -1.
-            d2dy2%cols(ind) = colInd
-            d2dy2%rows_start(rowInd) = ind
-            
-            !increment to next element
-            ind = ind + 1
-            
-            d2dy2%values(ind) = 1.
-            d2dy2%cols(ind) = colInd + nx
-            d2dy2%rows_end(rowInd) = ind+1
-            rowInd = rowInd + 1
-            
-            !increment to next element
-            ind = ind + 1
-            
-            colInd = colInd + 1
-        enddo
-        
-        !Everything in between
-        do j=2,ny-1
-                    
-            
+        ind = 1
+        rowInd = 1
+        colInd = 1
+        do k=1,nz
+            !The bottom boundary
             do i=1,nx
-                
-                !lower value
-                d2dy2%values(ind) = 1.
-                d2dy2%cols(ind) = colInd-nx
-                d2dy2%rows_start(rowInd) = ind
-                !increment to next element
-                ind = ind + 1  
-                
-                !central value
-                d2dy2%values(ind) = -2.
+                d2dy2%values(ind) = -1.
                 d2dy2%cols(ind) = colInd
+                d2dy2%rows_start(rowInd) = ind
             
                 !increment to next element
                 ind = ind + 1
             
-                !upper value
                 d2dy2%values(ind) = 1.
                 d2dy2%cols(ind) = colInd + nx
                 d2dy2%rows_end(rowInd) = ind+1
                 rowInd = rowInd + 1
-                
+            
                 !increment to next element
                 ind = ind + 1
+            
                 colInd = colInd + 1
             enddo
+        
+            !Everything in between
+            do j=2,ny-1
+                    
+            
+                do i=1,nx
+                
+                    !lower value
+                    d2dy2%values(ind) = problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))
+                    d2dy2%cols(ind) = colInd-nx
+                    d2dy2%rows_start(rowInd) = ind
+                    !increment to next element
+                    ind = ind + 1  
+                
+                    !central value
+                    d2dy2%values(ind) = -(problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))+problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k)))
+                    d2dy2%cols(ind) = colInd
+            
+                    !increment to next element
+                    ind = ind + 1
+            
+                    !upper value
+                    d2dy2%values(ind) = problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k))
+                    d2dy2%cols(ind) = colInd + nx
+                    d2dy2%rows_end(rowInd) = ind+1
+                    rowInd = rowInd + 1
+                
+                    !increment to next element
+                    ind = ind + 1
+                    colInd = colInd + 1
+                enddo
                         
         
-        enddo
+            enddo
         
-        !The top boundary    
-        do i=1,nx
-            !lower element
-            d2dy2%values(ind) = 1.
-            d2dy2%cols(ind) = colInd - nx
-            d2dy2%rows_start(rowInd) = ind
+            !The top boundary    
+            do i=1,nx
+                !lower element
+                d2dy2%values(ind) = 1.
+                d2dy2%cols(ind) = colInd - nx
+                d2dy2%rows_start(rowInd) = ind
             
-            !increment to next element
-            ind = ind + 1            
+                !increment to next element
+                ind = ind + 1            
             
-            !central element
-            d2dy2%values(ind) = -1.
-            d2dy2%cols(ind) = colInd
-            d2dy2%rows_end(rowInd) = ind + 1
-            rowInd = rowInd + 1
+                !central element
+                d2dy2%values(ind) = -1.
+                d2dy2%cols(ind) = colInd
+                d2dy2%rows_end(rowInd) = ind + 1
+                rowInd = rowInd + 1
             
-            ind = ind + 1
-            colInd = colInd + 1
+                ind = ind + 1
+                colInd = colInd + 1
             
+            enddo
         enddo
-    enddo
     
-    !Multiply by the discretization
-    d2dy2%values = d2dy2%values * 1./grid%dy**2
+        !Multiply by the discretization
+        d2dy2%values = d2dy2%values * 2./grid%dy**2
         
-    !Create the sparse matrix for the d^2dy^2
-    stat = mkl_sparse_d_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
+        !Create the sparse matrix for the d^2dy^2
+        stat = mkl_sparse_d_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
+    endif
     
     !----------------------------------d^2dy^2 ends ----------------------------!
     
@@ -1466,7 +1843,7 @@
             do j=1,ny
                 do i=1,nx
                     !left-most value
-                    d2dz2%values(ind) = 1.
+                    d2dz2%values(ind) = problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))
                     d2dz2%cols(ind) = colInd - nx * ny
                     d2dz2%rows_start(rowInd) = ind
             
@@ -1474,14 +1851,14 @@
                     ind = ind + 1
                 
                     !central value
-                    d2dz2%values(ind) = -2.
+                    d2dz2%values(ind) = -(problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))+problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k)))
                     d2dz2%cols(ind) = colInd
                             
                     !increment position
                     ind = ind + 1
                 
                     !right-most value
-                    d2dz2%values(ind) = 1.
+                    d2dz2%values(ind) = problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k))
                     d2dz2%cols(ind) = colInd + nx * ny
                     d2dz2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
@@ -1522,7 +1899,7 @@
     
     
         !Multiply by the discretization
-        d2dz2%values = d2dz2%values * 1./grid%dz**2
+        d2dz2%values = d2dz2%values * 2./grid%dz**2
         
         !Create the sparse matrix for the d^2dz^2
         stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
@@ -1538,83 +1915,105 @@
     !call writeSparseMatrixToDisk( d2dy2%A, nx*ny*nz, 'd2dy2.dat' )
     
     const = 1.
-    stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dy2%A, tmp)    
+    
+    if ( nx .gt. 1) then
+        if ( ny .gt. 1) then
+            stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dy2%A, tmp)  
+            deallocate(d2dy2%values,d2dy2%cols,d2dy2%rows_start,d2dy2%rows_end)
+            stat = mkl_sparse_destroy (d2dy2%A)
+            
+            if ( nz .gt. 1) then
+                !nx+ny+nz
+                call displayGUIMessage( 'Exchange in x,y,z' )
+                stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, const, tmp, A)       
+                deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
+                stat = mkl_sparse_destroy (d2dz2%A)
+            else
+                !nx+ny
+                call displayGUIMessage( 'Exchange in x,y' )
+                descr%type = SPARSE_MATRIX_TYPE_GENERAL
+                descr%mode = SPARSE_FILL_MODE_FULL
+                descr%diag = SPARSE_DIAG_NON_UNIT
+                stat = mkl_sparse_copy ( tmp, descr, A )
+                stat = mkl_sparse_destroy (tmp)
+            endif
+        else
+            if ( nz .gt. 1) then
+                !nx+nz
+                call displayGUIMessage( 'Exchange in x,z' )
+                stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dz2%A, A)  
+                deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
+                stat = mkl_sparse_destroy (d2dz2%A)
+            else
+                !nx
+                call displayGUIMessage( 'Exchange in x' )
+                descr%type = SPARSE_MATRIX_TYPE_GENERAL
+                descr%mode = SPARSE_FILL_MODE_FULL
+                descr%diag = SPARSE_DIAG_NON_UNIT
+                stat = mkl_sparse_copy ( d2dx2%A, descr, A )
+            endif
+        endif
+        deallocate(d2dx2%values,d2dx2%cols,d2dx2%rows_start,d2dx2%rows_end)
+        stat = mkl_sparse_destroy (d2dx2%A)
+    else
+        if ( ny .gt. 1) then
+            if ( nz .gt. 1) then
+                !ny+nz
+                call displayGUIMessage( 'Exchange in y,z' )
+                stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dy2%A, const, d2dz2%A, A) 
+                deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
+                stat = mkl_sparse_destroy (d2dz2%A)
+            else
+                !ny
+                call displayGUIMessage( 'Exchange in y' )
+                descr%type = SPARSE_MATRIX_TYPE_GENERAL
+                descr%mode = SPARSE_FILL_MODE_FULL
+                descr%diag = SPARSE_DIAG_NON_UNIT
+                stat = mkl_sparse_copy ( d2dy2%A, descr, A )
+            endif
+            deallocate(d2dy2%values,d2dy2%cols,d2dy2%rows_start,d2dy2%rows_end)
+            stat = mkl_sparse_destroy (d2dy2%A)
+        else
+            if ( nz .gt. 1) then
+                !nz
+                call displayGUIMessage( 'Exchange in z' )
+                descr%type = SPARSE_MATRIX_TYPE_GENERAL
+                descr%mode = SPARSE_FILL_MODE_FULL
+                descr%diag = SPARSE_DIAG_NON_UNIT
+                stat = mkl_sparse_copy ( d2dz2%A, descr, A )
+            else
+                !no exchange terms
+            endif
+            deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
+            stat = mkl_sparse_destroy (d2dz2%A)
+        endif
+    endif
     
     !call writeSparseMatrixToDisk( tmp, nx*ny*nz, 'A_exch.dat' )
     
-    if ( nz .gt. 1 ) then    
-        stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, const, tmp, A)
-        !clean up        
-        deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
-        stat = mkl_sparse_destroy (d2dz2%A)
-    else
-        descr%type = SPARSE_MATRIX_TYPE_GENERAL
-        descr%mode = SPARSE_FILL_MODE_FULL
-        descr%diag = SPARSE_DIAG_NON_UNIT
-        stat = mkl_sparse_copy ( tmp, descr, A )
-        stat = mkl_sparse_destroy (tmp)
-    endif
-    
-    !call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_total.dat' )
-    
-    !clean up
-    deallocate(d2dx2%values,d2dx2%cols,d2dx2%rows_start,d2dx2%rows_end)
-    deallocate(d2dy2%values,d2dy2%cols,d2dy2%rows_start,d2dy2%rows_end)
-    
-    stat = mkl_sparse_destroy (d2dx2%A)
-    stat = mkl_sparse_destroy (d2dy2%A)
-    
     !call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_exch.dat' )
     
+    call create_COO_values_from_CSR(A,solution%gridinfo)
+    
+
+    call trace%end( "ComputeExchangeTerm3D_Uniform", itimer=itimer, verbose=1 )
     end subroutine ComputeExchangeTerm3D_Uniform
        
-    !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
-    !> @brief
-    !> Converts the loaded information from Matlab in CSR 
-    !> format to a CSR MKL type
-    !---------------------------------------------------------------------------   
-    subroutine ConvertExchangeTerm3D_NonUniform(grid, A)
-    type(MicroMagGrid),intent(in) :: grid             !> Struct containing the grid information    
-    type(sparse_matrix_t),intent(out) :: A            !> The returned matrix from the sparse matrix creator
-                
-    integer :: stat                                   !> Status value for the various sparse matrix operations        
-    integer :: nx,ny,nz                               !> Dimensions
-    type(matrix_descr) :: descr                       !> Describes a sparse matrix operation
-    
-    nx = grid%nx
-    ny = grid%ny
-    nz = grid%nz
-    
-    stat = mkl_sparse_d_create_csr ( A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, grid%A_exch_load%rows_start, grid%A_exch_load%rows_end, grid%A_exch_load%cols, grid%A_exch_load%values)
-        
-    end subroutine ConvertExchangeTerm3D_NonUniform
-    
-    
-    !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
-    !> @brief
-    !> Calculates the anisotropy term sparse matrix assuming the effective field anisotropy is linear in m    
-    !> @param[inout] problem the data structure containing the problem
-    !---------------------------------------------------------------------------   
-    subroutine ComputeAnisotropyTerm3D( problem )
-    type(MicroMagProblem),intent(inout) :: problem       !> Struct containing the problem
-    
-    call ComputeAnisotropyTerm3D_General( problem )
-    
-    end subroutine ComputeAnisotropyTerm3D
-    
     !>-----------------------------------------
     !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
     !> @brief
     !> Calculates the anisotropy term matrix on any grid  
     !> @param[inout] problem the data structure containing the problem
     !---------------------------------------------------------------------------   
-    subroutine ComputeAnisotropyTerm3D_General( problem )
+    subroutine ComputeAnisotropyTerm3D( problem )
     type(MicroMagProblem),intent(inout) :: problem             !> Struct containing the problem
     
     integer :: nx,ny,nz,ntot, i
+    integer, save :: itimer = 0
     
+    ntot = size(problem%Ms)
+
+    call trace%begin( "ComputeAnisotropyTerm3D", itimer=itimer, verbose=1 )
     !--- We use the general formulation introduced in updateAnisotropy
     !--- If the user has specified a value for the uniaxial anisotropy or the cubic anisotropy, we use transform
     !--- those to the general matrix formulation
@@ -1628,9 +2027,21 @@
         enddo
         
         !Set the crystal axis as the user only specified u_ea
-        problem%CrystalAxis(:,1,3) =  problem%u_ea(:,1)
-        problem%CrystalAxis(:,2,3) =  problem%u_ea(:,2)
+        problem%CrystalAxis(:,3,1) =  problem%u_ea(:,1)
+        problem%CrystalAxis(:,3,2) =  problem%u_ea(:,2)
         problem%CrystalAxis(:,3,3) =  problem%u_ea(:,3)
+
+        allocate(problem%Axx(ntot),problem%Axy(ntot),problem%Axz(ntot), &
+                 problem%Ayy(ntot),problem%Ayz(ntot),problem%Azz(ntot))
+        problem%Axx = problem%u_ea(:,1) * problem%u_ea(:,1)
+        problem%Axy = problem%u_ea(:,1) * problem%u_ea(:,2)
+        problem%Axz = problem%u_ea(:,1) * problem%u_ea(:,3)
+        problem%Ayy = problem%u_ea(:,2) * problem%u_ea(:,2)
+        problem%Ayz = problem%u_ea(:,2) * problem%u_ea(:,3)
+        problem%Azz = problem%u_ea(:,3) * problem%u_ea(:,3)
+
+
+        
         
     elseif (any(problem%K1 .ne. 0)) then !Cubic anisotropy
         call displayGUIMessage( 'Assuming cubic anisotropy' )
@@ -1645,8 +2056,104 @@
             problem%Kfact_arr(i,:,:) = problem%K0_arr(i,:,:) / ( mu0 * problem%Ms(i) )
         enddo
     endif
+
+    call trace%end( "ComputeAnisotropyTerm3D", itimer=itimer, verbose=1 )
     
-    end subroutine ComputeAnisotropyTerm3D_General
+    end subroutine ComputeAnisotropyTerm3D
+
+    
+
+
+    !================== Helper functions for FMM correction =========================================
+
+
+
+!>======================================================================
+!> Add demagnitization field from nearfield 
+!> uses K_nbrcorr, which depending on the setup contains either
+!>      1. The correction tensors (Nnbr - Kdip*V) stored in sparse format
+!>      2. The demagnetization tensor Nnbr stored in sparse format
+!> adds computed field to the existing solution%H
+!>======================================================================
+subroutine add_near_field(problem, solution)
+  implicit none
+  type(MicroMagProblem),  intent(in)    :: problem
+  type(MicroMagSolution), intent(inout) :: solution
+
+  !-----------------------------------------------------------------------------
+  real(SP), contiguous, pointer :: mxm(:), mym(:), mzm(:)
+  real(SP), contiguous, pointer :: hx_tmp(:), hy_tmp(:), hz_tmp(:), temp(:)
+  integer :: ntot
+  real(SP) :: pref
+  integer :: stat
+  real(SP) :: alpha, beta
+  integer, save :: itimer = 0
+  call trace%begin( "add_near_field", itimer=itimer, verbose=1 )
+
+
+  ntot = size(problem%grid%pts, dim=1)
+
+
+#if USE_CUDA
+    allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) )
+    hx_tmp = 0.0_SP
+    hy_tmp = 0.0_SP
+    hz_tmp = 0.0_SP
+
+    pref = sngl(-1)
+    call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
+
+    solution%HmX = solution%HmX - hx_tmp  * problem%Mfact
+    solution%HmY = solution%HmY - hy_tmp  * problem%Mfact
+    solution%HmZ = solution%HmZ - hz_tmp  * problem%Mfact
+
+    deallocate(hx_tmp, hy_tmp, hz_tmp)
+
+#else
+    allocate(mxm(ntot), mym(ntot), mzm(ntot))
+    allocate(temp(ntot))
+
+    ! Pre-scale magnetisation by Ms (as you do for CUDA)
+    mxm = solution%Mx_s * real(problem%Ms, SP)
+    mym = solution%My_s * real(problem%Ms, SP)
+    mzm = solution%Mz_s * real(problem%Ms, SP)
+
+    alpha = 1.0_SP
+    ! ---------------- Hx correction = xx*Mx + xy*My + xz*Mz ----------------
+    beta = 0.0_SP
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(1)%A, problem%K_fmm_descr_s, mxm, beta, temp)
+    beta = 1.0_SP
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(2)%A, problem%K_fmm_descr_s, mym, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(3)%A, problem%K_fmm_descr_s, mzm, beta, temp)
+
+    solution%HmX = solution%HmX - temp
+    ! ---------------- Hy correction = xy*Mx + yy*My + yz*Mz ----------------
+    beta = 0.0_SP
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(2)%A, problem%K_fmm_descr_s, mxm, beta, temp)
+    beta = 1.0_SP
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(4)%A, problem%K_fmm_descr_s, mym, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(5)%A, problem%K_fmm_descr_s, mzm, beta, temp)
+
+    solution%HmY = solution%HmY - temp
+    ! ---------------- Hz correction = xz*Mx + yz*My + zz*Mz ----------------
+    beta = 0.0_SP
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(3)%A, problem%K_fmm_descr_s, mxm, beta, temp)
+    beta = 1.0_SP
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(5)%A, problem%K_fmm_descr_s, mym, beta, temp)
+    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(6)%A, problem%K_fmm_descr_s, mzm, beta, temp)
+
+    solution%HmZ = solution%HmZ - temp
+    deallocate(mxm, mym, mzm, temp)
+#endif
+
+    call trace%end( "add_near_field", itimer=itimer, verbose=1 )
+end subroutine add_near_field
+
+        !------------------------------------------------------------------------------------------------
+    !============================================================================================================
+
+
+
 
     
 end module LandauLifshitzSolution

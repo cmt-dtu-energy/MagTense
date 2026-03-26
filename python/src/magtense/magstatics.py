@@ -1065,3 +1065,82 @@ def get_H_field(
     )
 
     return H_out
+
+
+def get_H_field_fmm(
+    tiles, pts, eps=1e-6
+) -> np.ndarray:
+    """
+    FMM-backed H-field, test version.
+    Mirrors get_H_field(...) but calls the Fortran FMM routine.
+
+    Notes:
+      - Currently uses a single dipole per tile (centre + moment).
+      - 'demag_tensor' is ignored here (no tensor reuse in this FMM path).
+      - 'eps' controls FMM accuracy.
+    """
+
+    H_out = magtensesource.fortrantopythonio.gethfromtilesfmm(
+        centerpos=tiles.center_pos,
+        dev_center=tiles.dev_center,
+        tile_size=tiles.size,
+        vertices=tiles.vertices,
+        mag=tiles.M,
+        u_ea=tiles.u_ea,
+        u_oa1=tiles.u_oa1,
+        u_oa2=tiles.u_oa2,
+        mu_r_ea=tiles.mu_r_ea,
+        mu_r_oa=tiles.mu_r_oa,
+        mrem=tiles.M_rem,
+        tiletype=tiles.tile_type,
+        offset=tiles.offset,
+        rotangles=tiles.rot,
+        color=tiles.color,
+        magnettype=tiles.magnet_type,
+        statefunctionindex=tiles.stfcn_index,
+        includeiniteration=tiles.incl_it,
+        exploitsymmetry=tiles.use_sym,
+        symmetryops=tiles.sym_op,
+        mrel=tiles.M_rel,
+        pts=pts,
+        n_tiles=np.int32(tiles.n),
+        n_pts=np.int32(len(pts)),
+        eps=np.float64(eps),     # FMM precision
+    )
+    return H_out
+
+
+def get_H_on_sources_fmm(tiles, eps=1e-6) -> np.ndarray:
+    """
+    H field evaluated at tile centres using FMM (dipoles-only, sources->sources).
+
+    Returns:
+        H_src: (n_tiles, 3) ndarray, field at each tile centre.
+    """
+    H_src = magtensesource.fortrantopythonio.gethonsourcesfmm(
+        centerpos=tiles.center_pos,
+        dev_center=tiles.dev_center,
+        tile_size=tiles.size,
+        vertices=tiles.vertices,
+        mag=tiles.M,
+        u_ea=tiles.u_ea,
+        u_oa1=tiles.u_oa1,
+        u_oa2=tiles.u_oa2,
+        mu_r_ea=tiles.mu_r_ea,
+        mu_r_oa=tiles.mu_r_oa,
+        mrem=tiles.M_rem,
+        tiletype=tiles.tile_type,
+        offset=tiles.offset,
+        rotangles=tiles.rot,
+        color=tiles.color,
+        magnettype=tiles.magnet_type,
+        statefunctionindex=tiles.stfcn_index,
+        includeiniteration=tiles.incl_it,
+        exploitsymmetry=tiles.use_sym,
+        symmetryops=tiles.sym_op,
+        mrel=tiles.M_rel,
+        n_tiles=np.int32(tiles.n),
+        eps=np.float64(eps),
+    )
+    return H_src
+

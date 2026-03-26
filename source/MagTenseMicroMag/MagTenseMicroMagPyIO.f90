@@ -1,5 +1,6 @@
 module MagTenseMicroMagPyIO
 use MicroMagParameters
+use trace_mod
     
 implicit none
 
@@ -10,9 +11,9 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
     N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-    exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
+    exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
 	CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn, &
-	passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem )
+	passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n )
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
     integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols
     integer(4),dimension(3),intent(in) :: grid_n
@@ -26,10 +27,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     real(8),dimension(nt),intent(in) :: t
     real(8),dimension(3*ntot),intent(in) :: m0
     real(8),dimension(nt_alpha,2),intent(in) :: alphat
-    integer(4),dimension(exch_nval),intent(in) :: exch_val
-    integer(4),dimension(exch_nval),intent(in) :: exch_rows
-	integer(4),dimension(exch_nrow),intent(in) :: exch_rowe
-    integer(4),dimension(exch_nval),intent(in) :: exch_col
+    integer(4),dimension(exch_nval),intent(in) :: exch_val, exch_rows, exch_cols
     real(8),dimension(nt_conv),intent(in) :: t_conv
     integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
     integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch
@@ -38,12 +36,35 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 	real(8),dimension(ntot,6,3),intent(in) :: K0_arr
 	real(8),dimension(ntot,3,3),intent(in):: crysaxis
     integer(4), dimension(3) :: N_ave
-    real(8) :: demag_fac, pi, mu0
+    real(8) :: demag_fac
 	real(8), intent(in) :: CV, exch_weigh
 	
     character*256,intent(in) :: N_file_in, N_file_out
 
     type(MicroMagProblem),intent(inout) :: problem
+
+    integer, intent(in) :: dummy_run
+    integer(4), intent(in) :: fmm_cells_per_node
+    real(8), intent(in) :: eps_fmm
+    integer(4), intent(in) :: ifunif
+    integer(4), intent(in) :: nlmin
+    integer(4), intent(in) :: nlmax
+    integer(4), intent(in) :: allow_fmm_short_circuit
+    integer(4), intent(in) :: fmm_min_n
+
+    logical :: ex
+    integer, save :: itimer = 0
+
+    call trace%begin("loadMicroMagProblem", itimer=itimer, verbose=1)
+
+    problem%dummy_run = dummy_run
+    problem%fmm_cells_per_node = fmm_cells_per_node
+    problem%fmm_eps = eps_fmm
+    problem%ifunif = ifunif
+    problem%nlmin = nlmin
+    problem%nlmax = nlmax
+    problem%allow_fmm_short_circuit = allow_fmm_short_circuit
+    problem%fmm_min_n = fmm_min_n
 
     problem%grid%nx = grid_n(1)
     problem%grid%ny = grid_n(2)
@@ -113,7 +134,6 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     !Applied field as a function of time evaluated at the timesteps specified in nt_Hext
     !problem%Hext(:,1) is the time grid while problem%Hext(:,2:4) are the x-,y- and z-components of the applied field
     problem%Hext = Hext
-    
     allocate( problem%t(nt) )
     problem%t = t
     
@@ -144,11 +164,17 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     
     !flag whether the demag tensor should be loaded
     problem%demagTensorLoadState = N_load
-    
     !File for loading the demag tensor to a file on disk (has to have length>2)
     if ( problem%demagTensorLoadState .gt. 2 ) then
-        !Length of the file name
-        problem%demagTensorFileIn = N_file_in
+
+        inquire(file=trim(N_file_in), exist=ex)
+        if (.not. ex ) then
+            problem%demagTensorLoadState = 0
+        else
+            !Length of the file name
+            problem%demagTensorFileIn = N_file_in
+
+        end if 
     endif
     
     problem%setTimeDisplay = 100
@@ -184,28 +210,13 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 			problem%grid%A_exch_load%ncols = exch_ncols
 			
 			allocate( problem%grid%A_exch_load%values(exch_nval))
-			allocate(problem%grid%A_exch_load%rows_start(exch_nval))
+			allocate(problem%grid%A_exch_load%rows(exch_nval))
 			allocate(problem%grid%A_exch_load%cols(exch_nval))
 
 			problem%grid%A_exch_load%values = exch_val
-			problem%grid%A_exch_load%rows_start = exch_rows
-			problem%grid%A_exch_load%cols = exch_col
-			
-		else
-			! Pass the exchange matrix in CSR sparse information - deprecated feature
-			problem%grid%A_exch_load%nvalues = exch_nval
-			problem%grid%A_exch_load%nrows = exch_nrow
-			
-			allocate( problem%grid%A_exch_load%values(exch_nval) )
-			allocate( problem%grid%A_exch_load%rows_start(exch_nval) )
-			allocate( problem%grid%A_exch_load%rows_end(exch_nrow) )
-			allocate( problem%grid%A_exch_load%cols(exch_nval) )
-				
-			problem%grid%A_exch_load%values = exch_val
-			problem%grid%A_exch_load%rows_start = exch_rows
-			problem%grid%A_exch_load%rows_end = exch_rowe
-			problem%grid%A_exch_load%cols = exch_col
-		endif
+			problem%grid%A_exch_load%rows = exch_rows
+			problem%grid%A_exch_load%cols = exch_cols
+        endif
     endif
         
     !Load the no. of time steps in the time convergence array        
@@ -243,18 +254,8 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     problem%K0_arr = k0_arr
     problem%K1 = k1	
     problem%K2 = k2
-        
-	!>-----------------------------------------
-	!Calculate the local scaled coefficients for the LLG equation
-	!"J" : exchange term
-	pi = 3.141592653589793
-	mu0 = 4*pi*1e-7
-	problem%Jfact = problem%A0 / ( mu0 * problem%Ms )
-	!"M" : demagnetization term
-	problem%Mfact = problem%Ms
-	!"K" : anisotropy term
-	problem%Kfact = problem%K0 / ( mu0 * problem%Ms )
 
+    call trace%end("loadMicroMagProblem", itimer=itimer, verbose=1)
 end subroutine loadMicroMagProblem
 
 

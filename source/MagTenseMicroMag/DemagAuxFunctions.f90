@@ -118,6 +118,8 @@ module DemagAuxFunctions
     call ConvertDenseToSparse_s( problem%Kyy, problem%K_s(4), threshold_var)
     call ConvertDenseToSparse_s( problem%Kyz, problem%K_s(5), threshold_var)
     call ConvertDenseToSparse_s( problem%Kzz, problem%K_s(6), threshold_var)
+
+    !TODO - potential memory leak - deallocate the dense matrices here?
     
     end subroutine ApplyThresholdDense
     
@@ -325,6 +327,9 @@ module DemagAuxFunctions
     call ConvertDenseToSparse_c( Kyy_c, problem%K_s_c(4), thres)
     call ConvertDenseToSparse_c( Kyz_c, problem%K_s_c(5), thres)
     call ConvertDenseToSparse_c( Kzz_c, problem%K_s_c(6), thres)
+
+        !TODO - potential memory leak - deallocate the dense matrices here?
+
         
     !then use problem%K_s(1..6) with cuda or MKL to do the sparse matrix-vector product with the FFT(M) and subsequently the IFT on the whole thing to get H
         
@@ -429,7 +434,7 @@ module DemagAuxFunctions
     
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2024
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2024
     !> @brief
     !> Change the demag field based on a error drawn from a standard distribution  
     !> @param[inout] problem the data structure containing the problem
@@ -465,7 +470,7 @@ module DemagAuxFunctions
     
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2024
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2024
     !> @brief
     !> Reduce the size of the demag tensor by figuring out which tiles will have the same demag tensor 
     !> @param[inout] problem the data structure containing the problem
@@ -596,7 +601,7 @@ module DemagAuxFunctions
     
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2024
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2024
     !> @brief
     !> Calculate a hash array for each tile to all field evaluation points
     !> @param[inout] problem the data structure containing the problem
@@ -642,7 +647,7 @@ module DemagAuxFunctions
 
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2024
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2024
     !> @brief
     !> Calculate a hash value for an array of floats
     !> @param[inout] problem the data structure containing the problem

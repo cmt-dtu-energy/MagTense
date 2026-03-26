@@ -33,6 +33,13 @@ hF = figure('color','w') ;
 
 hA1 = subplot(1,2,1) ;
 
+mesh_cart.iIn{1} = 1:length(problem.grid_pts(:,1));
+mesh_cart.iIn{2} = [];
+if (~issparse(GridInfo.TheSigns))
+    GridInfo.TheSigns = sparse(GridInfo.TheSigns(:,1),GridInfo.TheSigns(:,2),single(GridInfo.TheSigns(:,3)));
+    GridInfo.TheDs = sparse(GridInfo.TheDs(:,1),GridInfo.TheDs(:,2),ones(length(GridInfo.TheDs(:,2)),1));
+    GridInfo.TheTs = sparse(GridInfo.TheTs(:,1),GridInfo.TheTs(:,2),ones(length(GridInfo.TheTs(:,2)),1));
+end
 cartesianUnstructuredMeshPlot(problem.grid_pts,problem.grid_abc,GridInfo,mesh_cart.iIn,fname,hA1)  ;
 set(hA1,'visible','off') ;
 
@@ -110,5 +117,25 @@ set(theTextBox4,'string',[...
     eval(['print -dpdf ',fnameSave,'Result','.pdf']) ;
 
     drawnow ;
+
+end
+
+function [theString] = DoTheUnitThing(theNumber,theUnit)
+
+    if theNumber==0
+        theString = ['0 ',theUnit] ;
+    else
+        TheSign = sign(theNumber) ;
+        SignSym = {'-','','','',''} ;
+        theNumber = abs(theNumber) ;
+        thePrefix = {'a','f','p','n','u','m','','k','M','G','T','P','E'} ;
+        theLog10 = round(log10(theNumber)/3)*3 ;
+        theNumber = theNumber/(10^theLog10) ;
+        try
+            theString = [SignSym{TheSign+2},num2str(theNumber,'%0.3f'),' ',thePrefix{theLog10/3+7},theUnit] ;
+        catch
+            theString = [SignSym{TheSign+2},num2str(theNumber,'%0.3f'),'*10^{',num2str(theLog10),'} ',theUnit] ;
+        end
+    end
 
 end

@@ -6,14 +6,18 @@ module DifferentialOperators
   use IO_GENERAL
   use ISO_C_BINDING
   use UTIL_CALL
+  use UTIL_MICROMAG
+
+  use sort_mod
+  use trace_mod
   
   implicit none
 
     contains
 
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2025
-    !> Original Matlab implementation by Emil Jørgensen
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2025
+    !> Original Matlab implementation by Emil Jï¿½rgensen
     !> @brief
     !> computeDifferentialOperatorsFromMesh_DirectLap computes the exchange operator for an unstructured mesh
     !> 
@@ -122,6 +126,11 @@ module DifferentialOperators
         type(MATRIX_DESCR) :: descr_copy
         type(sparse_matrix_t) :: DDXA_sparse, FX_sparse, DDYA_sparse, FY_sparse, DDZA_sparse, FZ_sparse
         type(sparse_matrix_t) :: DDX_sparse, DDY_sparse, DDZ_sparse, W_sparse        
+        integer, save :: itimer=0
+        integer, dimension(:), allocatable :: sorted_indices
+        integer :: u 
+
+        call trace%begin( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
         eps_criteria = 1.0e-12
         const = 1.
@@ -167,6 +176,7 @@ module DifferentialOperators
         ss = Signs(:,3)
         ns = Signs(:,1)
         ks = Signs(:,2)
+
 
         !>-----------------------------------------
         ! Constructing summing matrix according to reference
@@ -243,26 +253,21 @@ module DifferentialOperators
             call displayGUIMessage( 'Warning: untested method: compact' )
         endif
 
-        !>-----------------------------------------
-        ! Calculating weights
+        ! !>-----------------------------------------
+        ! ! Calculating weights
         deallocate(ns,ks)
         allocate(ns(size(el2fa,1)),ks(size(el2fa,1)))
-        ns = el2fa(:,1)
-        ks = el2fa(:,2)
-               
-        ! Sort the indices of the faces and tiles
-        allocate(mask1D(size(ks)))    
-        mask1D(:) = .true.
         allocate(ks_sorted(size(ks)))
         allocate(ns_sorted(size(ks)))
-        do i = 1, size(ks)
-            indx = minloc(ks, 1, mask1D)
-            ks_sorted(i) = ks(indx)
-            ns_sorted(i) = ns(indx)
-            mask1D(MINLOC(ks,mask1D)) = .false.
-        end do    
-        deallocate(mask1D) 
-        
+        ns = el2fa(:,1)
+        ks = el2fa(:,2)
+
+        allocate(sorted_indices(size(ks)))
+        call argsort(ks, sorted_indices, algo="quicksort")
+        call apply_perm(ks, sorted_indices, ks_sorted)
+        call apply_perm(ns, sorted_indices, ns_sorted)
+        deallocate(sorted_indices)
+
        ! Determines which weights are to be used in the first interpolation step 
         allocate(w(size(ns)))
         if (dims == 1) then
@@ -273,18 +278,40 @@ module DifferentialOperators
             w = ((Xel(ns_sorted) - Xf(ks_sorted))**2 + (Yel(ns_sorted) - Yf(ks_sorted))**2 + (Zel(ns_sorted) - Zf(ks_sorted))**2)**(-weight/2.0)
         end if
         
+
+        
         !>-----------------------------------------
         ! Prepare distances for the interpolation.       
-        allocate(inds2_vals_temp(size(ns)))
-        call unique_sort(ks_sorted, inds2_vals_temp, n_unique)
-        allocate(inds2_vals, source=inds2_vals_temp(1:n_unique))
-        deallocate(inds2_vals_temp)
-             
-        allocate(inds2(size(inds2_vals)))
-        do i = 1, size(inds2_vals)
-            inds2(i) = minloc(ks_sorted, 1, mask=ks_sorted .eq. inds2_vals(i), back=.true.)
-        end do    
-        
+        !-------------------------------------------------------------------------------------------
+        ! Count unique values
+        !-------------------------------------------------------------------------------------------
+        n_unique = 0
+        if (size(ks_sorted) > 0) then
+            n_unique = 1
+            do i = 2, size(ks_sorted)
+                if (ks_sorted(i) /= ks_sorted(i-1)) n_unique = n_unique + 1
+            end do
+        end if
+        !-------------------------------------------------------------------------------------------
+        allocate(inds2_vals(n_unique))
+        allocate(inds2(n_unique))
+        !-------------------------------------------------------------------------------------------
+        ! Fill unique values and record the last index for each (equivalent to minloc(..., back=.true.))
+        !-------------------------------------------------------------------------------------------
+        if (n_unique > 0) then
+            u = 1
+            inds2_vals(u) = ks_sorted(1)
+
+            do i = 2, size(ks_sorted)
+                if (ks_sorted(i) /= ks_sorted(i-1)) then
+                    inds2(u) = i - 1
+                    u = u + 1
+                    inds2_vals(u) = ks_sorted(i)
+                end if
+            end do
+            inds2(u) = size(ks_sorted)
+        end if
+
         allocate(inds1(size(inds2)+1))
         inds1(1) = 1
         inds1(2:size(inds1)) = inds2(:) + 1
@@ -327,6 +354,7 @@ module DifferentialOperators
         ! for each face, ks. Details can be found in [2].
         allocate(mask1D(size(Signs(:,1))))
         
+
         do kk = 1, K
             
             allocate(ind(inds2(kk)-inds1(kk)+1))
@@ -580,6 +608,9 @@ module DifferentialOperators
         
         stat = mkl_sparse_destroy(DX_matrix)
                 
+
+
+        call trace%end( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
     end subroutine computeDifferentialOperatorsFromMesh_DirectLap
 
@@ -591,91 +622,13 @@ module DifferentialOperators
     
         eps_criteria = 1.0e-12
         call displayGUIMessage( 'Creating Exchange matrix start' )
-        call create_CSR_matrix(problem%grid%A_exch_load%rows_start, problem%grid%A_exch_load%cols, problem%grid%A_exch_load%values, problem%grid%A_exch_load%nrows, problem%grid%A_exch_load%ncols, eps_criteria, problem%A_exch)
+        call create_CSR_matrix(problem%grid%A_exch_load%rows, problem%grid%A_exch_load%cols, problem%grid%A_exch_load%values, problem%grid%A_exch_load%nrows, problem%grid%A_exch_load%ncols, eps_criteria, problem%A_exch)
         call displayGUIMessage( 'Creating Exchange matrix end' )
     
     end subroutine passDifferentialOperators
 
     
-    subroutine create_CSR_matrix(rows, columns, values, K, N, eps_criteria, CSR_matrix)
-        implicit none
-        integer, dimension(:), intent(in) :: rows, columns
-        real(dp), dimension(:), intent(in) :: values
-        integer, intent(in) :: K, N
-        real(dp), intent(in) :: eps_criteria
-        type(sparse_matrix_t), intent(out) :: CSR_matrix
-        integer :: nnz, stat
-        integer, dimension(:), allocatable :: rows_reduced_COO, columns_reduced_COO
-        real(dp), dimension(:), allocatable :: values_reduced_COO
-        logical, allocatable :: mask1D(:)
-        type(sparse_matrix_t) :: COO_matrix
     
-        !Find the non-zero values of values
-        allocate(mask1D(size(values)))    
-        mask1D(:) = .false.
-        mask1D = (abs(values) .gt. eps_criteria)
-        
-        !Then reduce the size of the arrays
-        rows_reduced_COO    = pack(rows,mask1D)
-        columns_reduced_COO = pack(columns,mask1D)
-        values_reduced_COO  = pack(values,mask1D)
-        deallocate(mask1D)
-
-        ! Create a sparse matrix in COO format from the reduced arrays
-        ! See https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-fortran/2023-1/mkl-sparse-create-coo.html
-        nnz = size(values_reduced_COO)
-        stat = mkl_sparse_d_create_coo (COO_matrix, SPARSE_INDEX_BASE_ONE, K, N, nnz, rows_reduced_COO, columns_reduced_COO, values_reduced_COO)
-
-        ! Create a sparse matrix in CSR format from COO format
-        ! See https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-fortran/2025-1/mkl-sparse-convert-csr.html
-        stat = mkl_sparse_convert_csr (COO_matrix, SPARSE_OPERATION_NON_TRANSPOSE, CSR_matrix)
-    
-        stat = mkl_sparse_destroy(COO_matrix)
-        
-    end subroutine create_CSR_matrix
-
-
-    subroutine create_COO_values_from_CSR(CSR_matrix, GridInfo)
-        implicit none
-
-        type(sparse_matrix_t), intent(inout) :: CSR_matrix
-        type(MicroMagGridInfo), intent(inout) :: GridInfo
-        type(sparse_matrix_t) :: CSR_copy_matrix
-        type(sparse_matrix_t) :: COO_matrix
-        integer :: N, K, stat, nnz, indexing
-        type(MATRIX_DESCR) :: descr
-        type(C_PTR)    :: rows_c, cols_c, values_c
-        integer, POINTER :: rows(:), cols(:)
-        real(dp), POINTER :: values(:)
-        
-        descr%type = SPARSE_MATRIX_TYPE_GENERAL 
-
-        !Copy the CSR matrix, convert it to COO, then export this
-        stat = mkl_sparse_copy (CSR_matrix, descr, CSR_copy_matrix)
-    
-        stat = mkl_sparse_convert_coo (CSR_copy_matrix, SPARSE_OPERATION_NON_TRANSPOSE, COO_matrix)
-    
-        stat = mkl_sparse_destroy (CSR_copy_matrix)
-    
-        stat = mkl_sparse_d_export_coo (COO_matrix, indexing, K, N, nnz, rows_c, cols_c, values_c)
-    
-        stat = mkl_sparse_destroy (COO_matrix)
-    
-        !   Converting C into Fortran pointers
-        call C_F_POINTER(rows_c  , rows  , [nnz])
-        call C_F_POINTER(cols_c  , cols  , [nnz])
-        call C_F_POINTER(values_c    , values    , [nnz])
-    
-        ! Save the COO matrix in GridInfo
-        allocate(GridInfo%Exch_mat_r(nnz),GridInfo%Exch_mat_c(nnz),GridInfo%Exch_mat_v(nnz))
-        GridInfo%Exch_mat_nr = K
-        GridInfo%Exch_mat_nc = N
-        GridInfo%Exch_mat_ntot = size(rows)
-        GridInfo%Exch_mat_r(:) = rows(:)
-        GridInfo%Exch_mat_c(:) = cols(:)
-        GridInfo%Exch_mat_v(:) = values(:)
-            
-    end subroutine create_COO_values_from_CSR
 
     
     ! For debugging, save the sparse matrix as a dense by multiplying it with the identity matrix

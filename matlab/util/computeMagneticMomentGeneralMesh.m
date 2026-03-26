@@ -1,15 +1,29 @@
-function [Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(magnetizationsAll,Vols)
+function [Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(magnetizationsAll,Vols,Ms)
 
 arguments
     magnetizationsAll   = [];     %--- The magnetizations
     Vols                = [];     %--- The volumes of the tiles used in the micromagnetism model
+    Ms                  = 1 ;     %--- The saturation magnetization
 end
 
 if (isempty(Vols))
     %--- The tiles all have the same volume, so we just return the mean
-    Mx = mean(magnetizationsAll(:,:,1),2);
-    My = mean(magnetizationsAll(:,:,2),2);
-    Mz = mean(magnetizationsAll(:,:,3),2);
+
+    if (length(magnetizationsAll(:,1,1,1)) == 2)
+        %--- We have a hysteresis problem
+        for i = 1:length(magnetizationsAll(1,1,:,1))
+            Mx(i) = mean(Ms'.*magnetizationsAll(end,:,i,1));
+            My(i) = mean(Ms'.*magnetizationsAll(end,:,i,2));
+            Mz(i) = mean(Ms'.*magnetizationsAll(end,:,i,3));
+        end
+    else
+        %--- We have a time-varying problem
+        for i = 1:length(magnetizationsAll(:,1,1,1))
+            Mx(i) = mean(Ms'.*magnetizationsAll(i,:,1,1));
+            My(i) = mean(Ms'.*magnetizationsAll(i,:,1,2));
+            Mz(i) = mean(Ms'.*magnetizationsAll(i,:,1,3));
+        end
+    end
 
     mx = [];
     my = [];
@@ -22,16 +36,16 @@ else
     if (length(magnetizationsAll(:,1,1,1)) == 2)
         %--- We have a hysteresis problem
         for i = 1:length(magnetizationsAll(1,1,:,1))
-            SigmaX(i,:) = magnetizationsAll(end,:,i,1);
-            SigmaY(i,:) = magnetizationsAll(end,:,i,2);
-            SigmaZ(i,:) = magnetizationsAll(end,:,i,3);
+            SigmaX(i,:) = Ms'.*magnetizationsAll(end,:,i,1);
+            SigmaY(i,:) = Ms'.*magnetizationsAll(end,:,i,2);
+            SigmaZ(i,:) = Ms'.*magnetizationsAll(end,:,i,3);
         end
     else
         %--- We have a time-varying problem
         for i = 1:length(magnetizationsAll(:,1,1,1))
-            SigmaX(i,:) = magnetizationsAll(i,:,1,1);
-            SigmaY(i,:) = magnetizationsAll(i,:,1,2);
-            SigmaZ(i,:) = magnetizationsAll(i,:,1,3);
+            SigmaX(i,:) = Ms'.*magnetizationsAll(i,:,1,1);
+            SigmaY(i,:) = Ms'.*magnetizationsAll(i,:,1,2);
+            SigmaZ(i,:) = Ms'.*magnetizationsAll(i,:,1,3);
         end
     end
 

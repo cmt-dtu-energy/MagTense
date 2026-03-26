@@ -35,8 +35,7 @@ properties
     exch_ncol
     exch_val
     exch_rows
-    exch_rowe
-    exch_col
+    exch_cols
 
     exch_weigh
     exch_meth
@@ -186,6 +185,16 @@ properties
 
     %The number of threads used by OpenMP for building the demag tensor
     nThreads = int32(1);
+
+    %FMM parameters
+    fmm_cells
+    fmm_eps
+    ifunif
+    nlmin
+    nlmax
+    use_fmm
+    fmm_short
+    fmm_min_n
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -304,8 +313,7 @@ methods
         obj.exch_ncol = 0;
         obj.exch_val = 0;
         obj.exch_rows = 0;
-        obj.exch_rowe = 0;
-        obj.exch_col = 0;
+        obj.exch_cols = 0;
 
         % Exchange term constant
         obj.A0 = 1.3e-11;
@@ -401,6 +409,15 @@ methods
         obj.MeshType = '' ;
         obj.ExternalMeshFileName = '' ;
         obj.DemagTensorFileName = 0 ;
+
+        obj.fmm_cells = int32(100);
+        obj.fmm_eps = 1e-4;
+        obj.ifunif = int32(1);
+        obj.nlmin = int32(1);
+        obj.nlmax = int32(5);
+        obj.use_fmm = int32(0);
+        obj.fmm_short = int32(1);
+        obj.fmm_min_n = int32(20000);
     end
     
     %%Calculates the applied field as a function of time on the time grid
@@ -507,20 +524,6 @@ methods
         end
     end
 
-    function obj = setExchangeMatrixSparse( obj, ExchangeMatrix )
-    % Convert the Exchange matrix to CSR and store it in the problem statement
-        [v,c,rs,re]   = convertToCSR(ExchangeMatrix);
-        obj.exch_nval = int32(numel(v));
-        obj.exch_nrow = int32(numel(rs));
-        obj.exch_val  = double(v);
-        obj.exch_rows = int32(rs);
-        obj.exch_rowe = int32(re);
-        obj.exch_col  = int32(c);
-        obj.exch_ncol = int32(0);
-
-        disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(2^30)) ' Gb'])
-    end
-
     function obj = setExchangeMatrixCOO( obj, nrows, ncols, rows, cols, values )
     % Pass the Exchange matrix to Fortran in COO format
         obj = obj.setMicroMagpassExch( true );
@@ -529,7 +532,7 @@ methods
         obj.exch_nval = int32(numel(rows));
         obj.exch_val  = double(values);
         obj.exch_rows = int32(rows);
-        obj.exch_col  = int32(cols);
+        obj.exch_cols  = int32(cols);
     end
 
     function obj = setMicroMagDemagApproximation( obj, type_var )
@@ -658,10 +661,21 @@ methods
                 obj.m0=obj.m0./mnorm;
             end
         end
+        disp(['The demag tensor will require around ' num2str(((3*numel(obj.m0)*(3*numel(obj.m0) + 1)/2))*4/(2^30)) ' Gb'])
         warning('off','MATLAB:structOnObject')
         obj2=builtin('struct',obj); % Actual struct conversion
         warning('on','MATLAB:structOnObject')
     end
     
+end
+
+methods (Static)
+    function [v,c,rs,re] = convertToCSR(B)
+        [c,r,v] = find(B');
+        dr = diff(r);
+        rtmp = repelem(find(dr > 0)+1,dr(dr>0));
+        rs = [1; rtmp];
+        re = [rtmp; length(r)+1];
+    end
 end
 end

@@ -9,13 +9,13 @@ addpath('../../../MEX_files/');
 mu0 = 4*pi*1e-7;
 
 %%Get a default tile from MagTense
-tile = getDefaultMagTile();
+tile = DefaultMagTile();
     
 %ensure the tile is a permanent magnet
-tile.magnetType = getMagnetType('hard');
+tile = tile.setMagnetType('hard');
 
 %set the geometry to be a rectangular prism
-tile.tileType = getMagTileType('cylinder');
+tile = tile.setMagTileType('cylinder');
 
 %set the dimensions of the prism
 tile.r0 = 5.3984;
@@ -70,9 +70,6 @@ tile = IterateMagnetization( tile, [], [], 1e-6, 100 );
 % x = -0.2:0.001:1.8;
 % y = -0.8:0.001:1.2;
 % z = -0.2:0.001:1.8;
-% data_FEM_x = load('..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_ex2_normH_x.txt');
-% data_FEM_y = load('..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_ex2_normH_y.txt');
-% data_FEM_z = load('..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_ex2_normH_z.txt');
 data_FEM_x = load('..\..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_example_1_Hx.txt');
 data_FEM_y = load('..\..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_example_1_Hy.txt');
 data_FEM_z = load('..\..\..\..\documentation\examples_FEM_validation\Validation_cylinder\Validation_cylinder_example_1_Hz.txt');

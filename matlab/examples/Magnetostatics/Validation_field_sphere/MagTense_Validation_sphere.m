@@ -1,6 +1,6 @@
 
 %%This function compares MagTense to a FEM simulations for a single permanent magnet.
-function [] = MagTense_Validation_sphere()
+function [rel_int_error] = MagTense_Validation_sphere()
 
 %make sure to source the right path for the generic Matlab routines
 addpath(genpath('../../../util/'));
@@ -9,13 +9,13 @@ addpath('../../../MEX_files/');
 mu0 = 4*pi*1e-7;
 
 %%Get a default tile from MagTense
-tile = getDefaultMagTile();
+tile = DefaultMagTile();
     
 %ensure the tile is a permanent magnet
-tile.magnetType = getMagnetType('hard');
+tile = tile.setMagnetType('hard');
 
 %set the geometry to be a rectangular prism
-tile.tileType = getMagTileType('sphere');
+tile = tile.setMagTileType('sphere');
 
 %set the dimensions of the prism
 tile.abc = [1.6,0,0];
@@ -123,4 +123,12 @@ h_l = legend(fig3,'MagTense, H_x','MagTense, H_y','MagTense, H_z','FEM, H_x','FE
 set(h_l,'fontsize',10);
 ylabel(fig3,'H [A/m]');
 xlabel(fig3,'z [m]');
+
+% Interpolate the MagTense solution to the FEM solution and calculate the relative error in percent
+rel_int_error(1) = calculate_relative_integral_error(data_FEM_Hx_x(:,1),data_FEM_Hx_x(:,2),x,H(1:numel(x),1));
+rel_int_error(2) = calculate_relative_integral_error(data_FEM_Hy_x(:,1),data_FEM_Hy_x(:,2),y,H(1:numel(x),2));
+rel_int_error(3) = calculate_relative_integral_error(data_FEM_Hz_x(:,1),data_FEM_Hz_x(:,2),z,H(1:numel(x),3));
+
+disp(['Relative integrated error between MagTense and FEM is Mx = ' num2str(rel_int_error(1)) ', My = ' num2str(rel_int_error(2)) ', Mz = ' num2str(rel_int_error(3)) ])
+
 end

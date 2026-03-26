@@ -10,7 +10,8 @@ MATLAB_INCLUDE =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
-LIBSRC_SOURCES = MicroMagParameters util_micromag DemagAuxFunctions FortranCuda ComputeDifferentialOperatorsFromMesh UnstructuredMeshAnalysis
+
+LIBSRC_SOURCES = fmm3d_tree_mod MicroMagParameters fmm_nbor_tensor_mod util_micromag DemagAuxFunctions FortranCuda ComputeDifferentialOperatorsFromMesh UnstructuredMeshAnalysis
 
 ifeq (${USE_MATLAB},1)
     OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
@@ -21,6 +22,7 @@ else
 	LIBSRC_SOURCES += MagTenseMicroMagPyIO
 	MATLAB_OPT =
 endif
+
 
 LIBSRC_SOURCES += LandauLifshitzEquationSolver
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
@@ -44,10 +46,13 @@ else
 endif
 
 STATIC_LIB = libMagTenseMicroMag${LIB_SUFFIX}
-NUM_INT_PATH = ../NumericalIntegration/NumericalIntegration
-TILE_DEMAG_TENSOR_PATH = ../TileDemagTensor/TileDemagTensor
-DEMAG_FIELD_PATH = ../DemagField/DemagField
+NUM_INT_PATH = ../NumericalIntegration
+TILE_DEMAG_TENSOR_PATH = ../TileDemagTensor
+DEMAG_FIELD_PATH = ../DemagField
 DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
+
+AUXMT_PATH = ../AuxMT
+AUXMT_LIB = ${AUXMT_PATH}/libAuxMT${LIB_SUFFIX}
 
 #=======================================================================
 #							Targets
@@ -56,9 +61,11 @@ DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX}
 .PHONY: all clean
 
 all: pre-build ${STATIC_LIB}
+# Ignore .mod files as targets
+%.o : %.mod
 
 .f90.o:
-	${FC} ${FFLAGS} -I${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} ${OPT} ${MATLAB_OPT} ${OPT} -c $< -o $@
+	${FC} ${FFLAGS} -I${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 -I${AUXMT_PATH} -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} ${OPT} ${MATLAB_OPT} ${OPT} -c $< -o $@
 
 pre-build:
 	cd ${NUM_INT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"

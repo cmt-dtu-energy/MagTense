@@ -4,6 +4,9 @@ include "mkl_dfti.f90"
     module MicroMagParameters
     use MKL_SPBLAS
     Use MKL_DFTI
+#if USE_FMM3D    
+    use fmm3d_tree_mod
+#endif
     INTEGER, PARAMETER :: SP = SELECTED_REAL_KIND(6, 37)
     INTEGER, PARAMETER :: DP = SELECTED_REAL_KIND(15, 307)
     
@@ -26,7 +29,8 @@ include "mkl_dfti.f90"
         real(SP),dimension(:),allocatable :: values                     !> the non-zero values
         integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
         integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
-        integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
+        integer,dimension(:),allocatable :: rows                        !> array of same length as values containing the row no. of the i'th value
+        integer,dimension(:),allocatable :: cols                        !> array of same length as values containing the column no. of the i'th value
         integer :: nvalues                                              !> the number of elements in values
         integer :: nrows                                                !> the number of elements in the row arrays
         integer :: ncols                                                !> the number of columns
@@ -38,6 +42,7 @@ include "mkl_dfti.f90"
         real(DP),dimension(:),allocatable :: values                     !> the non-zero values
         integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
         integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
+        integer,dimension(:),allocatable :: rows                        !> array of same length as values containing the row no. of the i'th value
         integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
         integer :: nvalues                                              !> the number of elements in values
         integer :: nrows                                                !> the number of elements in the row arrays
@@ -50,6 +55,7 @@ include "mkl_dfti.f90"
         complex(kind=4),dimension(:),allocatable :: values              !> the non-zero values
         integer,dimension(:),allocatable :: rows_start                  !> array of length no. of rows containing the index into values of the first non-zero value in that row
         integer,dimension(:),allocatable :: rows_end                    !> array of length no of rows containing the index into values of the last non-zero value in that row plus one, i.e. the starting value of the next row
+        integer,dimension(:),allocatable :: rows                        !> array of same length as values containing the row no. of the i'th value
         integer,dimension(:),allocatable :: cols                        !> Array of same length as values containing the column no. of the i'th value
         integer :: nvalues                                              !> the number of elements in values
         integer :: nrows                                                !> the number of elements in the row arrays
@@ -165,8 +171,38 @@ include "mkl_dfti.f90"
         
         real(DP),dimension(:),allocatable :: Axx,Axy,Axz,Ayy,Ayz,Azz    !> Anisotropy vectors assuming local anisotropy only, i.e. no interaction between grains
         real(DP),dimension(:,:,:),allocatable :: CrystalAxis, K0_arr !> The local crystal coordinates and the local anisotropy constants. See updateAnisotropy for details        
+        real(DP),dimension(:,:,:),allocatable :: A0_map     !> The specified exchange constant, mapped out on a grid, for computing the finite difference exchange operator for uniform grids        
         
         type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H       !> Handle for the FFT MKL stuff
+
+
+
+
+
+        !--------------- demag tensor neighbour stuff ---------------
+        integer :: fmm_cells_per_node
+        real(DP) :: fmm_eps 
+        integer :: ifunif = 1 
+        integer :: nlmin = 0
+        integer :: nlmax = 5
+        logical :: use_fmm = .true.
+        integer :: allow_fmm_short_circuit = 0
+        integer :: fmm_min_n = 20000    !> Minimum number of cells to use FMM
+
+        integer, dimension(:,:), pointer :: nbr_idx(:,:) => null()    !> Neighbour indices for each target cell
+        integer, dimension(:), pointer :: n_nbors(:) => null()
+        real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:) => null()
+        real(SP),dimension(:,:,:,:), pointer:: diffTens(:,:,:,:) => null()
+
+        type(MagTenseSparse), dimension(6) :: K_fmm_s
+        logical :: K_fmm_built = .false.
+        type(matrix_descr) :: K_fmm_descr_s
+
+        real(SP),dimension(:,:), contiguous, pointer :: Kxx_fmm,Kxy_fmm,Kxz_fmm  !> Demag field tensor split out into the nine symmetric components
+        real(SP),dimension(:,:), contiguous, pointer :: Kyy_fmm,Kyz_fmm      !> Demag field tensor split out into the nine symmetric components
+        real(SP),dimension(:,:), contiguous, pointer :: Kzz_fmm          !> Demag field tensor split out into the nine symmetric components
+        integer :: dummy_run = 0    !> Flag to indicate whether the demag tensor neighbour test setup has been done
+
         
     end type MicroMagProblem
     
@@ -198,6 +234,9 @@ include "mkl_dfti.f90"
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
+#if USE_FMM3D   
+        class(FMM3DTree), pointer :: fmm_tree => null()    !> FMM tree for computing the demag field using FMM
+#endif
     end type MicroMagSolution
     
     
@@ -218,5 +257,6 @@ include "mkl_dfti.f90"
     integer,parameter :: passExchTrue=1,passExchFalse=0
     integer,parameter :: usePrecisionTrue=1,usePrecisionFalse=0
     integer,parameter :: useReturnHallTrue=1,useReturnHallFalse=0
+    integer,parameter :: useFMMTrue=1,useFMMFalse=0
     
 end module MicroMagParameters    
