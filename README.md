@@ -80,16 +80,35 @@ As a starting point, you can run the example scripts in [python/examples/](./pyt
 
 #### Windows
 
-Install the prerequisites:
+Installation on Windows is a but more contrived because of the way Windows handles environments, so the user has to do more steps manually.
+
+##### Pre-requisites
+
+First, clone this repo.
+
+Then, install the prerequisites:
 
 - [The Anaconda distribution](https://www.anaconda.com/download)
 - [Visual Studio 2022](https://visualstudio.microsoft.com/vs/older-downloads/#visual-studio-2022-and-other-products) - select the option for desktop development with C++ and `cmake`
+- [Intel oneAPI](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html) (both C++ and Fortran)
+- [sundials-7.4.0](https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz) - unzip to a folder of your choice
+
+##### Building the cvode dependency
+
+
+
+##### Building the Fortran core
+
+##### Building the Python interface
 
 On modern windows distributions, this should create a new profile on the Windows Terminal app, with Anaconda set up. *All commands below should be issued from this terminal, and in the MagTense directory (where you cloned the repo)*.
 
 ```shell
 conda env create -f python/.build/env-314-win.yml
 ```
+
+Then, activate the environment with `conda activate magtense-env`.
+
 
 ### MATLAB interface
 

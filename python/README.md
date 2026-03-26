@@ -112,7 +112,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
   - Installation of [Intel oneAPI](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html) (both C++ and Fortran)
 
-  - Download [sundials-7.4.0](https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz) and unzip it.
+  - Download [sundials-7.4.0](https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz) and unzip it
   
 
   Open a "Intel oneAPI command prompt for Intel 64 for Visual Studio 2022" as administrator and then do:
