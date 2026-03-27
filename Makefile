@@ -29,6 +29,12 @@ FMM3D_DIR      ?= external/FMM3D
 FMM3D_ROOT     := $(abspath $(FMM3D_DIR))
 FMM3D_LIB      := $(FMM3D_ROOT)/local
 
+ifeq ($(OS),Windows_NT)
+  SEP = ;
+else
+  SEP = &&
+endif
+
 .PHONY: fmm3d
 fmm3d:
 ifeq ($(USE_FMM3D),1)
@@ -249,7 +255,7 @@ PYTHON_MODN_ALL = _${PYTHON_MODN}${PY_MOD_SUFFIX}
 #=======================================================================
 #							Targets
 #=======================================================================
-.PHONY: all clean install-miniconda build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL} rm-conda rm-env python-interface-win build-cvode-win install-oneapi
+.PHONY: all clean install-miniconda build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL} rm-conda rm-env python-interface-win 
 
 all: $(ALL_DEPS) ${AUXMT} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} 
 
@@ -296,21 +302,21 @@ clean-build:
 	rm -rf ${PYTHON_LIBPATH}/build
 
 magnetostatic:
-	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
-	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
-	cd ${DEMAG_FIELD_PATH}  && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd ${NUM_INT_PATH} $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd ${TILE_DEMAG_TENSOR_PATH} $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd ${DEMAG_FIELD_PATH}  $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 
 micromagnetism:
-	cd ${MICROMAG_PATH} && $(MAKE) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd ${MICROMAG_PATH} $(SEP) $(MAKE) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 
 cuda:
-	cd ${FORTRAN_CUDA_PATH} && $(MAKE) CPP=$(CPP)
+	cd ${FORTRAN_CUDA_PATH} $(SEP) $(MAKE) CPP=$(CPP)
 
 forceintegrator:
-	cd $(FORCEINTEGRATOR_PATH) && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd $(FORCEINTEGRATOR_PATH) $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 
 standalone:
-	cd $(STANDALONE_PATH) && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}'
+	cd $(STANDALONE_PATH) $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}'
 	mkdir build
 	cp $(STANDALONE_PATH)/MagTense.x build/MagTense.x
 
@@ -429,14 +435,5 @@ python-interface: build-env
 pytest:
 	$(CONDA_BIN) run -n magtense-env -- pytest
 
-
-install-oneapi:
-	curl https://registrationcenter-download.intel.com/akdlm/IRC_NAS/36f868e9-84b3-4b4f-90ef-ca84092cae6a/intel-oneapi-hpc-toolkit-2025.3.1.54_offline.exe --output intel-oneapi-hpc-toolkit-2025.3.1.54_offline.exe
-	powershell -Command "Start-Process 'intel-oneapi-hpc-toolkit-2025.3.1.54_offline.exe' -ArgumentList '-s -a --silent --eula accept -p=NEED_VS2019_INTEGRATION=0' -Verb RunAs"
-
-
-build-cvode-win:
-	curl.exe -L -o cvode-7.4.0.tar.gz https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz
-	tar -xzf cvode-7.4.0.tar.gz -C ${MKFILE_PATH}
-	cmd.exe /E:ON /C "`"C:\Program Files (x86)\Intel\oneAPI\setvars.bat`" intel64 vs2022 && cmake -S cvode-7.4.0 -B C:/CVODE_temp -G `"Ninja`" -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_ARKODE=OFF -DBUILD_CVODE=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_Fortran_COMPILER=ifx -DENABLE_OPENMP=ON"
-python-interface-win: install-oneapi build-cvode-win
+python-interface-win: 
+	make magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0
