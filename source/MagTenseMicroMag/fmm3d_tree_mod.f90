@@ -1,10 +1,13 @@
 module fmm3d_tree_mod
     use omp_lib
+    use omp_mod
     use trace_mod
         implicit none
       type :: FMM3DTree
             logical :: is_built = .false.
             logical :: keep_tree = .true.
+
+            integer :: nterms_in = -1
 
             integer :: nlmax = 51
             integer :: nlevels = 0
@@ -212,11 +215,13 @@ module fmm3d_tree_mod
         self%nlmin = nlmin
         self%nlmax = nlmax
 
-        !$omp parallel
-        !$omp single
-        self%nthd = omp_get_num_threads()
-        !$omp end single
-        !$omp end parallel
+       
+        !----------- use omp_mod to get number of threads -----------------
+        self%nthd = omp%numthreads()
+        !-----------------------------------------------------------------
+
+        
+
 
         !print *, " number of threads for fmm tree build: ", self%nthd
         
@@ -226,6 +231,7 @@ module fmm3d_tree_mod
 
 
         print *, " built tree with ", self%nlevels, " levels and ", self%nboxes, " boxes "
+        print *, " Number of multipole expansion terms:", self%nterms(0)
         print *, "Number of boxes per level:"
         do i = 0, self%nlevels
             print *, "Level ", i, ": ", self%laddr(2, i) - self%laddr(1, i) + 1, " boxes"
@@ -466,7 +472,13 @@ module fmm3d_tree_mod
 
         self%nmax = 0
         do i=0,self%nlevels
-            call l3dterms(self%eps,nterms(i))
+            !-----------if nterms_in is explicitly set, use that, otherwise compute nterms based on eps ------------------------------
+            if (self%nterms_in .gt. 0) then
+                nterms(i) = self%nterms_in
+            else
+              call l3dterms(self%eps,nterms(i))
+            end if 
+            !-------------------------------------------------------------------------------------------------------------------------
             if(nterms(i).gt.self%nmax) self%nmax = nterms(i)
         enddo
         self%nterms => nterms
@@ -671,7 +683,7 @@ module fmm3d_tree_mod
 !      set scjsort
 !
       do ilev=0,self%nlevels
-        !$OMP PARALLEL DO DEFAULT(SHARED) &
+        !$OMP TASKLOOP DEFAULT(SHARED) &
         !$OMP PRIVATE(ibox,nchild,istart,iend,i)
          do ibox=self%laddr(1,ilev),self%laddr(2,ilev)
             nchild = self%itree(self%ipointer(4)+ibox-1)
@@ -683,7 +695,7 @@ module fmm3d_tree_mod
                enddo
             endif
          enddo
-        !$OMP END PARALLEL DO
+        !$OMP END TASKLOOP
       enddo
 
 
@@ -714,7 +726,7 @@ module fmm3d_tree_mod
 
       nmaxt = 0 
 
-      !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
+      !$OMP TASKLOOP DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
       !$OMP REDUCTION(max:nmaxt)
             do ibox=1,self%nboxes
               if(self%list4ct(ibox).gt.0) then
@@ -724,7 +736,7 @@ module fmm3d_tree_mod
                 if(npts.gt.nmaxt) nmaxt = npts
               endif
             enddo
-      !$OMP END PARALLEL DO
+      !$OMP END TASKLOOP
 
       allocate(self%gboxind(nmaxt,self%nthd))
       allocate(self%gboxsort(3,nmaxt,self%nthd))
@@ -750,7 +762,7 @@ module fmm3d_tree_mod
     !  figure out allocations needed for iboxsrc,iboxsrcind,iboxpot
 
       nmaxt = 0
-    !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
+    !$OMP TASKLOOP DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
     !$OMP REDUCTION(max:nmaxt)
           do ibox=1,self%nboxes
             if(self%nlist3(ibox).gt.0) then
@@ -760,7 +772,7 @@ module fmm3d_tree_mod
               if(npts.gt.nmaxt) nmaxt = npts
             endif
           enddo
-    !$OMP END PARALLEL DO
+    !$OMP END TASKLOOP
 
       allocate(self%iboxsrcind(nmaxt,self%nthd))
       allocate(self%iboxsrc(3,nmaxt,self%nthd))
@@ -778,32 +790,32 @@ module fmm3d_tree_mod
 
       !-------- reset rmlexp to zero --------------
       ! do ilev = 0,self%nlevels
-      !   !$OMP PARALLEL DO DEFAULT(SHARED) &
+      !   !$OMP TASKLOOP DEFAULT(SHARED) &
       !   !$OMP PRIVATE(ibox)
       !   do ibox=self%laddr(1,ilev),self%laddr(2,ilev)
       !     call mpzero(self%nd,self%rmlexp(self%iaddr(1,ibox)),self%nterms(ilev))
       !     call mpzero(self%nd,self%rmlexp(self%iaddr(2,ibox)),self%nterms(ilev))
       !   enddo
-      !   !$OMP END PARALLEL DO
+      !   !$OMP END TASKLOOP
       ! enddo
       ! !-------------------------------------------
-      ! !$OMP PARALLEL DO  DEFAULT(SHARED) 
+      ! !$OMP TASKLOOP  DEFAULT(SHARED) 
       ! do i=1,self%nboxes
       !       self%mexp(:,:,i,:) = 0.0d0
       ! enddo
-      ! !$OMP END PARALLEL DO
+      ! !$OMP END TASKLOOP
 
       do ilev = 0,self%nlevels
-        !$OMP PARALLEL DO DEFAULT(SHARED) &
+        !$OMP TASKLOOP DEFAULT(SHARED) &
         !$OMP PRIVATE(ibox)
         do ibox=self%laddr(1,ilev),self%laddr(2,ilev)
           call mpzero(self%nd,self%rmlexp(self%iaddr(1,ibox)),self%nterms(ilev))
           call mpzero(self%nd,self%rmlexp(self%iaddr(2,ibox)),self%nterms(ilev))
         enddo
-        !$OMP END PARALLEL DO
+        !$OMP END TASKLOOP
       enddo
       !-------------------------------------------
-      !$OMP PARALLEL DO collapse(4) DEFAULT(SHARED) &
+      !$OMP TASKLOOP collapse(4) DEFAULT(SHARED) &
       !$OMP PRIVATE(i,j,k,idim)
             do k=1,6
               do i=1,self%nboxes
@@ -814,7 +826,7 @@ module fmm3d_tree_mod
                 enddo
               enddo
             enddo
-      !$OMP END PARALLEL DO
+      !$OMP END TASKLOOP
 
     end subroutine reset_expansion_coeff
 
@@ -826,7 +838,7 @@ module fmm3d_tree_mod
         !------------------------------------------------
         integer i,idim
         !------------------------------------------------
-    !$OMP PARALLEL DO collapse(2) DEFAULT(SHARED) PRIVATE(i,idim)
+    !$OMP TASKLOOP collapse(2) DEFAULT(SHARED) PRIVATE(i,idim)
             do i=1,self%nsource
             do idim=1,self%nd
                 self%gradsort(idim,1,i) = 0.0
@@ -834,7 +846,7 @@ module fmm3d_tree_mod
                 self%gradsort(idim,3,i) = 0.0
             enddo
             enddo
-    !$OMP END PARALLEL DO
+    !$OMP END TASKLOOP
     end subroutine reset_sort_arg
 
 
@@ -1227,12 +1239,13 @@ module fmm3d_tree_mod
             rscpow(i) = rscpow(i-1)*rtmp
          enddo
 
-!$OMP PARALLEL DO DEFAULT(SHARED) &
+!$OMP TASKLOOP DEFAULT(SHARED) &
 !$OMP PRIVATE(ibox,istart,iend,jbox,jstart,jend,npts,npts0,i) &
 !$OMP PRIVATE(ithd)
          do ibox=laddr(1,ilev),laddr(2,ilev)
             !ithd = 0
-           ithd=omp_get_thread_num()
+           !ithd=omp_get_thread_num()
+            ithd = omp%thread_id()
             ithd = ithd + 1
             if(list4ct(ibox).gt.0) then
               istart=isrcse(1,ibox)
@@ -1343,7 +1356,7 @@ module fmm3d_tree_mod
               endif
             endif
          enddo
-!$OMP END PARALLEL DO
+!$OMP END TASKLOOP
       enddo
 
 
@@ -1351,7 +1364,7 @@ module fmm3d_tree_mod
 !       ... step 1, locate all charges, assign them to boxes, and
 !       form multipole expansions
       do ilev=2,nlevels
-!$OMP PARALLEL DO DEFAULT(SHARED) &
+!$OMP TASKLOOP DEFAULT(SHARED) &
 !$OMP PRIVATE(ibox,npts,istart,iend,nchild)
             do ibox=laddr(1,ilev),laddr(2,ilev)
 
@@ -1369,13 +1382,13 @@ module fmm3d_tree_mod
      &    rmlexp(iaddr(1,ibox)),wlege,nlege)          
                endif
             enddo
-!$OMP END PARALLEL DO
+!$OMP END TASKLOOP
       enddo
 
       !----------------------------------------------------------------------------------------------------
 
       do ilev=nlevels-1,0,-1
-!$OMP PARALLEL DO DEFAULT(SHARED) &
+!$OMP TASKLOOP DEFAULT(SHARED) &
 !$OMP PRIVATE(ibox,i,jbox,istart,iend,npts)
          do ibox = laddr(1,ilev),laddr(2,ilev)
             do i=1,8
@@ -1393,7 +1406,7 @@ module fmm3d_tree_mod
                endif
             enddo
          enddo
-!$OMP END PARALLEL DO
+!$OMP END TASKLOOP
       enddo
 
 
@@ -1409,12 +1422,12 @@ module fmm3d_tree_mod
             rscpow(i) = rscpow(i-1)*rtmp
          enddo
 
-!$OMP PARALLEL DO DEFAULT (SHARED) &
+!$OMP TASKLOOP DEFAULT (SHARED) &
 !$OMP PRIVATE(ibox,istart,iend,npts) &
 !$OMP PRIVATE(ithd)
          do ibox=laddr(1,ilev),laddr(2,ilev)
             !ithd = 0
-            ithd=omp_get_thread_num()
+            ithd=omp%thread_id()
             ithd = ithd + 1
             istart = isrcse(1,ibox) 
             iend = isrcse(2,ibox)
@@ -1475,7 +1488,7 @@ module fmm3d_tree_mod
             endif
 
          enddo
-!$OMP END PARALLEL DO
+!$OMP END TASKLOOP
 !
 !
 !c         loop over parent boxes and ship plane wave
@@ -1494,7 +1507,7 @@ module fmm3d_tree_mod
          do i=1,nterms(ilev)
             rscpow(i) = rscpow(i-1)*rtmp
          enddo
-!$OMP PARALLEL DO DEFAULT (SHARED) &
+!$OMP TASKLOOP DEFAULT (SHARED) &
 !$OMP PRIVATE(ibox,istart,iend,npts,nchild) &
 !$OMP PRIVATE(nuall,ndall,nnall,nsall) &
 !$OMP PRIVATE(neall,nwall,nu1234,nd5678) &
@@ -1506,7 +1519,7 @@ module fmm3d_tree_mod
 !$OMP PRIVATE(ithd)
          do ibox = laddr(1,ilev-1),laddr(2,ilev-1)
            !ithd = 0
-           ithd=omp_get_thread_num()
+           ithd=omp%thread_id()
            ithd = ithd + 1
            npts = 0
 
@@ -1680,7 +1693,7 @@ module fmm3d_tree_mod
 !  continue from here
             endif
          enddo
-!$OMP END PARALLEL DO
+!$OMP END TASKLOOP
         deallocate(iboxlexp)  
       enddo
 
@@ -1691,7 +1704,7 @@ module fmm3d_tree_mod
 
       do ilev = 2,nlevels-1
 
-!$OMP PARALLEL DO DEFAULT(SHARED) &
+!$OMP TASKLOOP DEFAULT(SHARED) &
 !$OMP PRIVATE(ibox,i,jbox,istart,iend,npts)
          do ibox = laddr(1,ilev),laddr(2,ilev)
 
@@ -1717,7 +1730,7 @@ module fmm3d_tree_mod
                enddo
             endif
          enddo
-!$OMP END PARALLEL DO
+!$OMP END TASKLOOP
       enddo
 
       !--------------------------------------------------------------------
@@ -1738,7 +1751,7 @@ module fmm3d_tree_mod
         call trace%begin('FMM3DTree:eval_local', itimer=itimer, verbose=3)
 
         do ilev = 0,self%nlevels
-          !$OMP PARALLEL DO DEFAULT(SHARED) &
+          !$OMP TASKLOOP DEFAULT(SHARED) &
           !$OMP PRIVATE(ibox,nchild,istart,iend,i,npts) &
           !$OMP SCHEDULE(DYNAMIC)
           do ibox = self%laddr(1,ilev),self%laddr(2,ilev)
@@ -1753,7 +1766,7 @@ module fmm3d_tree_mod
      &    npts,self%gradsort(1,1,istart),self%wlege,self%nlege)
             endif
           enddo
-          !$OMP END PARALLEL DO
+          !$OMP END TASKLOOP
       enddo
 
       call trace%end('FMM3DTree:eval_local', itimer=itimer, verbose=3)
@@ -1768,7 +1781,7 @@ module fmm3d_tree_mod
         integer :: jbox,jstart,jend,npts
         !--------------------------------------------
         do ilev=0,self%nlevels
-            !$OMP PARALLEL DO DEFAULT(SHARED) &
+            !$OMP TASKLOOP DEFAULT(SHARED) &
             !$OMP PRIVATE(ibox,istarts,iends,npts0,i,jbox,jstart,jend,npts) &
             !$OMP SCHEDULE(DYNAMIC)
             do ibox = self%laddr(1,ilev),self%laddr(2,ilev)
@@ -1791,7 +1804,7 @@ module fmm3d_tree_mod
      &    npts0,self%gradsort(1,1,istarts),self%thresh)     
               enddo
             enddo
-            !$OMP END PARALLEL DO
+            !$OMP END TASKLOOP
       enddo
       end subroutine eval_direct
 
@@ -2121,7 +2134,7 @@ end module fmm3d_tree_mod
       threshsq = thresh**2
       do i=1,nt
 
-      !$omp parallel do default(none) schedule(static) &
+      !$OMP TASKLOOP default(none) schedule(static) &
       !$omp private(j,zdiff, dd, dinv,dinv2,dotprod,cd,cd2,cd3,cd4,idim) &
       !$omp shared(i, nd,ns,sources,ztarg,dipvec,grad,threshsq)
         do j=1,ns
