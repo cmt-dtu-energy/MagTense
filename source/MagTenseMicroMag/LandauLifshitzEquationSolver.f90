@@ -2087,9 +2087,11 @@ subroutine add_near_field(problem, solution)
     pref = sngl(-1)
     call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
 
-    solution%HmX = solution%HmX - hx_tmp  * problem%Mfact
-    solution%HmY = solution%HmY - hy_tmp  * problem%Mfact
-    solution%HmZ = solution%HmZ - hz_tmp  * problem%Mfact
+    !$omp critical (solution_update)
+    solution%HmX = solution%HmX + hx_tmp  * problem%Mfact
+    solution%HmY = solution%HmY + hy_tmp  * problem%Mfact
+    solution%HmZ = solution%HmZ + hz_tmp  * problem%Mfact
+    !$omp end critical (solution_update)
 
     deallocate(hx_tmp, hy_tmp, hz_tmp)
 
