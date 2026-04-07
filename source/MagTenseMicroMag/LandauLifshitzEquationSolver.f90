@@ -248,6 +248,9 @@
 
         CALL SYSTEM_CLOCK(c1)
 
+    !$omp parallel default(shared)
+    !$omp single
+
       do i=1,nt_Hext
           !Applied field
           gb_solution%HextInd = i
@@ -284,6 +287,9 @@
             ! error stop " test stop after cuda sparse"
               
       enddo
+
+      !$omp end single
+      !$omp end parallel
 
       
         CALL SYSTEM_CLOCK(c2)
@@ -336,7 +342,7 @@
         integer :: ntot
         real(DP) :: mx_mean, my_mean, mz_mean, volume_total
         integer :: i
-        integer, save :: itimer = 0
+        integer, save :: itimer = 0, itimer_wait = 0
         call trace%begin( "dmdt_fct", itimer=itimer, verbose=1 )
         !------------------------------------------
         ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
@@ -354,15 +360,24 @@
         !-------------------------------------------------------------
 
         !------------ add exchange term -----------------------------
+        !$omp task untied default(shared)
         call updateExchangeTerms( gb_problem, gb_solution )
+        !$omp end task
         !-------------------------------------------------------------
         !-------------- add external field ---------------------------
+        !$omp task untied default(shared)
         call updateExternalField( gb_problem, gb_solution, t )
+        !$omp end task
         !-------------------------------------------------------------
         !-------------- add anisotropy term --------------------------
+        !$omp task untied default(shared)
         call updateAnisotropy(  gb_problem, gb_solution )
+        !$omp end task
         !-------------------------------------------------------------
         !-------------- add demagnetization field --------------------
+                ! NOTE - we don't run updateDemagfield as a task as this is the most expensive part
+                ! instead, we run this on the main thread and then.
+
 #if USE_FMM3D
         !-------------------- if use_fmm then use FMM otherwise shortcircuit to normal demag field --------------
         if ( gb_problem%use_fmm)  then
@@ -375,6 +390,16 @@
          call updateDemagfield( gb_problem, gb_solution )
 #endif
         !-------------------------------------------------------------
+
+
+        !------------------ wait for all task to finish before calculating the effective field and the dm/dt ----------------
+        call trace%begin( "dmdt_fct_taskwait", itimer=itimer_wait, verbose=1 )
+        ! NOTE - probably not needed since we also have a taskwait in updateDemagfieldFMM
+        !$omp taskwait
+        call trace%end( "dmdt_fct_taskwait", itimer=itimer_wait, verbose=1 )
+        !--------------------------------------------------------------------------------------------------------------------
+
+
         !--------------- combine to get effective field, Heff -------------
         HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
         HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY
@@ -761,7 +786,7 @@ subroutine updateDemagfieldFMM(problem, solution)
 
   class(FMM3DTree), pointer :: fmm_tree
   logical :: built_tree
-  integer, save :: itimer = 0
+  integer, save :: itimer = 0, itimer_wait = 0 
   !------------------------------------------------
 
     call trace%begin( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
@@ -775,6 +800,20 @@ subroutine updateDemagfieldFMM(problem, solution)
   solution%My_s = real(solution%My, SP)
   solution%Mz_s = real(solution%Mz, SP)
   !--------------------------------------------------------------
+
+
+  !-------------- reset field ---------------------------------------------
+solution%HmX = 0.0_SP
+solution%HmY = 0.0_SP
+solution%HmZ = 0.0_SP
+  !-------------------------------------------------------------------------
+
+    !------------- add correction from neighbouring tiles ---------------------
+    !$omp task untied default(shared)
+    call add_near_field(problem, solution)
+    !$omp end task
+    !-------------------------------------------------------------------------
+
 
   !------------------ Allocate FMM work arrays ------------------
     built_tree = .false.
@@ -828,6 +867,7 @@ subroutine updateDemagfieldFMM(problem, solution)
     !--------------------------------------------------------------
   !------------------ Call FMM (sources->sources) ------------------
   nd = 1
+   fmm_tree%nterms_in = problem%fmm_nterms
    call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif, problem%nlmin, problem%nlmax)
    !------- only run if number of boxes > 9 -----------
    !--- NOTE - if nboxes <= 9 then we have all-to-all and the is no need for FMM ---
@@ -844,25 +884,19 @@ subroutine updateDemagfieldFMM(problem, solution)
   !------------------ Map grad -> H (and to single) ----------------
   ! include factor 4pi to match Magtense units
    if (fmm_tree%nboxes > 9) then 
-    !$omp parallel do default(shared)
-    do i = 1, ntot
-      solution%HmX(i) = real( grad(1,1,i) / fourpi, SP )
-      solution%HmY(i) = real( grad(1,2,i) / fourpi, SP )
-      solution%HmZ(i) = real( grad(1,3,i) / fourpi, SP )
-      ! solution%HmX(i) = real( grad(1,i) / fourpi, SP )
-      ! solution%HmY(i) = real( grad(2,i) / fourpi, SP )
-      ! solution%HmZ(i) = real( grad(3,i) / fourpi, SP )
-    end do
-    !$omp end parallel do
-  else
-    solution%HmX = 0.0_SP
-    solution%HmY = 0.0_SP
-    solution%HmZ = 0.0_SP
+      !$omp critical (solution_update)
+        solution%HmX = solution%HmX +  real( grad(1,1,:) / fourpi, SP )
+        solution%HmY = solution%HmY +  real( grad(1,2,:) / fourpi, SP )
+        solution%HmZ = solution%HmZ +  real( grad(1,3,:) / fourpi, SP ) 
+      !$omp end critical (solution_update)
   end if
   !-----------------------------------------------------------------
-  !------------- add correction from neighbouring tiles ---------------------
-call add_near_field(problem, solution)
-  !--------------------------------------------------------------------------
+
+  !------------------- Wait for near-field task to complete ------------------
+  call trace%begin( "updateDemagfieldFMM_taskwait", itimer=itimer_wait, verbose=1 )
+  !$omp taskwait
+  call trace%end( "updateDemagfieldFMM_taskwait", itimer=itimer_wait, verbose=1 )
+  !---------------------------------------------------------------------------
     !------------------ Cleanup -------------------------------------
   if (.not. fmm_tree%keep_tree) then
       call fmm_tree%dealloc()
