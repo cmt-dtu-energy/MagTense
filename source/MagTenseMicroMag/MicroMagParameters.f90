@@ -4,9 +4,8 @@ include "mkl_dfti.f90"
     module MicroMagParameters
     use MKL_SPBLAS
     Use MKL_DFTI
-#if USE_FMM3D    
     use fmm3d_tree_mod
-#endif
+
     INTEGER, PARAMETER :: SP = SELECTED_REAL_KIND(6, 37)
     INTEGER, PARAMETER :: DP = SELECTED_REAL_KIND(15, 307)
     
@@ -179,6 +178,7 @@ include "mkl_dfti.f90"
         !--------------- demag tensor neighbour stuff ---------------
         integer :: fmm_cells_per_node
         real(DP) :: fmm_eps 
+        integer :: fmm_nterms = -1  ! if positive, this is the number of expansions. If negative, the expansion number is computed inside the FMM tree build based on the value of fmm_eps. 
         integer :: ifunif = 1 
         integer :: nlmin = 0
         integer :: nlmax = 5
@@ -231,9 +231,9 @@ include "mkl_dfti.f90"
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
-#if USE_FMM3D   
+
         class(FMM3DTree), pointer :: fmm_tree => null()    !> FMM tree for computing the demag field using FMM
-#endif
+
     end type MicroMagSolution
     
     
