@@ -9,6 +9,7 @@ module fmm_nbor_tensor_mod
     use DemagFieldGetSolution
     use IO_GENERAL
     use trace_mod
+    use sort_mod
   implicit none
 contains 
 
@@ -209,6 +210,13 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
   end do
 
 
+  !---------- sort each row to improve data locality in subsequent tensor build  ----------
+  do i = 1, ntot
+    call sort(problem%nbr_idx(i,1:problem%n_nbors(i)))
+  end do
+  !------------------------------------------------------------------------------------------------
+
+
   call trace%end( "BuildNeighbourList_FromTree", itimer=itimer, verbose=1 )
 
 end subroutine BuildNeighbourList_FromTree
@@ -349,6 +357,7 @@ subroutine BuildNeighbourDemagTensor(problem)
     sources(3,i) = real(problem%grid%pts(i,3), DP)
   end do
 
+  fmm_tree%nterms_in = problem%fmm_nterms
   call fmm_tree%build_tree(sources, problem%fmm_eps, problem%fmm_cells_per_node, ier, problem%ifunif, problem%nlmin, problem%nlmax)
   if (ier /= 0) stop "BuildNeighbourDemagTensor: fmm_tree%build_tree failed"
 
@@ -474,7 +483,20 @@ subroutine BuildNeighbourDemagTensor(problem)
   !---------------------------------------
   ! 8. Attach diffTens and build CSR sparse matrices (opt)
   !---------------------------------------
+
+
+  !TODO - make this conditional instead of hardcoded
+  ! if eval_local is never called, we can skip the "diffTens = Nnbr - dipole" 
+  !      step and just point diffTens to Nnbr directly, saving memory and time.
   problem%diffTens => problem%Nnbr
+  ! else we convert Nbr to diffTens by subtracting dipole contribution 
+  !call convert_Nnbr_to_diffTens(problem)
+
+
+
+
+
+
   call build_FMM_sparse_nborTensor_opt(problem)
 
 
@@ -538,7 +560,9 @@ subroutine convert_Nnbr_to_diffTens(problem)
       endif
 
       problem%diffTens(t, m, :,:) = Kloc - Kdip * volj  ! correction compared to dipole 
-      !problem%diffTens(t, m, :,:) = Kloc  ! full tensor - if eval_direct is never called 
+      !problem%diffTens(t, m, :,:) = Kloc  ! full tensor - if eval_direct is never called   
+      !problem%diffTens(t, m, :,:) = Kdip * volj ! pure dipole contribution - for testing only
+
     end do
   end do
 
