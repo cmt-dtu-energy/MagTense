@@ -2072,7 +2072,7 @@ subroutine add_near_field(problem, solution)
   integer :: stat
   real(SP) :: alpha, beta
   integer, save :: itimer = 0
-  call trace%begin( "add_near_field", itimer=itimer, verbose=1 )
+  call trace%begin( "add_near_field", itimer=itimer, verbose=2 )
 
 
   ntot = size(problem%grid%pts, dim=1)
@@ -2132,7 +2132,7 @@ subroutine add_near_field(problem, solution)
     deallocate(mxm, mym, mzm, temp)
 #endif
 
-    call trace%end( "add_near_field", itimer=itimer, verbose=1 )
+    call trace%end( "add_near_field", itimer=itimer, verbose=2 )
 end subroutine add_near_field
 
         !------------------------------------------------------------------------------------------------
