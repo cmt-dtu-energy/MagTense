@@ -198,6 +198,7 @@ class MicromagProblem:
         self.nlmax = 5
         self.allow_fmm_short_circuit = 1
         self.fmm_min_n = 20000
+        self.fmm_nterms = -1
         #--------------------------------------------------
 
         #---------- timer and trace parameters ----------
@@ -633,6 +634,7 @@ class MicromagProblem:
             nlmax=self.nlmax,
             allow_fmm_short_circuit=self.allow_fmm_short_circuit,
             fmm_min_n=self.fmm_min_n,
+            fmm_nterms=self.fmm_nterms,
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,
@@ -757,6 +759,7 @@ class MicromagProblem:
             nlmax=self.nlmax,
             allow_fmm_short_circuit=self.allow_fmm_short_circuit,
             fmm_min_n=self.fmm_min_n,
+            fmm_nterms=self.fmm_nterms,
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,
