@@ -1753,7 +1753,7 @@ module fmm3d_tree_mod
         do ilev = 0,self%nlevels
           !$OMP TASKLOOP DEFAULT(SHARED) &
           !$OMP PRIVATE(ibox,nchild,istart,iend,i,npts) &
-          !$OMP SCHEDULE(DYNAMIC)
+          !$OMP GRAINSIZE(1)
           do ibox = self%laddr(1,ilev),self%laddr(2,ilev)
             nchild=self%itree(self%ipointer(4)+ibox-1)
             if(nchild.eq.0) then 
@@ -1783,7 +1783,7 @@ module fmm3d_tree_mod
         do ilev=0,self%nlevels
             !$OMP TASKLOOP DEFAULT(SHARED) &
             !$OMP PRIVATE(ibox,istarts,iends,npts0,i,jbox,jstart,jend,npts) &
-            !$OMP SCHEDULE(DYNAMIC)
+            !$OMP GRAINSIZE(1)
             do ibox = self%laddr(1,ilev),self%laddr(2,ilev)
               istarts = self%isrcse(1,ibox)
               iends = self%isrcse(2,ibox)
@@ -2134,7 +2134,7 @@ end module fmm3d_tree_mod
       threshsq = thresh**2
       do i=1,nt
 
-      !$OMP TASKLOOP default(none) schedule(static) &
+      !$OMP TASKLOOP default(none) GRAINSIZE(1) &
       !$omp private(j,zdiff, dd, dinv,dinv2,dotprod,cd,cd2,cd3,cd4,idim) &
       !$omp shared(i, nd,ns,sources,ztarg,dipvec,grad,threshsq)
         do j=1,ns
