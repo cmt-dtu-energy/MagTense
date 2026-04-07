@@ -113,14 +113,17 @@ CONTAINS
 !=============================================================================
 !> Finalise trace logging (writes timer summary and closes file)
 !=============================================================================
-  subroutine finalize()
+subroutine finalize()
     !DEC$ ATTRIBUTES ALIAS:"finalize_" :: finalize
     if (.not. trace%initialized) return
 
     !---------------------- Write timer summary -------------------------------
     if (trace%enabled .and. trace%unit > 0) then
       call trace_write_line("INFO ", "TIMER SUMMARY", 0, force_master=.true.)
-      call timer%print(unit=trace%unit, tid=0)
+      
+      ! Calling without tid triggers the aggregated sum over all threads
+      call timer%print(unit=trace%unit) 
+      
       if (trace%flush_each) flush(trace%unit)
     end if
     !---------------------------------------------------------------------------
@@ -142,7 +145,6 @@ CONTAINS
 
     trace%nthreads     = 1
     trace%initialized = .false.
-
   end subroutine finalize
 
 
