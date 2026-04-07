@@ -238,7 +238,15 @@ module FortranToPythonIO
 !
 subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
     mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
-    includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, eps )
+    includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, & 
+    fmm_eps, fmm_nterms_in, fmm_cells_per_node, fmm_nlmin, fmm_nlmax, fmm_ifunif,  &
+    do_target, do_fi, &
+    H )
+    !------------ IMPORTANT NOTE ------------
+    ! n_pts MUST match the number of output points. 
+    ! if do_target then it is len(pts) - if !do_target then it is n_tiles (for direct eval of sources as targets)
+    !---------------------------------------------
+
     implicit none
     integer(4),intent(in) :: n_tiles, n_pts
     real(8),dimension(n_tiles,3),intent(in) :: centerPos, dev_center
@@ -252,10 +260,134 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
     real(8),dimension(n_tiles),intent(in) :: Mrel
     real(8),dimension(n_pts,3),intent(in) :: pts
     real(8),dimension(n_pts,3),intent(out) :: H
-    real(8),intent(in),optional :: eps
+    real(8),intent(in) :: fmm_eps
+    integer(4),intent(in) :: fmm_nterms_in, fmm_cells_per_node, fmm_nlmin, fmm_nlmax, fmm_ifunif
+    integer(4) :: do_target, do_FI
     real(8) :: fourpi
 
-!#if USE_FMM3D
+
+#if USE_FMM3D
+    real(8) , contiguous, pointer:: source(:,:), dipvec(:,:,:), grad(:,:,:)
+    real(8) , contiguous, pointer:: dipvec_s(:,:), grad_s(:,:), pot(:), pottarg(:), gradtarg(:,:),   targ(:,:)
+    class(FMM3DTree), pointer :: fmm_tree
+    integer :: nd, ier
+    integer :: i, j
+    integer :: nterms_in, cells_per_node, nlmin, nlmax, ifunif
+    real(8) :: eps
+    real(8) :: vol_i
+    integer(8) :: nsource, ier8, ntarg
+
+    interface 
+    subroutine lfmm3d_t_d_g(eps,nsource,source,dipvec,ntarg,targ,pottarg,gradtarg,ier)
+        implicit none
+        integer(8), intent(in) :: nsource, ntarg
+        real(8),    intent(in) :: eps
+        real(8) :: source(3,nsource), dipvec(3,nsource), targ(3,ntarg)
+        real(8) :: pottarg(ntarg), gradtarg(3,ntarg)
+        integer(8) :: ier
+    end subroutine lfmm3d_t_d_g
+    subroutine lfmm3d_s_d_g(eps,nsource,source,dipvec,pot,grad,ier)
+        implicit none
+        integer(8), intent(in) :: nsource
+        real(8),    intent(in) :: eps
+        real(8) :: source(3,nsource), dipvec(3,nsource)
+        real(8) :: pot(nsource), grad(3,nsource)
+        integer(8) :: ier
+    end subroutine lfmm3d_s_d_g
+    end interface
+
+
+    ier = 0
+    ier8 = 0
+    nsource = n_tiles
+    ntarg = n_pts
+
+    eps = fmm_eps
+    nterms_in = fmm_nterms_in
+    cells_per_node = fmm_cells_per_node
+    nlmin = fmm_nlmin
+    nlmax = fmm_nlmax
+    ifunif = fmm_ifunif
+   !------------------- define 4pi  -------------------------------------------------
+   fourpi = 12.566370614359172d0
+   !---------------------------------------------------------------------------------
+   !---------------- allocate tmp arrays for FMM3D call -----------------------------
+   allocate(source(3,n_tiles), dipvec(1,3,n_tiles), grad(1,3,n_tiles))
+   allocate(targ(3,n_pts), pottarg(n_pts), gradtarg(3,n_pts), pot(n_tiles))
+   dipvec_s => dipvec(1,:,:)
+   grad_s => grad(1,:,:)
+
+   grad (:,:,:) = 0.0d0
+   !---------------------------------------------------------------------------------
+
+
+   H(:,:) = 0.0d0
+
+
+   do i = 1, n_tiles
+      !---------------- get and rotate source position ----------------
+      source(1,i) = offset(i,1)
+      source(2,i) = offset(i,2)
+      source(3,i) = offset(i,3)
+      ! TODO - maybe take into account centerPos and dev_center as well?
+      !----------------------------------------------------------------
+      !------------------- get volume of tile -------------------------------
+        vol_i = real(tile_size(i,1), DP) * &
+                real(tile_size(i,2), DP) * &
+                real(tile_size(i,3), DP)
+ 
+      !------------------------------------------------------------------------------------
+      !------------- convert magnetization to dipole moment --------------
+      dipvec(1,1,i) = Mag(i,1) * vol_i !* Mrem(i)
+      dipvec(1,2,i) = Mag(i,2) * vol_i !* Mrem(i)
+      dipvec(1,3,i) = Mag(i,3) * vol_i !* Mrem(i)
+   end do
+
+   do i = 1, n_pts
+      targ(1,i)=pts(i,1)
+      targ(2,i)=pts(i,2)
+      targ(3,i)=pts(i,3)
+   end do
+
+
+   if (do_FI .eq. 1) then
+    if (do_target .eq. 1) then
+        call lfmm3d_t_d_g(eps, nsource, source, dipvec_s, ntarg, targ, pottarg, gradtarg, ier8)
+        print *, "ntarg ", ntarg, " targ = ", targ
+        print *, " gradtarg", gradtarg
+    else
+        call lfmm3d_s_d_g(eps, nsource, source, dipvec_s, pot, grad_s, ier8)
+    end if
+   else
+        allocate(fmm_tree)
+        nd = 1
+        fmm_tree%nterms_in = nterms_in
+        call fmm_tree%build_tree( source, eps, cells_per_node, ier, ifunif, nlmin, nlmax)
+        call fmm_tree%make_and_eval(dipvec, grad)
+        !missing direvt eval
+        call fmm_tree%dealloc()
+        deallocate(fmm_tree)
+   end if
+
+
+
+   if (do_FI .eq. 1 .and. do_target .eq. 1)then 
+        do j = 1, n_pts
+            H(j,1) = - gradtarg(1,j) / fourpi
+            H(j,2) = - gradtarg(2,j) / fourpi
+            H(j,3) = - gradtarg(3,j) / fourpi
+        end do
+   else
+        do j = 1, n_pts
+            H(j,1) = grad(1,1,j) / fourpi
+            H(j,2) = grad(1,2,j) / fourpi
+            H(j,3) = grad(1,3,j) / fourpi
+        end do
+    end if
+
+    deallocate(source, dipvec, grad)
+    deallocate(targ, pottarg, gradtarg)
+
 !    ! ---------- real implementation when USE_FMM3D=1 ----------
 !    integer(8) :: nd, nsrc8, ntgt8, ier
 !    real(8) :: fmm_eps, vol_i
@@ -331,13 +463,13 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
 !    end do
 !    !---------------------------------------------------------------------------------------------------
 !    deallocate(source, dipvec, targ, pottarg, gradtarg)
-!#else 
+#else 
     !------------------ Fallback implementation when USE_FMM3D=0 ------------------
     print *, "WARNING: getHFromTilesFMM called but MagTense built without FMM3D support. - Returning zero field." 
     H(:,:) = 0.0d0
     return
     !----------------------------------------------------------------------------
-!#endif
+#endif
 
 end subroutine getHFromTilesFMM
 
@@ -660,7 +792,7 @@ end subroutine getHOnSourcesFMM
         exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, demigstp, & 
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, &
-		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, &
+		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, &
         log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose )
 
         integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
@@ -707,6 +839,7 @@ end subroutine getHOnSourcesFMM
         integer(4), intent(in) :: nlmax
         integer(4), intent(in) :: allow_fmm_short_circuit
         integer(4), intent(in) :: fmm_min_n
+        integer(4), intent(in) :: fmm_nterms
 
         !-------------------- timer and trace modules --------------------------------------
         character*256,intent(in) :: timer_log_file, trace_log_file, log_dir
@@ -748,7 +881,7 @@ end subroutine getHOnSourcesFMM
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
             exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
 			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
-            CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n)
+            CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms)
 
         print *, " starting SolveLandauLifshitzEquation "
         call SolveLandauLifshitzEquation( problem, solution )
