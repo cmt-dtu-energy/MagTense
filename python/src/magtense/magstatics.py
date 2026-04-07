@@ -1068,7 +1068,10 @@ def get_H_field(
 
 
 def get_H_field_fmm(
-    tiles, pts, eps=1e-6
+    tiles, pts, eps=1e-6,
+    nterms_in=10, cells_per_node=10, nlmin=0, nlmax=2, ifunif=1,
+    do_target=0, do_FI=1, n_pts=-1
+
 ) -> np.ndarray:
     """
     FMM-backed H-field, test version.
@@ -1079,6 +1082,11 @@ def get_H_field_fmm(
       - 'demag_tensor' is ignored here (no tensor reuse in this FMM path).
       - 'eps' controls FMM accuracy.
     """
+
+    if n_pts > 0:
+        n_pts_in = np.int32(n_pts)
+    else:
+        n_pts_in = np.int32(len(pts))
 
     H_out = magtensesource.fortrantopythonio.gethfromtilesfmm(
         centerpos=tiles.center_pos,
@@ -1104,8 +1112,15 @@ def get_H_field_fmm(
         mrel=tiles.M_rel,
         pts=pts,
         n_tiles=np.int32(tiles.n),
-        n_pts=np.int32(len(pts)),
-        eps=np.float64(eps),     # FMM precision
+        n_pts=n_pts_in,
+        fmm_eps=np.float64(eps),     # FMM precision
+        fmm_nterms_in=np.int32(nterms_in),
+        fmm_cells_per_node=np.int32(cells_per_node),
+        fmm_nlmin=np.int32(nlmin),
+        fmm_nlmax=np.int32(nlmax),
+        fmm_ifunif=np.int32(ifunif),
+        do_target=np.int32(do_target),
+        do_fi=np.int32(do_FI)
     )
     return H_out
 
