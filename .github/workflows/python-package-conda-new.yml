@@ -18,7 +18,7 @@ jobs:
   build-wheel:
     strategy:
       matrix:
-        py-version: [312, 313, 314]
+        py-version: [314]
         cvode: [1]
         sys:
           - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
@@ -129,8 +129,6 @@ jobs:
       matrix:
         mt-punit: [cpu, cu12]
         py-version:
-          - { name: 312, id: "3.12" }
-          - { name: 313, id: "3.13" }
           - { name: 314, id: "3.14" }
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
