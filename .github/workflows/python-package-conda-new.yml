@@ -34,7 +34,17 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-    
+
+    - name: Fetch tags
+      if: "${{ inputs.tag == '' }}"
+      run: git fetch --tags origin
+
+    - name: Get latest release tag
+      id: previoustag
+      if: "${{ inputs.tag == '' }}"
+      uses: WyriHaximus/github-action-get-previous-tag@v1
+      with:
+        fallback: 1.0.0
     - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v3
       with:
