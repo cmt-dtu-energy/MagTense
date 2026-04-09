@@ -82,13 +82,18 @@ jobs:
         mkdir '${{ github.workspace }}'/python/cpu_libs
         mkdir '${{ github.workspace }}'/python/cu12_libs
     
-    - name: Linux - Compile Fortran source code and build Python wrapper
+    - name: Linux - Compile Fortran source code and build Python wrapper (CPU)
       if: ${{ runner.os == 'Linux' }}
       working-directory: ${{ github.workspace }}
       run: |
         make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
         cp magtensesource.* '${{ github.workspace }}'/python/cpu_libs/
         make clean
+
+    - name: Linux - Compile Fortran source code and build Python wrapper (CUDA)
+      if: ${{ runner.os == 'Linux' }}
+      working-directory: ${{ github.workspace }}
+      run: |
         make python-interface
         cp magtensesource.* '${{ github.workspace }}'/python/cu12_libs/
         make clean
