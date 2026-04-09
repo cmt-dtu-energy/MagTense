@@ -95,7 +95,6 @@ jobs:
       working-directory: ${{ github.workspace }}
       run: |
         make python-interface
-        cp magtensesource.* '${{ github.workspace }}'/python/cu12_libs/
         make clean
 
     - name: Build pip-wheels
