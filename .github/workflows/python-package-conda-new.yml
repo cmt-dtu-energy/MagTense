@@ -79,10 +79,7 @@ jobs:
         make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
         cp magtensesource.* '${{ github.workspace }}'/python/cpu_libs/
         make clean
-        make python-interface
-        cp magtensesource.* '${{ github.workspace }}'/python/cu12_libs/
-        make clean
-
+        
     - name: Build pip-wheels
       if: "${{ inputs.tag == '' }}"
       working-directory: ${{ github.workspace }}/python/
