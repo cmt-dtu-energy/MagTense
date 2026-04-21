@@ -107,6 +107,7 @@
             call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gb_solution%gridinfo)
         endif
     endif
+
     if (( gb_problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
         do i=1,gb_problem%grid%nx
             gb_solution%pts( i, 1 ) = gb_problem%grid%pts( i, 1 )
@@ -136,7 +137,8 @@
             enddo
         endif
     endif
-      
+        
+    
     call displayGUIMessage( 'Initializing matrices' )
     !Calculate the interaction matrices
     call initializeInteractionMatrices( gb_problem, gb_solution )
@@ -398,6 +400,31 @@
         !$omp taskwait
         call trace%end( "dmdt_fct_taskwait", itimer=itimer_wait, verbose=1 )
         !--------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+        !open (11, file="FMM_H.bin",  &
+        !        status='replace', form='unformatted', &
+        !        access='direct', recl=1*ntot)
+        !write(11,rec=1) gb_solution%HmX 
+        !write(11,rec=2) gb_solution%HmY
+        !write(11,rec=3) gb_solution%HmZ
+        !close(11)
+        !error stop " test stop after cuda sparse"
+              
+
+
+
+        !--------- debug test 
+        !print *, " Hmx(100:110) = ", gb_solution%HmX(100:110)
+        !print *, " Hmy(100:110) = ", gb_solution%HmY(100:110)
+        !print *, " Hmz(100:110) = ", gb_solution%HmZ(100:110)
+        !error stop " test stop after demag field update in dmdt_fct"
+
+
+
 
 
         !--------------- combine to get effective field, Heff -------------
@@ -811,6 +838,7 @@ solution%HmZ = 0.0_SP
     !------------- add correction from neighbouring tiles ---------------------
     !$omp task untied default(shared)
     call add_near_field(problem, solution)
+    !call add_near_field_dipole( problem, solution )
     !$omp end task
     !-------------------------------------------------------------------------
 
@@ -885,9 +913,16 @@ solution%HmZ = 0.0_SP
   ! include factor 4pi to match Magtense units
    if (fmm_tree%nboxes > 9) then 
       !$omp critical (solution_update)
-        solution%HmX = solution%HmX +  real( grad(1,1,:) / fourpi, SP )
-        solution%HmY = solution%HmY +  real( grad(1,2,:) / fourpi, SP )
-        solution%HmZ = solution%HmZ +  real( grad(1,3,:) / fourpi, SP ) 
+
+        !print *, "FMM Hmx(100:110) = ", grad(1,1,100:110) / fourpi * problem%Mfact(100:110)
+        !print *, "FMM Hmy(100:110) = ", grad(1,2,100:110) / fourpi * problem%Mfact(100:110)
+        !print *, "FMM Hmz(100:110) = ", grad(1,3,100:110) / fourpi * problem%Mfact(100:110)
+
+
+
+        solution%HmX = solution%HmX +  real( grad(1,1,:) / fourpi, SP ) !* problem%Mfact
+        solution%HmY = solution%HmY +  real( grad(1,2,:) / fourpi, SP ) !* problem%Mfact
+        solution%HmZ = solution%HmZ +  real( grad(1,3,:) / fourpi, SP ) !* problem%Mfact 
       !$omp end critical (solution_update)
   end if
   !-----------------------------------------------------------------
@@ -897,6 +932,8 @@ solution%HmZ = 0.0_SP
   !$omp taskwait
   call trace%end( "updateDemagfieldFMM_taskwait", itimer=itimer_wait, verbose=1 )
   !---------------------------------------------------------------------------
+
+
     !------------------ Cleanup -------------------------------------
   if (.not. fmm_tree%keep_tree) then
       call fmm_tree%dealloc()
@@ -936,7 +973,7 @@ end subroutine updateDemagfieldFMM
     type(matrix_descr) :: descr
     real(SP) :: pref,alpha,beta
     complex(kind=4) :: alpha_c, beta_c
-    real(SP), dimension(:), allocatable :: temp
+    real(SP), dimension(:), allocatable :: temp, mx, my, mz
     character*(100) :: prog_str 
     integer, save :: itimer = 0
     call trace%begin( "updateDemagfield", itimer=itimer, verbose=1 )
@@ -964,7 +1001,7 @@ end subroutine updateDemagfieldFMM
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My_s, beta, temp )
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz_s, beta, temp )
         
-            solution%HmX = temp * ( problem%Mfact )
+            !solution%HmX = temp * ( problem%Mfact )
             !ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
             !call vsmul( ntot, solution%HmX, -problem%Mfact, solution%HmX )
             
@@ -974,7 +1011,7 @@ end subroutine updateDemagfieldFMM
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My_s, beta, temp )
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz_s, beta, temp )
         
-            solution%HmY = temp * ( problem%Mfact )
+            !solution%HmY = temp * ( problem%Mfact )
             !call vsmul( ntot, solution%HmY, -problem%Mfact, solution%HmY )
           
             beta = 0.
@@ -983,7 +1020,7 @@ end subroutine updateDemagfieldFMM
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My_s, beta, temp )
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz_s, beta, temp )
         
-            solution%HmZ = temp * ( problem%Mfact )
+            !solution%HmZ = temp * ( problem%Mfact )
             !call vsmul( ntot, solution%HmZ, -problem%Mfact, solution%HmZ )
         else
 #if USE_CUDA
@@ -991,12 +1028,12 @@ end subroutine updateDemagfieldFMM
             !call displayGUIMessage( ' runing cuda demag sparse matrix multiplication' )
             pref = sngl(-1 )!* problem%Mfact)                                
             call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
-            temp = solution%HmX * problem%Mfact
-            solution%HmX = temp
-            temp = solution%HmY * problem%Mfact
-            solution%HmY = temp
-            temp = solution%HmZ * problem%Mfact
-            solution%HmZ = temp
+            !temp = solution%HmX * problem%Mfact
+            !solution%HmX = temp
+            !temp = solution%HmY * problem%Mfact
+            !solution%HmY = temp
+            !temp = solution%HmZ * problem%Mfact
+            !solution%HmZ = temp
 
             ! open (11, file="sparse_CUDA_H.bin",  &
             !         status='unknown', form='unformatted', &
@@ -1051,7 +1088,7 @@ end subroutine updateDemagfieldFMM
             stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmX_C )
         
             !Get the field
-            solution%HmX = -problem%Mfact * real(solution%HmX_c)
+            !solution%HmX = -problem%Mfact * real(solution%HmX_c)
             !call vsmul( ntot, real(solution%HmX_c), -problem%Mfact, solution%HmX )
         
         
@@ -1066,7 +1103,7 @@ end subroutine updateDemagfieldFMM
             stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmY_c )
         
             !Get the field        
-            solution%HmY = -problem%Mfact * real(solution%HmY_c)
+            !solution%HmY = -problem%Mfact * real(solution%HmY_c)
             !call vsmul( ntot, real(solution%HmY_c), -problem%Mfact, solution%HmY )
         
         
@@ -1080,7 +1117,7 @@ end subroutine updateDemagfieldFMM
             !Fourier transform backwards to get the field
             stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmZ_c )
             !finally, get the field out        
-            solution%HmZ = -problem%Mfact * real(solution%HmZ_c)
+           ! solution%HmZ = -problem%Mfact * real(solution%HmZ_c)
             !call vsmul( ntot, real(solution%HmZ_c), -problem%Mfact, solution%HmZ )
         
         else
@@ -1132,23 +1169,39 @@ end subroutine updateDemagfieldFMM
             !HmZ = HmZ + Kzz * Mz
             call gemv( problem%Kzz, solution%Mz_s, solution%HmZ, alpha, beta )
             
-            temp = solution%HmX * problem%Mfact
-            solution%HmX = temp
-            temp = solution%HmY * problem%Mfact
-            solution%HmY = temp
-            temp = solution%HmZ * problem%Mfact
-            solution%HmZ = temp
+            !temp = solution%HmX * problem%Mfact
+            !solution%HmX = temp
+            !temp = solution%HmY * problem%Mfact
+            !solution%HmY = temp
+            !temp = solution%HmZ * problem%Mfact
+            !solution%HmZ = temp
             
         else
             pref = sngl(-1)! * problem%Mfact)
 #if USE_CUDA
+
+            ! ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+            ! allocate(mx(ntot), my(ntot), mz(ntot))
+            ! mx = solution%Mx_s * problem%Ms
+            ! my = solution%My_s * problem%Ms
+            ! mz = solution%Mz_s * problem%Ms
+            ! call cudaMatrVecMult( mx, my, mz, solution%HmX, solution%HmY, solution%HmZ, pref )
+            ! !temp = solution%HmX * problem%Mfact
+            ! !solution%HmX = temp
+            ! !temp = solution%HmY * problem%Mfact
+            ! !solution%HmY = temp
+            ! !temp = solution%HmZ * problem%Mfact
+            ! !solution%HmZ = temp
+            ! deallocate(mx, my, mz)
+
+
             call cudaMatrVecMult( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
-            temp = solution%HmX * problem%Mfact
-            solution%HmX = temp
-            temp = solution%HmY * problem%Mfact
-            solution%HmY = temp
-            temp = solution%HmZ * problem%Mfact
-            solution%HmZ = temp
+            !temp = solution%HmX * problem%Mfact
+            !solution%HmX = temp
+            !temp = solution%HmY * problem%Mfact
+            !solution%HmY = temp
+            !temp = solution%HmZ * problem%Mfact
+            !solution%HmZ = temp
 #endif
         endif 
     endif
@@ -1301,6 +1354,13 @@ end subroutine updateDemagfieldFMM
     integer :: c1,c2,cr,cm
     character(10) :: prog_str
     integer, save :: itimer = 0
+
+    real(DP) :: volj
+    real(DP) :: xt, yt, zt, xj, yj, zj
+    real(DP) :: Rvec(3), Kdip(3,3)
+
+
+
     call trace%begin( "ComputeDemagfieldTensor", itimer=itimer, verbose=1 )
     
     ! First initialize the system_clock
@@ -1318,6 +1378,7 @@ end subroutine updateDemagfieldFMM
     ny_ave = problem%N_ave(2)
     nz_ave = problem%N_ave(3)
     
+
     !Demag tensor components
     allocate( problem%Kxx(ntot,ntot), problem%Kxy(ntot,ntot), problem%Kxz(ntot,ntot) )
     allocate( problem%Kyy(ntot,ntot), problem%Kyz(ntot,ntot) )
@@ -1450,11 +1511,42 @@ end subroutine updateDemagfieldFMM
             !$OMP END PARALLEL DO
             
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
+
+!        !----- for testing dipoles 
+!        if ( .true.) then
+!            !$OMP PARALLEL DO SHARED(problem, ntot) PRIVATE(xt, yt, zt, xj, yj, zj, Rvec, volj, Kdip, j ) default(none)
+!            do i = 1,ntot
+!                xt = real(problem%grid%pts(i,1),DP)
+!                yt = real(problem%grid%pts(i,2),DP)
+!                zt = real(problem%grid%pts(i,3),DP)
+!                do j = 1,ntot
+!                    xj = real(problem%grid%pts(j,1),DP)
+!                    yj = real(problem%grid%pts(j,2),DP)
+!                    zj = real(problem%grid%pts(j,3),DP)
+!
+!                    Rvec(1) = xt - xj
+!                    Rvec(2) = yt - yj
+!                    Rvec(3) = zt - zj
+!                    volj = problem%grid%abc(j,1) * problem%grid%abc(j,2) * problem%grid%abc(j,3)
+!
+!                    call dipole_tensor_3x3(Rvec, Kdip)
+!                    
+!                    Kdip = Kdip * volj
+!
+!                    problem%Kxx(i,j) = sngl(Kdip(1,1))
+!                    problem%Kxy(i,j) = sngl(Kdip(1,2))
+!                    problem%Kxz(i,j) = sngl(Kdip(1,3))
+!                    problem%Kyy(i,j) = sngl(Kdip(2,2))
+!                    problem%Kyz(i,j) = sngl(Kdip(2,3))
+!                    problem%Kzz(i,j) = sngl(Kdip(3,3))
+!                end do
+!            end do
+!            !$omp end parallel do
+!        else 
             !call displayGUIMessage( 'Constructing the Tensormap' )
             !call ConstructDemagTensorMap( problem )
             !call displayGUIMessage( 'Done constructing the Tensormap' )
             !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout,Noutave,dx,dy,dz,pts_arr)
-            
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do i=1,ntot
                 !Setup template tile
@@ -1537,6 +1629,7 @@ end subroutine updateDemagfieldFMM
             enddo
         
             !$OMP END PARALLEL DO
+!        end if
             
         endif
         
@@ -1551,6 +1644,19 @@ end subroutine updateDemagfieldFMM
         !write (prog_str,'(f10.3)') problem%Kxx(1,1)
         !call displayGUIMessage( prog_str )      
         
+
+        !---------- scale sources with the magnetization saturan -----------------
+        do i=1,ntot
+            problem%Kxx(i,:) = problem%Kxx(i,:) * problem%Ms(:)
+            problem%Kxy(i,:) = problem%Kxy(i,:) * problem%Ms(:)
+            problem%Kxz(i,:) = problem%Kxz(i,:) * problem%Ms(:)
+            problem%Kyy(i,:) = problem%Kyy(i,:) * problem%Ms(:)
+            problem%Kyz(i,:) = problem%Kyz(i,:) * problem%Ms(:)
+            problem%Kzz(i,:) = problem%Kzz(i,:) * problem%Ms(:)
+        end do
+        !---------------------------------------------------------------------------
+
+
         !Write the demag tensors to disk if asked to do so            
         if ( problem%demagTensorReturnState .gt. DemagTensorReturnMemory ) then
             call writeDemagTensorToDisk( problem )
@@ -1558,6 +1664,10 @@ end subroutine updateDemagfieldFMM
         
     endif
     
+
+
+
+
         
     !Make a sparse matrix out of the dense matrices by specifying a threshold
     if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then     
@@ -1570,18 +1680,19 @@ end subroutine updateDemagfieldFMM
 
     !-------------- for debug write the dense matrices to binary files --------------
     ! TODO - add option to control this and maybe an "auxiliary" module to do this
-    !open (11, file="dense_std_ref_nocuda.bin",  &
-    !       status='unknown', form='unformatted', &
-    !       access='direct', recl=1*ntot*ntot)
-    ! write(11,rec=1) problem%Kxx
-    ! write(11,rec=2) problem%Kxy
-    ! write(11,rec=3) problem%Kxz
-    ! write(11,rec=4) problem%Kyy
-    ! write(11,rec=5) problem%Kyz
-    ! write(11,rec=6) problem%Kzz
-    ! close(11)
+    ! open (11, file="dense_std_ref_nocuda.bin",  &
+    !        status='replace', form='unformatted', &
+    !        access='direct', recl=1*ntot*ntot)
+    !  write(11,rec=1) problem%Kxx
+    !  write(11,rec=2) problem%Kxy
+    !  write(11,rec=3) problem%Kxz
+    !  write(11,rec=4) problem%Kyy
+    !  write(11,rec=5) problem%Kyz
+    !  write(11,rec=6) problem%Kzz
+    !  close(11)
     !error stop " test stop after writing dense ref"
     !-------------- end debug write the dense matrices to binary files --------------
+
 
     call trace%end( "ComputeDemagfieldTensor", itimer=itimer, verbose=1 )
     
@@ -2086,6 +2197,70 @@ end subroutine updateDemagfieldFMM
 
 
 
+
+subroutine add_near_field_dipole(problem, solution)
+  implicit none
+  type(MicroMagProblem),  intent(in)    :: problem
+  type(MicroMagSolution), intent(inout) :: solution
+  !---------------------------------------------------------------------------
+  integer :: ntot, max_nbor
+  integer :: s, t, m
+  real(8) :: diff_pos(3), Kdip(3,3), volj, mx, my, mz
+    real(SP), contiguous, pointer :: hx_tmp(:), hy_tmp(:), hz_tmp(:)
+  !-----------------------------------------------------------------------------
+
+
+#if USE_FMM3D
+  ntot = size(problem%diffTens, dim=1)
+  max_nbor = size(problem%diffTens, dim=2)
+
+    allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) )
+    hx_tmp = 0.0_SP
+    hy_tmp = 0.0_SP
+    hz_tmp = 0.0_SP
+
+  do t = 1, ntot
+    do m=1, problem%n_nbors(t)
+      s = problem%nbr_idx(t,m)
+      if (s < 0) cycle   ! empty slot (boundary)
+      diff_pos = problem%grid%pts(t,:) - problem%grid%pts(s,:)
+      volj = problem%grid%abc(s,1) * problem%grid%abc(s,2) * problem%grid%abc(s,3)
+
+      !mx = solution%Mx_s(s) * real(problem%Ms(s), SP) * volj
+      !my = solution%My_s(s) * real(problem%Ms(s), SP) * volj
+      !mz = solution%Mz_s(s) * real(problem%Ms(s), SP) * volj
+      
+      mx = solution%Mx(s) * volj * problem%Ms(s)
+      my = solution%My(s) * volj * problem%Ms(s)
+      mz = solution%Mz(s) * volj * problem%Ms(s)
+
+
+      !-------- tensor method --------
+      call dipole_tensor_3x3(diff_pos, Kdip)
+
+      hx_tmp(t) = hx_tmp(t) + Kdip(1,1)*mx + Kdip(1,2)*my + Kdip(1,3)*mz
+      hy_tmp(t) = hy_tmp(t) + Kdip(2,1)*mx + Kdip(2,2)*my + Kdip(2,3)*mz
+      hz_tmp(t) = hz_tmp(t) + Kdip(3,1)*mx + Kdip(3,2)*my + Kdip(3,3)*mz
+      !-------- end tensor method --------
+
+    enddo
+end do
+
+    !$omp critical (solution_update)
+        !print *, "near_field_dip Hmx(100:110) = ", hx_tmp(100:110)  * problem%Mfact(100:110)
+        !print *, "near_field_dip Hmy(100:110) = ", hy_tmp(100:110)  * problem%Mfact(100:110)
+        !print *, "near_field_dip Hmz(100:110) = ", hz_tmp(100:110)  * problem%Mfact(100:110)
+    solution%HmX = solution%HmX + hx_tmp  !* problem%Mfact
+    solution%HmY = solution%HmY + hy_tmp  !* problem%Mfact
+    solution%HmZ = solution%HmZ + hz_tmp  !* problem%Mfact
+    !$omp end critical (solution_update)
+
+   deallocate(hx_tmp, hy_tmp, hz_tmp)
+#endif 
+
+end subroutine 
+
+
 !>======================================================================
 !> Add demagnitization field from nearfield 
 !> uses K_nbrcorr, which depending on the setup contains either
@@ -2121,10 +2296,21 @@ subroutine add_near_field(problem, solution)
     pref = sngl(-1)
     call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
 
+
+
+
+
+
+
+
+
     !$omp critical (solution_update)
-    solution%HmX = solution%HmX + hx_tmp  * problem%Mfact
-    solution%HmY = solution%HmY + hy_tmp  * problem%Mfact
-    solution%HmZ = solution%HmZ + hz_tmp  * problem%Mfact
+        !print *, "near_field Hmx(100:110) = ", hx_tmp(100:110)  * problem%Mfact(100:110)
+        !print *, "near_field Hmy(100:110) = ", hy_tmp(100:110)  * problem%Mfact(100:110)
+        !print *, "near_field Hmz(100:110) = ", hz_tmp(100:110)  * problem%Mfact(100:110)
+    solution%HmX = solution%HmX + hx_tmp  !* problem%Mfact
+    solution%HmY = solution%HmY + hy_tmp  !* problem%Mfact
+    solution%HmZ = solution%HmZ + hz_tmp  !* problem%Mfact
     !$omp end critical (solution_update)
 
     deallocate(hx_tmp, hy_tmp, hz_tmp)
@@ -2133,10 +2319,9 @@ subroutine add_near_field(problem, solution)
     allocate(mxm(ntot), mym(ntot), mzm(ntot))
     allocate(temp(ntot))
 
-    ! Pre-scale magnetisation by Ms (as you do for CUDA)
-    mxm = solution%Mx_s * real(problem%Ms, SP)
-    mym = solution%My_s * real(problem%Ms, SP)
-    mzm = solution%Mz_s * real(problem%Ms, SP)
+    mxm = solution%Mx_s !* real(problem%Ms, SP)
+    mym = solution%My_s !* real(problem%Ms, SP)
+    mzm = solution%Mz_s !* real(problem%Ms, SP)
 
     alpha = 1.0_SP
     ! ---------------- Hx correction = xx*Mx + xy*My + xz*Mz ----------------
