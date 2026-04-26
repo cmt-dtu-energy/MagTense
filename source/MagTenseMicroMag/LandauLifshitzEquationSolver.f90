@@ -939,6 +939,7 @@
     integer :: i_a,j_a,k_a,nx_ave,ny_ave,nz_ave                   !> Internal counters and index variables for avering the demag tensor over the recieving tile
     real(DP),dimension(:),allocatable :: dx,dy,dz
     real(DP), dimension(:,:),allocatable :: pts_arr
+    real(DP), dimension(:,:),allocatable :: obs_size_list
     real(DP),dimension(:,:,:,:),allocatable :: Nout,Noutave             !> Temporary storage for the demag tensor            
     integer,dimension(4) :: indx_ele
     real :: rate
@@ -977,15 +978,21 @@
         call omp_set_num_threads(1)
                
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
-            print *, "calling getfieldfromtiles in line 1010"
             
             if (nx_ave*ny_ave*nz_ave > 1) then
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
         
+            allocate(obs_size_list(ntot,3))
+            obs_size_list(:,1) = problem%grid%dx
+            obs_size_list(:,2) = problem%grid%dy
+            obs_size_list(:,3) = problem%grid%dz
+
             !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout, k, j, i)
         
             !for each element find the tensor for all evaluation points (i.e. all elements)
+            
+            
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx
@@ -1003,6 +1010,8 @@
                         tile(1)%exploitSymmetry = 0 !0 for no and this is important
                         tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
                         tile(1)%M(:) = 0.
+
+                        
                         
                         !Set the center of the tile to be the current point
                         tile(1)%offset(1) = problem%grid%x(i,j,k)
@@ -1012,7 +1021,11 @@
                         allocate(Nout(1,ntot,3,3))
                         allocate(H(ntot,3))
                         
+                        if (gb_problem%useAvgN .eq. useAvgNTrue) then
+                        call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false.,Obs_size=obs_size_list)
+                        else
                         call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                        endif
                         
                         !Copy Nout into the proper structure used by the micro mag model
                         ind = (k-1) * nx * ny + (j-1) * nx + i
@@ -1041,6 +1054,8 @@
             
             !$OMP END PARALLEL DO
             
+            deallocate(obs_size_list)
+
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
         
             if (nx_ave*ny_ave*nz_ave > 1) then
@@ -1139,12 +1154,12 @@
                 Noutave(1,:,:,:) = 0;
 
                 !Calculate the spacing between the points to do average in
-                !Note that abc is the full side length of the tile - it is divided with 1/2 in the demag tensor calculation
+                !Note that abc is the full side length of the tile - it is divided with 2 in the demag tensor calculation
                 !to make it compatible to the expression in Smith_2010
                 dx = problem%grid%abc(:,1)/(nx_ave+1)
                 dy = problem%grid%abc(:,2)/(ny_ave+1)
                 dz = problem%grid%abc(:,3)/(nz_ave+1)
-                print *, "calling getfieldfromtiles in line 1146"
+
                 do k_a=1,nz_ave
                     do j_a=1,ny_ave                
                         do i_a=1,nx_ave
@@ -1152,9 +1167,14 @@
                             pts_arr(:,1) =  (problem%grid%pts(:,1)-problem%grid%abc(:,1)/2)+dx(:)*i_a
                             pts_arr(:,2) =  (problem%grid%pts(:,2)-problem%grid%abc(:,2)/2)+dy(:)*j_a
                             pts_arr(:,3) =  (problem%grid%pts(:,3)-problem%grid%abc(:,3)/2)+dz(:)*k_a
+                            
+                            if (gb_problem%useAvgN .eq. useAvgNTrue) then
+                            call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false., obs_size = problem%grid%abc) !are the cells subdivided or no?
+                            else
                             !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
                             call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
-                            
+                            endif
+
                             Noutave = Noutave+Nout
                             
                         enddo

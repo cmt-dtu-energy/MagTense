@@ -494,7 +494,7 @@ class MicromagProblem:
         self._solver = {None: -1, "explicit": 1, "dynamic": 2, "implicit": 3}[val]
 
     def run_simulation(
-        self, t_end: float, nt: int, fct_h_ext: Callable, nt_h_ext: int
+        self, t_end: float, nt: int, fct_h_ext: Callable, nt_h_ext: int,
     ) -> list[np.ndarray | int]:
         """
         Run the micromagnetic simulation.

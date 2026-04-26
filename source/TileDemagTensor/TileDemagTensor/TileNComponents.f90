@@ -649,22 +649,24 @@ module TileNComponents
 
     pi = 4.0_8 * atan(1.0_8)
 
+    
+
     !Lengths of source tile in x,y,z dimensions
-    a = Avgprism%a
-    b = Avgprism%b
-    c = Avgprism%c
+    a = Avgprism%a/2.0
+    b = Avgprism%b/2.0
+    c = Avgprism%c/2.0
 
     !Lengths of receiving (observer) tile in x,y,z dimensions, if provided, else same as lengths of source
     if (present(Obs_size_ele).and. all(abs(Obs_size_ele) > 0.0)) then
         !print *, "Using specified obs_size:", Obs_size_ele
-        a1 = Obs_size_ele(1)
-        b1 = Obs_size_ele(2)
-        c1 = Obs_size_ele(3)
+        a1 = Obs_size_ele(1)/2.0
+        b1 = Obs_size_ele(2)/2.0
+        c1 = Obs_size_ele(3)/2.0
     else
         !print *, "Using hard coded obs_size"
-        a1 = Avgprism%a
-        b1 = Avgprism%b
-        c1 = Avgprism%c
+        a1 = Avgprism%a/2.0
+        b1 = Avgprism%b/2.0
+        c1 = Avgprism%c/2.0
     end if
     
     ! coordinates from center of source tile to center of receiving tile
@@ -731,7 +733,7 @@ module TileNComponents
             N_out(3,1) = -N_out(3,1) / (4*pi*vol)
             N_out(1,3) = N_out(3,1)
 
-            !N_out=N_out*1.0d5 !scaling to see if we can get correct field
+            
 
     !print *, "N_out(1,1) =", N_out(1,1)
     !print *, "N_out(1,2) =", N_out(1,2)
