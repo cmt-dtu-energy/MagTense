@@ -9,6 +9,11 @@
 # private files for MagTense
 MagTense_private/
 
+#image files
+*.png
+*.pdf
+*.svg
+
 # data files
 *.mat
 *.bin
