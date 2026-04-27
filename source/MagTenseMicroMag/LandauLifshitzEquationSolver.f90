@@ -913,16 +913,9 @@ solution%HmZ = 0.0_SP
   ! include factor 4pi to match Magtense units
    if (fmm_tree%nboxes > 9) then 
       !$omp critical (solution_update)
-
-        !print *, "FMM Hmx(100:110) = ", grad(1,1,100:110) / fourpi * problem%Mfact(100:110)
-        !print *, "FMM Hmy(100:110) = ", grad(1,2,100:110) / fourpi * problem%Mfact(100:110)
-        !print *, "FMM Hmz(100:110) = ", grad(1,3,100:110) / fourpi * problem%Mfact(100:110)
-
-
-
-        solution%HmX = solution%HmX +  real( grad(1,1,:) / fourpi, SP ) !* problem%Mfact
-        solution%HmY = solution%HmY +  real( grad(1,2,:) / fourpi, SP ) !* problem%Mfact
-        solution%HmZ = solution%HmZ +  real( grad(1,3,:) / fourpi, SP ) !* problem%Mfact 
+        solution%HmX = solution%HmX +  real( grad(1,1,:) / fourpi, SP )
+        solution%HmY = solution%HmY +  real( grad(1,2,:) / fourpi, SP )
+        solution%HmZ = solution%HmZ +  real( grad(1,3,:) / fourpi, SP ) 
       !$omp end critical (solution_update)
   end if
   !-----------------------------------------------------------------
@@ -1001,18 +994,12 @@ end subroutine updateDemagfieldFMM
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%My_s, beta, temp )
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mz_s, beta, temp )
         
-            !solution%HmX = temp * ( problem%Mfact )
-            !ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
-            !call vsmul( ntot, solution%HmX, -problem%Mfact, solution%HmX )
-            
+           
             beta = 0.
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(2)%A, descr, solution%Mx_s, beta, temp )
             beta = 1.0
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(4)%A, descr, solution%My_s, beta, temp )
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%Mz_s, beta, temp )
-        
-            !solution%HmY = temp * ( problem%Mfact )
-            !call vsmul( ntot, solution%HmY, -problem%Mfact, solution%HmY )
           
             beta = 0.
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(3)%A, descr, solution%Mx_s, beta, temp )
@@ -1020,38 +1007,26 @@ end subroutine updateDemagfieldFMM
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(5)%A, descr, solution%My_s, beta, temp )
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(6)%A, descr, solution%Mz_s, beta, temp )
         
-            !solution%HmZ = temp * ( problem%Mfact )
-            !call vsmul( ntot, solution%HmZ, -problem%Mfact, solution%HmZ )
         else
 #if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
             !call displayGUIMessage( ' runing cuda demag sparse matrix multiplication' )
-            pref = sngl(-1 )!* problem%Mfact)                                
+            pref = sngl(-1 )                              
             call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
-            !temp = solution%HmX * problem%Mfact
-            !solution%HmX = temp
-            !temp = solution%HmY * problem%Mfact
-            !solution%HmY = temp
-            !temp = solution%HmZ * problem%Mfact
-            !solution%HmZ = temp
-
-            ! open (11, file="sparse_CUDA_H.bin",  &
-            !         status='unknown', form='unformatted', &
-            !         access='direct', recl=1*ntot)
-            ! write(11,rec=1) solution%HmX 
-            ! write(11,rec=2) solution%HmY
-            ! write(11,rec=3) solution%HmZ
-            ! close(11)
-            ! error stop " test stop after cuda sparse"
 #endif
         endif
         
     elseif ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
-        
+
         if ( problem%useCuda .eq. useCudaFalse ) then
             !fourier transform Mx, My and Mz
             ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
                 
+
+            !======= Needs proper Ms correction 
+            print *, "WARNING: not properly corrected for Ms"
+            !==========================================
+
             !Convert to complex format
             do i=1,ntot
                 solution%Mx_FT(i) = cmplx( solution%Mx_s(i), 0. )
@@ -1089,8 +1064,7 @@ end subroutine updateDemagfieldFMM
         
             !Get the field
             !solution%HmX = -problem%Mfact * real(solution%HmX_c)
-            !call vsmul( ntot, real(solution%HmX_c), -problem%Mfact, solution%HmX )
-        
+            !call vsmul( ntot, real(solution%HmX_c), -problem%Mfact, solution%HmX )        
         
             !Second Hy = Kyx * Mx + Kyy * My + Kyz * Mz        
             beta_c = cmplx(0.,0.)
@@ -1101,6 +1075,7 @@ end subroutine updateDemagfieldFMM
         
             !Fourier transform backwards to get the field
             stat = DftiComputeBackward( problem%desc_hndl_FFT_M_H, solution%HmY_c )
+
         
             !Get the field        
             !solution%HmY = -problem%Mfact * real(solution%HmY_c)
@@ -1131,77 +1106,29 @@ end subroutine updateDemagfieldFMM
         if ( problem%useCuda .eq. useCudaFalse ) then
             !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
             !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
-            !solution%HmX = - problem%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
-            !solution%HmY = - problem%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
-            !solution%HmZ = - problem%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
-            
-            alpha = -1.! * problem%Mfact
+            !======== Hmx ===========
+            alpha = -1.
             beta = 0.0
-            !Hmx = Kxx * Mx
-            call gemv( problem%Kxx, solution%Mx_s, solution%HmX, alpha, beta )
-                                   
+            call gemv( problem%Kxx, solution%Mx_s, solution%HmX, alpha, beta )        
             beta = 1.0
-            !Hmx = Hmx + Kxy * My
             call gemv( problem%Kxy, solution%My_s, solution%HmX, alpha, beta )
-            
-            !Hmx = Hmx + Kxz * Mz
             call gemv( problem%Kxz, solution%Mz_s, solution%HmX, alpha, beta )
-            
+            !======= Hmy ==========
             beta = 0.0
-            !HmY = Kyx * Mx
             call gemv( problem%Kxy, solution%Mx_s, solution%HmY, alpha, beta )
-            
             beta = 1.0
-            !HmY = HmY + Kyy * My
             call gemv( problem%Kyy, solution%My_s, solution%HmY, alpha, beta )
-            
-            !Hmy = Hmy + Kyz * Mz
             call gemv( problem%Kyz, solution%Mz_s, solution%HmY, alpha, beta )
-            
+            !======= Hmz =========
             beta = 0.0
-            !HmZ = Kzx * Mx
             call gemv( problem%Kxz, solution%Mx_s, solution%HmZ, alpha, beta )
-            
             beta = 1.0
-            !HmZ = HmZ + Kzy * My
             call gemv( problem%Kyz, solution%My_s, solution%HmZ, alpha, beta )
-            
-            !HmZ = HmZ + Kzz * Mz
             call gemv( problem%Kzz, solution%Mz_s, solution%HmZ, alpha, beta )
-            
-            !temp = solution%HmX * problem%Mfact
-            !solution%HmX = temp
-            !temp = solution%HmY * problem%Mfact
-            !solution%HmY = temp
-            !temp = solution%HmZ * problem%Mfact
-            !solution%HmZ = temp
-            
         else
-            pref = sngl(-1)! * problem%Mfact)
+            pref = sngl(-1)
 #if USE_CUDA
-
-            ! ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
-            ! allocate(mx(ntot), my(ntot), mz(ntot))
-            ! mx = solution%Mx_s * problem%Ms
-            ! my = solution%My_s * problem%Ms
-            ! mz = solution%Mz_s * problem%Ms
-            ! call cudaMatrVecMult( mx, my, mz, solution%HmX, solution%HmY, solution%HmZ, pref )
-            ! !temp = solution%HmX * problem%Mfact
-            ! !solution%HmX = temp
-            ! !temp = solution%HmY * problem%Mfact
-            ! !solution%HmY = temp
-            ! !temp = solution%HmZ * problem%Mfact
-            ! !solution%HmZ = temp
-            ! deallocate(mx, my, mz)
-
-
             call cudaMatrVecMult( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
-            !temp = solution%HmX * problem%Mfact
-            !solution%HmX = temp
-            !temp = solution%HmY * problem%Mfact
-            !solution%HmY = temp
-            !temp = solution%HmZ * problem%Mfact
-            !solution%HmZ = temp
 #endif
         endif 
     endif
@@ -2247,12 +2174,9 @@ subroutine add_near_field_dipole(problem, solution)
 end do
 
     !$omp critical (solution_update)
-        !print *, "near_field_dip Hmx(100:110) = ", hx_tmp(100:110)  * problem%Mfact(100:110)
-        !print *, "near_field_dip Hmy(100:110) = ", hy_tmp(100:110)  * problem%Mfact(100:110)
-        !print *, "near_field_dip Hmz(100:110) = ", hz_tmp(100:110)  * problem%Mfact(100:110)
-    solution%HmX = solution%HmX + hx_tmp  !* problem%Mfact
-    solution%HmY = solution%HmY + hy_tmp  !* problem%Mfact
-    solution%HmZ = solution%HmZ + hz_tmp  !* problem%Mfact
+    solution%HmX = solution%HmX + hx_tmp 
+    solution%HmY = solution%HmY + hy_tmp 
+    solution%HmZ = solution%HmZ + hz_tmp 
     !$omp end critical (solution_update)
 
    deallocate(hx_tmp, hy_tmp, hz_tmp)
@@ -2296,21 +2220,10 @@ subroutine add_near_field(problem, solution)
     pref = sngl(-1)
     call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
 
-
-
-
-
-
-
-
-
     !$omp critical (solution_update)
-        !print *, "near_field Hmx(100:110) = ", hx_tmp(100:110)  * problem%Mfact(100:110)
-        !print *, "near_field Hmy(100:110) = ", hy_tmp(100:110)  * problem%Mfact(100:110)
-        !print *, "near_field Hmz(100:110) = ", hz_tmp(100:110)  * problem%Mfact(100:110)
-    solution%HmX = solution%HmX + hx_tmp  !* problem%Mfact
-    solution%HmY = solution%HmY + hy_tmp  !* problem%Mfact
-    solution%HmZ = solution%HmZ + hz_tmp  !* problem%Mfact
+    solution%HmX = solution%HmX + hx_tmp 
+    solution%HmY = solution%HmY + hy_tmp 
+    solution%HmZ = solution%HmZ + hz_tmp 
     !$omp end critical (solution_update)
 
     deallocate(hx_tmp, hy_tmp, hz_tmp)
@@ -2319,9 +2232,9 @@ subroutine add_near_field(problem, solution)
     allocate(mxm(ntot), mym(ntot), mzm(ntot))
     allocate(temp(ntot))
 
-    mxm = solution%Mx_s !* real(problem%Ms, SP)
-    mym = solution%My_s !* real(problem%Ms, SP)
-    mzm = solution%Mz_s !* real(problem%Ms, SP)
+    mxm = solution%Mx_s 
+    mym = solution%My_s 
+    mzm = solution%Mz_s 
 
     alpha = 1.0_SP
     ! ---------------- Hx correction = xx*Mx + xy*My + xz*Mz ----------------
