@@ -161,7 +161,6 @@ module fmm3d_tree_mod
         !-------- 
 
         contains
-          procedure :: full_fmm
           procedure :: build1
           procedure :: reset_sort_arg
           procedure :: dealloc
@@ -204,8 +203,6 @@ module fmm3d_tree_mod
           self%ndiv = ndiv 
         end if
 
-        !print *, " building fmm tree"
-
         self%source => source
         self%nsource = size(source,2)
         self%eps = eps
@@ -219,13 +216,7 @@ module fmm3d_tree_mod
        
         !----------- use omp_mod to get number of threads -----------------
         self%nthd = omp%numthreads()
-        !self%nthd = 1
         !-----------------------------------------------------------------
-
-        
-
-
-        !print *, " number of threads for fmm tree build: ", self%nthd
         
 
         call self%build1()
@@ -260,9 +251,10 @@ module fmm3d_tree_mod
         call self%lfmm3dmain_tree()
         call self%eval_local()
 
-        !self%gradsort = 0.0 ! reset for comparison with direct eval
-        !call self%eval_direct()
 
+        !======== commented out - all near field is handled by MagTense analytical tensor ==========
+        !call self%eval_direct()
+        !===========================================================================================
 
         call dreorderi(3*self%nd,self%nsource,self%gradsort,self%grad,self%isrc)
         call drescale(self%nd*3*self%nsource,self%grad,self%b0inv)
@@ -271,110 +263,6 @@ module fmm3d_tree_mod
 
 
       end subroutine make_and_eval
-
-
-    subroutine full_fmm(self,nd,eps,nsource,source, &
-            dipvec,grad,ier)
-        use omp_lib, only: omp_get_wtime
-        class(FMM3DTree), intent(inout) :: self
-        !------------------------------------------------
-        double precision eps
-
-        integer nsource,ntarg 
-        integer nd,iper,ier
-        
-        double precision, target :: source(3,nsource)!,targ(3,1)
-        double precision, target :: charge(nd,1)
-        
-        double precision, target :: dipvec(nd,3,nsource)
-
-        double precision, target :: grad(nd,3,nsource)
-
-
-        integer, contiguous, pointer ::  laddr(:,:)
-
-        real(kind=8) :: t1, tb1, tb2, tmain, teloc, tdir, t_reorder, t_dealloc
-
-      ntarg = 0
-
-      ier = 0
-
-        !---------- setting self varialbes ----------------
-        self%source => source
-        self%nsource = nsource
-        self%dipvec => dipvec
-
-        !self%pot => pot
-        self%grad => grad
-        self%eps = eps
-        self%nd = nd
-        self%ier = ier
-        self%ntarg = ntarg
-        !--------------------------------------------------
-
-
-      !print *, " calling fmm tree "
-
-
-
-
-        !self%nthd = omp_get_num_threads()
-
-
-
-        t1 = omp_get_wtime()
-        call self%build1()
-
-        tb1 = omp_get_wtime() - t1
-
-        t1 = omp_get_wtime()
-        !self%laddr(1:2,0:self%nlevels) => self%itree(self%ipointer(1) : self%ipointer(1)+(self%nlevels + 1)*2-1)
-        call self%build2()
-        tb2 = omp_get_wtime() - t1
-        
-        
-        t1 = omp_get_wtime()
-        call self%lfmm3dmain_tree()
-
-        tmain = omp_get_wtime() - t1
-
-
-        t1 = omp_get_wtime()
-
-        call self%eval_local()
-        teloc = omp_get_wtime() - t1
-        t1 = omp_get_wtime()
-        call self%eval_direct()
-        tdir = omp_get_wtime() - t1
-
-
-
-        t1 = omp_get_wtime()
-  
-        call dreorderi(3*self%nd,self%nsource,self%gradsort,self%grad,self%isrc)
-        call drescale(self%nd*3*self%nsource,self%grad,self%b0inv)
-
-
-
-        t_reorder = omp_get_wtime() - t1
-
-        t1 = omp_get_wtime()
-
-            call self%dealloc()
-        t_dealloc = omp_get_wtime() - t1
-
-
-
-        print *, " FMM3DTree timings: "
-        print *, "  build1 time = ", tb1
-        print *, "  build2 time = ", tb2
-        print *, "  main fmm time = ", tmain
-        print *, "  local eval time = ", teloc
-        print *, "  direct eval time = ", tdir
-        print *, "  reorder time = ", t_reorder
-        print *, "  dealloc time = ", t_dealloc
-        print *, "  total time = ", tb1 + tb2 + tmain + teloc + tdir + t_reorder + t_dealloc
-    end subroutine full_fmm
 
 
     subroutine build1(self)
@@ -443,8 +331,6 @@ module fmm3d_tree_mod
         self%itarg => itarg
 
         !-------- end of tree build --------------------
-
-        !print *, " finished tree build "
         !------ set scaling 
 
         self%b0 = self%boxsize(0)
@@ -457,25 +343,16 @@ module fmm3d_tree_mod
 
 
         !-------------- allocate sorted source and targ arrays------
-
-        !print *, " allocating sorted arrays "
-
         allocate(sourcesort(3,self%nsource))
-
         allocate(dipvecsort(self%nd,3,self%nsource))
-
-
         allocate(gradsort(self%nd,3,self%nsource))
             !------------------------------------------------------
-
-
         self%sourcesort => sourcesort
         self%dipvecsort => dipvecsort
         self%gradsort => gradsort
         !--------------------------------------------------------
 
         allocate(nterms(0:self%nlevels))
-
         self%nmax = 0
         do i=0,self%nlevels
             !-----------if nterms_in is explicitly set, use that, otherwise compute nterms based on eps ------------------------------
@@ -489,20 +366,10 @@ module fmm3d_tree_mod
         enddo
         self%nterms => nterms
 !       
-
       call dreorderf(3,self%nsource,self%source,self%sourcesort,self%isrc)
-
       call drescale(3*self%nsource,self%sourcesort,self%b0inv)
-
-
-
-
-
-
       call drescale(3*self%nboxes,self%treecenters,self%b0inv)
       call drescale(self%nlevels+1,self%boxsize,self%b0inv)
-
-
 
       allocate(iaddr(2,self%nboxes))
       self%lmptemp = (self%nmax+1)*(2*self%nmax+1)*2*self%nd
@@ -525,9 +392,6 @@ module fmm3d_tree_mod
 
 
         self%laddr(1:2,0:self%nlevels) => self%itree(self%ipointer(1) : self%ipointer(1)+(self%nlevels + 1)*2-1)
-
-        !print *, " done with build1 "
-
     end subroutine build1
 
     subroutine reorder_dipvec(self)
@@ -598,8 +462,6 @@ module fmm3d_tree_mod
       do i=0,self%nlevels
          if(self%nmax.lt.self%nterms(i)) self%nmax = self%nterms(i)
       enddo
-      !print *, " FMM3DTree: max number of terms = ", self%nmax
-
 
        allocate(self%rscpow(0:self%nmax))
        allocate(self%carray(4*self%nmax+1,4*self%nmax+1))
@@ -651,10 +513,6 @@ module fmm3d_tree_mod
       allocate(self%mexpf1(self%nd,self%nexptot,self%nthd),self%mexpf2(self%nd,self%nexptot,self%nthd), &
      &    self%mexpp1(self%nd,self%nexptotp,self%nthd))
       allocate(self%mexpp2(self%nd,self%nexptotp,self%nthd),self%mexppall(self%nd,self%nexptotp,16,self%nthd))
-
-      !print *, " done with build2 "
-
-
       !
       bigint = 0
       bigint = self%nboxes
@@ -663,8 +521,7 @@ module fmm3d_tree_mod
 
       if(self%ifprint.ge.1) print *, "mexp memory=",bigint/1.0d9, " GB "
 
-      
-
+    
       allocate(self%mexp(self%nd,self%nexptotp,self%nboxes,6),stat=iert)
       if(iert.ne.0) then
         print *, "Cannot allocate pw expansion workspace"
@@ -793,23 +650,6 @@ module fmm3d_tree_mod
         integer :: ilev, ibox
         integer :: i,j,k,idim
         !------------------------------------------------
-
-      !-------- reset rmlexp to zero --------------
-      ! do ilev = 0,self%nlevels
-      !   !$OMP TASKLOOP DEFAULT(SHARED) &
-      !   !$OMP PRIVATE(ibox)
-      !   do ibox=self%laddr(1,ilev),self%laddr(2,ilev)
-      !     call mpzero(self%nd,self%rmlexp(self%iaddr(1,ibox)),self%nterms(ilev))
-      !     call mpzero(self%nd,self%rmlexp(self%iaddr(2,ibox)),self%nterms(ilev))
-      !   enddo
-      !   !$OMP END TASKLOOP
-      ! enddo
-      ! !-------------------------------------------
-      ! !$OMP TASKLOOP  DEFAULT(SHARED) 
-      ! do i=1,self%nboxes
-      !       self%mexp(:,:,i,:) = 0.0d0
-      ! enddo
-      ! !$OMP END TASKLOOP
 
       do ilev = 0,self%nlevels
         !$OMP TASKLOOP DEFAULT(SHARED) &
@@ -1044,14 +884,7 @@ module fmm3d_tree_mod
       integer, save :: itimer = 0
 
       call trace%begin("FMM3DTree:lfmm3dmain_tree", itimer=itimer, verbose=3)
-      !integer omp_get_max_threads,omp_get_thread_num
-
-
-
-
-
       !--------
-      !nthd = 1
       nthd = self%nthd
       ifprint=0
 
@@ -1223,10 +1056,8 @@ module fmm3d_tree_mod
 
         nlege = self%nlege
 
-        !call self%reset_sort_arg()
         self%gradsort = 0.0
         
-        !call self%reset_expansion_coeff()
         self%rmlexp = 0.0
         self%mexp = 0.0
 
@@ -1384,12 +1215,7 @@ module fmm3d_tree_mod
 
                nchild = itree(ipointer(4)+ibox-1)
 
-               if(npts.gt.0.and.nchild.eq.0.and.list4ct(ibox).eq.0) then
-    !               call l3dformmpd(nd,rscales(ilev), &
-    !  &    sourcesort(1,istart), &
-    !  &    dipvecsort(1,1,istart),npts, &
-    !  &    centers(1,ibox),nterms(ilev), &
-    !  &    rmlexp(iaddr(1,ibox)),wlege,nlege)          
+               if(npts.gt.0.and.nchild.eq.0.and.list4ct(ibox).eq.0) then      
                   call l3dformmpd_new(nd,rscales(ilev), &
      &    sourcesort(1,istart), &
      &    dipvecsort(1,1,istart),npts, &
@@ -1642,9 +1468,6 @@ module fmm3d_tree_mod
      &    nnall,nall(1,ithd), &
      &    nsall,sall(1,ithd),neall,eall(1,ithd), &
      &    nwall,wall(1,ithd))
-              !do i=1,8
-              !  call mpzero(nd,iboxlexp(1,i,ithd),nterms(ilev))
-              !enddo
               iboxlexp(:,:,ithd)=0.0d0
 
               call processlist3udexplong(nd,ibox,nboxes,centers, &
@@ -1794,7 +1617,7 @@ module fmm3d_tree_mod
         integer :: ilev,ibox,istarts,iends,npts0,i
         integer :: jbox,jstart,jend,npts
         !--------------------------------------------
-       ! print *, " evaluating direct interactions"
+        !TODO - Needs testing in parallel!!!
         do ilev=0,self%nlevels
             !!$OMP TASKLOOP DEFAULT(SHARED) &
             !!$OMP PRIVATE(ibox,istarts,iends,npts0,i,jbox,jstart,jend,npts) 
@@ -1808,14 +1631,6 @@ module fmm3d_tree_mod
                 jstart = self%isrcse(1,jbox)
                 jend = self%isrcse(2,jbox)
                 npts = jend-jstart+1
-
-    !            call l3ddirectdg_grad_vec(self%nd,self%sourcesort(1,jstart), &
-    ! &    self%dipvecsort(1,1,jstart),npts,self%sourcesort(1,istarts), &
-    ! &    npts0,self%gradsort(1,1,istarts),self%thresh)     
-
-                !print *, " eval direct for box ",ibox," and neighbor ",jbox
-                !print *, "istarts = ",istarts," iends = ",iends," npts0 = ",npts0
-                !print *, "jstart = ",jstart," jend = ",jend," npts = ",npts
                      call l3ddirectdg_grad(self%nd,self%sourcesort(1,jstart), &
      &    self%dipvecsort(1,1,jstart),npts,self%sourcesort(1,istarts), &
      &    npts0,self%gradsort(1,1,istarts),self%thresh, self%isrc, istarts, jstart)     
@@ -1825,13 +1640,6 @@ module fmm3d_tree_mod
       enddo
       print *, " finished evaluating direct interactions"
       end subroutine eval_direct
-
-    real(8) function walltime()
-    !TODO - at some point, make a timing module to handle this
-        use omp_lib, only: omp_get_wtime
-        walltime = omp_get_wtime()
-    end function walltime
-
 
 end module fmm3d_tree_mod
 
