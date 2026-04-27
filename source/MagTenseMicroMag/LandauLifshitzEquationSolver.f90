@@ -406,8 +406,8 @@
 
 
         !open (11, file="FMM_H.bin",  &
-        !        status='replace', form='unformatted', &
-        !        access='direct', recl=1*ntot)
+        !       status='replace', form='unformatted', &
+        !       access='direct', recl=1*ntot)
         !write(11,rec=1) gb_solution%HmX 
         !write(11,rec=2) gb_solution%HmY
         !write(11,rec=3) gb_solution%HmZ
