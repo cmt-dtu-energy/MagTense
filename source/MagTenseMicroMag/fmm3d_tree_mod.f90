@@ -188,6 +188,7 @@ module fmm3d_tree_mod
         integer :: ifunif, nlmin, nlmax
         !------------------------------------------------
         integer :: i
+        integer :: ibox, ilev
         integer, save :: itimer = 0
         !-----------------
 
@@ -218,6 +219,7 @@ module fmm3d_tree_mod
        
         !----------- use omp_mod to get number of threads -----------------
         self%nthd = omp%numthreads()
+        !self%nthd = 1
         !-----------------------------------------------------------------
 
         
@@ -236,6 +238,8 @@ module fmm3d_tree_mod
         do i = 0, self%nlevels
             print *, "Level ", i, ": ", self%laddr(2, i) - self%laddr(1, i) + 1, " boxes"
         enddo
+        print *, " scaling factor b0 = ", self%b0, " b0inv = ", self%b0inv
+
 
         self%is_built = .true.
         call trace%end( "FMM3DTree_build_tree", itimer=itimer, verbose=2 )
@@ -255,6 +259,8 @@ module fmm3d_tree_mod
 
         call self%lfmm3dmain_tree()
         call self%eval_local()
+
+        !self%gradsort = 0.0 ! reset for comparison with direct eval
         !call self%eval_direct()
 
 
@@ -442,9 +448,9 @@ module fmm3d_tree_mod
         !------ set scaling 
 
         self%b0 = self%boxsize(0)
-        self%b0inv = 1.0d0/self%b0
+        self%b0inv = 1.0d0  /self%b0
         self%b0inv2 = self%b0inv**2
-        self%b0inv3 = self%b0inv2*self%b0inv
+        !self%b0inv3 = self%b0inv2*self%b0inv !not used 
 
 
 
@@ -726,8 +732,8 @@ module fmm3d_tree_mod
 
       nmaxt = 0 
 
-      !$OMP TASKLOOP DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
-      !$OMP REDUCTION(max:nmaxt)
+      !!$OMP TASKLOOP DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
+      !!$OMP REDUCTION(max:nmaxt)
             do ibox=1,self%nboxes
               if(self%list4ct(ibox).gt.0) then
                 istart = self%isrcse(1,ibox)
@@ -736,7 +742,7 @@ module fmm3d_tree_mod
                 if(npts.gt.nmaxt) nmaxt = npts
               endif
             enddo
-      !$OMP END TASKLOOP
+      !!$OMP END TASKLOOP
 
       allocate(self%gboxind(nmaxt,self%nthd))
       allocate(self%gboxsort(3,nmaxt,self%nthd))
@@ -1034,7 +1040,6 @@ module fmm3d_tree_mod
       integer *8 bigint
       integer iert
       data ima/(0.0d0,1.0d0)/
-
       integer nthd,ithd
       integer, save :: itimer = 0
 
@@ -1230,142 +1235,147 @@ module fmm3d_tree_mod
 
       call self%reorder_dipvec()
 
+!
+!====== not tested and only for non-complete trees
+!
+
 !     form mexp for all list4 type box at first ghost box center
-      do ilev=1,nlevels-1
-
-         rscpow(0) = 1.0d0/boxsize(ilev+1)
-         rtmp = rscales(ilev+1)/boxsize(ilev+1)
-         do i=1,nterms(ilev+1)
-            rscpow(i) = rscpow(i-1)*rtmp
-         enddo
-
-!$OMP TASKLOOP DEFAULT(SHARED) &
-!$OMP PRIVATE(ibox,istart,iend,jbox,jstart,jend,npts,npts0,i) &
-!$OMP PRIVATE(ithd)
-         do ibox=laddr(1,ilev),laddr(2,ilev)
-            !ithd = 0
-           !ithd=omp_get_thread_num()
-            ithd = omp%thread_id()
-            ithd = ithd + 1
-            if(list4ct(ibox).gt.0) then
-              istart=isrcse(1,ibox)
-              iend=isrcse(2,ibox)
-              npts = iend-istart+1
-
-              if(npts.gt.0) then
-                call subdividebox(sourcesort(1,istart),npts, &
-     &    centers(1,ibox),boxsize(ilev+1), &
-     &    gboxind(1,ithd),gboxfl(1,1,ithd), &
-     &    gboxsubcenters(1,1,ithd))
-                call dreorderf(3,npts,sourcesort(1,istart), &
-     &    gboxsort(1,1,ithd),gboxind(1,ithd))
-                  call dreorderf(3*nd,npts,dipvecsort(1,1,istart), &
-     &    gboxdpsort(1,1,1,ithd),gboxind(1,ithd))
-                do i=1,8
-                  if(gboxfl(1,i,ithd).gt.0) then
-                    jstart=gboxfl(1,i,ithd)
-                    jend=gboxfl(2,i,ithd)
-                    npts0=jend-jstart+1
-                    jbox=list4ct(ibox)
-
-                      call l3dformmpd(nd,rscales(ilev+1), &
-     &    gboxsort(1,jstart,ithd), &
-     &    gboxdpsort(1,1,jstart,ithd), &
-     &    npts0,gboxsubcenters(1,i,ithd),nterms(ilev+1), &
-     &    gboxmexp(1,i,jbox),wlege,nlege)          
-
-                    call l3dmpmp(nd,rscales(ilev+1), &
-     &    gboxsubcenters(1,i,ithd),gboxmexp(1,i,jbox), &
-     &    nterms(ilev+1),rscales(ilev),centers(1,ibox), &
-     &    rmlexp(iaddr(1,ibox)),nterms(ilev),dc,lca)
-     
-                    call mpscale(nd,nterms(ilev+1),gboxmexp(1,i,jbox), &
-     &    rscpow,tmp(1,0,-nmax,ithd))
+!      do ilev=1,nlevels-1
 !
-!c                process up down for current box
+!         rscpow(0) = 1.0d0/boxsize(ilev+1)
+!         rtmp = rscales(ilev+1)/boxsize(ilev+1)
+!         do i=1,nterms(ilev+1)
+!            rscpow(i) = rscpow(i-1)*rtmp
+!         enddo
 !
-                    call mpoletoexp(nd,tmp(1,0,-nmax,ithd), &
-     &    nterms(ilev+1),nlams, &
-     &    nfourier,nexptot,mexpf1(1,1,ithd), &
-     &    mexpf2(1,1,ithd),rlsc)
-
-                    call ftophys(nd,mexpf1(1,1,ithd), &
-     &    nlams,rlams,nfourier, &
-     &    nphysical,nthmax,gboxwexp(1,1,1,i,ithd), &
-     &    fexpe,fexpo)
-
-                    call ftophys(nd,mexpf2(1,1,ithd), &
-     &    nlams,rlams,nfourier, &
-     &    nphysical,nthmax,gboxwexp(1,1,2,i,ithd), &
-     &    fexpe,fexpo)
-
-                    call processgboxudexp(nd,gboxwexp(1,1,1,i,ithd), &
-     &    gboxwexp(1,1,2,i,ithd),i,nexptotp, &
-     &    pgboxwexp(1,1,jbox,1),pgboxwexp(1,1,jbox,2), &
-     &    xshift,yshift,zshift)
+!!!$OMP TASKLOOP DEFAULT(SHARED) &
+!!!$OMP PRIVATE(ibox,istart,iend,jbox,jstart,jend,npts,npts0,i) &
+!!!$OMP PRIVATE(ithd)
+!         do ibox=laddr(1,ilev),laddr(2,ilev)
+!            ithd = 0
+!           !ithd=omp_get_thread_num()
+!           ! ithd = omp%thread_id()
+!            ithd = ithd + 1
+!            if(list4ct(ibox).gt.0) then
+!              istart=isrcse(1,ibox)
+!              iend=isrcse(2,ibox)
+!              npts = iend-istart+1
 !
-!c                process north-south for current box
+!              if(npts.gt.0) then
+!                call subdividebox(sourcesort(1,istart),npts, &
+!     &    centers(1,ibox),boxsize(ilev+1), &
+!     &    gboxind(1,ithd),gboxfl(1,1,ithd), &
+!     &    gboxsubcenters(1,1,ithd))
+!                call dreorderf(3,npts,sourcesort(1,istart), &
+!     &    gboxsort(1,1,ithd),gboxind(1,ithd))
+!                  call dreorderf(3*nd,npts,dipvecsort(1,1,istart), &
+!     &    gboxdpsort(1,1,1,ithd),gboxind(1,ithd))
+!                do i=1,8
+!                  if(gboxfl(1,i,ithd).gt.0) then
+!                    jstart=gboxfl(1,i,ithd)
+!                    jend=gboxfl(2,i,ithd)
+!                    npts0=jend-jstart+1
+!                    jbox=list4ct(ibox)
 !
-                    call rotztoy(nd,nterms(ilev+1),tmp(1,0,-nmax,ithd), &
-     &    mptmp(1,ithd),rdminus)
-                    call mpoletoexp(nd,mptmp(1,ithd), &
-     &    nterms(ilev+1),nlams, &
-     &    nfourier,nexptot,mexpf1(1,1,ithd), &
-     &    mexpf2(1,1,ithd),rlsc)
-
-                    call ftophys(nd,mexpf1(1,1,ithd), &
-     &    nlams,rlams,nfourier, &
-     &    nphysical,nthmax,gboxwexp(1,1,3,i,ithd), &
-     &    fexpe,fexpo)
-
-                    call ftophys(nd,mexpf2(1,1,ithd), &
-     &    nlams,rlams,nfourier, &
-     &    nphysical,nthmax,gboxwexp(1,1,4,i,ithd), &
-     &    fexpe,fexpo)
-
-                    call processgboxnsexp(nd,gboxwexp(1,1,3,i,ithd), &
-     &    gboxwexp(1,1,4,i,ithd),i,nexptotp, &
-     &    pgboxwexp(1,1,jbox,3),pgboxwexp(1,1,jbox,4), &
-     &    xshift,yshift,zshift)
+!                      call l3dformmpd(nd,rscales(ilev+1), &
+!     &    gboxsort(1,jstart,ithd), &
+!     &    gboxdpsort(1,1,jstart,ithd), &
+!     &    npts0,gboxsubcenters(1,i,ithd),nterms(ilev+1), &
+!     &    gboxmexp(1,i,jbox),wlege,nlege)          
 !
-!c                process east-west for current box
+!                    call l3dmpmp(nd,rscales(ilev+1), &
+!     &    gboxsubcenters(1,i,ithd),gboxmexp(1,i,jbox), &
+!     &    nterms(ilev+1),rscales(ilev),centers(1,ibox), &
+!     &    rmlexp(iaddr(1,ibox)),nterms(ilev),dc,lca)
+!     
+!                    call mpscale(nd,nterms(ilev+1),gboxmexp(1,i,jbox), &
+!     &    rscpow,tmp(1,0,-nmax,ithd))
+!!
+!!c                process up down for current box
+!!
+!                    call mpoletoexp(nd,tmp(1,0,-nmax,ithd), &
+!     &    nterms(ilev+1),nlams, &
+!     &    nfourier,nexptot,mexpf1(1,1,ithd), &
+!     &    mexpf2(1,1,ithd),rlsc)
 !
-                    call rotztox(nd,nterms(ilev+1),tmp(1,0,-nmax,ithd), &
-     &    mptmp(1,ithd),rdplus)
-                    call mpoletoexp(nd,mptmp(1,ithd), &
-     &    nterms(ilev+1),nlams, &
-     &    nfourier,nexptot,mexpf1(1,1,ithd), &
-     &    mexpf2(1,1,ithd),rlsc)
-
-                    call ftophys(nd,mexpf1(1,1,ithd), &
-     &    nlams,rlams,nfourier, &
-     &    nphysical,nthmax,gboxwexp(1,1,5,i,ithd), &
-     &    fexpe,fexpo)
-
-                    call ftophys(nd,mexpf2(1,1,ithd), &
-     &    nlams,rlams,nfourier, &
-     &    nphysical,nthmax,gboxwexp(1,1,6,i,ithd), &
-     &    fexpe,fexpo)
-                
-                    call processgboxewexp(nd,gboxwexp(1,1,5,i,ithd), &
-     &    gboxwexp(1,1,6,i,ithd),i,nexptotp, &
-     &    pgboxwexp(1,1,jbox,5),pgboxwexp(1,1,jbox,6), &
-     &    xshift,yshift,zshift)
-                  endif
-                enddo
-              endif
-            endif
-         enddo
-!$OMP END TASKLOOP
-      enddo
+!                    call ftophys(nd,mexpf1(1,1,ithd), &
+!     &    nlams,rlams,nfourier, &
+!     &    nphysical,nthmax,gboxwexp(1,1,1,i,ithd), &
+!     &    fexpe,fexpo)
+!
+!                    call ftophys(nd,mexpf2(1,1,ithd), &
+!     &    nlams,rlams,nfourier, &
+!     &    nphysical,nthmax,gboxwexp(1,1,2,i,ithd), &
+!     &    fexpe,fexpo)
+!
+!                    call processgboxudexp(nd,gboxwexp(1,1,1,i,ithd), &
+!     &    gboxwexp(1,1,2,i,ithd),i,nexptotp, &
+!     &    pgboxwexp(1,1,jbox,1),pgboxwexp(1,1,jbox,2), &
+!     &    xshift,yshift,zshift)
+!!
+!!c                process north-south for current box
+!!
+!                    call rotztoy(nd,nterms(ilev+1),tmp(1,0,-nmax,ithd), &
+!     &    mptmp(1,ithd),rdminus)
+!                    call mpoletoexp(nd,mptmp(1,ithd), &
+!     &    nterms(ilev+1),nlams, &
+!     &    nfourier,nexptot,mexpf1(1,1,ithd), &
+!     &    mexpf2(1,1,ithd),rlsc)
+!
+!                    call ftophys(nd,mexpf1(1,1,ithd), &
+!     &    nlams,rlams,nfourier, &
+!     &    nphysical,nthmax,gboxwexp(1,1,3,i,ithd), &
+!     &    fexpe,fexpo)
+!
+!                    call ftophys(nd,mexpf2(1,1,ithd), &
+!     &    nlams,rlams,nfourier, &
+!     &    nphysical,nthmax,gboxwexp(1,1,4,i,ithd), &
+!     &    fexpe,fexpo)
+!
+!                    call processgboxnsexp(nd,gboxwexp(1,1,3,i,ithd), &
+!     &    gboxwexp(1,1,4,i,ithd),i,nexptotp, &
+!     &    pgboxwexp(1,1,jbox,3),pgboxwexp(1,1,jbox,4), &
+!     &    xshift,yshift,zshift)
+!!
+!!c                process east-west for current box
+!!
+!                    call rotztox(nd,nterms(ilev+1),tmp(1,0,-nmax,ithd), &
+!     &    mptmp(1,ithd),rdplus)
+!                    call mpoletoexp(nd,mptmp(1,ithd), &
+!     &    nterms(ilev+1),nlams, &
+!     &    nfourier,nexptot,mexpf1(1,1,ithd), &
+!     &    mexpf2(1,1,ithd),rlsc)
+!
+!                    call ftophys(nd,mexpf1(1,1,ithd), &
+!     &    nlams,rlams,nfourier, &
+!     &    nphysical,nthmax,gboxwexp(1,1,5,i,ithd), &
+!     &    fexpe,fexpo)
+!
+!                    call ftophys(nd,mexpf2(1,1,ithd), &
+!     &    nlams,rlams,nfourier, &
+!     &    nphysical,nthmax,gboxwexp(1,1,6,i,ithd), &
+!     &    fexpe,fexpo)
+!                
+!                    call processgboxewexp(nd,gboxwexp(1,1,5,i,ithd), &
+!     &    gboxwexp(1,1,6,i,ithd),i,nexptotp, &
+!     &    pgboxwexp(1,1,jbox,5),pgboxwexp(1,1,jbox,6), &
+!     &    xshift,yshift,zshift)
+!                  endif
+!                enddo
+!              endif
+!            endif
+!         enddo
+!!!$OMP END TASKLOOP
+!      enddo
 
 
 !------------------ step 1 ??? -----------------------------------------------------------------
 !       ... step 1, locate all charges, assign them to boxes, and
 !       form multipole expansions
       do ilev=2,nlevels
-!$OMP TASKLOOP DEFAULT(SHARED) &
-!$OMP PRIVATE(ibox,npts,istart,iend,nchild)
+!$OMP TASKLOOP DEFAULT(NONE) &
+!$OMP PRIVATE(ibox,npts,istart,iend,nchild) &
+!$OMP SHARED(ilev, laddr, isrcse, itree, ipointer, list4ct, nd, rscales, sourcesort, dipvecsort, centers, nterms, rmlexp, iaddr, wlege, nlege)
             do ibox=laddr(1,ilev),laddr(2,ilev)
 
                istart = isrcse(1,ibox) 
@@ -1375,11 +1385,16 @@ module fmm3d_tree_mod
                nchild = itree(ipointer(4)+ibox-1)
 
                if(npts.gt.0.and.nchild.eq.0.and.list4ct(ibox).eq.0) then
-                  call l3dformmpd(nd,rscales(ilev), &
+    !               call l3dformmpd(nd,rscales(ilev), &
+    !  &    sourcesort(1,istart), &
+    !  &    dipvecsort(1,1,istart),npts, &
+    !  &    centers(1,ibox),nterms(ilev), &
+    !  &    rmlexp(iaddr(1,ibox)),wlege,nlege)          
+                  call l3dformmpd_new(nd,rscales(ilev), &
      &    sourcesort(1,istart), &
      &    dipvecsort(1,1,istart),npts, &
      &    centers(1,ibox),nterms(ilev), &
-     &    rmlexp(iaddr(1,ibox)),wlege,nlege)          
+     &    rmlexp(iaddr(1,ibox)),wlege,nlege)    
                endif
             enddo
 !$OMP END TASKLOOP
@@ -1752,8 +1767,7 @@ module fmm3d_tree_mod
 
         do ilev = 0,self%nlevels
           !$OMP TASKLOOP DEFAULT(SHARED) &
-          !$OMP PRIVATE(ibox,nchild,istart,iend,i,npts) &
-          !$OMP GRAINSIZE(1)
+          !$OMP PRIVATE(ibox,nchild,istart,iend,i,npts) 
           do ibox = self%laddr(1,ilev),self%laddr(2,ilev)
             nchild=self%itree(self%ipointer(4)+ibox-1)
             if(nchild.eq.0) then 
@@ -1780,10 +1794,10 @@ module fmm3d_tree_mod
         integer :: ilev,ibox,istarts,iends,npts0,i
         integer :: jbox,jstart,jend,npts
         !--------------------------------------------
+       ! print *, " evaluating direct interactions"
         do ilev=0,self%nlevels
-            !$OMP TASKLOOP DEFAULT(SHARED) &
-            !$OMP PRIVATE(ibox,istarts,iends,npts0,i,jbox,jstart,jend,npts) &
-            !$OMP GRAINSIZE(1)
+            !!$OMP TASKLOOP DEFAULT(SHARED) &
+            !!$OMP PRIVATE(ibox,istarts,iends,npts0,i,jbox,jstart,jend,npts) 
             do ibox = self%laddr(1,ilev),self%laddr(2,ilev)
               istarts = self%isrcse(1,ibox)
               iends = self%isrcse(2,ibox)
@@ -1799,13 +1813,17 @@ module fmm3d_tree_mod
     ! &    self%dipvecsort(1,1,jstart),npts,self%sourcesort(1,istarts), &
     ! &    npts0,self%gradsort(1,1,istarts),self%thresh)     
 
+                !print *, " eval direct for box ",ibox," and neighbor ",jbox
+                !print *, "istarts = ",istarts," iends = ",iends," npts0 = ",npts0
+                !print *, "jstart = ",jstart," jend = ",jend," npts = ",npts
                      call l3ddirectdg_grad(self%nd,self%sourcesort(1,jstart), &
      &    self%dipvecsort(1,1,jstart),npts,self%sourcesort(1,istarts), &
-     &    npts0,self%gradsort(1,1,istarts),self%thresh)     
+     &    npts0,self%gradsort(1,1,istarts),self%thresh, self%isrc, istarts, jstart)     
               enddo
             enddo
-            !$OMP END TASKLOOP
+           ! !$OMP END TASKLOOP
       enddo
+      print *, " finished evaluating direct interactions"
       end subroutine eval_direct
 
     real(8) function walltime()
@@ -2066,7 +2084,7 @@ end module fmm3d_tree_mod
 
 !***********************************************************************
       subroutine l3ddirectdg_grad(nd,sources, &
-                 dipvec,ns,ztarg,nt,grad,thresh)
+                 dipvec,ns,ztarg,nt,grad,thresh, isrc, istart, jstart)
 !**********************************************************************
 !
 !     This subroutine evaluates the potential and gradient due to a 
@@ -2114,6 +2132,8 @@ end module fmm3d_tree_mod
 !cf2py intent(in) nd,sources,dipvec,ns,ztarg,nt,thresh
 !cf2py intent(out) pot,grad
       intent(in) nd,sources,dipvec,ns,ztarg,nt,thresh
+      integer, intent(in) :: isrc(nt), istart, jstart
+      
       intent(out) grad
 !c
 !cc      calling sequence variables
@@ -2134,15 +2154,17 @@ end module fmm3d_tree_mod
       threshsq = thresh**2
       do i=1,nt
 
-      !$OMP TASKLOOP default(none) GRAINSIZE(1) &
-      !$omp private(j,zdiff, dd, dinv,dinv2,dotprod,cd,cd2,cd3,cd4,idim) &
-      !$omp shared(i, nd,ns,sources,ztarg,dipvec,grad,threshsq)
+    !  print *, " ====== iteration ", i, " fmm target ", isrc(i+istart-1), " ====== "
+      !!$OMP TASKLOOP default(none) &
+      !!$omp private(j,zdiff, dd, dinv,dinv2,dotprod,cd,cd2,cd3,cd4,idim) &
+      !!$omp shared(i, nd,ns,sources,ztarg,dipvec,grad,threshsq)
         do j=1,ns
           zdiff(1) = ztarg(1,i)-sources(1,j)
           zdiff(2) = ztarg(2,i)-sources(2,j)
           zdiff(3) = ztarg(3,i)-sources(3,j)
 
           dd = zdiff(1)**2 + zdiff(2)**2 + zdiff(3)**2
+         ! print *, " nbor ", j, " real index", isrc(j+jstart-1), "zdiff = ", zdiff 
           if(dd.lt.threshsq) goto 1000
 
           dinv2 = 1/dd
@@ -2150,6 +2172,9 @@ end module fmm3d_tree_mod
           cd = dinv
           cd2 = -cd*dinv2
           cd3 = -3*cd*dinv2*dinv2
+
+
+
 
           do idim=1,nd
           
@@ -2172,3 +2197,162 @@ end module fmm3d_tree_mod
 
       return
       end
+
+
+
+subroutine l3dformmpd_new(nd, rscale, sources, dipvec, ns, center, &
+                                nterms, mpole, wlege, nlege)
+    implicit none
+
+    ! --- Arguments ---
+    integer, intent(in) :: nd, ns, nterms, nlege
+    real(kind(0.d0)), intent(in) :: rscale, center(3)
+    real(kind(0.d0)), intent(in) :: sources(3, ns)
+    real(kind(0.d0)), intent(in) :: dipvec(nd, 3, ns)
+    real(kind(0.d0)), intent(in) :: wlege(0:nlege, 0:nlege)
+    ! mpole is modified (added to)
+    complex(kind(0.d0)), intent(inout) :: mpole(nd, 0:nterms, -nterms:nterms)
+
+    ! --- Local Parameters ---
+    complex(kind(0.d0)), parameter :: eye = (0.0d0, 1.0d0)
+    real(kind(0.d0)), parameter    :: one = 1.0d0
+
+    ! --- Local Variables (Thread-Safe on the Stack) ---
+    integer :: i, j, k, l, m, n, isrc, idim
+    real(kind(0.d0)) :: zdiff(3), r, theta, phi
+    real(kind(0.d0)) :: stheta, ctheta, sphi, cphi
+    real(kind(0.d0)) :: rx, ry, rz, thetax, thetay, thetaz, phix, phiy, phiz
+    real(kind(0.d0)) :: fruse, d
+    complex(kind(0.d0)) :: ephi1, ur, utheta, uphi, ux, uy, uz, zzz
+
+    ! Allocatable scratch arrays (Automatically thread-private)
+    real(kind(0.d0)), allocatable :: ynm(:,:), fr(:), rfac(:), frder(:), ynmd(:,:)
+    complex(kind(0.d0)), allocatable :: ephi(:)
+
+    ! Allocate local memory
+    allocate(ynm(0:nterms, 0:nterms), fr(0:nterms+1))
+    allocate(frder(0:nterms), ynmd(0:nterms, 0:nterms))
+    allocate(ephi(-nterms-1:nterms+1))
+    allocate(rfac(0:nterms))
+
+    ! Initialize scaling factors
+    do i = 0, nterms
+        rfac(i) = one / sqrt(2.0d0 * i + one)
+    end do
+
+    ! Loop over sources
+    do isrc = 1, ns
+        zdiff(1) = sources(1, isrc) - center(1)
+        zdiff(2) = sources(2, isrc) - center(2)
+        zdiff(3) = sources(3, isrc) - center(3)
+
+        ! Convert to polar coordinates
+        call cart2polar(zdiff, r, theta, phi)
+        
+        ctheta = cos(theta)
+        stheta = sin(theta)
+        cphi   = cos(phi)
+        sphi   = sin(phi)
+        ephi1  = cmplx(cphi, sphi, kind=kind(0.d0))
+
+        ! Compute e^(i*m*phi) and radial scaling powers
+        ephi(0)  = one
+        ephi(1)  = ephi1
+        ephi(-1) = conjg(ephi1)
+        
+        fr(0) = one
+        d = r / rscale
+        fr(1) = d
+        
+        do i = 2, nterms + 1
+            fr(i) = fr(i-1) * d
+            ephi(i) = ephi(i-1) * ephi1
+            ephi(-i) = ephi(-i+1) * ephi(-1)
+        end do
+
+        frder(0) = 0.0d0
+        do i = 1, nterms
+            frder(i) = i * fr(i-1) / rscale
+        end do
+
+        ! Spherical to Cartesian gradient transformation components
+        rx = stheta * cphi
+        thetax = ctheta * cphi
+        phix = -sphi
+        ry = stheta * sphi
+        thetay = ctheta * sphi
+        phiy = cphi
+        rz = ctheta
+        thetaz = -stheta
+        phiz = 0.0d0
+
+        ! Legendre functions (Ensure this routine is also thread-safe/recursive)
+        call ylgndr2sfw(nterms, ctheta, ynm, ynmd, wlege, nlege)
+        
+        do i = 0, nterms
+            do j = 0, nterms
+                ynm(j, i)  = ynm(j, i) * rfac(j)
+                ynmd(j, i) = ynmd(j, i) * rfac(j)
+            end do
+        end do
+
+        ! --- N=0 Contribution ---
+        ur = ynm(0, 0) * frder(0)
+        ux = ur * rx 
+        uy = ur * ry 
+        uz = ur * rz
+        do idim = 1, nd
+            zzz = dipvec(idim, 1, isrc)*ux + dipvec(idim, 2, isrc)*uy + &
+                  dipvec(idim, 3, isrc)*uz
+            mpole(idim, 0, 0) = mpole(idim, 0, 0) + zzz
+        end do
+
+        ! --- N > 0 Contributions ---
+        do n = 1, nterms
+            fruse = fr(n-1) / rscale
+            ur = ynm(n, 0) * frder(n)
+            utheta = -fruse * ynmd(n, 0) * stheta
+            ux = ur*rx + utheta*thetax 
+            uy = ur*ry + utheta*thetay 
+            uz = ur*rz + utheta*thetaz
+            
+            do idim = 1, nd
+                zzz = dipvec(idim, 1, isrc)*ux + dipvec(idim, 2, isrc)*uy + &
+                      dipvec(idim, 3, isrc)*uz
+                mpole(idim, n, 0) = mpole(idim, n, 0) + zzz
+            end do
+
+            do m = 1, n
+                ! m positive terms (using conjugate ephi for m > 0 logic)
+                ur = frder(n) * ynm(n, m) * stheta * ephi(-m)
+                utheta = -ephi(-m) * fruse * ynmd(n, m)
+                uphi = -eye * m * ephi(-m) * fruse * ynm(n, m)
+                ux = ur*rx + utheta*thetax + uphi*phix
+                uy = ur*ry + utheta*thetay + uphi*phiy
+                uz = ur*rz + utheta*thetaz + uphi*phiz
+                do idim = 1, nd
+                    zzz = dipvec(idim, 1, isrc)*ux + dipvec(idim, 2, isrc)*uy + &
+                          dipvec(idim, 3, isrc)*uz
+                    mpole(idim, n, m) = mpole(idim, n, m) + zzz
+                end do
+
+                ! m negative terms
+                ur = frder(n) * ynm(n, m) * stheta * ephi(m)
+                utheta = -ephi(m) * fruse * ynmd(n, m)
+                uphi = eye * m * ephi(m) * fruse * ynm(n, m)
+                ux = ur*rx + utheta*thetax + uphi*phix
+                uy = ur*ry + utheta*thetay + uphi*phiy
+                uz = ur*rz + utheta*thetaz + uphi*phiz
+                do idim = 1, nd
+                    zzz = dipvec(idim, 1, isrc)*ux + dipvec(idim, 2, isrc)*uy + &
+                          dipvec(idim, 3, isrc)*uz
+                    mpole(idim, n, -m) = mpole(idim, n, -m) + zzz
+                end do
+            end do
+        end do
+    end do
+    
+    ! Clean up memory to avoid leaks in the TASKLOOP
+    deallocate(ynm, fr, frder, ynmd, ephi, rfac)
+
+end subroutine l3dformmpd_new
