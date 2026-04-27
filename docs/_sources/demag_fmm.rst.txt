@@ -16,8 +16,6 @@ Compilation
 -----------
 To enable FMM support during the build process, you must explicitly include the FMM flag in your make command. This ensures the compiler links the necessary FMM3D libraries and enables the specialized Fortran modules.
 
-Use the following flag when calling ``make``:
-
 .. code-block:: bash
 
     make USE_FMM3D=1
@@ -35,18 +33,17 @@ Near-Field Evaluation & Neighbor Tensors
 ----------------------------------------
 In standard FMM implementations, near-field interactions are usually handled by a direct "Point-to-Point" (P2P) evaluation. In MagTense, this standard P2P evaluation is **disabled**. 
 
-Instead, MagTense utilizes its high-precision analytical demagnetization tensors for all near-field interactions. The process follows these steps:
+Instead, MagTense utilizes its high-precision analytical demagnetization tensors for all near-field interactions:
 
 1. **Neighbor Identification:** Based on **List 1** from the FMM tree creation, MagTense identifies "neighbor" pairs (cells within the same or adjacent leaf nodes).
 2. **Sparse Neighbor Tensor:** A sparse tensor structure is created to map these neighbor interactions.
-3. **Analytical Calculation:** The exact analytical demagnetization tensor is calculated for every neighbor pair in the list.
-4. **Sparse Matrix Storage:** These analytical values are converted into a sparse matrix. 
+3. **Analytical Calculation:** The exact analytical demagnetization tensor is calculated for every neighbor pair.
+4. **Sparse Matrix Storage:** These values are converted into a sparse matrix. 
    - On **CPU**, this is stored as an **Intel MKL sparse matrix**.
-   - On **GPU**, it is stored persistently in global memory to allow high-speed **CUDA** evaluation of the near-field in each timestep.
+   - On **GPU**, it is stored persistently in global memory for **CUDA** evaluation in each timestep.
 
 Input Variables
 ---------------
-The following FMM-specific variables are available in the ``RunMicroMagSimulation`` function and the Python interface:
 
 .. list-table::
    :widths: 25 10 65
@@ -57,51 +54,41 @@ The following FMM-specific variables are available in the ``RunMicroMagSimulatio
      - Description
    * - **fmm_cells_per_node**
      - int
-     - The maximum number of cells in an octree leaf node before it splits.
+     - Maximum cells in a leaf node before splitting.
    * - **eps_fmm**
      - float
-     - Controls the **exponential order** (plane-wave expansion) of the FMM.
+     - Controls the **exponential order** (plane-wave expansion).
    * - **fmm_nterms**
      - int
-     - Sets the **multipole expansion order**. If 0, uses FMM3D's standard defaults.
+     - Sets the **multipole expansion order**. (0 = auto).
    * - **ifunif**
      - int
-     - **Tree Type:** Only uniform trees are supported. **Must be 1.**
+     - **Tree Type:** Must be **1** (Uniform tree).
    * - **nlmin**
      - int
-     - The minimum level of the octree hierarchy.
+     - Minimum level of the octree hierarchy.
    * - **nlmax**
      - int
-     - The maximum level of the octree hierarchy.
+     - Maximum level (dictates the depth of the uniform tree).
    * - **allow_fmm_short_circuit**
-     - bool
-     - If True, uses direct calculation if the problem size is small.
+     - int
+     - **1** to allow direct calculation for small problems; **0** to force FMM.
    * - **fmm_min_n**
      - int
-     - The cell count threshold required to activate the FMM algorithm.
-
-Understanding Uniform Tree Parameters
--------------------------------------
-Because we use a fully grown tree (``ifunif = 1``), the depth is dictated by ``nlmax``. 
-
-Usually, ``fmm_cells_per_node`` is set to a relatively low value (e.g., 10). However, the tree will only split up to the level specified by ``nlmax``. For example, if you have 100,000 nodes and set ``nlmax = 2``, the tree will only have $8^{2} = 64$ leaf nodes. In this scenario, each leaf node will contain significantly more than 10 tiles, regardless of the ``fmm_cells_per_node`` setting.
+     - Cell count threshold required to activate FMM.
 
 Python Usage Example
 --------------------
-These parameters are integrated into the experiment scripts (e.g., ``python/experiments/Grain/hysteresis.py``).
 
 .. code-block:: python
 
-    # Configure FMM with decoupled precision and tree caching
     problem.fmm_cells_per_node = 10
-    problem.eps_fmm = 1e-4          # Controls exponential order
-    problem.fmm_nterms = 12         # Manually set multipole order
-    problem.ifunif = 1              # Mandatory: use uniform tree
+    problem.eps_fmm = 1e-4          
+    problem.fmm_nterms = 12         
+    problem.ifunif = 1              
     problem.nlmin = 1
     problem.nlmax = 2
-    problem.allow_fmm_short_circuit = True
-    problem.fmm_min_n = 20000        # Only use FMM if N > 20000
+    problem.allow_fmm_short_circuit = 1
+    problem.fmm_min_n = 20000        
 
-    # Execute the simulation
-    # The "magtense-local" tree and neighbor sparse matrix are stored and reused
     RunMicroMagSimulation(problem)
