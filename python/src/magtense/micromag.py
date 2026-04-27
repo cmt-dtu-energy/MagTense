@@ -27,7 +27,7 @@ class MicromagProblem:
         res: Resolution of grid.
         grid_L: Spatial extensions.
         grid_nnod:
-        grid_type: Curently only 'uniform' is supported.
+        grid_type:
         prob_mode:
         solver:
         A0: Anisotropy constant.
@@ -73,8 +73,8 @@ class MicromagProblem:
             K2: int | float | list | np.ndarray | None = None,
             K0_arr: np.ndarray | None = None,
             CrysAxis: np.ndarray | None = None,
-            alpha: float = 0.02,
-            gamma: float = 0.0,
+            alpha: float = 4.42e3,
+            gamma: float = 2.21e5,
             max_T0: float = 2.0,
             nt_conv: int = 1,
             conv_tol: float = 1e-4,

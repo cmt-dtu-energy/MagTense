@@ -325,10 +325,10 @@ methods
         obj.K2 = zeros(obj.ntot,1);
 
         %precession constant
-        obj.gamma = 0; %m/A*s
+        obj.gamma = 2.21e5; %m/A*s
 
         %
-        obj.alpha = 0.02;
+        obj.alpha = 4.42e3;
 
         %if set to zero then the alpha parameter remains constant.
         %if MaxT0 > 0 then alpha = alpha0 * 10^( 7 * min(t,MaxT0)/MaxT0 )
