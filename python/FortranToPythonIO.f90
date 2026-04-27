@@ -387,82 +387,6 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
 
     deallocate(source, dipvec, grad)
     deallocate(targ, pottarg, gradtarg)
-
-!    ! ---------- real implementation when USE_FMM3D=1 ----------
-!    integer(8) :: nd, nsrc8, ntgt8, ier
-!    real(8) :: fmm_eps, vol_i
-!    real(8),allocatable :: source(:,:), targ(:,:), dipvec(:,:,:), pottarg(:,:), gradtarg(:,:,:)
-!    integer :: i, j
-!    !-------------------------- Interface to FMM3D dipole FMM --------------------------
-!    ! Mainly included to allow f2py to parse the subroutine signature, potentially catching errors at compile time
-!    interface
-!      subroutine lfmm3d_t_d_g_vec(nd,eps,nsource,source,dipvec,ntarg,targ,pottarg,gradtarg,ier)
-!        implicit none
-!        integer(8), intent(in) :: nd, nsource, ntarg
-!        real(8),    intent(in) :: eps
-!        real(8) :: source(3,nsource), dipvec(nd,3,nsource), targ(3,ntarg)
-!        real(8) :: pottarg(nd,ntarg), gradtarg(nd,3,ntarg)
-!        integer(8) :: ier
-!      end subroutine lfmm3d_t_d_g_vec
-!    end interface
-!    !---------------------------------------------------------------------------------
-!    !------------------- define 4pi  -------------------------------------------------
-!    fourpi = 12.566370614359172d0
-!    !---------------------------------------------------------------------------------
-!    !---------------- set FMM precision - 1e-6 if not provided -----------------------
-!    fmm_eps = merge(eps, 1.0d-6, present(eps))
-!    !---------------------------------------------------------------------------------
-!    !---------------- allocate tmp arrays for FMM3D call -----------------------------
-!    allocate(source(3,n_tiles), dipvec(1,3,n_tiles))
-!    allocate(targ(3,n_pts), pottarg(1,n_pts), gradtarg(1,3,n_pts))
-!    !---------------------------------------------------------------------------------
-!    !---------------- rotate targets from (n_pts,3) to (3,n_pts) ---------------------
-!    do j = 1, n_pts
-!      targ(1,j)=pts(j,1)
-!      targ(2,j)=pts(j,2)
-!      targ(3,j)=pts(j,3)
-!    end do
-!    !------------------------------------------------------------------------------
-!    !--------------- iterate over source tiles to get position and dipole moment -----
-!    do i = 1, n_tiles
-!      !---------------- get and rotate source position ----------------
-!      source(1,i) = offset(i,1)
-!      source(2,i) = offset(i,2)
-!      source(3,i) = offset(i,3)
-!      ! TODO - maybe take into account centerPos and dev_center as well?
-!      !----------------------------------------------------------------
-!      !------------------- get volume of tile -------------------------------
-!      ! TODO - refine with proper volume calculations for other shapes
-!      if (tileType(i) == 2) then
-!       vol_i = max(0d0,tile_size(i,1))*max(0d0,tile_size(i,2))*max(0d0,tile_size(i,3))
-!      else
-!       vol_i = (max(0d0,tile_size(i,1))*max(0d0,tile_size(i,2))*max(0d0,tile_size(i,3)))**(1d0/3d0)
-!       vol_i = vol_i**3
-!      end if
-!      !------------------------------------------------------------------------------------
-!      !------------- convert magnetization to dipole moment --------------
-!      dipvec(1,1,i) = Mag(i,1)*vol_i !* mu0
-!      dipvec(1,2,i) = Mag(i,2)*vol_i !* mu0
-!      dipvec(1,3,i) = Mag(i,3)*vol_i !* mu0
-!      !--------------------------------------------------------------------
-!    end do
-!    !----------------------------------------------------------------------------
-!    !-------------------  set integer variables for FMM3D call -------------------
-!    nd=1_8
-!    nsrc8=int(n_tiles,8)
-!    ntgt8=int(n_pts,8)
-!    !----------------------------------------------------------------------------
-!    !-------------------- call FMM3D Laplace dipole FMM ------------------------
-!    call lfmm3d_t_d_g_vec(nd,fmm_eps,nsrc8,source,dipvec,ntgt8,targ,pottarg,gradtarg,ier)
-!    !----------------------------------------------------------------------------
-!    !------------------ rotate gradient, scale and negate to get H-field in (n_pts,3) -------------------
-!    do j = 1, n_pts
-!      H(j,1) = -gradtarg(1,1,j) / fourpi
-!      H(j,2) = -gradtarg(1,2,j) / fourpi
-!      H(j,3) = -gradtarg(1,3,j) / fourpi
-!    end do
-!    !---------------------------------------------------------------------------------------------------
-!    deallocate(source, dipvec, targ, pottarg, gradtarg)
 #else 
     !------------------ Fallback implementation when USE_FMM3D=0 ------------------
     print *, "WARNING: getHFromTilesFMM called but MagTense built without FMM3D support. - Returning zero field." 
@@ -472,113 +396,6 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
 #endif
 
 end subroutine getHFromTilesFMM
-
-!----------------------------------------------------------------------------------
-! FMM-backed H-field AT SOURCE POSITIONS using FMM3D (dipoles-only, src->src)
-! Each tile i is a dipole at its centre with moment m_i = M_i * Volume_i.
-! Returns H on the tile centres (n_tiles,3).
-!
-subroutine getHOnSourcesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
-    mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
-    includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, H_src, eps )
-  implicit none
-  !---------------- args ----------------
-  integer(4),intent(in) :: n_tiles
-  real(8),dimension(n_tiles,3),intent(in) :: centerPos, dev_center
-  real(8),dimension(n_tiles,3),intent(in) :: tile_size
-  real(8),dimension(n_tiles,3,4),intent(in) :: vertices
-  real(8),dimension(n_tiles,3),intent(in) :: Mag, u_ea, u_oa1, u_oa2
-  real(8),dimension(n_tiles),intent(in) :: mu_r_ea, mu_r_oa, Mrem
-  integer(4),dimension(n_tiles),intent(in) :: tileType, magnetType, stateFunctionIndex
-  integer(4),dimension(n_tiles),intent(in) :: includeInIteration, exploitSymmetry
-  real(8),dimension(n_tiles,3),intent(in) :: offset, rotAngles, color, symmetryOps
-  real(8),dimension(n_tiles),intent(in) :: Mrel
-  real(8),dimension(n_tiles,3),intent(out) :: H_src
-  real(8),intent(in),optional :: eps
-
-  real(8) :: fourpi
-!#if USE_FMM3D
-!  !-------------- locals --------------
-!  integer :: i, ier4
-!  integer :: nd4, nsrc4
-!  real(8) :: fmm_eps, vol_i
-!  real(8),allocatable :: source(:,:)          ! (3, n_tiles)
-!  real(8),allocatable :: dipvec(:,:,:)        ! (1, 3, n_tiles)
-!  real(8),allocatable :: pot(:,:)             ! (1, n_tiles)
-!  real(8),allocatable :: grad(:,:,:)          ! (1, 3, n_tiles)
-!
-!  interface
-!    subroutine lfmm3d_s_d_g_vec(nd,eps,nsource,source,dipvec,pot,grad,ier)
-!      implicit none
-!      integer, intent(in) :: nd, nsource
-!      double precision, intent(in) :: eps
-!      double precision :: source(3,nsource)
-!      double precision :: dipvec(nd,3,nsource)
-!      double precision :: pot(nd,nsource)
-!      double precision :: grad(nd,3,nsource)
-!      integer :: ier
-!    end subroutine lfmm3d_s_d_g_vec
-!  end interface
-!
-!  fourpi  = 12.566370614359172d0
-!  fmm_eps = merge(eps, 1.0d-6, present(eps))
-!
-!  allocate(source(3,n_tiles), dipvec(1,3,n_tiles))
-!  allocate(pot(1,n_tiles), grad(1,3,n_tiles))
-!
-!  ! Pack sources (tile centres) and dipole moments (M*V)
-!  do i = 1, n_tiles
-!    ! Use offset as the global tile centre; adjust if your pipeline prefers centerPos+dev_center
-!    source(1,i) = offset(i,1)
-!    source(2,i) = offset(i,2)
-!    source(3,i) = offset(i,3)
-!
-!    ! Volume estimate: exact for prisms; crude fallback for others
-!    if (tileType(i) == 2) then
-!      vol_i = max(0d0,tile_size(i,1))*max(0d0,tile_size(i,2))*max(0d0,tile_size(i,3))
-!    else
-!      vol_i = (max(0d0,tile_size(i,1))*max(0d0,tile_size(i,2))*max(0d0,tile_size(i,3)))**(1d0/3d0)
-!      vol_i = vol_i**3
-!    end if
-!
-!    dipvec(1,1,i) = Mag(i,1) * vol_i
-!    dipvec(1,2,i) = Mag(i,2) * vol_i
-!    dipvec(1,3,i) = Mag(i,3) * vol_i
-!  end do
-!
-!  nd4   = 1
-!  nsrc4 = n_tiles
-!  call lfmm3d_s_d_g_vec(nd4, fmm_eps, nsrc4, source, dipvec, pot, grad, ier4)
-!  if (ier4 /= 0) then
-!    write(*,*) 'FMM3D error in getHOnSourcesFMM: ier =', ier4
-!  end if
-!
-!  ! Map ∇u -> H: H = -grad / (4π)
-!  do i = 1, n_tiles
-!    H_src(i,1) = -grad(1,1,i) / fourpi
-!    H_src(i,2) = -grad(1,2,i) / fourpi
-!    H_src(i,3) = -grad(1,3,i) / fourpi
-!  end do
-!
-!
-!  call add_self_field(  H_src, centerPos, dev_center, tile_size, vertices, &
-!                        Mag, u_ea, u_oa1, u_oa2, mu_r_ea, mu_r_oa, Mrem, tileType, &
-!                        offset, rotAngles, color, magnetType, stateFunctionIndex,   &
-!                        includeInIteration, exploitSymmetry, symmetryOps, Mrel)
-!
-!
-!    call add_neighbour_corrections(H_src, centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
-!                                mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType,     &
-!                                stateFunctionIndex, includeInIteration, exploitSymmetry, symmetryOps, Mrel, &
-!                                radius_cells = 2)
-!
-!  deallocate(source, dipvec, pot, grad)
-!#else
-!  fourpi = 12.566370614359172d0
-  H_src(:,:) = 0.0d0
-  print *, "WARNING: getHOnSourcesFMM called without FMM3D support; returning zeros."
-!#endif
-end subroutine getHOnSourcesFMM
 
 
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -860,17 +677,11 @@ end subroutine getHOnSourcesFMM
         !---------------------- initiaize auxiliary modules -----------------------------
         call omp%init()
         call omp%info()
-
-
         window_enabled_l = merge(.true., .false., window_enabled /= 0)
         trace_enabled_l = merge(.true., .false., trace_enabled /= 0)
         flush_each_l = merge(.true., .false., flush_each /= 0)
-
         call timer%log_init(trim(log_dir), trim(timer_log_file), window_enabled=window_enabled_l, window_interval=window_interval)
         call trace%trace_init(trim(log_dir), trim(trace_log_file), enabled=trace_enabled_l, unit=97, flush_each=flush_each_l, verbose=trace_verbose)
-        
-        !call timer%log_init("timing.log", window_enabled=.true., window_interval=30.0d0)
-        !call trace%init("trace.log", enabled=.false., unit=97, flush_each=.true.)
         !---------------------------------------------------------------------------------
 
 
@@ -883,25 +694,15 @@ end subroutine getHOnSourcesFMM
 			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
             CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms)
 
-        print *, " starting SolveLandauLifshitzEquation "
         call SolveLandauLifshitzEquation( problem, solution )
-        print *, " finished SolveLandauLifshitzEquation "
 
 
         t_out = solution%t_out
-        print *, " M_mm", shape(M_mm)
-        print *, " M_mm size", shape(solution%M_out)
         M_mm = solution%M_out
-        print *, " pts ", shape(pts)
-        print *, " pts size", shape(solution%pts)
         pts = solution%pts
-        print *, " H_exc size", shape(solution%H_exc)
         H_exc = solution%H_exc
-        print *, " H_ext size", shape(solution%H_ext)
         H_ext = solution%H_ext
-        print *, " H_dem size", shape(solution%H_dem)
         H_dem = solution%H_dem
-        print *, " H_ani size", shape(solution%H_ani)
         H_ani = solution%H_ani
 				n_tot_Exch = solution%gridinfo%Exch_mat_ntot
 
