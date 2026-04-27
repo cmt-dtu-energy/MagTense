@@ -25,6 +25,7 @@ Content
    installation
    calculations
    micromagnetism
+   demag_fmm
    documentation
    theory
    publications
