@@ -10,6 +10,7 @@ module fmm_nbor_tensor_mod
     use IO_GENERAL
     use trace_mod
     use sort_mod
+    use omp_mod
   implicit none
 contains 
 
@@ -404,11 +405,7 @@ subroutine BuildNeighbourDemagTensor(problem)
   !    Determine number of threads via a parallel singleton.
   !---------------------------------------
   nthreads = 1
-  !$omp parallel default(none) shared(nthreads)
-    !$omp single
-      nthreads = omp_get_num_threads()
-    !$omp end single
-  !$omp end parallel
+  nthreads = omp%numthreads()
 
   allocate(tiles_thr(nthreads))
   allocate(nout_thr(nthreads))
@@ -440,31 +437,58 @@ subroutine BuildNeighbourDemagTensor(problem)
     pts_t(1,2) = offset(t,2)
     pts_t(1,3) = offset(t,3)
 
+
     do q = 1, m
       s = nbr_idx_p(t,q)
       if (s < 1) cycle   ! skip invalid slots (-1/0). Adjust if your valid range differs.
 
       tiles_thr(tid)%a(1)%tileType        = 2
-      tiles_thr(tid)%a(1)%a               = size_cell(s,1)
-      tiles_thr(tid)%a(1)%b               = size_cell(s,2)
-      tiles_thr(tid)%a(1)%c               = size_cell(s,3)
+      tiles_thr(tid)%a(1)%a               = problem%grid%abc(s,1)
+      tiles_thr(tid)%a(1)%b               = problem%grid%abc(s,2)
+      tiles_thr(tid)%a(1)%c               = problem%grid%abc(s,3)
       tiles_thr(tid)%a(1)%exploitSymmetry = 0
       tiles_thr(tid)%a(1)%rotAngles(:)    = 0.0_DP
       tiles_thr(tid)%a(1)%M(:)            = 0.0_DP
-      tiles_thr(tid)%a(1)%offset(1)       = offset(s,1)
-      tiles_thr(tid)%a(1)%offset(2)       = offset(s,2)
-      tiles_thr(tid)%a(1)%offset(3)       = offset(s,3)
+      tiles_thr(tid)%a(1)%offset(1)       = problem%grid%pts(s,1)
+      tiles_thr(tid)%a(1)%offset(2)       = problem%grid%pts(s,2)
+      tiles_thr(tid)%a(1)%offset(3)       = problem%grid%pts(s,3)
 
       nout_thr(tid)%a = 0.0_DP
 
       ! Whole allocatable actual argument (OK with allocatable dummy)
       call getFieldFromTiles( tiles_thr(tid)%a, hdum_thr(tid)%a, pts_t, 1, 1, nout_thr(tid)%a, .false. )
 
-      Nnbr_p(t, q, :, :) = sngl(nout_thr(tid)%a(1,1,:,:))
+      Nnbr_p(t, q, :, :) = sngl(nout_thr(tid)%a(1,1,:,:)) * problem%Ms(s)
+
     end do
 
   end do
   !$omp end parallel do
+
+
+
+    !-------------- for debug write the dense matrices to binary files --------------
+    ! TODO - add option to control this and maybe an "auxiliary" module to do this
+
+  !  open (11, file="fmm_indices.bin",  &
+  !         status='replace', form='unformatted', &
+  !         access='direct', recl=1*ntot*nneigh_max)
+  !   write(11,rec=1) problem%nbr_idx(:,:)
+  !   close(11)
+  !     open (11, file="fmm_tensor.bin",  &
+  !         status='replace', form='unformatted', &
+  !         access='direct', recl=1*ntot*nneigh_max)  
+  !   write(11,rec=1) Nnbr_p(:,:,1,1)!problem%diffTens(:,:,1,1)
+  !   write(11,rec=2) Nnbr_p(:,:,1,2)!problem%diffTens(:,:,1,2)
+  !   write(11,rec=3) Nnbr_p(:,:,1,3)!problem%diffTens(:,:,1,3)
+  !   write(11,rec=4) Nnbr_p(:,:,2,2)!problem%diffTens(:,:,2,2)
+  !   write(11,rec=5) Nnbr_p(:,:,2,3)!problem%diffTens(:,:,2,3)
+  !   write(11,rec=6) Nnbr_p(:,:,3,3)!problem%diffTens(:,:,3,3)
+  !   close(11)
+    !-------------- end debug write the dense matrices to binary files --------------
+
+
+
 
   call displayGUIMessage(" done building demag tensor from fmm nbors")
 
@@ -489,6 +513,7 @@ subroutine BuildNeighbourDemagTensor(problem)
   ! if eval_local is never called, we can skip the "diffTens = Nnbr - dipole" 
   !      step and just point diffTens to Nnbr directly, saving memory and time.
   problem%diffTens => problem%Nnbr
+
   ! else we convert Nbr to diffTens by subtracting dipole contribution 
   !call convert_Nnbr_to_diffTens(problem)
 
@@ -498,6 +523,13 @@ subroutine BuildNeighbourDemagTensor(problem)
 
 
   call build_FMM_sparse_nborTensor_opt(problem)
+
+
+
+
+
+
+
 
 
   call trace%end( "BuildNeighbourDemagTensor", itimer=itimer, verbose=2 )
@@ -553,15 +585,17 @@ subroutine convert_Nnbr_to_diffTens(problem)
       Rvec(2) = yt - yj
       Rvec(3) = zt - zj
       call dipole_tensor_3x3(Rvec, Kdip)
+      Kdip = Kdip * real(problem%Ms(jidx), DP)
+
       if (problem%grid%gridType .eq. gridTypeUniform) then
           volj = dx * dy * dz
       else
           volj = problem%grid%abc(jidx,1) * problem%grid%abc(jidx,2) * problem%grid%abc(jidx,3)
       endif
 
-      problem%diffTens(t, m, :,:) = Kloc - Kdip * volj  ! correction compared to dipole 
+      !problem%diffTens(t, m, :,:) = Kloc - Kdip * volj  ! correction compared to dipole 
       !problem%diffTens(t, m, :,:) = Kloc  ! full tensor - if eval_direct is never called   
-      !problem%diffTens(t, m, :,:) = Kdip * volj ! pure dipole contribution - for testing only
+      problem%diffTens(t, m, :,:) = Kdip * volj   ! pure dipole contribution - for testing only
 
     end do
   end do
