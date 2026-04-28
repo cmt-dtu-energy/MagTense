@@ -631,25 +631,20 @@ module TileNComponents
     
     end subroutine getN_circPiece_Inv
     
-    ! Emma:
-    ! Calculates averaged N from expressions in Fukushima paper using the Avgprism tile
+
+    ! Calculates averaged N from expressions in Fukushima et al. 2002 [DOI: 10.1109/20.650225] using the Avgprism tile
     subroutine getAvgN_prism_3D(Avgprism, pos, N_out, Obs_size_ele)
     type(MagTile),intent(in) :: Avgprism 
-    real(8),intent(in),dimension(3) :: pos
-    real(8),intent(in),dimension(3), optional :: Obs_size_ele
-    real(8),intent(inout),dimension(3,3) :: N_out
+    real,intent(in),dimension(3) :: pos
+    real,intent(in),dimension(3), optional :: Obs_size_ele
+    real,intent(inout),dimension(3,3) :: N_out
     integer :: i, j, k !for internal looping
 
-    real(8) :: a,b,c,x,y,z,a1,b1,c1
-    real(8) :: source_coords(6), obs_coords(6)
-    real(8) :: X1, X2, Y1, Y2, Z1, Z2, vol, min_vol
-    real(8), parameter :: eps = 1.0d-12
-    real(8) :: pi
+    real :: a,b,c,x,y,z,a1,b1,c1
+    real :: source_coords(6), obs_coords(6)
+    real :: X1, X2, Y1, Y2, Z1, Z2, vol, min_vol
+    real, parameter :: eps = 1.0d-12
     integer :: unit
-
-    pi = 4.0_8 * atan(1.0_8)
-
-    
 
     !Lengths of source tile in x,y,z dimensions
     a = Avgprism%a/2.0
@@ -657,13 +652,12 @@ module TileNComponents
     c = Avgprism%c/2.0
 
     !Lengths of receiving (observer) tile in x,y,z dimensions, if provided, else same as lengths of source
-    if (present(Obs_size_ele).and. all(abs(Obs_size_ele) > 0.0)) then
-        !print *, "Using specified obs_size:", Obs_size_ele
+    if (present(Obs_size_ele) .and. all(abs(Obs_size_ele) > 0.0)) then
         a1 = Obs_size_ele(1)/2.0
         b1 = Obs_size_ele(2)/2.0
         c1 = Obs_size_ele(3)/2.0
     else
-        !print *, "Using hard coded obs_size"
+        !Use the same size as source tile
         a1 = Avgprism%a/2.0
         b1 = Avgprism%b/2.0
         c1 = Avgprism%c/2.0
@@ -679,8 +673,7 @@ module TileNComponents
     obs_coords    = (/ x-a1, x+a1, y-b1, y+b1, z-c1, z+c1 /)
     !vol = (obs_coords(2)-obs_coords(1)) * (obs_coords(4)-obs_coords(3)) * (obs_coords(6)-obs_coords(5))
     vol = 8.0d0 * a1 * b1 * c1 !more stable version of the same volume as above
-    !min_vol = 1e-18 !something else?
-    !vol = max(vol,min_vol)
+    
     !Calculating tensor elements
     N_out(1,1) = 0.0d0
     N_out(2,2) = 0.0d0
@@ -692,76 +685,46 @@ module TileNComponents
     N_out(3,1) = 0.0d0
     N_out(3,2) = 0.0d0
     do i = 0, 1
-                do j = 0, 1
-                    do k = 0, 1
-                        !Define distances for integration
-                        X1 = obs_coords(1) - source_coords(1+i)
-                        X2 = obs_coords(2) - source_coords(1+i)
-                        Y1 = obs_coords(3) - source_coords(3+j)
-                        Y2 = obs_coords(4) - source_coords(3+j)
-                        Z1 = obs_coords(5) - source_coords(5+k)
-                        Z2 = obs_coords(6) - source_coords(5+k)
+        do j = 0, 1
+            do k = 0, 1
+                !Define distances for integration
+                X1 = obs_coords(1) - source_coords(1+i)
+                X2 = obs_coords(2) - source_coords(1+i)
+                Y1 = obs_coords(3) - source_coords(3+j)
+                Y2 = obs_coords(4) - source_coords(3+j)
+                Z1 = obs_coords(5) - source_coords(5+k)
+                Z2 = obs_coords(6) - source_coords(5+k)
 
-                        ! Failsafe: avoid zero distances
-                        X1 = sign(max(abs(X1), eps), X1)
-                        X2 = sign(max(abs(X2), eps), X2)
-                        Y1 = sign(max(abs(Y1), eps), Y1)
-                        Y2 = sign(max(abs(Y2), eps), Y2)
-                        Z1 = sign(max(abs(Z1), eps), Z1)
-                        Z2 = sign(max(abs(Z2), eps), Z2)
+                ! Failsafe: avoid zero distances
+                X1 = sign(max(abs(X1), eps), X1)
+                X2 = sign(max(abs(X2), eps), X2)
+                Y1 = sign(max(abs(Y1), eps), Y1)
+                Y2 = sign(max(abs(Y2), eps), Y2)
+                Z1 = sign(max(abs(Z1), eps), Z1)
+                Z2 = sign(max(abs(Z2), eps), Z2)
 
-                        !print *, X1,X2,Y1,Y2,Z1,Z2
-
-                        !Integrate over receiving volume
-                        N_out(1,1) = N_out(1,1) + (-1.0d0)**(i+j+k) * definite_integral(F1, X1, X2, Y1, Y2, Z1, Z2)
-                        N_out(2,2) = N_out(2,2) + (-1.0d0)**(i+j+k) * definite_integral(F1, Y1, Y2, Z1, Z2, X1, X2)
-                        N_out(3,3) = N_out(3,3) + (-1.0d0)**(i+j+k) * definite_integral(F1, Z1, Z2, X1, X2, Y1, Y2)
-                        N_out(1,2) = N_out(1,2) + (-1.0d0)**(i+j+k) * definite_integral(F2, X1, X2, Y1, Y2, Z1, Z2)
-                        N_out(2,3) = N_out(2,3) + (-1.0d0)**(i+j+k) * definite_integral(F2, Y1, Y2, Z1, Z2, X1, X2)
-                        N_out(3,1) = N_out(3,1) + (-1.0d0)**(i+j+k) * definite_integral(F2, Z1, Z2, X1, X2, Y1, Y2)
-                    end do
-                end do
+                !Integrate over receiving volume
+                N_out(1,1) = N_out(1,1) + (-1.0d0)**(i+j+k) * AvgN_prism_definite_integral(F1, X1, X2, Y1, Y2, Z1, Z2)
+                N_out(2,2) = N_out(2,2) + (-1.0d0)**(i+j+k) * AvgN_prism_definite_integral(F1, Y1, Y2, Z1, Z2, X1, X2)
+                N_out(3,3) = N_out(3,3) + (-1.0d0)**(i+j+k) * AvgN_prism_definite_integral(F1, Z1, Z2, X1, X2, Y1, Y2)
+                N_out(1,2) = N_out(1,2) + (-1.0d0)**(i+j+k) * AvgN_prism_definite_integral(F2, X1, X2, Y1, Y2, Z1, Z2)
+                N_out(2,3) = N_out(2,3) + (-1.0d0)**(i+j+k) * AvgN_prism_definite_integral(F2, Y1, Y2, Z1, Z2, X1, X2)
+                N_out(3,1) = N_out(3,1) + (-1.0d0)**(i+j+k) * AvgN_prism_definite_integral(F2, Z1, Z2, X1, X2, Y1, Y2)
             end do
-            !Scaling and using symmetry
-            N_out(1,1) = -N_out(1,1) / (4*pi*vol)
-            N_out(2,2) = -N_out(2,2) / (4*pi*vol)
-            N_out(3,3) = -N_out(3,3) / (4*pi*vol)
-            N_out(1,2) = -N_out(1,2) / (4*pi*vol)
-            N_out(2,1) = N_out(1,2)
-            N_out(2,3) = -N_out(2,3) / (4*pi*vol)
-            N_out(3,2) = N_out(2,3)
-            N_out(3,1) = -N_out(3,1) / (4*pi*vol)
-            N_out(1,3) = N_out(3,1)
-
-            
-
-    !print *, "N_out(1,1) =", N_out(1,1)
-    !print *, "N_out(1,2) =", N_out(1,2)
-    !print *, "N_out(1,3) =", N_out(1,3)
-    !print *, "N_out(2,1) =", N_out(2,1)
-    !print *, "N_out(2,2) =", N_out(2,2)
-    !print *, "N_out(2,3) =", N_out(2,3)
-    !print *, "N_out(3,1) =", N_out(3,1)
-    !print *, "N_out(3,2) =", N_out(3,2)
-    !print *, "N_out(3,3) =", N_out(3,3)
+        end do
+    end do
     
-    
-    !print *, "testprint avg"
-    !print '(A,3ES14.6)', "x, y, z: ", x, y, z
-    !print '(A,3ES14.6)', "a, b, c: ", a, b, c
-    !print '(A,3ES14.6)', "a1, b1, c1: ", a1, b1, c1
-    !print *, "N_out: ", N_out
-    
-    
+    !Scaling and using symmetry
+    N_out(1,1) = -N_out(1,1) / (4*pi*vol)
+    N_out(2,2) = -N_out(2,2) / (4*pi*vol)
+    N_out(3,3) = -N_out(3,3) / (4*pi*vol)
+    N_out(1,2) = -N_out(1,2) / (4*pi*vol)
+    N_out(2,1) = N_out(1,2)
+    N_out(2,3) = -N_out(2,3) / (4*pi*vol)
+    N_out(3,2) = N_out(2,3)
+    N_out(3,1) = -N_out(3,1) / (4*pi*vol)
+    N_out(1,3) = N_out(3,1)
 
-    !unit = 10
-    !open(unit=unit, file="demag_avg_output.txt", position="append", action="write")
-    !write(unit,'(A,3ES14.6)') "x, y, z: ", x, y, z
-    !write(unit,'(A,3ES14.6)') "a, b, c: ", a, b, c
-    !write(unit,'(A,3ES14.6)') "a1, b1, c1: ", a1, b1, c1
-    !write(unit,*) "N_out: ", N_out
-
-    !close(unit)
     end subroutine getAvgN_prism_3D
 
     

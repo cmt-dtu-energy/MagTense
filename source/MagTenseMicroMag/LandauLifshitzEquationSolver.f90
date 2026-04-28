@@ -939,8 +939,8 @@
     integer :: i_a,j_a,k_a,nx_ave,ny_ave,nz_ave                   !> Internal counters and index variables for avering the demag tensor over the recieving tile
     real(DP),dimension(:),allocatable :: dx,dy,dz
     real(DP), dimension(:,:),allocatable :: pts_arr
-    real(DP), dimension(:,:),allocatable :: obs_size_list
-    real(DP),dimension(:,:,:,:),allocatable :: Nout,Noutave             !> Temporary storage for the demag tensor            
+    real(DP), dimension(:,:),allocatable :: obs_size_arr          !> Array containing the size of the observation tile for the average prism demag tensor
+    real(DP),dimension(:,:,:,:),allocatable :: Nout,Noutave       !> Temporary storage for the demag tensor            
     integer,dimension(4) :: indx_ele
     real :: rate
     integer :: c1,c2,cr,cm
@@ -979,39 +979,31 @@
                
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
             
-            if (nx_ave*ny_ave*nz_ave > 1) then
-                call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
-            endif
-        
-            allocate(obs_size_list(ntot,3))
-            obs_size_list(:,1) = problem%grid%dx
-            obs_size_list(:,2) = problem%grid%dy
-            obs_size_list(:,3) = problem%grid%dz
+            allocate(obs_size_arr(ntot,3))
+            obs_size_arr(:,1) = problem%grid%dx
+            obs_size_arr(:,2) = problem%grid%dy
+            obs_size_arr(:,3) = problem%grid%dz
 
             !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout, k, j, i)
         
             !for each element find the tensor for all evaluation points (i.e. all elements)
-            
-            
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx
-                        !Setup average N template tile
                         if (gb_problem%useAvgN .eq. useAvgNTrue) then
-                        tile(1)%tileType = 8 !(for avgPrism)
+                            !Setup average N template tile
+                            tile(1)%tileType = 8 !(for avgPrism)
                         else
-                        !Setup template tile
-                        tile(1)%tileType = 2 !(for prism)
+                            !Setup template tile
+                            tile(1)%tileType = 2 !(for prism)
                         endif
-                        !dimensions of the tile
+                        !Dimensions of the tile
                         tile(1)%a = problem%grid%dx
                         tile(1)%b = problem%grid%dy
                         tile(1)%c = problem%grid%dz
                         tile(1)%exploitSymmetry = 0 !0 for no and this is important
-                        tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+                        tile(1)%rotAngles(:) = 0.   !ensure that these are indeed zero
                         tile(1)%M(:) = 0.
-
-                        
                         
                         !Set the center of the tile to be the current point
                         tile(1)%offset(1) = problem%grid%x(i,j,k)
@@ -1022,9 +1014,11 @@
                         allocate(H(ntot,3))
                         
                         if (gb_problem%useAvgN .eq. useAvgNTrue) then
-                        call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false.,Obs_size=obs_size_list)
+                            !Use the average prism tensor
+                            call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false., Obs_size=obs_size_arr)
                         else
-                        call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                            !Use the point prism tensor
+                            call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
                         endif
                         
                         !Copy Nout into the proper structure used by the micro mag model
@@ -1054,7 +1048,7 @@
             
             !$OMP END PARALLEL DO
             
-            deallocate(obs_size_list)
+            deallocate(obs_size_arr)
 
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
         
@@ -1121,18 +1115,18 @@
             
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do i=1,ntot
-                !Setup average N template tile
                 if (gb_problem%useAvgN .eq. useAvgNTrue) then
-                tile(1)%tileType = 8 !(for avgPrism)
+                    !Setup average N template tile
+                    tile(1)%tileType = 8 !(for avgPrism)
                 else
-                !Setup template tile
-                tile(1)%tileType = 2 !(for prism)
+                    !Setup template tile
+                    tile(1)%tileType = 2 !(for prism)
                 endif
                 tile(1)%exploitSymmetry = 0 !0 for no and this is important
-                tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+                tile(1)%rotAngles(:) = 0.   !ensure that these are indeed zero
                 tile(1)%M(:) = 0.
             
-                !dimensions of the tile
+                !Dimensions of the tile
                 tile(1)%a = problem%grid%abc(i,1)
                 tile(1)%b = problem%grid%abc(i,2)
                 tile(1)%c = problem%grid%abc(i,3)
@@ -1154,8 +1148,7 @@
                 Noutave(1,:,:,:) = 0;
 
                 !Calculate the spacing between the points to do average in
-                !Note that abc is the full side length of the tile - it is divided with 2 in the demag tensor calculation
-                !to make it compatible to the expression in Smith_2010
+                !Note that abc is the full side length of the tile - it is divided with 2 in the demag tensor calculation to make it compatible to the expression in Smith_2010
                 dx = problem%grid%abc(:,1)/(nx_ave+1)
                 dy = problem%grid%abc(:,2)/(ny_ave+1)
                 dz = problem%grid%abc(:,3)/(nz_ave+1)
@@ -1163,20 +1156,20 @@
                 do k_a=1,nz_ave
                     do j_a=1,ny_ave                
                         do i_a=1,nx_ave
-                            !x = -2; a = 6; N = 4; dx = a/(N+1); figure; hold all; plot(x,0,'kd'); plot(x-a/2,0,'bd'); plot(x+a/2,0,'bd'); plot((x-a/2)+(1:N)*dx,0,'k*');
                             pts_arr(:,1) =  (problem%grid%pts(:,1)-problem%grid%abc(:,1)/2)+dx(:)*i_a
                             pts_arr(:,2) =  (problem%grid%pts(:,2)-problem%grid%abc(:,2)/2)+dy(:)*j_a
                             pts_arr(:,3) =  (problem%grid%pts(:,3)-problem%grid%abc(:,3)/2)+dz(:)*k_a
                             
                             if (gb_problem%useAvgN .eq. useAvgNTrue) then
-                            call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false., obs_size = problem%grid%abc) !are the cells subdivided or no?
+                                !Use the average prism tensor
+                                call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false., obs_size = problem%grid%abc)
                             else
-                            !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
-                            call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
+                                !Use the point prism tensor
+                                !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                                call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
                             endif
 
                             Noutave = Noutave+Nout
-                            
                         enddo
                     enddo
                 enddo
