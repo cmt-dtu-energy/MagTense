@@ -146,52 +146,54 @@
     !write(prog_str,'(A37, F8.4, A5)') 'Demagnetization tensor memory usage: ', 6*storage_size(gb_problem%Kxx)*ntot/(8*2**30), ' gigabytes'
     !call displayGUIMessage( trim(prog_str) )    
     
-    !Copy the demag tensor to CUDA
-    if ( gb_problem%useCuda .eq. useCudaTrue ) then
-        call displayGUIMessage( 'Copying to CUDA' ) 
+    if ( gb_problem%useDemag .eq. useDemagTrue ) then
+        !Copy the demag tensor to CUDA
+        if ( gb_problem%useCuda .eq. useCudaTrue ) then
+            call displayGUIMessage( 'Copying to CUDA' ) 
 #if USE_CUDA
 #if USE_FMM3D 
-        !------------- if use_fmm then copy sparse nbr_corr tensor else copy normal demag tensor --------------
-        if ( gb_problem%use_fmm) then
-          call displayGUIMessage( 'copying nbr_corr for FMM nbor correction')  
-          call cudaInit_sparse( gb_problem%K_fmm_s )    
-        !----------------------------------------------------------------------------------------------
-        !------------ else copy the normal demag tensor ------------------------------------------------
-        else 
-          !Initialize the Cuda arrays and load the demag tensors into the GPU memory
-          if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
-              !If the matrices are sparse
-            call displayGUIMessage( 'Initializing sparse matrices on CUDA' )
-              call cudaInit_sparse( gb_problem%K_s )            
-          else
-              !if the matrices are dense 
-            call displayGUIMessage( 'Initializing dense matrices on CUDA' )
-              call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
-          endif
-        end if
-        !----------------------------------------------------------------------------------------------
+            !------------- if use_fmm then copy sparse nbr_corr tensor else copy normal demag tensor --------------
+            if ( gb_problem%use_fmm) then
+              call displayGUIMessage( 'copying nbr_corr for FMM nbor correction')  
+              call cudaInit_sparse( gb_problem%K_fmm_s )    
+            !----------------------------------------------------------------------------------------------
+            !------------ else copy the normal demag tensor ------------------------------------------------
+            else 
+              !Initialize the Cuda arrays and load the demag tensors into the GPU memory
+              if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
+                  !If the matrices are sparse
+                call displayGUIMessage( 'Initializing sparse matrices on CUDA' )
+                  call cudaInit_sparse( gb_problem%K_s )            
+              else
+                  !if the matrices are dense 
+                call displayGUIMessage( 'Initializing dense matrices on CUDA' )
+                  call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+              endif
+            end if
+            !----------------------------------------------------------------------------------------------
 #else
-        !Initialize the Cuda arrays and load the demag tensors into the GPU memory
-        if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
-            !If the matrices are sparse
-            call displayGUIMessage( 'Initializing sparse matrices on CUDA' )
-            call cudaInit_sparse( gb_problem%K_s )        
+            !Initialize the Cuda arrays and load the demag tensors into the GPU memory
+            if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
+                !If the matrices are sparse
+                call displayGUIMessage( 'Initializing sparse matrices on CUDA' )
+                call cudaInit_sparse( gb_problem%K_s )        
              
-        else
-            !if the matrices are dense 
-            call displayGUIMessage( 'Initializing dense matrices on CUDA' )
+            else
+                !if the matrices are dense 
+                call displayGUIMessage( 'Initializing dense matrices on CUDA' )
 
-            call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
+                call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
 
-            !TODO - make this as option depending on flag/use input
-            !call cudaDumpDemagDense("CUDA_dense_K_matrices.bin")
+                !TODO - make this as option depending on flag/use input
+                !call cudaDumpDemagDense("CUDA_dense_K_matrices.bin")
 
-        endif
+            endif
 #endif
 #else
-        call displayGUIMessage( 'MagTense not compiled with CUDA - exiting!' )
-        stop
+            call displayGUIMessage( 'MagTense not compiled with CUDA - exiting!' )
+            stop
 #endif
+        endif
     endif
    
     
@@ -765,8 +767,15 @@ subroutine updateDemagfieldFMM(problem, solution)
   logical :: built_tree
   integer, save :: itimer = 0
   !------------------------------------------------
-
-    call trace%begin( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
+    
+  if ( problem%useDemag .eq. useDemagFalse ) then
+        solution%HmX(:) = 0.
+        solution%HmY(:) = 0.
+        solution%HmZ(:) = 0.
+        return
+  endif
+  
+  call trace%begin( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
 
   fourpi  = 12.566370614359172D0
   ntot = size(problem%grid%pts, dim=1)
@@ -912,6 +921,13 @@ end subroutine updateDemagfieldFMM
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
+    
+    if ( problem%useDemag .eq. useDemagFalse ) then
+        solution%HmX(:) = 0.
+        solution%HmY(:) = 0.
+        solution%HmZ(:) = 0.
+        return
+    endif
     
     ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
     allocate(temp(ntot))
@@ -1152,20 +1168,22 @@ end subroutine updateDemagfieldFMM
     integer, save :: itimer = 0
     call trace%begin( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     
-    !Demagnetization tensor matrix
+    if ( problem%useDemag .eq. useDemagTrue ) then
+        !Demagnetization tensor matrix
 #if USE_FMM3D
-    !------------- build neighbour demag tensor -------------------------------------------------------------------
-    call BuildNeighbourDemagTensor( problem)
-        !---------- if BuildNeighbourDemagTensor sets use_fmm to false then compute the demag tensor normally -----
-    if (.not. problem%use_fmm) then
-       call ComputeDemagfieldTensor( problem )
-    end if
-        !-----------------------------------------------------------------------------------------------------------
-    !---------------------------------------------------------------------------------------------------------------
+        !------------- build neighbour demag tensor -------------------------------------------------------------------
+        call BuildNeighbourDemagTensor( problem)
+            !---------- if BuildNeighbourDemagTensor sets use_fmm to false then compute the demag tensor normally -----
+        if (.not. problem%use_fmm) then
+           call ComputeDemagfieldTensor( problem )
+        end if
+            !-----------------------------------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------------------------------------
 #else
-    call ComputeDemagfieldTensor( problem )
+        call ComputeDemagfieldTensor( problem )
 #endif
-
+    endif
+    
     !Anisotropy matrix
     call ComputeAnisotropyTerm3D( problem )
     
@@ -1367,13 +1385,13 @@ end subroutine updateDemagfieldFMM
             !$OMP END PARALLEL DO
 
             
-            open(21,file='Kxx.txt',status='unknown',form='formatted',action='write')
-            do i=1,size(problem%Kxx,1)
-                do j=1,size(problem%Kxx,2)
-                    write(21,*)  problem%Kxx(i,j)
-                enddo
-            enddo
-            close(21)
+            !open(21,file='Kxx.txt',status='unknown',form='formatted',action='write')
+            !do i=1,size(problem%Kxx,1)
+            !    do j=1,size(problem%Kxx,2)
+            !        write(21,*)  problem%Kxx(i,j)
+            !    enddo
+            !enddo
+            !close(21)
             
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
         
@@ -2040,8 +2058,6 @@ end subroutine updateDemagfieldFMM
         problem%Ayz = problem%u_ea(:,2) * problem%u_ea(:,3)
         problem%Azz = problem%u_ea(:,3) * problem%u_ea(:,3)
 
-
-        
         
     elseif (any(problem%K1 .ne. 0)) then !Cubic anisotropy
         call displayGUIMessage( 'Assuming cubic anisotropy' )

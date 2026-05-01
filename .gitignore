@@ -220,3 +220,4 @@ error.txt
 # CVODE downloaded files and folders
 cvode*/
 *tar.gz
+.vs/

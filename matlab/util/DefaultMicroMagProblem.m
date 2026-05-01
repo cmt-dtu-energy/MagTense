@@ -241,6 +241,9 @@ properties (SetAccess=private,GetAccess=public)
     %active if CVODE is not used.
     useCVODE
 
+    %defines if the demagnetization field is calculated or not
+    useDemag
+
     %defines what precision is used for the demag tensor. Right now only
     %single is supported. All other varibales are double.
     usePres
@@ -373,6 +376,8 @@ methods
         obj.useCuda = int32(0);
 		%set use CVODE to default
         obj.useCVODE = int32(0);
+		%set use Demag to default
+        obj.useDemag = int32(1);
         %set use CVODE to default
         obj.usePres = int32(0);
         %set the demag approximation to the default, i.e. use no
@@ -482,6 +487,14 @@ methods
            obj.useCVODE = int32(1);
        else
            obj.useCVODE = int32(0);
+       end
+    end
+
+    function obj = setUseDemag( obj, enabled )
+       if enabled
+           obj.useDemag = int32(1);
+       else
+           obj.useDemag = int32(0);
        end
     end
     

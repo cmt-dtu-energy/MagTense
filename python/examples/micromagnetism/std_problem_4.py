@@ -209,7 +209,7 @@ if __name__ == "__main__":
         NIST_field=1,
         cuda=True,
         cvode=False,
-        unstructured=True,
+        unstructured=False,
         plotting=True,
         #figpath=Path(__file__).parent.absolute().joinpath("..", "figs"),
         figpath=None,

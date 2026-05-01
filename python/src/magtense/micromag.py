@@ -102,6 +102,7 @@ class MicromagProblem:
             filename: str = "t",
             cuda: bool = False,
             cvode: bool = False,
+            usedemag: bool = True,
             precision: bool = False,
             n_threads: int = 1,
             N_ave: tuple[int] = (1, 1, 1),
@@ -183,6 +184,7 @@ class MicromagProblem:
             self.cuda = int(cuda)
 
         self.cvode = int(cvode)
+        self.usedemag = int(usedemag)
         self.precision = int(precision)
         self.n_threads = n_threads
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")
@@ -598,6 +600,7 @@ class MicromagProblem:
             tol=self.tol,
             thres=self.thres,
             usecvode=self.cvode,
+            usedemag=self.usedemag,
             nt_conv=self.nt_conv,
             t_conv=self.t_conv,
             conv_tol=self.conv_tol,
@@ -721,6 +724,7 @@ class MicromagProblem:
             tol=self.tol,
             thres=self.thres,
             usecvode=self.cvode,
+            usedemag=self.usedemag,
             nt_conv=self.nt_conv,
             t_conv=self.t_conv,
             conv_tol=self.conv_tol,

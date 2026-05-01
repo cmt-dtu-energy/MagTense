@@ -22,7 +22,7 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall, passExch, UseFMM
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall, passExch, UseFMM, useDemag
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: exch_weightProblemPtr, exch_methodProblemPtr, exch_interpnProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, K1ProblemPtr, K2ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
@@ -38,6 +38,7 @@
         mwPointer :: usePrecisionPtr, N_aveProblemPtr, useReturnHallProblemPtr
         mwPointer :: demag_ignore_stepsProblemPtr, CrystalAxisProblemPtr, K0_arrProblemPtr
         mwPointer :: fmm_cellsProblemPtr,fmm_epsProblemPtr,ifunifProblemPtr,nlminProblemPtr,nlmaxProblemPtr,use_fmmlProblemPtr,fmm_shortProblemPtr,fmm_min_nProblemPtr
+        mwPointer :: useDemagPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
         real(DP) :: demag_fac, CV
@@ -443,6 +444,16 @@
         fmm_min_nProblemPtr = mxGetField( prhs, i, problemFields(68) )
         call mxCopyPtrToInteger4(mxGetPr(fmm_min_nProblemPtr), problem%fmm_min_n, sx )
         
+        sx = 1
+        useDemagPtr = mxGetField( prhs, i, problemFields(69) )
+        call mxCopyPtrToInteger4(mxGetPr(useDemagPtr), useDemag, sx )
+        if ( useDemag .eq. 1 ) then
+            problem%useDemag = useDemagTrue
+        else
+            problem%useDemag = useDemagFalse
+            call displayGUIMessage( 'NOT using demag field in calculations' )
+        endif
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -456,7 +467,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=68
+        integer,parameter :: nf=69
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -531,6 +542,7 @@
         fieldnames(66) = 'use_fmm'
         fieldnames(67) = 'fmm_short'
         fieldnames(68) = 'fmm_min_n'
+        fieldnames(69) = 'useDemag'
         
     end subroutine getProblemFieldnames
     
