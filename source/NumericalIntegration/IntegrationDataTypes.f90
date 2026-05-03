@@ -7,6 +7,12 @@
     !!@todo Do NOT have useCVODETrue/-False variables both here and in MicroMagParameters.
     integer,parameter :: useCVODETrue=1,useCVODEFalse=0
 
+    !> Double-precision kind parameter — private to this module; used in the
+    !> dydt_fct abstract interface via the 'import' statement.  Making it private
+    !> prevents a name conflict with the identically-named DP in MicroMagParameters
+    !> when both modules are USE'd together (e.g., in LandauLifshitzSolution).
+    integer, parameter, private :: DP = selected_real_kind(15, 307)
+
     !---------------------------------------------------------------------------    
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
@@ -15,12 +21,18 @@
     !> @param[in] t the time at which the derivative is requested
     !> @param[in] y array size n holding the y_i values corresponding to the time t
     !> @param[inout] dydt array size n for the derivatives at the time t
+    !>
+    !> NOTE: The interface uses real(DP) throughout to match the double-precision
+    !> LLG implementation in LandauLifshitzEquationSolver.f90 and to avoid the
+    !> precision loss that would occur if single-precision data were passed to the
+    !> double-precision RKSuite (wp == DP) or CVODE (c_double == DP) integrators.
     !---------------------------------------------------------------------------    
     abstract interface
-          subroutine dydt_fct ( t, y, dydt )  
-             real,intent(in) :: t
-             real,dimension(:),intent(in) :: y
-             real,dimension(:),intent(inout) :: dydt
+          subroutine dydt_fct ( t, y, dydt )
+             import DP
+             real(DP),intent(in) :: t
+             real(DP),dimension(:),intent(in) :: y
+             real(DP),dimension(:),intent(inout) :: dydt
          
           end subroutine dydt_fct
     end interface

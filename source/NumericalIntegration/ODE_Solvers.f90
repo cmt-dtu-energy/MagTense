@@ -9,9 +9,12 @@ module ODE_Solvers
     !======= Declarations =========
     implicit none
 
+    !> Double-precision kind — private to avoid conflicts with MicroMagParameters%DP.
+    integer, parameter, private :: DP = selected_real_kind(15, 307)
+
     !integer,parameter :: ODE_Solver_RKSUITE=1, ODE_Solver_CVODE=2
     procedure(dydt_fct), pointer :: MTdmdt  !>Input function pointer for the function to be integrated
-    real, allocatable, dimension(:) :: MTy_out, MTf_vec
+    real(DP), allocatable, dimension(:) :: MTy_out, MTf_vec
     private MTdmdt, MTy_out, MTf_vec
 
     contains
@@ -38,19 +41,19 @@ module ODE_Solvers
         !======= Declarations =========
         procedure(dydt_fct), pointer :: fct                     !>Input function pointer for the function to be integrated
         procedure(callback_fct), pointer :: callback            !>Callback function
-        real,dimension(:),intent(in) :: t, y0                   !>Requested time (size m) and initial values ofy (size n)
-        real,dimension(:),intent(inout) :: t_out                !>Actual time values at which the y_i are found, size m
-        real,dimension(:,:),intent(inout) :: y_out              !>Function values at the times t_out, size [n,m]
+        real(DP),dimension(:),intent(in) :: t, y0               !>Requested time (size m) and initial values of y (size n)
+        real(DP),dimension(:),intent(inout) :: t_out            !>Actual time values at which the y_i are found, size m
+        real(DP),dimension(:,:),intent(inout) :: y_out          !>Function values at the times t_out, size [n,m]
         integer,intent(in) :: callback_display                  !>Sets at what time index values Fortran displays the results in Matlab
-        real,intent(in) :: tol                                  !>Relative tolerance
-        real,intent(in) :: thres_value                          !>When a solution component Y(L) is less in magnitude than thres_value its set to zero
+        real(DP),intent(in) :: tol                              !>Relative tolerance
+        real(DP),intent(in) :: thres_value                      !>When a solution component Y(L) is less in magnitude than thres_value its set to zero
         integer,intent(in),optional :: useCVODE                 !>Flag that determines if the CVODE solver is to be used or not
-        real,dimension(:),intent(in) :: t_conv                  !>Array for the time values where the solution will be checked for convergence
-        real,intent(in) :: conv_tol                             !>Converge criteria on difference between magnetization at different timesteps
+        real(DP),dimension(:),intent(in) :: t_conv              !>Array for the time values where the solution will be checked for convergence
+        real(DP),intent(in) :: conv_tol                         !>Converge criteria on difference between magnetization at different timesteps
         integer :: solver_flag
         
         integer :: neq, nt, nt_conv
-        real, allocatable, dimension(:,:) :: yderiv_out         !>The derivative of y_i wrt t at each time step
+        real(DP), allocatable, dimension(:,:) :: yderiv_out     !>The derivative of y_i wrt t at each time step
     
         !find the no. of equations and the no. of requested timesteps
         neq = size(y0)
@@ -85,7 +88,7 @@ module ODE_Solvers
             allocate( MTy_out(neq), MTf_vec(neq) )
 
             !call solver...
-            call MagTense_CVODEsuite( int(neq, kind=c_long), neq, real(t, kind=c_double), int(nt, kind=c_long), nt, real(y0, kind=c_double), t_out, y_out, real(tol, kind=c_double), callback, int(callback_display, kind=c_long) )
+            call MagTense_CVODEsuite( int(neq, kind=c_long), neq, t, int(nt, kind=c_long), nt, y0, t_out, y_out, tol, callback, int(callback_display, kind=c_long) )
 
             !clean-up
             deallocate(MTy_out, MTf_vec)
@@ -117,32 +120,32 @@ module ODE_Solvers
         !======= Declarations =========
         procedure(dydt_fct), pointer :: fct                  !>Input function pointer for the function to be integrated
         integer,intent(in) :: neq, nt, nt_conv               !>Input no. of equations, no. of time steps and no. of time steps in the check for convergence array
-        real,dimension(nt),intent(in) :: t                   !>Input time array, size nt
-        real,dimension(neq),intent(in) :: ystart             !>Input initial conditions (y at t=0), size neq
-        real,dimension(nt),intent(inout) :: t_out            !>Array for the actual time values where the solution was found
-        real,dimension(neq,nt),intent(inout) :: y_out        !>Array returning the solution at the times in t_out
-        real,dimension(neq,nt),intent(inout) :: yderiv_out   !>Array returning dy/dt at the times in t_out
+        real(DP),dimension(nt),intent(in) :: t               !>Input time array, size nt
+        real(DP),dimension(neq),intent(in) :: ystart         !>Input initial conditions (y at t=0), size neq
+        real(DP),dimension(nt),intent(inout) :: t_out        !>Array for the actual time values where the solution was found
+        real(DP),dimension(neq,nt),intent(inout) :: y_out    !>Array returning the solution at the times in t_out
+        real(DP),dimension(neq,nt),intent(inout) :: yderiv_out !>Array returning dy/dt at the times in t_out
         procedure(callback_fct), pointer :: callback         !>Callback function
         integer,intent(in) :: callback_display               !>Sets at what time index values Fortran displays the results in Matlab
-        real,intent(in) :: tol                               !>Relative tolerance
-        real,intent(in) :: thres_value                       !>When a solution component Y(L) is less in magnitude than thres_value its set to zero
-        real,dimension(nt_conv),intent(in) :: t_conv         !>Array for the time values where the solution will be checked for convergence
-        real,intent(in) :: conv_tol                          !>Converge criteria on difference between magnetization at different timesteps
+        real(DP),intent(in) :: tol                           !>Relative tolerance
+        real(DP),intent(in) :: thres_value                   !>When a solution component Y(L) is less in magnitude than thres_value its set to zero
+        real(DP),dimension(nt_conv),intent(in) :: t_conv     !>Array for the time values where the solution will be checked for convergence
+        real(DP),intent(in) :: conv_tol                      !>Converge criteria on difference between magnetization at different timesteps
         
-        real,dimension(:),allocatable :: thres          !>arrays used by the initiater     
-        real,dimension(neq) :: y_last                   !>Array containing the solution in the last returned convergence timestep
-        real,dimension(neq) :: y_step                   !>Array containing the solution in the current timestep
-        real,dimension(neq) :: yderiv_step              !>Array containing dy/dt in the current timestep
-        real,dimension(nt+nt_conv) :: t_comb            !>The concatenated time array of the output times and the convergence times
-        real,dimension(nt+nt_conv) :: t_comb_out        !>The concatenated time array of the output times and the convergence times
-        real,dimension(:),allocatable :: t_comb_unique  !>The concatenated time array of the output times and the convergence times, only unique values
-        integer,dimension(:),allocatable :: ind         !>The indices for sort
+        real(DP),dimension(:),allocatable :: thres           !>arrays used by the initiater     
+        real(DP),dimension(neq) :: y_last                    !>Array containing the solution in the last returned convergence timestep
+        real(DP),dimension(neq) :: y_step                    !>Array containing the solution in the current timestep
+        real(DP),dimension(neq) :: yderiv_step               !>Array containing dy/dt in the current timestep
+        real(DP),dimension(nt+nt_conv) :: t_comb             !>The concatenated time array of the output times and the convergence times
+        real(DP),dimension(nt+nt_conv) :: t_comb_out         !>The concatenated time array of the output times and the convergence times
+        real(DP),dimension(:),allocatable :: t_comb_unique   !>The concatenated time array of the output times and the convergence times, only unique values
+        integer,dimension(:),allocatable :: ind              !>The indices for sort
         
-        character(len=1) :: task,method             !>Which version of the solver to use. = 'u' or 'U' for normal and 'C' or 'c' for complicated, Which RK method to use. 1 = RK23, 2 = RK45 and 3 = RK78
+        character(len=1) :: task,method             !>Which version of the solver to use. = 'u' or 'U' for normal and 'C' or 'c' for complicated, Which RK method to use. L/l = RK23, M/m = RK45, H/h = RK78
         logical :: errass,message                   !>whether to assess the true error or not, give message on errors
-        real :: hstart                              !>Whether the code should choose the size of the first step. Set to 0.0d if so (recommended)    
-        real :: t_step                              !>The current time at the end of a time step
-        real :: conv_error                          !>The maximum error in the current time step
+        real(DP) :: hstart                          !>Whether the code should choose the size of the first step. Set to 0.0 if so (recommended)    
+        real(DP) :: t_step                          !>The current time at the end of a time step
+        real(DP) :: conv_error                      !>The maximum error in the current time step
         type(rk_comm_real_1d) :: setup_comm         !>Stores all the stuff used by setup
         integer :: flag                             !>Flag indicating how the integration went
         integer :: i, k                             !>Counter variable
@@ -155,14 +158,14 @@ module ODE_Solvers
         thres(:) = thres_value
         
         !Set the method to RK45 as default (will be parameterized later as the code evolves)
-        !L or l for 23, M or m for 45 and H or h for 67
+        !L or l for RK23, M or m for RK45 and H or h for RK78
         method = 'M'
         !Set default solver to normal (R or r) or complex (S or s)
         task = 'R'
         !Set the assessing of the true error to not be done
         errass = .false.
         !Set the flag so that the code selects the starting step size
-        hstart = 0.0
+        hstart = 0.0_DP
         !Set output message to true
         message = .true.
         
@@ -284,7 +287,7 @@ module ODE_Solvers
     type(c_ptr) :: ctx                                    ! SUNContext type introduced in SUNDIALS 6.0.0
 
     ! solution vector, neq is set in the ode_functions module
-    real, dimension(neq_f, nt_f), intent(inout) :: y_out
+    real(DP), dimension(neq_f, nt_f), intent(inout) :: y_out
     real(c_double), dimension(neq), intent(in) :: ystart
     real(c_double), dimension(neq) :: y_cur, y_norm
     real(c_double) :: max_norm_dev
@@ -292,8 +295,12 @@ module ODE_Solvers
     !======= Internals ============
     ! create the SUNDIALS context
     ierr = FSUNContext_Create(SUN_COMM_NULL, ctx)
-    ! set relative and absolute tolerances
-    atol = 1.0d-10
+    ! Set absolute tolerance equal to the relative tolerance.
+    ! Previously this was hardcoded to 1e-10, which is far tighter than the
+    ! typical rtol (1e-4) and forced extremely small time steps.  Matching atol
+    ! to rtol gives a balanced, user-controlled accuracy target and significantly
+    ! reduces the number of internal steps CVODE needs to take.
+    atol = rtol
 
     ! initialize solution vector
     y_cur = ystart
@@ -358,19 +365,17 @@ module ODE_Solvers
 	    stop
     end if
     
-    ! set maximum number of steps (default: 500)
-    ierr = FCVodeSetMaxNumSteps(cvode_mem, 5000)
+    ! set maximum number of steps (default: 500). Raised to 100000 to avoid
+    ! premature termination in long or complex integrations.
+    ierr = FCVodeSetMaxNumSteps(cvode_mem, int(100000, kind=c_long))
     if (ierr /= 0) then
 	    call CVODE_error('Error in FCVodeSetMaxNumSteps, ierr = ', ierr, callback ) 
 		stop
     end if
     
-    ! set maximum order of BDF method (default: 5)
-    ierr = FCVodeSetMaxOrd(cvode_mem, 2)
-    if (ierr /= 0) then
-	    call CVODE_error('Error in FCVodeSetMaxOrd, ierr = ', ierr, callback ) 
-		stop
-    end if
+    ! Maximum BDF order is left at the CVODE default (5).  The previous cap of 2
+    ! prevented the higher-order BDF steps that are essential for efficiency:
+    ! order 5 allows much larger time steps while maintaining accuracy.
     
     ! Input because otherwise we get error that in- and output times are too close
     dum_t(1) = (t(2) - t(1)) / 2
@@ -398,10 +403,9 @@ module ODE_Solvers
     end if
     call callback('Finished initialization, starting time steps', 0 )
     
-    t_out = real(t_inout, kind=c_double)
     t_out(1) = t(1)
     t_inout(1) = real(t(1))
-    y_out(:, 1) = real(y_cur)
+    y_out(:, 1) = y_cur
 
     do outstep = 2, nt
 	    ! call CVode
@@ -466,7 +470,7 @@ module ODE_Solvers
 	            stop
             endif
         endif
-        y_out(:, outstep) = real(y_cur)
+        y_out(:, outstep) = y_cur
     enddo
 
     ! diagnostics output
@@ -516,7 +520,8 @@ module ODE_Solvers
         
         ! fill RHS vector
         ! fvec(1) = lamda * yvec(1) + 1.0 / (1.0 + tn * tn) - lamda * atan(tn);
-        call MTdmdt( real(tn), MTy_out, MTf_vec )  
+        ! tn is real(c_double) == real(DP), matching the updated dydt_fct interface.
+        call MTdmdt( tn, MTy_out, MTf_vec )  
 
         !copy the result back
         fvec(1:neq) = MTf_vec(1:neq)

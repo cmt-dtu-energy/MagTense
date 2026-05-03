@@ -1,16 +1,36 @@
 module SPECIALFUNCTIONS
     implicit none
+
+    !> Double-precision kind â€” private to avoid conflicts with MicroMagParameters%DP
+    !> when both modules are used together.
+    integer, parameter, private :: DP = selected_real_kind(15, 307)
+
+    !> Generic interfaces that dispatch to SP or DP versions based on argument kind.
+    !> Existing single-precision call sites (e.g. TileTriangle.f90) continue to work
+    !> without change; the new DP variants are called automatically when DP arrays
+    !> are passed from the ODE solver.
+    interface simple_sort
+        module procedure simple_sort_sp
+        module procedure simple_sort_dp
+    end interface simple_sort
+
+    interface simple_unique
+        module procedure simple_unique_sp
+        module procedure simple_unique_dp
+    end interface simple_unique
+
     contains 
     
     !---------------------------------------------------------------------------    
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
-    !> Simple sorting function. Code implemented from Stack-overflow: https://stackoverflow.com/questions/54005339/sorting-an-array-from-lowest-to-greatest-fortran
+    !> Simple sorting function (single-precision). Code implemented from Stack-overflow:
+    !> https://stackoverflow.com/questions/54005339/sorting-an-array-from-lowest-to-greatest-fortran
     !> @param[in] arr the array to be sorted (n,1)
     !> @param[inout] arr_out sorted array (ascending order)
     !> @param[inout] ind indices such that arr_out = arr(ind)
     !---------------------------------------------------------------------------            
-    subroutine simple_sort( arr, arr_out, ind )
+    subroutine simple_sort_sp( arr, arr_out, ind )
         
     real,dimension(:),intent(in) :: arr
     real,dimension(:),intent(inout) :: arr_out
@@ -31,18 +51,45 @@ module SPECIALFUNCTIONS
     enddo
     
     
-    end subroutine simple_sort
+    end subroutine simple_sort_sp
+
+
+    !---------------------------------------------------------------------------    
+    !> Double-precision version of simple_sort
+    !---------------------------------------------------------------------------            
+    subroutine simple_sort_dp( arr, arr_out, ind )
+        
+    real(DP),dimension(:),intent(in) :: arr
+    real(DP),dimension(:),intent(inout) :: arr_out
+    integer,dimension(:),intent(inout) :: ind
+    LOGICAL, DIMENSION(size(arr)) :: mk
+    integer :: i,sz
+    integer,dimension(1) :: tmp
     
+    mk(:) = .true.
+    
+    sz = size(arr)
+    do i = 1, sz
+        arr_out(i) = MINVAL(arr,mk)
+        tmp = MINLOC(arr,mk)
+        ind(i) = tmp(1)
+        mk(MINLOC(arr,mk)) = .FALSE.
+    enddo
+    
+    end subroutine simple_sort_dp
+
     
     !---------------------------------------------------------------------------    
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2020
     !> @brief
-    !> Simple function to find the unique elements in an array. Code implemented from Rosettacode: https://rosettacode.org/wiki/Remove_duplicate_elements#Fortran
+    !> Simple function to find the unique elements in an array (single-precision).
+    !> Code implemented from Rosettacode:
+    !> https://rosettacode.org/wiki/Remove_duplicate_elements#Fortran
     !> @param[in] arr the array to be sorted (n,1)
     !> @param[inout] arr_out sorted array (ascending order)
     !> @param[inout] ind indices such that arr_out = arr(ind)
     !---------------------------------------------------------------------------            
-    subroutine simple_unique( arr, arr_out, k)
+    subroutine simple_unique_sp( arr, arr_out, k)
     
     real,dimension(:),intent(in) :: arr
     real,dimension(:),intent(inout) :: arr_out
@@ -62,8 +109,34 @@ module SPECIALFUNCTIONS
         arr_out(k) = arr(i)
     end do
     
-    end subroutine simple_unique
+    end subroutine simple_unique_sp
+
+
+    !---------------------------------------------------------------------------    
+    !> Double-precision version of simple_unique
+    !---------------------------------------------------------------------------            
+    subroutine simple_unique_dp( arr, arr_out, k)
     
+    real(DP),dimension(:),intent(in) :: arr
+    real(DP),dimension(:),intent(inout) :: arr_out
+    integer,intent(inout) :: k
+    
+    integer :: i
+    
+    arr_out(:) = 0.0_DP
+    
+    k = 1
+    arr_out(1) = arr(1)
+    do i=2,size(arr)
+        ! if the number already exist in res check next
+        if (any( arr_out == arr(i) )) cycle
+        ! No match found so add it to the output
+        k = k + 1
+        arr_out(k) = arr(i)
+    end do
+    
+    end subroutine simple_unique_dp
+
     !---------------------------------------------------------------------------    
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
