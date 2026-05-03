@@ -88,7 +88,7 @@ module ODE_Solvers
             allocate( MTy_out(neq), MTf_vec(neq) )
 
             !call solver...
-            call MagTense_CVODEsuite( int(neq, kind=c_long), neq, t, int(nt, kind=c_long), nt, y0, t_out, y_out, tol, callback, int(callback_display, kind=c_long) )
+            call MagTense_CVODEsuite( int(neq, kind=c_long), neq, real(t, kind=c_double), int(nt, kind=c_long), nt, real(y0, kind=c_double), t_out, y_out, real(tol, kind=c_double), callback, int(callback_display, kind=c_long) )
 
             !clean-up
             deallocate(MTy_out, MTf_vec)
@@ -403,9 +403,10 @@ module ODE_Solvers
     end if
     call callback('Finished initialization, starting time steps', 0 )
     
+    t_out = real(t_inout, kind=c_double)
     t_out(1) = t(1)
     t_inout(1) = real(t(1))
-    y_out(:, 1) = y_cur
+    y_out(:, 1) = real(y_cur)
 
     do outstep = 2, nt
 	    ! call CVode
@@ -470,7 +471,7 @@ module ODE_Solvers
 	            stop
             endif
         endif
-        y_out(:, outstep) = y_cur
+        y_out(:, outstep) = real(y_cur)
     enddo
 
     ! diagnostics output
@@ -520,8 +521,7 @@ module ODE_Solvers
         
         ! fill RHS vector
         ! fvec(1) = lamda * yvec(1) + 1.0 / (1.0 + tn * tn) - lamda * atan(tn);
-        ! tn is real(c_double) == real(DP), matching the updated dydt_fct interface.
-        call MTdmdt( tn, MTy_out, MTf_vec )  
+        call MTdmdt( real(tn), MTy_out, MTf_vec )  
 
         !copy the result back
         fvec(1:neq) = MTf_vec(1:neq)

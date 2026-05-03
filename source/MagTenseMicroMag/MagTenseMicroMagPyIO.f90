@@ -1,5 +1,6 @@
 module MagTenseMicroMagPyIO
 use MicroMagParameters
+use IO_GENERAL
 use trace_mod
     
 implicit none

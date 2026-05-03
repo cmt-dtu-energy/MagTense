@@ -4,6 +4,7 @@ module SPECIALFUNCTIONS
     !> Double-precision kind — private to avoid conflicts with MicroMagParameters%DP
     !> when both modules are used together.
     integer, parameter, private :: DP = selected_real_kind(15, 307)
+    INTEGER, PARAMETER, private :: SP = SELECTED_REAL_KIND(6, 37)
 
     !> Generic interfaces that dispatch to SP or DP versions based on argument kind.
     !> Existing single-precision call sites (e.g. TileTriangle.f90) continue to work
@@ -32,8 +33,8 @@ module SPECIALFUNCTIONS
     !---------------------------------------------------------------------------            
     subroutine simple_sort_sp( arr, arr_out, ind )
         
-    real,dimension(:),intent(in) :: arr
-    real,dimension(:),intent(inout) :: arr_out
+    real(SP),dimension(:),intent(in) :: arr
+    real(SP),dimension(:),intent(inout) :: arr_out
     integer,dimension(:),intent(inout) :: ind
     LOGICAL, DIMENSION(size(arr)) :: mk
     integer :: i,sz
@@ -91,8 +92,8 @@ module SPECIALFUNCTIONS
     !---------------------------------------------------------------------------            
     subroutine simple_unique_sp( arr, arr_out, k)
     
-    real,dimension(:),intent(in) :: arr
-    real,dimension(:),intent(inout) :: arr_out
+    real(SP),dimension(:),intent(in) :: arr
+    real(SP),dimension(:),intent(inout) :: arr_out
     integer,intent(inout) :: k
     
     integer :: i
