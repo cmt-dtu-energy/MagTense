@@ -103,14 +103,22 @@ def main(
                 cwd=py_folder,
                 check=False,
             )
-            subprocess.run(
-                [
-                    "mv",
-                    f"{py_folder}/dist/magtense-{pkg_version.removeprefix('v')}-py{py[0]}-none-any.whl",
-                    f"{py_folder}/dist/magtense-{pkg_version.removeprefix('v')}-{build_tag[cuda]}-py{py}-none-{whl_arch}.whl",
-                ],
-                check=False,
+            # python -m build normalizes the version in the wheel filename
+            # (e.g. lowercases local version labels like fmmWorking -> fmmworking),
+            # so use glob to locate the built wheel rather than constructing its exact name.
+            built_wheels = sorted(
+                (py_folder / "dist").glob(f"magtense-*-py{py[0]}-none-any.whl"),
+                key=lambda p: p.stat().st_mtime,
             )
+            if built_wheels:
+                subprocess.run(
+                    [
+                        "mv",
+                        str(built_wheels[-1]),
+                        f"{py_folder}/dist/magtense-{pkg_version.removeprefix('v')}-{build_tag[cuda]}-py{py}-none-{whl_arch}.whl",
+                    ],
+                    check=True,
+                )
 
             subprocess.run(
                 ["rm", f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}"],
