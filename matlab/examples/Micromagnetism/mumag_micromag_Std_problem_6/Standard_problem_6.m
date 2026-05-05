@@ -46,7 +46,7 @@ arguments
     options.ShowTheResult {mustBeNumericOrLogical}     = true          %--- Show the result
 end
 
-y_steps = 11;
+y_steps = 1;
 
 mu0 = 4*pi*1e-7;
 

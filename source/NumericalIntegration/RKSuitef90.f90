@@ -620,6 +620,7 @@ real(kind=wp) :: cdiff
 integer :: ier, nrec, tr_dim_of_stages
 logical :: legalt
 character(len=1) :: task1, method1
+character*(500) :: prog_str
 !
 integer, parameter :: not_ready=-1, fatal=911, just_fine=1
 real(kind=wp), parameter :: zero=0.0_wp, pt01=0.01_wp, fivepc=0.05_wp, &
@@ -647,8 +648,9 @@ body: do
 !  Check for valid shape
    if (size(shape(y_start))>0) then
       if (any(shape(y_start)==0)) then
-         ier = fatal; nrec = 2; write (comm%rec,"(a)") &
-" ** An extent of Y_START has zero length. This is not permitted."
+         ier = fatal; nrec = 2
+         write(prog_str,'(A)') " ** An extent of Y_START has zero length. This is not permitted."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
    end if
@@ -658,9 +660,10 @@ body: do
       task1 = task(1:1); comm%use_range = task1 == "R" .or. task1 == "r"
       legalt = comm%use_range  .or.  task1 == "S" .or. task1 == "s"
       if (.not.legalt) then
-         ier = fatal; nrec = 2; write (comm%rec,"(a,a,a/a)") &
-" ** You have set the first character of TASK to be '",TASK1,"'.", &
-" ** It must be one of 'R','r','S' or 's'."
+         ier = fatal; nrec = 2
+         write(prog_str,'(A,A,A,A)') " ** You have set the first character of TASK to be '",TASK1, &
+         "'. It must be one of 'R','r','S' or 's'."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
    end if
@@ -671,9 +674,10 @@ body: do
       case("M","m"); comm%rk_method = 2
       case("H","h"); comm%rk_method = 3
       case default
-         ier = fatal; nrec = 2; write (comm%rec,"(a,a,a/a)") &
-" ** You have set the first character of METHOD to be '",METHOD1,"'.", &
-" ** It must be one of 'L','l','M','m','H' or 'h'."
+         ier = fatal; nrec = 2
+         write(prog_str,'(A,A,A,A)') " ** You have set the first character of METHOD to be '",METHOD1, &
+         "'. It must be one of 'L','l','M','m','H' or 'h'."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end select
    end if
@@ -682,15 +686,17 @@ body: do
 ! Check consistency of array arguments
 !
    if (any(shape(y_start)/=shape(thresholds))) then
-      ier = fatal; nrec = 1; write (comm%rec,"(a)") &
-" ** The shapes of Y_START and THRESHOLDS are not consistent."
+      ier = fatal; nrec = 1
+      write(prog_str,'(A)') " ** The shapes of Y_START and THRESHOLDS are not consistent."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
 !
 ! Check and process compulsory arguments
    if (t_start == t_end) then
-      ier = fatal; nrec = 1; write (comm%rec,"(a,e13.5,a)") &
-" ** You have set T_START = T_END = ",T_START,"."
+      ier = fatal; nrec = 1
+      write(prog_str,'(A,E13.5,A)') " ** You have set T_START = T_END = ",T_START,"."
+      call displayGUIMessage(trim(prog_str))
       exit body
    else
       comm%t_end = t_end; comm%t_start = t_start
@@ -698,17 +704,19 @@ body: do
       comm%dir = sign(one,t_end-t_start)
    end if
    if ((tolerance > pt01) .or. (tolerance < comm%round_off)) then
-      ier = fatal; nrec = 2; write (comm%rec,"(a,e13.5,a/a,e13.5,a)") &
-" ** You have set TOLERANCE = ",tolerance," which is not permitted. The", &
-" ** range of permitted values is (",comm%round_off,",0.01)."
+      ier = fatal; nrec = 2
+      write(prog_str,'(A,E13.5,A,E13.5,A)') " ** You have set TOLERANCE = ",tolerance, &
+      " which is not permitted. The range of permitted values is (",comm%round_off,",0.01)."
+      call displayGUIMessage(trim(prog_str))
       exit body
    else
       comm%tol = tolerance
    end if
    if (minval(thresholds) < comm%sqtiny) then                        !spec-ar!
-      ier = fatal; nrec = 2; write (comm%rec,"(a/a,e13.5,a)") &
-" ** You have set a component of THRESHOLDS to be less than the permitted", &
-" ** minimum,",comm%sqtiny,"."
+      ier = fatal; nrec = 2
+      write(prog_str,'(A,E13.5,A)') " ** You have set a component of THRESHOLDS to be less than the permitted minimum,", &
+      comm%sqtiny,"."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
 !
@@ -737,11 +745,10 @@ body: do
 !  
    hmin = max(comm%sqtiny,comm%toosml*max(abs(t_start),abs(t_end)))
    if (abs(t_end-t_start) < hmin) then
-      ier = fatal; nrec = 4; write (comm%rec,"(a/a/a,e13.5,a/a,e13.5,a)") &
-" ** You have set values for T_END and T_START that are not clearly", &
-" ** distinguishable for the method and the precision of the computer", &
-" ** being used. ABS(T_END-T_START) is ",ABS(T_END-T_START)," but should be", &
-" **  at least ",hmin,"."
+      ier = fatal; nrec = 4
+      write(prog_str,'(A,E13.5,A,E13.5,A)') " ** You have set values for T_END and T_START that are not clearly distinguishable for the method and the precision of the computer being used. ABS(T_END-T_START) is ", &
+      ABS(T_END-T_START)," but should be at least ",hmin,"."
+      call displayGUIMessage(trim(prog_str))
      exit body
    end if
    if (present(h_start)) comm%h_start = abs(h_start)
@@ -765,8 +772,9 @@ body: do
             comm%stages(size(y_start,1),tr_dim_of_stages), &         !alloc!
             comm%ymax(size(y_start,1)),stat=ier)                     !alloc!
    if (ier /= 0) then
-      ier = fatal; nrec = 1 ; write (comm%rec,"(a)") &
-" ** Not enough storage available to create workspace required internally."
+      ier = fatal; nrec = 1
+      write(prog_str,'(A)') " ** Not enough storage available to create workspace required internally."
+      call displayGUIMessage(trim(prog_str))
       exit body
    else
       comm%y = y_start; comm%ymax = abs(y_start) 
@@ -788,8 +796,9 @@ body: do
                      comm%ytemp(size(y_start,1)), &                  !alloc!
                      comm%xstage(size(y_start,1)),stat=ier)          !alloc!
             if (ier /= 0) then
-               ier = fatal; nrec = 1 ; write (comm%rec,"(a)") &
-" ** Not enough storage available to create workspace required internally."
+               ier = fatal; nrec = 1
+               write(prog_str,'(A)') " ** Not enough storage available to create workspace required internally."
+               call displayGUIMessage(trim(prog_str))
                exit body
             end if
          end if
@@ -812,8 +821,9 @@ body: do
       else
          allocate(comm%ge_stages(size(y_start,1),tr_dim_of_stages),stat=ier) !alloc!
          if (ier /= 0) then
-            ier = fatal; nrec = 1 ; write (comm%rec,"(a)") &
-" ** Not enough storage available to create workspace required internally."
+            ier = fatal; nrec = 1
+            write(prog_str,'(A)') " ** Not enough storage available to create workspace required internally."
+            call displayGUIMessage(trim(prog_str))
             exit body
          end if
       end if
@@ -821,11 +831,12 @@ body: do
                comm%ge_yp(size(y_start,1)), &                        !alloc!
                comm%ge_err_estimates(size(y_start,1)), &             !alloc!
                comm%ge_assess(size(y_start,1)), &                    !alloc!
-               comm%ge_y_new(size(y_start,1)),stat=ier)              !alloc!
-      if (ier /= 0) then
-         ier = fatal; nrec = 1 ; write (comm%rec,"(a)") &
-" ** Not enough storage available to create workspace required internally."
-         exit body
+                              comm%ge_y_new(size(y_start,1)),stat=ier)              !alloc!
+               if (ier /= 0) then
+                  ier = fatal; nrec = 1
+                  write(prog_str,'(A)') " ** Not enough storage available to create workspace required internally."
+                  call displayGUIMessage(trim(prog_str))
+                  exit body
       else
          comm%ge_assess = 0.0_wp; comm%ge_y = y_start
       end if
@@ -975,6 +986,7 @@ character(len=*), parameter :: srname="RANGE_INTEGRATE"
 real(kind=wp) :: hmin, t_now                                         !indep!
 integer :: step_flag, ier, nrec, state
 logical :: goback, baderr
+character*(500) :: prog_str
 !
 integer, parameter :: not_ready=-1, usable=-2, fatal=911, catastrophe=912, &
    just_fine=1
@@ -989,26 +1001,28 @@ body: do
 !
    state = get_saved_state_r1("SETUP",comm%save_states)
    if (state==fatal) then
-      ier = catastrophe; nrec = 1; write (comm%rec,"(a)") &
-" ** A catastrophic error has already been detected elsewhere."
+      ier = catastrophe; nrec = 1
+      write(prog_str,'(A)') " ** A catastrophic error has already been detected elsewhere."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    if (state==not_ready) then
-      ier = fatal; nrec = 1; write (comm%rec,"(a)") &
-" ** You have not called SETUP, so you cannot use RANGE_INTEGRATE."
+      ier = fatal; nrec = 1
+      write(prog_str,'(A)') " ** You have not called SETUP, so you cannot use RANGE_INTEGRATE."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    if (.not.comm%use_range) then
-      ier = fatal; nrec = 2; write (comm%rec,"(a/a)") &
-" ** You have called RANGE_INTEGRATE after you specified in SETUP that you",&
-" ** were going to use STEP_INTEGRATE. This is not permitted."
+      ier = fatal; nrec = 2
+      write(prog_str,'(A)') " ** You have called RANGE_INTEGRATE after you specified in SETUP that you were going to use STEP_INTEGRATE. This is not permitted."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    state = get_saved_state_r1(srname,comm%save_states)
    if (state==5 .or. state==6) then
-      ier = fatal; nrec = 1; write (comm%rec,"(a/a)") &
-" ** This routine has already returned with a hard failure. You must call",&
-" ** SETUP to start another problem."
+      ier = fatal; nrec = 1
+      write(prog_str,'(A)') " ** This routine has already returned with a hard failure. You must call SETUP to start another problem."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    state = usable
@@ -1047,10 +1061,9 @@ body: do
 !  Subsequent call.
 !
       if (comm%tlast==comm%range_t_end) then
-         ier = fatal; nrec = 3; write (comm%rec,"(a/a/a)") &
-" ** You have called RANGE_INTEGRATE after reaching T_END. (Your last call",&
-" ** to RANGE_INTEGRATE  resulted in T_GOT = T_END.)  To start a new",&
-" ** problem, you will need to call SETUP."
+         ier = fatal; nrec = 3
+         write(prog_str,'(A)') " ** You have called RANGE_INTEGRATE after reaching T_END. (Your last call to RANGE_INTEGRATE resulted in T_GOT = T_END.) To start a new problem, you will need to call SETUP."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
 !
@@ -1059,37 +1072,32 @@ body: do
 !  Check for valid T_WANT.
 !
    if (comm%dir*(t_want-comm%tlast)<=zero) then
-      ier = fatal; nrec = 3; write (comm%rec,"(a/a/a)") &
-" ** You have made a call to RANGE_INTEGRATE with a T_WANT that does not lie",&
-" ** between the previous value of T_GOT (T_START on the first call) and",&
-" ** T_END. This is not permitted. Check your program carefully."
+      ier = fatal; nrec = 3
+      write(prog_str,'(A)') " ** You have made a call to RANGE_INTEGRATE with a T_WANT that does not lie between the previous value of T_GOT (T_START on the first call) and T_END. This is not permitted. Check your program carefully."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    if (comm%dir*(t_want-comm%range_t_end)>zero) then
       hmin = max(comm%sqtiny,comm%toosml* &
              max(abs(t_want),abs(comm%range_t_end)))
       if (abs(t_want-comm%range_t_end)<hmin) then
-         ier = fatal; nrec = 4; write (comm%rec,"(a/a/a/a)") &
-" ** You have made a call to RANGE_INTEGRATE with a T_WANT that does not lie",&
-" ** between the previous value of T_GOT (T_START on the first call) and",&
-" ** T_END. This is not permitted. T_WANT is very close to T_END, so you may",&
-" ** have meant to set it to be T_END exactly.  Check your program carefully."
+         ier = fatal; nrec = 4
+         write(prog_str,'(A)') " ** You have made a call to RANGE_INTEGRATE with a T_WANT that does not lie between the previous value of T_GOT (T_START on the first call) and T_END. This is not permitted. T_WANT is very close to T_END, so you may have meant to set it to be T_END exactly. Check your program carefully."
+         call displayGUIMessage(trim(prog_str))
       else
-         ier = fatal; nrec = 3; write (comm%rec,"(a/a/a/a)") &
-" ** You have made a call to RANGE_INTEGRATE with a T_WANT that does not lie",&
-" ** between the previous value of T_GOT (T_START on the first call) and",&
-" ** T_END. This is not permitted. Check your program carefully."
+         ier = fatal; nrec = 3
+         write(prog_str,'(A)') " ** You have made a call to RANGE_INTEGRATE with a T_WANT that does not lie between the previous value of T_GOT (T_START on the first call) and T_END. This is not permitted. Check your program carefully."
+         call displayGUIMessage(trim(prog_str))
       end if
       exit body
    end if
    if (.not.comm%intrp_able) then
       hmin = max(comm%sqtiny,comm%toosml*max(abs(comm%tlast),abs(t_want)))
       if (abs(t_want-comm%tlast)<hmin) then
-         ier = fatal; nrec = 4; write (comm%rec,"(a/a/a/a,e13.5,a)") &
-" ** You have made a call to RANGE_INTEGRATE with a T_WANT that is not",&
-" ** sufficiently different from the last value of T_GOT (T_START on the",&
-" ** first call). When using METHOD = 'H', it must differ by at least ",&
-" ** ",HMIN,"."
+         ier = fatal; nrec = 4
+         write(prog_str,'(A,E13.5,A)') " ** You have made a call to RANGE_INTEGRATE with a T_WANT that is not sufficiently different from the last value of T_GOT (T_START on the first call). When using METHOD = 'H', it must differ by at least ", &
+         HMIN,"."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
 !
@@ -1149,17 +1157,14 @@ body: do
       ier = step_flag 
 !  
 !  A successful step by STEP_INTEGRATE is indicated by step_flag= 1.
+!  Warnings (step_flag = 2,3,4) allow continuation.
+!  Fatal errors (step_flag >= 5) require exit.
 !
       select case(step_flag)
-         case(1); cycle proceed
-         case(2); nrec = 4; write (comm%rec,"(a/a/a/a)") &
-" ** The last message was produced on a call to STEP_INTEGRATE from",&
-" ** RANGE_INTEGRATE. In RANGE_INTAGRATE the appropriate action is to",&
-" ** change to METHOD = 'M', or, if insufficient memory is available,",&
-" ** to METHOD = 'L'. "
-         case(3:6); nrec = 2; write (comm%rec,"(a)") &
-" ** The last message was produced on a call to STEP_INTEGRATE from",&
-" ** RANGE_INTEGRATE."
+         case(1); cycle proceed  ! Success, continue
+         case(2:6); nrec = 2  ! Fatal errors, must exit
+         write(prog_str,'(A)') " ** The last message was produced on a call to STEP_INTEGRATE from RANGE_INTEGRATE."
+         call displayGUIMessage(trim(prog_str))
          case default; baderr = .true.
       end select
       t_got = comm%t; exit body
@@ -1168,10 +1173,9 @@ body: do
 end do body
 !
 if (baderr) then
-   ier = fatal; nrec = 3; write (comm%rec,"(a/a/a)") &
-" ** An internal call by RANGE_INTEGRATE to a subroutine resulted in an",&
-" ** error that should not happen. Check your program carefully for array",&
-" ** sizes, correct number of arguments, type mismatches ... ."
+   ier = fatal; nrec = 3
+   write(prog_str,'(A)') " ** An internal call by RANGE_INTEGRATE to a subroutine resulted in an error that should not happen. Check your program carefully for array sizes, correct number of arguments, type mismatches ... ."
+   call displayGUIMessage(trim(prog_str))
 end if
 !
 comm%tlast = t_got
@@ -1216,9 +1220,10 @@ real(kind=wp) :: hmin, htry                                          !indep!
 real(kind=wp) :: alpha, beta, err, tau, t1, t2, ypnorm, extra_wk
 integer :: ier, nrec, state
 logical :: failed, phase1, phase3, toomch, sure_stiff
+character*(500) :: prog_str
 !
 integer, parameter :: not_ready=-1, usable=-2, fatal=911, catastrophe=912, &
-    max_f_count=5000, just_fine=1
+    max_f_count=15000, just_fine=1
 logical, parameter :: tell=.false., ask=.true.
 real(kind=wp),parameter :: zero=0.0_wp, pt1=0.1_wp, pt9=0.9_wp, one=1.0_wp, &
    two=2.0_wp, hundrd=100.0_wp
@@ -1230,30 +1235,31 @@ ier = just_fine; nrec = 0
 body: do
    state = get_saved_state_r1("SETUP",comm%save_states)
    if (state==fatal) then
-      ier = catastrophe; nrec = 1; write (comm%rec,"(a)") &
-" ** A catastrophic error has already been detected elsewhere."
+      ier = catastrophe; nrec = 1
+      write(prog_str,'(A)') " ** A catastrophic error has already been detected elsewhere."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    if (state==not_ready) then
-      ier = fatal; nrec = 1; write (comm%rec,"(a)") &
-" ** You have not called SETUP, so you cannot use STEP_INTEGRATE."
+      ier = fatal; nrec = 1
+      write(prog_str,'(A)') " ** You have not called SETUP, so you cannot use STEP_INTEGRATE."
+      call displayGUIMessage(trim(prog_str))
      exit body
    end if
    if (comm%use_range) then
       if (get_saved_state_r1("RANGE_INTEGRATE",comm%save_states)/=usable) then
-         ier = fatal; nrec = 2; write (comm%rec,"(a/a)") &
-" ** You have called STEP_INTEGRATE after you specified in SETUP that you", &
-" ** were going to use RANGE_INTEGRATE. This is not permitted."
+         ier = fatal; nrec = 2
+         write(prog_str,'(A)') " ** You have called STEP_INTEGRATE after you specified in SETUP that you were going to use RANGE_INTEGRATE. This is not permitted."
+         call displayGUIMessage(trim(prog_str))
          comm%use_range = .false.
          exit body
       end if
    end if
    state = get_saved_state_r1(srname,comm%save_states)
    if (state==5 .or. state==6) then
-      ier = fatal; nrec = 3; write (comm%rec,"(a/a/a)") &
-" ** STEP_INTEGRATE has already returned with a flag value of 5 or 6. You",&
-" ** cannot continue integrating this problem. You must call SETUP to start ",&
-" ** another problem."
+      ier = fatal; nrec = 3
+      write(prog_str,'(A)') " ** STEP_INTEGRATE has already returned with a flag value of 5 or 6. You cannot continue integrating this problem. You must call SETUP to start another problem."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
 !
@@ -1310,10 +1316,9 @@ body: do
 ! Continuation call
 !
       if (comm%at_t_end) then
-         ier = fatal; nrec = 3; write (comm%rec,"(a,e13.5,a/a/a)") &
-" ** You have already reached T_END ( = ",comm%t_end, "). To integrate",&
-" ** furhter with the same problem you must call the routine RESET_T_END",&
-" ** with a new value of T_END."
+         ier = fatal; nrec = 3
+         write(prog_str,'(A,E13.5,A)') " ** You have already reached T_END ( = ",comm%t_end, "). To integrate furhter with the same problem you must call the routine RESET_T_END with a new value of T_END."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
    end if
@@ -1343,10 +1348,10 @@ body: do
 !
       hmin = max(comm%sqtiny,comm%toosml*max(abs(comm%t),abs(comm%t+comm%h)))
       if (abs(comm%h)<hmin) then
-         ier = 5; nrec = 3; write (comm%rec,"(a/a,e13.5,a,e13.5,a/a)") &
-" ** In order to satisfy your error requirements STEP_INTEGRATE would have",&
-" ** to use a step size of ",comm%H," at T_NOW = ",comm%T," This is too",&
-" ** small for the machine precision."
+         ier = 5; nrec = 3
+         write(prog_str,'(A,E13.5,A,E13.5,A)') " ** In order to satisfy your error requirements STEP_INTEGRATE would have to use a step size of ", &
+         comm%H," at T_NOW = ",comm%T," This is too small for the machine precision."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
 !
@@ -1356,12 +1361,9 @@ body: do
          comm%hit_t_end_count = comm%hit_t_end_count + 1
          if (comm%hit_t_end_count>=100 .and. &
              comm%hit_t_end_count>=comm%step_count/3) then
-            ier = 2; nrec = 5; write (comm%rec,"(a/a/a/a/a)") &
-" ** More than 100 output points have been obtained by integrating to T_END.",&
-" ** They have been sufficiently close to one another that the efficiency",&
-" ** of the integration has been degraded. It would probably be (much) more",&
-" ** efficient to obtain output by interpolating with INTERPOLATE (after",&
-" ** changing to METHOD='M' if you are using METHOD = 'H')."
+            ier = 2; nrec = 5
+            write(prog_str,'(A)') " ** More than 100 output points have been obtained by integrating to T_END. They have been sufficiently close to one another that the efficiency of the integration has been degraded. It would probably be (much) more efficient to obtain output by interpolating with INTERPOLATE (after changing to METHOD='M' if you are using METHOD = 'H')."
+            call displayGUIMessage(trim(prog_str))
             comm%hit_t_end_count = 0; exit body
          end if
       end if
@@ -1374,10 +1376,10 @@ body: do
 !  Check for too much work.
          toomch = comm%f_count > max_f_count
          if (toomch) then
-            ier = 3; nrec = 3; write (comm%rec,"(a,i6,a/a/a)") &
-" ** Approximately ",max_f_count," function evaluations have been used to",&
-" ** compute the solution since the integration started or since this", &
-" ** message was last printed."
+            ier = 3; nrec = 3
+            write(prog_str,'(A,I6,A)') " ** Approximately ",max_f_count, &
+            " function evaluations have been used to compute the solution since the integration started or since this message was last printed."
+            call displayGUIMessage(trim(prog_str))
 !
 !  After this warning message, F_COUNT is reset to permit the integration
 !  to continue.  The total number of function evaluations in the primary
@@ -1398,11 +1400,9 @@ body: do
             extra_wk = (comm%cost*abs((comm%t_end-comm%t)/comm%h_average)) / &
                      real(comm%full_f_count+comm%f_count,kind=wp)
             ier = 4; nrec = nrec + 4 
-            write (comm%rec(nrec-3:nrec),"(a/a,e13.5,a/a/a)") &
-" ** Your problem has been diagnosed as stiff.  If the  situation persists,",&
-" ** it will cost roughly ",extra_wk," times as much to reach T_END as it", &
-" ** has cost to reach T_NOW. You should probably change to a code intended",&
-" ** for stiff problems."
+            write(prog_str,'(A,E13.5,A)') " ** Your problem has been diagnosed as stiff. If the situation persists, it will cost roughly ", &
+            extra_wk," times as much to reach T_END as it has cost to reach T_NOW. You should probably change to a code intended for stiff problems."
+            call displayGUIMessage(trim(prog_str))
          end if
          if (ier/=just_fine) exit body
       end if
@@ -1551,14 +1551,15 @@ body: do
             comm%t = comm%t_old; comm%h = comm%h_old
             comm%y = comm%y_old; comm%yp = comm%yp_old
             if (comm%step_count > 0) then
-               nrec = 2; write (comm%rec,"(a/a,e13.5/a)") &
-" ** The global error assessment may not be reliable for T past ",&
-" ** T_NOW = ",comm%t,". The integration is being terminated."
+               nrec = 2
+               write(prog_str,'(A,E13.5,A)') " ** The global error assessment may not be reliable for T past T_NOW = ", &
+               comm%t,". The integration is being terminated."
+               call displayGUIMessage(trim(prog_str))
                exit body
             else
-               nrec = 2; write (comm%rec,"(a/a)") &
-" ** The global error assessment algorithm failed at the start of the ",&
-" ** integration.  The integration is being terminated."
+               nrec = 2
+               write(prog_str,'(A)') " ** The global error assessment algorithm failed at the start of the integration. The integration is being terminated."
+               call displayGUIMessage(trim(prog_str))
                exit body
             end if
          end if
@@ -2015,7 +2016,7 @@ integer, parameter :: bigr=1, smlr=2
 real(kind=wp), dimension(:), pointer :: v0, v1, v2, v3, y, y_old     !dep!
 real(kind=wp), dimension(:), pointer :: weights, thresh              !shp-dep!
 !
-integer, parameter :: max_f_count=5000
+integer, parameter :: max_f_count=15000
 real(kind=wp),parameter :: zero=0.0_wp, pt001=0.001_wp, pt9=0.9_wp, &
    fifth=0.2_wp, half=0.5_wp, one=1.0_wp, two=2.0_wp, five=5.0_wp, &
    large=1.0e+10_wp
@@ -2386,6 +2387,7 @@ integer, optional, intent(out) :: step_cost, num_succ_steps, total_f_calls
 character(len=*), parameter :: srname="STATISTICS"
 !
 integer :: ier, nrec, state
+character*(500) :: prog_str
 !
 integer, parameter :: not_ready=-1, not_reusable=-3, fatal=911, &
    catastrophe=912, just_fine=1
@@ -2400,33 +2402,34 @@ body: do
 !
    state = get_saved_state_r1(srname,comm%save_states)
    if (state==fatal) then
-      ier = catastrophe; nrec = 1; write (comm%rec,"(a)") &
-" ** A catastrophic error has already been detected elsewhere."
+      ier = catastrophe; nrec = 1
+      write(prog_str,'(A)') " ** A catastrophic error has already been detected elsewhere."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    if (state==not_reusable) then
-      ier = fatal; nrec = 2; write (comm%rec,"(a/a)") &
-" ** You have already made a call to STATISTICS after a hard failure was ", &
-" ** reported from the integrator. You cannot call STATISTICS again."
+      ier = fatal; nrec = 2
+      write(prog_str,'(A)') " ** You have already made a call to STATISTICS after a hard failure was reported from the integrator. You cannot call STATISTICS again."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    state = get_saved_state_r1("STEP_INTEGRATE",comm%save_states)
    if (state==not_ready) then
       ier = fatal; nrec = 1
       if (comm%use_range) then
-         write (comm%rec,"(a)") &
-" ** You have not called RANGE_INTEGRATE, so you cannot use STATISTICS."
+         write(prog_str,'(A)') " ** You have not called RANGE_INTEGRATE, so you cannot use STATISTICS."
+         call displayGUIMessage(trim(prog_str))
       else
-         write (comm%rec,"(a)") &
-" ** You have not called STEP_INTEGRATE, so you cannot use STATISTICS."
+         write(prog_str,'(A)') " ** You have not called STEP_INTEGRATE, so you cannot use STATISTICS."
+         call displayGUIMessage(trim(prog_str))
       end if
       exit body
    end if
    if (present(y_maxvals)) then
       if (any(shape(y_maxvals) /= shape(comm%y))) then
-         ier = fatal; nrec = 2; write (comm%rec,"(a,i6,a/a,i6,a)") &
-" ** The shape of Y_MAXVALS is not consistent with the shape of the", &
-" ** dependent variables."
+         ier = fatal; nrec = 2
+         write(prog_str,'(A)') " ** The shape of Y_MAXVALS is not consistent with the shape of the dependent variables."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
    end if
@@ -2476,6 +2479,7 @@ real(kind=wp), dimension(:), optional, intent(out) :: rms_error      !shp-dep!
 character(len=*), parameter :: srname="GLOBAL_ERROR"
 !
 integer :: ier, nrec, state
+character*(500) :: prog_str
 !
 intrinsic         sqrt
 !
@@ -2491,30 +2495,31 @@ body: do
 !
    state = get_saved_state_r1(srname,comm%save_states)
    if (state==fatal) then
-      ier = catastrophe; nrec = 1; write (comm%rec,"(a)") &
-" ** A catastrophic error has already been detected elsewhere."
+      ier = catastrophe; nrec = 1
+      write(prog_str,'(A)') " ** A catastrophic error has already been detected elsewhere."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    if (state==not_reusable) then
-      ier = fatal; nrec = 2; write (comm%rec,"(a/a)") &
-" ** You have already made a call to GLOBAL_ERROR after a hard failure was", &
-" ** reported from the integrator. You cannot call GLOBAL_ERROR again."
+      ier = fatal; nrec = 2
+      write(prog_str,'(A)') " ** You have already made a call to GLOBAL_ERROR after a hard failure was reported from the integrator. You cannot call GLOBAL_ERROR again."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    state = get_saved_state_r1("STEP_INTEGRATE",comm%save_states)
    if (state==not_ready) then
       ier = fatal; nrec = 1
       if (comm%use_range) then
-         write (comm%rec,"(a)") &
-" ** You have not yet called RANGE_INTEGRATE, so you cannot call GLOBAL_ERROR."
+         write(prog_str,'(A)') " ** You have not yet called RANGE_INTEGRATE, so you cannot call GLOBAL_ERROR."
+         call displayGUIMessage(trim(prog_str))
       else
-         write (comm%rec,"(a)") &
-" ** You have not yet called STEP_INTEGRATE, so you cannot call GLOBAL_ERROR."
+         write(prog_str,'(A)') " ** You have not yet called STEP_INTEGRATE, so you cannot call GLOBAL_ERROR."
+         call displayGUIMessage(trim(prog_str))
       end if
       exit body
    end if
 !
-!  Set flag so that the routine can only be called once after a hard 
+!  Set flag so that the routine can only be called once after a hard
 !  failure from the integrator.
 !
    if (state==5 .or. state==6) ier = not_reusable
@@ -2522,9 +2527,9 @@ body: do
 !  Check that ERROR_ASSESS was set properly for error assessment in SETUP.
 !
    if (.not.comm%erason) then
-      ier = fatal; nrec = 3; write (comm%rec,"(a/a/a)") &
-" ** No error assessment is available since you did not ask for it in your",&
-" ** call to the routine SETUP. Check your program carefully."
+      ier = fatal; nrec = 3
+      write(prog_str,'(A)') " ** No error assessment is available since you did not ask for it in your call to the routine SETUP. Check your program carefully."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
 !
@@ -2532,9 +2537,9 @@ body: do
 !
    if (present(rms_error)) then
       if (any(shape(rms_error) /= shape(comm%y))) then
-         ier = fatal; nrec = 2; write (comm%rec,"(a,a)") &
-" ** The shape of RMS_ERROR is not consistent with the shape of the", &
-" ** dependent variables."
+         ier = fatal; nrec = 2
+         write(prog_str,'(A)') " ** The shape of RMS_ERROR is not consistent with the shape of the dependent variables."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
    end if
@@ -2542,9 +2547,9 @@ body: do
 !  Check to see if the integrator has not actually taken a step.
 !
    if (comm%step_count==0) then
-      ier = fatal; nrec = 2; write (comm%rec,"(a/a)") &
-" ** The integrator has not actually taken any successful steps. You cannot",&
-" ** call GLOBAL_ERROR in this circumstance. Check your program carefully."
+      ier = fatal; nrec = 2
+      write(prog_str,'(A)') " ** The integrator has not actually taken any successful steps. You cannot call GLOBAL_ERROR in this circumstance. Check your program carefully."
+      call displayGUIMessage(trim(prog_str))
        exit body
    end if
 !
@@ -2578,6 +2583,7 @@ character(len=*), parameter :: srname="RESET_T_END"
 !
 real(kind=wp) :: hmin, tdiff                                         !indep!
 integer ::           ier, nrec, state
+character*(500) :: prog_str
 !
 integer, parameter :: not_ready=-1, usable=-2, fatal=911, catastrophe=912, &
    just_fine=1
@@ -2592,54 +2598,54 @@ body: do
 !
    state = get_saved_state_r1("STEP_INTEGRATE",comm%save_states)
    if (state==fatal) then
-      ier = catastrophe; nrec = 1; write (comm%rec,"(a)") &
-" ** A catastrophic error has already been detected elsewhere."
+      ier = catastrophe; nrec = 1
+      write(prog_str,'(A)') " ** A catastrophic error has already been detected elsewhere."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    if (comm%use_range) then
       if (get_saved_state_r1("RANGE_INTEGRATE",comm%save_states)/=usable) then
-         ier = fatal; nrec = 2; write (comm%rec,"(a/a)") &
-" ** You have called RESET_T_END after you specified to SETUP that you were",&
-" ** going to use RANGE_INTEGRATE. This is not permitted."
+         ier = fatal; nrec = 2
+         write(prog_str,'(A)') " ** You have called RESET_T_END after you specified to SETUP that you were going to use RANGE_INTEGRATE. This is not permitted."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
    end if
    if (state==not_ready) then
-      ier = fatal; nrec = 1; write (comm%rec,"(a)") &
-" ** You have not called STEP_INTEGRATE, so you cannot use RESET_T_END."
+      ier = fatal; nrec = 1
+      write(prog_str,'(A)') " ** You have not called STEP_INTEGRATE, so you cannot use RESET_T_END."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    if (state==5 .or. state==6) then
-      ier = fatal; nrec = 2; write (comm%rec,"(a,i1,a/a)") &
-" ** STEP_INTEGRATE has returned with FLAG =  ",STATE," You cannot call",&
-" ** RESET_T_END inthis circumstance."
+      ier = fatal; nrec = 2
+      write(prog_str,'(A,I1,A)') " ** STEP_INTEGRATE has returned with FLAG = ",STATE,". You cannot call RESET_T_END inthis circumstance."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
 !
 !  Check value of T_END_NEW
 !
    if (comm%dir>zero .and. t_end_new<=comm%t) then
-      ier = fatal; nrec = 3; write (comm%rec,"(a/a,e13.5/a,e13.5,a)") &
-" ** Integration is proceeding in the positive direction. The current value",&
-" ** for the independent variable is ",comm%T," and you have set T_END_NEW =",&
-" ** ",T_END_NEW,".  T_END_NEW must be greater than T."
+      ier = fatal; nrec = 3
+      write(prog_str,'(A,E13.5,A,E13.5,A)') " ** Integration is proceeding in the positive direction. The current value for the independent variable is ", &
+      comm%T," and you have set T_END_NEW = ",T_END_NEW,". T_END_NEW must be greater than T."
+      call displayGUIMessage(trim(prog_str))
       exit body
    else if (comm%dir<zero .and. t_end_new>=comm%t) then
-      ier = fatal; nrec = 3; write (comm%rec,"(a/a,e13.5/a,e13.5,a)") &
-" ** Integration is proceeding in the negative direction. The current value",&
-" ** for the independent variable is ",comm%T," and you have set T_END_NEW =",&
-" ** ",T_END_NEW,".  T_END_NEW must be less than T."
+      ier = fatal; nrec = 3
+      write(prog_str,'(A,E13.5,A,E13.5,A)') " ** Integration is proceeding in the negative direction. The current value for the independent variable is ", &
+      comm%T," and you have set T_END_NEW = ",T_END_NEW,". T_END_NEW must be less than T."
+      call displayGUIMessage(trim(prog_str))
       exit body
    else
       hmin = max(comm%sqtiny,comm%toosml*max(abs(comm%t),abs(t_end_new)))
       tdiff = abs(t_end_new-comm%t)
       if (tdiff<hmin) then
          ier = fatal; nrec = 4 
-         write (comm%rec,"(a,e13.5,a/a,e13.5,a/a/a,e13.5,a)")&
-" ** The current value of the independent variable T is ",comm%T,". The",&
-" ** T_END_NEW you supplied has ABS(T_END_NEW-T) = ",TDIFF,". For the METHOD",&
-" ** and the precision of the computer being used, this difference must be",&
-" ** at least ",HMIN,"."
+         write(prog_str,'(A,E13.5,A,E13.5,A,E13.5,A)') " ** The current value of the independent variable T is ",comm%T,". The T_END_NEW you supplied has ABS(T_END_NEW-T) = ", &
+         TDIFF,". For the METHOD and the precision of the computer being used, this difference must be at least ",HMIN,"."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
    end if
@@ -2681,6 +2687,7 @@ procedure(dydt_fct), pointer :: f
 character(len=*),parameter :: srname="INTERPOLATE"
 integer :: ier, jer, nrec, state, npcls
 logical :: intrp_initialised
+character*(500) :: prog_str
 !
 integer, parameter :: not_ready=-1, usable=-2, fatal=911, catastrophe=912, &
    just_fine=1
@@ -2694,27 +2701,29 @@ body: do
 !
    state = get_saved_state_r1("STEP_INTEGRATE",comm%save_states)
    if (state==fatal) then
-      ier = catastrophe; nrec = 1; write (comm%rec,"(a)") &
-" ** A catastrophic error has already been detected elsewhere."
+      ier = catastrophe; nrec = 1
+      write(prog_str,'(A)') " ** A catastrophic error has already been detected elsewhere."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    if (comm%use_range) then
       if (get_saved_state_r1("RANGE_INTEGRATE",comm%save_states)/=usable) then
-         ier = fatal; nrec = 2; write (comm%rec,"(a/a)") &
-" ** You have called INTERPOLATE after you specified to SETUP that you were",&
-" ** going to use RANGE_INTEGRATE. This is not permitted."
+         ier = fatal; nrec = 2
+         write(prog_str,'(A)') " ** You have called INTERPOLATE after you specified to SETUP that you were going to use RANGE_INTEGRATE. This is not permitted."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
    end if
    if (state==not_ready) then
-      ier = fatal; nrec = 1; write (comm%rec,"(a)") &
-" ** You have not called STEP_INTEGRATE, so you cannot use INTERPOLATE."
+      ier = fatal; nrec = 1
+      write(prog_str,'(A)') " ** You have not called STEP_INTEGRATE, so you cannot use INTERPOLATE."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
    if (state > just_fine) then
-      ier = fatal; nrec = 2; write (comm%rec,"(a/a)") &
-" ** STEP_INTEGRATE has returned with a flag value greater than 1. You", &
-" ** cannot call INTERPOLATE in this circumstance."
+      ier = fatal; nrec = 2
+      write(prog_str,'(A)') " ** STEP_INTEGRATE has returned with a flag value greater than 1. You cannot call INTERPOLATE in this circumstance."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
 !
@@ -2722,17 +2731,17 @@ body: do
 !
    if (present(y_want)) then
       if (any(shape(y_want)/=shape(comm%y))) then
-         ier = fatal; nrec = 3; write (comm%rec,"(a,i6,a/a,i6,a/a)") &
-" ** The shape of the array Y_WANT is not consistent with the shape of the ", &
-" ** dependent variables."
+         ier = fatal; nrec = 3
+         write(prog_str,'(A)') " ** The shape of the array Y_WANT is not consistent with the shape of the dependent variables."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
    end if
    if (present(yderiv_want)) then
       if (any(shape(yderiv_want)/=shape(comm%y))) then
-         ier = fatal; nrec = 3; write (comm%rec,"(a,i6,a/a,i6,a/a)") &
-" ** The shape of the array YDERIV_WANT is not consistent with the shape of", &
-" ** the dependent variables."
+         ier = fatal; nrec = 3
+         write(prog_str,'(A)') " ** The shape of the array YDERIV_WANT is not consistent with the shape of the dependent variables."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
    end if
@@ -2740,12 +2749,9 @@ body: do
 !  Check METHOD is ok to interpolate with
 !
    if (comm%rk_method==3) then
-      ier = fatal; nrec = 5; write (comm%rec,"(a/a/a/a/a)") &
-" ** You have been using STEP_INTEGRATE with METHOD = 'H' to integrate your",&
-" ** equations. You have just called INTERPOLATE, but interpolation is not",&
-" ** available for this METHOD. Either use METHOD = 'M', for which",&
-" ** interpolation is available, or use RESET_T_END to make STEP_INTEGRATE",&
-" ** step exactly to the points where you want output."
+      ier = fatal; nrec = 5
+      write(prog_str,'(A)') " ** You have been using STEP_INTEGRATE with METHOD = 'H' to integrate your equations. You have just called INTERPOLATE, but interpolation is not available for this METHOD. Either use METHOD = 'M', for which interpolation is available, or use RESET_T_END to make STEP_INTEGRATE step exactly to the points where you want output."
+      call displayGUIMessage(trim(prog_str))
       exit body
    end if
 !
@@ -2771,8 +2777,9 @@ body: do
       end if
       npcls = 5
       if (jer /= 0) then
-         ier = fatal; nrec = 1 ; write (comm%rec,"(a)") &
-" ** Not enough storage available to create workspace required internally."
+         ier = fatal; nrec = 1
+         write(prog_str,'(A)') " ** Not enough storage available to create workspace required internally."
+         call displayGUIMessage(trim(prog_str))
          exit body
       end if
    end select

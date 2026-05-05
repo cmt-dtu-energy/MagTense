@@ -454,7 +454,7 @@
         !Exchange term    
         call updateExchangeTerms( gb_problem, gb_solution )
         !External field
-        call updateExternalField( gb_problem, gb_solution, gb_problem%t(j) )
+        call updateExternalField( gb_problem, gb_solution, gb_solution%t_out(j) )
         !Anisotropy term
         call updateAnisotropy(  gb_problem, gb_solution )
         !Demag. field
@@ -916,11 +916,6 @@ end subroutine updateDemagfieldFMM
     real(SP), dimension(:), allocatable :: temp
     character*(100) :: prog_str 
     integer, save :: itimer = 0
-    call trace%begin( "updateDemagfield", itimer=itimer, verbose=1 )
-    
-    descr%type = SPARSE_MATRIX_TYPE_GENERAL
-    descr%mode = SPARSE_FILL_MODE_FULL
-    descr%diag = SPARSE_DIAG_NON_UNIT
     
     if ( problem%useDemag .eq. useDemagFalse ) then
         solution%HmX(:) = 0.
@@ -928,6 +923,12 @@ end subroutine updateDemagfieldFMM
         solution%HmZ(:) = 0.
         return
     endif
+    
+    call trace%begin( "updateDemagfield", itimer=itimer, verbose=1 )
+    
+    descr%type = SPARSE_MATRIX_TYPE_GENERAL
+    descr%mode = SPARSE_FILL_MODE_FULL
+    descr%diag = SPARSE_DIAG_NON_UNIT
     
     ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
     allocate(temp(ntot))

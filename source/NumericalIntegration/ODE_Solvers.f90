@@ -5,6 +5,7 @@ module ODE_Solvers
     use rksuite_90
     use integrationDataTypes
     use SPECIALFUNCTIONS
+    use IO_GENERAL
 
     !======= Declarations =========
     implicit none
@@ -184,44 +185,84 @@ module ODE_Solvers
         allocate(t_comb_unique(k))
         allocate(ind(k))
         call simple_sort( t_comb_out(1:k), t_comb_unique, ind )
-        
+                
         !First time is the same as the input
         t_out(1) = t(1)
         y_out(:,1) = ystart
-        
+        y_step = ystart         !Initialize y_step with the starting magnetization
+
         k = 2
         !Call the integrator
-        do i=2,size(t_comb_unique)                
-            call range_integrate( setup_comm, fct, t_comb_unique(i), t_step, y_step, yderiv_step, flag )
-            
+        do i=2,size(t_comb_unique)
+            !Keep integrating until we reach the target time
+            do while (t_step .lt. t_comb_unique(i))
+                call range_integrate( setup_comm, fct, t_comb_unique(i), t_step, y_step, yderiv_step, flag )
+
+                !Check flag and handle warnings/errors
+                if (flag .eq. 1) then
+                    !Success - continue
+                    continue
+                else if (flag .eq. 2) then
+                    !Inefficiency warning - continue but log
+                    if ( mod(i, callback_display) .eq. 0 ) then
+                        write(prog_str,'(A)') 'Warning: Integration is inefficient. Consider using METHOD = M with interpolation.'
+                        call callback( prog_str, -1 )
+                    endif
+                else if (flag .eq. 3) then
+                    !Too much work warning - continue but log
+                    if ( mod(i, callback_display) .eq. 0 ) then
+                        write(prog_str,'(A)') 'Warning: Approximately 15000 function evaluations used. Continuing...'
+                        call callback( prog_str, -1 )
+                    endif
+                else if (flag .eq. 4) then
+                    !Stiffness detected - RKSuite does not have a stiff solver, so we log warning and continue
+                    if ( mod(i, callback_display) .eq. 0 ) then
+                        write(prog_str,'(A)') 'Warning: Stiffness detected. RKSuite is not optimized for stiff problems.'
+                        call callback( prog_str, -1 )
+                        write(prog_str,'(A)') '         Consider using CVODE solver for better performance on stiff problems.'
+                        call callback( prog_str, -1 )
+                    endif
+                else if (flag .eq. 5 .or. flag .eq. 6) then
+                    !Fatal error - cannot continue
+                    write(prog_str,'(A,I1,A)') 'Error: Integration failed with flag = ', flag, '. Stopping integration.'
+                    call callback( prog_str, -1 )
+                    exit
+                endif
+
+                !Check if we've reached the target time (within tolerance)
+                if (abs(t_step - t_comb_unique(i)) .lt. 1.0e-12) then
+                    exit
+                endif
+            enddo
+
             if ( mod(i, callback_display) .eq. 0 ) then
                 write(prog_str,'(A6, F8.2, A15, I4.1, A1, I4.1)') 'Time: ', t_step*1e9, ' ns, i.e. step ', i, '/', size(t_comb_unique)
                 call callback( prog_str, -1 )
             endif
             
             !Check if the time which the solution is returned is part of the array that checks for converge or if it part of the times where the simulation is to be saved
-            ind = findloc(t_conv,t_comb_unique(i))
-            if (maxval(ind) .gt. 0) then !If the time is part of the converge array, we check for converge
-                conv_error = maxval(abs(y_step-y_last))
-                if (conv_error < conv_tol) then
-                    !Save the current state before exiting
-                    y_out(:,k) = y_step
-                    yderiv_out(:,k) = yderiv_step
-                    t_out(k) = t_step
-                    exit
-                endif
-                !Save the new magnetization to use for the next converge calculation
-                y_last = y_step
-            endif
+            !ind = findloc(t_conv,t_comb_unique(i))
+            !if (maxval(ind) .gt. 0) then !If the time is part of the converge array, we check for converge
+            !    conv_error = maxval(abs(y_step-y_last))
+            !    if (conv_error < conv_tol) then
+            !        !Save the current state before exiting
+            !        y_out(:,k) = y_step
+            !        yderiv_out(:,k) = yderiv_step
+            !        t_out(k) = t_step
+            !        exit
+            !    endif
+            !    !Save the new magnetization to use for the next converge calculation
+            !    y_last = y_step
+            !endif
             
             !Check if we should save the result in the array to be returned
-            ind = findloc(t,t_comb_unique(i))
-            if (maxval(ind) .gt. 0) then !If the time is part of the save array
+            !ind = findloc(t,t_comb_unique(i))
+            !if (maxval(ind) .gt. 0) then !If the time is part of the save array
                 y_out(:,k) = y_step
                 yderiv_out(:,k) = yderiv_step
                 t_out(k) = t_step
                 k = k+1
-            endif
+            !endif
         enddo
         !Clean up
         deallocate(thres)
@@ -293,7 +334,7 @@ module ODE_Solvers
     ! create the SUNDIALS context
     ierr = FSUNContext_Create(SUN_COMM_NULL, ctx)
     ! set relative and absolute tolerances
-    atol = 1.0d-10
+    atol = rtol !Used to be 1.0d-10
 
     ! initialize solution vector
     y_cur = ystart
@@ -359,14 +400,14 @@ module ODE_Solvers
     end if
     
     ! set maximum number of steps (default: 500)
-    ierr = FCVodeSetMaxNumSteps(cvode_mem, 5000)
+    ierr = FCVodeSetMaxNumSteps(cvode_mem, 15000)
     if (ierr /= 0) then
 	    call CVODE_error('Error in FCVodeSetMaxNumSteps, ierr = ', ierr, callback ) 
 		stop
     end if
     
     ! set maximum order of BDF method (default: 5)
-    ierr = FCVodeSetMaxOrd(cvode_mem, 2)
+    ierr = FCVodeSetMaxOrd(cvode_mem, 5)    !Used to be 2
     if (ierr /= 0) then
 	    call CVODE_error('Error in FCVodeSetMaxOrd, ierr = ', ierr, callback ) 
 		stop
