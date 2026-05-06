@@ -717,10 +717,10 @@ end subroutine getHOnSourcesFMM
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
             exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
-			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
-            CrysAxis, K0_arr, K1, K2, problem, &
-            n_macro, shiftVec, macroShape, sampleShape, &
-            dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n)
+			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	&
+            n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
+            dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, &
+            passExch, exch_ncols, CrysAxis, K0_arr, K1, K2, problem)
 
         call SolveLandauLifshitzEquation( problem, solution )
 

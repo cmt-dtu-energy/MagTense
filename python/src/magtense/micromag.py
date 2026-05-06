@@ -80,6 +80,8 @@ class MicromagProblem:
         grid_L: list[float] = (500e-9, 125e-9, 3e-9),
         grid_nnod: int = 0,
         grid_type: str | None = "uniform",
+        grid_pts: list | np.ndarray | None = None,
+        grid_abc: list | np.ndarray | None = None,
         prob_mode: str | None = "new",
         solver: str | None = "dynamic",
         m0: int | float | list | np.ndarray | None = None,
@@ -102,8 +104,6 @@ class MicromagProblem:
         dem_thres: float = 0.0,
         demag_approx: str | None = None,
         cv: float = 0.0,
-        grid_pts: list | np.ndarray | None = None,
-        grid_abc: list | np.ndarray | None = None,
         exch_val: list | np.ndarray | None = None,
         exch_rows: list | np.ndarray | None = None,
         exch_col: list | np.ndarray | None = None,
@@ -131,20 +131,10 @@ class MicromagProblem:
         sampleShape: list | np.ndarray | None = None,
         exchPBC: list | np.ndarray | None = None,
     ) -> None:
-        ntot = np.prod(res)
-        self.ntot = ntot
-        self.grid_nnod = grid_nnod
         self.nt_conv = nt_conv
-        self.exch_nval = exch_nval
-        self.exch_nrow = exch_nrow
-        self.exch_ncols = exch_ncols
-        self.exch_intpn = exch_intpn
-        self.exch_meth = exch_meth
-        self.exch_weigh = exch_weigh
-        self.passexch = passexch
-        self.demigstp = demigstp
+
         self.usereturnhall = usereturnhall
-        self.exch_presize = exch_presize
+        self.demigstp = demigstp
 
         # Set grid, solver and problem type
         self.grid_type = grid_type
@@ -165,8 +155,6 @@ class MicromagProblem:
         self.grid_nnod = grid_nnod
         self.grid_ele = np.zeros(shape=(4, ntot), dtype=np.float64, order="F")
         self.grid_nod = np.zeros(shape=(grid_nnod, 3), dtype=np.float64, order="F")
-        self.grid_abc = grid_abc
-        self.u_ea = np.zeros(shape=(ntot, 3), dtype=np.float64, order="F")
 
         # Set macrogeometry
         self.n_macro = n_macro
@@ -175,11 +163,7 @@ class MicromagProblem:
         self.sampleShape = sampleShape
         self.exchPBC = exchPBC
 
-        self.grid_type = grid_type
-        self.prob_mode = prob_mode
-        self.solver = solver
-
-        self.m0 = m0
+        # Set material parameters
         self.A0 = A0
         self.Ms = Ms
         self.K0 = K0
@@ -193,6 +177,7 @@ class MicromagProblem:
 
         # --- Set the local crystal coordinates to the three Cartesian axis
         self.CrysAxis = CrysAxis
+        self.u_ea = np.zeros(shape=(ntot, 3), dtype=np.float64, order="F")  # Anisotropy axes
 
         self.alpha_mm = alpha
         self.gamma = gamma
@@ -215,10 +200,20 @@ class MicromagProblem:
         self.alphat[:, 0] = t_alpha
         self.alphat[:, 1] = alpha_fct(t_alpha)
 
-        self.exch_val = exch_val
-        self.exch_rows = exch_rows
-        self.exch_rowe = np.zeros(shape=(self.exch_nrow), dtype=np.int32, order="F")
-        self.exch_col = exch_col
+        # Define exchange interaction
+        self.exch_nval = exch_nval      # Number of values
+        self.exch_nrow = exch_nrow      # Number of rows
+        self.exch_ncols = exch_ncols    # Number of columns
+        self.exch_val = exch_val        # Values
+        self.exch_rows = exch_rows      # Rows
+        self.exch_rowe = np.zeros(shape=(self.exch_nrow), dtype=np.int32, order="F")    # ???
+        self.exch_col = exch_col        # Columns
+        self.exch_intpn = exch_intpn    # ??? (interpolation method?)
+        self.exch_meth = exch_meth      # ??? (exchange computation method?)
+        self.exch_weigh = exch_weigh    # ??? (exchange weights? 'weigh' is just 'weight' misspelled, right?)
+        self.passexch = passexch        # ??? (Whether to pass a predefined exchange tensor or compute a new one?)
+        self.exch_presize = exch_presize
+
 
         self.N_load = len(filename)
         self.N_file_in = filename
@@ -693,9 +688,13 @@ class MicromagProblem:
 
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
             ntot=self.ntot,
+            grid_type=self.grid_type,
             grid_n=self.grid_n,
             grid_l=self.grid_L,
-            grid_type=self.grid_type,
+            grid_pts=self.grid_pts,
+            grid_ele=self.grid_ele,
+            grid_nod=self.grid_nod,
+            grid_nnod=self.grid_nnod,
             u_ea=self.u_ea,
             problemmode=self.prob_mode,
             solver=self.solver,
@@ -732,10 +731,6 @@ class MicromagProblem:
             nt_conv=self.nt_conv,
             t_conv=self.t_conv,
             conv_tol=self.conv_tol,
-            grid_pts=self.grid_pts,
-            grid_ele=self.grid_ele,
-            grid_nod=self.grid_nod,
-            grid_nnod=self.grid_nnod,
             exch_nval=self.exch_nval,
             exch_nrow=self.exch_nrow,
             exch_val=self.exch_val,
