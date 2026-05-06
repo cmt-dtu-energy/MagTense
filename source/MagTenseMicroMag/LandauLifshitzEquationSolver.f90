@@ -455,9 +455,9 @@
         t1 = walltime()
 #endif
         !--------------- calculate precession term: m x Heff -------------
-        crossX = -1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
-        crossY = -1.0_DP * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
-        crossZ = -1.0_DP * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
+        crossX = 1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
+        crossY = 1.0_DP * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
+        crossZ = 1.0_DP * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
         !-------------------------------------------------------------
 #if USE_TIMING
         acc_cross = acc_cross + (walltime() - t1)
@@ -707,8 +707,7 @@
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
     
-    alpha = -2.! * solution%Jfact
-    !alpha = -2. * problem%A0 / ( mu0 * 8.0e5 )
+    alpha = 2.! * solution%Jfact
     beta = 0.
     
     ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
@@ -748,9 +747,9 @@
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
          !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
-        solution%HhX = -problem%Hext(solution%HextInd,2)
-        solution%HhY = -problem%Hext(solution%HextInd,3)
-        solution%HhZ = -problem%Hext(solution%HextInd,4)
+        solution%HhX = problem%Hext(solution%HextInd,2)
+        solution%HhY = problem%Hext(solution%HextInd,3)
+        solution%HhZ = problem%Hext(solution%HextInd,4)
 
     elseif ( problem%solver .eq. MicroMagSolverDynamic ) then
         
@@ -758,10 +757,10 @@
         call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,2), t, size(problem%Hext(:,1)), HextX )
         call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
         call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
-        
-        solution%HhX = -HextX
-        solution%HhY = -HextY
-        solution%HhZ = -HextZ
+
+        solution%HhX = HextX
+        solution%HhY = HextY
+        solution%HhZ = HextZ
         
     elseif ( problem%solver .eq. MicroMagSolverImplicit ) then
         !not implemented yet
@@ -829,14 +828,14 @@
     Hkx_rot = -2*Mx_rot(:)*(problem%Kfact_arr(:,1,1) + 2*problem%Kfact_arr(:,2,1)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,3)*My_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*My_rot(:)**2*Mz_rot(:)**2 )
     Hky_rot = -2*My_rot(:)*(problem%Kfact_arr(:,1,2) + 2*problem%Kfact_arr(:,2,2)*My_rot(:)**2 + problem%Kfact_arr(:,3,3)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,2)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,2)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*Mz_rot(:)**2 )
     Hkz_rot = -2*Mz_rot(:)*(problem%Kfact_arr(:,1,3) + 2*problem%Kfact_arr(:,2,3)*Mz_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*My_rot(:)**2 + 3*problem%Kfact_arr(:,4,3)*Mz_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + 2*problem%Kfact_arr(:,5,3)*Mx_rot(:)**2*Mz_rot(:)**2 + 2*problem%Kfact_arr(:,5,3)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*My_rot(:)**2 )
-    
-    solution%Hkx(:) = problem%CrystalAxis(:,1,1)*Hkx_rot(:) + problem%CrystalAxis(:,2,1)*Hky_rot(:) + problem%CrystalAxis(:,3,1)*Hkz_rot(:)
-    solution%Hky(:) = problem%CrystalAxis(:,1,2)*Hkx_rot(:) + problem%CrystalAxis(:,2,2)*Hky_rot(:) + problem%CrystalAxis(:,3,2)*Hkz_rot(:)
-    solution%Hkz(:) = problem%CrystalAxis(:,1,3)*Hkx_rot(:) + problem%CrystalAxis(:,2,3)*Hky_rot(:) + problem%CrystalAxis(:,3,3)*Hkz_rot(:)
+
+    solution%Hkx(:) = -problem%CrystalAxis(:,1,1)*Hkx_rot(:) - problem%CrystalAxis(:,2,1)*Hky_rot(:) - problem%CrystalAxis(:,3,1)*Hkz_rot(:)
+    solution%Hky(:) = -problem%CrystalAxis(:,1,2)*Hkx_rot(:) - problem%CrystalAxis(:,2,2)*Hky_rot(:) - problem%CrystalAxis(:,3,2)*Hkz_rot(:)
+    solution%Hkz(:) = -problem%CrystalAxis(:,1,3)*Hkx_rot(:) - problem%CrystalAxis(:,2,3)*Hky_rot(:) - problem%CrystalAxis(:,3,3)*Hkz_rot(:)
     
     deallocate(Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot)
 
-    end subroutine updateAnisotropy    
+    end subroutine updateAnisotropy
 
     !>-----------------------------------------
     !> @author Frederik L. Durhuus, fladu@dtu.dk, DTU, 2026
@@ -1335,8 +1334,8 @@ end subroutine updateDemagfieldFMM
             !solution%HmX = - problem%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
             !solution%HmY = - problem%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
             !solution%HmZ = - problem%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
-            
-            alpha = -1.! * problem%Mfact
+
+            alpha = 1. ! With MagTense conventions on the demagnetisation tensor H = N * M
             beta = 0.0
             !Hmx = Kxx * Mx
             call gemv( problem%Kxx, solution%Mx_s, solution%HmX, alpha, beta )
@@ -1420,10 +1419,6 @@ end subroutine updateDemagfieldFMM
         solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
     endif
     
-
-
-
-
 
     end subroutine updateDemagfield
     
