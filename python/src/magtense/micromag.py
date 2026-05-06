@@ -69,6 +69,7 @@ class MicromagProblem:
         solver: str | None = "dynamic",
         m0: int | float | list | np.ndarray | None = None,
         A0: int | float | list | np.ndarray | None = None,
+        T:  int | float | list | np.ndarray | None = None,
         Ms: int | float | list | np.ndarray | None = None,
         K0: int | float | list | np.ndarray | None = None,
         K1: int | float | list | np.ndarray | None = None,
@@ -154,6 +155,7 @@ class MicromagProblem:
         self.K1 = K1
         self.K2 = K2
         self.K0_arr = K0_arr
+        self.T = T
 
         # --- Set the local crystal coordinates to the three Cartesian axis
         self.CrysAxis = CrysAxis
@@ -326,6 +328,22 @@ class MicromagProblem:
         else:
             assert np.asarray(val).shape == (self.ntot, 1)
             self._A0 = np.asarray(val, dtype=np.float64, order="F")
+
+    @property
+    def T(self) -> int | float | list | np.ndarray | None:
+        return self._T
+
+    @T.setter
+    def T(self, val: int | float | list | np.ndarray | None) -> None:
+        if val is None:
+            self._T = 0.0 + np.zeros(self.ntot, dtype=np.float64, order="F")
+
+        elif isinstance(val, (int, float)):
+            self._T = val + np.zeros(self.ntot, dtype=np.float64, order="F")
+
+        else:
+            assert np.asarray(val).shape == self.ntot
+            self._T = np.asarray(val, dtype=np.float64, order="F")
 
     @property
     def Ms(self) -> int | float | list | np.ndarray | None:
@@ -629,6 +647,7 @@ class MicromagProblem:
             crysaxis=self.CrysAxis,
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
+            temperature=self.T,
             maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             hext=h_ext,

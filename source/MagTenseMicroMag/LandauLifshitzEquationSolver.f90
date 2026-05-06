@@ -54,14 +54,17 @@
     !>-----------------------------------------
     subroutine SolveLandauLifshitzEquation( prob, sol )
     !DEC$ ATTRIBUTES ALIAS:"solvelandaulifshitzequation_" :: SolveLandauLifshitzEquation
-    type(MicroMagProblem),intent(inout) :: prob     !> The problem data structure
-    type(MicroMagSolution),intent(inout) :: sol     !> The solution data structure    
-    type(MicroMagGridInfo) :: gridinfo              !> The grid information structure
-    integer :: ntot,i,j,k,ind,nt,nt_Hext,stat       !> total no. of tiles
-    procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
-    procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
-    real(DP),dimension(:,:,:),allocatable :: M_out  !> Internal buffer for the solution (M) on the form (3*ntot,nt)
+    type(MicroMagProblem),intent(inout) :: prob          !> The problem data structure
+    type(MicroMagSolution),intent(inout) :: sol          !> The solution data structure
+    type(MicroMagGridInfo) :: gridinfo                   !> The grid information structure
+    integer :: ntot,i,j,k,ind,nt,nt_Hext,stat            !> total no. of tiles (Note from F. Durhuus: n_Hext would make more sense than nt_Hext)
+    procedure(dydt_fct), pointer :: fct                  !> Input function pointer for the function to be integrated
+    procedure(no_argument_fct), pointer :: fct_thermal   !> Function pointer for the function that updates the stochastic thermal field
+    procedure(callback_fct),pointer :: cb_fct            !> Callback function for displaying progress
+    real(DP),dimension(:,:,:),allocatable :: M_out       !> Internal buffer for the solution (M) on the form (3*ntot,nt)
     real(DP) :: A0_max
+    real(DP) :: t_step, gamma, kB, alpha0, alphaGilbert  !> Parameters needed for thermal factor
+    real(DP),dimension(:),allocatable :: volCells        !> Cell volumes
     character*(100) :: prog_str 
     real :: rate
     integer :: c1,c2,cr,cm 
@@ -194,13 +197,22 @@
     
     !Do the solution
     fct => dmdt_fct
+    fct_thermal => updateThermal_wrapper
     cb_fct => displayGUIProgressMessage
     
     gb_solution%HextInd = 1;
     
-    !Go through a range of applied fields and find the equilibrium solution for each of them
-    !The no. of applied fields to consider
-    nt = size( gb_problem%t ) 
+    !Number of timesteps (for each field value, right?)
+    nt = size( gb_problem%t )
+
+    !Whether to include the thermal field
+    !If the temperature is nonzero anywhere, include stochastic field and normalise magnetisation every timestep
+    if (any(gb_problem%temperature > 1.0e-15)) then
+        gb_problem%includeThermal = .true.
+        call displayGUIMessage( 'Including thermal noise' )
+    else
+        gb_problem%includeThermal = .false.
+    end if
         
     if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
         !Run several different applied fields
@@ -208,6 +220,29 @@
     else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
         !Simply do a time evolution as specified in the problem  
         nt_Hext = 1
+
+        if (gb_problem%includeThermal) then
+            ! Calculate the prefactor for the thermal magnetic field
+            t_step = gb_problem%t(nt) / nt    ! Timestep [s] (assumed constant)
+            gamma = gb_problem%gamma          ! Gyromagnetic factor [m/(A*s)]
+            alpha0 = gb_problem%alpha0        ! Damping constant [m/(A*s)]
+            kB = 1.38064851 * 1e-23           ! The Boltzmann constant [J/K]
+            ! Get cell volumes
+            allocate( volCells(ntot) )
+            if (gb_problem%grid%gridType /= gridTypeUniform) then
+                volCells = gb_problem%grid%abc(:,1) * gb_problem%grid%abc(:,2) * gb_problem%grid%abc(:,3)
+            else
+                volCells = gb_problem%grid%dx * gb_problem%grid%dy * gb_problem%grid%dz
+            end if
+            ! Combined computation
+            alphaGilbert = gamma/(2*alpha0) + 1/2 * sqrt((gamma/alpha0)**2 - 4)   ! Dimensionless Gilbert damping (second order polynomial equation)
+            allocate( gb_problem%Tfact(ntot) )
+            gb_problem%Tfact = sqrt(2*kB * gb_problem%temperature * alphaGilbert / (mu0 * gamma * volCells * gb_problem%Ms * t_step))
+            print *, "Finished calculating thermal prefactor"
+            !print *, 'Tfact', gb_problem%Tfact(1)   ! Just for debugging
+        else
+            gb_problem%Tfact = 0
+        end if
     endif
     
     allocate(M_out(3*ntot,nt,nt_Hext))   
@@ -407,9 +442,9 @@
         t1 = walltime()
 #endif
         !--------------- combine to get effective field, Heff -------------
-        HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
-        HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY
-        HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ
+        HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX + gb_solution%HtX
+        HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY + gb_solution%HtX
+        HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ + gb_solution%HtX
         !-------------------------------------------------------------
 #if USE_TIMING
         acc_heff = acc_heff + (walltime() - t1)
@@ -623,6 +658,12 @@
         solution%HmX(:) = 0.
         solution%HmY(:) = 0.
         solution%HmZ(:) = 0.
+
+        !Thermal field
+        allocate( solution%HtX(ntot), solution%HtY(ntot), solution%HtZ(ntot) )
+        solution%HtX(:) = 0.
+        solution%HtY(:) = 0.
+        solution%HtZ(:) = 0.
         
         if ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
             !allocate the Fourier Transform of the magnetization
@@ -792,6 +833,99 @@
     deallocate(Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot)
 
     end subroutine updateAnisotropy    
+
+    !>-----------------------------------------
+    !> @author Frederik L. Durhuus, fladu@dtu.dk, DTU, 2026
+    !> Lightly edited function from ChatGPT
+    !> Fills an array, z, with Gaussian distributed random numbers of mean 0 and standard deviation 1
+    !> Uses the Marsaglia polar method to map uniformly distributed random numbers onto a Gaussian distribution
+    !> TODO : Put this in some utilities module rather than the core script
+    !>-----------------------------------------
+    subroutine GenerateGaussianArray(z)
+    real, intent(out) :: z(:)
+
+    integer :: n, filled, batch, i
+    real, allocatable :: u(:), v(:), s(:), factor(:)
+    logical, allocatable :: mask(:)
+
+    n = size(z)
+    filled = 0
+
+    ! Batch size: typically similar to output size
+    ! Lower limit to avoid efficiency issues and upper limit to avoid excessively large arrays
+    batch = min(max(64, n), 8192)
+
+    allocate(u(batch), v(batch), s(batch), factor(batch), mask(batch))
+
+    do while (filled < n)
+
+        ! Generate uniform random numbers
+        call random_number(u)
+        call random_number(v)
+
+        ! Transform to [-1,1]
+        u = 2.0*u - 1.0
+        v = 2.0*v - 1.0
+
+        ! Compute radius
+        s = u*u + v*v
+
+        ! Acceptance mask
+        mask = (s < 1.0) .and. (s > 0.0)
+
+        where(mask)
+            factor = sqrt(-2.0*log(s)/s)
+        end where
+
+        ! Store accepted numbers
+        do i = 1, batch
+            if (mask(i)) then
+                if (filled < n) then
+                    filled = filled + 1
+                    z(filled) = u(i)*factor(i)
+                end if
+
+                if (filled < n) then
+                    filled = filled + 1
+                    z(filled) = v(i)*factor(i)
+                end if
+            end if
+
+            if (filled >= n) exit
+        end do
+
+    end do
+
+    deallocate(u,v,s,factor,mask)
+
+    end subroutine GenerateGaussianArray
+
+    !>-----------------------------------------
+    !> @author Frederik L. Durhuus, fladu@dtu.dk, DTU, 2026
+    !> Calculates and returns the thermal field
+    !>-----------------------------------------
+    subroutine updateThermalField( problem, solution )
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure
+    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+
+    integer :: ntot
+    real,dimension(:),allocatable :: GaussianArray
+
+    ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+    allocate(GaussianArray(3*ntot))
+    call GenerateGaussianArray(GaussianArray)
+
+    solution%HtX = GaussianArray(1:ntot) * problem%Tfact
+    solution%HtY = GaussianArray(ntot+1:2*ntot) * problem%Tfact
+    solution%HtZ = GaussianArray(2*ntot+1:3*ntot) * problem%Tfact
+
+    end subroutine updateThermalField
+
+    !> Wrapper function so we can construct a pointer for updateThermalField
+    !>  and future thermal update functions that does not require any arguments
+    subroutine updateThermal_wrapper()
+        call updateThermalField( gb_problem, gb_solution)
+    end subroutine updateThermal_wrapper
 
 
 subroutine updateDemagfieldFMM(problem, solution)

@@ -133,6 +133,9 @@ include "mkl_dfti.f90"
         real(DP) :: tol,thres_value                      !> User defined coefficients for the ODE solver
         real(DP),dimension(:),allocatable :: Jfact,Kfact
         real(SP),dimension(:),allocatable :: Mfact
+        real(DP),dimension(:),allocatable :: temperature  !> User defined system temperature
+        real(DP),dimension(:),allocatable :: Tfact        !> Prefactor of the termal magnetic field
+        logical :: includeThermal                         !> Whether thermal noise is included in the simulations
         
         real(DP),dimension(:,:),allocatable :: Hext      !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
         real(DP),dimension(:,:),allocatable :: alpha     !> A time dependent dampning parameter, i.e. as a function of time. Size (nt,1).

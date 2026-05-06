@@ -30,13 +30,14 @@ module ODE_Solvers
     !> @param[in] useCVODE optional flag for choosing solvers. 
     !> more parameters to come as we progress in the build-up of this function (error, options such as tolerances etc)
     !---------------------------------------------------------------------------
-    subroutine MagTense_ODE( fct, t, y0, t_out, y_out, callback, callback_display, tol, thres_value, useCVODE, t_conv, conv_tol )
+    subroutine MagTense_ODE( fct, t, y0, t_out, y_out, includeThermal, fct_thermal, callback, callback_display, tol, thres_value, useCVODE, t_conv, conv_tol )
     
         !======= Inclusions ===========
         use, intrinsic :: iso_c_binding
         
         !======= Declarations =========
         procedure(dydt_fct), pointer :: fct                     !>Input function pointer for the function to be integrated
+        procedure(no_argument_fct), pointer :: fct_thermal      !>Function pointer for the function that updates the thermal field
         procedure(callback_fct), pointer :: callback            !>Callback function
         real,dimension(:),intent(in) :: t, y0                   !>Requested time (size m) and initial values ofy (size n)
         real,dimension(:),intent(inout) :: t_out                !>Actual time values at which the y_i are found, size m
@@ -48,6 +49,7 @@ module ODE_Solvers
         real,dimension(:),intent(in) :: t_conv                  !>Array for the time values where the solution will be checked for convergence
         real,intent(in) :: conv_tol                             !>Converge criteria on difference between magnetization at different timesteps
         integer :: solver_flag
+        logical :: includeThermal
         
         integer :: neq, nt, nt_conv
         real, allocatable, dimension(:,:) :: yderiv_out         !>The derivative of y_i wrt t at each time step
@@ -72,7 +74,7 @@ module ODE_Solvers
             yderiv_out(:,:) = 0
 
             !Call the solver
-            call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol )
+            call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, includeThermal, fct_thermal, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol )
             
             !clean-up
             deallocate(yderiv_out)
@@ -112,10 +114,11 @@ module ODE_Solvers
     !> @param[inut] yderiv_out output array with dy_i/dt at each time
     !> @param[in] callback procedure pointer to callback to Matlab for progress updates
     !---------------------------------------------------------------------------
-    subroutine MagTense_ODE_RKSuite( fct, neq, t, nt, ystart,  t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol )
+    subroutine MagTense_ODE_RKSuite( fct, neq, t, nt, ystart,  t_out, y_out, yderiv_out, includeThermal, fct_thermal, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol )
         
         !======= Declarations =========
         procedure(dydt_fct), pointer :: fct                  !>Input function pointer for the function to be integrated
+        procedure(no_argument_fct), pointer :: fct_thermal   !>Function pointer for the function that updates the thermal field
         integer,intent(in) :: neq, nt, nt_conv               !>Input no. of equations, no. of time steps and no. of time steps in the check for convergence array
         real,dimension(nt),intent(in) :: t                   !>Input time array, size nt
         real,dimension(neq),intent(in) :: ystart             !>Input initial conditions (y at t=0), size neq
@@ -133,6 +136,7 @@ module ODE_Solvers
         real,dimension(neq) :: y_last                   !>Array containing the solution in the last returned convergence timestep
         real,dimension(neq) :: y_step                   !>Array containing the solution in the current timestep
         real,dimension(neq) :: yderiv_step              !>Array containing dy/dt in the current timestep
+        real,dimension(:),allocatable :: y_norm         !>Array of vector magnitudes used for normalising y_step. neq/3 = ntot
         real,dimension(nt+nt_conv) :: t_comb            !>The concatenated time array of the output times and the convergence times
         real,dimension(nt+nt_conv) :: t_comb_out        !>The concatenated time array of the output times and the convergence times
         real,dimension(:),allocatable :: t_comb_unique  !>The concatenated time array of the output times and the convergence times, only unique values
@@ -143,10 +147,12 @@ module ODE_Solvers
         real :: hstart                              !>Whether the code should choose the size of the first step. Set to 0.0d if so (recommended)    
         real :: t_step                              !>The current time at the end of a time step
         real :: conv_error                          !>The maximum error in the current time step
+        integer :: ntot                             !>Total number of micromagnetic cells (ntot = neq/3)
         type(rk_comm_real_1d) :: setup_comm         !>Stores all the stuff used by setup
         integer :: flag                             !>Flag indicating how the integration went
         integer :: i, k                             !>Counter variable
         character*(100) :: prog_str                 !>Variable holding the output string
+        logical :: includeThermal                   !>Whether to normalise result and update thermal field after each timestep
         !integer,parameter :: n_write=100
         !Perform allocations. 
         allocate(thres(neq))
@@ -188,11 +194,26 @@ module ODE_Solvers
         !First time is the same as the input
         t_out(1) = t(1)
         y_out(:,1) = ystart
+
+        !Allocate norm array
+        ntot = neq/3
+        if ( includeThermal ) then
+            allocate( y_norm(ntot) )
+            call fct_thermal()  ! Generate the stochastic thermal field
+        end if
         
         k = 2
         !Call the integrator
         do i=2,size(t_comb_unique)                
             call range_integrate( setup_comm, fct, t_comb_unique(i), t_step, y_step, yderiv_step, flag )
+
+            if ( includeThermal ) then
+                y_norm = sqrt(y_step(1:ntot)**2 + y_step(ntot+1:2*ntot)**2 + y_step(2*ntot+1:3*ntot)**2)
+                y_step(1:ntot) = y_step(1:ntot)/y_norm                     ! Normalise x-component
+                y_step(ntot+1:2*ntot) = y_step(ntot+1:2*ntot)/y_norm       ! Normalise y-component
+                y_step(2*ntot+1:3*ntot) = y_step(2*ntot+1:3*ntot)/y_norm   ! Normalise z-component
+                call fct_thermal()  ! Update the stochastic thermal field
+            end if
             
             if ( mod(i, callback_display) .eq. 0 ) then
                 write(prog_str,'(A6, F8.2, A15, I4.1, A1, I4.1)') 'Time: ', t_step*1e9, ' ns, i.e. step ', i, '/', size(t_comb_unique)
