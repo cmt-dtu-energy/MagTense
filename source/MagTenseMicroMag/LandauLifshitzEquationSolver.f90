@@ -119,7 +119,7 @@
         !Setup the grid
         call setupGrid( gb_problem%grid )
         
-        !Set up the mesh for an uniform grid
+        !Set up the mesh for a uniform grid
         allocate( gb_problem%A0_map(gb_problem%grid%nx,gb_problem%grid%ny,gb_problem%grid%nz) )
         if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then   
             do k=1,gb_problem%grid%nz
@@ -1032,7 +1032,7 @@ subroutine updateDemagfieldFMM(problem, solution)
             real(problem%grid%dz, DP)
     end if
     !------------------------------------------------------------
-    !--------- conert to dipole moment m = M * ΔV --------------
+    !--------- convert to dipole moment m = M * ΔV --------------
     ! TODO - is Ms the correct scaling here?
     mx = solution%Mx(i) * vol_i * problem%Ms(i)
     my = solution%My(i) * vol_i * problem%Ms(i)

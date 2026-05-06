@@ -220,9 +220,9 @@ module ODE_Solvers
                 call callback( prog_str, -1 )
             endif
             
-            !Check if the time which the solution is returned is part of the array that checks for converge or if it part of the times where the simulation is to be saved
+            !Check if the time which the solution is returned is part of the array that checks for convergence or if it is part of the times where the simulation is to be saved
             ind = findloc(t_conv,t_comb_unique(i))
-            if (maxval(ind) .gt. 0) then !If the time is part of the converge array, we check for converge
+            if (maxval(ind) .gt. 0) then !If the time is part of the converge array, we check for convergence
                 conv_error = maxval(abs(y_step-y_last))
                 if (conv_error < conv_tol) then
                     !Save the current state before exiting
@@ -231,7 +231,7 @@ module ODE_Solvers
                     t_out(k) = t_step
                     exit
                 endif
-                !Save the new magnetization to use for the next converge calculation
+                !Save the new magnetization to use for the next convergence calculation
                 y_last = y_step
             endif
             

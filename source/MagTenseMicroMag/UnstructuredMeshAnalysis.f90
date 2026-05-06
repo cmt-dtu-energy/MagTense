@@ -1,4 +1,4 @@
-﻿module UnstructuredMeshAnalysis
+module UnstructuredMeshAnalysis
   use MKL_SPBLAS
   use BLAS95
   use MicroMagParameters
@@ -25,7 +25,7 @@
     !> start with all the elements centers ("pos") and cell sizes ("dims")
     !> round centers and sizes to minimum
     !> the elements are already the right number
-    !> generate 6 faces for each of them an connect them (TheSigns matrix)
+    !> generate 6 faces for each of them and connect them (TheSigns matrix)
     !> there are too many faces
     !> cycle over each pair of faces.
     !> For each pair (A,B) these are the possible relations
