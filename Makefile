@@ -114,7 +114,8 @@ ifeq ($(OS),Windows_NT)
 else
  	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
 	CUDA_ROOT = ${CONDA_PREFIX}/lib
-	LDFLAGS += -lstdc++ -liomp5
+	LDFLAGS =
+	#LDFLAGS += -lstdc++ -liomp5
 	LIB_SUFFIX = .a
 	PY_MOD_SUFFIX = .so
 	CVODE_SUFFIX =
