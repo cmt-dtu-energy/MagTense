@@ -1171,7 +1171,7 @@ end subroutine updateDemagfieldFMM
     complex(kind=4) :: alpha_c, beta_c
     real(SP), dimension(:), allocatable :: temp
     character*(100) :: prog_str
-    real(SP),dimension(3) :: Mavg_s
+    real(DP),dimension(3) :: Mavg           !> Average magnetisation
     
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
@@ -1186,10 +1186,11 @@ end subroutine updateDemagfieldFMM
     solution%Mz_s = real(solution%Mz, SP)
 
     ! Get average magnetisation
-    Mavg_s(1) = sum(solution%Mx_s)/ntot
-    Mavg_s(2) = sum(solution%My_s)/ntot
-    Mavg_s(3) = sum(solution%Mz_s)/ntot
-
+    ! Average across micromagnetic cells, then multiply by the volume fraction of the cells so
+    ! non-magnetic regions are included in the volume average. Assumes all cells have the same volume.
+    Mavg(1) = sum(solution%Mx)/ntot * problem%VfracOcc
+    Mavg(2) = sum(solution%My)/ntot * problem%VfracOcc
+    Mavg(3) = sum(solution%Mz)/ntot * problem%VfracOcc
     
     if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
         if ( problem%useCuda .eq. useCudaFalse ) then
@@ -1874,11 +1875,13 @@ end subroutine updateDemagfieldFMM
     subroutine ComputeShapeCorrectionTensor( problem )
     type(MicroMagProblem),intent(inout) :: problem       !> Grid data structure
 
-    integer :: nx,ny,nz,ntot                                      !> Internal counters and index variables
-    real(DP), dimension(:,:),allocatable :: pts                   !> Evaluation points
-    real(DP),dimension(:,:,:),allocatable :: Nshape               !> Temporary storage for the demag tensor
-    real(DP),allocatable :: aMacro,bMacro,cMacro                  !> Macrogeometry shape parameters
-    real(DP),allocatable :: aSample,bSample,cSample               !> Macrogeometry shape parameters
+    integer :: nx,ny,nz,ntot                             !> Internal counters and index variables
+    real(DP),dimension(:,:),allocatable :: pts           !> Evaluation points
+    real(DP),dimension(:,:,:),allocatable :: Nshape      !> Temporary storage for the demag tensor
+    real(DP),allocatable :: aMacro,bMacro,cMacro         !> Macrogeometry shape parameters
+    real(DP),allocatable :: aSample,bSample,cSample      !> Sample shape parameters
+    integer :: ntotMacro                                 !> Number of domain copies in macrogeometry
+    real(DP) :: Vcell, Vdomain                           !> Volume of single cell and simulated domain
 
     ! Get number of elements
     nx = problem%grid%nx
@@ -1916,6 +1919,15 @@ end subroutine updateDemagfieldFMM
 
     ! By symmetry Kxz = Kzx and Kyz = Kzy
     problem%Kzz_shape = Nshape(:,3,3)
+
+    ! Get volume fraction occupied
+    ntotMacro = (1 + 2*problem%macrogrid%n_macro(1)) * (1 + 2*problem%macrogrid%n_macro(2)) * (1 + 2*problem%macrogrid%n_macro(3))
+    Vdomain = aMacro * bMacro * cMacro / ntotMacro
+    Vcell = problem%grid%dx * problem%grid%dy * problem%grid%dz
+    allocate( problem%VfracOcc )
+    problem%VfracOcc = ntot * Vcell / Vdomain
+    call displayGUIMessage( 'Volume fraction occupied by magnetic material :' )
+    print *, problem%VfracOcc
 
     ! Clean up
     deallocate(Nshape)

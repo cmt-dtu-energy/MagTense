@@ -70,6 +70,8 @@ class MicromagProblem:
         alpha_fct:
         n_macro: How many copies of the simulated domain to have along x, y and z to represent the macrogeometry
         shiftVec: How far to shift domain copies along x, y and z when constructing the macrogeometry
+        macroShape: Sidelengths of a prism representing the shape of the macrogeometry.
+        sampleShape: Sidelengths of a prism representing the sample shape.
     """
 
     def __init__(

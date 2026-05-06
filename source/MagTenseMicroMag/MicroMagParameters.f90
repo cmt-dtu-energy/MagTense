@@ -100,12 +100,11 @@ include "mkl_dfti.f90"
         real(dp), allocatable :: Exch_mat_v(:)   !> Values for the exchange coupling matrix
      end type MicroMagGridInfo
 
-    !Additional information about the macrogeometry and sample shape
-    ! used for computing the demagnetisation field
+    !Additional information about the macrogeometry and sample shape used to implement periodic boundary conditions (PBCs)
     !Note that current version approximates the overall shape of sample and macrogeometry by rectangular prisms
     type MicroMagMacrogeometry
-        !> Number of copies on both sides of the intial domain which together form the macrogeometry
-        integer,allocatable :: n_macro(:)
+        ! Settings for periodic demagnetisation field
+        integer,allocatable :: n_macro(:)      !> Number of copies on both sides of the intial domain along x,y and z, which together form the macrogeometry
         real(dp),allocatable :: shiftVec(:)    !> How far to shift neighbouring domain copies along x, y, z
         real(dp),allocatable :: macroShape(:)  !> Sidelengths of macrogeometry prism
         real(dp),allocatable :: sampleShape(:) !> Sidelengths of sample prism
@@ -183,6 +182,8 @@ include "mkl_dfti.f90"
         real(SP),dimension(:),allocatable :: Kxx_shape,Kxy_shape,Kxz_shape  !> Shape correction tensor components
         real(SP),dimension(:),allocatable :: Kyy_shape,Kyz_shape            !> Shape correction tensor components
         real(SP),dimension(:),allocatable :: Kzz_shape                      !> Shape correction tensor components
+
+        real(DP),allocatable :: VfracOcc    !> Fraction of simulation volume occupied by micromagnetic cells
 
         integer,dimension(:,:),allocatable :: tensorMap     !> A map of the unique entries in the demagnetization tensor
         logical,dimension(:,:),allocatable :: tensorMapX, tensorMapY, tensorMapZ   !> The sign of the different components in the demagnetization tensor map
