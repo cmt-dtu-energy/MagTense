@@ -1629,7 +1629,6 @@ end subroutine updateDemagfieldFMM
                         if (all(n_macro == 0.0)) then
                             call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
                         else
-                            write(*,*) "get field from tiles : PBC version"
                             call getFieldFromTiles_PBC( tile, H, problem%grid%pts, 1, ntot, n_macro, &
                             shiftVec, Nout, .false. )
                         end if
