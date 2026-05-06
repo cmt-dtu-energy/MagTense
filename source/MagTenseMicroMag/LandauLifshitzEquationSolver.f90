@@ -250,11 +250,13 @@
     !Allocate the arrays for the different fields
     !Only if these are to be returned are they saved at every time step
     if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
+        call displayGUIMessage( 'useReturnHall is True ' )
         allocate(gb_solution%H_exc(size(gb_problem%t),ntot,nt_Hext,3))
         allocate(gb_solution%H_ext(size(gb_problem%t),ntot,nt_Hext,3))
         allocate(gb_solution%H_dem(size(gb_problem%t),ntot,nt_Hext,3))
         allocate(gb_solution%H_ani(size(gb_problem%t),ntot,nt_Hext,3))  
     else
+        call displayGUIMessage( 'useReturnHall is False ' )
         allocate(gb_solution%H_exc(1,1,1,3))
         allocate(gb_solution%H_ext(1,1,1,3))
         allocate(gb_solution%H_dem(1,1,1,3))
