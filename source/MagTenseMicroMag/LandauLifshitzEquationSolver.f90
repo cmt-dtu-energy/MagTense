@@ -200,7 +200,7 @@
     fct_thermal => updateThermal_wrapper
     cb_fct => displayGUIProgressMessage
     
-    gb_solution%HextInd = 1;
+    gb_solution%HextInd = 1
     
     !Number of timesteps (for each field value, right?)
     nt = size( gb_problem%t )
