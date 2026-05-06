@@ -656,7 +656,7 @@ end subroutine getHOnSourcesFMM
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
         exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, demigstp, & 
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
-        n_macro, shiftVec, macroShape, sampleShape, &
+        n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n )
 
@@ -683,8 +683,9 @@ end subroutine getHOnSourcesFMM
         character*256,intent(in) :: N_file_in, N_file_out
 		real(8), intent(in) :: CV, exch_weigh
 
-        integer(4),dimension(3) :: n_macro
-        real(8),dimension(3) :: shiftVec, macroShape, sampleShape
+        integer(4),dimension(3),intent(in) :: n_macro
+        real(8),dimension(3),intent(in) :: shiftVec, macroShape, sampleShape
+        logical,dimension(3),intent(in) :: exchPBC
 
         real(8),dimension(nt),intent(in) :: t
         real(8),dimension(nt),intent(out) :: t_out

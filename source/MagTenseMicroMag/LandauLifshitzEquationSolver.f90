@@ -1964,17 +1964,18 @@ end subroutine updateDemagfieldFMM
     subroutine ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
     type(MicroMagGrid),intent(in) :: grid              !> Struct containing the grid information    
     type(sparse_matrix_t),intent(inout) :: A           !> The returned matrix from the sparse matrix creator
-    type(MicroMagProblem),intent(inout) :: problem      !> Problem data structure 
-    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+    type(MicroMagProblem),intent(inout) :: problem     !> Problem data structure
+    type(MicroMagSolution),intent(inout) :: solution   !> Solution data structure
         
     integer :: stat                                    !> Status value for the various sparse matrix operations        
     type(MagTenseSparse_d) :: d2dx2, d2dy2, d2dz2      !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
     type(sparse_matrix_t) :: tmp                       !> Temporary sparse matrices used for internal calculations
-    integer :: ind, ntot,colInd,rowInd                 !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
+    integer :: ind,ntot,nNonZero,colInd,rowInd         !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated
     integer :: i,j,k,nx,ny,nz                          !> For-loop counters
     type(matrix_descr) :: descr                        !> Describes a sparse matrix operation
     real(DP) :: const
-    character*(100) :: prog_str 
+    character*(100) :: prog_str
+    logical :: PBCx, PBCy, PBCz                        !> Whether to have periodic boundary conditions along x, y and z respectively
     
     !Find the three sparse matrices for the individual directions. Then add them to get the total matrix
     !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My or Mz respectively.
@@ -1990,12 +1991,20 @@ end subroutine updateDemagfieldFMM
     nx = grid%nx
     ny = grid%ny
     nz = grid%nz
+    ntot = nx*ny*nz     ! Total number of micromagnetic tiles
+    PBCx = problem%macrogrid%exchPBC(1)
+    PBCy = problem%macrogrid%exchPBC(2)
+    PBCz = problem%macrogrid%exchPBC(3)
     
     !----------------------------------d^2dx^2 begins -----------------------------!
     if ( nx .gt. 1 ) then
-        !Make the d^2/dx^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz
-        ntot = nz * ( ny * 4 + ny * (nx-2)*3 )
-        allocate(d2dx2%values(ntot),d2dx2%cols(ntot),d2dx2%rows_start(nx*ny*nz),d2dx2%rows_end(nx*ny*nz))
+        ! Make the d^2/dx^2 matrix
+        if ( PBCx ) then
+            nNonZero = 3*ntot             ! For each tile, there are 3 non-zero elements corresponding to itself and the two neighbours along x
+        else
+            nNonZero = 3*ntot - 2*ny*nz   ! With a vacuum boundary, the 2*ny*nz tiles at the two end surfaces only have one neighbour each
+        end if
+        allocate(d2dx2%values(nNonZero),d2dx2%cols(nNonZero),d2dx2%rows_start(ntot),d2dx2%rows_end(ntot))
     
         ind = 1
         rowInd = 1
@@ -2003,65 +2012,112 @@ end subroutine updateDemagfieldFMM
     
         do k=1,nz
             do j=1,ny
-            
-                !The left boundary
-                d2dx2%values(ind) = -1.
-                d2dx2%cols(ind) = colInd
-                d2dx2%rows_start(rowInd) = ind            
-                ind = ind + 1
-            
-                d2dx2%values(ind) = 1.
-                d2dx2%cols(ind) = colInd + 1
-                d2dx2%rows_end(rowInd) = ind+1
-                rowInd = rowInd + 1
-                ind = ind + 1
-            
+                ! The left boundary
+                if ( PBCx ) then
+                    ! Coupling to the left (loops around and connects with rightmost tile)
+                    d2dx2%values(ind) = problem%A0_map(nx,j,k)/(problem%A0_map(nx,j,k)+problem%A0_map(1,j,k))
+                    d2dx2%cols(ind) = colInd + nx - 1
+                    d2dx2%rows_start(rowInd) = ind
+                    ind = ind + 1
+
+                    ! Current tile
+                    d2dx2%values(ind) = -( problem%A0_map(nx,j,k)/(problem%A0_map(nx,j,k)+problem%A0_map(1,j,k)) &
+                            + problem%A0_map(2,j,k)/(problem%A0_map(2,j,k)+problem%A0_map(1,j,k)) )
+                    d2dx2%cols(ind) = colInd
+                    ind = ind + 1
+
+                    ! Coupling to the right
+                    d2dx2%values(ind) = problem%A0_map(2,j,k)/(problem%A0_map(2,j,k)+problem%A0_map(1,j,k))
+                    d2dx2%cols(ind) = colInd + 1
+                    d2dx2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1
+                else
+                    ! Current tile
+                    d2dx2%values(ind) = -1.
+                    d2dx2%cols(ind) = colInd
+                    d2dx2%rows_start(rowInd) = ind
+                    ind = ind + 1
+
+                    ! Coupling to the right
+                    d2dx2%values(ind) = 1.
+                    d2dx2%cols(ind) = colInd + 1
+                    d2dx2%rows_end(rowInd) = ind+1
+                    rowInd = rowInd + 1
+                    ind = ind + 1
+                end if
             
                 !Go through one row at a time
                 do i=2,nx-1
-                            
-                    !Left-most point
-                    d2dx2%values( ind ) = problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))
+                    ! Coupling to the left
+                    d2dx2%values(ind) = problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))
                     d2dx2%cols(ind) = colInd
                     !update where the row starts
                     d2dx2%rows_start(rowInd) = ind                           
                     ind = ind + 1
                 
-                    !Center point
-                    d2dx2%values( ind ) = -(problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))+problem%A0_map(i+1,j,k)/(problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k)))
+                    ! Current tile
+                    d2dx2%values(ind) = -( problem%A0_map(i-1,j,k) / (problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k)) &
+                            + problem%A0_map(i+1,j,k) / (problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k)) )
                     d2dx2%cols(ind) = colInd + 1
                     ind = ind + 1
                 
-                    !Right-most point
+                    ! Coupling to the right
                     d2dx2%values( ind ) = problem%A0_map(i+1,j,k)/(problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k))
                     d2dx2%cols(ind) = colInd + 2
                     d2dx2%rows_end(rowInd) = ind+1
                     rowInd = rowInd + 1
                     ind = ind + 1
-                
+
                     colInd = colInd + 1
-                enddo            
-                !The right boundary
-                d2dx2%values(ind) = 1.
-                d2dx2%cols(ind) = colInd
-                !update where the row starts
-                d2dx2%rows_start(rowInd) = ind            
-                ind = ind + 1
-            
-                d2dx2%values(ind) = -1.
-                d2dx2%cols(ind) = colInd+1
-                d2dx2%rows_end(rowInd) = ind+1
-                rowInd = rowInd + 1
-                ind = ind + 1     
-            
-                colInd = colInd + 2
-            enddo
-        enddo
+                end do
+                ! The right boundary
+                if ( PBCx ) then
+
+                    ! Coupling to the left
+                    d2dx2%values(ind) = problem%A0_map(nx-1,j,k)/(problem%A0_map(nx-1,j,k)+problem%A0_map(nx,j,k))
+                    d2dx2%cols(ind) = colInd
+                    ! Update where the row starts
+                    d2dx2%rows_start(rowInd) = ind
+                    ind = ind + 1
+
+                    ! Current tile
+                    d2dx2%values(ind) = -( problem%A0_map(nx-1,j,k)/(problem%A0_map(nx-1,j,k)+problem%A0_map(nx,j,k)) &
+                            + problem%A0_map(1,j,k)/(problem%A0_map(1,j,k)+problem%A0_map(nx,j,k)) )
+                    d2dx2%cols(ind) = colInd + 1
+                    ind = ind + 1
+
+                    ! Coupling to the right (loops around and connects with leftmost tile)
+                    d2dx2%values(ind) = problem%A0_map(1,j,k)/(problem%A0_map(1,j,k)+problem%A0_map(nx,j,k))
+                    d2dx2%cols(ind) = colInd - nx + 2
+                    d2dx2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1
+
+                    colInd = colInd + 2
+                else
+                    ! Coupling to the left
+                    d2dx2%values(ind) = 1.
+                    d2dx2%cols(ind) = colInd
+                    d2dx2%rows_start(rowInd) = ind
+                    ind = ind + 1
+
+                    ! Current tile
+                    d2dx2%values(ind) = -1.
+                    d2dx2%cols(ind) = colInd+1
+                    d2dx2%rows_end(rowInd) = ind+1
+                    rowInd = rowInd + 1
+                    ind = ind + 1
+
+                    colInd = colInd + 2
+                end if
+            end do
+        end do
     
-        !Multiply by the discretization
+        ! Multiply by the discretization
         d2dx2%values = d2dx2%values * 2./grid%dx**2
         
-        !Create the sparse matrix for the d^2dx^2
+        ! Create the sparse matrix for the d^2dx^2
         stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
     
     endif
@@ -2071,94 +2127,130 @@ end subroutine updateDemagfieldFMM
     
     !----------------------------------d^2dy^2 begins ----------------------------!
     if ( ny .gt. 1 ) then
-        ntot = nz * ( nx * 2 + (ny-2) * nx * 3 + nx * 2 )
-        !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2
-        allocate(d2dy2%values(ntot),d2dy2%cols(ntot),d2dy2%rows_start(nx*ny*nz),d2dy2%rows_end(nx*ny*nz))
+        ! Make the d^2/dy^2 matrix
+        if ( PBCy ) then
+            nNonZero = 3*ntot             ! For each tile, there are 3 non-zero elements corresponding to itself and the two neighbours along y
+        else
+            nNonZero = 3*ntot - 2*nx*nz   ! With a vacuum boundary, the 2*nx*nz tiles at the two end surfaces only have one neighbour each
+        end if
+        allocate(d2dy2%values(nNonZero),d2dy2%cols(nNonZero),d2dy2%rows_start(ntot),d2dy2%rows_end(ntot))
     
         ind = 1
         rowInd = 1
         colInd = 1
         do k=1,nz
-            !The bottom boundary
-            do i=1,nx
-                d2dy2%values(ind) = -1.
-                d2dy2%cols(ind) = colInd
-                d2dy2%rows_start(rowInd) = ind
-            
-                !increment to next element
-                ind = ind + 1
-            
-                d2dy2%values(ind) = 1.
-                d2dy2%cols(ind) = colInd + nx
-                d2dy2%rows_end(rowInd) = ind+1
-                rowInd = rowInd + 1
-            
-                !increment to next element
-                ind = ind + 1
-            
-                colInd = colInd + 1
-            enddo
-        
-            !Everything in between
-            do j=2,ny-1
-                    
-            
+            ! The backwards boundary (Imagine standing on the origin, eyes pointed along the positive y-axis)
+            if ( PBCy ) then
                 do i=1,nx
-                
-                    !lower value
-                    d2dy2%values(ind) = problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))
-                    d2dy2%cols(ind) = colInd-nx
+                    ! Backwards coupling (loops around and couples to forwardmost tile)
+                    d2dy2%values(ind) = problem%A0_map(i,ny,k)/(problem%A0_map(i,ny,k)+problem%A0_map(i,1,k))
+                    d2dy2%cols(ind) = colInd + nx*(ny-1)
                     d2dy2%rows_start(rowInd) = ind
-                    !increment to next element
-                    ind = ind + 1  
-                
-                    !central value
-                    d2dy2%values(ind) = -(problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))+problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k)))
+                    ind = ind + 1  ! Increment to next element
+
+                    ! Current tile
+                    d2dy2%values(ind) = -(problem%A0_map(i,ny,k)/(problem%A0_map(i,ny,k)+problem%A0_map(i,1,k)) &
+                            + problem%A0_map(i,2,k)/(problem%A0_map(i,2,k)+problem%A0_map(i,1,k)))
                     d2dy2%cols(ind) = colInd
-            
-                    !increment to next element
-                    ind = ind + 1
-            
-                    !upper value
-                    d2dy2%values(ind) = problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k))
+                    ind = ind + 1  ! Increment to next element
+
+                    ! Forwards coupling
+                    d2dy2%values(ind) = problem%A0_map(i,2,k)/(problem%A0_map(i,2,k)+problem%A0_map(i,1,k))
+                    d2dy2%cols(ind) = colInd + nx
+                    d2dy2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1  ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            else
+                do i=1,nx
+                    ! Current tile
+                    d2dy2%values(ind) = -1.
+                    d2dy2%cols(ind) = colInd
+                    d2dy2%rows_start(rowInd) = ind
+                    ind = ind + 1  ! Increment to next element
+
+                    ! Forwards coupling
+                    d2dy2%values(ind) = 1.
                     d2dy2%cols(ind) = colInd + nx
                     d2dy2%rows_end(rowInd) = ind+1
                     rowInd = rowInd + 1
-                
-                    !increment to next element
-                    ind = ind + 1
+                    ind = ind + 1  ! Increment to next element
                     colInd = colInd + 1
-                enddo
-                        
+                end do
+            endif
         
-            enddo
+            ! Everything in between
+            do j=2,ny-1
+                do i=1,nx
+                    ! Backwards coupling
+                    d2dy2%values(ind) = problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k) + problem%A0_map(i,j,k))
+                    d2dy2%cols(ind) = colInd - nx
+                    d2dy2%rows_start(rowInd) = ind
+                    ind = ind + 1  ! Increment to next element
+                
+                    ! Current tile
+                    d2dy2%values(ind) = -(problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k) + problem%A0_map(i,j,k)) &
+                            + problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k) + problem%A0_map(i,j,k)))
+                    d2dy2%cols(ind) = colInd
+                    ind = ind + 1  ! Increment to next element
+            
+                    ! Forwards coupling
+                    d2dy2%values(ind) = problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k) + problem%A0_map(i,j,k))
+                    d2dy2%cols(ind) = colInd + nx
+                    d2dy2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1  ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            end do
         
-            !The top boundary    
-            do i=1,nx
-                !lower element
-                d2dy2%values(ind) = 1.
-                d2dy2%cols(ind) = colInd - nx
-                d2dy2%rows_start(rowInd) = ind
-            
-                !increment to next element
-                ind = ind + 1            
-            
-                !central element
-                d2dy2%values(ind) = -1.
-                d2dy2%cols(ind) = colInd
-                d2dy2%rows_end(rowInd) = ind + 1
-                rowInd = rowInd + 1
-            
-                ind = ind + 1
-                colInd = colInd + 1
-            
-            enddo
-        enddo
+            !The forwards boundary
+            if ( PBCy ) then
+                do i=1,nx
+                    ! Backwards coupling
+                    d2dy2%values(ind) = problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k))
+                    d2dy2%cols(ind) = colInd - nx
+                    d2dy2%rows_start(rowInd) = ind
+                    ind = ind + 1  ! Increment to next element
+
+                    ! Current tile
+                    d2dy2%values(ind) = -(problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k)) &
+                            + problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k)))
+                    d2dy2%cols(ind) = colInd
+                    ind = ind + 1  ! Increment to next element
+
+                    ! Forwards coupling (loops around and couples to backmost tile)
+                    d2dy2%values(ind) = problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k))
+                    d2dy2%cols(ind) = colInd - nx*(ny-1)
+                    d2dy2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1  ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            else
+                do i=1,nx
+                    ! Backwards coupling
+                    d2dy2%values(ind) = 1.
+                    d2dy2%cols(ind) = colInd - nx
+                    d2dy2%rows_start(rowInd) = ind
+                    ind = ind + 1  ! Increment to next element
+
+                    ! Current tile
+                    d2dy2%values(ind) = -1.
+                    d2dy2%cols(ind) = colInd
+                    d2dy2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1  ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            endif
+        end do
     
-        !Multiply by the discretization
+        ! Multiply by the discretization
         d2dy2%values = d2dy2%values * 2./grid%dy**2
         
-        !Create the sparse matrix for the d^2dy^2
+        ! Create the sparse matrix for the d^2dy^2
         stat = mkl_sparse_d_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
     endif
     
@@ -2167,95 +2259,134 @@ end subroutine updateDemagfieldFMM
     
     !----------------------------------d^2dz^2 begins ----------------------------!
     if ( nz .gt. 1 ) then
-        !Make the d^2/dz^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2 and d^2dy^2
-        ntot = 2 * 2 * nx * ny + 3 * (nz-2) * nx * ny
-        !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2
-        allocate(d2dz2%values(ntot),d2dz2%cols(ntot),d2dz2%rows_start(nx*ny*nz),d2dz2%rows_end(nx*ny*nz))
+        ! Make the d^2/dz^2 matrix
+        if ( PBCz ) then
+            nNonZero = 3*ntot             ! For each tile, there are 3 non-zero elements corresponding to itself and the two neighbours along z
+        else
+            nNonZero = 3*ntot - 2*nx*ny   ! With a vacuum boundary, the 2*nx*ny tiles at the two end surfaces only have one neighbour each
+        end if
+        allocate(d2dz2%values(nNonZero),d2dz2%cols(nNonZero),d2dz2%rows_start(ntot),d2dz2%rows_end(ntot))
     
         ind = 1
         rowInd = 1
         colInd = 1
-        !The z=1 face        
-        do j=1,ny
-            do i=1,nx
-                !central value
-                d2dz2%values(ind) = -1.
-                d2dz2%cols(ind) = colInd
-                d2dz2%rows_start(rowInd) = ind
-            
-                !increment position
-                ind = ind + 1
-            
-                !right-most value
-                d2dz2%values(ind) = 1.
-                d2dz2%cols(ind) = nx * ny + colInd
-                d2dz2%rows_end(rowInd) = ind + 1
-                rowInd = rowInd + 1
-            
-                !increment position
-                ind = ind + 1
-                colInd = colInd + 1
-            enddo
-        enddo
-        !Everything in between
+        ! The bottom boundary
+        if ( PBCz ) then
+            do j=1,ny
+                do i=1,nx
+                    ! Downwards coupling (loops around and couples to topmost tile)
+                    d2dz2%values(ind) = problem%A0_map(i,j,nz)/(problem%A0_map(i,j,nz)+problem%A0_map(i,j,1))
+                    d2dz2%cols(ind) = colInd + ny*nx*(nz-1)
+                    d2dz2%rows_start(rowInd) = ind
+                    ind = ind + 1   ! Increment to next element
+
+                    ! Current tile
+                    d2dz2%values(ind) = -(problem%A0_map(i,j,nz)/(problem%A0_map(i,j,nz) + problem%A0_map(i,j,1)) &
+                            + problem%A0_map(i,j,2)/(problem%A0_map(i,j,2) + problem%A0_map(i,j,1)))
+                    d2dz2%cols(ind) = colInd
+                    d2dz2%rows_start(rowInd) = ind
+                    ind = ind + 1   ! Increment to next element
+
+                    ! Upwards coupling
+                    d2dz2%values(ind) = problem%A0_map(i,j,2)/(problem%A0_map(i,j,2)+problem%A0_map(i,j,1))
+                    d2dz2%cols(ind) = nx*ny + colInd
+                    d2dz2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1   ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            end do
+        else
+            do j=1,ny
+                do i=1,nx
+                    ! Current tile
+                    d2dz2%values(ind) = -1.
+                    d2dz2%cols(ind) = colInd
+                    d2dz2%rows_start(rowInd) = ind
+                    ind = ind + 1   ! Increment to next element
+
+                    ! Upwards coupling
+                    d2dz2%values(ind) = 1.
+                    d2dz2%cols(ind) = nx*ny + colInd
+                    d2dz2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1   ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            end do
+        endif
+
+        ! Everything in between
         do k=2,nz-1            
             do j=1,ny
                 do i=1,nx
-                    !left-most value
+                    ! Downwards coupling
                     d2dz2%values(ind) = problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))
-                    d2dz2%cols(ind) = colInd - nx * ny
+                    d2dz2%cols(ind) = colInd - nx*ny
                     d2dz2%rows_start(rowInd) = ind
-            
-                    !increment position
-                    ind = ind + 1
+                    ind = ind + 1   ! Increment to next element
                 
-                    !central value
-                    d2dz2%values(ind) = -(problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))+problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k)))
+                    ! Current tile
+                    d2dz2%values(ind) = -(problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1) + problem%A0_map(i,j,k)) &
+                            + problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1) + problem%A0_map(i,j,k)))
                     d2dz2%cols(ind) = colInd
-                            
-                    !increment position
-                    ind = ind + 1
+                    ind = ind + 1   ! Increment to next element
                 
-                    !right-most value
+                    ! Upwards coupling
                     d2dz2%values(ind) = problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k))
-                    d2dz2%cols(ind) = colInd + nx * ny
+                    d2dz2%cols(ind) = colInd + nx*ny
                     d2dz2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
-                
-                    !increment position
-                    ind = ind + 1
+                    ind = ind + 1   ! Increment to next element
                     colInd = colInd + 1
-                enddo
-            enddo
-        
-        enddo
-    
-    
-        !The z=nz face        
-        do j=1,ny
-            do i=1,nx
-                
-                !left-most value
-                d2dz2%values(ind) = 1.
-                d2dz2%cols(ind) = colInd - nx * ny
-                d2dz2%rows_start(rowInd) = ind
-            
-                !increment position
-                ind = ind + 1
-            
-                !central value
-                d2dz2%values(ind) = -1.
-                d2dz2%cols(ind) = colInd
-                d2dz2%rows_end(rowInd) = ind + 1
-                rowInd = rowInd + 1
-            
-                !increment position
-                ind = ind + 1
-                colInd = colInd + 1
-            
-            enddo
-        enddo
-    
+                end do
+            end do
+        end do
+
+        ! The top boundary
+        if ( PBCz ) then
+            do j=1,ny
+                do i=1,nx
+                    ! Downwards coupling
+                    d2dz2%values(ind) = problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz))
+                    d2dz2%cols(ind) = colInd - nx*ny
+                    d2dz2%rows_start(rowInd) = ind
+                    ind = ind + 1   ! Increment to next element
+
+                    ! Current tile
+                    d2dz2%values(ind) = -(problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz)) &
+                            + problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz)))
+                    d2dz2%cols(ind) = colInd
+                    ind = ind + 1   ! Increment to next element
+
+                    ! Upwards coupling (loops around and couples to bottommost tile)
+                    d2dz2%values(ind) = problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz))
+                    d2dz2%cols(ind) = colInd - nx*ny*(nz - 1)
+                    d2dz2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1   ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            end do
+        else
+            do j=1,ny
+                do i=1,nx
+                    ! Downwards coupling
+                    d2dz2%values(ind) = 1.
+                    d2dz2%cols(ind) = colInd - nx*ny
+                    d2dz2%rows_start(rowInd) = ind
+                    ind = ind + 1   ! Increment to next element
+
+                    ! Current tile
+                    d2dz2%values(ind) = -1.
+                    d2dz2%cols(ind) = colInd
+                    d2dz2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1   ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            end do
+        endif
     
         !Multiply by the discretization
         d2dz2%values = d2dz2%values * 2./grid%dz**2
@@ -2268,7 +2399,7 @@ end subroutine updateDemagfieldFMM
     
             
     !Finally, add up the three diagonals and store in the output sparse matrix, A
-    !store the results temporarily in tmp4
+    !Store the results temporarily in tmp4
     
     !call writeSparseMatrixToDisk( d2dz2%A, nx*ny*nz, 'd2dz2.dat' )
     !call writeSparseMatrixToDisk( d2dy2%A, nx*ny*nz, 'd2dy2.dat' )

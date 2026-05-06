@@ -109,6 +109,8 @@ include "mkl_dfti.f90"
         real(dp),allocatable :: shiftVec(:)    !> How far to shift neighbouring domain copies along x, y, z
         real(dp),allocatable :: macroShape(:)  !> Sidelengths of macrogeometry prism
         real(dp),allocatable :: sampleShape(:) !> Sidelengths of sample prism
+        ! Settings for exchange coupling between copies of the simulated domain
+        logical,allocatable :: exchPBC(:)      !> Periodic boundary conditions along x, y and z for the exchange coupling
     end type MicroMagMacrogeometry
 
     !>-----------------

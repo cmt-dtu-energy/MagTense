@@ -12,7 +12,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
     exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
 	CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn, &
-    n_macro, shiftVec, macroShape, sampleShape, &
+    n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
     dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, &
 	passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem )
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
@@ -44,6 +44,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 	real(8), intent(in) :: CV, exch_weigh
     integer(4),dimension(3),intent(in) :: n_macro
     real(8),dimension(3),intent(in) :: shiftVec, macroShape, sampleShape
+    logical,dimension(3),intent(in) :: exchPBC
 
     character*256,intent(in) :: N_file_in, N_file_out
 
@@ -91,6 +92,9 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 
     !Load sample shape information
     problem%macrogrid%sampleShape = sampleShape
+
+    !Load periodic boundary conditions on the exchange coupling
+    problem%macrogrid%exchPBC = exchPBC
 
     !Load additional things for a tetrahedron grid
     if ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
