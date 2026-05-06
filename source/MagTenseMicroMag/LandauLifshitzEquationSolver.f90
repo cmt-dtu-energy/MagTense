@@ -112,7 +112,7 @@
             gb_solution%pts( i, 1 ) = gb_problem%grid%pts( i, 1 )
             gb_solution%pts( i, 2 ) = gb_problem%grid%pts( i, 2 )
             gb_solution%pts( i, 3 ) = gb_problem%grid%pts( i, 3 )
-        enddo
+        end do
     endif   
     
     if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then
@@ -131,9 +131,9 @@
                         gb_solution%pts(ind,3) = gb_problem%grid%z(i,j,k)
                     
                         gb_problem%A0_map(i,j,k) = gb_problem%A0(ind)
-                    enddo
-                enddo
-            enddo
+                    end do
+                end do
+            end do
         endif
     endif
       
@@ -298,11 +298,7 @@
           gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
 
 
-          
-              
           call StoreHeffComponents ( gb_problem, gb_solution )
-
-
 
             ! open (11, file="sparse_CUDA_H.bin",  &
             !         status='unknown', form='unformatted', &
@@ -313,7 +309,7 @@
             ! close(11)
             ! error stop " test stop after cuda sparse"
               
-      enddo
+      end do
 
       
         CALL SYSTEM_CLOCK(c2)
@@ -501,7 +497,7 @@
                 mx_mean = mx_mean + gb_solution%Mx_s(i) * gb_problem%Ms(i) * (gb_problem%grid%abc(i,1) * gb_problem%grid%abc(i,2) * gb_problem%grid%abc(i,3))
                 my_mean = my_mean + gb_solution%My_s(i) * gb_problem%Ms(i) * (gb_problem%grid%abc(i,1) * gb_problem%grid%abc(i,2) * gb_problem%grid%abc(i,3))
                 mz_mean = mz_mean + gb_solution%Mz_s(i) * gb_problem%Ms(i) * (gb_problem%grid%abc(i,1) * gb_problem%grid%abc(i,2) * gb_problem%grid%abc(i,3))
-            enddo
+            end do
             volume_total = sum( gb_problem%grid%abc(:,1) * gb_problem%grid%abc(:,2) * gb_problem%grid%abc(:,3) )
             mx_mean = mx_mean / volume_total
             my_mean = my_mean / volume_total
@@ -606,7 +602,7 @@
             gb_solution%H_ani(j,:,i,2) = gb_solution%HkY
             gb_solution%H_ani(j,:,i,3) = gb_solution%HkZ
         endif
-    enddo
+    end do
     
     end subroutine StoreHeffComponents
     
@@ -1259,7 +1255,7 @@ end subroutine updateDemagfieldFMM
                 solution%Mx_FT(i) = cmplx( solution%Mx_s(i), 0. )
                 solution%My_FT(i) = cmplx( solution%My_s(i), 0. )
                 solution%Mz_FT(i) = cmplx( solution%Mz_s(i), 0. )
-            enddo
+            end do
         
             stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mx_FT )
             !normalization
@@ -1490,7 +1486,7 @@ end subroutine updateDemagfieldFMM
             grid%dx = grid%Lx / grid%nx
             do i=1,grid%nx
                 grid%x(i,:,:) = -grid%Lx/2 + (i-1) * grid%dx + grid%dx/2
-            enddo
+            end do
             
         else
             grid%x(:,:,:) = 0.
@@ -1501,7 +1497,7 @@ end subroutine updateDemagfieldFMM
             grid%dy = grid%Ly / grid%ny
             do i=1,grid%ny
                 grid%y(:,i,:) = -grid%Ly/2 + (i-1) * grid%dy + grid%dy/2
-            enddo            
+            end do
         else
             grid%y(:,:,:) = 0.
             grid%dy = grid%Ly
@@ -1511,7 +1507,7 @@ end subroutine updateDemagfieldFMM
             grid%dz = grid%Lz / grid%nz
             do i=1,grid%nz
                 grid%z(:,:,i) = -grid%Lz/2 + (i-1) * grid%dz + grid%dz/2
-            enddo            
+            end do
         else
             grid%z(:,:,:) = 0.
             grid%dz = grid%Lz
@@ -1525,9 +1521,9 @@ end subroutine updateDemagfieldFMM
                     grid%pts( ind, 1 ) = grid%x(i,j,k)
                     grid%pts( ind, 2 ) = grid%y(i,j,k)
                     grid%pts( ind, 3 ) = grid%z(i,j,k)
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
     endif
     
     end subroutine setupGrid
@@ -1550,7 +1546,7 @@ end subroutine updateDemagfieldFMM
     integer :: i_a,j_a,k_a,nx_ave,ny_ave,nz_ave                   !> Internal counters and index variables for avering the demag tensor over the recieving tile
     real(DP),dimension(:),allocatable :: dx,dy,dz
     real(DP), dimension(:,:),allocatable :: pts_arr
-    real(DP),dimension(:,:,:,:),allocatable :: Nout,Noutave             !> Temporary storage for the demag tensor            
+    real(DP),dimension(:,:,:,:),allocatable :: Nout,Noutave       !> Temporary storage for the demag tensor
     integer,dimension(4) :: indx_ele
     real :: rate
     integer :: c1,c2,cr,cm
@@ -1569,7 +1565,7 @@ end subroutine updateDemagfieldFMM
     nz = problem%grid%nz
     ntot = nx * ny * nz
     
-    !The number of elements to average the receiving tile over
+    !The number of tiles to average the receiving tile over
     nx_ave = problem%N_ave(1)
     ny_ave = problem%N_ave(2)
     nz_ave = problem%N_ave(3)
@@ -1631,8 +1627,8 @@ end subroutine updateDemagfieldFMM
                         pts_arr(:,1) =  problem%grid%pts(:,1)
                         pts_arr(:,2) =  problem%grid%pts(:,2)
                         pts_arr(:,3) =  problem%grid%pts(:,3)
-                        
-                                                if (all(n_macro == 0.0)) then
+
+                        if (all(n_macro == 0.0)) then
                             call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
                         else
                             write(*,*) "get field from tiles : PBC version"
@@ -1662,9 +1658,9 @@ end subroutine updateDemagfieldFMM
                         deallocate(pts_arr)
                         deallocate(Nout)
                         deallocate(H)
-                    enddo
-                enddo
-            enddo
+                    end do
+                end do
+            end do
             
             !$OMP END PARALLEL DO
             
@@ -1672,8 +1668,8 @@ end subroutine updateDemagfieldFMM
             do i=1,size(problem%Kxx,1)
                 do j=1,size(problem%Kxx,2)
                     write(21,*)  problem%Kxx(i,j)
-                enddo
-            enddo
+                end do
+            end do
             close(21)
             
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
@@ -1684,7 +1680,7 @@ end subroutine updateDemagfieldFMM
     
             !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, indx_ele, tile, H, Nout, pts_arr, i)
                         
-            !for each element find the tensor for all evaluation points (i.e. all elements)
+            !for each tile find the tensor for all evaluation points (i.e. all tiles)
             do i=1,nx
                 !Setup template tile
                 tile(1)%tileType = 5 !(for tetrahedron)
@@ -1728,7 +1724,7 @@ end subroutine updateDemagfieldFMM
                 deallocate(pts_arr)
                 deallocate(Nout)
                 deallocate(H)
-            enddo
+            end do
             
             !$OMP END PARALLEL DO
             
@@ -1738,7 +1734,7 @@ end subroutine updateDemagfieldFMM
             !call displayGUIMessage( 'Done constructing the Tensormap' )
             !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout,Noutave,dx,dy,dz,pts_arr)
             
-            !for each element find the tensor for all evaluation points (i.e. all elements)
+            !for each tile find the tensor for all evaluation points (i.e. all tiles)
             do i=1,ntot
                 !Setup template tile
                 tile(1)%tileType = 2 !(for prism)
@@ -1785,9 +1781,9 @@ end subroutine updateDemagfieldFMM
                             
                             Noutave = Noutave+Nout
                             
-                        enddo
-                    enddo
-                enddo
+                        end do
+                    end do
+                end do
                 
                 Nout = Noutave/(nx_ave*ny_ave*nz_ave)
                 
@@ -1817,7 +1813,7 @@ end subroutine updateDemagfieldFMM
                 deallocate(dy)
                 deallocate(dz)
                 deallocate(pts_arr)
-            enddo
+            end do
         
             !$OMP END PARALLEL DO
             
@@ -1874,7 +1870,7 @@ end subroutine updateDemagfieldFMM
     !> @param[inout] problem, the struct containing the problem
     !>-----------------------------------------
     subroutine ComputeShapeCorrectionTensor( problem )
-    type(MicroMagProblem),intent(inout) :: problem                !> Grid data structure
+    type(MicroMagProblem),intent(inout) :: problem       !> Grid data structure
 
     integer :: nx,ny,nz,ntot                                      !> Internal counters and index variables
     real(DP), dimension(:,:),allocatable :: pts                   !> Evaluation points
@@ -1907,7 +1903,7 @@ end subroutine updateDemagfieldFMM
     allocate( problem%Kyy_shape(ntot), problem%Kyz_shape(ntot) )
     allocate( problem%Kzz_shape(ntot) )
 
-    ! Copy Nshape into the proper structure used by the micro mag model
+    ! Copy Nshape into the proper structure used by the micromag model
     problem%Kxx_shape = Nshape(:,1,1)
     problem%Kxy_shape = Nshape(:,1,2)
     problem%Kxz_shape = Nshape(:,1,3)
@@ -2496,7 +2492,7 @@ end subroutine updateDemagfieldFMM
     subroutine ComputeAnisotropyTerm3D( problem )
     type(MicroMagProblem),intent(inout) :: problem             !> Struct containing the problem
     
-    integer :: nx,ny,nz,ntot, i
+    integer :: nx,ny,nz,ntot,i
     
     !--- We use the general formulation introduced in updateAnisotropy
     !--- If the user has specified a value for the uniaxial anisotropy or the cubic anisotropy, we use transform
@@ -2508,8 +2504,8 @@ end subroutine updateDemagfieldFMM
         call displayGUIMessage( 'Assuming uniaxial anisotropy' )
         do i = 1,size(problem%Ms)
             problem%Kfact_arr(i,1,3) = problem%K0(i) / ( mu0 * problem%Ms(i) )
-        enddo
-        
+        end do
+
         !Set the crystal axis as the user only specified u_ea
         problem%CrystalAxis(:,3,1) =  problem%u_ea(:,1)
         problem%CrystalAxis(:,3,2) =  problem%u_ea(:,2)
@@ -2522,11 +2518,11 @@ end subroutine updateDemagfieldFMM
             problem%Kfact_arr(i,3,2) = problem%K1(i) / ( mu0 * problem%Ms(i) )
             problem%Kfact_arr(i,3,3) = problem%K1(i) / ( mu0 * problem%Ms(i) )
             problem%Kfact_arr(i,6,1) = problem%K2(i) / ( mu0 * problem%Ms(i) )
-        enddo
+        end do
     else !General anisotropy
         do i = 1,size(problem%Ms)
             problem%Kfact_arr(i,:,:) = problem%K0_arr(i,:,:) / ( mu0 * problem%Ms(i) )
-        enddo
+        end do
     endif
     
     end subroutine ComputeAnisotropyTerm3D

@@ -173,7 +173,7 @@ module ODE_Solvers
         message = .true.
         
         !Call the setup function in order to initiate the solver    
-        call setup(  setup_comm, t(1), ystart, t(nt), tol, thres, method,task,errass, hstart,message)
+        call setup(  setup_comm, t(1), ystart, t(nt), tol, thres, method, task, errass, hstart, message)
 
         !Calculate the magnetization to use for the first convergence calculation
         y_last = ystart

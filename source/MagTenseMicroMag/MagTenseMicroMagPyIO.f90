@@ -61,7 +61,6 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 
     logical :: ex
 
-
     problem%dummy_run = dummy_run
     problem%fmm_cells_per_node = fmm_cells_per_node
     problem%fmm_eps = eps_fmm
@@ -135,7 +134,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     !Allocate memory for the easy axis vectors
     allocate( problem%u_ea(ntot,3) )
     problem%u_ea = u_ea
-    
+
     problem%ProblemMode = ProblemMode
     problem%solver = solver
     problem%A0 = A0
