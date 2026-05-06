@@ -660,7 +660,7 @@ end subroutine getHOnSourcesFMM
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n )
 
-        integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
+        integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, n_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
         integer(4),dimension(3),intent(in) :: grid_n, N_ave
         real(8),dimension(3),intent(in) :: grid_L
         real(8),dimension(ntot,3),intent(in) :: grid_pts
@@ -689,8 +689,8 @@ end subroutine getHOnSourcesFMM
 
         real(8),dimension(nt),intent(in) :: t
         real(8),dimension(nt),intent(out) :: t_out
-        real(8),dimension(nt,ntot,nt_Hext,3),intent(out) :: M_mm
-        real(8),dimension(nt,ntot,nt_Hext,3),intent(out) :: H_exc, H_ext, H_dem, H_ani
+        real(8),dimension(nt,ntot,n_Hext,3),intent(out) :: M_mm
+        real(8),dimension(nt,ntot,n_Hext,3),intent(out) :: H_exc, H_ext, H_dem, H_ani
         real(8),dimension(ntot,3),intent(out) :: pts
 		
 		integer,intent(out) :: n_tot_Exch

@@ -681,6 +681,14 @@ class MicromagProblem:
 
         print("dummy run in python = ", self.dummy_run)
 
+        # Determine number of distinct external magnetic fields to solve for
+        if self.solver == 1: # explicit solver
+            n_h_ext = nt_h_ext
+        elif self.solver == 2: # dynamic solver
+            n_h_ext = 1
+        else:
+            print("Only 'dynamic' and 'explicit' solvers are implemented")
+
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
             ntot=self.ntot,
             grid_n=self.grid_n,
@@ -701,6 +709,7 @@ class MicromagProblem:
             temperature=self.T,
             maxt0=self.max_T0,
             nt_hext=nt_h_ext,
+            n_hext = n_h_ext,
             hext=h_ext,
             nt=nt,
             t=np.linspace(0, t_end, nt),

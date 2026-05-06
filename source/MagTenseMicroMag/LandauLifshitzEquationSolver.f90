@@ -215,10 +215,10 @@
     end if
         
     if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
-        !Run several different applied fields
-        nt_Hext = size(gb_problem%Hext, 1) 
+        !Go through several different applied fields and find the equilibrium solution for each of them
+        nt_Hext = size(gb_problem%Hext, 1)          !The no. of applied fields to consider
     else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
-        !Simply do a time evolution as specified in the problem  
+        !Simply do a time evolution as specified in the problem
         nt_Hext = 1
 
         if (gb_problem%includeThermal) then
