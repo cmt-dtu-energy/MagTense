@@ -36,7 +36,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
     integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch
     real(8),intent(in) :: gamma, alpha, MaxT0, tol, thres, conv_tol, dem_thres
-	real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2
+	real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2, temperature
 	real(8),dimension(ntot,6,3),intent(in) :: K0_arr
 	real(8),dimension(ntot,3,3),intent(in):: crysaxis
     integer(4), dimension(3) :: N_ave
