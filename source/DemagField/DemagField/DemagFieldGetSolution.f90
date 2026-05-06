@@ -206,7 +206,7 @@
         integer(4),dimension(3) :: n_macro
         real(8),dimension(3) :: shiftVec
         integer(4) :: nx_macro, ny_macro, nz_macro
-        real(8),dimension(:,:,:,:),allocatable,optional :: Nout
+        real(8),dimension(:,:,:,:),intent(inout) :: Nout
         real(8),dimension(:,:,:,:),allocatable :: Ntemp
         logical,optional :: useStoredNorg
         integer(4) :: i, j, l
@@ -223,22 +223,20 @@
                 do i=-nx_macro,nx_macro
                     Htemp(:,:) = 0.0
                     Ntemp(:,:,:,:) = 0.0
-                    ! Shift evaluation points
+                    !Shift evaluation points
                     pts_temp = pts
                     pts_temp(:, 1) = pts_temp(:, 1) - i * shiftVec(1)
                     pts_temp(:, 2) = pts_temp(:, 2) - j * shiftVec(2)
                     pts_temp(:, 3) = pts_temp(:, 3) - l * shiftVec(3)
                     ! Evaluate field and demagnetisation tensor with shifted evaluation points
-                    call getFieldFromTiles(tiles, Htemp, pts, n_tiles, n_ele, Ntemp, .false. )
+                    call getFieldFromTiles(tiles, Htemp, pts_temp, n_tiles, n_ele, Ntemp, .false. )
                     ! Add to existing values
                     H = H + Htemp
                     Nout = Nout + Ntemp
-!                    write(*,*) "i, j, l = ", i, j, l
                 end do
             end do
         end do
-    write(*,*) "Finished getFieldFromTiles_PBC"
-    end subroutine
+    end subroutine getFieldFromTiles_PBC
     
 !---------------------------------------------------------------------------------------!
 !------------------------ Specific tile geometries -------------------------------------!
