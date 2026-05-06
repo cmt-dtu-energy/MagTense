@@ -281,7 +281,13 @@
               call displayGUIMessage( trim(prog_str) )
           endif
 
-          call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )  
+          ! This is where the LLG is actually integrated (short description by F. Durhuus)
+          ! fct is a pointer to the dmdt_fct function which returns time derivatives of the normalised magnetic moments
+          ! With m0 as initial condition, integrate from t(1) to t(nt) with effective field updated at each time coordinate t, then store result in t_out and M_out.
+          ! t_conv is time coordinates where convergence is tested when computing equilibrium structure (explicit solver rather than dynamic). Also included in t_out.
+          ! When thermal noise is included (includeThermal = .true.) the magnetisation is normalised each timestep to prevent thermal drift
+          call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), gb_problem%includeThermal, fct_thermal, cb_fct, &
+                  gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
           
           !The initial state of the next solution is the previous solution result
           gb_problem%m0 = M_out(:,nt,i)
@@ -1970,8 +1976,16 @@ end subroutine updateDemagfieldFMM
     real(DP) :: const
     character*(100) :: prog_str 
     
-    !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
-    !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
+    !Find the three sparse matrices for the individual directions. Then add them to get the total matrix
+    !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My or Mz respectively.
+
+    !The sparse matrices are encoded using an older version of Intels Compressed Sparse Row (CSR) format
+    !cols(i) and values(i) give the column index and value of the i'th non-zero element
+    !rows_start(i) and rows_end(i)-1 give the first and last index corresponding to the i'th row
+    !If rows_start(i) = rows_end(i), the row is empty
+    !For instance the matrix [[1, 0, 2], [0, -1, 0], [0, 0, 0], [-2, 5, 4]] has cols = (1, 3, 2, 1, 2, 3),
+    !values = (1, 2, -1, -2, 5, 4), rows_start = (1, 3, 4, 4) and rows_end = (3, 4, 4, 7)
+    !Note how size(rows_start) and size(rows_end) equal the number of rows, while size(cols) and size(values) equal the number of non-zero elements
     
     nx = grid%nx
     ny = grid%ny

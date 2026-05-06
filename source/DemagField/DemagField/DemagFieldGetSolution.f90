@@ -191,10 +191,11 @@
 
     end subroutine getFieldFromTiles
 
-    ! Implement periodic boundary conditions by the macrogeometry method, i.e. calculating the
-    ! field and demagnetisation tensor from shifted copies of the tiles and adding them together.
+    ! Implement periodic boundary conditions by the macrogeometry method, i.e. calculate the
+    ! field and demagnetisation tensor from shifted copies of the simulated domain and add
+    ! together the contribution from each copy.
     ! Note that instead of shifting the tiles, the evaluation points are shifted in the opposite
-    ! direction instead, which is equivalent
+    ! direction, which is equivalent
     subroutine getFieldFromTiles_PBC(tiles, H, pts, n_tiles, n_ele, n_macro, shiftVec, Nout, useStoredNorg)
         type(MagTile),intent(inout),dimension(n_tiles) :: tiles
         real(8),dimension(n_ele,3),intent(inout) :: H

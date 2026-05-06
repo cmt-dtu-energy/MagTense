@@ -23,21 +23,34 @@ class MicromagProblem:
     """
     Micromagnetic problem using the Fortran implementation of MagTense.
 
+    Notes:
+        All inputs are given in SI units. Magnetisation and field strengths are in A/m rather than T.
+
     Args:
-        res: Resolution of grid.
-        grid_L: Spatial extensions.
-        grid_nnod:
-        grid_type: Curently only 'uniform' is supported.
+        grid_type: Currently supports 'uniform', 'tetrahedron' and 'unstructuredPrisms'.
+            If 'uniform', grid is inferred from res and grid_L.
+            If 'tetrahedron', grid is specified by grid_pts, grid_nnod and grid_ele.
+            If 'unstructuredPrisms', grid is specified by grid_pts and grid_abc.
+        res: Resolution of grid, i.e. number of micromagnetic tiles along x, y and z.
+        grid_L: Spatial extension of simulated domain along x, y and z.
+        grid_nnod: Number of nodes in the tetrahedron mesh
+        grid_pts: xyz coordinates of micromagnetic tiles
+        grid_abc: sidelengths of prism tiles
         prob_mode:
-        solver:
+        solver: Options are 'explicit', 'dynamic' and 'implicit'.
+            If solver = 'dynamic', a single time-varying magnetic field is constructed
+            If solver = 'explicit', the equilibrium configuration is computed at several constant fields
+            solver = 'implicit' has not been implemented.
+            See documentation under run_simulation for details.
         A0: Anisotropy constant.
         Ms: Saturation magnetization [A/m].
         K0: Exchange constant.
-        alpha_mm: Dampening constant.
-        gamma: Gyromagnetic factor.
+        alpha: Dampening constant [m/(A*s)]. Product of Gilbert damping and precession parameter.
+        T: Temperature [K] ('temp' in fortran part)
+        gamma: Gyromagnetic factor [m/(A*s)].
         max_T0:
         nt_conv:
-        conv_tol: The convergence tolerence, which is the maximum change in
+        conv_tol: The convergence tolerance, which is the maximum change in
                   magnetization between two timesteps.
         tol: Relative tolerance for the Fortran ODE solver.
         thres: Fortran ODE solver, when a solution component Y(L) is less in
@@ -130,9 +143,23 @@ class MicromagProblem:
         self.usereturnhall = usereturnhall
         self.exch_presize = exch_presize
 
+        # Set grid, solver and problem type
+        self.grid_type = grid_type
+        self.prob_mode = prob_mode
+        self.solver = solver
+
+        ### Define grid ###
+        # Uniform grid
+        ntot = np.prod(res)     # Total number of micromagnetic tiles
+        self.ntot = ntot
         self.grid_n = np.array(res, dtype=np.int32, order="F")
         self.grid_L = np.array(grid_L, dtype=np.float64, order="F")
+        # Tetrahedron and prism grids
         self.grid_pts = grid_pts
+        # Prism grid
+        self.grid_abc = grid_abc
+        # Tetrahedron grid
+        self.grid_nnod = grid_nnod
         self.grid_ele = np.zeros(shape=(4, ntot), dtype=np.float64, order="F")
         self.grid_nod = np.zeros(shape=(grid_nnod, 3), dtype=np.float64, order="F")
         self.grid_abc = grid_abc
@@ -156,6 +183,9 @@ class MicromagProblem:
         self.K2 = K2
         self.K0_arr = K0_arr
         self.T = T
+
+        # Set initial state
+        self.m0 = m0
 
         # --- Set the local crystal coordinates to the three Cartesian axis
         self.CrysAxis = CrysAxis
@@ -605,7 +635,12 @@ class MicromagProblem:
             t_end: End time of the simulation.
             nt: Number of timesteps.
             fct_h_ext: Function to calculate the external field at each timestep.
-            nt_h_ext: Number of timesteps for the external field.
+            nt_h_ext: Number of time coordinates at which to evaluate fct_h_ext.
+                      Evaluation times are uniformly distributed from t=0 to t=t_end
+                      If solver = "dynamic", a single time-varying magnetic field is constructed
+                       by linear interpolation of the evaluation points.
+                      If solver = "explicit", then each of the nt_h_ext field evaluations are treated
+                       as a distinct, constant field and the equilibrium solution is computed for each field
 
         Outputs:
             A list containing the simulation results.
