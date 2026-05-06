@@ -77,7 +77,7 @@ class MicromagProblem:
     def __init__(
         self,
         res: list[int],
-        grid_L: list[float] = (500e-9, 125e-9, 3e-9),
+        grid_L: list[float] = (100e-9, 100e-9, 100e-9),   # mumag standard problem 4 was the default. This can get confusing, so I changed it.
         grid_nnod: int = 0,
         grid_type: str | None = "uniform",
         grid_pts: list | np.ndarray | None = None,
@@ -93,8 +93,8 @@ class MicromagProblem:
         K2: int | float | list | np.ndarray | None = None,
         K0_arr: np.ndarray | None = None,
         CrysAxis: np.ndarray | None = None,
-        alpha: float = 0.02,
-        gamma: float = 0.0,
+        alpha: float = 1e3,
+        gamma: float = 2.21*1e5,   # Default was zero, even though gamma is a constant of nature with a well-known value.
         max_T0: float = 2.0,
         nt_conv: int = 1,
         conv_tol: float = 1e-4,
@@ -714,7 +714,7 @@ class MicromagProblem:
             hext=h_ext,
             nt=nt,
             t=np.linspace(0, t_end, nt),
-            m0=np.concatenate((self.m0[:, 0], self.m0[:, 1], self.m0[:, 2]), axis=None),
+            m0=np.concatenate((self.m0[:, 0], self.m0[:, 1], self.m0[:, 2]), axis=None),    # NOTE : this is where you find the convention on how to put the x,y,z components into one axis
             dem_thres=self.dem_thres,
             usecuda=self.cuda,
             dem_appr=self.dem_appr,
