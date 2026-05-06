@@ -1369,13 +1369,13 @@ end subroutine updateDemagfieldFMM
             !HmZ = HmZ + Kzz * Mz
             call gemv( problem%Kzz, solution%Mz_s, solution%HmZ, alpha, beta )
 
-            !Apply shape correction (untested)
-            solution%HmX = solution%HmX + problem%Kxx_shape * Mavg_s(1) &
-                    + problem%Kxy_shape * Mavg_s(2) + problem%Kxz_shape * Mavg_s(3)
-            solution%HmY = solution%HmY + problem%Kxy_shape * Mavg_s(1) &
-                    + problem%Kyy_shape * Mavg_s(2) + problem%Kyz_shape * Mavg_s(3)
-            solution%HmZ = solution%HmX + problem%Kxz_shape * Mavg_s(1) &
-                    + problem%Kyz_shape * Mavg_s(2) + problem%Kzz_shape * Mavg_s(3)
+            !Apply shape correction
+            solution%HmX = solution%HmX + problem%Kxx_shape * Mavg(1) &
+                    + problem%Kxy_shape * Mavg(2) + problem%Kxz_shape * Mavg(3)
+            solution%HmY = solution%HmY + problem%Kxy_shape * Mavg(1) &
+                    + problem%Kyy_shape * Mavg(2) + problem%Kyz_shape * Mavg(3)
+            solution%HmZ = solution%HmX + problem%Kxz_shape * Mavg(1) &
+                    + problem%Kyz_shape * Mavg(2) + problem%Kzz_shape * Mavg(3)
 
             temp = solution%HmX * problem%Mfact
             solution%HmX = temp
@@ -1550,8 +1550,8 @@ end subroutine updateDemagfieldFMM
     integer :: c1,c2,cr,cm
     character(10) :: prog_str
 
-    integer(4),dimension(3) :: n_macro
-    real(8),dimension(3) :: shiftVec
+    integer,dimension(3) :: n_macro
+    real(DP),dimension(3) :: shiftVec
 
     ! First initialize the system_clock
     call system_clock(count_rate=cr)
@@ -1596,10 +1596,10 @@ end subroutine updateDemagfieldFMM
             if (nx_ave*ny_ave*nz_ave > 1) then
                 call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
             endif
-        
-            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout, pts_arr) default(none)
-        
-            !for each element find the tensor for all evaluation points (i.e. all elements)
+
+            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot, shiftVec, n_macro) PRIVATE(ind, tile, H, Nout, pts_arr) default(none)
+
+            !for each tile find the tensor for all evaluation points (i.e. all tiles)
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx
