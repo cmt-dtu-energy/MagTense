@@ -23,11 +23,9 @@ module TileRectangularPrismAvgTensor
             if(Yv == 0.0d0) Yv = eps
             if(Zv == 0.0d0) Zv = eps
             if(D-Yv == 0.0d0) then
-                !print *, 'D-Y=0'
                 Yv = Yv + eps
             end if
             if(D-Zv == 0.0d0) then
-                !print *, 'D-Z=0 D=', D, ' Z=', Zv, ' X=', Xv, ' Y=', Yv
                 Zv = Zv + eps
             end if
 
@@ -77,24 +75,23 @@ module TileRectangularPrismAvgTensor
 
         end function F2
         
-        !Function definite_integral corresponding to eq. 13 in The Fukushima paper:
-        ! Volume Average Demagnetizing Tensor of Rectangular Prisms, 
-        ! Hiroshi Fukushima, Yoshinobu Nakatani, and Nobuo Hayashi, Member, ZEEE 
-        function definite_integral(func,X1,X2,Y1,Y2,Z1,Z2) result(res)
-            real(8), intent(in) :: X1,X2,Y1,Y2,Z1,Z2
+        ! Function AvgN_prism_definite_integral corresponding to eq. 13 in Fukushima et al. 2002 [DOI: 10.1109/20.650225],
+        ! Volume Average Demagnetizing Tensor of Rectangular Prisms
+        function AvgN_prism_definite_integral(func,X1,X2,Y1,Y2,Z1,Z2) result(res)
+            real, intent(in) :: X1,X2,Y1,Y2,Z1,Z2
             interface
                 function func(X,Y,Z) result(f)
                     real(8), intent(in) :: X,Y,Z
                     real(8) :: f
                 end function func
             end interface
-            real(8) :: res
+            real :: res
 
             res = func(X2,Y2,Z2) - func(X1,Y2,Z2) &
                 - func(X2,Y1,Z2) + func(X1,Y1,Z2) &
                 - func(X2,Y2,Z1) + func(X1,Y2,Z1) &
                 + func(X2,Y1,Z1) - func(X1,Y1,Z1)
-        end function definite_integral
+        end function AvgN_prism_definite_integral
     
     
 end module TileRectangularPrismAvgTensor
