@@ -643,12 +643,13 @@ module TileNComponents
     real(8) :: a,b,c,x,y,z,a1,b1,c1
     real(8) :: source_coords(6), obs_coords(6)
     real(8) :: X1, X2, Y1, Y2, Z1, Z2, vol, min_vol
-    real(8), parameter :: eps = 1.0d-12
+    real(8), parameter :: eps = 1.0d-15
     real(8) :: pi
     integer :: unit
 
     pi = 4.0_8 * atan(1.0_8)
-
+    !unit = 10
+!open(unit=unit, file="distances_log.txt", status="unknown", position="append", action="write")
     
 
     !Lengths of source tile in x,y,z dimensions
@@ -701,6 +702,8 @@ module TileNComponents
                         Y2 = obs_coords(4) - source_coords(3+j)
                         Z1 = obs_coords(5) - source_coords(5+k)
                         Z2 = obs_coords(6) - source_coords(5+k)
+
+                        !write(unit,'(6ES20.12)') X1, X2, Y1, Y2, Z1, Z2
 
                         ! Failsafe: avoid zero distances
                         X1 = sign(max(abs(X1), eps), X1)
