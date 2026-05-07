@@ -1163,8 +1163,10 @@ body: do
       select case(step_flag)
          case(1); cycle proceed  ! Success, continue
          case(2:6); nrec = 2  ! Fatal errors, must exit
-         write(prog_str,'(A)') " ** The last message was produced on a call to STEP_INTEGRATE from RANGE_INTEGRATE."
-         call displayGUIMessage(trim(prog_str))
+         if (comm%print_message) then
+            write(prog_str,'(A)') " ** The last message was produced on a call to STEP_INTEGRATE from RANGE_INTEGRATE."
+            call displayGUIMessage(trim(prog_str))
+         end if
          case default; baderr = .true.
       end select
       t_got = comm%t; exit body
@@ -1362,8 +1364,10 @@ body: do
          if (comm%hit_t_end_count>=100 .and. &
              comm%hit_t_end_count>=comm%step_count/3) then
             ier = 2; nrec = 5
-            write(prog_str,'(A)') " ** More than 100 output points have been obtained by integrating to T_END. They have been sufficiently close to one another that the efficiency of the integration has been degraded. It would probably be (much) more efficient to obtain output by interpolating with INTERPOLATE (after changing to METHOD='M' if you are using METHOD = 'H')."
-            call displayGUIMessage(trim(prog_str))
+            if (comm%print_message) then
+               write(prog_str,'(A)') " ** More than 100 output points have been obtained by integrating to T_END. They have been sufficiently close to one another that the efficiency of the integration has been degraded. It would probably be (much) more efficient to obtain output by interpolating with INTERPOLATE (after changing to METHOD='M' if you are using METHOD = 'H')."
+               call displayGUIMessage(trim(prog_str))
+            end if
             comm%hit_t_end_count = 0; exit body
          end if
       end if
@@ -1377,9 +1381,11 @@ body: do
          toomch = comm%f_count > max_f_count
          if (toomch) then
             ier = 3; nrec = 3
-            write(prog_str,'(A,I6,A)') " ** Approximately ",max_f_count, &
-            " function evaluations have been used to compute the solution since the integration started or since this message was last printed."
-            call displayGUIMessage(trim(prog_str))
+            if (comm%print_message) then
+               write(prog_str,'(A,I6,A)') " ** Approximately ",max_f_count, &
+               " function evaluations have been used to compute the solution since the integration started or since this message was last printed."
+               call displayGUIMessage(trim(prog_str))
+            end if
 !
 !  After this warning message, F_COUNT is reset to permit the integration
 !  to continue.  The total number of function evaluations in the primary
@@ -1400,9 +1406,11 @@ body: do
             extra_wk = (comm%cost*abs((comm%t_end-comm%t)/comm%h_average)) / &
                      real(comm%full_f_count+comm%f_count,kind=wp)
             ier = 4; nrec = nrec + 4 
-            write(prog_str,'(A,E13.5,A)') " ** Your problem has been diagnosed as stiff. If the situation persists, it will cost roughly ", &
-            extra_wk," times as much to reach T_END as it has cost to reach T_NOW. You should probably change to a code intended for stiff problems."
-            call displayGUIMessage(trim(prog_str))
+            if (comm%print_message) then
+               write(prog_str,'(A,E13.5,A)') " ** Your problem has been diagnosed as stiff. If the situation persists, it will cost roughly ", &
+               extra_wk," times as much to reach T_END as it has cost to reach T_NOW. You should probably change to a code intended for stiff problems."
+               call displayGUIMessage(trim(prog_str))
+            end if
          end if
          if (ier/=just_fine) exit body
       end if

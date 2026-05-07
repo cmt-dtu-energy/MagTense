@@ -31,7 +31,7 @@ module ODE_Solvers
     !> @param[in] useCVODE optional flag for choosing solvers. 
     !> more parameters to come as we progress in the build-up of this function (error, options such as tolerances etc)
     !---------------------------------------------------------------------------
-    subroutine MagTense_ODE( fct, t, y0, t_out, y_out, callback, callback_display, tol, thres_value, useCVODE, t_conv, conv_tol )
+    subroutine MagTense_ODE( fct, t, y0, t_out, y_out, callback, callback_display, tol, thres_value, useCVODE, t_conv, conv_tol, rksuite_verbose )
     
         !======= Inclusions ===========
         use, intrinsic :: iso_c_binding
@@ -48,6 +48,7 @@ module ODE_Solvers
         integer,intent(in),optional :: useCVODE                 !>Flag that determines if the CVODE solver is to be used or not
         real,dimension(:),intent(in) :: t_conv                  !>Array for the time values where the solution will be checked for convergence
         real,intent(in) :: conv_tol                             !>Converge criteria on difference between magnetization at different timesteps
+        logical,intent(in),optional :: rksuite_verbose                    !>If .true., RKSuite will display diagnostic messages (default .false.)
         integer :: solver_flag
         
         integer :: neq, nt, nt_conv
@@ -73,7 +74,7 @@ module ODE_Solvers
             yderiv_out(:,:) = 0
 
             !Call the solver
-            call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol )
+            call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol, rksuite_verbose )
             
             !clean-up
             deallocate(yderiv_out)
@@ -113,7 +114,7 @@ module ODE_Solvers
     !> @param[inut] yderiv_out output array with dy_i/dt at each time
     !> @param[in] callback procedure pointer to callback to Matlab for progress updates
     !---------------------------------------------------------------------------
-    subroutine MagTense_ODE_RKSuite( fct, neq, t, nt, ystart,  t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol )
+    subroutine MagTense_ODE_RKSuite( fct, neq, t, nt, ystart,  t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol, rksuite_verbose )
         
         !======= Declarations =========
         procedure(dydt_fct), pointer :: fct                  !>Input function pointer for the function to be integrated
@@ -129,6 +130,7 @@ module ODE_Solvers
         real,intent(in) :: thres_value                       !>When a solution component Y(L) is less in magnitude than thres_value its set to zero
         real,dimension(nt_conv),intent(in) :: t_conv         !>Array for the time values where the solution will be checked for convergence
         real,intent(in) :: conv_tol                          !>Converge criteria on difference between magnetization at different timesteps
+        logical,intent(in),optional :: rksuite_verbose                 !>If .true., RKSuite will display diagnostic messages (default .false.)
         
         real,dimension(:),allocatable :: thres          !>arrays used by the initiater     
         real,dimension(neq) :: y_last                   !>Array containing the solution in the last returned convergence timestep
@@ -164,11 +166,15 @@ module ODE_Solvers
         errass = .false.
         !Set the flag so that the code selects the starting step size
         hstart = 0.0
-        !Set output message to true
-        message = .true.
+        !Set output message based on rksuite_verbose flag (default .false. to suppress RKSuite diagnostic messages)
+        if ( present(rksuite_verbose) ) then
+            message = rksuite_verbose
+        else
+            message = .false.
+        endif
         
         !Call the setup function in order to initiate the solver    
-        call setup(  setup_comm, t(1), ystart, t(nt), tol, thres, method,task,errass, hstart,message)
+        call setup(  setup_comm, t(1), ystart, t(nt), tol, thres, method, task, errass, hstart, message)
 
         !Calculate the magnetization to use for the first convergence calculation
         y_last = ystart
@@ -217,9 +223,7 @@ module ODE_Solvers
                 else if (flag .eq. 4) then
                     !Stiffness detected - RKSuite does not have a stiff solver, so we log warning and continue
                     if ( mod(i, callback_display) .eq. 0 ) then
-                        write(prog_str,'(A)') 'Warning: Stiffness detected. RKSuite is not optimized for stiff problems.'
-                        call callback( prog_str, -1 )
-                        write(prog_str,'(A)') '         Consider using CVODE solver for better performance on stiff problems.'
+                        write(prog_str,'(A)') 'Warning: Stiff problem detected. Consider using the CVODE solver.'
                         call callback( prog_str, -1 )
                     endif
                 else if (flag .eq. 5 .or. flag .eq. 6) then
