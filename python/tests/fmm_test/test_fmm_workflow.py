@@ -7,11 +7,14 @@ import pytest
 
 
 @pytest.mark.skipif(
-    os.environ.get("MAGTENSE_USE_FMM3D") != "1",
-    reason="FMM3D quick test requires an FMM-enabled MagTense build.",
+    os.environ.get("MAGTENSE_USE_FMM3D") != "1"
+    or os.environ.get("MAGTENSE_WHEEL_VARIANT") != "cu12-fmm",
+    reason="FMM3D quick test requires the cu12-fmm MagTense wheel.",
 )
 def test_fmm_quick_workflow() -> None:
     test_dir = Path(__file__).parent
+    env = os.environ.copy()
+    env.setdefault("MPLBACKEND", "Agg")
 
     subprocess.run(
         [
@@ -24,5 +27,6 @@ def test_fmm_quick_workflow() -> None:
             "2",
         ],
         cwd=test_dir,
+        env=env,
         check=True,
     )

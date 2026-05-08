@@ -2,7 +2,7 @@ import numpy as np
 from magtense.micromag import MicromagProblem
 from grain_generator import AdaptiveGrainGenerator
 import sys
-sys.path.append("../../src/utils")
+sys.path.append("../../src")
 from utils import *
 from typing import Optional
 

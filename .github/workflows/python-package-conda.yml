@@ -199,10 +199,15 @@ jobs:
     - name: Install pip-wheel and pytest
       env:
         MAGTENSE_USE_FMM3D: ${{ matrix.mt-punit.fmm3d }}
+        MAGTENSE_WHEEL_VARIANT: ${{ matrix.mt-punit.name }}
       run: |
         python3 -m pip install '${{ github.workspace }}'/*.whl
         python3 -m pip install pytest
-        pytest
+        if [ "${MAGTENSE_WHEEL_VARIANT}" = "cu12-fmm" ]; then
+          pytest python/tests/fmm_test/test_fmm_workflow.py
+        else
+          pytest
+        fi
 
         
   cache-conda-win:
