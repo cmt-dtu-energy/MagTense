@@ -21,7 +21,8 @@ def setup_grain_problem_from_matfile(
                     exch_ncols: int = 1,
                     passexch : int = 0,
                     input_file_name : str = "t",
-                    grid_type : str = "unstructuredPrisms"
+                    grid_type : str = "unstructuredPrisms",
+                    cone_angle_degree : float = 1.0
                     ) -> MicromagProblem:
     
 
