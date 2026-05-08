@@ -6,9 +6,16 @@ from pathlib import Path
 import pytest
 
 
+def _is_fmm3d_wheel() -> bool:
+    return (
+        os.environ.get("MAGTENSE_USE_FMM3D", "").strip().lower()
+        in {"1", "true", "yes", "on"}
+        and os.environ.get("MAGTENSE_WHEEL_VARIANT") == "cu12-fmm"
+    )
+
+
 @pytest.mark.skipif(
-    os.environ.get("MAGTENSE_USE_FMM3D") != "1"
-    or os.environ.get("MAGTENSE_WHEEL_VARIANT") != "cu12-fmm",
+    not _is_fmm3d_wheel(),
     reason="FMM3D quick test requires the cu12-fmm MagTense wheel.",
 )
 def test_fmm_quick_workflow() -> None:

@@ -203,11 +203,7 @@ jobs:
       run: |
         python3 -m pip install '${{ github.workspace }}'/*.whl
         python3 -m pip install pytest
-        if [ "${MAGTENSE_WHEEL_VARIANT}" = "cu12-fmm" ]; then
-          pytest python/tests/fmm_test/test_fmm_workflow.py
-        else
-          pytest
-        fi
+        pytest
 
         
   cache-conda-win:
