@@ -33,7 +33,7 @@ The script depends on:
 ## Standard Run
 
 ```bash
-python fmm_test_main.py
+python run_fmm_test.py
 ```
 
 ## Quick Test
@@ -41,7 +41,7 @@ python fmm_test_main.py
 Runs only the fastest FMM configurations (`nlmax=2`).
 
 ```bash
-python fmm_test_main.py --quick-test
+python run_fmm_test.py --quick-test
 ```
 
 ## Custom Seed
@@ -49,7 +49,7 @@ python fmm_test_main.py --quick-test
 Seed is used both for generating the grain structure, and for assiging random magnetizations.
 
 ```bash
-python fmm_test_main.py --seed 123
+python run_fmm_test.py --seed 123
 ```
 
 Default seed value is 100
@@ -57,7 +57,7 @@ Default seed value is 100
 ## External Field Direction
 
 ```bash
-python fmm_test_main.py --Hext-dir-type 1
+python run_fmm_test.py --Hext-dir-type 1
 ```
 
 | Value | Description |
@@ -160,7 +160,7 @@ Suitable for CI pipelines.
 # Example
 
 ```bash
-python fmm_test_main.py \
+python run_fmm_test.py \
     --quick-test \
     --seed 42 \
     --Hext-dir-type 2
