@@ -42,7 +42,7 @@ def main(
     build_tag: dict | None = None,
 ) -> None:
     if build_tag is None:
-        build_tag = {"cpu": 0, "cu12": 1}
+        build_tag = {"cpu": 0, "cu12": 1, "cu12-fmm": 3}
     py_folder = Path(__file__).parent.parent
     lib_folder = py_folder / "src" / "magtense" / "lib"
 
@@ -52,6 +52,8 @@ def main(
         whl_arch = "win_amd64" if platform == "win" else "manylinux1_x86_64"
 
         for lib_file in lib_folder.glob(f"*.{suffix}"):
+            subprocess.run(["rm", lib_file], check=False)
+        for lib_file in lib_folder.glob("*.dll"):
             subprocess.run(["rm", lib_file], check=False)
 
         for cuda, py in itertools.product(cu_versions, py_versions):
@@ -64,18 +66,40 @@ def main(
                 ],
                 check=False,
             )
+            if cuda.endswith("-fmm") and platform == "linux":
+                subprocess.run(
+                    [
+                        "cp",
+                        f"{py_folder}/{cuda}_libs/libfmm3d.so",
+                        lib_folder,
+                    ],
+                    check=False,
+                )
+            if cuda.endswith("-fmm") and platform == "win":
+                subprocess.run(
+                    [
+                        "cp",
+                        f"{py_folder}/{cuda}_libs/libfmm3d.dll",
+                        lib_folder,
+                    ],
+                    check=False,
+                )
             if platform == "linux":
-                rpath = "$ORIGIN/../../../../../lib/"
-                if cuda == "cu12":
-                    rpath += ":$ORIGIN/../../nvidia/cublas/lib/"
-                    rpath += ":$ORIGIN/../../nvidia/cuda_runtime/lib/"
-                    rpath += ":$ORIGIN/../../nvidia/cusparse/lib/"
+                rpath_entries = ["$ORIGIN/../../../../../lib/"]
+                if cuda.endswith("-fmm"):
+                    rpath_entries.insert(0, "$ORIGIN")
+                if cuda.startswith("cu12"):
+                    rpath_entries += [
+                        "$ORIGIN/../../nvidia/cublas/lib/",
+                        "$ORIGIN/../../nvidia/cuda_runtime/lib/",
+                        "$ORIGIN/../../nvidia/cusparse/lib/",
+                    ]
                 subprocess.run(
                     [
                         "patchelf",
                         "--force-rpath",
                         "--set-rpath",
-                        f"{rpath}",
+                        ":".join(rpath_entries),
                         f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}",
                     ],
                     check=False,
@@ -116,6 +140,16 @@ def main(
                 ["rm", f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}"],
                 check=False,
             )
+            if cuda.endswith("-fmm") and platform == "linux":
+                subprocess.run(
+                    ["rm", f"{lib_folder}/libfmm3d.so"],
+                    check=False,
+                )
+            if cuda.endswith("-fmm") and platform == "win":
+                subprocess.run(
+                    ["rm", f"{lib_folder}/libfmm3d.dll"],
+                    check=False,
+                )
             if Path(py_folder / "src" / "magtense.egg-info").is_dir():
                 subprocess.run(
                     [

@@ -32,6 +32,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
     
     - name: Fetch tags
       if: "${{ inputs.tag == '' }}"
@@ -86,6 +88,7 @@ jobs:
       run: |
         mkdir '${{ github.workspace }}'/python/cpu_libs
         mkdir '${{ github.workspace }}'/python/cu12_libs
+        mkdir '${{ github.workspace }}'/python/cu12-fmm_libs
     
     # Workaround: Issue with msvc-dev-cmd and link.exe in the conda environment
     - name: Win - Delete link.exe
@@ -104,6 +107,10 @@ jobs:
         make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
         cp magtensesource.* ${{ github.workspace }}/python/cu12_libs/
         make clean
+        make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0 USE_FMM3D=1
+        cp magtensesource.* ${{ github.workspace }}/python/cu12-fmm_libs/
+        cp external/FMM3D/local/libfmm3d.dll ${{ github.workspace }}/python/cu12-fmm_libs/
+        make clean
     
     - name: Linux - Compile Fortran source code and build Python wrapper
       if: ${{ runner.os == 'Linux' }}
@@ -115,20 +122,24 @@ jobs:
         make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
         cp magtensesource.* '${{ github.workspace }}'/python/cu12_libs/
         make clean
+        make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0 USE_FMM3D=1
+        cp magtensesource.* '${{ github.workspace }}'/python/cu12-fmm_libs/
+        cp external/FMM3D/local/libfmm3d.so '${{ github.workspace }}'/python/cu12-fmm_libs/
+        make clean
 
     - name: Build pip-wheels
       if: "${{ inputs.tag == '' }}"
       working-directory: ${{ github.workspace }}/python/
       run: |
         sed -i 's/1.0.0/${{ steps.previoustag.outputs.tag }}/' src/magtense/__init__.py
-        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --platform ${{ matrix.sys.name }} --pkg_version ${{ steps.previoustag.outputs.tag }}
+        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu,cu12,cu12-fmm --platform ${{ matrix.sys.name }} --pkg_version ${{ steps.previoustag.outputs.tag }}
 
     - name: Deployment - Build pip-wheels
       if: "${{ inputs.tag != '' }}"
       working-directory: ${{ github.workspace }}/python/
       run: |
         sed -i 's/1.0.0/${{ inputs.tag }}/' src/magtense/__init__.py
-        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --platform ${{ matrix.sys.name }} --pkg_version ${{ inputs.tag }}
+        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu,cu12,cu12-fmm --platform ${{ matrix.sys.name }} --pkg_version ${{ inputs.tag }}
 
     - name: cpu - Archive pip-wheel
       uses: actions/upload-artifact@v4
@@ -142,11 +153,20 @@ jobs:
         name: pip-wheel-py${{ matrix.py-version }}-cu12-${{ runner.os }}
         path: ${{ github.workspace }}/python/dist/magtense-*-1-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
 
+    - name: cu12-fmm - Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version }}-cu12-fmm-${{ runner.os }}
+        path: ${{ github.workspace }}/python/dist/magtense-*-3-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
+
 
   test-wheel:
     strategy:
       matrix:
-        mt-punit: [cpu, cu12]
+        mt-punit:
+          - { name: cpu, fmm3d: 0 }
+          - { name: cu12, fmm3d: 0 }
+          - { name: cu12-fmm, fmm3d: 1 }
         py-version:
           - { name: 312, id: "3.12" }
           - { name: 313, id: "3.13" }
@@ -163,12 +183,13 @@ jobs:
       with:
         sparse-checkout: |
           python/tests/
+          python/src/utils/
           documentation/examples_FEM_validation/
     
     - name: Download a single artifact
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-py${{ matrix.py-version.name }}-${{ matrix.mt-punit }}-${{ runner.os }}
+        name: pip-wheel-py${{ matrix.py-version.name }}-${{ matrix.mt-punit.name }}-${{ runner.os }}
 
     - name: Setup python
       uses: actions/setup-python@v5
@@ -176,6 +197,8 @@ jobs:
         python-version: ${{ matrix.py-version.id }}
 
     - name: Install pip-wheel and pytest
+      env:
+        MAGTENSE_USE_FMM3D: ${{ matrix.mt-punit.fmm3d }}
       run: |
         python3 -m pip install '${{ github.workspace }}'/*.whl
         python3 -m pip install pytest

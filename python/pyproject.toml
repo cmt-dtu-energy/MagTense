@@ -9,7 +9,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-"magtense.lib" = ["*.pyd", "*.so"]
+"magtense.lib" = ["*.pyd", "*.so", "*.dll"]
 "magtense.mat" = ["*.csv"]
 
 [tool.setuptools.dynamic]
