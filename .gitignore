@@ -212,3 +212,6 @@ error.txt
 # CVODE downloaded files and folders
 cvode*/
 *tar.gz
+.vs/CopilotSnapshots/
+
+.vs/MagTense/copilot-chat/

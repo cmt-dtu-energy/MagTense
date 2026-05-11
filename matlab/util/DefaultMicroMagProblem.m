@@ -122,6 +122,9 @@ properties
     % are returned from Fortran
     ReturnHall
     
+    %A parameter that determines if the average of the prism is used or not
+    useAvgN
+
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
     
@@ -361,6 +364,8 @@ methods
         obj.CV = 0;
         %initial value of the ReturnHall is zero, i.e. the specific fields are not returned
         obj.ReturnHall = int32(0);
+        %initial value of the useAvgN is true
+        obj.useAvgN = int32(1);
         %set use cuda to default not
         obj.useCuda = int32(0);
 		%set use CVODE to default

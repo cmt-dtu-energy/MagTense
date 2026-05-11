@@ -22,11 +22,11 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall, passExch
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall, passExch, useAvgN
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: exch_weightProblemPtr, exch_methodProblemPtr, exch_interpnProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, K1ProblemPtr, K2ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
-        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr, usePassExchPtr
+        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr, usePassExchPtr, useAvgNProblemPtr
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
         mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr, CVThresProblemPtr
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
@@ -387,7 +387,6 @@
         !Parameter to determine if the specific H_fields are returned (exchange, demag, etc.)
         sx = 1
         useReturnHallProblemPtr = mxGetField(prhs,i,problemFields(50))
-        
         call mxCopyPtrToInteger4(mxGetPr(useReturnHallProblemPtr), useReturnHall, sx )
         if ( useReturnHall .eq. 1 ) then
             problem%useReturnHall = useReturnHallTrue
@@ -435,6 +434,16 @@
         exch_interpnProblemPtr = mxGetField( prhs, i, problemFields(54) )
         call mxCopyPtrToInteger4(mxGetPr(exch_interpnProblemPtr), problem%exch_interpn, sx )
         
+        !Parameter to determine if the average tensor is used for the prisms
+        sx = 1
+        useAvgNProblemPtr = mxGetField(prhs,i,problemFields(61))
+        call mxCopyPtrToInteger4(mxGetPr(useAvgNProblemPtr), useAvgN, sx )
+        if ( useAvgN .eq. 1 ) then
+            problem%useAvgN = useAvgNTrue
+        else
+            problem%useAvgN = useAvgNFalse
+        endif
+        
         !>-----------------------------------------
         !Calculate the local scaled coefficients for the LLG equation
         !"J" : exchange term
@@ -460,7 +469,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=60
+        integer,parameter :: nf=61
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -527,6 +536,7 @@
         fieldnames(58) = 'K0_arr'
         fieldnames(59) = 'K1'
         fieldnames(60) = 'K2'
+        fieldnames(61) = 'useAvgN'
         
     end subroutine getProblemFieldnames
     

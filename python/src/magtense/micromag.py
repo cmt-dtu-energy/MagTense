@@ -98,8 +98,8 @@ class MicromagProblem:
         exch_presize: int = 12,
         demigstp: int = 0,
         passexch: int = 0,
-        usereturnhall: int = 1,
-        useavgn: int = 0,
+        usereturnhall: bool = True,
+        useavgn: bool = False,
         filename: str = "t",
         cuda: bool = False,
         cvode: bool = False,
@@ -186,6 +186,8 @@ class MicromagProblem:
             self.cuda = int(cuda)
 
         self.cvode = int(cvode)
+        self.useavgn = int(useavgn)
+        self.usereturnhall = int(usereturnhall)
         self.precision = int(precision)
         self.n_threads = n_threads
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")

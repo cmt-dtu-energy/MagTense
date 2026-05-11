@@ -1,4 +1,4 @@
-% Model:              less simple comsol model_6.3.mph
+% Model:              Example_prism_average.mph
 % Version:            COMSOL 6.3.0.420
 % Date:               Jan 6 2026, 12:46
 % Table:              Table 3 - Global Evaluation 1

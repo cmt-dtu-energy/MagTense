@@ -1,4 +1,5 @@
 module TileNComponents
+    use TileTensorHelperFunctions
     use TileCylPieceTensor
     use TileRectangularPrismTensor
     use TileRectangularPrismAvgTensor
@@ -644,10 +645,7 @@ module TileNComponents
     real(8) :: source_coords(6), obs_coords(6)
     real(8) :: X1, X2, Y1, Y2, Z1, Z2, vol, min_vol
     real(8), parameter :: eps = 1.0d-15
-    real(8) :: pi
     integer :: unit
-
-    pi = 4.0_8 * atan(1.0_8)
 
     !Lengths of source tile in x,y,z dimensions
     a = Avgprism%a/2.0
@@ -829,21 +827,7 @@ module TileNComponents
     
     !!Change the sign so that the output tensor follows the same definition as all the other tensors
     N_out = -1.* N_out
-
-    !print *, "testprint regular"
-    !print *, "x, y, z: ",x,y,z
-    !print *, "a, b, c: ", a,b,c
-    !print *, "N_out: ", N_out
-    
-    !unit = 11
-    !open(unit=unit, file="demag_point_output.txt", position="append", action="write")
-    !write(unit,'(A,3ES14.6)') "x, y, z: ", x, y, z
-    !write(unit,'(A,3ES14.6)') "a, b, c: ", a, b, c
-    !write(unit,*) "N_out: ", N_out
-
-    !close(unit)
-    
-    
+ 
     end subroutine
     
     
