@@ -219,7 +219,10 @@ jobs:
         py-version:
           - { name: 312, id: "3.12" }
           - { name: 313, id: "3.13" }
-    runs-on: [ self-hosted, Linux, CUDA ]
+        fmm_runner:
+          - { os_name: linux, labels: '["self-hosted", "Linux", "CUDA"]' }
+          - { os_name: windows, labels: '["self-hosted", "Windows", "CUDA"]' }
+    runs-on: ${{ fromJSON(matrix.fmm_runner.labels) }}
     needs: build-wheel
     defaults:
       run:
@@ -238,6 +241,13 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: pip-wheel-py${{ matrix.py-version.name }}-cu12-fmm-${{ runner.os }}
+
+    - name: Allow setup-python install script
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      shell: powershell
+      run: |
+        Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
+        Get-ExecutionPolicy -List
 
     - name: Setup python
       uses: actions/setup-python@v5
