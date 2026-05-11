@@ -205,6 +205,12 @@ jobs:
       with:
         python-version: ${{ matrix.py-version.id }}
 
+    - name: Show CUDA device info
+      if: ${{ matrix.mt-punit.fmm3d == 1 }}
+      run: |
+        python3 -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
+        nvidia-smi || true
+
     - name: Install pip-wheel and pytest
       env:
         MAGTENSE_USE_FMM3D: ${{ matrix.mt-punit.fmm3d }}
