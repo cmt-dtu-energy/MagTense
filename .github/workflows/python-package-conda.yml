@@ -248,12 +248,31 @@ jobs:
       with:
         python-version: ${{ matrix.py-version.id }}
 
-    - name: Check Windows Python
+    - name: Resolve Windows Python
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
       shell: cmd
       run: |
-        py -0p
-        py -${{ matrix.py-version.id }} -c "import sys; print(sys.executable); print(sys.version)"
+        set "PYTHON_EXE="
+        for /f "delims=" %%p in ('where python 2^>nul') do (
+          if not defined PYTHON_EXE set "PYTHON_EXE=%%p"
+        )
+        if not defined PYTHON_EXE (
+          for /d %%d in ("%RUNNER_TOOL_CACHE%\Python\${{ matrix.py-version.id }}.*\x64") do (
+            if exist "%%d\python.exe" set "PYTHON_EXE=%%d\python.exe"
+          )
+        )
+        if not defined PYTHON_EXE (
+          for /d %%d in ("%AGENT_TOOLSDIRECTORY%\Python\${{ matrix.py-version.id }}.*\x64") do (
+            if exist "%%d\python.exe" set "PYTHON_EXE=%%d\python.exe"
+          )
+        )
+        if not defined PYTHON_EXE (
+          echo Could not find Python ${{ matrix.py-version.id }} on this self-hosted Windows runner.
+          echo Install Python ${{ matrix.py-version.id }} and add it to PATH, or pre-populate the Actions toolcache.
+          exit /b 1
+        )
+        "%PYTHON_EXE%" -c "import sys; expected=tuple(map(int, '${{ matrix.py-version.id }}'.split('.'))); print(sys.executable); print(sys.version); raise SystemExit(0 if sys.version_info[:2] == expected else f'Expected Python {expected}, got {sys.version_info[:2]}')"
+        echo PYTHON_EXE=%PYTHON_EXE%>> "%GITHUB_ENV%"
 
     - name: Show CUDA device info
       if: ${{ matrix.fmm_runner.os_name == 'linux' }}
@@ -265,7 +284,7 @@ jobs:
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
       shell: cmd
       run: |
-        py -${{ matrix.py-version.id }} -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
+        "%PYTHON_EXE%" -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
         nvidia-smi
 
     - name: Install pip-wheel and pytest
@@ -285,9 +304,9 @@ jobs:
         MAGTENSE_USE_FMM3D: 1
         MAGTENSE_WHEEL_VARIANT: cu12-fmm
       run: |
-        for %%f in ("%GITHUB_WORKSPACE%\*.whl") do py -${{ matrix.py-version.id }} -m pip install "%%f"
-        py -${{ matrix.py-version.id }} -m pip install pytest
-        py -${{ matrix.py-version.id }} -m pytest python/tests/fmm_test/test_fmm_workflow.py
+        for %%f in ("%GITHUB_WORKSPACE%\*.whl") do "%PYTHON_EXE%" -m pip install "%%f"
+        "%PYTHON_EXE%" -m pip install pytest
+        "%PYTHON_EXE%" -m pytest python/tests/fmm_test/test_fmm_workflow.py
 
         
   cache-conda-win:
