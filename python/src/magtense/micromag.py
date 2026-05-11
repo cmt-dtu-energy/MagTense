@@ -746,6 +746,7 @@ class MicromagProblem:
             n_ave=self.N_ave,
             cv=self.cv,
             usereturnhall=self.usereturnhall,
+            useavgn=self.useavgn,
             demigstp=self.demigstp,
             exch_weigh=self.exch_weigh,
             exch_meth=self.exch_meth,

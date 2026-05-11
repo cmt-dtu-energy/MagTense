@@ -907,7 +907,7 @@ end subroutine updateDemagfieldFMM
     !> @param[inout] solution, struct containing the current solution        
     !>-----------------------------------------
     subroutine updateDemagfield( problem, solution)
-    type(MicroMagProblem),intent(inout) :: problem         !> Problem data structure    
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     integer :: stat,ntot,i
     type(matrix_descr) :: descr
@@ -1173,8 +1173,9 @@ end subroutine updateDemagfieldFMM
         !Demagnetization tensor matrix
 #if USE_FMM3D
         !------------- build neighbour demag tensor -------------------------------------------------------------------
-        call BuildNeighbourDemagTensor( problem)
-            !---------- if BuildNeighbourDemagTensor sets use_fmm to false then compute the demag tensor normally -----
+        call BuildNeighbourDemagTensor( problem )
+        
+        !---------- if BuildNeighbourDemagTensor sets use_fmm to false then compute the demag tensor normally -----
         if (.not. problem%use_fmm) then
            call ComputeDemagfieldTensor( problem )
         end if
@@ -1331,11 +1332,11 @@ end subroutine updateDemagfieldFMM
             !for each element find the tensor for all evaluation points (i.e. all elements)    
             !======== NOTE ===============
             ! this parallelization seem to give issues when compiled with matlab in debug mode
-            !$OMP PARALLEL DO collapse(3) SHARED(problem, gb_problem, nx, ny, nz, ntot, obs_size_arr) PRIVATE(ind, tile, H, Nout, pts_arr) default(none)
+            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot, obs_size_arr) PRIVATE(ind, tile, H, Nout, pts_arr) default(none)
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx
-                        if (gb_problem%useAvgN .eq. useAvgNTrue) then
+                        if (problem%useAvgN .eq. useAvgNTrue) then
                             !Setup average N template tile
                             tile(1)%tileType = 8 !(for avgPrism)
                         else
@@ -1358,14 +1359,22 @@ end subroutine updateDemagfieldFMM
                         allocate(Nout(1,ntot,3,3))
                         allocate(H(ntot,3))
                         
-                        if (gb_problem%useAvgN .eq. useAvgNTrue) then
+                        allocate(pts_arr(ntot,3))
+                        pts_arr(:,1) =  problem%grid%pts(:,1)
+                        pts_arr(:,2) =  problem%grid%pts(:,2)
+                        pts_arr(:,3) =  problem%grid%pts(:,3)
+                        
+                        if (problem%useAvgN .eq. useAvgNTrue) then
                             !Use the average prism tensor
-                            call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false., Obs_size=obs_size_arr)
+                            !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false., Obs_size=obs_size_arr)
+                            call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false., Obs_size=obs_size_arr)
                         else
                             !Use the point prism tensor
-                            call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                            !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                            call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
                         endif
                         
+                        !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
                         call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
                         
                         !Copy Nout into the proper structure used by the micro mag model
@@ -1397,7 +1406,6 @@ end subroutine updateDemagfieldFMM
 
             
             deallocate(obs_size_arr)
-
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
         
             if (nx_ave*ny_ave*nz_ave > 1) then
@@ -1420,13 +1428,13 @@ end subroutine updateDemagfieldFMM
                 allocate(Nout(1,ntot,3,3))
                 allocate(H(ntot,3))
                 
-                allocate(pts_arr(ntot,3))
-                pts_arr(:,1) =  problem%grid%pts(:,1)
-                pts_arr(:,2) =  problem%grid%pts(:,2)
-                pts_arr(:,3) =  problem%grid%pts(:,3)
+                !allocate(pts_arr(ntot,3))
+                !pts_arr(:,1) =  problem%grid%pts(:,1)
+                !pts_arr(:,2) =  problem%grid%pts(:,2)
+                !pts_arr(:,3) =  problem%grid%pts(:,3)
                 
-                !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
-                call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
+                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                !call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
                     
                 !Copy Nout into the proper structure used by the micro mag model
                 ind = i
@@ -1447,7 +1455,7 @@ end subroutine updateDemagfieldFMM
                 problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
                 
                 !Clean up
-                deallocate(pts_arr)
+                !deallocate(pts_arr)
                 deallocate(Nout)
                 deallocate(H)
             enddo
@@ -1462,7 +1470,7 @@ end subroutine updateDemagfieldFMM
             
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do i=1,ntot
-                if (gb_problem%useAvgN .eq. useAvgNTrue) then
+                if (problem%useAvgN .eq. useAvgNTrue) then
                     !Setup average N template tile
                     tile(1)%tileType = 8 !(for avgPrism)
                 else
@@ -1507,7 +1515,7 @@ end subroutine updateDemagfieldFMM
                             pts_arr(:,2) =  (problem%grid%pts(:,2)-problem%grid%abc(:,2)/2)+dy(:)*j_a
                             pts_arr(:,3) =  (problem%grid%pts(:,3)-problem%grid%abc(:,3)/2)+dz(:)*k_a
                             
-                            if (gb_problem%useAvgN .eq. useAvgNTrue) then
+                            if (problem%useAvgN .eq. useAvgNTrue) then
                                 !Use the average prism tensor
                                 call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false., obs_size = problem%grid%abc)
                             else
@@ -1618,7 +1626,7 @@ end subroutine updateDemagfieldFMM
     real(DP),dimension(:),allocatable :: A0_normalized  !> Normalized A0 for uneven anisotropy
         
 
-    if ( gb_problem%passExch .eq. passExchTrue) return ! Skip this if the exchange has already been passed from outside
+    if ( problem%passExch .eq. passExchTrue) return ! Skip this if the exchange has already been passed from outside
 
     allocate( A0_normalized(size(problem%A0)) )  
     A0_normalized = problem%A0 / ( maxval(problem%A0) )   ! Normalized by the largest exchange factor

@@ -17,7 +17,7 @@ def std_prob_4(
     mesh_file: str = "unstructured_grains_6_res_80_20_ref_2",
     plotting: bool = True,
     figpath: Path | None = None,
-    useavgn: int = 0,
+    useavgn: bool = True,
 ) -> list[float]:
     mu0 = 4 * np.pi * 1e-7
     grid_L = [500e-9, 125e-9, 3e-9]
@@ -215,6 +215,7 @@ if __name__ == "__main__":
         cvode=False,
         unstructured=False,
         plotting=True,
+        useavgn=True,
         #figpath=Path(__file__).parent.absolute().joinpath("..", "figs"),
         figpath=None,
     )
