@@ -174,18 +174,16 @@ jobs:
         mt-punit:
           - { name: cpu, fmm3d: 0 }
           - { name: cu12, fmm3d: 0 }
-          - { name: cu12-fmm, fmm3d: 1 }
         py-version:
           - { name: 312, id: "3.12" }
           - { name: 313, id: "3.13" }
-        #os: [windows-latest, ubuntu-latest}
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     needs: build-wheel
     defaults:
       run:
         shell: bash -el {0}
-    
+
     steps:
     - name: Checkout test scripts
       uses: actions/checkout@v4
@@ -194,7 +192,7 @@ jobs:
           python/tests/
           python/src/utils/
           documentation/examples_FEM_validation/
-    
+
     - name: Download a single artifact
       uses: actions/download-artifact@v4
       with:
@@ -205,20 +203,60 @@ jobs:
       with:
         python-version: ${{ matrix.py-version.id }}
 
-    - name: Show CUDA device info
-      if: ${{ matrix.mt-punit.fmm3d == 1 }}
-      run: |
-        python3 -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
-        nvidia-smi || true
-
     - name: Install pip-wheel and pytest
       env:
         MAGTENSE_USE_FMM3D: ${{ matrix.mt-punit.fmm3d }}
         MAGTENSE_WHEEL_VARIANT: ${{ matrix.mt-punit.name }}
       run: |
-        python3 -m pip install '${{ github.workspace }}'/*.whl
-        python3 -m pip install pytest
-        pytest
+        python -m pip install '${{ github.workspace }}'/*.whl
+        python -m pip install pytest
+        python -m pytest
+
+
+  test-wheel-fmm-cuda:
+    strategy:
+      matrix:
+        py-version:
+          - { name: 312, id: "3.12" }
+          - { name: 313, id: "3.13" }
+    runs-on: [ self-hosted, Windows, CUDA ]
+    needs: build-wheel
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/tests/
+          python/src/utils/
+          documentation/examples_FEM_validation/
+
+    - name: Download cu12-fmm artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version.name }}-cu12-fmm-${{ runner.os }}
+
+    - name: Setup python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.py-version.id }}
+
+    - name: Show CUDA device info
+      run: |
+        python -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
+        nvidia-smi
+
+    - name: Install pip-wheel and pytest
+      env:
+        MAGTENSE_USE_FMM3D: 1
+        MAGTENSE_WHEEL_VARIANT: cu12-fmm
+      run: |
+        python -m pip install '${{ github.workspace }}'/*.whl
+        python -m pip install pytest
+        python -m pytest python/tests/fmm_test/test_fmm_workflow.py
 
         
   cache-conda-win:
