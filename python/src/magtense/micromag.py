@@ -98,11 +98,12 @@ class MicromagProblem:
             exch_presize: int = 12,
             demigstp: int = 0,
             passexch: int = 0,
-            usereturnhall: int = 0,
             filename: str = "t",
             cuda: bool = False,
             cvode: bool = False,
             usedemag: bool = True,
+            useavgn: bool = False,
+            usereturnhall: bool = True,
             precision: bool = False,
             n_threads: int = 1,
             N_ave: tuple[int] = (1, 1, 1),
@@ -122,6 +123,7 @@ class MicromagProblem:
         self.passexch = passexch
         self.demigstp = demigstp
         self.usereturnhall = usereturnhall
+        self.useavgn = useavgn
         self.exch_presize = exch_presize
 
         self.grid_n = np.array(res, dtype=np.int32, order="F")
@@ -185,6 +187,8 @@ class MicromagProblem:
 
         self.cvode = int(cvode)
         self.usedemag = int(usedemag)
+        self.useavgn = int(useavgn)
+        self.usereturnhall = int(usereturnhall)
         self.precision = int(precision)
         self.n_threads = n_threads
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")
@@ -617,6 +621,7 @@ class MicromagProblem:
             n_ave=self.N_ave,
             cv=self.cv,
             usereturnhall=self.usereturnhall,
+            useavgn=self.useavgn,
             demigstp=self.demigstp,
             exch_weigh=self.exch_weigh,
             exch_meth=self.exch_meth,

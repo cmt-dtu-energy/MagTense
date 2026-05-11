@@ -111,7 +111,7 @@ ifeq ($(OS),Windows_NT)
 		OPT = ${CONDA_PATH}/Library/include \
 			-I${CONDA_PATH}/Library/include/intel64/lp64 \
 			-I${CONDA_PATH}/opt/compiler/include/intel64
-		LIB_OPT = -llibDemagField
+		LIB_OPT = -llibDemagField -llibTileDemagTensor -llibNumericalIntegration
 	endif
 else
  	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl

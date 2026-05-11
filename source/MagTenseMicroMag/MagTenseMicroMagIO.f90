@@ -22,11 +22,11 @@
         character(len=10),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall, passExch, UseFMM, useDemag
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall, passExch, UseFMM, useDemag, useAvgN
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: exch_weightProblemPtr, exch_methodProblemPtr, exch_interpnProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, K1ProblemPtr, K2ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
-        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr, usePassExchPtr
+        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr, usePassExchPtr, useAvgNProblemPtr
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
         mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr, CVThresProblemPtr
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
@@ -41,7 +41,7 @@
         mwPointer :: useDemagPtr
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
-        real(DP) :: demag_fac, CV
+        real(DP) :: demag_fac, CV, pi, mu0
         character*(40) :: prog_str
             
         !Get the expected names of the fields
@@ -406,6 +406,27 @@
         exch_interpnProblemPtr = mxGetField( prhs, i, problemFields(54) )
         call mxCopyPtrToInteger4(mxGetPr(exch_interpnProblemPtr), problem%exch_interpn, sx )
         
+        !Parameter to determine if the average tensor is used for the prisms
+        sx = 1
+        useAvgNProblemPtr = mxGetField(prhs,i,problemFields(70))
+        call mxCopyPtrToInteger4(mxGetPr(useAvgNProblemPtr), useAvgN, sx )
+        if ( useAvgN .eq. 1 ) then
+            problem%useAvgN = useAvgNTrue
+        else
+            problem%useAvgN = useAvgNFalse
+        endif
+        
+        !>-----------------------------------------
+        !Calculate the local scaled coefficients for the LLG equation
+        !"J" : exchange term
+        pi = 3.141592653589793
+        mu0 = 4*pi*1e-7
+        problem%Jfact = problem%A0 / ( mu0 * problem%Ms )
+        !"M" : demagnetization term
+        problem%Mfact = problem%Ms
+        !"K" : anisotropy term
+        problem%Kfact = problem%K0 / ( mu0 * problem%Ms )
+        
         !FMM parameters
         sx = 1
         fmm_cellsProblemPtr = mxGetField( prhs, i, problemFields(61) )
@@ -467,7 +488,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=69
+        integer,parameter :: nf=70
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -543,6 +564,7 @@
         fieldnames(67) = 'fmm_short'
         fieldnames(68) = 'fmm_min_n'
         fieldnames(69) = 'useDemag'
+        fieldnames(70) = 'useAvgN'
         
     end subroutine getProblemFieldnames
     

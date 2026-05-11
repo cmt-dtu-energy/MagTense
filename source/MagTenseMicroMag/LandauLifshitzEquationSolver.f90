@@ -1282,7 +1282,8 @@ end subroutine updateDemagfieldFMM
     integer :: i_a,j_a,k_a,nx_ave,ny_ave,nz_ave                   !> Internal counters and index variables for avering the demag tensor over the recieving tile
     real(DP),dimension(:),allocatable :: dx,dy,dz
     real(DP), dimension(:,:),allocatable :: pts_arr
-    real(DP),dimension(:,:,:,:),allocatable :: Nout,Noutave             !> Temporary storage for the demag tensor            
+    real(DP), dimension(:,:),allocatable :: obs_size_arr          !> Array containing the size of the observation tile for the average prism demag tensor
+    real(DP),dimension(:,:,:,:),allocatable :: Nout,Noutave       !> Temporary storage for the demag tensor            
     integer,dimension(4) :: indx_ele
     real :: rate
     integer :: c1,c2,cr,cm
@@ -1322,25 +1323,31 @@ end subroutine updateDemagfieldFMM
         !call omp_set_num_threads(1)               
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
             
-            if (nx_ave*ny_ave*nz_ave > 1) then
-                call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
-            endif
-        
+            allocate(obs_size_arr(ntot,3))
+            obs_size_arr(:,1) = problem%grid%dx
+            obs_size_arr(:,2) = problem%grid%dy
+            obs_size_arr(:,3) = problem%grid%dz
+            
             !for each element find the tensor for all evaluation points (i.e. all elements)    
             !======== NOTE ===============
             ! this parallelization seem to give issues when compiled with matlab in debug mode
-            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot) PRIVATE(ind, tile, H, Nout, pts_arr) default(none)
+            !$OMP PARALLEL DO collapse(3) SHARED(problem, gb_problem, nx, ny, nz, ntot, obs_size_arr) PRIVATE(ind, tile, H, Nout, pts_arr) default(none)
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx
-                        !Setup template tile
-                        tile(1)%tileType = 2 !(for prism)
-                        !dimensions of the tile
+                        if (gb_problem%useAvgN .eq. useAvgNTrue) then
+                            !Setup average N template tile
+                            tile(1)%tileType = 8 !(for avgPrism)
+                        else
+                            !Setup template tile
+                            tile(1)%tileType = 2 !(for prism)
+                        endif
+                        !Dimensions of the tile
                         tile(1)%a = problem%grid%dx
                         tile(1)%b = problem%grid%dy
                         tile(1)%c = problem%grid%dz
                         tile(1)%exploitSymmetry = 0 !0 for no and this is important
-                        tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+                        tile(1)%rotAngles(:) = 0.   !ensure that these are indeed zero
                         tile(1)%M(:) = 0.
                         
                         !Set the center of the tile to be the current point
@@ -1351,10 +1358,13 @@ end subroutine updateDemagfieldFMM
                         allocate(Nout(1,ntot,3,3))
                         allocate(H(ntot,3))
                         
-                        allocate(pts_arr(ntot,3))
-                        pts_arr(:,1) =  problem%grid%pts(:,1)
-                        pts_arr(:,2) =  problem%grid%pts(:,2)
-                        pts_arr(:,3) =  problem%grid%pts(:,3)
+                        if (gb_problem%useAvgN .eq. useAvgNTrue) then
+                            !Use the average prism tensor
+                            call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false., Obs_size=obs_size_arr)
+                        else
+                            !Use the point prism tensor
+                            call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                        endif
                         
                         call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
                         
@@ -1386,14 +1396,8 @@ end subroutine updateDemagfieldFMM
             !$OMP END PARALLEL DO
 
             
-            !open(21,file='Kxx.txt',status='unknown',form='formatted',action='write')
-            !do i=1,size(problem%Kxx,1)
-            !    do j=1,size(problem%Kxx,2)
-            !        write(21,*)  problem%Kxx(i,j)
-            !    enddo
-            !enddo
-            !close(21)
-            
+            deallocate(obs_size_arr)
+
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
         
             if (nx_ave*ny_ave*nz_ave > 1) then
@@ -1458,13 +1462,18 @@ end subroutine updateDemagfieldFMM
             
             !for each element find the tensor for all evaluation points (i.e. all elements)
             do i=1,ntot
-                !Setup template tile
-                tile(1)%tileType = 2 !(for prism)
+                if (gb_problem%useAvgN .eq. useAvgNTrue) then
+                    !Setup average N template tile
+                    tile(1)%tileType = 8 !(for avgPrism)
+                else
+                    !Setup template tile
+                    tile(1)%tileType = 2 !(for prism)
+                endif
                 tile(1)%exploitSymmetry = 0 !0 for no and this is important
-                tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+                tile(1)%rotAngles(:) = 0.   !ensure that these are indeed zero
                 tile(1)%M(:) = 0.
             
-                !dimensions of the tile
+                !Dimensions of the tile
                 tile(1)%a = problem%grid%abc(i,1)
                 tile(1)%b = problem%grid%abc(i,2)
                 tile(1)%c = problem%grid%abc(i,3)
@@ -1486,23 +1495,28 @@ end subroutine updateDemagfieldFMM
                 Noutave(1,:,:,:) = 0;
 
                 !Calculate the spacing between the points to do average in
-                !Note that abc is the full side length of the tile - it is divided with 1/2 in the demag tensor calculation
-                !to make it compatible to the expression in Smith_2010
+                !Note that abc is the full side length of the tile - it is divided with 2 in the demag tensor calculation to make it compatible to the expression in Smith_2010
                 dx = problem%grid%abc(:,1)/(nx_ave+1)
                 dy = problem%grid%abc(:,2)/(ny_ave+1)
                 dz = problem%grid%abc(:,3)/(nz_ave+1)
+
                 do k_a=1,nz_ave
                     do j_a=1,ny_ave                
                         do i_a=1,nx_ave
-                            !x = -2; a = 6; N = 4; dx = a/(N+1); figure; hold all; plot(x,0,'kd'); plot(x-a/2,0,'bd'); plot(x+a/2,0,'bd'); plot((x-a/2)+(1:N)*dx,0,'k*');
                             pts_arr(:,1) =  (problem%grid%pts(:,1)-problem%grid%abc(:,1)/2)+dx(:)*i_a
                             pts_arr(:,2) =  (problem%grid%pts(:,2)-problem%grid%abc(:,2)/2)+dy(:)*j_a
                             pts_arr(:,3) =  (problem%grid%pts(:,3)-problem%grid%abc(:,3)/2)+dz(:)*k_a
-                            !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
-                            call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
                             
+                            if (gb_problem%useAvgN .eq. useAvgNTrue) then
+                                !Use the average prism tensor
+                                call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false., obs_size = problem%grid%abc)
+                            else
+                                !Use the point prism tensor
+                                !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                                call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
+                            endif
+
                             Noutave = Noutave+Nout
-                            
                         enddo
                     enddo
                 enddo

@@ -2,6 +2,7 @@ module FortranToPythonIO
     use omp_mod
     use timer_mod
     use trace_mod
+    use TileNComponents
     use MagParameters
     use DemagFieldGetSolution
     use IterateMagnetSolution
@@ -29,7 +30,7 @@ module FortranToPythonIO
     !!
     subroutine getNFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
-        includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, N )
+        includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, N , Obs_size)
 
         integer(4),intent(in) :: n_tiles, n_pts
 
@@ -60,6 +61,7 @@ module FortranToPythonIO
         real(8),dimension(n_pts,3),intent(in) :: pts
         real(8),dimension(n_pts,3) :: H
         real(8),dimension(n_tiles,n_pts,3,3),intent(out) :: N
+        real(8),dimension(n_pts,3),intent(in), optional :: Obs_size
         type(MagTile),dimension(n_tiles) :: tiles
         integer :: i
 
@@ -78,6 +80,12 @@ module FortranToPythonIO
                 call getFieldFromCylTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case ( tileTypePrism )
                 call getFieldFromRectangularPrismTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+            case ( tileTypeAvgPrism )
+                if (present(Obs_size)) then
+                    call getAvgFieldFromRPT(tiles(i), H, pts, n_pts, N(i,:,:,:), .false., Obs_size)
+                else
+                    call getAvgFieldFromRPT(tiles(i), H, pts, n_pts, N(i,:,:,:), .false.)
+                end if
             case ( tileTypeSphere )
                 call getFieldFromSphereTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case ( tileTypeSpheroid )
@@ -110,7 +118,7 @@ module FortranToPythonIO
     !!
     subroutine getHFromTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
-        includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, N, useStoredN )
+        includeInIteration, exploitSymmetry, symmetryOps, Mrel, pts, n_tiles, n_pts, H, N, useStoredN, Obs_size )
 
         integer(4),intent(in) :: n_tiles, n_pts
 
@@ -143,6 +151,7 @@ module FortranToPythonIO
         real(8),dimension(n_pts,3) :: H_tmp
         real(8),dimension(n_tiles,n_pts,3,3),intent(inout) :: N
         logical,intent(in) :: useStoredN
+        real,intent(in),dimension(n_pts,3), optional :: Obs_size
 
         type(MagTile),dimension(n_tiles) :: tiles
         integer :: i
@@ -177,6 +186,20 @@ module FortranToPythonIO
                 else
                     call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts )
                 endif
+            case ( tileTypeAvgPrism )
+                    if (useStoredN) then
+                        if (present(Obs_size)) then
+                            call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN=useStoredN, Obs_size=Obs_size )
+                        else
+                            call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN=useStoredN )
+                        end if
+                    else
+                        if (present(Obs_size)) then
+                            call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_pts, Obs_size=Obs_size )
+                        else
+                            call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_pts )
+                        end if
+                    end if
             case ( tileTypeSphere )
                 if ( useStoredN .eqv. .true. ) then
                     call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
@@ -534,8 +557,7 @@ end subroutine getHOnSourcesFMM
     subroutine runSimulation( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
         mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
         includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, n_stateFcn, nT, nH, &
-        data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out )
-
+        data_stateFcn, T, maxErr, nIteMax, iterateSolution, returnSolution, n_pts, pts, H, Mag_out, Mrel_out, Obs_size )
         integer(4),intent(in) :: n_tiles, n_pts, n_stateFcn, nT, nH
 
         !::Specific for a cylindrical tile piece
@@ -575,6 +597,7 @@ end subroutine getHOnSourcesFMM
         real(8),dimension(n_pts,3),intent(in) :: pts
         real(8),dimension(n_pts,3),intent(out) :: H
         real(8),dimension(n_pts,3) :: H_tmp
+        real(8),dimension(n_pts,3),intent(in), optional :: Obs_size
         type(MagTile),dimension(n_tiles) :: tiles
         integer :: i
 
@@ -582,17 +605,18 @@ end subroutine getHOnSourcesFMM
 
         !!@todo no support for resuming iterations at the moment
         resumeIteration = 0
-
         !::initialise MagTile with specified parameters
         call loadTiles( centerPos, dev_center, tile_size, vertices, Mag, u_ea, u_oa1, u_oa2, &
             mu_r_ea, mu_r_oa, Mrem, tileType, offset, rotAngles, color, magnetType, stateFunctionIndex, &
             includeInIteration, exploitSymmetry, symmetryOps, Mrel, n_tiles, tiles )
-
+        !print *, "After loadtiles, M:", tiles(1)%M
+        !print *, "Mrem: ", Mrem
         !::load state function from table
         call loadStateFunction( nT, nH, stateFcn, data_stateFcn, n_stateFcn )
+        !print *, "After loadstatefunction, M:", tiles(1)%M
+        !print *, "Mrem: ", Mrem
 
         if ( iterateSolution .eqv. .true. ) then
-            write(*,*) 'Doing iteration'
             call iterateMagnetization( tiles, n_tiles, stateFcn, n_stateFcn, T, maxErr, nIteMax, resumeIteration )
 
             do i=1,n_tiles
@@ -600,6 +624,8 @@ end subroutine getHOnSourcesFMM
                 Mrel_out(i) = tiles(i)%Mrel
             enddo
         endif
+        !print *, "After iterateMagnetization, M:", tiles(1)%M
+        !print *, "Mrem: ", Mrem
 
         if ( returnSolution .eqv. .true. ) then
             write(*,*) 'Finding solution at requested points'
@@ -614,6 +640,7 @@ end subroutine getHOnSourcesFMM
                 H_tmp(:,:) = 0.
                 ! $OMP END CRITICAL
 
+
                 !! Here a selection of which subroutine to use should be done, i.e. whether the tile
                 !! is cylindrical, a prism or an ellipsoid or another geometry
                 select case (tiles(i)%tileType )
@@ -621,6 +648,15 @@ end subroutine getHOnSourcesFMM
                     call getFieldFromCylTile( tiles(i), H_tmp, pts, n_pts )
                 case (tileTypePrism)
                     call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_pts )
+                case (tileTypeAvgPrism)
+                    !write(*,*)  "TileType avgPrism detected"
+                    if (present(Obs_size)) then
+                        !write(*,*)  "This is what we want!"
+                       ! print *, "Obs_size = ", Obs_size
+                        call getAvgFieldFromRPT(tiles(i), H_tmp, pts, n_pts, Obs_size=Obs_size)
+                    else
+                        call getAvgFieldFromRPT(tiles(i), H_tmp, pts, n_pts)
+                    end if
                 case (tileTypeSphere)
                     call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts )
                 case (tileTypeSpheroid)
@@ -657,7 +693,7 @@ end subroutine getHOnSourcesFMM
         K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, MaxT0, nt_Hext, nt_Hext_out, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
         N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-        exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, demigstp, & 
+        exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, useAvgN, demigstp, & 
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, &
@@ -676,7 +712,7 @@ end subroutine getHOnSourcesFMM
         real(8),dimension(nt_alpha,2),intent(in) :: alphat
         integer(4),dimension(exch_nval),intent(in) :: exch_val, exch_cols, exch_rows
         real(8),dimension(nt_conv),intent(in) :: t_conv
-		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
+		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab, useAvgN
 		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch, useDemag
         real(8),intent(in) :: gamma, alpha_mm, MaxT0, tol, thres, conv_tol, dem_thres
 		real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2
@@ -745,7 +781,7 @@ end subroutine getHOnSourcesFMM
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
             exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
-			CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
+			CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
             CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, useDemag)
 
         print *, " starting SolveLandauLifshitzEquation "

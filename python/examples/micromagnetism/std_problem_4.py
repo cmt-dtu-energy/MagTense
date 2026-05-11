@@ -17,6 +17,7 @@ def std_prob_4(
     mesh_file: str = "unstructured_grains_6_res_80_20_ref_2",
     plotting: bool = True,
     figpath: Path | None = None,
+    useavgn: int = 0,
 ) -> list[float]:
     mu0 = 4 * np.pi * 1e-7
     grid_L = [500e-9, 125e-9, 3e-9]
@@ -46,6 +47,7 @@ def std_prob_4(
         grid_type=grid_type,
         cuda=cuda,
         cvode=cvode,
+        useavgn=useavgn,
     )
     h_ext = np.array([1, 1, 1]) / mu0
 
@@ -90,6 +92,7 @@ def std_prob_4(
         passexch=passexch,
         cuda=cuda,
         cvode=cvode,
+        useavgn=useavgn,
     )
 
     # Two applied external fields of std problem 4
@@ -200,8 +203,9 @@ def std_prob_4(
         if not unstructured:
             plot_M_thin_film(M_sq_dym[0], res, "Start_state", figpath=figpath)
             plot_M_thin_film(M_sq_dym[-1], res, "Final_state", figpath=figpath)
-
+    print("int_error: ", int_error)
     return int_error
+
 
 
 if __name__ == "__main__":

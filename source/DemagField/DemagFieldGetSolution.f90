@@ -20,13 +20,14 @@
     !!@param n_ele, the number of points at which to evaluate the field
     !!@param Nout the demag tensor calculated by this function (size (n_tiles,n_pts,3,3) )
     !!
-    subroutine getFieldFromTiles( tiles, H, pts, n_tiles, n_ele, Nout, useStoredNorg )
+    subroutine getFieldFromTiles( tiles, H, pts, n_tiles, n_ele, Nout, useStoredNorg, Obs_size )
         type(MagTile),intent(inout),dimension(n_tiles) :: tiles
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3),intent(in) :: pts
         integer(4),intent(in) :: n_tiles,n_ele
-        real(8),dimension(:,:,:,:),allocatable,optional :: Nout
+        real(8),dimension(:,:,:,:),allocatable,optional,intent(inout) :: Nout
         logical,optional :: useStoredNorg
+        real(8),dimension(n_ele,3),optional :: Obs_size
     
         integer(4) :: i,prgCnt,tid,prog,OMP_GET_THREAD_NUM
         real(8),dimension(:,:),allocatable :: H_tmp
@@ -72,7 +73,12 @@
             !Make sure to allocate H_tmp on the heap and for each thread
             ! $OMP CRITICAL
             H_tmp(:,:) = 0.        
-        
+            
+            !Hard-code tile choice for debugging:
+            !tiles(i)%tileType = tileTypeAvgPrism
+
+
+            
             ! $OMP END CRITICAL
             !! Here a selection of which subroutine to use should be done, i.e. whether the tile
             !! is cylindrical, a prism or an ellipsoid or another geometry
@@ -85,9 +91,23 @@
                 endif
             case (tileTypePrism)
                 if ( present(Nout) ) then
-                    call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+                   call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )  
+                else 
+                   call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele)
+                endif
+            case (tileTypeAvgPrism)
+                if ( present(Nout) ) then
+                   if (present(Obs_size)) then
+                   call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN,Obs_size=Obs_size)
+                   else
+                   call getAvgFieldFromRPT( tiles(i),  H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+                   endif
                 else
-                    call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele )
+                   if (present(Obs_size)) then
+                   call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_ele, Obs_size=Obs_size )
+                   else
+                   call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_ele)
+                   endif
                 endif
             case (tileTypeSphere)
                 if ( present(Nout) ) then
@@ -233,6 +253,49 @@
         !H = -1. * H
     
     end subroutine getFieldFromRectangularPrismTile      
+
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the magnetic field from a rectangular prism using averaged demag tensor
+    !! RPT = rectangular prism tile
+    !!
+
+    subroutine getAvgFieldFromRPT( prismTile, H, pts, n_ele, N_out, useStoredN, Obs_size )
+        !DEC$ ATTRIBUTES ALIAS:"getavgfieldfromrpt_" :: getAvgFieldFromRPT
+        type(MagTile),intent(in) :: prismTile
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
+        logical,intent(in),optional :: useStoredN
+        real,intent(in),dimension(n_ele,3), optional :: Obs_size
+
+    
+        !print *, "test test test"
+        procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
+        N_tensor => getAvgN_prism_3D
+        
+        !! Check to see if we should use symmetry
+        if ( prismTile%exploitSymmetry .eq. 1 ) then 
+            if (present(Obs_size)) then     
+                call getFieldFromTile_symm(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN, Obs_size )
+            else
+                call getFieldFromTile_symm(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN)
+            endif
+        else
+            if (present(Obs_size)) then       
+                call getFieldFromTile(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN, Obs_size )     
+            else
+                call getFieldFromTile(prismTile, H, pts, N_ele, N_tensor, N_out, useStoredN)  
+            endif
+        endif
+    
+        !!@todo Can this be removed?
+        !! The minus sign comes from the definition of the demag tensor (the demagfield is assumed negative)
+        !! Change in the tensor subroutine in order to make the behavior of the tensor components of the various geometries conform
+        !H = -1. * H
+    
+    end subroutine getAvgFieldFromRPT   
         
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>
@@ -688,7 +751,7 @@
     !>
     !!Calculates the actual field from a tile of a given geometry
     !!
-    subroutine getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+    subroutine getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN, Obs_size )
         type(MagTile),intent(in) :: tile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3),intent(in) :: pts
@@ -699,7 +762,11 @@
             
         real(8),dimension(3,3) :: rotMat,rotMatInv,N
         integer(4) :: i
-        real(8),dimension(3) :: diffPos,dotProd        
+        real(8),dimension(3) :: diffPos,dotProd   
+        real,intent(in),dimension(n_ele,3), optional :: Obs_size  
+        real, dimension(3) :: Obs_size_ele
+        !Print *, "Using getFieldFromTile from DemagFieldGetSolution" 
+        !Print *, "Using Obs_size: ", Obs_size(1,:)  
     
         !! get the rotation matrices
         call getRotationMatrices( tile, rotMat, rotMatInv)
@@ -710,27 +777,37 @@
         
             !! Rotate the position vector according to the rotation of the prism
             diffPos = matmul( rotMat, diffPos )
+
+            if (present(obs_size)) then
+            Obs_size_ele = obs_size(i,:)
+            else 
+            Obs_size_ele = 0.0 !Maybe use different default here instead of checking for 0 later?
+            endif
         
             !! Get the demag tensor                
             if ( present( useStoredN ) .eqv. .true. ) then
                 if ( useStoredN .eqv. .false. ) then
-                     call N_tensor( tile, diffPos, N )
+                     call N_tensor( tile, diffPos, N ,Obs_size_ele)
                      N_out(i,:,:) = N
                 else
                     N = N_out(i,:,:)
                 endif
             else
-                call N_tensor( tile, diffPos, N )
+                call N_tensor( tile, diffPos, N ,Obs_size_ele)
             endif
-
+            !print *, "M for dotprod: ", tile%M !Why is this NAN for tiletype 8?
+            !print *, "rotmat for dotprod: ", rotMat
+            !print *, "N for dotprod: ", N
             !! Rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
             call getDotProd( N, matmul( rotMat, tile%M ), dotProd )
+            !print *, "DotProd from line 804: ", dotProd
 
             !! Rotate the resulting field back to the global coordinate system
             dotProd = matmul( rotMatInv, dotProd )        
         
             !! Update the solution.
             H(i,:) = dotProd
+            !print *, "H from line 812: ", H
         enddo
 
     end subroutine getFieldFromTile
@@ -747,7 +824,7 @@
     !! @N_out the resulting demag tensor for each of the points in question 
     !! @ useStoredN logical. If true then use the values in N_out else calculate the tensor
     !!
-    subroutine getFieldFromTile_symm(tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+    subroutine getFieldFromTile_symm(tile, H, pts, n_ele, N_tensor, N_out, useStoredN, Obs_size )
         type(MagTile),intent(in) :: tile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3),intent(in) :: pts
@@ -763,6 +840,7 @@
         real(8),dimension(8,3,3) :: symm_op_M, symm_op_H
         !!@todo Why is this temporary variable used instead of just useStoredN
         logical :: useStoredN_tmp
+        real,intent(in),dimension(n_ele,3), optional :: Obs_size
     
         !! get the rotation matrices for the tile
         call getRotationMatrices( tile, rotMat, rotMatInv)

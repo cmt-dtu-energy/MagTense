@@ -13,7 +13,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
     exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
-	CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn, &
+	CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
 	passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, useDemag )
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
     integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols
@@ -31,7 +31,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     integer(4),dimension(exch_nval),intent(in) :: exch_val, exch_rows, exch_cols
     real(8),dimension(nt_conv),intent(in) :: t_conv
     integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
-    integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch, useDemag
+    integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, useAvgN, useDemag, demigstp, exch_meth, exch_intpn, passExch
     real(8),intent(in) :: gamma, alpha, MaxT0, tol, thres, conv_tol, dem_thres
 	real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2
 	real(8),dimension(ntot,6,3),intent(in) :: K0_arr
@@ -247,6 +247,12 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 		problem%useReturnHall = useReturnHallTrue
 	else
 		problem%useReturnHall = useReturnHallFalse
+	endif
+
+    if ( useAvgN .eq. 1 ) then
+		problem%useAvgN = useAvgNTrue
+	else
+		problem%useAvgN = useAvgNFalse
 	endif
 	
 	problem%demag_ignore_steps = demigstp

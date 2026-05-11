@@ -147,6 +147,7 @@ include "mkl_dfti.f90"
         integer :: useDemag                                     !> Defines whether to include the demagnetization field in the calculations or not
         integer :: usePrecision                                 !> Defines whether to use single (false) or double precision (true)
         integer :: useReturnHall                                !> Defines whether to return all the specific H-fields (exchange, demag) �(true) or not (false)
+        integer :: useAvgN                                      !> Defines wether to use volume avergared demag tensor for the prism (True) or not (False)
         integer :: passExch                                     !> Defines whether the exchange matrix is passed from Matlab/Python (true) or calculated localled (false).
         integer :: demag_approximation                          !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         integer :: demagTensorReturnState                       !> Flag describing how or if the demag tensor should be returned
@@ -260,5 +261,6 @@ include "mkl_dfti.f90"
     integer,parameter :: useReturnHallTrue=1,useReturnHallFalse=0
     integer,parameter :: useFMMTrue=1,useFMMFalse=0
     integer,parameter :: useDemagTrue=1,useDemagFalse=0
+    integer, parameter :: useAvgNTrue=1, useAvgNFalse=0
     
 end module MicroMagParameters    
