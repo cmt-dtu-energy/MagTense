@@ -42,6 +42,7 @@ def std_prob_4(
         grid_L=grid_L,
         m0=1 / np.sqrt(3),
         alpha=4.42e3,
+        gamma=0,
         grid_pts=grid_pts,
         grid_abc=grid_abc,
         grid_type=grid_type,
