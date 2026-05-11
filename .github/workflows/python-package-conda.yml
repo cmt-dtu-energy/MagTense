@@ -177,7 +177,7 @@ jobs:
         py-version:
           - { name: 312, id: "3.12" }
           - { name: 313, id: "3.13" }
-        os: [ubuntu-latest]
+        os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     needs: build-wheel
     defaults:
@@ -219,7 +219,7 @@ jobs:
         py-version:
           - { name: 312, id: "3.12" }
           - { name: 313, id: "3.13" }
-    runs-on: [ self-hosted, Windows, CUDA ]
+    runs-on: [ self-hosted, Linux, CUDA ]
     needs: build-wheel
     defaults:
       run:
