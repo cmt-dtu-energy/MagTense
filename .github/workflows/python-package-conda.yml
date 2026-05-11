@@ -242,23 +242,34 @@ jobs:
       with:
         name: pip-wheel-py${{ matrix.py-version.name }}-cu12-fmm-${{ runner.os }}
 
-    - name: Allow setup-python install script
-      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: cmd
-      run: |
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force; Get-ExecutionPolicy -List"
-
     - name: Setup python
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.py-version.id }}
 
+    - name: Check Windows Python
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      shell: cmd
+      run: |
+        py -0p
+        py -${{ matrix.py-version.id }} -c "import sys; print(sys.executable); print(sys.version)"
+
     - name: Show CUDA device info
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
       run: |
         python -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
         nvidia-smi
 
+    - name: Show CUDA device info (Windows)
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      shell: cmd
+      run: |
+        py -${{ matrix.py-version.id }} -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
+        nvidia-smi
+
     - name: Install pip-wheel and pytest
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
       env:
         MAGTENSE_USE_FMM3D: 1
         MAGTENSE_WHEEL_VARIANT: cu12-fmm
@@ -266,6 +277,17 @@ jobs:
         python -m pip install '${{ github.workspace }}'/*.whl
         python -m pip install pytest
         python -m pytest python/tests/fmm_test/test_fmm_workflow.py
+
+    - name: Install pip-wheel and pytest (Windows)
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      shell: cmd
+      env:
+        MAGTENSE_USE_FMM3D: 1
+        MAGTENSE_WHEEL_VARIANT: cu12-fmm
+      run: |
+        for %%f in ("%GITHUB_WORKSPACE%\*.whl") do py -${{ matrix.py-version.id }} -m pip install "%%f"
+        py -${{ matrix.py-version.id }} -m pip install pytest
+        py -${{ matrix.py-version.id }} -m pytest python/tests/fmm_test/test_fmm_workflow.py
 
         
   cache-conda-win:
