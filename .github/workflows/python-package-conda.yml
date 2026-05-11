@@ -34,6 +34,14 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+
+    - name: Linux - Select FMM3D make.inc
+      if: ${{ runner.os == 'Linux' }}
+      run: cp external/FMM3D/make.inc.linux external/FMM3D/make.inc
+
+    - name: Win - Select FMM3D make.inc
+      if: ${{ runner.os == 'Windows' }}
+      run: cp external/FMM3D/make.inc.windows external/FMM3D/make.inc
     
     - name: Fetch tags
       if: "${{ inputs.tag == '' }}"
