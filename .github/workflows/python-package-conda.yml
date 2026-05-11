@@ -244,10 +244,9 @@ jobs:
 
     - name: Allow setup-python install script
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: powershell
+      shell: cmd
       run: |
-        Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
-        Get-ExecutionPolicy -List
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force; Get-ExecutionPolicy -List"
 
     - name: Setup python
       uses: actions/setup-python@v5
