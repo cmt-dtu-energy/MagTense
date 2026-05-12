@@ -1374,9 +1374,6 @@ end subroutine updateDemagfieldFMM
                             call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
                         endif
                         
-                        !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
-                        call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
-                        
                         !Copy Nout into the proper structure used by the micro mag model
                         ind = (k-1) * nx * ny + (j-1) * nx + i
                     
