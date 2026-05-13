@@ -1684,12 +1684,14 @@ end subroutine updateDemagfieldFMM
             do j=1,ny
             
                 !The left boundary
-                d2dx2%values(ind) = -1.
+                const = 2 *  problem%A0_map(2,j,k) / (problem%A0_map(2,j,k) + problem%A0_map(1,j,k))
+
+                d2dx2%values(ind) = -const
                 d2dx2%cols(ind) = colInd
                 d2dx2%rows_start(rowInd) = ind            
                 ind = ind + 1
             
-                d2dx2%values(ind) = 1.
+                d2dx2%values(ind) = const
                 d2dx2%cols(ind) = colInd + 1
                 d2dx2%rows_end(rowInd) = ind+1
                 rowInd = rowInd + 1
@@ -1700,19 +1702,20 @@ end subroutine updateDemagfieldFMM
                 do i=2,nx-1
                             
                     !Left-most point
-                    d2dx2%values( ind ) = problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))
+                    d2dx2%values( ind ) = 2 * problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))
+                    
                     d2dx2%cols(ind) = colInd
                     !update where the row starts
                     d2dx2%rows_start(rowInd) = ind                           
                     ind = ind + 1
                 
                     !Center point
-                    d2dx2%values( ind ) = -(problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))+problem%A0_map(i+1,j,k)/(problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k)))
+                    d2dx2%values( ind ) = 2 * ( -(problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))+problem%A0_map(i+1,j,k)/(problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k))))
                     d2dx2%cols(ind) = colInd + 1
                     ind = ind + 1
                 
                     !Right-most point
-                    d2dx2%values( ind ) = problem%A0_map(i+1,j,k)/(problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k))
+                    d2dx2%values( ind ) = 2 * problem%A0_map(i+1,j,k)/(problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k))
                     d2dx2%cols(ind) = colInd + 2
                     d2dx2%rows_end(rowInd) = ind+1
                     rowInd = rowInd + 1
@@ -1720,14 +1723,17 @@ end subroutine updateDemagfieldFMM
                 
                     colInd = colInd + 1
                 enddo            
+
+
+                const = 2 * problem%A0_map(nx-1,j,k) / (problem%A0_map(nx-1,j,k) + problem%A0_map(nx,j,k))
                 !The right boundary
-                d2dx2%values(ind) = 1.
+                d2dx2%values(ind) = const 
                 d2dx2%cols(ind) = colInd
                 !update where the row starts
                 d2dx2%rows_start(rowInd) = ind            
                 ind = ind + 1
             
-                d2dx2%values(ind) = -1.
+                d2dx2%values(ind) = -const
                 d2dx2%cols(ind) = colInd+1
                 d2dx2%rows_end(rowInd) = ind+1
                 rowInd = rowInd + 1
@@ -1738,7 +1744,7 @@ end subroutine updateDemagfieldFMM
         enddo
     
         !Multiply by the discretization
-        d2dx2%values = d2dx2%values * 2./grid%dx**2
+        d2dx2%values = d2dx2%values * 1.0/grid%dx**2
         
         !Create the sparse matrix for the d^2dx^2
         stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
@@ -1760,14 +1766,16 @@ end subroutine updateDemagfieldFMM
         do k=1,nz
             !The bottom boundary
             do i=1,nx
-                d2dy2%values(ind) = -1.
+                const = 2 * problem%A0_map(i,2,k) / (problem%A0_map(i,2,k) + problem%A0_map(i,1,k))
+
+                d2dy2%values(ind) = -const
                 d2dy2%cols(ind) = colInd
                 d2dy2%rows_start(rowInd) = ind
             
                 !increment to next element
                 ind = ind + 1
             
-                d2dy2%values(ind) = 1.
+                d2dy2%values(ind) = const
                 d2dy2%cols(ind) = colInd + nx
                 d2dy2%rows_end(rowInd) = ind+1
                 rowInd = rowInd + 1
@@ -1785,21 +1793,21 @@ end subroutine updateDemagfieldFMM
                 do i=1,nx
                 
                     !lower value
-                    d2dy2%values(ind) = problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))
+                    d2dy2%values(ind) = 2 * problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))
                     d2dy2%cols(ind) = colInd-nx
                     d2dy2%rows_start(rowInd) = ind
                     !increment to next element
                     ind = ind + 1  
                 
                     !central value
-                    d2dy2%values(ind) = -(problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))+problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k)))
+                    d2dy2%values(ind) = 2*(-(problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))+problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k))))
                     d2dy2%cols(ind) = colInd
             
                     !increment to next element
                     ind = ind + 1
             
                     !upper value
-                    d2dy2%values(ind) = problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k))
+                    d2dy2%values(ind) = 2 * problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k))
                     d2dy2%cols(ind) = colInd + nx
                     d2dy2%rows_end(rowInd) = ind+1
                     rowInd = rowInd + 1
@@ -1814,8 +1822,9 @@ end subroutine updateDemagfieldFMM
         
             !The top boundary    
             do i=1,nx
+                const = 2 * problem%A0_map(i,ny-1,k) / (problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k))
                 !lower element
-                d2dy2%values(ind) = 1.
+                d2dy2%values(ind) = const
                 d2dy2%cols(ind) = colInd - nx
                 d2dy2%rows_start(rowInd) = ind
             
@@ -1823,7 +1832,7 @@ end subroutine updateDemagfieldFMM
                 ind = ind + 1            
             
                 !central element
-                d2dy2%values(ind) = -1.
+                d2dy2%values(ind) = -const
                 d2dy2%cols(ind) = colInd
                 d2dy2%rows_end(rowInd) = ind + 1
                 rowInd = rowInd + 1
@@ -1835,7 +1844,7 @@ end subroutine updateDemagfieldFMM
         enddo
     
         !Multiply by the discretization
-        d2dy2%values = d2dy2%values * 2./grid%dy**2
+        d2dy2%values = d2dy2%values * 1./grid%dy**2
         
         !Create the sparse matrix for the d^2dy^2
         stat = mkl_sparse_d_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
@@ -1857,8 +1866,9 @@ end subroutine updateDemagfieldFMM
         !The z=1 face        
         do j=1,ny
             do i=1,nx
+                const = 2 * problem%A0_map(i,j,2) / (problem%A0_map(i,j,2) + problem%A0_map(i,j,1))
                 !central value
-                d2dz2%values(ind) = -1.
+                d2dz2%values(ind) = -const
                 d2dz2%cols(ind) = colInd
                 d2dz2%rows_start(rowInd) = ind
             
@@ -1866,7 +1876,7 @@ end subroutine updateDemagfieldFMM
                 ind = ind + 1
             
                 !right-most value
-                d2dz2%values(ind) = 1.
+                d2dz2%values(ind) = const
                 d2dz2%cols(ind) = nx * ny + colInd
                 d2dz2%rows_end(rowInd) = ind + 1
                 rowInd = rowInd + 1
@@ -1881,7 +1891,7 @@ end subroutine updateDemagfieldFMM
             do j=1,ny
                 do i=1,nx
                     !left-most value
-                    d2dz2%values(ind) = problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))
+                    d2dz2%values(ind) = 2 * problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))
                     d2dz2%cols(ind) = colInd - nx * ny
                     d2dz2%rows_start(rowInd) = ind
             
@@ -1889,14 +1899,14 @@ end subroutine updateDemagfieldFMM
                     ind = ind + 1
                 
                     !central value
-                    d2dz2%values(ind) = -(problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))+problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k)))
+                    d2dz2%values(ind) = 2 * (-(problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))+problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k))))
                     d2dz2%cols(ind) = colInd
                             
                     !increment position
                     ind = ind + 1
                 
                     !right-most value
-                    d2dz2%values(ind) = problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k))
+                    d2dz2%values(ind) = 2 * problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k))
                     d2dz2%cols(ind) = colInd + nx * ny
                     d2dz2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
@@ -1913,9 +1923,10 @@ end subroutine updateDemagfieldFMM
         !The z=nz face        
         do j=1,ny
             do i=1,nx
-                
+                const = 2 * problem%A0_map(i,j,nz-1) / (problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz))
+
                 !left-most value
-                d2dz2%values(ind) = 1.
+                d2dz2%values(ind) = const
                 d2dz2%cols(ind) = colInd - nx * ny
                 d2dz2%rows_start(rowInd) = ind
             
@@ -1923,7 +1934,7 @@ end subroutine updateDemagfieldFMM
                 ind = ind + 1
             
                 !central value
-                d2dz2%values(ind) = -1.
+                d2dz2%values(ind) = -const
                 d2dz2%cols(ind) = colInd
                 d2dz2%rows_end(rowInd) = ind + 1
                 rowInd = rowInd + 1
@@ -1937,7 +1948,7 @@ end subroutine updateDemagfieldFMM
     
     
         !Multiply by the discretization
-        d2dz2%values = d2dz2%values * 2./grid%dz**2
+        d2dz2%values = d2dz2%values * 1./grid%dz**2
         
         !Create the sparse matrix for the d^2dz^2
         stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
