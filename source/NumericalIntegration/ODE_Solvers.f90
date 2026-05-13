@@ -148,6 +148,7 @@ module ODE_Solvers
         real :: conv_error                          !>The maximum error in the current time step
         type(rk_comm_real_1d) :: setup_comm         !>Stores all the stuff used by setup
         integer :: flag                             !>Flag indicating how the integration went
+        integer :: message_flag                     !>Flag indicating if the error message has already been displayed to the user
         integer :: i, k                             !>Counter variable
         character*(100) :: prog_str                 !>Variable holding the output string
         !integer,parameter :: n_write=100
@@ -200,6 +201,8 @@ module ODE_Solvers
         k = 2
         !Call the integrator
         do i=2,size(t_comb_unique)
+            
+            message_flag = 0
             !Keep integrating until we reach the target time
             do while (t_step .lt. t_comb_unique(i))
                 call range_integrate( setup_comm, fct, t_comb_unique(i), t_step, y_step, yderiv_step, flag )
@@ -223,8 +226,11 @@ module ODE_Solvers
                 else if (flag .eq. 4) then
                     !Stiffness detected - RKSuite does not have a stiff solver, so we log warning and continue
                     if ( mod(i, callback_display) .eq. 0 ) then
-                        write(prog_str,'(A)') 'Warning: Stiff problem detected. Consider using the CVODE solver.'
-                        call callback( prog_str, -1 )
+                        if (message_flag .eq. 0) then
+                            write(prog_str,'(A)') 'Warning: Stiff problem detected. Consider using the CVODE solver.'
+                            call callback( prog_str, -1 )
+                            message_flag = 1
+                        endif
                     endif
                 else if (flag .eq. 5 .or. flag .eq. 6) then
                     !Fatal error - cannot continue

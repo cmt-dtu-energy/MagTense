@@ -679,7 +679,9 @@ methods
                 obj.m0=obj.m0./mnorm;
             end
         end
-        disp(['The demag tensor will require around ' num2str(((3*numel(obj.m0)*(3*numel(obj.m0) + 1)/2))*4/(2^30)) ' Gb'])
+        if (obj.useDemag)
+           disp(['The demag tensor will require around ' num2str(((3*numel(obj.m0)*(3*numel(obj.m0) + 1)/2))*4/(2^30)) ' Gb'])
+        end
         warning('off','MATLAB:structOnObject')
         obj2=builtin('struct',obj); % Actual struct conversion
         warning('on','MATLAB:structOnObject')
