@@ -176,7 +176,6 @@ jobs:
           - { name: cu12, fmm3d: 0 }
         py-version:
           - { name: 312, id: "3.12" }
-          - { name: 313, id: "3.13" }
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     needs: build-wheel
@@ -218,7 +217,6 @@ jobs:
       matrix:
         py-version:
           - { name: 312, id: "3.12" }
-          - { name: 313, id: "3.13" }
         fmm_runner:
           - { os_name: linux, labels: '["self-hosted", "Linux", "CUDA"]' }
           - { os_name: windows, labels: '["self-hosted", "Windows", "CUDA"]' }
@@ -242,38 +240,92 @@ jobs:
       with:
         name: pip-wheel-py${{ matrix.py-version.name }}-cu12-fmm-${{ runner.os }}
 
-    - name: Setup python
+    - name: Python diagnostics before setup (Windows)
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      shell: cmd
+      run: |
+        echo RUNNER_TOOL_CACHE=%RUNNER_TOOL_CACHE%
+        echo AGENT_TOOLSDIRECTORY=%AGENT_TOOLSDIRECTORY%
+        where python || ver > nul
+        python --version || ver > nul
+        py -0p || ver > nul
+
+    - name: Setup python (Linux self-hosted)
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.py-version.id }}
         check-latest: true
 
-    - name: Python diagnostics (Linux/macOS)
-      if: ${{ matrix.fmm_runner.os_name != 'windows' }}
+    - name: Select python (Linux self-hosted)
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
       run: |
-        python --version
-        which python
-        python -c "import sys; print('selected:', sys.executable)"
+        echo "PYTHON_EXE=$(command -v python)" >> "$GITHUB_ENV"
 
-    - name: Python diagnostics (Windows)
+    - name: Select python (Windows self-hosted, with fallback install)
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      shell: powershell
+      run: |
+        $ErrorActionPreference = 'Stop'
+
+        function Set-PythonPath {
+          $cmd = Get-Command python -ErrorAction SilentlyContinue
+          if ($cmd) {
+            "PYTHON_EXE=$($cmd.Source)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            return $true
+          }
+          return $false
+        }
+
+        if (-not (Set-PythonPath)) {
+          Write-Host 'Python was not found on PATH. Attempting installation via winget/choco.'
+          if (Get-Command winget -ErrorAction SilentlyContinue) {
+            winget install --id Python.Python.3.12 --scope machine --silent --accept-package-agreements --accept-source-agreements
+          } elseif (Get-Command choco -ErrorAction SilentlyContinue) {
+            choco install python312 -y
+          } else {
+            throw 'Neither winget nor choco is available to install Python.'
+          }
+          $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+          $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+          $env:Path = "$machinePath;$userPath;$env:Path"
+          if (-not (Set-PythonPath)) {
+            throw 'Python is still not available on PATH after installation attempt.'
+          }
+        }
+
+    - name: Python diagnostics after setup
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
+      run: |
+        echo "PYTHON_EXE=$PYTHON_EXE"
+        "$PYTHON_EXE" --version
+        which "$PYTHON_EXE"
+        "$PYTHON_EXE" -c "import sys; print('selected:', sys.executable)"
+
+    - name: Python diagnostics after setup (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
       shell: cmd
       run: |
-        python --version
+        echo RUNNER_TOOL_CACHE=%RUNNER_TOOL_CACHE%
+        echo AGENT_TOOLSDIRECTORY=%AGENT_TOOLSDIRECTORY%
+        echo PYTHON_EXE=%PYTHON_EXE%
         where python
-        python -c "import sys; print('selected:', sys.executable)"
+        python --version
+        py -0p || ver > nul
+        "%PYTHON_EXE%" --version
+        "%PYTHON_EXE%" -c "import sys; print('selected:', sys.executable)"
 
     - name: Show CUDA device info
       if: ${{ matrix.fmm_runner.os_name == 'linux' }}
       run: |
-        python -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
+        "$PYTHON_EXE" -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
         nvidia-smi
 
     - name: Show CUDA device info (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
       shell: cmd
       run: |
-        python -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
+        "%PYTHON_EXE%" -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
         nvidia-smi
 
     - name: Install pip-wheel and pytest
@@ -282,9 +334,9 @@ jobs:
         MAGTENSE_USE_FMM3D: 1
         MAGTENSE_WHEEL_VARIANT: cu12-fmm
       run: |
-        python -m pip install '${{ github.workspace }}'/*.whl
-        python -m pip install pytest
-        python -m pytest python/tests/fmm_test/test_fmm_workflow.py
+        "$PYTHON_EXE" -m pip install '${{ github.workspace }}'/*.whl
+        "$PYTHON_EXE" -m pip install pytest
+        "$PYTHON_EXE" -m pytest python/tests/fmm_test/test_fmm_workflow.py
 
     - name: Install pip-wheel and pytest (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
@@ -293,9 +345,9 @@ jobs:
         MAGTENSE_USE_FMM3D: 1
         MAGTENSE_WHEEL_VARIANT: cu12-fmm
       run: |
-        for %%f in ("%GITHUB_WORKSPACE%\*.whl") do python -m pip install "%%f"
-        python -m pip install pytest
-        python -m pytest python/tests/fmm_test/test_fmm_workflow.py
+        for %%f in ("%GITHUB_WORKSPACE%\*.whl") do "%PYTHON_EXE%" -m pip install "%%f"
+        "%PYTHON_EXE%" -m pip install pytest
+        "%PYTHON_EXE%" -m pytest python/tests/fmm_test/test_fmm_workflow.py
 
         
   cache-conda-win:
