@@ -18,14 +18,18 @@ jobs:
         py-version: [312, 313]
         cvode: [1]
         sys:
-          - { os: windows-latest, name: win, whl-arch: win_amd64}
+          - { os: windows-latest, name: win, whl-arch: win_amd64 }
           - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
+
     runs-on: ${{ matrix.sys.os }}
+
     # Workaround: Issue with msvc-dev-cmd and new conda installation
     needs: [cache-conda-win, build-cvode]
+
     defaults:
       run:
         shell: bash -el {0}
+
     env:
       build_file: python/.build/env-${{ matrix.py-version }}-${{ matrix.sys.name }}.yml
 
@@ -42,7 +46,7 @@ jobs:
     - name: Win - Select FMM3D make.inc
       if: ${{ runner.os == 'Windows' }}
       run: cp external/FMM3D/make.inc.windows external/FMM3D/make.inc
-    
+
     - name: Fetch tags
       if: "${{ inputs.tag == '' }}"
       run: git fetch --tags origin
@@ -91,18 +95,18 @@ jobs:
       with:
         name: cvode-${{ runner.os }}
         path: ${{ github.workspace }}/cvode/
-    
+
     - name: Create directory for wrappers of compiled Fortran source code
       run: |
         mkdir '${{ github.workspace }}'/python/cpu_libs
         mkdir '${{ github.workspace }}'/python/cu12_libs
         mkdir '${{ github.workspace }}'/python/cu12-fmm_libs
-    
+
     # Workaround: Issue with msvc-dev-cmd and link.exe in the conda environment
     - name: Win - Delete link.exe
       if: ${{ runner.os == 'Windows' }}
       run: rm '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
-    
+
     # Shell cannot use job/matrix templates: https://github.com/actions/runner/issues/444
     - name: Win - Compile Fortran source code and build Python wrapper
       if: ${{ runner.os == 'Windows' }}
@@ -112,14 +116,16 @@ jobs:
         make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
         cp magtensesource.* ${{ github.workspace }}/python/cpu_libs/
         make clean
+
         make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
         cp magtensesource.* ${{ github.workspace }}/python/cu12_libs/
         make clean
-        make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0 USE_FMM3D=1
+
+        make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0 USE_FMM3D=1
         cp magtensesource.* ${{ github.workspace }}/python/cu12-fmm_libs/
         cp external/FMM3D/local/libfmm3d.dll ${{ github.workspace }}/python/cu12-fmm_libs/
         make clean
-    
+
     - name: Linux - Compile Fortran source code and build Python wrapper
       if: ${{ runner.os == 'Linux' }}
       working-directory: ${{ github.workspace }}
@@ -127,10 +133,12 @@ jobs:
         make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
         cp magtensesource.* '${{ github.workspace }}'/python/cpu_libs/
         make clean
+
         make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
         cp magtensesource.* '${{ github.workspace }}'/python/cu12_libs/
         make clean
-        make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0 USE_FMM3D=1
+
+        make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0 USE_FMM3D=1
         cp magtensesource.* '${{ github.workspace }}'/python/cu12-fmm_libs/
         cp external/FMM3D/local/libfmm3d.so '${{ github.workspace }}'/python/cu12-fmm_libs/
         make clean
@@ -167,124 +175,6 @@ jobs:
         name: pip-wheel-py${{ matrix.py-version }}-cu12-fmm-${{ runner.os }}
         path: ${{ github.workspace }}/python/dist/magtense-*-3-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
 
-  build-wheel-fmm-cuda-self-hosted:
-    strategy:
-      matrix:
-        py-version: [312, 313]
-        fmm_runner:
-          - { os_name: linux, name: linux, whl-arch: manylinux1_x86_64, labels: '["self-hosted", "Linux", "CUDA"]' }
-          - { os_name: windows, name: win, whl-arch: win_amd64, labels: '["self-hosted", "Windows", "CUDA"]' }
-
-    runs-on: ${{ fromJSON(matrix.fmm_runner.labels) }}
-
-    defaults:
-      run:
-        shell: bash -el {0}
-
-    env:
-      build_file: python/.build/env-${{ matrix.py-version }}-${{ matrix.fmm_runner.name }}.yml
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-
-    - name: Linux - Select FMM3D make.inc
-      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
-      run: cp external/FMM3D/make.inc.linux external/FMM3D/make.inc
-
-    - name: Win - Select FMM3D make.inc
-      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      run: cp external/FMM3D/make.inc.windows external/FMM3D/make.inc
-
-    - name: Fetch tags
-      if: "${{ inputs.tag == '' }}"
-      run: git fetch --tags origin
-
-    - name: Get latest release tag
-      id: previoustag
-      if: "${{ inputs.tag == '' }}"
-      uses: WyriHaximus/github-action-get-previous-tag@v1
-      with:
-        fallback: 1.0.0
-
-    - name: Setup msvc-dev-cmd
-      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: amd64
-
-    - name: Setup Miniforge
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        miniforge-version: latest
-        activate-environment: magtense-env
-        use-mamba: true
-
-    - name: Install compiler in base (Linux)
-      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
-      run: conda install -n base -c conda-forge gxx_linux-64 -y
-
-    - name: Cache conda
-      uses: actions/cache@v4
-      env:
-        cache_number: 0
-      with:
-        path: ${{ env.CONDA }}/envs
-        key: conda-selfhosted-fmm-nocvode-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
-      id: cache
-
-    - name: Update environment
-      run: conda env update -f ${{ env.build_file }}
-      if: steps.cache.outputs.cache-hit != 'true'
-
-    - name: Create directory for FMM wrapper
-      run: mkdir -p '${{ github.workspace }}'/python/cu12-fmm_libs
-
-    - name: Win - Delete link.exe
-      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      run: rm -f '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
-
-    - name: Win - Compile CUDA/FMM wrapper without CVODE
-      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-      working-directory: ${{ github.workspace }}
-      run: |
-        make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0 USE_FMM3D=1
-        cp magtensesource.* ${{ github.workspace }}/python/cu12-fmm_libs/
-        cp external/FMM3D/local/libfmm3d.dll ${{ github.workspace }}/python/cu12-fmm_libs/
-        make clean
-
-    - name: Linux - Compile CUDA/FMM wrapper without CVODE
-      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
-      working-directory: ${{ github.workspace }}
-      run: |
-        make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0 USE_FMM3D=1
-        cp magtensesource.* '${{ github.workspace }}'/python/cu12-fmm_libs/
-        cp external/FMM3D/local/libfmm3d.so '${{ github.workspace }}'/python/cu12-fmm_libs/
-        make clean
-
-    - name: Build CUDA/FMM pip-wheel without CVODE
-      if: "${{ inputs.tag == '' }}"
-      working-directory: ${{ github.workspace }}/python/
-      run: |
-        sed -i 's/1.0.0/${{ steps.previoustag.outputs.tag }}/' src/magtense/__init__.py
-        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cu12-fmm --platform ${{ matrix.fmm_runner.name }} --pkg_version ${{ steps.previoustag.outputs.tag }}
-
-    - name: Deployment - Build CUDA/FMM pip-wheel without CVODE
-      if: "${{ inputs.tag != '' }}"
-      working-directory: ${{ github.workspace }}/python/
-      run: |
-        sed -i 's/1.0.0/${{ inputs.tag }}/' src/magtense/__init__.py
-        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cu12-fmm --platform ${{ matrix.fmm_runner.name }} --pkg_version ${{ inputs.tag }}
-
-    - name: cu12-fmm no-CVODE - Archive pip-wheel
-      uses: actions/upload-artifact@v4
-      with:
-        name: pip-wheel-py${{ matrix.py-version }}-cu12-fmm-nocvode-${{ runner.os }}
-        path: ${{ github.workspace }}/python/dist/magtense-*-3-py${{ matrix.py-version }}-none-${{ matrix.fmm_runner.whl-arch }}.whl
-
 
   test-wheel:
     strategy:
@@ -296,8 +186,11 @@ jobs:
           - { name: 312, id: "3.12" }
           - { name: 313, id: "3.13" }
         os: [windows-latest, ubuntu-latest]
+
     runs-on: ${{ matrix.os }}
+
     needs: build-wheel
+
     defaults:
       run:
         shell: bash -el {0}
@@ -342,7 +235,9 @@ jobs:
           - { os_name: windows, labels: '["self-hosted", "Windows", "CUDA"]' }
 
     runs-on: ${{ fromJSON(matrix.fmm_runner.labels) }}
-    needs: build-wheel-fmm-cuda-self-hosted
+
+    needs: build-wheel
+
     defaults:
       run:
         shell: bash -el {0}
@@ -356,10 +251,10 @@ jobs:
           python/src/utils/
           documentation/examples_FEM_validation/
 
-    - name: Download cu12-fmm no-CVODE artifact
+    - name: Download cu12-fmm artifact
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-py${{ matrix.py-version.name }}-cu12-fmm-nocvode-${{ runner.os }}
+        name: pip-wheel-py${{ matrix.py-version.name }}-cu12-fmm-${{ runner.os }}
 
     - name: Python diagnostics before setup (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
@@ -383,37 +278,33 @@ jobs:
       run: |
         echo "PYTHON_EXE=$(command -v python)" >> "$GITHUB_ENV"
 
-    - name: Select python (Windows self-hosted, with fallback install)
+    - name: Select python (Windows self-hosted)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
       shell: powershell
       run: |
         $ErrorActionPreference = 'Stop'
 
-        function Set-PythonPath {
-          $cmd = Get-Command python -ErrorAction SilentlyContinue
-          if ($cmd) {
-            "PYTHON_EXE=$($cmd.Source)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            return $true
+        $wanted = '${{ matrix.py-version.id }}'
+        $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+
+        if ($pyLauncher) {
+          $candidate = & py "-$wanted" -c "import sys; print(sys.executable)" 2>$null
+          if ($LASTEXITCODE -eq 0 -and $candidate) {
+            "PYTHON_EXE=$candidate" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            exit 0
           }
-          return $false
         }
 
-        if (-not (Set-PythonPath)) {
-          Write-Host 'Python was not found on PATH. Attempting installation via winget/choco.'
-          if (Get-Command winget -ErrorAction SilentlyContinue) {
-            winget install --id Python.Python.3.12 --scope machine --silent --accept-package-agreements --accept-source-agreements
-          } elseif (Get-Command choco -ErrorAction SilentlyContinue) {
-            choco install python312 -y
-          } else {
-            throw 'Neither winget nor choco is available to install Python.'
-          }
-          $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-          $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-          $env:Path = "$machinePath;$userPath;$env:Path"
-          if (-not (Set-PythonPath)) {
-            throw 'Python is still not available on PATH after installation attempt.'
+        $cmd = Get-Command python -ErrorAction SilentlyContinue
+        if ($cmd) {
+          $version = & $cmd.Source -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+          if ($version -eq $wanted) {
+            "PYTHON_EXE=$($cmd.Source)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            exit 0
           }
         }
+
+        throw "Python $wanted was not found on this self-hosted Windows runner. Install it on the runner image or expose it through the runner environment."
 
     - name: Python diagnostics after setup
       if: ${{ matrix.fmm_runner.os_name == 'linux' }}
@@ -430,8 +321,8 @@ jobs:
         echo RUNNER_TOOL_CACHE=%RUNNER_TOOL_CACHE%
         echo AGENT_TOOLSDIRECTORY=%AGENT_TOOLSDIRECTORY%
         echo PYTHON_EXE=%PYTHON_EXE%
-        where python
-        python --version
+        where python || ver > nul
+        python --version || ver > nul
         py -0p || ver > nul
         "%PYTHON_EXE%" --version
         "%PYTHON_EXE%" -c "import sys; print('selected:', sys.executable)"
@@ -470,12 +361,14 @@ jobs:
         "%PYTHON_EXE%" -m pip install pytest
         "%PYTHON_EXE%" -m pytest python/tests/fmm_test/test_fmm_workflow.py
 
-        
+
   cache-conda-win:
     strategy:
       matrix:
         py-version: [312, 313]
+
     runs-on: windows-latest
+
     env:
       build_file: python/.build/env-${{ matrix.py-version }}-win.yml
 
@@ -489,7 +382,7 @@ jobs:
     - name: Install VS2017 build tools
       run: |
         choco install visualstudio2017buildtools -y
-      
+
     - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v3
       with:
@@ -510,7 +403,7 @@ jobs:
       run: conda env update -f ${{ env.build_file }}
       if: steps.cache.outputs.cache-hit != 'true'
 
-  
+
   build-cvode:
     name: cvode
     uses: ./.github/workflows/cmake-sundials-cvode.yml
