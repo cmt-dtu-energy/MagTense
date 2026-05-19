@@ -167,6 +167,124 @@ jobs:
         name: pip-wheel-py${{ matrix.py-version }}-cu12-fmm-${{ runner.os }}
         path: ${{ github.workspace }}/python/dist/magtense-*-3-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
 
+  build-wheel-fmm-cuda-self-hosted:
+    strategy:
+      matrix:
+        py-version: [312, 313]
+        fmm_runner:
+          - { os_name: linux, name: linux, whl-arch: manylinux1_x86_64, labels: '["self-hosted", "Linux", "CUDA"]' }
+          - { os_name: windows, name: win, whl-arch: win_amd64, labels: '["self-hosted", "Windows", "CUDA"]' }
+
+    runs-on: ${{ fromJSON(matrix.fmm_runner.labels) }}
+
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    env:
+      build_file: python/.build/env-${{ matrix.py-version }}-${{ matrix.fmm_runner.name }}.yml
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Linux - Select FMM3D make.inc
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
+      run: cp external/FMM3D/make.inc.linux external/FMM3D/make.inc
+
+    - name: Win - Select FMM3D make.inc
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      run: cp external/FMM3D/make.inc.windows external/FMM3D/make.inc
+
+    - name: Fetch tags
+      if: "${{ inputs.tag == '' }}"
+      run: git fetch --tags origin
+
+    - name: Get latest release tag
+      id: previoustag
+      if: "${{ inputs.tag == '' }}"
+      uses: WyriHaximus/github-action-get-previous-tag@v1
+      with:
+        fallback: 1.0.0
+
+    - name: Setup msvc-dev-cmd
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: amd64
+
+    - name: Setup Miniforge
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-version: latest
+        activate-environment: magtense-env
+        use-mamba: true
+
+    - name: Install compiler in base (Linux)
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
+      run: conda install -n base -c conda-forge gxx_linux-64 -y
+
+    - name: Cache conda
+      uses: actions/cache@v4
+      env:
+        cache_number: 0
+      with:
+        path: ${{ env.CONDA }}/envs
+        key: conda-selfhosted-fmm-nocvode-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
+      id: cache
+
+    - name: Update environment
+      run: conda env update -f ${{ env.build_file }}
+      if: steps.cache.outputs.cache-hit != 'true'
+
+    - name: Create directory for FMM wrapper
+      run: mkdir -p '${{ github.workspace }}'/python/cu12-fmm_libs
+
+    - name: Win - Delete link.exe
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      run: rm -f '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
+
+    - name: Win - Compile CUDA/FMM wrapper without CVODE
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      working-directory: ${{ github.workspace }}
+      run: |
+        make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0 USE_FMM3D=1
+        cp magtensesource.* ${{ github.workspace }}/python/cu12-fmm_libs/
+        cp external/FMM3D/local/libfmm3d.dll ${{ github.workspace }}/python/cu12-fmm_libs/
+        make clean
+
+    - name: Linux - Compile CUDA/FMM wrapper without CVODE
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
+      working-directory: ${{ github.workspace }}
+      run: |
+        make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0 USE_FMM3D=1
+        cp magtensesource.* '${{ github.workspace }}'/python/cu12-fmm_libs/
+        cp external/FMM3D/local/libfmm3d.so '${{ github.workspace }}'/python/cu12-fmm_libs/
+        make clean
+
+    - name: Build CUDA/FMM pip-wheel without CVODE
+      if: "${{ inputs.tag == '' }}"
+      working-directory: ${{ github.workspace }}/python/
+      run: |
+        sed -i 's/1.0.0/${{ steps.previoustag.outputs.tag }}/' src/magtense/__init__.py
+        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cu12-fmm --platform ${{ matrix.fmm_runner.name }} --pkg_version ${{ steps.previoustag.outputs.tag }}
+
+    - name: Deployment - Build CUDA/FMM pip-wheel without CVODE
+      if: "${{ inputs.tag != '' }}"
+      working-directory: ${{ github.workspace }}/python/
+      run: |
+        sed -i 's/1.0.0/${{ inputs.tag }}/' src/magtense/__init__.py
+        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cu12-fmm --platform ${{ matrix.fmm_runner.name }} --pkg_version ${{ inputs.tag }}
+
+    - name: cu12-fmm no-CVODE - Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version }}-cu12-fmm-nocvode-${{ runner.os }}
+        path: ${{ github.workspace }}/python/dist/magtense-*-3-py${{ matrix.py-version }}-none-${{ matrix.fmm_runner.whl-arch }}.whl
+
 
   test-wheel:
     strategy:
@@ -176,6 +294,7 @@ jobs:
           - { name: cu12, fmm3d: 0 }
         py-version:
           - { name: 312, id: "3.12" }
+          - { name: 313, id: "3.13" }
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     needs: build-wheel
@@ -217,11 +336,13 @@ jobs:
       matrix:
         py-version:
           - { name: 312, id: "3.12" }
+          - { name: 313, id: "3.13" }
         fmm_runner:
           - { os_name: linux, labels: '["self-hosted", "Linux", "CUDA"]' }
           - { os_name: windows, labels: '["self-hosted", "Windows", "CUDA"]' }
+
     runs-on: ${{ fromJSON(matrix.fmm_runner.labels) }}
-    needs: build-wheel
+    needs: build-wheel-fmm-cuda-self-hosted
     defaults:
       run:
         shell: bash -el {0}
@@ -235,10 +356,10 @@ jobs:
           python/src/utils/
           documentation/examples_FEM_validation/
 
-    - name: Download cu12-fmm artifact
+    - name: Download cu12-fmm no-CVODE artifact
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-py${{ matrix.py-version.name }}-cu12-fmm-${{ runner.os }}
+        name: pip-wheel-py${{ matrix.py-version.name }}-cu12-fmm-nocvode-${{ runner.os }}
 
     - name: Python diagnostics before setup (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
