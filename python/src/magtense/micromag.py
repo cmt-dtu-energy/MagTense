@@ -561,8 +561,6 @@ class MicromagProblem:
         else:
             nt_h_ext_out = nt_h_ext 
 
-        print("dummy run in python = ", self.dummy_run)
-
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
             ntot=self.ntot,
             grid_n=self.grid_n,
