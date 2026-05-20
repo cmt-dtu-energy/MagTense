@@ -116,7 +116,8 @@ ifeq ($(OS),Windows_NT)
 else
  	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
 	CUDA_ROOT = ${CONDA_PREFIX}/lib
-	LDFLAGS =
+# adding LD flags here to aviod "cannot enable executable stack as shared object requires" on newer Linux distributions.
+	LDFLAGS = -Wl,-z,noexecstack  
 #	LDFLAGS += '-lstdc++ -liomp5'
 	LIB_SUFFIX = .a
 	PY_MOD_SUFFIX = .so
