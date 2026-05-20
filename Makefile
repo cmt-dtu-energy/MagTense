@@ -117,7 +117,7 @@ else
  	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
 	CUDA_ROOT = ${CONDA_PREFIX}/lib
 # adding LD flags here to aviod "cannot enable executable stack as shared object requires" on newer Linux distributions.
-	LDFLAGS = -Wl,-z,noexecstack  
+	LDFLAGS = "-Wl,-z,noexecstack"
 #	LDFLAGS += '-lstdc++ -liomp5'
 	LIB_SUFFIX = .a
 	PY_MOD_SUFFIX = .so
@@ -191,7 +191,7 @@ else
     CP_LIB += && cp "${FMM3D_LIB}/libfmm3d.lib" ./fmm3d.lib
   else
     FMM3D = -L${FMM3D_LIB} -lfmm3d
-    LDFLAGS += -Wl,-rpath,${FMM3D_LIB}
+    LDFLAGS = "-Wl,-z,noexecstack -Wl,-rpath,${FMM3D_LIB}"
     CP_LIB += && cp ${FMM3D_LIB}/libfmm3d${LIB_SUFFIX} .
   endif
 endif
