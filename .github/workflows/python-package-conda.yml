@@ -232,7 +232,7 @@ jobs:
           - { name: 313, id: "3.13" }
         fmm_runner:
           - { os_name: linux, labels: '["self-hosted", "Linux", "CUDA"]' }
-         # - { os_name: windows, labels: '["self-hosted", "Windows", "CUDA"]' }
+          - { os_name: windows, labels: '["self-hosted", "Windows", "CUDA"]' }
 
     runs-on: ${{ fromJSON(matrix.fmm_runner.labels) }}
 
