@@ -258,13 +258,13 @@ jobs:
 
     - name: Python diagnostics before setup (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: cmd
+      shell: powershell
       run: |
-        echo RUNNER_TOOL_CACHE=%RUNNER_TOOL_CACHE%
-        echo AGENT_TOOLSDIRECTORY=%AGENT_TOOLSDIRECTORY%
-        where python || ver > nul
-        python --version || ver > nul
-        py -0p || ver > nul
+        Write-Host "RUNNER_TOOL_CACHE=$env:RUNNER_TOOL_CACHE"
+        Write-Host "AGENT_TOOLSDIRECTORY=$env:AGENT_TOOLSDIRECTORY"
+        & where.exe python
+        & python --version
+        & py -0p
 
     - name: Setup python (Linux self-hosted)
       if: ${{ matrix.fmm_runner.os_name == 'linux' }}
@@ -280,7 +280,7 @@ jobs:
 
     - name: Select python (Windows self-hosted)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: pwsh
+      shell: powershell
       run: |
         $condaBat = 'C:\Users\github_runner\miniconda3\condabin\conda.bat'
         if (Test-Path $condaBat) {
@@ -315,16 +315,16 @@ jobs:
 
     - name: Python diagnostics after setup (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: cmd
+      shell: powershell
       run: |
-        echo RUNNER_TOOL_CACHE=%RUNNER_TOOL_CACHE%
-        echo AGENT_TOOLSDIRECTORY=%AGENT_TOOLSDIRECTORY%
-        echo PYTHON_EXE=%PYTHON_EXE%
-        where python || ver > nul
-        python --version || ver > nul
-        py -0p || ver > nul
-        "%PYTHON_EXE%" --version
-        "%PYTHON_EXE%" -c "import sys; print('selected:', sys.executable)"
+        Write-Host "RUNNER_TOOL_CACHE=$env:RUNNER_TOOL_CACHE"
+        Write-Host "AGENT_TOOLSDIRECTORY=$env:AGENT_TOOLSDIRECTORY"
+        Write-Host "PYTHON_EXE=$env:PYTHON_EXE"
+        & where.exe python
+        & python --version
+        & py -0p
+        & $env:PYTHON_EXE --version
+        & $env:PYTHON_EXE -c "import sys; print('selected:', sys.executable)"
 
     - name: Show CUDA device info
       if: ${{ matrix.fmm_runner.os_name == 'linux' }}
@@ -334,10 +334,10 @@ jobs:
 
     - name: Show CUDA device info (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: cmd
+      shell: powershell
       run: |
-        "%PYTHON_EXE%" -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
-        nvidia-smi
+        & $env:PYTHON_EXE -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
+        & nvidia-smi
 
     - name: Install pip-wheel and pytest
       if: ${{ matrix.fmm_runner.os_name == 'linux' }}
@@ -351,14 +351,14 @@ jobs:
 
     - name: Install pip-wheel and pytest (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: cmd
+      shell: powershell
       env:
         MAGTENSE_USE_FMM3D: 1
         MAGTENSE_WHEEL_VARIANT: cu12-fmm
       run: |
-        for %%f in ("%GITHUB_WORKSPACE%\*.whl") do "%PYTHON_EXE%" -m pip install "%%f"
-        "%PYTHON_EXE%" -m pip install pytest
-        "%PYTHON_EXE%" -m pytest python/tests/fmm_test/test_fmm_workflow.py
+        Get-ChildItem "$env:GITHUB_WORKSPACE\*.whl" | ForEach-Object { & $env:PYTHON_EXE -m pip install $_.FullName }
+        & $env:PYTHON_EXE -m pip install pytest
+        & $env:PYTHON_EXE -m pytest python/tests/fmm_test/test_fmm_workflow.py
 
 
   cache-conda-win:
