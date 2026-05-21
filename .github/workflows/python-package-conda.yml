@@ -280,23 +280,30 @@ jobs:
 
     - name: Select python (Windows self-hosted)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: cmd
+      shell: pwsh
       run: |
-        set "condaExe=C:\Users\github_runner\miniconda3\condabin\conda.bat"
-        if exist "%condaExe%" (
-          call "%condaExe%" activate magtense-env
-          for /f "delims=" %%x in ('python -c "import sys; print(sys.executable)"') do set "PYTHON_EXE=%%x"
-          echo PYTHON_EXE=%PYTHON_EXE%>>%GITHUB_ENV%
-        ) else (
-          echo WARNING: conda not found at %condaExe%
-          for /f "delims=" %%x in ('py -{{ matrix.py-version.id }} -c "import sys; print(sys.executable)" 2^>nul') do set "PYTHON_EXE=%%x"
-          if defined PYTHON_EXE (
-            echo PYTHON_EXE=%PYTHON_EXE%>>%GITHUB_ENV%
-          ) else (
-            echo ERROR: Python ${{ matrix.py-version.id }} not found.
-            exit /b 1
-          )
-        )
+        $condaBat = 'C:\Users\github_runner\miniconda3\condabin\conda.bat'
+        if (Test-Path $condaBat) {
+          $hook = & cmd.exe /c "`"$condaBat`" shell.powershell hook"
+          Invoke-Expression $hook
+          conda activate
+          "PATH=$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        } else {
+          Write-Warning "Conda not found at $condaBat"
+        }
+
+        try {
+          $py = python -c 'import sys; print(sys.executable)'
+          "PYTHON_EXE=$py" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        } catch {
+          $wanted = '${{ matrix.py-version.id }}'
+          $candidate = & py "-$wanted" -c "import sys; print(sys.executable)" 2>$null
+          if ($LASTEXITCODE -eq 0 -and $candidate) {
+            "PYTHON_EXE=$candidate" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          } else {
+            throw "Python $wanted was not found."
+          }
+        }
 
     - name: Python diagnostics after setup
       if: ${{ matrix.fmm_runner.os_name == 'linux' }}
