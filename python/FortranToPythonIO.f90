@@ -690,16 +690,17 @@ end subroutine getHOnSourcesFMM
 
 
     subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-        K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, MaxT0, nt_Hext, nt_Hext_out, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+        K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, temperature, MaxT0, nt_Hext, n_Hext, nt_Hext_out, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
         N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
         exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, useAvgN, demigstp, & 
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
+        n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, &
         log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, useDemag )
 
-        integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
+        integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, n_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
         integer(4), intent(in) :: nt_Hext_out
         integer(4),dimension(3),intent(in) :: grid_n, N_ave
         real(8),dimension(3),intent(in) :: grid_L
@@ -715,11 +716,15 @@ end subroutine getHOnSourcesFMM
 		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab, useAvgN
 		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch, useDemag
         real(8),intent(in) :: gamma, alpha_mm, MaxT0, tol, thres, conv_tol, dem_thres
-		real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2
+		real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2, temperature
         real(8),dimension(ntot,6,3),intent(in) :: K0_arr
         real(8),dimension(ntot,3,3),intent(in):: CrysAxis
         character*256,intent(in) :: N_file_in, N_file_out
 		real(8), intent(in) :: CV, exch_weigh
+
+        integer(4),dimension(3),intent(in) :: n_macro
+        real(8),dimension(3),intent(in) :: shiftVec, macroShape, sampleShape
+        logical,dimension(3),intent(in) :: exchPBC
 
         real(8),dimension(nt),intent(in) :: t
         real(8),dimension(nt),intent(out) :: t_out
@@ -777,12 +782,14 @@ end subroutine getHOnSourcesFMM
 
 
         call loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-            gamma, alpha_mm, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+            gamma, alpha_mm, temperature, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
             exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
-			CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn,	passExch, exch_ncols, &
-            CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, useDemag)
+			CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
+            n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
+            passExch, exch_ncols, CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, useDemag)
+            
 
         print *, " starting SolveLandauLifshitzEquation "
         call SolveLandauLifshitzEquation( problem, solution )

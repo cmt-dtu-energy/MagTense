@@ -1,5 +1,6 @@
 ! #if USE_MATLAB
 ! include 'mkl_blas.f90'
+! include 'mkl_blas.f90'
 ! #endif
 
 !include 'mkl_vml.f90'
@@ -56,14 +57,17 @@
     !>-----------------------------------------
     subroutine SolveLandauLifshitzEquation( prob, sol )
     !DEC$ ATTRIBUTES ALIAS:"solvelandaulifshitzequation_" :: SolveLandauLifshitzEquation
-    type(MicroMagProblem),intent(inout) :: prob     !> The problem data structure
-    type(MicroMagSolution),intent(inout) :: sol     !> The solution data structure    
-    type(MicroMagGridInfo) :: gridinfo              !> The grid information structure
-    integer :: ntot,i,j,k,ind,nt,nt_Hext,stat       !> total no. of tiles
-    procedure(dydt_fct), pointer :: fct             !> Input function pointer for the function to be integrated
-    procedure(callback_fct),pointer :: cb_fct       !> Callback function for displaying progress
-    real(DP),dimension(:,:,:),allocatable :: M_out  !> Internal buffer for the solution (M) on the form (3*ntot,nt)
+    type(MicroMagProblem),intent(inout) :: prob          !> The problem data structure
+    type(MicroMagSolution),intent(inout) :: sol          !> The solution data structure
+    type(MicroMagGridInfo) :: gridinfo                   !> The grid information structure
+    integer :: ntot,i,j,k,ind,nt,nt_Hext,stat            !> total no. of tiles (Note from F. Durhuus: n_Hext would make more sense than nt_Hext)
+    procedure(dydt_fct), pointer :: fct                  !> Input function pointer for the function to be integrated
+    procedure(no_argument_fct), pointer :: fct_thermal   !> Function pointer for the function that updates the stochastic thermal field
+    procedure(callback_fct),pointer :: cb_fct            !> Callback function for displaying progress
+    real(DP),dimension(:,:,:),allocatable :: M_out       !> Internal buffer for the solution (M) on the form (3*ntot,nt)
     real(DP) :: A0_max
+    real(DP) :: t_step, gamma, kB, alpha0, alphaGilbert  !> Parameters needed for thermal factor
+    real(DP),dimension(:),allocatable :: volCells        !> Cell volumes
     character*(100) :: prog_str 
     real :: rate
     integer :: c1,c2,cr,cm 
@@ -114,14 +118,14 @@
             gb_solution%pts( i, 1 ) = gb_problem%grid%pts( i, 1 )
             gb_solution%pts( i, 2 ) = gb_problem%grid%pts( i, 2 )
             gb_solution%pts( i, 3 ) = gb_problem%grid%pts( i, 3 )
-        enddo
+        end do
     endif   
     
     if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then
         !Setup the grid
         call setupGrid( gb_problem%grid )
         
-        !Set up the mesh for an uniform grid
+        !Set up the mesh for a uniform grid
         allocate( gb_problem%A0_map(gb_problem%grid%nx,gb_problem%grid%ny,gb_problem%grid%nz) )
         if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then   
             do k=1,gb_problem%grid%nz
@@ -133,9 +137,9 @@
                         gb_solution%pts(ind,3) = gb_problem%grid%z(i,j,k)
                     
                         gb_problem%A0_map(i,j,k) = gb_problem%A0(ind)
-                    enddo
-                enddo
-            enddo
+                    end do
+                end do
+            end do
         endif
     endif
       
@@ -209,20 +213,52 @@
     
     !Do the solution
     fct => dmdt_fct
+    fct_thermal => updateThermal_wrapper
     cb_fct => displayGUIProgressMessage
     
-    gb_solution%HextInd = 1;
+    gb_solution%HextInd = 1
     
-    !Go through a range of applied fields and find the equilibrium solution for each of them
-    !The no. of applied fields to consider
-    nt = size( gb_problem%t ) 
+    !Number of timesteps (for each field value, right?)
+    nt = size( gb_problem%t )
+
+    !Whether to include the thermal field
+    !If the temperature is nonzero anywhere, include stochastic field and normalise magnetisation every timestep
+    if (any(gb_problem%temperature > 1.0e-15)) then
+        gb_problem%includeThermal = .true.
+        call displayGUIMessage( 'Including thermal noise' )
+    else
+        gb_problem%includeThermal = .false.
+    end if
         
     if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
-        !Run several different applied fields
-        nt_Hext = size(gb_problem%Hext, 1) 
+        !Go through several different applied fields and find the equilibrium solution for each of them
+        nt_Hext = size(gb_problem%Hext, 1)          !The no. of applied fields to consider
     else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
-        !Simply do a time evolution as specified in the problem  
+        !Simply do a time evolution as specified in the problem
         nt_Hext = 1
+
+        if (gb_problem%includeThermal) then
+            ! Calculate the prefactor for the thermal magnetic field
+            t_step = gb_problem%t(nt) / nt    ! Timestep [s] (assumed constant)
+            gamma = gb_problem%gamma          ! Gyromagnetic factor [m/(A*s)]
+            alpha0 = gb_problem%alpha0        ! Damping constant [m/(A*s)]
+            kB = 1.38064851 * 1e-23           ! The Boltzmann constant [J/K]
+            ! Get cell volumes
+            allocate( volCells(ntot) )
+            if (gb_problem%grid%gridType /= gridTypeUniform) then
+                volCells = gb_problem%grid%abc(:,1) * gb_problem%grid%abc(:,2) * gb_problem%grid%abc(:,3)
+            else
+                volCells = gb_problem%grid%dx * gb_problem%grid%dy * gb_problem%grid%dz
+            end if
+            ! Combined computation
+            alphaGilbert = gamma/(2*alpha0) + 1/2 * sqrt((gamma/alpha0)**2 - 4)   ! Dimensionless Gilbert damping (second order polynomial equation)
+            allocate( gb_problem%Tfact(ntot) )
+            gb_problem%Tfact = sqrt(2*kB * gb_problem%temperature * alphaGilbert / (mu0 * gamma * volCells * gb_problem%Ms * t_step))
+            print *, "Finished calculating thermal prefactor"
+            !print *, 'Tfact', gb_problem%Tfact(1)   ! Just for debugging
+        else
+            gb_problem%Tfact = 0
+        end if
     endif
     
     allocate(M_out(3*ntot,nt,nt_Hext))   
@@ -230,11 +266,13 @@
     !Allocate the arrays for the different fields
     !Only if these are to be returned are they saved at every time step
     if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
+        call displayGUIMessage( 'useReturnHall is True ' )
         allocate(gb_solution%H_exc(size(gb_problem%t),ntot,nt_Hext,3))
         allocate(gb_solution%H_ext(size(gb_problem%t),ntot,nt_Hext,3))
         allocate(gb_solution%H_dem(size(gb_problem%t),ntot,nt_Hext,3))
         allocate(gb_solution%H_ani(size(gb_problem%t),ntot,nt_Hext,3))  
     else
+        call displayGUIMessage( 'useReturnHall is False ' )
         allocate(gb_solution%H_exc(1,1,1,3))
         allocate(gb_solution%H_ext(1,1,1,3))
         allocate(gb_solution%H_dem(1,1,1,3))
@@ -261,7 +299,13 @@
               call displayGUIMessage( trim(prog_str) )
           endif
 
-          call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), cb_fct, gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )  
+          ! This is where the LLG is actually integrated (short description by F. Durhuus)
+          ! fct is a pointer to the dmdt_fct function which returns time derivatives of the normalised magnetic moments
+          ! With m0 as initial condition, integrate from t(1) to t(nt) with effective field updated at each time coordinate t, then store result in t_out and M_out.
+          ! t_conv is time coordinates where convergence is tested when computing equilibrium structure (explicit solver rather than dynamic). Also included in t_out.
+          ! When thermal noise is included (includeThermal = .true.) the magnetisation is normalised each timestep to prevent thermal drift
+          call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), gb_problem%includeThermal, fct_thermal, cb_fct, &
+                  gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
           
           !The initial state of the next solution is the previous solution result
           gb_problem%m0 = M_out(:,nt,i)
@@ -272,11 +316,7 @@
           gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
 
 
-          
-              
           call StoreHeffComponents ( gb_problem, gb_solution )
-
-
 
             ! open (11, file="sparse_CUDA_H.bin",  &
             !         status='unknown', form='unformatted', &
@@ -287,7 +327,7 @@
             ! close(11)
             ! error stop " test stop after cuda sparse"
               
-      enddo
+      end do
 
       
         CALL SYSTEM_CLOCK(c2)
@@ -380,14 +420,14 @@
 #endif
         !-------------------------------------------------------------
         !--------------- combine to get effective field, Heff -------------
-        HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX
-        HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY
-        HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ
+        HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX + gb_solution%HtX
+        HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY + gb_solution%HtX
+        HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ + gb_solution%HtX
         !-------------------------------------------------------------
         !--------------- calculate precession term: m x Heff -------------
-        crossX = -1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
-        crossY = -1.0_DP * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
-        crossZ = -1.0_DP * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
+        crossX = 1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
+        crossY = 1.0_DP * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
+        crossZ = 1.0_DP * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
         !-------------------------------------------------------------
         !--------------- calculate damping term: m x (m x Heff) -------------
         HeffX2 = gb_solution%My * crossZ - gb_solution%Mz * crossY
@@ -487,7 +527,7 @@
             gb_solution%H_ani(j,:,i,2) = gb_solution%HkY
             gb_solution%H_ani(j,:,i,3) = gb_solution%HkZ
         endif
-    enddo
+    end do
     
     call trace%end( "StoreHeffComponents", itimer=itimer, verbose=1 )
     end subroutine StoreHeffComponents
@@ -549,6 +589,12 @@
         solution%HmX(:) = 0.
         solution%HmY(:) = 0.
         solution%HmZ(:) = 0.
+
+        !Thermal field
+        allocate( solution%HtX(ntot), solution%HtY(ntot), solution%HtZ(ntot) )
+        solution%HtX(:) = 0.
+        solution%HtY(:) = 0.
+        solution%HtZ(:) = 0.
         
         if ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
             !allocate the Fourier Transform of the magnetization
@@ -591,8 +637,7 @@
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
     
-    alpha = -2.! * solution%Jfact
-    !alpha = -2. * problem%A0 / ( mu0 * 8.0e5 )
+    alpha = 2.! * solution%Jfact
     beta = 0.
     
     ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
@@ -637,9 +682,9 @@
     
     if ( problem%solver .eq. MicroMagSolverExplicit ) then
          !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
-        solution%HhX = -problem%Hext(solution%HextInd,2)
-        solution%HhY = -problem%Hext(solution%HextInd,3)
-        solution%HhZ = -problem%Hext(solution%HextInd,4)
+        solution%HhX = problem%Hext(solution%HextInd,2)
+        solution%HhY = problem%Hext(solution%HextInd,3)
+        solution%HhZ = problem%Hext(solution%HextInd,4)
 
     elseif ( problem%solver .eq. MicroMagSolverDynamic ) then
         
@@ -647,10 +692,10 @@
         call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,2), t, size(problem%Hext(:,1)), HextX )
         call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
         call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,4), t, size(problem%Hext(:,1)), HextZ )
-        
-        solution%HhX = -HextX
-        solution%HhY = -HextY
-        solution%HhZ = -HextZ
+
+        solution%HhX = HextX
+        solution%HhY = HextY
+        solution%HhZ = HextZ
         
     elseif ( problem%solver .eq. MicroMagSolverImplicit ) then
         !not implemented yet
@@ -742,6 +787,99 @@
 
     end subroutine updateAnisotropy    
 
+    !>-----------------------------------------
+    !> @author Frederik L. Durhuus, fladu@dtu.dk, DTU, 2026
+    !> Lightly edited function from ChatGPT
+    !> Fills an array, z, with Gaussian distributed random numbers of mean 0 and standard deviation 1
+    !> Uses the Marsaglia polar method to map uniformly distributed random numbers onto a Gaussian distribution
+    !> TODO : Put this in some utilities module rather than the core script
+    !>-----------------------------------------
+    subroutine GenerateGaussianArray(z)
+    real, intent(out) :: z(:)
+
+    integer :: n, filled, batch, i
+    real, allocatable :: u(:), v(:), s(:), factor(:)
+    logical, allocatable :: mask(:)
+
+    n = size(z)
+    filled = 0
+
+    ! Batch size: typically similar to output size
+    ! Lower limit to avoid efficiency issues and upper limit to avoid excessively large arrays
+    batch = min(max(64, n), 8192)
+
+    allocate(u(batch), v(batch), s(batch), factor(batch), mask(batch))
+
+    do while (filled < n)
+
+        ! Generate uniform random numbers
+        call random_number(u)
+        call random_number(v)
+
+        ! Transform to [-1,1]
+        u = 2.0*u - 1.0
+        v = 2.0*v - 1.0
+
+        ! Compute radius
+        s = u*u + v*v
+
+        ! Acceptance mask
+        mask = (s < 1.0) .and. (s > 0.0)
+
+        where(mask)
+            factor = sqrt(-2.0*log(s)/s)
+        end where
+
+        ! Store accepted numbers
+        do i = 1, batch
+            if (mask(i)) then
+                if (filled < n) then
+                    filled = filled + 1
+                    z(filled) = u(i)*factor(i)
+                end if
+
+                if (filled < n) then
+                    filled = filled + 1
+                    z(filled) = v(i)*factor(i)
+                end if
+            end if
+
+            if (filled >= n) exit
+        end do
+
+    end do
+
+    deallocate(u,v,s,factor,mask)
+
+    end subroutine GenerateGaussianArray
+
+    !>-----------------------------------------
+    !> @author Frederik L. Durhuus, fladu@dtu.dk, DTU, 2026
+    !> Calculates and returns the thermal field
+    !>-----------------------------------------
+    subroutine updateThermalField( problem, solution )
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure
+    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+
+    integer :: ntot
+    real,dimension(:),allocatable :: GaussianArray
+
+    ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+    allocate(GaussianArray(3*ntot))
+    call GenerateGaussianArray(GaussianArray)
+
+    solution%HtX = GaussianArray(1:ntot) * problem%Tfact
+    solution%HtY = GaussianArray(ntot+1:2*ntot) * problem%Tfact
+    solution%HtZ = GaussianArray(2*ntot+1:3*ntot) * problem%Tfact
+
+    end subroutine updateThermalField
+
+    !> Wrapper function so we can construct a pointer for updateThermalField
+    !>  and future thermal update functions that does not require any arguments
+    subroutine updateThermal_wrapper()
+        call updateThermalField( gb_problem, gb_solution)
+    end subroutine updateThermal_wrapper
+
 
 subroutine updateDemagfieldFMM(problem, solution)
   implicit none
@@ -824,7 +962,7 @@ subroutine updateDemagfieldFMM(problem, solution)
             real(problem%grid%dz, DP)
     end if
     !------------------------------------------------------------
-    !--------- conert to dipole moment m = M * ΔV --------------
+    !--------- convert to dipole moment m = M * ΔV --------------
     ! TODO - is Ms the correct scaling here?
     mx = solution%Mx(i) * vol_i * problem%Ms(i)
     my = solution%My(i) * vol_i * problem%Ms(i)
@@ -916,6 +1054,7 @@ end subroutine updateDemagfieldFMM
     real(SP), dimension(:), allocatable :: temp
     character*(100) :: prog_str 
     integer, save :: itimer = 0
+    real(DP),dimension(3) :: Mavg           !> Average magnetisation
     
     if ( problem%useDemag .eq. useDemagFalse ) then
         solution%HmX(:) = 0.
@@ -933,11 +1072,17 @@ end subroutine updateDemagfieldFMM
     ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
     allocate(temp(ntot))
     
-    ! Convert the magnetization to single before the demag calculation
+    ! Convert the magnetization to single precision before the demag calculation
     solution%Mx_s = real(solution%Mx, SP)
     solution%My_s = real(solution%My, SP)
     solution%Mz_s = real(solution%Mz, SP)
-    
+
+    ! Get average magnetisation
+    ! Average across micromagnetic cells, then multiply by the volume fraction of the cells so
+    ! non-magnetic regions are included in the volume average. Assumes all cells have the same volume.
+    Mavg(1) = sum(solution%Mx)/ntot * problem%VfracOcc
+    Mavg(2) = sum(solution%My)/ntot * problem%VfracOcc
+    Mavg(3) = sum(solution%Mz)/ntot * problem%VfracOcc
     
     if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
         if ( problem%useCuda .eq. useCudaFalse ) then
@@ -1005,7 +1150,7 @@ end subroutine updateDemagfieldFMM
                 solution%Mx_FT(i) = cmplx( solution%Mx_s(i), 0. )
                 solution%My_FT(i) = cmplx( solution%My_s(i), 0. )
                 solution%Mz_FT(i) = cmplx( solution%Mz_s(i), 0. )
-            enddo
+            end do
         
             stat = DftiComputeForward( problem%desc_hndl_FFT_M_H, solution%Mx_FT )
             !normalization
@@ -1082,8 +1227,8 @@ end subroutine updateDemagfieldFMM
             !solution%HmX = - problem%Mfact * ( matmul( problem%Kxx, solution%Mx ) + matmul( problem%Kxy, solution%My ) + matmul( problem%Kxz, solution%Mz ) )
             !solution%HmY = - problem%Mfact * ( matmul( problem%Kxy, solution%Mx ) + matmul( problem%Kyy, solution%My ) + matmul( problem%Kyz, solution%Mz ) )
             !solution%HmZ = - problem%Mfact * ( matmul( problem%Kxz, solution%Mx ) + matmul( problem%Kyz, solution%My ) + matmul( problem%Kzz, solution%Mz ) )
-            
-            alpha = -1.! * problem%Mfact
+
+            alpha = 1. ! With MagTense conventions on the demagnetisation tensor H = N * M
             beta = 0.0
             !Hmx = Kxx * Mx
             call gemv( problem%Kxx, solution%Mx_s, solution%HmX, alpha, beta )
@@ -1116,7 +1261,15 @@ end subroutine updateDemagfieldFMM
             
             !HmZ = HmZ + Kzz * Mz
             call gemv( problem%Kzz, solution%Mz_s, solution%HmZ, alpha, beta )
-            
+
+            !Apply shape correction
+            solution%HmX = solution%HmX + problem%Kxx_shape * Mavg(1) &
+                    + problem%Kxy_shape * Mavg(2) + problem%Kxz_shape * Mavg(3)
+            solution%HmY = solution%HmY + problem%Kxy_shape * Mavg(1) &
+                    + problem%Kyy_shape * Mavg(2) + problem%Kyz_shape * Mavg(3)
+            solution%HmZ = solution%HmX + problem%Kxz_shape * Mavg(1) &
+                    + problem%Kyz_shape * Mavg(2) + problem%Kzz_shape * Mavg(3)
+
             temp = solution%HmX * problem%Mfact
             solution%HmX = temp
             temp = solution%HmY * problem%Mfact
@@ -1186,6 +1339,10 @@ end subroutine updateDemagfieldFMM
 #endif
     endif
     
+
+    !Shape correction tensor
+    call ComputeShapeCorrectionTensor( problem )
+
     !Anisotropy matrix
     call ComputeAnisotropyTerm3D( problem )
     
@@ -1223,7 +1380,7 @@ end subroutine updateDemagfieldFMM
             grid%dx = grid%Lx / grid%nx
             do i=1,grid%nx
                 grid%x(i,:,:) = -grid%Lx/2 + (i-1) * grid%dx + grid%dx/2
-            enddo
+            end do
             
         else
             grid%x(:,:,:) = 0.
@@ -1234,7 +1391,7 @@ end subroutine updateDemagfieldFMM
             grid%dy = grid%Ly / grid%ny
             do i=1,grid%ny
                 grid%y(:,i,:) = -grid%Ly/2 + (i-1) * grid%dy + grid%dy/2
-            enddo            
+            end do
         else
             grid%y(:,:,:) = 0.
             grid%dy = grid%Ly
@@ -1244,7 +1401,7 @@ end subroutine updateDemagfieldFMM
             grid%dz = grid%Lz / grid%nz
             do i=1,grid%nz
                 grid%z(:,:,i) = -grid%Lz/2 + (i-1) * grid%dz + grid%dz/2
-            enddo            
+            end do
         else
             grid%z(:,:,:) = 0.
             grid%dz = grid%Lz
@@ -1258,9 +1415,9 @@ end subroutine updateDemagfieldFMM
                     grid%pts( ind, 1 ) = grid%x(i,j,k)
                     grid%pts( ind, 2 ) = grid%y(i,j,k)
                     grid%pts( ind, 3 ) = grid%z(i,j,k)
-                enddo
-            enddo
-        enddo
+                end do
+            end do
+        end do
     endif
     call trace%end( "setupGrid", itimer=itimer, verbose=1 )
     end subroutine setupGrid
@@ -1290,6 +1447,9 @@ end subroutine updateDemagfieldFMM
     integer :: c1,c2,cr,cm
     character(10) :: prog_str
     integer, save :: itimer = 0
+    integer,dimension(3) :: n_macro
+    real(DP),dimension(3) :: shiftVec
+    
     call trace%begin( "ComputeDemagfieldTensor", itimer=itimer, verbose=1 )
     
     ! First initialize the system_clock
@@ -1302,11 +1462,15 @@ end subroutine updateDemagfieldFMM
     nz = problem%grid%nz
     ntot = nx * ny * nz
     
-    !The number of elements to average the receiving tile over
+    !The number of tiles to average the receiving tile over
     nx_ave = problem%N_ave(1)
     ny_ave = problem%N_ave(2)
     nz_ave = problem%N_ave(3)
-    
+
+    !Macrogeometry info (added by F. Durhuus)
+    n_macro = problem%macrogrid%n_macro
+    shiftVec = problem%macrogrid%shiftVec
+
     !Demag tensor components
     allocate( problem%Kxx(ntot,ntot), problem%Kxy(ntot,ntot), problem%Kxz(ntot,ntot) )
     allocate( problem%Kyy(ntot,ntot), problem%Kyz(ntot,ntot) )
@@ -1332,7 +1496,7 @@ end subroutine updateDemagfieldFMM
             !for each element find the tensor for all evaluation points (i.e. all elements)    
             !======== NOTE ===============
             ! this parallelization seem to give issues when compiled with matlab in debug mode
-            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot, obs_size_arr) PRIVATE(ind, tile, H, Nout, pts_arr) default(none)
+            !$OMP PARALLEL DO collapse(3) SHARED(problem, nx, ny, nz, ntot, obs_size_arr, n_macro, shiftVec) PRIVATE(ind, tile, H, Nout, pts_arr) default(none)
             do k=1,nz
                 do j=1,ny                
                     do i=1,nx
@@ -1358,11 +1522,18 @@ end subroutine updateDemagfieldFMM
                         
                         allocate(Nout(1,ntot,3,3))
                         allocate(H(ntot,3))
-                        
+
                         allocate(pts_arr(ntot,3))
                         pts_arr(:,1) =  problem%grid%pts(:,1)
                         pts_arr(:,2) =  problem%grid%pts(:,2)
                         pts_arr(:,3) =  problem%grid%pts(:,3)
+
+                        if (all(n_macro == 0.0)) then
+                            call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                        else
+                            call getFieldFromTiles_PBC( tile, H, problem%grid%pts, 1, ntot, n_macro, &
+                            shiftVec, Nout, .false. )
+                        end if
                         
                         if (problem%useAvgN .eq. useAvgNTrue) then
                             !Use the average prism tensor
@@ -1411,7 +1582,7 @@ end subroutine updateDemagfieldFMM
     
             !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, indx_ele, tile, H, Nout, pts_arr, i)
                         
-            !for each element find the tensor for all evaluation points (i.e. all elements)
+            !for each tile find the tensor for all evaluation points (i.e. all tiles)
             do i=1,nx
                 !Setup template tile
                 tile(1)%tileType = 5 !(for tetrahedron)
@@ -1455,7 +1626,7 @@ end subroutine updateDemagfieldFMM
                 !deallocate(pts_arr)
                 deallocate(Nout)
                 deallocate(H)
-            enddo
+            end do
             
             !$OMP END PARALLEL DO
             
@@ -1465,7 +1636,7 @@ end subroutine updateDemagfieldFMM
             !call displayGUIMessage( 'Done constructing the Tensormap' )
             !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, tile, H, Nout,Noutave,dx,dy,dz,pts_arr)
             
-            !for each element find the tensor for all evaluation points (i.e. all elements)
+            !for each tile find the tensor for all evaluation points (i.e. all tiles)
             do i=1,ntot
                 if (problem%useAvgN .eq. useAvgNTrue) then
                     !Setup average N template tile
@@ -1554,7 +1725,7 @@ end subroutine updateDemagfieldFMM
                 deallocate(dy)
                 deallocate(dz)
                 deallocate(pts_arr)
-            enddo
+            end do
         
             !$OMP END PARALLEL DO
             
@@ -1606,8 +1777,75 @@ end subroutine updateDemagfieldFMM
     call trace%end( "ComputeDemagfieldTensor", itimer=itimer, verbose=1 )
     
     end subroutine ComputeDemagfieldTensor
-    
-    
+
+    !>-----------------------------------------
+    !> @author Frederik L. Durhuus, fladu@dtu.dk, DTU, 2025
+    !> Calculates and returns the shape correction tensor,
+    !> which ensures that the correct sample shape is used
+    !> for computing the demagnetisation field
+    !> @param[inout] problem, the struct containing the problem
+    !>-----------------------------------------
+    subroutine ComputeShapeCorrectionTensor( problem )
+    type(MicroMagProblem),intent(inout) :: problem       !> Grid data structure
+
+    integer :: nx,ny,nz,ntot                             !> Internal counters and index variables
+    real(DP),dimension(:,:),allocatable :: pts           !> Evaluation points
+    real(DP),dimension(:,:,:),allocatable :: Nshape      !> Temporary storage for the demag tensor
+    real(DP),allocatable :: aMacro,bMacro,cMacro         !> Macrogeometry shape parameters
+    real(DP),allocatable :: aSample,bSample,cSample      !> Sample shape parameters
+    integer :: ntotMacro                                 !> Number of domain copies in macrogeometry
+    real(DP) :: Vcell, Vdomain                           !> Volume of single cell and simulated domain
+
+    ! Get number of elements
+    nx = problem%grid%nx
+    ny = problem%grid%ny
+    nz = problem%grid%nz
+    ntot = nx * ny * nz
+
+    ! Get macrogeometry shape parameters (approximated by rectangular prism)
+    aMacro = problem%macrogrid%macroShape(1)
+    bMacro = problem%macrogrid%macroShape(2)
+    cMacro = problem%macrogrid%macroShape(3)
+    ! Get sample shape parameters (approximated by rectangular prism)
+    aSample = problem%macrogrid%sampleShape(1)
+    bSample = problem%macrogrid%sampleShape(2)
+    cSample = problem%macrogrid%sampleShape(3)
+    ! Get array of points to evaluate tensor at
+    pts = problem%grid%pts
+
+    allocate(Nshape(ntot,3,3))
+    call getShapeTensor(pts, ntot, aMacro, bMacro, cMacro, aSample, bSample, cSample, Nshape)
+
+    ! Tensor components for shape correction tensor
+    allocate( problem%Kxx_shape(ntot), problem%Kxy_shape(ntot), problem%Kxz_shape(ntot) )
+    allocate( problem%Kyy_shape(ntot), problem%Kyz_shape(ntot) )
+    allocate( problem%Kzz_shape(ntot) )
+
+    ! Copy Nshape into the proper structure used by the micromag model
+    problem%Kxx_shape = Nshape(:,1,1)
+    problem%Kxy_shape = Nshape(:,1,2)
+    problem%Kxz_shape = Nshape(:,1,3)
+
+    ! By symmetry Kxy = Kyx
+    problem%Kyy_shape = Nshape(:,2,2)
+    problem%Kyz_shape = Nshape(:,2,3)
+
+    ! By symmetry Kxz = Kzx and Kyz = Kzy
+    problem%Kzz_shape = Nshape(:,3,3)
+
+    ! Get volume fraction occupied
+    ntotMacro = (1 + 2*problem%macrogrid%n_macro(1)) * (1 + 2*problem%macrogrid%n_macro(2)) * (1 + 2*problem%macrogrid%n_macro(3))
+    Vdomain = aMacro * bMacro * cMacro / ntotMacro
+    Vcell = problem%grid%dx * problem%grid%dy * problem%grid%dz
+    allocate( problem%VfracOcc )
+    problem%VfracOcc = ntot * Vcell / Vdomain
+    call displayGUIMessage( 'Volume fraction occupied by magnetic material :' )
+    print *, problem%VfracOcc
+
+    ! Clean up
+    deallocate(Nshape)
+
+    end subroutine ComputeShapeCorrectionTensor
     
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
@@ -1649,32 +1887,50 @@ end subroutine updateDemagfieldFMM
     subroutine ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
     type(MicroMagGrid),intent(in) :: grid              !> Struct containing the grid information    
     type(sparse_matrix_t),intent(inout) :: A           !> The returned matrix from the sparse matrix creator
-    type(MicroMagProblem),intent(inout) :: problem      !> Problem data structure 
-    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+    type(MicroMagProblem),intent(inout) :: problem     !> Problem data structure
+    type(MicroMagSolution),intent(inout) :: solution   !> Solution data structure
         
     integer :: stat                                    !> Status value for the various sparse matrix operations        
     type(MagTenseSparse_d) :: d2dx2, d2dy2, d2dz2      !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
     type(sparse_matrix_t) :: tmp                       !> Temporary sparse matrices used for internal calculations
-    integer :: ind, ntot,colInd,rowInd                 !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated    
+    integer :: ind,ntot,nNonZero,colInd,rowInd         !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated
     integer :: i,j,k,nx,ny,nz                          !> For-loop counters
     type(matrix_descr) :: descr                        !> Describes a sparse matrix operation
     real(DP) :: const
     character*(100) :: prog_str 
     integer, save :: itimer = 0
+    logical :: PBCx, PBCy, PBCz                        !> Whether to have periodic boundary conditions along x, y and z respectively
+    
     call trace%begin( "ComputeExchangeTerm3D_Uniform", itimer=itimer, verbose=1 )
     
-    !Find the three sparse matrices for the the individual directions, respectively. Then add them to get the total matrix
-    !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My and Mz respectively.
+    !Find the three sparse matrices for the individual directions. Then add them to get the total matrix
+    !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My or Mz respectively.
+
+    !The sparse matrices are encoded using an older version of Intels Compressed Sparse Row (CSR) format
+    !cols(i) and values(i) give the column index and value of the i'th non-zero element
+    !rows_start(i) and rows_end(i)-1 give the first and last index corresponding to the i'th row
+    !If rows_start(i) = rows_end(i), the row is empty
+    !For instance the matrix [[1, 0, 2], [0, -1, 0], [0, 0, 0], [-2, 5, 4]] has cols = (1, 3, 2, 1, 2, 3),
+    !values = (1, 2, -1, -2, 5, 4), rows_start = (1, 3, 4, 4) and rows_end = (3, 4, 4, 7)
+    !Note how size(rows_start) and size(rows_end) equal the number of rows, while size(cols) and size(values) equal the number of non-zero elements
     
     nx = grid%nx
     ny = grid%ny
     nz = grid%nz
+    ntot = nx*ny*nz     ! Total number of micromagnetic tiles
+    PBCx = problem%macrogrid%exchPBC(1)
+    PBCy = problem%macrogrid%exchPBC(2)
+    PBCz = problem%macrogrid%exchPBC(3)
     
     !----------------------------------d^2dx^2 begins -----------------------------!
     if ( nx .gt. 1 ) then
-        !Make the d^2/dx^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz
-        ntot = nz * ( ny * 4 + ny * (nx-2)*3 )
-        allocate(d2dx2%values(ntot),d2dx2%cols(ntot),d2dx2%rows_start(nx*ny*nz),d2dx2%rows_end(nx*ny*nz))
+        ! Make the d^2/dx^2 matrix
+        if ( PBCx ) then
+            nNonZero = 3*ntot             ! For each tile, there are 3 non-zero elements corresponding to itself and the two neighbours along x
+        else
+            nNonZero = 3*ntot - 2*ny*nz   ! With a vacuum boundary, the 2*ny*nz tiles at the two end surfaces only have one neighbour each
+        end if
+        allocate(d2dx2%values(nNonZero),d2dx2%cols(nNonZero),d2dx2%rows_start(ntot),d2dx2%rows_end(ntot))
     
         ind = 1
         rowInd = 1
@@ -1682,6 +1938,40 @@ end subroutine updateDemagfieldFMM
     
         do k=1,nz
             do j=1,ny
+                ! The left boundary
+                if ( PBCx ) then
+                    ! Coupling to the left (loops around and connects with rightmost tile)
+                    d2dx2%values(ind) = 2*problem%A0_map(nx,j,k)/(problem%A0_map(nx,j,k)+problem%A0_map(1,j,k))
+                    d2dx2%cols(ind) = colInd + nx - 1
+                    d2dx2%rows_start(rowInd) = ind
+                    ind = ind + 1
+
+                    ! Current tile
+                    d2dx2%values(ind) = 2*(-( problem%A0_map(nx,j,k)/(problem%A0_map(nx,j,k)+problem%A0_map(1,j,k)) &
+                            + problem%A0_map(2,j,k)/(problem%A0_map(2,j,k)+problem%A0_map(1,j,k)) ))
+                    d2dx2%cols(ind) = colInd
+                    ind = ind + 1
+
+                    ! Coupling to the right
+                    d2dx2%values(ind) = 2*problem%A0_map(2,j,k)/(problem%A0_map(2,j,k)+problem%A0_map(1,j,k))
+                    d2dx2%cols(ind) = colInd + 1
+                    d2dx2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1
+                else
+                    ! Current tile
+                    d2dx2%values(ind) = -1.
+                    d2dx2%cols(ind) = colInd
+                    d2dx2%rows_start(rowInd) = ind
+                    ind = ind + 1
+
+                    ! Coupling to the right
+                    d2dx2%values(ind) = 1.
+                    d2dx2%cols(ind) = colInd + 1
+                    d2dx2%rows_end(rowInd) = ind+1
+                    rowInd = rowInd + 1
+                    ind = ind + 1
+                end if
             
                 !The left boundary
                 const = 2 *  problem%A0_map(2,j,k) / (problem%A0_map(2,j,k) + problem%A0_map(1,j,k))
@@ -1720,33 +2010,58 @@ end subroutine updateDemagfieldFMM
                     d2dx2%rows_end(rowInd) = ind+1
                     rowInd = rowInd + 1
                     ind = ind + 1
-                
+
                     colInd = colInd + 1
                 enddo            
 
+                ! The right boundary
+                if ( PBCx ) then
 
-                const = 2 * problem%A0_map(nx-1,j,k) / (problem%A0_map(nx-1,j,k) + problem%A0_map(nx,j,k))
-                !The right boundary
-                d2dx2%values(ind) = const 
-                d2dx2%cols(ind) = colInd
-                !update where the row starts
-                d2dx2%rows_start(rowInd) = ind            
-                ind = ind + 1
+                    ! Coupling to the left
+                    d2dx2%values(ind) = 2*problem%A0_map(nx-1,j,k)/(problem%A0_map(nx-1,j,k)+problem%A0_map(nx,j,k))
+                    d2dx2%cols(ind) = colInd
+                    ! Update where the row starts
+                    d2dx2%rows_start(rowInd) = ind
+                    ind = ind + 1
+
+                    ! Current tile
+                    d2dx2%values(ind) = 2*(-( problem%A0_map(nx-1,j,k)/(problem%A0_map(nx-1,j,k)+problem%A0_map(nx,j,k)) &
+                            + problem%A0_map(1,j,k)/(problem%A0_map(1,j,k)+problem%A0_map(nx,j,k)) ))
+                    d2dx2%cols(ind) = colInd + 1
+                    ind = ind + 1
+
+                    ! Coupling to the right (loops around and connects with leftmost tile)
+                    d2dx2%values(ind) = 2*problem%A0_map(1,j,k)/(problem%A0_map(1,j,k)+problem%A0_map(nx,j,k))
+                    d2dx2%cols(ind) = colInd - nx + 2
+                    d2dx2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1
+
+                    colInd = colInd + 2
+                else
+                    const = 2 * problem%A0_map(nx-1,j,k) / (problem%A0_map(nx-1,j,k) + problem%A0_map(nx,j,k))
+                    !The right boundary
+                    d2dx2%values(ind) = const 
+                    d2dx2%cols(ind) = colInd
+                    !update where the row starts
+                    d2dx2%rows_start(rowInd) = ind            
+                    ind = ind + 1
             
-                d2dx2%values(ind) = -const
-                d2dx2%cols(ind) = colInd+1
-                d2dx2%rows_end(rowInd) = ind+1
-                rowInd = rowInd + 1
-                ind = ind + 1     
+                    d2dx2%values(ind) = -const
+                    d2dx2%cols(ind) = colInd+1
+                    d2dx2%rows_end(rowInd) = ind+1
+                    rowInd = rowInd + 1
+                    ind = ind + 1     
             
-                colInd = colInd + 2
+                    colInd = colInd + 2
+                endif
             enddo
         enddo
     
         !Multiply by the discretization
         d2dx2%values = d2dx2%values * 1.0/grid%dx**2
         
-        !Create the sparse matrix for the d^2dx^2
+        ! Create the sparse matrix for the d^2dx^2
         stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
     
     endif
@@ -1756,52 +2071,80 @@ end subroutine updateDemagfieldFMM
     
     !----------------------------------d^2dy^2 begins ----------------------------!
     if ( ny .gt. 1 ) then
-        ntot = nz * ( nx * 2 + (ny-2) * nx * 3 + nx * 2 )
-        !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2
-        allocate(d2dy2%values(ntot),d2dy2%cols(ntot),d2dy2%rows_start(nx*ny*nz),d2dy2%rows_end(nx*ny*nz))
+        ! Make the d^2/dy^2 matrix
+        if ( PBCy ) then
+            nNonZero = 3*ntot             ! For each tile, there are 3 non-zero elements corresponding to itself and the two neighbours along y
+        else
+            nNonZero = 3*ntot - 2*nx*nz   ! With a vacuum boundary, the 2*nx*nz tiles at the two end surfaces only have one neighbour each
+        end if
+        allocate(d2dy2%values(nNonZero),d2dy2%cols(nNonZero),d2dy2%rows_start(ntot),d2dy2%rows_end(ntot))
     
         ind = 1
         rowInd = 1
         colInd = 1
         do k=1,nz
             !The bottom boundary
-            do i=1,nx
-                const = 2 * problem%A0_map(i,2,k) / (problem%A0_map(i,2,k) + problem%A0_map(i,1,k))
+             ! The backwards boundary (Imagine standing on the origin, eyes pointed along the positive y-axis)
+            if ( PBCy ) then
+                do i=1,nx
+                    ! Backwards coupling (loops around and couples to forwardmost tile)
+                    d2dy2%values(ind) = 2*problem%A0_map(i,ny,k)/(problem%A0_map(i,ny,k)+problem%A0_map(i,1,k))
+                    d2dy2%cols(ind) = colInd + nx*(ny-1)
+                    d2dy2%rows_start(rowInd) = ind
+                    ind = ind + 1  ! Increment to next element
 
-                d2dy2%values(ind) = -const
-                d2dy2%cols(ind) = colInd
-                d2dy2%rows_start(rowInd) = ind
+                    ! Current tile
+                    d2dy2%values(ind) = 2*(-(problem%A0_map(i,ny,k)/(problem%A0_map(i,ny,k)+problem%A0_map(i,1,k)) &
+                            + problem%A0_map(i,2,k)/(problem%A0_map(i,2,k)+problem%A0_map(i,1,k))))
+                    d2dy2%cols(ind) = colInd
+                    ind = ind + 1  ! Increment to next element
+
+                    ! Forwards coupling
+                    d2dy2%values(ind) = 2*problem%A0_map(i,2,k)/(problem%A0_map(i,2,k)+problem%A0_map(i,1,k))
+                    d2dy2%cols(ind) = colInd + nx
+                    d2dy2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1  ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            else
             
-                !increment to next element
-                ind = ind + 1
+                do i=1,nx
+                    const = 2 * problem%A0_map(i,2,k) / (problem%A0_map(i,2,k) + problem%A0_map(i,1,k))
+
+                    d2dy2%values(ind) = -const
+                    d2dy2%cols(ind) = colInd
+                    d2dy2%rows_start(rowInd) = ind
             
-                d2dy2%values(ind) = const
-                d2dy2%cols(ind) = colInd + nx
-                d2dy2%rows_end(rowInd) = ind+1
-                rowInd = rowInd + 1
+                    !increment to next element
+                    ind = ind + 1
             
-                !increment to next element
-                ind = ind + 1
+                    d2dy2%values(ind) = const
+                    d2dy2%cols(ind) = colInd + nx
+                    d2dy2%rows_end(rowInd) = ind+1
+                    rowInd = rowInd + 1
             
-                colInd = colInd + 1
-            enddo
-        
-            !Everything in between
+                    !increment to next element
+                    ind = ind + 1
+            
+                    colInd = colInd + 1
+                enddo
+            endif
+            
+            ! Everything in between
             do j=2,ny-1
-                    
-            
                 do i=1,nx
                 
                     !lower value
                     d2dy2%values(ind) = 2 * problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))
                     d2dy2%cols(ind) = colInd-nx
                     d2dy2%rows_start(rowInd) = ind
-                    !increment to next element
-                    ind = ind + 1  
+                    ind = ind + 1  ! Increment to next element
                 
                     !central value
                     d2dy2%values(ind) = 2*(-(problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))+problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k))))
                     d2dy2%cols(ind) = colInd
+                    ind = ind + 1  ! Increment to next element
             
                     !increment to next element
                     ind = ind + 1
@@ -1809,44 +2152,63 @@ end subroutine updateDemagfieldFMM
                     !upper value
                     d2dy2%values(ind) = 2 * problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k))
                     d2dy2%cols(ind) = colInd + nx
-                    d2dy2%rows_end(rowInd) = ind+1
+                    d2dy2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
-                
+                    ind = ind + 1  ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            end do
+        
+            !The forwards boundary
+            if ( PBCy ) then
+                do i=1,nx
+                    ! Backwards coupling
+                    d2dy2%values(ind) = problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k))
+                    d2dy2%cols(ind) = colInd - nx
+                    d2dy2%rows_start(rowInd) = ind
+                    ind = ind + 1  ! Increment to next element
+
+                    ! Current tile
+                    d2dy2%values(ind) = -(problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k)) &
+                            + problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k)))
+                    d2dy2%cols(ind) = colInd
+                    ind = ind + 1  ! Increment to next element
+
+                    ! Forwards coupling (loops around and couples to backmost tile)
+                    d2dy2%values(ind) = problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k))
+                    d2dy2%cols(ind) = colInd - nx*(ny-1)
+                    d2dy2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1  ! Increment to next element
+                    colInd = colInd + 1
+                enddo
+            else
+                do i=1,nx
+                   const = 2 * problem%A0_map(i,ny-1,k) / (problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k))
+                    !lower element
+                    d2dy2%values(ind) = const
+                    d2dy2%cols(ind) = colInd - nx
+                    d2dy2%rows_start(rowInd) = ind
+            
                     !increment to next element
+                    ind = ind + 1            
+            
+                    !central element
+                    d2dy2%values(ind) = -const
+                    d2dy2%cols(ind) = colInd
+                    d2dy2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+            
                     ind = ind + 1
                     colInd = colInd + 1
                 enddo
-                        
-        
-            enddo
-        
-            !The top boundary    
-            do i=1,nx
-                const = 2 * problem%A0_map(i,ny-1,k) / (problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k))
-                !lower element
-                d2dy2%values(ind) = const
-                d2dy2%cols(ind) = colInd - nx
-                d2dy2%rows_start(rowInd) = ind
-            
-                !increment to next element
-                ind = ind + 1            
-            
-                !central element
-                d2dy2%values(ind) = -const
-                d2dy2%cols(ind) = colInd
-                d2dy2%rows_end(rowInd) = ind + 1
-                rowInd = rowInd + 1
-            
-                ind = ind + 1
-                colInd = colInd + 1
-            
-            enddo
+            endif
         enddo
-    
+                    
         !Multiply by the discretization
         d2dy2%values = d2dy2%values * 1./grid%dy**2
         
-        !Create the sparse matrix for the d^2dy^2
+        ! Create the sparse matrix for the d^2dy^2
         stat = mkl_sparse_d_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
     endif
     
@@ -1855,38 +2217,69 @@ end subroutine updateDemagfieldFMM
     
     !----------------------------------d^2dz^2 begins ----------------------------!
     if ( nz .gt. 1 ) then
-        !Make the d^2/dz^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2 and d^2dy^2
-        ntot = 2 * 2 * nx * ny + 3 * (nz-2) * nx * ny
-        !Make the d^2/dy^2 matrix. The no. of non-zero elements is 3 * nx*ny*nz - 2 * ny * nz just as for d^2dx^2
-        allocate(d2dz2%values(ntot),d2dz2%cols(ntot),d2dz2%rows_start(nx*ny*nz),d2dz2%rows_end(nx*ny*nz))
+        ! Make the d^2/dz^2 matrix
+        if ( PBCz ) then
+            nNonZero = 3*ntot             ! For each tile, there are 3 non-zero elements corresponding to itself and the two neighbours along z
+        else
+            nNonZero = 3*ntot - 2*nx*ny   ! With a vacuum boundary, the 2*nx*ny tiles at the two end surfaces only have one neighbour each
+        end if
+        allocate(d2dz2%values(nNonZero),d2dz2%cols(nNonZero),d2dz2%rows_start(ntot),d2dz2%rows_end(ntot))
     
         ind = 1
         rowInd = 1
         colInd = 1
-        !The z=1 face        
-        do j=1,ny
-            do i=1,nx
-                const = 2 * problem%A0_map(i,j,2) / (problem%A0_map(i,j,2) + problem%A0_map(i,j,1))
-                !central value
-                d2dz2%values(ind) = -const
-                d2dz2%cols(ind) = colInd
-                d2dz2%rows_start(rowInd) = ind
+        ! The bottom boundary
+        if ( PBCz ) then
+            do j=1,ny
+                do i=1,nx
+                    ! Downwards coupling (loops around and couples to topmost tile)
+                    d2dz2%values(ind) = 2*problem%A0_map(i,j,nz)/(problem%A0_map(i,j,nz)+problem%A0_map(i,j,1))
+                    d2dz2%cols(ind) = colInd + ny*nx*(nz-1)
+                    d2dz2%rows_start(rowInd) = ind
+                    ind = ind + 1   ! Increment to next element
+
+                    ! Current tile
+                    d2dz2%values(ind) = 2*(-(problem%A0_map(i,j,nz)/(problem%A0_map(i,j,nz) + problem%A0_map(i,j,1)) &
+                            + problem%A0_map(i,j,2)/(problem%A0_map(i,j,2) + problem%A0_map(i,j,1))))
+                    d2dz2%cols(ind) = colInd
+                    d2dz2%rows_start(rowInd) = ind
+                    ind = ind + 1   ! Increment to next element
+
+                    ! Upwards coupling
+                    d2dz2%values(ind) = 2*problem%A0_map(i,j,2)/(problem%A0_map(i,j,2)+problem%A0_map(i,j,1))
+                    d2dz2%cols(ind) = nx*ny + colInd
+                    d2dz2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1   ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            end do
+        else
+            do j=1,ny
+                do i=1,nx
+                    const = 2 * problem%A0_map(i,j,2) / (problem%A0_map(i,j,2) + problem%A0_map(i,j,1))
+                    !central value
+                    d2dz2%values(ind) = -const
+                    d2dz2%cols(ind) = colInd
+                    d2dz2%rows_start(rowInd) = ind
             
-                !increment position
-                ind = ind + 1
+                    !increment position
+                    ind = ind + 1
             
-                !right-most value
-                d2dz2%values(ind) = const
-                d2dz2%cols(ind) = nx * ny + colInd
-                d2dz2%rows_end(rowInd) = ind + 1
-                rowInd = rowInd + 1
+                    !right-most value
+                    d2dz2%values(ind) = const
+                    d2dz2%cols(ind) = nx * ny + colInd
+                    d2dz2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
             
-                !increment position
-                ind = ind + 1
-                colInd = colInd + 1
-            enddo
-        enddo
-        !Everything in between
+                    !increment position
+                    ind = ind + 1
+                    colInd = colInd + 1
+                end do
+            end do
+        endif
+
+        ! Everything in between
         do k=2,nz-1            
             do j=1,ny
                 do i=1,nx
@@ -1894,30 +2287,68 @@ end subroutine updateDemagfieldFMM
                     d2dz2%values(ind) = 2 * problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))
                     d2dz2%cols(ind) = colInd - nx * ny
                     d2dz2%rows_start(rowInd) = ind
-            
-                    !increment position
-                    ind = ind + 1
+                    ind = ind + 1   ! Increment to next element
                 
                     !central value
                     d2dz2%values(ind) = 2 * (-(problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))+problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k))))
                     d2dz2%cols(ind) = colInd
-                            
-                    !increment position
-                    ind = ind + 1
+                    ind = ind + 1   ! Increment to next element
                 
                     !right-most value
                     d2dz2%values(ind) = 2 * problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k))
                     d2dz2%cols(ind) = colInd + nx * ny
                     d2dz2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
-                
-                    !increment position
-                    ind = ind + 1
+                    ind = ind + 1   ! Increment to next element
                     colInd = colInd + 1
-                enddo
-            enddo
-        
-        enddo
+                end do
+            end do
+        end do
+
+        ! The top boundary
+        if ( PBCz ) then
+            do j=1,ny
+                do i=1,nx
+                    ! Downwards coupling
+                    d2dz2%values(ind) = problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz))
+                    d2dz2%cols(ind) = colInd - nx*ny
+                    d2dz2%rows_start(rowInd) = ind
+                    ind = ind + 1   ! Increment to next element
+
+                    ! Current tile
+                    d2dz2%values(ind) = -(problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz)) &
+                            + problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz)))
+                    d2dz2%cols(ind) = colInd
+                    ind = ind + 1   ! Increment to next element
+
+                    ! Upwards coupling (loops around and couples to bottommost tile)
+                    d2dz2%values(ind) = problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz))
+                    d2dz2%cols(ind) = colInd - nx*ny*(nz - 1)
+                    d2dz2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1   ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            end do
+        else
+            do j=1,ny
+                do i=1,nx
+                    ! Downwards coupling
+                    d2dz2%values(ind) = 1.
+                    d2dz2%cols(ind) = colInd - nx*ny
+                    d2dz2%rows_start(rowInd) = ind
+                    ind = ind + 1   ! Increment to next element
+
+                    ! Current tile
+                    d2dz2%values(ind) = -1.
+                    d2dz2%cols(ind) = colInd
+                    d2dz2%rows_end(rowInd) = ind + 1
+                    rowInd = rowInd + 1
+                    ind = ind + 1   ! Increment to next element
+                    colInd = colInd + 1
+                end do
+            end do
+        endif
     
     
         !The z=nz face        
@@ -1958,7 +2389,7 @@ end subroutine updateDemagfieldFMM
     
             
     !Finally, add up the three diagonals and store in the output sparse matrix, A
-    !store the results temporarily in tmp4
+    !Store the results temporarily in tmp4
     
     !call writeSparseMatrixToDisk( d2dz2%A, nx*ny*nz, 'd2dz2.dat' )
     !call writeSparseMatrixToDisk( d2dy2%A, nx*ny*nz, 'd2dy2.dat' )
@@ -2073,8 +2504,8 @@ end subroutine updateDemagfieldFMM
         call displayGUIMessage( 'Assuming uniaxial anisotropy' )
         do i = 1,size(problem%Ms)
             problem%Kfact_arr(i,1,3) = problem%K0(i) / ( mu0 * problem%Ms(i) )
-        enddo
-        
+        end do
+
         !Set the crystal axis as the user only specified u_ea
         problem%CrystalAxis(:,3,1) =  problem%u_ea(:,1)
         problem%CrystalAxis(:,3,2) =  problem%u_ea(:,2)
@@ -2097,11 +2528,11 @@ end subroutine updateDemagfieldFMM
             problem%Kfact_arr(i,3,2) = problem%K1(i) / ( mu0 * problem%Ms(i) )
             problem%Kfact_arr(i,3,3) = problem%K1(i) / ( mu0 * problem%Ms(i) )
             problem%Kfact_arr(i,6,1) = problem%K2(i) / ( mu0 * problem%Ms(i) )
-        enddo
+        end do
     else !General anisotropy
         do i = 1,size(problem%Ms)
             problem%Kfact_arr(i,:,:) = problem%K0_arr(i,:,:) / ( mu0 * problem%Ms(i) )
-        enddo
+        end do
     endif
 
     call trace%end( "ComputeAnisotropyTerm3D", itimer=itimer, verbose=1 )

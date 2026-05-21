@@ -102,42 +102,58 @@ include "mkl_dfti.f90"
         integer, allocatable  :: Exch_mat_c(:)   !> Column indices for the exchange coupling matrix
         real(dp), allocatable :: Exch_mat_v(:)   !> Values for the exchange coupling matrix
      end type MicroMagGridInfo
-     
+
+    !Additional information about the macrogeometry and sample shape used to implement periodic boundary conditions (PBCs)
+    !Note that current version approximates the overall shape of sample and macrogeometry by rectangular prisms
+    type MicroMagMacrogeometry
+        ! Settings for periodic demagnetisation field
+        integer,allocatable :: n_macro(:)      !> Number of copies on both sides of the intial domain along x,y and z, which together form the macrogeometry
+        real(dp),allocatable :: shiftVec(:)    !> How far to shift neighbouring domain copies along x, y, z
+        real(dp),allocatable :: macroShape(:)  !> Sidelengths of macrogeometry prism
+        real(dp),allocatable :: sampleShape(:) !> Sidelengths of sample prism
+        ! Settings for exchange coupling between copies of the simulated domain
+        logical,allocatable :: exchPBC(:)      !> Periodic boundary conditions along x, y and z for the exchange coupling
+    end type MicroMagMacrogeometry
+
     !>-----------------
     !> Overall data structure for a micro magnetism problem.
     !> The design intention is such that a problem may be restarted given the information stored in this struct
     !>-----------------
     type MicroMagProblem
         !Below is stuff that needs to be provided by the "user":
-        type(MicroMagGrid) :: grid                      !> Grid of the problem
+        type(MicroMagGrid) :: grid                        !> Grid of the problem
+        type(MicroMagMacrogeometry) :: macrogrid          !> Info on macrogeometry grid and sample shape
         
         real(DP),dimension(:,:),allocatable :: u_ea      !> Easy axis vectors that should have the dimensions (n,3) where n is the no. of grid points and thus u_ea(i,3) is the i'th point's z-component
         
-        integer :: ProblemMode                           !> Defines the problem mode (new or continued from previous solution)
+        integer :: ProblemMode                            !> Defines the problem mode (new or continued from previous solution)
         
-        integer :: solver                                !> Determines what type of solver to use
+        integer :: solver                                 !> Determines what type of solver to use
         
-        real(DP) :: exch_weight                          !> Sets the weight for the exchange operator calculation
-        integer  :: exch_method                          !> Determines what type of exchange operator method to use
-        integer  :: exch_interpn                         !> Determines what type of exchange interpolation method to use
+        real(DP) :: exch_weight                           !> Sets the weight for the exchange operator calculation
+        integer  :: exch_method                           !> Determines what type of exchange operator method to use
+        integer  :: exch_interpn                          !> Determines what type of exchange interpolation method to use
     
-        real(DP) :: gamma,alpha0,MaxT0                   !> User defined coefficients determining part of the problem.
-        real(DP) :: tol,thres_value                      !> User defined coefficients for the ODE solver
+        real(DP) :: gamma,alpha0,MaxT0                    !> User defined coefficients determining part of the problem.
+        real(DP) :: tol,thres_value                       !> User defined coefficients for the ODE solver
         real(DP),dimension(:),allocatable :: Jfact,Kfact
         real(SP),dimension(:),allocatable :: Mfact
+        real(DP),dimension(:),allocatable :: temperature  !> User defined system temperature
+        real(DP),dimension(:),allocatable :: Tfact        !> Prefactor of the termal magnetic field
+        logical :: includeThermal                         !> Whether thermal noise is included in the simulations
         
-        real(DP),dimension(:,:),allocatable :: Hext      !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
-        real(DP),dimension(:,:),allocatable :: alpha     !> A time dependent dampning parameter, i.e. as a function of time. Size (nt,1).
+        real(DP),dimension(:,:),allocatable :: Hext       !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
+        real(DP),dimension(:,:),allocatable :: alpha      !> A time dependent damping parameter, i.e. as a function of time. Size (nt,1).
         
         real(DP),dimension(:),allocatable :: t              !> Time array for the desired output times
         real(DP),dimension(:),allocatable :: m0             !> Initial value of the magnetization
         real(DP),dimension(:),allocatable :: Ms,K0,K1,K2,A0 !> User defined coefficients determining part of the problem.
         real(DP),dimension(:,:,:),allocatable :: Kfact_arr  !> n,6,3 array specifying the local anisotropy constants. See updateAnisotropy for details
         
-        real(DP),dimension(:),allocatable :: t_conv      !> Time array with the time values where the solution will be checked for convergence compared to the last timestep
-        real(DP) :: conv_tol                             !> Converge criteria on difference between magnetization at different timesteps
+        real(DP),dimension(:),allocatable :: t_conv        !> Time array with the time values where the solution will be checked for convergence compared to the last timestep
+        real(DP) :: conv_tol                               !> Converge criteria on difference between magnetization at different timesteps
         
-        real(SP) :: demag_threshold                      !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
+        real(SP) :: demag_threshold                        !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         real(SP) :: CV                                   !> The coefficient of variation (CV), i.e. the ratio of the standard deviation to the mean, which can be used to add an error to the demag field
         integer :: demag_ignore_steps                    !> Only compute the demag tensor every demag_ignore_steps'th-step in a calculation using the hysteresis-model. Otherwise the parameter is ignore (i.e. in the dynamic solver)
         
@@ -152,7 +168,7 @@ include "mkl_dfti.f90"
         integer :: demag_approximation                          !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         integer :: demagTensorReturnState                       !> Flag describing how or if the demag tensor should be returned
         integer :: demagTensorLoadState                         !> Flag describing how or if to load the demag tensor (from disk e.g.)
-        integer :: nThreadsMatlab                             !> Number of threads to use in the OpenMP demag tensor allocation
+        integer :: nThreadsMatlab                               !> Number of threads to use in the OpenMP demag tensor allocation
         integer,dimension(3) :: N_ave                           !> Number of points to average the demag tensor in in the recieving tile, N_ave(1) = N_x etc
         character*256 :: demagTensorFileOut, demagTensorFileIn  !> Filename (including path) for output (input) of demag tensor if it is to be returned as a file (demagTensorReturnState >2 and the value is equal to the length of the file including path)
         
@@ -167,7 +183,13 @@ include "mkl_dfti.f90"
         real(SP),dimension(:,:),allocatable :: Kxx,Kxy,Kxz  !> Demag field tensor split out into the nine symmetric components
         real(SP),dimension(:,:),allocatable :: Kyy,Kyz      !> Demag field tensor split out into the nine symmetric components
         real(SP),dimension(:,:),allocatable :: Kzz          !> Demag field tensor split out into the nine symmetric components
-        
+
+        real(SP),dimension(:),allocatable :: Kxx_shape,Kxy_shape,Kxz_shape  !> Shape correction tensor components
+        real(SP),dimension(:),allocatable :: Kyy_shape,Kyz_shape            !> Shape correction tensor components
+        real(SP),dimension(:),allocatable :: Kzz_shape                      !> Shape correction tensor components
+
+        real(DP),allocatable :: VfracOcc    !> Fraction of simulation volume occupied by micromagnetic cells
+
         integer,dimension(:,:),allocatable :: tensorMap     !> A map of the unique entries in the demagnetization tensor
         logical,dimension(:,:),allocatable :: tensorMapX, tensorMapY, tensorMapZ   !> The sign of the different components in the demagnetization tensor map
         
@@ -218,7 +240,8 @@ include "mkl_dfti.f90"
         real(DP),dimension(:),allocatable :: HjX,HjY,HjZ                   !> Effective fields for the exchange term (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: HhX,HhY,HhZ                   !> Effective fields for the external field (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: HkX,HkY,HkZ                   !> Effective fields for the anisotropy energy term (X,Y and Z-directions, respectively)        
-        real(SP),dimension(:),allocatable :: HmX,HmY,HmZ                   !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)        
+        real(SP),dimension(:),allocatable :: HmX,HmY,HmZ                   !> Effective fields for the demag energy term (X,Y and Z-directions, respectively)
+        real(DP),dimension(:),allocatable :: HtX,HtY,HtZ                   !> Effective fields for the thermal noise (X,Y and Z-directions, respectively)
         real(DP),dimension(:),allocatable :: Mx,My,Mz                      !> The magnetization components used internally as the solution progresses
         real(SP),dimension(:),allocatable :: Mx_s,My_s,Mz_s                !> The magnetization components used internally as the solution progresses in single precision
         complex(kind=4),dimension(:),allocatable :: Mx_FT, My_FT, Mz_FT    !> Fourier transform of Mx, My and Mz (complex)

@@ -9,7 +9,7 @@ module TileNComponents
 
     implicit none
     
-    !::General base-type for alle the different tile types
+    !::General base-type for all the different tile types
     type MagTile
         !::Specific for a cylindrical tile piece
         real :: r0, theta0, z0, dr, dtheta, dz

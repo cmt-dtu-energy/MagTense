@@ -9,12 +9,13 @@ contains
 
 
 subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-    gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+    gamma, alpha, temperature, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
     N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
     exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
 	CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
-	passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, useDemag )
+	n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
+    passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, useDemag )
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
     integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols
     integer(4),dimension(3),intent(in) :: grid_n
@@ -33,13 +34,16 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
     integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, useAvgN, useDemag, demigstp, exch_meth, exch_intpn, passExch
     real(8),intent(in) :: gamma, alpha, MaxT0, tol, thres, conv_tol, dem_thres
-	real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2
+	real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2, temperature
 	real(8),dimension(ntot,6,3),intent(in) :: K0_arr
 	real(8),dimension(ntot,3,3),intent(in):: crysaxis
     integer(4), dimension(3) :: N_ave
     real(8) :: demag_fac
 	real(8), intent(in) :: CV, exch_weigh
-	
+    integer(4),dimension(3),intent(in) :: n_macro
+    real(8),dimension(3),intent(in) :: shiftVec, macroShape, sampleShape
+    logical,dimension(3),intent(in) :: exchPBC
+
     character*256,intent(in) :: N_file_in, N_file_out
 
     type(MicroMagProblem),intent(inout) :: problem
@@ -81,6 +85,17 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 
     problem%grid%gridType = grid_type
 
+    !Load macrogeometry information
+    problem%macrogrid%n_macro = n_macro
+    problem%macrogrid%shiftVec = shiftVec
+    problem%macrogrid%macroShape = macroShape
+
+    !Load sample shape information
+    problem%macrogrid%sampleShape = sampleShape
+
+    !Load periodic boundary conditions on the exchange coupling
+    problem%macrogrid%exchPBC = exchPBC
+
     !Load additional things for a tetrahedron grid
     if ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
         !The center points of all the tetrahedron elements           
@@ -120,7 +135,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     !Allocate memory for the easy axis vectors
     allocate( problem%u_ea(ntot,3) )
     problem%u_ea = u_ea
-    
+
     problem%ProblemMode = ProblemMode
     problem%solver = solver
     problem%A0 = A0
@@ -130,6 +145,8 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     problem%K0 = K0
     problem%gamma = gamma
     problem%alpha0 = alpha
+    allocate( problem%temperature(ntot) )
+    problem%temperature = temperature
     problem%MaxT0 = MaxT0
     
     !Applied field as a function of time evaluated at the timesteps specified in nt_Hext

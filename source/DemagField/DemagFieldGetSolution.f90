@@ -216,8 +216,53 @@
 
         call trace%end("getFieldFromTiles", itimer=itimer, verbose=4)
     end subroutine getFieldFromTiles
-    
-    
+
+    ! Implement periodic boundary conditions by the macrogeometry method, i.e. calculate the
+    ! field and demagnetisation tensor from shifted copies of the simulated domain and add
+    ! together the contribution from each copy.
+    ! Note that instead of shifting the tiles, the evaluation points are shifted in the opposite
+    ! direction, which is equivalent
+    subroutine getFieldFromTiles_PBC(tiles, H, pts, n_tiles, n_ele, n_macro, shiftVec, Nout, useStoredNorg)
+        type(MagTile),intent(inout),dimension(n_tiles) :: tiles
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: Htemp
+        real(8),dimension(n_ele,3),intent(in) :: pts
+        real(8),dimension(n_ele,3) :: pts_temp
+        integer(4),intent(in) :: n_tiles,n_ele
+        integer(4),dimension(3) :: n_macro
+        real(8),dimension(3) :: shiftVec
+        integer(4) :: nx_macro, ny_macro, nz_macro
+        real(8),dimension(:,:,:,:),intent(inout) :: Nout
+        real(8),dimension(:,:,:,:),allocatable :: Ntemp
+        logical,optional :: useStoredNorg
+        integer(4) :: i, j, l
+
+        H(:,:) = 0.0
+        Nout(:,:,:,:) = 0.0
+
+        nx_macro = n_macro(1)
+        ny_macro = n_macro(2)
+        nz_macro = n_macro(3)
+
+        do l=-nz_macro,nz_macro     !> k was taken
+            do j=-ny_macro,ny_macro
+                do i=-nx_macro,nx_macro
+                    Htemp(:,:) = 0.0
+                    Ntemp(:,:,:,:) = 0.0
+                    !Shift evaluation points
+                    pts_temp = pts
+                    pts_temp(:, 1) = pts_temp(:, 1) - i * shiftVec(1)
+                    pts_temp(:, 2) = pts_temp(:, 2) - j * shiftVec(2)
+                    pts_temp(:, 3) = pts_temp(:, 3) - l * shiftVec(3)
+                    ! Evaluate field and demagnetisation tensor with shifted evaluation points
+                    call getFieldFromTiles(tiles, Htemp, pts_temp, n_tiles, n_ele, Ntemp, .false. )
+                    ! Add to existing values
+                    H = H + Htemp
+                    Nout = Nout + Ntemp
+                end do
+            end do
+        end do
+    end subroutine getFieldFromTiles_PBC
     
 !---------------------------------------------------------------------------------------!
 !------------------------ Specific tile geometries -------------------------------------!
@@ -980,7 +1025,67 @@
         symm_H(8,:,:) = matmul( symm_H(2,:,:), matmul( symm_H(3,:,:), symm_H(4,:,:) ) )
     
     end subroutine getSymmOpMatrices
-    
+
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !> Returns the shape correction tensor which maps the average magnetisation onto the shape correction field
+    !! Note that the getN_prism_3D subroutine takes a MagTile object as input, but
+    !! it only uses the a, b, c values so all other parameters can be left at their defaults
+    !! @param pts : Array of positions for all micromagnetic tiles
+    !! @param n_ele : Number of elements (micromagnetic tiles) to evaluate field at
+    !! @param aMacro, bMacro, cMacro : length of macrogeometry prism along x, y and z
+    !! @param aShape, bShape, cShape : length of sample prism along x, y and z
+    !!
+    subroutine getShapeTensor( pts, n_ele, aMacro, bMacro, cMacro, aSample, bSample, cSample, Nshape )
+        real(8),dimension(n_ele,3),intent(in) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),intent(in) :: aMacro,bMacro,cMacro,aSample,bSample,cSample
+        real(8),dimension(n_ele,3,3) :: Nshape
+
+        !type(MagTile),dimension(1) :: prismMacro, prismSample !> This format does not match the one in getN_prism_3D
+        type(MagTile) :: prismMacro, prismSample
+        real(8),dimension(3) :: posMacro, posSample
+        integer :: i
+        real(8),dimension(3) :: diffPosMacro, diffPosSample
+        real(8),dimension(3,3) :: Nmacro, Nsample
+
+        ! Center positions of macrogeometry and sample
+        posMacro = 0.0      !Assume centered on the origin
+        posSample = 0.0     !Assume centered on the origin
+
+        !Setup template tile for macrogeometry
+        prismMacro%tileType = 2 !(for prism)
+        !dimensions of the tile
+        prismMacro%a = aMacro
+        prismMacro%b = bMacro
+        prismMacro%c = cMacro
+
+        !Setup template tile for sample geometry
+        prismSample%tileType = 2 !(for prism)
+        !dimensions of the tile
+        prismSample%a = aSample
+        prismSample%b = bSample
+        prismSample%c = cSample
+        !prismSample%exploitSymmetry = 0 !Irrelevant
+        !prismSample%rotAngles(:) = 0.   !Irrelevant
+        !prismSample%M(:) = 0.           !Irrelevant
+
+        do i=1,n_ele
+            !! The relative position vectors between the origin of the macrogeometry/sample and the evaluation point
+            diffPosMacro = pts(i,:) - posMacro
+            diffPosSample = pts(i,:) - posSample
+
+            !! Compute tensors for element i
+            call getN_prism_3D( prismMacro, diffPosMacro, Nmacro )
+            call getN_prism_3D( prismSample, diffPosSample, Nsample )
+
+            !! Store shape correction tensor (difference between sample- and macrogeometry tensors)
+            Nshape(i,:,:) = Nsample - Nmacro
+
+        end do
+
+!        deallocate(Nsample, Nmacro)
+
+    end subroutine getShapeTensor
 
 !---------------------------------------------------------------------------------------!
 !------------------------------ Helper routines ----------------------------------------!

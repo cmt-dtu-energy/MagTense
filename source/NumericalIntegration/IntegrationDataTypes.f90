@@ -24,6 +24,16 @@
          
           end subroutine dydt_fct
     end interface
+
+    !---------------------------------------------------------------------------
+    !> @author Frederik L. Durhuus, fladu@dtu.dk, DTU, 2026
+    !> Defines an abstract interface for functions with no arguments
+    !> Intended for the wrapper function for the thermal field update
+    !---------------------------------------------------------------------------
+    abstract interface
+          subroutine no_argument_fct ( )
+          end subroutine no_argument_fct
+    end interface
     
      !---------------------------------------------------------------------------    
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
