@@ -71,7 +71,6 @@ jobs:
         activate-environment: magtense-env
         use-mamba: true
 
-    # Install compiler into base
     - name: Install compiler in base (Linux)
       if: runner.os == 'Linux'
       run: conda install -n base -c conda-forge gxx_linux-64 -y
@@ -102,12 +101,10 @@ jobs:
         mkdir '${{ github.workspace }}'/python/cu12_libs
         mkdir '${{ github.workspace }}'/python/cu12-fmm_libs
 
-    # Workaround: Issue with msvc-dev-cmd and link.exe in the conda environment
     - name: Win - Delete link.exe
       if: ${{ runner.os == 'Windows' }}
       run: rm '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
 
-    # Shell cannot use job/matrix templates: https://github.com/actions/runner/issues/444
     - name: Win - Compile Fortran source code and build Python wrapper
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
@@ -256,6 +253,26 @@ jobs:
       with:
         name: pip-wheel-py${{ matrix.py-version.name }}-cu12-fmm-${{ runner.os }}
 
+    - name: Diagnose Windows self-hosted runner identity
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      shell: cmd /C CALL {0}
+      run: |
+        echo RUNNER_NAME=%RUNNER_NAME%
+        echo RUNNER_OS=%RUNNER_OS%
+        echo RUNNER_ARCH=%RUNNER_ARCH%
+        echo USERNAME=%USERNAME%
+        echo USERDOMAIN=%USERDOMAIN%
+        echo USERPROFILE=%USERPROFILE%
+        whoami
+
+        echo.
+        echo Checking expected Conda path:
+        dir C:\Users\github_runner\miniconda3\condabin\conda.bat || echo Conda path is not accessible from this runner process.
+
+        echo.
+        echo Runner services:
+        powershell -NoProfile -Command "Get-CimInstance Win32_Service | Where-Object { $_.Name -like 'actions.runner*' } | Select-Object Name,State,StartName,PathName | Format-List"
+
     - name: Setup python (Linux self-hosted)
       if: ${{ matrix.fmm_runner.os_name == 'linux' }}
       uses: actions/setup-python@v5
@@ -270,95 +287,86 @@ jobs:
 
     - name: Bootstrap existing Miniconda Python (Windows self-hosted)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: powershell
+      shell: cmd /C CALL {0}
       run: |
-        $ErrorActionPreference = "Stop"
+        echo Bootstrapping Python from existing Miniconda installation
+        echo USERNAME=%USERNAME%
+        echo USERPROFILE=%USERPROFILE%
+        whoami
 
-        $condaRoot = "C:\Users\github_runner\miniconda3"
-        $condaBat = Join-Path $condaRoot "condabin\conda.bat"
+        set CONDA_ROOT=C:\Users\github_runner\miniconda3
+        set CONDA_BAT=C:\Users\github_runner\miniconda3\condabin\conda.bat
 
-        if (-not (Test-Path $condaBat)) {
-          throw "Expected existing Miniconda at $condaBat, but it was not found."
-        }
-
-        Write-Host "Using existing Miniconda installation:"
-        Write-Host "  $condaRoot"
-
-        # Initialise Conda for this non-interactive PowerShell process.
-        $hook = & cmd.exe /d /c "`"$condaBat`" shell.powershell hook"
-        if ($LASTEXITCODE -ne 0) {
-          throw "Failed to initialise Conda PowerShell hook from $condaBat"
-        }
-        Invoke-Expression $hook
-
-        $envName = "magtense-test-py${{ matrix.py-version.name }}"
-        $wanted = "${{ matrix.py-version.id }}"
-
-        Write-Host "Requested Python version: $wanted"
-        Write-Host "Conda test environment: $envName"
-
-        $envList = conda env list --json | ConvertFrom-Json
-        $exists = $false
-
-        foreach ($prefix in $envList.envs) {
-          if ((Split-Path $prefix -Leaf) -eq $envName) {
-            $exists = $true
-          }
-        }
-
-        if (-not $exists) {
-          Write-Host "Creating Conda environment $envName"
-          conda create -y -n $envName "python=$wanted" pip
-        }
-
-        conda activate $envName
-
-        $actual = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-        $actual = $actual.Trim()
-
-        if ($actual -ne $wanted) {
-          Write-Host "Environment $envName has Python $actual; updating to $wanted"
-          conda deactivate
-          conda install -y -n $envName "python=$wanted" pip
-          conda activate $envName
-
-          $actual = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-          $actual = $actual.Trim()
-
-          if ($actual -ne $wanted) {
-            throw "Conda environment $envName has Python $actual, expected $wanted."
-          }
-        }
-
-        $py = python -c "import sys; print(sys.executable)"
-        $py = $py.Trim()
-
-        Write-Host "Selected Python:"
-        Write-Host "  $py"
-
-        "CONDA=$condaRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        "MAGTENSE_CONDA_ENV=$envName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        "PYTHON_EXE=$py" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-        # Make the Conda environment DLL paths available to subsequent PowerShell steps.
-        $envPrefix = $env:CONDA_PREFIX
-
-        $pathEntries = @(
-          $envPrefix,
-          (Join-Path $envPrefix "Scripts"),
-          (Join-Path $envPrefix "Library\mingw-w64\bin"),
-          (Join-Path $envPrefix "Library\usr\bin"),
-          (Join-Path $envPrefix "Library\bin"),
-          (Join-Path $condaRoot "condabin"),
-          (Join-Path $condaRoot "Scripts"),
-          (Join-Path $condaRoot "Library\bin")
+        if not exist "%CONDA_BAT%" (
+          echo Expected Conda at "%CONDA_BAT%", but it was not found or is not accessible.
+          exit /b 1
         )
 
-        foreach ($entry in $pathEntries) {
-          if ($entry -and (Test-Path $entry)) {
-            $entry | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          }
-        }
+        call "%CONDA_BAT%" activate base
+        if errorlevel 1 (
+          echo Failed to activate Conda base environment.
+          exit /b 1
+        )
+
+        set ENV_NAME=magtense-test-py${{ matrix.py-version.name }}
+        set WANTED=${{ matrix.py-version.id }}
+
+        echo Requested Python version: %WANTED%
+        echo Conda environment: %ENV_NAME%
+
+        call conda env list | findstr /C:"%ENV_NAME%" >nul
+        if errorlevel 1 (
+          echo Creating Conda environment %ENV_NAME%
+          call conda create -y -n %ENV_NAME% python=%WANTED% pip
+          if errorlevel 1 (
+            echo Failed to create Conda environment %ENV_NAME%.
+            exit /b 1
+          )
+        )
+
+        call conda activate %ENV_NAME%
+        if errorlevel 1 (
+          echo Failed to activate Conda environment %ENV_NAME%.
+          exit /b 1
+        )
+
+        python -c "import sys; raise SystemExit(0 if f'{sys.version_info.major}.{sys.version_info.minor}' == '%WANTED%' else 1)"
+        if errorlevel 1 (
+          echo Environment %ENV_NAME% does not have Python %WANTED%; updating it.
+          call conda install -y -n %ENV_NAME% python=%WANTED% pip
+          if errorlevel 1 (
+            echo Failed to update Conda environment %ENV_NAME% to Python %WANTED%.
+            exit /b 1
+          )
+
+          call conda activate %ENV_NAME%
+          if errorlevel 1 (
+            echo Failed to reactivate Conda environment %ENV_NAME%.
+            exit /b 1
+          )
+
+          python -c "import sys; raise SystemExit(0 if f'{sys.version_info.major}.{sys.version_info.minor}' == '%WANTED%' else 1)"
+          if errorlevel 1 (
+            echo Conda environment %ENV_NAME% still does not have Python %WANTED%.
+            exit /b 1
+          )
+        )
+
+        for /f "delims=" %%i in ('python -c "import sys; print(sys.executable)"') do set PYTHON_EXE=%%i
+
+        echo Selected Python: %PYTHON_EXE%
+        python --version
+
+        echo CONDA=%CONDA_ROOT%>> "%GITHUB_ENV%"
+        echo MAGTENSE_CONDA_ENV=%ENV_NAME%>> "%GITHUB_ENV%"
+        echo PYTHON_EXE=%PYTHON_EXE%>> "%GITHUB_ENV%"
+
+        echo %CONDA_ROOT%\envs\%ENV_NAME%>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Scripts>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Library\mingw-w64\bin>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Library\usr\bin>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Library\bin>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\condabin>> "%GITHUB_PATH%"
 
     - name: Python diagnostics after setup
       if: ${{ matrix.fmm_runner.os_name == 'linux' }}
@@ -374,8 +382,6 @@ jobs:
       run: |
         $ErrorActionPreference = "Stop"
 
-        Write-Host "RUNNER_TOOL_CACHE=$env:RUNNER_TOOL_CACHE"
-        Write-Host "AGENT_TOOLSDIRECTORY=$env:AGENT_TOOLSDIRECTORY"
         Write-Host "CONDA=$env:CONDA"
         Write-Host "MAGTENSE_CONDA_ENV=$env:MAGTENSE_CONDA_ENV"
         Write-Host "PYTHON_EXE=$env:PYTHON_EXE"
@@ -417,6 +423,10 @@ jobs:
         MAGTENSE_WHEEL_VARIANT: cu12-fmm
       run: |
         $ErrorActionPreference = "Stop"
+
+        Write-Host "Using Python:"
+        Write-Host "  $env:PYTHON_EXE"
+        & $env:PYTHON_EXE --version
 
         Get-ChildItem "$env:GITHUB_WORKSPACE\*.whl" | ForEach-Object {
           & $env:PYTHON_EXE -m pip install $_.FullName
