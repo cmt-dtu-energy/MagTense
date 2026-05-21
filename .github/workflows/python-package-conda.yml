@@ -256,16 +256,6 @@ jobs:
       with:
         name: pip-wheel-py${{ matrix.py-version.name }}-cu12-fmm-${{ runner.os }}
 
-    - name: Python diagnostics before setup (Windows)
-      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: powershell
-      run: |
-        Write-Host "RUNNER_TOOL_CACHE=$env:RUNNER_TOOL_CACHE"
-        Write-Host "AGENT_TOOLSDIRECTORY=$env:AGENT_TOOLSDIRECTORY"
-        & where.exe python
-        & python --version
-        & py -0p
-
     - name: Setup python (Linux self-hosted)
       if: ${{ matrix.fmm_runner.os_name == 'linux' }}
       uses: actions/setup-python@v5
@@ -278,30 +268,95 @@ jobs:
       run: |
         echo "PYTHON_EXE=$(command -v python)" >> "$GITHUB_ENV"
 
-    - name: Select python (Windows self-hosted)
+    - name: Bootstrap existing Miniconda Python (Windows self-hosted)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
       shell: powershell
       run: |
-        $condaBat = 'C:\Users\github_runner\miniconda3\condabin\conda.bat'
-        if (Test-Path $condaBat) {
-          $hook = & cmd.exe /c "`"$condaBat`" shell.powershell hook"
-          Invoke-Expression $hook
-          conda activate
-          "PATH=$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        } else {
-          Write-Warning "Conda not found at $condaBat"
+        $ErrorActionPreference = "Stop"
+
+        $condaRoot = "C:\Users\github_runner\miniconda3"
+        $condaBat = Join-Path $condaRoot "condabin\conda.bat"
+
+        if (-not (Test-Path $condaBat)) {
+          throw "Expected existing Miniconda at $condaBat, but it was not found."
         }
 
-        try {
-          $py = python -c 'import sys; print(sys.executable)'
-          "PYTHON_EXE=$py" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        } catch {
-          $wanted = '${{ matrix.py-version.id }}'
-          $candidate = & py "-$wanted" -c "import sys; print(sys.executable)" 2>$null
-          if ($LASTEXITCODE -eq 0 -and $candidate) {
-            "PYTHON_EXE=$candidate" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          } else {
-            throw "Python $wanted was not found."
+        Write-Host "Using existing Miniconda installation:"
+        Write-Host "  $condaRoot"
+
+        # Initialise Conda for this non-interactive PowerShell process.
+        $hook = & cmd.exe /d /c "`"$condaBat`" shell.powershell hook"
+        if ($LASTEXITCODE -ne 0) {
+          throw "Failed to initialise Conda PowerShell hook from $condaBat"
+        }
+        Invoke-Expression $hook
+
+        $envName = "magtense-test-py${{ matrix.py-version.name }}"
+        $wanted = "${{ matrix.py-version.id }}"
+
+        Write-Host "Requested Python version: $wanted"
+        Write-Host "Conda test environment: $envName"
+
+        $envList = conda env list --json | ConvertFrom-Json
+        $exists = $false
+
+        foreach ($prefix in $envList.envs) {
+          if ((Split-Path $prefix -Leaf) -eq $envName) {
+            $exists = $true
+          }
+        }
+
+        if (-not $exists) {
+          Write-Host "Creating Conda environment $envName"
+          conda create -y -n $envName "python=$wanted" pip
+        }
+
+        conda activate $envName
+
+        $actual = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+        $actual = $actual.Trim()
+
+        if ($actual -ne $wanted) {
+          Write-Host "Environment $envName has Python $actual; updating to $wanted"
+          conda deactivate
+          conda install -y -n $envName "python=$wanted" pip
+          conda activate $envName
+
+          $actual = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+          $actual = $actual.Trim()
+
+          if ($actual -ne $wanted) {
+            throw "Conda environment $envName has Python $actual, expected $wanted."
+          }
+        }
+
+        $py = python -c "import sys; print(sys.executable)"
+        $py = $py.Trim()
+
+        Write-Host "Selected Python:"
+        Write-Host "  $py"
+
+        "CONDA=$condaRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        "MAGTENSE_CONDA_ENV=$envName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        "PYTHON_EXE=$py" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+        # Make the Conda environment DLL paths available to subsequent PowerShell steps.
+        $envPrefix = $env:CONDA_PREFIX
+
+        $pathEntries = @(
+          $envPrefix,
+          (Join-Path $envPrefix "Scripts"),
+          (Join-Path $envPrefix "Library\mingw-w64\bin"),
+          (Join-Path $envPrefix "Library\usr\bin"),
+          (Join-Path $envPrefix "Library\bin"),
+          (Join-Path $condaRoot "condabin"),
+          (Join-Path $condaRoot "Scripts"),
+          (Join-Path $condaRoot "Library\bin")
+        )
+
+        foreach ($entry in $pathEntries) {
+          if ($entry -and (Test-Path $entry)) {
+            $entry | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           }
         }
 
@@ -317,12 +372,15 @@ jobs:
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
       shell: powershell
       run: |
+        $ErrorActionPreference = "Stop"
+
         Write-Host "RUNNER_TOOL_CACHE=$env:RUNNER_TOOL_CACHE"
         Write-Host "AGENT_TOOLSDIRECTORY=$env:AGENT_TOOLSDIRECTORY"
+        Write-Host "CONDA=$env:CONDA"
+        Write-Host "MAGTENSE_CONDA_ENV=$env:MAGTENSE_CONDA_ENV"
         Write-Host "PYTHON_EXE=$env:PYTHON_EXE"
+
         & where.exe python
-        & python --version
-        & py -0p
         & $env:PYTHON_EXE --version
         & $env:PYTHON_EXE -c "import sys; print('selected:', sys.executable)"
 
@@ -336,6 +394,8 @@ jobs:
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
       shell: powershell
       run: |
+        $ErrorActionPreference = "Stop"
+
         & $env:PYTHON_EXE -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
         & nvidia-smi
 
@@ -356,7 +416,12 @@ jobs:
         MAGTENSE_USE_FMM3D: 1
         MAGTENSE_WHEEL_VARIANT: cu12-fmm
       run: |
-        Get-ChildItem "$env:GITHUB_WORKSPACE\*.whl" | ForEach-Object { & $env:PYTHON_EXE -m pip install $_.FullName }
+        $ErrorActionPreference = "Stop"
+
+        Get-ChildItem "$env:GITHUB_WORKSPACE\*.whl" | ForEach-Object {
+          & $env:PYTHON_EXE -m pip install $_.FullName
+        }
+
         & $env:PYTHON_EXE -m pip install pytest
         & $env:PYTHON_EXE -m pytest python/tests/fmm_test/test_fmm_workflow.py
 
