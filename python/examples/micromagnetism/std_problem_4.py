@@ -55,6 +55,16 @@ def std_prob_4(
     def h_ext_fct_init(t) -> np.ndarray:
         return np.expand_dims(np.where(t < 1e-09, 1e-09 - t, 0), axis=1) * h_ext
 
+
+    problem_ini.window_enabled = 0
+    problem_ini.window_interval = 30.0
+    problem_ini.trace_enabled = 0
+    problem_ini.flush_each = 1
+    problem_ini.trace_verbose = 2
+    problem_ini.timer_log_file =  "std_4_ini_timer.log"
+    problem_ini.trace_log_file =  "std_4_ini_trace.log"
+
+
     result = problem_ini.run_simulation(
         t_end=100e-9,
         nt=200,
@@ -106,6 +116,15 @@ def std_prob_4(
 
     def h_ext_fct(t) -> np.ndarray:
         return np.expand_dims(t > -1, axis=1) * (h_ext_nist / 1000 / mu0)
+
+
+    problem_dym.window_enabled = 0
+    problem_dym.window_interval = 30.0
+    problem_dym.trace_enabled = 0
+    problem_dym.flush_each = 1
+    problem_dym.trace_verbose = 2
+    problem_dym.timer_log_file =  "std_4_dym_timer.log"
+    problem_dym.trace_log_file =  "std_4_dym_trace.log"
 
     t_dym, M_out = problem_dym.run_simulation(
         t_end=1e-9,
