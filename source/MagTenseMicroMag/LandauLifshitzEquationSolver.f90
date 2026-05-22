@@ -1959,34 +1959,21 @@ end subroutine updateDemagfieldFMM
                     rowInd = rowInd + 1
                     ind = ind + 1
                 else
-                    ! Current tile
-                    d2dx2%values(ind) = -1.
-                    d2dx2%cols(ind) = colInd
-                    d2dx2%rows_start(rowInd) = ind
-                    ind = ind + 1
+                    !The left boundary
+                    const = 2 *  problem%A0_map(2,j,k) / (problem%A0_map(2,j,k) + problem%A0_map(1,j,k))
 
-                    ! Coupling to the right
-                    d2dx2%values(ind) = 1.
+                    d2dx2%values(ind) = -const
+                    d2dx2%cols(ind) = colInd
+                    d2dx2%rows_start(rowInd) = ind            
+                    ind = ind + 1
+                
+                    d2dx2%values(ind) = const
                     d2dx2%cols(ind) = colInd + 1
                     d2dx2%rows_end(rowInd) = ind+1
                     rowInd = rowInd + 1
                     ind = ind + 1
                 end if
-            
-                !The left boundary
-                const = 2 *  problem%A0_map(2,j,k) / (problem%A0_map(2,j,k) + problem%A0_map(1,j,k))
-
-                d2dx2%values(ind) = -const
-                d2dx2%cols(ind) = colInd
-                d2dx2%rows_start(rowInd) = ind            
-                ind = ind + 1
-            
-                d2dx2%values(ind) = const
-                d2dx2%cols(ind) = colInd + 1
-                d2dx2%rows_end(rowInd) = ind+1
-                rowInd = rowInd + 1
-                ind = ind + 1
-            
+                        
             
                 !Go through one row at a time
                 do i=2,nx-1
@@ -2146,8 +2133,6 @@ end subroutine updateDemagfieldFMM
                     d2dy2%cols(ind) = colInd
                     ind = ind + 1  ! Increment to next element
             
-                    !increment to next element
-                    ind = ind + 1
             
                     !upper value
                     d2dy2%values(ind) = 2 * problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k))
@@ -2333,51 +2318,29 @@ end subroutine updateDemagfieldFMM
         else
             do j=1,ny
                 do i=1,nx
-                    ! Downwards coupling
-                    d2dz2%values(ind) = 1.
-                    d2dz2%cols(ind) = colInd - nx*ny
-                    d2dz2%rows_start(rowInd) = ind
-                    ind = ind + 1   ! Increment to next element
+                    const = 2 * problem%A0_map(i,j,nz-1) / (problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz))
 
-                    ! Current tile
-                    d2dz2%values(ind) = -1.
+                    !left-most value
+                    d2dz2%values(ind) = const
+                    d2dz2%cols(ind) = colInd - nx * ny
+                    d2dz2%rows_start(rowInd) = ind
+                
+                    !increment position
+                    ind = ind + 1
+                
+                    !central value
+                    d2dz2%values(ind) = -const
                     d2dz2%cols(ind) = colInd
                     d2dz2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
-                    ind = ind + 1   ! Increment to next element
+                
+                    !increment position
+                    ind = ind + 1
                     colInd = colInd + 1
                 end do
             end do
         endif
-    
-    
-        !The z=nz face        
-        do j=1,ny
-            do i=1,nx
-                const = 2 * problem%A0_map(i,j,nz-1) / (problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz))
-
-                !left-most value
-                d2dz2%values(ind) = const
-                d2dz2%cols(ind) = colInd - nx * ny
-                d2dz2%rows_start(rowInd) = ind
-            
-                !increment position
-                ind = ind + 1
-            
-                !central value
-                d2dz2%values(ind) = -const
-                d2dz2%cols(ind) = colInd
-                d2dz2%rows_end(rowInd) = ind + 1
-                rowInd = rowInd + 1
-            
-                !increment position
-                ind = ind + 1
-                colInd = colInd + 1
-            
-            enddo
-        enddo
-    
-    
+        
         !Multiply by the discretization
         d2dz2%values = d2dz2%values * 1./grid%dz**2
         
