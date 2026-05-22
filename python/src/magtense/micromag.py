@@ -643,18 +643,21 @@ class MicromagProblem:
             self._sampleShape[:] = val
 
     @property
-    def exchPBC(self) -> list | np.ndarray | None:
+    def exchPBC(self) -> np.ndarray:
         return self._exchPBC
 
     @exchPBC.setter
-    def exchPBC(self, val: list | np.ndarray | None) -> None:
-        self._exchPBC = np.zeros(shape=3, dtype=bool, order="F")
+    def exchPBC(self, val: list | tuple | np.ndarray | None) -> None:
+        self._exchPBC = np.zeros(shape=3, dtype=np.int32)
 
         if val is None:
             pass
 
-        elif isinstance(val, (list, np.ndarray)):
-            self._exchPBC[:] = val
+        elif isinstance(val, (list, tuple, np.ndarray)):
+            val_arr = np.asarray(val, dtype=np.int32)
+            assert val_arr.shape == (3,), "exchPBC must be an array of length 3"
+            assert np.all((val_arr == 0) | (val_arr == 1)), "exchPBC elements must be 0 or 1"
+            self._exchPBC[:] = val_arr
 
     @property
     def usereturnhall(self) -> int | None:

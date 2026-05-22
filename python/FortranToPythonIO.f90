@@ -724,7 +724,7 @@ end subroutine getHOnSourcesFMM
 
         integer(4),dimension(3),intent(in) :: n_macro
         real(8),dimension(3),intent(in) :: shiftVec, macroShape, sampleShape
-        logical,dimension(3),intent(in) :: exchPBC
+        integer(4),dimension(3),intent(in) :: exchPBC
 
         real(8),dimension(nt),intent(in) :: t
         real(8),dimension(nt),intent(out) :: t_out
@@ -754,6 +754,7 @@ end subroutine getHOnSourcesFMM
         integer, intent(in) :: trace_verbose
         
         logical :: window_enabled_l, trace_enabled_l, flush_each_l
+        logical,dimension(3) :: exchPBC_l
 
         !-----------------------------------------------------------------------------------
 
@@ -781,13 +782,16 @@ end subroutine getHOnSourcesFMM
 
 
 
+
+        exchPBC_l = merge(.true., .false., exchPBC /= 0)
+
         call loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
             gamma, alpha_mm, temperature, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
             exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
-			CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
-            n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
+            CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
+            n_macro, shiftVec, macroShape, sampleShape, exchPBC_l, &
             passExch, exch_ncols, CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, useDemag)
             
 
