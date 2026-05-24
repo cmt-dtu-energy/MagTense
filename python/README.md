@@ -233,7 +233,7 @@ python -m pip install -e ./python
 The `python/.build/` contains requirement-files, which are shipped with the respective pip-wheel.
 
 ```bash
-python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm importlib_resources
+python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm importlib_resources ipympl
 python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cusparse-cu12 nvidia-nvjitlink-cu12 # only required for cuda support
 ```
 
