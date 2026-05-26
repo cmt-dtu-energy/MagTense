@@ -1,6 +1,5 @@
 ! #if USE_MATLAB
 ! include 'mkl_blas.f90'
-! include 'mkl_blas.f90'
 ! #endif
 
 !include 'mkl_vml.f90'
@@ -1087,7 +1086,7 @@ end subroutine updateDemagfieldFMM
     if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
         if ( problem%useCuda .eq. useCudaFalse ) then
             !Do the matrix multiplications using sparse matrices
-            alpha = -1.0
+            alpha = 1.0
             beta = 0.
             stat = mkl_sparse_s_mv ( SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_s(1)%A, descr, solution%Mx_s, beta, temp )
             beta = 1.0
@@ -1119,7 +1118,7 @@ end subroutine updateDemagfieldFMM
 #if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
             !call displayGUIMessage( ' runing cuda demag sparse matrix multiplication' )
-            pref = sngl(-1 )!* problem%Mfact)                                
+            pref = sngl(1 )!* problem%Mfact)                                
             call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
             temp = solution%HmX * problem%Mfact
             solution%HmX = temp
@@ -1261,34 +1260,25 @@ end subroutine updateDemagfieldFMM
             
             !HmZ = HmZ + Kzz * Mz
             call gemv( problem%Kzz, solution%Mz_s, solution%HmZ, alpha, beta )
-
-            !Apply shape correction
-            solution%HmX = solution%HmX + problem%Kxx_shape * Mavg(1) &
-                    + problem%Kxy_shape * Mavg(2) + problem%Kxz_shape * Mavg(3)
-            solution%HmY = solution%HmY + problem%Kxy_shape * Mavg(1) &
-                    + problem%Kyy_shape * Mavg(2) + problem%Kyz_shape * Mavg(3)
-            solution%HmZ = solution%HmX + problem%Kxz_shape * Mavg(1) &
-                    + problem%Kyz_shape * Mavg(2) + problem%Kzz_shape * Mavg(3)
-
-            temp = solution%HmX * problem%Mfact
-            solution%HmX = temp
-            temp = solution%HmY * problem%Mfact
-            solution%HmY = temp
-            temp = solution%HmZ * problem%Mfact
-            solution%HmZ = temp
             
         else
-            pref = sngl(-1)! * problem%Mfact)
+            pref = sngl(1)! * problem%Mfact)
 #if USE_CUDA
             call cudaMatrVecMult( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
-            temp = solution%HmX * problem%Mfact
-            solution%HmX = temp
-            temp = solution%HmY * problem%Mfact
-            solution%HmY = temp
-            temp = solution%HmZ * problem%Mfact
-            solution%HmZ = temp
 #endif
         endif 
+        
+        !Apply shape correction
+        !solution%HmX = solution%HmX + problem%Kxx_shape * Mavg(1) + problem%Kxy_shape * Mavg(2) + problem%Kxz_shape * Mavg(3)
+        !solution%HmY = solution%HmY + problem%Kxy_shape * Mavg(1) + problem%Kyy_shape * Mavg(2) + problem%Kyz_shape * Mavg(3)
+        !solution%HmZ = solution%HmX + problem%Kxz_shape * Mavg(1) + problem%Kyz_shape * Mavg(2) + problem%Kzz_shape * Mavg(3)
+
+        temp = solution%HmX * problem%Mfact
+        solution%HmX = temp
+        temp = solution%HmY * problem%Mfact
+        solution%HmY = temp
+        temp = solution%HmZ * problem%Mfact
+        solution%HmZ = temp
     endif
         
        
@@ -2541,7 +2531,7 @@ subroutine add_near_field(problem, solution)
     hy_tmp = 0.0_SP
     hz_tmp = 0.0_SP
 
-    pref = sngl(-1)
+    pref = sngl(1)
     call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
 
     solution%HmX = solution%HmX - hx_tmp  * problem%Mfact
