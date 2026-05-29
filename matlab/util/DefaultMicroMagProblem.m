@@ -35,8 +35,7 @@ properties
     exch_ncol
     exch_val
     exch_rows
-    exch_rowe
-    exch_col
+    exch_cols
 
     exch_weigh
     exch_meth
@@ -122,6 +121,9 @@ properties
     % are returned from Fortran
     ReturnHall
     
+    %A parameter that determines if the average of the prism is used or not
+    useAvgN
+
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
     
@@ -186,6 +188,16 @@ properties
 
     %The number of threads used by OpenMP for building the demag tensor
     nThreads = int32(1);
+
+    %FMM parameters
+    fmm_cells
+    fmm_eps
+    ifunif
+    nlmin
+    nlmax
+    use_fmm
+    fmm_short
+    fmm_min_n
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -231,6 +243,9 @@ properties (SetAccess=private,GetAccess=public)
     %1 for do use (int32). Currently implemented alternative is RK_SUITE,
     %active if CVODE is not used.
     useCVODE
+
+    %defines if the demagnetization field is calculated or not
+    useDemag
 
     %defines what precision is used for the demag tensor. Right now only
     %single is supported. All other varibales are double.
@@ -304,8 +319,7 @@ methods
         obj.exch_ncol = 0;
         obj.exch_val = 0;
         obj.exch_rows = 0;
-        obj.exch_rowe = 0;
-        obj.exch_col = 0;
+        obj.exch_cols = 0;
 
         % Exchange term constant
         obj.A0 = 1.3e-11;
@@ -317,10 +331,10 @@ methods
         obj.K2 = zeros(obj.ntot,1);
 
         %precession constant
-        obj.gamma = 0; %m/A*s
+        obj.gamma = 2.21e5; %m/A*s
 
         %
-        obj.alpha = 0.02;
+        obj.alpha = 4.42e3;
 
         %if set to zero then the alpha parameter remains constant.
         %if MaxT0 > 0 then alpha = alpha0 * 10^( 7 * min(t,MaxT0)/MaxT0 )
@@ -361,10 +375,14 @@ methods
         obj.CV = 0;
         %initial value of the ReturnHall is zero, i.e. the specific fields are not returned
         obj.ReturnHall = int32(0);
+        %initial value of the useAvgN is true
+        obj.useAvgN = int32(1);
         %set use cuda to default not
         obj.useCuda = int32(0);
 		%set use CVODE to default
         obj.useCVODE = int32(0);
+		%set use Demag to default
+        obj.useDemag = int32(1);
         %set use CVODE to default
         obj.usePres = int32(0);
         %set the demag approximation to the default, i.e. use no
@@ -401,6 +419,15 @@ methods
         obj.MeshType = '' ;
         obj.ExternalMeshFileName = '' ;
         obj.DemagTensorFileName = 0 ;
+
+        obj.fmm_cells = int32(100);
+        obj.fmm_eps = 1e-4;
+        obj.ifunif = int32(1);
+        obj.nlmin = int32(1);
+        obj.nlmax = int32(5);
+        obj.use_fmm = int32(0);
+        obj.fmm_short = int32(1);
+        obj.fmm_min_n = int32(20000);
     end
     
     %%Calculates the applied field as a function of time on the time grid
@@ -467,6 +494,14 @@ methods
            obj.useCVODE = int32(0);
        end
     end
+
+    function obj = setUseDemag( obj, enabled )
+       if enabled
+           obj.useDemag = int32(1);
+       else
+           obj.useDemag = int32(0);
+       end
+    end
     
     function obj = setLoadNFilename( obj, filename )
         obj.N_load = int32(length(filename));
@@ -507,20 +542,6 @@ methods
         end
     end
 
-    function obj = setExchangeMatrixSparse( obj, ExchangeMatrix )
-    % Convert the Exchange matrix to CSR and store it in the problem statement
-        [v,c,rs,re]   = DefaultMicroMagProblem.convertToCSR(ExchangeMatrix);
-        obj.exch_nval = int32(numel(v));
-        obj.exch_nrow = int32(numel(rs));
-        obj.exch_val  = double(v);
-        obj.exch_rows = int32(rs);
-        obj.exch_rowe = int32(re);
-        obj.exch_col  = int32(c);
-        obj.exch_ncol = int32(0);
-
-        disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(2^30)) ' Gb'])
-    end
-
     function obj = setExchangeMatrixCOO( obj, nrows, ncols, rows, cols, values )
     % Pass the Exchange matrix to Fortran in COO format
         obj = obj.setMicroMagpassExch( true );
@@ -529,7 +550,7 @@ methods
         obj.exch_nval = int32(numel(rows));
         obj.exch_val  = double(values);
         obj.exch_rows = int32(rows);
-        obj.exch_col  = int32(cols);
+        obj.exch_cols  = int32(cols);
     end
 
     function obj = setMicroMagDemagApproximation( obj, type_var )
@@ -657,6 +678,9 @@ methods
                 warning('Initial array not normalized -- Normalizing')
                 obj.m0=obj.m0./mnorm;
             end
+        end
+        if (obj.useDemag)
+           disp(['The demag tensor will require around ' num2str(((3*numel(obj.m0)*(3*numel(obj.m0) + 1)/2))*4/(2^30)) ' Gb'])
         end
         warning('off','MATLAB:structOnObject')
         obj2=builtin('struct',obj); % Actual struct conversion

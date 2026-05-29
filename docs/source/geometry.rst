@@ -28,6 +28,7 @@ Tile Types
 * 5 = tetrahedron
 * 6 = sphere
 * 7 = spheroid
+* 8 = avgPrism
 
 
 ----------------------------------------

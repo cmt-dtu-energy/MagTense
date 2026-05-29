@@ -77,13 +77,13 @@ PYTHON_MODN = magtensesource
 PYTHON_LIBPATH = python/src/magtense/lib
 
 AUXMT_PATH = source/AuxMT
-NUM_INT_PATH = source/NumericalIntegration/NumericalIntegration
-TILE_DEMAG_TENSOR_PATH = source/TileDemagTensor/TileDemagTensor
-DEMAG_FIELD_PATH = source/DemagField/DemagField
+NUM_INT_PATH = source/NumericalIntegration
+TILE_DEMAG_TENSOR_PATH = source/TileDemagTensor
+DEMAG_FIELD_PATH = source/DemagField
 MICROMAG_PATH = source/MagTenseMicroMag
 FORTRAN_CUDA_PATH = source/MagTenseFortranCuda/cuda
-STANDALONE_PATH = source/MagTense_StandAlone/MagTense_StandAlone
-FORCEINTEGRATOR_PATH = source/MagneticForceIntegrator/MagneticForceIntegrator
+STANDALONE_PATH = source/MagTense_StandAlone
+FORCEINTEGRATOR_PATH = source/MagneticForceIntegrator
 
 VPATH = ${AUXMT_PATH}:${NUM_INT_PATH}:${TILE_DEMAG_TENSOR_PATH}:${DEMAG_FIELD_PATH}:\
 ${MICROMAG_PATH}:${FORTRAN_CUDA_PATH}:${STANDALONE_PATH}:${FORCEINTEGRATOR_PATH}
@@ -111,7 +111,7 @@ ifeq ($(OS),Windows_NT)
 		OPT = ${CONDA_PATH}/Library/include \
 			-I${CONDA_PATH}/Library/include/intel64/lp64 \
 			-I${CONDA_PATH}/opt/compiler/include/intel64
-		LIB_OPT = -llibDemagField
+		LIB_OPT = -llibDemagField -llibTileDemagTensor -llibNumericalIntegration
 	endif
 else
  	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl

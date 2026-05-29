@@ -40,10 +40,11 @@ arguments
     x_steps (1,1) {mustBeNumeric}                      = 80;           %--- The spatial resolution
     field_steps (1,1) {mustBeNumeric}                  = 201;          %--- The field resolution
     cart_dir (1,1) string                              = 'x';          %--- The directions along which the geometry is oriented. Has no influence on the results, but can test the physics is correct in different directions
-    options.use_CUDA {mustBeNumericOrLogical}          = true;         %--- Use CUDA for the calculations
     options.use_uniform_mesh {mustBeNumericOrLogical}  = true;         %--- Use a uniform or unstructured mesh
-    options.use_CVODE {mustBeNumericOrLogical}         = true;         %--- Use CVODE for the numerical time evolution
-    options.ShowTheResult {mustBeNumericOrLogical}     = true          %--- Show the result
+    options.use_CVODE {mustBeNumericOrLogical}         = false         %--- Use CVODE for the numerical time evolution
+    options.ShowTheResult {mustBeNumericOrLogical}     = true;         %--- Show the result
+    options.TwoDsim {mustBeNumericOrLogical}           = false;        %--- Run a 2D simulation in x,y
+    options.TwoDsize {mustBeNumeric}                   = 5;            %--- Size of second dimension in 2D
 end
 
 mu0 = 4*pi*1e-7;
@@ -84,7 +85,11 @@ switch cart_dir
 end
 
 if (options.use_uniform_mesh)
-    resolution(dim) = x_steps;
+    if (options.TwoDsim)
+        resolution = [x_steps options.TwoDsize 1];
+    else
+        resolution(dim) = x_steps;
+    end
 else
     x_start = 1/2*80e-9/x_steps;
     x_end   = 80e-9-1/2*80e-9/x_steps;
@@ -103,7 +108,6 @@ thisGridL(dim)  = 80e-9;
 
 %% Problem structure creation
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
-problem = problem.setUseCuda( options.use_CUDA );
 problem = problem.setMicroMagDemagApproximation('threshold_fraction');  % Turn off demag field
 problem.dem_thres = 2;                                                  % Turn off demag field
 if ~(options.use_uniform_mesh)
@@ -129,14 +133,30 @@ problem.A0 = A0*ones(prod(resolution),1);
 
 % Set lower properties for left region
 n_middle = x_steps/2;
-if contains(settings,'a')
-    problem.A0(1:n_middle) = A0_soft;
-end
-if contains(settings,'k')
-    problem.K0(1:n_middle) = K0_soft;
-end
-if contains(settings,'j') 
-    problem.Ms(1:n_middle) = Ms_soft;
+if (options.TwoDsim)
+    for i = 1:options.TwoDsize
+        if contains(settings,'a')
+            problem.A0(x_steps*(i-1)+[1:n_middle]) = A0_soft;
+        end
+        if contains(settings,'k')
+            problem.K0(x_steps*(i-1)+[1:n_middle]) = K0_soft;
+        end
+        if contains(settings,'j') 
+            problem.Ms(x_steps*(i-1)+[1:n_middle]) = Ms_soft;
+        end
+    end
+else
+    for i = 1:options.TwoDsize
+        if contains(settings,'a')
+            problem.A0(1:n_middle) = A0_soft;
+        end
+        if contains(settings,'k')
+            problem.K0(1:n_middle) = K0_soft;
+        end
+        if contains(settings,'j') 
+            problem.Ms(1:n_middle) = Ms_soft;
+        end
+    end
 end
 
 %% Grain anisotropies
@@ -154,7 +174,12 @@ switch cart_dir
         easyY = 0 ;
         easyZ = 1 ;
 end
-problem.u_ea = repmat([easyX,easyY,easyZ],x_steps,1);
+
+if (options.TwoDsim)
+    problem.u_ea = repmat([easyX,easyY,easyZ],x_steps*options.TwoDsize,1);
+else
+    problem.u_ea = repmat([easyX,easyY,easyZ],x_steps,1);
+end
 
 %% Applied Field
 HystDir = normalize([easyX,easyY,easyZ],'norm') ;
@@ -177,10 +202,15 @@ problem.m0(:,1) = init_stat(1)/norm(init_stat) ;
 problem.m0(:,2) = init_stat(2)/norm(init_stat) ;
 problem.m0(:,3) = init_stat(3)/norm(init_stat) ;
 
-problem.m0(1:n_middle,dim) = -problem.m0(1:n_middle,dim);
+if (options.TwoDsim)
+    problem.m0(x_steps*(i-1)+[1:n_middle],dim) = -problem.m0(x_steps*(i-1)+[1:n_middle],dim);
+else
+    problem.m0(1:n_middle,dim) = -problem.m0(1:n_middle,dim);
+end
 
 % Time/field grid on which to solve the problems
 problem = problem.setUseCVODE( options.use_CVODE );
+problem = problem.setUseDemag( false );
 problem = problem.setTime( linspace(0,100e-9,field_steps) );
 
 

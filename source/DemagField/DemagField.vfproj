@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VisualStudioProject ProjectType="typeStaticLibrary" ProjectCreator="Intel Fortran" Keyword="Static Library" Version="11.0" ProjectIdGuid="{982041ED-A185-4F5C-9926-AD8E0941B6D0}">
+	<Platforms>
+		<Platform Name="x64"/>
+	</Platforms>
+	<Configurations>
+		<Configuration Name="Debug|x64" UseCompiler="ifxCompiler" ConfigurationType="typeStaticLibrary">
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="../AuxMT/x64/Debug/;../TileDemagTensor/x64/Debug/;../NumericalIntegration/x64/Debug/;C:\Program Files\MATLAB\R2025b\extern\include\" OpenMP="OpenMPParallelCode" RealKIND="realKIND8" FloatingPointExceptionHandling="fpe0" FloatingPointModel="strict" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+			<Tool Name="VFLibrarianTool"/>
+			<Tool Name="VFResourceCompilerTool"/>
+			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+			<Tool Name="VFCustomBuildTool"/>
+			<Tool Name="VFPreLinkEventTool"/>
+			<Tool Name="VFPreBuildEventTool"/>
+			<Tool Name="VFPostBuildEventTool"/>
+		</Configuration>
+		<Configuration Name="Release|x64" UseCompiler="ifxCompiler" ConfigurationType="typeStaticLibrary">
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" Preprocess="preprocessYes" AdditionalIncludeDirectories="../AuxMT/x64/Release/;../TileDemagTensor/x64/Release/;../NumericalIntegration/x64/Release/;C:\Program Files\MATLAB\R2025b\extern\include\" OpenMP="OpenMPParallelCode" RealKIND="realKIND8"/>
+			<Tool Name="VFLibrarianTool"/>
+			<Tool Name="VFResourceCompilerTool"/>
+			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+			<Tool Name="VFCustomBuildTool"/>
+			<Tool Name="VFPreLinkEventTool"/>
+			<Tool Name="VFPreBuildEventTool"/>
+			<Tool Name="VFPostBuildEventTool"/>
+		</Configuration>
+		<Configuration Name="Debug_no_CVODE|x64" UseCompiler="ifxCompiler" ConfigurationType="typeStaticLibrary">
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="../AuxMT/x64/Debug/;../TileDemagTensor/x64/Debug_no_CVODE/;../NumericalIntegration/x64/Debug_no_CVODE/;C:\Program Files\MATLAB\R2025b\extern\include\;" OpenMP="OpenMPParallelCode" WarnInterfaces="true" RealKIND="realKIND8" FloatingPointExceptionHandling="fpe0" FloatingPointModel="strict" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+			<Tool Name="VFLinkerTool" SuppressStartupBanner="true"/>
+			<Tool Name="VFLibrarianTool"/>
+			<Tool Name="VFResourceCompilerTool"/>
+			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+			<Tool Name="VFCustomBuildTool"/>
+			<Tool Name="VFPreLinkEventTool"/>
+			<Tool Name="VFPreBuildEventTool"/>
+			<Tool Name="VFPostBuildEventTool"/>
+			<Tool Name="VFManifestTool" SuppressStartupBanner="true"/>
+		</Configuration>
+		<Configuration Name="Release_no_CVODE|x64" UseCompiler="ifxCompiler" ConfigurationType="typeStaticLibrary">
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="../AuxMT/x64/Release/;../TileDemagTensor/x64/Release_no_CVODE/;../NumericalIntegration/x64/Release_no_CVODE/;C:\Program Files\MATLAB\R2025b\extern\include\" OpenMP="OpenMPParallelCode" RealKIND="realKIND8"/>
+			<Tool Name="VFLibrarianTool"/>
+			<Tool Name="VFResourceCompilerTool"/>
+			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+			<Tool Name="VFCustomBuildTool"/>
+			<Tool Name="VFPreLinkEventTool"/>
+			<Tool Name="VFPreBuildEventTool"/>
+			<Tool Name="VFPostBuildEventTool"/>
+		</Configuration>
+		<Configuration Name="Release_Standalone_exe|x64" UseCompiler="ifortCompiler" ConfigurationType="typeStaticLibrary">
+			<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Optimization="optimizeFull" HeapArrays="0" Preprocess="preprocessYes" AdditionalIncludeDirectories="../TileDemagTensor/x64/release_Standalone_exe/;../NumericalIntegration/x64/Release_Standalone_exe/;C:\Program Files\MATLAB\R2022a\extern\include\" OpenMP="OpenMPParallelCode" RealKIND="realKIND8"/>
+			<Tool Name="VFLibrarianTool"/>
+			<Tool Name="VFResourceCompilerTool"/>
+			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
+			<Tool Name="VFCustomBuildTool"/>
+			<Tool Name="VFPreLinkEventTool"/>
+			<Tool Name="VFPreBuildEventTool"/>
+			<Tool Name="VFPostBuildEventTool"/>
+		</Configuration>
+	</Configurations>
+	<Files>
+		<Filter Name="Header Files" Filter="fi;fd"/>
+		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
+		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
+			<File RelativePath=".\DemagFieldGetSolution.f90">
+				<FileConfiguration Name="Release_no_CVODE|x64">
+					<Tool Name="VFFortranCompilerTool" AdditionalIncludeDirectories="../NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/;../x64/release/" OpenMP="OpenMPParallelCode"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Release_Standalone_exe|x64">
+					<Tool Name="VFFortranCompilerTool" AdditionalIncludeDirectories="../NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/;../TileDemagTensor/x64/release/" OpenMP="OpenMPParallelCode"/>
+				</FileConfiguration>
+			</File>
+			<File RelativePath=".\IterateMagnetSolution.f90">
+			</File>
+			<File RelativePath=".\MagParameters.f90">
+			</File>
+			<File RelativePath=".\MagTileIO.f90">
+			</File>
+			<File RelativePath=".\spline.f90">
+			</File>
+		</Filter>
+	</Files>
+	<Globals/>
+</VisualStudioProject>

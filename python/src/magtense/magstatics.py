@@ -69,7 +69,7 @@ class Tiles:
         mu_r_oa: Relative permeability in other axis.
         M_rem: Remanent magnetization.
         tile_type: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
-                   5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
+                   5 = tetrahedron, 6 = sphere, 7 = spheroid, 8 = avg prism, 10 = ellipsoid
         offset: Offset of global coordinates.
         rot: Rotation in local coordinate system.
         color: Color in visualization.
@@ -854,6 +854,7 @@ def grid_config(
 def run_simulation(
     tiles: Tiles,
     pts: np.ndarray,
+    obs_size: np.ndarray = None,
     max_error: float = 1e-5,
     max_it: int = 500,
     T: float = 300.0,
@@ -907,10 +908,12 @@ def run_simulation(
         nitemax=max_it,
         iteratesolution=True,
         returnsolution=True,
+        obs_size=obs_size
     )
-
+   
     tiles.M = M_out
     tiles.M_rel = Mrel_out
+    #print("obs_size:", obs_size, type(obs_size))
 
     return tiles, H_out
 
@@ -974,13 +977,14 @@ def iterate_magnetization(
     return tiles
 
 
-def get_demag_tensor(tiles: Tiles, pts: np.ndarray) -> np.ndarray:
+def get_demag_tensor(tiles: Tiles, pts: np.ndarray,obs_size: np.ndarray = None) -> np.ndarray:
     """
     Get demagnetization tensor of tiles and the specified evaluation points.
 
     Args:
         tiles: Magnetic tiles to produce magnetic field.
         pts: Evaluation points.
+        obs_size : optional, used for averaging
 
     Returns:
         Demagnetization tensor.
@@ -1008,6 +1012,7 @@ def get_demag_tensor(tiles: Tiles, pts: np.ndarray) -> np.ndarray:
         symmetryops=tiles.sym_op,
         mrel=tiles.M_rel,
         pts=pts,
+        obs_size=obs_size
     )
 
     return demag_tensor
