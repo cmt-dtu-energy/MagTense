@@ -1,4 +1,4 @@
-name: Python pip-wheel with conda build and test on Windows and Linux
+name: Python pip-wheel with conda build and test on Windows and Linux - new interface
 
 on:
   pull_request:
