@@ -130,8 +130,9 @@ jobs:
         mt-punit: [cpu, cu12]
         py-version:
           - { name: 314, id: "3.14" }
-        os: [ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+        sys:
+          - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
+    runs-on: ${{ matrix.sys.os }}
     needs: build-wheel
     defaults:
       run:
@@ -157,7 +158,7 @@ jobs:
 
     - name: Install pip-wheel and pytest
       run: |
-        python3 -m pip install '${{ github.workspace }}'/*.whl
+        python3 -m pip install ${{ github.workspace }}/python/dist/magtense-*-1-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
         python3 -m pip install pytest
         pytest
 
