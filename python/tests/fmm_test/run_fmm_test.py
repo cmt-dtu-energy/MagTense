@@ -20,6 +20,8 @@ def fmm_test_main(
     gen = AdaptiveGrainGenerator(n_grains=25, offset_d=4e-9, rng=rng)
     gen.generate(res_base=6, num_refinements=2)
 
+    cuda = True
+
     exma_file =  "seed_" + str(rng_seed) + "_exMa.npz"
     demag_file = "seed_" + str(rng_seed) + "_demag.bin"
 
@@ -52,7 +54,8 @@ def fmm_test_main(
             input_file_name=demag_file,
             rng=np.random.default_rng(rng_seed),
             H_ext_dir=H_ext_dir,
-            dummy_run=1
+            dummy_run=1,
+            cuda = cuda
             )
 
         res = problem.run_simulation(
@@ -121,7 +124,8 @@ def fmm_test_main(
         allow_fmm_short_circuit=1,
         timer_log_file=f"cuda_{rng_seed}_timer.log",
         trace_log_file=f"cuda_{rng_seed}_trace.log",
-        rng = np.random.default_rng(rng_seed)
+        rng = np.random.default_rng(rng_seed),
+        cuda = cuda
     )
     res_cuda = problem_cuda.run_simulation(
         t_end=t_end, nt=problem_cuda.nt, 
@@ -141,7 +145,8 @@ def fmm_test_main(
             fmm_nterms=nt_fmm,
             timer_log_file=f"{config_label}_{rng_seed}_timer.log",
             trace_log_file=f"{config_label}_{rng_seed}_trace.log",
-            rng = np.random.default_rng(rng_seed)
+            rng = np.random.default_rng(rng_seed),
+            cuda = cuda
         )
         
         res = prob.run_simulation(
