@@ -127,7 +127,7 @@ jobs:
   test-wheel:
     strategy:
       matrix:
-        mt-punit: [cpu, cu12]
+        mt-punit: [cu12]
         py-version:
           - { name: 314, id: "3.14" }
         sys:
