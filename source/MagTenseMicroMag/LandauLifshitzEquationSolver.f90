@@ -788,9 +788,9 @@
         Hkz_rot = -2*Mz_rot(:)*(problem%Kfact_arr(:,1,3) + 2*problem%Kfact_arr(:,2,3)*Mz_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*My_rot(:)**2 + 3*problem%Kfact_arr(:,4,3)*Mz_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + 2*problem%Kfact_arr(:,5,3)*Mx_rot(:)**2*Mz_rot(:)**2 + 2*problem%Kfact_arr(:,5,3)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*My_rot(:)**2 )
         call trace%end( "updateAnisotropy_calc", itimer=itimer2, verbose=2 )
 
-        solution%Hkx(:) = problem%CrystalAxis(:,1,1)*Hkx_rot(:) + problem%CrystalAxis(:,2,1)*Hky_rot(:) + problem%CrystalAxis(:,3,1)*Hkz_rot(:)
-        solution%Hky(:) = problem%CrystalAxis(:,1,2)*Hkx_rot(:) + problem%CrystalAxis(:,2,2)*Hky_rot(:) + problem%CrystalAxis(:,3,2)*Hkz_rot(:)
-        solution%Hkz(:) = problem%CrystalAxis(:,1,3)*Hkx_rot(:) + problem%CrystalAxis(:,2,3)*Hky_rot(:) + problem%CrystalAxis(:,3,3)*Hkz_rot(:)
+        solution%Hkx(:) = - problem%CrystalAxis(:,1,1)*Hkx_rot(:) - problem%CrystalAxis(:,2,1)*Hky_rot(:) - problem%CrystalAxis(:,3,1)*Hkz_rot(:)
+        solution%Hky(:) = - problem%CrystalAxis(:,1,2)*Hkx_rot(:) - problem%CrystalAxis(:,2,2)*Hky_rot(:) - problem%CrystalAxis(:,3,2)*Hkz_rot(:)
+        solution%Hkz(:) = - problem%CrystalAxis(:,1,3)*Hkx_rot(:) - problem%CrystalAxis(:,2,3)*Hky_rot(:) - problem%CrystalAxis(:,3,3)*Hkz_rot(:)
         
         deallocate(Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot)
     end if 
@@ -996,8 +996,8 @@ solution%HmZ = 0.0_SP
     !------------------------------------------------------------ 
   end do
     !--------------------------------------------------------------
-  !------------------ Call FMM (sources->sources) ------------------
-  nd = 1
+   !------------------ Call FMM (sources->sources) ------------------
+   nd = 1
    fmm_tree%nterms_in = problem%fmm_nterms
    call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif, problem%nlmin, problem%nlmax)
    !------- only run if number of boxes > 9 -----------
@@ -1016,9 +1016,9 @@ solution%HmZ = 0.0_SP
   ! include factor 4pi to match Magtense units
    if (fmm_tree%nboxes > 9) then 
       !$omp critical (solution_update)
-        solution%HmX = solution%HmX +  real( grad(1,1,:) / fourpi, SP )
-        solution%HmY = solution%HmY +  real( grad(1,2,:) / fourpi, SP )
-        solution%HmZ = solution%HmZ +  real( grad(1,3,:) / fourpi, SP ) 
+        solution%HmX = solution%HmX - real( grad(1,1,:) / fourpi, SP )
+        solution%HmY = solution%HmY - real( grad(1,2,:) / fourpi, SP )
+        solution%HmZ = solution%HmZ - real( grad(1,3,:) / fourpi, SP ) 
       !$omp end critical (solution_update)
   end if
   !-----------------------------------------------------------------
@@ -1127,7 +1127,7 @@ end subroutine updateDemagfieldFMM
 #if USE_CUDA
             !Do the sparse matrix multiplication using CUDA
             !call displayGUIMessage( ' runing cuda demag sparse matrix multiplication' )
-            pref = sngl(-1 )                              
+            pref = sngl(1 )                              
             call cudaMatrVecMult_sparse( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
 #endif
         endif
@@ -1223,7 +1223,7 @@ end subroutine updateDemagfieldFMM
             !Needs to be checked for proper matrix calculation (Kxx is an n x n matrix while Mx should be n x 1 column vector and the result an n x 1 column vector)
             !Note that the demag tensor is symmetric such that Kxy = Kyx and we only store what is needed.
             !======== Hmx ===========
-            alpha = -1.
+            alpha = 1.
             beta = 0.0
             call gemv( problem%Kxx, solution%Mx_s, solution%HmX, alpha, beta )        
             beta = 1.0
@@ -1242,7 +1242,7 @@ end subroutine updateDemagfieldFMM
             call gemv( problem%Kyz, solution%My_s, solution%HmZ, alpha, beta )
             call gemv( problem%Kzz, solution%Mz_s, solution%HmZ, alpha, beta )
         else
-            pref = sngl(-1)
+            pref = sngl(1)
 #if USE_CUDA
             call cudaMatrVecMult( solution%Mx_s, solution%My_s, solution%Mz_s, solution%HmX, solution%HmY, solution%HmZ, pref )
 #endif
@@ -1256,10 +1256,6 @@ end subroutine updateDemagfieldFMM
         solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
     endif
     
-
-
-
-
     call trace%end( "updateDemagfield", itimer=itimer, verbose=1 )
 
     end subroutine updateDemagfield
@@ -2479,7 +2475,7 @@ subroutine add_near_field(problem, solution)
     hy_tmp = 0.0_SP
     hz_tmp = 0.0_SP
 
-    pref = sngl(1)
+    pref = sngl(1.0)
     call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
 
     !$omp critical (solution_update)
