@@ -80,12 +80,14 @@ def fmm_test_setup(
                 cvode=cvode,
                 exch_val=exch_val,
                 exch_rows=exch_rows,
-                exch_col=exch_col,
+                exch_cols=exch_col,
                 exch_nval=exch_nval,
                 exch_nrow=exch_nrow,
                 exch_ncols=exch_ncols,
                 passexch=passexch,
                 filename=input_file_name,
+                useavgn=False,
+                usereturnhall=True,
         )
 
         # --- Assign Material Properties and Easy Axes per Grain ---
@@ -153,11 +155,12 @@ def fmm_test_setup(
         problem.timer_log_file = timer_log_file
         problem.trace_log_file = trace_log_file
         problem.window_enabled = 1
-        problem.window_interval = 15.0
+        problem.window_interval = 5.0
         problem.trace_enabled = 0
         problem.flush_each = 1
-        problem.trace_verbose = 1
+        problem.trace_verbose = 2
 
-        problem.usereturnhall = True
+        
+        #problem.usereturnhall = True
 
         return problem
