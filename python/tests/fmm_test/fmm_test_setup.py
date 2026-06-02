@@ -86,7 +86,7 @@ def fmm_test_setup(
                 exch_ncols=exch_ncols,
                 passexch=passexch,
                 filename=input_file_name,
-                useavgn=False,
+                useavgn=True,
                 usereturnhall=True,
         )
 
