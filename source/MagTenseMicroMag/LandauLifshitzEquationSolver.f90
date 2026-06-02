@@ -770,9 +770,9 @@
     !                      [Kfact2 0 0]
     
     if (any(problem%K0 .ne. 0)) then
-        solution%Hkx = -2. * problem%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-        solution%Hky = -2. * problem%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-        solution%Hkz = -2. * problem%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
+        solution%Hkx = 2. * problem%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
+        solution%Hky = 2. * problem%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
+        solution%Hkz = 2. * problem%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
     else 
         call trace%begin( "updateAnisotropy_alloc", itimer=itimer1, verbose=2 )
         allocate(Mx_rot(size(solution%Mx)), My_rot(size(solution%My)), Mz_rot(size(solution%Mz)))
