@@ -291,7 +291,7 @@ subroutine BuildNeighbourDemagTensor(problem)
 
   ! Neighbour / tensor loop locals (declared here; user said they moved defs to top)
   integer :: t, m, q, s
-  real(DP) :: pts_t(1,3)
+  real(DP) :: pts_t(1,3), obs_size(1,3)
 
   ! FMM-tree neighbour construction locals
   integer :: ier, i
@@ -424,7 +424,7 @@ subroutine BuildNeighbourDemagTensor(problem)
   !---------------------------------------
   !$omp parallel do default(none) &
   !$omp shared(ntot, problem, nbr_idx_p, Nnbr_p, offset, size_cell, tiles_thr, nout_thr, hdum_thr) &
-  !$omp private(t, m, q, s, pts_t, tid) schedule(static)
+  !$omp private(t, m, q, s, pts_t, tid, obs_size) schedule(static)
   do t = 1, ntot
 
     tid = omp_get_thread_num() + 1
@@ -436,12 +436,19 @@ subroutine BuildNeighbourDemagTensor(problem)
     pts_t(1,2) = offset(t,2)
     pts_t(1,3) = offset(t,3)
 
+    obs_size(1,1) = problem%grid%abc(t,1)
+    obs_size(1,2) = problem%grid%abc(t,2)
+    obs_size(1,3) = problem%grid%abc(t,3)
 
     do q = 1, m
       s = nbr_idx_p(t,q)
       if (s < 1) cycle   ! skip invalid slots (-1/0). Adjust if your valid range differs.
 
-      tiles_thr(tid)%a(1)%tileType        = 2
+      if (problem%useAvgN .eq. useAvgNTrue) then
+        tiles_thr(tid)%a(1)%tileType        = 8
+      else
+        tiles_thr(tid)%a(1)%tileType        = 2
+      endif
       tiles_thr(tid)%a(1)%a               = problem%grid%abc(s,1)
       tiles_thr(tid)%a(1)%b               = problem%grid%abc(s,2)
       tiles_thr(tid)%a(1)%c               = problem%grid%abc(s,3)
@@ -455,7 +462,13 @@ subroutine BuildNeighbourDemagTensor(problem)
       nout_thr(tid)%a = 0.0_DP
 
       ! Whole allocatable actual argument (OK with allocatable dummy)
-      call getFieldFromTiles( tiles_thr(tid)%a, hdum_thr(tid)%a, pts_t, 1, 1, nout_thr(tid)%a, .false. )
+
+
+      if (problem%useAvgN .eq. useAvgNTrue) then
+        call getFieldFromTiles( tiles_thr(tid)%a, hdum_thr(tid)%a, pts_t, 1, 1, nout_thr(tid)%a, .false., Obs_size=obs_size )
+      else
+        call getFieldFromTiles( tiles_thr(tid)%a, hdum_thr(tid)%a, pts_t, 1, 1, nout_thr(tid)%a, .false. )
+      endif
 
       Nnbr_p(t, q, :, :) = sngl(nout_thr(tid)%a(1,1,:,:)) * problem%Ms(s)
 
