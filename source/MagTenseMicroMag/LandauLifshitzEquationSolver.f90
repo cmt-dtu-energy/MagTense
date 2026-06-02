@@ -1249,9 +1249,6 @@ end subroutine updateDemagfieldFMM
         endif 
     endif
         
-       
-    deallocate(temp)
-    
     !Apply shape correction
     solution%HmX = solution%HmX + problem%Kxx_shape * Mavg(1) * problem%Mfact + problem%Kxy_shape * Mavg(2) * problem%Mfact + problem%Kxz_shape * Mavg(3) * problem%Mfact
     solution%HmY = solution%HmY + problem%Kxy_shape * Mavg(1) * problem%Mfact + problem%Kyy_shape * Mavg(2) * problem%Mfact + problem%Kyz_shape * Mavg(3) * problem%Mfact
