@@ -55,7 +55,7 @@ def std_prob_4(
     def h_ext_fct_init(t) -> np.ndarray:
         return np.expand_dims(np.where(t < 1e-09, 1e-09 - t, 0), axis=1) * h_ext
 
-
+    problem_ini.use_fmm = 0
     problem_ini.window_enabled = 0
     problem_ini.window_interval = 30.0
     problem_ini.trace_enabled = 0
@@ -118,6 +118,7 @@ def std_prob_4(
         return np.expand_dims(t > -1, axis=1) * (h_ext_nist / 1000 / mu0)
 
 
+    problem_dym.use_fmm = 0
     problem_dym.window_enabled = 0
     problem_dym.window_interval = 30.0
     problem_dym.trace_enabled = 0
@@ -236,6 +237,7 @@ if __name__ == "__main__":
         unstructured=False,
         plotting=True,
         useavgn=True,
+        #figpath= Path.cwd() / "results"
         #figpath=Path(__file__).parent.absolute().joinpath("..", "figs"),
         figpath=None,
     )
