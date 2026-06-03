@@ -705,8 +705,9 @@ end subroutine getHFromTilesFMM
         integer, intent(in) :: trace_verbose
         !-----------------------------------------------------------------------------------
         
-        logical,dimension(3) :: exchPBC_l
+        logical :: window_enabled_l, trace_enabled_l, flush_each_l
         logical :: use_fmm
+        integer,dimension(3) :: exchPBC_l
 
 #if USE_MICROMAG
         type(MicroMagProblem) :: problem

@@ -19,7 +19,7 @@
         mwPointer, intent(in) :: prhs
         type(MicroMagProblem),intent(inout) :: problem
         
-        character(len=10),dimension(:),allocatable :: problemFields
+        character(len=12),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
         integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall, passExch, UseFMM, useDemag, useAvgN
@@ -30,6 +30,7 @@
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
         mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr, CVThresProblemPtr
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
+        mwPointer :: temperatureProblemPtr, n_macroVecProblemPtr, shiftVecProblemPtr, macroShapeProblemPtr, sampleShapeProblemPtr, exchPBCProblemPtr, dummy_runProblemPtr, fmm_ntermsProblemPtr
         mwPointer :: tolProblemPtr, thres_valueProblemPtr
         mwPointer :: exch_matProblemPtr, irPtr, jcPtr
         mwPointer :: genericProblemPtr
@@ -39,6 +40,9 @@
         mwPointer :: demag_ignore_stepsProblemPtr, CrystalAxisProblemPtr, K0_arrProblemPtr
         mwPointer :: fmm_cellsProblemPtr,fmm_epsProblemPtr,ifunifProblemPtr,nlminProblemPtr,nlmaxProblemPtr,use_fmmlProblemPtr,fmm_shortProblemPtr,fmm_min_nProblemPtr
         mwPointer :: useDemagPtr
+        mwPointer :: window_enaProblemPtr, window_intProblemPtr, trace_enaProblemPtr, flush_eachProblemPtr, trace_verbProblemPtr
+        mwPointer :: N_log_dirPtr, log_dirPtr, N_timer_logPtr, timer_logPtr, N_trace_logPtr, trace_logPtr
+        integer :: N_timer_log, N_trace_log, N_log_dir
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
         real(DP) :: demag_fac, CV, pi, mu0
@@ -475,6 +479,86 @@
             call displayGUIMessage( 'NOT using demag field in calculations' )
         endif
         
+        allocate( problem%temperature(ntot) )
+        sx = ntot
+        temperatureProblemPtr = mxGetField( prhs, i, problemFields(71) )
+        call mxCopyPtrToReal8(mxGetPr(temperatureProblemPtr), problem%temperature, sx )
+       
+        sx = 3
+        n_macroVecProblemPtr = mxGetField( prhs, i, problemFields(72) )
+        call mxCopyPtrToInteger4(mxGetPr(n_macroVecProblemPtr), problem%macrogrid%n_macro, sx )
+        
+        sx = 3
+        shiftVecProblemPtr = mxGetField( prhs, i, problemFields(73) )
+        call mxCopyPtrToReal8(mxGetPr(shiftVecProblemPtr), problem%macrogrid%shiftVec, sx )
+        
+        sx = 3
+        macroShapeProblemPtr = mxGetField( prhs, i, problemFields(74) )
+        call mxCopyPtrToReal8(mxGetPr(macroShapeProblemPtr), problem%macrogrid%macroShape, sx )
+        
+        sx = 3
+        sampleShapeProblemPtr = mxGetField( prhs, i, problemFields(75) )
+        call mxCopyPtrToReal8(mxGetPr(sampleShapeProblemPtr), problem%macrogrid%sampleShape, sx )
+        
+        sx = 1
+        exchPBCProblemPtr = mxGetField( prhs, i, problemFields(76) )
+        call mxCopyPtrToInteger4(mxGetPr(exchPBCProblemPtr), problem%macrogrid%exchPBC, sx )
+        
+        sx = 1
+        dummy_runProblemPtr = mxGetField( prhs, i, problemFields(77) )
+        call mxCopyPtrToInteger4(mxGetPr(dummy_runProblemPtr), problem%dummy_run, sx )
+        
+        sx = 1
+        fmm_ntermsProblemPtr = mxGetField( prhs, i, problemFields(78) )
+        call mxCopyPtrToInteger4(mxGetPr(fmm_ntermsProblemPtr), problem%fmm_nterms, sx )
+        
+        sx = 1
+        window_enaProblemPtr = mxGetField( prhs, i, problemFields(82) )
+        call mxCopyPtrToInteger4(mxGetPr(window_enaProblemPtr), problem%window_ena, sx )
+        
+        sx = 1
+        window_intProblemPtr = mxGetField( prhs, i, problemFields(83) )
+        call mxCopyPtrToReal8(mxGetPr(window_intProblemPtr), problem%window_int, sx )
+        
+        sx = 1
+        trace_enaProblemPtr = mxGetField( prhs, i, problemFields(84) )
+        call mxCopyPtrToInteger4(mxGetPr(trace_enaProblemPtr), problem%trace_ena, sx )
+        
+        sx = 1
+        flush_eachProblemPtr = mxGetField( prhs, i, problemFields(85) )
+        call mxCopyPtrToInteger4(mxGetPr(flush_eachProblemPtr), problem%flush_each, sx )
+        
+        sx = 1
+        trace_verbProblemPtr = mxGetField( prhs, i, problemFields(86) )
+        call mxCopyPtrToInteger4(mxGetPr(trace_verbProblemPtr), problem%trace_verb, sx )
+        
+        !flag whether the demag tensor should be loaded
+        sx = 1
+        N_log_dirPtr = mxGetField( prhs, i, problemFields(87) )
+        call mxCopyPtrToInteger4(mxGetPr(N_log_dirPtr), N_log_dir, sx )
+        !Length of the file name
+        sx = N_log_dir
+        log_dirPtr = mxGetField( prhs, i, problemFields(79) )            
+        status = mxGetString( log_dirPtr, problem%log_dir, sx )
+        
+        !flag whether the demag tensor should be loaded
+        sx = 1
+        N_timer_logPtr = mxGetField( prhs, i, problemFields(88) )
+        call mxCopyPtrToInteger4(mxGetPr(N_timer_logPtr), N_timer_log, sx )
+        !Length of the file name
+        sx = N_timer_log
+        timer_logPtr = mxGetField( prhs, i, problemFields(80) )            
+        status = mxGetString( timer_logPtr, problem%timer_log, sx )
+        
+        !flag whether the demag tensor should be loaded
+        sx = 1
+        N_trace_logPtr = mxGetField( prhs, i, problemFields(89) )
+        call mxCopyPtrToInteger4(mxGetPr(N_trace_logPtr), N_trace_log, sx )
+        !Length of the file name
+        sx = N_trace_log
+        trace_logPtr = mxGetField( prhs, i, problemFields(81) )            
+        status = mxGetString( trace_logPtr, problem%trace_log, sx )
+        
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -488,8 +572,8 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=70
-        character(len=10),dimension(:),intent(out),allocatable :: fieldnames
+        integer,parameter :: nf=89
+        character(len=12),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
         allocate(fieldnames(nfields))
@@ -499,7 +583,7 @@
         fieldnames(2) = 'grid_L'
         fieldnames(3) = 'grid_type'
         fieldnames(4) = 'u_ea'
-        fieldnames(5) = 'ProblemMode'
+        fieldnames(5) = 'ProblemMod'
         fieldnames(6) = 'solver'
         fieldnames(7) = 'A0'
         fieldnames(8) = 'Ms'
@@ -565,6 +649,25 @@
         fieldnames(68) = 'fmm_min_n'
         fieldnames(69) = 'useDemag'
         fieldnames(70) = 'useAvgN'
+        fieldnames(71) = 'temperature'
+        fieldnames(72) = 'n_macro'
+        fieldnames(73) = 'shiftVec'
+        fieldnames(74) = 'macroShape'
+        fieldnames(75) = 'sampleShape'
+        fieldnames(76) = 'exchPBC'
+        fieldnames(77) = 'dummy_run'
+        fieldnames(78) = 'fmm_nterms'
+        fieldnames(79) = 'log_dir'
+        fieldnames(80) = 'timer_log'
+        fieldnames(81) = 'trace_log'
+        fieldnames(82) = 'window_ena'
+        fieldnames(83) = 'window_int'
+        fieldnames(84) = 'trace_ena'
+        fieldnames(85) = 'flush_each'
+        fieldnames(86) = 'trace_verb'
+        fieldnames(87) = 'N_log_dir'
+        fieldnames(88) = 'N_timer_log'
+        fieldnames(89) = 'N_trace_log'
         
     end subroutine getProblemFieldnames
     

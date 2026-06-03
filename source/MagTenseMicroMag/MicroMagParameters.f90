@@ -4,7 +4,9 @@ include "mkl_dfti.f90"
     module MicroMagParameters
     use MKL_SPBLAS
     Use MKL_DFTI
+#if USE_FMM3D    
     use fmm3d_tree_mod
+#endif    
 
     INTEGER, PARAMETER :: SP = SELECTED_REAL_KIND(6, 37)
     INTEGER, PARAMETER :: DP = SELECTED_REAL_KIND(15, 307)
@@ -106,12 +108,12 @@ include "mkl_dfti.f90"
     !Note that current version approximates the overall shape of sample and macrogeometry by rectangular prisms
     type MicroMagMacrogeometry
         ! Settings for periodic demagnetisation field
-        integer,allocatable :: n_macro(:)      !> Number of copies on both sides of the intial domain along x,y and z, which together form the macrogeometry
-        real(dp),allocatable :: shiftVec(:)    !> How far to shift neighbouring domain copies along x, y, z
-        real(dp),allocatable :: macroShape(:)  !> Sidelengths of macrogeometry prism
-        real(dp),allocatable :: sampleShape(:) !> Sidelengths of sample prism
+        integer :: n_macro(3)      !> Number of copies on both sides of the intial domain along x,y and z, which together form the macrogeometry
+        real(dp) :: shiftVec(3)    !> How far to shift neighbouring domain copies along x, y, z
+        real(dp) :: macroShape(3)  !> Sidelengths of macrogeometry prism
+        real(dp) :: sampleShape(3) !> Sidelengths of sample prism
         ! Settings for exchange coupling between copies of the simulated domain
-        logical,allocatable :: exchPBC(:)      !> Periodic boundary conditions along x, y and z for the exchange coupling
+        integer :: exchPBC(3)      !> Periodic boundary conditions along x, y and z for the exchange coupling
     end type MicroMagMacrogeometry
 
     !>-----------------
@@ -226,7 +228,15 @@ include "mkl_dfti.f90"
         real(SP),dimension(:,:), contiguous, pointer :: Kyy_fmm,Kyz_fmm      !> Demag field tensor split out into the nine symmetric components
         real(SP),dimension(:,:), contiguous, pointer :: Kzz_fmm          !> Demag field tensor split out into the nine symmetric components
         integer :: dummy_run = 0    !> Flag to indicate whether the demag tensor neighbour test setup has been done
-
+        
+        integer :: window_ena
+        real(DP) :: window_int
+        integer :: trace_ena
+        integer :: flush_each
+        integer :: trace_verb
+        character*256 :: log_dir
+        character*256 :: timer_log
+        character*256 :: trace_log
         
     end type MicroMagProblem
     
@@ -259,9 +269,9 @@ include "mkl_dfti.f90"
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
-
+#if USE_FMM3D
         class(FMM3DTree), pointer :: fmm_tree => null()    !> FMM tree for computing the demag field using FMM
-
+#endif
     end type MicroMagSolution
     
     

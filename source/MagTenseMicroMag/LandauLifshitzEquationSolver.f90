@@ -256,7 +256,7 @@
             alphaGilbert = gamma/(2*alpha0) + 1/2 * sqrt((gamma/alpha0)**2 - 4)   ! Dimensionless Gilbert damping (second order polynomial equation)
             allocate( gb_problem%Tfact(ntot) )
             gb_problem%Tfact = sqrt(2*kB * gb_problem%temperature * alphaGilbert / (mu0 * gamma * volCells * gb_problem%Ms * t_step))
-            print *, "Finished calculating thermal prefactor"
+            !print *, "Finished calculating thermal prefactor"
             !print *, 'Tfact', gb_problem%Tfact(1)   ! Just for debugging
         else
             gb_problem%Tfact = 0
@@ -290,11 +290,10 @@
        call displayGUIMessage( 'Performing dummy run - skipping time evolution ' )
     else 
 
-        CALL SYSTEM_CLOCK(c1)
-
+        !CALL SYSTEM_CLOCK(c1)
     !$omp parallel default(shared)
     !$omp single
-
+        
       do i=1,nt_Hext
           !Applied field
           gb_solution%HextInd = i
@@ -303,7 +302,7 @@
               write(prog_str,'(A20, I5.2, A8, I5.2, A6, F6.2, A7)') 'External Field nr.: ', i, ' out of ', nt_Hext, ' i.e. ', real(i)/real(nt_Hext)*100,'% done'
               call displayGUIMessage( trim(prog_str) )
           endif
-
+          
           ! This is where the LLG is actually integrated (short description by F. Durhuus)
           ! fct is a pointer to the dmdt_fct function which returns time derivatives of the normalised magnetic moments
           ! With m0 as initial condition, integrate from t(1) to t(nt) with effective field updated at each time coordinate t, then store result in t_out and M_out.
@@ -319,7 +318,7 @@
           gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
           gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
           gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
-
+ 
           call StoreHeffComponents ( gb_problem, gb_solution )              
       enddo
 
@@ -327,10 +326,10 @@
       !$omp end parallel
 
       
-        CALL SYSTEM_CLOCK(c2)
-        call displayGUIMessage( 'Time simulation time integration:' )
-        write (prog_str,'(f10.3)') (c2 - c1)/rate
-        call displayGUIMessage( prog_str )
+        !CALL SYSTEM_CLOCK(c2)
+        !call displayGUIMessage( 'Time simulation time integration:' )
+        !write (prog_str,'(f10.3)') (c2 - c1)/rate
+        !call displayGUIMessage( prog_str )
 
 
       !clean up
@@ -1402,7 +1401,7 @@ end subroutine updateDemagfieldFMM
     real(DP),dimension(:,:,:,:),allocatable :: Nout,Noutave       !> Temporary storage for the demag tensor            
     integer,dimension(4) :: indx_ele
     real :: rate
-    integer :: c1,c2,cr,cm
+    !integer :: c1,c2,cr,cm
     character(10) :: prog_str
     integer, save :: itimer = 0
     integer,dimension(3) :: n_macro
@@ -1411,9 +1410,9 @@ end subroutine updateDemagfieldFMM
     call trace%begin( "ComputeDemagfieldTensor", itimer=itimer, verbose=1 )
     
     ! First initialize the system_clock
-    call system_clock(count_rate=cr)
-    call system_clock(count_max=cm)
-    rate = REAL(cr)
+    !call system_clock(count_rate=cr)
+    !call system_clock(count_max=cm)
+    !rate = REAL(cr)
     
     nx = problem%grid%nx
     ny = problem%grid%ny
@@ -1439,7 +1438,7 @@ end subroutine updateDemagfieldFMM
         call loadDemagTensorFromDisk( problem )
     else
 
-        CALL SYSTEM_CLOCK(c1)
+        !CALL SYSTEM_CLOCK(c1)
  
         !call mkl_set_num_threads(problem%nThreadsMatlab)
         !call omp_set_num_threads(problem%nThreadsMatlab)
@@ -1689,7 +1688,7 @@ end subroutine updateDemagfieldFMM
             
         endif
         
-        CALL SYSTEM_CLOCK(c2)        
+        !CALL SYSTEM_CLOCK(c2)        
 
         !---------- scale sources with the saturation magnetization -----------------
         do i=1,ntot
@@ -1739,6 +1738,7 @@ end subroutine updateDemagfieldFMM
     real(DP),allocatable :: aSample,bSample,cSample      !> Sample shape parameters
     integer :: ntotMacro                                 !> Number of domain copies in macrogeometry
     real(DP) :: Vcell, Vdomain                           !> Volume of single cell and simulated domain
+    character*(100) :: prog_str 
 
     ! Get number of elements
     nx = problem%grid%nx
@@ -1784,7 +1784,8 @@ end subroutine updateDemagfieldFMM
     allocate( problem%VfracOcc )
     problem%VfracOcc = ntot * Vcell / Vdomain
     call displayGUIMessage( 'Volume fraction occupied by magnetic material :' )
-    print *, problem%VfracOcc
+    write(prog_str,'(F20.10)') problem%VfracOcc
+    call displayGUIMessage( trim(prog_str) )
 
     ! Clean up
     deallocate(Nshape)

@@ -43,7 +43,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 	real(8), intent(in) :: CV, exch_weigh
     integer(4),dimension(3),intent(in) :: n_macro
     real(8),dimension(3),intent(in) :: shiftVec, macroShape, sampleShape
-    logical,dimension(3),intent(in) :: exchPBC
+    integer(4),dimension(3),intent(in) :: exchPBC
 
     character*256,intent(in) :: N_file_in, N_file_out
 

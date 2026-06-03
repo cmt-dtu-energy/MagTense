@@ -83,7 +83,7 @@ addpath('../../../util');
 %% ------------------------------------------------------------------- MAGTENSE ---------------------------------------------------------
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% Setup the problem for the initial configuration
-% Constuct a default problem, with a grid with size (nx,ny,nz)
+% Construct a default problem, with a grid with size (nx,ny,nz)
 problem_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));    
 problem_ini.grid_L = [500e-9,125e-9,3e-9]; %m
 problem_ini.nThreads = int32(8);

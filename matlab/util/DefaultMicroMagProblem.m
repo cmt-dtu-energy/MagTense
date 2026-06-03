@@ -198,6 +198,27 @@ properties
     use_fmm
     fmm_short
     fmm_min_n
+
+    temperature
+    n_macro
+    shiftVec
+    macroShape
+    sampleShape
+    exchPBC
+    dummy_run
+    fmm_nterms
+
+    log_dir char = '';
+    timer_log char = '';
+    trace_log char = '';
+    window_ena
+    window_int
+    trace_ena
+    flush_each
+    trace_verb
+    N_log_dir
+    N_timer_log
+    N_trace_log
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -428,6 +449,25 @@ methods
         obj.use_fmm = int32(0);
         obj.fmm_short = int32(1);
         obj.fmm_min_n = int32(20000);
+
+        obj.temperature	 = zeros(obj.ntot);
+        obj.n_macro	= int32([0 0 0]);
+        obj.shiftVec = ([0 0 0]);
+        obj.macroShape = [1 1 1];
+        obj.sampleShape = [1 1 1];
+        obj.exchPBC	= int32([0 0 0]);
+        obj.dummy_run = 0;
+        obj.fmm_nterms = -1;
+
+        obj = obj.setLogDirFilename( 'logs' );
+        obj = obj.setTimerLogFilename( 'timing.log' );
+        obj = obj.setTraceLogFilename( 'trace.log' );
+        obj.window_ena = int32(1);
+        obj.window_int = 30.0;
+        obj.trace_ena = int32(0);
+        obj.flush_each = int32(1);
+        obj.trace_verb = int32(1);
+
     end
     
     %%Calculates the applied field as a function of time on the time grid
@@ -511,6 +551,21 @@ methods
     function obj = setReturnNFilename( obj, filename )
         obj.N_ret = int32(length(filename));
         obj.N_file_out = filename;
+    end
+
+    function obj = setLogDirFilename( obj, filename )
+        obj.N_log_dir = int32(length(filename));
+        obj.log_dir = filename;
+    end
+
+    function obj = setTimerLogFilename( obj, filename )
+        obj.N_timer_log = int32(length(filename));
+        obj.timer_log = filename;
+    end
+
+    function obj = setTraceLogFilename( obj, filename )
+        obj.N_trace_log = int32(length(filename));
+        obj.trace_log = filename;
     end
     
     function obj = setSaveTheResult( obj, enabled )
