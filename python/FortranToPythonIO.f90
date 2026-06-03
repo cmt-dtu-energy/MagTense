@@ -1,5 +1,5 @@
 module FortranToPythonIO
-    use omp_mod
+    use auxInit_mod
     use timer_mod
     use trace_mod
     use TileNComponents
@@ -703,12 +703,10 @@ end subroutine getHFromTilesFMM
         integer, intent(in) :: window_enabled, trace_enabled, flush_each
         real(8), intent(in) :: window_interval
         integer, intent(in) :: trace_verbose
+        !-----------------------------------------------------------------------------------
         
-        logical :: window_enabled_l, trace_enabled_l, flush_each_l
         logical,dimension(3) :: exchPBC_l
         logical :: use_fmm
-
-        !-----------------------------------------------------------------------------------
 
 #if USE_MICROMAG
         type(MicroMagProblem) :: problem
@@ -716,14 +714,9 @@ end subroutine getHFromTilesFMM
 
 
 
-        !---------------------- initiaize auxiliary modules -----------------------------
-        call omp%init()
-        call omp%info()
-        window_enabled_l = merge(.true., .false., window_enabled /= 0)
-        trace_enabled_l = merge(.true., .false., trace_enabled /= 0)
-        flush_each_l = merge(.true., .false., flush_each /= 0)
-        call timer%log_init(trim(log_dir), trim(timer_log_file), window_enabled=window_enabled_l, window_interval=window_interval)
-        call trace%trace_init(trim(log_dir), trim(trace_log_file), enabled=trace_enabled_l, unit=97, flush_each=flush_each_l, verbose=trace_verbose)
+        !---------------------- initiaize auxiliary modules ----------------------------- 
+        call auxInit%init(log_dir, timer_log_file, trace_log_file, window_enabled, &
+            window_interval, trace_enabled, flush_each, trace_verbose)
         !---------------------------------------------------------------------------------
 
 
