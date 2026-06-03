@@ -11,7 +11,7 @@ MATLAB_INCLUDE =
 #       List all source files required for the project
 #=======================================================================
 
-LIBSRC_SOURCES = sort_mod omp_mod omp_timer_mod omp_lock_mod timer_mod trace_mod
+LIBSRC_SOURCES = sort_mod omp_mod omp_timer_mod omp_lock_mod timer_mod trace_mod auxinit_mod
 
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
