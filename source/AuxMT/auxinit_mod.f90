@@ -18,7 +18,7 @@ MODULE auxInit_mod
     real(8) :: window_interval = 30.0d0                  ! seconds between timer windows
     integer :: trace_verbose  = 1                        ! trace verbosity level
   contains
-    procedure :: init
+    procedure :: initAux
   end type auxInit_t
   !----------------------------------------------------------------------------
 
@@ -39,8 +39,9 @@ CONTAINS
 !> flush_each      : optional integer flag for flushing after each write
 !> trace_verbose   : optional trace verbosity level
 !=============================================================================
-  subroutine init(self, log_dir, timer_log_file, trace_log_file, window_enabled, &
+  subroutine initAux(self, log_dir, timer_log_file, trace_log_file, window_enabled, &
       window_interval, trace_enabled, flush_each, trace_verbose)
+    !DEC$ ATTRIBUTES ALIAS:"initaux_" :: initAux
     class(auxInit_t), intent(inout) :: self
     character(len=*), intent(in), optional :: log_dir, timer_log_file, trace_log_file
     integer, intent(in), optional :: window_enabled, trace_enabled, flush_each
@@ -69,6 +70,6 @@ CONTAINS
       verbose=self%trace_verbose)
     !---------------------------------------------------------------------------
 
-  end subroutine init
+  end subroutine initAux
 
 END MODULE auxInit_mod

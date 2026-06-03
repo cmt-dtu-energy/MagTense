@@ -715,7 +715,7 @@ end subroutine getHFromTilesFMM
 
 
         !---------------------- initiaize auxiliary modules ----------------------------- 
-        call auxInit%init(log_dir, timer_log_file, trace_log_file, window_enabled, &
+        call auxInit%initAux(log_dir, timer_log_file, trace_log_file, window_enabled, &
             window_interval, trace_enabled, flush_each, trace_verbose)
         !---------------------------------------------------------------------------------
 
