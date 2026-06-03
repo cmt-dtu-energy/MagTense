@@ -1282,7 +1282,9 @@ end subroutine updateDemagfieldFMM
         !Demagnetization tensor matrix
 #if USE_FMM3D
         !------------- build neighbour demag tensor -------------------------------------------------------------------
-        call BuildNeighbourDemagTensor( problem )
+        if (problem%use_fmm) then
+            call BuildNeighbourDemagTensor( problem )
+        end if
         
         !---------- if BuildNeighbourDemagTensor sets use_fmm to false then compute the demag tensor normally -----
         if (.not. problem%use_fmm) then

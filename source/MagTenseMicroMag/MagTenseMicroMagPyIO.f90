@@ -15,7 +15,8 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
 	CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
 	n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
-    passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useDemag)
+    passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
+    useDemag)
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
     integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols
     integer(4),dimension(3),intent(in) :: grid_n
@@ -57,7 +58,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     integer(4), intent(in) :: allow_fmm_short_circuit
     integer(4), intent(in) :: fmm_min_n
     integer(4), intent(in) :: fmm_nterms
-
+    logical, intent(in) :: use_fmm  
     logical :: ex
     integer, save :: itimer = 0
 
@@ -72,6 +73,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     problem%allow_fmm_short_circuit = allow_fmm_short_circuit
     problem%fmm_min_n = fmm_min_n
     problem%fmm_nterms = fmm_nterms
+    problem%use_fmm = use_fmm
 
     problem%grid%nx = grid_n(1)
     problem%grid%ny = grid_n(2)

@@ -646,7 +646,7 @@ end subroutine getHFromTilesFMM
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
         n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, &
-		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, &
+		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useFMM, &
         log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, useDemag )
 
         integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, n_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
@@ -696,6 +696,7 @@ end subroutine getHFromTilesFMM
         integer(4), intent(in) :: allow_fmm_short_circuit
         integer(4), intent(in) :: fmm_min_n
         integer(4), intent(in) :: fmm_nterms
+        integer(4), intent(in) :: useFMM
 
         !-------------------- timer and trace modules --------------------------------------
         character*256,intent(in) :: timer_log_file, trace_log_file, log_dir
@@ -705,6 +706,7 @@ end subroutine getHFromTilesFMM
         
         logical :: window_enabled_l, trace_enabled_l, flush_each_l
         logical,dimension(3) :: exchPBC_l
+        logical :: use_fmm
 
         !-----------------------------------------------------------------------------------
 
@@ -728,7 +730,7 @@ end subroutine getHFromTilesFMM
 
 
         exchPBC_l = merge(.true., .false., exchPBC /= 0)
-
+        use_fmm = merge(.true., .false., useFMM /= 0)
         call loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
             gamma, alpha_mm, temperature, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
@@ -736,7 +738,8 @@ end subroutine getHFromTilesFMM
             exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
             CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
             n_macro, shiftVec, macroShape, sampleShape, exchPBC_l, &
-            passExch, exch_ncols, CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useDemag)
+            passExch, exch_ncols, CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
+            useDemag)
             
 
         call SolveLandauLifshitzEquation( problem, solution )
