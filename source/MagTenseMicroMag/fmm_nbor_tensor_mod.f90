@@ -436,9 +436,18 @@ subroutine BuildNeighbourDemagTensor(problem)
     pts_t(1,2) = offset(t,2)
     pts_t(1,3) = offset(t,3)
 
-    obs_size(1,1) = problem%grid%abc(t,1)
-    obs_size(1,2) = problem%grid%abc(t,2)
-    obs_size(1,3) = problem%grid%abc(t,3)
+
+    if ( problem%grid%gridType .eq. gridTypeUniform ) then
+      obs_size(1,1) = problem%grid%dx
+      obs_size(1,2) = problem%grid%dy
+      obs_size(1,3) = problem%grid%dz
+    elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
+      obs_size(1,1) = problem%grid%abc(t,1)
+      obs_size(1,2) = problem%grid%abc(t,2)
+      obs_size(1,3) = problem%grid%abc(t,3)
+    else
+          error stop "BuildNeighbourDemagTensor: unsupported grid type - only uniform and unstructured prisms currently supported"
+    end if
 
     do q = 1, m
       s = nbr_idx_p(t,q)
@@ -449,15 +458,24 @@ subroutine BuildNeighbourDemagTensor(problem)
       else
         tiles_thr(tid)%a(1)%tileType        = 2
       endif
+
+  if ( problem%grid%gridType .eq. gridTypeUniform ) then
+      tiles_thr(tid)%a(1)%a               = problem%grid%dx
+      tiles_thr(tid)%a(1)%b               = problem%grid%dy
+      tiles_thr(tid)%a(1)%c               = problem%grid%dz
+    elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
       tiles_thr(tid)%a(1)%a               = problem%grid%abc(s,1)
       tiles_thr(tid)%a(1)%b               = problem%grid%abc(s,2)
       tiles_thr(tid)%a(1)%c               = problem%grid%abc(s,3)
-      tiles_thr(tid)%a(1)%exploitSymmetry = 0
-      tiles_thr(tid)%a(1)%rotAngles(:)    = 0.0_DP
-      tiles_thr(tid)%a(1)%M(:)            = 0.0_DP
+    else
+          error stop "BuildNeighbourDemagTensor: unsupported grid type - only uniform and unstructured prisms currently supported"
+    end if
       tiles_thr(tid)%a(1)%offset(1)       = problem%grid%pts(s,1)
       tiles_thr(tid)%a(1)%offset(2)       = problem%grid%pts(s,2)
       tiles_thr(tid)%a(1)%offset(3)       = problem%grid%pts(s,3)
+      tiles_thr(tid)%a(1)%exploitSymmetry = 0
+      tiles_thr(tid)%a(1)%rotAngles(:)    = 0.0_DP
+      tiles_thr(tid)%a(1)%M(:)            = 0.0_DP
 
       nout_thr(tid)%a = 0.0_DP
 
