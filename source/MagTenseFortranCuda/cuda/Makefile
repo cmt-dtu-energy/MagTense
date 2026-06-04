@@ -12,8 +12,13 @@ CUDA_WRAP_SOURCE = MagTenseCudaBlasICLWrapper
 #=======================================================================
 CUDA_FILE = $(addsuffix .cu, ${CUDA_SOURCE})
 CUDA_WRAP_FILE = $(addsuffix .cxx, ${CUDA_WRAP_SOURCE})
-CUDA_OBJECT = $(addsuffix .obj, ${CUDA_SOURCE})
-CUDA_WRAP = $(addsuffix .obj, ${CUDA_WRAP_SOURCE})
+ifeq ($(OS),Windows_NT)
+	CUDA_OBJECT = $(addsuffix .obj, ${CUDA_SOURCE})
+	CUDA_WRAP = $(addsuffix .obj, ${CUDA_WRAP_SOURCE})
+else
+	CUDA_OBJECT = $(addsuffix .o, ${CUDA_SOURCE})
+	CUDA_WRAP = $(addsuffix .o, ${CUDA_WRAP_SOURCE})
+endif
 #=======================================================================
 #
 #=======================================================================
