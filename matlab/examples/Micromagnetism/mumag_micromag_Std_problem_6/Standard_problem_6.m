@@ -231,7 +231,7 @@ case 'z'
 end
 
 %% Plot average magnetization
-H = -mu0*solution.H_ext(:,1,1,dim);
+H = mu0*solution.H_ext(:,1,1,dim);
 Switching_field = min(H(M > 1-1e-3));
 
 if (options.ShowTheResult)

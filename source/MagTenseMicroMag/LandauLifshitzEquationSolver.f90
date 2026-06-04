@@ -292,7 +292,7 @@
 
         !CALL SYSTEM_CLOCK(c1)
     !$omp parallel default(shared)
-    !$omp single
+    !$omp master
         
       do i=1,nt_Hext
           !Applied field
@@ -322,7 +322,7 @@
           call StoreHeffComponents ( gb_problem, gb_solution )              
       enddo
 
-      !$omp end single
+      !$omp end master
       !$omp end parallel
 
       
