@@ -21,7 +21,7 @@ ifeq ($(OS),Windows_NT)
 else
     OBJ_SUFFIX = .o
     CUFLAGS = -shared -Xcompiler -fPIC -I ${CONDA_PREFIX}/include
-    CPPFLAGS = ${CFLAGS} -o
+    CPPFLAGS = ${CFLAGS}
     LIB_SUFFIX = .a
     ifeq (${UNAME}, Darwin)
         LIBTOOL = libtool -static -o $@ $?
