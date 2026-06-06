@@ -9,9 +9,18 @@ import numpy as np
 from magtense.micromag import MicromagProblem
 
 MU0 = 4 * np.pi * 1e-7
-DEFAULT_MS = 1.61 / MU0  # [A/m], equivalent to mu0 Ms = 1.61 T.
-DEFAULT_K0 = 4.3e6  # [J/m^3], uniaxial anisotropy constant.
-DEFAULT_A0 = 7.7e-12  # [J/m], exchange stiffness used by the grain examples.
+# DEFAULT_MS = 1.61 / MU0  # [A/m], equivalent to mu0 Ms = 1.61 T.
+# DEFAULT_K0 = 4.3e6  # [J/m^3], uniaxial anisotropy constant.
+# DEFAULT_A0 = 7.7e-12  # [J/m], exchange stiffness used by the grain examples.
+
+#DEFAULT_MS = 2.3e6      # A/m
+#DEFAULT_A0 = 7.0e-12    # J/m
+#DEFAULT_K0 = 1.8e6      # J/m^3
+
+DEFAULT_MS = 1.25e6     # A/m
+DEFAULT_K0 = 1.0e6      # J/m^3
+DEFAULT_A0 = 7.0e-12    # J/m
+
 DEFAULT_TILT_DEGREES = 3.0
 
 
@@ -57,7 +66,7 @@ def create_single_grain_problem(
     Ms: float = DEFAULT_MS,
     K0: float = DEFAULT_K0,
     A0: float = DEFAULT_A0,
-    t_end: float = 40e-9,
+    t_end: float = 1e-9,
     nt: int = 2,
     fmm_cells_per_node: int = 660,
     fmm_eps: float = 1e-4,
@@ -90,6 +99,8 @@ def create_single_grain_problem(
         res=[n, n, n],
         grid_L=[L, L, L],
         grid_type="uniform",
+        grid_pts = None,
+        grid_abc = None,
         solver="explicit",
         m0=np.tile(easy_axis, (ntot, 1)),
         A0=A0,
@@ -162,15 +173,24 @@ def interpolated_coercivity(H: np.ndarray, M: np.ndarray) -> float:
     return float(h0 + (0.0 - m0) * (h1 - h0) / (m1 - m0))
 
 
-def output_stem(L: float, n: int, use_fmm: bool) -> str:
-    """Stable run identifier containing grain size, resolution and FMM state."""
-    fmm_tag = "fmm_on" if use_fmm else "fmm_off"
-    return f"single_grain_L{L:.6e}m_n{n}_{fmm_tag}"
+def output_stem(
+    size_factor: float,
+    n: int,
+    use_fmm: bool,
+    fmm_nterms: int,
+    nlmax: int,
+) -> str:
+    """Stable run identifier containing size factor, resolution and FMM state."""
+    stem = f"single_grain_sf{size_factor:.2g}_n{n}"
+    if use_fmm:
+        stem += f"_fmm_on_N{fmm_nterms}_L{nlmax}"
+    return stem
 
 
 def run_single_grain_coercivity(
     *,
     L: float,
+    size_factor: float,
     n: int,
     use_fmm: bool = False,
     cuda: bool = False,
@@ -210,15 +230,16 @@ def run_single_grain_coercivity(
         fmm_nterms=fmm_nterms,
     )
 
-    stem = output_stem(L, n, use_fmm)
+    stem = output_stem(size_factor, n, use_fmm, fmm_nterms, nlmax)
     problem.timer_log_file = f"{stem}_timer.log"
     problem.trace_log_file = f"{stem}_trace.log"
 
     print("Single-grain coercivity experiment")
     print(f"  L = {L:.6e} m")
+    print(f"  size_factor = {size_factor:.2g}")
     print(f"  n = {n} ({n**3} cells)")
     print(f"  characteristic_length = {characteristic_length():.6e} m")
-    print(f"  L / characteristic_length = {L / characteristic_length():.6g}")
+    print(f"  L / characteristic_length = {size_factor:.6g}")
     print(f"  easy_axis_tilt = {tilt_degrees:.3f} degrees")
     print(f"  easy_axis = {tilted_easy_axis(tilt_degrees)}")
     print(f"  use_fmm = {use_fmm}")
@@ -283,14 +304,22 @@ def run_single_grain_coercivity(
 
         fig_path = output_dir / f"{stem}.png"
         fig, ax = plt.subplots(figsize=(8, 4))
-        ax.plot(H_A_per_m, Mz / DEFAULT_MS, ".-k", linewidth=1.5, markersize=4)
-        ax.plot(Hc_A_per_m, 0.0, "r*", markersize=10, label="Hc")
-        ax.set_xlabel("H_z [A/m]")
-        ax.set_ylabel("M_z / Ms [-]")
-        ax.set_title(f"Single grain hysteresis: L={L:.3e} m, n={n}, FMM={use_fmm}")
-        ax.grid(True, which="both", linestyle="--", linewidth=0.5)
-        ax.legend()
-        fig.tight_layout()
+        ax.plot(MU0 * H_A_per_m, MU0 * Mz, ".-k", linewidth=1.5, markersize=4)
+        ax.plot(
+            MU0 * Hc_A_per_m,
+            0.0,
+            "r*",
+            markersize=10,
+            label=f"Hc = {Hc_T:.3f} T",
+        )
+        ax.set_xlabel(r"Applied Field, $\mu_0 H$ [ T ]")
+        ax.set_ylabel(r"Magnetization, $\mu_0 M$ [ T ]")
+        ax.set_title(
+            f"Single grain hysteresis: size_factor={size_factor:.2g}, n={n}, FMM={use_fmm}"
+        )
+        ax.grid(True, which="both", linestyle=":", linewidth=0.8, alpha=0.6)
+        ax.legend(loc="lower right", frameon=True, framealpha=0.9, edgecolor="inherit")
+        fig.tight_layout(pad=0.2)
         fig.savefig(fig_path, dpi=300)
         plt.close(fig)
         print(f"Saved figure to: {fig_path}")
@@ -317,18 +346,13 @@ def main() -> None:
     parser.add_argument(
         "--n", type=int, default=10, help="Cubic grid resolution (default: 10)."
     )
-    parser.add_argument("--use-fmm", action="store_true", help="Enable FMM demag.")
-    parser.add_argument("--cuda", action="store_true", help="Enable CUDA acceleration.")
-    parser.add_argument(
-        "--cvode", action="store_true", help="Enable CVODE integration."
-    )
     parser.add_argument(
         "--tilt-degrees",
         type=float,
         default=DEFAULT_TILT_DEGREES,
         help="Easy-axis tilt away from z in the x-z plane [degrees].",
     )
-    parser.add_argument("--field-min-t", type=float, default=-7.0)
+    parser.add_argument("--field-min-t", type=float, default=-2.0)
     parser.add_argument("--field-max-t", type=float, default=1.0)
     parser.add_argument("--field-step-t", type=float, default=-0.1)
     parser.add_argument("--output-dir", type=Path, default=Path("results"))
@@ -337,6 +361,7 @@ def main() -> None:
         action="store_true",
         help="Disable the default hysteresis plot written to the output directory.",
     )
+    parser.add_argument("--use-fmm", action="store_true", help="Enable FMM demag.")
     parser.add_argument("--fmm-cpn", type=int, default=660)
     parser.add_argument("--fmm-eps", type=float, default=1e-4)
     parser.add_argument("--ifunif", type=int, default=1)
@@ -347,14 +372,23 @@ def main() -> None:
     parser.add_argument("--fmm-nterms", type=int, default=-1)
     args = parser.parse_args()
 
-    size_factor = 1.0 if args.size_factor is None else args.size_factor
+    if args.size_factor is None:
+        if args.L is None:
+            size_factor = 1.0
+        else:
+            size_factor = args.L / characteristic_length()
+    else:
+        size_factor = args.size_factor
     L = args.L if args.L is not None else size_factor * characteristic_length()
+
+
     run_single_grain_coercivity(
         L=L,
+        size_factor=size_factor,
         n=args.n,
         use_fmm=args.use_fmm,
-        cuda=args.cuda,
-        cvode=args.cvode,
+        cuda=True,
+        cvode=False,
         tilt_degrees=args.tilt_degrees,
         field_min_t=args.field_min_t,
         field_max_t=args.field_max_t,
