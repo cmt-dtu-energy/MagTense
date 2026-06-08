@@ -236,6 +236,13 @@ def run_single_grain_coercivity(
     )
 
     stem = output_stem(size_factor, n, use_fmm, fmm_nterms, nlmax)
+    if adaptive:
+        dH_min_t = (
+            abs(adaptive_dh_min_t)
+            if adaptive_dh_min_t is not None
+            else abs(field_step_t / 10.0)
+        )
+        stem += f"_A_FS{dH_min_t:.1e}"
     problem.timer_log_file = f"{stem}_timer.log"
     problem.trace_log_file = f"{stem}_trace.log"
 
@@ -251,6 +258,7 @@ def run_single_grain_coercivity(
     print(f"  cuda = {cuda}")
     print(f"  cvode = {cvode}")
     print(f"  adaptive = {adaptive}")
+
 
     start_time = time.time()
     if adaptive:
@@ -416,10 +424,10 @@ def main() -> None:
         action="store_true",
         help="Use adaptive backend hysteresis stepping.",
     )
-    parser.add_argument("--adaptive-max-steps", type=int, default=None)
-    parser.add_argument("--adaptive-dh-initial-t", type=float, default=None)
-    parser.add_argument("--adaptive-dh-min-t", type=float, default=None)
-    parser.add_argument("--adaptive-dh-max-t", type=float, default=None)
+    parser.add_argument("--adaptive-max-steps", type=int, default=500)
+    parser.add_argument("--adaptive-dh-initial-t", type=float, default=0.5)
+    parser.add_argument("--adaptive-dh-min-t", type=float, default=0.01)
+    parser.add_argument("--adaptive-dh-max-t", type=float, default=0.5)
     args = parser.parse_args()
 
     if args.size_factor is None:
