@@ -237,7 +237,8 @@
         !Go through several different applied fields and find the equilibrium solution for each of them
         nt_Hext = size(gb_problem%Hext, 1)          !The no. of applied fields to consider
         if (gb_problem%adaptiveHext) then
-            nt_Hext = gb_problem%maxHextSteps
+            ! Allocate one extra slot for the initial starting field and state
+            nt_Hext = gb_problem%maxHextSteps + 1
         endif
     else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
         !Simply do a time evolution as specified in the problem
@@ -391,12 +392,12 @@
     procedure(callback_fct),pointer :: cb_fct
     real(DP),dimension(:,:,:),intent(inout) :: M_out
     integer,intent(in) :: ntot, nt, n_reject_max
-    integer :: i_acc, i_trial, n_reject, n_reject_total
+    integer :: i_acc, i_trial, n_reject, n_reject_total, ti
     real(DP) :: H_delta(3), H_dir(3), H_current(3), H_trial(3), H_remaining(3)
-    real(DP) :: H_distance, remaining_distance, dH, dM, m_parallel_before, m_parallel_trial
+    real(DP) :: H_distance, remaining_distance, dH, dH_initial, dH_step, dH_initial_T, dH_T, dH_step_T, dM, m_parallel_before, m_parallel_trial
     real(DP),dimension(:),allocatable :: m_before, m_accepted, m_trial
     logical :: reject_step, reached_end
-    character*(160) :: prog_str
+    character*(256) :: prog_str
 
       if (gb_problem%maxHextSteps <= 0) then
           call displayGUIMessage('Adaptive hysteresis requires maxHextSteps > 0')
@@ -420,21 +421,40 @@
 
       H_dir = H_delta / H_distance
       H_current = gb_problem%H_start
-      dH = min(max(gb_problem%dH_initial, gb_problem%dH_min), gb_problem%dH_max)
+      dH_initial = gb_problem%dH_initial
+      dH = dH_initial
       allocate(m_before(3*ntot), m_accepted(3*ntot), m_trial(3*ntot))
       m_accepted = gb_problem%m0
-      i_acc = 0
-      n_reject = 0
+
+    ! Save the starting field and magnetisation state (store at first time index)
+    i_acc = 1
+    gb_solution%HextInd = i_acc
+    gb_problem%Hext(i_acc,1) = 0.0_DP
+    gb_problem%Hext(i_acc,2:4) = H_current
+    ! Store the initial condition for all time indices so the returned
+    ! `gb_solution%M_out` contains a valid time-series for the initial field.
+    do ti = 1, size(gb_problem%t)
+        gb_solution%M_out(ti,:,i_acc,1) = m_accepted(1:ntot)
+        gb_solution%M_out(ti,:,i_acc,2) = m_accepted(ntot+1:2*ntot)
+        gb_solution%M_out(ti,:,i_acc,3) = m_accepted(2*ntot+1:3*ntot)
+    end do
+    call StoreHeffComponents ( gb_problem, gb_solution )
+
+    n_reject = 0
       n_reject_total = 0
       reached_end = .false.
 
-      do while (.not. reached_end .and. i_acc < gb_problem%maxHextSteps)
+      do while (.not. reached_end .and. i_acc < gb_problem%maxHextSteps + 1)
           remaining_distance = dot_product(gb_problem%H_end - H_current, H_dir)
           if (remaining_distance <= max(1.0e-12_DP * H_distance, tiny(1.0_DP))) exit
 
           i_trial = i_acc + 1
           H_trial = H_current + min(dH, remaining_distance) * H_dir
           if (remaining_distance <= dH) H_trial = gb_problem%H_end
+          dH_step = sqrt(sum((H_trial - H_current)**2))
+          dH_initial_T = mu0 * dH_initial
+          dH_T = mu0 * dH
+          dH_step_T = mu0 * dH_step
 
           m_before = m_accepted
           gb_problem%m0 = m_before
@@ -442,8 +462,14 @@
           gb_problem%Hext(i_trial,1) = 0.0_DP
           gb_problem%Hext(i_trial,2:4) = H_trial
 
-          write(prog_str,'(A31, I5, A8, I5, A6, F6.2, A7)') 'Adaptive External Field nr.: ', i_trial, ' max ', gb_problem%maxHextSteps, ' i.e. ', real(i_trial)/real(gb_problem%maxHextSteps)*100,'% done'
-          call displayGUIMessage( trim(prog_str) )
+          if (n_reject == 0) then
+              write(prog_str,'(A31,I5,A10,F8.2,A7)') 'Adaptive External Field nr.: ', i_trial, '   progress ', real(100.0_DP*dot_product(H_trial - gb_problem%H_start, H_dir)/H_distance, DP), '% done'
+              call displayGUIMessage( trim(prog_str) )
+              write(prog_str,'(A22,3F10.6,A2)') '      mu0 H [T] = ', mu0*H_trial(1), mu0*H_trial(2), mu0*H_trial(3), ' '
+              call displayGUIMessage( trim(prog_str) )
+              write(prog_str,'(A27,F10.6,A9,F10.6,A13,F10.6)') '      dH_initial [T] = ', dH_initial_T, ' dH [T] = ', dH_T, ' actual [T] = ', dH_step_T
+              call displayGUIMessage( trim(prog_str) )
+          endif
 
           call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i_trial), gb_problem%includeThermal, fct_thermal, cb_fct, &
                   gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
@@ -464,6 +490,9 @@
                   reject_step = .false.
               else
                   dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+                  dH_T = mu0 * dH
+                  write(prog_str,'(A27,F10.6,A4)') '   Retrying with lower dH = ', dH_T, ' T'
+                  call displayGUIMessage( trim(prog_str) )
               endif
           endif
 
@@ -482,7 +511,7 @@
               call displayGUIMessage('Adaptive hysteresis accepting a large magnetisation change at dH_min')
           endif
 
-          i_acc = i_acc + 1
+          i_acc = i_trial
           n_reject = 0
           H_current = H_trial
           m_accepted = m_trial
@@ -505,6 +534,9 @@
           else if (dM > gb_problem%dM_target) then
               dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
           endif
+
+          
+          
       enddo
 
       gb_problem%nHextAccepted = i_acc
@@ -517,12 +549,14 @@
     real(DP) function adaptiveStepMetric(m_before, m_trial, ntot) result(dM_rms)
     real(DP),dimension(:),intent(in) :: m_before, m_trial
     integer,intent(in) :: ntot
-    integer :: j
-      dM_rms = 0.0_DP
-      do j = 1, 3*ntot
-          dM_rms = dM_rms + (m_trial(j) - m_before(j))**2
-      enddo
-      dM_rms = sqrt(dM_rms / real(ntot, DP))
+    real(DP) :: M_sum_before(3), M_sum_trial(3)
+      M_sum_before(1) = sum(m_before(1:ntot)) / real(ntot, DP)
+      M_sum_before(2) = sum(m_before(ntot+1:2*ntot)) / real(ntot, DP)
+      M_sum_before(3) = sum(m_before(2*ntot+1:3*ntot)) / real(ntot, DP)
+      M_sum_trial(1)  = sum(m_trial(1:ntot)) / real(ntot, DP)
+      M_sum_trial(2)  = sum(m_trial(ntot+1:2*ntot)) / real(ntot, DP)
+      M_sum_trial(3)  = sum(m_trial(2*ntot+1:3*ntot)) / real(ntot, DP)
+      dM_rms = sqrt(sum((M_sum_trial - M_sum_before)**2))
     end function adaptiveStepMetric
 
     real(DP) function meanMagnetisationAlongField(m, ntot, H_dir) result(M_parallel)
