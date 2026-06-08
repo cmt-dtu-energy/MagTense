@@ -15,13 +15,15 @@ CUDA_WRAP_FILE = $(CUDA_WRAP_SOURCE).cxx
 
 ifeq ($(OS),Windows_NT)
     OBJ_SUFFIX = .obj
-    CPPFLAGS = /nologo /Fo:
+    CPPFLAGS = /nologo
+    CPPFLAGS_OUT = /Fo:
     LIBTOOL = LIB $? /NOLOGO /OUT:$@
     LIB_SUFFIX = .lib
 else
     OBJ_SUFFIX = .o
     CUFLAGS = -shared -Xcompiler -fPIC -I ${CONDA_PREFIX}/include
     CPPFLAGS = ${CFLAGS}
+    CPPFLAGS_OUT = -o 
     LIB_SUFFIX = .a
     ifeq (${UNAME}, Darwin)
         LIBTOOL = libtool -static -o $@ $?
@@ -48,7 +50,7 @@ cuda:
 	nvcc $(CUFLAGS) -c $(CUDA_FILE) -o $(CUDA_OBJECT)
 
 $(CUDA_WRAP):
-	$(CPP) $(CPPFLAGS) $(CUDA_WRAP_FILE) -c -o $@
+	$(CPP) $(CPPFLAGS) $(CPPFLAGS_OUT)$@ -c $(CUDA_WRAP_FILE)
 
 $(STATIC_LIB): $(CUDA_OBJECT) $(CUDA_WRAP)
 	$(LIBTOOL)
