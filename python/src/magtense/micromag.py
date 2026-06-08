@@ -973,8 +973,8 @@ class MicromagProblem:
             dM_min: float = 1e-3,
             dM_target: float = 1e-2,
             dM_reject: float = 5e-2,
-            dH_grow: float = 1.25,
-            dH_shrink: float = 0.5,
+            dH_grow: float = 1.5,
+            dH_shrink: float = 0.75,
             switch_refine_dH: float | None = None,
     ) -> list[np.ndarray | int]:
         """
