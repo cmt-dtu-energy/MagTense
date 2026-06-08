@@ -209,6 +209,11 @@ def run_single_grain_coercivity(
     allow_fmm_short_circuit: int = 0,
     fmm_min_n: int = 20000,
     fmm_nterms: int = -1,
+    adaptive: bool = False,
+    adaptive_max_steps: int | None = None,
+    adaptive_dh_initial_t: float | None = None,
+    adaptive_dh_min_t: float | None = None,
+    adaptive_dh_max_t: float | None = None,
 ) -> None:
     """Run one size/resolution hysteresis curve and save compatible arrays."""
     steps_t = np.arange(field_max_t, field_min_t + 0.5 * field_step_t, field_step_t)
@@ -245,13 +250,49 @@ def run_single_grain_coercivity(
     print(f"  use_fmm = {use_fmm}")
     print(f"  cuda = {cuda}")
     print(f"  cvode = {cvode}")
+    print(f"  adaptive = {adaptive}")
 
     start_time = time.time()
-    res = problem.run_hysteresis(H_ext=H_ext)
+    if adaptive:
+        max_steps = (
+            adaptive_max_steps if adaptive_max_steps is not None else len(steps_t)
+        )
+        dH_initial_t = (
+            adaptive_dh_initial_t
+            if adaptive_dh_initial_t is not None
+            else field_step_t
+        )
+        dH_min_t = (
+            adaptive_dh_min_t
+            if adaptive_dh_min_t is not None
+            else field_step_t / 10.0
+        )
+        dH_max_t = (
+            adaptive_dh_max_t
+            if adaptive_dh_max_t is not None
+            else field_step_t * 2.0
+        )
+        dH_initial = abs(dH_initial_t) / MU0
+        dH_min = abs(dH_min_t) / MU0
+        dH_max = abs(dH_max_t) / MU0
+        res = problem.run_hysteresis_adaptive(
+            H_start=H_ext[0, 1:4],
+            H_end=H_ext[-1, 1:4],
+            dH_initial=dH_initial,
+            dH_min=dH_min,
+            dH_max=dH_max,
+            max_steps=max_steps,
+            switch_refine_dH=dH_min,
+        )
+        n_fields = res[-1]
+        H_A_per_m = res[4][0, 0, :n_fields, 2]
+    else:
+        res = problem.run_hysteresis(H_ext=H_ext)
+        n_fields = len(steps_t)
+        H_A_per_m = H_ext[:, 3]
     runtime = time.time() - start_time
 
-    Mx, My, Mz = extract_mean_magnetisation(res, len(steps_t), DEFAULT_MS)
-    H_A_per_m = H_ext[:, 3]
+    Mx, My, Mz = extract_mean_magnetisation(res, n_fields, DEFAULT_MS)
     H_T = MU0 * H_A_per_m
     Hc_A_per_m = interpolated_coercivity(H_A_per_m, Mz)
     Hc_T = MU0 * Hc_A_per_m if np.isfinite(Hc_A_per_m) else np.nan
@@ -370,6 +411,15 @@ def main() -> None:
     parser.add_argument("--allow-fmm-short-circuit", type=int, default=0)
     parser.add_argument("--fmm-min-n", type=int, default=20000)
     parser.add_argument("--fmm-nterms", type=int, default=-1)
+    parser.add_argument(
+        "--adaptive",
+        action="store_true",
+        help="Use adaptive backend hysteresis stepping.",
+    )
+    parser.add_argument("--adaptive-max-steps", type=int, default=None)
+    parser.add_argument("--adaptive-dh-initial-t", type=float, default=None)
+    parser.add_argument("--adaptive-dh-min-t", type=float, default=None)
+    parser.add_argument("--adaptive-dh-max-t", type=float, default=None)
     args = parser.parse_args()
 
     if args.size_factor is None:
@@ -403,6 +453,11 @@ def main() -> None:
         allow_fmm_short_circuit=args.allow_fmm_short_circuit,
         fmm_min_n=args.fmm_min_n,
         fmm_nterms=args.fmm_nterms,
+        adaptive=args.adaptive,
+        adaptive_max_steps=args.adaptive_max_steps,
+        adaptive_dh_initial_t=args.adaptive_dh_initial_t,
+        adaptive_dh_min_t=args.adaptive_dh_min_t,
+        adaptive_dh_max_t=args.adaptive_dh_max_t,
     )
 
 

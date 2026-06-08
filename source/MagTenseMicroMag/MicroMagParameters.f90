@@ -144,6 +144,21 @@ include "mkl_dfti.f90"
         logical :: includeThermal                         !> Whether thermal noise is included in the simulations
         
         real(DP),dimension(:,:),allocatable :: Hext       !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
+        logical :: adaptiveHext = .false.                 !> Enable adaptive external-field stepping for explicit hysteresis.
+        integer :: maxHextSteps = 0                       !> Maximum number of accepted adaptive external-field steps.
+        integer :: nHextAccepted = 0                      !> Number of accepted adaptive external-field steps.
+        real(DP),dimension(3) :: H_start = 0.0_DP         !> Adaptive hysteresis start field [A/m].
+        real(DP),dimension(3) :: H_end = 0.0_DP           !> Adaptive hysteresis end field [A/m].
+        real(DP) :: dH_initial = 0.0_DP                   !> Initial adaptive field-step length [A/m].
+        real(DP) :: dH_min = 0.0_DP                       !> Minimum adaptive field-step length [A/m].
+        real(DP) :: dH_max = 0.0_DP                       !> Maximum adaptive field-step length [A/m].
+        real(DP) :: dH_grow = 1.25_DP                     !> Factor for increasing adaptive field-step length.
+        real(DP) :: dH_shrink = 0.5_DP                    !> Factor for decreasing adaptive field-step length.
+        real(DP) :: dM_min = 1.0e-3_DP                    !> Magnetisation-change threshold for growing adaptive field steps.
+        real(DP) :: dM_target = 1.0e-2_DP                 !> Magnetisation-change threshold for shrinking adaptive field steps.
+        real(DP) :: dM_reject = 5.0e-2_DP                 !> Magnetisation-change threshold for rejecting adaptive field steps.
+        real(DP) :: switch_refine_dH = 0.0_DP             !> Maximum accepted step across magnetisation sign changes [A/m].
+        logical :: use_switch_refine = .false.            !> Enable adaptive sign-change refinement.
         real(DP),dimension(:,:),allocatable :: alpha      !> A time dependent damping parameter, i.e. as a function of time. Size (nt,1).
         
         real(DP),dimension(:),allocatable :: t              !> Time array for the desired output times

@@ -789,6 +789,179 @@ end subroutine getHFromTilesFMM
 
     end subroutine RunMicroMagSimulation
 
+    subroutine RunMicroMagAdaptiveHysteresis( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
+        K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, temperature, MaxT0, nt_Hext, n_Hext, nt_Hext_out, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+        N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
+        conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
+        exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, useAvgN, demigstp, &
+		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
+        n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
+        H_start, H_end, dH_initial, dH_min, dH_max, maxHextSteps, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH, use_switch_refine, &
+        t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, n_Hext_accepted, &
+		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useFMM, &
+        log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, useDemag )
+
+        integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, n_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
+        integer(4), intent(in) :: nt_Hext_out
+        integer(4),dimension(3),intent(in) :: grid_n, N_ave
+        real(8),dimension(3),intent(in) :: grid_L
+        real(8),dimension(3),intent(in) :: H_start, H_end
+        real(8),intent(in) :: dH_initial, dH_min, dH_max, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH
+        integer(4),intent(in) :: maxHextSteps, use_switch_refine
+        real(8),dimension(ntot,3),intent(in) :: grid_pts
+        integer(4),dimension(4,ntot),intent(in) :: grid_ele
+        real(8),dimension(grid_nnod,3),intent(in) :: grid_nod
+        real(8),dimension(ntot, 3),intent(in) :: grid_abc, u_ea
+        real(8),dimension(nt_Hext, 4),intent(in) :: Hext
+        real(8),dimension(3*ntot),intent(in) :: m0
+        real(8),dimension(nt_alpha,2),intent(in) :: alphat
+        integer(4),dimension(exch_nval),intent(in) :: exch_val, exch_cols, exch_rows
+        real(8),dimension(nt_conv),intent(in) :: t_conv
+		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab, useAvgN
+		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch, useDemag
+        real(8),intent(in) :: gamma, alpha_mm, MaxT0, tol, thres, conv_tol, dem_thres
+		real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2, temperature
+        real(8),dimension(ntot,6,3),intent(in) :: K0_arr
+        real(8),dimension(ntot,3,3),intent(in):: CrysAxis
+        character*256,intent(in) :: N_file_in, N_file_out
+		real(8), intent(in) :: CV, exch_weigh
+
+        integer(4),dimension(3),intent(in) :: n_macro
+        real(8),dimension(3),intent(in) :: shiftVec, macroShape, sampleShape
+        integer(4),dimension(3),intent(in) :: exchPBC
+
+        real(8),dimension(nt),intent(in) :: t
+        real(8),dimension(nt),intent(out) :: t_out
+        real(8),dimension(nt,ntot,nt_Hext_out,3),intent(out) :: M_mm
+        real(8),dimension(nt,ntot,nt_Hext_out,3),intent(out) :: H_exc, H_ext, H_dem, H_ani
+        integer(4),intent(out) :: n_Hext_accepted
+        real(8),dimension(ntot,3),intent(out) :: pts
+
+		integer,intent(out) :: n_tot_Exch
+		integer,dimension(exch_presize*ntot),intent(out)  :: ExchMat_r
+		integer,dimension(exch_presize*ntot),intent(out)  :: ExchMat_c
+		real(8),dimension(exch_presize*ntot),intent(out)  :: ExchMat_v
+		integer,intent(out) :: ExchMat_nr,ExchMat_nc
+
+        integer, intent(in) :: dummy_run
+        integer(4), intent(in) :: fmm_cells_per_node
+        real(8), intent(in) :: eps_fmm
+        integer(4), intent(in) :: ifunif
+        integer(4), intent(in) :: nlmin
+        integer(4), intent(in) :: nlmax
+        integer(4), intent(in) :: allow_fmm_short_circuit
+        integer(4), intent(in) :: fmm_min_n
+        integer(4), intent(in) :: fmm_nterms
+        integer(4), intent(in) :: useFMM
+
+        !-------------------- timer and trace modules --------------------------------------
+        character*256,intent(in) :: timer_log_file, trace_log_file, log_dir
+        integer, intent(in) :: window_enabled, trace_enabled, flush_each
+        real(8), intent(in) :: window_interval
+        integer, intent(in) :: trace_verbose
+        !-----------------------------------------------------------------------------------
+
+        logical :: window_enabled_l, trace_enabled_l, flush_each_l
+        logical :: use_fmm
+        integer,dimension(3) :: exchPBC_l
+
+#if USE_MICROMAG
+        type(MicroMagProblem) :: problem
+        type(MicroMagSolution) :: solution
+
+
+
+        !---------------------- initiaize auxiliary modules -----------------------------
+        call auxInit%initAux(log_dir, timer_log_file, trace_log_file, window_enabled, &
+            window_interval, trace_enabled, flush_each, trace_verbose)
+        !---------------------------------------------------------------------------------
+
+
+
+
+        exchPBC_l = merge(.true., .false., exchPBC /= 0)
+        use_fmm = merge(.true., .false., useFMM /= 0)
+        call loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
+            gamma, alpha_mm, temperature, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+            N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
+            conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
+            exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
+            CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
+            n_macro, shiftVec, macroShape, sampleShape, exchPBC_l, &
+            passExch, exch_ncols, CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
+            useDemag)
+
+        problem%adaptiveHext = .true.
+        problem%maxHextSteps = maxHextSteps
+        problem%nHextAccepted = 0
+        problem%H_start = H_start
+        problem%H_end = H_end
+        problem%dH_initial = dH_initial
+        problem%dH_min = dH_min
+        problem%dH_max = dH_max
+        problem%dH_grow = dH_grow
+        problem%dH_shrink = dH_shrink
+        problem%dM_min = dM_min
+        problem%dM_target = dM_target
+        problem%dM_reject = dM_reject
+        problem%switch_refine_dH = switch_refine_dH
+        problem%use_switch_refine = (use_switch_refine /= 0)
+
+        call SolveLandauLifshitzEquation( problem, solution )
+
+
+        t_out = solution%t_out
+        M_mm = solution%M_out
+        pts = solution%pts
+        H_exc = solution%H_exc
+        H_ext = solution%H_ext
+        H_dem = solution%H_dem
+        H_ani = solution%H_ani
+        n_Hext_accepted = problem%nHextAccepted
+				n_tot_Exch = solution%gridinfo%Exch_mat_ntot
+
+		if (exch_presize*ntot < n_tot_Exch) then
+            write(*,*) 'ExchMat_presize is too small to copy all exchange matrix values. It is set to ', exch_presize*ntot, ' but the exchange matrix has ', n_tot_Exch, ' entries.'
+            write(*,*) 'Please increase the value of exch_presize to at least ', n_tot_Exch/ntot, ' in the Python script.'
+            write(*,*) 'Returning zeros for exchange matrix.'
+            ExchMat_r = 0
+            ExchMat_c = 0
+            ExchMat_v = 0.
+        else
+            ExchMat_r(1:n_tot_Exch) = solution%gridinfo%Exch_mat_r
+            ExchMat_c(1:n_tot_Exch) = solution%gridinfo%Exch_mat_c
+            ExchMat_v(1:n_tot_Exch) = solution%gridinfo%Exch_mat_v
+        end if
+
+        ExchMat_nr = solution%gridinfo%Exch_mat_nr
+		ExchMat_nc = solution%gridinfo%Exch_mat_nc
+#else
+        write(*,*) 'Compiled without micromagnetic part. Returning zeros.'
+        n_tot_Exch = 0
+        ExchMat_r = 0
+        ExchMat_c = 0
+        ExchMat_v = 0.
+        ExchMat_nr = 0
+        ExchMat_nc = 0
+
+        t_out = 0.
+        M_mm(:,:,:,:) = 0.
+        pts(:,:) = 0.
+        H_exc(:,:,:,:) = 0.
+        H_ext(:,:,:,:) = 0.
+        H_dem(:,:,:,:) = 0.
+        H_ani(:,:,:,:) = 0.
+        n_Hext_accepted = 0
+#endif
+
+
+    !---------------------- finalize auxiliary modules -----------------------------
+    call trace%finalize()
+    call timer%log_finalize()
+    !---------------------------------------------------------------------------------
+
+    end subroutine RunMicroMagAdaptiveHysteresis
+
 
 
 
