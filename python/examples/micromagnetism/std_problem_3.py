@@ -33,6 +33,21 @@ def std_prob_3(
         usereturnhall=True ,
     )
 
+    #--------- disable fmm -----
+    problem.use_fmm = 0
+    #----------------------------
+    
+    #--------------- set trace/timing options -------------
+    problem.use_fmm = 0
+    problem.window_enabled = 0
+    problem.window_interval = 30.0
+    problem.trace_enabled = 0
+    problem.flush_each = 1
+    problem.trace_verbose = 2
+    problem.timer_log_file =  "std_3_timer.log"
+    problem.trace_log_file =  "std_3_trace.log"
+    #------------------------------------------------------
+
     problem.u_ea[:, 2] = 1
     lex = np.sqrt(A0 / (0.5 * mu0 * Ms**2))
 

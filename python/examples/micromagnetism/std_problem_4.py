@@ -237,7 +237,7 @@ if __name__ == "__main__":
         unstructured=False,
         plotting=True,
         useavgn=True,
-        #figpath= Path.cwd() / "results"
+        figpath= Path.cwd() / "results"
         #figpath=Path(__file__).parent.absolute().joinpath("..", "figs"),
-        figpath=None,
+        #figpath=None,
     )
