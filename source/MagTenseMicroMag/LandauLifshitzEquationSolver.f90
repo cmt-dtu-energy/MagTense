@@ -1697,23 +1697,30 @@ end subroutine updateDemagfieldFMM
                         pts_arr(:,2) =  problem%grid%pts(:,2)
                         pts_arr(:,3) =  problem%grid%pts(:,3)
 
-                        if (all(n_macro == 0.0)) then
-                            call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                        if (all(n_macro == 0)) then
+
+                            if (problem%useAvgN .eq. useAvgNTrue) then
+                                ! Non-periodic, average prism tensor
+                                call getFieldFromTiles(tile, H, pts_arr, 1, ntot, Nout, .false., &
+                                    Obs_size=obs_size_arr)
+                            else
+                                ! Non-periodic, point prism tensor
+                                call getFieldFromTiles(tile, H, pts_arr, 1, ntot, Nout, .false.)
+                            end if
+
                         else
-                            call getFieldFromTiles_PBC( tile, H, problem%grid%pts, 1, ntot, n_macro, &
-                            shiftVec, Nout, .false. )
+
+                            if (problem%useAvgN .eq. useAvgNTrue) then
+                                ! Periodic, average prism tensor
+                                call getFieldFromTiles_PBC(tile, H, pts_arr, 1, ntot, n_macro, &
+                                    shiftVec, Nout, .false., Obs_size=obs_size_arr)
+                            else
+                                ! Periodic, point prism tensor
+                                call getFieldFromTiles_PBC(tile, H, pts_arr, 1, ntot, n_macro, &
+                                    shiftVec, Nout, .false.)
+                            end if
+
                         end if
-                        
-                        if (problem%useAvgN .eq. useAvgNTrue) then
-                            !Use the average prism tensor
-                            !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false., Obs_size=obs_size_arr)
-                            call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false., Obs_size=obs_size_arr)
-                        else
-                            !Use the point prism tensor
-                            !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
-                            call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
-                        endif
-                        
                         !Copy Nout into the proper structure used by the micro mag model
                         ind = (k-1) * nx * ny + (j-1) * nx + i
                     
