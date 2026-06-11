@@ -2,120 +2,178 @@
 set -u
 
 # ============================================================
-# Single-grain grain-size/resolution coercivity sweep
+# Single-grain coercivity parameter scan
 # ============================================================
-# Physical setup implemented by single_grain_coercivity.py:
-#   Lx = Ly = Lz = L, nx = ny = nz = n, one material grain,
-#   H_ext along z, and the easy axis tilted slightly away from z.
 #
-# Grain sizes are defined by SIZE_FACTORS relative to the characteristic
-# exchange/demagnetisation scale
-#   ell = sqrt(A0 / (0.5 * mu0 * Ms**2))
-# using the same SI-unit material defaults as the grain examples
-# (A0 = 7.7e-12 J/m, mu0*Ms = 1.61 T).  The Python setup computes
-# L = factor * ell to avoid unit conversion mistakes in this shell script.
+# Scans:
+#   --adaptive-dh-min-t   only when USE_ADAPTIVE=true
+#   --n
+#   --size-factor
 #
-# The default RESOLUTIONS span roughly 1000--10000 cubic cells:
-#   10^3, 12^3, 14^3, 16^3, 18^3, 20^3, 22^3.
+# Optional flags:
+#   USE_ADAPTIVE=true  -> add --adaptive and --adaptive-dh-min-t
+#   USE_PERIODIC=true  -> add --periodic
 #
-# FMM is disabled by default.  Set USE_FMM=true to add --use-fmm while
-# preserving the same physical setup and output naming convention.
+# All other parameters are left at the defaults in:
+#   single_grain_coercivity.py
+#
+# Example adaptive + periodic command:
+#   python single_grain_coercivity.py \
+#       --size-factor 15 \
+#       --n 10 \
+#       --adaptive \
+#       --adaptive-dh-min-t 0.001 \
+#       --periodic
+#
+# Example non-adaptive + non-periodic command:
+#   python single_grain_coercivity.py \
+#       --size-factor 15 \
+#       --n 10
 # ============================================================
 
 PYTHON_BIN="python"
 PY_SCRIPT="single_grain_coercivity.py"
 
-RESOLUTIONS=(10 12 14 16 18 20 22)
-SIZE_FACTORS=(0.5 0.75 1.0 1.25 1.5 2.0)
-USE_FMM=false
-USE_CUDA=false
-DO_PLOT=true
+# Top-level run-mode flags
+USE_ADAPTIVE=true
+USE_PERIODIC=true
 
-TILT_DEGREES=3.0
-OUTPUT_ROOT="results"
+# Smallest dh_min first, so the finest adaptive stepping runs first.
+# This array is only used when USE_ADAPTIVE=true.
+DH_MIN_VAL=(0.001 0.01 0.1)
+
+#RESOLUTIONS=(10 12 14 16 18 20)
+RESOLUTIONS=(10 12 14)
+SIZE_FACTORS=(1 5 10 15 20 25 30 40)
+
+
 LOGDIR="logs"
 
-# Hysteresis field sweep in Tesla-equivalent values.  The Python setup converts
-# these to A/m for MagTense, matching the existing grain hysteresis convention.
-FIELD_MAX_T=1.0
-FIELD_MIN_T=-7.0
-FIELD_STEP_T=-0.1
-
-# Optional FMM controls for future comparisons when USE_FMM=true.
-# Defaults match the grain and grain_perf command-line defaults.
-FMM_CPN=660
-FMM_EPS="1e-4"
-IFUNIF=1
-NLMIN=1
-NLMAX=5
-ALLOW_FMM_SHORT_CIRCUIT=0
-FMM_MIN_N=20000
-FMM_NTERMS=-1
-
-# Ensure the local package sources are importable when this script is run from
-# the experiment directory without installing MagTense as a wheel.
+# Ensure local MagTense sources are importable.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PYTHONPATH="${SCRIPT_DIR}/../../src:${PYTHONPATH:-}"
 
-mkdir -p "$LOGDIR" "$OUTPUT_ROOT"
+mkdir -p "$LOGDIR"
+
 timestamp="$(date +%Y%m%d_%H%M%S)"
 summary="${LOGDIR}/summary_single_grain_${timestamp}.tsv"
-echo -e "size_factor\tresolution\tntot\tfmm\texit_code\toutput_dir" > "$summary"
+
+echo -e "adaptive\tperiodic\tdh_min\tn\tsize_factor\tntot\texit_code\tstdout\tstderr" > "$summary"
 
 fail_count=0
+run_index=0
 
-for size_factor in "${SIZE_FACTORS[@]}"; do
-  for n in "${RESOLUTIONS[@]}"; do
-    fmm_tag="fmm_off"
-    cmd=("$PYTHON_BIN" "$PY_SCRIPT" --size-factor "$size_factor" --n "$n")
-    cmd+=(--tilt-degrees "$TILT_DEGREES")
-    cmd+=(--field-max-t "$FIELD_MAX_T" --field-min-t "$FIELD_MIN_T" --field-step-t "$FIELD_STEP_T")
-    cmd+=(--output-dir "$OUTPUT_ROOT")
+if [[ "$USE_ADAPTIVE" == true ]]; then
+  n_runs=$((${#DH_MIN_VAL[@]} * ${#RESOLUTIONS[@]} * ${#SIZE_FACTORS[@]}))
+else
+  n_runs=$((${#RESOLUTIONS[@]} * ${#SIZE_FACTORS[@]}))
+fi
 
-    if [[ "$USE_FMM" == true ]]; then
-      fmm_tag="fmm_on"
-      cmd+=(--use-fmm --fmm-cpn "$FMM_CPN" --fmm-eps "$FMM_EPS")
-      cmd+=(--ifunif "$IFUNIF" --nlmin "$NLMIN" --nlmax "$NLMAX")
-      cmd+=(--allow-fmm-short-circuit "$ALLOW_FMM_SHORT_CIRCUIT")
-      cmd+=(--fmm-min-n "$FMM_MIN_N" --fmm-nterms "$FMM_NTERMS")
-    fi
+make_stem() {
+  local size_factor="$1"
+  local n="$2"
+  local dh_min="${3:-}"
 
-    if [[ "$USE_CUDA" == true ]]; then
-      cmd+=(--cuda)
-    fi
+  "$PYTHON_BIN" - "$size_factor" "$n" "$USE_PERIODIC" "$USE_ADAPTIVE" "$dh_min" <<'PY'
+import sys
+import math
 
-    if [[ "$DO_PLOT" != true ]]; then
-      cmd+=(--no-plot)
-    fi
+size_factor = float(sys.argv[1])
+n = int(sys.argv[2])
+periodic = sys.argv[3].lower() == "true"
+adaptive = sys.argv[4].lower() == "true"
+dh_min_arg = sys.argv[5] if len(sys.argv) > 5 else ""
 
-    tag="single_grain_sf${size_factor}_n${n}_${fmm_tag}_${timestamp}"
-    out="${LOGDIR}/${tag}.out"
-    err="${LOGDIR}/${tag}.err"
+stem = f"single_grain_sf{size_factor:.2g}_n{n}"
 
-    echo "=================================================="
-    echo "Size factor : $size_factor"
-    echo "Resolution  : $n ($((n*n*n)) cells)"
-    echo "FMM         : $USE_FMM"
-    echo "Command     : ${cmd[*]}"
-    echo "Started at  : $(date)"
+if periodic:
+    stem = stem.replace(f"_n{n}", f"_n{n}_P", 1)
 
-    "${cmd[@]}" >"$out" 2>"$err"
-    rc=$?
+if adaptive:
+    dh_min = abs(float(dh_min_arg))
+    stem += f"_A_FS{dh_min:.1e}"
 
-    echo "Finished at : $(date)"
-    echo "Exit code   : $rc"
-    echo "stdout      : $out"
-    echo "stderr      : $err"
+print(stem)
+PY
+}
 
-    echo -e "${size_factor}\t${n}\t$((n*n*n))\t${USE_FMM}\t${rc}\t${OUTPUT_ROOT}" >> "$summary"
-    if (( rc != 0 )); then
-      fail_count=$((fail_count + 1))
-    fi
+run_one() {
+  local dh_min="$1"
+  local n="$2"
+  local size_factor="$3"
+
+  run_index=$((run_index + 1))
+
+  cmd=(
+    "$PYTHON_BIN"
+    "$PY_SCRIPT"
+    --size-factor "$size_factor"
+    --n "$n"
+  )
+
+  if [[ "$USE_ADAPTIVE" == true ]]; then
+    cmd+=(--adaptive)
+    cmd+=(--adaptive-dh-min-t "$dh_min")
+  fi
+
+  if [[ "$USE_PERIODIC" == true ]]; then
+    cmd+=(--periodic)
+  fi
+
+  stem="$(make_stem "$size_factor" "$n" "$dh_min")"
+  out="${LOGDIR}/${stem}_${timestamp}.out"
+  err="${LOGDIR}/${stem}_${timestamp}.err"
+
+  echo "=================================================="
+  echo "Run              : ${run_index}/${n_runs}"
+  echo "Adaptive         : $USE_ADAPTIVE"
+  echo "Periodic         : $USE_PERIODIC"
+  if [[ "$USE_ADAPTIVE" == true ]]; then
+    echo "dh_min           : $dh_min"
+  fi
+  echo "Resolution       : $n ($((n*n*n)) cells)"
+  echo "Size factor      : $size_factor"
+  echo "Log stem         : $stem"
+  echo "Command          : ${cmd[*]}"
+  echo "Started at       : $(date)"
+
+  "${cmd[@]}" >"$out" 2>"$err"
+  rc=$?
+
+  echo "Finished at      : $(date)"
+  echo "Exit code        : $rc"
+  echo "stdout           : $out"
+  echo "stderr           : $err"
+
+  echo -e "${USE_ADAPTIVE}\t${USE_PERIODIC}\t${dh_min}\t${n}\t${size_factor}\t$((n*n*n))\t${rc}\t${out}\t${err}" >> "$summary"
+
+  if (( rc != 0 )); then
+    fail_count=$((fail_count + 1))
+  fi
+}
+
+if [[ "$USE_ADAPTIVE" == true ]]; then
+  for dh_min in "${DH_MIN_VAL[@]}"; do
+    for n in "${RESOLUTIONS[@]}"; do
+      for size_factor in "${SIZE_FACTORS[@]}"; do
+        run_one "$dh_min" "$n" "$size_factor"
+      done
+    done
   done
-done
+else
+  for n in "${RESOLUTIONS[@]}"; do
+    for size_factor in "${SIZE_FACTORS[@]}"; do
+      run_one "none" "$n" "$size_factor"
+    done
+  done
+fi
 
+echo "=================================================="
 echo "Summary written to: $summary"
+
 if (( fail_count > 0 )); then
   echo "ERROR: $fail_count run(s) failed." >&2
   exit 1
 fi
+
+echo "All runs completed successfully."

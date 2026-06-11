@@ -60,6 +60,7 @@
     type(MicroMagSolution),intent(inout) :: sol          !> The solution data structure
     type(MicroMagGridInfo) :: gridinfo                   !> The grid information structure
     integer :: ntot,i,j,k,ind,nt,nt_Hext,stat            !> total no. of tiles (Note from F. Durhuus: n_Hext would make more sense than nt_Hext)
+    integer :: n_reject_max
     procedure(dydt_fct), pointer :: fct                  !> Input function pointer for the function to be integrated
     procedure(no_argument_fct), pointer :: fct_thermal   !> Function pointer for the function that updates the stochastic thermal field
     procedure(callback_fct),pointer :: cb_fct            !> Callback function for displaying progress
@@ -235,6 +236,10 @@
     if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
         !Go through several different applied fields and find the equilibrium solution for each of them
         nt_Hext = size(gb_problem%Hext, 1)          !The no. of applied fields to consider
+        if (gb_problem%adaptiveHext) then
+            ! Allocate one extra slot for the initial starting field and state
+            nt_Hext = gb_problem%maxHextSteps + 1
+        endif
     else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
         !Simply do a time evolution as specified in the problem
         nt_Hext = 1
@@ -294,36 +299,19 @@
     !$omp parallel default(shared)
     !$omp master
         
-      do i=1,nt_Hext
-          !Applied field
-          gb_solution%HextInd = i
-          
-          if (gb_problem%solver .eq. MicroMagSolverExplicit) then               
-              write(prog_str,'(A20, I5.2, A8, I5.2, A6, F6.2, A7)') 'External Field nr.: ', i, ' out of ', nt_Hext, ' i.e. ', real(i)/real(nt_Hext)*100,'% done'
-              call displayGUIMessage( trim(prog_str) )
-          endif
-          
-          ! This is where the LLG is actually integrated (short description by F. Durhuus)
-          ! fct is a pointer to the dmdt_fct function which returns time derivatives of the normalised magnetic moments
-          ! With m0 as initial condition, integrate from t(1) to t(nt) with effective field updated at each time coordinate t, then store result in t_out and M_out.
-          ! t_conv is time coordinates where convergence is tested when computing equilibrium structure (explicit solver rather than dynamic). Also included in t_out.
-          ! When thermal noise is included (includeThermal = .true.) the magnetisation is normalised each timestep to prevent thermal drift
-          call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), gb_problem%includeThermal, fct_thermal, cb_fct, &
-                  gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
-          
-          !The initial state of the next solution is the previous solution result
-          gb_problem%m0 = M_out(:,nt,i)
-          
-          !Store the solution
-          gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
-          gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
-          gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
- 
-          call StoreHeffComponents ( gb_problem, gb_solution )              
-      enddo
+      if (gb_problem%adaptiveHext) then
+          n_reject_max = max(100, 10 * gb_problem%maxHextSteps)
+          call SolveAdaptiveHextLoop(fct, fct_thermal, cb_fct, M_out, ntot, nt, n_reject_max)
+      else
+          call SolveFixedHextLoop(fct, fct_thermal, cb_fct, M_out, ntot, nt, nt_Hext)
+      endif
 
       !$omp end master
       !$omp end parallel
+
+      if (gb_problem%adaptiveHext) then
+          nt_Hext = gb_problem%nHextAccepted
+      endif
 
       
         !CALL SYSTEM_CLOCK(c2)
@@ -357,6 +345,230 @@
     call trace%end( "SolveLandauLifshitzEquation", itimer=itimer, verbose=1 )
     end subroutine SolveLandauLifshitzEquation
 
+
+    subroutine SolveFixedHextLoop(fct, fct_thermal, cb_fct, M_out, ntot, nt, nt_Hext)
+    procedure(dydt_fct), pointer :: fct
+    procedure(no_argument_fct), pointer :: fct_thermal
+    procedure(callback_fct),pointer :: cb_fct
+    real(DP),dimension(:,:,:),intent(inout) :: M_out
+    integer,intent(in) :: ntot, nt, nt_Hext
+    integer :: i
+    character*(100) :: prog_str
+
+      do i=1,nt_Hext
+          !Applied field
+          gb_solution%HextInd = i
+
+          if (gb_problem%solver .eq. MicroMagSolverExplicit) then
+              write(prog_str,'(A20, I5, A8, I5, A6, F6.2, A7)') 'External Field nr.: ', i, ' out of ', nt_Hext, ' i.e. ', real(i)/real(nt_Hext)*100,'% done'
+              call displayGUIMessage( trim(prog_str) )
+          endif
+
+          ! This is where the LLG is actually integrated (short description by F. Durhuus)
+          ! fct is a pointer to the dmdt_fct function which returns time derivatives of the normalised magnetic moments
+          ! With m0 as initial condition, integrate from t(1) to t(nt) with effective field updated at each time coordinate t, then store result in t_out and M_out.
+          ! t_conv is time coordinates where convergence is tested when computing equilibrium structure (explicit solver rather than dynamic). Also included in t_out.
+          ! When thermal noise is included (includeThermal = .true.) the magnetisation is normalised each timestep to prevent thermal drift
+          call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), gb_problem%includeThermal, fct_thermal, cb_fct, &
+                  gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
+
+          !The initial state of the next solution is the previous solution result
+          gb_problem%m0 = M_out(:,nt,i)
+
+          !Store the solution
+          gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
+          gb_solution%M_out(:,:,i,2) =  transpose( M_out((ntot+1):2*ntot,:,i) )
+          gb_solution%M_out(:,:,i,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i)  )
+
+          call StoreHeffComponents ( gb_problem, gb_solution )
+      enddo
+
+      gb_problem%nHextAccepted = nt_Hext
+    end subroutine SolveFixedHextLoop
+
+    subroutine SolveAdaptiveHextLoop(fct, fct_thermal, cb_fct, M_out, ntot, nt, n_reject_max)
+    procedure(dydt_fct), pointer :: fct
+    procedure(no_argument_fct), pointer :: fct_thermal
+    procedure(callback_fct),pointer :: cb_fct
+    real(DP),dimension(:,:,:),intent(inout) :: M_out
+    integer,intent(in) :: ntot, nt, n_reject_max
+    integer :: i_acc, i_trial, n_reject, n_reject_total, ti
+    real(DP) :: H_delta(3), H_dir(3), H_current(3), H_trial(3), H_remaining(3)
+    real(DP) :: H_distance, remaining_distance, dH, dH_initial, dH_step, dH_initial_T, dH_T, dH_step_T, dM, m_parallel_before, m_parallel_trial
+    real(DP),dimension(:),allocatable :: m_before, m_accepted, m_trial
+    logical :: reject_step, reached_end
+    character*(256) :: prog_str
+
+      if (gb_problem%maxHextSteps <= 0) then
+          call displayGUIMessage('Adaptive hysteresis requires maxHextSteps > 0')
+          error stop 'Adaptive hysteresis requires maxHextSteps > 0'
+      endif
+      if (gb_problem%dH_initial <= 0.0_DP .or. gb_problem%dH_min <= 0.0_DP .or. gb_problem%dH_max <= 0.0_DP) then
+          call displayGUIMessage('Adaptive hysteresis requires positive dH_initial, dH_min and dH_max')
+          error stop 'Adaptive hysteresis requires positive dH_initial, dH_min and dH_max'
+      endif
+      if (gb_problem%dH_min > gb_problem%dH_max) then
+          call displayGUIMessage('Adaptive hysteresis requires dH_min <= dH_max')
+          error stop 'Adaptive hysteresis requires dH_min <= dH_max'
+      endif
+
+      H_delta = gb_problem%H_end - gb_problem%H_start
+      H_distance = sqrt(sum(H_delta**2))
+      if (H_distance <= tiny(1.0_DP)) then
+          call displayGUIMessage('Adaptive hysteresis requires H_start and H_end to differ')
+          error stop 'Adaptive hysteresis requires H_start and H_end to differ'
+      endif
+
+      H_dir = H_delta / H_distance
+      H_current = gb_problem%H_start
+      dH_initial = gb_problem%dH_initial
+      dH = dH_initial
+      allocate(m_before(3*ntot), m_accepted(3*ntot), m_trial(3*ntot))
+      m_accepted = gb_problem%m0
+
+    ! Save the starting field and magnetisation state (store at first time index)
+    i_acc = 1
+    gb_solution%HextInd = i_acc
+    gb_problem%Hext(i_acc,1) = 0.0_DP
+    gb_problem%Hext(i_acc,2:4) = H_current
+    ! Store the initial condition for all time indices so the returned
+    ! `gb_solution%M_out` contains a valid time-series for the initial field.
+    do ti = 1, size(gb_problem%t)
+        gb_solution%M_out(ti,:,i_acc,1) = m_accepted(1:ntot)
+        gb_solution%M_out(ti,:,i_acc,2) = m_accepted(ntot+1:2*ntot)
+        gb_solution%M_out(ti,:,i_acc,3) = m_accepted(2*ntot+1:3*ntot)
+    end do
+    call StoreHeffComponents ( gb_problem, gb_solution )
+
+    n_reject = 0
+      n_reject_total = 0
+      reached_end = .false.
+
+      do while (.not. reached_end .and. i_acc < gb_problem%maxHextSteps + 1)
+          remaining_distance = dot_product(gb_problem%H_end - H_current, H_dir)
+          if (remaining_distance <= max(1.0e-12_DP * H_distance, tiny(1.0_DP))) exit
+
+          i_trial = i_acc + 1
+          H_trial = H_current + min(dH, remaining_distance) * H_dir
+          if (remaining_distance <= dH) H_trial = gb_problem%H_end
+          dH_step = sqrt(sum((H_trial - H_current)**2))
+          dH_initial_T = mu0 * dH_initial
+          dH_T = mu0 * dH
+          dH_step_T = mu0 * dH_step
+
+          m_before = m_accepted
+          gb_problem%m0 = m_before
+          gb_solution%HextInd = i_trial
+          gb_problem%Hext(i_trial,1) = 0.0_DP
+          gb_problem%Hext(i_trial,2:4) = H_trial
+
+          if (n_reject == 0) then
+              write(prog_str,'(A31,I5,A10,F8.2,A7)') 'Adaptive External Field nr.: ', i_trial, '   progress ', real(100.0_DP*dot_product(H_trial - gb_problem%H_start, H_dir)/H_distance, DP), '% done'
+              call displayGUIMessage( trim(prog_str) )
+              write(prog_str,'(A22,3F10.6,A2)') '      mu0 H [T] = ', mu0*H_trial(1), mu0*H_trial(2), mu0*H_trial(3), ' '
+              call displayGUIMessage( trim(prog_str) )
+              write(prog_str,'(A27,F10.6,A9,F10.6,A13,F10.6)') '      dH_initial [T] = ', dH_initial_T, ' dH [T] = ', dH_T, ' actual [T] = ', dH_step_T
+              call displayGUIMessage( trim(prog_str) )
+          endif
+
+          call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i_trial), gb_problem%includeThermal, fct_thermal, cb_fct, &
+                  gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
+
+          m_trial = M_out(:,nt,i_trial)
+          dM = adaptiveStepMetric(m_before, m_trial, ntot)
+
+          m_parallel_before = meanMagnetisationAlongField(m_before, ntot, H_dir)
+          m_parallel_trial = meanMagnetisationAlongField(m_trial, ntot, H_dir)
+          reject_step = .false.
+          if (dM > gb_problem%dM_reject .and. dH > gb_problem%dH_min) reject_step = .true.
+          if (gb_problem%use_switch_refine) then
+              if (m_parallel_before * m_parallel_trial < 0.0_DP .and. dH > gb_problem%switch_refine_dH .and. dH > gb_problem%dH_min) reject_step = .true.
+          endif
+
+          if (reject_step) then
+              if (n_reject > 0 .and. dH <= gb_problem%dH_min) then
+                  reject_step = .false.
+              else
+                  dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+                  dH_T = mu0 * dH
+                  write(prog_str,'(A27,F10.6,A4)') '   Retrying with lower dH = ', dH_T, ' T'
+                  call displayGUIMessage( trim(prog_str) )
+              endif
+          endif
+
+          if (reject_step) then
+              gb_problem%m0 = m_before
+              n_reject = n_reject + 1
+              n_reject_total = n_reject_total + 1
+              if (n_reject_total > n_reject_max) then
+                  call displayGUIMessage('Adaptive hysteresis stopped after too many rejected field steps')
+                  error stop 'Adaptive hysteresis stopped after too many rejected field steps'
+              endif
+              cycle
+          endif
+
+          if (dM > gb_problem%dM_reject .and. dH <= gb_problem%dH_min) then
+              call displayGUIMessage('Adaptive hysteresis accepting a large magnetisation change at dH_min')
+          endif
+
+          i_acc = i_trial
+          n_reject = 0
+          H_current = H_trial
+          m_accepted = m_trial
+          gb_problem%m0 = m_accepted
+          gb_solution%HextInd = i_acc
+          gb_problem%Hext(i_acc,1) = 0.0_DP
+          gb_problem%Hext(i_acc,2:4) = H_current
+
+          gb_solution%M_out(:,:,i_acc,1) =  transpose( M_out(1:ntot,:,i_trial) )
+          gb_solution%M_out(:,:,i_acc,2) =  transpose( M_out((ntot+1):2*ntot,:,i_trial) )
+          gb_solution%M_out(:,:,i_acc,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i_trial)  )
+
+          call StoreHeffComponents ( gb_problem, gb_solution )
+
+          H_remaining = gb_problem%H_end - H_current
+          reached_end = sqrt(sum(H_remaining**2)) <= max(1.0e-10_DP * H_distance, 1.0e-9_DP)
+
+          if (dM < gb_problem%dM_min) then
+              dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
+          else if (dM > gb_problem%dM_target) then
+              dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+          endif
+
+          
+          
+      enddo
+
+      gb_problem%nHextAccepted = i_acc
+      if (.not. reached_end) then
+          call displayGUIMessage('Adaptive hysteresis reached maxHextSteps before H_end')
+      endif
+      deallocate(m_before, m_accepted, m_trial)
+    end subroutine SolveAdaptiveHextLoop
+
+    real(DP) function adaptiveStepMetric(m_before, m_trial, ntot) result(dM_rms)
+    real(DP),dimension(:),intent(in) :: m_before, m_trial
+    integer,intent(in) :: ntot
+    real(DP) :: M_sum_before(3), M_sum_trial(3)
+      M_sum_before(1) = sum(m_before(1:ntot)) / real(ntot, DP)
+      M_sum_before(2) = sum(m_before(ntot+1:2*ntot)) / real(ntot, DP)
+      M_sum_before(3) = sum(m_before(2*ntot+1:3*ntot)) / real(ntot, DP)
+      M_sum_trial(1)  = sum(m_trial(1:ntot)) / real(ntot, DP)
+      M_sum_trial(2)  = sum(m_trial(ntot+1:2*ntot)) / real(ntot, DP)
+      M_sum_trial(3)  = sum(m_trial(2*ntot+1:3*ntot)) / real(ntot, DP)
+      dM_rms = sqrt(sum((M_sum_trial - M_sum_before)**2))
+    end function adaptiveStepMetric
+
+    real(DP) function meanMagnetisationAlongField(m, ntot, H_dir) result(M_parallel)
+    real(DP),dimension(:),intent(in) :: m
+    integer,intent(in) :: ntot
+    real(DP),dimension(3),intent(in) :: H_dir
+    real(DP) :: M_mean(3)
+      M_mean(1) = sum(m(1:ntot)) / real(ntot, DP)
+      M_mean(2) = sum(m(ntot+1:2*ntot)) / real(ntot, DP)
+      M_mean(3) = sum(m(2*ntot+1:3*ntot)) / real(ntot, DP)
+      M_parallel = dot_product(M_mean, H_dir)
+    end function meanMagnetisationAlongField
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
@@ -1485,23 +1697,30 @@ end subroutine updateDemagfieldFMM
                         pts_arr(:,2) =  problem%grid%pts(:,2)
                         pts_arr(:,3) =  problem%grid%pts(:,3)
 
-                        if (all(n_macro == 0.0)) then
-                            call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+                        if (all(n_macro == 0)) then
+
+                            if (problem%useAvgN .eq. useAvgNTrue) then
+                                ! Non-periodic, average prism tensor
+                                call getFieldFromTiles(tile, H, pts_arr, 1, ntot, Nout, .false., &
+                                    Obs_size=obs_size_arr)
+                            else
+                                ! Non-periodic, point prism tensor
+                                call getFieldFromTiles(tile, H, pts_arr, 1, ntot, Nout, .false.)
+                            end if
+
                         else
-                            call getFieldFromTiles_PBC( tile, H, problem%grid%pts, 1, ntot, n_macro, &
-                            shiftVec, Nout, .false. )
+
+                            if (problem%useAvgN .eq. useAvgNTrue) then
+                                ! Periodic, average prism tensor
+                                call getFieldFromTiles_PBC(tile, H, pts_arr, 1, ntot, n_macro, &
+                                    shiftVec, Nout, .false., Obs_size=obs_size_arr)
+                            else
+                                ! Periodic, point prism tensor
+                                call getFieldFromTiles_PBC(tile, H, pts_arr, 1, ntot, n_macro, &
+                                    shiftVec, Nout, .false.)
+                            end if
+
                         end if
-                        
-                        if (problem%useAvgN .eq. useAvgNTrue) then
-                            !Use the average prism tensor
-                            !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false., Obs_size=obs_size_arr)
-                            call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false., Obs_size=obs_size_arr)
-                        else
-                            !Use the point prism tensor
-                            !call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
-                            call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
-                        endif
-                        
                         !Copy Nout into the proper structure used by the micro mag model
                         ind = (k-1) * nx * ny + (j-1) * nx + i
                     

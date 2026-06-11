@@ -17,7 +17,10 @@ MU0 = 4 * np.pi * 1e-7
 #DEFAULT_A0 = 7.0e-12    # J/m
 #DEFAULT_K0 = 1.8e6      # J/m^3
 
-DEFAULT_MS = 1.25e6     # A/m
+#DEFAULT_MS = 1.25e6     # A/m
+
+
+DEFAULT_MS = 2.4 / MU0      # A/m
 DEFAULT_K0 = 1.0e6      # J/m^3
 DEFAULT_A0 = 7.0e-12    # J/m
 
@@ -75,7 +78,7 @@ def create_single_grain_problem(
     nlmax: int = 5,
     allow_fmm_short_circuit: int = 0,
     fmm_min_n: int = 20000,
-    fmm_nterms: int = -1,
+    fmm_nterms: int = -1
 ) -> MicromagProblem:
     """
     Create the single-grain cubic coercivity problem.
@@ -110,6 +113,7 @@ def create_single_grain_problem(
         gamma=0.0,
         cuda=cuda,
         cvode=cvode,
+        useavgn=1
     )
 
     problem.u_ea[:, :] = easy_axis[np.newaxis, :]
@@ -193,6 +197,7 @@ def run_single_grain_coercivity(
     size_factor: float,
     n: int,
     use_fmm: bool = False,
+    periodic: bool = False,
     cuda: bool = False,
     cvode: bool = False,
     tilt_degrees: float = DEFAULT_TILT_DEGREES,
@@ -209,6 +214,11 @@ def run_single_grain_coercivity(
     allow_fmm_short_circuit: int = 0,
     fmm_min_n: int = 20000,
     fmm_nterms: int = -1,
+    adaptive: bool = False,
+    adaptive_max_steps: int | None = None,
+    adaptive_dh_initial_t: float | None = None,
+    adaptive_dh_min_t: float | None = None,
+    adaptive_dh_max_t: float | None = None,
 ) -> None:
     """Run one size/resolution hysteresis curve and save compatible arrays."""
     steps_t = np.arange(field_max_t, field_min_t + 0.5 * field_step_t, field_step_t)
@@ -230,7 +240,52 @@ def run_single_grain_coercivity(
         fmm_nterms=fmm_nterms,
     )
 
+    # Configure periodic exchange boundary conditions at the script level
+    # (do not modify core MicromagProblem implementation here).
+    if periodic:
+        try:
+            problem.exchPBC = [1, 1, 1]
+        except Exception:
+            # Best-effort: if attribute not present, set attribute anyway
+            setattr(problem, "exchPBC", [1, 1, 1])
+    else:
+        try:
+            problem.exchPBC = [0, 0, 0]
+        except Exception:
+            setattr(problem, "exchPBC", [0, 0, 0])
+
+    # Also set periodic repetition for the demag field (n_macro):
+    # use a single periodic repetition in each dimension when periodic=True.
+    if periodic:
+        try:
+            problem.n_macro = np.array([1, 1, 1], dtype=int)
+            problem.shiftVec = np.array([L, L, L])
+        except Exception:
+            setattr(problem, "n_macro", np.array([1, 1, 1], dtype=int))
+            setattr(problem, "shiftVec", np.array([L, L, L]))
+    else:
+        try:
+            problem.n_macro = np.zeros(3, dtype=int)
+            problem.shiftVec = np.zeros(3)
+        except Exception:
+            setattr(problem, "n_macro", np.zeros(3, dtype=int))
+            setattr(problem, "shiftVec", np.zeros(3))
+
     stem = output_stem(size_factor, n, use_fmm, fmm_nterms, nlmax)
+    # Append _P to the stem when periodic boundary conditions are enabled.
+    if periodic:
+        n_token = f"_n{n}"
+        if n_token in stem:
+            stem = stem.replace(n_token, n_token + "_P", 1)
+        else:
+            stem = stem + "_P"
+    if adaptive:
+        dH_min_t = (
+            abs(adaptive_dh_min_t)
+            if adaptive_dh_min_t is not None
+            else abs(field_step_t / 10.0)
+        )
+        stem += f"_A_FS{dH_min_t:.1e}"
     problem.timer_log_file = f"{stem}_timer.log"
     problem.trace_log_file = f"{stem}_trace.log"
 
@@ -245,13 +300,50 @@ def run_single_grain_coercivity(
     print(f"  use_fmm = {use_fmm}")
     print(f"  cuda = {cuda}")
     print(f"  cvode = {cvode}")
+    print(f"  adaptive = {adaptive}")
+
 
     start_time = time.time()
-    res = problem.run_hysteresis(H_ext=H_ext)
+    if adaptive:
+        max_steps = (
+            adaptive_max_steps if adaptive_max_steps is not None else len(steps_t)
+        )
+        dH_initial_t = (
+            adaptive_dh_initial_t
+            if adaptive_dh_initial_t is not None
+            else field_step_t
+        )
+        dH_min_t = (
+            adaptive_dh_min_t
+            if adaptive_dh_min_t is not None
+            else field_step_t / 10.0
+        )
+        dH_max_t = (
+            adaptive_dh_max_t
+            if adaptive_dh_max_t is not None
+            else field_step_t * 2.0
+        )
+        dH_initial = abs(dH_initial_t) / MU0
+        dH_min = abs(dH_min_t) / MU0
+        dH_max = abs(dH_max_t) / MU0
+        res = problem.run_hysteresis_adaptive(
+            H_start=H_ext[0, 1:4],
+            H_end=H_ext[-1, 1:4],
+            dH_initial=dH_initial,
+            dH_min=dH_min,
+            dH_max=dH_max,
+            max_steps=max_steps,
+            switch_refine_dH=dH_min,
+        )
+        n_fields = res[-1]
+        H_A_per_m = res[4][0, 0, :n_fields, 2]
+    else:
+        res = problem.run_hysteresis(H_ext=H_ext)
+        n_fields = len(steps_t)
+        H_A_per_m = H_ext[:, 3]
     runtime = time.time() - start_time
 
-    Mx, My, Mz = extract_mean_magnetisation(res, len(steps_t), DEFAULT_MS)
-    H_A_per_m = H_ext[:, 3]
+    Mx, My, Mz = extract_mean_magnetisation(res, n_fields, DEFAULT_MS)
     H_T = MU0 * H_A_per_m
     Hc_A_per_m = interpolated_coercivity(H_A_per_m, Mz)
     Hc_T = MU0 * Hc_A_per_m if np.isfinite(Hc_A_per_m) else np.nan
@@ -352,7 +444,7 @@ def main() -> None:
         default=DEFAULT_TILT_DEGREES,
         help="Easy-axis tilt away from z in the x-z plane [degrees].",
     )
-    parser.add_argument("--field-min-t", type=float, default=-2.0)
+    parser.add_argument("--field-min-t", type=float, default=-3.0)
     parser.add_argument("--field-max-t", type=float, default=1.0)
     parser.add_argument("--field-step-t", type=float, default=-0.1)
     parser.add_argument("--output-dir", type=Path, default=Path("results"))
@@ -370,6 +462,20 @@ def main() -> None:
     parser.add_argument("--allow-fmm-short-circuit", type=int, default=0)
     parser.add_argument("--fmm-min-n", type=int, default=20000)
     parser.add_argument("--fmm-nterms", type=int, default=-1)
+    parser.add_argument(
+        "--adaptive",
+        action="store_true",
+        help="Use adaptive backend hysteresis stepping.",
+    )
+    parser.add_argument("--adaptive-max-steps", type=int, default=500)
+    parser.add_argument("--adaptive-dh-initial-t", type=float, default=0.5)
+    parser.add_argument("--adaptive-dh-min-t", type=float, default=0.01)
+    parser.add_argument("--adaptive-dh-max-t", type=float, default=0.5)
+    parser.add_argument(
+        "--periodic",
+        action="store_true",
+        help="Enable periodic exchange boundary conditions (exchPBC=1) and append _P to output names.",
+    )
     args = parser.parse_args()
 
     if args.size_factor is None:
@@ -395,6 +501,7 @@ def main() -> None:
         field_step_t=args.field_step_t,
         output_dir=args.output_dir,
         plotting=not args.no_plot,
+        periodic=args.periodic,
         fmm_cells_per_node=args.fmm_cpn,
         fmm_eps=args.fmm_eps,
         ifunif=args.ifunif,
@@ -403,6 +510,11 @@ def main() -> None:
         allow_fmm_short_circuit=args.allow_fmm_short_circuit,
         fmm_min_n=args.fmm_min_n,
         fmm_nterms=args.fmm_nterms,
+        adaptive=args.adaptive,
+        adaptive_max_steps=args.adaptive_max_steps,
+        adaptive_dh_initial_t=args.adaptive_dh_initial_t,
+        adaptive_dh_min_t=args.adaptive_dh_min_t,
+        adaptive_dh_max_t=args.adaptive_dh_max_t,
     )
 
 

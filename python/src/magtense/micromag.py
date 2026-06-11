@@ -961,3 +961,174 @@ class MicromagProblem:
         result[10] = result[10][:n_tot_Exch]  # ExchMat_v
 
         return result
+
+    def run_hysteresis_adaptive(
+            self,
+            H_start: np.ndarray,
+            H_end: np.ndarray,
+            dH_initial: float,
+            dH_min: float,
+            dH_max: float,
+            max_steps: int,
+            dM_min: float = 1e-3,
+            dM_target: float = 1e-2,
+            dM_reject: float = 5e-2,
+            dH_grow: float = 1.5,
+            dH_shrink: float = 0.75,
+            switch_refine_dH: float | None = None,
+    ) -> list[np.ndarray | int]:
+        """
+        Run a micromagnetic hysteresis simulation with adaptive external-field steps.
+
+        The adaptive accept/reject loop is executed by the Fortran backend in a
+        single call. Output arrays are preallocated to ``max_steps`` in Fortran
+        and sliced here to include only accepted field steps.
+        """
+
+        if self.solver != 1:
+            raise ValueError("Adaptive hysteresis requires the explicit solver")
+
+        H_start = np.asarray(H_start, dtype=np.float64)
+        H_end = np.asarray(H_end, dtype=np.float64)
+        if H_start.shape != (3,) or H_end.shape != (3,):
+            raise ValueError("H_start and H_end must be 3-vectors")
+        if max_steps <= 0:
+            raise ValueError("max_steps must be positive")
+        if dH_initial <= 0 or dH_min <= 0 or dH_max <= 0:
+            raise ValueError("dH_initial, dH_min and dH_max must be positive")
+        if dH_min > dH_max:
+            raise ValueError("dH_min must be smaller than or equal to dH_max")
+        if np.allclose(H_start, H_end, rtol=0.0, atol=0.0):
+            raise ValueError("H_start and H_end must differ")
+        if dH_grow <= 1.0:
+            raise ValueError("dH_grow must be larger than 1")
+        if not (0.0 < dH_shrink < 1.0):
+            raise ValueError("dH_shrink must be between 0 and 1")
+
+        nt_h_ext = int(max_steps)
+        nt_h_ext_out = int(max_steps)
+        n_h_ext = int(max_steps)
+        use_switch_refine = switch_refine_dH is not None
+        switch_refine_value = float(switch_refine_dH) if use_switch_refine else 0.0
+        if use_switch_refine and switch_refine_value <= 0:
+            raise ValueError("switch_refine_dH must be positive when provided")
+
+        h_ext = np.zeros(shape=(nt_h_ext, 4), dtype=np.float64, order="F")
+        h_ext[:, 1:4] = H_start
+
+        result = magtensesource.fortrantopythonio.runmicromagadaptivehysteresis(
+            ntot=self.ntot,
+            grid_type=self.grid_type,
+            grid_n=self.grid_n,
+            grid_l=self.grid_L,
+            u_ea=self.u_ea,
+            problemmode=self.prob_mode,
+            solver=self.solver,
+            a0=self.A0,
+            ms=self.Ms,
+            k0=self.K0,
+            k1=self.K1,
+            k2=self.K2,
+            k0_arr=self.K0_arr,
+            crysaxis=self.CrysAxis,
+            gamma=self.gamma,
+            alpha_mm=self.alpha_mm,
+            temperature=self.T,
+            n_hext=n_h_ext,
+            maxt0=self.max_T0,
+            nt_hext=nt_h_ext,
+            nt_hext_out=nt_h_ext_out,
+            hext=h_ext,
+            nt=self.nt,
+            t=self.t,
+            m0=np.concatenate((self.m0[:, 0], self.m0[:, 1], self.m0[:, 2]), axis=None),
+            dem_thres=self.dem_thres,
+            usecuda=self.cuda,
+            dem_appr=self.dem_appr,
+            n_ret=self.N_ret,
+            n_file_out=self.N_file_out,
+            n_load=self.N_load,
+            n_file_in=self.N_file_in,
+            settimedis=self.setTimeDis,
+            nt_alpha=self.nt_alpha,
+            alphat=self.alphat,
+            tol=self.tol,
+            thres=self.thres,
+            usecvode=self.cvode,
+            usedemag=self.usedemag,
+            nt_conv=self.nt_conv,
+            t_conv=self.t_conv,
+            conv_tol=self.conv_tol,
+            grid_pts=self.grid_pts,
+            grid_ele=self.grid_ele,
+            grid_nod=self.grid_nod,
+            grid_nnod=self.grid_nnod,
+            exch_nval=self.exch_nval,
+            exch_nrow=self.exch_nrow,
+            exch_val=self.exch_val,
+            exch_rows=self.exch_rows,
+            exch_cols=self.exch_cols,
+            grid_abc=self.grid_abc,
+            useprecision=self.precision,
+            nthreadsmatlab=self.n_threads,
+            n_ave=self.N_ave,
+            cv=self.cv,
+            usereturnhall=self.usereturnhall,
+            useavgn=self.useavgn,
+            demigstp=self.demigstp,
+            exch_weigh=self.exch_weigh,
+            exch_meth=self.exch_meth,
+            exch_intpn=self.exch_intpn,
+            passexch=self.passexch,
+            exch_ncols=self.exch_ncols,
+            exch_presize=self.exch_presize,
+            n_macro=self.n_macro,
+            shiftvec=self.shiftVec,
+            macroshape=self.macroShape,
+            sampleshape=self.sampleShape,
+            exchpbc=self.exchPBC,
+            h_start=H_start,
+            h_end=H_end,
+            dh_initial=float(dH_initial),
+            dh_min=float(dH_min),
+            dh_max=float(dH_max),
+            maxhextsteps=int(max_steps),
+            dm_min=float(dM_min),
+            dm_target=float(dM_target),
+            dm_reject=float(dM_reject),
+            dh_grow=float(dH_grow),
+            dh_shrink=float(dH_shrink),
+            switch_refine_dh=switch_refine_value,
+            use_switch_refine=int(use_switch_refine),
+            dummy_run=self.dummy_run,
+            fmm_cells_per_node=self.fmm_cells_per_node,
+            eps_fmm=self.fmm_eps,
+            ifunif=self.ifunif,
+            nlmin=self.nlmin,
+            nlmax=self.nlmax,
+            allow_fmm_short_circuit=self.allow_fmm_short_circuit,
+            fmm_min_n=self.fmm_min_n,
+            fmm_nterms=self.fmm_nterms,
+            usefmm=self.use_fmm,
+            log_dir=self.log_dir,
+            timer_log_file=self.timer_log_file,
+            trace_log_file=self.trace_log_file,
+            window_enabled=self.window_enabled,
+            window_interval=self.window_interval,
+            trace_enabled=self.trace_enabled,
+            flush_each=self.flush_each,
+            trace_verbose=self.trace_verbose
+        )
+
+        result = list(result)
+        n_accepted = int(result[7])
+        n_tot_Exch = result[8]
+
+        fixed_order_result = result[0:7] + result[8:14] + [n_accepted]
+        for idx in (1, 3, 4, 5, 6):
+            fixed_order_result[idx] = fixed_order_result[idx][:, :, :n_accepted, :]
+        fixed_order_result[8] = fixed_order_result[8][:n_tot_Exch]  # ExchMat_r
+        fixed_order_result[9] = fixed_order_result[9][:n_tot_Exch]  # ExchMat_c
+        fixed_order_result[10] = fixed_order_result[10][:n_tot_Exch]  # ExchMat_v
+
+        return fixed_order_result

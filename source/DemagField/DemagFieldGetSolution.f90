@@ -222,46 +222,65 @@
     ! together the contribution from each copy.
     ! Note that instead of shifting the tiles, the evaluation points are shifted in the opposite
     ! direction, which is equivalent
-    subroutine getFieldFromTiles_PBC(tiles, H, pts, n_tiles, n_ele, n_macro, shiftVec, Nout, useStoredNorg)
+    subroutine getFieldFromTiles_PBC(tiles, H, pts, n_tiles, n_ele, n_macro, shiftVec, Nout, useStoredNorg, Obs_size)
         type(MagTile),intent(inout),dimension(n_tiles) :: tiles
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3) :: Htemp
         real(8),dimension(n_ele,3),intent(in) :: pts
         real(8),dimension(n_ele,3) :: pts_temp
         integer(4),intent(in) :: n_tiles,n_ele
-        integer(4),dimension(3) :: n_macro
-        real(8),dimension(3) :: shiftVec
+        integer(4),dimension(3),intent(in) :: n_macro
+        real(8),dimension(3),intent(in) :: shiftVec
         integer(4) :: nx_macro, ny_macro, nz_macro
         real(8),dimension(:,:,:,:),intent(inout) :: Nout
         real(8),dimension(:,:,:,:),allocatable :: Ntemp
         logical,optional :: useStoredNorg
+        real(8),dimension(n_ele,3),optional,intent(in) :: Obs_size
         integer(4) :: i, j, l
 
-        H(:,:) = 0.0
-        Nout(:,:,:,:) = 0.0
+        H(:,:) = 0.0d0
+        Nout(:,:,:,:) = 0.0d0
 
         nx_macro = n_macro(1)
         ny_macro = n_macro(2)
         nz_macro = n_macro(3)
 
-        do l=-nz_macro,nz_macro     !> k was taken
-            do j=-ny_macro,ny_macro
-                do i=-nx_macro,nx_macro
-                    Htemp(:,:) = 0.0
-                    Ntemp(:,:,:,:) = 0.0
-                    !Shift evaluation points
+        allocate(Ntemp(n_tiles,n_ele,3,3))
+
+        do l = -nz_macro, nz_macro
+            do j = -ny_macro, ny_macro
+                do i = -nx_macro, nx_macro
+
+                    Htemp(:,:) = 0.0d0
+                    Ntemp(:,:,:,:) = 0.0d0
+
+                    ! Shift evaluation points. This is equivalent to shifting the
+                    ! periodic copies of the source tiles in the opposite direction.
                     pts_temp = pts
-                    pts_temp(:, 1) = pts_temp(:, 1) - i * shiftVec(1)
-                    pts_temp(:, 2) = pts_temp(:, 2) - j * shiftVec(2)
-                    pts_temp(:, 3) = pts_temp(:, 3) - l * shiftVec(3)
-                    ! Evaluate field and demagnetisation tensor with shifted evaluation points
-                    call getFieldFromTiles(tiles, Htemp, pts_temp, n_tiles, n_ele, Ntemp, .false. )
-                    ! Add to existing values
+                    pts_temp(:,1) = pts_temp(:,1) - dble(i) * shiftVec(1)
+                    pts_temp(:,2) = pts_temp(:,2) - dble(j) * shiftVec(2)
+                    pts_temp(:,3) = pts_temp(:,3) - dble(l) * shiftVec(3)
+
+                    ! Evaluate field and demagnetisation tensor with shifted
+                    ! evaluation points. If Obs_size is present, getFieldFromTiles
+                    ! uses the averaged prism tensor path for tileTypeAvgPrism.
+                    if (present(Obs_size)) then
+                        call getFieldFromTiles(tiles, Htemp, pts_temp, n_tiles, n_ele, &
+                            Ntemp, .false., Obs_size=Obs_size)
+                    else
+                        call getFieldFromTiles(tiles, Htemp, pts_temp, n_tiles, n_ele, &
+                            Ntemp, .false.)
+                    end if
+
                     H = H + Htemp
                     Nout = Nout + Ntemp
+
                 end do
             end do
         end do
+
+        deallocate(Ntemp)
+
     end subroutine getFieldFromTiles_PBC
     
 !---------------------------------------------------------------------------------------!

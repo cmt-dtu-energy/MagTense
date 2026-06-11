@@ -114,6 +114,26 @@ def std_prob_6(
         usedemag=False,   # demag negligible for this 1-D geometry
     )
 
+
+
+
+    #--------- disable fmm -----
+    problem.use_fmm = 0
+    #----------------------------
+    
+    #--------------- set trace/timing options -------------
+    problem.use_fmm = 0
+    problem.window_enabled = 0
+    problem.window_interval = 30.0
+    problem.trace_enabled = 0
+    problem.flush_each = 1
+    problem.trace_verbose = 2
+    problem.timer_log_file =  "std_6_timer.log"
+    problem.trace_log_file =  "std_6_trace.log"
+    #------------------------------------------------------
+
+
+
     # Easy axis along x for all cells
     problem.u_ea[:, 0] = 1.0
 
@@ -205,7 +225,8 @@ if __name__ == "__main__":
             cuda=False,
             cvode=False,
             plotting=True,
-            figpath=None,
+            #figpath=None,
+            figpath= Path.cwd() / "results"
         )
         _theory = THEORETICAL_PINNING_FIELDS[_s]
         if _sw is not None:
