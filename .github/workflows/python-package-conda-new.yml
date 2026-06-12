@@ -158,7 +158,7 @@ jobs:
 
     - name: Install pip-wheel and pytest
       run: |
-        python3 -m pip install ${{ github.workspace }}/magtense-*-1-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
+        python3 -m pip install ${{ github.workspace }}/magtense-*-1-py${{ matrix.py-version.name }}-none-${{ matrix.sys.whl-arch }}.whl
         python3 -m pip install pytest
         pytest
 
