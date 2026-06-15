@@ -81,6 +81,7 @@ def create_single_grain_problem(
     fmm_min_n: int = 20000,
     fmm_nterms: int = -1,
     timer_log_dir: Path = Path("timer_logs_single_grain"),
+    hysteresis_solver: str = "static",
 ) -> MicromagProblem:
     """
     Create the single-grain cubic coercivity problem.
@@ -107,7 +108,9 @@ def create_single_grain_problem(
         grid_pts = None,
         grid_abc = None,
         solver="explicit",
-        m0=np.tile(easy_axis, (ntot, 1)),
+        hysteresis_solver=hysteresis_solver,
+        m0=np.tile([0.0, 0.0, 1.0], (ntot, 1)),
+        #m0=np.tile(easy_axis, (ntot, 1)),
         A0=A0,
         Ms=Ms,
         K0=K0,
@@ -249,6 +252,7 @@ def run_single_grain_coercivity(
         fmm_min_n=fmm_min_n,
         fmm_nterms=fmm_nterms,
         timer_log_dir=timer_log_dir,
+        hysteresis_solver="adaptive" if adaptive else "static",
     )
 
     # Configure periodic exchange boundary conditions at the script level
