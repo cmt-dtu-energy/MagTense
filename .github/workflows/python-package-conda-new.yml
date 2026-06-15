@@ -95,6 +95,7 @@ jobs:
       working-directory: ${{ github.workspace }}
       run: |
         make python-interface
+        cp -v magtensesource.* '${{ github.workspace }}'/python/cu12_libs/ || { echo "ERROR: No magtensesource.* files found after CUDA build"; exit 1; }
         make clean
 
     - name: Build pip-wheels

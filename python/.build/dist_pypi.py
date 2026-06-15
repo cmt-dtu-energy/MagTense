@@ -56,13 +56,21 @@ def main(
 
         for cuda, py in itertools.product(cu_versions, py_versions):
             py_lib = "cp" + py if platform == "win" else "cpython-" + py
+            ext_name = f"magtensesource.{py_lib}-{arch}.{suffix}"
+            src_ext = Path(f"{py_folder}/{cuda}_libs/{ext_name}")
+            if not src_ext.exists():
+                raise FileNotFoundError(
+                    f"Expected compiled extension not found: {src_ext}\n"
+                    f"Make sure the {cuda} build step has staged the extension into "
+                    f"python/{cuda}_libs/ before running this script."
+                )
             subprocess.run(
                 [
                     "cp",
-                    f"{py_folder}/{cuda}_libs/magtensesource.{py_lib}-{arch}.{suffix}",
+                    str(src_ext),
                     lib_folder,
                 ],
-                check=False,
+                check=True,
             )
             if platform == "linux":
                 rpath = "$ORIGIN/../../../../../lib/"
@@ -76,7 +84,7 @@ def main(
                         "--force-rpath",
                         "--set-rpath",
                         f"{rpath}",
-                        f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}",
+                        f"{lib_folder}/{ext_name}",
                     ],
                     check=False,
                 )
@@ -113,7 +121,7 @@ def main(
             )
 
             subprocess.run(
-                ["rm", f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}"],
+                ["rm", f"{lib_folder}/{ext_name}"],
                 check=False,
             )
             if Path(py_folder / "src" / "magtense.egg-info").is_dir():
