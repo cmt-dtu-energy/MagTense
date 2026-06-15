@@ -20,9 +20,10 @@ MU0 = 4 * np.pi * 1e-7
 #DEFAULT_MS = 1.25e6     # A/m
 
 
-DEFAULT_MS = 2.4 / MU0      # A/m
-DEFAULT_K0 = 1.0e6      # J/m^3
-DEFAULT_A0 = 7.0e-12    # J/m
+DEFAULT_MU0_MS_T = 2.4  # [T]
+DEFAULT_MS = DEFAULT_MU0_MS_T / MU0  # [A/m]
+DEFAULT_K0 = 1.0e6  # [J/m^3]
+DEFAULT_A0 = 7.0e-12  # [J/m]
 
 DEFAULT_TILT_DEGREES = 3.0
 
@@ -78,7 +79,8 @@ def create_single_grain_problem(
     nlmax: int = 5,
     allow_fmm_short_circuit: int = 0,
     fmm_min_n: int = 20000,
-    fmm_nterms: int = -1
+    fmm_nterms: int = -1,
+    timer_log_dir: Path = Path("timer_logs_single_grain"),
 ) -> MicromagProblem:
     """
     Create the single-grain cubic coercivity problem.
@@ -138,7 +140,7 @@ def create_single_grain_problem(
     problem.fmm_min_n = fmm_min_n
     problem.fmm_nterms = fmm_nterms
 
-    problem.log_dir = "timer_logs_single_grain"
+    problem.log_dir = str(timer_log_dir)
     problem.window_enabled = 1
     problem.window_interval = 30.0
     problem.trace_enabled = 0
@@ -205,7 +207,11 @@ def run_single_grain_coercivity(
     field_max_t: float = 1.0,
     field_step_t: float = -0.1,
     output_dir: Path = Path("results"),
+    timer_log_dir: Path = Path("timer_logs_single_grain"),
     plotting: bool = True,
+    Ms: float = DEFAULT_MS,
+    K0: float = DEFAULT_K0,
+    A0: float = DEFAULT_A0,
     fmm_cells_per_node: int = 660,
     fmm_eps: float = 1e-4,
     ifunif: int = 1,
@@ -221,6 +227,7 @@ def run_single_grain_coercivity(
     adaptive_dh_max_t: float | None = None,
 ) -> None:
     """Run one size/resolution hysteresis curve and save compatible arrays."""
+    timer_log_dir.mkdir(parents=True, exist_ok=True)
     steps_t = np.arange(field_max_t, field_min_t + 0.5 * field_step_t, field_step_t)
     H_ext = build_hysteresis_field(steps_t)
     problem = create_single_grain_problem(
@@ -230,6 +237,9 @@ def run_single_grain_coercivity(
         cuda=cuda,
         cvode=cvode,
         tilt_degrees=tilt_degrees,
+        Ms=Ms,
+        K0=K0,
+        A0=A0,
         fmm_cells_per_node=fmm_cells_per_node,
         fmm_eps=fmm_eps,
         ifunif=ifunif,
@@ -238,6 +248,7 @@ def run_single_grain_coercivity(
         allow_fmm_short_circuit=allow_fmm_short_circuit,
         fmm_min_n=fmm_min_n,
         fmm_nterms=fmm_nterms,
+        timer_log_dir=timer_log_dir,
     )
 
     # Configure periodic exchange boundary conditions at the script level
@@ -293,16 +304,19 @@ def run_single_grain_coercivity(
     print(f"  L = {L:.6e} m")
     print(f"  size_factor = {size_factor:.2g}")
     print(f"  n = {n} ({n**3} cells)")
-    print(f"  characteristic_length = {characteristic_length():.6e} m")
-    print(f"  L / characteristic_length = {size_factor:.6g}")
+    material_length = characteristic_length(A0, Ms)
+    print(f"  mu0 Ms = {MU0 * Ms:.6e} T")
+    print(f"  Ms = {Ms:.6e} A/m")
+    print(f"  A0 = {A0:.6e} J/m")
+    print(f"  K0 = {K0:.6e} J/m^3")
+    print(f"  characteristic_length = {material_length:.6e} m")
+    print(f"  L / characteristic_length = {L / material_length:.6g}")
     print(f"  easy_axis_tilt = {tilt_degrees:.3f} degrees")
     print(f"  easy_axis = {tilted_easy_axis(tilt_degrees)}")
     print(f"  use_fmm = {use_fmm}")
     print(f"  cuda = {cuda}")
     print(f"  cvode = {cvode}")
     print(f"  adaptive = {adaptive}")
-
-
     start_time = time.time()
     if adaptive:
         max_steps = (
@@ -343,11 +357,11 @@ def run_single_grain_coercivity(
         H_A_per_m = H_ext[:, 3]
     runtime = time.time() - start_time
 
-    Mx, My, Mz = extract_mean_magnetisation(res, n_fields, DEFAULT_MS)
+    Mx, My, Mz = extract_mean_magnetisation(res, n_fields, Ms)
     H_T = MU0 * H_A_per_m
     Hc_A_per_m = interpolated_coercivity(H_A_per_m, Mz)
     Hc_T = MU0 * Hc_A_per_m if np.isfinite(Hc_A_per_m) else np.nan
-    anisotropy_field_A_per_m = 2.0 * DEFAULT_K0 / DEFAULT_MS
+    anisotropy_field_A_per_m = 2.0 * K0 / Ms
 
     output_dir.mkdir(parents=True, exist_ok=True)
     res_path = output_dir / f"{stem}.npz"
@@ -379,13 +393,14 @@ def run_single_grain_coercivity(
         allow_fmm_short_circuit=allow_fmm_short_circuit,
         fmm_min_n=fmm_min_n,
         fmm_nterms=fmm_nterms,
-        characteristic_length=characteristic_length(),
-        size_factor=L / characteristic_length(),
+        characteristic_length=material_length,
+        size_factor=L / material_length,
         easy_axis=tilted_easy_axis(tilt_degrees),
         easy_axis_tilt_degrees=tilt_degrees,
-        Ms=DEFAULT_MS,
-        K0=DEFAULT_K0,
-        A0=DEFAULT_A0,
+        mu0_Ms_T=MU0 * Ms,
+        Ms=Ms,
+        K0=K0,
+        A0=A0,
     )
     print(f"Hysteresis simulation took {runtime:.3f} seconds")
     print(f"Hc = {Hc_A_per_m:.6e} A/m ({Hc_T:.6e} T)")
@@ -449,6 +464,27 @@ def main() -> None:
     parser.add_argument("--field-step-t", type=float, default=-0.1)
     parser.add_argument("--output-dir", type=Path, default=Path("results"))
     parser.add_argument(
+        "--timer-log-dir",
+        type=Path,
+        default=Path("timer_logs_single_grain"),
+        help="Directory for backend timer and trace logs.",
+    )
+    parser.add_argument(
+        "--mu0-ms-t",
+        type=float,
+        default=DEFAULT_MU0_MS_T,
+        help="Saturation magnetization expressed as mu0*Ms [T].",
+    )
+    parser.add_argument(
+        "--a0", type=float, default=DEFAULT_A0, help="Exchange stiffness [J/m]."
+    )
+    parser.add_argument(
+        "--k0",
+        type=float,
+        default=DEFAULT_K0,
+        help="Uniaxial anisotropy constant [J/m^3].",
+    )
+    parser.add_argument(
         "--no-plot",
         action="store_true",
         help="Disable the default hysteresis plot written to the output directory.",
@@ -478,16 +514,30 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if not np.isfinite(args.mu0_ms_t) or args.mu0_ms_t <= 0.0:
+        parser.error("--mu0-ms-t must be positive")
+    if not np.isfinite(args.a0) or args.a0 <= 0.0:
+        parser.error("--a0 must be positive")
+    if not np.isfinite(args.k0) or args.k0 < 0.0:
+        parser.error("--k0 must be non-negative")
+    if args.n <= 0:
+        parser.error("--n must be positive")
+    if args.size_factor is not None and args.size_factor <= 0.0:
+        parser.error("--size-factor must be positive")
+    if args.L is not None and args.L <= 0.0:
+        parser.error("--L must be positive")
+
+    Ms = args.mu0_ms_t / MU0
+    material_length = characteristic_length(args.a0, Ms)
+
     if args.size_factor is None:
         if args.L is None:
             size_factor = 1.0
         else:
-            size_factor = args.L / characteristic_length()
+            size_factor = args.L / material_length
     else:
         size_factor = args.size_factor
-    L = args.L if args.L is not None else size_factor * characteristic_length()
-
-
+    L = args.L if args.L is not None else size_factor * material_length
     run_single_grain_coercivity(
         L=L,
         size_factor=size_factor,
@@ -500,7 +550,11 @@ def main() -> None:
         field_max_t=args.field_max_t,
         field_step_t=args.field_step_t,
         output_dir=args.output_dir,
+        timer_log_dir=args.timer_log_dir,
         plotting=not args.no_plot,
+        Ms=Ms,
+        K0=args.k0,
+        A0=args.a0,
         periodic=args.periodic,
         fmm_cells_per_node=args.fmm_cpn,
         fmm_eps=args.fmm_eps,
