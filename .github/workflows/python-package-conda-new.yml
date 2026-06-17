@@ -1,4 +1,4 @@
-name: Python pip-wheel with conda build and test on Windows and Linux - new interface
+name: Python pip-wheel via make python-interface (Linux, CUDA)
 
 on:
   pull_request:
@@ -16,20 +16,10 @@ on:
 
 jobs:
   build-wheel:
-    strategy:
-      matrix:
-        py-version: [314]
-        cvode: [1]
-        sys:
-          - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
-    runs-on: ${{ matrix.sys.os }}
-    # Workaround: Issue with msvc-dev-cmd and new conda installation
-    needs: [build-cvode]
+    runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash -el {0}
-    env:
-      build_file: python/.build/env-${{ matrix.py-version }}-${{ matrix.sys.name }}.yml
 
     steps:
     - name: Checkout repository
@@ -45,99 +35,51 @@ jobs:
       uses: WyriHaximus/github-action-get-previous-tag@v1
       with:
         fallback: 1.0.0
-    - name: Setup Miniforge
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        miniforge-version: latest
-        activate-environment: magtense-env
-        use-mamba: true
 
-    # Install compiler into base
-    - name: Install compiler in base (Linux)
-      if: runner.os == 'Linux'
-      run: conda install -n base -c conda-forge gxx_linux-64 -y
+    - name: Build Python interface via make python-interface
+      working-directory: ${{ github.workspace }}
+      run: make python-interface
 
-    - name: Cache conda
-      uses: actions/cache@v4
-      env:
-        cache_number: 0
-      with:
-        path: ${{ env.CONDA }}/envs
-        key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
-      id: cache
-
-    - name: Update environment
-      run: conda env update -f ${{ env.build_file }}
-      if: steps.cache.outputs.cache-hit != 'true'
-
-    - name: Download cvode (sundials-7.2.1)
-      if: ${{ matrix.cvode == 1 }}
-      uses: actions/download-artifact@v4
-      with:
-        name: cvode-${{ runner.os }}
-        path: ${{ github.workspace }}/cvode/
-    
-    - name: Create directory for wrappers of compiled Fortran source code
-      run: |
-        mkdir '${{ github.workspace }}'/python/cpu_libs
-        mkdir '${{ github.workspace }}'/python/cu12_libs
-    
-    - name: Linux - Compile Fortran source code and build Python wrapper (CPU)
-      if: ${{ runner.os == 'Linux' }}
+    - name: Stage CUDA .so for dist_pypi.py
       working-directory: ${{ github.workspace }}
       run: |
-        make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
-        cp magtensesource.* '${{ github.workspace }}'/python/cpu_libs/
-        make clean
+        mkdir -p python/cu12_libs
+        cp python/src/magtense/lib/magtensesource*.so python/cu12_libs/
 
-    - name: Linux - Compile Fortran source code and build Python wrapper (CUDA)
-      if: ${{ runner.os == 'Linux' }}
-      working-directory: ${{ github.workspace }}
-      run: |
-        make python-interface
-        make clean
-
-    - name: Build pip-wheels
+    - name: Build pip-wheel
       if: "${{ inputs.tag == '' }}"
       working-directory: ${{ github.workspace }}/python/
       run: |
         sed -i 's/1.0.0/${{ steps.previoustag.outputs.tag }}/' src/magtense/__init__.py
-        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --platform ${{ matrix.sys.name }} --pkg_version ${{ steps.previoustag.outputs.tag }}
+        $HOME/miniconda3/bin/conda run -n magtense-env -- \
+          python .build/dist_pypi.py \
+            --py_version 314 --cu_version cu12 --platform linux \
+            --pkg_version ${{ steps.previoustag.outputs.tag }}
 
-    - name: Deployment - Build pip-wheels
+    - name: Deployment - Build pip-wheel
       if: "${{ inputs.tag != '' }}"
       working-directory: ${{ github.workspace }}/python/
       run: |
         sed -i 's/1.0.0/${{ inputs.tag }}/' src/magtense/__init__.py
-        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --platform ${{ matrix.sys.name }} --pkg_version ${{ inputs.tag }}
+        $HOME/miniconda3/bin/conda run -n magtense-env -- \
+          python .build/dist_pypi.py \
+            --py_version 314 --cu_version cu12 --platform linux \
+            --pkg_version ${{ inputs.tag }}
 
-    - name: cpu - Archive pip-wheel
+    - name: Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
-        name: pip-wheel-py${{ matrix.py-version }}-cpu-${{ runner.os }}
-        path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
-
-    - name: cu12 - Archive pip-wheel
-      uses: actions/upload-artifact@v4
-      with:
-        name: pip-wheel-py${{ matrix.py-version }}-cu12-${{ runner.os }}
-        path: ${{ github.workspace }}/python/dist/magtense-*-1-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
+        name: pip-wheel-py314-cu12-Linux
+        path: ${{ github.workspace }}/python/dist/magtense-*-1-py314-none-manylinux1_x86_64.whl
 
 
   test-wheel:
-    strategy:
-      matrix:
-        mt-punit: [cu12]
-        py-version:
-          - { name: 314, id: "3.14" }
-        sys:
-          - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
-    runs-on: ${{ matrix.sys.os }}
+    runs-on: ubuntu-latest
     needs: build-wheel
     defaults:
       run:
         shell: bash -el {0}
-    
+
     steps:
     - name: Checkout test scripts
       uses: actions/checkout@v4
@@ -145,24 +87,19 @@ jobs:
         sparse-checkout: |
           python/tests/
           documentation/examples_FEM_validation/
-    
-    - name: Download a single artifact
+
+    - name: Download wheel artifact
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-py${{ matrix.py-version.name }}-${{ matrix.mt-punit }}-${{ runner.os }}
+        name: pip-wheel-py314-cu12-Linux
 
     - name: Setup python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.py-version.id }}
+        python-version: "3.14"
 
-    - name: Install pip-wheel and pytest
+    - name: Install pip-wheel and run pytest
       run: |
-        python3 -m pip install ${{ github.workspace }}/magtense-*-1-py${{ matrix.py-version.name }}-none-${{ matrix.sys.whl-arch }}.whl
+        python3 -m pip install ${{ github.workspace }}/magtense-*-1-py314-none-manylinux1_x86_64.whl
         python3 -m pip install pytest
         pytest
-
-        
-  build-cvode:
-    name: cvode
-    uses: ./.github/workflows/cmake-sundials-cvode.yml

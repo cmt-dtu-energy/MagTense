@@ -356,10 +356,10 @@ ${PYTHON_MODN_ALL}:
 
 # Rule that installs Miniconda only if "conda" is not found
 install-miniconda:
-	@if command -v conda >/dev/null 2>&1 || [ -x "$(CONDA_BIN)" ]; then \
-			echo "Conda already installed."; \
+	@if [ -x "$(CONDA_BIN)" ]; then \
+			echo "Conda already installed at $(CONDA_DIR)."; \
 	else \
-			echo "Conda not found. Installing Miniconda..."; \
+			echo "Conda not found at $(CONDA_DIR). Installing Miniconda..."; \
 			curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o miniconda.sh; \
 			bash miniconda.sh -b -p $(CONDA_DIR) && rm miniconda.sh; \
 			echo "Miniconda installed at $(CONDA_DIR)."; \
