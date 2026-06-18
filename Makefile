@@ -425,10 +425,10 @@ python-interface: build-env
 	cp python/.build/requirements-py3-dev.txt python/requirements.txt
 	
 	@if [ "$$CONDA_DEFAULT_ENV" = "$(ENV_NAME)" ]; then \
-		$(MAKE) python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 && \
+		$(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 && \
 		python -m pip install -e ./python; \
 	else \
-		$(CONDA_BIN) run -n magtense-env $(MAKE) python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 && \
+		$(CONDA_BIN) run -n magtense-env $(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 && \
 		$(CONDA_BIN) run -n magtense-env -- python -m pip install -e ./python; \
 	fi
 
