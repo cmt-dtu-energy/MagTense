@@ -22,6 +22,10 @@ jobs:
         cuda:
           - { use: 1, name: cu12, build_tag: 1, libs_dir: cu12_libs }
           - { use: 0, name: cpu,  build_tag: 0, libs_dir: cpu_libs  }
+        py-version:
+          - { version: "312", semver: "3.12" }
+          - { version: "313", semver: "3.13" }
+          - { version: "314", semver: "3.14" }
     defaults:
       run:
         shell: bash -el {0}
@@ -43,7 +47,7 @@ jobs:
 
     - name: Build Python interface via make python-interface
       working-directory: ${{ github.workspace }}
-      run: make python-interface USE_CUDA=${{ matrix.cuda.use }}
+      run: make python-interface USE_CUDA=${{ matrix.cuda.use }} PY_VERSION=${{ matrix.py-version.version }}
 
     - name: Stage .so for dist_pypi.py
       working-directory: ${{ github.workspace }}
@@ -58,7 +62,7 @@ jobs:
         sed -i 's/1.0.0/${{ steps.previoustag.outputs.tag }}/' src/magtense/__init__.py
         $HOME/miniconda3/bin/conda run -n magtense-env -- \
           python .build/dist_pypi.py \
-            --py_version 314 --cu_version ${{ matrix.cuda.name }} --platform linux \
+            --py_version ${{ matrix.py-version.version }} --cu_version ${{ matrix.cuda.name }} --platform linux \
             --pkg_version ${{ steps.previoustag.outputs.tag }}
 
     - name: Deployment - Build pip-wheel
@@ -68,14 +72,14 @@ jobs:
         sed -i 's/1.0.0/${{ inputs.tag }}/' src/magtense/__init__.py
         $HOME/miniconda3/bin/conda run -n magtense-env -- \
           python .build/dist_pypi.py \
-            --py_version 314 --cu_version ${{ matrix.cuda.name }} --platform linux \
+            --py_version ${{ matrix.py-version.version }} --cu_version ${{ matrix.cuda.name }} --platform linux \
             --pkg_version ${{ inputs.tag }}
 
     - name: Archive pip-wheel
       uses: actions/upload-artifact@v4
       with:
-        name: pip-wheel-py314-${{ matrix.cuda.name }}-Linux
-        path: ${{ github.workspace }}/python/dist/magtense-*-${{ matrix.cuda.build_tag }}-py314-none-manylinux1_x86_64.whl
+        name: pip-wheel-py${{ matrix.py-version.version }}-${{ matrix.cuda.name }}-Linux
+        path: ${{ github.workspace }}/python/dist/magtense-*-${{ matrix.cuda.build_tag }}-py${{ matrix.py-version.version }}-none-manylinux1_x86_64.whl
 
 
   test-wheel:
@@ -86,6 +90,10 @@ jobs:
         cuda:
           - { name: cu12, build_tag: 1 }
           - { name: cpu,  build_tag: 0 }
+        py-version:
+          - { version: "312", semver: "3.12" }
+          - { version: "313", semver: "3.13" }
+          - { version: "314", semver: "3.14" }
     defaults:
       run:
         shell: bash -el {0}
@@ -101,15 +109,15 @@ jobs:
     - name: Download wheel artifact
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-py314-${{ matrix.cuda.name }}-Linux
+        name: pip-wheel-py${{ matrix.py-version.version }}-${{ matrix.cuda.name }}-Linux
 
     - name: Setup python
       uses: actions/setup-python@v5
       with:
-        python-version: "3.14"
+        python-version: "${{ matrix.py-version.semver }}"
 
     - name: Install pip-wheel and run pytest
       run: |
-        python3 -m pip install ${{ github.workspace }}/magtense-*-${{ matrix.cuda.build_tag }}-py314-none-manylinux1_x86_64.whl
+        python3 -m pip install ${{ github.workspace }}/magtense-*-${{ matrix.cuda.build_tag }}-py${{ matrix.py-version.version }}-none-manylinux1_x86_64.whl
         python3 -m pip install pytest
         pytest

@@ -2,6 +2,7 @@
 #                       compiler names and flags
 #=======================================================================
 USE_CUDA = 1
+PY_VERSION ?= 314
 USE_CVODE = 0
 USE_MICROMAG = 1
 USE_MATLAB = 0
@@ -371,7 +372,7 @@ rm-conda:
 build-env: install-miniconda
 # Check if the "magtense-env" environment already exists before creating it
 	@if ! conda env list  | grep -q "magtense-env"; then \
-		$(CONDA_BIN) env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-314-linux.yml; \
+		$(CONDA_BIN) env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-$(PY_VERSION)-linux.yml; \
 	else \
 		echo "magtense-env environment already exists."; \
 	fi
