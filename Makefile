@@ -19,6 +19,16 @@ CVODE_ROOT = ${MKFILE_PATH}/cvode
 # Location where Miniconda will be installed
 CONDA_DIR := $(HOME)/miniconda3
 CONDA_BIN := $(CONDA_DIR)/bin/conda
+
+# Python bound to the conda env (mirrors CMAKE below) so f2py/pip use the env
+# interpreter regardless of what "python" resolves to on PATH. On Windows the
+# build runs inside an already-activated env (CONDA_PREFIX), so plain python is
+# correct there.
+ifeq ($(OS),Windows_NT)
+  PYTHON := python
+else
+  PYTHON := $(CONDA_BIN) run -n magtense-env -- python
+endif
 #=======================================================================
 #                    FMM3D integration (upstream Makefile)
 #=======================================================================
@@ -350,7 +360,7 @@ test:
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
-		python -m numpy.f2py -c -m ${PYTHON_MODN} \
+		$(PYTHON) -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} \
 		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${FMM3D}
 	cp *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/
