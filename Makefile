@@ -20,14 +20,15 @@ CVODE_ROOT = ${MKFILE_PATH}/cvode
 CONDA_DIR := $(HOME)/miniconda3
 CONDA_BIN := $(CONDA_DIR)/bin/conda
 
-# Python bound to the conda env (mirrors CMAKE below) so f2py/pip use the env
-# interpreter regardless of what "python" resolves to on PATH. On Windows the
-# build runs inside an already-activated env (CONDA_PREFIX), so plain python is
-# correct there.
+# Python bound to the conda env by absolute path so f2py uses the env
+# interpreter regardless of PATH. "conda run -- python" is still a name lookup
+# and can be shadowed by version managers (e.g. mise) that front-load PATH;
+# the absolute path cannot. On Windows the build runs inside an already-
+# activated env (CONDA_PREFIX), so plain python is correct there.
 ifeq ($(OS),Windows_NT)
   PYTHON := python
 else
-  PYTHON := $(CONDA_BIN) run -n magtense-env -- python
+  PYTHON := $(CONDA_DIR)/envs/magtense-env/bin/python
 endif
 #=======================================================================
 #                    FMM3D integration (upstream Makefile)
