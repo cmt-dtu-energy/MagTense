@@ -437,12 +437,15 @@ python-interface: build-env
 	cp python/.build/requirements-py3-dev.txt python/requirements.txt
 	
 	@if [ "$$CONDA_DEFAULT_ENV" = "$(ENV_NAME)" ]; then \
-		$(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 && \
-		python -m pip install -e ./python; \
+		$(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0; \
 	else \
-		$(CONDA_BIN) run -n magtense-env $(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 && \
-		$(CONDA_BIN) run -n magtense-env -- python -m pip install -e ./python; \
+		$(CONDA_BIN) run -n magtense-env $(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0; \
 	fi
+# Install into the conda env via its absolute interpreter path. A bare "python"
+# or "conda run -- python" is a name lookup that version managers (e.g. mise)
+# can shadow by front-loading PATH, which would install the requirements into
+# the wrong Python. The absolute path cannot be shadowed. See $(PYTHON) above.
+	$(PYTHON) -m pip install -e ./python
 
 pytest:
 	$(CONDA_BIN) run -n magtense-env -- pytest
