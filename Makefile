@@ -448,7 +448,7 @@ python-interface: build-env
 	$(PYTHON) -m pip install -e ./python
 
 pytest:
-	$(CONDA_BIN) run -n magtense-env -- pytest
+	$(PYTHON) -m pytest
 
 python-interface-win: 
 	make magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0
