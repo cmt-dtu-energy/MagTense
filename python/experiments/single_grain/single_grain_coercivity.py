@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import time
 from pathlib import Path
 
@@ -8,192 +9,165 @@ import numpy as np
 
 from magtense.micromag import MicromagProblem
 
-MU0 = 4 * np.pi * 1e-7
-# DEFAULT_MS = 1.61 / MU0  # [A/m], equivalent to mu0 Ms = 1.61 T.
-# DEFAULT_K0 = 4.3e6  # [J/m^3], uniaxial anisotropy constant.
-# DEFAULT_A0 = 7.7e-12  # [J/m], exchange stiffness used by the grain examples.
-
-#DEFAULT_MS = 2.3e6      # A/m
-#DEFAULT_A0 = 7.0e-12    # J/m
-#DEFAULT_K0 = 1.8e6      # J/m^3
-
-#DEFAULT_MS = 1.25e6     # A/m
-
-
-DEFAULT_MU0_MS_T = 2.4  # [T]
-DEFAULT_MS = DEFAULT_MU0_MS_T / MU0  # [A/m]
-DEFAULT_K0 = 1.0e6  # [J/m^3]
-DEFAULT_A0 = 7.0e-12  # [J/m]
-
-DEFAULT_TILT_DEGREES = 3.0
-
-
-def characteristic_length(A0: float = DEFAULT_A0, Ms: float = DEFAULT_MS) -> float:
-    """Return sqrt(A0 / (0.5 * mu0 * Ms**2)) in SI units [m]."""
-    return float(np.sqrt(A0 / (0.5 * MU0 * Ms**2)))
-
-
-def tilted_easy_axis(tilt_degrees: float = DEFAULT_TILT_DEGREES) -> np.ndarray:
-    """
-    Construct a unit easy-axis vector tilted in the x-z plane.
-
-    The external hysteresis field is applied along +z.  A small default tilt of
-    three degrees avoids the perfectly aligned switching geometry while keeping
-    this a deliberately simple single-grain experiment.
-    """
-    theta = np.deg2rad(tilt_degrees)
-    return np.array([np.sin(theta), 0.0, np.cos(theta)], dtype=float)
+from utils.metrics import calculate_hysteresis_metrics
+from utils.simulation import (
+    DEFAULT_A0,
+    DEFAULT_K0,
+    DEFAULT_MS,
+    DEFAULT_MU0_MS_T,
+    DEFAULT_TILT_DEGREES,
+    MU0,
+    build_hysteresis_field,
+    characteristic_length,
+    create_single_grain_problem,
+    extract_mean_magnetisation,
+    interpolated_coercivity,
+    output_stem,
+    tilted_field_direction,
+    z_easy_axis,
+)
+from utils.geometry import (
+    PrismMesh,
+    generate_cylinder,
+    generate_ellipsoid,
+    generate_hexagonal_prism,
+    generate_rectangular_prism,
+    generate_sphere,
+)
 
 
-def build_hysteresis_field(steps_t: np.ndarray) -> np.ndarray:
-    """
-    Build MagTense hysteresis input with the field along z.
+SHAPE_ALIASES = {
+    "cube": ("cube", "cube"),
+    "box": ("cube", "cube"),
+    "rect": ("rectangle", "rectangle"),
+    "rectangle": ("rectangle", "rectangle"),
+    "recantgle": ("rectangle", "rectangle"),
+    "rectangular_prism": ("rectangle", "rectangle"),
+    "sphere": ("sphere", "sphere"),
+    "cylinder": ("cylinder", "cylinder_z"),
+    "ellipsoid": ("ellipsoid", "ellipsoid_z"),
+    "elipsoid": ("ellipsoid", "ellipsoid_z"),
+    "ellipsoid_x": ("ellipsoid", "ellipsoid_x"),
+    "elipsoid_x": ("ellipsoid", "ellipsoid_x"),
+    "ellipsoid_z": ("ellipsoid", "ellipsoid_z"),
+    "elipsoid_z": ("ellipsoid", "ellipsoid_z"),
+    "hexagon": ("hexagon", "hexagon"),
+    "hexagonal_prism": ("hexagon", "hexagon"),
+}
 
-    The first column stores the signed scalar sweep value.  The vector columns
-    are H in A/m, so the Tesla-equivalent sweep values are divided by mu0, which
-    is the convention used in the existing grain hysteresis scripts.
-    """
-    h_ext = np.zeros((len(steps_t), 4), dtype=float)
-    h_ext[:, 0] = steps_t
-    h_ext[:, 3] = steps_t / MU0
-    return h_ext
+
+@dataclass(frozen=True)
+class ShapeSpec:
+    """Resolved geometric shape parameters for one single-grain run."""
+
+    shape: str
+    variant: str
+    outer_size_m: float
+    parameters: dict[str, float | str | tuple[float, ...]]
 
 
-def create_single_grain_problem(
-    L: float,
-    n: int,
-    *,
-    use_fmm: bool = False,
-    cuda: bool = False,
-    cvode: bool = False,
-    tilt_degrees: float = DEFAULT_TILT_DEGREES,
-    Ms: float = DEFAULT_MS,
-    K0: float = DEFAULT_K0,
-    A0: float = DEFAULT_A0,
-    t_end: float = 1e-9,
-    nt: int = 2,
-    fmm_cells_per_node: int = 660,
-    fmm_eps: float = 1e-4,
-    ifunif: int = 1,
-    nlmin: int = 1,
-    nlmax: int = 5,
-    allow_fmm_short_circuit: int = 0,
-    fmm_min_n: int = 20000,
-    fmm_nterms: int = -1,
-    timer_log_dir: Path = Path("timer_logs_single_grain"),
-    hysteresis_solver: str = "static",
-) -> MicromagProblem:
-    """
-    Create the single-grain cubic coercivity problem.
+def resolve_shape_spec(
+    shape: str,
+    shape_variant: str | None,
+    outer_size_m: float,
+) -> ShapeSpec:
+    """Normalize aliases and convert outer size to concrete shape parameters."""
+    shape_key = shape.lower().replace("-", "_")
+    if shape_key not in SHAPE_ALIASES:
+        valid = ", ".join(sorted(SHAPE_ALIASES))
+        raise ValueError(f"Unknown shape {shape!r}. Expected one of: {valid}")
+    base_shape, default_variant = SHAPE_ALIASES[shape_key]
+    variant = (shape_variant or default_variant).lower().replace("-", "_")
+    if variant in SHAPE_ALIASES:
+        alias_shape, alias_variant = SHAPE_ALIASES[variant]
+        if alias_shape != base_shape and shape_variant is not None:
+            raise ValueError(
+                f"Shape variant {shape_variant!r} does not belong to shape {shape!r}"
+            )
+        base_shape, variant = alias_shape, alias_variant
 
-    Physical setup
-    --------------
-    * Uniform cubic domain with Lx = Ly = Lz = L [m].
-    * Cubic numerical grid with nx = ny = nz = n.
-    * All cells are one material/grain: identical A0, K0, Ms and easy axis.
-    * External field is applied along z.
-    * Easy axis is tilted slightly away from z in the x-z plane.
+    L = float(outer_size_m)
+    if not np.isfinite(L) or L <= 0.0:
+        raise ValueError("outer_size_m must be positive and finite")
 
-    The characteristic exchange/demagnetisation scale used by the run script is
-    sqrt(A0 / (0.5 * mu0 * Ms**2)); default size factors are centred around this
-    value and are passed as L = factor * characteristic_length.
-    """
-    ntot = n**3
-    easy_axis = tilted_easy_axis(tilt_degrees)
+    if base_shape == "cube":
+        variant = "cube"
+        parameters = {"side_length": L}
+    elif base_shape == "rectangle":
+        variant = "rectangle"
+        parameters = {"dimensions": (L, 0.7 * L, 0.7 * L)}
+    elif base_shape == "sphere":
+        variant = "sphere"
+        parameters = {"radius": L / 2.0}
+    elif base_shape == "cylinder":
+        variant = "cylinder_z"
+        parameters = {"radius": L / 2.0, "length": L, "axis": "z"}
+    elif base_shape == "ellipsoid":
+        if variant not in {"ellipsoid_x", "ellipsoid_z", "x", "z"}:
+            raise ValueError("--shape-variant for ellipsoid must be x or z")
+        variant = "ellipsoid_x" if variant in {"ellipsoid_x", "x"} else "ellipsoid_z"
+        if variant == "ellipsoid_x":
+            semi_axes = (L / 2.0, 0.35 * L, 0.35 * L)
+        else:
+            semi_axes = (0.35 * L, 0.35 * L, L / 2.0)
+        parameters = {"semi_axes": semi_axes}
+    elif base_shape == "hexagon":
+        variant = "hexagon"
+        parameters = {"side_length": L / 2.0, "height": L, "axis": "z"}
+    else:
+        raise AssertionError(f"Unhandled shape: {base_shape}")
 
-    problem = MicromagProblem(
-        res=[n, n, n],
-        grid_L=[L, L, L],
-        grid_type="uniform",
-        grid_pts = None,
-        grid_abc = None,
-        solver="explicit",
-        hysteresis_solver=hysteresis_solver,
-        m0=np.tile([0.0, 0.0, 1.0], (ntot, 1)),
-        #m0=np.tile(easy_axis, (ntot, 1)),
-        A0=A0,
-        Ms=Ms,
-        K0=K0,
-        alpha=4000.0,
-        gamma=0.0,
-        cuda=cuda,
-        cvode=cvode,
-        useavgn=1
+    return ShapeSpec(
+        shape=base_shape,
+        variant=variant,
+        outer_size_m=L,
+        parameters=parameters,
     )
 
-    problem.u_ea[:, :] = easy_axis[np.newaxis, :]
-    problem.t = np.linspace(0.0, t_end, nt)
-    problem.nt = len(problem.t)
-    problem.t_conv = np.linspace(0.0, t_end, nt)
-    problem.nt_conv = len(problem.t_conv)
 
-    # A uniform cubic cell has up to 26 neighbours in the exchange stencil.
-    # Keep this explicit so the experiment remains easy to extend later.
-    problem.exch_presize = problem.ntot * (27 + 1)
-
-    # FMM is intentionally disabled by default for this experiment.  The CLI and
-    # run script can enable it later without changing the physical setup.
-    problem.use_fmm = int(use_fmm)
-    problem.fmm_cells_per_node = fmm_cells_per_node if use_fmm else 0
-    problem.fmm_eps = fmm_eps
-    problem.ifunif = ifunif
-    problem.nlmin = nlmin
-    problem.nlmax = nlmax
-    problem.allow_fmm_short_circuit = allow_fmm_short_circuit
-    problem.fmm_min_n = fmm_min_n
-    problem.fmm_nterms = fmm_nterms
-
-    problem.log_dir = str(timer_log_dir)
-    problem.window_enabled = 1
-    problem.window_interval = 30.0
-    problem.trace_enabled = 0
-    problem.flush_each = 1
-    problem.trace_verbose = 1
-
-    return problem
-
-
-def extract_mean_magnetisation(
-    res: list[np.ndarray | int],
-    n_steps: int,
-    Ms: float,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return volume-averaged magnetisation components in A/m."""
-    M_out = res[1][1, :, :, :]  # Existing grain scripts use this hysteresis slice.
-    Mx = Ms * np.mean(M_out[:, :n_steps, 0], axis=0)
-    My = Ms * np.mean(M_out[:, :n_steps, 1], axis=0)
-    Mz = Ms * np.mean(M_out[:, :n_steps, 2], axis=0)
-    return Mx, My, Mz
+def build_shape_mesh(shape_spec: ShapeSpec, n: int) -> PrismMesh | None:
+    """Return a mesh for non-cube shapes, or None for the legacy cube path."""
+    if shape_spec.shape == "cube":
+        return None
+    target_tiles = n**3
+    common = {
+        "target_tiles": target_tiles,
+        "overshoot_policy": "soft",
+        "queue_policy": "symmetric_priority",
+        "grid_shifts": "half_step",
+        "max_depth": 8,
+        "eps": 1e-12,
+    }
+    params = shape_spec.parameters
+    if shape_spec.shape == "rectangle":
+        dimensions = params["dimensions"]
+        return generate_rectangular_prism(dimensions, n, n, n)
+    if shape_spec.shape == "sphere":
+        return generate_sphere(params["radius"], **common)
+    if shape_spec.shape == "cylinder":
+        return generate_cylinder(
+            params["radius"], params["length"], params["axis"], **common
+        )
+    if shape_spec.shape == "ellipsoid":
+        return generate_ellipsoid(params["semi_axes"], **common)
+    if shape_spec.shape == "hexagon":
+        return generate_hexagonal_prism(
+            params["side_length"], params["height"], params["axis"], **common
+        )
+    raise AssertionError(f"Unhandled shape: {shape_spec.shape}")
 
 
-def interpolated_coercivity(H: np.ndarray, M: np.ndarray) -> float:
-    """Interpolate H(M=0) for the descending hysteresis branch."""
-    H = np.asarray(H, dtype=float).ravel()
-    M = np.asarray(M, dtype=float).ravel()
-    crossings = np.flatnonzero(M[:-1] * M[1:] <= 0.0)
-    if crossings.size == 0:
-        return float("nan")
-
-    i = int(crossings[0])
-    m0, m1 = M[i], M[i + 1]
-    h0, h1 = H[i], H[i + 1]
-    if m1 == m0:
-        return float(0.5 * (h0 + h1))
-    return float(h0 + (0.0 - m0) * (h1 - h0) / (m1 - m0))
-
-
-def output_stem(
-    size_factor: float,
-    n: int,
-    use_fmm: bool,
-    fmm_nterms: int,
-    nlmax: int,
-) -> str:
-    """Stable run identifier containing size factor, resolution and FMM state."""
-    stem = f"single_grain_sf{size_factor:.2g}_n{n}"
-    if use_fmm:
-        stem += f"_fmm_on_N{fmm_nterms}_L{nlmax}"
-    return stem
+def _json_safe(value):
+    """Convert nested numpy-heavy metadata to simple serializable objects."""
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
 
 
 def run_single_grain_coercivity(
@@ -228,35 +202,101 @@ def run_single_grain_coercivity(
     adaptive_dh_initial_t: float | None = None,
     adaptive_dh_min_t: float | None = None,
     adaptive_dh_max_t: float | None = None,
+    output_stem_override: str | None = None,
+    shape: str = "cube",
+    shape_variant: str | None = None,
+    material_label: str | None = None,
+    sw_coercivity_t: float | None = None,
 ) -> None:
     """Run one size/resolution hysteresis curve and save compatible arrays."""
     timer_log_dir.mkdir(parents=True, exist_ok=True)
     steps_t = np.arange(field_max_t, field_min_t + 0.5 * field_step_t, field_step_t)
-    H_ext = build_hysteresis_field(steps_t)
-    problem = create_single_grain_problem(
-        L,
-        n,
-        use_fmm=use_fmm,
-        cuda=cuda,
-        cvode=cvode,
-        tilt_degrees=tilt_degrees,
-        Ms=Ms,
-        K0=K0,
-        A0=A0,
-        fmm_cells_per_node=fmm_cells_per_node,
-        fmm_eps=fmm_eps,
-        ifunif=ifunif,
-        nlmin=nlmin,
-        nlmax=nlmax,
-        allow_fmm_short_circuit=allow_fmm_short_circuit,
-        fmm_min_n=fmm_min_n,
-        fmm_nterms=fmm_nterms,
-        timer_log_dir=timer_log_dir,
-        hysteresis_solver="adaptive" if adaptive else "static",
-    )
+    easy_axis = z_easy_axis()
+    field_direction = tilted_field_direction(tilt_degrees)
+    H_ext = build_hysteresis_field(steps_t, field_direction)
+    shape_spec = resolve_shape_spec(shape, shape_variant, L)
+    mesh = build_shape_mesh(shape_spec, n)
+    if mesh is None:
+        problem = create_single_grain_problem(
+            L,
+            n,
+            use_fmm=use_fmm,
+            cuda=cuda,
+            cvode=cvode,
+            tilt_degrees=tilt_degrees,
+            Ms=Ms,
+            K0=K0,
+            A0=A0,
+            fmm_cells_per_node=fmm_cells_per_node,
+            fmm_eps=fmm_eps,
+            ifunif=ifunif,
+            nlmin=nlmin,
+            nlmax=nlmax,
+            allow_fmm_short_circuit=allow_fmm_short_circuit,
+            fmm_min_n=fmm_min_n,
+            fmm_nterms=fmm_nterms,
+            timer_log_dir=timer_log_dir,
+            hysteresis_solver="adaptive" if adaptive else "static",
+            easy_axis=easy_axis,
+            m0_direction=field_direction,
+        )
+        grid_L = np.array([L, L, L], dtype=float)
+        target_tiles = n**3
+        achieved_tiles = n**3
+        mesh_metadata = {}
+        shape_metadata = _json_safe(shape_spec.parameters)
+        root_bounds = np.vstack((-grid_L / 2.0, grid_L / 2.0))
+        represented_volume = L**3
+    else:
+        grid_kwargs = mesh.to_micromag_kwargs()
+        grid_L = list(mesh.root_bounds[1] - mesh.root_bounds[0])
+        problem = MicromagProblem(
+            grid_L=grid_L,
+            solver="explicit",
+            hysteresis_solver="adaptive" if adaptive else "static",
+            m0=np.tile(field_direction, (mesh.achieved_tiles, 1)),
+            A0=A0,
+            Ms=Ms,
+            K0=K0,
+            alpha=4000.0,
+            gamma=0.0,
+            cuda=cuda,
+            cvode=cvode,
+            useavgn=1,
+            **grid_kwargs,
+        )
+        problem.u_ea[:, :] = easy_axis[np.newaxis, :]
+        problem.t = np.linspace(0.0, 1e-9, 2)
+        problem.nt = len(problem.t)
+        problem.t_conv = np.linspace(0.0, 1e-9, 2)
+        problem.nt_conv = len(problem.t_conv)
+        problem.exch_presize = problem.ntot * 28
+        problem.use_fmm = int(use_fmm)
+        problem.fmm_cells_per_node = fmm_cells_per_node if use_fmm else 0
+        problem.fmm_eps = fmm_eps
+        problem.ifunif = ifunif
+        problem.nlmin = nlmin
+        problem.nlmax = nlmax
+        problem.allow_fmm_short_circuit = allow_fmm_short_circuit
+        problem.fmm_min_n = fmm_min_n
+        problem.fmm_nterms = fmm_nterms
+        problem.log_dir = str(timer_log_dir)
+        problem.window_enabled = 1
+        problem.window_interval = 30.0
+        problem.trace_enabled = 0
+        problem.flush_each = 1
+        problem.trace_verbose = 1
+        target_tiles = n**3
+        achieved_tiles = mesh.achieved_tiles
+        mesh_metadata = _json_safe(mesh.refinement_metadata)
+        shape_metadata = _json_safe(mesh.shape_metadata)
+        root_bounds = mesh.root_bounds
+        represented_volume = mesh.represented_volume
 
     # Configure periodic exchange boundary conditions at the script level
     # (do not modify core MicromagProblem implementation here).
+    if periodic and shape_spec.shape != "cube":
+        raise ValueError("--periodic is only supported for cube runs")
     if periodic:
         try:
             problem.exchPBC = [1, 1, 1]
@@ -274,10 +314,10 @@ def run_single_grain_coercivity(
     if periodic:
         try:
             problem.n_macro = np.array([1, 1, 1], dtype=int)
-            problem.shiftVec = np.array([L, L, L])
+            problem.shiftVec = np.array(grid_L)
         except Exception:
             setattr(problem, "n_macro", np.array([1, 1, 1], dtype=int))
-            setattr(problem, "shiftVec", np.array([L, L, L]))
+            setattr(problem, "shiftVec", np.array(grid_L))
     else:
         try:
             problem.n_macro = np.zeros(3, dtype=int)
@@ -286,28 +326,34 @@ def run_single_grain_coercivity(
             setattr(problem, "n_macro", np.zeros(3, dtype=int))
             setattr(problem, "shiftVec", np.zeros(3))
 
-    stem = output_stem(size_factor, n, use_fmm, fmm_nterms, nlmax)
-    # Append _P to the stem when periodic boundary conditions are enabled.
-    if periodic:
-        n_token = f"_n{n}"
-        if n_token in stem:
-            stem = stem.replace(n_token, n_token + "_P", 1)
-        else:
-            stem = stem + "_P"
-    if adaptive:
-        dH_min_t = (
-            abs(adaptive_dh_min_t)
-            if adaptive_dh_min_t is not None
-            else abs(field_step_t / 10.0)
-        )
-        stem += f"_A_FS{dH_min_t:.1e}"
+    if output_stem_override is None:
+        stem = output_stem(size_factor, n, use_fmm, fmm_nterms, nlmax)
+        if shape_spec.variant != "cube":
+            stem = stem.replace("single_grain_", f"single_grain_{shape_spec.variant}_", 1)
+        # Append _P to the stem when periodic boundary conditions are enabled.
+        if periodic:
+            n_token = f"_n{n}"
+            if n_token in stem:
+                stem = stem.replace(n_token, n_token + "_P", 1)
+            else:
+                stem = stem + "_P"
+        if adaptive:
+            dH_min_t = (
+                abs(adaptive_dh_min_t)
+                if adaptive_dh_min_t is not None
+                else abs(field_step_t / 10.0)
+            )
+            stem += f"_A_FS{dH_min_t:.1e}"
+    else:
+        stem = output_stem_override
     problem.timer_log_file = f"{stem}_timer.log"
     problem.trace_log_file = f"{stem}_trace.log"
 
     print("Single-grain coercivity experiment")
     print(f"  L = {L:.6e} m")
+    print(f"  shape = {shape_spec.shape} ({shape_spec.variant})")
     print(f"  size_factor = {size_factor:.2g}")
-    print(f"  n = {n} ({n**3} cells)")
+    print(f"  n = {n} (target {target_tiles} cells, achieved {achieved_tiles})")
     material_length = characteristic_length(A0, Ms)
     print(f"  mu0 Ms = {MU0 * Ms:.6e} T")
     print(f"  Ms = {Ms:.6e} A/m")
@@ -315,13 +361,17 @@ def run_single_grain_coercivity(
     print(f"  K0 = {K0:.6e} J/m^3")
     print(f"  characteristic_length = {material_length:.6e} m")
     print(f"  L / characteristic_length = {L / material_length:.6g}")
-    print(f"  easy_axis_tilt = {tilt_degrees:.3f} degrees")
-    print(f"  easy_axis = {tilted_easy_axis(tilt_degrees)}")
+    print("  easy_axis_tilt = 0.000 degrees")
+    print(f"  easy_axis = {easy_axis}")
+    print(f"  field_angle = {tilt_degrees:.3f} degrees")
+    print(f"  field_direction = {field_direction}")
+    print(f"  initial_magnetisation = {field_direction}")
     print(f"  use_fmm = {use_fmm}")
     print(f"  cuda = {cuda}")
     print(f"  cvode = {cvode}")
     print(f"  adaptive = {adaptive}")
     start_time = time.time()
+    resolved_adaptive_dh_min_t = np.nan
     if adaptive:
         max_steps = (
             adaptive_max_steps if adaptive_max_steps is not None else len(steps_t)
@@ -344,6 +394,7 @@ def run_single_grain_coercivity(
         dH_initial = abs(dH_initial_t) / MU0
         dH_min = abs(dH_min_t) / MU0
         dH_max = abs(dH_max_t) / MU0
+        resolved_adaptive_dh_min_t = abs(dH_min_t)
         res = problem.run_hysteresis_adaptive(
             H_start=H_ext[0, 1:4],
             H_end=H_ext[-1, 1:4],
@@ -354,17 +405,23 @@ def run_single_grain_coercivity(
             switch_refine_dH=dH_min,
         )
         n_fields = res[-1]
-        H_A_per_m = res[4][0, 0, :n_fields, 2]
+        H_vectors_A_per_m = res[4][0, 0, :n_fields, :]
+        H_A_per_m = H_vectors_A_per_m @ field_direction
     else:
         res = problem.run_hysteresis(H_ext=H_ext)
         n_fields = len(steps_t)
-        H_A_per_m = H_ext[:, 3]
+        H_vectors_A_per_m = H_ext[:, 1:4]
+        H_A_per_m = H_vectors_A_per_m @ field_direction
     runtime = time.time() - start_time
 
     Mx, My, Mz = extract_mean_magnetisation(res, n_fields, Ms)
+    M_parallel = (
+        np.column_stack((Mx, My, Mz)) @ field_direction
+    )
     H_T = MU0 * H_A_per_m
-    Hc_A_per_m = interpolated_coercivity(H_A_per_m, Mz)
-    Hc_T = MU0 * Hc_A_per_m if np.isfinite(Hc_A_per_m) else np.nan
+    metrics = calculate_hysteresis_metrics(H_A_per_m, M_parallel, Ms)
+    Hc_A_per_m = metrics.Hc_A_per_m
+    Hc_T = metrics.Hc_T
     anisotropy_field_A_per_m = 2.0 * K0 / Ms
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -374,18 +431,41 @@ def run_single_grain_coercivity(
         res=np.array(res, dtype=object),
         H_array=H_T,
         H_array_A_per_m=H_A_per_m,
-        M_array=Mz,
+        Hx_array_A_per_m=H_vectors_A_per_m[:, 0],
+        Hy_array_A_per_m=H_vectors_A_per_m[:, 1],
+        Hz_array_A_per_m=H_vectors_A_per_m[:, 2],
+        M_array=M_parallel,
         Mx_array=Mx,
         My_array=My,
         Mz_array=Mz,
+        M_parallel_array=M_parallel,
         Hc=Hc_A_per_m,
         Hc_A_per_m=Hc_A_per_m,
         Hc_T=Hc_T,
+        Mr_A_per_m=metrics.Mr_A_per_m,
+        mu0_Mr_T=metrics.mu0_Mr_T,
+        Mr_over_Ms=metrics.Mr_over_Ms,
+        BH_max_J_per_m3=metrics.BH_max_J_per_m3,
+        BH_max_kJ_per_m3=metrics.BH_max_kJ_per_m3,
+        BH_max_MGOe=metrics.BH_max_MGOe,
+        coercivity_status=metrics.coercivity_status,
+        remanence_status=metrics.remanence_status,
+        energy_product_status=metrics.energy_product_status,
         H_N=anisotropy_field_A_per_m,
         runtime=runtime,
         L=L,
         n=n,
-        ntot=n**3,
+        ntot=achieved_tiles,
+        shape=shape_spec.shape,
+        shape_variant=shape_spec.variant,
+        shape_outer_size_m=shape_spec.outer_size_m,
+        shape_parameters=np.array(_json_safe(shape_spec.parameters), dtype=object),
+        shape_metadata=np.array(shape_metadata, dtype=object),
+        mesh_metadata=np.array(mesh_metadata, dtype=object),
+        mesh_root_bounds=np.asarray(root_bounds, dtype=float),
+        represented_volume=represented_volume,
+        target_tiles=target_tiles,
+        achieved_tiles=achieved_tiles,
         use_fmm=use_fmm,
         cuda=cuda,
         cvode=cvode,
@@ -399,15 +479,37 @@ def run_single_grain_coercivity(
         fmm_nterms=fmm_nterms,
         characteristic_length=material_length,
         size_factor=L / material_length,
-        easy_axis=tilted_easy_axis(tilt_degrees),
-        easy_axis_tilt_degrees=tilt_degrees,
+        adaptive=adaptive,
+        periodic=periodic,
+        adaptive_dh_min_t=resolved_adaptive_dh_min_t,
+        easy_axis=easy_axis,
+        easy_axis_tilt_degrees=0.0,
+        field_direction=field_direction,
+        field_angle_degrees=tilt_degrees,
+        initial_magnetisation=field_direction,
+        magnetisation_projection="field_direction",
+        material_label=material_label or "",
+        sw_coercivity_t=(
+            float(sw_coercivity_t) if sw_coercivity_t is not None else np.nan
+        ),
+        field_min_t=field_min_t,
+        field_max_t=field_max_t,
         mu0_Ms_T=MU0 * Ms,
         Ms=Ms,
         K0=K0,
         A0=A0,
+        output_stem=stem,
     )
     print(f"Hysteresis simulation took {runtime:.3f} seconds")
     print(f"Hc = {Hc_A_per_m:.6e} A/m ({Hc_T:.6e} T)")
+    print(
+        f"Mr = {metrics.Mr_A_per_m:.6e} A/m "
+        f"(mu0 Mr = {metrics.mu0_Mr_T:.6e} T)"
+    )
+    print(
+        f"(BH)max = {metrics.BH_max_kJ_per_m3:.6e} kJ/m^3 "
+        f"({metrics.BH_max_MGOe:.6e} MGOe)"
+    )
     print(f"Saved result object and scalars to: {res_path}")
 
     if plotting:
@@ -415,7 +517,7 @@ def run_single_grain_coercivity(
 
         fig_path = output_dir / f"{stem}.png"
         fig, ax = plt.subplots(figsize=(8, 4))
-        ax.plot(MU0 * H_A_per_m, MU0 * Mz, ".-k", linewidth=1.5, markersize=4)
+        ax.plot(MU0 * H_A_per_m, MU0 * M_parallel, ".-k", linewidth=1.5, markersize=4)
         ax.plot(
             MU0 * Hc_A_per_m,
             0.0,
@@ -424,7 +526,7 @@ def run_single_grain_coercivity(
             label=f"Hc = {Hc_T:.3f} T",
         )
         ax.set_xlabel(r"Applied Field, $\mu_0 H$ [ T ]")
-        ax.set_ylabel(r"Magnetization, $\mu_0 M$ [ T ]")
+        ax.set_ylabel(r"Magnetization parallel to field, $\mu_0 M$ [ T ]")
         ax.set_title(
             f"Single grain hysteresis: size_factor={size_factor:.2g}, n={n}, FMM={use_fmm}"
         )
@@ -461,12 +563,19 @@ def main() -> None:
         "--tilt-degrees",
         type=float,
         default=DEFAULT_TILT_DEGREES,
-        help="Easy-axis tilt away from z in the x-z plane [degrees].",
+        help="External-field tilt away from z in the x-z plane [degrees].",
     )
     parser.add_argument("--field-min-t", type=float, default=-3.0)
     parser.add_argument("--field-max-t", type=float, default=1.0)
     parser.add_argument("--field-step-t", type=float, default=-0.1)
     parser.add_argument("--output-dir", type=Path, default=Path("results"))
+    parser.add_argument(
+        "--output-stem",
+        help=(
+            "Override the complete result/plot/log stem. Intended for sweep "
+            "submitters that use physical-size names."
+        ),
+    )
     parser.add_argument(
         "--timer-log-dir",
         type=Path,
@@ -494,6 +603,7 @@ def main() -> None:
         help="Disable the default hysteresis plot written to the output directory.",
     )
     parser.add_argument("--use-fmm", action="store_true", help="Enable FMM demag.")
+    parser.add_argument("--cuda", action="store_true", help="Enable CUDA backend support.")
     parser.add_argument("--fmm-cpn", type=int, default=660)
     parser.add_argument("--fmm-eps", type=float, default=1e-4)
     parser.add_argument("--ifunif", type=int, default=1)
@@ -516,6 +626,27 @@ def main() -> None:
         action="store_true",
         help="Enable periodic exchange boundary conditions (exchPBC=1) and append _P to output names.",
     )
+    parser.add_argument(
+        "--shape",
+        default="cube",
+        help=(
+            "Shape to simulate: cube, rectangle, sphere, cylinder, ellipsoid, "
+            "or hexagon. Common aliases and misspellings are accepted."
+        ),
+    )
+    parser.add_argument(
+        "--shape-variant",
+        help="Optional variant, currently x/z for ellipsoid orientation.",
+    )
+    parser.add_argument(
+        "--material-label",
+        help="Optional metadata label for custom/property-grid sweeps.",
+    )
+    parser.add_argument(
+        "--sw-coercivity-t",
+        type=float,
+        help="Optional Stoner-Wohlfarth coercivity estimate stored as metadata [T].",
+    )
     args = parser.parse_args()
 
     if not np.isfinite(args.mu0_ms_t) or args.mu0_ms_t <= 0.0:
@@ -530,6 +661,16 @@ def main() -> None:
         parser.error("--size-factor must be positive")
     if args.L is not None and args.L <= 0.0:
         parser.error("--L must be positive")
+    if args.output_stem is not None and (
+        not args.output_stem or Path(args.output_stem).name != args.output_stem
+    ):
+        parser.error("--output-stem must be a non-empty filename stem")
+    try:
+        shape_spec = resolve_shape_spec(args.shape, args.shape_variant, 1.0)
+    except ValueError as error:
+        parser.error(str(error))
+    if args.periodic and shape_spec.shape != "cube":
+        parser.error("--periodic is only supported for cube runs")
 
     Ms = args.mu0_ms_t / MU0
     material_length = characteristic_length(args.a0, Ms)
@@ -547,7 +688,7 @@ def main() -> None:
         size_factor=size_factor,
         n=args.n,
         use_fmm=args.use_fmm,
-        cuda=True,
+        cuda=args.cuda,
         cvode=False,
         tilt_degrees=args.tilt_degrees,
         field_min_t=args.field_min_t,
@@ -573,6 +714,11 @@ def main() -> None:
         adaptive_dh_initial_t=args.adaptive_dh_initial_t,
         adaptive_dh_min_t=args.adaptive_dh_min_t,
         adaptive_dh_max_t=args.adaptive_dh_max_t,
+        output_stem_override=args.output_stem,
+        shape=args.shape,
+        shape_variant=args.shape_variant,
+        material_label=args.material_label,
+        sw_coercivity_t=args.sw_coercivity_t,
     )
 
 
