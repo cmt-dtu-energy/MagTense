@@ -12,19 +12,19 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 Provided you already have `make` installed, you can simply run
 
 ```shell
-make python-interface
+make python-interface [PY_VERSION=314(default) | 313 | 312] [USE_CUDA=1(default) | 0]
 ```
 
 This will:
 
 - Download [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main) if you don't have it already (by default it assumes the installation lives at `~/miniconda3`);
-- Create the conda environment `magtense-env` with all the dependencies for building the Python interface;
-- Build the MagTense Fortran core and the CVODE library;
+- Create the conda environment `magtense-env` with all the dependencies for building the Python interface, using the specified Python vesrsion
+- Build the MagTense Fortran core and the CVODE library, using CUDA by default (if you have an NVIDIA GPU and the CUDA toolkit installed) - set `USE_CUDA=0` to disable CUDA support
 - Build the Python interface and install it in the `magtense-env` conda environment
 
 There are also Make targets `rm-env` and `rm-conda` to clean up your installation. The Make rules should be smart enough to not do unnecessary work; for instance, if you modify some part of the Python interface, `make python` will re-build the wheel and re-install it on the environment, without re-downloading Miniconda. In case of errors, the simplest first step probably is to run `make rm-env` and `make rm-conda` to start from a clean slate.
 
-To test if the interface was built correctly, run `make test`.
+To test if the interface was built correctly, run `make pytest`.
 
 Note that all automated commands are run by subshells managed by Make. To actually use conda and explore the Python files, you have to first initialize conda in your current shell:
 
