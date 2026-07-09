@@ -155,10 +155,16 @@ try {
     Write-Step "Ensuring conda (Miniforge3) is installed"
     $CondaExe = Join-Path $CondaDir 'Scripts\conda.exe'
     if (-not (Test-Path $CondaExe)) {
-        # Maybe conda is already on PATH from another install
-        $existing = Get-Command conda -ErrorAction SilentlyContinue
-        if ($existing) {
-            $CondaExe = $existing.Source
+        # Maybe conda is already installed from another distribution. Only an
+        # Application has a real path in .Source; if `conda init` has run, the
+        # PATH entry is a PowerShell *function* whose .Source is empty, so we
+        # restrict the lookup to Application and fall back to $env:CONDA_EXE
+        # (which conda sets to the real conda.exe path when it is initialized).
+        $existing = Get-Command conda -CommandType Application -ErrorAction SilentlyContinue |
+                    Select-Object -First 1
+        $existingExe = if ($existing) { $existing.Source } elseif ($env:CONDA_EXE) { $env:CONDA_EXE } else { $null }
+        if ($existingExe -and (Test-Path $existingExe)) {
+            $CondaExe = $existingExe
             # Derive base dir (…\Scripts\conda.exe or …\condabin\conda.bat)
             $CondaDir = Split-Path (Split-Path $CondaExe -Parent) -Parent
             Write-Ok "Using existing conda: $CondaExe"
