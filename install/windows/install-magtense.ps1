@@ -165,9 +165,17 @@ try {
         $existingExe = if ($existing) { $existing.Source } elseif ($env:CONDA_EXE) { $env:CONDA_EXE } else { $null }
         if ($existingExe -and (Test-Path $existingExe)) {
             $CondaExe = $existingExe
-            # Derive base dir (…\Scripts\conda.exe or …\condabin\conda.bat)
-            $CondaDir = Split-Path (Split-Path $CondaExe -Parent) -Parent
-            Write-Ok "Using existing conda: $CondaExe"
+            # Ask conda for its base dir; the executable can live at various
+            # depths (…\Scripts\conda.exe, …\condabin\conda.bat,
+            # …\Library\bin\conda.bat) so string-splitting the path is unreliable.
+            $base = (& $CondaExe info --base 2>$null | Select-Object -First 1)
+            if ($base) { $base = $base.Trim() }
+            if ($base -and (Test-Path $base)) {
+                $CondaDir = $base
+            } else {
+                $CondaDir = Split-Path (Split-Path $CondaExe -Parent) -Parent
+            }
+            Write-Ok "Using existing conda: $CondaExe (base: $CondaDir)"
         } else {
             $installer = Join-Path $env:TEMP 'Miniforge3-Windows-x86_64.exe'
             Write-Info "Downloading Miniforge3..."
