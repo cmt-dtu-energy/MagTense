@@ -57,6 +57,7 @@ dependencies:
   - libwinpthread=12.0.0.r4.gg4f2fc60ca=h57928b3_9
   - libzlib=1.3.1=h2466b09_2
   - make=4.4.1=h0e40799_2
+  - ninja
   - mkl=2025.2.0=intel_627
   - mkl-devel=2025.2.0=intel_627
   - mkl-include=2025.2.0=intel_627

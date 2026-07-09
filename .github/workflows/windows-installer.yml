@@ -1,0 +1,40 @@
+name: Windows installer
+
+# Attaches the Windows installer scripts to a published GitHub Release so that
+# users can download them directly from the Releases page.
+on:
+  release:
+    types: [published]
+  # Allow attaching to an existing release manually as well.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to attach the installer to'
+        required: true
+
+jobs:
+  attach-installer:
+    name: Attach installer scripts to release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine target tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload installer assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ steps.tag.outputs.tag }}" \
+            install/windows/install-magtense.ps1 \
+            install/windows/install-magtense.bat \
+            --clobber

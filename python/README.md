@@ -47,7 +47,38 @@ After this modify the Makefile to replace `USE_FMM3D=0` with `USE_FMM3D=1`.
 
 #### Windows
 
-Installation on Windows is a but more contrived because of the way Windows handles environments and privileges, so the user has to do more steps manually. Fortunately, the user who wants to customize and develop MagTense will likely handle the [pre-requisites](#pre-requisites) only once, to set up the development environment, and then the build process when the Fortran or Python parts are modified should be straightforward.
+The easiest way to set up a MagTense development environment on Windows is the
+**automated installer**. Download the latest `install-magtense.bat` and
+`install-magtense.ps1` from the [Releases](https://github.com/cmt-dtu-energy/MagTense/releases)
+page (keep both files in the same folder), then double-click `install-magtense.bat`.
+
+The installer provisions the *entire* toolchain through a conda environment — you
+do **not** need to install Visual Studio or Intel oneAPI separately. It will:
+
+- Install [Miniforge](https://github.com/conda-forge/miniforge) (userspace, no admin) if `conda` is not already present;
+- Create the `magtense-env` conda environment with the Intel Fortran/C compilers, MKL, the MSVC build tools, `make`, `ninja`, Python and NumPy;
+- Download and build CVODE/SUNDIALS from source into a `cvode` folder at the top of the repo;
+- Build the MagTense Fortran core and the Python interface and install it (editable) into `magtense-env`;
+- Verify that `import magtense` works and add a "MagTense Dev Shell" Start Menu shortcut.
+
+It auto-detects an NVIDIA GPU and builds with CUDA when present; otherwise it does a
+CPU-only build. You can force a choice or pick the Python version, e.g. from a terminal:
+
+```powershell
+.\install-magtense.bat -Compute cpu -PyVersion 313
+```
+
+The installer is idempotent — if a step fails you can fix the cause and re-run it;
+completed steps (conda, the environment, an already-built CVODE) are detected and skipped.
+A log of each run is written to `%USERPROFILE%\.magtense\`.
+
+Once installed, open the "MagTense Dev Shell" from the Start Menu (a PowerShell with
+`magtense-env` already activated) and try the example scripts in [python/examples/](./examples/).
+
+<details>
+<summary><b>Manual installation (advanced / fallback)</b></summary>
+
+Installation on Windows is a bit more contrived because of the way Windows handles environments and privileges, so the user has to do more steps manually. Fortunately, the user who wants to customize and develop MagTense will likely handle the pre-requisites only once, to set up the development environment, and then the build process when the Fortran or Python parts are modified should be straightforward.
 
 ##### Pre-requisites (setting up the development environment)
 
@@ -90,6 +121,8 @@ conda env create -f python/.build/env-314-win.yml
 ```
 
 Then, activate the environment with `conda activate magtense-env`.
+
+</details>
 
 ## Read-in customized M-H-curve
 

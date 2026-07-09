@@ -450,5 +450,14 @@ python-interface: build-env
 pytest:
 	$(PYTHON) -m pytest
 
-python-interface-win: 
-	make magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0
+# Complete Windows build of the Fortran core + Python interface.
+#
+# Assumes it runs INSIDE an activated "magtense-env" conda env, so ifx/icx, the
+# conda-provided MSVC toolchain and $(PYTHON) (=python, see lines 28-32) are all
+# on PATH. CVODE must already be built into ./cvode beforehand; the Windows
+# installer (install/windows/install-magtense.ps1) downloads and cmake-builds it
+# before invoking this target. Pass USE_CUDA=0 for a CPU-only build.
+python-interface-win:
+	cp python/.build/requirements-py3-dev.txt python/requirements.txt
+	$(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0
+	$(PYTHON) -m pip install -e ./python
