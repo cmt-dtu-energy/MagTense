@@ -232,7 +232,10 @@ try {
         if (Test-Path $srcParent) { Remove-Item $srcParent -Recurse -Force }
         New-Item -ItemType Directory -Force -Path $srcParent | Out-Null
         Write-Info "Extracting CVODE sources"
-        Invoke-Native { & tar -xf $tgz -C $srcParent } 'tar (extract cvode)'
+        # The env ships GNU tar (via the git/MSYS package), which treats a
+        # "C:\...tar.gz" archive path as a remote host:path spec ("Cannot
+        # connect to C: resolve failed"). --force-local forces local handling.
+        Invoke-Native { & tar --force-local -xf $tgz -C $srcParent } 'tar (extract cvode)'
         $CvodeSrc = (Get-ChildItem -Path $srcParent -Directory | Select-Object -First 1).FullName
 
         $CvodeBuild = Join-Path $env:TEMP "cvode-build-$CvodeVersion"
