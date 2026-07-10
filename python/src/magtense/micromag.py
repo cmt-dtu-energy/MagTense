@@ -42,6 +42,9 @@ class MicromagProblem:
             If solver = 'explicit', the equilibrium configuration is computed at several constant fields
             solver = 'implicit' has not been implemented.
             See documentation under run_simulation for details.
+        hysteresis_solver: External-field stepping mode. Options are 'static'
+            and 'adaptive'. The default 'static' mode preserves the predefined
+            field sequence used by existing simulations.
         A0: Anisotropy constant.
         Ms: Saturation magnetization [A/m].
         K0: Exchange constant.
@@ -132,6 +135,7 @@ class MicromagProblem:
             macroShape: list | np.ndarray | None = None,
             shiftVec: list | np.ndarray | None = np.zeros(3, dtype=np.float64),
             n_macro: list | np.ndarray | None = np.zeros(3),
+            hysteresis_solver: str = "static",
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -160,6 +164,7 @@ class MicromagProblem:
         self.grid_type = grid_type
         self.prob_mode = prob_mode
         self.solver = solver
+        self.hysteresis_solver = hysteresis_solver
 
         ### Define grid ###
         # Uniform grid
@@ -589,6 +594,19 @@ class MicromagProblem:
         self._solver = {None: -1, "explicit": 1, "dynamic": 2, "implicit": 3}[val]
 
     @property
+    def hysteresis_solver(self) -> int:
+        return self._hysteresis_solver
+
+    @hysteresis_solver.setter
+    def hysteresis_solver(self, val: str = "static") -> None:
+        try:
+            self._hysteresis_solver = {"static": 1, "adaptive": 2}[val]
+        except KeyError as error:
+            raise ValueError(
+                "hysteresis_solver must be 'static' or 'adaptive'"
+            ) from error
+
+    @property
     def n_macro(self) -> list | np.ndarray | None:
         return self._n_macro
 
@@ -791,6 +809,20 @@ class MicromagProblem:
             macroshape=self.macroShape,
             sampleshape=self.sampleShape,
             exchpbc=self.exchPBC,
+            hysteresis_solver=1,
+            h_start=np.zeros(3, dtype=np.float64),
+            h_end=np.zeros(3, dtype=np.float64),
+            dh_initial=0.0,
+            dh_min=0.0,
+            dh_max=0.0,
+            maxhextsteps=0,
+            dm_min=0.0,
+            dm_target=0.0,
+            dm_reject=0.0,
+            dh_grow=0.0,
+            dh_shrink=0.0,
+            switch_refine_dh=0.0,
+            use_switch_refine=0,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
@@ -811,8 +843,9 @@ class MicromagProblem:
             trace_verbose=self.trace_verbose
         )
 
-        n_tot_Exch = result[7]
         result = list(result)
+        result.pop(7)  # n_Hext_accepted is only public for adaptive hysteresis.
+        n_tot_Exch = result[7]
         result[8] = result[8][:n_tot_Exch]  # ExchMat_r
         result[9] = result[9][:n_tot_Exch]  # ExchMat_c
         result[10] = result[10][:n_tot_Exch]  # ExchMat_v
@@ -849,7 +882,11 @@ class MicromagProblem:
 
         """
 
-        
+        if self.hysteresis_solver != 1:
+            raise ValueError(
+                "run_hysteresis requires hysteresis_solver='static'"
+            )
+
         #----------- we always run hysteresis with explicit solver so no need to check here
         nt_h_ext = H_ext.shape[0]
         nt_h_ext_out = nt_h_ext
@@ -934,6 +971,20 @@ class MicromagProblem:
             macroshape=self.macroShape,
             sampleshape=self.sampleShape,
             exchpbc=self.exchPBC,
+            hysteresis_solver=self.hysteresis_solver,
+            h_start=np.zeros(3, dtype=np.float64),
+            h_end=np.zeros(3, dtype=np.float64),
+            dh_initial=0.0,
+            dh_min=0.0,
+            dh_max=0.0,
+            maxhextsteps=0,
+            dm_min=0.0,
+            dm_target=0.0,
+            dm_reject=0.0,
+            dh_grow=0.0,
+            dh_shrink=0.0,
+            switch_refine_dh=0.0,
+            use_switch_refine=0,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
@@ -954,8 +1005,9 @@ class MicromagProblem:
             trace_verbose=self.trace_verbose
         )
 
-        n_tot_Exch = result[7]
         result = list(result)
+        result.pop(7)  # n_Hext_accepted is only public for adaptive hysteresis.
+        n_tot_Exch = result[7]
         result[8] = result[8][:n_tot_Exch]  # ExchMat_r
         result[9] = result[9][:n_tot_Exch]  # ExchMat_c
         result[10] = result[10][:n_tot_Exch]  # ExchMat_v
@@ -985,6 +1037,10 @@ class MicromagProblem:
         and sliced here to include only accepted field steps.
         """
 
+        if self.hysteresis_solver != 2:
+            raise ValueError(
+                "run_hysteresis_adaptive requires hysteresis_solver='adaptive'"
+            )
         if self.solver != 1:
             raise ValueError("Adaptive hysteresis requires the explicit solver")
 
@@ -1016,7 +1072,7 @@ class MicromagProblem:
         h_ext = np.zeros(shape=(nt_h_ext, 4), dtype=np.float64, order="F")
         h_ext[:, 1:4] = H_start
 
-        result = magtensesource.fortrantopythonio.runmicromagadaptivehysteresis(
+        result = magtensesource.fortrantopythonio.runmicromagsimulation(
             ntot=self.ntot,
             grid_type=self.grid_type,
             grid_n=self.grid_n,
@@ -1087,6 +1143,7 @@ class MicromagProblem:
             macroshape=self.macroShape,
             sampleshape=self.sampleShape,
             exchpbc=self.exchPBC,
+            hysteresis_solver=self.hysteresis_solver,
             h_start=H_start,
             h_end=H_end,
             dh_initial=float(dH_initial),
