@@ -65,8 +65,8 @@
       call timer%log_finalize()
       !---------------------------------------------------------------------------------
     
-      call returnMicroMagSolution( solution, plhs(1) )
-      
+      call returnMicroMagSolution( solution, plhs(1), problem )
+
       !Return the mesh, if the user requested it
       if (nlhs .eq. 2) then
             call returnMicroMagGrid( solution%gridinfo, plhs(2) )  

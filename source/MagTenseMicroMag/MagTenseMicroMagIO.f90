@@ -43,6 +43,10 @@
         mwPointer :: window_enaProblemPtr, window_intProblemPtr, trace_enaProblemPtr, flush_eachProblemPtr, trace_verbProblemPtr
         mwPointer :: N_log_dirPtr, log_dirPtr, N_timer_logPtr, timer_logPtr, N_trace_logPtr, trace_logPtr
         integer :: N_timer_log, N_trace_log, N_log_dir
+        mwPointer :: adaptiveHextPtr, maxHextStepsPtr, H_startPtr, H_endPtr
+        mwPointer :: dH_initialPtr, dH_minPtr, dH_maxPtr, dH_growPtr, dH_shrinkPtr
+        mwPointer :: dM_minPtr, dM_targetPtr, dM_rejectPtr, switch_refine_dHPtr, use_switch_refinePtr
+        integer :: use_switch_refine
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
         real(DP) :: demag_fac, CV, pi, mu0
@@ -559,6 +563,65 @@
         trace_logPtr = mxGetField( prhs, i, problemFields(81) )            
         status = mxGetString( trace_logPtr, problem%trace_log, sx )
         
+        !Load adaptive hysteresis parameters
+        sx = 1
+        adaptiveHextPtr = mxGetField( prhs, i, problemFields(90) )
+        call mxCopyPtrToInteger4(mxGetPr(adaptiveHextPtr), use_switch_refine, sx )
+        problem%adaptiveHext = (use_switch_refine .ne. 0)
+
+        sx = 1
+        maxHextStepsPtr = mxGetField( prhs, i, problemFields(91) )
+        call mxCopyPtrToInteger4(mxGetPr(maxHextStepsPtr), problem%maxHextSteps, sx )
+
+        sx = 3
+        H_startPtr = mxGetField( prhs, i, problemFields(92) )
+        call mxCopyPtrToReal8(mxGetPr(H_startPtr), problem%H_start, sx )
+
+        sx = 3
+        H_endPtr = mxGetField( prhs, i, problemFields(93) )
+        call mxCopyPtrToReal8(mxGetPr(H_endPtr), problem%H_end, sx )
+
+        sx = 1
+        dH_initialPtr = mxGetField( prhs, i, problemFields(94) )
+        call mxCopyPtrToReal8(mxGetPr(dH_initialPtr), problem%dH_initial, sx )
+
+        sx = 1
+        dH_minPtr = mxGetField( prhs, i, problemFields(95) )
+        call mxCopyPtrToReal8(mxGetPr(dH_minPtr), problem%dH_min, sx )
+
+        sx = 1
+        dH_maxPtr = mxGetField( prhs, i, problemFields(96) )
+        call mxCopyPtrToReal8(mxGetPr(dH_maxPtr), problem%dH_max, sx )
+
+        sx = 1
+        dH_growPtr = mxGetField( prhs, i, problemFields(97) )
+        call mxCopyPtrToReal8(mxGetPr(dH_growPtr), problem%dH_grow, sx )
+
+        sx = 1
+        dH_shrinkPtr = mxGetField( prhs, i, problemFields(98) )
+        call mxCopyPtrToReal8(mxGetPr(dH_shrinkPtr), problem%dH_shrink, sx )
+
+        sx = 1
+        dM_minPtr = mxGetField( prhs, i, problemFields(99) )
+        call mxCopyPtrToReal8(mxGetPr(dM_minPtr), problem%dM_min, sx )
+
+        sx = 1
+        dM_targetPtr = mxGetField( prhs, i, problemFields(100) )
+        call mxCopyPtrToReal8(mxGetPr(dM_targetPtr), problem%dM_target, sx )
+
+        sx = 1
+        dM_rejectPtr = mxGetField( prhs, i, problemFields(101) )
+        call mxCopyPtrToReal8(mxGetPr(dM_rejectPtr), problem%dM_reject, sx )
+
+        sx = 1
+        switch_refine_dHPtr = mxGetField( prhs, i, problemFields(102) )
+        call mxCopyPtrToReal8(mxGetPr(switch_refine_dHPtr), problem%switch_refine_dH, sx )
+
+        sx = 1
+        use_switch_refinePtr = mxGetField( prhs, i, problemFields(103) )
+        call mxCopyPtrToInteger4(mxGetPr(use_switch_refinePtr), use_switch_refine, sx )
+        problem%use_switch_refine = (use_switch_refine .ne. 0)
+
         !Clean-up 
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -572,7 +635,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=89
+        integer,parameter :: nf=103
         character(len=12),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -668,7 +731,21 @@
         fieldnames(87) = 'N_log_dir'
         fieldnames(88) = 'N_timer_log'
         fieldnames(89) = 'N_trace_log'
-        
+        fieldnames(90) = 'adaptiveHext'
+        fieldnames(91) = 'maxHextSteps'
+        fieldnames(92) = 'H_start'
+        fieldnames(93) = 'H_end'
+        fieldnames(94) = 'dH_initial'
+        fieldnames(95) = 'dH_min'
+        fieldnames(96) = 'dH_max'
+        fieldnames(97) = 'dH_grow'
+        fieldnames(98) = 'dH_shrink'
+        fieldnames(99) = 'dM_min'
+        fieldnames(100) = 'dM_target'
+        fieldnames(101) = 'dM_reject'
+        fieldnames(102) = 'switch_refdH'
+        fieldnames(103) = 'use_sw_ref'
+
     end subroutine getProblemFieldnames
     
     
@@ -678,15 +755,16 @@
     !> @param[in] solution struct for the internal Fortran represantation of the solution
     !> @param[in] plhs pointer to the Matlab data struct    
     !>-----------------------------------------
-    subroutine returnMicroMagSolution( solution, plhs )
+    subroutine returnMicroMagSolution( solution, plhs, problem )
         type(MicroMagSolution),intent(in) :: solution           !> Solution to be copied to Matlab        
+        type(MicroMagProblem),intent(in) :: problem             !> Problem struct needed for n_Hext_accepted
         mwPointer,intent(inout) :: plhs
     
         integer :: ComplexFlag,classid,mxClassIDFromClassName
         mwSize,dimension(1) :: dims
         mwSize :: s1,s2,sx,ndim
         mwSize,dimension(4) :: dims_4
-        mwPointer :: pt,pm,pp,pdem,pext,pexc,pani
+        mwPointer :: pt,pm,pp,pdem,pext,pexc,pani,pnHext
         mwPointer :: mxCreateStructArray, mxCreateDoubleMatrix,mxGetPr,mxCreateNumericMatrix,mxCreateNumericArray
         mwIndex :: ind
         character(len=10),dimension(:),allocatable :: fieldnames    
@@ -786,11 +864,17 @@
         sx = dims_4(1) * dims_4(2) * dims_4(3) * dims_4(4)
         call mxCopyReal8ToPtr( solution%H_ani, mxGetPr( pani ), sx )
         call mxSetField( plhs, ind, fieldnames(7), pani )
-        
-       
+
+        s1 = 1
+        s2 = 1
+        pnHext = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)
+        sx = s1 * s2
+        call mxCopyInteger4ToPtr( problem%nHextAccepted, mxGetPr( pnHext ), sx )
+        call mxSetField( plhs, ind, fieldnames(8), pnHext )
+
         !Clean up
         deallocate(fieldnames)
-    
+
     end subroutine returnMicroMagSolution
     
     
@@ -802,12 +886,12 @@
     !>-----------------------------------------
     subroutine getSolutionFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=7
+        integer,parameter :: nf=8
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
-            
+
         nfields = nf
         allocate(fieldnames(nfields))
-        
+
         !! Setup the names of the members of the output struct
         fieldnames(1) = 't'
         fieldnames(2) = 'M'
@@ -816,7 +900,8 @@
         fieldnames(5) = 'H_ext'
         fieldnames(6) = 'H_dem'
         fieldnames(7) = 'H_ani'
-        
+        fieldnames(8) = 'n_Hext_acc'
+
     end subroutine getSolutionFieldnames
     
     

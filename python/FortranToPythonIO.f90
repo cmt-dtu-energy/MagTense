@@ -708,6 +708,9 @@ end subroutine getHFromTilesFMM
         logical :: window_enabled_l, trace_enabled_l, flush_each_l
         logical :: use_fmm
         integer,dimension(3) :: exchPBC_l
+        !! Local auxiliary instance - avoids referencing the auxInit_mod module
+        !! global across the f2py name-mangling boundary on Windows.
+        type(auxInit_t) :: auxInit_local
 
 #if USE_MICROMAG
         type(MicroMagProblem) :: problem
@@ -715,8 +718,8 @@ end subroutine getHFromTilesFMM
 
 
 
-        !---------------------- initiaize auxiliary modules ----------------------------- 
-        call auxInit%initAux(log_dir, timer_log_file, trace_log_file, window_enabled, &
+        !---------------------- initiaize auxiliary modules -----------------------------
+        call initAux(auxInit_local, log_dir, timer_log_file, trace_log_file, window_enabled, &
             window_interval, trace_enabled, flush_each, trace_verbose)
         !---------------------------------------------------------------------------------
 
@@ -864,6 +867,9 @@ end subroutine getHFromTilesFMM
         logical :: window_enabled_l, trace_enabled_l, flush_each_l
         logical :: use_fmm
         integer,dimension(3) :: exchPBC_l
+        !! Local auxiliary instance - avoids referencing the auxInit_mod module
+        !! global across the f2py name-mangling boundary on Windows.
+        type(auxInit_t) :: auxInit_local
 
 #if USE_MICROMAG
         type(MicroMagProblem) :: problem
@@ -872,7 +878,7 @@ end subroutine getHFromTilesFMM
 
 
         !---------------------- initiaize auxiliary modules -----------------------------
-        call auxInit%initAux(log_dir, timer_log_file, trace_log_file, window_enabled, &
+        call initAux(auxInit_local, log_dir, timer_log_file, trace_log_file, window_enabled, &
             window_interval, trace_enabled, flush_each, trace_verbose)
         !---------------------------------------------------------------------------------
 

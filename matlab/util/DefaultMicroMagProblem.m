@@ -219,6 +219,22 @@ properties
     N_log_dir
     N_timer_log
     N_trace_log
+
+    %Adaptive hysteresis parameters
+    adaptiveHext
+    maxHextSteps
+    H_start
+    H_end
+    dH_initial
+    dH_min
+    dH_max
+    dH_grow
+    dH_shrink
+    dM_min
+    dM_target
+    dM_reject
+    switch_refdH
+    use_sw_ref
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -467,6 +483,22 @@ methods
         obj.trace_ena = int32(0);
         obj.flush_each = int32(1);
         obj.trace_verb = int32(1);
+
+        %Adaptive hysteresis defaults (disabled by default)
+        obj.adaptiveHext = int32(0);
+        obj.maxHextSteps = int32(1000);
+        obj.H_start = [0, 0, 0];
+        obj.H_end = [0, 0, 0];
+        obj.dH_initial = 1e3;
+        obj.dH_min = 1e1;
+        obj.dH_max = 1e5;
+        obj.dH_grow = 1.25;
+        obj.dH_shrink = 0.5;
+        obj.dM_min = 1e-3;
+        obj.dM_target = 1e-2;
+        obj.dM_reject = 5e-2;
+        obj.switch_refdH = 0.0;
+        obj.use_sw_ref = int32(0);
 
     end
     
