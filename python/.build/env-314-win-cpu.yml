@@ -11,6 +11,7 @@ dependencies:
   - _openmp_mutex=4.5=20_gnu
   - bzip2=1.0.8=h0ad9c76_9
   - ca-certificates=2026.2.25=h4c7d964_0
+  - cmake
   - compiler_shared=2025.3.2=intel_833
   - dpcpp-cpp-rt=2025.3.2=intel_833
   - dpcpp_impl_win-64=2025.3.2=intel_833

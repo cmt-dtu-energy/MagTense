@@ -9,6 +9,7 @@ dependencies:
   - _openmp_mutex=4.5=2_gnu
   - bzip2=1.0.8=h2466b09_7
   - ca-certificates=2025.8.3=h4c7d964_0
+  - cmake
   - compiler_shared=2025.2.0=intel_756
   - cuda-cccl_win-64=12.8.90=0
   - cuda-crt-dev_win-64=12.8.93=0
