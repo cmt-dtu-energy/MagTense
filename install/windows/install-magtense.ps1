@@ -232,10 +232,20 @@ try {
         if (Test-Path $srcParent) { Remove-Item $srcParent -Recurse -Force }
         New-Item -ItemType Directory -Force -Path $srcParent | Out-Null
         Write-Info "Extracting CVODE sources"
-        # The env ships GNU tar (via the git/MSYS package), which treats a
-        # "C:\...tar.gz" archive path as a remote host:path spec ("Cannot
-        # connect to C: resolve failed"). --force-local forces local handling.
-        Invoke-Native { & tar --force-local -xf $tgz -C $srcParent } 'tar (extract cvode)'
+        # Prefer the native Windows bsdtar (System32\tar.exe): it handles
+        # "C:\..." drive-letter paths directly. The env's GNU tar (from the
+        # git/MSYS package) instead reads the archive path as a remote
+        # host:path spec and mangles the backslash paths it is given.
+        $winTar = Join-Path $env:SystemRoot 'System32\tar.exe'
+        if (Test-Path $winTar) {
+            Invoke-Native { & $winTar -xf $tgz -C $srcParent } 'tar (extract cvode)'
+        } else {
+            # Fallback for older Windows without bsdtar: GNU tar needs
+            # forward-slash paths plus --force-local for the drive colon.
+            $tgzFwd = $tgz -replace '\\', '/'
+            $srcFwd = $srcParent -replace '\\', '/'
+            Invoke-Native { & tar --force-local -xf $tgzFwd -C $srcFwd } 'tar (extract cvode)'
+        }
         $CvodeSrc = (Get-ChildItem -Path $srcParent -Directory | Select-Object -First 1).FullName
 
         $CvodeBuild = Join-Path $env:TEMP "cvode-build-$CvodeVersion"
