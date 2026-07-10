@@ -224,6 +224,12 @@ try {
     if (Test-Path (Join-Path $CvodeRoot 'lib')) {
         Write-Ok "CVODE already built at $CvodeRoot (skipping)."
     } else {
+        # cmake is required to build CVODE but is not part of the pinned env
+        # spec; install it into the env on demand (idempotent).
+        if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+            Write-Info "cmake not found in env; installing via conda..."
+            Invoke-Native { & $CondaExe install -n $EnvName -y cmake } 'conda install cmake'
+        }
         $tgz = Join-Path $env:TEMP "cvode-$CvodeVersion.tar.gz"
         $srcParent = Join-Path $env:TEMP "cvode-src-$CvodeVersion"
         $cvUrl = "https://github.com/LLNL/sundials/releases/download/v$CvodeVersion/cvode-$CvodeVersion.tar.gz"
