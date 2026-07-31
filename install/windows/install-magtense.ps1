@@ -246,11 +246,24 @@ try {
     if (Test-Path (Join-Path $CvodeRoot 'lib')) {
         Write-Ok "CVODE already built at $CvodeRoot (skipping)."
     } else {
-        # cmake is required to build CVODE but is not part of the pinned env
-        # spec; install it into the env on demand (idempotent).
-        if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
-            Write-Info "cmake not found in env; installing via conda..."
-            Invoke-Native { & $CondaExe install -p $EnvPrefix -y cmake } 'conda install cmake'
+        # CVODE/SUNDIALS requires CMake >= 3.18. Resolve cmake by the env's own
+        # path (…\Library\bin\cmake.exe) rather than trusting whatever `cmake`
+        # is first on PATH: a stale system-wide CMake (< 3.18) earlier on PATH
+        # would otherwise satisfy a presence-only check and then fail configure.
+        # (Re)install into the env when the binary is missing or too old.
+        $CMake = Join-Path $EnvPrefix 'Library\bin\cmake.exe'
+        $cmakeOk = $false
+        if (Test-Path $CMake) {
+            $verLine = (& $CMake --version | Select-Object -First 1)   # "cmake version 3.30.5"
+            if ($verLine -match '(\d+\.\d+\.\d+)' -and [version]$Matches[1] -ge [version]'3.18.0') {
+                $cmakeOk = $true
+                Write-Info "Using env cmake $($Matches[1]) at $CMake"
+            }
+        }
+        if (-not $cmakeOk) {
+            Write-Info "Suitable cmake (>=3.18) not found in env; installing via conda..."
+            Invoke-Native { & $CondaExe install -p $EnvPrefix -y "cmake>=3.18" } 'conda install cmake'
+            if (-not (Test-Path $CMake)) { throw "cmake.exe not found in env at $CMake after install." }
         }
         $tgz = Join-Path $env:TEMP "cvode-$CvodeVersion.tar.gz"
         $srcParent = Join-Path $env:TEMP "cvode-src-$CvodeVersion"
@@ -283,7 +296,7 @@ try {
         # Flags mirror python/README.md and .github/workflows/cmake-sundials-cvode.yml.
         Write-Info "Configuring CVODE (cmake -G Ninja, ifx/icx-cl)"
         Invoke-Native {
-            & cmake -G Ninja -B $CvodeBuild -S $CvodeSrc `
+            & $CMake -G Ninja -B $CvodeBuild -S $CvodeSrc `
                 -D CMAKE_BUILD_TYPE=Release `
                 -D BUILD_ARKODE=OFF -D BUILD_CVODE=ON -D BUILD_CVODES=OFF `
                 -D BUILD_IDA=OFF -D BUILD_IDAS=OFF -D BUILD_KINSOL=OFF `
@@ -296,8 +309,8 @@ try {
                 -D BUILD_FORTRAN_MODULE_INTERFACE=ON -D ENABLE_OPENMP=ON
         } 'cmake configure (cvode)'
         Write-Info "Building + installing CVODE"
-        Invoke-Native { & cmake --build $CvodeBuild --config Release } 'cmake --build (cvode)'
-        Invoke-Native { & cmake --install $CvodeBuild } 'cmake --install (cvode)'
+        Invoke-Native { & $CMake --build $CvodeBuild --config Release } 'cmake --build (cvode)'
+        Invoke-Native { & $CMake --install $CvodeBuild } 'cmake --install (cvode)'
         Remove-Item $tgz -Force
         Write-Ok "CVODE installed to $CvodeRoot"
     }
