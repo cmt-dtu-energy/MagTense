@@ -203,20 +203,42 @@ try {
 
     # --- 4. create env -----------------------------------------------------
     Write-Step "Creating conda environment '$EnvName' ($Compute build)"
-    $envList = & $CondaExe env list
-    if ($envList -match "[\\/]$EnvName\b") {
-        Write-Ok "Environment '$EnvName' already exists (skipping creation)."
+    # Resolve the env by *prefix*, not by a substring match on `conda env list`.
+    # That text listing includes stale entries from ~/.conda/environments.txt
+    # (shared across every conda/miniconda/miniforge on the machine and left
+    # behind when an env is deleted or built by a different distribution). A
+    # substring match on such a phantom path makes us skip creation, and then
+    # `conda activate <name>` fails with EnvironmentNameNotFound because the
+    # prefix is not under *this* conda's envs_dirs. Instead, list prefixes as
+    # JSON and keep only one whose leaf is $EnvName and that actually contains a
+    # conda-meta dir (i.e. a real, populated env), then activate it by path.
+    $envJson  = & $CondaExe env list --json | ConvertFrom-Json
+    $EnvPrefix = $envJson.envs |
+        Where-Object { (Split-Path $_ -Leaf) -eq $EnvName -and
+                       (Test-Path (Join-Path $_ 'conda-meta')) } |
+        Select-Object -First 1
+    if ($EnvPrefix) {
+        Write-Ok "Environment '$EnvName' already exists at $EnvPrefix (skipping creation)."
     } else {
         $suffix  = if ($Compute -eq 'cpu') { '-cpu' } else { '' }
         $envFile = Join-Path $RepoDir "python\.build\env-$PyVersion-win$suffix.yml"
         if (-not (Test-Path $envFile)) { throw "Env file not found: $envFile" }
         Write-Info "conda env create -f $envFile"
         Invoke-Native { & $CondaExe env create -n $EnvName -f $envFile } 'conda env create'
-        Write-Ok "Environment created."
+        # Re-resolve the prefix conda just created so we activate by path below.
+        $envJson  = & $CondaExe env list --json | ConvertFrom-Json
+        $EnvPrefix = $envJson.envs |
+            Where-Object { (Split-Path $_ -Leaf) -eq $EnvName -and
+                           (Test-Path (Join-Path $_ 'conda-meta')) } |
+            Select-Object -First 1
+        if (-not $EnvPrefix) { throw "Environment '$EnvName' not found after creation." }
+        Write-Ok "Environment created at $EnvPrefix."
     }
 
-    conda activate $EnvName
-    Write-Ok "Activated '$EnvName'."
+    # Activate by prefix: name-based activation only works when the prefix's
+    # parent is a registered envs_dir, whereas a prefix path always resolves.
+    conda activate $EnvPrefix
+    Write-Ok "Activated '$EnvName' ($EnvPrefix)."
 
     # --- 5. build CVODE ----------------------------------------------------
     Write-Step "Building CVODE $CvodeVersion"
@@ -228,7 +250,7 @@ try {
         # spec; install it into the env on demand (idempotent).
         if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
             Write-Info "cmake not found in env; installing via conda..."
-            Invoke-Native { & $CondaExe install -n $EnvName -y cmake } 'conda install cmake'
+            Invoke-Native { & $CondaExe install -p $EnvPrefix -y cmake } 'conda install cmake'
         }
         $tgz = Join-Path $env:TEMP "cvode-$CvodeVersion.tar.gz"
         $srcParent = Join-Path $env:TEMP "cvode-src-$CvodeVersion"
