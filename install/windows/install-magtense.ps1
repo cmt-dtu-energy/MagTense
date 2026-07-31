@@ -85,6 +85,53 @@ function Invoke-Native {
     }
 }
 
+function Initialize-MsvcEnv {
+    # CVODE (built with the Ninja generator + icx-cl/ifx) and the Fortran core
+    # link against the MSVC C runtime and the Windows SDK (kernel32.lib,
+    # user32.lib, ...). With the Ninja generator CMake does NOT provision the
+    # toolchain environment itself the way the Visual Studio generator does; it
+    # relies on the ambient developer environment (INCLUDE/LIB/PATH). Activating
+    # the conda env alone does not put the Windows SDK 'um' lib dir on LIB in a
+    # PowerShell session, so importing the real MSVC vcvars is required. This is
+    # the local equivalent of the CI 'ilammy/msvc-dev-cmd' step added to
+    # .github/workflows/cmake-sundials-cvode.yml.
+    if ($env:LIB -and $env:LIB -match 'Windows Kits') {
+        Write-Info "MSVC developer environment already active (Windows SDK on LIB)."
+        return
+    }
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (-not (Test-Path $vswhere)) {
+        throw ("Visual Studio not found (vswhere.exe missing). Install Visual Studio 2022 or " +
+               "the Build Tools with the 'Desktop development with C++' workload (MSVC + " +
+               "Windows SDK), then re-run this installer.")
+    }
+    $vsPath = (& $vswhere -latest -products * `
+                 -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+                 -property installationPath 2>$null | Select-Object -First 1)
+    if (-not $vsPath) {
+        throw ("No Visual Studio installation with the C++ toolset was found. In the Visual " +
+               "Studio Installer, add the 'Desktop development with C++' workload (MSVC + " +
+               "Windows SDK), then re-run this installer.")
+    }
+    $vcvars = Join-Path $vsPath 'VC\Auxiliary\Build\vcvars64.bat'
+    if (-not (Test-Path $vcvars)) { throw "vcvars64.bat not found under $vsPath." }
+    Write-Info "Importing MSVC environment from $vcvars"
+    # Run vcvars in a cmd subshell (it inherits the already-activated conda PATH)
+    # and copy the resulting environment back into this PowerShell session.
+    $out = cmd /c "`"$vcvars`" && set"
+    if ($LASTEXITCODE -ne 0) { throw "vcvars64.bat failed with exit code $LASTEXITCODE." }
+    foreach ($line in $out) {
+        if ($line -match '^([^=]+)=(.*)$') {
+            Set-Item -Path ("env:{0}" -f $Matches[1]) -Value $Matches[2]
+        }
+    }
+    if ($env:LIB -notmatch 'Windows Kits') {
+        throw ("Windows SDK libraries are still not on LIB after running vcvars. Ensure the " +
+               "Windows SDK component of the 'Desktop development with C++' workload is installed.")
+    }
+    Write-Ok "MSVC developer environment ready (Windows SDK on LIB)."
+}
+
 # --- 1. preflight ----------------------------------------------------------
 $LogDir = Join-Path $env:USERPROFILE '.magtense'
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
@@ -239,6 +286,12 @@ try {
     # parent is a registered envs_dir, whereas a prefix path always resolves.
     conda activate $EnvPrefix
     Write-Ok "Activated '$EnvName' ($EnvPrefix)."
+
+    # --- 4b. MSVC developer environment -----------------------------------
+    # Needed for both the CVODE (Ninja) build below and the Fortran core link
+    # in step 6; persists for the rest of this session once imported.
+    Write-Step "Setting up MSVC developer environment (vcvars)"
+    Initialize-MsvcEnv
 
     # --- 5. build CVODE ----------------------------------------------------
     Write-Step "Building CVODE $CvodeVersion"
