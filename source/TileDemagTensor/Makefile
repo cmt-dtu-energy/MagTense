@@ -52,5 +52,7 @@ ${STATIC_LIB}: ${NUM_INT_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
 clean:
-	-$(RM) *${LIB_SUFFIX} *.o *.mod
+	-$(RM) *${LIB_SUFFIX}
+	-$(RM) *.o
+	-$(RM) *.mod
 	

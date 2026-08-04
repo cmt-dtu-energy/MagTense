@@ -68,4 +68,6 @@ ${STATIC_LIB}: ${AUXMT_LIB} ${TILE_DEMAG_TENSOR_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
 clean:
-	-$(RM) *${LIB_SUFFIX} *.o *.mod
+	-$(RM) *${LIB_SUFFIX}
+	-$(RM) *.o
+	-$(RM) *.mod

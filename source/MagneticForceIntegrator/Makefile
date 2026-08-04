@@ -47,4 +47,6 @@ ${STATIC_LIB}: ${DEMAG_FIELD_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
 clean:
-	-$(RM) ${STATIC_LIB} *.o *.mod
+	-$(RM) ${STATIC_LIB}
+	-$(RM) *.o
+	-$(RM) *.mod

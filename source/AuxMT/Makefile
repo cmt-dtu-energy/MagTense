@@ -54,7 +54,9 @@ endif
 all: ${STATIC_LIB}
 
 clean:
-	-$(RM) *${LIB_SUFFIX} *.o *.mod
+	-$(RM) *${LIB_SUFFIX}
+	-$(RM) *.o
+	-$(RM) *.mod
 
 .f90.o:
 	$(FC) $(FFLAGS) ${OPT} ${CVODE_OPT} ${MATLAB_OPT} -c $< -o $@

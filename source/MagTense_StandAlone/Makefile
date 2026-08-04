@@ -30,7 +30,9 @@ DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libTileDemagTensor${LIB_SUFFIX}
 all: MagTense.x
 
 clean:
-	-$(RM) *.x *.o *.mod
+	-$(RM) *.x
+	-$(RM) *.o
+	-$(RM) *.mod
 
 .f90.o:
 	$(FC) $(FFLAGS) -I ${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -c  $<
