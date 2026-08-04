@@ -124,7 +124,10 @@ ${MICROMAG_PATH}:${FORTRAN_CUDA_PATH}:${STANDALONE_PATH}:${FORCEINTEGRATOR_PATH}
 
 ifeq ($(OS),Windows_NT)
 	CONDA_PATH = $(subst \,/,${CONDA_PREFIX})
-	CUDA_ROOT = ${CONDA_PATH}/Library/lib
+	# conda's nvidia-channel CUDA packages put the import libraries (cublas.lib,
+	# cudart.lib, cusparse.lib) in Library/lib/x64, not Library/lib (where MKL
+	# lives).
+	CUDA_ROOT = ${CONDA_PATH}/Library/lib/x64
 	MKL = -L${CONDA_PATH}/Library/lib -lmkl_intel_lp64_dll -lmkl_intel_thread_dll \
 		-lmkl_core_dll -lmkl_blas95_lp64 -llibiomp5md
 		
@@ -247,7 +250,10 @@ else
 	CUDA = -L${CUDA_ROOT} -lcublas -lcudart -lcusparse
 	CP_LIB += $(SEP) cp ${FORTRAN_CUDA_PATH}/libCuda${LIB_SUFFIX} .
 	ifeq ($(OS),Windows_NT)
-		CUDA += -lcuda
+		# No CUDA driver API (cuInit/cuCtx*/cuMemAlloc) is used -- the compiled
+		# sources call only cuBLAS and the CUDA runtime -- so the driver stub
+		# cuda.lib (-lcuda) is not needed, and it is not shipped in the Windows
+		# conda env anyway.
 		LIB_OPT += -llibCuda
 	else
 		LIB_OPT += -lCuda
