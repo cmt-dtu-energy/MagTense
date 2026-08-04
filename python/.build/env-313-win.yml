@@ -1,7 +1,6 @@
 name: magtense-env
 channels:
   - https://software.repos.intel.com/python/conda
-  - nvidia/label/cuda-12.8.1
   - https://software.repos.intel.com/python/conda/
   - conda-forge
   - defaults
@@ -11,25 +10,6 @@ dependencies:
   - ca-certificates=2025.8.3=h4c7d964_0
   - cmake
   - compiler_shared=2025.2.0=intel_756
-  - cuda-cccl_win-64=12.8.90=0
-  - cuda-crt-dev_win-64=12.8.93=0
-  - cuda-crt-tools=12.8.93=0
-  - cuda-cudart=12.8.90=0
-  - cuda-cudart-dev=12.8.90=0
-  - cuda-cudart-dev_win-64=12.8.90=0
-  - cuda-cudart-static=12.8.90=0
-  - cuda-cudart-static_win-64=12.8.90=0
-  - cuda-cudart_win-64=12.8.90=0
-  - cuda-nvcc=12.8.93=0
-  - cuda-nvcc-dev_win-64=12.8.93=0
-  - cuda-nvcc-impl=12.8.93=0
-  - cuda-nvcc-tools=12.8.93=0
-  - cuda-nvcc_win-64=12.8.93=0
-  - cuda-nvrtc=12.8.93=0
-  - cuda-nvvm-dev_win-64=12.8.93=0
-  - cuda-nvvm-impl=12.8.93=0
-  - cuda-nvvm-tools=12.8.93=0
-  - cuda-version=12.8=3
   - dpcpp-cpp-rt=2025.2.0=intel_756
   - dpcpp_impl_win-64=2025.2.0=intel_756
   - dpcpp_win-64=2025.2.0=intel_756
@@ -43,18 +23,12 @@ dependencies:
   - intel-opencl-rt=2025.2.0=intel_756
   - intel-openmp=2025.2.0=intel_756
   - intel-sycl-rt=2025.2.0=intel_756
-  - libcublas=12.8.4.1=0
-  - libcublas-dev=12.8.4.1=0
-  - libcusparse=12.5.8.93=0
-  - libcusparse-dev=12.5.8.93=0
   - libexpat=2.7.1=hac47afa_0
   - libffi=3.4.6=h537db12_1
   - libgcc=15.1.0=h1383e82_4
   - libgomp=15.1.0=h1383e82_4
   - liblzma=5.8.1=h2466b09_2
   - libmpdec=4.0.0=h2466b09_0
-  - libnvjitlink=12.8.93=1
-  - libnvjitlink-dev=12.8.93=1
   - libsqlite=3.50.4=hf5d6505_0
   - libwinpthread=12.0.0.r4.gg4f2fc60ca=h57928b3_9
   - libzlib=1.3.1=h2466b09_2
@@ -84,6 +58,15 @@ dependencies:
   - vs2022_win-64=19.44.35207=ha74f236_31
   - vs_win-64=2022.14=ha74f236_31
   - vswhere=3.1.7=h40126e0_1
+  # CUDA toolkit from conda-forge. Loose pins on purpose: the exact
+  # nvidia-label builds this file used to pin were dropped from the
+  # channel and no longer solve. The -dev packages ship the Windows
+  # import libs (Library/lib/x64/*.lib) MSVC needs; conda pulls nvcc,
+  # the CUDA runtime and cuda-version transitively.
+  - cuda-nvcc
+  - cuda-cudart-dev
+  - libcublas-dev
+  - libcusparse-dev
   - pip:
       - build==1.3.0
       - charset-normalizer==3.4.3
