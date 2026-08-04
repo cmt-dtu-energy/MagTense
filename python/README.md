@@ -9,6 +9,13 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
 #### Linux
 
+On a fresh Debian/Ubuntu system, first install the build prerequisites:
+
+```shell
+sudo apt-get update
+sudo apt-get install -y git curl build-essential
+```
+
 Provided you already have `make` installed, you can simply run
 
 ```shell
