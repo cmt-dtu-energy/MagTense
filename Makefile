@@ -178,9 +178,9 @@ ifeq ($(USE_MICROMAG),0)
 		CP_LIB = cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
 	else
 		CP_LIB = cp ${AUXMT_PATH}/libAuxMT${LIB_SUFFIX} .
-		CP_LIB += && cp ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX} .
-		CP_LIB += && cp ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX} .
-		CP_LIB += && cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
+		CP_LIB += $(SEP) cp ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX} .
+		CP_LIB += $(SEP) cp ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX} .
+		CP_LIB += $(SEP) cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
 	endif
 else
 	MICROMAG = micromagnetism
@@ -190,15 +190,15 @@ else
 		
 		LIB_OPT += -llibMagTenseMicroMag
 		#CP_LIB = cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
-		CP_LIB += && cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
+		CP_LIB += $(SEP) cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
 		
 	else
 		LIB_OPT += -lMagTenseMicroMag
 		CP_LIB = cp ${AUXMT_PATH}/libAuxMT${LIB_SUFFIX} .
-		CP_LIB += && cp ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX} .
-		CP_LIB += && cp ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX} .
-		CP_LIB += && cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
-		CP_LIB += && cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
+		CP_LIB += $(SEP) cp ${NUM_INT_PATH}/libNumericalIntegration${LIB_SUFFIX} .
+		CP_LIB += $(SEP) cp ${TILE_DEMAG_TENSOR_PATH}/libTileDemagTensor${LIB_SUFFIX} .
+		CP_LIB += $(SEP) cp ${DEMAG_FIELD_PATH}/libDemagField${LIB_SUFFIX} .
+		CP_LIB += $(SEP) cp ${MICROMAG_PATH}/libMagTenseMicroMag${LIB_SUFFIX} .
 	endif
 
 
@@ -214,11 +214,11 @@ else
     
     # 2. Use 'cp' (since your shell is sh) and RENAME the file during copy
     # This creates fmm3d.lib in your root so the linker finds it easily
-    CP_LIB += && cp "${FMM3D_LIB}/libfmm3d.lib" ./fmm3d.lib
+    CP_LIB += $(SEP) cp "${FMM3D_LIB}/libfmm3d.lib" ./fmm3d.lib
   else
     FMM3D = -L${FMM3D_LIB} -lfmm3d
     LDFLAGS += -Wl,-rpath,${FMM3D_LIB}
-    CP_LIB += && cp ${FMM3D_LIB}/libfmm3d${LIB_SUFFIX} .
+    CP_LIB += $(SEP) cp ${FMM3D_LIB}/libfmm3d${LIB_SUFFIX} .
   endif
 endif
 #===================================================================
@@ -229,7 +229,7 @@ ifeq ($(USE_MATLAB),0)
 	FORCEINTEGRATOR =
 else
 	FORCEINTEGRATOR = forceintegrator
-	CP_LIB += && cp ${FORCEINTEGRATOR_PATH}/libMagneticForceIntegrator${LIB_SUFFIX} .
+	CP_LIB += $(SEP) cp ${FORCEINTEGRATOR_PATH}/libMagneticForceIntegrator${LIB_SUFFIX} .
 endif
 
 ifeq ($(USE_CUDA),0)
@@ -238,7 +238,7 @@ ifeq ($(USE_CUDA),0)
 else
 	COMPILE_CUDA = cuda
 	CUDA = -L${CUDA_ROOT} -lcublas -lcudart -lcusparse
-	CP_LIB += && cp ${FORTRAN_CUDA_PATH}/libCuda${LIB_SUFFIX} .
+	CP_LIB += $(SEP) cp ${FORTRAN_CUDA_PATH}/libCuda${LIB_SUFFIX} .
 	ifeq ($(OS),Windows_NT)
 		CUDA += -lcuda
 		LIB_OPT += -llibCuda
@@ -278,13 +278,13 @@ python: $(PY_DEPS) ${AUXMT} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_M
 python-win: ${PYTHON_MODN_ALL}
 
 define clean-subdirs
-	cd ${NUM_INT_PATH} && ${MAKE} clean
-	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} clean
-	cd ${DEMAG_FIELD_PATH} && ${MAKE} clean
-	cd ${MICROMAG_PATH} && ${MAKE} clean
-	cd ${FORTRAN_CUDA_PATH} && ${MAKE} clean
-	cd $(STANDALONE_PATH) && ${MAKE} clean
-	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
+	cd ${NUM_INT_PATH} $(SEP) ${MAKE} clean
+	cd ${TILE_DEMAG_TENSOR_PATH} $(SEP) ${MAKE} clean
+	cd ${DEMAG_FIELD_PATH} $(SEP) ${MAKE} clean
+	cd ${MICROMAG_PATH} $(SEP) ${MAKE} clean
+	cd ${FORTRAN_CUDA_PATH} $(SEP) ${MAKE} clean
+	cd $(STANDALONE_PATH) $(SEP) ${MAKE} clean
+	cd $(FORCEINTEGRATOR_PATH) $(SEP) ${MAKE} clean
 endef
 
 clean:
@@ -294,20 +294,20 @@ clean:
 	rm -rf cvode*
 
 clean_full:
-	cd ${FMM3D_DIR} && ${MAKE} clean
-	cd ${AUXMT_PATH} && ${MAKE} clean
-	cd ${NUM_INT_PATH} && ${MAKE} clean
-	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} clean
-	cd ${DEMAG_FIELD_PATH} && ${MAKE} clean
-	cd ${MICROMAG_PATH} && ${MAKE} clean
-	cd ${FORTRAN_CUDA_PATH} && ${MAKE} clean
-	cd $(STANDALONE_PATH) && ${MAKE} clean
-	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
+	cd ${FMM3D_DIR} $(SEP) ${MAKE} clean
+	cd ${AUXMT_PATH} $(SEP) ${MAKE} clean
+	cd ${NUM_INT_PATH} $(SEP) ${MAKE} clean
+	cd ${TILE_DEMAG_TENSOR_PATH} $(SEP) ${MAKE} clean
+	cd ${DEMAG_FIELD_PATH} $(SEP) ${MAKE} clean
+	cd ${MICROMAG_PATH} $(SEP) ${MAKE} clean
+	cd ${FORTRAN_CUDA_PATH} $(SEP) ${MAKE} clean
+	cd $(STANDALONE_PATH) $(SEP) ${MAKE} clean
+	cd $(FORCEINTEGRATOR_PATH) $(SEP) ${MAKE} clean
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
 	rm -rf ${PYTHON_LIBPATH}/build
 
 auxmt:
-	cd ${AUXMT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
+	cd ${AUXMT_PATH} $(SEP) ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
 
 clean-build:
 	rm -f ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
