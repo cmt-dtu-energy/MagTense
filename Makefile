@@ -143,7 +143,11 @@ ifeq ($(OS),Windows_NT)
 else
  	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
 	CUDA_ROOT = ${CONDA_PREFIX}/lib
-	LDFLAGS =
+	# Mark the produced .so as needing a non-executable stack. Fortran objects
+	# otherwise leave GNU_STACK executable, and recent Linux kernels refuse to
+	# dlopen such a library ("cannot enable executable stack as shared object
+	# requires: Invalid argument").
+	LDFLAGS = -Wl,-z,noexecstack
 #	LDFLAGS += '-lstdc++ -liomp5'
 	LIB_SUFFIX = .a
 	PY_MOD_SUFFIX = .so
