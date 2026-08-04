@@ -33,6 +33,7 @@ ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PATH}/opt/compiler/include/intel64
 	LIBTOOL = LIB $? /OUT:$@
 	LIB_SUFFIX = .lib
+	RM = Remove-Item -Force -ErrorAction SilentlyContinue
 else
 	MKL_ROOT = ${CONDA_PREFIX}
 	OPT =
@@ -76,4 +77,4 @@ ${STATIC_LIB}: ${DEMAG_FIELD_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
 clean:
-	-rm -f *${LIB_SUFFIX} *.o *.mod
+	-$(RM) *${LIB_SUFFIX} *.o *.mod

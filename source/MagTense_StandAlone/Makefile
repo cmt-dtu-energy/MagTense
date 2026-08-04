@@ -12,6 +12,7 @@ LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	LIB_SUFFIX = .lib
+	RM = Remove-Item -Force -ErrorAction SilentlyContinue
 else
 	LIB_SUFFIX = .a
 endif
@@ -29,7 +30,7 @@ DEMAG_FIELD_LIB = ${DEMAG_FIELD_PATH}/libTileDemagTensor${LIB_SUFFIX}
 all: MagTense.x
 
 clean:
-	-rm -f *.x *.o *.mod
+	-$(RM) *.x *.o *.mod
 
 .f90.o:
 	$(FC) $(FFLAGS) -I ${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} -c  $<

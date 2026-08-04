@@ -19,6 +19,7 @@ ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
 	LIBTOOL = LIB $? /OUT:$@
 	LIB_SUFFIX = .lib
+	RM = Remove-Item -Force -ErrorAction SilentlyContinue
 	
 else
 	OPT =
@@ -53,7 +54,7 @@ endif
 all: ${STATIC_LIB}
 
 clean:
-	-rm -f *${LIB_SUFFIX} *.o *.mod
+	-$(RM) *${LIB_SUFFIX} *.o *.mod
 
 .f90.o:
 	$(FC) $(FFLAGS) ${OPT} ${CVODE_OPT} ${MATLAB_OPT} -c $< -o $@

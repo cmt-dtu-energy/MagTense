@@ -43,8 +43,15 @@ FMM3D_LIB      := $(FMM3D_ROOT)/local
 
 ifeq ($(OS),Windows_NT)
   SEP = ;
+  # PowerShell: `rm -f`/`rm -rf` are invalid (rm is an alias for Remove-Item
+  # and -f/-r are not its parameters). Use Remove-Item; SilentlyContinue makes
+  # a non-matching wildcard a no-op, matching `rm -f` semantics.
+  RM = Remove-Item -Force -ErrorAction SilentlyContinue
+  RMDIR = Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 else
   SEP = &&
+  RM = rm -f
+  RMDIR = rm -rf
 endif
 
 .PHONY: fmm3d
@@ -289,9 +296,9 @@ endef
 
 clean:
 	$(clean-subdirs)
-	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
-	rm -rf ${PYTHON_LIBPATH}/build
-	rm -rf cvode*
+	$(RM) *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
+	$(RMDIR) ${PYTHON_LIBPATH}/build
+	$(RMDIR) cvode*
 
 clean_full:
 	cd ${FMM3D_DIR} $(SEP) ${MAKE} clean
@@ -303,15 +310,15 @@ clean_full:
 	cd ${FORTRAN_CUDA_PATH} $(SEP) ${MAKE} clean
 	cd $(STANDALONE_PATH) $(SEP) ${MAKE} clean
 	cd $(FORCEINTEGRATOR_PATH) $(SEP) ${MAKE} clean
-	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
-	rm -rf ${PYTHON_LIBPATH}/build
+	$(RM) *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
+	$(RMDIR) ${PYTHON_LIBPATH}/build
 
 auxmt:
 	cd ${AUXMT_PATH} $(SEP) ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
 
 clean-build:
-	rm -f ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
-	rm -rf ${PYTHON_LIBPATH}/build
+	$(RM) ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
+	$(RMDIR) ${PYTHON_LIBPATH}/build
 
 magnetostatic:
 	cd ${NUM_INT_PATH} $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)

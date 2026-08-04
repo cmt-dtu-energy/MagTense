@@ -27,6 +27,7 @@ ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
 	LIBTOOL = LIB $? /OUT:$@
 	LIB_SUFFIX = .lib
+	RM = Remove-Item -Force -ErrorAction SilentlyContinue
 else
 	OPT =
 	LIB_SUFFIX = .a
@@ -67,4 +68,4 @@ ${STATIC_LIB}: ${AUXMT_LIB} ${TILE_DEMAG_TENSOR_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
 clean:
-	-rm -f *${LIB_SUFFIX} *.o *.mod
+	-$(RM) *${LIB_SUFFIX} *.o *.mod

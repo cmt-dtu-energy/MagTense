@@ -13,6 +13,7 @@ LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
 	LIB_SUFFIX = .lib
+	RM = Remove-Item -Force -ErrorAction SilentlyContinue
 	LIBTOOL = LIB $? /OUT:$@
 else
 	OPT =
@@ -46,4 +47,4 @@ ${STATIC_LIB}: ${DEMAG_FIELD_LIB} ${LIBSRC_OBJECTS}
 	${LIBTOOL}
 
 clean:
-	-rm -f ${STATIC_LIB} *.o *.mod
+	-$(RM) ${STATIC_LIB} *.o *.mod
