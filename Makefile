@@ -360,10 +360,14 @@ test:
 
 ${PYTHON_MODN_ALL}:
 	${CP_LIB}
+ifeq ($(OS),Windows_NT)
+	$$env:FC='${FC}'; $$env:FFLAGS=${EXTRA_FFLAGS}; $$env:LDFLAGS=${LDFLAGS}; $(PYTHON) -m numpy.f2py -c -m ${PYTHON_MODN} --build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} -L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${FMM3D}
+else
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
 		$(PYTHON) -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} \
 		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${FMM3D}
+endif
 	cp *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/
 
 # Rule that installs Miniconda only if "conda" is not found
