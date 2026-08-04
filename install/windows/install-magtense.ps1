@@ -391,8 +391,13 @@ try {
         $ws = New-Object -ComObject WScript.Shell
         $sc = $ws.CreateShortcut($lnk)
         $sc.TargetPath = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+        # Activate by prefix, not by name: the env may physically live under a
+        # different conda distribution (discovered here via the shared
+        # environments.txt) so it is not resolvable as a bare name under
+        # $CondaHook's conda -- `conda activate <name>` would then fail with
+        # EnvironmentNameNotFound. A prefix path always resolves.
         $sc.Arguments  = "-NoExit -ExecutionPolicy Bypass -Command " +
-                         "`"& '$CondaHook'; conda activate $EnvName; Set-Location '$RepoDir'`""
+                         "`"& '$CondaHook'; conda activate '$EnvPrefix'; Set-Location '$RepoDir'`""
         $sc.WorkingDirectory = $RepoDir
         $sc.Description = 'PowerShell with the MagTense conda environment activated'
         $sc.Save()
@@ -405,7 +410,7 @@ try {
     Write-Host ""
     Write-Host "MagTense is installed. To start working:" -ForegroundColor Green
     Write-Host "  * Open 'MagTense Dev Shell' from the Start Menu, or run:" -ForegroundColor Green
-    Write-Host "      & '$CondaHook'; conda activate $EnvName" -ForegroundColor Green
+    Write-Host "      & '$CondaHook'; conda activate '$EnvPrefix'" -ForegroundColor Green
     Write-Host "  * Repository:      $RepoDir" -ForegroundColor Green
     Write-Host "  * Example scripts: $RepoDir\python\examples" -ForegroundColor Green
     Write-Host ""
