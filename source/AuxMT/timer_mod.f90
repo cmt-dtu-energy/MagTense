@@ -105,7 +105,10 @@ CONTAINS
     !---------------------------------------------------------------------------
 
     !---------------------- Allocate per-thread timer arrays -------------------
-    nthreads = omp%max_threads
+    ! Guard against omp%max_threads still being -1 (its default) when the timer
+    ! is used via the lazy-init path before omp%init() has run; otherwise the
+    ! array would be allocated with extent 0 and timers(0) would be out of bounds.
+    nthreads = max(1, omp%max_threads)
     allocate(timers(0:nthreads-1))
 
     !$omp parallel private(tid)
@@ -477,7 +480,7 @@ subroutine dump_window(tnow)
     integer :: i, t, nthreads
     integer(8), allocatable :: cur_calls(:), del_calls(:)
     real(8),    allocatable :: cur_total(:), del_total(:)
-    real(8) :: t_rel, t_rel_r, dt, dt_r, other_time
+    real(8) :: t_rel, t_rel_r, dt, dt_r
     character(len=128) :: title
 
     if (.not. timer%log_enabled) return
@@ -526,10 +529,6 @@ subroutine dump_window(tnow)
     dt_r = dble(nint(10.0d0*dt))/10.0d0
     timer%last_dump_time = tnow
 
-    ! Calculate "other" based ONLY on thread 0's coverage vs wallclock
-    ! We use the difference between thread 0's current total and its previous window snapshot
-    other_time = max(0.0d0, dt - sum(timers(0)%total(1:ntimer) - (win_prev_total(1:ntimer) - del_total(1:ntimer))))
-
     write(title,'(a,f0.1,a)') "Window timer summary for last ", dt_r, " seconds"
     !-----------------------------------------------------------------------
 
@@ -540,9 +539,6 @@ subroutine dump_window(tnow)
       write(timer%log_unit,'(a)') trim(title)
       write(timer%log_unit,'(a)') "------------------------------------------------------------"
     call log_lock%unlock()
-
-    ! call print_from_arrays(unit=timer%log_unit, calls=del_calls, total=del_total, &
-    !                        title="", total_ref=dt, other_time=other_time, show_total=.false.)
 
     call print_from_arrays(unit=timer%log_unit, calls=del_calls, total=del_total, &
                            title="", total_ref=dt, show_total=.false.)

@@ -2033,6 +2033,11 @@ end subroutine updateDemagfieldFMM
     if ( grid%gridType .eq. gridTypeUniform ) then
         call ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
     elseif (( grid%gridType .eq. gridTypeTetrahedron ) .or. (grid%gridType .eq. gridTypeUnstructuredPrisms)) then
+    
+         if ( problem%macrogrid%exchPBC(1) .or. problem%macrogrid%exchPBC(2) .or. problem%macrogrid%exchPBC(3) ) then
+            call displayGUIMessage( 'Periodic exchange boundary conditions not supported for irregular meshes - exiting!' )
+            stop
+        endif
         call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, problem%A_exch)
     endif
 

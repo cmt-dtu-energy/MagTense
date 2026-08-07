@@ -151,7 +151,7 @@ module FortranToPythonIO
         real(8),dimension(n_pts,3) :: H_tmp
         real(8),dimension(n_tiles,n_pts,3,3),intent(inout) :: N
         logical,intent(in) :: useStoredN
-        real,intent(in),dimension(n_pts,3), optional :: Obs_size
+        real(8),intent(in),dimension(n_pts,3), optional :: Obs_size
 
         type(MagTile),dimension(n_tiles) :: tiles
         integer :: i
