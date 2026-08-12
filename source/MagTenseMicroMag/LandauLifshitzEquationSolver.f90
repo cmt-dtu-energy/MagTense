@@ -110,7 +110,8 @@
             call displayGUIMessage( 'Passing exchange matrix' )
             call passDifferentialOperators(gb_problem)
         else    
-            call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gb_solution%gridinfo)
+            call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gb_solution%gridinfo, &
+                gb_problem%macrogrid%exchPBC)
         endif
     endif
 
@@ -2035,8 +2036,17 @@ end subroutine updateDemagfieldFMM
     elseif (( grid%gridType .eq. gridTypeTetrahedron ) .or. (grid%gridType .eq. gridTypeUnstructuredPrisms)) then
     
          if ( problem%macrogrid%exchPBC(1) .or. problem%macrogrid%exchPBC(2) .or. problem%macrogrid%exchPBC(3) ) then
-            call displayGUIMessage( 'Periodic exchange boundary conditions not supported for irregular meshes - exiting!' )
-            stop
+            !The tiles at the two ends of each periodic direction have been linked together in the mesh
+            !analysis, i.e. they share a face and enter each others interpolation stencils, so the
+            !exchange operator below is computed in exactly the same way as without periodic boundaries.
+            !This is only done for the unstructured prisms, as the mesh analysis is not run for a
+            !tetrahedral mesh. An exchange matrix passed from the outside carries its own boundary
+            !conditions and has already returned above.
+            if ( grid%gridType .ne. gridTypeUnstructuredPrisms ) then
+                call displayGUIMessage( 'Periodic exchange boundary conditions are only supported for unstructured prisms - exiting!' )
+                stop
+            endif
+            call displayGUIMessage( 'Using periodic exchange boundary conditions' )
         endif
         call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, problem%A_exch)
     endif
@@ -2317,19 +2327,19 @@ end subroutine updateDemagfieldFMM
             if ( PBCy ) then
                 do i=1,nx
                     ! Backwards coupling
-                    d2dy2%values(ind) = problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k))
+                    d2dy2%values(ind) = 2*problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k))
                     d2dy2%cols(ind) = colInd - nx
                     d2dy2%rows_start(rowInd) = ind
                     ind = ind + 1  ! Increment to next element
 
                     ! Current tile
-                    d2dy2%values(ind) = -(problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k)) &
-                            + problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k)))
+                    d2dy2%values(ind) = 2*(-(problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k)) &
+                            + problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k))))
                     d2dy2%cols(ind) = colInd
                     ind = ind + 1  ! Increment to next element
 
                     ! Forwards coupling (loops around and couples to backmost tile)
-                    d2dy2%values(ind) = problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k))
+                    d2dy2%values(ind) = 2*problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k))
                     d2dy2%cols(ind) = colInd - nx*(ny-1)
                     d2dy2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
@@ -2396,7 +2406,6 @@ end subroutine updateDemagfieldFMM
                     d2dz2%values(ind) = 2*(-(problem%A0_map(i,j,nz)/(problem%A0_map(i,j,nz) + problem%A0_map(i,j,1)) &
                             + problem%A0_map(i,j,2)/(problem%A0_map(i,j,2) + problem%A0_map(i,j,1))))
                     d2dz2%cols(ind) = colInd
-                    d2dz2%rows_start(rowInd) = ind
                     ind = ind + 1   ! Increment to next element
 
                     ! Upwards coupling
@@ -2464,19 +2473,19 @@ end subroutine updateDemagfieldFMM
             do j=1,ny
                 do i=1,nx
                     ! Downwards coupling
-                    d2dz2%values(ind) = problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz))
+                    d2dz2%values(ind) = 2*problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz))
                     d2dz2%cols(ind) = colInd - nx*ny
                     d2dz2%rows_start(rowInd) = ind
                     ind = ind + 1   ! Increment to next element
 
                     ! Current tile
-                    d2dz2%values(ind) = -(problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz)) &
-                            + problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz)))
+                    d2dz2%values(ind) = 2*(-(problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz)) &
+                            + problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz))))
                     d2dz2%cols(ind) = colInd
                     ind = ind + 1   ! Increment to next element
 
                     ! Upwards coupling (loops around and couples to bottommost tile)
-                    d2dz2%values(ind) = problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz))
+                    d2dz2%values(ind) = 2*problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz))
                     d2dz2%cols(ind) = colInd - nx*ny*(nz - 1)
                     d2dz2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1

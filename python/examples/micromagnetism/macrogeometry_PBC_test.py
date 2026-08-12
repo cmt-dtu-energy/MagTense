@@ -24,6 +24,8 @@ independent validation along x, y and z.
 """
 
 # General modules
+from pathlib import Path
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -63,11 +65,11 @@ nTimesteps = int(t_end / t_step)    # Number of timesteps
 # Plot settings
 Ndata = 200
 dataperiod = int(nTimesteps / Ndata)
-show = True
+results_dir = Path(__file__).resolve().parent / "results"
 
 # Micromagnetic solver settings
 cuda=False
-cvode=True
+cvode=False
 
 #%% Fixed settings (don't change these)
 
@@ -82,7 +84,7 @@ alpha = 1              # Gilbert damping [-]
 eta = alpha/(1 + alpha**2) * 2.21*1e5  # Damping constant [m/(A*s)]
 K = 2.7e4              # Uniaxial anisotropy constant [J/m^3]
 T = 0                  # Temperature [K]
-Aex = 0                # Exchange constant [J/m]
+Aex = 1e-20                # Exchange constant [J/m]
 
 # Applied field
 def fct_h_ext(t) -> np.ndarray:
@@ -236,5 +238,13 @@ ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
 ax.set_ylabel(r'$\text{Polar angle}$')
 ax.set_yticks([0, np.pi/4, np.pi/2])
 ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
-if show:
-    fig.show()
+
+# Save the figure beside the other micromagnetic example results.  Including
+# the periodic axis in the filename prevents the three axis tests from
+# overwriting one another.
+results_dir.mkdir(parents=True, exist_ok=True)
+axis_name = ("x", "y", "z")[testAxis]
+figure_path = results_dir / f"macrogeometry_PBC_test_axis_{axis_name}.png"
+fig.savefig(figure_path, dpi=300, bbox_inches="tight")
+plt.close(fig)
+print(f"Saved figure to {figure_path}")

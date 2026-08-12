@@ -268,16 +268,40 @@ module DifferentialOperators
         call apply_perm(ns, sorted_indices, ns_sorted)
         deallocate(sorted_indices)
 
-       ! Determines which weights are to be used in the first interpolation step 
+        ! Distances from the centers of the tiles to the centers of the faces
+        dx = Xel(ns_sorted) - Xf(ks_sorted)
+        dy = Yel(ns_sorted) - Yf(ks_sorted)
+        dz = Zel(ns_sorted) - Zf(ks_sorted)
+
+        ! Along a periodic direction the tiles at the two ends of the domain have been linked together
+        ! in the mesh analysis. The distance between such a linked pair of tiles has to be measured
+        ! through the boundary, i.e. using the minimum image convention, and not across the entire
+        ! domain. A tile in the interpolation stencil of a face is never further away from that face
+        ! than the largest tile size, and the mesh analysis has verified that the period is larger
+        ! than twice the largest tile, so only the linked pairs are affected by the wrapping below.
+        if ( GridInfo%exchPBC(1) ) then
+            where ( dx .gt.  0.5*GridInfo%Lper(1) ) dx = dx - GridInfo%Lper(1)
+            where ( dx .lt. -0.5*GridInfo%Lper(1) ) dx = dx + GridInfo%Lper(1)
+        endif
+        if ( GridInfo%exchPBC(2) ) then
+            where ( dy .gt.  0.5*GridInfo%Lper(2) ) dy = dy - GridInfo%Lper(2)
+            where ( dy .lt. -0.5*GridInfo%Lper(2) ) dy = dy + GridInfo%Lper(2)
+        endif
+        if ( GridInfo%exchPBC(3) ) then
+            where ( dz .gt.  0.5*GridInfo%Lper(3) ) dz = dz - GridInfo%Lper(3)
+            where ( dz .lt. -0.5*GridInfo%Lper(3) ) dz = dz + GridInfo%Lper(3)
+        endif
+
+       ! Determines which weights are to be used in the first interpolation step
         allocate(w(size(ns)))
         if (dims == 1) then
-            w = ((Xel(ns_sorted) - Xf(ks_sorted))**2)**(-weight/2.0)
+            w = (dx**2)**(-weight/2.0)
         else if (dims == 2) then
-            w = ((Xel(ns_sorted) - Xf(ks_sorted))**2 + (Yel(ns_sorted) - Yf(ks_sorted))**2)**(-weight/2.0)
+            w = (dx**2 + dy**2)**(-weight/2.0)
         else
-            w = ((Xel(ns_sorted) - Xf(ks_sorted))**2 + (Yel(ns_sorted) - Yf(ks_sorted))**2 + (Zel(ns_sorted) - Zf(ks_sorted))**2)**(-weight/2.0)
+            w = (dx**2 + dy**2 + dz**2)**(-weight/2.0)
         end if
-        
+
 
         
         !>-----------------------------------------
@@ -315,9 +339,6 @@ module DifferentialOperators
         allocate(inds1(size(inds2)+1))
         inds1(1) = 1
         inds1(2:size(inds1)) = inds2(:) + 1
-        dx = Xel(ns_sorted) - Xf(ks_sorted)
-        dy = Yel(ns_sorted) - Yf(ks_sorted)
-        dz = Zel(ns_sorted) - Zf(ks_sorted)
         allocate(vw(size(w)))
         allocate(vx(size(w)))
         allocate(vy(size(w)))

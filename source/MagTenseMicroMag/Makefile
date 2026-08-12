@@ -31,7 +31,7 @@ ifeq ($(OS),Windows_NT)
 	CONDA_PATH = $(subst \,/,${CONDA_PREFIX})
 	MKL_ROOT = ${CONDA_PATH}/Library
 	OPT = -I${CONDA_PATH}/opt/compiler/include/intel64
-	LIBTOOL = LIB $? /OUT:$@
+	LIBTOOL = LIB $^ /OUT:$@
 	LIB_SUFFIX = .lib
 else
 	MKL_ROOT = ${CONDA_PREFIX}
@@ -39,7 +39,7 @@ else
 	LIB_SUFFIX = .a
 
 	ifeq (${UNAME}, Darwin)
-		LIBTOOL = libtool -static -o $@ $?
+		LIBTOOL = libtool -static -o $@ $^
 	else
 		LIBTOOL = ar src $@ $?
 	endif

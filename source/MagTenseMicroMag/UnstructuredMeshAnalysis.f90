@@ -40,14 +40,22 @@ module UnstructuredMeshAnalysis
     !> if A contains {B_i}, then A needs to be removed
     !> the boundaries of the corresponding element now include all the {B_i}
     !> TheSigns is equal to -1 since the normals point inwards
+    !>
+    !> If periodic boundary conditions are requested through exchPBC, the elements at the two ends
+    !> of a periodic direction are linked together, i.e. they are made to share a face and to enter
+    !> each others interpolation stencils, exactly as an ordinary pair of neighbouring elements.
+    !> The differential operators computed from the mesh therefore need no special treatment of the
+    !> periodic boundaries, apart from measuring the distance between a linked pair of elements
+    !> through the boundary rather than across the entire domain.
     !> @param[in] XXX
     !> @param[in] XXX
     !> @param[inout] XXX
     !---------------------------------------------------------------------------
-    subroutine CartesianUnstructuredMeshAnalysis(pos, dims, GridInfo)
+    subroutine CartesianUnstructuredMeshAnalysis(pos, dims, GridInfo, exchPBC)
     real(dp), intent(in) :: pos(:,:)
     real(dp), intent(in) :: dims(:,:)
     type(MicroMagGridInfo), intent(out) :: GridInfo
+    integer, intent(in) :: exchPBC(3)                  !> Periodic boundary conditions along x, y and z for the exchange coupling
 
     integer :: Nel, k, idim, ipm, j, n, kb, i, k_i, n_faces, k1, k2, Ncount
     real(dp), allocatable :: Xel(:), Yel(:), Zel(:)
@@ -87,6 +95,11 @@ module UnstructuredMeshAnalysis
     integer, allocatable :: TheSigns_indices_pos(:,:), TheSigns_indices_neg(:,:), TheSigns_indices(:,:)
     integer, allocatable :: grow_temp(:,:), maskCount(:)
     integer :: Ncap, Ncap_T, Ncap_D, N_T, N_D, Nadd, alloc_stat
+    logical :: PBC(3)
+    real(dp) :: globMin(3), globMax(3), Lper(3), sVec(3)
+    real(dp), allocatable :: shiftList(:,:)
+    integer :: nShifts, ishift, ia, ib, ic
+    integer, allocatable :: theseNumMax(:)
     character*(40) :: prog_str
     integer, save :: itimer=0
     
@@ -121,7 +134,30 @@ module UnstructuredMeshAnalysis
     do i = 1, 3
         dimscopy(:,i) = dims(:,i) / DimsScales(i)
     end do
-         
+
+    ! Periodic boundary conditions for the exchange interaction.
+    ! The bounding box of the mesh defines the period along each of the three directions. Note that
+    ! everything below is done in the rescaled coordinates used internally in this routine, so the
+    ! period is converted back to the original scale when it is stored in GridInfo.
+    PBC = ( exchPBC .ne. 0 )
+    do i = 1, 3
+        globMin(i) = minval( XXel(:,i) - dimscopy(:,i)/2.0 )
+        globMax(i) = maxval( XXel(:,i) + dimscopy(:,i)/2.0 )
+        Lper(i) = globMax(i) - globMin(i)
+    end do
+
+    do i = 1, 3
+        ! The domain has to be thicker than two elements along a periodic direction. Otherwise an
+        ! element becomes its own neighbour through the periodic image, and the distance between a
+        ! linked pair of elements can no longer be identified unambiguously when the differential
+        ! operators are computed.
+        if ( PBC(i) .and. ( Lper(i) .lt. (2.0 * maxval(dimscopy(:,i)) + 1e-9) ) ) then
+            call displayGUIMessage( 'MagTense: too few elements along a periodic direction' )
+            call displayGUIMessage( 'MagTense: at least three elements are required for periodic exchange boundary conditions' )
+            error stop 'CartesianUnstructuredMeshAnalysis: too few elements along a periodic direction'
+        endif
+    end do
+
     ! Construct all faces
     n_faces = 6 * Nel
     allocate(fNormX(n_faces), fNormY(n_faces), fNormZ(n_faces), AreaFaces(n_faces), DimsF(n_faces, 3), stat=alloc_stat)
@@ -198,6 +234,17 @@ module UnstructuredMeshAnalysis
       
       do kb = 1, Nel
         SamePosAlongDim = (abs(XXf(Aindex,idim) - XXf(Bindex(kb),idim)) < 1e-9) ;
+
+        !With periodic boundary conditions a face at one end of the domain is also considered to be
+        !at the same position as a face at the other end. The A faces have their normal along -idim
+        !and the B faces along +idim, so this links the element at the low end of the domain with the
+        !element at the high end. The containment tests below only involve the two dimensions
+        !orthogonal to idim and are thus unaffected by the periodic shift.
+        if ( PBC(idim) ) then
+            SamePosAlongDim = SamePosAlongDim .or. &
+                (abs( abs(XXf(Aindex,idim) - XXf(Bindex(kb),idim)) - Lper(idim) ) < 1e-9)
+        endif
+
         UAcontainsUB = (((UminA - UminB(kb)) < +1e-9) .and. ((UmaxA - UmaxB(kb)) > -1e-9))
         VAcontainsVB = (((VminA - VminB(kb)) < +1e-9) .and. ((VmaxA - VmaxB(kb)) > -1e-9))
        
@@ -514,32 +561,70 @@ module UnstructuredMeshAnalysis
     allocate(TheDs_indices(Ncap_D,2), stat=alloc_stat)
     call checkAllocation( alloc_stat, 'TheDs_indices' )
 
-    do n=1,Nel
-        TheseMinXXel(:,1) = xxMinEl(n,1)
-        TheseMinXXel(:,2) = xxMinEl(n,2)
-        TheseMinXXel(:,3) = xxMinEl(n,3)
-        TheseMaxXXel(:,1) = xxMaxEl(n,1)
-        TheseMaxXXel(:,2) = xxMaxEl(n,2)
-        TheseMaxXXel(:,3) = xxMaxEl(n,3)
+    !The list of periodic images that each element is tested against below. Without periodic
+    !boundary conditions this is just the single zero shift, and the loop below is then identical to
+    !the non-periodic version. All combinations of the periodic directions are needed, as an element
+    !can share a vertex with a face across two (or three) periodic directions at the same time.
+    allocate(shiftList(27,3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'shiftList' )
+    nShifts = 0
+    do ia = -1, 1
+      do ib = -1, 1
+        do ic = -1, 1
+          if ( (ia .ne. 0 .and. .not. PBC(1)) .or. (ib .ne. 0 .and. .not. PBC(2)) &
+                .or. (ic .ne. 0 .and. .not. PBC(3)) ) cycle
+          nShifts = nShifts + 1
+          shiftList(nShifts,:) = [ia*Lper(1), ib*Lper(2), ic*Lper(3)]
+        end do
+      end do
+    end do
 
-        theseA = all((((TheseMinXXel - xVertA) < +1e-9 ) .and. ((TheseMaxXXel - xVertA ) > -1e-9)) ,2)
-        theseB = all((((TheseMinXXel - xVertB) < +1e-9 ) .and. ((TheseMaxXXel - xVertB ) > -1e-9)) ,2)
-        theseC = all((((TheseMinXXel - xVertC) < +1e-9 ) .and. ((TheseMaxXXel - xVertC ) > -1e-9)) ,2)
-        theseD = all((((TheseMinXXel - xVertD) < +1e-9 ) .and. ((TheseMaxXXel - xVertD ) > -1e-9)) ,2)
-                    
-        theseA_int(:) = 0
-        theseB_int(:) = 0
-        theseC_int(:) = 0
-        theseD_int(:) = 0
-        
-        where (theseA) theseA_int = 1
-        where (theseB) theseB_int = 1
-        where (theseC) theseC_int = 1
-        where (theseD) theseD_int = 1
-    
-        theseNum = theseA_int + theseB_int + theseC_int + theseD_int
-        
-        mask1D = (theseNum >= 2)
+    allocate(theseNumMax(k), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'theseNumMax' )
+
+    do n=1,Nel
+        theseNumMax(:) = 0
+
+        do ishift = 1, nShifts
+            sVec = shiftList(ishift,:)
+
+            !Skip the image if the shifted element falls entirely outside the mesh. This keeps the
+            !cost of the periodic images negligible, as only the elements at a boundary have an
+            !image that can touch a face at the opposite boundary. The zero shift is never skipped.
+            if ( any( (xxMinEl(n,:) + sVec) .gt. (globMax + 1e-9) ) .or. &
+                 any( (xxMaxEl(n,:) + sVec) .lt. (globMin - 1e-9) ) ) cycle
+
+            TheseMinXXel(:,1) = xxMinEl(n,1) + sVec(1)
+            TheseMinXXel(:,2) = xxMinEl(n,2) + sVec(2)
+            TheseMinXXel(:,3) = xxMinEl(n,3) + sVec(3)
+            TheseMaxXXel(:,1) = xxMaxEl(n,1) + sVec(1)
+            TheseMaxXXel(:,2) = xxMaxEl(n,2) + sVec(2)
+            TheseMaxXXel(:,3) = xxMaxEl(n,3) + sVec(3)
+
+            theseA = all((((TheseMinXXel - xVertA) < +1e-9 ) .and. ((TheseMaxXXel - xVertA ) > -1e-9)) ,2)
+            theseB = all((((TheseMinXXel - xVertB) < +1e-9 ) .and. ((TheseMaxXXel - xVertB ) > -1e-9)) ,2)
+            theseC = all((((TheseMinXXel - xVertC) < +1e-9 ) .and. ((TheseMaxXXel - xVertC ) > -1e-9)) ,2)
+            theseD = all((((TheseMinXXel - xVertD) < +1e-9 ) .and. ((TheseMaxXXel - xVertD ) > -1e-9)) ,2)
+
+            theseA_int(:) = 0
+            theseB_int(:) = 0
+            theseC_int(:) = 0
+            theseD_int(:) = 0
+
+            where (theseA) theseA_int = 1
+            where (theseB) theseB_int = 1
+            where (theseC) theseC_int = 1
+            where (theseD) theseD_int = 1
+
+            theseNum = theseA_int + theseB_int + theseC_int + theseD_int
+
+            !The maximum, and not the sum, over the images ensures that an element is only entered
+            !once in TheTs and TheDs, even if it touches the face both directly and through one of
+            !its periodic images
+            theseNumMax = max(theseNumMax, theseNum)
+        end do
+
+        mask1D = (theseNumMax >= 2)
 
         !Instead of assigning the values to a TheTs matrix, we simply find the indices and save those.
         !The TheTs matrix would have been assigned as "where (mask1D) TheTs(:,n) = .true."
@@ -563,7 +648,7 @@ module UnstructuredMeshAnalysis
             N_T = N_T + Nadd
         endif
 
-        mask1D = (theseNum >= 1)
+        mask1D = (theseNumMax >= 1)
 
         !The same logic as for TheTs is applied here for the TheDs.
         !The code mimics "where (mask1D) TheDs(:,n) = .true." but operates only on indices
@@ -625,7 +710,13 @@ module UnstructuredMeshAnalysis
     GridInfo%DimsF = DimsF
     GridInfo%TheTs = TheTs_indices
     GridInfo%TheDs = TheDs_indices
-    GridInfo%TheSigns = TheSigns_indices    
+    GridInfo%TheSigns = TheSigns_indices
+
+    !The periodic directions and the corresponding periods, converted back to the original scale.
+    !These are needed when the differential operators are computed, as the distance between a pair
+    !of elements linked across a periodic boundary has to be measured through that boundary.
+    GridInfo%exchPBC = PBC
+    GridInfo%Lper = Lper * DimsScales
 
     call displayGUIMessage( 'Mesh analysis done' )
 

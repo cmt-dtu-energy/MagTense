@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -7,14 +8,26 @@ import numpy as np
 
 # Windows only
 if hasattr(os, "add_dll_directory"):
-    mkl_path = Path(__file__).parent / ".." / ".." / ".." / "Library" / "bin"
-    if Path.is_dir(mkl_path):
-        os.add_dll_directory(mkl_path)
+    # First entry is the installed layout
+    # (<prefix>/Lib/site-packages/magtense/../../../Library/bin), the second the
+    # active environment prefix, which is what applies when running from source.
+    dll_paths = [
+        Path(__file__).parent / ".." / ".." / ".." / "Library" / "bin",
+        Path(sys.prefix) / "Library" / "bin",
+    ]
 
     nvidia_path = Path(__file__).parent / ".." / "nvidia"
-    for lib in ["cublas", "cuda_runtime", "cusparse", "nvjitlink"]:
-        if Path.is_dir(nvidia_path / lib / "bin"):
-            os.add_dll_directory(nvidia_path / lib / "bin")
+    dll_paths += [
+        nvidia_path / lib / "bin"
+        for lib in ["cublas", "cuda_runtime", "cusparse", "nvjitlink"]
+    ]
+
+    for dll_path in dll_paths:
+        if Path.is_dir(dll_path):
+            os.add_dll_directory(dll_path)
+            # libifcoremd.dll resolves its own dependency on libmmd.dll through
+            # PATH, which add_dll_directory does not cover.
+            os.environ["PATH"] = f"{dll_path.resolve()}{os.pathsep}{os.environ['PATH']}"
 
 from magtense.lib import magtensesource
 

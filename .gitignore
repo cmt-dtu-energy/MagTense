@@ -226,3 +226,6 @@ error.txt
 cvode*/
 *tar.gz
 .vs/
+
+# Build configuration stamp written by the Makefile
+.build_flags

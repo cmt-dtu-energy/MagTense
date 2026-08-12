@@ -95,8 +95,8 @@ colors_n = ['navy', 'forestgreen', 'crimson', 'magenta', 'darkorange', 'purple',
 Ndata = 8    # Number of datapoints to save
 
 # Micromagnetic solver settings
-cuda=False
-cvode=True
+cuda=True
+cvode=False
 
 #%% Micromagnetic computations
 

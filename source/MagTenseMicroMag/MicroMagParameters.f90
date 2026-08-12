@@ -96,6 +96,8 @@ include "mkl_dfti.f90"
         real(dp), allocatable :: Yf(:)
         real(dp), allocatable :: Zf(:)
         real(dp), allocatable :: DimsF(:,:)
+        logical  :: exchPBC(3) = .false.         !> Periodic boundary conditions along x, y and z for the exchange coupling
+        real(dp) :: Lper(3) = 0.                 !> Period, i.e. the extent of the mesh, along x, y and z. Only used when exchPBC is set
         integer :: Exch_mat_nr                   !> Number of rows in the exchange coupling matrix
         integer :: Exch_mat_nc                   !> Number of columns in the exchange coupling matrix
         integer :: Exch_mat_ntot                 !> Number of elements in the exchange coupling matrix
