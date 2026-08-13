@@ -1,6 +1,6 @@
 """
 Test if periodic boundary conditions as modeled by the macrogeometry method are implemented correctly in the Magtense micromagnetics solver.
-SHORT EXPLANATION : If the plotted polar angle is constant, the code works.
+SHORT EXPLANATION : If the plotted polar angle is constant at the critical point, the code works.
 
 LONG EXPLANATION :
 The system is a pair of uniformly magnetised cubes of sidelength a, placed side by side along x.
@@ -19,8 +19,13 @@ The test is to verify the agreement still holds, i.e. θ is essentially constant
 Note : The magnetisation and anisotropy constants are chosen so that the anisotropy and pair interaction
 mostly cancel, ensuring the θ(t) behaviour is decided by the periodically repeating copies.
 
-Other note : By changing testAxis, the entire setup is rotated so the axis-of-periodicity becomes y or z, allowing
-independent validation along x, y and z.
+Other note : The whole setup is rotated so that the axis-of-periodicity becomes x, y or z in turn, which
+validates the macrogeometry along all three axes independently.
+
+The test runs three simulations at the critical spacing, one per axis of periodicity, and requires θ to
+stay put. Two further simulations at spacings on either side of the critical point act as controls: they
+must move θ towards π/2 and 0 respectively, in the direction predicted by the analytical prefactor below.
+Without those controls a solver that simply froze the magnetisation would pass the constant-θ check.
 """
 
 # General modules
@@ -49,27 +54,34 @@ plt.rcParams['text.latex.preamble'] = r'\usepackage{physics}'
 #%% Settings
 
 # Distance between neighbouring domain copies in macrogeometry
-A = 1.1837e-7   # Critical point where the torque is zero at all theta (constant theta)
-# A = 2e-7      # Should go towards theta = π/2 (increasing theta)
-# A = 0.7e-7    # Should go towards theta = 0 (decreasing theta)
+A_crit = 1.1837e-7  # Critical point where the torque is zero at all theta (constant theta)
+A_wide = 2e-7       # Should go towards theta = π/2 (increasing theta)
+A_narrow = 0.7e-7   # Should go towards theta = 0 (decreasing theta)
 
-# Which axis to test PBC
-testAxis = 0    # 0 for x-axis, 1 for y-axis and 2 for z-axis
+# Which axes to test the PBC along. 0 for x-axis, 1 for y-axis and 2 for z-axis
+testAxes = (0, 1, 2)
+
+# The axis used for the two control simulations that check the test is sensitive at all
+controlAxis = 0
 
 # Timestepping
-t_end = 1e-7                        # Total time simulated [s]
-# t_end = 1e-8                      # Total time simulated [s]
-t_step = 1e-12                      # Timestep [s]
-nTimesteps = int(t_end / t_step)    # Number of timesteps
+t_end = 1e-7                                 # Total time simulated [s]
+t_step = 1e-10                               # Requested output spacing [s]
+nTimesteps = int(round(t_end / t_step)) + 1  # Include both time endpoints
+# The output spacing only sets how densely theta(t) is sampled - RKSuite picks its own
+# internal steps. Requesting 1e5 output times made the ODE driver overflow the stack.
+
+# How constant theta has to be at the critical point to count as passed [rad]
+angle_tol = 0.05
+# The controls only approach their fixed point asymptotically, so they get a looser bound [rad]
+control_tol = 0.1
 
 # Plot settings
-Ndata = 200
-dataperiod = int(nTimesteps / Ndata)
 results_dir = Path(__file__).resolve().parent / "results"
 
 # Micromagnetic solver settings
-cuda=False
-cvode=False
+cuda = False
+cvode = False
 
 #%% Fixed settings (don't change these)
 
@@ -95,75 +107,8 @@ def fct_h_ext(t) -> np.ndarray:
 # Side lengths of individual micromagnetic cells
 a = 1e-8    # [m]
 
-# Initial magnetisations
-theta_p = np.array([np.pi/4, -np.pi/4])
-if testAxis == 0:
-    mx_p = np.cos(theta_p)
-    my_p = np.array([0, 0])
-    mz_p = np.sin(theta_p)
-elif testAxis == 1:
-    mx_p = np.array([0, 0])
-    my_p = np.cos(theta_p)
-    mz_p = np.sin(theta_p)
-elif testAxis == 2:
-    mx_p = np.sin(theta_p)
-    my_p = np.array([0, 0])
-    mz_p = np.cos(theta_p)
-else:
-    print("testAxis must be 0, 1 or 2 for the x, y or z axis respectively")
-m0_pv = np.vstack([mx_p, my_p, mz_p]).T     # Initial magnetisation directions
-
-#%% Magtense computations
-
-# Define micromagnetic problem
-grid_type = "uniform"
-grid_L = [a, a, a]                  # Grid size along x, y and z for simulated domain
-res = [1, 1, 1]                     # Grid resolution, i.e. number of cells along x, y and z
-# Make two tiles along the axis of periodicity
-grid_L[testAxis] = 2*a
-res[testAxis] = 2
-
-# Define macrogeometry.
-# The macrogeometry is a (2nx + 1) X (2ny + 1) X (2nz + 1) grid of domain copies
-n_macro, shiftVec = np.zeros(3), np.zeros(3)
-n_macro[testAxis] = 1000 # Number of copies on each side along x, y and z
-shiftVec[testAxis] = A  # How far to shift the domain copies along x, y and z
-
-problem = MicromagProblem(
-    res=res,
-    A0=Aex,
-    Ms=Ms,
-    K0=K,
-    alpha=eta,
-    gamma=gamma,
-    m0=m0_pv,
-    cuda=cuda,
-    cvode=cvode,
-    n_macro=n_macro,
-    shiftVec=shiftVec,
-    grid_L=grid_L,
-    grid_type=grid_type,
-    usereturnhall=True,
-    solver='dynamic',
-    # solver='explicit',
-    T=T,
-)
-
-problem.u_ea = np.zeros([2,3])
-if testAxis in {0, 1}:
-    problem.u_ea=np.array([[0, 0, 1], [0, 0, 1]])   # Easy-axis anisotropy along z
-elif testAxis == 2:
-    problem.u_ea=np.array([[1, 0, 0], [1, 0, 0]])   # Easy-axis anisotropy along x
-
-# Run simulation
-print('Run simulation')
-result = problem.run_simulation(
-    t_end=t_end,
-    nt=nTimesteps,
-    fct_h_ext=fct_h_ext,
-    nt_h_ext=100,     # Number of datapoints used to fit the zero-function (error when set to 1)
-)
-print('Done running simulation')
+# Number of copies of the simulated domain on each side along the axis of periodicity
+n_copies = 1000
 
 #%% Analytical results
 
@@ -217,34 +162,147 @@ def prefactor(q, K, M):
 
     return 2*mu0 * M**2/np.pi * (fPair + q**2 * fSelf + q**2 * fInter + fAni)
 
+#%% Magtense computations
+
+def run_case(testAxis: int, A: float):
+    """Simulate the two-cube system with periodic copies spaced A apart along testAxis.
+
+    Returns the time array and the polar angles of both moments. The angle is measured
+    from the axis of periodicity towards the easy-axis, which is z when the periodicity
+    is along x or y and x when the periodicity is along z. Both choices keep the easy-axis
+    perpendicular to the axis of periodicity, so the three cases are rotations of one another.
+    """
+    perpAxis = 2 if testAxis in {0, 1} else 0
+
+    # Initial magnetisations, at +-45 degrees to the axis of periodicity
+    theta_p = np.array([np.pi/4, -np.pi/4])
+    m0_pv = np.zeros([2, 3])
+    m0_pv[:, testAxis] = np.cos(theta_p)
+    m0_pv[:, perpAxis] = np.sin(theta_p)
+
+    # Define micromagnetic problem
+    grid_type = "uniform"
+    grid_L = [a, a, a]                  # Grid size along x, y and z for simulated domain
+    res = [1, 1, 1]                     # Grid resolution, i.e. number of cells along x, y and z
+    # Make two tiles along the axis of periodicity
+    grid_L[testAxis] = 2*a
+    res[testAxis] = 2
+
+    # Define macrogeometry.
+    # The macrogeometry is a (2nx + 1) X (2ny + 1) X (2nz + 1) grid of domain copies
+    n_macro, shiftVec = np.zeros(3), np.zeros(3)
+    n_macro[testAxis] = n_copies  # Number of copies on each side along x, y and z
+    shiftVec[testAxis] = A  # How far to shift the domain copies along x, y and z
+
+    problem = MicromagProblem(
+        res=res,
+        A0=Aex,
+        Ms=Ms,
+        K0=K,
+        alpha=eta,
+        gamma=gamma,
+        m0=m0_pv,
+        cuda=cuda,
+        cvode=cvode,
+        n_macro=n_macro,
+        shiftVec=shiftVec,
+        grid_L=grid_L,
+        grid_type=grid_type,
+        usereturnhall=True,
+        solver='dynamic',
+        # solver='explicit',
+        T=T,
+    )
+
+    # Easy-axis anisotropy perpendicular to the axis of periodicity
+    problem.u_ea = np.zeros([2, 3])
+    problem.u_ea[:, perpAxis] = 1
+
+    result = problem.run_simulation(
+        t_end=t_end,
+        nt=nTimesteps,
+        fct_h_ext=fct_h_ext,
+        nt_h_ext=2,     # Two samples completely define the constant zero field.
+    )
+
+    t_n, M_out = result[:2]
+    M_npv = M_out[:, :, 0, :]
+    M1_nv, M2_nv = M_npv[:, 0, :], M_npv[:, 1, :]
+    # By symmetry theta_2 = -theta_1, so negating the perpendicular component of the second
+    # moment should reproduce the first angle.
+    theta1_n = np.arctan2(M1_nv[:, perpAxis], M1_nv[:, testAxis])
+    theta2_n = np.arctan2(-M2_nv[:, perpAxis], M2_nv[:, testAxis])
+    return t_n, theta1_n, theta2_n
+
+#%% Run the simulations
+
+axis_names = ("x", "y", "z")
+
+# The analytical prefactor decides where theta is heading, and vanishes at the critical spacing
+print('Analytical prefactor (>0 drives theta to 0, <0 drives theta to pi/2, 0 means no torque):')
+for A in (A_crit, A_wide, A_narrow):
+    print(f'  A = {A:.4e} m : {prefactor(a/(2*A), K, Ms):+.4e}')
+
+runs = [(axis, A_crit, 'critical') for axis in testAxes]
+runs += [(controlAxis, A_wide, 'wide'), (controlAxis, A_narrow, 'narrow')]
+
+print('Run simulations')
+results = {}
+for testAxis, A, label in tqdm(runs):
+    results[(testAxis, label)] = run_case(testAxis, A)
+print('Done running simulations')
+
+#%% Check the results
+
+passed = True
+
+# At the critical spacing theta must stay at its initial value of pi/4 along every axis
+for testAxis in testAxes:
+    t_n, theta1_n, theta2_n = results[(testAxis, 'critical')]
+    drift = float(np.max(np.abs(theta1_n - np.pi/4)))
+    asymmetry = float(np.max(np.abs(theta1_n - theta2_n)))
+    ok = drift < angle_tol and asymmetry < angle_tol
+    passed = passed and ok
+    verdict = 'works' if ok else 'FAILED'
+    print(f'Macrogeometry PBC {verdict} along {axis_names[testAxis]}: '
+          f'max |theta - pi/4| = {drift:.2e} rad, max |theta_1 + theta_2| = {asymmetry:.2e} rad')
+
+# The controls must actually move, and in the direction the analytical prefactor predicts
+for label, A, target in (('wide', A_wide, np.pi/2), ('narrow', A_narrow, 0.0)):
+    t_n, theta1_n, _ = results[(controlAxis, label)]
+    moved = float(theta1_n[-1] - theta1_n[0])
+    expected = target - np.pi/4
+    ok = abs(theta1_n[-1] - target) < control_tol and np.sign(moved) == np.sign(expected)
+    passed = passed and ok
+    verdict = 'works' if ok else 'FAILED'
+    print(f'Control at A = {A:.4e} m {verdict}: theta went from {theta1_n[0]:.4f} to '
+          f'{theta1_n[-1]:.4f} rad, expected {target:.4f}')
+
+print('macrogeometry_PBC_test PASSED' if passed else 'macrogeometry_PBC_test FAILED')
+
 #%% Plot results
 
-# Get important data
-t_out, M_out = result[:2]
-t_n = t_out
-M_npv = M_out[:, :, 0, :]
-
-# Select data to plot
-tPlot_n = t_n[::dataperiod] * 1e9   # Switch from s to ns
-M1_nv = M_npv[:, 0, :]
-M2_nv = M_npv[:, 1, :]
-theta1_n = np.arctan2(M1_nv[:, 2], M1_nv[:, 0])[::dataperiod]
-theta2_n = np.arctan2(-M2_nv[:, 2], M2_nv[:, 0])[::dataperiod]
-
-# Make plot
-fig, ax = plt.subplots(layout='constrained', figsize=(6, 4))
-ax.plot(tPlot_n, theta1_n, color='forestgreen')
+fig, ax = plt.subplots(layout='constrained', figsize=(7, 4.5))
+critical_colours = ('forestgreen', 'darkorange', 'navy')
+for i, testAxis in enumerate(testAxes):
+    t_n, theta1_n, _ = results[(testAxis, 'critical')]
+    ax.plot(t_n * 1e9, theta1_n, color=critical_colours[i % len(critical_colours)],
+            label=f'critical, PBC along {axis_names[testAxis]}')
+for label, colour in (('wide', 'crimson'), ('narrow', 'purple')):
+    t_n, theta1_n, _ = results[(controlAxis, label)]
+    ax.plot(t_n * 1e9, theta1_n, color=colour, linestyle='--',
+            label=f'control, A {label}')
+ax.axhline(np.pi/4, color='black', linestyle=':', linewidth=1)
 ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
 ax.set_ylabel(r'$\text{Polar angle}$')
 ax.set_yticks([0, np.pi/4, np.pi/2])
 ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
+ax.legend(fontsize=10)
 
-# Save the figure beside the other micromagnetic example results.  Including
-# the periodic axis in the filename prevents the three axis tests from
-# overwriting one another.
+# Save the figure beside the other micromagnetic example results and close it so the
+# script does not open an interactive plotting window.
 results_dir.mkdir(parents=True, exist_ok=True)
-axis_name = ("x", "y", "z")[testAxis]
-figure_path = results_dir / f"macrogeometry_PBC_test_axis_{axis_name}.png"
+figure_path = results_dir / "macrogeometry_PBC_test.png"
 fig.savefig(figure_path, dpi=300, bbox_inches="tight")
 plt.close(fig)
 print(f"Saved figure to {figure_path}")

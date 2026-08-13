@@ -244,31 +244,40 @@
     else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
         !Simply do a time evolution as specified in the problem
         nt_Hext = 1
-
-        if (gb_problem%includeThermal) then
-            ! Calculate the prefactor for the thermal magnetic field
-            t_step = gb_problem%t(nt) / nt    ! Timestep [s] (assumed constant)
-            gamma = gb_problem%gamma          ! Gyromagnetic factor [m/(A*s)]
-            alpha0 = gb_problem%alpha0        ! Damping constant [m/(A*s)]
-            kB = 1.38064851 * 1e-23           ! The Boltzmann constant [J/K]
-            ! Get cell volumes
-            allocate( volCells(ntot) )
-            if (gb_problem%grid%gridType /= gridTypeUniform) then
-                volCells = gb_problem%grid%abc(:,1) * gb_problem%grid%abc(:,2) * gb_problem%grid%abc(:,3)
-            else
-                volCells = gb_problem%grid%dx * gb_problem%grid%dy * gb_problem%grid%dz
-            end if
-            ! Combined computation
-            alphaGilbert = gamma/(2*alpha0) + 1/2 * sqrt((gamma/alpha0)**2 - 4)   ! Dimensionless Gilbert damping (second order polynomial equation)
-            allocate( gb_problem%Tfact(ntot) )
-            gb_problem%Tfact = sqrt(2*kB * gb_problem%temperature * alphaGilbert / (mu0 * gamma * volCells * gb_problem%Ms * t_step))
-            !print *, "Finished calculating thermal prefactor"
-            !print *, 'Tfact', gb_problem%Tfact(1)   ! Just for debugging
-        else
-            gb_problem%Tfact = 0
-        end if
     endif
-    
+
+    !The thermal prefactor is needed by updateThermalField for every solver type, so it is
+    !always allocated. Leaving it unallocated for the explicit solver crashed the solution.
+    if ( allocated(gb_problem%Tfact) ) deallocate( gb_problem%Tfact )
+    allocate( gb_problem%Tfact(ntot) )
+    if (gb_problem%includeThermal) then
+        ! Calculate the prefactor for the thermal magnetic field
+        ! The stochastic field is redrawn at each of the nt requested times, so the
+        ! interval between redraws is the spacing of the requested time array.
+        t_step = ( gb_problem%t(nt) - gb_problem%t(1) ) / max( nt-1, 1 )    ! Timestep [s] (assumed constant)
+        gamma = gb_problem%gamma          ! Gyromagnetic factor [m/(A*s)]
+        alpha0 = gb_problem%alpha0        ! Damping constant [m/(A*s)]
+        kB = 1.38064851 * 1e-23           ! The Boltzmann constant [J/K]
+        ! Get cell volumes
+        allocate( volCells(ntot) )
+        if (gb_problem%grid%gridType /= gridTypeUniform) then
+            volCells = gb_problem%grid%abc(:,1) * gb_problem%grid%abc(:,2) * gb_problem%grid%abc(:,3)
+        else
+            volCells = gb_problem%grid%dx * gb_problem%grid%dy * gb_problem%grid%dz
+        end if
+        ! Combined computation
+        ! alpha0 = gamma*alphaGilbert/(1+alphaGilbert**2), so alphaGilbert solves
+        ! alphaGilbert**2 - (gamma/alpha0)*alphaGilbert + 1 = 0. The two roots are reciprocal;
+        ! the minus sign picks the root with alphaGilbert <= 1, which is the physical damping.
+        alphaGilbert = gamma/(2*alpha0) - 0.5_DP * sqrt((gamma/alpha0)**2 - 4)   ! Dimensionless Gilbert damping (second order polynomial equation)
+        gb_problem%Tfact = sqrt(2*kB * gb_problem%temperature * alphaGilbert / (mu0 * gamma * volCells * gb_problem%Ms * t_step))
+        deallocate( volCells )
+        !print *, "Finished calculating thermal prefactor"
+        !print *, 'Tfact', gb_problem%Tfact(1)   ! Just for debugging
+    else
+        gb_problem%Tfact = 0
+    end if
+
     allocate(M_out(3*ntot,nt,nt_Hext))   
     allocate(gb_solution%M_out(size(gb_problem%t),ntot,nt_Hext,3))
     !Allocate the arrays for the different fields
@@ -644,8 +653,8 @@
         !--------------------------------------------------------------------------------------------------------------------
         !--------------- combine to get effective field, Heff -------------
         HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX + gb_solution%HtX
-        HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY + gb_solution%HtX
-        HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ + gb_solution%HtX
+        HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY + gb_solution%HtY
+        HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ + gb_solution%HtZ
         !-------------------------------------------------------------
         !--------------- calculate precession term: m x Heff -------------
         crossX = 1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
