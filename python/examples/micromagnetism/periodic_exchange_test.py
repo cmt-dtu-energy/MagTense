@@ -9,6 +9,9 @@ the yFace (4 tiles on both the front and back face), the zFace (4 tiles on both 
 xyEdge (8 tiles on the edges perpendicular to the xy plane), the xyEdge and the yzEdge.
 The remaining cells are numerically inert spacers and there is no dipole interaction, so the separate sections are effectively
 decoupled, giving 8 tests of the exchange coupling. The center tiles test basic exchange, while the rest check the periodic boundary conditions.
+
+Running the file executes the test and saves a figure. ``run_test()`` returns the same result as a
+list of checks, which is the contract the combined suite in testMagTenseFunctions.py expects.
 """
 
 # General modules
@@ -119,80 +122,102 @@ m0_pv = m0_pv / np.sqrt(np.sum(m0_pv**2, axis=1, keepdims=True))           # Nor
 
 #%% Magtense computation
 
-# Setup micromagnetics problem
-problem = MicromagProblem(
-    res=res,
-    A0=Aex_n,
-    Ms=Ms_n[:, np.newaxis],
-    K0=K,
-    alpha=eta,
-    gamma=gamma,
-    m0=m0_pv,
-    cuda=cuda,
-    cvode=cvode,
-    grid_L=grid_L,
-    grid_type=grid_type,
-    usereturnhall=True,
-    solver='dynamic',
-    T=T,
-    usedemag=0,
-)
+# A section counts as exchange coupled when all its moments agree to within this [-]
+error_threshold = 1e-4
 
-# Run simulation
-print('Run simulation')
-result = problem.run_simulation(
-    t_end=t_end,
-    nt=nTimesteps,
-    fct_h_ext=fct_h_ext,
-    nt_h_ext=2,  # Two samples completely define the constant zero field.
-)
-print('Done running simulation')
-
-#%% Check which parts of the output magnetisation pass the test
-
-# Get important data
-t_out, M_out = result[:2]
-t_n = t_out
-M_pv = M_out[-1, :, 0, :]
-
-# Test if exchange coupled magnetic moments are indeed identical
 sections_s = [center_n, corner_n, xFace_n, yFace_n, zFace_n, xyEdge_n, xzEdge_n, yzEdge_n]
 sectionNames_s = ['center', 'corner', 'xFace', 'yFace', 'zFace', 'xyEdge', 'xzEdge', 'yzEdge']
-section_errors = []
-for s in range(len(sections_s)):
-    section_n = sections_s[s]
-    sectionName = sectionNames_s[s]
-    Mavg_dv = np.mean(M_pv[section_n, :], axis=0, keepdims=True)
-    error_p = np.sqrt(np.sum((M_pv[section_n, :] - Mavg_dv)**2, axis=1))/Ms
-    max_error = float(np.max(error_p))
-    section_errors.append(max_error)
-    if max_error < 1e-4:
-        print(f'Exchange coupling works for {sectionName} tiles')
-    else:
-        print(f'Exchange coupling test failed for {sectionName} tiles')
 
-#%% Plot validation errors
 
-# A logarithmic bar plot shows directly whether every connected section lies
-# below the numerical acceptance threshold.
-error_threshold = 1e-4
-bar_colours = [
-    'forestgreen' if error < error_threshold else 'firebrick'
-    for error in section_errors
-]
-fig, ax = plt.subplots(layout='constrained', figsize=(9, 4))
-ax.bar(sectionNames_s, section_errors, color=bar_colours)
-ax.axhline(error_threshold, color='black', linestyle='--', label='Pass threshold')
-ax.set_yscale('log')
-ax.set_xlabel('Periodically connected section')
-ax.set_ylabel(r'Maximum $|\mathbf{M}_i - \langle\mathbf{M}\rangle|/M_s$')
-plt.setp(ax.get_xticklabels(), rotation=25, ha='right')
-ax.legend()
+def run_test(plotting: bool = True) -> list[dict]:
+    """Run the periodic exchange test and return one check per connected section.
 
-# Save the validation figure beside the other micromagnetic example results
-# and close it so the script does not open an interactive plotting window.
-results_dir.mkdir(parents=True, exist_ok=True)
-figure_path = results_dir / 'periodic_exchange_test.png'
-fig.savefig(figure_path, dpi=300, bbox_inches='tight')
-plt.close(fig)
-print(f'Saved figure to {figure_path}')
+    Each check is a dict with the keys 'check', 'value', 'limit' and 'passed', where the test
+    passes when value < limit. This is the contract used by testMagTenseFunctions.py.
+    """
+    # Setup micromagnetics problem
+    problem = MicromagProblem(
+        res=res,
+        A0=Aex_n,
+        Ms=Ms_n[:, np.newaxis],
+        K0=K,
+        alpha=eta,
+        gamma=gamma,
+        m0=m0_pv,
+        cuda=cuda,
+        cvode=cvode,
+        grid_L=grid_L,
+        grid_type=grid_type,
+        usereturnhall=True,
+        solver='dynamic',
+        T=T,
+        usedemag=0,
+    )
+
+    # Run simulation
+    print('Run simulation')
+    result = problem.run_simulation(
+        t_end=t_end,
+        nt=nTimesteps,
+        fct_h_ext=fct_h_ext,
+        nt_h_ext=2,  # Two samples completely define the constant zero field.
+    )
+    print('Done running simulation')
+
+    # Get important data
+    M_out = result[1]
+    M_pv = M_out[-1, :, 0, :]
+
+    # Test if exchange coupled magnetic moments are indeed identical
+    section_errors = []
+    for s in range(len(sections_s)):
+        section_n = sections_s[s]
+        sectionName = sectionNames_s[s]
+        Mavg_dv = np.mean(M_pv[section_n, :], axis=0, keepdims=True)
+        error_p = np.sqrt(np.sum((M_pv[section_n, :] - Mavg_dv)**2, axis=1))/Ms
+        max_error = float(np.max(error_p))
+        section_errors.append(max_error)
+        if max_error < error_threshold:
+            print(f'Exchange coupling works for {sectionName} tiles')
+        else:
+            print(f'Exchange coupling test failed for {sectionName} tiles')
+
+    if plotting:
+        # A logarithmic bar plot shows directly whether every connected section lies
+        # below the numerical acceptance threshold.
+        bar_colours = [
+            'forestgreen' if error < error_threshold else 'firebrick'
+            for error in section_errors
+        ]
+        fig, ax = plt.subplots(layout='constrained', figsize=(9, 4))
+        ax.bar(sectionNames_s, section_errors, color=bar_colours)
+        ax.axhline(error_threshold, color='black', linestyle='--', label='Pass threshold')
+        ax.set_yscale('log')
+        ax.set_xlabel('Periodically connected section')
+        ax.set_ylabel(r'Maximum $|\mathbf{M}_i - \langle\mathbf{M}\rangle|/M_s$')
+        plt.setp(ax.get_xticklabels(), rotation=25, ha='right')
+        ax.legend()
+
+        # Save the validation figure beside the other micromagnetic example results
+        # and close it so the script does not open an interactive plotting window.
+        results_dir.mkdir(parents=True, exist_ok=True)
+        figure_path = results_dir / 'periodic_exchange_test.png'
+        fig.savefig(figure_path, dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        print(f'Saved figure to {figure_path}')
+
+    return [
+        {
+            'check': f'{name} tiles exchange coupled',
+            'value': error,
+            'limit': error_threshold,
+            'passed': error < error_threshold,
+        }
+        for name, error in zip(sectionNames_s, section_errors, strict=True)
+    ]
+
+
+if __name__ == '__main__':
+    checks = run_test()
+    print('periodic_exchange_test '
+          + ('PASSED' if all(c['passed'] for c in checks) else 'FAILED'))

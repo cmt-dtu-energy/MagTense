@@ -2,6 +2,9 @@
 Test if the shape correction field is implemented correctly in the Magtense micromagnetics solver.
 
 The system is a uniform grid of micromagnetic tiles forming a rectangular prism.
+
+Running the file executes the test and saves a figure. ``run_test()`` returns the same result as a
+list of checks, which is the contract the combined suite in testMagTenseFunctions.py expects.
 """
 
 # General modules
@@ -59,6 +62,9 @@ Ndata = 200
 dataperiod = int(nTimesteps / Ndata)
 results_dir = Path(__file__).resolve().parent / "results"
 
+# How far the magnetisation may deviate from uniform to count as passed [-]
+uniformity_tol = 1e-4
+
 # Micromagnetic solver settings
 cuda=True
 cvode=False
@@ -107,67 +113,87 @@ u_pv = np.tile(np.array([1, 0, 0]), [Ntiles, 1])
 
 #%% Magtense computation
 
-problem = MicromagProblem(
-    res=res,
-    A0=Aex,
-    Ms=Ms,
-    K0=K,
-    alpha=eta,
-    gamma=gamma,
-    m0=m0_pv,
-    macroShape=macroShape,
-    sampleShape=sampleShape,
-    cuda=cuda,
-    cvode=cvode,
-    grid_L=grid_L,
-    grid_type=grid_type,
-    usereturnhall=True,
-    solver='dynamic',
-    T=T,
-)
-problem.u_ea = u_pv
+def run_test(plotting: bool = True) -> list[dict]:
+    """Run the shape correction test and return the checks it consists of.
 
-# Run simulation
-print('Run simulation')
-result = problem.run_simulation(
-    t_end=t_end,
-    nt=nTimesteps,
-    fct_h_ext=fct_h_ext,
-    nt_h_ext=2,  # Two samples completely define the constant zero field.
-)
-print('Done running simulation')
+    Each check is a dict with the keys 'check', 'value', 'limit' and 'passed', where the test
+    passes when value < limit. This is the contract used by testMagTenseFunctions.py.
+    """
+    problem = MicromagProblem(
+        res=res,
+        A0=Aex,
+        Ms=Ms,
+        K0=K,
+        alpha=eta,
+        gamma=gamma,
+        m0=m0_pv,
+        macroShape=macroShape,
+        sampleShape=sampleShape,
+        cuda=cuda,
+        cvode=cvode,
+        grid_L=grid_L,
+        grid_type=grid_type,
+        usereturnhall=True,
+        solver='dynamic',
+        T=T,
+    )
+    problem.u_ea = u_pv
+
+    # Run simulation
+    print('Run simulation')
+    result = problem.run_simulation(
+        t_end=t_end,
+        nt=nTimesteps,
+        fct_h_ext=fct_h_ext,
+        nt_h_ext=2,  # Two samples completely define the constant zero field.
+    )
+    print('Done running simulation')
+
+    # Get important data
+    t_out, M_out = result[:2]
+    t_n = t_out
+    M_npv = M_out[:, :, 0, :]
+
+    # Check if the magnetisation is still uniform at the end of the simulation
+    Mavg_dv = np.mean(M_npv[-1, :, :], axis=0, keepdims=True)
+    error_p = np.sqrt(np.sum((M_npv[-1, :, :] - Mavg_dv)**2, axis=1))/Ms
+    uniformity = float(np.max(error_p))
+    if uniformity < uniformity_tol:
+        print('Magnetisation is uniform')
+    else:
+        print('Magnetisation is NOT uniform')
+
+    if plotting:
+        # Select data to plot
+        tPlot_n = t_n[::dataperiod] * 1e9   # Switch from s to ns
+        Mavg_nv = np.mean(M_npv, axis=1)
+        theta_n = np.arctan2(Mavg_nv[:, 2], Mavg_nv[:, 0])[::dataperiod]
+
+        # Make plot
+        fig, ax = plt.subplots(layout='constrained', figsize=(6, 4))
+        ax.plot(tPlot_n, theta_n, color='forestgreen')
+        ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
+        ax.set_ylabel(r'$\text{Polar angle}$')
+        ax.set_yticks([0, np.pi/4, np.pi/2])
+        ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
+
+        # Save the validation figure beside the other micromagnetic example results
+        # and close it so the script does not open an interactive plotting window.
+        results_dir.mkdir(parents=True, exist_ok=True)
+        figure_path = results_dir / "shape_correction_test.png"
+        fig.savefig(figure_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Saved figure to {figure_path}")
+
+    return [{
+        'check': 'magnetisation stays uniform',
+        'value': uniformity,
+        'limit': uniformity_tol,
+        'passed': uniformity < uniformity_tol,
+    }]
 
 
-#%% Plot results
-
-# Get important data
-t_out, M_out = result[:2]
-t_n = t_out
-M_npv = M_out[:, :, 0, :]
-
-# Check if the magnetisation is still uniform at the end of the simulation
-Mavg_dv = np.mean(M_npv[-1, :, :], axis=0, keepdims=True)
-error_p = np.sqrt(np.sum((M_npv[-1, :, :] - Mavg_dv)**2, axis=1))/Ms
-if np.max(error_p) < 1e-4:
-    print('Magnetisation is uniform')
-
-# Select data to plot
-tPlot_n = t_n[::dataperiod] * 1e9   # Switch from s to ns
-Mavg_nv = np.mean(M_npv, axis=1)
-theta_n = np.arctan2(Mavg_nv[:, 2], Mavg_nv[:, 0])[::dataperiod]
-
-# Make plot
-fig, ax = plt.subplots(layout='constrained', figsize=(6, 4))
-ax.plot(tPlot_n, theta_n, color='forestgreen')
-ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
-ax.set_ylabel(r'$\text{Polar angle}$')
-ax.set_yticks([0, np.pi/4, np.pi/2])
-ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
-
-# Save the validation figure beside the other micromagnetic example results
-# and close it so the script does not open an interactive plotting window.
-results_dir.mkdir(parents=True, exist_ok=True)
-figure_path = results_dir / "shape_correction_test.png"
-fig.savefig(figure_path, dpi=300, bbox_inches="tight")
-plt.close(fig)
-print(f"Saved figure to {figure_path}")
+if __name__ == '__main__':
+    checks = run_test()
+    print('shape_correction_test '
+          + ('PASSED' if all(c['passed'] for c in checks) else 'FAILED'))

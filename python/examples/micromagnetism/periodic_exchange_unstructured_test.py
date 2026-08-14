@@ -218,25 +218,21 @@ def dispersion(A, res, a, direction):
     return k_m, lam_m
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--res', type=int, nargs=3, default=[6, 6, 6],
-                        help="Number of cells along x, y and z")
-    parser.add_argument('--a', type=float, default=1e-9, help="Side length of a cell [m]")
-    parser.add_argument('--pbc', type=int, nargs=3, default=[1, 1, 1],
-                        help="Periodic exchange boundary conditions along x, y and z")
-    parser.add_argument('--cuda', action='store_true', help="Use the CUDA solver")
-    parser.add_argument('--skip-uniform', action='store_true',
-                        help="Skip the comparison with the uniform grid implementation")
-    args = parser.parse_args()
+def run_test(res=(6, 6, 6), a=1e-9, pbc=(1, 1, 1), cuda=False, skip_uniform=False,
+             plotting: bool = True) -> list[dict]:
+    """Run the periodic exchange checks on the unstructured mesh and return them.
 
-    res, a, pbc = args.res, args.a, args.pbc
+    Each check is a dict with the keys 'check', 'value', 'limit' and 'passed', where the test
+    passes when value < limit. This is the contract used by testMagTenseFunctions.py. Only the
+    periodic operator is checked; the free-boundary and uniform-grid comparisons that are also
+    printed are diagnostics rather than tests.
+    """
+    res, pbc = list(res), list(pbc)
     print(f"Mesh: {res[0]} x {res[1]} x {res[2]} cubes of {a:.3e} m, exchPBC = {pbc}")
 
     # The exchange operator on the unstructured mesh, with and without the periodic linking
-    A_pbc = exchange_matrix(res, a, pbc, unstructured=True, cuda=args.cuda)
-    A_free = exchange_matrix(res, a, [0, 0, 0], unstructured=True, cuda=args.cuda)
+    A_pbc = exchange_matrix(res, a, pbc, unstructured=True, cuda=cuda)
+    A_free = exchange_matrix(res, a, [0, 0, 0], unstructured=True, cuda=cuda)
 
     res_pbc = analyse(A_pbc, res, a, pbc, "Unstructured prisms, periodic")
     analyse(A_free, res, a, [0, 0, 0], "Unstructured prisms, free boundaries")
@@ -257,53 +253,86 @@ def main():
 
     # Reference: the uniform grid implementation, which has always supported periodic boundaries
     A_unif = None
-    if not args.skip_uniform:
-        A_unif = exchange_matrix(res, a, pbc, unstructured=False, cuda=args.cuda)
+    if not skip_uniform:
+        A_unif = exchange_matrix(res, a, pbc, unstructured=False, cuda=cuda)
         analyse(A_unif, res, a, pbc, "Uniform grid, periodic (reference)")
         difference = np.abs(A_pbc - A_unif).max() / np.abs(A_unif).max()
         print(f"\nLargest difference between the unstructured and the uniform operator: "
               f"{difference:.3e}")
         print("  (the two use different stencils, so this is informative rather than a test)")
 
-    # Plot the sparsity patterns and the dispersion relation
-    fig, axes = plt.subplots(1, 3, layout='constrained', figsize=(14, 4.4))
+    if plotting:
+        # Plot the sparsity patterns and the dispersion relation
+        fig, axes = plt.subplots(1, 3, layout='constrained', figsize=(14, 4.4))
 
-    for ax, matrix, title in zip(axes[:2], [A_free, A_pbc],
-                                 ['Free boundaries', f'Periodic {pbc}']):
-        ax.spy(np.abs(matrix) > 1e-14 * np.abs(matrix).max(), markersize=1.2, color='navy')
-        ax.set_title(f'Exchange matrix, {title}')
-        ax.set_xlabel('Tile index')
-        ax.set_ylabel('Tile index')
+        for ax, matrix, title in zip(axes[:2], [A_free, A_pbc],
+                                     ['Free boundaries', f'Periodic {pbc}'], strict=True):
+            ax.spy(np.abs(matrix) > 1e-14 * np.abs(matrix).max(), markersize=1.2, color='navy')
+            ax.set_title(f'Exchange matrix, {title}')
+            ax.set_xlabel('Tile index')
+            ax.set_ylabel('Tile index')
 
-    ax = axes[2]
+        ax = axes[2]
+        for direction, name in enumerate('xyz'):
+            if not pbc[direction] or res[direction] < 3:
+                continue
+            k_m, lam_m = dispersion(A_pbc, res, a, direction)
+            ax.plot(k_m * a, -lam_m * a**2, 'o', label=f'MagTense, {name}')
+            if A_unif is not None:
+                k_u, lam_u = dispersion(A_unif, res, a, direction)
+                ax.plot(k_u * a, -lam_u * a**2, 'x', label=f'Uniform grid, {name}')
+        k_fine = np.linspace(0, np.pi, 200)
+        ax.plot(k_fine, k_fine**2, 'k-', label=r'Continuum, $k^2$')
+        ax.plot(k_fine, 4 * np.sin(k_fine / 2)**2, 'k--', label=r'7 point stencil')
+        ax.set_xlabel(r'$k a$')
+        ax.set_ylabel(r'$-\lambda a^2$')
+        ax.set_title('Dispersion of the periodic operator')
+        ax.legend(fontsize=9)
+
+        results_dir = Path(__file__).resolve().parent / "results"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        figure_path = results_dir / 'periodic_exchange_unstructured_test.png'
+        fig.savefig(figure_path, dpi=200, bbox_inches='tight')
+        plt.close(fig)
+        print(f"\nSaved figure to {figure_path}")
+
+    checks = [{
+        'check': 'exchange operator has vanishing row sums',
+        'value': res_pbc['row_sum'],
+        'limit': ROW_SUM_TOL,
+        'passed': res_pbc['row_sum'] < ROW_SUM_TOL,
+    }]
     for direction, name in enumerate('xyz'):
-        if not pbc[direction] or res[direction] < 3:
+        if not pbc[direction] or name not in res_pbc['residuals']:
             continue
-        k_m, lam_m = dispersion(A_pbc, res, a, direction)
-        ax.plot(k_m * a, -lam_m * a**2, 'o', label=f'MagTense, {name}')
-        if A_unif is not None:
-            k_u, lam_u = dispersion(A_unif, res, a, direction)
-            ax.plot(k_u * a, -lam_u * a**2, 'x', label=f'Uniform grid, {name}')
-    k_fine = np.linspace(0, np.pi, 200)
-    ax.plot(k_fine, k_fine**2, 'k-', label=r'Continuum, $k^2$')
-    ax.plot(k_fine, 4 * np.sin(k_fine / 2)**2, 'k--', label=r'7 point stencil')
-    ax.set_xlabel(r'$k a$')
-    ax.set_ylabel(r'$-\lambda a^2$')
-    ax.set_title('Dispersion of the periodic operator')
-    ax.legend(fontsize=9)
+        residual = res_pbc['residuals'][name]
+        checks.append({
+            'check': f'plane wave along {name} is an eigenvector',
+            'value': residual,
+            'limit': EIGENVECTOR_TOL,
+            'passed': residual < EIGENVECTOR_TOL,
+        })
 
-    results_dir = Path(__file__).resolve().parent / "results"
-    results_dir.mkdir(parents=True, exist_ok=True)
-    figure_path = results_dir / 'periodic_exchange_unstructured_test.png'
-    fig.savefig(figure_path, dpi=200, bbox_inches='tight')
-    plt.close(fig)
-    print(f"\nSaved figure to {figure_path}")
+    return checks
 
-    # Overall verdict
-    passed = res_pbc['row_sum'] < ROW_SUM_TOL
-    for direction, name in enumerate('xyz'):
-        if name in res_pbc['residuals'] and pbc[direction]:
-            passed &= res_pbc['residuals'][name] < EIGENVECTOR_TOL
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--res', type=int, nargs=3, default=[6, 6, 6],
+                        help="Number of cells along x, y and z")
+    parser.add_argument('--a', type=float, default=1e-9, help="Side length of a cell [m]")
+    parser.add_argument('--pbc', type=int, nargs=3, default=[1, 1, 1],
+                        help="Periodic exchange boundary conditions along x, y and z")
+    parser.add_argument('--cuda', action='store_true', help="Use the CUDA solver")
+    parser.add_argument('--skip-uniform', action='store_true',
+                        help="Skip the comparison with the uniform grid implementation")
+    args = parser.parse_args()
+
+    checks = run_test(res=args.res, a=args.a, pbc=args.pbc, cuda=args.cuda,
+                      skip_uniform=args.skip_uniform)
+
+    passed = all(c['passed'] for c in checks)
     print("\nPeriodic exchange on the unstructured mesh: " + ("PASSED" if passed else "FAILED"))
 
     return 0 if passed else 1

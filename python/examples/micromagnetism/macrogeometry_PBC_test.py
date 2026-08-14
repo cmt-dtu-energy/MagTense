@@ -238,71 +238,96 @@ def run_case(testAxis: int, A: float):
 
 axis_names = ("x", "y", "z")
 
-# The analytical prefactor decides where theta is heading, and vanishes at the critical spacing
-print('Analytical prefactor (>0 drives theta to 0, <0 drives theta to pi/2, 0 means no torque):')
-for A in (A_crit, A_wide, A_narrow):
-    print(f'  A = {A:.4e} m : {prefactor(a/(2*A), K, Ms):+.4e}')
 
-runs = [(axis, A_crit, 'critical') for axis in testAxes]
-runs += [(controlAxis, A_wide, 'wide'), (controlAxis, A_narrow, 'narrow')]
+def run_test(plotting: bool = True) -> list[dict]:
+    """Run the macrogeometry PBC test and return the checks it consists of.
 
-print('Run simulations')
-results = {}
-for testAxis, A, label in tqdm(runs):
-    results[(testAxis, label)] = run_case(testAxis, A)
-print('Done running simulations')
+    Each check is a dict with the keys 'check', 'value', 'limit' and 'passed', where the test
+    passes when value < limit. This is the contract used by testMagTenseFunctions.py.
+    """
+    # The analytical prefactor decides where theta is heading, and vanishes at the critical spacing
+    print('Analytical prefactor (>0 drives theta to 0, <0 drives theta to pi/2, 0 means no torque):')
+    for A in (A_crit, A_wide, A_narrow):
+        print(f'  A = {A:.4e} m : {prefactor(a/(2*A), K, Ms):+.4e}')
 
-#%% Check the results
+    runs = [(axis, A_crit, 'critical') for axis in testAxes]
+    runs += [(controlAxis, A_wide, 'wide'), (controlAxis, A_narrow, 'narrow')]
 
-passed = True
+    print('Run simulations')
+    results = {}
+    for testAxis, A, label in tqdm(runs):
+        results[(testAxis, label)] = run_case(testAxis, A)
+    print('Done running simulations')
 
-# At the critical spacing theta must stay at its initial value of pi/4 along every axis
-for testAxis in testAxes:
-    t_n, theta1_n, theta2_n = results[(testAxis, 'critical')]
-    drift = float(np.max(np.abs(theta1_n - np.pi/4)))
-    asymmetry = float(np.max(np.abs(theta1_n - theta2_n)))
-    ok = drift < angle_tol and asymmetry < angle_tol
-    passed = passed and ok
-    verdict = 'works' if ok else 'FAILED'
-    print(f'Macrogeometry PBC {verdict} along {axis_names[testAxis]}: '
-          f'max |theta - pi/4| = {drift:.2e} rad, max |theta_1 + theta_2| = {asymmetry:.2e} rad')
+    checks = []
 
-# The controls must actually move, and in the direction the analytical prefactor predicts
-for label, A, target in (('wide', A_wide, np.pi/2), ('narrow', A_narrow, 0.0)):
-    t_n, theta1_n, _ = results[(controlAxis, label)]
-    moved = float(theta1_n[-1] - theta1_n[0])
-    expected = target - np.pi/4
-    ok = abs(theta1_n[-1] - target) < control_tol and np.sign(moved) == np.sign(expected)
-    passed = passed and ok
-    verdict = 'works' if ok else 'FAILED'
-    print(f'Control at A = {A:.4e} m {verdict}: theta went from {theta1_n[0]:.4f} to '
-          f'{theta1_n[-1]:.4f} rad, expected {target:.4f}')
+    # At the critical spacing theta must stay at its initial value of pi/4 along every axis
+    for testAxis in testAxes:
+        t_n, theta1_n, theta2_n = results[(testAxis, 'critical')]
+        drift = float(np.max(np.abs(theta1_n - np.pi/4)))
+        asymmetry = float(np.max(np.abs(theta1_n - theta2_n)))
+        ok = drift < angle_tol and asymmetry < angle_tol
+        verdict = 'works' if ok else 'FAILED'
+        print(f'Macrogeometry PBC {verdict} along {axis_names[testAxis]}: '
+              f'max |theta - pi/4| = {drift:.2e} rad, '
+              f'max |theta_1 + theta_2| = {asymmetry:.2e} rad')
+        checks.append({
+            'check': f'PBC along {axis_names[testAxis]}: theta constant at critical A',
+            'value': drift, 'limit': angle_tol, 'passed': drift < angle_tol,
+        })
+        checks.append({
+            'check': f'PBC along {axis_names[testAxis]}: theta_1 = -theta_2',
+            'value': asymmetry, 'limit': angle_tol, 'passed': asymmetry < angle_tol,
+        })
 
-print('macrogeometry_PBC_test PASSED' if passed else 'macrogeometry_PBC_test FAILED')
+    # The controls must actually move, and in the direction the analytical prefactor predicts
+    for label, A, target in (('wide', A_wide, np.pi/2), ('narrow', A_narrow, 0.0)):
+        t_n, theta1_n, _ = results[(controlAxis, label)]
+        moved = float(theta1_n[-1] - theta1_n[0])
+        expected = target - np.pi/4
+        distance = float(abs(theta1_n[-1] - target))
+        right_way = np.sign(moved) == np.sign(expected)
+        ok = distance < control_tol and right_way
+        verdict = 'works' if ok else 'FAILED'
+        print(f'Control at A = {A:.4e} m {verdict}: theta went from {theta1_n[0]:.4f} to '
+              f'{theta1_n[-1]:.4f} rad, expected {target:.4f}')
+        checks.append({
+            'check': f'control, A {label}: theta reaches {target:.3f} rad',
+            # A wrong direction is reported as a failure however close the endpoint happens to be
+            'value': distance if right_way else float('inf'),
+            'limit': control_tol, 'passed': ok,
+        })
 
-#%% Plot results
+    if plotting:
+        fig, ax = plt.subplots(layout='constrained', figsize=(7, 4.5))
+        critical_colours = ('forestgreen', 'darkorange', 'navy')
+        for i, testAxis in enumerate(testAxes):
+            t_n, theta1_n, _ = results[(testAxis, 'critical')]
+            ax.plot(t_n * 1e9, theta1_n, color=critical_colours[i % len(critical_colours)],
+                    label=f'critical, PBC along {axis_names[testAxis]}')
+        for label, colour in (('wide', 'crimson'), ('narrow', 'purple')):
+            t_n, theta1_n, _ = results[(controlAxis, label)]
+            ax.plot(t_n * 1e9, theta1_n, color=colour, linestyle='--',
+                    label=f'control, A {label}')
+        ax.axhline(np.pi/4, color='black', linestyle=':', linewidth=1)
+        ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
+        ax.set_ylabel(r'$\text{Polar angle}$')
+        ax.set_yticks([0, np.pi/4, np.pi/2])
+        ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
+        ax.legend(fontsize=10)
 
-fig, ax = plt.subplots(layout='constrained', figsize=(7, 4.5))
-critical_colours = ('forestgreen', 'darkorange', 'navy')
-for i, testAxis in enumerate(testAxes):
-    t_n, theta1_n, _ = results[(testAxis, 'critical')]
-    ax.plot(t_n * 1e9, theta1_n, color=critical_colours[i % len(critical_colours)],
-            label=f'critical, PBC along {axis_names[testAxis]}')
-for label, colour in (('wide', 'crimson'), ('narrow', 'purple')):
-    t_n, theta1_n, _ = results[(controlAxis, label)]
-    ax.plot(t_n * 1e9, theta1_n, color=colour, linestyle='--',
-            label=f'control, A {label}')
-ax.axhline(np.pi/4, color='black', linestyle=':', linewidth=1)
-ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
-ax.set_ylabel(r'$\text{Polar angle}$')
-ax.set_yticks([0, np.pi/4, np.pi/2])
-ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
-ax.legend(fontsize=10)
+        # Save the figure beside the other micromagnetic example results and close it so the
+        # script does not open an interactive plotting window.
+        results_dir.mkdir(parents=True, exist_ok=True)
+        figure_path = results_dir / "macrogeometry_PBC_test.png"
+        fig.savefig(figure_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Saved figure to {figure_path}")
 
-# Save the figure beside the other micromagnetic example results and close it so the
-# script does not open an interactive plotting window.
-results_dir.mkdir(parents=True, exist_ok=True)
-figure_path = results_dir / "macrogeometry_PBC_test.png"
-fig.savefig(figure_path, dpi=300, bbox_inches="tight")
-plt.close(fig)
-print(f"Saved figure to {figure_path}")
+    return checks
+
+
+if __name__ == '__main__':
+    all_checks = run_test()
+    print('macrogeometry_PBC_test '
+          + ('PASSED' if all(c['passed'] for c in all_checks) else 'FAILED'))

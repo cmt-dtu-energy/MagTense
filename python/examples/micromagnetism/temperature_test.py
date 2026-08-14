@@ -144,150 +144,180 @@ grid_type = "uniform"
 grid_L = [A, B, C]              # Grid size along x, y and z
 res = [Ncell, Ncell, Ncell]     # Grid resolution, i.e. number of cells along x, y and z
 
-problem = MicromagProblem(
-    res=res,
-    A0=Aex,
-    Ms=Ms,
-    K0=K,
-    m0=m0_pv,
-    alpha=eta,
-    gamma=gamma,
-    cuda=cuda,
-    cvode=cvode,
-    grid_L=grid_L,
-    grid_type=grid_type,
-    usereturnhall=True,
-    solver='dynamic',
-    T=T,
-    usedemag=0,
-)
 
-# Run simulation
-print('Run simulation')
-result = problem.run_simulation(
-    t_end=t_end,
-    nt=nt,
-    fct_h_ext=fct_h_ext,
-    nt_h_ext=nt_h_ext,
-)
-print('Done running simulation')
+def run_test(plotting: bool = True) -> list[dict]:
+    """Run the thermal fluctuation test and return the checks it consists of.
 
-t_out, M_out = result[:2]
-pts = result[2]
-H_exc, H_ext, H_dem, H_ani = result[3:7]
+    Each check is a dict with the keys 'check', 'value', 'limit' and 'passed', where the test
+    passes when value < limit. This is the contract used by testMagTenseFunctions.py.
+    """
+    problem = MicromagProblem(
+        res=res,
+        A0=Aex,
+        Ms=Ms,
+        K0=K,
+        m0=m0_pv,
+        alpha=eta,
+        gamma=gamma,
+        cuda=cuda,
+        cvode=cvode,
+        grid_L=grid_L,
+        grid_type=grid_type,
+        usereturnhall=True,
+        solver='dynamic',
+        T=T,
+        usedemag=0,
+    )
 
-#%% Store results
+    # Run simulation
+    print('Run simulation')
+    result = problem.run_simulation(
+        t_end=t_end,
+        nt=nt,
+        fct_h_ext=fct_h_ext,
+        nt_h_ext=nt_h_ext,
+    )
+    print('Done running simulation')
 
-# Get important data
-t_n = t_out
-M_npv = M_out[:, :, 0, :]
-Bext_nv = H_ext[:, 0, 0, :] * mu0
+    t_out, M_out = result[:2]
 
-# Dataperiod
-dataperiod = max(int(len(t_n)/Ndata), 1)
+    # Get important data
+    t_n = t_out
+    M_npv = M_out[:, :, 0, :]
 
-if save:
-    # Load or create data dictionary
-    dataDict = dict()
-    # Always overwrite the stored settings with the most updated version
-    # This way, previous simulation sequences can be fixed or extended
-    dataDict['settings'] = {'A':A, 'B':B, 'C':C, 'Ncell':Ncell, 'alpha':alpha, 'T':T, 'tStep':tStep, 'u_v':u_v}
+    # Dataperiod
+    dataperiod = max(int(len(t_n)/Ndata), 1)
 
-    # Add current simulation to data dictionary
-    dataDict[f'results'] = {'t_n': t_n[::dataperiod], 'M_npv': M_npv[::dataperiod]}
+    if save:
+        # Load or create data dictionary
+        dataDict = dict()
+        # Always overwrite the stored settings with the most updated version
+        # This way, previous simulation sequences can be fixed or extended
+        dataDict['settings'] = {'A':A, 'B':B, 'C':C, 'Ncell':Ncell, 'alpha':alpha, 'T':T,
+                                'tStep':tStep, 'u_v':u_v}
 
-    # Store data dictionary
-    write_json(str(results_dir / 'data' / f'{savename}_dataDict.json'), dataDict)
+        # Add current simulation to data dictionary
+        dataDict['results'] = {'t_n': t_n[::dataperiod], 'M_npv': M_npv[::dataperiod]}
+
+        # Store data dictionary
+        write_json(str(results_dir / 'data' / f'{savename}_dataDict.json'), dataDict)
+
+    #%% Analytical result
+
+    # Times at which simulation and theory are compared. The n = 0 entry is skipped in the
+    # comparison: at t = 0 the distribution is a delta function and the Legendre series does
+    # not converge.
+    compare_i = np.linspace(0, nt - 1, Ndata).astype(int)
+    t_cmp = t_n[compare_i]
+
+    # Angle sampling
+    theta_j = np.linspace(0, np.pi, 200)
+
+    # Empty arrays
+    P_njk = np.zeros([len(t_cmp), len(theta_j), nOrder])
+    exp_nk = np.zeros([len(t_cmp), nOrder])
+    Pn_jk = np.zeros([len(theta_j), nOrder])
+
+    # Fill arrays one order of Legendre polynomial at a time
+    for k in range(nOrder):
+        exp_nk[:, k] = np.exp(-k*(k+1)*D_LLG*t_cmp)
+        Pn_jk[:, k] = eval_legendre(k, np.cos(theta_j))
+        P_njk[:, :, k] = (2*k+1)/2 * Pn_jk[np.newaxis, :, k] * exp_nk[:, np.newaxis, k]
+
+    # Sum over Legendre polynomial orders
+    P_nj = np.sum(P_njk, axis=2)
+    P_nj = np.sin(theta_j)[np.newaxis, :] * P_nj
+
+    #%% Compare analytical and simulated results
+
+    # Get simulated results. The magnetisation is returned normalised, but renormalise anyway so
+    # that the polar angle is well defined even if the integrator lets |m| drift.
+    M_norm_np = np.linalg.norm(M_npv, axis=2)
+    thetaSim_np = np.arccos(np.clip(M_npv[:, :, 2] / M_norm_np, -1, 1))
+
+    # Histogram the simulated angles at each comparison time separately
+    Psim_nh = np.zeros([Ndata, Nbin])
+    for n in range(Ndata):
+        hist, binEdges = np.histogram(thetaSim_np[compare_i[n], :], bins=Nbin,
+                                      range=(0, np.pi), density=True)
+        binWidth = np.mean(np.diff(binEdges))
+        Psim_nh[n, :] = hist*binWidth
+    thetaSim_nh = (binEdges[1:] + binEdges[:-1])/2
+
+    # Bin the analytical distribution the same way so the two can be compared bin by bin
+    Pana_nh = np.zeros([Ndata, Nbin])
+    for n in range(Ndata):
+        for h in range(Nbin):
+            sel = (theta_j >= binEdges[h]) & (theta_j <= binEdges[h+1])
+            Pana_nh[n, h] = np.trapezoid(P_nj[n, sel], theta_j[sel])
+
+    # Total variation distance between the two distributions, skipping the t = 0 comparison
+    TV_n = 0.5*np.sum(np.abs(Psim_nh - Pana_nh), axis=1)
+    TV_max = float(np.max(TV_n[1:]))
+
+    # The first Legendre order alone gives <cos θ> = exp(-2 D t), which is a much less noisy
+    # estimator of the diffusion constant than the full distribution
+    cosMean_n = np.mean(np.cos(thetaSim_np), axis=1)
+    fit_n = (t_n > 0) & (t_n < 0.7/D_LLG) & (cosMean_n > 0)
+    D_sim = float(-np.polyfit(t_n[fit_n], np.log(cosMean_n[fit_n]), 1)[0] / 2)
+
+    print(f'Number of independent cells        : {NcellTot}')
+    print(f'Analytical diffusion constant D_LLG: {D_LLG:.4e} 1/s')
+    print(f'Simulated diffusion constant       : {D_sim:.4e} 1/s  '
+          f'(ratio {D_sim/D_LLG:.3f}, accepted {D_tol[0]}-{D_tol[1]})')
+    print(f'Max total variation distance       : {TV_max:.4f} (accepted < {TV_tol})')
+
+    if plotting:
+        # Prepare colormap
+        norm = mpl.colors.Normalize(vmin=0, vmax=t_end)
+        colorMap = mpl.colormaps[cmap]
+        mappable = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+
+        # Plot results
+        fig, ax = plt.subplots(figsize=(8,4), layout='constrained')
+        plt.colorbar(mappable=mappable, ax=ax, location='right', orientation='vertical')
+        # Skip the t = 0 comparison (not interesting and requires infinite orders of Legendre
+        # polynomials)
+        for n in range(1, Ndata):
+            ax.plot(theta_j, P_nj[n, :], linestyle='-', marker='',
+                    color=colorMap(t_cmp[n]/t_end))
+            ax.plot(thetaSim_nh, Psim_nh[n, :]/binWidth, linestyle='', marker='o',
+                    color=colorMap(t_cmp[n]/t_end))
+        ax.set_xlabel(r'Polar angle, $\theta$')
+        ax.set_xticks([0, np.pi/4, np.pi/2, 3*np.pi/4, np.pi])
+        ax.set_xticklabels([r'$0$', r'$\pi/4$', r'$\pi/2$', r'$3\pi/4$', r'$\pi$'])
+        ax.set_ylabel(r'Probabililty distribution, $P(\theta)$')
+
+        # Save the figure beside the other micromagnetic example results and close it so the
+        # script does not open an interactive plotting window.
+        results_dir.mkdir(parents=True, exist_ok=True)
+        figure_path = results_dir / 'temperature_test.png'
+        fig.savefig(figure_path, dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        print(f'Saved figure to {figure_path}')
+
+    # The allowed range of D_sim/D_LLG is turned into an upper bound on the deviation from 1 so
+    # that every check in the combined suite has the same "value below limit" form.
+    D_ratio = D_sim/D_LLG
+    D_centre = (D_tol[0] + D_tol[1])/2
+    D_halfwidth = (D_tol[1] - D_tol[0])/2
+    return [
+        {
+            'check': 'diffusion constant matches D_LLG',
+            'value': abs(D_ratio - D_centre),
+            'limit': D_halfwidth,
+            'passed': D_tol[0] < D_ratio < D_tol[1],
+        },
+        {
+            'check': 'angular distribution matches theory',
+            'value': TV_max,
+            'limit': TV_tol,
+            'passed': TV_max < TV_tol,
+        },
+    ]
 
 
-#%% Analytical result
-
-# Times at which simulation and theory are compared. The n = 0 entry is skipped in the comparison:
-# at t = 0 the distribution is a delta function and the Legendre series does not converge.
-compare_i = np.linspace(0, nt - 1, Ndata).astype(int)
-t_cmp = t_n[compare_i]
-
-# Angle sampling
-theta_j = np.linspace(0, np.pi, 200)
-
-# Empty arrays
-P_njk = np.zeros([len(t_cmp), len(theta_j), nOrder])
-exp_nk = np.zeros([len(t_cmp), nOrder])
-Pn_jk = np.zeros([len(theta_j), nOrder])
-
-# Fill arrays one order of Legendre polynomial at a time
-for k in range(nOrder):
-    exp_nk[:, k] = np.exp(-k*(k+1)*D_LLG*t_cmp)
-    Pn_jk[:, k] = eval_legendre(k, np.cos(theta_j))
-    P_njk[:, :, k] = (2*k+1)/2 * Pn_jk[np.newaxis, :, k] * exp_nk[:, np.newaxis, k]
-
-# Sum over Legendre polynomial orders
-P_nj = np.sum(P_njk, axis=2)
-P_nj = np.sin(theta_j)[np.newaxis, :] * P_nj
-
-#%% Compare analytical and simulated results
-
-# Get simulated results. The magnetisation is returned normalised, but renormalise anyway so that the
-# polar angle is well defined even if the integrator lets |m| drift.
-M_norm_np = np.linalg.norm(M_npv, axis=2)
-thetaSim_np = np.arccos(np.clip(M_npv[:, :, 2] / M_norm_np, -1, 1))
-
-# Histogram the simulated angles at each comparison time separately
-Psim_nh = np.zeros([Ndata, Nbin])
-for n in range(Ndata):
-    hist, binEdges = np.histogram(thetaSim_np[compare_i[n], :], bins=Nbin,
-                                  range=(0, np.pi), density=True)
-    binWidth = np.mean(np.diff(binEdges))
-    Psim_nh[n, :] = hist*binWidth
-thetaSim_nh = (binEdges[1:] + binEdges[:-1])/2
-
-# Bin the analytical distribution the same way so the two can be compared bin by bin
-Pana_nh = np.zeros([Ndata, Nbin])
-for n in range(Ndata):
-    for h in range(Nbin):
-        sel = (theta_j >= binEdges[h]) & (theta_j <= binEdges[h+1])
-        Pana_nh[n, h] = np.trapezoid(P_nj[n, sel], theta_j[sel])
-
-# Total variation distance between the two distributions, skipping the t = 0 comparison
-TV_n = 0.5*np.sum(np.abs(Psim_nh - Pana_nh), axis=1)
-TV_max = float(np.max(TV_n[1:]))
-
-# The first Legendre order alone gives <cos θ> = exp(-2 D t), which is a much less noisy
-# estimator of the diffusion constant than the full distribution
-cosMean_n = np.mean(np.cos(thetaSim_np), axis=1)
-fit_n = (t_n > 0) & (t_n < 0.7/D_LLG) & (cosMean_n > 0)
-D_sim = -np.polyfit(t_n[fit_n], np.log(cosMean_n[fit_n]), 1)[0] / 2
-
-print(f'Number of independent cells        : {NcellTot}')
-print(f'Analytical diffusion constant D_LLG: {D_LLG:.4e} 1/s')
-print(f'Simulated diffusion constant       : {D_sim:.4e} 1/s  '
-      f'(ratio {D_sim/D_LLG:.3f}, accepted {D_tol[0]}-{D_tol[1]})')
-print(f'Max total variation distance       : {TV_max:.4f} (accepted < {TV_tol})')
-
-passed = (D_tol[0] < D_sim/D_LLG < D_tol[1]) and (TV_max < TV_tol)
-print('temperature_test PASSED' if passed else 'temperature_test FAILED')
-
-# Prepare colormap
-norm = mpl.colors.Normalize(vmin=0, vmax=t_end)
-colorMap = mpl.colormaps[cmap]
-mappable = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
-
-# Plot results
-fig, ax = plt.subplots(figsize=(8,4), layout='constrained')
-plt.colorbar(mappable=mappable, ax=ax, location = 'right', orientation = 'vertical')
-for n in range(1, Ndata):   # Skip the t = 0 comparison (not interesting and requires infinite orders of Legendre polynomials)
-    ax.plot(theta_j, P_nj[n, :], linestyle='-', marker='', color=colorMap(t_cmp[n]/t_end))
-    ax.plot(thetaSim_nh, Psim_nh[n, :]/binWidth, linestyle='', marker='o',
-            color=colorMap(t_cmp[n]/t_end))
-ax.set_xlabel(r'Polar angle, $\theta$')
-ax.set_xticks([0, np.pi/4, np.pi/2, 3*np.pi/4, np.pi])
-ax.set_xticklabels([r'$0$', r'$\pi/4$', r'$\pi/2$', r'$3\pi/4$', r'$\pi$'])
-ax.set_ylabel(r'Probabililty distribution, $P(\theta)$')
-
-# Save the figure beside the other micromagnetic example results and close it so the script
-# does not open an interactive plotting window.
-results_dir.mkdir(parents=True, exist_ok=True)
-figure_path = results_dir / 'temperature_test.png'
-fig.savefig(figure_path, dpi=300, bbox_inches='tight')
-plt.close(fig)
-print(f'Saved figure to {figure_path}')
+if __name__ == '__main__':
+    checks = run_test()
+    print('temperature_test '
+          + ('PASSED' if all(c['passed'] for c in checks) else 'FAILED'))
