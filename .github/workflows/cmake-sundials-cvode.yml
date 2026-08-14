@@ -10,7 +10,10 @@ jobs:
   build-and-test:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        # Windows is pinned rather than windows-latest to keep the whole
+        # pipeline on one toolchain: the latest images ship VS 2026, which
+        # oneAPI 2025.0 predates and which nvcc rejects in matlab_package.yml.
+        os: [windows-2025, ubuntu-latest]
     runs-on: ${{ matrix.os }}
 
     steps:

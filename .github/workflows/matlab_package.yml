@@ -17,7 +17,9 @@ jobs:
       matrix:
         CVODE-compile: [CVODE,noCVODE]
         CUDA-compile: [CUDA,noCUDA]
-    runs-on: [windows-latest]
+    # Pinned rather than windows-latest: nvcc only supports host compilers up to
+    # VS 2022, which the latest images no longer guarantee is installed.
+    runs-on: [windows-2025]
     needs: [build-cvode]
     env:
       build_file: python/.build/env-313-win.yml
@@ -43,8 +45,14 @@ jobs:
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found at $vswhere" }
 
-          $vsDir = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-          if (-not $vsDir) { throw "No Visual Studio installation with the MSVC toolset was found." }
+          Write-Host "Visual Studio instances present on this image:"
+          & $vswhere -all -products * -property installationPath
+
+          # nvcc rejects any host compiler newer than VS 2022 (see crt/host_config.h),
+          # and runner images now also ship VS 2026, so restrict the search to
+          # [15.0,18.0) = VS 2017..2022 rather than taking whatever is newest.
+          $vsDir = & $vswhere -latest -products * -version "[15.0,18.0)" -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsDir) { throw "No Visual Studio 2017-2022 installation with the MSVC toolset was found; nvcc does not support newer versions." }
 
           $versionFile = Join-Path $vsDir "VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt"
           $toolsVersion = (Get-Content $versionFile -Raw).Trim()
