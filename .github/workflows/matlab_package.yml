@@ -32,11 +32,31 @@ jobs:
           environment-file: ${{ env.build_file }}
           use-mamba: true
 
-      - name: Check the directory of Visual Studio
-        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      # The runner image updates both the Visual Studio edition/year and the
+      # MSVC toolset version, so those paths cannot be hardcoded. Resolve them
+      # once here and reuse them via the environment in the steps below.
+      - name: Locate Visual Studio and the MSVC toolset
+        shell: pwsh
         run: |
-          dir "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\"
-          
+          $ErrorActionPreference = "Stop"
+
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found at $vswhere" }
+
+          $vsDir = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsDir) { throw "No Visual Studio installation with the MSVC toolset was found." }
+
+          $versionFile = Join-Path $vsDir "VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt"
+          $toolsVersion = (Get-Content $versionFile -Raw).Trim()
+          $hostBin = Join-Path $vsDir "VC\Tools\MSVC\$toolsVersion\bin\Hostx64\x64"
+          if (-not (Test-Path (Join-Path $hostBin "cl.exe"))) { throw "cl.exe not found in $hostBin" }
+
+          Write-Host "VS_INSTALL_DIR=$vsDir"
+          Write-Host "MSVC_HOST_BIN=$hostBin"
+
+          Add-Content -Path $env:GITHUB_ENV -Value "VS_INSTALL_DIR=$vsDir"
+          Add-Content -Path $env:GITHUB_ENV -Value "MSVC_HOST_BIN=$hostBin"
+
       - name: Download cvode (sundials-7.2.1)
         uses: actions/download-artifact@v4
         with:
@@ -53,14 +73,13 @@ jobs:
         shell: bash -el {0}
         working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
         run: |
-          nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64" -o MagTenseCudaBlas.obj
+          nvcc -c MagTenseCudaBlas.cu -ccbin "$MSVC_HOST_BIN" -o MagTenseCudaBlas.obj
 
       - name: Make the wrapper for the CUDA file using icx in a Developer PowerShell for VS 2022
         if: ${{ matrix.CUDA-compile == 'CUDA' }}
         shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
         run: |
-          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-          .\Launch-VsDevShell.ps1
+          & "$env:VS_INSTALL_DIR\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -HostArch amd64
           cd ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
           make wrap
           ls
@@ -71,8 +90,7 @@ jobs:
           CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
         shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
         run: |
-          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-          .\Launch-VsDevShell.ps1
+          & "$env:VS_INSTALL_DIR\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -HostArch amd64
           conda info
           cd ${{ github.workspace }}
           pwd
@@ -93,7 +111,7 @@ jobs:
         run: |
           cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\usr
           move bin bin_renamed
-          cmd /c mklink /D bin "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\" 
+          cmd /c mklink /D bin "$env:MSVC_HOST_BIN"
       
       - name: Compile MEX code using Matlab with or without CUDA
         env:
