@@ -10,10 +10,11 @@ jobs:
   build-and-test:
     strategy:
       matrix:
-        # Windows is pinned rather than windows-latest to keep the whole
-        # pipeline on one toolchain: the latest images ship VS 2026, which
-        # oneAPI 2025.0 predates and which nvcc rejects in matlab_package.yml.
-        os: [windows-2025, ubuntu-latest]
+        # windows-latest and windows-2025 both moved to Visual Studio 2026 in
+        # June 2026. oneAPI 2025.0 predates it, and CUDA 12.8's nvcc rejects it
+        # outright in matlab_package.yml, so pin the whole pipeline to the last
+        # VS 2022 image. See the CUDA note in matlab_package.yml.
+        os: [windows-2022, ubuntu-latest]
     runs-on: ${{ matrix.os }}
 
     steps:

@@ -18,10 +18,11 @@ jobs:
         py-version: [312, 313]
         cvode: [1]
         sys:
-          # Pinned rather than windows-latest: the latest images ship VS 2026,
-          # which oneAPI 2025.0 predates and which nvcc rejects. Keep this in
-          # step with the cvode libs this job links against.
-          - { os: windows-2025, name: win, whl-arch: win_amd64 }
+          # Pinned to the last VS 2022 image: windows-latest and windows-2025
+          # moved to VS 2026 in June 2026, which oneAPI 2025.0 predates and
+          # CUDA 12.8's nvcc rejects. Keep this in step with the cvode libs
+          # this job links against.
+          - { os: windows-2022, name: win, whl-arch: win_amd64 }
           - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
 
     runs-on: ${{ matrix.sys.os }}
@@ -185,7 +186,7 @@ jobs:
         py-version:
           - { name: 312, id: "3.12" }
           - { name: 313, id: "3.13" }
-        os: [windows-2025, ubuntu-latest]
+        os: [windows-2022, ubuntu-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -444,7 +445,7 @@ jobs:
       matrix:
         py-version: [312, 313]
 
-    runs-on: windows-2025
+    runs-on: windows-2022
 
     env:
       build_file: python/.build/env-${{ matrix.py-version }}-win.yml

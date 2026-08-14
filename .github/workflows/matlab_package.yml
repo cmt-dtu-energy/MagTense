@@ -17,9 +17,12 @@ jobs:
       matrix:
         CVODE-compile: [CVODE,noCVODE]
         CUDA-compile: [CUDA,noCUDA]
-    # Pinned rather than windows-latest: nvcc only supports host compilers up to
-    # VS 2022, which the latest images no longer guarantee is installed.
-    runs-on: [windows-2025]
+    # CUDA 12.8's nvcc only supports host compilers up to VS 2022, but
+    # windows-latest and windows-2025 both moved to VS 2026 in June 2026 and no
+    # longer carry VS 2022 at all. windows-2022 is GitHub's supported fallback.
+    # Lifting this pin requires a CUDA version that accepts a newer host
+    # compiler, which means re-pinning cuda-* in python/.build/env-*-win.yml.
+    runs-on: [windows-2022]
     needs: [build-cvode]
     env:
       build_file: python/.build/env-313-win.yml
