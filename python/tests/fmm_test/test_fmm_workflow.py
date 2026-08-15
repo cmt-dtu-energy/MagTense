@@ -86,6 +86,10 @@ def test_fmm_quick_workflow() -> None:
     env.setdefault("MPLBACKEND", "Agg")
     env.setdefault("PYTHONFAULTHANDLER", "1")
     env.setdefault("CUDA_LAUNCH_BLOCKING", "1")
+    # capture_output makes the child's stdout a pipe, so without this Python
+    # encodes it with the locale codec (cp1252 on Windows) and any non-ASCII
+    # output dies with UnicodeEncodeError.
+    env.setdefault("PYTHONUTF8", "1")
 
     completed = subprocess.run(
         [

@@ -98,9 +98,7 @@ def validate_results(metrics, threshold_map, default_key="L2"):
                 failures.append(f"{metric_name}({val:.2e} > {limit:.2e})")
         
         status = "✅ PASS" if not failures else "❌ FAIL"
-        if failures: 
-            all_passed = False
-        
+
         overall_pass = overall_pass and (not failures)
 
 

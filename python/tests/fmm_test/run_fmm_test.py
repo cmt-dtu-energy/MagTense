@@ -10,6 +10,14 @@ import argparse
 from pathlib import Path
 from itertools import product
 
+# The results table uses non-ASCII status markers. When this script runs under
+# the test harness its stdout is a pipe, not a console, so Python falls back to
+# the locale encoding - cp1252 on Windows - and printing the table raises
+# UnicodeEncodeError. Linux defaults to UTF-8 and never hits this.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 def fmm_test_main(
                 quick_test: bool = False,
                 H_ext_dir_type: int = 1,

@@ -443,6 +443,11 @@ jobs:
       env:
         MAGTENSE_USE_FMM3D: 1
         MAGTENSE_WHEEL_VARIANT: cu12-fmm
+        # pytest's stdout is a pipe here, so without UTF-8 mode it encodes with
+        # cp1252 and dies on the non-ASCII status markers it echoes from the
+        # test subprocess. UTF-8 mode also makes text=True decode the child's
+        # output as UTF-8 rather than cp1252, so the table stays readable.
+        PYTHONUTF8: 1
       run: |
         $ErrorActionPreference = "Stop"
 
