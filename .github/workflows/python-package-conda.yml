@@ -111,18 +111,27 @@ jobs:
 
     - name: Win - Compile Fortran source code and build Python wrapper
       if: ${{ runner.os == 'Windows' }}
-      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      # -NoExit was masking the script's exit code, so a failed make still
+      # passed this step and produced a wheel with no extension module in it.
+      # $LASTEXITCODE has to be checked explicitly: a non-zero exit from a
+      # native command does not trip $ErrorActionPreference.
+      shell: pwsh -ExecutionPolicy ByPass -File {0}
       working-directory: ${{ github.workspace }}
       run: |
+        $ErrorActionPreference = "Stop"
+
         make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
+        if ($LASTEXITCODE -ne 0) { throw "make python failed for the cpu variant (exit $LASTEXITCODE)" }
         cp magtensesource.* ${{ github.workspace }}/python/cpu_libs/
         make clean
 
         make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
+        if ($LASTEXITCODE -ne 0) { throw "make python failed for the cu12 variant (exit $LASTEXITCODE)" }
         cp magtensesource.* ${{ github.workspace }}/python/cu12_libs/
         make clean
 
         make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0 USE_FMM3D=1
+        if ($LASTEXITCODE -ne 0) { throw "make python failed for the cu12-fmm variant (exit $LASTEXITCODE)" }
         cp magtensesource.* ${{ github.workspace }}/python/cu12-fmm_libs/
         cp external/FMM3D/local/libfmm3d.dll ${{ github.workspace }}/python/cu12-fmm_libs/
         make clean

@@ -58,14 +58,17 @@ def main(
 
         for cuda, py in itertools.product(cu_versions, py_versions):
             py_lib = "cp" + py if platform == "win" else "cpython-" + py
-            subprocess.run(
-                [
-                    "cp",
-                    f"{py_folder}/{cuda}_libs/magtensesource.{py_lib}-{arch}.{suffix}",
-                    lib_folder,
-                ],
-                check=False,
+            # Not check=False: without the extension module the wheel still
+            # builds, installs, and then fails at import time in the test job.
+            ext_module = Path(
+                f"{py_folder}/{cuda}_libs/magtensesource.{py_lib}-{arch}.{suffix}"
             )
+            if not ext_module.is_file():
+                raise FileNotFoundError(
+                    f"No extension module for {cuda}/{platform}/py{py}: {ext_module}. "
+                    "The compile step did not produce it."
+                )
+            subprocess.run(["cp", str(ext_module), lib_folder], check=True)
             if cuda.endswith("-fmm") and platform == "linux":
                 subprocess.run(
                     [
@@ -125,7 +128,7 @@ def main(
             subprocess.run(
                 ["python", "-m", "build", "--wheel"],
                 cwd=py_folder,
-                check=False,
+                check=True,
             )
             # python -m build normalizes the version in the wheel filename
             # (e.g. lowercases local version labels like fmmWorking -> fmmworking),
