@@ -430,7 +430,12 @@ jobs:
         MAGTENSE_USE_FMM3D: 1
         MAGTENSE_WHEEL_VARIANT: cu12-fmm
       run: |
+        # Same staleness hazard as the Windows leg below: this is a persistent
+        # self-hosted runner and the wheel version does not change between
+        # builds, so pip would skip the install and keep the previous wheel.
+        "$PYTHON_EXE" -m pip uninstall -y magtense
         "$PYTHON_EXE" -m pip install '${{ github.workspace }}'/*.whl
+        "$PYTHON_EXE" -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
         "$PYTHON_EXE" -m pip install pytest
         "$PYTHON_EXE" -m pytest python/tests/fmm_test/test_fmm_workflow.py
 
@@ -455,9 +460,18 @@ jobs:
         Write-Host "  $env:PYTHON_EXE"
         & $env:PYTHON_EXE --version
 
+        # These runners keep their conda envs between runs, and the wheel
+        # version string does not change from build to build, so a plain
+        # install is a no-op and silently leaves the previous wheel in place.
+        # Uninstall first rather than --force-reinstall, which would also
+        # redownload the ~1 GB of CUDA dependency wheels every run.
+        & $env:PYTHON_EXE -m pip uninstall -y magtense
+
         Get-ChildItem "$env:GITHUB_WORKSPACE\*.whl" | ForEach-Object {
           & $env:PYTHON_EXE -m pip install $_.FullName
         }
+
+        & $env:PYTHON_EXE -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
 
         & $env:PYTHON_EXE -m pip install pytest
         & $env:PYTHON_EXE -m pytest python/tests/fmm_test/test_fmm_workflow.py
