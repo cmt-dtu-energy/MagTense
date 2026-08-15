@@ -475,10 +475,6 @@ jobs:
         sparse-checkout: |
           python/.build/
 
-    - name: Install VS2017 build tools
-      run: |
-        choco install visualstudio2017buildtools -y
-
     - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v3
       with:

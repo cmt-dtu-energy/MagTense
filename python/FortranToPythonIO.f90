@@ -303,6 +303,14 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
     interface 
     subroutine lfmm3d_t_d_g(eps,nsource,source,dipvec,ntarg,targ,pottarg,gradtarg,ier)
         implicit none
+        ! FMM3D is built without /assume:underscore /names:lowercase (see
+        ! external/FMM3D/make.inc.windows), so on Windows it exports the
+        ! default upper-case name while this file, compiled with those
+        ! options, would otherwise look for lfmm3d_t_d_g_. On Linux both
+        ! sides already agree on the default lower-case form.
+#ifdef _WIN32
+        !DEC$ ATTRIBUTES ALIAS:"LFMM3D_T_D_G" :: lfmm3d_t_d_g
+#endif
         integer(8), intent(in) :: nsource, ntarg
         real(8),    intent(in) :: eps
         real(8) :: source(3,nsource), dipvec(3,nsource), targ(3,ntarg)
@@ -311,6 +319,9 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
     end subroutine lfmm3d_t_d_g
     subroutine lfmm3d_s_d_g(eps,nsource,source,dipvec,pot,grad,ier)
         implicit none
+#ifdef _WIN32
+        !DEC$ ATTRIBUTES ALIAS:"LFMM3D_S_D_G" :: lfmm3d_s_d_g
+#endif
         integer(8), intent(in) :: nsource
         real(8),    intent(in) :: eps
         real(8) :: source(3,nsource), dipvec(3,nsource)

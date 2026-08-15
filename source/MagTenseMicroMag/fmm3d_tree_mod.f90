@@ -3,6 +3,16 @@ module fmm3d_tree_mod
     use omp_mod
     use trace_mod
         implicit none
+
+    ! On Windows the python extension is compiled with
+    ! /assume:underscore /names:lowercase (EXTRA_FFLAGS in the root Makefile)
+    ! while this library is not, so the extension looks for these procedures
+    ! under Linux-style names while ifx would emit FMM3D_TREE_MOD_mp_BUILD1
+    ! and friends. Each procedure below therefore carries an explicit ALIAS,
+    ! the same convention already used for the other f2py entry points (see
+    ! LandauLifshitzEquationSolver.f90). The alias strings are identical to
+    ! ifx's default mangling on Linux, so they change nothing there.
+
       type :: FMM3DTree
             logical :: is_built = .false.
             logical :: keep_tree = .true.
@@ -179,6 +189,7 @@ module fmm3d_tree_mod
 
 
       subroutine build_tree(self, source, eps, ndiv, ier, ifunif, nlmin, nlmax)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_build_tree_" :: build_tree
         class(FMM3DTree), intent(inout) :: self
         double precision, contiguous, pointer :: source(:,:)
         double precision eps
@@ -237,6 +248,7 @@ module fmm3d_tree_mod
       end subroutine 
 
       subroutine make_and_eval(self, dipvec, grad)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_make_and_eval_" :: make_and_eval
         class(FMM3DTree), intent(inout) :: self
         double precision, contiguous, pointer :: dipvec(:,:,:)
         double precision, contiguous, pointer :: grad(:,:,:)
@@ -266,6 +278,7 @@ module fmm3d_tree_mod
 
 
     subroutine build1(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_build1_" :: build1
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------
         !----------------
@@ -395,6 +408,7 @@ module fmm3d_tree_mod
     end subroutine build1
 
     subroutine reorder_dipvec(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_reorder_dipvec_" :: reorder_dipvec
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------   
         call dreorderf(3*self%nd,self%nsource,self%dipvec,self%dipvecsort, self%isrc)
@@ -403,6 +417,7 @@ module fmm3d_tree_mod
 
 
     subroutine build2(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_build2_" :: build2
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------
         integer :: i, nn, ilev
@@ -645,6 +660,7 @@ module fmm3d_tree_mod
 
 
     subroutine reset_expansion_coeff(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_reset_expansion_coeff_" :: reset_expansion_coeff
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------
         integer :: ilev, ibox
@@ -680,6 +696,7 @@ module fmm3d_tree_mod
 
 
     subroutine reset_sort_arg(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_reset_sort_arg_" :: reset_sort_arg
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------
         integer i,idim
@@ -697,6 +714,7 @@ module fmm3d_tree_mod
 
 
     subroutine dealloc(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_dealloc_" :: dealloc
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------
 
@@ -721,6 +739,7 @@ module fmm3d_tree_mod
 
      subroutine lfmm3dmain_tree(self) 
       implicit none
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_lfmm3dmain_tree_" :: lfmm3dmain_tree
         class(FMM3DTree), intent(inout) :: self
       integer nd
       integer ier
@@ -1579,6 +1598,7 @@ module fmm3d_tree_mod
 
 
       subroutine eval_local(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_eval_local_" :: eval_local
         class(FMM3DTree), intent(inout) :: self
         !--------------------------------------------
         integer :: ilev,ibox,istart,iend,i,npts
@@ -1612,6 +1632,7 @@ module fmm3d_tree_mod
 
 
       subroutine eval_direct(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_eval_direct_" :: eval_direct
         class(FMM3DTree), intent(inout) :: self
         !--------------------------------------------
         integer :: ilev,ibox,istarts,iends,npts0,i
