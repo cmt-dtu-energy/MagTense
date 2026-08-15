@@ -214,6 +214,11 @@ def run_case(testAxis: int, A: float):
         T=T,
     )
 
+    # The FMM demag path segfaults on this two tile, effectively one dimensional geometry when
+    # the library is built with USE_FMM3D=1, and an octree is pointless for two tiles anyway.
+    # std_problem_3.py disables it the same way.
+    problem.use_fmm = 0
+
     # Easy-axis anisotropy perpendicular to the axis of periodicity
     problem.u_ea = np.zeros([2, 3])
     problem.u_ea[:, perpAxis] = 1

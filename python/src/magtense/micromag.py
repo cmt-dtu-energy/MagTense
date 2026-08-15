@@ -273,7 +273,11 @@ class MicromagProblem:
         self.allow_fmm_short_circuit = 1
         self.fmm_min_n = 20000
         self.fmm_nterms = -1
-        self.use_fmm = 1
+        # Off by default: the FMM demag path only pays off for large problems, and it is
+        # ignored altogether unless the library is built with USE_FMM3D=1. Opting in
+        # explicitly means a problem does not silently change its demag path when the
+        # library is rebuilt with FMM enabled. Set `problem.use_fmm = 1` to use it.
+        self.use_fmm = 0
         #--------------------------------------------------
 
         #---------- timer and trace parameters ----------

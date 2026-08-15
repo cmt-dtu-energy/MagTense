@@ -8,9 +8,9 @@ plus a figure showing which tests passed.
 Coverage compared with the MATLAB suite
 ---------------------------------------
 Shared with MATLAB : standard problem 4, standard problem 6.
-Only in python     : macrogeometry periodic boundary conditions, periodic exchange on a
-                     uniform grid, periodic exchange on an unstructured mesh, shape
-                     correction, thermal fluctuations, standard problem 3.
+Only in python     : macrogeometry periodic boundary conditions, periodic exchange on
+                     both the uniform grid and the unstructured mesh, shape correction,
+                     thermal fluctuations, standard problem 3.
 Only in MATLAB     : the six magnetostatic field validations (cylindrical slice, prism,
                      sphere, spheroid, tetrahedron), and the standard problem 6
                      direction and unstructured mesh variants. The python examples for
@@ -77,11 +77,6 @@ def _macrogeometry_PBC_test() -> list[dict]:
 
 def _periodic_exchange_test() -> list[dict]:
     import periodic_exchange_test as mod
-    return mod.run_test()
-
-
-def _periodic_exchange_unstructured_test() -> list[dict]:
-    import periodic_exchange_unstructured_test as mod
     return mod.run_test(cuda=USE_CUDA)
 
 
@@ -216,11 +211,7 @@ TESTS = {
     ),
     'periodic_exchange_test': (
         _periodic_exchange_test, False,
-        'Periodic exchange coupling on a uniform grid',
-    ),
-    'periodic_exchange_unstructured_test': (
-        _periodic_exchange_unstructured_test, False,
-        'Periodic exchange coupling on an unstructured prism mesh',
+        'Periodic exchange coupling, uniform grid and unstructured mesh',
     ),
     'shape_correction_test': (
         _shape_correction_test, False,

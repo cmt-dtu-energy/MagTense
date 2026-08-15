@@ -330,6 +330,26 @@ subroutine BuildNeighbourDemagTensor(problem)
   !---------------------------------------
   ntot = size(problem%grid%pts, dim=1)
 
+  !---------------------------------------
+  ! 1a. Short circuit small problems before anything is built
+  !
+  ! The octree built in step 3 is precisely what a problem below fmm_min_n has to be spared,
+  ! so the test has to come before it. It used to sit after the tree had been constructed,
+  ! which meant a handful of tiles still went through build_tree and crashed there on small
+  ! and on effectively one dimensional geometries - the check could only ever disable FMM for
+  ! problems that had already survived it.
+  ! dealloc_fmm_arrays only releases what is associated, so it is safe this early and still
+  ! clears anything left behind by a previous call on the same problem.
+  !---------------------------------------
+  if (problem%allow_fmm_short_circuit .eq. 1 .and. ntot < problem%fmm_min_n) then
+    print *, " Short circuiting FMM - disabling FMM"
+    call dealloc_fmm_arrays(problem)
+    problem%use_fmm = .false.
+    call trace%end( "BuildNeighbourDemagTensor", itimer=itimer, verbose=2 )
+
+    return
+  end if
+
   allocate(offset(ntot,3))
   allocate(size_cell(ntot,3))
   offset(:,:)    = problem%grid%pts(:,:)
@@ -370,17 +390,7 @@ subroutine BuildNeighbourDemagTensor(problem)
   deallocate(fmm_tree)
   deallocate(sources)
 
-
-  if (problem%allow_fmm_short_circuit .eq. 1 .and. ntot < problem%fmm_min_n) then
-    print *, " Short circuiting FMM - disabling FMM"
-    call dealloc_fmm_arrays(problem)
-    problem%use_fmm = .false.
-    call trace%end( "BuildNeighbourDemagTensor", itimer=itimer, verbose=2 )
-
-    return
-  end if 
-
-
+  ! The short circuit for small problems is now done in step 1a, before the tree is built
 
 
   nbr_idx_p => problem%nbr_idx

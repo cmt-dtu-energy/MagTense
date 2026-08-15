@@ -137,6 +137,11 @@ def run_test(plotting: bool = True) -> list[dict]:
         solver='dynamic',
         T=T,
     )
+    # The FMM demag path segfaults on this small grid when the library is built with
+    # USE_FMM3D=1, and an octree is pointless for 72 tiles anyway. std_problem_3.py
+    # disables it the same way.
+    problem.use_fmm = 0
+
     problem.u_ea = u_pv
 
     # Run simulation
