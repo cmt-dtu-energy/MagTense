@@ -382,7 +382,10 @@ jobs:
 
     - name: Python diagnostics after setup (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: powershell
+      # The self-hosted runner has a Restricted execution policy and a user
+      # profile.ps1, neither of which the built-in "powershell" shell copes
+      # with, so invoke it explicitly.
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
       run: |
         $ErrorActionPreference = "Stop"
 
@@ -402,7 +405,10 @@ jobs:
 
     - name: Show CUDA device info (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: powershell
+      # The self-hosted runner has a Restricted execution policy and a user
+      # profile.ps1, neither of which the built-in "powershell" shell copes
+      # with, so invoke it explicitly.
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
       run: |
         $ErrorActionPreference = "Stop"
 
@@ -421,7 +427,10 @@ jobs:
 
     - name: Install pip-wheel and pytest (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: powershell
+      # The self-hosted runner has a Restricted execution policy and a user
+      # profile.ps1, neither of which the built-in "powershell" shell copes
+      # with, so invoke it explicitly.
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
       env:
         MAGTENSE_USE_FMM3D: 1
         MAGTENSE_WHEEL_VARIANT: cu12-fmm
