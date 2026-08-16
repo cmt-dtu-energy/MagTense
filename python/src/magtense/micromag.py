@@ -136,7 +136,8 @@ class MicromagProblem:
             cuda: bool = False,
             cvode: bool = False,
             usedemag: bool = True,
-            useavgn: bool = False,
+            # True to match the MATLAB DefaultMicroMagProblem, which sets useAvgN = 1
+            useavgn: bool = True,
             usereturnhall: bool = True,
             precision: bool = False,
             n_threads: int = 1,

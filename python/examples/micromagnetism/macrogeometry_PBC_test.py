@@ -209,6 +209,12 @@ def run_case(testAxis: int, A: float):
         m0=m0_pv,
         cuda=cuda,
         cvode=cvode,
+        # The averaged demagnetisation tensor is the library default, but the analytical
+        # prefactor this test is built on does not hold for it: with useavgn=True the moments
+        # rotate straight past the fixed point (drift of ~3.9 rad rather than ~7e-3) and both
+        # controls overshoot their targets. Evaluated at the cell centres the critical point
+        # is reproduced to better than 1e-2 rad, so the test opts out explicitly.
+        useavgn=False,
         n_macro=n_macro,
         shiftVec=shiftVec,
         grid_L=grid_L,

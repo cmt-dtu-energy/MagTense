@@ -136,7 +136,10 @@ sectionNames_s = ['center', 'corner', 'xFace', 'yFace', 'zFace', 'xyEdge', 'xzEd
 def build_sections():
     """Return the boolean masks of the 8 periodically connected sections and the spacers.
 
-    Tiles are ordered with z running fastest, i.e. n = k + 6*j + 36*i.
+    Tiles are ordered the way setupGrid in LandauLifshitzEquationSolver.f90 orders them, with x
+    running fastest: n = i + 6*j + 36*k. The sectioned geometry happens to be symmetric under
+    exchanging x and z, so getting this backwards swaps the xFace/zFace and xyEdge/yzEdge labels
+    without changing which eight sections are tested.
     """
     side = SECTION_SIDE
     ntot = side**3
@@ -147,9 +150,9 @@ def build_sections():
     xyEdge_n, xzEdge_n, yzEdge_n = (np.zeros(ntot, dtype=bool), np.zeros(ntot, dtype=bool),
                                     np.zeros(ntot, dtype=bool))
     n = 0
-    for i in range(side):
+    for k in range(side):
         for j in range(side):
-            for k in range(side):
+            for i in range(side):
                 if i in {0, 5}:
                     if j in {0, 5}:
                         if k in {0, 5}:
@@ -213,9 +216,9 @@ def build_section_mesh():
     ntot = side**3
     pts = np.zeros((ntot, 3))
     n = 0
-    for i in range(side):
+    for k in range(side):
         for j in range(side):
-            for k in range(side):
+            for i in range(side):
                 pts[n, :] = (np.array([i, j, k]) + 0.5) * a_section - side * a_section / 2
                 n += 1
     abc = a_section * np.ones((ntot, 3))

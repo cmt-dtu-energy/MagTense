@@ -130,6 +130,11 @@ def run_test(plotting: bool = True) -> list[dict]:
         sampleShape=sampleShape,
         cuda=cuda,
         cvode=cvode,
+        # The uniaxial anisotropy below is set from the analytical demagnetisation factor of the
+        # sample prism, which is what the tensor evaluated at the cell centres reproduces. With
+        # the averaged tensor (the library default) the cancellation is only good to 1.1e-4 rad
+        # instead of 2.6e-8, so this test opts out explicitly to keep the tight drift limit.
+        useavgn=False,
         grid_L=grid_L,
         grid_type=grid_type,
         usereturnhall=True,

@@ -8,10 +8,11 @@
 % table in the command window and as a colour coded overview figure, so that a single
 % failure does not hide the state of everything else.
 %
-% This is the counterpart of python/examples/micromagnetism/testMagTenseFunctions.py.
-% The two suites cover different ground: the magnetostatic validations and the standard
-% problem 6 direction and mesh variants only exist here, while the periodic boundary,
-% shape correction and thermal fluctuation tests only exist in the python suite.
+% This is the counterpart of python/examples/micromagnetism/testMagTenseFunctions.py. The
+% micromagnetic tests in examples/Micromagnetism/MagTense_tests mirror the python ones one
+% for one, with the same geometries and the same acceptance limits. Beyond those, the
+% magnetostatic validations and the standard problem 6 direction and mesh variants only
+% exist here, while standard problem 3 only exists in the python suite.
 %
 % Every test returns a struct array of checks with the fields 'check', 'value', 'limit'
 % and 'passed', where a check passes when value < limit.
@@ -64,6 +65,22 @@ tests = {
         @() validationChecks(fullfile(magnetostatics_dir, 'Validation_field_tetrahedron'), ...
                              'MagTense_Validation_tetrahedron', field_error_limit), ...
         'Field of a tetrahedron vs FEM'
+    'macrogeometry_PBC_test', ...
+        @() micromagTestChecks(fullfile(micromagnetism_dir, 'MagTense_tests'), ...
+                               'macrogeometry_PBC_test'), ...
+        'Periodic boundaries by the macrogeometry method, along x, y and z'
+    'periodic_exchange_test', ...
+        @() micromagTestChecks(fullfile(micromagnetism_dir, 'MagTense_tests'), ...
+                               'periodic_exchange_test'), ...
+        'Periodic exchange coupling, uniform grid and unstructured mesh'
+    'shape_correction_test', ...
+        @() micromagTestChecks(fullfile(micromagnetism_dir, 'MagTense_tests'), ...
+                               'shape_correction_test'), ...
+        'Shape correction field of the sample geometry'
+    'temperature_test', ...
+        @() micromagTestChecks(fullfile(micromagnetism_dir, 'MagTense_tests'), ...
+                               'temperature_test'), ...
+        'Thermal fluctuations against the analytical angular diffusion'
     'std_problem_4', ...
         @() stdProblem4Checks(fullfile(micromagnetism_dir, 'mumag_micromag_Std_problem_4')), ...
         'mumag standard problem 4 against the published mean solutions'
@@ -153,6 +170,17 @@ function checks = validationChecks(exampleDir, functionName, limit)
         checks(end + 1) = makeCheck(sprintf('rel. integrated error, %s', label), ...
                                     relativeError(i), limit); %#ok<AGROW>
     end
+end
+
+function checks = micromagTestChecks(exampleDir, functionName)
+    % Run one of the micromagnetic test functions in MagTense_tests from its own directory.
+    % Each of them already returns the check struct array this suite expects, and each has a
+    % python counterpart in python/examples/micromagnetism with the same limits.
+
+    oldDir = cd(exampleDir);
+    cleanupObj = onCleanup(@() cd(oldDir));
+
+    checks = feval(functionName);
 end
 
 function checks = stdProblem4Checks(exampleDir)

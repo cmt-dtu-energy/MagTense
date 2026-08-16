@@ -504,7 +504,10 @@
         sampleShapeProblemPtr = mxGetField( prhs, i, problemFields(75) )
         call mxCopyPtrToReal8(mxGetPr(sampleShapeProblemPtr), problem%macrogrid%sampleShape, sx )
         
-        sx = 1
+        ! exchPBC has one entry per direction, like n_macro and shiftVec above. Copying only a
+        ! single element left the y and z entries at zero, so from MATLAB the periodic exchange
+        ! could only ever be switched on along x.
+        sx = 3
         exchPBCProblemPtr = mxGetField( prhs, i, problemFields(76) )
         call mxCopyPtrToInteger4(mxGetPr(exchPBCProblemPtr), problem%macrogrid%exchPBC, sx )
         

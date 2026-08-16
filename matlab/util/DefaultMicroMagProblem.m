@@ -466,7 +466,7 @@ methods
         obj.fmm_short = int32(1);
         obj.fmm_min_n = int32(20000);
 
-        obj.temperature	 = zeros(obj.ntot);
+        obj.temperature	 = zeros(obj.ntot,1);
         obj.n_macro	= int32([0 0 0]);
         obj.shiftVec = ([0 0 0]);
         obj.macroShape = [1 1 1];

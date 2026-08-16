@@ -7,10 +7,13 @@ plus a figure showing which tests passed.
 
 Coverage compared with the MATLAB suite
 ---------------------------------------
-Shared with MATLAB : standard problem 4, standard problem 6.
-Only in python     : macrogeometry periodic boundary conditions, periodic exchange on
+Shared with MATLAB : macrogeometry periodic boundary conditions, periodic exchange on
                      both the uniform grid and the unstructured mesh, shape correction,
-                     thermal fluctuations, standard problem 3.
+                     thermal fluctuations, standard problem 4, standard problem 6. The
+                     MATLAB counterparts live in
+                     matlab/examples/Micromagnetism/MagTense_tests and use the same
+                     geometries and the same acceptance limits.
+Only in python     : standard problem 3.
 Only in MATLAB     : the six magnetostatic field validations (cylindrical slice, prism,
                      sphere, spheroid, tetrahedron), and the standard problem 6
                      direction and unstructured mesh variants. The python examples for

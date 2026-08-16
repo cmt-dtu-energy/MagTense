@@ -2012,9 +2012,9 @@ end subroutine updateDemagfieldFMM
     Vcell = problem%grid%dx * problem%grid%dy * problem%grid%dz
     allocate( problem%VfracOcc )
     problem%VfracOcc = ntot * Vcell / Vdomain
-    call displayGUIMessage( 'Volume fraction occupied by magnetic material :' )
-    write(prog_str,'(F20.10)') problem%VfracOcc
-    call displayGUIMessage( trim(prog_str) )
+    !call displayGUIMessage( 'Volume fraction occupied by magnetic material :' )
+    !write(prog_str,'(F20.10)') problem%VfracOcc
+    !call displayGUIMessage( trim(prog_str) )
 
     ! Clean up
     deallocate(Nshape)
