@@ -2746,8 +2746,14 @@ subroutine add_near_field(problem, solution)
     stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(2)%A, problem%K_fmm_descr_s, solution%My_s, beta, temp)
     stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(3)%A, problem%K_fmm_descr_s, solution%Mz_s, beta, temp)
 
+    !--- Accumulated with '+', matching the CUDA branch above. That branch
+    !    calls cu_MVMult_GetH_sparse, which computes alpha*(K.M) with
+    !    alpha = pref = 1 and applies no negation of its own, so both paths
+    !    have to add K.M. This used to subtract, which put a systematic error
+    !    of order 10x the field norm on every non-CUDA FMM run - independent
+    !    of fmm_nterms, since it is not an expansion-order effect.
     !$omp critical (solution_update)
-    solution%HmX = solution%HmX - temp
+    solution%HmX = solution%HmX + temp
     !$omp end critical (solution_update)
     ! ---------------- Hy correction = xy*Mx + yy*My + yz*Mz ----------------
     beta = 0.0_SP
@@ -2757,7 +2763,7 @@ subroutine add_near_field(problem, solution)
     stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(5)%A, problem%K_fmm_descr_s, solution%Mz_s, beta, temp)
 
     !$omp critical (solution_update)
-    solution%HmY = solution%HmY - temp
+    solution%HmY = solution%HmY + temp
     !$omp end critical (solution_update)
     ! ---------------- Hz correction = xz*Mx + yz*My + zz*Mz ----------------
     beta = 0.0_SP
@@ -2767,7 +2773,7 @@ subroutine add_near_field(problem, solution)
     stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(6)%A, problem%K_fmm_descr_s, solution%Mz_s, beta, temp)
 
     !$omp critical (solution_update)
-    solution%HmZ = solution%HmZ - temp
+    solution%HmZ = solution%HmZ + temp
     !$omp end critical (solution_update)
     deallocate(temp)
 #endif
