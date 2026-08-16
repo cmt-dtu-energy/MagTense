@@ -65,7 +65,7 @@ testAxes = (0, 1, 2)
 controlAxis = 0
 
 # Timestepping
-t_end = 1e-7                                 # Total time simulated [s]
+t_end = 2e-7                                 # Total time simulated [s]
 t_step = 1e-10                               # Requested output spacing [s]
 nTimesteps = int(round(t_end / t_step)) + 1  # Include both time endpoints
 # The output spacing only sets how densely theta(t) is sampled - RKSuite picks its own

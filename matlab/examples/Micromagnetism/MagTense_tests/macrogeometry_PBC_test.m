@@ -51,7 +51,7 @@ testAxes = [1, 2, 3];       % Axes to test the PBC along (1 = x, 2 = y, 3 = z)
 controlAxis = 1;            % Axis used for the two control simulations
 
 % Timestepping
-t_end = 1e-7;                            % Total time simulated [s]
+t_end = 2e-7;                            % Total time simulated [s]
 t_step = 1e-10;                          % Requested output spacing [s]
 nTimesteps = round(t_end/t_step) + 1;    % Include both time endpoints
 
