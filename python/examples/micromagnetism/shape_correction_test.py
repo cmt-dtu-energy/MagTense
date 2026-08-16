@@ -5,6 +5,7 @@ The system is a uniform grid of micromagnetic tiles forming a rectangular prism.
 """
 
 # General modules
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -12,7 +13,7 @@ import matplotlib.pyplot as plt
 from magtense.micromag import MicromagProblem
 
 # Style settings for plots
-plt.rcParams['font.size'] = 16
+plt.rcParams['font.size'] = 15
 plt.rcParams['text.usetex'] = False
 plt.rcParams['text.latex.preamble'] = r'\usepackage{physics}'
 
@@ -35,11 +36,6 @@ aSample = 3  # Length of sample along x
 bSample = 1  # Transverse dimension of sample
 sampleShape = np.array([aSample, bSample, bSample])
 
-# # Applied field
-# Bamp = 1        # Field amplitude [T]
-# Bdir_v = np.array([1/np.sqrt(2), 0, 1/np.sqrt(2)])  # Magnetic field direction
-# Bdir_v = Bdir_v / np.sqrt(np.sum(Bdir_v**2))        # Normalise
-# fct_h_ext = lambda t : Bamp/mu0 * Bdir_v[:, np.newaxis]    # Constant applied field as a 3-by-1 column vector [A/m]
 # Applied field (set to zero)
 def fct_h_ext(t) -> np.ndarray:
     e_z = np.array([[0, 0, 1]]).T   # Unit vector along z as 3-by-1 column vector
@@ -49,13 +45,13 @@ def fct_h_ext(t) -> np.ndarray:
 # Timestepping
 # t_end = 1e-7                        # Total time simulated [s]
 t_end = 1e-8                        # Total time simulated [s]
-t_step = 1e-12                      # Timestep [s]
+t_step = 5e-11                      # Timestep [s]
 nTimesteps = int(t_end / t_step)    # Number of timesteps
 
 # Plot settings
 Ndata = 200
 dataperiod = int(nTimesteps / Ndata)
-show = True
+results_dir = Path(__file__).resolve().parent / "results"
 
 # Micromagnetic solver settings
 cuda=False
@@ -75,7 +71,7 @@ alpha = 1              # Gilbert damping [-]
 # eta = alpha/(1 + alpha**2) * gamma  # Damping constant [m/(A*s)]
 eta = alpha/(1 + alpha**2) * 2.21*1e5  # Damping constant [m/(A*s)]
 T = 0                  # Temperature [K]
-Aex = 1e-10                # Exchange constant [J/m]
+Aex = 1e-14                # Exchange constant [J/m]
 
 # Initial magnetisation directions
 m0_v = np.array([1/np.sqrt(2), 0, 1/np.sqrt(2)])    # xz-plane at 45 degrees to horizontal
@@ -129,7 +125,7 @@ result = problem.run_simulation(
     t_end=t_end,
     nt=nTimesteps,
     fct_h_ext=fct_h_ext,
-    nt_h_ext=100,
+    nt_h_ext=2,
 )
 print('Done running simulation')
 
@@ -154,10 +150,20 @@ theta_n = np.arctan2(Mavg_nv[:, 2], Mavg_nv[:, 0])[::dataperiod]
 
 # Make plot
 fig, ax = plt.subplots(layout='constrained', figsize=(6, 4))
-ax.plot(tPlot_n, theta_n, color='forestgreen')
+ax.plot(tPlot_n, theta_n-theta_n[0], color='crimson', label=r'Calculation (should be constant)')
 ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
-ax.set_ylabel(r'$\text{Polar angle}$')
-ax.set_yticks([0, np.pi/4, np.pi/2])
-ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
-if show:
-    fig.show()
+ax.set_ylabel(r'$\text{Change in polar angle}$')
+ax.set_yticks([-1e-4, 0, 1e-4])
+ax.set_ylim(-1e-4, 1e-4)
+ax.set_yticklabels([r'$-10^{-4}$', r'$0$', r'$10^{-4}$'])
+ax.fill_between(np.array([tPlot_n[0], tPlot_n[-1]]), np.array([-1e-5, -1e-5]), np.array([1e-5, 1e-5]),
+                alpha=0.2, color='forestgreen', label='Accepted interval')
+ax.legend(loc='best')
+
+# Save the validation figure beside the other micromagnetic example results
+# and close it so the script does not open an interactive plotting window.
+results_dir.mkdir(parents=True, exist_ok=True)
+figure_path = results_dir / "shape_correction_test.png"
+fig.savefig(figure_path, dpi=300, bbox_inches="tight")
+plt.close(fig)
+print(f"Saved figure to {figure_path}")

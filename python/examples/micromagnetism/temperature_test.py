@@ -8,6 +8,7 @@ where t is time, theta is polar angle, Pn is the n'th order Legendre polynomial 
 The script compares the simulated distribution to the analytical."""
 
 # General modules
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -50,13 +51,15 @@ alpha = 0.1         # Gilbert damping
 T = 300             # Temperature [K]
 Ms = 1.0            # Saturation magnetisation in magnetic region [T]
 Ms = Ms/mu0         # [A/m]
-Aex = 0             # Exchange constant in magnetic region [J/m]
+Aex = 1e-24         # Exchange constant in magnetic region [J/m]
 eta = alpha/(1 + alpha**2) * gamma  # Damping constant [m/(A*s)]
 K = 0               # Uniaxial anisotropy in magnetic region [J/m^3]
+# Hext = 1e4          # External field along z [A/m]
+Hext = 0          # External field along z [A/m]
 
 # Geometry
-# Ncell = 100         # Micromagnetic cells in each direction (Ncell X Ncell X Ncell grid)
-Ncell = 10         # Micromagnetic cells in each direction (Ncell X Ncell X Ncell grid)
+Ncell = 30         # Micromagnetic cells in each direction (Ncell X Ncell X Ncell grid)
+# Ncell = 20        # Micromagnetic cells in each direction (Ncell X Ncell X Ncell grid)
 a, b, c = 10*1e-9, 10*1e-9, 10*1e-9    # Single-cell sidelengths
 A, B, C = a*Ncell, b*Ncell, c*Ncell    # Total size of simulated domain
 u_v = np.array([0, 0, 1])   # Direction of anisotropy axis when randomAniDir == False
@@ -65,38 +68,44 @@ V = a*b*c
 # For the analytical formula
 nOrder = 20     # The highest order of Legendre polynomial included
 D_LLG = alpha * gamma * kB * T / (mu0 * (1+alpha**2) * Ms * V)    # Diffusion constant (inverse Néel time) [1/s]
+# D_LLG = D_LLG * 1.1
 
 # Timestepping
-tStep = 0.5*1e-12           # Timestep [s]
-t_end = 1/D_LLG * 1.5         # Total time interval simulated
-nt = round(t_end/tStep)     # Number of timesteps
+t_end = 1/D_LLG * 1.5       # Total time interval simulated
+nt = 1001                   # Number of timesteps
+tStep = t_end/(nt - 1)      # Timestep [s]
+# tStep = 1*1e-10           # Timestep [s]
+# nt = round(t_end/tStep)     # Number of timesteps
 
 # Zero external field
 def fct_h_ext(t) -> np.ndarray:
     """Function for generating external field.
     Has to end with the shape (nt, 3) when t is an array of length nt"""
     try:
-        return np.zeros([len(t), 3])
+        H = np.zeros([len(t), 3])
     except TypeError:
-        return np.zeros([1, 3])
-nt_h_ext = 1    # Number of distinct fields (when using the 'explicit' solver)
+        H = np.zeros([1, 3])
+    H[:, 2] = Hext
+    return H
+nt_h_ext = 2    # Number of time coordinates at which to evaluate fct_h_ext
 
 # Where to save
-save = False    # Whether to save
+save = False    # Whether to save the raw simulation output as json
 savename = 'temperature_example_calc'
+results_dir = Path(__file__).resolve().parent / "results"
 
 # Plot settings
 show = True         # Whether to show the plots
-Nbins = 10          # Number of histogram bins
+Nbins = 20          # Number of histogram bins
 cmap = 'rainbow'    # Colormap
 colors_n = ['navy', 'forestgreen', 'crimson', 'magenta', 'darkorange', 'purple', 'darkcyan', 'darkgoldenrod']
 
 # How much data to save
-Ndata = 8    # Number of datapoints to save
+Ndata = 6    # Number of datapoints to save
 
 # Micromagnetic solver settings
-cuda=False
-cvode=True
+cuda=True
+cvode=False
 
 #%% Micromagnetic computations
 
@@ -134,7 +143,7 @@ problem = MicromagProblem(
     grid_L=grid_L,
     grid_type=grid_type,
     usereturnhall=True,
-    solver='explicit',
+    solver='dynamic',
     T=T,
     usedemag=0,
 )
@@ -145,7 +154,7 @@ result = problem.run_simulation(
     t_end=t_end,
     nt=nt,
     fct_h_ext=fct_h_ext,
-    nt_h_ext=1,
+    nt_h_ext=nt_h_ext,
 )
 print('Done running simulation')
 
@@ -156,24 +165,25 @@ H_exc, H_ext, H_dem, H_ani = result[3:7]
 #%% Store results
 
 # Get important data
-t_n = t_out
+tSim_n = t_out
 M_npv = M_out[:, :, 0, :]
 Bext_nv = H_ext[:, 0, 0, :] * mu0
 
-# Dataperiod
-dataperiod = max(int(len(t_n)/Ndata), 1)
+# Data selector
+dataSelector = np.linspace(0, nt-1, Ndata).astype(int)
 
-# Load or create data dictionary
-dataDict = dict()
-# Always overwrite the stored settings with the most updated version
-# This way, previous simulation sequences can be fixed or extended
-dataDict['settings'] = {'A':A, 'B':B, 'C':C, 'Ncell':Ncell, 'alpha':alpha, 'T':T, 'tStep':tStep, 'u_v':u_v}
+if save:
+    # Load or create data dictionary
+    dataDict = dict()
+    # Always overwrite the stored settings with the most updated version
+    # This way, previous simulation sequences can be fixed or extended
+    dataDict['settings'] = {'A':A, 'B':B, 'C':C, 'Ncell':Ncell, 'alpha':alpha, 'T':T, 'tStep':tStep, 'u_v':u_v}
 
-# Add current simulation to data dictionary
-dataDict[f'results'] = {'t_n': t_n[::dataperiod], 'M_npv': M_npv[::dataperiod]}
+    # Add current simulation to data dictionary
+    dataDict[f'results'] = {'t_n': tSim_n[dataSelector], 'M_npv': M_npv[dataSelector]}
 
-# Store data dictionary
-write_json(f'data/{savename}_dataDict.json', dataDict)
+    # Store data dictionary
+    write_json(f'data/{savename}_dataDict.json', dataDict)
 
 
 #%% Analytical result
@@ -200,23 +210,23 @@ P_nj = np.sin(theta_j)[np.newaxis, :] * P_nj
 #%% Compare analytical and simulated results
 
 # Get simulated results
-thetaSim_np = np.arccos(M_npv[:, :, 2])
-Nbin = 20
-Psim_nh = np.zeros([Ndata, Nbin])
+thetaSim_np = np.arccos(M_npv[dataSelector, :, 2])
+Psim_nh = np.zeros([Ndata, Nbins])
 for n in range(Ndata):
-    hist, binEdges = np.histogram(thetaSim_np, bins=Nbin, range=(0, np.pi), density=True)
+    hist, binEdges = np.histogram(thetaSim_np[n, :], bins=Nbins, range=(0, np.pi), density=True)
     binWidth = np.mean(np.diff(binEdges))
-    Psim_nh[n, :] = hist*binWidth
+    # Psim_nh[n, :] = hist*binWidth
+    Psim_nh[n, :] = hist
 thetaSim_nh = (binEdges[1:] + binEdges[:-1])/2
 
 # Prepare colormap
-norm = mpl.colors.Normalize(vmin=0, vmax=t_end)
+norm = mpl.colors.Normalize(vmin=0, vmax=t_end*1e9)
 colorMap = mpl.colormaps[cmap]
 mappable = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
 
 # Plot results
 fig, ax = plt.subplots(figsize=(8,4), layout='constrained')
-plt.colorbar(mappable=mappable, ax=ax, location = 'right', orientation = 'vertical')
+plt.colorbar(mappable=mappable, ax=ax, location = 'right', orientation = 'vertical', label=r'$\text{Time } \mathrm{[ns]}$')
 for n in range(1, Ndata):   # Skip the t = 0 comparison (not interesting and requires infinite orders of Legendre polynomials)
     ax.plot(theta_j, P_nj[n, :], linestyle='-', marker='', color=colorMap(t_n[n]/t_end))
     ax.plot(thetaSim_nh, Psim_nh[n, :], linestyle='', marker='o', color=colorMap(t_n[n]/t_end))
@@ -225,7 +235,22 @@ ax.set_xticks([0, np.pi/4, np.pi/2, 3*np.pi/4, np.pi])
 ax.set_xticklabels([r'$0$', r'$\pi/4$', r'$\pi/2$', r'$3\pi/4$', r'$\pi$'])
 ax.set_ylabel(r'Probabililty distribution, $P(\theta)$')
 
-if show:
+# Save the figure beside the other micromagnetic example results and close it so the script
+# does not open an interactive plotting window.
+results_dir.mkdir(parents=True, exist_ok=True)
+figure_path = results_dir / 'temperature_test.png'
+fig.savefig(figure_path, dpi=300, bbox_inches='tight')
+plt.close(fig)
+print(f'Saved figure to {figure_path}')
+
+
+# Plot relaxation of average magnetisation
+if Hext > 0:
+    Mavg_n = np.mean(M_npv[:, :, 2], axis=1)
+    xi = mu0 * Ms * V * Hext / (kB * T)
+    fig, ax = plt.subplots(figsize=(6,4), layout='constrained')
+    ax.axhline(np.cosh(xi)/np.sinh(xi) - 1/xi, color='purple')
+    ax.plot(tSim_n*1e9, Mavg_n, color='navy', marker='x')
+    ax.set_xlabel(r'$\text{Time, } t [ns]$')
+    ax.set_ylabel(r'$\text{Average magnetisation, } <M_z>/M_s$')
     fig.show()
-if save:
-    fig.savefig(f'figures/{savename}_probability_distribution.pdf', format='pdf')
