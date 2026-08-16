@@ -62,7 +62,7 @@ CONTAINS
 
     !---------------------- Initialise auxiliary modules -----------------------
     call omp%init()
-    call omp%info()
+    if (self%trace_enabled) call omp%info()
     call timer%log_init(trim(self%log_dir), trim(self%timer_log_file), &
       flush_each=self%flush_each, window_enabled=self%window_enabled, &
       window_interval=self%window_interval)

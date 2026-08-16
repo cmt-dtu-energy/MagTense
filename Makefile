@@ -16,6 +16,24 @@ MKFILE_PATH := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CVODE_ROOT = ${MKFILE_PATH}/cvode
 
 #=======================================================================
+#                    Recursive make on Windows
+#
+# Recipes are run through conda's msys sh, which mounts ${CONDA_PREFIX}/Library
+# as / and binds /bin to Library/usr/bin. The PATH entry Library/bin - the only
+# directory holding make.exe - is therefore translated to /bin, where it is
+# shadowed, and a recursive make invoked by name fails with
+#   /usr/bin/sh: line 1: make: command not found
+# Pinning MAKE to the absolute path of the conda make.exe makes every sub-make
+# resolve, no matter how the top-level make was invoked.
+#=======================================================================
+ifeq ($(OS),Windows_NT)
+	CONDA_MAKE := $(wildcard $(subst \,/,${CONDA_PREFIX})/Library/bin/make.exe)
+	ifneq ($(CONDA_MAKE),)
+		MAKE := $(CONDA_MAKE)
+	endif
+endif
+
+#=======================================================================
 #                    FMM3D integration (upstream Makefile)
 #=======================================================================
 FMM3D_DEBUG ?= 0
