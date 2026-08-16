@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from magtense.micromag import MicromagProblem
 
 # Style settings for plots
-plt.rcParams['font.size'] = 16
+plt.rcParams['font.size'] = 15
 plt.rcParams['text.usetex'] = False
 plt.rcParams['text.latex.preamble'] = r'\usepackage{physics}'
 
@@ -40,11 +40,6 @@ aSample = 3  # Length of sample along x
 bSample = 1  # Transverse dimension of sample
 sampleShape = np.array([aSample, bSample, bSample])
 
-# # Applied field
-# Bamp = 1        # Field amplitude [T]
-# Bdir_v = np.array([1/np.sqrt(2), 0, 1/np.sqrt(2)])  # Magnetic field direction
-# Bdir_v = Bdir_v / np.sqrt(np.sum(Bdir_v**2))        # Normalise
-# fct_h_ext = lambda t : Bamp/mu0 * Bdir_v[:, np.newaxis]    # Constant applied field as a 3-by-1 column vector [A/m]
 # Applied field (set to zero)
 def fct_h_ext(t) -> np.ndarray:
     e_z = np.array([[0, 0, 1]]).T   # Unit vector along z as 3-by-1 column vector
@@ -64,9 +59,13 @@ results_dir = Path(__file__).resolve().parent / "results"
 
 # How far the magnetisation may deviate from uniform to count as passed [-]
 uniformity_tol = 1e-4
+# How far the mean polar angle may drift over the simulation to count as passed [rad].
+# With the shape correction in place the demagnetisation field of the sample is cancelled
+# exactly by the uniaxial anisotropy, so theta should not move at all.
+drift_tol = 1e-5
 
 # Micromagnetic solver settings
-cuda=True
+cuda=False
 cvode=False
 
 #%% Fixed settings (don't change these)
@@ -168,19 +167,31 @@ def run_test(plotting: bool = True) -> list[dict]:
     else:
         print('Magnetisation is NOT uniform')
 
-    if plotting:
-        # Select data to plot
-        tPlot_n = t_n[::dataperiod] * 1e9   # Switch from s to ns
-        Mavg_nv = np.mean(M_npv, axis=1)
-        theta_n = np.arctan2(Mavg_nv[:, 2], Mavg_nv[:, 0])[::dataperiod]
+    # The shape correction cancels the demagnetisation field of the sample against the uniaxial
+    # anisotropy, so the mean polar angle should not move over the simulation at all
+    tPlot_n = t_n[::dataperiod] * 1e9   # Switch from s to ns
+    Mavg_nv = np.mean(M_npv, axis=1)
+    theta_n = np.arctan2(Mavg_nv[:, 2], Mavg_nv[:, 0])[::dataperiod]
+    drift = float(np.max(np.abs(theta_n - theta_n[0])))
+    verdict = 'stays put' if drift < drift_tol else 'DRIFTS'
+    print(f'Mean polar angle {verdict}: max change = {drift:.3e} rad')
 
+    if plotting:
         # Make plot
         fig, ax = plt.subplots(layout='constrained', figsize=(6, 4))
-        ax.plot(tPlot_n, theta_n, color='forestgreen')
+        ax.plot(tPlot_n, theta_n-theta_n[0], color='crimson',
+                label=r'Calculation (should be constant)')
         ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
-        ax.set_ylabel(r'$\text{Polar angle}$')
-        ax.set_yticks([0, np.pi/4, np.pi/2])
-        ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
+        ax.set_ylabel(r'$\text{Change in polar angle}$')
+        angle_window = 10**(np.floor(np.log10(drift_tol*10)))
+        ax.set_yticks([-angle_window, 0, angle_window])
+        ax.set_ylim(-angle_window, angle_window)
+        ax.set_yticklabels([f'$-10^{{{np.log10(angle_window):.0f}}}$', r'$0$',
+                            f'$10^{{{np.log10(angle_window):.0f}}}$'])
+        ax.fill_between(np.array([tPlot_n[0], tPlot_n[-1]]),
+                        np.array([-drift_tol, -drift_tol]), np.array([drift_tol, drift_tol]),
+                        alpha=0.2, color='forestgreen', label='Accepted interval')
+        ax.legend(loc='best')
 
         # Save the validation figure beside the other micromagnetic example results
         # and close it so the script does not open an interactive plotting window.
@@ -190,12 +201,20 @@ def run_test(plotting: bool = True) -> list[dict]:
         plt.close(fig)
         print(f"Saved figure to {figure_path}")
 
-    return [{
-        'check': 'magnetisation stays uniform',
-        'value': uniformity,
-        'limit': uniformity_tol,
-        'passed': uniformity < uniformity_tol,
-    }]
+    return [
+        {
+            'check': 'magnetisation stays uniform',
+            'value': uniformity,
+            'limit': uniformity_tol,
+            'passed': uniformity < uniformity_tol,
+        },
+        {
+            'check': 'mean polar angle does not drift',
+            'value': drift,
+            'limit': drift_tol,
+            'passed': drift < drift_tol,
+        },
+    ]
 
 
 if __name__ == '__main__':

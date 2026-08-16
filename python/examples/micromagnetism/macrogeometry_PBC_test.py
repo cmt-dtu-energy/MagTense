@@ -54,7 +54,7 @@ plt.rcParams['text.latex.preamble'] = r'\usepackage{physics}'
 #%% Settings
 
 # Distance between neighbouring domain copies in macrogeometry
-A_crit = 1.1837e-7  # Critical point where the torque is zero at all theta (constant theta)
+A_crit = 1.18369410e-07 # Critical point where the torque is zero at all theta (constant theta)
 A_wide = 2e-7       # Should go towards theta = π/2 (increasing theta)
 A_narrow = 0.7e-7   # Should go towards theta = 0 (decreasing theta)
 
@@ -72,7 +72,7 @@ nTimesteps = int(round(t_end / t_step)) + 1  # Include both time endpoints
 # internal steps. Requesting 1e5 output times made the ODE driver overflow the stack.
 
 # How constant theta has to be at the critical point to count as passed [rad]
-angle_tol = 0.05
+angle_tol = 2e-2
 # The controls only approach their fixed point asymptotically, so they get a looser bound [rad]
 control_tol = 0.1
 
@@ -161,6 +161,11 @@ def prefactor(q, K, M):
     fAni = -2*np.pi*K/(mu0 * M**2)
 
     return 2*mu0 * M**2/np.pi * (fPair + q**2 * fSelf + q**2 * fInter + fAni)
+
+# # A_crit found by:
+# f = lambda A : np.abs(prefactor(a/(2*A), K, Ms))
+# from scipy.optimize import minimize_scalar
+# minimize_scalar(f, bracket=[1.18e-7, 1.185e-7, 1.19e-7], tol=1e-20, method='bounded', bounds=[1.18e-7, 1.19e-7])
 
 #%% Magtense computations
 
@@ -304,32 +309,65 @@ def run_test(plotting: bool = True) -> list[dict]:
         })
 
     if plotting:
-        fig, ax = plt.subplots(layout='constrained', figsize=(7, 4.5))
-        critical_colours = ('forestgreen', 'darkorange', 'navy')
-        for i, testAxis in enumerate(testAxes):
-            t_n, theta1_n, _ = results[(testAxis, 'critical')]
-            ax.plot(t_n * 1e9, theta1_n, color=critical_colours[i % len(critical_colours)],
-                    label=f'critical, PBC along {axis_names[testAxis]}')
-        for label, colour in (('wide', 'crimson'), ('narrow', 'purple')):
-            t_n, theta1_n, _ = results[(controlAxis, label)]
-            ax.plot(t_n * 1e9, theta1_n, color=colour, linestyle='--',
-                    label=f'control, A {label}')
-        ax.axhline(np.pi/4, color='black', linestyle=':', linewidth=1)
-        ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
-        ax.set_ylabel(r'$\text{Polar angle}$')
-        ax.set_yticks([0, np.pi/4, np.pi/2])
-        ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
-        ax.legend(fontsize=10)
-
-        # Save the figure beside the other micromagnetic example results and close it so the
-        # script does not open an interactive plotting window.
-        results_dir.mkdir(parents=True, exist_ok=True)
-        figure_path = results_dir / "macrogeometry_PBC_test.png"
-        fig.savefig(figure_path, dpi=300, bbox_inches="tight")
-        plt.close(fig)
-        print(f"Saved figure to {figure_path}")
+        plot_results(results)
 
     return checks
+
+
+def plot_results(results) -> None:
+    """Two figures: the critical case against its controls, and the drift along each axis."""
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    # ---- The critical spacing against the two controls, periodicity along x ----------------
+    fig, ax = plt.subplots(layout='constrained', figsize=(6, 4))
+    # Plot control tests with non-critical spacing
+    label_wide = r'$A > A_\text{crit}, \text{should go to } \frac{\pi}{2}$'
+    label_narrow = r'$A < A_\text{crit}, \text{should go to } 0$'
+    labelDict = {'narrow': label_narrow, 'wide': label_wide}
+    for label, colour in zip(('narrow', 'wide'), ('darkorange', 'purple'), strict=True):
+        t_n, theta1_n, _ = results[(controlAxis, label)]
+        ax.plot(t_n * 1e9, theta1_n, color=colour, linestyle='--', label=labelDict[label])
+    # Plot test with critical spacing and PBC along x
+    t_n, theta1_n, _ = results[(controlAxis, 'critical')]
+    ax.plot(t_n * 1e9, theta1_n, color='forestgreen',
+            label=r'$A = A_\text{crit}, \text{should be constant}$')
+    ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
+    ax.set_ylabel(r'$\text{Polar angle}$')
+    ax.set_yticks([0, np.pi/4, np.pi/2])
+    ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
+    ax.legend(loc='best', fontsize='14')
+
+    # Save the figure beside the other micromagnetic example results and close it so the
+    # script does not open an interactive plotting window.
+    figure_path = results_dir / "macrogeometry_PBC_test_periodic_along_x.png"
+    fig.savefig(figure_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved figure to {figure_path}")
+
+    # ---- The drift at the critical spacing along each axis, against the accepted band ------
+    fig, ax = plt.subplots(layout='constrained', figsize=(6, 4))
+    critical_colours = ('forestgreen', 'crimson', 'navy')
+    for i, testAxis in enumerate(testAxes):
+        t_n, theta1_n, _ = results[(testAxis, 'critical')]
+        ax.plot(t_n * 1e9, theta1_n - theta1_n[0],
+                color=critical_colours[i % len(critical_colours)],
+                label=f'$\\text{{PBCs along {axis_names[testAxis]}}}$')
+    ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
+    ax.set_ylabel(r'$\text{Change in polar angle}$')
+    angle_window = 10**(np.floor(np.log10(angle_tol*10)))
+    ax.set_yticks([-angle_window, 0, angle_window])
+    ax.set_ylim(-angle_window, angle_window)
+    ax.set_yticklabels([f'$-10^{{{np.log10(angle_window):.0f}}}$', r'$0$',
+                        f'$10^{{{np.log10(angle_window):.0f}}}$'])
+    ax.fill_between(np.array([t_n[0]*1e9, t_n[-1]*1e9]),
+                    np.array([-angle_tol, -angle_tol]), np.array([angle_tol, angle_tol]),
+                    alpha=0.2, color='gray', label='Accepted interval')
+    ax.legend(loc='best', fontsize='14')
+
+    figure_path = results_dir / "macrogeometry_PBC_test_periodic_along_x_y_or_z.png"
+    fig.savefig(figure_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved figure to {figure_path}")
 
 
 if __name__ == '__main__':

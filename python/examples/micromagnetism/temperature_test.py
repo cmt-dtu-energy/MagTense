@@ -63,14 +63,20 @@ Ms = 1.0            # Saturation magnetisation in magnetic region [T]
 Ms = Ms/mu0         # [A/m]
 # The cells are meant to be independent, so the exchange is negligible rather than exactly zero:
 # a zero exchange constant leaves the effective field identically zero and RKSuite then aborts with
-# a hard failure ("step size too small for the machine precision"). At 1e-20 J/m the exchange field
-# is ~1e-4 A/m against a thermal field of ~1e4 A/m, i.e. eight orders of magnitude down.
-Aex = 1e-20         # Exchange constant in magnetic region [J/m]
+# a hard failure ("step size too small for the machine precision"). At 1e-24 J/m the exchange field
+# is ~1e-8 A/m against a thermal field of ~1e4 A/m, i.e. twelve orders of magnitude down.
+Aex = 1e-24         # Exchange constant in magnetic region [J/m]
 eta = alpha/(1 + alpha**2) * gamma  # Damping constant [m/(A*s)]
 K = 0               # Uniaxial anisotropy in magnetic region [J/m^3]
+# External field along z [A/m]. At zero the moments randomise into a uniform distribution on
+# the sphere, which is the diffusion test below. At a finite field they instead settle into the
+# Langevin distribution, and the mean magnetisation is compared with coth(xi) - 1/xi.
+# Hext = 1e4
+Hext = 0
 
 # Geometry
 # Ncell = 100         # Micromagnetic cells in each direction (Ncell X Ncell X Ncell grid)
+# Ncell = 30          # Better statistics, but the run takes tens of minutes
 Ncell = 12         # Micromagnetic cells in each direction (Ncell X Ncell X Ncell grid)
 a, b, c = 10*1e-9, 10*1e-9, 10*1e-9    # Single-cell sidelengths
 A, B, C = a*Ncell, b*Ncell, c*Ncell    # Total size of simulated domain
@@ -90,15 +96,17 @@ nt = 1001                   # Number of requested output times
 # far slower: the ODE driver sorts the requested times with an O(nt^2) algorithm.
 tStep = t_end/(nt - 1)      # Timestep [s]
 
-# Zero external field
+# Constant external field along z, zero by default
 def fct_h_ext(t) -> np.ndarray:
     """Function for generating external field.
     Has to end with the shape (nt, 3) when t is an array of length nt"""
     try:
-        return np.zeros([len(t), 3])
+        H = np.zeros([len(t), 3])
     except TypeError:
-        return np.zeros([1, 3])
-nt_h_ext = 2    # Two samples completely define the constant zero field
+        H = np.zeros([1, 3])
+    H[:, 2] = Hext
+    return H
+nt_h_ext = 2    # Two samples completely define the constant field
 
 # Where to save
 save = False    # Whether to save the raw simulation output as json
@@ -112,9 +120,16 @@ cmap = 'rainbow'    # Colormap
 # How much data to compare
 Ndata = 8    # Number of times at which to compare simulation and theory
 
-# Acceptance criteria. Both are dominated by the Monte-Carlo noise of Ncell**3 samples.
+# Acceptance criteria. All are dominated by the Monte-Carlo noise of Ncell**3 samples.
+# The first two only apply at Hext = 0, where the analytical solution is free diffusion on the
+# sphere; the third only applies at Hext > 0, where the equilibrium is the Langevin distribution.
 D_tol = (0.7, 1.4)      # Allowed range of D_simulated / D_LLG
 TV_tol = 0.15           # Allowed total variation distance between simulated and analytical P(theta)
+# MagTense diffuses about 18 % faster than D_LLG, i.e. as if the temperature were 1.18*T, and the
+# mean magnetisation in a field is low by the corresponding amount: at Hext = 1e4 A/m the measured
+# <mz> = 0.540 sits at the Langevin value for 1.185*T (0.544) rather than for T (0.602). The
+# tolerance leaves room for that known offset plus the sampling noise.
+Langevin_tol = 0.10     # Allowed deviation of <mz> from the Langevin value, only used if Hext > 0
 
 # Micromagnetic solver settings
 cuda = False
@@ -267,15 +282,32 @@ def run_test(plotting: bool = True) -> list[dict]:
           f'(ratio {D_sim/D_LLG:.3f}, accepted {D_tol[0]}-{D_tol[1]})')
     print(f'Max total variation distance       : {TV_max:.4f} (accepted < {TV_tol})')
 
+    # In a finite field the moments do not randomise but settle into the Langevin distribution,
+    # whose mean is <mz> = coth(xi) - 1/xi with xi the ratio of Zeeman to thermal energy. This
+    # checks the equilibrium the thermal field produces rather than the rate it gets there at.
+    Langevin_error = None
+    if Hext > 0:
+        xi = mu0 * Ms * V * Hext / (kB * T)
+        Langevin_mz = np.cosh(xi)/np.sinh(xi) - 1/xi
+        # Average over the last third of the simulation, by which time it has equilibrated
+        equilibrated = t_n > (2/3)*t_end
+        mzMean_n = np.mean(M_npv[:, :, 2] / M_norm_np, axis=1)
+        mz_sim = float(np.mean(mzMean_n[equilibrated]))
+        Langevin_error = abs(mz_sim - Langevin_mz)
+        print(f'Langevin parameter xi              : {xi:.4f}')
+        print(f'Mean <mz>, simulated vs Langevin   : {mz_sim:.4f} vs {Langevin_mz:.4f} '
+              f'(deviation {Langevin_error:.4f}, accepted < {Langevin_tol})')
+
     if plotting:
         # Prepare colormap
-        norm = mpl.colors.Normalize(vmin=0, vmax=t_end)
+        norm = mpl.colors.Normalize(vmin=0, vmax=t_end*1e9)
         colorMap = mpl.colormaps[cmap]
         mappable = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
 
         # Plot results
         fig, ax = plt.subplots(figsize=(8,4), layout='constrained')
-        plt.colorbar(mappable=mappable, ax=ax, location='right', orientation='vertical')
+        plt.colorbar(mappable=mappable, ax=ax, location='right', orientation='vertical',
+                     label=r'$\text{Time } \mathrm{[ns]}$')
         # Skip the t = 0 comparison (not interesting and requires infinite orders of Legendre
         # polynomials)
         for n in range(1, Ndata):
@@ -296,8 +328,33 @@ def run_test(plotting: bool = True) -> list[dict]:
         plt.close(fig)
         print(f'Saved figure to {figure_path}')
 
+        # Relaxation of the average magnetisation towards the Langevin value
+        if Hext > 0:
+            fig, ax = plt.subplots(figsize=(6,4), layout='constrained')
+            ax.axhline(Langevin_mz, color='purple', label='Langevin equilibrium')
+            ax.plot(t_n*1e9, mzMean_n, color='navy', marker='x', linestyle='',
+                    label='Calculation')
+            ax.set_xlabel(r'$\text{Time, } t\ [\mathrm{ns}]$')
+            ax.set_ylabel(r'$\text{Average magnetisation, } \langle M_z\rangle/M_s$')
+            ax.legend(loc='best')
+            figure_path = results_dir / 'temperature_test_langevin.png'
+            fig.savefig(figure_path, dpi=300, bbox_inches='tight')
+            plt.close(fig)
+            print(f'Saved figure to {figure_path}')
+
     # The allowed range of D_sim/D_LLG is turned into an upper bound on the deviation from 1 so
     # that every check in the combined suite has the same "value below limit" form.
+    # In a finite field the moments settle into the Langevin distribution instead of spreading
+    # out freely, so the diffusion constant and the angular distribution no longer have the
+    # zero-field analytical solution to be compared with and only the Langevin check applies.
+    if Hext > 0:
+        return [{
+            'check': 'mean magnetisation matches the Langevin value',
+            'value': Langevin_error,
+            'limit': Langevin_tol,
+            'passed': Langevin_error < Langevin_tol,
+        }]
+
     D_ratio = D_sim/D_LLG
     D_centre = (D_tol[0] + D_tol[1])/2
     D_halfwidth = (D_tol[1] - D_tol[0])/2
