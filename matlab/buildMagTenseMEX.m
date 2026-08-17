@@ -192,22 +192,10 @@ else
         ForceIntegrator_path ' -lMagneticForceIntegrator -L' DemagField_path ' -lDemagField -L' ...
         TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration -L' ...
         AuxMT_path ' -lAuxMT'''];
-    %--- Bind the OpenMP runtime to the copy MATLAB has already loaded, rather
-    %--- than the oneAPI/conda libiomp5.so that a bare -liomp5 resolves to
-    %--- through the ifx driver's default search path. Both carry the SONAME
-    %--- libiomp5.so, so MATLAB's copy wins at runtime whatever we link
-    %--- against; pointing at it here means an ABI mismatch surfaces as a link
-    %--- error at build time instead of as a segfault on an OpenMP worker
-    %--- thread inside MATLAB. libmkl_intel_thread below binds to the same
-    %--- runtime, so the process ends up with one thread pool instead of two.
-    %--- Note -static-intel covers libifcore/libirc/libsvml but deliberately
-    %--- not the OpenMP runtime, which is why this -L is needed at all.
-    matlab_omp = fullfile(matlabroot, 'sys', 'os', 'glnxa64');
-
     if (MKL_STATIC)
         LIBS = [LIBS(1:(end-1)) ' ' mkl_lib '/libmkl_blas95_lp64.a -Wl,--start-group ' ...
                mkl_lib '/libmkl_intel_lp64.a ' mkl_lib '/libmkl_intel_thread.a ' ...
-               mkl_lib '/libmkl_core.a -Wl,--end-group -L' matlab_omp ' -liomp5 -lpthread -lm -ldl -static-intel'''];
+               mkl_lib '/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl -static-intel'''];
         MKL = [];
         %INCLUDE = [INCLUDE '/include/intel64/lp64 '];
     else
