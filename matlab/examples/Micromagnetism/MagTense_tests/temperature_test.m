@@ -36,7 +36,7 @@ addpath('../../../util');
 % Constants of nature
 mu0 = 4*pi*1e-7;            % Vacuum permeability [N/A^2]
 gamma = 2.21e5;             % Gyromagnetic ratio [rad*m/(A*s)]
-kB = 1.3806488e-23;         % Boltzmann's constant [J/K]
+kB = 1.380649e-23;          % Boltzmann's constant [J/K] (CODATA 2018, exact by definition)
 
 % Material properties
 alpha = 0.1;                % Gilbert damping

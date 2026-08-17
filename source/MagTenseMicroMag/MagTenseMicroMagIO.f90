@@ -46,6 +46,7 @@
         mwPointer :: adaptiveHextPtr, maxHextStepsPtr, H_startPtr, H_endPtr
         mwPointer :: dH_initialPtr, dH_minPtr, dH_maxPtr, dH_growPtr, dH_shrinkPtr
         mwPointer :: dM_minPtr, dM_targetPtr, dM_rejectPtr, switch_refine_dHPtr, use_switch_refinePtr
+        mwPointer :: rng_seedPtr
         integer :: use_switch_refine
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
@@ -625,7 +626,12 @@
         call mxCopyPtrToInteger4(mxGetPr(use_switch_refinePtr), use_switch_refine, sx )
         problem%use_switch_refine = (use_switch_refine .ne. 0)
 
-        !Clean-up 
+        !Seed for the stochastic thermal field
+        sx = 1
+        rng_seedPtr = mxGetField( prhs, i, problemFields(104) )
+        call mxCopyPtrToInteger4(mxGetPr(rng_seedPtr), problem%rng_seed, sx )
+
+        !Clean-up
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
     
@@ -638,7 +644,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=103
+        integer,parameter :: nf=104
         character(len=12),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -748,6 +754,7 @@
         fieldnames(101) = 'dM_reject'
         fieldnames(102) = 'switch_refdH'
         fieldnames(103) = 'use_sw_ref'
+        fieldnames(104) = 'rng_seed'
 
     end subroutine getProblemFieldnames
     

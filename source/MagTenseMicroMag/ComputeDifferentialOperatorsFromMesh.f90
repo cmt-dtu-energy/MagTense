@@ -390,22 +390,34 @@ module DifferentialOperators
             dxk = dx(ind)                ! relevant subset of x-distances
             dyk = dy(ind)
             dzk = dz(ind)
-            scale_local = sum(abs(dxk))/size(dxk)
-            scale = 10.0 ** nint(log10(scale_local))    ! Local distance scaling (see above for global alternative)
-          
-            if (dims > 1) then
+            ! Local distance scaling (see above for the global alternative). The set of distances
+            ! the scale is derived from is assembled once for the actual dimensionality, rather
+            ! than computing log10 for x, then for xy, then for xyz and keeping only the last.
+            ! That ordering evaluated log10(scale_local) before the dims tests, so a stencil whose
+            ! x-distances all vanish - possible for a face whose neighbours share its x coordinate -
+            ! raised a divide-by-zero and handed -Inf to nint, whose result is undefined.
+            if (dims == 1) then
+                dks = dxk
+            else if (dims == 2) then
                 dks = [dxk, dyk]
-                scale_local = sum(abs(dks))/size(dks)
-                scale = 10.0 ** nint(log10(scale_local))
-                if (dims > 2) then
-                    dks = [dks, dzk]
-                    scale_local = sum(abs(dks))/size(dks)
-                    scale = 10.0 ** nint(log10(scale_local))
-                    dzk = dzk / scale   ! Scale distances to avoid ill conditioning
-                end if
-                dyk = dyk / scale       ! Scale distances to avoid ill conditioning
+            else
+                dks = [dxk, dyk, dzk]
             end if
-            dxk = dxk / scale           ! Scale distances to avoid ill conditioning
+            scale_local = sum(abs(dks))/size(dks)
+
+            if (scale_local > 0.0_dp) then
+                scale = 10.0 ** nint(log10(scale_local))
+            else
+                ! Every distance in the stencil is zero, so there is no length to normalise by and
+                ! nothing to gain from scaling. Leaving the distances alone keeps the least squares
+                ! system exactly as it was rather than multiplying it by an arbitrary factor.
+                scale = 1.0_dp
+            end if
+
+            ! Scale distances to avoid ill conditioning
+            if (dims > 2) dzk = dzk / scale
+            if (dims > 1) dyk = dyk / scale
+            dxk = dxk / scale
 
             mask1D = (kk .eq. Signs(:,2))
            
@@ -516,12 +528,13 @@ module DifferentialOperators
             Wktmp(:,:) = HkRed(:,:)
                 
             !Taken from https://www.intel.com/content/www/us/en/docs/onemkl/code-samples-lapack/2025-0/dgesv-example-fortran.html
-            if (kk == 1) then
-                allocate(IPIV(size(GkRed,1)))
-            else
-                deallocate(IPIV)
-                allocate(IPIV(size(GkRed,1)))
-            endif
+            !Keyed off the allocation status rather than off kk == 1. The loop can reach the cycle
+            !above before ever allocating IPIV - an edge face pointing purely in an extradimensional
+            !direction is skipped - so if that happened on the first face, the kk /= 1 branch would
+            !deallocate an unallocated array. Face ordering happens to put an x-normal face first
+            !today, which is the only reason this never fired.
+            if (allocated(IPIV)) deallocate(IPIV)
+            allocate(IPIV(size(GkRed,1)))
             
             call dgesv( size(GkRed,1), size(Wktmp,2), GkRed, size(GkRed,1), IPIV, Wktmp, size(Wktmp,1), INFO )
             

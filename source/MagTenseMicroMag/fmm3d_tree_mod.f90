@@ -234,13 +234,18 @@ module fmm3d_tree_mod
         call self%build2()
 
 
-        print *, " built tree with ", self%nlevels, " levels and ", self%nboxes, " boxes "
-        print *, " Number of multipole expansion terms:", self%nterms(0)
-        print *, "Number of boxes per level:"
-        do i = 0, self%nlevels
-            print *, "Level ", i, ": ", self%laddr(2, i) - self%laddr(1, i) + 1, " boxes"
-        enddo
-        print *, " scaling factor b0 = ", self%b0, " b0inv = ", self%b0inv
+        !Tree diagnostics. These are only of interest when debugging the FMM setup, and the tree is
+        !rebuilt for every problem, so they are gated on the trace flag rather than printed
+        !unconditionally to stdout - which, under Matlab, is not even reliably visible.
+        if ( trace%enabled .and. trace%verbose .ge. 2 ) then
+            print *, " built tree with ", self%nlevels, " levels and ", self%nboxes, " boxes "
+            print *, " Number of multipole expansion terms:", self%nterms(0)
+            print *, "Number of boxes per level:"
+            do i = 0, self%nlevels
+                print *, "Level ", i, ": ", self%laddr(2, i) - self%laddr(1, i) + 1, " boxes"
+            enddo
+            print *, " scaling factor b0 = ", self%b0, " b0inv = ", self%b0inv
+        endif
 
 
         self%is_built = .true.
@@ -719,6 +724,10 @@ module fmm3d_tree_mod
         !------------------------------------------------
 
 
+        !The source positions are handed over by build_tree and referenced by the tree for as long
+        !as it lives, so the tree releases them here rather than the caller releasing them while
+        !self%source still points at them.
+        if (associated(self%source)) deallocate(self%source)
         if (associated(self%itree)) deallocate(self%itree)
         if (associated(self%boxsize)) deallocate(self%boxsize)
         if (associated(self%treecenters)) deallocate(self%treecenters)
@@ -1659,7 +1668,7 @@ module fmm3d_tree_mod
             enddo
            ! !$OMP END TASKLOOP
       enddo
-      print *, " finished evaluating direct interactions"
+      if ( trace%enabled .and. trace%verbose .ge. 2 ) print *, " finished evaluating direct interactions"
       end subroutine eval_direct
 
 end module fmm3d_tree_mod

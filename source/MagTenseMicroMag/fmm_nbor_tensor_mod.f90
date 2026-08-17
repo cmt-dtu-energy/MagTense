@@ -129,7 +129,7 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
   allocate(problem%n_nbors(ntot))
   problem%n_nbors = 0
 
-  print *, " counting neighbours from FMM tree ..."
+  if ( trace%enabled .and. trace%verbose .ge. 2 ) print *, " counting neighbours from FMM tree ..."
   !===========================
   ! Pass 1: count neighbours
   !===========================
@@ -169,7 +169,7 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
   allocate(problem%nbr_idx(ntot, nneigh_max))
 
 
-  print *, " filling neighbour list from FMM tree ..."
+  if ( trace%enabled .and. trace%verbose .ge. 2 ) print *, " filling neighbour list from FMM tree ..."
   !===========================
   ! Pass 2: fill neighbour ids
   !===========================
@@ -342,7 +342,9 @@ subroutine BuildNeighbourDemagTensor(problem)
   ! clears anything left behind by a previous call on the same problem.
   !---------------------------------------
   if (problem%allow_fmm_short_circuit .eq. 1 .and. ntot < problem%fmm_min_n) then
-    print *, " Short circuiting FMM - disabling FMM"
+    !This one reports an actual change of behaviour rather than progress, so it goes through the
+    !normal message channel - which is also the only one visible from Matlab.
+    call displayGUIMessage( 'MagTense: problem smaller than fmm_min_n - disabling FMM and using the full demag tensor' )
     call dealloc_fmm_arrays(problem)
     problem%use_fmm = .false.
     call trace%end( "BuildNeighbourDemagTensor", itimer=itimer, verbose=2 )
@@ -384,8 +386,10 @@ subroutine BuildNeighbourDemagTensor(problem)
   call BuildNeighbourList_FromTree(problem, fmm_tree)
 
   nneigh_max = maxval(problem%n_nbors)
-  print *, " nbor list built from tree has ", sum(problem%n_nbors), " total nbor"
-  print *, " max nbor = ", nneigh_max
+  if ( trace%enabled .and. trace%verbose .ge. 2 ) then
+      print *, " nbor list built from tree has ", sum(problem%n_nbors), " total nbor"
+      print *, " max nbor = ", nneigh_max
+  endif
 
   deallocate(fmm_tree)
   deallocate(sources)

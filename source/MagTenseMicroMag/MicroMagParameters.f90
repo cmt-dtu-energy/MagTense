@@ -144,6 +144,10 @@ include "mkl_dfti.f90"
         real(DP),dimension(:),allocatable :: temperature  !> User defined system temperature
         real(DP),dimension(:),allocatable :: Tfact        !> Prefactor of the termal magnetic field
         logical :: includeThermal                         !> Whether thermal noise is included in the simulations
+        integer :: rng_seed = 0                           !> Seed for the stochastic thermal field. 0 keeps the compiler default sequence, which is
+                                                          !> identical on every run. A positive value seeds the generator deterministically with that
+                                                          !> value, so runs are reproducible but differ from each other. A negative value seeds from
+                                                          !> the system entropy, which is what independent Monte-Carlo samples require.
         
         real(DP),dimension(:,:),allocatable :: Hext       !> Applied field as a function of time. Size (nt,3) with the latter dimension specifying the spatial dimensions.
         logical :: adaptiveHext = .false.                 !> Enable adaptive external-field stepping for explicit hysteresis.
