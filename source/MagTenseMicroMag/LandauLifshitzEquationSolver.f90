@@ -210,12 +210,41 @@
     endif
    
     
+    ! Seed the generator behind both stochastic paths: the thermal field drawn by
+    ! updateThermalField, and the demagnetisation noise that AddUncertaintyToDemagField draws
+    ! from initializeSolution just below. It has to sit above that call - when it lived down in
+    ! the thermal-prefactor block it ran after the CV draws and so never affected them - and it
+    ! is unconditional, because the CV path is independent of whether a temperature is set.
+    ! Without any seeding the compiler default sequence is used, which restarts identically in
+    ! every process and keeps advancing between solves in the same process, so runs are neither
+    ! reproducible nor independent.
+    if ( gb_problem%rng_seed .ne. 0 ) then
+        call random_seed( size = seed_n )
+        allocate( seed_arr(seed_n) )
+        if ( gb_problem%rng_seed .gt. 0 ) then
+            ! Deterministic but user-selectable: different seeds give independent runs, and the
+            ! same seed reproduces a run exactly.
+            do i = 1, seed_n
+                seed_arr(i) = gb_problem%rng_seed + 37 * (i-1)
+            end do
+        else
+            ! Seeded from the clock, i.e. a fresh realisation on every run.
+            call system_clock( count = seed_clock )
+            do i = 1, seed_n
+                seed_arr(i) = seed_clock + 37 * (i-1)
+            end do
+        endif
+        call random_seed( put = seed_arr )
+        deallocate( seed_arr )
+    endif
+
     call displayGUIMessage( 'Initializing solution' )
     !Initialize the solution, i.e. allocate various arrays
     call initializeSolution( gb_problem, gb_solution )
          
     !Set the initial values for m (remember that M is organized such that mx = m(1:ntot), my = m(ntot+1:2*ntot), mz = m(2*ntot+1:3*ntot)
     allocate(gb_solution%t_out(size(gb_problem%t)))
+    gb_solution%t_out = 0.
         
     
     call displayGUIMessage( 'Running solution' )
@@ -300,29 +329,6 @@
         alpha0 = gb_problem%alpha0        ! Damping constant [m/(A*s)]
         kB = 1.380649 * 1e-23             ! The Boltzmann constant [J/K] (CODATA 2018, exact by definition)
 
-        ! Seed the generator that draws the stochastic field. Without this the compiler default
-        ! sequence is used, which is identical on every run, so repeated runs are not independent
-        ! samples of the same random walk and cannot be averaged.
-        if ( gb_problem%rng_seed .ne. 0 ) then
-            call random_seed( size = seed_n )
-            allocate( seed_arr(seed_n) )
-            if ( gb_problem%rng_seed .gt. 0 ) then
-                ! Deterministic but user-selectable: different seeds give independent runs, and the
-                ! same seed reproduces a run exactly.
-                do i = 1, seed_n
-                    seed_arr(i) = gb_problem%rng_seed + 37 * (i-1)
-                end do
-            else
-                ! Seeded from the clock, i.e. a fresh realisation on every run.
-                call system_clock( count = seed_clock )
-                do i = 1, seed_n
-                    seed_arr(i) = seed_clock + 37 * (i-1)
-                end do
-            endif
-            call random_seed( put = seed_arr )
-            deallocate( seed_arr )
-        endif
-
         ! Get cell volumes
         allocate( volCells(ntot) )
         if (gb_problem%grid%gridType /= gridTypeUniform) then
@@ -345,6 +351,12 @@
 
     allocate(M_out(3*ntot,nt,nt_Hext))   
     allocate(gb_solution%M_out(size(gb_problem%t),ntot,nt_Hext,3))
+    !Zero the returned arrays rather than relying on the solve loop to fill them. With
+    !dummy_run set that loop is skipped entirely and these were copied out to the caller as
+    !whatever happened to be in memory. It also covers the adaptive solver, which fills only
+    !the slots it accepts and leaves the tail of M_out untouched.
+    M_out = 0.
+    gb_solution%M_out = 0.
     !Allocate the arrays for the different fields
     !Only if these are to be returned are they saved at every time step
     if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
