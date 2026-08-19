@@ -235,6 +235,12 @@ properties
     dM_reject
     switch_refdH
     use_sw_ref
+
+    %Seed for the stochastic thermal field. 0 keeps the compiler default sequence,
+    %which is identical on every run. A positive value seeds deterministically with
+    %that value, so runs are reproducible but differ from each other. A negative
+    %value seeds from the clock, which is what independent Monte-Carlo runs need.
+    rng_seed
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -466,7 +472,7 @@ methods
         obj.fmm_short = int32(1);
         obj.fmm_min_n = int32(20000);
 
-        obj.temperature	 = zeros(obj.ntot);
+        obj.temperature	 = zeros(obj.ntot,1);
         obj.n_macro	= int32([0 0 0]);
         obj.shiftVec = ([0 0 0]);
         obj.macroShape = [1 1 1];
@@ -499,6 +505,9 @@ methods
         obj.dM_reject = 5e-2;
         obj.switch_refdH = 0.0;
         obj.use_sw_ref = int32(0);
+
+        %Thermal-field RNG seed. Default 0 preserves the previous behaviour.
+        obj.rng_seed = int32(0);
 
     end
     
@@ -759,11 +768,17 @@ methods
         mnorm=vecnorm(obj.m0,2,2); % Check if input array is normalized
         normcondfail=abs(mnorm-ones(obj.ntot,1)) >= obj.tol;
         if any(normcondfail)
-            if all(mnorm(normcondfail)==0*mnorm(normcondfail))
+            % Rows of zero length have no direction to normalise to. Dividing them
+            % would produce NaN, so they are reported and then left alone -- the
+            % previous version only reported them when *every* failing row was zero,
+            % and otherwise divided the whole array, NaN-ing the zero rows.
+            zerorow = (mnorm == 0);
+            if any(zerorow)
                 warning('Zero magnetization in initial array')
-            else
+            end
+            if any(normcondfail & ~zerorow)
                 warning('Initial array not normalized -- Normalizing')
-                obj.m0=obj.m0./mnorm;
+                obj.m0(~zerorow,:) = obj.m0(~zerorow,:)./mnorm(~zerorow);
             end
         end
         if (obj.useDemag)

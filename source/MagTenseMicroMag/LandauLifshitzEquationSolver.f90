@@ -68,6 +68,11 @@
     real(DP) :: A0_max
     real(DP) :: t_step, gamma, kB, alpha0, alphaGilbert  !> Parameters needed for thermal factor
     real(DP),dimension(:),allocatable :: volCells        !> Cell volumes
+    real(DP),dimension(:,:),allocatable :: Hext_tmp      !> Buffer used when growing problem%Hext for the adaptive solver
+    integer :: n_unique_t, i_t, j_t                      !> Counters for the thermal-field redraw interval
+    logical :: is_dup_t                                  !> Whether a convergence time coincides with a requested output time
+    integer,dimension(:),allocatable :: seed_arr         !> Seed array for the stochastic thermal field
+    integer :: seed_n, seed_clock                        !> Size of the seed array and a clock value to seed it from
     character*(100) :: prog_str 
     real :: rate
     integer :: c1,c2,cr,cm 
@@ -110,7 +115,8 @@
             call displayGUIMessage( 'Passing exchange matrix' )
             call passDifferentialOperators(gb_problem)
         else    
-            call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gb_solution%gridinfo)
+            call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gb_solution%gridinfo, &
+                gb_problem%macrogrid%exchPBC)
         endif
     endif
 
@@ -204,12 +210,41 @@
     endif
    
     
+    ! Seed the generator behind both stochastic paths: the thermal field drawn by
+    ! updateThermalField, and the demagnetisation noise that AddUncertaintyToDemagField draws
+    ! from initializeSolution just below. It has to sit above that call - when it lived down in
+    ! the thermal-prefactor block it ran after the CV draws and so never affected them - and it
+    ! is unconditional, because the CV path is independent of whether a temperature is set.
+    ! Without any seeding the compiler default sequence is used, which restarts identically in
+    ! every process and keeps advancing between solves in the same process, so runs are neither
+    ! reproducible nor independent.
+    if ( gb_problem%rng_seed .ne. 0 ) then
+        call random_seed( size = seed_n )
+        allocate( seed_arr(seed_n) )
+        if ( gb_problem%rng_seed .gt. 0 ) then
+            ! Deterministic but user-selectable: different seeds give independent runs, and the
+            ! same seed reproduces a run exactly.
+            do i = 1, seed_n
+                seed_arr(i) = gb_problem%rng_seed + 37 * (i-1)
+            end do
+        else
+            ! Seeded from the clock, i.e. a fresh realisation on every run.
+            call system_clock( count = seed_clock )
+            do i = 1, seed_n
+                seed_arr(i) = seed_clock + 37 * (i-1)
+            end do
+        endif
+        call random_seed( put = seed_arr )
+        deallocate( seed_arr )
+    endif
+
     call displayGUIMessage( 'Initializing solution' )
     !Initialize the solution, i.e. allocate various arrays
     call initializeSolution( gb_problem, gb_solution )
          
     !Set the initial values for m (remember that M is organized such that mx = m(1:ntot), my = m(ntot+1:2*ntot), mz = m(2*ntot+1:3*ntot)
     allocate(gb_solution%t_out(size(gb_problem%t)))
+    gb_solution%t_out = 0.
         
     
     call displayGUIMessage( 'Running solution' )
@@ -239,37 +274,89 @@
         if (gb_problem%adaptiveHext) then
             ! Allocate one extra slot for the initial starting field and state
             nt_Hext = gb_problem%maxHextSteps + 1
+
+            !SolveAdaptiveHextLoop records the field of every accepted step in gb_problem%Hext, and
+            !the accepted-step index runs up to maxHextSteps + 1. The array that came in from
+            !Matlab/Python is sized by the caller and has no relation to maxHextSteps, so it has to
+            !be grown here - otherwise the last step writes past the end of it.
+            if ( size(gb_problem%Hext, 1) .lt. nt_Hext ) then
+                allocate( Hext_tmp(nt_Hext, 4) )
+                Hext_tmp = 0.
+                Hext_tmp(1:size(gb_problem%Hext,1),:) = gb_problem%Hext
+                call move_alloc( Hext_tmp, gb_problem%Hext )
+            endif
         endif
     else if ( gb_problem%solver .eq. MicroMagSolverDynamic ) then
         !Simply do a time evolution as specified in the problem
         nt_Hext = 1
-
-        if (gb_problem%includeThermal) then
-            ! Calculate the prefactor for the thermal magnetic field
-            t_step = gb_problem%t(nt) / nt    ! Timestep [s] (assumed constant)
-            gamma = gb_problem%gamma          ! Gyromagnetic factor [m/(A*s)]
-            alpha0 = gb_problem%alpha0        ! Damping constant [m/(A*s)]
-            kB = 1.38064851 * 1e-23           ! The Boltzmann constant [J/K]
-            ! Get cell volumes
-            allocate( volCells(ntot) )
-            if (gb_problem%grid%gridType /= gridTypeUniform) then
-                volCells = gb_problem%grid%abc(:,1) * gb_problem%grid%abc(:,2) * gb_problem%grid%abc(:,3)
-            else
-                volCells = gb_problem%grid%dx * gb_problem%grid%dy * gb_problem%grid%dz
-            end if
-            ! Combined computation
-            alphaGilbert = gamma/(2*alpha0) + 1/2 * sqrt((gamma/alpha0)**2 - 4)   ! Dimensionless Gilbert damping (second order polynomial equation)
-            allocate( gb_problem%Tfact(ntot) )
-            gb_problem%Tfact = sqrt(2*kB * gb_problem%temperature * alphaGilbert / (mu0 * gamma * volCells * gb_problem%Ms * t_step))
-            !print *, "Finished calculating thermal prefactor"
-            !print *, 'Tfact', gb_problem%Tfact(1)   ! Just for debugging
-        else
-            gb_problem%Tfact = 0
-        end if
     endif
-    
+
+    !The thermal prefactor is needed by updateThermalField for every solver type, so it is
+    !always allocated. Leaving it unallocated for the explicit solver crashed the solution.
+    if ( allocated(gb_problem%Tfact) ) deallocate( gb_problem%Tfact )
+    allocate( gb_problem%Tfact(ntot) )
+    if (gb_problem%includeThermal) then
+        ! Calculate the prefactor for the thermal magnetic field
+        ! The stochastic field is redrawn once per element of the time array that the ODE driver
+        ! actually steps on, and that array is the union of the requested output times t and the
+        ! convergence-check times t_conv (see MagTense_ODE_RKSuite, which merges the two with
+        ! simple_unique before integrating). Deriving the interval from t alone overestimates it
+        ! whenever t_conv contributes times of its own, and the field then decorrelates faster than
+        ! the prefactor below assumes, i.e. the system runs at an effective temperature that is too
+        ! high by the ratio of the two spacings.
+        n_unique_t = nt
+        do i_t = 1, size(gb_problem%t_conv)
+            is_dup_t = .false.
+            do j_t = 1, nt
+                if ( gb_problem%t_conv(i_t) .eq. gb_problem%t(j_t) ) then
+                    is_dup_t = .true.
+                    exit
+                endif
+            end do
+            !Also skip a convergence time that duplicates an earlier convergence time
+            if ( .not. is_dup_t ) then
+                do j_t = 1, i_t-1
+                    if ( gb_problem%t_conv(i_t) .eq. gb_problem%t_conv(j_t) ) then
+                        is_dup_t = .true.
+                        exit
+                    endif
+                end do
+            endif
+            if ( .not. is_dup_t ) n_unique_t = n_unique_t + 1
+        end do
+        t_step = ( gb_problem%t(nt) - gb_problem%t(1) ) / max( n_unique_t-1, 1 )    ! Timestep [s] (assumed constant)
+        gamma = gb_problem%gamma          ! Gyromagnetic factor [m/(A*s)]
+        alpha0 = gb_problem%alpha0        ! Damping constant [m/(A*s)]
+        kB = 1.380649 * 1e-23             ! The Boltzmann constant [J/K] (CODATA 2018, exact by definition)
+
+        ! Get cell volumes
+        allocate( volCells(ntot) )
+        if (gb_problem%grid%gridType /= gridTypeUniform) then
+            volCells = gb_problem%grid%abc(:,1) * gb_problem%grid%abc(:,2) * gb_problem%grid%abc(:,3)
+        else
+            volCells = gb_problem%grid%dx * gb_problem%grid%dy * gb_problem%grid%dz
+        end if
+        ! Combined computation
+        ! alpha0 = gamma*alphaGilbert/(1+alphaGilbert**2), so alphaGilbert solves
+        ! alphaGilbert**2 - (gamma/alpha0)*alphaGilbert + 1 = 0. The two roots are reciprocal;
+        ! the minus sign picks the root with alphaGilbert <= 1, which is the physical damping.
+        alphaGilbert = gamma/(2*alpha0) - 0.5_DP * sqrt((gamma/alpha0)**2 - 4)   ! Dimensionless Gilbert damping (second order polynomial equation)
+        gb_problem%Tfact = sqrt(2*kB * gb_problem%temperature * alphaGilbert / (mu0 * gamma * volCells * gb_problem%Ms * t_step))
+        deallocate( volCells )
+        !print *, "Finished calculating thermal prefactor"
+        !print *, 'Tfact', gb_problem%Tfact(1)   ! Just for debugging
+    else
+        gb_problem%Tfact = 0
+    end if
+
     allocate(M_out(3*ntot,nt,nt_Hext))   
     allocate(gb_solution%M_out(size(gb_problem%t),ntot,nt_Hext,3))
+    !Zero the returned arrays rather than relying on the solve loop to fill them. With
+    !dummy_run set that loop is skipped entirely and these were copied out to the caller as
+    !whatever happened to be in memory. It also covers the adaptive solver, which fills only
+    !the slots it accepts and leaves the tail of M_out untouched.
+    M_out = 0.
+    gb_solution%M_out = 0.
     !Allocate the arrays for the different fields
     !Only if these are to be returned are they saved at every time step
     if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
@@ -643,8 +730,8 @@
         !--------------------------------------------------------------------------------------------------------------------
         !--------------- combine to get effective field, Heff -------------
         HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX + gb_solution%HtX
-        HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY + gb_solution%HtX
-        HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ + gb_solution%HtX
+        HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY + gb_solution%HtY
+        HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ + gb_solution%HtZ
         !-------------------------------------------------------------
         !--------------- calculate precession term: m x Heff -------------
         crossX = 1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
@@ -702,9 +789,23 @@
     type(MicroMagSolution),intent(inout) :: solution
     integer :: i,j,nt
     integer, save :: itimer = 0
+
+    !This routine exists only to fill the returned H_exc/H_ext/H_dem/H_ani arrays, so there is
+    !nothing to do when the caller has not asked for them.
+    !Note that this is NOT the field update the solver runs on - that is dmdt_fct, which the
+    !integrator calls at every right-hand-side evaluation. This routine runs after MagTense_ODE has
+    !returned and recomputes the field terms at the nt output times from the stored solution,
+    !because the integrator's last right-hand-side evaluation is at an internal step rather than at
+    !the requested output state. The recomputed terms land in solution%HjX/HhX/HkX/HmX, which
+    !dmdt_fct overwrites from scratch on its next call and which nothing outside this file reads,
+    !so with useReturnHall off the whole loop below has no consumer.
+    !The test lives here rather than at the call sites so that a new call site cannot reintroduce
+    !the redundant work by forgetting it.
+    if ( problem%useReturnHall .ne. useReturnHallTrue ) return
+
     call trace%begin( "StoreHeffComponents", itimer=itimer, verbose=1 )
-    
-    i = gb_solution%HextInd       
+
+    i = gb_solution%HextInd
     nt = size( gb_problem%t ) 
     
     do j=1,nt
@@ -1210,7 +1311,12 @@ solution%HmZ = 0.0_SP
    !------------------ Call FMM (sources->sources) ------------------
    nd = 1
    fmm_tree%nterms_in = problem%fmm_nterms
-   call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif, problem%nlmin, problem%nlmax)
+   !Only build on the call that allocated the source array. build_tree returns immediately once
+   !is_built is set, but reaching it on a later call meant passing a local pointer whose
+   !association status is undefined, since source is only allocated in the branch above.
+   if (built_tree) then
+       call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif, problem%nlmin, problem%nlmax)
+   end if
    !------- only run if number of boxes > 9 -----------
    !--- NOTE - if nboxes <= 9 then we have all-to-all and the is no need for FMM ---
    if (fmm_tree%nboxes > 9) then
@@ -1240,15 +1346,20 @@ solution%HmZ = 0.0_SP
   call trace%end( "updateDemagfieldFMM_taskwait", itimer=itimer_wait, verbose=1 )
   !---------------------------------------------------------------------------
 
+  !------------------ Shape correction ----------------------------
+  ! Applied after the taskwait so the near-field contribution is already in HmX/HmY/HmZ, and
+  ! through the same routine the non-FMM path uses so the two demag paths agree.
+  call applyShapeCorrection( problem, solution )
+  !----------------------------------------------------------------
 
     !------------------ Cleanup -------------------------------------
+  ! The source array is owned by the tree from build_tree onwards - fmm_tree%source points at it
+  ! for as long as the tree lives - so fmm_tree%dealloc releases it. It must not be released here:
+  ! doing so left that component dangling for every later call while keep_tree was set.
   if (.not. fmm_tree%keep_tree) then
       call fmm_tree%dealloc()
       deallocate( fmm_tree )
       nullify(solution%fmm_tree)
-  end if
-  if (built_tree) then
-      deallocate( source )
   end if
   deallocate(dipvec, grad)
     !--------------------------------------------------------------
@@ -1280,10 +1391,9 @@ end subroutine updateDemagfieldFMM
     real(SP) :: pref,alpha,beta
     complex(kind=4) :: alpha_c, beta_c
     real(SP), dimension(:), allocatable :: temp, mx, my, mz
-    character*(100) :: prog_str 
+    character*(100) :: prog_str
     integer, save :: itimer = 0
-    real(DP),dimension(3) :: Mavg           !> Average magnetisation
-    
+
     if ( problem%useDemag .eq. useDemagFalse ) then
         solution%HmX(:) = 0.
         solution%HmY(:) = 0.
@@ -1304,13 +1414,6 @@ end subroutine updateDemagfieldFMM
     solution%My_s = real(solution%My, SP)
     solution%Mz_s = real(solution%Mz, SP)
 
-    ! Get average magnetisation
-    ! Average across micromagnetic cells, then multiply by the volume fraction of the cells so
-    ! non-magnetic regions are included in the volume average. Assumes all cells have the same volume.
-    Mavg(1) = sum(solution%Mx)/ntot * problem%VfracOcc
-    Mavg(2) = sum(solution%My)/ntot * problem%VfracOcc
-    Mavg(3) = sum(solution%Mz)/ntot * problem%VfracOcc
-    
     if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
         if ( problem%useCuda .eq. useCudaFalse ) then
             !Do the matrix multiplications using sparse matrices
@@ -1346,13 +1449,26 @@ end subroutine updateDemagfieldFMM
     elseif ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
 
         if ( problem%useCuda .eq. useCudaFalse ) then
+            !====================================================================================
+            ! STALE AND UNTESTED - DO NOT RELY ON THE RESULT
+            !
+            ! This branch is left from an earlier attempt at applying the demag threshold in
+            ! Fourier space and has not been maintained or validated since. Two things are known
+            ! to be wrong with it:
+            !
+            !   1. The three assignments that map the back-transformed field onto HmX/HmY/HmZ are
+            !      commented out below, so this branch computes HmX_c/HmY_c/HmZ_c and discards
+            !      them. HmX/HmY/HmZ therefore keep whatever they held from the previous call,
+            !      and the shape correction at the end of this routine accumulates onto that.
+            !   2. Even with those assignments restored, the demag tensor is not corrected for a
+            !      spatially varying Ms the way the dense and sparse branches are.
+            !
+            ! The one-time warning is raised in ComputeDemagfieldTensor, where the approximation is
+            ! selected, rather than here - this routine runs once per right-hand-side evaluation.
+            !====================================================================================
+
             !fourier transform Mx, My and Mz
             ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
-                
-
-            !======= Needs proper Ms correction 
-            print *, "WARNING: not properly corrected for Ms"
-            !==========================================
 
             !Convert to complex format
             do i=1,ntot
@@ -1461,9 +1577,7 @@ end subroutine updateDemagfieldFMM
     endif
         
     !Apply shape correction
-    solution%HmX = solution%HmX + problem%Kxx_shape * Mavg(1) * problem%Mfact + problem%Kxy_shape * Mavg(2) * problem%Mfact + problem%Kxz_shape * Mavg(3) * problem%Mfact
-    solution%HmY = solution%HmY + problem%Kxy_shape * Mavg(1) * problem%Mfact + problem%Kyy_shape * Mavg(2) * problem%Mfact + problem%Kyz_shape * Mavg(3) * problem%Mfact
-    solution%HmZ = solution%HmZ + problem%Kxz_shape * Mavg(1) * problem%Mfact + problem%Kyz_shape * Mavg(2) * problem%Mfact + problem%Kzz_shape * Mavg(3) * problem%Mfact
+    call applyShapeCorrection( problem, solution )
 
     if (problem%CV > 0) then
         solution%HmX = solution%HmX + solution%HmX*problem%CV*sqrt(-2d0*log(solution%u1))*cos(2d0*pi*solution%u2)
@@ -1474,7 +1588,41 @@ end subroutine updateDemagfieldFMM
     call trace%end( "updateDemagfield", itimer=itimer, verbose=1 )
 
     end subroutine updateDemagfield
-    
+
+
+    !>-----------------------------------------
+    !> @author Frederik L. Durhuus, fladu@dtu.dk, DTU, 2025
+    !> @brief
+    !> Adds the macrogeometry/sample shape correction onto the demagnetisation field.
+    !> Factored out of updateDemagfield so that the FMM demag path applies exactly the same
+    !> correction - it previously had no equivalent block, so setting use_fmm silently discarded
+    !> macroShape and sampleShape while still accepting them as inputs.
+    !> @param[in] problem, the struct containing the problem
+    !> @param[inout] solution, struct containing the current solution
+    !>-----------------------------------------
+    subroutine applyShapeCorrection( problem, solution )
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure
+    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
+
+    integer :: ntot
+    real(DP),dimension(3) :: Mavg                       !> Average magnetisation
+
+    ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+
+    ! Get average magnetisation
+    ! Average across micromagnetic cells, then multiply by the volume fraction of the cells so
+    ! non-magnetic regions are included in the volume average. Assumes all cells have the same volume.
+    Mavg(1) = sum(solution%Mx)/ntot * problem%VfracOcc
+    Mavg(2) = sum(solution%My)/ntot * problem%VfracOcc
+    Mavg(3) = sum(solution%Mz)/ntot * problem%VfracOcc
+
+    solution%HmX = solution%HmX + problem%Kxx_shape * Mavg(1) * problem%Mfact + problem%Kxy_shape * Mavg(2) * problem%Mfact + problem%Kxz_shape * Mavg(3) * problem%Mfact
+    solution%HmY = solution%HmY + problem%Kxy_shape * Mavg(1) * problem%Mfact + problem%Kyy_shape * Mavg(2) * problem%Mfact + problem%Kyz_shape * Mavg(3) * problem%Mfact
+    solution%HmZ = solution%HmZ + problem%Kxz_shape * Mavg(1) * problem%Mfact + problem%Kyz_shape * Mavg(2) * problem%Mfact + problem%Kzz_shape * Mavg(3) * problem%Mfact
+
+    end subroutine applyShapeCorrection
+
+
     
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
@@ -1933,9 +2081,20 @@ end subroutine updateDemagfieldFMM
     if ( ( problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then     
         call ApplyThresholdDense( problem )
     elseif ( ( problem%demag_approximation .eq. DemagApproximationFFTThreshold ) .or. ( problem%demag_approximation .eq. DemagApproximationFFTThresholdFraction ) ) then
+        !The Fourier-space threshold is stale: updateDemagfield computes the transformed field for
+        !this approximation but never maps it back onto HmX/HmY/HmZ, and the tensor is not
+        !corrected for a spatially varying Ms. Warn loudly and once, here where the approximation
+        !is selected, rather than from the per-timestep routine.
+        call displayGUIMessage( '================================ WARNING ================================' )
+        call displayGUIMessage( 'MagTense: the FFT demag approximations (fft_thres and' )
+        call displayGUIMessage( 'fft_threshold_fraction) are stale and untested. The demagnetisation' )
+        call displayGUIMessage( 'field they produce is NOT correct - it is not written back from Fourier' )
+        call displayGUIMessage( 'space and it is not corrected for a spatially varying Ms.' )
+        call displayGUIMessage( 'Use none, threshold or threshold_fraction instead.' )
+        call displayGUIMessage( '=========================================================================' )
         call ApplyThresholdFFT( problem )
     endif
-    
+
     call trace%end( "ComputeDemagfieldTensor", itimer=itimer, verbose=1 )
     
     end subroutine ComputeDemagfieldTensor
@@ -1957,7 +2116,10 @@ end subroutine updateDemagfieldFMM
     real(DP),allocatable :: aSample,bSample,cSample      !> Sample shape parameters
     integer :: ntotMacro                                 !> Number of domain copies in macrogeometry
     real(DP) :: Vcell, Vdomain                           !> Volume of single cell and simulated domain
-    character*(100) :: prog_str 
+    real(DP) :: Vmagnetic                                !> Total volume of the magnetic cells
+    real(DP),dimension(3) :: sampleCentre                !> Centre of the bounding box of the mesh
+    integer :: idim                                      !> Loop counter over the three directions
+    character*(100) :: prog_str
 
     ! Get number of elements
     nx = problem%grid%nx
@@ -1975,6 +2137,16 @@ end subroutine updateDemagfieldFMM
     cSample = problem%macrogrid%sampleShape(3)
     ! Get array of points to evaluate tensor at
     pts = problem%grid%pts
+
+    ! getShapeTensor places both the sample and the macrogeometry prism at the origin, which holds
+    ! for a uniform grid - setupGrid builds it on [-L/2, L/2] - but not for an externally supplied
+    ! mesh, which commonly runs from 0 to L. Shift the evaluation points into a frame centred on
+    ! the bounding box of the mesh so that the correction is evaluated at the right offsets in
+    ! either case. For a grid that is already centred this shift is zero and nothing changes.
+    do idim = 1, 3
+        sampleCentre(idim) = 0.5_DP * ( minval(pts(:,idim)) + maxval(pts(:,idim)) )
+        pts(:,idim) = pts(:,idim) - sampleCentre(idim)
+    end do
 
     allocate(Nshape(ntot,3,3))
     call getShapeTensor(pts, ntot, aMacro, bMacro, cMacro, aSample, bSample, cSample, Nshape)
@@ -1999,12 +2171,33 @@ end subroutine updateDemagfieldFMM
     ! Get volume fraction occupied
     ntotMacro = (1 + 2*problem%macrogrid%n_macro(1)) * (1 + 2*problem%macrogrid%n_macro(2)) * (1 + 2*problem%macrogrid%n_macro(3))
     Vdomain = aMacro * bMacro * cMacro / ntotMacro
-    Vcell = problem%grid%dx * problem%grid%dy * problem%grid%dz
+    ! grid%dx, dy and dz are Lx/nx etc., which is only a cell size on a uniform grid. For the
+    ! unstructured grid types the cell sizes are in grid%abc and vary between cells, so the total
+    ! magnetic volume is summed directly rather than taken as ntot times one cell.
+    if ( problem%grid%gridType .eq. gridTypeUniform ) then
+        Vcell = problem%grid%dx * problem%grid%dy * problem%grid%dz
+        Vmagnetic = ntot * Vcell
+    else if ( allocated(problem%grid%abc) ) then
+        Vmagnetic = sum( problem%grid%abc(:,1) * problem%grid%abc(:,2) * problem%grid%abc(:,3) )
+    else
+        ! Tetrahedral meshes carry no per-element size array, so the occupied fraction cannot be
+        ! evaluated. The shape correction is meaningless without it, so disable it rather than
+        ! scaling by a wrong number.
+        Vmagnetic = 0.
+    endif
+
     allocate( problem%VfracOcc )
-    problem%VfracOcc = ntot * Vcell / Vdomain
-    call displayGUIMessage( 'Volume fraction occupied by magnetic material :' )
-    write(prog_str,'(F20.10)') problem%VfracOcc
-    call displayGUIMessage( trim(prog_str) )
+    if ( Vdomain .gt. 0. ) then
+        problem%VfracOcc = Vmagnetic / Vdomain
+    else
+        ! A zero macroShape would divide by zero here and poison every subsequent demag field with
+        ! NaN, including the case where the shape tensor itself is identically zero.
+        call displayGUIMessage( 'MagTense: macroShape has a zero side length - disabling the shape correction' )
+        problem%VfracOcc = 0.
+    endif
+    !call displayGUIMessage( 'Volume fraction occupied by magnetic material :' )
+    !write(prog_str,'(F20.10)') problem%VfracOcc
+    !call displayGUIMessage( trim(prog_str) )
 
     ! Clean up
     deallocate(Nshape)
@@ -2033,6 +2226,20 @@ end subroutine updateDemagfieldFMM
     if ( grid%gridType .eq. gridTypeUniform ) then
         call ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
     elseif (( grid%gridType .eq. gridTypeTetrahedron ) .or. (grid%gridType .eq. gridTypeUnstructuredPrisms)) then
+    
+         if ( problem%macrogrid%exchPBC(1) .or. problem%macrogrid%exchPBC(2) .or. problem%macrogrid%exchPBC(3) ) then
+            !The tiles at the two ends of each periodic direction have been linked together in the mesh
+            !analysis, i.e. they share a face and enter each others interpolation stencils, so the
+            !exchange operator below is computed in exactly the same way as without periodic boundaries.
+            !This is only done for the unstructured prisms, as the mesh analysis is not run for a
+            !tetrahedral mesh. An exchange matrix passed from the outside carries its own boundary
+            !conditions and has already returned above.
+            if ( grid%gridType .ne. gridTypeUnstructuredPrisms ) then
+                call displayGUIMessage( 'Periodic exchange boundary conditions are only supported for unstructured prisms - exiting!' )
+                stop
+            endif
+            call displayGUIMessage( 'Using periodic exchange boundary conditions' )
+        endif
         call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, problem%A_exch)
     endif
 
@@ -2085,7 +2292,20 @@ end subroutine updateDemagfieldFMM
     PBCx = problem%macrogrid%exchPBC(1)
     PBCy = problem%macrogrid%exchPBC(2)
     PBCz = problem%macrogrid%exchPBC(3)
-    
+
+    !A periodic direction needs at least three cells. With exactly two, the wrap-around neighbour
+    !and the ordinary neighbour of a boundary cell are the same cell, so the row would carry two
+    !entries with the same column index, which is not a valid CSR row. The unstructured mesh
+    !analysis already refuses this case; the uniform grid used to build the degenerate matrix
+    !silently. A single cell along a direction is fine - the direction is simply dropped below,
+    !which is the correct periodic answer for one cell.
+    if ( ( PBCx .and. nx .eq. 2 ) .or. ( PBCy .and. ny .eq. 2 ) .or. ( PBCz .and. nz .eq. 2 ) ) then
+        call displayGUIMessage( 'MagTense: periodic exchange requires at least three cells along a periodic direction' )
+        call displayGUIMessage( 'MagTense: with two cells a tile becomes its own neighbour through the periodic image' )
+        error stop 'ComputeExchangeTerm3D_Uniform: too few cells along a periodic direction'
+    endif
+
+
     !----------------------------------d^2dx^2 begins -----------------------------!
     if ( nx .gt. 1 ) then
         ! Make the d^2/dx^2 matrix
@@ -2104,21 +2324,25 @@ end subroutine updateDemagfieldFMM
             do j=1,ny
                 ! The left boundary
                 if ( PBCx ) then
-                    ! Coupling to the left (loops around and connects with rightmost tile)
-                    d2dx2%values(ind) = 2*problem%A0_map(nx,j,k)/(problem%A0_map(nx,j,k)+problem%A0_map(1,j,k))
-                    d2dx2%cols(ind) = colInd + nx - 1
-                    d2dx2%rows_start(rowInd) = ind
-                    ind = ind + 1
+                    ! Entries are emitted in ascending column order: the wrap-around neighbour of
+                    ! the left boundary is the rightmost tile and therefore comes last, not first.
+                    ! MKL's sparse routines take sorted column indices within a row as given.
 
                     ! Current tile
                     d2dx2%values(ind) = 2*(-( problem%A0_map(nx,j,k)/(problem%A0_map(nx,j,k)+problem%A0_map(1,j,k)) &
                             + problem%A0_map(2,j,k)/(problem%A0_map(2,j,k)+problem%A0_map(1,j,k)) ))
                     d2dx2%cols(ind) = colInd
+                    d2dx2%rows_start(rowInd) = ind
                     ind = ind + 1
 
                     ! Coupling to the right
                     d2dx2%values(ind) = 2*problem%A0_map(2,j,k)/(problem%A0_map(2,j,k)+problem%A0_map(1,j,k))
                     d2dx2%cols(ind) = colInd + 1
+                    ind = ind + 1
+
+                    ! Coupling to the left (loops around and connects with rightmost tile)
+                    d2dx2%values(ind) = 2*problem%A0_map(nx,j,k)/(problem%A0_map(nx,j,k)+problem%A0_map(1,j,k))
+                    d2dx2%cols(ind) = colInd + nx - 1
                     d2dx2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
                     ind = ind + 1
@@ -2167,23 +2391,25 @@ end subroutine updateDemagfieldFMM
 
                 ! The right boundary
                 if ( PBCx ) then
+                    ! Ascending column order: here the wrap-around neighbour is the leftmost tile,
+                    ! so it is the smallest column index and comes first.
+
+                    ! Coupling to the right (loops around and connects with leftmost tile)
+                    d2dx2%values(ind) = 2*problem%A0_map(1,j,k)/(problem%A0_map(1,j,k)+problem%A0_map(nx,j,k))
+                    d2dx2%cols(ind) = colInd - nx + 2
+                    ! Update where the row starts
+                    d2dx2%rows_start(rowInd) = ind
+                    ind = ind + 1
 
                     ! Coupling to the left
                     d2dx2%values(ind) = 2*problem%A0_map(nx-1,j,k)/(problem%A0_map(nx-1,j,k)+problem%A0_map(nx,j,k))
                     d2dx2%cols(ind) = colInd
-                    ! Update where the row starts
-                    d2dx2%rows_start(rowInd) = ind
                     ind = ind + 1
 
                     ! Current tile
                     d2dx2%values(ind) = 2*(-( problem%A0_map(nx-1,j,k)/(problem%A0_map(nx-1,j,k)+problem%A0_map(nx,j,k)) &
                             + problem%A0_map(1,j,k)/(problem%A0_map(1,j,k)+problem%A0_map(nx,j,k)) ))
                     d2dx2%cols(ind) = colInd + 1
-                    ind = ind + 1
-
-                    ! Coupling to the right (loops around and connects with leftmost tile)
-                    d2dx2%values(ind) = 2*problem%A0_map(1,j,k)/(problem%A0_map(1,j,k)+problem%A0_map(nx,j,k))
-                    d2dx2%cols(ind) = colInd - nx + 2
                     d2dx2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
                     ind = ind + 1
@@ -2238,21 +2464,24 @@ end subroutine updateDemagfieldFMM
              ! The backwards boundary (Imagine standing on the origin, eyes pointed along the positive y-axis)
             if ( PBCy ) then
                 do i=1,nx
-                    ! Backwards coupling (loops around and couples to forwardmost tile)
-                    d2dy2%values(ind) = 2*problem%A0_map(i,ny,k)/(problem%A0_map(i,ny,k)+problem%A0_map(i,1,k))
-                    d2dy2%cols(ind) = colInd + nx*(ny-1)
-                    d2dy2%rows_start(rowInd) = ind
-                    ind = ind + 1  ! Increment to next element
+                    ! Ascending column order: the wrap-around neighbour is the forwardmost tile and
+                    ! therefore has the largest column index, so it is emitted last.
 
                     ! Current tile
                     d2dy2%values(ind) = 2*(-(problem%A0_map(i,ny,k)/(problem%A0_map(i,ny,k)+problem%A0_map(i,1,k)) &
                             + problem%A0_map(i,2,k)/(problem%A0_map(i,2,k)+problem%A0_map(i,1,k))))
                     d2dy2%cols(ind) = colInd
+                    d2dy2%rows_start(rowInd) = ind
                     ind = ind + 1  ! Increment to next element
 
                     ! Forwards coupling
                     d2dy2%values(ind) = 2*problem%A0_map(i,2,k)/(problem%A0_map(i,2,k)+problem%A0_map(i,1,k))
                     d2dy2%cols(ind) = colInd + nx
+                    ind = ind + 1  ! Increment to next element
+
+                    ! Backwards coupling (loops around and couples to forwardmost tile)
+                    d2dy2%values(ind) = 2*problem%A0_map(i,ny,k)/(problem%A0_map(i,ny,k)+problem%A0_map(i,1,k))
+                    d2dy2%cols(ind) = colInd + nx*(ny-1)
                     d2dy2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
                     ind = ind + 1  ! Increment to next element
@@ -2311,21 +2540,24 @@ end subroutine updateDemagfieldFMM
             !The forwards boundary
             if ( PBCy ) then
                 do i=1,nx
-                    ! Backwards coupling
-                    d2dy2%values(ind) = problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k))
-                    d2dy2%cols(ind) = colInd - nx
+                    ! Ascending column order: the wrap-around neighbour is the backmost tile and
+                    ! therefore has the smallest column index, so it is emitted first.
+
+                    ! Forwards coupling (loops around and couples to backmost tile)
+                    d2dy2%values(ind) = 2*problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k))
+                    d2dy2%cols(ind) = colInd - nx*(ny-1)
                     d2dy2%rows_start(rowInd) = ind
                     ind = ind + 1  ! Increment to next element
 
-                    ! Current tile
-                    d2dy2%values(ind) = -(problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k)) &
-                            + problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k)))
-                    d2dy2%cols(ind) = colInd
+                    ! Backwards coupling
+                    d2dy2%values(ind) = 2*problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k))
+                    d2dy2%cols(ind) = colInd - nx
                     ind = ind + 1  ! Increment to next element
 
-                    ! Forwards coupling (loops around and couples to backmost tile)
-                    d2dy2%values(ind) = problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k))
-                    d2dy2%cols(ind) = colInd - nx*(ny-1)
+                    ! Current tile
+                    d2dy2%values(ind) = 2*(-(problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k)) &
+                            + problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k))))
+                    d2dy2%cols(ind) = colInd
                     d2dy2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
                     ind = ind + 1  ! Increment to next element
@@ -2381,11 +2613,8 @@ end subroutine updateDemagfieldFMM
         if ( PBCz ) then
             do j=1,ny
                 do i=1,nx
-                    ! Downwards coupling (loops around and couples to topmost tile)
-                    d2dz2%values(ind) = 2*problem%A0_map(i,j,nz)/(problem%A0_map(i,j,nz)+problem%A0_map(i,j,1))
-                    d2dz2%cols(ind) = colInd + ny*nx*(nz-1)
-                    d2dz2%rows_start(rowInd) = ind
-                    ind = ind + 1   ! Increment to next element
+                    ! Ascending column order: the wrap-around neighbour is the topmost tile and
+                    ! therefore has the largest column index, so it is emitted last.
 
                     ! Current tile
                     d2dz2%values(ind) = 2*(-(problem%A0_map(i,j,nz)/(problem%A0_map(i,j,nz) + problem%A0_map(i,j,1)) &
@@ -2397,6 +2626,11 @@ end subroutine updateDemagfieldFMM
                     ! Upwards coupling
                     d2dz2%values(ind) = 2*problem%A0_map(i,j,2)/(problem%A0_map(i,j,2)+problem%A0_map(i,j,1))
                     d2dz2%cols(ind) = nx*ny + colInd
+                    ind = ind + 1   ! Increment to next element
+
+                    ! Downwards coupling (loops around and couples to topmost tile)
+                    d2dz2%values(ind) = 2*problem%A0_map(i,j,nz)/(problem%A0_map(i,j,nz)+problem%A0_map(i,j,1))
+                    d2dz2%cols(ind) = colInd + ny*nx*(nz-1)
                     d2dz2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
                     ind = ind + 1   ! Increment to next element
@@ -2458,21 +2692,24 @@ end subroutine updateDemagfieldFMM
         if ( PBCz ) then
             do j=1,ny
                 do i=1,nx
-                    ! Downwards coupling
-                    d2dz2%values(ind) = problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz))
-                    d2dz2%cols(ind) = colInd - nx*ny
+                    ! Ascending column order: the wrap-around neighbour is the bottommost tile and
+                    ! therefore has the smallest column index, so it is emitted first.
+
+                    ! Upwards coupling (loops around and couples to bottommost tile)
+                    d2dz2%values(ind) = 2*problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz))
+                    d2dz2%cols(ind) = colInd - nx*ny*(nz - 1)
                     d2dz2%rows_start(rowInd) = ind
                     ind = ind + 1   ! Increment to next element
 
-                    ! Current tile
-                    d2dz2%values(ind) = -(problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz)) &
-                            + problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz)))
-                    d2dz2%cols(ind) = colInd
+                    ! Downwards coupling
+                    d2dz2%values(ind) = 2*problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz))
+                    d2dz2%cols(ind) = colInd - nx*ny
                     ind = ind + 1   ! Increment to next element
 
-                    ! Upwards coupling (loops around and couples to bottommost tile)
-                    d2dz2%values(ind) = problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz))
-                    d2dz2%cols(ind) = colInd - nx*ny*(nz - 1)
+                    ! Current tile
+                    d2dz2%values(ind) = 2*(-(problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz)) &
+                            + problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz))))
+                    d2dz2%cols(ind) = colInd
                     d2dz2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
                     ind = ind + 1   ! Increment to next element
@@ -2627,17 +2864,32 @@ end subroutine updateDemagfieldFMM
     allocate(problem%Kfact_arr(size(problem%Ms),6,3))
     problem%Kfact_arr(:,:,:) = 0.0
     
+    !The three ways of specifying the anisotropy are not combined by the code below: the uniaxial
+    !K0 is evaluated through its own Axx..Azz path in updateAnisotropy, while the cubic K1/K2 and
+    !the general K0_arr share the Kfact_arr path. Combining K0 with either of the other two used to
+    !drop the other term without saying so, so it is now rejected outright. K1/K2 and K0_arr are
+    !compatible - they live in the same rotated frame - and are summed.
+    if ( any(problem%K0 .ne. 0) .and. &
+         ( any(problem%K1 .ne. 0) .or. any(problem%K2 .ne. 0) .or. any(problem%K0_arr .ne. 0) ) ) then
+        call displayGUIMessage( 'MagTense: the uniaxial anisotropy K0 cannot be combined with K1, K2 or K0_arr' )
+        call displayGUIMessage( 'MagTense: express the uniaxial term through K0_arr(:,1,:) instead, or set K0 to zero' )
+        error stop 'ComputeAnisotropyTerm3D: K0 cannot be combined with K1, K2 or K0_arr'
+    endif
+
     if (any(problem%K0 .ne. 0)) then !Uniaxial anisotropy
         call displayGUIMessage( 'Assuming uniaxial anisotropy' )
         do i = 1,size(problem%Ms)
             problem%Kfact_arr(i,1,3) = problem%K0(i) / ( mu0 * problem%Ms(i) )
         end do
 
-        !Set the crystal axis as the user only specified u_ea
-        problem%CrystalAxis(:,3,1) =  problem%u_ea(:,1)
-        problem%CrystalAxis(:,3,2) =  problem%u_ea(:,2)
-        problem%CrystalAxis(:,3,3) =  problem%u_ea(:,3)
-
+        !Note: this branch deliberately does not touch problem%CrystalAxis. It used to overwrite
+        !row 3 with u_ea and leave rows 1 and 2 at whatever the caller passed, which produced a
+        !frame that is not orthonormal in general. Nothing read it - updateAnisotropy evaluates the
+        !uniaxial term through the Axx..Azz products below and never rotates - so the assignment
+        !was dead, and a later change that did start using CrystalAxis here would have silently
+        !inherited the broken frame. Building a proper frame from u_ea is only meaningful if the
+        !uniaxial term ever moves onto the Kfact_arr path, which it cannot while K0 is exclusive
+        !with K1/K2/K0_arr.
         allocate(problem%Axx(ntot),problem%Axy(ntot),problem%Axz(ntot), &
                  problem%Ayy(ntot),problem%Ayz(ntot),problem%Azz(ntot))
         problem%Axx = problem%u_ea(:,1) * problem%u_ea(:,1)
@@ -2648,18 +2900,27 @@ end subroutine updateDemagfieldFMM
         problem%Azz = problem%u_ea(:,3) * problem%u_ea(:,3)
 
         
-    elseif (any(problem%K1 .ne. 0)) then !Cubic anisotropy
-        call displayGUIMessage( 'Assuming cubic anisotropy' )
-        do i = 1,size(problem%Ms)
-            problem%Kfact_arr(i,3,1) = problem%K1(i) / ( mu0 * problem%Ms(i) )
-            problem%Kfact_arr(i,3,2) = problem%K1(i) / ( mu0 * problem%Ms(i) )
-            problem%Kfact_arr(i,3,3) = problem%K1(i) / ( mu0 * problem%Ms(i) )
-            problem%Kfact_arr(i,6,1) = problem%K2(i) / ( mu0 * problem%Ms(i) )
-        end do
-    else !General anisotropy
+    else
+        !General anisotropy. K0_arr is the base, and the cubic constants are added on top of it.
         do i = 1,size(problem%Ms)
             problem%Kfact_arr(i,:,:) = problem%K0_arr(i,:,:) / ( mu0 * problem%Ms(i) )
         end do
+
+        if (any(problem%K1 .ne. 0) .or. any(problem%K2 .ne. 0)) then !Cubic anisotropy
+            call displayGUIMessage( 'Assuming cubic anisotropy' )
+            !The sign is negative because updateAnisotropy negates the whole expansion on the way
+            !back out of the rotated frame, which is what makes a positive K0 an easy axis. Feeding
+            !a positive K1 straight in therefore produced the field of the energy -K1*(mx^2*my^2 +
+            !...), i.e. <111> easy for K1 > 0. Negating here restores the standard convention
+            !E = K1*(mx^2*my^2 + my^2*mz^2 + mz^2*mx^2) + K2*mx^2*my^2*mz^2, so that K1 > 0 gives
+            !<100> easy as in d'Aquino and the standard texts.
+            do i = 1,size(problem%Ms)
+                problem%Kfact_arr(i,3,1) = problem%Kfact_arr(i,3,1) - problem%K1(i) / ( mu0 * problem%Ms(i) )
+                problem%Kfact_arr(i,3,2) = problem%Kfact_arr(i,3,2) - problem%K1(i) / ( mu0 * problem%Ms(i) )
+                problem%Kfact_arr(i,3,3) = problem%Kfact_arr(i,3,3) - problem%K1(i) / ( mu0 * problem%Ms(i) )
+                problem%Kfact_arr(i,6,1) = problem%Kfact_arr(i,6,1) - problem%K2(i) / ( mu0 * problem%Ms(i) )
+            end do
+        endif
     endif
 
     call trace%end( "ComputeAnisotropyTerm3D", itimer=itimer, verbose=1 )
@@ -2723,8 +2984,14 @@ subroutine add_near_field(problem, solution)
     stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(2)%A, problem%K_fmm_descr_s, solution%My_s, beta, temp)
     stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(3)%A, problem%K_fmm_descr_s, solution%Mz_s, beta, temp)
 
+    !--- Accumulated with '+', matching the CUDA branch above. That branch
+    !    calls cu_MVMult_GetH_sparse, which computes alpha*(K.M) with
+    !    alpha = pref = 1 and applies no negation of its own, so both paths
+    !    have to add K.M. This used to subtract, which put a systematic error
+    !    of order 10x the field norm on every non-CUDA FMM run - independent
+    !    of fmm_nterms, since it is not an expansion-order effect.
     !$omp critical (solution_update)
-    solution%HmX = solution%HmX - temp
+    solution%HmX = solution%HmX + temp
     !$omp end critical (solution_update)
     ! ---------------- Hy correction = xy*Mx + yy*My + yz*Mz ----------------
     beta = 0.0_SP
@@ -2734,7 +3001,7 @@ subroutine add_near_field(problem, solution)
     stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(5)%A, problem%K_fmm_descr_s, solution%Mz_s, beta, temp)
 
     !$omp critical (solution_update)
-    solution%HmY = solution%HmY - temp
+    solution%HmY = solution%HmY + temp
     !$omp end critical (solution_update)
     ! ---------------- Hz correction = xz*Mx + yz*My + zz*Mz ----------------
     beta = 0.0_SP
@@ -2744,7 +3011,7 @@ subroutine add_near_field(problem, solution)
     stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(6)%A, problem%K_fmm_descr_s, solution%Mz_s, beta, temp)
 
     !$omp critical (solution_update)
-    solution%HmZ = solution%HmZ - temp
+    solution%HmZ = solution%HmZ + temp
     !$omp end critical (solution_update)
     deallocate(temp)
 #endif

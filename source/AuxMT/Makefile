@@ -24,7 +24,7 @@ else
 	OPT =
 	LIB_SUFFIX = .a
 	ifeq (${UNAME}, Darwin)
-  		LIBTOOL = libtool -static -o $@ $?
+  		LIBTOOL = libtool -static -o $@ $^
 	else
   		LIBTOOL = ar src $@ $?
 	endif

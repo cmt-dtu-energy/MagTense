@@ -17,13 +17,25 @@ jobs:
       matrix:
         CVODE-compile: [CVODE,noCVODE]
         CUDA-compile: [CUDA,noCUDA]
-    runs-on: [windows-latest]
+    # CUDA 12.8's nvcc only supports host compilers up to VS 2022, but
+    # windows-latest and windows-2025 both moved to VS 2026 in June 2026 and no
+    # longer carry VS 2022 at all. windows-2022 is GitHub's supported fallback.
+    # Lifting this pin requires a CUDA version that accepts a newer host
+    # compiler, which means re-pinning cuda-* in python/.build/env-*-win.yml.
+    runs-on: [windows-2022]
     needs: [build-cvode]
     env:
       build_file: python/.build/env-313-win.yml
     steps:
       - uses: actions/checkout@v4
-   
+        with:
+          # FMM3D lives in external/FMM3D as a submodule; without this it is
+          # not fetched and 'make fmm3d' has nothing to build.
+          submodules: recursive
+
+      - name: Win - Select FMM3D make.inc
+        run: Copy-Item external/FMM3D/make.inc.windows external/FMM3D/make.inc
+
       - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -32,11 +44,37 @@ jobs:
           environment-file: ${{ env.build_file }}
           use-mamba: true
 
-      - name: Check the directory of Visual Studio
-        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      # The runner image updates both the Visual Studio edition/year and the
+      # MSVC toolset version, so those paths cannot be hardcoded. Resolve them
+      # once here and reuse them via the environment in the steps below.
+      - name: Locate Visual Studio and the MSVC toolset
+        shell: pwsh
         run: |
-          dir "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\"
-          
+          $ErrorActionPreference = "Stop"
+
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found at $vswhere" }
+
+          Write-Host "Visual Studio instances present on this image:"
+          & $vswhere -all -products * -property installationPath
+
+          # nvcc rejects any host compiler newer than VS 2022 (see crt/host_config.h),
+          # and runner images now also ship VS 2026, so restrict the search to
+          # [15.0,18.0) = VS 2017..2022 rather than taking whatever is newest.
+          $vsDir = & $vswhere -latest -products * -version "[15.0,18.0)" -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsDir) { throw "No Visual Studio 2017-2022 installation with the MSVC toolset was found; nvcc does not support newer versions." }
+
+          $versionFile = Join-Path $vsDir "VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt"
+          $toolsVersion = (Get-Content $versionFile -Raw).Trim()
+          $hostBin = Join-Path $vsDir "VC\Tools\MSVC\$toolsVersion\bin\Hostx64\x64"
+          if (-not (Test-Path (Join-Path $hostBin "cl.exe"))) { throw "cl.exe not found in $hostBin" }
+
+          Write-Host "VS_INSTALL_DIR=$vsDir"
+          Write-Host "MSVC_HOST_BIN=$hostBin"
+
+          Add-Content -Path $env:GITHUB_ENV -Value "VS_INSTALL_DIR=$vsDir"
+          Add-Content -Path $env:GITHUB_ENV -Value "MSVC_HOST_BIN=$hostBin"
+
       - name: Download cvode (sundials-7.2.1)
         uses: actions/download-artifact@v4
         with:
@@ -53,14 +91,13 @@ jobs:
         shell: bash -el {0}
         working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
         run: |
-          nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64" -o MagTenseCudaBlas.obj
+          nvcc -c MagTenseCudaBlas.cu -ccbin "$MSVC_HOST_BIN" -o MagTenseCudaBlas.obj
 
       - name: Make the wrapper for the CUDA file using icx in a Developer PowerShell for VS 2022
         if: ${{ matrix.CUDA-compile == 'CUDA' }}
         shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
         run: |
-          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-          .\Launch-VsDevShell.ps1
+          & "$env:VS_INSTALL_DIR\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -HostArch amd64
           cd ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
           make wrap
           ls
@@ -69,14 +106,23 @@ jobs:
         env:
           CUDA: ${{ matrix.CUDA-compile == 'noCUDA' && '0' || '1' }}
           CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
-        shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+        # No -NoExit: it keeps the shell alive past the script and masks the
+        # exit code, so a failed make would pass this step and only surface
+        # later as missing symbols at MEX link time.
+        shell: pwsh -ExecutionPolicy ByPass -File {0}
         run: |
-          cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-          .\Launch-VsDevShell.ps1
+          & "$env:VS_INSTALL_DIR\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -HostArch amd64
           conda info
           cd ${{ github.workspace }}
           pwd
-          make auxmt magnetostatic micromagnetism forceintegrator USE_CUDA=$env:CUDA USE_CVODE=$env:CVODE USE_MATLAB=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
+
+          # The MATLAB targets do not depend on fmm3d the way 'all' and
+          # 'python' do, so the archive has to be built explicitly.
+          make fmm3d USE_FMM3D=1
+          if ($LASTEXITCODE -ne 0) { throw "make fmm3d failed (exit $LASTEXITCODE)" }
+
+          make auxmt magnetostatic micromagnetism forceintegrator USE_CUDA=$env:CUDA USE_CVODE=$env:CVODE USE_MATLAB=1 USE_FMM3D=1 MATLAB_INCLUDE=D:/hostedtoolcache/windows/MATLAB/2024.2.999/x64/extern/include
+          if ($LASTEXITCODE -ne 0) { throw "make of the MagTense libraries failed (exit $LASTEXITCODE)" }
       
       - name: Setup a symbolic link to the ifx compiler so that Matlab's "mex -setup FORTRAN" can find it
         shell: powershell
@@ -93,7 +139,7 @@ jobs:
         run: |
           cd C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\usr
           move bin bin_renamed
-          cmd /c mklink /D bin "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\" 
+          cmd /c mklink /D bin "$env:MSVC_HOST_BIN"
       
       - name: Compile MEX code using Matlab with or without CUDA
         env:
@@ -101,7 +147,7 @@ jobs:
           CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
         uses: matlab-actions/run-command@v2
         with:
-          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_RELEASE',true,'USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib');
+          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_RELEASE',true,'USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'USE_FMM3D',true,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib');
        
       - name: Check created MEX-files
         shell: bash -el {0}
@@ -163,7 +209,23 @@ jobs:
       shell: cmd /C CALL {0}
       run: |
         "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE)"
-          
+
+    # Pinned to one MATLAB release: the multi-version matrix exists to catch
+    # MEX compatibility problems, which Standard_problem_4 already covers.
+    # This step validates FMM numerics, so running it 6 more times per CUDA
+    # variant would double the job time for no extra signal.
+    #
+    # Runs on both the CUDA and noCUDA legs. The CPU near-field path was
+    # verified against the CUDA one after the sign fix in add_near_field:
+    # both agree with the direct reference to ~2e-4 at fmm_nterms = 6.
+    - name: Run the FMM accuracy test
+      if: ${{ matrix.mat-version == 'R2024b' }}
+      env:
+        CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
+      shell: cmd /C CALL {0}
+      run: |
+        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "USE_CUDA = logical(str2num(getenv('CUDA'))); cd('C:\actions-runner\_work\MagTense\MagTense\matlab\tests\fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA)"
+
 #################################
 
   build-linux:
@@ -184,6 +246,13 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        # FMM3D lives in external/FMM3D as a submodule; without this it is
+        # not fetched and 'make fmm3d' has nothing to build.
+        submodules: recursive
+
+    - name: Linux - Select FMM3D make.inc
+      run: cp external/FMM3D/make.inc.linux external/FMM3D/make.inc
 
     - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v3
@@ -223,7 +292,11 @@ jobs:
           CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
           MATLAB: ${{ matrix.mat-version == 'R2024a' && '1' || '2' }}
       working-directory: ${{ github.workspace }}
-      run: make auxmt magnetostatic micromagnetism cuda forceintegrator USE_CUDA=$CUDA USE_CVODE=$CVODE USE_MATLAB=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.$MATLAB.999/x64/extern/include
+      run: |
+        # The MATLAB targets do not depend on fmm3d the way 'all' and 'python'
+        # do, so the archive has to be built explicitly.
+        make fmm3d USE_FMM3D=1
+        make auxmt magnetostatic micromagnetism cuda forceintegrator USE_CUDA=$CUDA USE_CVODE=$CVODE USE_MATLAB=1 USE_FMM3D=1 MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.$MATLAB.999/x64/extern/include
       #MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.1.999/x64/extern/include for R2024a
       #MATLAB_INCLUDE=/opt/hostedtoolcache/MATLAB/2024.2.999/x64/extern/include for R2024b 
    
@@ -233,7 +306,7 @@ jobs:
           CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
       uses: matlab-actions/run-command@v2
       with:
-        command: cd('matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); buildMagTenseMEX('USE_RELEASE', true, 'USE_CUDA', USE_CUDA, 'USE_CVODE', USE_CVODE);  
+        command: cd('matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); buildMagTenseMEX('USE_RELEASE', true, 'USE_CUDA', USE_CUDA, 'USE_CVODE', USE_CVODE, 'USE_FMM3D', true);  
 
     - name: Archive MEX-files
       uses: actions/upload-artifact@v4
@@ -307,6 +380,23 @@ jobs:
         CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }} 
       run: |
         /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE)";
+
+    - name: Run the FMM accuracy test
+      if: ${{ matrix.os-version == 'ubuntu-latest' && matrix.mat-version == 'R2024a' }}
+      continue-on-error: true
+      uses: matlab-actions/run-command@v2
+      env:
+        CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
+      with:
+        command: USE_CUDA = logical(str2num(getenv('CUDA'))); cd('matlab/tests/fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA);
+
+    - name: Run the FMM accuracy test with CUDA
+      if: ${{ matrix.os-version == 'ubuntu_CUDA' && matrix.mat-version == 'R2024a' }}
+      continue-on-error: true
+      env:
+        CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
+      run: |
+        /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "USE_CUDA = logical(str2num(getenv('CUDA'))); cd('matlab/tests/fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA)";
 
 
   build-cvode:

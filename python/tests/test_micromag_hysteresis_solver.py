@@ -134,7 +134,13 @@ class HysteresisSolverTests(unittest.TestCase):
 
         self.assertEqual(captured["hysteresis_solver"], 2)
         self.assertEqual(captured["maxhextsteps"], 4)
-        self.assertEqual(captured["nt_hext_out"], 4)
+        # The Fortran loop stores the starting field in slot 1 and then one slot per accepted
+        # step, so it needs max_steps + 1 slots. Sizing these to max_steps overran
+        # problem%Hext by one row on the last step and made the copy-out of M/H a
+        # non-conforming array assignment.
+        self.assertEqual(captured["nt_hext"], 5)
+        self.assertEqual(captured["nt_hext_out"], 5)
+        self.assertEqual(captured["hext"].shape, (5, 4))
         np.testing.assert_array_equal(captured["h_start"], [0.0, 0.0, 1.0])
         np.testing.assert_array_equal(captured["h_end"], [0.0, 0.0, -1.0])
         self.assertEqual(captured["dh_initial"], 0.5)

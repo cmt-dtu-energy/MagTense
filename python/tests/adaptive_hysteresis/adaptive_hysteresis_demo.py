@@ -168,6 +168,9 @@ def create_problem(config: DemoConfig, hysteresis_solver: str) -> MicromagProble
         cuda=False,
         cvode=False,
         useavgn=1,
+        # This script plots the applied field from result[4], so the individual H
+        # components have to be returned.
+        usereturnhall=True,
     )
 
     # The easy axis is stored once per tile even though this example is uniform.

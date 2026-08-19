@@ -91,7 +91,10 @@ CONTAINS
     !-------------------- Allocate per-thread state ----------------------------
     if (allocated(trace%t)) deallocate(trace%t)
 
-    trace%nthreads = omp%max_threads
+    ! Guard against omp%max_threads still being -1 (its default) when trace is
+    ! used via the lazy-init path before omp%init() has run; otherwise the array
+    ! would be allocated with extent 0 and trace%t(0) would be out of bounds.
+    trace%nthreads = max(1, omp%max_threads)
     allocate(trace%t(0:trace%nthreads-1))
     trace%t(:)%level = 0
     !---------------------------------------------------------------------------

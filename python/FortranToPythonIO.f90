@@ -151,7 +151,7 @@ module FortranToPythonIO
         real(8),dimension(n_pts,3) :: H_tmp
         real(8),dimension(n_tiles,n_pts,3,3),intent(inout) :: N
         logical,intent(in) :: useStoredN
-        real,intent(in),dimension(n_pts,3), optional :: Obs_size
+        real(8),intent(in),dimension(n_pts,3), optional :: Obs_size
 
         type(MagTile),dimension(n_tiles) :: tiles
         integer :: i
@@ -303,6 +303,14 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
     interface 
     subroutine lfmm3d_t_d_g(eps,nsource,source,dipvec,ntarg,targ,pottarg,gradtarg,ier)
         implicit none
+        ! FMM3D is built without /assume:underscore /names:lowercase (see
+        ! external/FMM3D/make.inc.windows), so on Windows it exports the
+        ! default upper-case name while this file, compiled with those
+        ! options, would otherwise look for lfmm3d_t_d_g_. On Linux both
+        ! sides already agree on the default lower-case form.
+#ifdef _WIN32
+        !DEC$ ATTRIBUTES ALIAS:"LFMM3D_T_D_G" :: lfmm3d_t_d_g
+#endif
         integer(8), intent(in) :: nsource, ntarg
         real(8),    intent(in) :: eps
         real(8) :: source(3,nsource), dipvec(3,nsource), targ(3,ntarg)
@@ -311,6 +319,9 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
     end subroutine lfmm3d_t_d_g
     subroutine lfmm3d_s_d_g(eps,nsource,source,dipvec,pot,grad,ier)
         implicit none
+#ifdef _WIN32
+        !DEC$ ATTRIBUTES ALIAS:"LFMM3D_S_D_G" :: lfmm3d_s_d_g
+#endif
         integer(8), intent(in) :: nsource
         real(8),    intent(in) :: eps
         real(8) :: source(3,nsource), dipvec(3,nsource)
@@ -376,8 +387,6 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
    if (do_FI .eq. 1) then
     if (do_target .eq. 1) then
         call lfmm3d_t_d_g(eps, nsource, source, dipvec_s, ntarg, targ, pottarg, gradtarg, ier8)
-        print *, "ntarg ", ntarg, " targ = ", targ
-        print *, " gradtarg", gradtarg
     else
         call lfmm3d_s_d_g(eps, nsource, source, dipvec_s, pot, grad_s, ier8)
     end if
@@ -388,8 +397,11 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
         call fmm_tree%build_tree( source, eps, cells_per_node, ier, ifunif, nlmin, nlmax)
         call fmm_tree%make_and_eval(dipvec, grad)
         !missing direvt eval
+        !dealloc releases the source array as well, since build_tree takes ownership of it, so
+        !drop our own reference to it here rather than deallocating it a second time below.
         call fmm_tree%dealloc()
         deallocate(fmm_tree)
+        nullify(source)
    end if
 
 
@@ -408,8 +420,9 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
         end do
     end if
 
-    deallocate(source, dipvec, grad)
-    deallocate(targ, pottarg, gradtarg)
+    if (associated(source)) deallocate(source)
+    deallocate(dipvec, grad)
+    deallocate(targ, pottarg, gradtarg, pot)
 #else 
     !------------------ Fallback implementation when USE_FMM3D=0 ------------------
     print *, "WARNING: getHFromTilesFMM called but MagTense built without FMM3D support. - Returning zero field." 
@@ -639,7 +652,7 @@ end subroutine getHFromTilesFMM
 
 
     subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-        K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, temperature, MaxT0, nt_Hext, n_Hext, nt_Hext_out, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+        K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, temperature, MaxT0, nt_Hext, nt_Hext_out, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
         N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
         exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, useAvgN, demigstp, & 
@@ -648,9 +661,14 @@ end subroutine getHFromTilesFMM
         H_start, H_end, dH_initial, dH_min, dH_max, maxHextSteps, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH, use_switch_refine, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, n_Hext_accepted, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useFMM, &
-        log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, useDemag )
+        log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, useDemag, rng_seed )
 
-        integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, n_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
+        !nt_Hext is the number of rows in the Hext array; nt_Hext_out is the third extent of the
+        !returned M and H arrays. There used to be a third, n_Hext, which was accepted and declared
+        !but never referenced anywhere in this routine - the number of distinct applied fields is
+        !taken from size(problem%Hext,1) inside the solver. It has been removed rather than left as
+        !a parameter that looks meaningful from the Python side.
+        integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
         integer(4), intent(in) :: nt_Hext_out
         integer(4),dimension(3),intent(in) :: grid_n, N_ave
         real(8),dimension(3),intent(in) :: grid_L
@@ -664,7 +682,11 @@ end subroutine getHFromTilesFMM
         real(8),dimension(nt_Hext, 4),intent(in) :: Hext
         real(8),dimension(3*ntot),intent(in) :: m0
         real(8),dimension(nt_alpha,2),intent(in) :: alphat
-        integer(4),dimension(exch_nval),intent(in) :: exch_val, exch_cols, exch_rows
+        !The exchange operator values are real. Declaring them integer(4) here made f2py generate
+        !an 'i' argument, and it force-casts the float64 array from Python to int32 without an
+        !error - which destroys entries of order 1/dx**2. rows/cols stay integer.
+        real(8),dimension(exch_nval),intent(in) :: exch_val
+        integer(4),dimension(exch_nval),intent(in) :: exch_cols, exch_rows
         real(8),dimension(nt_conv),intent(in) :: t_conv
 		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab, useAvgN
 		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch, useDemag
@@ -702,6 +724,10 @@ end subroutine getHFromTilesFMM
         integer(4), intent(in) :: fmm_min_n
         integer(4), intent(in) :: fmm_nterms
         integer(4), intent(in) :: useFMM
+        !> Seed for the stochastic thermal field: 0 keeps the compiler default sequence (identical
+        !> on every run), a positive value seeds deterministically, a negative value seeds from the
+        !> clock so that repeated runs are independent Monte-Carlo samples.
+        integer(4), intent(in) :: rng_seed
 
         !-------------------- timer and trace modules --------------------------------------
         character*256,intent(in) :: timer_log_file, trace_log_file, log_dir
@@ -712,7 +738,6 @@ end subroutine getHFromTilesFMM
         
         logical :: window_enabled_l, trace_enabled_l, flush_each_l
         logical :: use_fmm
-        integer,dimension(3) :: exchPBC_l
         !! Local auxiliary instance - avoids referencing the auxInit_mod module
         !! global across the f2py name-mangling boundary on Windows.
         type(auxInit_t) :: auxInit_local
@@ -731,7 +756,11 @@ end subroutine getHFromTilesFMM
 
 
 
-        exchPBC_l = merge(.true., .false., exchPBC /= 0)
+        !exchPBC is an integer flag per direction at both ends of this call - loadMicroMagProblem
+        !takes integer(4) and stores it in problem%macrogrid%exchPBC, which is integer - so it is
+        !passed straight through. It used to be routed through a local declared integer but
+        !assigned from merge(.true., .false., ...), which is a logical-to-integer assignment that
+        !only compiles as an Intel extension and that gfortran rejects outright.
         use_fmm = merge(.true., .false., useFMM /= 0)
         call loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
             gamma, alpha_mm, temperature, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
@@ -739,9 +768,9 @@ end subroutine getHFromTilesFMM
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
             exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
             CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
-            n_macro, shiftVec, macroShape, sampleShape, exchPBC_l, &
+            n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
             passExch, exch_ncols, CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
-            useDemag)
+            useDemag, rng_seed)
 
         if (hysteresis_solver .eq. 2) then
             problem%adaptiveHext = .true.
@@ -771,10 +800,23 @@ end subroutine getHFromTilesFMM
         t_out = solution%t_out
         M_mm = solution%M_out
         pts = solution%pts
-        H_exc = solution%H_exc
-        H_ext = solution%H_ext
-        H_dem = solution%H_dem
-        H_ani = solution%H_ani
+
+        !solution%H_* are only allocated at the full (nt, ntot, nt_Hext, 3) size when
+        !useReturnHall is set; otherwise they are a (1,1,1,3) placeholder. Copying the placeholder
+        !into these full-size intent(out) arrays is a non-conforming array assignment, and it left
+        !the caller holding uninitialised memory - values of order 1e+60 and 1e-227 were coming
+        !back. Return explicit zeros in that case instead.
+        if ( useReturnHall .eq. 1 ) then
+            H_exc = solution%H_exc
+            H_ext = solution%H_ext
+            H_dem = solution%H_dem
+            H_ani = solution%H_ani
+        else
+            H_exc = 0.
+            H_ext = 0.
+            H_dem = 0.
+            H_ani = 0.
+        endif
 		n_Hext_accepted = problem%nHextAccepted
 				n_tot_Exch = solution%gridinfo%Exch_mat_ntot
 

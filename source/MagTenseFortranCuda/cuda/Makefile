@@ -17,7 +17,7 @@ ifeq ($(OS),Windows_NT)
     OBJ_SUFFIX = .obj
     CPPFLAGS = /nologo
     CPPFLAGS_OUT = /Fo:
-    LIBTOOL = LIB $? /NOLOGO /OUT:$@
+    LIBTOOL = LIB $^ /NOLOGO /OUT:$@
     LIB_SUFFIX = .lib
 else
     OBJ_SUFFIX = .o
@@ -26,7 +26,7 @@ else
     CPPFLAGS_OUT = -o 
     LIB_SUFFIX = .a
     ifeq (${UNAME}, Darwin)
-        LIBTOOL = libtool -static -o $@ $?
+        LIBTOOL = libtool -static -o $@ $^
     else
         LIBTOOL = ar src $@ $?
     endif

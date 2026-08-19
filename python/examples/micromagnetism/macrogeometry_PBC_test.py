@@ -65,7 +65,7 @@ testAxes = (0, 1, 2)
 controlAxis = 0
 
 # Timestepping
-t_end = 1e-7                                 # Total time simulated [s]
+t_end = 2e-7                                 # Total time simulated [s]
 t_step = 1e-10                               # Requested output spacing [s]
 nTimesteps = int(round(t_end / t_step)) + 1  # Include both time endpoints
 # The output spacing only sets how densely theta(t) is sampled - RKSuite picks its own
@@ -209,6 +209,12 @@ def run_case(testAxis: int, A: float):
         m0=m0_pv,
         cuda=cuda,
         cvode=cvode,
+        # The averaged demagnetisation tensor is the library default, but the analytical
+        # prefactor this test is built on does not hold for it: with useavgn=True the moments
+        # rotate straight past the fixed point (drift of ~3.9 rad rather than ~7e-3) and both
+        # controls overshoot their targets. Evaluated at the cell centres the critical point
+        # is reproduced to better than 1e-2 rad, so the test opts out explicitly.
+        useavgn=False,
         n_macro=n_macro,
         shiftVec=shiftVec,
         grid_L=grid_L,
@@ -218,6 +224,11 @@ def run_case(testAxis: int, A: float):
         # solver='explicit',
         T=T,
     )
+
+    # The FMM demag path segfaults on this two tile, effectively one dimensional geometry when
+    # the library is built with USE_FMM3D=1, and an octree is pointless for two tiles anyway.
+    # std_problem_3.py disables it the same way.
+    problem.use_fmm = 0
 
     # Easy-axis anisotropy perpendicular to the axis of periodicity
     problem.u_ea = np.zeros([2, 3])
@@ -243,100 +254,129 @@ def run_case(testAxis: int, A: float):
 
 axis_names = ("x", "y", "z")
 
-# The analytical prefactor decides where theta is heading, and vanishes at the critical spacing
-print('Analytical prefactor (>0 drives theta to 0, <0 drives theta to pi/2, 0 means no torque):')
-for A in (A_crit, A_wide, A_narrow):
-    print(f'  A = {A:.4e} m : {prefactor(a/(2*A), K, Ms):+.4e}')
 
-runs = [(axis, A_crit, 'critical') for axis in testAxes]
-runs += [(controlAxis, A_wide, 'wide'), (controlAxis, A_narrow, 'narrow')]
+def run_test(plotting: bool = True) -> list[dict]:
+    """Run the macrogeometry PBC test and return the checks it consists of.
 
-print('Run simulations')
-results = {}
-for testAxis, A, label in tqdm(runs):
-    results[(testAxis, label)] = run_case(testAxis, A)
-print('Done running simulations')
+    Each check is a dict with the keys 'check', 'value', 'limit' and 'passed', where the test
+    passes when value < limit. This is the contract used by testMagTenseFunctions.py.
+    """
+    # The analytical prefactor decides where theta is heading, and vanishes at the critical spacing
+    print('Analytical prefactor (>0 drives theta to 0, <0 drives theta to pi/2, 0 means no torque):')
+    for A in (A_crit, A_wide, A_narrow):
+        print(f'  A = {A:.4e} m : {prefactor(a/(2*A), K, Ms):+.4e}')
 
-#%% Check the results
+    runs = [(axis, A_crit, 'critical') for axis in testAxes]
+    runs += [(controlAxis, A_wide, 'wide'), (controlAxis, A_narrow, 'narrow')]
 
-passed = True
+    print('Run simulations')
+    results = {}
+    for testAxis, A, label in tqdm(runs):
+        results[(testAxis, label)] = run_case(testAxis, A)
+    print('Done running simulations')
 
-# At the critical spacing theta must stay at its initial value of pi/4 along every axis
-for testAxis in testAxes:
-    t_n, theta1_n, theta2_n = results[(testAxis, 'critical')]
-    drift = float(np.max(np.abs(theta1_n - np.pi/4)))
-    asymmetry = float(np.max(np.abs(theta1_n - theta2_n)))
-    ok = drift < angle_tol and asymmetry < angle_tol
-    passed = passed and ok
-    verdict = 'works' if ok else 'FAILED'
-    print(f'Macrogeometry PBC {verdict} along {axis_names[testAxis]}: '
-          f'max |theta - pi/4| = {drift:.2e} rad, max |theta_1 + theta_2| = {asymmetry:.2e} rad')
+    checks = []
 
-# The controls must actually move, and in the direction the analytical prefactor predicts
-for label, A, target in (('wide', A_wide, np.pi/2), ('narrow', A_narrow, 0.0)):
-    t_n, theta1_n, _ = results[(controlAxis, label)]
-    moved = float(theta1_n[-1] - theta1_n[0])
-    expected = target - np.pi/4
-    ok = abs(theta1_n[-1] - target) < control_tol and np.sign(moved) == np.sign(expected)
-    passed = passed and ok
-    verdict = 'works' if ok else 'FAILED'
-    print(f'Control at A = {A:.4e} m {verdict}: theta went from {theta1_n[0]:.4f} to '
-          f'{theta1_n[-1]:.4f} rad, expected {target:.4f}')
+    # At the critical spacing theta must stay at its initial value of pi/4 along every axis
+    for testAxis in testAxes:
+        t_n, theta1_n, theta2_n = results[(testAxis, 'critical')]
+        drift = float(np.max(np.abs(theta1_n - np.pi/4)))
+        asymmetry = float(np.max(np.abs(theta1_n - theta2_n)))
+        ok = drift < angle_tol and asymmetry < angle_tol
+        verdict = 'works' if ok else 'FAILED'
+        print(f'Macrogeometry PBC {verdict} along {axis_names[testAxis]}: '
+              f'max |theta - pi/4| = {drift:.2e} rad, '
+              f'max |theta_1 + theta_2| = {asymmetry:.2e} rad')
+        checks.append({
+            'check': f'PBC along {axis_names[testAxis]}: theta constant at critical A',
+            'value': drift, 'limit': angle_tol, 'passed': drift < angle_tol,
+        })
+        checks.append({
+            'check': f'PBC along {axis_names[testAxis]}: theta_1 = -theta_2',
+            'value': asymmetry, 'limit': angle_tol, 'passed': asymmetry < angle_tol,
+        })
 
-print('macrogeometry_PBC_test PASSED' if passed else 'macrogeometry_PBC_test FAILED')
+    # The controls must actually move, and in the direction the analytical prefactor predicts
+    for label, A, target in (('wide', A_wide, np.pi/2), ('narrow', A_narrow, 0.0)):
+        t_n, theta1_n, _ = results[(controlAxis, label)]
+        moved = float(theta1_n[-1] - theta1_n[0])
+        expected = target - np.pi/4
+        distance = float(abs(theta1_n[-1] - target))
+        right_way = np.sign(moved) == np.sign(expected)
+        ok = distance < control_tol and right_way
+        verdict = 'works' if ok else 'FAILED'
+        print(f'Control at A = {A:.4e} m {verdict}: theta went from {theta1_n[0]:.4f} to '
+              f'{theta1_n[-1]:.4f} rad, expected {target:.4f}')
+        checks.append({
+            'check': f'control, A {label}: theta reaches {target:.3f} rad',
+            # A wrong direction is reported as a failure however close the endpoint happens to be
+            'value': distance if right_way else float('inf'),
+            'limit': control_tol, 'passed': ok,
+        })
 
-#%% Plot results
+    if plotting:
+        plot_results(results)
 
-# Make figure
-fig, ax = plt.subplots(layout='constrained', figsize=(6, 4))
-# Plot control tests with non-critical spacing
-label_wide = r'$A > A_\text{crit}, \text{should go to } \frac{\pi}{2}$'
-label_narrow = r'$A < A_\text{crit}, \text{should go to } 0$'
-labelDict = {'narrow': label_narrow, 'wide': label_wide}
-for label, colour in zip(('narrow', 'wide'), ('darkorange', 'purple')):
-    t_n, theta1_n, _ = results[(controlAxis, label)]
-    ax.plot(t_n * 1e9, theta1_n, color=colour, linestyle='--',
-            label=labelDict[label])
-# Plot test with critical spcing and PBC along x
-t_n, theta1_n, _ = results[(0, 'critical')]
-ax.plot(t_n * 1e9, theta1_n, color='forestgreen',
-        label=r'$A = A_\text{crit}, \text{should be constant}$')
-ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
-ax.set_ylabel(r'$\text{Polar angle}$')
-ax.set_yticks([0, np.pi/4, np.pi/2])
-ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
-ax.legend(loc='best', fontsize='14')
+    return checks
 
-# Save the figure beside the other micromagnetic example results and close it so the
-# script does not open an interactive plotting window.
-results_dir.mkdir(parents=True, exist_ok=True)
-figure_path = results_dir / "macrogeometry_PBC_test_periodic_along_x.png"
-fig.savefig(figure_path, dpi=300, bbox_inches="tight")
-plt.close(fig)
-print(f"Saved figure to {figure_path}")
 
-# Make second figure
-fig, ax = plt.subplots(layout='constrained', figsize=(6, 4))
-# Plot tests with critical spacing and PBC's along x, y and z
-critical_colours = ('forestgreen', 'crimson', 'navy')
-for i, testAxis in enumerate(testAxes):
-    t_n, theta1_n, _ = results[(testAxis, 'critical')]
-    ax.plot(t_n * 1e9, theta1_n - theta1_n[0], color=critical_colours[i % len(critical_colours)],
-            label=f'$\\text{{PBCs along {axis_names[testAxis]}}}$')
-ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
-ax.set_ylabel(r'$\text{Change in polar angle}$')
-angle_window = 10**(np.floor(np.log10(angle_tol*10)))
-ax.set_yticks([-angle_window, 0, angle_window])
-ax.set_ylim(-angle_window, angle_window)
-ax.set_yticklabels([f'$-10^{{{np.log10(angle_window):.0f}}}$', r'$0$', f'$10^{{{np.log10(angle_window):.0f}}}$'])
-ax.fill_between(np.array([t_n[0]*1e9, t_n[-1]*1e9]), np.array([-angle_tol, -angle_tol]), np.array([angle_tol, angle_tol]),
-                alpha=0.2, color='gray', label='Accepted interval')
-ax.legend(loc='best', fontsize='14')
+def plot_results(results) -> None:
+    """Two figures: the critical case against its controls, and the drift along each axis."""
+    results_dir.mkdir(parents=True, exist_ok=True)
 
-# Save the figure beside the other micromagnetic example results and close it so the
-# script does not open an interactive plotting window.
-results_dir.mkdir(parents=True, exist_ok=True)
-figure_path = results_dir / "macrogeometry_PBC_test_periodic_along_x_y_or_z.png"
-fig.savefig(figure_path, dpi=300, bbox_inches="tight")
-plt.close(fig)
-print(f"Saved figure to {figure_path}")
+    # ---- The critical spacing against the two controls, periodicity along x ----------------
+    fig, ax = plt.subplots(layout='constrained', figsize=(6, 4))
+    # Plot control tests with non-critical spacing
+    label_wide = r'$A > A_\text{crit}, \text{should go to } \frac{\pi}{2}$'
+    label_narrow = r'$A < A_\text{crit}, \text{should go to } 0$'
+    labelDict = {'narrow': label_narrow, 'wide': label_wide}
+    for label, colour in zip(('narrow', 'wide'), ('darkorange', 'purple'), strict=True):
+        t_n, theta1_n, _ = results[(controlAxis, label)]
+        ax.plot(t_n * 1e9, theta1_n, color=colour, linestyle='--', label=labelDict[label])
+    # Plot test with critical spacing and PBC along x
+    t_n, theta1_n, _ = results[(controlAxis, 'critical')]
+    ax.plot(t_n * 1e9, theta1_n, color='forestgreen',
+            label=r'$A = A_\text{crit}, \text{should be constant}$')
+    ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
+    ax.set_ylabel(r'$\text{Polar angle}$')
+    ax.set_yticks([0, np.pi/4, np.pi/2])
+    ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
+    ax.legend(loc='best', fontsize='14')
+
+    # Save the figure beside the other micromagnetic example results and close it so the
+    # script does not open an interactive plotting window.
+    figure_path = results_dir / "macrogeometry_PBC_test_periodic_along_x.png"
+    fig.savefig(figure_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved figure to {figure_path}")
+
+    # ---- The drift at the critical spacing along each axis, against the accepted band ------
+    fig, ax = plt.subplots(layout='constrained', figsize=(6, 4))
+    critical_colours = ('forestgreen', 'crimson', 'navy')
+    for i, testAxis in enumerate(testAxes):
+        t_n, theta1_n, _ = results[(testAxis, 'critical')]
+        ax.plot(t_n * 1e9, theta1_n - theta1_n[0],
+                color=critical_colours[i % len(critical_colours)],
+                label=f'$\\text{{PBCs along {axis_names[testAxis]}}}$')
+    ax.set_xlabel(r'$\text{Time } [\mathrm{ns}]$')
+    ax.set_ylabel(r'$\text{Change in polar angle}$')
+    angle_window = 10**(np.floor(np.log10(angle_tol*10)))
+    ax.set_yticks([-angle_window, 0, angle_window])
+    ax.set_ylim(-angle_window, angle_window)
+    ax.set_yticklabels([f'$-10^{{{np.log10(angle_window):.0f}}}$', r'$0$',
+                        f'$10^{{{np.log10(angle_window):.0f}}}$'])
+    ax.fill_between(np.array([t_n[0]*1e9, t_n[-1]*1e9]),
+                    np.array([-angle_tol, -angle_tol]), np.array([angle_tol, angle_tol]),
+                    alpha=0.2, color='gray', label='Accepted interval')
+    ax.legend(loc='best', fontsize='14')
+
+    figure_path = results_dir / "macrogeometry_PBC_test_periodic_along_x_y_or_z.png"
+    fig.savefig(figure_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved figure to {figure_path}")
+
+
+if __name__ == '__main__':
+    all_checks = run_test()
+    print('macrogeometry_PBC_test '
+          + ('PASSED' if all(c['passed'] for c in all_checks) else 'FAILED'))

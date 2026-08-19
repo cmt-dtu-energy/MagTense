@@ -16,6 +16,24 @@ MKFILE_PATH := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CVODE_ROOT = ${MKFILE_PATH}/cvode
 
 #=======================================================================
+#                    Recursive make on Windows
+#
+# Recipes are run through conda's msys sh, which mounts ${CONDA_PREFIX}/Library
+# as / and binds /bin to Library/usr/bin. The PATH entry Library/bin - the only
+# directory holding make.exe - is therefore translated to /bin, where it is
+# shadowed, and a recursive make invoked by name fails with
+#   /usr/bin/sh: line 1: make: command not found
+# Pinning MAKE to the absolute path of the conda make.exe makes every sub-make
+# resolve, no matter how the top-level make was invoked.
+#=======================================================================
+ifeq ($(OS),Windows_NT)
+	CONDA_MAKE := $(wildcard $(subst \,/,${CONDA_PREFIX})/Library/bin/make.exe)
+	ifneq ($(CONDA_MAKE),)
+		MAKE := $(CONDA_MAKE)
+	endif
+endif
+
+#=======================================================================
 #                    FMM3D integration (upstream Makefile)
 #=======================================================================
 FMM3D_DEBUG ?= 0
@@ -239,6 +257,37 @@ INCLUDE_OBJ = ${MKFILE_PATH}/${AUXMT_PATH} \
 PYTHON_MODN_ALL = _${PYTHON_MODN}${PY_MOD_SUFFIX}
 
 #=======================================================================
+#                    Build configuration consistency
+#
+# The USE_* settings are baked into the objects as preprocessor defines, so the
+# static libraries and the python extension have to be built with the same set.
+# Make cannot tell that a flag changed - the sources are unmodified, so nothing
+# is recompiled - and a mismatch therefore surfaces only as a wall of unresolved
+# symbols when the extension is linked. Building the libraries with USE_FMM3D=1
+# and then linking with USE_FMM3D=0 leaves every FMM3D symbol undefined, and the
+# reverse leaves the FMM3D entry points out of the extension.
+#
+# The settings are therefore recorded when the libraries are built and compared
+# before the extension is linked, so that a mismatch is reported in terms of the
+# flags that caused it.
+#=======================================================================
+BUILD_FLAGS_FILE := .build_flags
+BUILD_FLAGS := USE_CUDA=${USE_CUDA} USE_CVODE=${USE_CVODE} USE_MATLAB=${USE_MATLAB} USE_MICROMAG=${USE_MICROMAG} USE_FMM3D=${USE_FMM3D}
+
+# Written by the library targets once they have succeeded
+RECORD_FLAGS = @echo "${BUILD_FLAGS}" > ${BUILD_FLAGS_FILE}
+
+.PHONY: check-flags
+check-flags:
+	@if [ -f ${BUILD_FLAGS_FILE} ] && [ "`cat ${BUILD_FLAGS_FILE}`" != "${BUILD_FLAGS}" ]; then \
+		echo "ERROR: the libraries and this link step were configured differently."; \
+		echo "       libraries built with: `cat ${BUILD_FLAGS_FILE}`"; \
+		echo "       linking with:         ${BUILD_FLAGS}"; \
+		echo "       Re-run both steps with the same USE_* settings, or 'make clean' first."; \
+		exit 1; \
+	fi
+
+#=======================================================================
 #							Targets
 #=======================================================================
 .PHONY: all clean
@@ -249,7 +298,7 @@ standalone: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} standal
 
 python: $(PY_DEPS) ${AUXMT} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
 
-python-win: ${PYTHON_MODN_ALL}
+python-win: $(PY_DEPS) ${PYTHON_MODN_ALL}
 
 clean:
 	cd ${AUXMT_PATH} && ${MAKE} clean
@@ -262,6 +311,7 @@ clean:
 	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
 	rm -rf ${PYTHON_LIBPATH}/build
+	rm -f ${BUILD_FLAGS_FILE}
 
 clean_full:
 	cd ${FMM3D_DIR} && ${MAKE} clean
@@ -275,9 +325,11 @@ clean_full:
 	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
 	rm -rf ${PYTHON_LIBPATH}/build
+	rm -f ${BUILD_FLAGS_FILE}
 
 auxmt:
 	cd ${AUXMT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
+	${RECORD_FLAGS}
 
 clean-build:
 	rm -f ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
@@ -287,9 +339,11 @@ magnetostatic:
 	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 	cd ${DEMAG_FIELD_PATH}  && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	${RECORD_FLAGS}
 
 micromagnetism:
 	cd ${MICROMAG_PATH} && $(MAKE) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	${RECORD_FLAGS}
 
 cuda:
 	cd ${FORTRAN_CUDA_PATH} && $(MAKE) CPP=$(CPP)
@@ -328,7 +382,7 @@ test:
 
 
 
-${PYTHON_MODN_ALL}:
+${PYTHON_MODN_ALL}: check-flags
 	${CP_LIB}
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
 		python -m numpy.f2py -c -m ${PYTHON_MODN} \

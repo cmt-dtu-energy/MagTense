@@ -65,6 +65,9 @@ problem = MicromagProblem(
     cuda=False,
     cvode=False,
     useavgn=1,
+    # This script reads the applied field back from result[4], so the individual H
+    # components have to be returned.
+    usereturnhall=True,
 )
 
 # Set the uniaxial easy axis to z for every cell.

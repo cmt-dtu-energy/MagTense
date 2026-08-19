@@ -69,14 +69,10 @@
 					<Tool Name="VFFortranCompilerTool" AdditionalIncludeDirectories="../NumericalIntegration/x64/release/;../../../SpecialFunctions/SpecialFunctions/x64/release/;../TileDemagTensor/x64/release/" OpenMP="OpenMPParallelCode"/>
 				</FileConfiguration>
 			</File>
-			<File RelativePath=".\IterateMagnetSolution.f90">
-			</File>
-			<File RelativePath=".\MagParameters.f90">
-			</File>
-			<File RelativePath=".\MagTileIO.f90">
-			</File>
-			<File RelativePath=".\spline.f90">
-			</File>
+			<File RelativePath=".\IterateMagnetSolution.f90"/>
+			<File RelativePath=".\MagParameters.f90"/>
+			<File RelativePath=".\MagTileIO.f90"/>
+			<File RelativePath=".\spline.f90"/>
 		</Filter>
 	</Files>
 	<Globals/>

@@ -1,5 +1,7 @@
 import os
 import shutil
+import sys
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 
@@ -7,14 +9,26 @@ import numpy as np
 
 # Windows only
 if hasattr(os, "add_dll_directory"):
-    mkl_path = Path(__file__).parent / ".." / ".." / ".." / "Library" / "bin"
-    if Path.is_dir(mkl_path):
-        os.add_dll_directory(mkl_path)
+    # First entry is the installed layout
+    # (<prefix>/Lib/site-packages/magtense/../../../Library/bin), the second the
+    # active environment prefix, which is what applies when running from source.
+    dll_paths = [
+        Path(__file__).parent / ".." / ".." / ".." / "Library" / "bin",
+        Path(sys.prefix) / "Library" / "bin",
+    ]
 
     nvidia_path = Path(__file__).parent / ".." / "nvidia"
-    for lib in ["cublas", "cuda_runtime", "cusparse", "nvjitlink"]:
-        if Path.is_dir(nvidia_path / lib / "bin"):
-            os.add_dll_directory(nvidia_path / lib / "bin")
+    dll_paths += [
+        nvidia_path / lib / "bin"
+        for lib in ["cublas", "cuda_runtime", "cusparse", "nvjitlink"]
+    ]
+
+    for dll_path in dll_paths:
+        if Path.is_dir(dll_path):
+            os.add_dll_directory(dll_path)
+            # libifcoremd.dll resolves its own dependency on libmmd.dll through
+            # PATH, which add_dll_directory does not cover.
+            os.environ["PATH"] = f"{dll_path.resolve()}{os.pathsep}{os.environ['PATH']}"
 
 from magtense.lib import magtensesource
 
@@ -123,8 +137,12 @@ class MicromagProblem:
             cuda: bool = False,
             cvode: bool = False,
             usedemag: bool = True,
-            useavgn: bool = False,
-            usereturnhall: bool = True,
+            # True to match the MATLAB DefaultMicroMagProblem, which sets useAvgN = 1
+            useavgn: bool = True,
+            # False to match the MATLAB DefaultMicroMagProblem, which sets ReturnHall = 0.
+            # Set it to True to have run_simulation return H_exc/H_ext/H_dem/H_ani; leaving it
+            # off also avoids allocating four more (nt, ntot, nt_h_ext, 3) arrays.
+            usereturnhall: bool = False,
             precision: bool = False,
             n_threads: int = 1,
             N_ave: tuple[int] = (1, 1, 1),
@@ -136,6 +154,7 @@ class MicromagProblem:
             shiftVec: list | np.ndarray | None = np.zeros(3, dtype=np.float64),
             n_macro: list | np.ndarray | None = np.zeros(3),
             hysteresis_solver: str = "static",
+            rng_seed: int = 0,
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -218,6 +237,12 @@ class MicromagProblem:
         self.dem_appr = demag_approx
         self.cv = cv
 
+        # Seed for the stochastic thermal field, drawn inside Fortran. 0 keeps the compiler
+        # default sequence, which is identical on every run; a positive value seeds
+        # deterministically with that value; a negative value seeds from the clock, which is
+        # what independent Monte-Carlo runs need. NumPy's own seed has no effect on it.
+        self.rng_seed = int(rng_seed)
+
         self.nt_alpha = len(t_alpha)
         self.alphat = np.zeros(shape=(self.nt_alpha, 2), dtype=np.float64, order="F")
         self.alphat[:, 0] = t_alpha
@@ -260,7 +285,11 @@ class MicromagProblem:
         self.allow_fmm_short_circuit = 1
         self.fmm_min_n = 20000
         self.fmm_nterms = -1
-        self.use_fmm = 1
+        # Off by default: the FMM demag path only pays off for large problems, and it is
+        # ignored altogether unless the library is built with USE_FMM3D=1. Opting in
+        # explicitly means a problem does not silently change its demag path when the
+        # library is rebuilt with FMM enabled. Set `problem.use_fmm = 1` to use it.
+        self.use_fmm = 0
         #--------------------------------------------------
 
         #---------- timer and trace parameters ----------
@@ -526,6 +555,25 @@ class MicromagProblem:
             assert np.asarray(val).shape == (self.ntot, 3)
             self._m0 = np.asarray(val, dtype=np.float64, order="F")
 
+        # The LLG equation is written for a unit vector, so an un-normalised m0 silently
+        # rescales the effective field. MATLAB's DefaultMicroMagProblem.struct() has always
+        # checked and corrected this; do the same here rather than passing it through.
+        # Rows of zero length are left alone - there is no direction to normalise them to,
+        # and dividing them would turn them into NaN.
+        norm = np.linalg.norm(self._m0, axis=1)
+        nonzero = norm > 0
+        if np.any(~nonzero):
+            warnings.warn(
+                "Zero magnetization in initial array", RuntimeWarning, stacklevel=2
+            )
+        if np.any(np.abs(norm[nonzero] - 1.0) >= 1e-4):
+            warnings.warn(
+                "Initial magnetization array not normalized -- normalizing",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        self._m0[nonzero] /= norm[nonzero, np.newaxis]
+
     @property
     def dem_appr(self) -> int:
         return self._dem_appr
@@ -730,12 +778,7 @@ class MicromagProblem:
         else:
             nt_h_ext_out = nt_h_ext 
 
-        # Determine number of distinct external magnetic fields to solve for
-        if self.solver == 1: # explicit solver
-            n_h_ext = nt_h_ext
-        elif self.solver == 2: # dynamic solver
-            n_h_ext = 1
-        else:
+        if self.solver not in (1, 2):
             print("Only 'dynamic' and 'explicit' solvers are implemented")
 
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
@@ -756,7 +799,6 @@ class MicromagProblem:
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
             temperature=self.T,
-            n_hext=n_h_ext,
             maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             nt_hext_out = nt_h_ext_out,
@@ -840,7 +882,8 @@ class MicromagProblem:
             window_interval=self.window_interval,
             trace_enabled=self.trace_enabled,
             flush_each=self.flush_each,
-            trace_verbose=self.trace_verbose
+            trace_verbose=self.trace_verbose,
+            rng_seed=self.rng_seed
         )
 
         result = list(result)
@@ -891,12 +934,7 @@ class MicromagProblem:
         nt_h_ext = H_ext.shape[0]
         nt_h_ext_out = nt_h_ext
 
-        # Determine number of distinct external magnetic fields to solve for
-        if self.solver == 1: # explicit solver
-            n_h_ext = nt_h_ext
-        elif self.solver == 2: # dynamic solver
-            n_h_ext = 1
-        else:
+        if self.solver not in (1, 2):
             print("Only 'dynamic' and 'explicit' solvers are implemented")
 
 
@@ -918,7 +956,6 @@ class MicromagProblem:
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
             temperature=self.T,
-            n_hext=n_h_ext,
             maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             nt_hext_out = nt_h_ext_out,
@@ -1002,7 +1039,8 @@ class MicromagProblem:
             window_interval=self.window_interval,
             trace_enabled=self.trace_enabled,
             flush_each=self.flush_each,
-            trace_verbose=self.trace_verbose
+            trace_verbose=self.trace_verbose,
+            rng_seed=self.rng_seed
         )
 
         result = list(result)
@@ -1061,9 +1099,12 @@ class MicromagProblem:
         if not (0.0 < dH_shrink < 1.0):
             raise ValueError("dH_shrink must be between 0 and 1")
 
-        nt_h_ext = int(max_steps)
-        nt_h_ext_out = int(max_steps)
-        n_h_ext = int(max_steps)
+        # The Fortran loop records the starting field in slot 1 and then one slot per accepted
+        # step, so it needs max_steps + 1 slots. Sizing these to max_steps overran problem%Hext
+        # by one row on the last step and left the returned M/H arrays one field short of
+        # solution%M_out, which made the copy-out a non-conforming array assignment.
+        nt_h_ext = int(max_steps) + 1
+        nt_h_ext_out = int(max_steps) + 1
         use_switch_refine = switch_refine_dH is not None
         switch_refine_value = float(switch_refine_dH) if use_switch_refine else 0.0
         if use_switch_refine and switch_refine_value <= 0:
@@ -1090,7 +1131,6 @@ class MicromagProblem:
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
             temperature=self.T,
-            n_hext=n_h_ext,
             maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             nt_hext_out=nt_h_ext_out,
@@ -1174,7 +1214,8 @@ class MicromagProblem:
             window_interval=self.window_interval,
             trace_enabled=self.trace_enabled,
             flush_each=self.flush_each,
-            trace_verbose=self.trace_verbose
+            trace_verbose=self.trace_verbose,
+            rng_seed=self.rng_seed
         )
 
         result = list(result)

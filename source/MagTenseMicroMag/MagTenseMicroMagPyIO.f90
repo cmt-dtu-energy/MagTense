@@ -16,7 +16,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 	CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
 	n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
     passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
-    useDemag)
+    useDemag, rng_seed)
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
     integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols
     integer(4),dimension(3),intent(in) :: grid_n
@@ -30,7 +30,12 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     real(8),dimension(nt),intent(in) :: t
     real(8),dimension(3*ntot),intent(in) :: m0
     real(8),dimension(nt_alpha,2),intent(in) :: alphat
-    integer(4),dimension(exch_nval),intent(in) :: exch_val, exch_rows, exch_cols
+    !exch_val holds the non-zero entries of the exchange operator and lands in
+    !problem%grid%A_exch_load%values, which is real(DP). It used to be declared integer(4) here, so
+    !f2py force-cast the float64 array the caller passes down to int32 - and the entries scale as
+    !1/dx**2, i.e. ~1e17 on a nanometre mesh, so they overflowed outright.
+    real(8),dimension(exch_nval),intent(in) :: exch_val
+    integer(4),dimension(exch_nval),intent(in) :: exch_rows, exch_cols
     real(8),dimension(nt_conv),intent(in) :: t_conv
     integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
     integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, useAvgN, useDemag, demigstp, exch_meth, exch_intpn, passExch
@@ -58,7 +63,8 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     integer(4), intent(in) :: allow_fmm_short_circuit
     integer(4), intent(in) :: fmm_min_n
     integer(4), intent(in) :: fmm_nterms
-    logical, intent(in) :: use_fmm  
+    logical, intent(in) :: use_fmm
+    integer(4), intent(in) :: rng_seed
     logical :: ex
     integer, save :: itimer = 0
 
@@ -88,6 +94,9 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     problem%grid%dz = problem%grid%Lz / problem%grid%nz
 
     problem%grid%gridType = grid_type
+
+    !Seed for the stochastic thermal field
+    problem%rng_seed = rng_seed
 
     !Load macrogeometry information
     problem%macrogrid%n_macro = n_macro

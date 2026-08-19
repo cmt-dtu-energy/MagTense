@@ -18,7 +18,11 @@ jobs:
         py-version: [312, 313]
         cvode: [1]
         sys:
-          - { os: windows-latest, name: win, whl-arch: win_amd64 }
+          # Pinned to the last VS 2022 image: windows-latest and windows-2025
+          # moved to VS 2026 in June 2026, which oneAPI 2025.0 predates and
+          # CUDA 12.8's nvcc rejects. Keep this in step with the cvode libs
+          # this job links against.
+          - { os: windows-2022, name: win, whl-arch: win_amd64 }
           - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
 
     runs-on: ${{ matrix.sys.os }}
@@ -107,18 +111,27 @@ jobs:
 
     - name: Win - Compile Fortran source code and build Python wrapper
       if: ${{ runner.os == 'Windows' }}
-      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+      # -NoExit was masking the script's exit code, so a failed make still
+      # passed this step and produced a wheel with no extension module in it.
+      # $LASTEXITCODE has to be checked explicitly: a non-zero exit from a
+      # native command does not trip $ErrorActionPreference.
+      shell: pwsh -ExecutionPolicy ByPass -File {0}
       working-directory: ${{ github.workspace }}
       run: |
+        $ErrorActionPreference = "Stop"
+
         make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
+        if ($LASTEXITCODE -ne 0) { throw "make python failed for the cpu variant (exit $LASTEXITCODE)" }
         cp magtensesource.* ${{ github.workspace }}/python/cpu_libs/
         make clean
 
         make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
+        if ($LASTEXITCODE -ne 0) { throw "make python failed for the cu12 variant (exit $LASTEXITCODE)" }
         cp magtensesource.* ${{ github.workspace }}/python/cu12_libs/
         make clean
 
         make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0 USE_FMM3D=1
+        if ($LASTEXITCODE -ne 0) { throw "make python failed for the cu12-fmm variant (exit $LASTEXITCODE)" }
         cp magtensesource.* ${{ github.workspace }}/python/cu12-fmm_libs/
         cp external/FMM3D/local/libfmm3d.dll ${{ github.workspace }}/python/cu12-fmm_libs/
         make clean
@@ -182,7 +195,7 @@ jobs:
         py-version:
           - { name: 312, id: "3.12" }
           - { name: 313, id: "3.13" }
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-2022, ubuntu-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -378,7 +391,10 @@ jobs:
 
     - name: Python diagnostics after setup (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: powershell
+      # The self-hosted runner has a Restricted execution policy and a user
+      # profile.ps1, neither of which the built-in "powershell" shell copes
+      # with, so invoke it explicitly.
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
       run: |
         $ErrorActionPreference = "Stop"
 
@@ -398,7 +414,10 @@ jobs:
 
     - name: Show CUDA device info (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: powershell
+      # The self-hosted runner has a Restricted execution policy and a user
+      # profile.ps1, neither of which the built-in "powershell" shell copes
+      # with, so invoke it explicitly.
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
       run: |
         $ErrorActionPreference = "Stop"
 
@@ -411,16 +430,29 @@ jobs:
         MAGTENSE_USE_FMM3D: 1
         MAGTENSE_WHEEL_VARIANT: cu12-fmm
       run: |
+        # Same staleness hazard as the Windows leg below: this is a persistent
+        # self-hosted runner and the wheel version does not change between
+        # builds, so pip would skip the install and keep the previous wheel.
+        "$PYTHON_EXE" -m pip uninstall -y magtense
         "$PYTHON_EXE" -m pip install '${{ github.workspace }}'/*.whl
+        "$PYTHON_EXE" -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
         "$PYTHON_EXE" -m pip install pytest
         "$PYTHON_EXE" -m pytest python/tests/fmm_test/test_fmm_workflow.py
 
     - name: Install pip-wheel and pytest (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
-      shell: powershell
+      # The self-hosted runner has a Restricted execution policy and a user
+      # profile.ps1, neither of which the built-in "powershell" shell copes
+      # with, so invoke it explicitly.
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
       env:
         MAGTENSE_USE_FMM3D: 1
         MAGTENSE_WHEEL_VARIANT: cu12-fmm
+        # pytest's stdout is a pipe here, so without UTF-8 mode it encodes with
+        # cp1252 and dies on the non-ASCII status markers it echoes from the
+        # test subprocess. UTF-8 mode also makes text=True decode the child's
+        # output as UTF-8 rather than cp1252, so the table stays readable.
+        PYTHONUTF8: 1
       run: |
         $ErrorActionPreference = "Stop"
 
@@ -428,9 +460,18 @@ jobs:
         Write-Host "  $env:PYTHON_EXE"
         & $env:PYTHON_EXE --version
 
+        # These runners keep their conda envs between runs, and the wheel
+        # version string does not change from build to build, so a plain
+        # install is a no-op and silently leaves the previous wheel in place.
+        # Uninstall first rather than --force-reinstall, which would also
+        # redownload the ~1 GB of CUDA dependency wheels every run.
+        & $env:PYTHON_EXE -m pip uninstall -y magtense
+
         Get-ChildItem "$env:GITHUB_WORKSPACE\*.whl" | ForEach-Object {
           & $env:PYTHON_EXE -m pip install $_.FullName
         }
+
+        & $env:PYTHON_EXE -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
 
         & $env:PYTHON_EXE -m pip install pytest
         & $env:PYTHON_EXE -m pytest python/tests/fmm_test/test_fmm_workflow.py
@@ -441,7 +482,7 @@ jobs:
       matrix:
         py-version: [312, 313]
 
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     env:
       build_file: python/.build/env-${{ matrix.py-version }}-win.yml
@@ -452,10 +493,6 @@ jobs:
       with:
         sparse-checkout: |
           python/.build/
-
-    - name: Install VS2017 build tools
-      run: |
-        choco install visualstudio2017buildtools -y
 
     - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v3

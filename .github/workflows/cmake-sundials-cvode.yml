@@ -10,7 +10,11 @@ jobs:
   build-and-test:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        # windows-latest and windows-2025 both moved to Visual Studio 2026 in
+        # June 2026. oneAPI 2025.0 predates it, and CUDA 12.8's nvcc rejects it
+        # outright in matlab_package.yml, so pin the whole pipeline to the last
+        # VS 2022 image. See the CUDA note in matlab_package.yml.
+        os: [windows-2022, ubuntu-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -19,7 +23,16 @@ jobs:
       with:
         compiler: intel
         version: '2025.0'
-    
+
+    # icx-cl/ifx link against the MSVC CRT and Windows SDK, but oneAPI's
+    # setvars.bat does not pick up the toolset on the current runner image,
+    # leaving LIB without kernel32.lib etc. Set the MSVC env explicitly.
+    - name: Win - Setup msvc-dev-cmd
+      if: ${{ runner.os == 'Windows' }}
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: amd64
+
     # - uses: Jimver/cuda-toolkit@v0.2.22
     #   id: cuda-toolkit
     #   with:

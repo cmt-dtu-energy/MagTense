@@ -18,7 +18,16 @@ def std_prob_4(
     plotting: bool = True,
     figpath: Path | None = None,
     useavgn: bool = True,
-) -> list[float]:
+) -> tuple[list[float], list[float]]:
+    """Run the muMag standard problem 4 and compare with the published mean solutions.
+
+    Returns:
+        int_error: the integral of |M_MagTense - M_mumag| over the simulated second, for the
+            x, y and z component. Has units of seconds.
+        rel_int_error: the same integral divided by the integral of |M_mumag| and expressed in
+            percent. This is the same measure as calculate_relative_integral_error.m uses in the
+            MATLAB test suite, so the two can be compared directly.
+    """
     mu0 = 4 * np.pi * 1e-7
     grid_L = [500e-9, 125e-9, 3e-9]
 
@@ -169,6 +178,15 @@ def std_prob_4(
         np.trapezoid(np.abs(M_mumag[:, 2] - Magtense_My_interpolated), t),
         np.trapezoid(np.abs(M_mumag[:, 4] - Magtense_Mz_interpolated), t),
     ]
+    # Normalised the way the MATLAB test suite does it, so the acceptance limits carry over
+    reference = [
+        np.trapezoid(np.abs(M_mumag[:, 0]), t),
+        np.trapezoid(np.abs(M_mumag[:, 2]), t),
+        np.trapezoid(np.abs(M_mumag[:, 4]), t),
+    ]
+    rel_int_error = [
+        float(err / ref * 100) for err, ref in zip(int_error, reference, strict=True)
+    ]
 
     if plotting:
         _, ax1 = plt.subplots()
@@ -225,12 +243,13 @@ def std_prob_4(
             plot_M_thin_film(M_sq_dym[0], res, "Start_state", figpath=figpath)
             plot_M_thin_film(M_sq_dym[-1], res, "Final_state", figpath=figpath)
     print("int_error: ", int_error)
-    return int_error
+    print("rel_int_error [%]: ", rel_int_error)
+    return int_error, rel_int_error
 
 
 
 if __name__ == "__main__":
-    int_error = std_prob_4(
+    int_error, rel_int_error = std_prob_4(
         NIST_field=1,
         cuda=True,
         cvode=False,
