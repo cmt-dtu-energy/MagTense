@@ -17,7 +17,17 @@ def std_prob_4(
     mesh_file: str = "unstructured_grains_6_res_80_20_ref_2",
     plotting: bool = True,
     figpath: Path | None = None,
-) -> list[float]:
+    useavgn: bool = True,
+) -> tuple[list[float], list[float]]:
+    """Run the muMag standard problem 4 and compare with the published mean solutions.
+
+    Returns:
+        int_error: the integral of |M_MagTense - M_mumag| over the simulated second, for the
+            x, y and z component. Has units of seconds.
+        rel_int_error: the same integral divided by the integral of |M_mumag| and expressed in
+            percent. This is the same measure as calculate_relative_integral_error.m uses in the
+            MATLAB test suite, so the two can be compared directly.
+    """
     mu0 = 4 * np.pi * 1e-7
     grid_L = [500e-9, 125e-9, 3e-9]
 
@@ -41,16 +51,28 @@ def std_prob_4(
         grid_L=grid_L,
         m0=1 / np.sqrt(3),
         alpha=4.42e3,
+        gamma=0,
         grid_pts=grid_pts,
         grid_abc=grid_abc,
         grid_type=grid_type,
         cuda=cuda,
         cvode=cvode,
+        useavgn=useavgn,
     )
     h_ext = np.array([1, 1, 1]) / mu0
 
     def h_ext_fct_init(t) -> np.ndarray:
         return np.expand_dims(np.where(t < 1e-09, 1e-09 - t, 0), axis=1) * h_ext
+
+    problem_ini.use_fmm = 0
+    problem_ini.window_enabled = 0
+    problem_ini.window_interval = 30.0
+    problem_ini.trace_enabled = 0
+    problem_ini.flush_each = 1
+    problem_ini.trace_verbose = 2
+    problem_ini.timer_log_file =  "std_4_ini_timer.log"
+    problem_ini.trace_log_file =  "std_4_ini_trace.log"
+
 
     result = problem_ini.run_simulation(
         t_end=100e-9,
@@ -90,6 +112,7 @@ def std_prob_4(
         passexch=passexch,
         cuda=cuda,
         cvode=cvode,
+        useavgn=useavgn,
     )
 
     # Two applied external fields of std problem 4
@@ -102,6 +125,16 @@ def std_prob_4(
 
     def h_ext_fct(t) -> np.ndarray:
         return np.expand_dims(t > -1, axis=1) * (h_ext_nist / 1000 / mu0)
+
+
+    problem_dym.use_fmm = 0
+    problem_dym.window_enabled = 0
+    problem_dym.window_interval = 30.0
+    problem_dym.trace_enabled = 0
+    problem_dym.flush_each = 1
+    problem_dym.trace_verbose = 2
+    problem_dym.timer_log_file =  "std_4_dym_timer.log"
+    problem_dym.trace_log_file =  "std_4_dym_trace.log"
 
     t_dym, M_out = problem_dym.run_simulation(
         t_end=1e-9,
@@ -144,6 +177,15 @@ def std_prob_4(
         np.trapezoid(np.abs(M_mumag[:, 0] - Magtense_Mx_interpolated), t),
         np.trapezoid(np.abs(M_mumag[:, 2] - Magtense_My_interpolated), t),
         np.trapezoid(np.abs(M_mumag[:, 4] - Magtense_Mz_interpolated), t),
+    ]
+    # Normalised the way the MATLAB test suite does it, so the acceptance limits carry over
+    reference = [
+        np.trapezoid(np.abs(M_mumag[:, 0]), t),
+        np.trapezoid(np.abs(M_mumag[:, 2]), t),
+        np.trapezoid(np.abs(M_mumag[:, 4]), t),
+    ]
+    rel_int_error = [
+        float(err / ref * 100) for err, ref in zip(int_error, reference, strict=True)
     ]
 
     if plotting:
@@ -200,17 +242,21 @@ def std_prob_4(
         if not unstructured:
             plot_M_thin_film(M_sq_dym[0], res, "Start_state", figpath=figpath)
             plot_M_thin_film(M_sq_dym[-1], res, "Final_state", figpath=figpath)
+    print("int_error: ", int_error)
+    print("rel_int_error [%]: ", rel_int_error)
+    return int_error, rel_int_error
 
-    return int_error
 
 
 if __name__ == "__main__":
-    int_error = std_prob_4(
+    int_error, rel_int_error = std_prob_4(
         NIST_field=1,
         cuda=True,
         cvode=False,
-        unstructured=True,
+        unstructured=False,
         plotting=True,
+        useavgn=True,
+        #figpath= Path.cwd() / "results"
         #figpath=Path(__file__).parent.absolute().joinpath("..", "figs"),
         figpath=None,
     )

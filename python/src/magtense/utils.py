@@ -690,6 +690,7 @@ def create_plot(
     ax = plt.figure().add_subplot(projection="3d")
 
     if tiles is not None:
+        print("Tile types:", tiles.tile_type)
         for i in range(tiles.n):
             if tiles.tile_type[i] == 1:
                 plot_cylindrical(
@@ -745,6 +746,16 @@ def create_plot(
 
             elif tiles.tile_type[i] == 7:
                 plot_spheroid(
+                    ax,
+                    tiles.size[i],
+                    tiles.offset[i],
+                    tiles.rot[i],
+                    tiles.M[i],
+                    tiles.color[i],
+                )
+            
+            elif tiles.tile_type[i] == 8:
+                plot_cube(
                     ax,
                     tiles.size[i],
                     tiles.offset[i],

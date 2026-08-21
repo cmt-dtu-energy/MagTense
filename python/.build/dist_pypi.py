@@ -42,7 +42,7 @@ def main(
     build_tag: dict | None = None,
 ) -> None:
     if build_tag is None:
-        build_tag = {"cpu": 0, "cu12": 1}
+        build_tag = {"cpu": 0, "cu12": 1, "cu12-fmm": 3}
     py_folder = Path(__file__).parent.parent
     lib_folder = py_folder / "src" / "magtense" / "lib"
 
@@ -53,29 +53,56 @@ def main(
 
         for lib_file in lib_folder.glob(f"*.{suffix}"):
             subprocess.run(["rm", lib_file], check=False)
+        for lib_file in lib_folder.glob("*.dll"):
+            subprocess.run(["rm", lib_file], check=False)
 
         for cuda, py in itertools.product(cu_versions, py_versions):
             py_lib = "cp" + py if platform == "win" else "cpython-" + py
-            subprocess.run(
-                [
-                    "cp",
-                    f"{py_folder}/{cuda}_libs/magtensesource.{py_lib}-{arch}.{suffix}",
-                    lib_folder,
-                ],
-                check=False,
+            # Not check=False: without the extension module the wheel still
+            # builds, installs, and then fails at import time in the test job.
+            ext_module = Path(
+                f"{py_folder}/{cuda}_libs/magtensesource.{py_lib}-{arch}.{suffix}"
             )
+            if not ext_module.is_file():
+                raise FileNotFoundError(
+                    f"No extension module for {cuda}/{platform}/py{py}: {ext_module}. "
+                    "The compile step did not produce it."
+                )
+            subprocess.run(["cp", str(ext_module), lib_folder], check=True)
+            if cuda.endswith("-fmm") and platform == "linux":
+                subprocess.run(
+                    [
+                        "cp",
+                        f"{py_folder}/{cuda}_libs/libfmm3d.so",
+                        lib_folder,
+                    ],
+                    check=False,
+                )
+            if cuda.endswith("-fmm") and platform == "win":
+                subprocess.run(
+                    [
+                        "cp",
+                        f"{py_folder}/{cuda}_libs/libfmm3d.dll",
+                        lib_folder,
+                    ],
+                    check=False,
+                )
             if platform == "linux":
-                rpath = "$ORIGIN/../../../../../lib/"
-                if cuda == "cu12":
-                    rpath += ":$ORIGIN/../../nvidia/cublas/lib/"
-                    rpath += ":$ORIGIN/../../nvidia/cuda_runtime/lib/"
-                    rpath += ":$ORIGIN/../../nvidia/cusparse/lib/"
+                rpath_entries = ["$ORIGIN/../../../../../lib/"]
+                if cuda.endswith("-fmm"):
+                    rpath_entries.insert(0, "$ORIGIN")
+                if cuda.startswith("cu12"):
+                    rpath_entries += [
+                        "$ORIGIN/../../nvidia/cublas/lib/",
+                        "$ORIGIN/../../nvidia/cuda_runtime/lib/",
+                        "$ORIGIN/../../nvidia/cusparse/lib/",
+                    ]
                 subprocess.run(
                     [
                         "patchelf",
                         "--force-rpath",
                         "--set-rpath",
-                        f"{rpath}",
+                        ":".join(rpath_entries),
                         f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}",
                     ],
                     check=False,
@@ -101,21 +128,39 @@ def main(
             subprocess.run(
                 ["python", "-m", "build", "--wheel"],
                 cwd=py_folder,
-                check=False,
+                check=True,
             )
-            subprocess.run(
-                [
-                    "mv",
-                    f"{py_folder}/dist/magtense-{pkg_version.removeprefix('v')}-py{py[0]}-none-any.whl",
-                    f"{py_folder}/dist/magtense-{pkg_version.removeprefix('v')}-{build_tag[cuda]}-py{py}-none-{whl_arch}.whl",
-                ],
-                check=False,
+            # python -m build normalizes the version in the wheel filename
+            # (e.g. lowercases local version labels like fmmWorking -> fmmworking),
+            # so use glob to locate the built wheel rather than constructing its exact name.
+            built_wheels = sorted(
+                (py_folder / "dist").glob(f"magtense-*-py{py[0]}-none-any.whl"),
+                key=lambda p: p.stat().st_mtime,
             )
+            if built_wheels:
+                subprocess.run(
+                    [
+                        "mv",
+                        str(built_wheels[-1]),
+                        f"{py_folder}/dist/magtense-{pkg_version.removeprefix('v')}-{build_tag[cuda]}-py{py}-none-{whl_arch}.whl",
+                    ],
+                    check=True,
+                )
 
             subprocess.run(
                 ["rm", f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}"],
                 check=False,
             )
+            if cuda.endswith("-fmm") and platform == "linux":
+                subprocess.run(
+                    ["rm", f"{lib_folder}/libfmm3d.so"],
+                    check=False,
+                )
+            if cuda.endswith("-fmm") and platform == "win":
+                subprocess.run(
+                    ["rm", f"{lib_folder}/libfmm3d.dll"],
+                    check=False,
+                )
             if Path(py_folder / "src" / "magtense.egg-info").is_dir():
                 subprocess.run(
                     [

@@ -105,7 +105,10 @@ CONTAINS
     !---------------------------------------------------------------------------
 
     !---------------------- Allocate per-thread timer arrays -------------------
-    nthreads = omp%max_threads
+    ! Guard against omp%max_threads still being -1 (its default) when the timer
+    ! is used via the lazy-init path before omp%init() has run; otherwise the
+    ! array would be allocated with extent 0 and timers(0) would be out of bounds.
+    nthreads = max(1, omp%max_threads)
     allocate(timers(0:nthreads-1))
 
     !$omp parallel private(tid)
@@ -430,7 +433,7 @@ end subroutine ensure_dir_exists
       write(timer%log_unit,'(a)') "--------------------- FINAL TIMER SUMMARY -------------------"
     call log_lock%unlock()
 
-    call timer%print(unit=timer%log_unit, tid=0)
+    call timer%print(unit=timer%log_unit)
 
     call log_lock%lock()
       write(timer%log_unit,'(a)') "============================================================"
@@ -471,38 +474,39 @@ end subroutine ensure_dir_exists
 !> Dump delta timing summary for tid=0 since previous snapshot
 !> tnow : current wallclock time
 !=============================================================================
-  subroutine dump_window(tnow)
+subroutine dump_window(tnow)
     real(8), intent(in) :: tnow
 
-    integer :: i
+    integer :: i, t, nthreads
     integer(8), allocatable :: cur_calls(:), del_calls(:)
     real(8),    allocatable :: cur_total(:), del_total(:)
-    real(8) :: t_rel, t_rel_r, dt, dt_r, other_time
+    real(8) :: t_rel, t_rel_r, dt, dt_r
     character(len=128) :: title
 
     if (.not. timer%log_enabled) return
 
+    nthreads = size(timers)
     allocate(cur_calls(timer%capacity), cur_total(timer%capacity))
     allocate(del_calls(timer%capacity), del_total(timer%capacity))
 
     cur_calls = 0_8
     cur_total = 0.0d0
 
-    !---------------------- Snapshot current totals (tid=0) --------------------
-    do i = 1, ntimer
-      cur_calls(i) = timers(0)%calls(i)
-      cur_total(i) = timers(0)%total(i)
+    !---------------------- Sum totals from ALL threads --------------------
+    do t = 0, nthreads - 1
+      do i = 1, ntimer
+        cur_calls(i) = cur_calls(i) + timers(t)%calls(i)
+        cur_total(i) = cur_total(i) + timers(t)%total(i)
+      end do
     end do
-    !---------------------------------------------------------------------------
+    !-----------------------------------------------------------------------
 
-    !---------------------- Compute delta since previous snapshot --------------
+    !---------------------- Compute delta since previous snapshot ----------
     call log_lock%lock()
-
       if (.not. win_snap_initialized) then
         win_prev_calls = cur_calls
         win_prev_total = cur_total
         win_snap_initialized = .true.
-
         call log_lock%unlock()
         deallocate(cur_calls, cur_total, del_calls, del_total)
         timer%last_dump_time = tnow
@@ -513,28 +517,21 @@ end subroutine ensure_dir_exists
         del_calls(i) = cur_calls(i) - win_prev_calls(i)
         del_total(i) = cur_total(i) - win_prev_total(i)
       end do
-
       win_prev_calls = cur_calls
       win_prev_total = cur_total
-
     call log_lock%unlock()
-    !---------------------------------------------------------------------------
+    !-----------------------------------------------------------------------
 
-    !---------------------- Compute window times -------------------------------
-    t_rel   = tnow
+    !---------------------- Compute window times ---------------------------
+    t_rel = tnow
     t_rel_r = dble(nint(10.0d0*t_rel))/10.0d0
-
-    dt   = tnow - timer%last_dump_time
+    dt = tnow - timer%last_dump_time
     dt_r = dble(nint(10.0d0*dt))/10.0d0
-
     timer%last_dump_time = tnow
 
-    other_time = max(0.0d0, dt - sum(del_total(1:ntimer)))
-
     write(title,'(a,f0.1,a)') "Window timer summary for last ", dt_r, " seconds"
-    !---------------------------------------------------------------------------
+    !-----------------------------------------------------------------------
 
-    !---------------------- Print delta summary (single ==== region) -----------
     call log_lock%lock()
       write(timer%log_unit,'(a)') ""
       write(timer%log_unit,'(a)') "============================================================"
@@ -543,9 +540,8 @@ end subroutine ensure_dir_exists
       write(timer%log_unit,'(a)') "------------------------------------------------------------"
     call log_lock%unlock()
 
-    call print_from_arrays(unit=timer%log_unit, calls=del_calls, total=del_total, title="", total_ref=dt, other_time=other_time, show_total=.false.)
-    !---------------------------------------------------------------------------
-
+    call print_from_arrays(unit=timer%log_unit, calls=del_calls, total=del_total, &
+                           title="", total_ref=dt, show_total=.false.)
     deallocate(cur_calls, cur_total, del_calls, del_total)
   end subroutine dump_window
 
@@ -555,49 +551,55 @@ end subroutine ensure_dir_exists
 !> unit : output unit (default = stdout)
 !> tid  : if present -> print this tid only, else SUM over threads
 !=============================================================================
-  subroutine print(unit, tid)
+subroutine print(unit, tid)
     integer, intent(in), optional :: unit
     integer, intent(in), optional :: tid
-
     integer :: u, i, nthreads, t, tsel
     integer(8), allocatable :: calls(:)
     real(8),    allocatable :: total(:)
+    real(8) :: other_time, total_ref
 
     u = 6
     if (present(unit)) u = unit
     if (.not. allocated(timers)) call timer%timer_init()
 
     nthreads = size(timers)
-
     allocate(calls(timer%capacity), total(timer%capacity))
     calls = 0_8
     total = 0.0d0
+    other_time = 0.0d0
+    total_ref = wallclock()
 
-    !------------------ Select aggregation mode --------------------------------
+    !------------------ Select aggregation mode ----------------------------
     if (present(tid)) then
       tsel = tid
       if (tsel < 0 .or. tsel > nthreads-1) then
         error stop "timer_mod: print() called with invalid tid."
       end if
-
       do i = 1, ntimer
         calls(i) = timers(tsel)%calls(i)
         total(i) = timers(tsel)%total(i)
       end do
-
-      call print_from_arrays(unit=u, calls=calls, total=total, title="Timer summary (exclusive wall time, tid = 0)", show_total=.true.)
+      other_time = max(0.0d0, total_ref - sum(total(1:ntimer)))
     else
-      do t = 0, nthreads-1
+      ! SUM mode: sum all threads, but "other" is only for thread 0
+      do t = 0, nthreads - 1
         do i = 1, ntimer
           calls(i) = calls(i) + timers(t)%calls(i)
           total(i) = total(i) + timers(t)%total(i)
         end do
       end do
-
-      call print_from_arrays(unit=u, calls=calls, total=total, title="Timer summary (exclusive wall time, SUM over threads)", show_total=.true.)
+      ! Reference thread 0 specifically for the untraced "other" time
+      other_time = max(0.0d0, total_ref - sum(timers(0)%total(1:ntimer)))
     end if
-    !---------------------------------------------------------------------------
+    !-----------------------------------------------------------------------
 
+    !call print_from_arrays(unit=u, calls=calls, total=total, &
+    !                       title="CUMULATIVE TIMER SUMMARY", &
+    !                       total_ref=total_ref, other_time=other_time)
+    call print_from_arrays(unit=u, calls=calls, total=total, &
+                           title="CUMULATIVE TIMER SUMMARY", &
+                           total_ref=total_ref)
     deallocate(calls, total)
   end subroutine print
 
@@ -724,6 +726,7 @@ end subroutine ensure_dir_exists
       write(unit,'(a)') "  name                               total[s]       avg[s]      %     calls"
       write(unit,'(a)') "------------------------------------------------------------"
 
+
     call log_lock%unlock()
 
     if (total_sum <= 0.0d0) then
@@ -735,6 +738,7 @@ end subroutine ensure_dir_exists
       return
     end if
 
+
     !---------------------- Percentages ----------------------------------------
     do i = 1, nitem
       if (calls_w(i) > 0_8) then
@@ -744,6 +748,7 @@ end subroutine ensure_dir_exists
       end if
     end do
     !---------------------------------------------------------------------------
+
 
     !---------------------- Sort by percentage (descending) --------------------
     call sort_desc_by_real(idx, pct)
@@ -759,6 +764,7 @@ end subroutine ensure_dir_exists
       keep(nkeep) = i
     end do
     !---------------------------------------------------------------------------
+
 
     !---------------------- Print table ----------------------------------------
     do k = 1, nkeep
@@ -799,23 +805,37 @@ end subroutine ensure_dir_exists
 !=============================================================================
 !> Sort idx by val(idx(i)) descending (insertion sort; small arrays)
 !=============================================================================
-  subroutine sort_desc_by_real(idx, val)
+subroutine sort_desc_by_real(idx, val)
     integer, intent(inout) :: idx(:)
     real(8), intent(in)    :: val(:)
 
-    integer :: i, j, key
+    integer :: i, j, key, n
     real(8) :: keyv
 
-    !---------------------- Insertion sort (small ntimer) ----------------------
-    do i = 2, size(idx)
-      key  = idx(i)
-      keyv = val(key)
+    n = size(idx)
+    if (n < 2) return ! Nothing to sort
 
+    !---------------------- Insertion sort (small n) ----------------------
+    do i = 2, n
+      key  = idx(i)
+      
+      ! Safety check: Is the index valid for the val array?
+      if (key < 1 .or. key > size(val)) then
+          ! You might want to print an error or handle this
+          cycle 
+      end if
+      
+      keyv = val(key)
       j = i - 1
-      do while (j >= 1 .and. val(idx(j)) < keyv)
+
+      ! Use a loop with an internal exit to prevent evaluating val(idx(0))
+      do while (j >= 1)
+        if (val(idx(j)) >= keyv) exit ! Found the correct spot
+        
         idx(j+1) = idx(j)
         j = j - 1
       end do
+      
       idx(j+1) = key
     end do
     !---------------------------------------------------------------------------

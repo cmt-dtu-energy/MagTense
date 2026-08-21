@@ -5,6 +5,7 @@ module ODE_Solvers
     use rksuite_90
     use integrationDataTypes
     use SPECIALFUNCTIONS
+    use IO_GENERAL
 
     !======= Declarations =========
     implicit none
@@ -30,13 +31,14 @@ module ODE_Solvers
     !> @param[in] useCVODE optional flag for choosing solvers. 
     !> more parameters to come as we progress in the build-up of this function (error, options such as tolerances etc)
     !---------------------------------------------------------------------------
-    subroutine MagTense_ODE( fct, t, y0, t_out, y_out, callback, callback_display, tol, thres_value, useCVODE, t_conv, conv_tol )
+    subroutine MagTense_ODE( fct, t, y0, t_out, y_out, includeThermal, fct_thermal, callback, callback_display, tol, thres_value, useCVODE, t_conv, conv_tol, rksuite_verbose )
     
         !======= Inclusions ===========
         use, intrinsic :: iso_c_binding
         
         !======= Declarations =========
         procedure(dydt_fct), pointer :: fct                     !>Input function pointer for the function to be integrated
+        procedure(no_argument_fct), pointer :: fct_thermal      !>Function pointer for the function that updates the thermal field
         procedure(callback_fct), pointer :: callback            !>Callback function
         real,dimension(:),intent(in) :: t, y0                   !>Requested time (size m) and initial values ofy (size n)
         real,dimension(:),intent(inout) :: t_out                !>Actual time values at which the y_i are found, size m
@@ -47,7 +49,9 @@ module ODE_Solvers
         integer,intent(in),optional :: useCVODE                 !>Flag that determines if the CVODE solver is to be used or not
         real,dimension(:),intent(in) :: t_conv                  !>Array for the time values where the solution will be checked for convergence
         real,intent(in) :: conv_tol                             !>Converge criteria on difference between magnetization at different timesteps
+        logical,intent(in),optional :: rksuite_verbose                    !>If .true., RKSuite will display diagnostic messages (default .false.)
         integer :: solver_flag
+        logical :: includeThermal
         
         integer :: neq, nt, nt_conv
         real, allocatable, dimension(:,:) :: yderiv_out         !>The derivative of y_i wrt t at each time step
@@ -72,7 +76,7 @@ module ODE_Solvers
             yderiv_out(:,:) = 0
 
             !Call the solver
-            call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol )
+            call MagTense_ODE_RKSuite( fct, neq, t, nt, y0, t_out, y_out, yderiv_out, includeThermal, fct_thermal, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol, rksuite_verbose )
             
             !clean-up
             deallocate(yderiv_out)
@@ -112,10 +116,11 @@ module ODE_Solvers
     !> @param[inut] yderiv_out output array with dy_i/dt at each time
     !> @param[in] callback procedure pointer to callback to Matlab for progress updates
     !---------------------------------------------------------------------------
-    subroutine MagTense_ODE_RKSuite( fct, neq, t, nt, ystart,  t_out, y_out, yderiv_out, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol )
+    subroutine MagTense_ODE_RKSuite( fct, neq, t, nt, ystart,  t_out, y_out, yderiv_out, includeThermal, fct_thermal, callback, callback_display, tol, thres_value, nt_conv, t_conv, conv_tol, rksuite_verbose )
         
         !======= Declarations =========
         procedure(dydt_fct), pointer :: fct                  !>Input function pointer for the function to be integrated
+        procedure(no_argument_fct), pointer :: fct_thermal   !>Function pointer for the function that updates the thermal field
         integer,intent(in) :: neq, nt, nt_conv               !>Input no. of equations, no. of time steps and no. of time steps in the check for convergence array
         real,dimension(nt),intent(in) :: t                   !>Input time array, size nt
         real,dimension(neq),intent(in) :: ystart             !>Input initial conditions (y at t=0), size neq
@@ -128,11 +133,13 @@ module ODE_Solvers
         real,intent(in) :: thres_value                       !>When a solution component Y(L) is less in magnitude than thres_value its set to zero
         real,dimension(nt_conv),intent(in) :: t_conv         !>Array for the time values where the solution will be checked for convergence
         real,intent(in) :: conv_tol                          !>Converge criteria on difference between magnetization at different timesteps
+        logical,intent(in),optional :: rksuite_verbose                 !>If .true., RKSuite will display diagnostic messages (default .false.)
         
         real,dimension(:),allocatable :: thres          !>arrays used by the initiater     
         real,dimension(neq) :: y_last                   !>Array containing the solution in the last returned convergence timestep
         real,dimension(neq) :: y_step                   !>Array containing the solution in the current timestep
         real,dimension(neq) :: yderiv_step              !>Array containing dy/dt in the current timestep
+        real,dimension(:),allocatable :: y_norm         !>Array of vector magnitudes used for normalising y_step. neq/3 = ntot
         real,dimension(nt+nt_conv) :: t_comb            !>The concatenated time array of the output times and the convergence times
         real,dimension(nt+nt_conv) :: t_comb_out        !>The concatenated time array of the output times and the convergence times
         real,dimension(:),allocatable :: t_comb_unique  !>The concatenated time array of the output times and the convergence times, only unique values
@@ -143,10 +150,13 @@ module ODE_Solvers
         real :: hstart                              !>Whether the code should choose the size of the first step. Set to 0.0d if so (recommended)    
         real :: t_step                              !>The current time at the end of a time step
         real :: conv_error                          !>The maximum error in the current time step
+        integer :: ntot                             !>Total number of micromagnetic cells (ntot = neq/3)
         type(rk_comm_real_1d) :: setup_comm         !>Stores all the stuff used by setup
         integer :: flag                             !>Flag indicating how the integration went
+        integer :: message_flag                     !>Flag indicating if the error message has already been displayed to the user
         integer :: i, k                             !>Counter variable
         character*(100) :: prog_str                 !>Variable holding the output string
+        logical :: includeThermal                   !>Whether to normalise result and update thermal field after each timestep
         !integer,parameter :: n_write=100
         !Perform allocations. 
         allocate(thres(neq))
@@ -163,11 +173,15 @@ module ODE_Solvers
         errass = .false.
         !Set the flag so that the code selects the starting step size
         hstart = 0.0
-        !Set output message to true
-        message = .true.
+        !Set output message based on rksuite_verbose flag (default .false. to suppress RKSuite diagnostic messages)
+        if ( present(rksuite_verbose) ) then
+            message = rksuite_verbose
+        else
+            message = .false.
+        endif
         
         !Call the setup function in order to initiate the solver    
-        call setup(  setup_comm, t(1), ystart, t(nt), tol, thres, method,task,errass, hstart,message)
+        call setup(  setup_comm, t(1), ystart, t(nt), tol, thres, method, task, errass, hstart, message)
 
         !Calculate the magnetization to use for the first convergence calculation
         y_last = ystart
@@ -184,44 +198,104 @@ module ODE_Solvers
         allocate(t_comb_unique(k))
         allocate(ind(k))
         call simple_sort( t_comb_out(1:k), t_comb_unique, ind )
-        
+                
         !First time is the same as the input
         t_out(1) = t(1)
         y_out(:,1) = ystart
+        y_step = ystart         !Initialize y_step with the starting magnetization
+
+
+        !Allocate norm array
+        ntot = neq/3
+        if ( includeThermal ) then
+            allocate( y_norm(ntot) )
+            call fct_thermal()  ! Generate the stochastic thermal field
+        end if
         
         k = 2
         !Call the integrator
         do i=2,size(t_comb_unique)                
             call range_integrate( setup_comm, fct, t_comb_unique(i), t_step, y_step, yderiv_step, flag )
+
+            if ( includeThermal ) then
+                y_norm = sqrt(y_step(1:ntot)**2 + y_step(ntot+1:2*ntot)**2 + y_step(2*ntot+1:3*ntot)**2)
+                y_step(1:ntot) = y_step(1:ntot)/y_norm                     ! Normalise x-component
+                y_step(ntot+1:2*ntot) = y_step(ntot+1:2*ntot)/y_norm       ! Normalise y-component
+                y_step(2*ntot+1:3*ntot) = y_step(2*ntot+1:3*ntot)/y_norm   ! Normalise z-component
+                call fct_thermal()  ! Update the stochastic thermal field
+            end if
             
+            message_flag = 0
+            !Keep integrating until we reach the target time
+            do while (t_step .lt. t_comb_unique(i))
+                call range_integrate( setup_comm, fct, t_comb_unique(i), t_step, y_step, yderiv_step, flag )
+
+                !Check flag and handle warnings/errors
+                if (flag .eq. 1) then
+                    !Success - continue
+                    continue
+                else if (flag .eq. 2) then
+                    !Inefficiency warning - continue but log
+                    if ( mod(i, callback_display) .eq. 0 ) then
+                        write(prog_str,'(A)') 'Warning: Integration is inefficient. Consider using METHOD = M with interpolation.'
+                        call callback( prog_str, -1 )
+                    endif
+                else if (flag .eq. 3) then
+                    !Too much work warning - continue but log
+                    if ( mod(i, callback_display) .eq. 0 ) then
+                        write(prog_str,'(A)') 'Warning: Approximately 15000 function evaluations used. Continuing...'
+                        call callback( prog_str, -1 )
+                    endif
+                else if (flag .eq. 4) then
+                    !Stiffness detected - RKSuite does not have a stiff solver, so we log warning and continue
+                    if ( mod(i, callback_display) .eq. 0 ) then
+                        if (message_flag .eq. 0) then
+                            write(prog_str,'(A)') 'Warning: Stiff problem detected. Consider using the CVODE solver.'
+                            call callback( prog_str, -1 )
+                            message_flag = 1
+                        endif
+                    endif
+                else if (flag .eq. 5 .or. flag .eq. 6) then
+                    !Fatal error - cannot continue
+                    write(prog_str,'(A,I1,A)') 'Error: Integration failed with flag = ', flag, '. Stopping integration.'
+                    call callback( prog_str, -1 )
+                    exit
+                endif
+
+                !Check if we've reached the target time (within tolerance)
+                if (abs(t_step - t_comb_unique(i)) .lt. 1.0e-12) then
+                    exit
+                endif
+            enddo
+
             if ( mod(i, callback_display) .eq. 0 ) then
                 write(prog_str,'(A6, F8.2, A15, I4.1, A1, I4.1)') 'Time: ', t_step*1e9, ' ns, i.e. step ', i, '/', size(t_comb_unique)
                 call callback( prog_str, -1 )
             endif
             
             !Check if the time which the solution is returned is part of the array that checks for converge or if it part of the times where the simulation is to be saved
-            ind = findloc(t_conv,t_comb_unique(i))
-            if (maxval(ind) .gt. 0) then !If the time is part of the converge array, we check for converge
-                conv_error = maxval(abs(y_step-y_last))
-                if (conv_error < conv_tol) then
-                    !Save the current state before exiting
-                    y_out(:,k) = y_step
-                    yderiv_out(:,k) = yderiv_step
-                    t_out(k) = t_step
-                    exit
-                endif
-                !Save the new magnetization to use for the next converge calculation
-                y_last = y_step
-            endif
+            !ind = findloc(t_conv,t_comb_unique(i))
+            !if (maxval(ind) .gt. 0) then !If the time is part of the converge array, we check for converge
+            !    conv_error = maxval(abs(y_step-y_last))
+            !    if (conv_error < conv_tol) then
+            !        !Save the current state before exiting
+            !        y_out(:,k) = y_step
+            !        yderiv_out(:,k) = yderiv_step
+            !        t_out(k) = t_step
+            !        exit
+            !    endif
+            !    !Save the new magnetization to use for the next converge calculation
+            !    y_last = y_step
+            !endif
             
             !Check if we should save the result in the array to be returned
-            ind = findloc(t,t_comb_unique(i))
-            if (maxval(ind) .gt. 0) then !If the time is part of the save array
+            !ind = findloc(t,t_comb_unique(i))
+            !if (maxval(ind) .gt. 0) then !If the time is part of the save array
                 y_out(:,k) = y_step
                 yderiv_out(:,k) = yderiv_step
                 t_out(k) = t_step
                 k = k+1
-            endif
+            !endif
         enddo
         !Clean up
         deallocate(thres)
@@ -293,7 +367,7 @@ module ODE_Solvers
     ! create the SUNDIALS context
     ierr = FSUNContext_Create(SUN_COMM_NULL, ctx)
     ! set relative and absolute tolerances
-    atol = 1.0d-10
+    atol = rtol !Used to be 1.0d-10
 
     ! initialize solution vector
     y_cur = ystart
@@ -359,14 +433,14 @@ module ODE_Solvers
     end if
     
     ! set maximum number of steps (default: 500)
-    ierr = FCVodeSetMaxNumSteps(cvode_mem, 5000)
+    ierr = FCVodeSetMaxNumSteps(cvode_mem, 15000)
     if (ierr /= 0) then
 	    call CVODE_error('Error in FCVodeSetMaxNumSteps, ierr = ', ierr, callback ) 
 		stop
     end if
     
     ! set maximum order of BDF method (default: 5)
-    ierr = FCVodeSetMaxOrd(cvode_mem, 2)
+    ierr = FCVodeSetMaxOrd(cvode_mem, 5)    !Used to be 2
     if (ierr /= 0) then
 	    call CVODE_error('Error in FCVodeSetMaxOrd, ierr = ', ierr, callback ) 
 		stop

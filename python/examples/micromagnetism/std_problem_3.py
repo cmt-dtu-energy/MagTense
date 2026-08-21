@@ -15,7 +15,16 @@ def std_prob_3(
     plotting: bool = True,
     figpath: Path | None = None,
     plot_details: bool = False,
-) -> None:
+) -> tuple[np.ndarray, np.ndarray]:
+    """Run the muMag standard problem 3 for a range of cube sizes.
+
+    Returns:
+        L_loop: the cube edge lengths in units of the exchange length that were simulated.
+        E_arr: the equilibrium energy terms with shape (4, len(L_loop), 2), where the first axis
+            is (exchange, external, demagnetisation, anisotropy) and the last axis selects the
+            flower state (0) or the vortex state (1). The single domain limit is the L where the
+            two total energies cross.
+    """
     mu0 = 4 * np.pi * 1e-7
     A0 = 1.74532925199e-10
     Ms = 1e6
@@ -32,6 +41,21 @@ def std_prob_3(
         cvode=cvode,
         usereturnhall=True ,
     )
+
+    #--------- disable fmm -----
+    problem.use_fmm = 0
+    #----------------------------
+    
+    #--------------- set trace/timing options -------------
+    problem.use_fmm = 0
+    problem.window_enabled = 0
+    problem.window_interval = 30.0
+    problem.trace_enabled = 0
+    problem.flush_each = 1
+    problem.trace_verbose = 2
+    problem.timer_log_file =  "std_3_timer.log"
+    problem.trace_log_file =  "std_3_trace.log"
+    #------------------------------------------------------
 
     problem.u_ea[:, 2] = 1
     lex = np.sqrt(A0 / (0.5 * mu0 * Ms**2))
@@ -112,6 +136,8 @@ def std_prob_3(
         else:
             figpath.mkdir(parents=True, exist_ok=True)
             plt.savefig(figpath / "3_solution.png")
+
+    return L_loop, E_arr
 
 
 if __name__ == "__main__":

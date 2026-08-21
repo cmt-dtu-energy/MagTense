@@ -121,6 +121,9 @@ properties
     % are returned from Fortran
     ReturnHall
     
+    %A parameter that determines if the average of the prism is used or not
+    useAvgN
+
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
     
@@ -195,6 +198,49 @@ properties
     use_fmm
     fmm_short
     fmm_min_n
+
+    temperature
+    n_macro
+    shiftVec
+    macroShape
+    sampleShape
+    exchPBC
+    dummy_run
+    fmm_nterms
+
+    log_dir char = '';
+    timer_log char = '';
+    trace_log char = '';
+    window_ena
+    window_int
+    trace_ena
+    flush_each
+    trace_verb
+    N_log_dir
+    N_timer_log
+    N_trace_log
+
+    %Adaptive hysteresis parameters
+    adaptiveHext
+    maxHextSteps
+    H_start
+    H_end
+    dH_initial
+    dH_min
+    dH_max
+    dH_grow
+    dH_shrink
+    dM_min
+    dM_target
+    dM_reject
+    switch_refdH
+    use_sw_ref
+
+    %Seed for the stochastic thermal field. 0 keeps the compiler default sequence,
+    %which is identical on every run. A positive value seeds deterministically with
+    %that value, so runs are reproducible but differ from each other. A negative
+    %value seeds from the clock, which is what independent Monte-Carlo runs need.
+    rng_seed
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -240,6 +286,9 @@ properties (SetAccess=private,GetAccess=public)
     %1 for do use (int32). Currently implemented alternative is RK_SUITE,
     %active if CVODE is not used.
     useCVODE
+
+    %defines if the demagnetization field is calculated or not
+    useDemag
 
     %defines what precision is used for the demag tensor. Right now only
     %single is supported. All other varibales are double.
@@ -325,10 +374,10 @@ methods
         obj.K2 = zeros(obj.ntot,1);
 
         %precession constant
-        obj.gamma = 0; %m/A*s
+        obj.gamma = 2.21e5; %m/A*s
 
         %
-        obj.alpha = 0.02;
+        obj.alpha = 4.42e3;
 
         %if set to zero then the alpha parameter remains constant.
         %if MaxT0 > 0 then alpha = alpha0 * 10^( 7 * min(t,MaxT0)/MaxT0 )
@@ -369,10 +418,14 @@ methods
         obj.CV = 0;
         %initial value of the ReturnHall is zero, i.e. the specific fields are not returned
         obj.ReturnHall = int32(0);
+        %initial value of the useAvgN is true
+        obj.useAvgN = int32(1);
         %set use cuda to default not
         obj.useCuda = int32(0);
 		%set use CVODE to default
         obj.useCVODE = int32(0);
+		%set use Demag to default
+        obj.useDemag = int32(1);
         %set use CVODE to default
         obj.usePres = int32(0);
         %set the demag approximation to the default, i.e. use no
@@ -418,6 +471,44 @@ methods
         obj.use_fmm = int32(0);
         obj.fmm_short = int32(1);
         obj.fmm_min_n = int32(20000);
+
+        obj.temperature	 = zeros(obj.ntot,1);
+        obj.n_macro	= int32([0 0 0]);
+        obj.shiftVec = ([0 0 0]);
+        obj.macroShape = [1 1 1];
+        obj.sampleShape = [1 1 1];
+        obj.exchPBC	= int32([0 0 0]);
+        obj.dummy_run = 0;
+        obj.fmm_nterms = -1;
+
+        obj = obj.setLogDirFilename( 'logs' );
+        obj = obj.setTimerLogFilename( 'timing.log' );
+        obj = obj.setTraceLogFilename( 'trace.log' );
+        obj.window_ena = int32(1);
+        obj.window_int = 30.0;
+        obj.trace_ena = int32(0);
+        obj.flush_each = int32(1);
+        obj.trace_verb = int32(1);
+
+        %Adaptive hysteresis defaults (disabled by default)
+        obj.adaptiveHext = int32(0);
+        obj.maxHextSteps = int32(1000);
+        obj.H_start = [0, 0, 0];
+        obj.H_end = [0, 0, 0];
+        obj.dH_initial = 1e3;
+        obj.dH_min = 1e1;
+        obj.dH_max = 1e5;
+        obj.dH_grow = 1.25;
+        obj.dH_shrink = 0.5;
+        obj.dM_min = 1e-3;
+        obj.dM_target = 1e-2;
+        obj.dM_reject = 5e-2;
+        obj.switch_refdH = 0.0;
+        obj.use_sw_ref = int32(0);
+
+        %Thermal-field RNG seed. Default 0 preserves the previous behaviour.
+        obj.rng_seed = int32(0);
+
     end
     
     %%Calculates the applied field as a function of time on the time grid
@@ -484,6 +575,14 @@ methods
            obj.useCVODE = int32(0);
        end
     end
+
+    function obj = setUseDemag( obj, enabled )
+       if enabled
+           obj.useDemag = int32(1);
+       else
+           obj.useDemag = int32(0);
+       end
+    end
     
     function obj = setLoadNFilename( obj, filename )
         obj.N_load = int32(length(filename));
@@ -493,6 +592,21 @@ methods
     function obj = setReturnNFilename( obj, filename )
         obj.N_ret = int32(length(filename));
         obj.N_file_out = filename;
+    end
+
+    function obj = setLogDirFilename( obj, filename )
+        obj.N_log_dir = int32(length(filename));
+        obj.log_dir = filename;
+    end
+
+    function obj = setTimerLogFilename( obj, filename )
+        obj.N_timer_log = int32(length(filename));
+        obj.timer_log = filename;
+    end
+
+    function obj = setTraceLogFilename( obj, filename )
+        obj.N_trace_log = int32(length(filename));
+        obj.trace_log = filename;
     end
     
     function obj = setSaveTheResult( obj, enabled )
@@ -654,14 +768,22 @@ methods
         mnorm=vecnorm(obj.m0,2,2); % Check if input array is normalized
         normcondfail=abs(mnorm-ones(obj.ntot,1)) >= obj.tol;
         if any(normcondfail)
-            if all(mnorm(normcondfail)==0*mnorm(normcondfail))
+            % Rows of zero length have no direction to normalise to. Dividing them
+            % would produce NaN, so they are reported and then left alone -- the
+            % previous version only reported them when *every* failing row was zero,
+            % and otherwise divided the whole array, NaN-ing the zero rows.
+            zerorow = (mnorm == 0);
+            if any(zerorow)
                 warning('Zero magnetization in initial array')
-            else
+            end
+            if any(normcondfail & ~zerorow)
                 warning('Initial array not normalized -- Normalizing')
-                obj.m0=obj.m0./mnorm;
+                obj.m0(~zerorow,:) = obj.m0(~zerorow,:)./mnorm(~zerorow);
             end
         end
-        disp(['The demag tensor will require around ' num2str(((3*numel(obj.m0)*(3*numel(obj.m0) + 1)/2))*4/(2^30)) ' Gb'])
+        if (obj.useDemag)
+           disp(['The demag tensor will require around ' num2str(((3*numel(obj.m0)*(3*numel(obj.m0) + 1)/2))*4/(2^30)) ' Gb'])
+        end
         warning('off','MATLAB:structOnObject')
         obj2=builtin('struct',obj); % Actual struct conversion
         warning('on','MATLAB:structOnObject')

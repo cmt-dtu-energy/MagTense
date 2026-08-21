@@ -26,7 +26,7 @@ module UnstructuredMeshAnalysis
     !> start with all the elements centers ("pos") and cell sizes ("dims")
     !> round centers and sizes to minimum
     !> the elements are already the right number
-    !> generate 6 faces for each of them an connect them (TheSigns matrix)
+    !> generate 6 faces for each of them and connect them (TheSigns matrix)
     !> there are too many faces
     !> cycle over each pair of faces.
     !> For each pair (A,B) these are the possible relations
@@ -40,16 +40,24 @@ module UnstructuredMeshAnalysis
     !> if A contains {B_i}, then A needs to be removed
     !> the boundaries of the corresponding element now include all the {B_i}
     !> TheSigns is equal to -1 since the normals point inwards
+    !>
+    !> If periodic boundary conditions are requested through exchPBC, the elements at the two ends
+    !> of a periodic direction are linked together, i.e. they are made to share a face and to enter
+    !> each others interpolation stencils, exactly as an ordinary pair of neighbouring elements.
+    !> The differential operators computed from the mesh therefore need no special treatment of the
+    !> periodic boundaries, apart from measuring the distance between a linked pair of elements
+    !> through the boundary rather than across the entire domain.
     !> @param[in] XXX
     !> @param[in] XXX
     !> @param[inout] XXX
     !---------------------------------------------------------------------------
-    subroutine CartesianUnstructuredMeshAnalysis(pos, dims, GridInfo)
+    subroutine CartesianUnstructuredMeshAnalysis(pos, dims, GridInfo, exchPBC)
     real(dp), intent(in) :: pos(:,:)
     real(dp), intent(in) :: dims(:,:)
     type(MicroMagGridInfo), intent(out) :: GridInfo
+    integer, intent(in) :: exchPBC(3)                  !> Periodic boundary conditions along x, y and z for the exchange coupling
 
-    integer :: Nel, k, idim, ipm, j, n, kb, i, k_i, n_faces, k1, k2, Nalloc_small, Nalloc_large, Ncount
+    integer :: Nel, k, idim, ipm, j, n, kb, i, k_i, n_faces, k1, k2, Ncount
     real(dp), allocatable :: Xel(:), Yel(:), Zel(:)
     real(dp), allocatable :: Volumes(:)
     real(dp) :: DimsScales(3)
@@ -85,6 +93,13 @@ module UnstructuredMeshAnalysis
     integer, allocatable :: TheTs_indices_this(:), TheTs_temp(:,:), TheTs_indices(:,:)
     integer, allocatable :: TheDs_indices_this(:), TheDs_temp(:,:), TheDs_indices(:,:)
     integer, allocatable :: TheSigns_indices_pos(:,:), TheSigns_indices_neg(:,:), TheSigns_indices(:,:)
+    integer, allocatable :: grow_temp(:,:), maskCount(:)
+    integer :: Ncap, Ncap_T, Ncap_D, N_T, N_D, Nadd, alloc_stat
+    logical :: PBC(3)
+    real(dp) :: globMin(3), globMax(3), Lper(3), sVec(3)
+    real(dp), allocatable :: shiftList(:,:)
+    integer :: nShifts, ishift, ia, ib, ic
+    integer, allocatable :: theseNumMax(:)
     character*(40) :: prog_str
     integer, save :: itimer=0
     
@@ -94,32 +109,61 @@ module UnstructuredMeshAnalysis
     
     ! Initialize some variables
     Nel = size(pos, 1)
-    allocate(Volumes(Nel)) 
+    allocate(Volumes(Nel), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'Volumes' )
     Volumes = dims(:,1) * dims(:,2) * dims(:,3)
     
     ! Rescaling
     DimsScales = minval(dims, dim=1) / 2.0_dp
     
-    allocate(Xel(Nel), Yel(Nel), Zel(Nel))
-    
+    allocate(Xel(Nel), Yel(Nel), Zel(Nel), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'Xel/Yel/Zel' )
+
     Xel = anint(pos(:,1) / DimsScales(1))
     Yel = anint(pos(:,2) / DimsScales(2))
     Zel = anint(pos(:,3) / DimsScales(3))
     
    
     
-    allocate(XXel(Nel,3)) 
+    allocate(XXel(Nel,3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'XXel' )
     XXel = reshape([Xel, Yel, Zel], [Nel, 3])
-    
-    allocate(dimscopy(Nel, 3))
+
+    allocate(dimscopy(Nel, 3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'dimscopy' )
     do i = 1, 3
         dimscopy(:,i) = dims(:,i) / DimsScales(i)
     end do
-         
+
+    ! Periodic boundary conditions for the exchange interaction.
+    ! The bounding box of the mesh defines the period along each of the three directions. Note that
+    ! everything below is done in the rescaled coordinates used internally in this routine, so the
+    ! period is converted back to the original scale when it is stored in GridInfo.
+    PBC = ( exchPBC .ne. 0 )
+    do i = 1, 3
+        globMin(i) = minval( XXel(:,i) - dimscopy(:,i)/2.0 )
+        globMax(i) = maxval( XXel(:,i) + dimscopy(:,i)/2.0 )
+        Lper(i) = globMax(i) - globMin(i)
+    end do
+
+    do i = 1, 3
+        ! The domain has to be thicker than two elements along a periodic direction. Otherwise an
+        ! element becomes its own neighbour through the periodic image, and the distance between a
+        ! linked pair of elements can no longer be identified unambiguously when the differential
+        ! operators are computed.
+        if ( PBC(i) .and. ( Lper(i) .lt. (2.0 * maxval(dimscopy(:,i)) + 1e-9) ) ) then
+            call displayGUIMessage( 'MagTense: too few elements along a periodic direction' )
+            call displayGUIMessage( 'MagTense: at least three elements are required for periodic exchange boundary conditions' )
+            error stop 'CartesianUnstructuredMeshAnalysis: too few elements along a periodic direction'
+        endif
+    end do
+
     ! Construct all faces
     n_faces = 6 * Nel
-    allocate(fNormX(n_faces), fNormY(n_faces), fNormZ(n_faces), AreaFaces(n_faces), DimsF(n_faces, 3))
-    allocate(Xf(n_faces), Yf(n_faces), Zf(n_faces), XXF(n_faces,3))
+    allocate(fNormX(n_faces), fNormY(n_faces), fNormZ(n_faces), AreaFaces(n_faces), DimsF(n_faces, 3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'fNormX/fNormY/fNormZ/AreaFaces/DimsF' )
+    allocate(Xf(n_faces), Yf(n_faces), Zf(n_faces), XXF(n_faces,3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'Xf/Yf/Zf/XXF' )
     
     ThePM = [-1, 1]
     TheEE = reshape([1, 0, 0, 0, 1, 0, 0, 0, 1], [3, 3])
@@ -147,13 +191,27 @@ module UnstructuredMeshAnalysis
     XXF(:,3) = Zf
     
     ! Check which faces are contained by other faces
-    allocate(indexItContainsTrue_temp(6 * Nel * Nel, 2))
-    allocate(UminA(Nel), UmaxA(Nel), VminA(Nel), VmaxA(Nel))
-    allocate(UminB(Nel), UmaxB(Nel), VminB(Nel), VmaxB(Nel))
-    allocate(Aindex(Nel), Bindex(Nel))
-    allocate(SamePosAlongDim(Nel))
-    allocate(UAcontainsUB(Nel), VAcontainsVB(Nel), UBcontainsUA(Nel), VBcontainsVA(Nel))
-    allocate(AcontainsB(Nel), BcontainsA(Nel))
+    !The number of contained-face pairs is not known in advance. The theoretical worst case is
+    !6*Nel*Nel (every A-face containing every B-face), but for an actual mesh the count is O(Nel):
+    !for a uniform 20x20x20 mesh only 45600 of the 384000000 worst-case rows are used.
+    !Allocating the worst case therefore costs 48*Nel^2 bytes (~3 GB at Nel = 8000) and, since the
+    !expression is evaluated in default integer kind, it also overflows for Nel > 18918.
+    !Instead the buffer starts at a modest size and is doubled on demand in the loop below.
+    Ncap = 12 * Nel
+    allocate(indexItContainsTrue_temp(Ncap, 2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'indexItContainsTrue_temp' )
+    allocate(UminA(Nel), UmaxA(Nel), VminA(Nel), VmaxA(Nel), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'UminA/UmaxA/VminA/VmaxA' )
+    allocate(UminB(Nel), UmaxB(Nel), VminB(Nel), VmaxB(Nel), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'UminB/UmaxB/VminB/VmaxB' )
+    allocate(Aindex(Nel), Bindex(Nel), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'Aindex/Bindex' )
+    allocate(SamePosAlongDim(Nel), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'SamePosAlongDim' )
+    allocate(UAcontainsUB(Nel), VAcontainsVB(Nel), UBcontainsUA(Nel), VBcontainsVA(Nel), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'UAcontainsUB/VAcontainsVB/UBcontainsUA/VBcontainsVA' )
+    allocate(AcontainsB(Nel), BcontainsA(Nel), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'AcontainsB/BcontainsA' )
     
    k = 1;
     do idim = 1, 3
@@ -176,6 +234,17 @@ module UnstructuredMeshAnalysis
       
       do kb = 1, Nel
         SamePosAlongDim = (abs(XXf(Aindex,idim) - XXf(Bindex(kb),idim)) < 1e-9) ;
+
+        !With periodic boundary conditions a face at one end of the domain is also considered to be
+        !at the same position as a face at the other end. The A faces have their normal along -idim
+        !and the B faces along +idim, so this links the element at the low end of the domain with the
+        !element at the high end. The containment tests below only involve the two dimensions
+        !orthogonal to idim and are thus unaffected by the periodic shift.
+        if ( PBC(idim) ) then
+            SamePosAlongDim = SamePosAlongDim .or. &
+                (abs( abs(XXf(Aindex,idim) - XXf(Bindex(kb),idim)) - Lper(idim) ) < 1e-9)
+        endif
+
         UAcontainsUB = (((UminA - UminB(kb)) < +1e-9) .and. ((UmaxA - UmaxB(kb)) > -1e-9))
         VAcontainsVB = (((VminA - VminB(kb)) < +1e-9) .and. ((VmaxA - VmaxB(kb)) > -1e-9))
        
@@ -185,14 +254,14 @@ module UnstructuredMeshAnalysis
         AcontainsB = (SamePosAlongDim .and. UAcontainsUB .and. VAcontainsVB)
         BcontainsA = (SamePosAlongDim .and. UBcontainsUA .and. VBcontainsVA)
         
-        allocate(indxAB(count(AcontainsB)))
-        allocate(indxBA(count(BcontainsA)))
+        allocate(indxAB(count(AcontainsB)), indxBA(count(BcontainsA)), stat=alloc_stat)
+        call checkAllocation( alloc_stat, 'indxAB/indxBA' )
         indxAB = pack(Aindex, AcontainsB)
         indxBA = pack(Aindex, BcontainsA)
-        
-        allocate(firstindx(size(indxAB)+size(indxBA)))
-        allocate(secondindx(size(indxAB)+size(indxBA)))
-        
+
+        allocate(firstindx(size(indxAB)+size(indxBA)), secondindx(size(indxAB)+size(indxBA)), stat=alloc_stat)
+        call checkAllocation( alloc_stat, 'firstindx/secondindx' )
+
         firstindx(1:size(indxAB)) = indxAB
         firstindx(size(indxAB)+1:size(firstindx)) = Bindex(kb)
         !k_i = 1
@@ -214,6 +283,17 @@ module UnstructuredMeshAnalysis
             secondindx(i) = indxBA(i-size(indxAB))
         enddo
         
+        !Grow the buffer (by doubling) if the entries about to be added do not fit
+        if ((k + size(firstindx) - 1) .gt. Ncap) then
+            do while ((k + size(firstindx) - 1) .gt. Ncap)
+                Ncap = 2 * Ncap
+            enddo
+            allocate(grow_temp(Ncap,2), stat=alloc_stat)
+            call checkAllocation( alloc_stat, 'indexItContainsTrue_temp' )
+            grow_temp(1:(k-1),:) = indexItContainsTrue_temp(1:(k-1),:)
+            call move_alloc(grow_temp, indexItContainsTrue_temp)
+        endif
+
         do i = 1,size(firstindx)
             indexItContainsTrue_temp(k,1) = firstindx(i)
             indexItContainsTrue_temp(k,2) = secondindx(i)
@@ -225,17 +305,21 @@ module UnstructuredMeshAnalysis
       end do               
     end do
     
-    allocate(indexItContainsTrue(k-1,2))
+    allocate(indexItContainsTrue(k-1,2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'indexItContainsTrue' )
     indexItContainsTrue(:,:) = indexItContainsTrue_temp(1:(k-1),:)
     deallocate(indexItContainsTrue_temp)
-    
-    
-    allocate(kMut_F_temp(size(indexItContainsTrue(:,1)),2))
+
+
+    allocate(kMut_F_temp(size(indexItContainsTrue(:,1)),2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'kMut_F_temp' )
     kMut_F_temp(:,:) = 0
-    allocate(kNonMut_F_temp(size(indexItContainsTrue(:,1)),2))
+    allocate(kNonMut_F_temp(size(indexItContainsTrue(:,1)),2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'kNonMut_F_temp' )
     kNonMut_F_temp(:,:) = 0
-    
-    allocate(mask1D(size(indexItContainsTrue(:,1))))
+
+    allocate(mask1D(size(indexItContainsTrue(:,1))), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'mask1D' )
     mask1D = .false.
     
     k1 = 1
@@ -256,43 +340,62 @@ module UnstructuredMeshAnalysis
     deallocate(mask1D)
                 
     !Allocate temporary arrays to reduce the size of the original arrays
-    allocate(kMut_F(k1-1,2))
+    allocate(kMut_F(k1-1,2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'kMut_F' )
     kMut_F(:,:) = 0
     kMut_F(1:(k1-1),:) = kMut_F_temp(1:(k1-1),:)
-    deallocate(kMut_F_temp)   
-    
-    allocate(kNonMut_F(k2-1,2))
+    deallocate(kMut_F_temp)
+
+    allocate(kNonMut_F(k2-1,2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'kNonMut_F' )
     kNonMut_F(:,:) = 0
     kNonMut_F(1:(k2-1),:) = kNonMut_F_temp(1:(k2-1),:)
-    deallocate(kNonMut_F_temp)   
-    
-    allocate(iYes(size(kMut_F,1)))
+    deallocate(kNonMut_F_temp)
+
+    allocate(iYes(size(kMut_F,1)), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'iYes' )
     iYes = kMut_F(:,1) > kMut_F(:,2)
-        
-    allocate(k1Mut(count(iYes)))
-    allocate(k2Mut(count(iYes)))
+
+    allocate(k1Mut(count(iYes)), k2Mut(count(iYes)), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'k1Mut/k2Mut' )
 
     k1Mut = pack(kMut_F(:,1),iYes)  
     k2Mut = pack(kMut_F(:,2),iYes)
     
     
-    allocate(kRmv(size(k1Mut)+size(kNonMut_F(:,1))))
-    allocate(kSurv(size(k2Mut)+size(kNonMut_F(:,2))))
-    allocate(TheSigns_indices_pos(6*Nel,2))   
-    allocate(TheSigns_indices_neg((size(k2Mut)+size(kNonMut_F(:,2))),2)) 
-    
+    allocate(kRmv(size(k1Mut)+size(kNonMut_F(:,1))), kSurv(size(k2Mut)+size(kNonMut_F(:,2))), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'kRmv/kSurv' )
+    allocate(TheSigns_indices_pos(6*Nel,2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'TheSigns_indices_pos' )
+    allocate(TheSigns_indices_neg((size(k2Mut)+size(kNonMut_F(:,2))),2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'TheSigns_indices_neg' )
+
     ! each of the faces being removed has:
     !   kSurv: one or more surviving contained (or equal) faces
     !   one element (nRmv) having the face as one of its 6 original boundaries
     kRmv  = [k1Mut, kNonMut_F(:,1)]
     kSurv = [k2Mut, kNonMut_F(:,2)]
-    allocate(nRmv(size(kRmv)))
+    allocate(nRmv(size(kRmv)), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'nRmv' )
     nRmv  = MOD(kRmv-1,Nel)+1
-    
-    allocate(mask1D(n_faces))
+
+    allocate(mask1D(n_faces), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'mask1D' )
     mask1D = .true.
     mask1D(kRmv(:)) = .false.
-    
+
+    !Ncount below is the number of surviving faces up to and including a given column. Evaluating
+    !it as count(mask1D(1:...)) inside the two loops rescans the mask on every iteration, which
+    !makes them O(n_faces^2). The running count is instead tabulated once here in a single pass,
+    !so that each lookup becomes O(1). maskCount(i) == count(mask1D(1:i)) by construction.
+    allocate(maskCount(n_faces), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'maskCount' )
+    Ncount = 0
+    do i = 1, n_faces
+        if (mask1D(i)) Ncount = Ncount + 1
+        maskCount(i) = Ncount
+    end do
+
     !To construct TheSigns matrix, we need to remove all the columns indicated by kRmv
     !This is build into the mask1D array. To then filter the columns, we look at the column value
     !for each indices pair. For the negative values, the column value in the sparse matrix is given by kSurv(i)
@@ -303,7 +406,7 @@ module UnstructuredMeshAnalysis
     k_i = 1
     do i=1,size(nRmv)        
         if (mask1D(kSurv(i))) then
-            Ncount = count(mask1D(1:kSurv(i)))
+            Ncount = maskCount(kSurv(i))
             TheSigns_indices_neg(k_i,1) = nRmv(i)
             TheSigns_indices_neg(k_i,2) = Ncount
             k_i = k_i + 1
@@ -315,7 +418,7 @@ module UnstructuredMeshAnalysis
     do i=0,5
         do j=1,Nel  
             if (mask1D(j+(i*Nel))) then
-                Ncount = count(mask1D(1:j+(i*Nel)))
+                Ncount = maskCount(j+(i*Nel))
                 TheSigns_indices_pos(k_i,1) = j
                 TheSigns_indices_pos(k_i,2) = Ncount
                 k_i = k_i + 1
@@ -323,9 +426,12 @@ module UnstructuredMeshAnalysis
         end do
     end do
     k2 = k_i - 1
-    
+
+    deallocate(maskCount)
+
     !Combine the two arrays into the final TheSigns_indices array
-    allocate(TheSigns_indices(k1+k2,3))
+    allocate(TheSigns_indices(k1+k2,3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'TheSigns_indices' )
     TheSigns_indices(1:k1,1:2) = TheSigns_indices_neg(1:k1,1:2)
     TheSigns_indices(1:k1,3) = -1
     TheSigns_indices(k1+1:k1+k2,1:2) = TheSigns_indices_pos(1:k2,1:2)
@@ -336,9 +442,12 @@ module UnstructuredMeshAnalysis
     k = count(mask1D)
     
     !Allocate temporary arrays to reduce the size of the original arrays
-    allocate(XXF_temp(k,3),DimsF_temp(k,3))
-    allocate(fNormX_temp(k),fNormY_temp(k),fNormZ_temp(k))
-    allocate(Xf_temp(k),Yf_temp(k),Zf_temp(k),AreaFaces_temp(k))
+    allocate(XXF_temp(k,3),DimsF_temp(k,3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'XXF_temp/DimsF_temp' )
+    allocate(fNormX_temp(k),fNormY_temp(k),fNormZ_temp(k), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'fNormX_temp/fNormY_temp/fNormZ_temp' )
+    allocate(Xf_temp(k),Yf_temp(k),Zf_temp(k),AreaFaces_temp(k), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'Xf_temp/Yf_temp/Zf_temp/AreaFaces_temp' )
     do i=1,3
         XXF_temp(:,i) = pack(XXf(:,i),mask1D)
         DimsF_temp(:,i) = pack(DimsF(:,i),mask1D)
@@ -358,8 +467,10 @@ module UnstructuredMeshAnalysis
     deallocate(mask1D)
     
     k = size(Xf_temp)
-    allocate(XXF(k,3),DimsF(k,3),DimsF2(k,3))
-    allocate(fNormX(k),fNormY(k),fNormZ(k),Xf(k),Yf(k),Zf(k),AreaFaces(k))
+    allocate(XXF(k,3),DimsF(k,3),DimsF2(k,3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'XXF/DimsF/DimsF2' )
+    allocate(fNormX(k),fNormY(k),fNormZ(k),Xf(k),Yf(k),Zf(k),AreaFaces(k), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'fNormX/fNormY/fNormZ/Xf/Yf/Zf/AreaFaces' )
     !allocate(TheSigns(Nel,k))
     call move_alloc (XXF_temp,XXF)
     call move_alloc (DimsF_temp,DimsF)
@@ -386,9 +497,12 @@ module UnstructuredMeshAnalysis
     ! TheDs = sparse(k,Nel) ;
     
     !k = size(Xf)
-    allocate(xVertA(k,3), xVertB(k,3), xVertC(k,3), xVertD(k,3))
-    allocate(xxMinEl(Nel,3), xxMaxEl(Nel,3))
-    allocate(iZero(k), count_temp(k,3))
+    allocate(xVertA(k,3), xVertB(k,3), xVertC(k,3), xVertD(k,3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'xVertA/xVertB/xVertC/xVertD' )
+    allocate(xxMinEl(Nel,3), xxMaxEl(Nel,3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'xxMinEl/xxMaxEl' )
+    allocate(iZero(k), count_temp(k,3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'iZero/count_temp' )
     
     xVertA = XXf(:,:)+DimsF(:,:)/2.0
     xVertC = XXf(:,:)-DimsF(:,:)/2.0
@@ -398,16 +512,18 @@ module UnstructuredMeshAnalysis
     count_temp(:,2) = 2;
     count_temp(:,3) = 3;
     
-    allocate(mask1D(k))
+    allocate(mask1D(k), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'mask1D' )
     mask1D = .false.
-    
+
     iZero(:) = 0
     do i = 1,3
         mask1D = (abs(DimsF(:,i)) < 1e-9)
         where (mask1D) iZero = iZero + count_temp(:,i)
     end do
     
-    allocate(cols(size(iZero)))
+    allocate(cols(size(iZero)), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'cols' )
     cols = mod(iZero+1,3)+1
     
     do i = 1,size(cols) 
@@ -421,78 +537,151 @@ module UnstructuredMeshAnalysis
     xxMaxEl(:,:) = XXel(:,:) + dimscopy(:,:)/2.0 
     
     k = size(Xf)
-    allocate(TheseMinXXel(k,3), TheseMaxXXel(k,3))
-    allocate(theseA(k),theseB(K),theseC(k),theseD(k),theseA_int(k),theseB_int(k),theseC_int(k),theseD_int(k))
-    allocate(theseNum(k),count1D(k))
+    allocate(TheseMinXXel(k,3), TheseMaxXXel(k,3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'TheseMinXXel/TheseMaxXXel' )
+    allocate(theseA(k),theseB(K),theseC(k),theseD(k),theseA_int(k),theseB_int(k),theseC_int(k),theseD_int(k), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'theseA/theseB/theseC/theseD' )
+    allocate(theseNum(k),count1D(k), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'theseNum/count1D' )
     TheseMinXXel(:,:) = 0
     
     do n=1,k
         count1D(n) = n
     end do
     
-    allocate(TheTs_indices(0,2))
-    allocate(TheDs_indices(0,2))
-    
-    do n=1,Nel
-        TheseMinXXel(:,1) = xxMinEl(n,1)
-        TheseMinXXel(:,2) = xxMinEl(n,2)
-        TheseMinXXel(:,3) = xxMinEl(n,3)
-        TheseMaxXXel(:,1) = xxMaxEl(n,1)
-        TheseMaxXXel(:,2) = xxMaxEl(n,2)
-        TheseMaxXXel(:,3) = xxMaxEl(n,3)
+    !TheTs_indices and TheDs_indices are also grown by doubling rather than being reallocated
+    !and copied in full on every pass through the loop below, which made the loop O(Nel^2) in
+    !both time and allocator traffic. N_T and N_D count the entries actually stored so far.
+    Ncap_T = 32 * Nel
+    Ncap_D = 64 * Nel
+    N_T = 0
+    N_D = 0
+    allocate(TheTs_indices(Ncap_T,2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'TheTs_indices' )
+    allocate(TheDs_indices(Ncap_D,2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'TheDs_indices' )
 
-        theseA = all((((TheseMinXXel - xVertA) < +1e-9 ) .and. ((TheseMaxXXel - xVertA ) > -1e-9)) ,2)
-        theseB = all((((TheseMinXXel - xVertB) < +1e-9 ) .and. ((TheseMaxXXel - xVertB ) > -1e-9)) ,2)
-        theseC = all((((TheseMinXXel - xVertC) < +1e-9 ) .and. ((TheseMaxXXel - xVertC ) > -1e-9)) ,2)
-        theseD = all((((TheseMinXXel - xVertD) < +1e-9 ) .and. ((TheseMaxXXel - xVertD ) > -1e-9)) ,2)
-                    
-        theseA_int(:) = 0
-        theseB_int(:) = 0
-        theseC_int(:) = 0
-        theseD_int(:) = 0
-        
-        where (theseA) theseA_int = 1
-        where (theseB) theseB_int = 1
-        where (theseC) theseC_int = 1
-        where (theseD) theseD_int = 1
-    
-        theseNum = theseA_int + theseB_int + theseC_int + theseD_int
-        
-        mask1D = (theseNum >= 2)
+    !The list of periodic images that each element is tested against below. Without periodic
+    !boundary conditions this is just the single zero shift, and the loop below is then identical to
+    !the non-periodic version. All combinations of the periodic directions are needed, as an element
+    !can share a vertex with a face across two (or three) periodic directions at the same time.
+    allocate(shiftList(27,3), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'shiftList' )
+    nShifts = 0
+    do ia = -1, 1
+      do ib = -1, 1
+        do ic = -1, 1
+          if ( (ia .ne. 0 .and. .not. PBC(1)) .or. (ib .ne. 0 .and. .not. PBC(2)) &
+                .or. (ic .ne. 0 .and. .not. PBC(3)) ) cycle
+          nShifts = nShifts + 1
+          shiftList(nShifts,:) = [ia*Lper(1), ib*Lper(2), ic*Lper(3)]
+        end do
+      end do
+    end do
+
+    allocate(theseNumMax(k), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'theseNumMax' )
+
+    do n=1,Nel
+        theseNumMax(:) = 0
+
+        do ishift = 1, nShifts
+            sVec = shiftList(ishift,:)
+
+            !Skip the image if the shifted element falls entirely outside the mesh. This keeps the
+            !cost of the periodic images negligible, as only the elements at a boundary have an
+            !image that can touch a face at the opposite boundary. The zero shift is never skipped.
+            if ( any( (xxMinEl(n,:) + sVec) .gt. (globMax + 1e-9) ) .or. &
+                 any( (xxMaxEl(n,:) + sVec) .lt. (globMin - 1e-9) ) ) cycle
+
+            TheseMinXXel(:,1) = xxMinEl(n,1) + sVec(1)
+            TheseMinXXel(:,2) = xxMinEl(n,2) + sVec(2)
+            TheseMinXXel(:,3) = xxMinEl(n,3) + sVec(3)
+            TheseMaxXXel(:,1) = xxMaxEl(n,1) + sVec(1)
+            TheseMaxXXel(:,2) = xxMaxEl(n,2) + sVec(2)
+            TheseMaxXXel(:,3) = xxMaxEl(n,3) + sVec(3)
+
+            theseA = all((((TheseMinXXel - xVertA) < +1e-9 ) .and. ((TheseMaxXXel - xVertA ) > -1e-9)) ,2)
+            theseB = all((((TheseMinXXel - xVertB) < +1e-9 ) .and. ((TheseMaxXXel - xVertB ) > -1e-9)) ,2)
+            theseC = all((((TheseMinXXel - xVertC) < +1e-9 ) .and. ((TheseMaxXXel - xVertC ) > -1e-9)) ,2)
+            theseD = all((((TheseMinXXel - xVertD) < +1e-9 ) .and. ((TheseMaxXXel - xVertD ) > -1e-9)) ,2)
+
+            theseA_int(:) = 0
+            theseB_int(:) = 0
+            theseC_int(:) = 0
+            theseD_int(:) = 0
+
+            where (theseA) theseA_int = 1
+            where (theseB) theseB_int = 1
+            where (theseC) theseC_int = 1
+            where (theseD) theseD_int = 1
+
+            theseNum = theseA_int + theseB_int + theseC_int + theseD_int
+
+            !The maximum, and not the sum, over the images ensures that an element is only entered
+            !once in TheTs and TheDs, even if it touches the face both directly and through one of
+            !its periodic images
+            theseNumMax = max(theseNumMax, theseNum)
+        end do
+
+        mask1D = (theseNumMax >= 2)
 
         !Instead of assigning the values to a TheTs matrix, we simply find the indices and save those.
         !The TheTs matrix would have been assigned as "where (mask1D) TheTs(:,n) = .true."
         !Instead we use an array going from 1:N and the use the mask1D to find the indices to be saved.
         !This is done in the temporary array TheTs_indices_this
-        !These are then put into the TheTs_indices full array, which size in expanded in every loop.
-        Nalloc_small = size(TheTs_indices,1)
+        !These are then appended to the TheTs_indices buffer, which is doubled when it runs full.
         if (any(mask1D)) then
             TheTs_indices_this = pack(count1D, mask1D)
-            Nalloc_large = Nalloc_small+size(TheTs_indices_this)
-            allocate(TheTs_temp(Nalloc_large,2))
-            TheTs_temp(1:Nalloc_small,:) = TheTs_indices(:,:)
-            TheTs_temp((Nalloc_small+1):Nalloc_large,1) = TheTs_indices_this
-            TheTs_temp((Nalloc_small+1):Nalloc_large,2) = n
-            call move_alloc (TheTs_temp, TheTs_indices) 
+            Nadd = size(TheTs_indices_this)
+            if ((N_T + Nadd) .gt. Ncap_T) then
+                do while ((N_T + Nadd) .gt. Ncap_T)
+                    Ncap_T = 2 * Ncap_T
+                enddo
+                allocate(TheTs_temp(Ncap_T,2), stat=alloc_stat)
+                call checkAllocation( alloc_stat, 'TheTs_indices' )
+                TheTs_temp(1:N_T,:) = TheTs_indices(1:N_T,:)
+                call move_alloc (TheTs_temp, TheTs_indices)
+            endif
+            TheTs_indices((N_T+1):(N_T+Nadd),1) = TheTs_indices_this
+            TheTs_indices((N_T+1):(N_T+Nadd),2) = n
+            N_T = N_T + Nadd
         endif
-        
-        mask1D = (theseNum >= 1)
-        
+
+        mask1D = (theseNumMax >= 1)
+
         !The same logic as for TheTs is applied here for the TheDs.
         !The code mimics "where (mask1D) TheDs(:,n) = .true." but operates only on indices
-        Nalloc_small = size(TheDs_indices,1)
         if (any(mask1D)) then
             TheDs_indices_this = pack(count1D, mask1D)
-            Nalloc_large = Nalloc_small+size(TheDs_indices_this)
-            allocate(TheDs_temp(Nalloc_large,2))
-            TheDs_temp(1:Nalloc_small,:) = TheDs_indices(:,:)
-            TheDs_temp((Nalloc_small+1):Nalloc_large,1) = TheDs_indices_this
-            TheDs_temp((Nalloc_small+1):Nalloc_large,2) = n
-            call move_alloc (TheDs_temp, TheDs_indices) 
+            Nadd = size(TheDs_indices_this)
+            if ((N_D + Nadd) .gt. Ncap_D) then
+                do while ((N_D + Nadd) .gt. Ncap_D)
+                    Ncap_D = 2 * Ncap_D
+                enddo
+                allocate(TheDs_temp(Ncap_D,2), stat=alloc_stat)
+                call checkAllocation( alloc_stat, 'TheDs_indices' )
+                TheDs_temp(1:N_D,:) = TheDs_indices(1:N_D,:)
+                call move_alloc (TheDs_temp, TheDs_indices)
+            endif
+            TheDs_indices((N_D+1):(N_D+Nadd),1) = TheDs_indices_this
+            TheDs_indices((N_D+1):(N_D+Nadd),2) = n
+            N_D = N_D + Nadd
         endif
-        
+
     end do
-    
+
+    !Trim the two index buffers down to the number of entries actually found
+    allocate(TheTs_temp(N_T,2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'TheTs_indices' )
+    TheTs_temp(:,:) = TheTs_indices(1:N_T,:)
+    call move_alloc (TheTs_temp, TheTs_indices)
+
+    allocate(TheDs_temp(N_D,2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'TheDs_indices' )
+    TheDs_temp(:,:) = TheDs_indices(1:N_D,:)
+    call move_alloc (TheDs_temp, TheDs_indices)
+
     ! Rescaling (inverse)
     Xel = Xel * DimsScales(1)
     Yel = Yel * DimsScales(2)
@@ -521,12 +710,39 @@ module UnstructuredMeshAnalysis
     GridInfo%DimsF = DimsF
     GridInfo%TheTs = TheTs_indices
     GridInfo%TheDs = TheDs_indices
-    GridInfo%TheSigns = TheSigns_indices    
+    GridInfo%TheSigns = TheSigns_indices
+
+    !The periodic directions and the corresponding periods, converted back to the original scale.
+    !These are needed when the differential operators are computed, as the distance between a pair
+    !of elements linked across a periodic boundary has to be measured through that boundary.
+    GridInfo%exchPBC = PBC
+    GridInfo%Lper = Lper * DimsScales
 
     call displayGUIMessage( 'Mesh analysis done' )
 
     call trace%end( "CartesianUnstructuredMeshAnalysis", itimer=itimer )
     
   end subroutine CartesianUnstructuredMeshAnalysis
+
+    !>-----------------------------------------
+    !> @brief
+    !> Checks the status value returned by an allocate statement and aborts with a
+    !> meaningful message if the allocation failed. Without this an out-of-memory
+    !> condition terminates the process (and thus Matlab) without any diagnostic.
+    !> @param[in] stat The status value returned by the allocate statement
+    !> @param[in] arrayname The name of the array that was being allocated
+    !---------------------------------------------------------------------------
+    subroutine checkAllocation( stat, arrayname )
+    integer, intent(in) :: stat
+    character(*), intent(in) :: arrayname
+
+    if ( stat .ne. 0 ) then
+        call displayGUIMessage( 'MagTense: out of memory in CartesianUnstructuredMeshAnalysis' )
+        call displayGUIMessage( 'MagTense: failed to allocate '//trim(arrayname) )
+        call displayGUIMessage( 'MagTense: reduce the number of mesh elements or free memory and retry' )
+        error stop 'CartesianUnstructuredMeshAnalysis: allocation failure'
+    endif
+
+    end subroutine checkAllocation
 
 end module UnstructuredMeshAnalysis

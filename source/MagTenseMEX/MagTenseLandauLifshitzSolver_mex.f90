@@ -16,7 +16,10 @@
       use LandauLifshitzSolution
       use integrationDataTypes
       use MagTenseMicroMagIO
-      
+      use auxInit_mod
+      use timer_mod
+      use trace_mod
+    
       implicit none
       mwPointer :: plhs(*), prhs(*)             !>Defines the input/output pointers
       mwPointer :: mxGetPr, mxCreateNumericArray!>Defines functions for interacting with MEX
@@ -49,11 +52,21 @@
       !Load the problem from Matlab into Fortran
       call loadMicroMagProblem( prhs(1), problem )
       
+      !---------------------- initiaize auxiliary modules ----------------------------- 
+      call initAux(auxInit, problem%log_dir, problem%timer_log, problem%trace_log, problem%window_ena, &
+          problem%window_int, problem%trace_ena, problem%flush_each, problem%trace_verb)
+      !---------------------------------------------------------------------------------
+      
       !Call the ODE solver
       call SolveLandauLifshitzEquation( problem, solution )    
     
-      call returnMicroMagSolution( solution, plhs(1) )
-      
+      !---------------------- finalize auxiliary modules -----------------------------
+      call trace%finalize()
+      call timer%log_finalize()
+      !---------------------------------------------------------------------------------
+    
+      call returnMicroMagSolution( solution, plhs(1), problem )
+
       !Return the mesh, if the user requested it
       if (nlhs .eq. 2) then
             call returnMicroMagGrid( solution%gridinfo, plhs(2) )  

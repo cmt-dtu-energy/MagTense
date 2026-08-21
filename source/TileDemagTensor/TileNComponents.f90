@@ -1,18 +1,24 @@
 module TileNComponents
+    use TileTensorHelperFunctions
     use TileCylPieceTensor
-    use TileRectanagularPrismTensor
+    use TileRectangularPrismTensor
+    use TileRectangularPrismAvgTensor
     use TileCircPieceTensor
     use TilePlanarCoilTensor
     use TileTriangle
+
     implicit none
     
-    !::General base-type for alle the different tile types
+    !::General base-type for all the different tile types
     type MagTile
         !::Specific for a cylindrical tile piece
         real :: r0, theta0, z0, dr, dtheta, dz
         
         !::Specific for a rectangular prism
         real :: a, b, c
+        
+        !::Specific for avg rectangular prism, size of receiving tile, used when averaging demagnetisation tensor
+        !real :: a1, b1, c1
         
         !::Generel variables, shared among all tile types
         real,dimension(3) :: M
@@ -47,15 +53,16 @@ module TileNComponents
     !! @param N is a (3,3) matrix where the tensor is returned to
     abstract interface
       
-      subroutine N_tensor_subroutine ( prismTile, diffPos, N )
+      subroutine N_tensor_subroutine ( prismTile, diffPos, N, Obs_size )
          import MagTile
          type(MagTile),intent(in) :: prismTile
          real,dimension(3),intent(in) :: diffPos
          real,dimension(3,3),intent(inout) :: N
+         real,dimension(3),intent(in), optional :: Obs_size
       end subroutine N_tensor_subroutine
     end interface
     
-    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeSphere=6,tileTypeSpheroid=7,tileTypePlanarCoil=101
+    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeSphere=6,tileTypeSpheroid=7,tileTypeAvgPrism=8,tileTypePlanarCoil=101
     integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2,magnetTypeSoftConstPerm=3
     integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     
@@ -100,9 +107,10 @@ module TileNComponents
         
     end subroutine setupEvaluationPoints
     
-    subroutine  getN_CylPiece( cylP, x, N )
+    subroutine  getN_CylPiece( cylP, x, N , Obs_size)
     type(MagTile),intent(in) :: cylP
     real,intent(in) :: x
+    real, intent(in), dimension(3), optional :: Obs_size  ! declare it to match interface, not used
     class( dataCollectionBase ), pointer :: dat
     real :: theta1, theta2
     real :: int_dDdx_dr_dz1,int_dDdx_dr_dz2
@@ -226,11 +234,12 @@ module TileNComponents
     !::x1 = R * cos( theta - dtheta/2 ), y1 = R * sin( theta - theta/2 )
     !::x2 = R * cos( theta + dtheta/2 ), y2 = R * sin( theta + dtheta/2 )
     !::x3 = R * cos( theta + dtheta/2 ), y3 = R * sin( theta - dtheta/2 )
-    subroutine getN_circPiece( tile, pos, Nout )
+    subroutine getN_circPiece( tile, pos, Nout, Obs_size )
     type(MagTile),intent(in) :: tile
     class( dataCollectionBase ), pointer :: dat
     real,dimension(3),intent(in) :: pos
     real,dimension(3,3),intent(inout) :: Nout
+    real, intent(in), dimension(3), optional :: Obs_size  ! declare it to match interface, not used
     real :: int_ddx_dy_dz_val,int_ddx_dx_dz_val,int_ddx_cos_dtheta_dz_val,int_ddx_sin_dtheta_dz_val
     real :: int_ddx_dx_dy_val1,int_ddx_dx_dy_val2,int_ddy_dy_dz_val, int_ddy_dx_dz_val,int_ddy_cos_dtheta_dz_val
     real :: int_ddy_sin_dtheta_dz_val, int_ddy_dx_dy_val1,int_ddy_dx_dy_val2,int_ddz_dy_dz_val
@@ -423,11 +432,12 @@ module TileNComponents
     !::x2 = R * cos( theta + dtheta/2 ), y2 = R * sin( theta + dtheta/2 )
     !::x3 = R * cos( theta - dtheta/2 ), y3 = R * sin( theta + dtheta/2 )
     !::It then extends in the z-direction by dz centered at z0
-    subroutine getN_circPiece_Inv( tile, pos, Nout )
+    subroutine getN_circPiece_Inv( tile, pos, Nout, Obs_size )
     type(MagTile),intent(in) :: tile
     class( dataCollectionBase ), pointer :: dat
     real,dimension(3),intent(in) :: pos
     real,dimension(3,3),intent(inout) :: Nout
+    real, intent(in), dimension(3), optional :: Obs_size  ! declare it to match interface, not used
     real :: int_ddx_dy_dz_val,int_ddx_dx_dz_val,int_ddx_cos_dtheta_dz_val,int_ddx_sin_dtheta_dz_val
     real :: int_ddx_dx_dy_val1,int_ddx_dx_dy_val2,int_ddy_dy_dz_val, int_ddy_dx_dz_val,int_ddy_cos_dtheta_dz_val
     real :: int_ddy_sin_dtheta_dz_val, int_ddy_dx_dy_val1,int_ddy_dx_dy_val2,int_ddz_dy_dz_val
@@ -622,19 +632,116 @@ module TileNComponents
     
     end subroutine getN_circPiece_Inv
     
+
+    ! Calculates averaged N from expressions in Fukushima et al. 2002 [DOI: 10.1109/20.650225] using the Avgprism tile
+    subroutine getAvgN_prism_3D(Avgprism, pos, N_out, Obs_size_ele)
+    type(MagTile),intent(in) :: Avgprism 
+    real,intent(in),dimension(3) :: pos
+    real,intent(in),dimension(3), optional :: Obs_size_ele
+    real,intent(inout),dimension(3,3) :: N_out
+    integer :: i, j, k !for internal looping
+
+    real(8) :: a,b,c,x,y,z,a1,b1,c1
+    real(8) :: source_coords(6), obs_coords(6)
+    real(8) :: X1, X2, Y1, Y2, Z1, Z2, vol, min_vol
+    real(8), parameter :: eps = 1.0d-15
+    integer :: unit
+
+    !Lengths of source tile in x,y,z dimensions
+    a = Avgprism%a/2.0
+    b = Avgprism%b/2.0
+    c = Avgprism%c/2.0
+
+    !Lengths of receiving (observer) tile in x,y,z dimensions, if provided, else same as lengths of source
+    if (present(Obs_size_ele) .and. all(abs(Obs_size_ele) > 0.0)) then
+        a1 = Obs_size_ele(1)/2.0
+        b1 = Obs_size_ele(2)/2.0
+        c1 = Obs_size_ele(3)/2.0
+    else
+        !Use the same size as source tile
+        a1 = Avgprism%a/2.0
+        b1 = Avgprism%b/2.0
+        c1 = Avgprism%c/2.0
+    end if
+    
+    ! coordinates from center of source tile to center of receiving tile
+    x = pos(1)
+    y = pos(2)
+    z = pos(3)
+
+    !Find coordinates for corners
+    source_coords = (/ -a,  a,  -b,  b,  -c,  c /)
+    obs_coords    = (/ x-a1, x+a1, y-b1, y+b1, z-c1, z+c1 /)
+    !vol = (obs_coords(2)-obs_coords(1)) * (obs_coords(4)-obs_coords(3)) * (obs_coords(6)-obs_coords(5))
+    vol = 8.0d0 * a1 * b1 * c1 !more stable version of the same volume as above
+    
+    !Calculating tensor elements
+    N_out(1,1) = 0.0d0
+    N_out(2,2) = 0.0d0
+    N_out(3,3) = 0.0d0
+    N_out(1,2) = 0.0d0
+    N_out(1,3) = 0.0d0
+    N_out(2,1) = 0.0d0
+    N_out(2,3) = 0.0d0
+    N_out(3,1) = 0.0d0
+    N_out(3,2) = 0.0d0
+    do i = 0, 1
+        do j = 0, 1
+            do k = 0, 1
+                !Define distances for integration
+                X1 = obs_coords(1) - source_coords(1+i)
+                X2 = obs_coords(2) - source_coords(1+i)
+                Y1 = obs_coords(3) - source_coords(3+j)
+                Y2 = obs_coords(4) - source_coords(3+j)
+                Z1 = obs_coords(5) - source_coords(5+k)
+                Z2 = obs_coords(6) - source_coords(5+k)
+
+                ! Failsafe: avoid zero distances
+                X1 = sign(max(abs(X1), eps), X1)
+                X2 = sign(max(abs(X2), eps), X2)
+                Y1 = sign(max(abs(Y1), eps), Y1)
+                Y2 = sign(max(abs(Y2), eps), Y2)
+                Z1 = sign(max(abs(Z1), eps), Z1)
+                Z2 = sign(max(abs(Z2), eps), Z2)
+
+                !Integrate over receiving volume
+                N_out(1,1) = N_out(1,1) + (-1.0d0)**(i+j+k) * AvgN_prism_definite_integral(F1, X1, X2, Y1, Y2, Z1, Z2)
+                N_out(2,2) = N_out(2,2) + (-1.0d0)**(i+j+k) * AvgN_prism_definite_integral(F1, Y1, Y2, Z1, Z2, X1, X2)
+                N_out(3,3) = N_out(3,3) + (-1.0d0)**(i+j+k) * AvgN_prism_definite_integral(F1, Z1, Z2, X1, X2, Y1, Y2)
+                N_out(1,2) = N_out(1,2) + (-1.0d0)**(i+j+k) * AvgN_prism_definite_integral(F2, X1, X2, Y1, Y2, Z1, Z2)
+                N_out(2,3) = N_out(2,3) + (-1.0d0)**(i+j+k) * AvgN_prism_definite_integral(F2, Y1, Y2, Z1, Z2, X1, X2)
+                N_out(3,1) = N_out(3,1) + (-1.0d0)**(i+j+k) * AvgN_prism_definite_integral(F2, Z1, Z2, X1, X2, Y1, Y2)
+            end do
+        end do
+    end do
+    
+    !Scaling and using symmetry
+    N_out(1,1) = -N_out(1,1) / (4*pi*vol)
+    N_out(2,2) = -N_out(2,2) / (4*pi*vol)
+    N_out(3,3) = -N_out(3,3) / (4*pi*vol)
+    N_out(1,2) = -N_out(1,2) / (4*pi*vol)
+    N_out(2,1) = N_out(1,2)
+    N_out(2,3) = -N_out(2,3) / (4*pi*vol)
+    N_out(3,2) = N_out(2,3)
+    N_out(3,1) = -N_out(3,1) / (4*pi*vol)
+    N_out(1,3) = N_out(3,1)
+
+    end subroutine getAvgN_prism_3D
+
     
     !::Calculates N from the analytical expression in 3D
     !::Given the prism tile (prism) and the position vector to it (pos = (x,y,z) )
     !::Returns a (3,3) array N_out
-    subroutine getN_prism_3D( prism, pos, N_out )
+    subroutine getN_prism_3D( prism, pos, N_out, Obs_size )
     type(MagTile),intent(in) :: prism
     real,intent(in),dimension(3) :: pos
     real,intent(inout),dimension(3,3) :: N_out
-    
+    real,intent(in),dimension(3), optional :: Obs_size
     real :: a,b,c,x,y,z
     real :: nom,denom,nom_l,nom_h,denom_l,denom_h    
     real,parameter :: lim_scl_h=1.01,lim_scl_l=0.98
     real :: xl,xh,yl,yh,zl,zh,al,ah,bl,bh,cl,ch,lim
+    integer :: unit
     
     a = prism%a
     b = prism%b
@@ -720,17 +827,18 @@ module TileNComponents
     
     !!Change the sign so that the output tensor follows the same definition as all the other tensors
     N_out = -1.* N_out
-    
+ 
     end subroutine
     
     
     !::Calculates N from the analytical expression in 3D
     !::Given the tile (sphere) and the position vector to it (pos = (x,y,z) )
     !::Returns a (3,3) array N_out
-    subroutine getN_sphere_3D( tile, pos, N_out )
+    subroutine getN_sphere_3D( tile, pos, N_out, Obs_size )
     type(MagTile),intent(in) :: tile
     real,intent(in),dimension(3) :: pos
     real,intent(inout),dimension(3,3) :: N_out
+    real,intent(in),dimension(3), optional :: Obs_size
     
     real :: a,x,y,z
     
@@ -774,10 +882,11 @@ module TileNComponents
     !::Calculates N from the analytical expression in 3D
     !::Given the tile (spheroid) and the position vector to it (pos = (x,y,z) )
     !::Returns a (3,3) array N_out
-    subroutine getN_spheroid_3D( tile, pos, N_out )
+    subroutine getN_spheroid_3D( tile, pos, N_out, Obs_size )
     type(MagTile),intent(in) :: tile
     real,intent(in),dimension(3) :: pos
     real,intent(inout),dimension(3,3) :: N_out
+    real,intent(in),dimension(3), optional :: Obs_size
     integer,dimension(3) :: indx_semi
     real,dimension(3) :: coor,semi_axis
     real,dimension(3,3) :: N_demag, N_temp
@@ -941,10 +1050,11 @@ module TileNComponents
     
         
     !> Returns the general tetrahedron solution
-    subroutine getN_tensor_tetrahedron ( tile, r, N )         
+    subroutine getN_tensor_tetrahedron ( tile, r, N, Obs_size)         
          type(MagTile),intent(in) :: tile
          real,dimension(3),intent(in) :: r
          real,dimension(3,3),intent(inout) :: N
+         real,intent(in),dimension(3), optional :: Obs_size
          
          real,dimension(3,3) :: N_tmp,P
          integer :: i
@@ -971,11 +1081,12 @@ module TileNComponents
     !::and NL windings between these two radii. Each winding is assumed to carry the same current, I, which
     !::is considered to be equivalent to the magnetization of the "tile"
     !::It is assumed tha NL = 100 yields a good approximation to a continuous coil. Then the field strength is governed by the current, I
-    subroutine getN_PlanarCoil( tile, pos, Nout )
+    subroutine getN_PlanarCoil( tile, pos, Nout, Obs_size )
     type(MagTile),intent(in) :: tile
     class( dataCollectionBase ), pointer :: dat
     real,dimension(3),intent(in) :: pos
     real,dimension(3,3),intent(inout) :: Nout
+    real,intent(in),dimension(3), optional :: Obs_size
     
     real,dimension(2) :: Npol,tmp
     real :: r,z,theta,Rin,Rout,R_loop

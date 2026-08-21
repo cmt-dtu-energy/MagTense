@@ -1,10 +1,23 @@
 module fmm3d_tree_mod
     use omp_lib
+    use omp_mod
     use trace_mod
         implicit none
+
+    ! On Windows the python extension is compiled with
+    ! /assume:underscore /names:lowercase (EXTRA_FFLAGS in the root Makefile)
+    ! while this library is not, so the extension looks for these procedures
+    ! under Linux-style names while ifx would emit FMM3D_TREE_MOD_mp_BUILD1
+    ! and friends. Each procedure below therefore carries an explicit ALIAS,
+    ! the same convention already used for the other f2py entry points (see
+    ! LandauLifshitzEquationSolver.f90). The alias strings are identical to
+    ! ifx's default mangling on Linux, so they change nothing there.
+
       type :: FMM3DTree
             logical :: is_built = .false.
             logical :: keep_tree = .true.
+
+            integer :: nterms_in = -1
 
             integer :: nlmax = 51
             integer :: nlevels = 0
@@ -158,7 +171,6 @@ module fmm3d_tree_mod
         !-------- 
 
         contains
-          procedure :: full_fmm
           procedure :: build1
           procedure :: reset_sort_arg
           procedure :: dealloc
@@ -177,6 +189,7 @@ module fmm3d_tree_mod
 
 
       subroutine build_tree(self, source, eps, ndiv, ier, ifunif, nlmin, nlmax)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_build_tree_" :: build_tree
         class(FMM3DTree), intent(inout) :: self
         double precision, contiguous, pointer :: source(:,:)
         double precision eps
@@ -185,6 +198,7 @@ module fmm3d_tree_mod
         integer :: ifunif, nlmin, nlmax
         !------------------------------------------------
         integer :: i
+        integer :: ibox, ilev
         integer, save :: itimer = 0
         !-----------------
 
@@ -200,8 +214,6 @@ module fmm3d_tree_mod
           self%ndiv = ndiv 
         end if
 
-        !print *, " building fmm tree"
-
         self%source => source
         self%nsource = size(source,2)
         self%eps = eps
@@ -212,30 +224,36 @@ module fmm3d_tree_mod
         self%nlmin = nlmin
         self%nlmax = nlmax
 
-        !$omp parallel
-        !$omp single
-        self%nthd = omp_get_num_threads()
-        !$omp end single
-        !$omp end parallel
-
-        !print *, " number of threads for fmm tree build: ", self%nthd
+       
+        !----------- use omp_mod to get number of threads -----------------
+        self%nthd = omp%numthreads()
+        !-----------------------------------------------------------------
         
 
         call self%build1()
         call self%build2()
 
 
-        print *, " built tree with ", self%nlevels, " levels and ", self%nboxes, " boxes "
-        print *, "Number of boxes per level:"
-        do i = 0, self%nlevels
-            print *, "Level ", i, ": ", self%laddr(2, i) - self%laddr(1, i) + 1, " boxes"
-        enddo
+        !Tree diagnostics. These are only of interest when debugging the FMM setup, and the tree is
+        !rebuilt for every problem, so they are gated on the trace flag rather than printed
+        !unconditionally to stdout - which, under Matlab, is not even reliably visible.
+        if ( trace%enabled .and. trace%verbose .ge. 2 ) then
+            print *, " built tree with ", self%nlevels, " levels and ", self%nboxes, " boxes "
+            print *, " Number of multipole expansion terms:", self%nterms(0)
+            print *, "Number of boxes per level:"
+            do i = 0, self%nlevels
+                print *, "Level ", i, ": ", self%laddr(2, i) - self%laddr(1, i) + 1, " boxes"
+            enddo
+            print *, " scaling factor b0 = ", self%b0, " b0inv = ", self%b0inv
+        endif
+
 
         self%is_built = .true.
         call trace%end( "FMM3DTree_build_tree", itimer=itimer, verbose=2 )
       end subroutine 
 
       subroutine make_and_eval(self, dipvec, grad)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_make_and_eval_" :: make_and_eval
         class(FMM3DTree), intent(inout) :: self
         double precision, contiguous, pointer :: dipvec(:,:,:)
         double precision, contiguous, pointer :: grad(:,:,:)
@@ -249,8 +267,11 @@ module fmm3d_tree_mod
 
         call self%lfmm3dmain_tree()
         call self%eval_local()
-        !call self%eval_direct()
 
+
+        !======== commented out - all near field is handled by MagTense analytical tensor ==========
+        !call self%eval_direct()
+        !===========================================================================================
 
         call dreorderi(3*self%nd,self%nsource,self%gradsort,self%grad,self%isrc)
         call drescale(self%nd*3*self%nsource,self%grad,self%b0inv)
@@ -261,111 +282,8 @@ module fmm3d_tree_mod
       end subroutine make_and_eval
 
 
-    subroutine full_fmm(self,nd,eps,nsource,source, &
-            dipvec,grad,ier)
-        use omp_lib, only: omp_get_wtime
-        class(FMM3DTree), intent(inout) :: self
-        !------------------------------------------------
-        double precision eps
-
-        integer nsource,ntarg 
-        integer nd,iper,ier
-        
-        double precision, target :: source(3,nsource)!,targ(3,1)
-        double precision, target :: charge(nd,1)
-        
-        double precision, target :: dipvec(nd,3,nsource)
-
-        double precision, target :: grad(nd,3,nsource)
-
-
-        integer, contiguous, pointer ::  laddr(:,:)
-
-        real(kind=8) :: t1, tb1, tb2, tmain, teloc, tdir, t_reorder, t_dealloc
-
-      ntarg = 0
-
-      ier = 0
-
-        !---------- setting self varialbes ----------------
-        self%source => source
-        self%nsource = nsource
-        self%dipvec => dipvec
-
-        !self%pot => pot
-        self%grad => grad
-        self%eps = eps
-        self%nd = nd
-        self%ier = ier
-        self%ntarg = ntarg
-        !--------------------------------------------------
-
-
-      !print *, " calling fmm tree "
-
-
-
-
-        !self%nthd = omp_get_num_threads()
-
-
-
-        t1 = omp_get_wtime()
-        call self%build1()
-
-        tb1 = omp_get_wtime() - t1
-
-        t1 = omp_get_wtime()
-        !self%laddr(1:2,0:self%nlevels) => self%itree(self%ipointer(1) : self%ipointer(1)+(self%nlevels + 1)*2-1)
-        call self%build2()
-        tb2 = omp_get_wtime() - t1
-        
-        
-        t1 = omp_get_wtime()
-        call self%lfmm3dmain_tree()
-
-        tmain = omp_get_wtime() - t1
-
-
-        t1 = omp_get_wtime()
-
-        call self%eval_local()
-        teloc = omp_get_wtime() - t1
-        t1 = omp_get_wtime()
-        call self%eval_direct()
-        tdir = omp_get_wtime() - t1
-
-
-
-        t1 = omp_get_wtime()
-  
-        call dreorderi(3*self%nd,self%nsource,self%gradsort,self%grad,self%isrc)
-        call drescale(self%nd*3*self%nsource,self%grad,self%b0inv)
-
-
-
-        t_reorder = omp_get_wtime() - t1
-
-        t1 = omp_get_wtime()
-
-            call self%dealloc()
-        t_dealloc = omp_get_wtime() - t1
-
-
-
-        print *, " FMM3DTree timings: "
-        print *, "  build1 time = ", tb1
-        print *, "  build2 time = ", tb2
-        print *, "  main fmm time = ", tmain
-        print *, "  local eval time = ", teloc
-        print *, "  direct eval time = ", tdir
-        print *, "  reorder time = ", t_reorder
-        print *, "  dealloc time = ", t_dealloc
-        print *, "  total time = ", tb1 + tb2 + tmain + teloc + tdir + t_reorder + t_dealloc
-    end subroutine full_fmm
-
-
     subroutine build1(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_build1_" :: build1
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------
         !----------------
@@ -431,60 +349,45 @@ module fmm3d_tree_mod
         self%itarg => itarg
 
         !-------- end of tree build --------------------
-
-        !print *, " finished tree build "
         !------ set scaling 
 
         self%b0 = self%boxsize(0)
-        self%b0inv = 1.0d0/self%b0
+        self%b0inv = 1.0d0  /self%b0
         self%b0inv2 = self%b0inv**2
-        self%b0inv3 = self%b0inv2*self%b0inv
+        !self%b0inv3 = self%b0inv2*self%b0inv !not used 
 
 
 
 
 
         !-------------- allocate sorted source and targ arrays------
-
-        !print *, " allocating sorted arrays "
-
         allocate(sourcesort(3,self%nsource))
-
         allocate(dipvecsort(self%nd,3,self%nsource))
-
-
         allocate(gradsort(self%nd,3,self%nsource))
             !------------------------------------------------------
-
-
         self%sourcesort => sourcesort
         self%dipvecsort => dipvecsort
         self%gradsort => gradsort
         !--------------------------------------------------------
 
         allocate(nterms(0:self%nlevels))
-
         self%nmax = 0
         do i=0,self%nlevels
-            call l3dterms(self%eps,nterms(i))
+            !-----------if nterms_in is explicitly set, use that, otherwise compute nterms based on eps ------------------------------
+            if (self%nterms_in .gt. 0) then
+                nterms(i) = self%nterms_in
+            else
+              call l3dterms(self%eps,nterms(i))
+            end if 
+            !-------------------------------------------------------------------------------------------------------------------------
             if(nterms(i).gt.self%nmax) self%nmax = nterms(i)
         enddo
         self%nterms => nterms
 !       
-
       call dreorderf(3,self%nsource,self%source,self%sourcesort,self%isrc)
-
       call drescale(3*self%nsource,self%sourcesort,self%b0inv)
-
-
-
-
-
-
       call drescale(3*self%nboxes,self%treecenters,self%b0inv)
       call drescale(self%nlevels+1,self%boxsize,self%b0inv)
-
-
 
       allocate(iaddr(2,self%nboxes))
       self%lmptemp = (self%nmax+1)*(2*self%nmax+1)*2*self%nd
@@ -507,12 +410,10 @@ module fmm3d_tree_mod
 
 
         self%laddr(1:2,0:self%nlevels) => self%itree(self%ipointer(1) : self%ipointer(1)+(self%nlevels + 1)*2-1)
-
-        !print *, " done with build1 "
-
     end subroutine build1
 
     subroutine reorder_dipvec(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_reorder_dipvec_" :: reorder_dipvec
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------   
         call dreorderf(3*self%nd,self%nsource,self%dipvec,self%dipvecsort, self%isrc)
@@ -521,6 +422,7 @@ module fmm3d_tree_mod
 
 
     subroutine build2(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_build2_" :: build2
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------
         integer :: i, nn, ilev
@@ -580,8 +482,6 @@ module fmm3d_tree_mod
       do i=0,self%nlevels
          if(self%nmax.lt.self%nterms(i)) self%nmax = self%nterms(i)
       enddo
-      !print *, " FMM3DTree: max number of terms = ", self%nmax
-
 
        allocate(self%rscpow(0:self%nmax))
        allocate(self%carray(4*self%nmax+1,4*self%nmax+1))
@@ -633,10 +533,6 @@ module fmm3d_tree_mod
       allocate(self%mexpf1(self%nd,self%nexptot,self%nthd),self%mexpf2(self%nd,self%nexptot,self%nthd), &
      &    self%mexpp1(self%nd,self%nexptotp,self%nthd))
       allocate(self%mexpp2(self%nd,self%nexptotp,self%nthd),self%mexppall(self%nd,self%nexptotp,16,self%nthd))
-
-      !print *, " done with build2 "
-
-
       !
       bigint = 0
       bigint = self%nboxes
@@ -645,8 +541,7 @@ module fmm3d_tree_mod
 
       if(self%ifprint.ge.1) print *, "mexp memory=",bigint/1.0d9, " GB "
 
-      
-
+    
       allocate(self%mexp(self%nd,self%nexptotp,self%nboxes,6),stat=iert)
       if(iert.ne.0) then
         print *, "Cannot allocate pw expansion workspace"
@@ -671,7 +566,7 @@ module fmm3d_tree_mod
 !      set scjsort
 !
       do ilev=0,self%nlevels
-        !$OMP PARALLEL DO DEFAULT(SHARED) &
+        !$OMP TASKLOOP DEFAULT(SHARED) &
         !$OMP PRIVATE(ibox,nchild,istart,iend,i)
          do ibox=self%laddr(1,ilev),self%laddr(2,ilev)
             nchild = self%itree(self%ipointer(4)+ibox-1)
@@ -683,7 +578,7 @@ module fmm3d_tree_mod
                enddo
             endif
          enddo
-        !$OMP END PARALLEL DO
+        !$OMP END TASKLOOP
       enddo
 
 
@@ -714,8 +609,8 @@ module fmm3d_tree_mod
 
       nmaxt = 0 
 
-      !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
-      !$OMP REDUCTION(max:nmaxt)
+      !!$OMP TASKLOOP DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
+      !!$OMP REDUCTION(max:nmaxt)
             do ibox=1,self%nboxes
               if(self%list4ct(ibox).gt.0) then
                 istart = self%isrcse(1,ibox)
@@ -724,7 +619,7 @@ module fmm3d_tree_mod
                 if(npts.gt.nmaxt) nmaxt = npts
               endif
             enddo
-      !$OMP END PARALLEL DO
+      !!$OMP END TASKLOOP
 
       allocate(self%gboxind(nmaxt,self%nthd))
       allocate(self%gboxsort(3,nmaxt,self%nthd))
@@ -750,7 +645,7 @@ module fmm3d_tree_mod
     !  figure out allocations needed for iboxsrc,iboxsrcind,iboxpot
 
       nmaxt = 0
-    !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
+    !$OMP TASKLOOP DEFAULT(SHARED) PRIVATE(ibox,istart,iend,npts) &
     !$OMP REDUCTION(max:nmaxt)
           do ibox=1,self%nboxes
             if(self%nlist3(ibox).gt.0) then
@@ -760,7 +655,7 @@ module fmm3d_tree_mod
               if(npts.gt.nmaxt) nmaxt = npts
             endif
           enddo
-    !$OMP END PARALLEL DO
+    !$OMP END TASKLOOP
 
       allocate(self%iboxsrcind(nmaxt,self%nthd))
       allocate(self%iboxsrc(3,nmaxt,self%nthd))
@@ -770,40 +665,24 @@ module fmm3d_tree_mod
 
 
     subroutine reset_expansion_coeff(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_reset_expansion_coeff_" :: reset_expansion_coeff
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------
         integer :: ilev, ibox
         integer :: i,j,k,idim
         !------------------------------------------------
 
-      !-------- reset rmlexp to zero --------------
-      ! do ilev = 0,self%nlevels
-      !   !$OMP PARALLEL DO DEFAULT(SHARED) &
-      !   !$OMP PRIVATE(ibox)
-      !   do ibox=self%laddr(1,ilev),self%laddr(2,ilev)
-      !     call mpzero(self%nd,self%rmlexp(self%iaddr(1,ibox)),self%nterms(ilev))
-      !     call mpzero(self%nd,self%rmlexp(self%iaddr(2,ibox)),self%nterms(ilev))
-      !   enddo
-      !   !$OMP END PARALLEL DO
-      ! enddo
-      ! !-------------------------------------------
-      ! !$OMP PARALLEL DO  DEFAULT(SHARED) 
-      ! do i=1,self%nboxes
-      !       self%mexp(:,:,i,:) = 0.0d0
-      ! enddo
-      ! !$OMP END PARALLEL DO
-
       do ilev = 0,self%nlevels
-        !$OMP PARALLEL DO DEFAULT(SHARED) &
+        !$OMP TASKLOOP DEFAULT(SHARED) &
         !$OMP PRIVATE(ibox)
         do ibox=self%laddr(1,ilev),self%laddr(2,ilev)
           call mpzero(self%nd,self%rmlexp(self%iaddr(1,ibox)),self%nterms(ilev))
           call mpzero(self%nd,self%rmlexp(self%iaddr(2,ibox)),self%nterms(ilev))
         enddo
-        !$OMP END PARALLEL DO
+        !$OMP END TASKLOOP
       enddo
       !-------------------------------------------
-      !$OMP PARALLEL DO collapse(4) DEFAULT(SHARED) &
+      !$OMP TASKLOOP collapse(4) DEFAULT(SHARED) &
       !$OMP PRIVATE(i,j,k,idim)
             do k=1,6
               do i=1,self%nboxes
@@ -814,7 +693,7 @@ module fmm3d_tree_mod
                 enddo
               enddo
             enddo
-      !$OMP END PARALLEL DO
+      !$OMP END TASKLOOP
 
     end subroutine reset_expansion_coeff
 
@@ -822,11 +701,12 @@ module fmm3d_tree_mod
 
 
     subroutine reset_sort_arg(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_reset_sort_arg_" :: reset_sort_arg
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------
         integer i,idim
         !------------------------------------------------
-    !$OMP PARALLEL DO collapse(2) DEFAULT(SHARED) PRIVATE(i,idim)
+    !$OMP TASKLOOP collapse(2) DEFAULT(SHARED) PRIVATE(i,idim)
             do i=1,self%nsource
             do idim=1,self%nd
                 self%gradsort(idim,1,i) = 0.0
@@ -834,15 +714,20 @@ module fmm3d_tree_mod
                 self%gradsort(idim,3,i) = 0.0
             enddo
             enddo
-    !$OMP END PARALLEL DO
+    !$OMP END TASKLOOP
     end subroutine reset_sort_arg
 
 
     subroutine dealloc(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_dealloc_" :: dealloc
         class(FMM3DTree), intent(inout) :: self
         !------------------------------------------------
 
 
+        !The source positions are handed over by build_tree and referenced by the tree for as long
+        !as it lives, so the tree releases them here rather than the caller releasing them while
+        !self%source still points at them.
+        if (associated(self%source)) deallocate(self%source)
         if (associated(self%itree)) deallocate(self%itree)
         if (associated(self%boxsize)) deallocate(self%boxsize)
         if (associated(self%treecenters)) deallocate(self%treecenters)
@@ -863,6 +748,7 @@ module fmm3d_tree_mod
 
      subroutine lfmm3dmain_tree(self) 
       implicit none
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_lfmm3dmain_tree_" :: lfmm3dmain_tree
         class(FMM3DTree), intent(inout) :: self
       integer nd
       integer ier
@@ -1022,19 +908,11 @@ module fmm3d_tree_mod
       integer *8 bigint
       integer iert
       data ima/(0.0d0,1.0d0)/
-
       integer nthd,ithd
       integer, save :: itimer = 0
 
       call trace%begin("FMM3DTree:lfmm3dmain_tree", itimer=itimer, verbose=3)
-      !integer omp_get_max_threads,omp_get_thread_num
-
-
-
-
-
       !--------
-      !nthd = 1
       nthd = self%nthd
       ifprint=0
 
@@ -1206,10 +1084,8 @@ module fmm3d_tree_mod
 
         nlege = self%nlege
 
-        !call self%reset_sort_arg()
         self%gradsort = 0.0
         
-        !call self%reset_expansion_coeff()
         self%rmlexp = 0.0
         self%mexp = 0.0
 
@@ -1218,141 +1094,147 @@ module fmm3d_tree_mod
 
       call self%reorder_dipvec()
 
+!
+!====== not tested and only for non-complete trees
+!
+
 !     form mexp for all list4 type box at first ghost box center
-      do ilev=1,nlevels-1
-
-         rscpow(0) = 1.0d0/boxsize(ilev+1)
-         rtmp = rscales(ilev+1)/boxsize(ilev+1)
-         do i=1,nterms(ilev+1)
-            rscpow(i) = rscpow(i-1)*rtmp
-         enddo
-
-!$OMP PARALLEL DO DEFAULT(SHARED) &
-!$OMP PRIVATE(ibox,istart,iend,jbox,jstart,jend,npts,npts0,i) &
-!$OMP PRIVATE(ithd)
-         do ibox=laddr(1,ilev),laddr(2,ilev)
-            !ithd = 0
-           ithd=omp_get_thread_num()
-            ithd = ithd + 1
-            if(list4ct(ibox).gt.0) then
-              istart=isrcse(1,ibox)
-              iend=isrcse(2,ibox)
-              npts = iend-istart+1
-
-              if(npts.gt.0) then
-                call subdividebox(sourcesort(1,istart),npts, &
-     &    centers(1,ibox),boxsize(ilev+1), &
-     &    gboxind(1,ithd),gboxfl(1,1,ithd), &
-     &    gboxsubcenters(1,1,ithd))
-                call dreorderf(3,npts,sourcesort(1,istart), &
-     &    gboxsort(1,1,ithd),gboxind(1,ithd))
-                  call dreorderf(3*nd,npts,dipvecsort(1,1,istart), &
-     &    gboxdpsort(1,1,1,ithd),gboxind(1,ithd))
-                do i=1,8
-                  if(gboxfl(1,i,ithd).gt.0) then
-                    jstart=gboxfl(1,i,ithd)
-                    jend=gboxfl(2,i,ithd)
-                    npts0=jend-jstart+1
-                    jbox=list4ct(ibox)
-
-                      call l3dformmpd(nd,rscales(ilev+1), &
-     &    gboxsort(1,jstart,ithd), &
-     &    gboxdpsort(1,1,jstart,ithd), &
-     &    npts0,gboxsubcenters(1,i,ithd),nterms(ilev+1), &
-     &    gboxmexp(1,i,jbox),wlege,nlege)          
-
-                    call l3dmpmp(nd,rscales(ilev+1), &
-     &    gboxsubcenters(1,i,ithd),gboxmexp(1,i,jbox), &
-     &    nterms(ilev+1),rscales(ilev),centers(1,ibox), &
-     &    rmlexp(iaddr(1,ibox)),nterms(ilev),dc,lca)
-     
-                    call mpscale(nd,nterms(ilev+1),gboxmexp(1,i,jbox), &
-     &    rscpow,tmp(1,0,-nmax,ithd))
+!      do ilev=1,nlevels-1
 !
-!c                process up down for current box
+!         rscpow(0) = 1.0d0/boxsize(ilev+1)
+!         rtmp = rscales(ilev+1)/boxsize(ilev+1)
+!         do i=1,nterms(ilev+1)
+!            rscpow(i) = rscpow(i-1)*rtmp
+!         enddo
 !
-                    call mpoletoexp(nd,tmp(1,0,-nmax,ithd), &
-     &    nterms(ilev+1),nlams, &
-     &    nfourier,nexptot,mexpf1(1,1,ithd), &
-     &    mexpf2(1,1,ithd),rlsc)
-
-                    call ftophys(nd,mexpf1(1,1,ithd), &
-     &    nlams,rlams,nfourier, &
-     &    nphysical,nthmax,gboxwexp(1,1,1,i,ithd), &
-     &    fexpe,fexpo)
-
-                    call ftophys(nd,mexpf2(1,1,ithd), &
-     &    nlams,rlams,nfourier, &
-     &    nphysical,nthmax,gboxwexp(1,1,2,i,ithd), &
-     &    fexpe,fexpo)
-
-                    call processgboxudexp(nd,gboxwexp(1,1,1,i,ithd), &
-     &    gboxwexp(1,1,2,i,ithd),i,nexptotp, &
-     &    pgboxwexp(1,1,jbox,1),pgboxwexp(1,1,jbox,2), &
-     &    xshift,yshift,zshift)
+!!!$OMP TASKLOOP DEFAULT(SHARED) &
+!!!$OMP PRIVATE(ibox,istart,iend,jbox,jstart,jend,npts,npts0,i) &
+!!!$OMP PRIVATE(ithd)
+!         do ibox=laddr(1,ilev),laddr(2,ilev)
+!            ithd = 0
+!           !ithd=omp_get_thread_num()
+!           ! ithd = omp%thread_id()
+!            ithd = ithd + 1
+!            if(list4ct(ibox).gt.0) then
+!              istart=isrcse(1,ibox)
+!              iend=isrcse(2,ibox)
+!              npts = iend-istart+1
 !
-!c                process north-south for current box
+!              if(npts.gt.0) then
+!                call subdividebox(sourcesort(1,istart),npts, &
+!     &    centers(1,ibox),boxsize(ilev+1), &
+!     &    gboxind(1,ithd),gboxfl(1,1,ithd), &
+!     &    gboxsubcenters(1,1,ithd))
+!                call dreorderf(3,npts,sourcesort(1,istart), &
+!     &    gboxsort(1,1,ithd),gboxind(1,ithd))
+!                  call dreorderf(3*nd,npts,dipvecsort(1,1,istart), &
+!     &    gboxdpsort(1,1,1,ithd),gboxind(1,ithd))
+!                do i=1,8
+!                  if(gboxfl(1,i,ithd).gt.0) then
+!                    jstart=gboxfl(1,i,ithd)
+!                    jend=gboxfl(2,i,ithd)
+!                    npts0=jend-jstart+1
+!                    jbox=list4ct(ibox)
 !
-                    call rotztoy(nd,nterms(ilev+1),tmp(1,0,-nmax,ithd), &
-     &    mptmp(1,ithd),rdminus)
-                    call mpoletoexp(nd,mptmp(1,ithd), &
-     &    nterms(ilev+1),nlams, &
-     &    nfourier,nexptot,mexpf1(1,1,ithd), &
-     &    mexpf2(1,1,ithd),rlsc)
-
-                    call ftophys(nd,mexpf1(1,1,ithd), &
-     &    nlams,rlams,nfourier, &
-     &    nphysical,nthmax,gboxwexp(1,1,3,i,ithd), &
-     &    fexpe,fexpo)
-
-                    call ftophys(nd,mexpf2(1,1,ithd), &
-     &    nlams,rlams,nfourier, &
-     &    nphysical,nthmax,gboxwexp(1,1,4,i,ithd), &
-     &    fexpe,fexpo)
-
-                    call processgboxnsexp(nd,gboxwexp(1,1,3,i,ithd), &
-     &    gboxwexp(1,1,4,i,ithd),i,nexptotp, &
-     &    pgboxwexp(1,1,jbox,3),pgboxwexp(1,1,jbox,4), &
-     &    xshift,yshift,zshift)
+!                      call l3dformmpd(nd,rscales(ilev+1), &
+!     &    gboxsort(1,jstart,ithd), &
+!     &    gboxdpsort(1,1,jstart,ithd), &
+!     &    npts0,gboxsubcenters(1,i,ithd),nterms(ilev+1), &
+!     &    gboxmexp(1,i,jbox),wlege,nlege)          
 !
-!c                process east-west for current box
+!                    call l3dmpmp(nd,rscales(ilev+1), &
+!     &    gboxsubcenters(1,i,ithd),gboxmexp(1,i,jbox), &
+!     &    nterms(ilev+1),rscales(ilev),centers(1,ibox), &
+!     &    rmlexp(iaddr(1,ibox)),nterms(ilev),dc,lca)
+!     
+!                    call mpscale(nd,nterms(ilev+1),gboxmexp(1,i,jbox), &
+!     &    rscpow,tmp(1,0,-nmax,ithd))
+!!
+!!c                process up down for current box
+!!
+!                    call mpoletoexp(nd,tmp(1,0,-nmax,ithd), &
+!     &    nterms(ilev+1),nlams, &
+!     &    nfourier,nexptot,mexpf1(1,1,ithd), &
+!     &    mexpf2(1,1,ithd),rlsc)
 !
-                    call rotztox(nd,nterms(ilev+1),tmp(1,0,-nmax,ithd), &
-     &    mptmp(1,ithd),rdplus)
-                    call mpoletoexp(nd,mptmp(1,ithd), &
-     &    nterms(ilev+1),nlams, &
-     &    nfourier,nexptot,mexpf1(1,1,ithd), &
-     &    mexpf2(1,1,ithd),rlsc)
-
-                    call ftophys(nd,mexpf1(1,1,ithd), &
-     &    nlams,rlams,nfourier, &
-     &    nphysical,nthmax,gboxwexp(1,1,5,i,ithd), &
-     &    fexpe,fexpo)
-
-                    call ftophys(nd,mexpf2(1,1,ithd), &
-     &    nlams,rlams,nfourier, &
-     &    nphysical,nthmax,gboxwexp(1,1,6,i,ithd), &
-     &    fexpe,fexpo)
-                
-                    call processgboxewexp(nd,gboxwexp(1,1,5,i,ithd), &
-     &    gboxwexp(1,1,6,i,ithd),i,nexptotp, &
-     &    pgboxwexp(1,1,jbox,5),pgboxwexp(1,1,jbox,6), &
-     &    xshift,yshift,zshift)
-                  endif
-                enddo
-              endif
-            endif
-         enddo
-!$OMP END PARALLEL DO
-      enddo
+!                    call ftophys(nd,mexpf1(1,1,ithd), &
+!     &    nlams,rlams,nfourier, &
+!     &    nphysical,nthmax,gboxwexp(1,1,1,i,ithd), &
+!     &    fexpe,fexpo)
+!
+!                    call ftophys(nd,mexpf2(1,1,ithd), &
+!     &    nlams,rlams,nfourier, &
+!     &    nphysical,nthmax,gboxwexp(1,1,2,i,ithd), &
+!     &    fexpe,fexpo)
+!
+!                    call processgboxudexp(nd,gboxwexp(1,1,1,i,ithd), &
+!     &    gboxwexp(1,1,2,i,ithd),i,nexptotp, &
+!     &    pgboxwexp(1,1,jbox,1),pgboxwexp(1,1,jbox,2), &
+!     &    xshift,yshift,zshift)
+!!
+!!c                process north-south for current box
+!!
+!                    call rotztoy(nd,nterms(ilev+1),tmp(1,0,-nmax,ithd), &
+!     &    mptmp(1,ithd),rdminus)
+!                    call mpoletoexp(nd,mptmp(1,ithd), &
+!     &    nterms(ilev+1),nlams, &
+!     &    nfourier,nexptot,mexpf1(1,1,ithd), &
+!     &    mexpf2(1,1,ithd),rlsc)
+!
+!                    call ftophys(nd,mexpf1(1,1,ithd), &
+!     &    nlams,rlams,nfourier, &
+!     &    nphysical,nthmax,gboxwexp(1,1,3,i,ithd), &
+!     &    fexpe,fexpo)
+!
+!                    call ftophys(nd,mexpf2(1,1,ithd), &
+!     &    nlams,rlams,nfourier, &
+!     &    nphysical,nthmax,gboxwexp(1,1,4,i,ithd), &
+!     &    fexpe,fexpo)
+!
+!                    call processgboxnsexp(nd,gboxwexp(1,1,3,i,ithd), &
+!     &    gboxwexp(1,1,4,i,ithd),i,nexptotp, &
+!     &    pgboxwexp(1,1,jbox,3),pgboxwexp(1,1,jbox,4), &
+!     &    xshift,yshift,zshift)
+!!
+!!c                process east-west for current box
+!!
+!                    call rotztox(nd,nterms(ilev+1),tmp(1,0,-nmax,ithd), &
+!     &    mptmp(1,ithd),rdplus)
+!                    call mpoletoexp(nd,mptmp(1,ithd), &
+!     &    nterms(ilev+1),nlams, &
+!     &    nfourier,nexptot,mexpf1(1,1,ithd), &
+!     &    mexpf2(1,1,ithd),rlsc)
+!
+!                    call ftophys(nd,mexpf1(1,1,ithd), &
+!     &    nlams,rlams,nfourier, &
+!     &    nphysical,nthmax,gboxwexp(1,1,5,i,ithd), &
+!     &    fexpe,fexpo)
+!
+!                    call ftophys(nd,mexpf2(1,1,ithd), &
+!     &    nlams,rlams,nfourier, &
+!     &    nphysical,nthmax,gboxwexp(1,1,6,i,ithd), &
+!     &    fexpe,fexpo)
+!                
+!                    call processgboxewexp(nd,gboxwexp(1,1,5,i,ithd), &
+!     &    gboxwexp(1,1,6,i,ithd),i,nexptotp, &
+!     &    pgboxwexp(1,1,jbox,5),pgboxwexp(1,1,jbox,6), &
+!     &    xshift,yshift,zshift)
+!                  endif
+!                enddo
+!              endif
+!            endif
+!         enddo
+!!!$OMP END TASKLOOP
+!      enddo
 
 
 !------------------ step 1 ??? -----------------------------------------------------------------
 !       ... step 1, locate all charges, assign them to boxes, and
 !       form multipole expansions
       do ilev=2,nlevels
-!$OMP PARALLEL DO DEFAULT(SHARED) &
-!$OMP PRIVATE(ibox,npts,istart,iend,nchild)
+!$OMP TASKLOOP DEFAULT(NONE) &
+!$OMP PRIVATE(ibox,npts,istart,iend,nchild) &
+!$OMP SHARED(ilev, laddr, isrcse, itree, ipointer, list4ct, nd, rscales, sourcesort, dipvecsort, centers, nterms, rmlexp, iaddr, wlege, nlege)
             do ibox=laddr(1,ilev),laddr(2,ilev)
 
                istart = isrcse(1,ibox) 
@@ -1361,21 +1243,21 @@ module fmm3d_tree_mod
 
                nchild = itree(ipointer(4)+ibox-1)
 
-               if(npts.gt.0.and.nchild.eq.0.and.list4ct(ibox).eq.0) then
-                  call l3dformmpd(nd,rscales(ilev), &
+               if(npts.gt.0.and.nchild.eq.0.and.list4ct(ibox).eq.0) then      
+                  call l3dformmpd_new(nd,rscales(ilev), &
      &    sourcesort(1,istart), &
      &    dipvecsort(1,1,istart),npts, &
      &    centers(1,ibox),nterms(ilev), &
-     &    rmlexp(iaddr(1,ibox)),wlege,nlege)          
+     &    rmlexp(iaddr(1,ibox)),wlege,nlege)    
                endif
             enddo
-!$OMP END PARALLEL DO
+!$OMP END TASKLOOP
       enddo
 
       !----------------------------------------------------------------------------------------------------
 
       do ilev=nlevels-1,0,-1
-!$OMP PARALLEL DO DEFAULT(SHARED) &
+!$OMP TASKLOOP DEFAULT(SHARED) &
 !$OMP PRIVATE(ibox,i,jbox,istart,iend,npts)
          do ibox = laddr(1,ilev),laddr(2,ilev)
             do i=1,8
@@ -1393,7 +1275,7 @@ module fmm3d_tree_mod
                endif
             enddo
          enddo
-!$OMP END PARALLEL DO
+!$OMP END TASKLOOP
       enddo
 
 
@@ -1409,12 +1291,12 @@ module fmm3d_tree_mod
             rscpow(i) = rscpow(i-1)*rtmp
          enddo
 
-!$OMP PARALLEL DO DEFAULT (SHARED) &
+!$OMP TASKLOOP DEFAULT (SHARED) &
 !$OMP PRIVATE(ibox,istart,iend,npts) &
 !$OMP PRIVATE(ithd)
          do ibox=laddr(1,ilev),laddr(2,ilev)
             !ithd = 0
-            ithd=omp_get_thread_num()
+            ithd=omp%thread_id()
             ithd = ithd + 1
             istart = isrcse(1,ibox) 
             iend = isrcse(2,ibox)
@@ -1475,7 +1357,7 @@ module fmm3d_tree_mod
             endif
 
          enddo
-!$OMP END PARALLEL DO
+!$OMP END TASKLOOP
 !
 !
 !c         loop over parent boxes and ship plane wave
@@ -1494,7 +1376,7 @@ module fmm3d_tree_mod
          do i=1,nterms(ilev)
             rscpow(i) = rscpow(i-1)*rtmp
          enddo
-!$OMP PARALLEL DO DEFAULT (SHARED) &
+!$OMP TASKLOOP DEFAULT (SHARED) &
 !$OMP PRIVATE(ibox,istart,iend,npts,nchild) &
 !$OMP PRIVATE(nuall,ndall,nnall,nsall) &
 !$OMP PRIVATE(neall,nwall,nu1234,nd5678) &
@@ -1506,7 +1388,7 @@ module fmm3d_tree_mod
 !$OMP PRIVATE(ithd)
          do ibox = laddr(1,ilev-1),laddr(2,ilev-1)
            !ithd = 0
-           ithd=omp_get_thread_num()
+           ithd=omp%thread_id()
            ithd = ithd + 1
            npts = 0
 
@@ -1614,9 +1496,6 @@ module fmm3d_tree_mod
      &    nnall,nall(1,ithd), &
      &    nsall,sall(1,ithd),neall,eall(1,ithd), &
      &    nwall,wall(1,ithd))
-              !do i=1,8
-              !  call mpzero(nd,iboxlexp(1,i,ithd),nterms(ilev))
-              !enddo
               iboxlexp(:,:,ithd)=0.0d0
 
               call processlist3udexplong(nd,ibox,nboxes,centers, &
@@ -1680,7 +1559,7 @@ module fmm3d_tree_mod
 !  continue from here
             endif
          enddo
-!$OMP END PARALLEL DO
+!$OMP END TASKLOOP
         deallocate(iboxlexp)  
       enddo
 
@@ -1691,7 +1570,7 @@ module fmm3d_tree_mod
 
       do ilev = 2,nlevels-1
 
-!$OMP PARALLEL DO DEFAULT(SHARED) &
+!$OMP TASKLOOP DEFAULT(SHARED) &
 !$OMP PRIVATE(ibox,i,jbox,istart,iend,npts)
          do ibox = laddr(1,ilev),laddr(2,ilev)
 
@@ -1717,7 +1596,7 @@ module fmm3d_tree_mod
                enddo
             endif
          enddo
-!$OMP END PARALLEL DO
+!$OMP END TASKLOOP
       enddo
 
       !--------------------------------------------------------------------
@@ -1728,6 +1607,7 @@ module fmm3d_tree_mod
 
 
       subroutine eval_local(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_eval_local_" :: eval_local
         class(FMM3DTree), intent(inout) :: self
         !--------------------------------------------
         integer :: ilev,ibox,istart,iend,i,npts
@@ -1738,9 +1618,8 @@ module fmm3d_tree_mod
         call trace%begin('FMM3DTree:eval_local', itimer=itimer, verbose=3)
 
         do ilev = 0,self%nlevels
-          !$OMP PARALLEL DO DEFAULT(SHARED) &
-          !$OMP PRIVATE(ibox,nchild,istart,iend,i,npts) &
-          !$OMP SCHEDULE(DYNAMIC)
+          !$OMP TASKLOOP DEFAULT(SHARED) &
+          !$OMP PRIVATE(ibox,nchild,istart,iend,i,npts) 
           do ibox = self%laddr(1,ilev),self%laddr(2,ilev)
             nchild=self%itree(self%ipointer(4)+ibox-1)
             if(nchild.eq.0) then 
@@ -1753,7 +1632,7 @@ module fmm3d_tree_mod
      &    npts,self%gradsort(1,1,istart),self%wlege,self%nlege)
             endif
           enddo
-          !$OMP END PARALLEL DO
+          !$OMP END TASKLOOP
       enddo
 
       call trace%end('FMM3DTree:eval_local', itimer=itimer, verbose=3)
@@ -1762,15 +1641,16 @@ module fmm3d_tree_mod
 
 
       subroutine eval_direct(self)
+        !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_eval_direct_" :: eval_direct
         class(FMM3DTree), intent(inout) :: self
         !--------------------------------------------
         integer :: ilev,ibox,istarts,iends,npts0,i
         integer :: jbox,jstart,jend,npts
         !--------------------------------------------
+        !TODO - Needs testing in parallel!!!
         do ilev=0,self%nlevels
-            !$OMP PARALLEL DO DEFAULT(SHARED) &
-            !$OMP PRIVATE(ibox,istarts,iends,npts0,i,jbox,jstart,jend,npts) &
-            !$OMP SCHEDULE(DYNAMIC)
+            !!$OMP TASKLOOP DEFAULT(SHARED) &
+            !!$OMP PRIVATE(ibox,istarts,iends,npts0,i,jbox,jstart,jend,npts) 
             do ibox = self%laddr(1,ilev),self%laddr(2,ilev)
               istarts = self%isrcse(1,ibox)
               iends = self%isrcse(2,ibox)
@@ -1781,26 +1661,15 @@ module fmm3d_tree_mod
                 jstart = self%isrcse(1,jbox)
                 jend = self%isrcse(2,jbox)
                 npts = jend-jstart+1
-
-    !            call l3ddirectdg_grad_vec(self%nd,self%sourcesort(1,jstart), &
-    ! &    self%dipvecsort(1,1,jstart),npts,self%sourcesort(1,istarts), &
-    ! &    npts0,self%gradsort(1,1,istarts),self%thresh)     
-
                      call l3ddirectdg_grad(self%nd,self%sourcesort(1,jstart), &
      &    self%dipvecsort(1,1,jstart),npts,self%sourcesort(1,istarts), &
-     &    npts0,self%gradsort(1,1,istarts),self%thresh)     
+     &    npts0,self%gradsort(1,1,istarts),self%thresh, self%isrc, istarts, jstart)     
               enddo
             enddo
-            !$OMP END PARALLEL DO
+           ! !$OMP END TASKLOOP
       enddo
+      if ( trace%enabled .and. trace%verbose .ge. 2 ) print *, " finished evaluating direct interactions"
       end subroutine eval_direct
-
-    real(8) function walltime()
-    !TODO - at some point, make a timing module to handle this
-        use omp_lib, only: omp_get_wtime
-        walltime = omp_get_wtime()
-    end function walltime
-
 
 end module fmm3d_tree_mod
 
@@ -2053,7 +1922,7 @@ end module fmm3d_tree_mod
 
 !***********************************************************************
       subroutine l3ddirectdg_grad(nd,sources, &
-                 dipvec,ns,ztarg,nt,grad,thresh)
+                 dipvec,ns,ztarg,nt,grad,thresh, isrc, istart, jstart)
 !**********************************************************************
 !
 !     This subroutine evaluates the potential and gradient due to a 
@@ -2101,6 +1970,8 @@ end module fmm3d_tree_mod
 !cf2py intent(in) nd,sources,dipvec,ns,ztarg,nt,thresh
 !cf2py intent(out) pot,grad
       intent(in) nd,sources,dipvec,ns,ztarg,nt,thresh
+      integer, intent(in) :: isrc(nt), istart, jstart
+      
       intent(out) grad
 !c
 !cc      calling sequence variables
@@ -2121,15 +1992,17 @@ end module fmm3d_tree_mod
       threshsq = thresh**2
       do i=1,nt
 
-      !$omp parallel do default(none) schedule(static) &
-      !$omp private(j,zdiff, dd, dinv,dinv2,dotprod,cd,cd2,cd3,cd4,idim) &
-      !$omp shared(i, nd,ns,sources,ztarg,dipvec,grad,threshsq)
+    !  print *, " ====== iteration ", i, " fmm target ", isrc(i+istart-1), " ====== "
+      !!$OMP TASKLOOP default(none) &
+      !!$omp private(j,zdiff, dd, dinv,dinv2,dotprod,cd,cd2,cd3,cd4,idim) &
+      !!$omp shared(i, nd,ns,sources,ztarg,dipvec,grad,threshsq)
         do j=1,ns
           zdiff(1) = ztarg(1,i)-sources(1,j)
           zdiff(2) = ztarg(2,i)-sources(2,j)
           zdiff(3) = ztarg(3,i)-sources(3,j)
 
           dd = zdiff(1)**2 + zdiff(2)**2 + zdiff(3)**2
+         ! print *, " nbor ", j, " real index", isrc(j+jstart-1), "zdiff = ", zdiff 
           if(dd.lt.threshsq) goto 1000
 
           dinv2 = 1/dd
@@ -2137,6 +2010,9 @@ end module fmm3d_tree_mod
           cd = dinv
           cd2 = -cd*dinv2
           cd3 = -3*cd*dinv2*dinv2
+
+
+
 
           do idim=1,nd
           
@@ -2159,3 +2035,162 @@ end module fmm3d_tree_mod
 
       return
       end
+
+
+
+subroutine l3dformmpd_new(nd, rscale, sources, dipvec, ns, center, &
+                                nterms, mpole, wlege, nlege)
+    implicit none
+
+    ! --- Arguments ---
+    integer, intent(in) :: nd, ns, nterms, nlege
+    real(kind(0.d0)), intent(in) :: rscale, center(3)
+    real(kind(0.d0)), intent(in) :: sources(3, ns)
+    real(kind(0.d0)), intent(in) :: dipvec(nd, 3, ns)
+    real(kind(0.d0)), intent(in) :: wlege(0:nlege, 0:nlege)
+    ! mpole is modified (added to)
+    complex(kind(0.d0)), intent(inout) :: mpole(nd, 0:nterms, -nterms:nterms)
+
+    ! --- Local Parameters ---
+    complex(kind(0.d0)), parameter :: eye = (0.0d0, 1.0d0)
+    real(kind(0.d0)), parameter    :: one = 1.0d0
+
+    ! --- Local Variables (Thread-Safe on the Stack) ---
+    integer :: i, j, k, l, m, n, isrc, idim
+    real(kind(0.d0)) :: zdiff(3), r, theta, phi
+    real(kind(0.d0)) :: stheta, ctheta, sphi, cphi
+    real(kind(0.d0)) :: rx, ry, rz, thetax, thetay, thetaz, phix, phiy, phiz
+    real(kind(0.d0)) :: fruse, d
+    complex(kind(0.d0)) :: ephi1, ur, utheta, uphi, ux, uy, uz, zzz
+
+    ! Allocatable scratch arrays (Automatically thread-private)
+    real(kind(0.d0)), allocatable :: ynm(:,:), fr(:), rfac(:), frder(:), ynmd(:,:)
+    complex(kind(0.d0)), allocatable :: ephi(:)
+
+    ! Allocate local memory
+    allocate(ynm(0:nterms, 0:nterms), fr(0:nterms+1))
+    allocate(frder(0:nterms), ynmd(0:nterms, 0:nterms))
+    allocate(ephi(-nterms-1:nterms+1))
+    allocate(rfac(0:nterms))
+
+    ! Initialize scaling factors
+    do i = 0, nterms
+        rfac(i) = one / sqrt(2.0d0 * i + one)
+    end do
+
+    ! Loop over sources
+    do isrc = 1, ns
+        zdiff(1) = sources(1, isrc) - center(1)
+        zdiff(2) = sources(2, isrc) - center(2)
+        zdiff(3) = sources(3, isrc) - center(3)
+
+        ! Convert to polar coordinates
+        call cart2polar(zdiff, r, theta, phi)
+        
+        ctheta = cos(theta)
+        stheta = sin(theta)
+        cphi   = cos(phi)
+        sphi   = sin(phi)
+        ephi1  = cmplx(cphi, sphi, kind=kind(0.d0))
+
+        ! Compute e^(i*m*phi) and radial scaling powers
+        ephi(0)  = one
+        ephi(1)  = ephi1
+        ephi(-1) = conjg(ephi1)
+        
+        fr(0) = one
+        d = r / rscale
+        fr(1) = d
+        
+        do i = 2, nterms + 1
+            fr(i) = fr(i-1) * d
+            ephi(i) = ephi(i-1) * ephi1
+            ephi(-i) = ephi(-i+1) * ephi(-1)
+        end do
+
+        frder(0) = 0.0d0
+        do i = 1, nterms
+            frder(i) = i * fr(i-1) / rscale
+        end do
+
+        ! Spherical to Cartesian gradient transformation components
+        rx = stheta * cphi
+        thetax = ctheta * cphi
+        phix = -sphi
+        ry = stheta * sphi
+        thetay = ctheta * sphi
+        phiy = cphi
+        rz = ctheta
+        thetaz = -stheta
+        phiz = 0.0d0
+
+        ! Legendre functions (Ensure this routine is also thread-safe/recursive)
+        call ylgndr2sfw(nterms, ctheta, ynm, ynmd, wlege, nlege)
+        
+        do i = 0, nterms
+            do j = 0, nterms
+                ynm(j, i)  = ynm(j, i) * rfac(j)
+                ynmd(j, i) = ynmd(j, i) * rfac(j)
+            end do
+        end do
+
+        ! --- N=0 Contribution ---
+        ur = ynm(0, 0) * frder(0)
+        ux = ur * rx 
+        uy = ur * ry 
+        uz = ur * rz
+        do idim = 1, nd
+            zzz = dipvec(idim, 1, isrc)*ux + dipvec(idim, 2, isrc)*uy + &
+                  dipvec(idim, 3, isrc)*uz
+            mpole(idim, 0, 0) = mpole(idim, 0, 0) + zzz
+        end do
+
+        ! --- N > 0 Contributions ---
+        do n = 1, nterms
+            fruse = fr(n-1) / rscale
+            ur = ynm(n, 0) * frder(n)
+            utheta = -fruse * ynmd(n, 0) * stheta
+            ux = ur*rx + utheta*thetax 
+            uy = ur*ry + utheta*thetay 
+            uz = ur*rz + utheta*thetaz
+            
+            do idim = 1, nd
+                zzz = dipvec(idim, 1, isrc)*ux + dipvec(idim, 2, isrc)*uy + &
+                      dipvec(idim, 3, isrc)*uz
+                mpole(idim, n, 0) = mpole(idim, n, 0) + zzz
+            end do
+
+            do m = 1, n
+                ! m positive terms (using conjugate ephi for m > 0 logic)
+                ur = frder(n) * ynm(n, m) * stheta * ephi(-m)
+                utheta = -ephi(-m) * fruse * ynmd(n, m)
+                uphi = -eye * m * ephi(-m) * fruse * ynm(n, m)
+                ux = ur*rx + utheta*thetax + uphi*phix
+                uy = ur*ry + utheta*thetay + uphi*phiy
+                uz = ur*rz + utheta*thetaz + uphi*phiz
+                do idim = 1, nd
+                    zzz = dipvec(idim, 1, isrc)*ux + dipvec(idim, 2, isrc)*uy + &
+                          dipvec(idim, 3, isrc)*uz
+                    mpole(idim, n, m) = mpole(idim, n, m) + zzz
+                end do
+
+                ! m negative terms
+                ur = frder(n) * ynm(n, m) * stheta * ephi(m)
+                utheta = -ephi(m) * fruse * ynmd(n, m)
+                uphi = eye * m * ephi(m) * fruse * ynm(n, m)
+                ux = ur*rx + utheta*thetax + uphi*phix
+                uy = ur*ry + utheta*thetay + uphi*phiy
+                uz = ur*rz + utheta*thetaz + uphi*phiz
+                do idim = 1, nd
+                    zzz = dipvec(idim, 1, isrc)*ux + dipvec(idim, 2, isrc)*uy + &
+                          dipvec(idim, 3, isrc)*uz
+                    mpole(idim, n, -m) = mpole(idim, n, -m) + zzz
+                end do
+            end do
+        end do
+    end do
+    
+    ! Clean up memory to avoid leaks in the TASKLOOP
+    deallocate(ynm, fr, frder, ynmd, ephi, rfac)
+
+end subroutine l3dformmpd_new

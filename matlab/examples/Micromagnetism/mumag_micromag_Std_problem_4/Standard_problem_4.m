@@ -61,11 +61,9 @@ function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_d
 %-------
 %   The script setups up and runs the mumag standard problem 4 for a prismal mesh.
 %
-%Version: 1.0.1
+%Version: 1.0.2
 %Author:  Rasmus Bjørk
-%Date:    2025.03.06
-%
-%See also: Benchmark_using_Standard_problem_4
+%Date:    2026.05.11
 
 arguments
     mumag_field (1,1) {mustBeInteger}                = 1            %--- Use either field 1 or field 2 from the mumag example
@@ -73,6 +71,7 @@ arguments
     options.use_CUDA {mustBeNumericOrLogical}       = true          %--- Use CUDA for the calculations
     options.ShowTheResult {mustBeNumericOrLogical}  = true          %--- Show the result
     options.use_CVODE {mustBeNumericOrLogical}      = false;        %--- Use CVODE for the numerical time evolution
+    options.use_AvgN {mustBeNumericOrLogical}       = true;         %--- Use the averaged prism tensor for demag field calculations
 end
 
 mu0 = 4*pi*1e-7;
@@ -84,7 +83,7 @@ addpath('../../../util');
 %% ------------------------------------------------------------------- MAGTENSE ---------------------------------------------------------
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% Setup the problem for the initial configuration
-% Constuct a default problem, with a grid with size (nx,ny,nz)
+% Construct a default problem, with a grid with size (nx,ny,nz)
 problem_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));    
 problem_ini.grid_L = [500e-9,125e-9,3e-9]; %m
 problem_ini.nThreads = int32(8);
@@ -93,6 +92,7 @@ problem_ini.nThreads = int32(8);
 problem_ini = problem_ini.setMicroMagDemagApproximation('none');
 problem_ini = problem_ini.setUseCuda( options.use_CUDA );
 problem_ini = problem_ini.setUseCVODE( options.use_CVODE );
+problem_ini.useAvgN = int32(options.use_AvgN);
 
 % Material properties
 problem_ini.alpha = 4.42e3;

@@ -74,6 +74,7 @@ def grain_hysteresis(
     nlmax: int = 5,
     allow_fmm_short_circuit: int = 0,
     fmm_min_n: int = 20000,
+    fmm_nterms: int = -1,
 ) -> None:
 
     """
@@ -122,7 +123,7 @@ def grain_hysteresis(
                 nt=2,
                 Hyst_dir=Hyst_dir,
                 rng=rng,
-                input_file_name=demag_file,
+                input_file_name=demag_file
             )
         else:
             problem_ini = setup_grain_problem_from_matfile(
@@ -132,10 +133,8 @@ def grain_hysteresis(
                 t_end=40e-9,
                 nt=2,
                 Hyst_dir=Hyst_dir,
-                rng=rng,
+                rng=rng
             )
-
-
 
         #problem_ini.exch_presize = 10 * problem_ini.nt * len(steps)
         nnbor = 27 # assmue 27 nearest neighbors for exchange
@@ -148,15 +147,16 @@ def grain_hysteresis(
         problem_ini.nlmax = nlmax
         problem_ini.allow_fmm_short_circuit = allow_fmm_short_circuit
         problem_ini.fmm_min_n = fmm_min_n
+        problem_ini.fmm_nterms = fmm_nterms
 
         problem_ini.log_dir = "timer_logs"
-        problem_ini.timer_log_file = mesh_file[:-4] + "_timer_ini.log"
-        problem_ini.trace_log_file = mesh_file[:-4] + "_trace_ini.log"
+        problem_ini.timer_log_file = mesh_file[:-4] + "_nterm_" + str(fmm_nterms) + "_timer_ini.log"
+        problem_ini.trace_log_file = mesh_file[:-4] + "_nterm_" + str(fmm_nterms) + "_trace_ini.log"
         problem_ini.window_enabled = 1
         problem_ini.window_interval = 30.0
         problem_ini.trace_enabled = 0
         problem_ini.flush_each = 1
-        problem_ini.trace_verbose = 1
+        problem_ini.trace_verbose = 2
 
 
         res_ini = problem_ini.run_hysteresis(H_ext=H_ext)
@@ -208,7 +208,7 @@ def grain_hysteresis(
             exch_nrow=exch_nrow,
             exch_ncols=exch_ncols,
             passexch=1,
-            input_file_name=demag_file,
+            input_file_name=demag_file
         )
     else:
         problem = setup_grain_problem_from_matfile(
@@ -225,8 +225,9 @@ def grain_hysteresis(
             exch_nval=exch_nval,
             exch_nrow=exch_nrow,
             exch_ncols=exch_ncols,
-            passexch=0,
+            passexch=0
         )
+
 
     #-------- for testing
     #problem.dem_appr = "threshold"
@@ -245,15 +246,16 @@ def grain_hysteresis(
     problem.nlmax = nlmax
     problem.allow_fmm_short_circuit = allow_fmm_short_circuit
     problem.fmm_min_n = fmm_min_n
+    problem.fmm_nterms = fmm_nterms
 
     problem.log_dir = "timer_logs"
-    problem.timer_log_file = mesh_file[:-4] + "_timer.log"
-    problem.trace_log_file = mesh_file[:-4] + "_trace.log"
+    problem.timer_log_file = mesh_file[:-4] + "_nterm_" + str(fmm_nterms) + "_timer.log"
+    problem.trace_log_file = mesh_file[:-4] + "_nterm_" + str(fmm_nterms) + "_trace.log"
     problem.window_enabled = 1
     problem.window_interval = 30.0
     problem.trace_enabled = 0
     problem.flush_each = 1
-    problem.trace_verbose = 1
+    problem.trace_verbose = 2
 
 
     start_time = time.time()
@@ -324,7 +326,7 @@ def grain_hysteresis(
         backend_tag = "_cuda_fmmsc"
     elif use_fmm:
         backend_tag = "_fmm"
-        backend_tag += f"_eps{fmm_eps:.2e}_cpn{fmm_cells_per_node}"
+        backend_tag += f"_eps{fmm_eps:.2e}_cpn{fmm_cells_per_node}_nterm{fmm_nterms}"
     else:
         backend_tag = "_cuda"
 
@@ -380,7 +382,8 @@ def grain_hysteresis(
         print(f"Saved figure to: {fig_path}")
 
 if __name__ == "__main__":
-    default_figpath = Path(__file__).parent.absolute().joinpath("..", "figs_perf")
+    #default_figpath = Path(__file__).parent.absolute().joinpath("..", "figs_perf")
+    default_figpath = Path.cwd() / "results"
 
     parser = argparse.ArgumentParser(
         description="Run grain hysteresis experiment"
@@ -424,6 +427,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--fmm-min-n", type=int, default=20000,
                         help="Minimum number of elements for FMM short circuit")
+    
+    parser.add_argument("--fmm-nterms", type=int, default=-1,
+                        help="Number of FMM terms (negative for default)")
 
 
     args = parser.parse_args()
@@ -443,6 +449,7 @@ if __name__ == "__main__":
     print(f"  nlmax = {args.nlmax}")
     print(f"  allow_fmm_short_circuit = {args.allow_fmm_short_circuit}")
     print(f"  fmm_min_n = {args.fmm_min_n}")
+    print(f"  fmm_nterms = {args.fmm_nterms}")
 
     grain_hysteresis(
         use_fmm=args.use_fmm,
@@ -458,6 +465,7 @@ if __name__ == "__main__":
         nlmax=args.nlmax,
         allow_fmm_short_circuit=args.allow_fmm_short_circuit,
         fmm_min_n=args.fmm_min_n,
+        fmm_nterms=args.fmm_nterms,
     )
 
 

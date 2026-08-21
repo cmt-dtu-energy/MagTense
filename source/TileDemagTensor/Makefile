@@ -12,19 +12,19 @@ MATLAB_INCLUDE =
 #=======================================================================
 LIBSRC_SOURCES = TileTensorHelperFunctions TileCylPieceTensor \
 	TileRectangularPrismTensor TilePlanarCoilTensor TileTriangle \
-	TileCircPieceTensor TileNComponents
+	TileRectangularPrismAvgTensor TileCircPieceTensor TileNComponents
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
-	LIBTOOL = LIB $? /OUT:$@
+	LIBTOOL = LIB $^ /OUT:$@
 	LIB_SUFFIX = .lib
 else
 	OPT =
 	LIB_SUFFIX = .a
 
 	ifeq (${UNAME}, Darwin)
-  		LIBTOOL = libtool -static -o $@ $?
+  		LIBTOOL = libtool -static -o $@ $^
 	else
   		LIBTOOL = ar src $@ $?
 	endif

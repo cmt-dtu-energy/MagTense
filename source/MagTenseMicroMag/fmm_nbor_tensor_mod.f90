@@ -9,6 +9,8 @@ module fmm_nbor_tensor_mod
     use DemagFieldGetSolution
     use IO_GENERAL
     use trace_mod
+    use sort_mod
+    use omp_mod
   implicit none
 contains 
 
@@ -127,7 +129,7 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
   allocate(problem%n_nbors(ntot))
   problem%n_nbors = 0
 
-  print *, " counting neighbours from FMM tree ..."
+  if ( trace%enabled .and. trace%verbose .ge. 2 ) print *, " counting neighbours from FMM tree ..."
   !===========================
   ! Pass 1: count neighbours
   !===========================
@@ -165,10 +167,9 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
   ! Allocate / reset nbr_idx
   if (associated(problem%nbr_idx)) nullify(problem%nbr_idx)
   allocate(problem%nbr_idx(ntot, nneigh_max))
-  !problem%nbr_idx = -1
 
 
-  print *, " filling neighbour list from FMM tree ..."
+  if ( trace%enabled .and. trace%verbose .ge. 2 ) print *, " filling neighbour list from FMM tree ..."
   !===========================
   ! Pass 2: fill neighbour ids
   !===========================
@@ -207,6 +208,13 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
       end do 
     end do
   end do
+
+
+  !---------- sort each row to improve data locality in subsequent tensor build  ----------
+  do i = 1, ntot
+    call sort(problem%nbr_idx(i,1:problem%n_nbors(i)))
+  end do
+  !------------------------------------------------------------------------------------------------
 
 
   call trace%end( "BuildNeighbourList_FromTree", itimer=itimer, verbose=1 )
@@ -283,7 +291,7 @@ subroutine BuildNeighbourDemagTensor(problem)
 
   ! Neighbour / tensor loop locals (declared here; user said they moved defs to top)
   integer :: t, m, q, s
-  real(DP) :: pts_t(1,3)
+  real(DP) :: pts_t(1,3), obs_size(1,3)
 
   ! FMM-tree neighbour construction locals
   integer :: ier, i
@@ -322,6 +330,28 @@ subroutine BuildNeighbourDemagTensor(problem)
   !---------------------------------------
   ntot = size(problem%grid%pts, dim=1)
 
+  !---------------------------------------
+  ! 1a. Short circuit small problems before anything is built
+  !
+  ! The octree built in step 3 is precisely what a problem below fmm_min_n has to be spared,
+  ! so the test has to come before it. It used to sit after the tree had been constructed,
+  ! which meant a handful of tiles still went through build_tree and crashed there on small
+  ! and on effectively one dimensional geometries - the check could only ever disable FMM for
+  ! problems that had already survived it.
+  ! dealloc_fmm_arrays only releases what is associated, so it is safe this early and still
+  ! clears anything left behind by a previous call on the same problem.
+  !---------------------------------------
+  if (problem%allow_fmm_short_circuit .eq. 1 .and. ntot < problem%fmm_min_n) then
+    !This one reports an actual change of behaviour rather than progress, so it goes through the
+    !normal message channel - which is also the only one visible from Matlab.
+    call displayGUIMessage( 'MagTense: problem smaller than fmm_min_n - disabling FMM and using the full demag tensor' )
+    call dealloc_fmm_arrays(problem)
+    problem%use_fmm = .false.
+    call trace%end( "BuildNeighbourDemagTensor", itimer=itimer, verbose=2 )
+
+    return
+  end if
+
   allocate(offset(ntot,3))
   allocate(size_cell(ntot,3))
   offset(:,:)    = problem%grid%pts(:,:)
@@ -349,29 +379,22 @@ subroutine BuildNeighbourDemagTensor(problem)
     sources(3,i) = real(problem%grid%pts(i,3), DP)
   end do
 
+  fmm_tree%nterms_in = problem%fmm_nterms
   call fmm_tree%build_tree(sources, problem%fmm_eps, problem%fmm_cells_per_node, ier, problem%ifunif, problem%nlmin, problem%nlmax)
   if (ier /= 0) stop "BuildNeighbourDemagTensor: fmm_tree%build_tree failed"
 
   call BuildNeighbourList_FromTree(problem, fmm_tree)
 
   nneigh_max = maxval(problem%n_nbors)
-  print *, " nbor list built from tree has ", sum(problem%n_nbors), " total nbor"
-  print *, " max nbor = ", nneigh_max
+  if ( trace%enabled .and. trace%verbose .ge. 2 ) then
+      print *, " nbor list built from tree has ", sum(problem%n_nbors), " total nbor"
+      print *, " max nbor = ", nneigh_max
+  endif
 
   deallocate(fmm_tree)
   deallocate(sources)
 
-
-  if (problem%allow_fmm_short_circuit .eq. 1 .and. ntot < problem%fmm_min_n) then
-    print *, " Short circuiting FMM - disabling FMM"
-    call dealloc_fmm_arrays(problem)
-    problem%use_fmm = .false.
-    call trace%end( "BuildNeighbourDemagTensor", itimer=itimer, verbose=2 )
-
-    return
-  end if 
-
-
+  ! The short circuit for small problems is now done in step 1a, before the tree is built
 
 
   nbr_idx_p => problem%nbr_idx
@@ -395,11 +418,7 @@ subroutine BuildNeighbourDemagTensor(problem)
   !    Determine number of threads via a parallel singleton.
   !---------------------------------------
   nthreads = 1
-  !$omp parallel default(none) shared(nthreads)
-    !$omp single
-      nthreads = omp_get_num_threads()
-    !$omp end single
-  !$omp end parallel
+  nthreads = omp%numthreads()
 
   allocate(tiles_thr(nthreads))
   allocate(nout_thr(nthreads))
@@ -419,7 +438,7 @@ subroutine BuildNeighbourDemagTensor(problem)
   !---------------------------------------
   !$omp parallel do default(none) &
   !$omp shared(ntot, problem, nbr_idx_p, Nnbr_p, offset, size_cell, tiles_thr, nout_thr, hdum_thr) &
-  !$omp private(t, m, q, s, pts_t, tid) schedule(static)
+  !$omp private(t, m, q, s, pts_t, tid, obs_size) schedule(static)
   do t = 1, ntot
 
     tid = omp_get_thread_num() + 1
@@ -431,27 +450,60 @@ subroutine BuildNeighbourDemagTensor(problem)
     pts_t(1,2) = offset(t,2)
     pts_t(1,3) = offset(t,3)
 
+
+    if ( problem%grid%gridType .eq. gridTypeUniform ) then
+      obs_size(1,1) = problem%grid%dx
+      obs_size(1,2) = problem%grid%dy
+      obs_size(1,3) = problem%grid%dz
+    elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
+      obs_size(1,1) = problem%grid%abc(t,1)
+      obs_size(1,2) = problem%grid%abc(t,2)
+      obs_size(1,3) = problem%grid%abc(t,3)
+    else
+          error stop "BuildNeighbourDemagTensor: unsupported grid type - only uniform and unstructured prisms currently supported"
+    end if
+
     do q = 1, m
       s = nbr_idx_p(t,q)
       if (s < 1) cycle   ! skip invalid slots (-1/0). Adjust if your valid range differs.
 
-      tiles_thr(tid)%a(1)%tileType        = 2
-      tiles_thr(tid)%a(1)%a               = size_cell(s,1)
-      tiles_thr(tid)%a(1)%b               = size_cell(s,2)
-      tiles_thr(tid)%a(1)%c               = size_cell(s,3)
+      if (problem%useAvgN .eq. useAvgNTrue) then
+        tiles_thr(tid)%a(1)%tileType        = 8
+      else
+        tiles_thr(tid)%a(1)%tileType        = 2
+      endif
+
+  if ( problem%grid%gridType .eq. gridTypeUniform ) then
+      tiles_thr(tid)%a(1)%a               = problem%grid%dx
+      tiles_thr(tid)%a(1)%b               = problem%grid%dy
+      tiles_thr(tid)%a(1)%c               = problem%grid%dz
+    elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
+      tiles_thr(tid)%a(1)%a               = problem%grid%abc(s,1)
+      tiles_thr(tid)%a(1)%b               = problem%grid%abc(s,2)
+      tiles_thr(tid)%a(1)%c               = problem%grid%abc(s,3)
+    else
+          error stop "BuildNeighbourDemagTensor: unsupported grid type - only uniform and unstructured prisms currently supported"
+    end if
+      tiles_thr(tid)%a(1)%offset(1)       = problem%grid%pts(s,1)
+      tiles_thr(tid)%a(1)%offset(2)       = problem%grid%pts(s,2)
+      tiles_thr(tid)%a(1)%offset(3)       = problem%grid%pts(s,3)
       tiles_thr(tid)%a(1)%exploitSymmetry = 0
       tiles_thr(tid)%a(1)%rotAngles(:)    = 0.0_DP
       tiles_thr(tid)%a(1)%M(:)            = 0.0_DP
-      tiles_thr(tid)%a(1)%offset(1)       = offset(s,1)
-      tiles_thr(tid)%a(1)%offset(2)       = offset(s,2)
-      tiles_thr(tid)%a(1)%offset(3)       = offset(s,3)
 
       nout_thr(tid)%a = 0.0_DP
 
       ! Whole allocatable actual argument (OK with allocatable dummy)
-      call getFieldFromTiles( tiles_thr(tid)%a, hdum_thr(tid)%a, pts_t, 1, 1, nout_thr(tid)%a, .false. )
 
-      Nnbr_p(t, q, :, :) = sngl(nout_thr(tid)%a(1,1,:,:))
+
+      if (problem%useAvgN .eq. useAvgNTrue) then
+        call getFieldFromTiles( tiles_thr(tid)%a, hdum_thr(tid)%a, pts_t, 1, 1, nout_thr(tid)%a, .false., Obs_size=obs_size )
+      else
+        call getFieldFromTiles( tiles_thr(tid)%a, hdum_thr(tid)%a, pts_t, 1, 1, nout_thr(tid)%a, .false. )
+      endif
+
+      Nnbr_p(t, q, :, :) = sngl(nout_thr(tid)%a(1,1,:,:)) * problem%Ms(s)
+
     end do
 
   end do
@@ -474,8 +526,18 @@ subroutine BuildNeighbourDemagTensor(problem)
   !---------------------------------------
   ! 8. Attach diffTens and build CSR sparse matrices (opt)
   !---------------------------------------
+
+
+  !============== TODO, this could be added as a user input, but currently it is only used for testing/debug, so remains hardcoded like this ======
+  ! if eval_local is never called, we can skip the "diffTens = Nnbr - dipole" 
+  !      step and just point diffTens to Nnbr directly, saving memory and time.
   problem%diffTens => problem%Nnbr
-  call build_FMM_sparse_nborTensor_opt(problem)
+  ! else we convert Nbr to diffTens by subtracting dipole contribution 
+  !call convert_Nnbr_to_diffTens(problem)
+  !=================================================================================================================================================
+
+
+  call build_FMM_sparse_nborTensor(problem)
 
 
   call trace%end( "BuildNeighbourDemagTensor", itimer=itimer, verbose=2 )
@@ -531,14 +593,17 @@ subroutine convert_Nnbr_to_diffTens(problem)
       Rvec(2) = yt - yj
       Rvec(3) = zt - zj
       call dipole_tensor_3x3(Rvec, Kdip)
+      Kdip = Kdip * real(problem%Ms(jidx), DP)
+
       if (problem%grid%gridType .eq. gridTypeUniform) then
           volj = dx * dy * dz
       else
           volj = problem%grid%abc(jidx,1) * problem%grid%abc(jidx,2) * problem%grid%abc(jidx,3)
       endif
 
-      problem%diffTens(t, m, :,:) = Kloc - Kdip * volj  ! correction compared to dipole 
-      !problem%diffTens(t, m, :,:) = Kloc  ! full tensor - if eval_direct is never called 
+      !problem%diffTens(t, m, :,:) = Kloc - Kdip * volj       ! correction compared to dipole 
+      problem%diffTens(t, m, :,:) = Kdip * volj               ! pure dipole contribution - for testing only
+
     end do
   end do
 
@@ -549,11 +614,10 @@ end subroutine convert_Nnbr_to_diffTens
 
 !=====================================================================
 !> Build sparse neighbour correction tensors in CSR format
-!! NOTE - optimized version - faster than build_FMM_sparse_nborTensor, but more complex
 !! 
 !!  arguments:
 !!   problem  - MicroMagProblem object containing nbr_idx, n_nbors, diffTens
-subroutine build_fmm_sparse_nborTensor_opt(problem)
+subroutine build_fmm_sparse_nborTensor(problem)
   implicit none
   type(MicroMagProblem), intent(inout) :: problem
 
@@ -568,7 +632,7 @@ subroutine build_fmm_sparse_nborTensor_opt(problem)
   real(SP) :: t_sec
   character(len=128) :: msg
   integer, save :: itimer = 0
-  call trace%begin( "build_fmm_sparse_nborTensor_opt", itimer=itimer, verbose=2 )
+  call trace%begin( "build_fmm_sparse_nborTensor", itimer=itimer, verbose=2 )
 
 
   !-------- optimized not fully tested - use with caution.
@@ -576,9 +640,9 @@ subroutine build_fmm_sparse_nborTensor_opt(problem)
   call system_clock(count_rate=clk_rate)
 
   ! Guards
-  if (.not. associated(problem%nbr_idx))   stop "build_fmm_sparse_nborTensor_opt: nbr_idx not associated"
-  if (.not. associated(problem%n_nbors))  stop "build_fmm_sparse_nborTensor_opt: n_nbors not associated"
-  if (.not. associated(problem%diffTens)) stop "build_fmm_sparse_nborTensor_opt: diffTens not associated"
+  if (.not. associated(problem%nbr_idx))   stop "build_fmm_sparse_nborTensor: nbr_idx not associated"
+  if (.not. associated(problem%n_nbors))  stop "build_fmm_sparse_nborTensor: n_nbors not associated"
+  if (.not. associated(problem%diffTens)) stop "build_fmm_sparse_nborTensor: diffTens not associated"
 
   call displayGUIMessage(" Starting FMM sparse nbor build (opt)")
 
@@ -654,7 +718,7 @@ subroutine build_fmm_sparse_nborTensor_opt(problem)
     pos = pos + row_nnz(t)
   end do
 
-  if (pos /= nnz_total + 1) stop "build_fmm_sparse_nborTensor_opt: nnz mismatch"
+  if (pos /= nnz_total + 1) stop "build_fmm_sparse_nborTensor: nnz mismatch"
 
   call system_clock(clk_end)
   t_sec = real(clk_end - clk_start, SP) / real(clk_rate, SP)
@@ -692,7 +756,7 @@ subroutine build_fmm_sparse_nborTensor_opt(problem)
       problem%K_fmm_s(6)%values(pos+k-1) = problem%diffTens(t,m,3,3)
     end do
 
-    if (k /= row_nnz(t)) stop "build_fmm_sparse_nborTensor_opt: row fill mismatch"
+    if (k /= row_nnz(t)) stop "build_fmm_sparse_nborTensor: row fill mismatch"
   end do
   !$omp end parallel do
 
@@ -714,7 +778,7 @@ subroutine build_fmm_sparse_nborTensor_opt(problem)
                                    ntot, ntot, &
                                    problem%K_fmm_s(idx)%rows_start, problem%K_fmm_s(idx)%rows_end, &
                                    problem%K_fmm_s(idx)%cols, problem%K_fmm_s(idx)%values )
-    if (stat /= SPARSE_STATUS_SUCCESS) stop "build_fmm_sparse_nborTensor_opt: mkl_sparse_s_create_csr failed"
+    if (stat /= SPARSE_STATUS_SUCCESS) stop "build_fmm_sparse_nborTensort: mkl_sparse_s_create_csr failed"
   end do
 
   call system_clock(clk_end)
@@ -728,158 +792,9 @@ subroutine build_fmm_sparse_nborTensor_opt(problem)
   call displayGUIMessage(" Finished FMM sparse nbor build (opt)")
 
 
-  call trace%end( "build_fmm_sparse_nborTensor_opt", itimer=itimer, verbose=2 )
+  call trace%end( "build_fmm_sparse_nborTensor", itimer=itimer, verbose=2 )
 
-end subroutine build_fmm_sparse_nborTensor_opt
-
-
-
-!=====================================================================
-!> Build sparse neighbour correction tensors in CSR format
-!! NOTE - semi-deprecated - use build_fmm_sparse_nborTensor_opt instead
-!!        code is kept as it is simpler to read/understand - but is slower. 
-!!
-!!  arguments:
-!!   problem  - MicroMagProblem object containing nbr_idx, n_nbors, diffTens
-!=====================================================================
-subroutine build_FMM_sparse_nborTensor(problem)
-  implicit none
-  type(MicroMagProblem), intent(inout) :: problem
-
-  integer :: ntot, t, m, j, row
-  integer :: nb_valid, nnz_total
-  integer :: pos
-  integer :: stat, idx
-
-  real(SP) :: v_xx, v_xy, v_xz, v_yy, v_yz, v_zz
-  integer, save :: itimer = 0
-  call trace%begin( "build_FMM_sparse_nborTensor", itimer=itimer, verbose=2 )
-
-  !TODO - this could be optimized by parralizing
-
-  call displayGUIMessage( " Starting FMM sparse nbor built" )
-
-
-  ! Guards
-  if (.not. associated(problem%nbr_idx))   stop "build_FMM_sparse_nborTensor: nbr_idx not associated"
-  if (.not. associated(problem%n_nbors))  stop "build_FMM_sparse_nborTensor: n_nbors not associated"
-  if (.not. associated(problem%diffTens)) stop "build_FMM_sparse_nborTensor: diffTens not associated"
-
-  ntot = size(problem%grid%pts, dim=1)
-
-  ! Destroy if already built
-  if (problem%K_fmm_built) call destroy_nbrcorr_sparse(problem)
-
-  ! Count nnz: one scalar entry per valid neighbour link
-  nnz_total = 0
-  do t = 1, ntot
-    do m = 1, problem%n_nbors(t)
-      j = problem%nbr_idx(t,m)
-      if (j < 0) cycle
-      nnz_total = nnz_total + 1
-    end do
-  end do
-
-  ! Allocate all 6 matrices
-  do idx = 1, 6
-    problem%K_fmm_s(idx)%nrows   = ntot
-    problem%K_fmm_s(idx)%ncols   = ntot
-    problem%K_fmm_s(idx)%nvalues = nnz_total
-
-    allocate(problem%K_fmm_s(idx)%rows_start(ntot))
-    allocate(problem%K_fmm_s(idx)%rows_end(ntot))
-    allocate(problem%K_fmm_s(idx)%cols(nnz_total))
-    allocate(problem%K_fmm_s(idx)%values(nnz_total))
-
-    problem%K_fmm_s(idx)%rows_start = 0
-    problem%K_fmm_s(idx)%rows_end   = 0
-    problem%K_fmm_s(idx)%cols       = 0
-    problem%K_fmm_s(idx)%values     = 0.0_SP
-    !problem%K_fmm_s(idx)%A          = SPARSE_MATRIX_T_NULL
-  end do
-
-  ! Build row pointers (rows_start/rows_end) – identical for all 6
-  pos = 1
-  do t = 1, ntot
-    nb_valid = 0
-    do m = 1, problem%n_nbors(t)
-      if (problem%nbr_idx(t,m) >= 0) nb_valid = nb_valid + 1
-    end do
-
-    ! row t has nb_valid entries
-    do idx = 1, 6
-      problem%K_fmm_s(idx)%rows_start(t) = pos
-      problem%K_fmm_s(idx)%rows_end(t)   = pos + nb_valid   ! one-past-end
-    end do
-
-    pos = pos + nb_valid
-  end do
-
-
-    call displayGUIMessage( " row pointers built" )
-
-  if (pos /= nnz_total + 1) stop "build_FMM_sparse_nborTensor: nnz mismatch"
-
-  ! Fill cols + values
-  do t = 1, ntot
-    pos = problem%K_fmm_s(1)%rows_start(t)
-
-    do m = 1, problem%n_nbors(t)
-      j = problem%nbr_idx(t,m)
-      if (j < 0) cycle
-
-      ! Column index is source cell index
-      do idx = 1, 6
-        problem%K_fmm_s(idx)%cols(pos) = j
-      end do
-
-      ! Extract the 6 unique components from diffTens(t,m,:,:)
-      v_xx = problem%diffTens(t,m,1,1)
-      v_xy = problem%diffTens(t,m,1,2)
-      v_xz = problem%diffTens(t,m,1,3)
-      v_yy = problem%diffTens(t,m,2,2)
-      v_yz = problem%diffTens(t,m,2,3)
-      v_zz = problem%diffTens(t,m,3,3)
-
-      problem%K_fmm_s(1)%values(pos) = v_xx
-      problem%K_fmm_s(2)%values(pos) = v_xy
-      problem%K_fmm_s(3)%values(pos) = v_xz
-      problem%K_fmm_s(4)%values(pos) = v_yy
-      problem%K_fmm_s(5)%values(pos) = v_yz
-      problem%K_fmm_s(6)%values(pos) = v_zz
-
-      pos = pos + 1
-    end do
-
-    if (pos /= problem%K_fmm_s(1)%rows_end(t)) stop "build_FMM_sparse_nborTensor: row fill mismatch"
-  end do
-
-    call displayGUIMessage( " K_fmm_s fully built" )
-
-
-  ! Create MKL handles
-  do idx = 1, 6
-    stat = mkl_sparse_s_create_csr( problem%K_fmm_s(idx)%A, SPARSE_INDEX_BASE_ONE, &
-                                   ntot, ntot, &
-                                   problem%K_fmm_s(idx)%rows_start, problem%K_fmm_s(idx)%rows_end, &
-                                   problem%K_fmm_s(idx)%cols, problem%K_fmm_s(idx)%values )
-    if (stat /= SPARSE_STATUS_SUCCESS) stop "build_FMM_sparse_nborTensor: mkl_sparse_s_create_csr failed"
-
-    !stat = mkl_sparse_optimize(problem%K_fmm_s(idx)%A)
-    !if (stat /= SPARSE_STATUS_SUCCESS) stop "build_FMM_sparse_nborTensor: mkl_sparse_optimize failed"
-  end do
-
-      call displayGUIMessage( " mkl_sparse matrix of FMM nbor built" )
-
-
-  ! Descriptor (GENERAL) – store once in problem for reuse
-  problem%K_fmm_descr_s%type = SPARSE_MATRIX_TYPE_GENERAL
-
-  problem%K_fmm_built = .true.
-
-  call trace%end( "build_FMM_sparse_nborTensor", itimer=itimer, verbose=2 )
-
-end subroutine build_FMM_sparse_nborTensor
+end subroutine build_fmm_sparse_nborTensor
 
 
 !=====================================================================
@@ -895,10 +810,6 @@ subroutine destroy_nbrcorr_sparse(problem)
   integer :: idx, stat
 
   do idx = 1, 6
-    ! if (problem%K_fmm_s(idx)%A .ne. SPARSE_MATRIX_T_NULL) then
-    !   stat = mkl_sparse_destroy(problem%K_fmm_s(idx)%A)
-    !   problem%K_fmm_s(idx)%A = SPARSE_MATRIX_T_NULL
-    ! end if
 
     if (allocated(problem%K_fmm_s(idx)%rows_start)) deallocate(problem%K_fmm_s(idx)%rows_start)
     if (allocated(problem%K_fmm_s(idx)%rows_end))   deallocate(problem%K_fmm_s(idx)%rows_end)

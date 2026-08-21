@@ -11,20 +11,20 @@ MATLAB_INCLUDE =
 #       List all source files required for the project
 #=======================================================================
 
-LIBSRC_SOURCES = sort_mod omp_mod omp_timer_mod omp_lock_mod timer_mod trace_mod
+LIBSRC_SOURCES = sort_mod omp_mod omp_timer_mod omp_lock_mod timer_mod trace_mod auxinit_mod
 
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
-	LIBTOOL = LIB $? /OUT:$@
+	LIBTOOL = LIB $^ /OUT:$@
 	LIB_SUFFIX = .lib
 	
 else
 	OPT =
 	LIB_SUFFIX = .a
 	ifeq (${UNAME}, Darwin)
-  		LIBTOOL = libtool -static -o $@ $?
+  		LIBTOOL = libtool -static -o $@ $^
 	else
   		LIBTOOL = ar src $@ $?
 	endif

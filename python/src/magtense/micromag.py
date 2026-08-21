@@ -1,5 +1,7 @@
 import os
 import shutil
+import sys
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 
@@ -7,14 +9,26 @@ import numpy as np
 
 # Windows only
 if hasattr(os, "add_dll_directory"):
-    mkl_path = Path(__file__).parent / ".." / ".." / ".." / "Library" / "bin"
-    if Path.is_dir(mkl_path):
-        os.add_dll_directory(mkl_path)
+    # First entry is the installed layout
+    # (<prefix>/Lib/site-packages/magtense/../../../Library/bin), the second the
+    # active environment prefix, which is what applies when running from source.
+    dll_paths = [
+        Path(__file__).parent / ".." / ".." / ".." / "Library" / "bin",
+        Path(sys.prefix) / "Library" / "bin",
+    ]
 
     nvidia_path = Path(__file__).parent / ".." / "nvidia"
-    for lib in ["cublas", "cuda_runtime", "cusparse", "nvjitlink"]:
-        if Path.is_dir(nvidia_path / lib / "bin"):
-            os.add_dll_directory(nvidia_path / lib / "bin")
+    dll_paths += [
+        nvidia_path / lib / "bin"
+        for lib in ["cublas", "cuda_runtime", "cusparse", "nvjitlink"]
+    ]
+
+    for dll_path in dll_paths:
+        if Path.is_dir(dll_path):
+            os.add_dll_directory(dll_path)
+            # libifcoremd.dll resolves its own dependency on libmmd.dll through
+            # PATH, which add_dll_directory does not cover.
+            os.environ["PATH"] = f"{dll_path.resolve()}{os.pathsep}{os.environ['PATH']}"
 
 from magtense.lib import magtensesource
 
@@ -23,21 +37,37 @@ class MicromagProblem:
     """
     Micromagnetic problem using the Fortran implementation of MagTense.
 
+    Notes:
+        All inputs are given in SI units. Magnetisation and field strengths are in A/m rather than T.
+
     Args:
-        res: Resolution of grid.
-        grid_L: Spatial extensions.
-        grid_nnod:
-        grid_type: Curently only 'uniform' is supported.
+        grid_type: Currently supports 'uniform', 'tetrahedron' and 'unstructuredPrisms'.
+            If 'uniform', grid is inferred from res and grid_L.
+            If 'tetrahedron', grid is specified by grid_pts, grid_nnod and grid_ele.
+            If 'unstructuredPrisms', grid is specified by grid_pts and grid_abc.
+        res: Resolution of grid, i.e. number of micromagnetic tiles along x, y and z.
+        grid_L: Spatial extension of simulated domain along x, y and z.
+        grid_nnod: Number of nodes in the tetrahedron mesh
+        grid_pts: xyz coordinates of micromagnetic tiles
+        grid_abc: sidelengths of prism tiles
         prob_mode:
-        solver:
+        solver: Options are 'explicit', 'dynamic' and 'implicit'.
+            If solver = 'dynamic', a single time-varying magnetic field is constructed
+            If solver = 'explicit', the equilibrium configuration is computed at several constant fields
+            solver = 'implicit' has not been implemented.
+            See documentation under run_simulation for details.
+        hysteresis_solver: External-field stepping mode. Options are 'static'
+            and 'adaptive'. The default 'static' mode preserves the predefined
+            field sequence used by existing simulations.
         A0: Anisotropy constant.
         Ms: Saturation magnetization [A/m].
         K0: Exchange constant.
-        alpha_mm: Dampening constant.
-        gamma: Gyromagnetic factor.
+        alpha: Dampening constant [m/(A*s)]. Product of Gilbert damping and precession parameter.
+        T: Temperature [K] ('temp' in fortran part)
+        gamma: Gyromagnetic factor [m/(A*s)].
         max_T0:
         nt_conv:
-        conv_tol: The convergence tolerence, which is the maximum change in
+        conv_tol: The convergence tolerance, which is the maximum change in
                   magnetization between two timesteps.
         tol: Relative tolerance for the Fortran ODE solver.
         thres: Fortran ODE solver, when a solution component Y(L) is less in
@@ -55,6 +85,10 @@ class MicromagProblem:
         N_ave:
         t_alpha:
         alpha_fct:
+        n_macro: How many copies of the simulated domain to have along x, y and z to represent the macrogeometry
+        shiftVec: How far to shift domain copies along x, y and z when constructing the macrogeometry
+        macroShape: Sidelengths of a prism representing the shape of the macrogeometry.
+        sampleShape: Sidelengths of a prism representing the sample shape.
     """
 
     def __init__(
@@ -71,10 +105,11 @@ class MicromagProblem:
             K0: int | float | list | np.ndarray | None = None,
             K1: int | float | list | np.ndarray | None = None,
             K2: int | float | list | np.ndarray | None = None,
+            T: int | float | list | np.ndarray | None = None,
             K0_arr: np.ndarray | None = None,
             CrysAxis: np.ndarray | None = None,
-            alpha: float = 0.02,
-            gamma: float = 0.0,
+            alpha: float = 4.42e3,
+            gamma: float = 2.21e5,
             max_T0: float = 2.0,
             nt_conv: int = 1,
             conv_tol: float = 1e-4,
@@ -98,15 +133,28 @@ class MicromagProblem:
             exch_presize: int = 12,
             demigstp: int = 0,
             passexch: int = 0,
-            usereturnhall: int = 0,
             filename: str = "t",
             cuda: bool = False,
             cvode: bool = False,
+            usedemag: bool = True,
+            # True to match the MATLAB DefaultMicroMagProblem, which sets useAvgN = 1
+            useavgn: bool = True,
+            # False to match the MATLAB DefaultMicroMagProblem, which sets ReturnHall = 0.
+            # Set it to True to have run_simulation return H_exc/H_ext/H_dem/H_ani; leaving it
+            # off also avoids allocating four more (nt, ntot, nt_h_ext, 3) arrays.
+            usereturnhall: bool = False,
             precision: bool = False,
             n_threads: int = 1,
             N_ave: tuple[int] = (1, 1, 1),
             t_alpha: np.ndarray = np.zeros(1),  # noqa: B008
-            alpha_fct=lambda t: np.atleast_2d(t).T * 0
+            alpha_fct=lambda t: np.atleast_2d(t).T * 0,
+            sampleShape: list | np.ndarray | None = None,
+            exchPBC: list | np.ndarray | None = None,
+            macroShape: list | np.ndarray | None = None,
+            shiftVec: list | np.ndarray | None = np.zeros(3, dtype=np.float64),
+            n_macro: list | np.ndarray | None = np.zeros(3),
+            hysteresis_solver: str = "static",
+            rng_seed: int = 0,
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -121,30 +169,57 @@ class MicromagProblem:
         self.passexch = passexch
         self.demigstp = demigstp
         self.usereturnhall = usereturnhall
+        self.useavgn = useavgn
         self.exch_presize = exch_presize
 
-        self.grid_n = np.array(res, dtype=np.int32, order="F")
-        self.grid_L = np.array(grid_L, dtype=np.float64, order="F")
-        self.grid_pts = grid_pts
-        self.grid_ele = np.zeros(shape=(4, ntot), dtype=np.float64, order="F")
-        self.grid_nod = np.zeros(shape=(grid_nnod, 3), dtype=np.float64, order="F")
-        self.grid_abc = grid_abc
-        self.u_ea = np.zeros(shape=(ntot, 3), dtype=np.float64, order="F")
+        self.nt_conv = nt_conv
 
+        self.usereturnhall = usereturnhall
+        self.demigstp = demigstp
+        self.usereturnhall = usereturnhall
+        self.exch_presize = exch_presize
+
+        # Set grid, solver and problem type
         self.grid_type = grid_type
         self.prob_mode = prob_mode
         self.solver = solver
+        self.hysteresis_solver = hysteresis_solver
 
-        self.m0 = m0
+        ### Define grid ###
+        # Uniform grid
+        self.grid_n = np.array(res, dtype=np.int32, order="F")
+        self.grid_L = np.array(grid_L, dtype=np.float64, order="F")
+        # Tetrahedron and prism grids
+        self.grid_pts = grid_pts
+        # Prism grid
+        self.grid_abc = grid_abc
+        # Tetrahedron grid
+        self.grid_nnod = grid_nnod
+        self.grid_ele = np.zeros(shape=(4, ntot), dtype=np.float64, order="F")
+        self.grid_nod = np.zeros(shape=(grid_nnod, 3), dtype=np.float64, order="F")
+
+        # Set macrogeometry
+        self.n_macro = n_macro
+        self.shiftVec = shiftVec
+        self.macroShape = macroShape
+        self.sampleShape = sampleShape
+        self.exchPBC = exchPBC
+
+        # Set material parameters
         self.A0 = A0
         self.Ms = Ms
         self.K0 = K0
         self.K1 = K1
         self.K2 = K2
         self.K0_arr = K0_arr
+        self.T = T
+
+        # Set initial state
+        self.m0 = m0
 
         # --- Set the local crystal coordinates to the three Cartesian axis
         self.CrysAxis = CrysAxis
+        self.u_ea = np.zeros(shape=(ntot, 3), dtype=np.float64, order="F")  # Anisotropy axes
 
         self.alpha_mm = alpha
         self.gamma = gamma
@@ -162,11 +237,20 @@ class MicromagProblem:
         self.dem_appr = demag_approx
         self.cv = cv
 
+        # Seed for the stochastic thermal field, drawn inside Fortran. 0 keeps the compiler
+        # default sequence, which is identical on every run; a positive value seeds
+        # deterministically with that value; a negative value seeds from the clock, which is
+        # what independent Monte-Carlo runs need. NumPy's own seed has no effect on it.
+        self.rng_seed = int(rng_seed)
+
         self.nt_alpha = len(t_alpha)
         self.alphat = np.zeros(shape=(self.nt_alpha, 2), dtype=np.float64, order="F")
         self.alphat[:, 0] = t_alpha
         self.alphat[:, 1] = alpha_fct(t_alpha)
 
+        self.exch_nval = exch_nval
+        self.exch_nrow = exch_nrow
+        self.exch_ncols = exch_ncols
         self.exch_val = exch_val
         self.exch_rows = exch_rows
         self.exch_cols = exch_cols
@@ -183,6 +267,9 @@ class MicromagProblem:
             self.cuda = int(cuda)
 
         self.cvode = int(cvode)
+        self.usedemag = int(usedemag)
+        self.useavgn = int(useavgn)
+        self.usereturnhall = int(usereturnhall)
         self.precision = int(precision)
         self.n_threads = n_threads
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")
@@ -197,6 +284,12 @@ class MicromagProblem:
         self.nlmax = 5
         self.allow_fmm_short_circuit = 1
         self.fmm_min_n = 20000
+        self.fmm_nterms = -1
+        # Off by default: the FMM demag path only pays off for large problems, and it is
+        # ignored altogether unless the library is built with USE_FMM3D=1. Opting in
+        # explicitly means a problem does not silently change its demag path when the
+        # library is rebuilt with FMM enabled. Set `problem.use_fmm = 1` to use it.
+        self.use_fmm = 0
         #--------------------------------------------------
 
         #---------- timer and trace parameters ----------
@@ -328,6 +421,22 @@ class MicromagProblem:
             self._A0 = np.asarray(val, dtype=np.float64, order="F")
 
     @property
+    def T(self) -> int | float | list | np.ndarray | None:
+        return self._T
+
+    @T.setter
+    def T(self, val: int | float | list | np.ndarray | None) -> None:
+        if val is None:
+            self._T = 0.0 + np.zeros(self.ntot, dtype=np.float64, order="F")
+
+        elif isinstance(val, (int, float)):
+            self._T = val + np.zeros(self.ntot, dtype=np.float64, order="F")
+
+        else:
+            assert np.asarray(val).shape == self.ntot
+            self._T = np.asarray(val, dtype=np.float64, order="F")
+
+    @property
     def Ms(self) -> int | float | list | np.ndarray | None:
         return self._Ms
 
@@ -446,6 +555,25 @@ class MicromagProblem:
             assert np.asarray(val).shape == (self.ntot, 3)
             self._m0 = np.asarray(val, dtype=np.float64, order="F")
 
+        # The LLG equation is written for a unit vector, so an un-normalised m0 silently
+        # rescales the effective field. MATLAB's DefaultMicroMagProblem.struct() has always
+        # checked and corrected this; do the same here rather than passing it through.
+        # Rows of zero length are left alone - there is no direction to normalise them to,
+        # and dividing them would turn them into NaN.
+        norm = np.linalg.norm(self._m0, axis=1)
+        nonzero = norm > 0
+        if np.any(~nonzero):
+            warnings.warn(
+                "Zero magnetization in initial array", RuntimeWarning, stacklevel=2
+            )
+        if np.any(np.abs(norm[nonzero] - 1.0) >= 1e-4):
+            warnings.warn(
+                "Initial magnetization array not normalized -- normalizing",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        self._m0[nonzero] /= norm[nonzero, np.newaxis]
+
     @property
     def dem_appr(self) -> int:
         return self._dem_appr
@@ -514,6 +642,92 @@ class MicromagProblem:
         self._solver = {None: -1, "explicit": 1, "dynamic": 2, "implicit": 3}[val]
 
     @property
+    def hysteresis_solver(self) -> int:
+        return self._hysteresis_solver
+
+    @hysteresis_solver.setter
+    def hysteresis_solver(self, val: str = "static") -> None:
+        try:
+            self._hysteresis_solver = {"static": 1, "adaptive": 2}[val]
+        except KeyError as error:
+            raise ValueError(
+                "hysteresis_solver must be 'static' or 'adaptive'"
+            ) from error
+
+    @property
+    def n_macro(self) -> list | np.ndarray | None:
+        return self._n_macro
+
+    @n_macro.setter
+    def n_macro(self, val: list | np.ndarray | None) -> None:
+        self._n_macro = np.zeros(shape=3, dtype=np.int32, order="F")
+
+        if val is None:
+            pass
+
+        elif isinstance(val, (list, np.ndarray)):
+            self._n_macro[:] = val
+
+    @property
+    def shiftVec(self) -> list | np.ndarray | None:
+        return self._shiftVec
+
+    @shiftVec.setter
+    def shiftVec(self, val: list | np.ndarray | None) -> None:
+        self._shiftVec = np.zeros(shape=3, dtype=np.float64, order="F")
+
+        if val is None:
+            pass
+
+        elif isinstance(val, (list, np.ndarray)):
+            self._shiftVec[:] = val
+
+    @property
+    def macroShape(self) -> list | np.ndarray | None:
+        return self._macroShape
+
+    @macroShape.setter
+    def macroShape(self, val: list | np.ndarray | None) -> None:
+        self._macroShape = np.ones(shape=3, dtype=np.float64, order="F")
+
+        if val is None:
+            pass
+
+        elif isinstance(val, (list, np.ndarray)):
+            self._macroShape[:] = val
+
+    @property
+    def sampleShape(self) -> list | np.ndarray | None:
+        return self._sampleShape
+
+    @sampleShape.setter
+    def sampleShape(self, val: list | np.ndarray | None) -> None:
+        self._sampleShape = np.ones(shape=3, dtype=np.float64, order="F")
+
+        if val is None:
+            pass
+
+        elif isinstance(val, (list, np.ndarray)):
+            self._sampleShape[:] = val
+
+    @property
+    def exchPBC(self) -> np.ndarray:
+        return self._exchPBC
+
+    @exchPBC.setter
+    def exchPBC(self, val: list | tuple | np.ndarray | None) -> None:
+        self._exchPBC = np.zeros(shape=3, dtype=np.int32)
+
+        if val is None:
+            pass
+
+        elif isinstance(val, (list, tuple, np.ndarray)):
+            val_arr = np.asarray(val, dtype=np.int32)
+            assert val_arr.shape == (3,), "exchPBC must be an array of length 3"
+            assert np.all((val_arr == 0) | (val_arr == 1)), "exchPBC elements must be 0 or 1"
+            self._exchPBC[:] = val_arr
+
+    @property
     def usereturnhall(self) -> int | None:
         return self._usereturnhall
 
@@ -531,7 +745,12 @@ class MicromagProblem:
             t_end: End time of the simulation.
             nt: Number of timesteps.
             fct_h_ext: Function to calculate the external field at each timestep.
-            nt_h_ext: Number of timesteps for the external field.
+            nt_h_ext: Number of time coordinates at which to evaluate fct_h_ext.
+                      Evaluation times are uniformly distributed from t=0 to t=t_end
+                      If solver = "dynamic", a single time-varying magnetic field is constructed
+                       by linear interpolation of the evaluation points.
+                      If solver = "explicit", then each of the nt_h_ext field evaluations are treated
+                       as a distinct, constant field and the equilibrium solution is computed for each field
 
         Outputs:
             A list containing the simulation results.
@@ -559,13 +778,14 @@ class MicromagProblem:
         else:
             nt_h_ext_out = nt_h_ext 
 
-        print("dummy run in python = ", self.dummy_run)
+        if self.solver not in (1, 2):
+            print("Only 'dynamic' and 'explicit' solvers are implemented")
 
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
             ntot=self.ntot,
+            grid_type=self.grid_type,
             grid_n=self.grid_n,
             grid_l=self.grid_L,
-            grid_type=self.grid_type,
             u_ea=self.u_ea,
             problemmode=self.prob_mode,
             solver=self.solver,
@@ -578,6 +798,7 @@ class MicromagProblem:
             crysaxis=self.CrysAxis,
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
+            temperature=self.T,
             maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             nt_hext_out = nt_h_ext_out,
@@ -598,6 +819,7 @@ class MicromagProblem:
             tol=self.tol,
             thres=self.thres,
             usecvode=self.cvode,
+            usedemag=self.usedemag,
             nt_conv=self.nt_conv,
             t_conv=self.t_conv,
             conv_tol=self.conv_tol,
@@ -616,6 +838,7 @@ class MicromagProblem:
             n_ave=self.N_ave,
             cv=self.cv,
             usereturnhall=self.usereturnhall,
+            useavgn=self.useavgn,
             demigstp=self.demigstp,
             exch_weigh=self.exch_weigh,
             exch_meth=self.exch_meth,
@@ -623,6 +846,25 @@ class MicromagProblem:
             passexch=self.passexch,
             exch_ncols=self.exch_ncols,
             exch_presize=self.exch_presize,
+            n_macro=self.n_macro,
+            shiftvec=self.shiftVec,
+            macroshape=self.macroShape,
+            sampleshape=self.sampleShape,
+            exchpbc=self.exchPBC,
+            hysteresis_solver=1,
+            h_start=np.zeros(3, dtype=np.float64),
+            h_end=np.zeros(3, dtype=np.float64),
+            dh_initial=0.0,
+            dh_min=0.0,
+            dh_max=0.0,
+            maxhextsteps=0,
+            dm_min=0.0,
+            dm_target=0.0,
+            dm_reject=0.0,
+            dh_grow=0.0,
+            dh_shrink=0.0,
+            switch_refine_dh=0.0,
+            use_switch_refine=0,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
@@ -631,6 +873,8 @@ class MicromagProblem:
             nlmax=self.nlmax,
             allow_fmm_short_circuit=self.allow_fmm_short_circuit,
             fmm_min_n=self.fmm_min_n,
+            fmm_nterms=self.fmm_nterms,
+            usefmm=self.use_fmm,
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,
@@ -638,11 +882,13 @@ class MicromagProblem:
             window_interval=self.window_interval,
             trace_enabled=self.trace_enabled,
             flush_each=self.flush_each,
-            trace_verbose=self.trace_verbose
+            trace_verbose=self.trace_verbose,
+            rng_seed=self.rng_seed
         )
 
-        n_tot_Exch = result[7]
         result = list(result)
+        result.pop(7)  # n_Hext_accepted is only public for adaptive hysteresis.
+        n_tot_Exch = result[7]
         result[8] = result[8][:n_tot_Exch]  # ExchMat_r
         result[9] = result[9][:n_tot_Exch]  # ExchMat_c
         result[10] = result[10][:n_tot_Exch]  # ExchMat_v
@@ -679,16 +925,24 @@ class MicromagProblem:
 
         """
 
-        
+        if self.hysteresis_solver != 1:
+            raise ValueError(
+                "run_hysteresis requires hysteresis_solver='static'"
+            )
+
         #----------- we always run hysteresis with explicit solver so no need to check here
         nt_h_ext = H_ext.shape[0]
         nt_h_ext_out = nt_h_ext
 
+        if self.solver not in (1, 2):
+            print("Only 'dynamic' and 'explicit' solvers are implemented")
+
+
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
             ntot=self.ntot,
+            grid_type=self.grid_type,
             grid_n=self.grid_n,
             grid_l=self.grid_L,
-            grid_type=self.grid_type,
             u_ea=self.u_ea,
             problemmode=self.prob_mode,
             solver=self.solver,
@@ -701,6 +955,7 @@ class MicromagProblem:
             crysaxis=self.CrysAxis,
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
+            temperature=self.T,
             maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             nt_hext_out = nt_h_ext_out,
@@ -721,6 +976,7 @@ class MicromagProblem:
             tol=self.tol,
             thres=self.thres,
             usecvode=self.cvode,
+            usedemag=self.usedemag,
             nt_conv=self.nt_conv,
             t_conv=self.t_conv,
             conv_tol=self.conv_tol,
@@ -739,6 +995,7 @@ class MicromagProblem:
             n_ave=self.N_ave,
             cv=self.cv,
             usereturnhall=self.usereturnhall,
+            useavgn=self.useavgn,
             demigstp=self.demigstp,
             exch_weigh=self.exch_weigh,
             exch_meth=self.exch_meth,
@@ -746,6 +1003,25 @@ class MicromagProblem:
             passexch=self.passexch,
             exch_ncols=self.exch_ncols,
             exch_presize=self.exch_presize,
+            n_macro=self.n_macro,
+            shiftvec=self.shiftVec,
+            macroshape=self.macroShape,
+            sampleshape=self.sampleShape,
+            exchpbc=self.exchPBC,
+            hysteresis_solver=self.hysteresis_solver,
+            h_start=np.zeros(3, dtype=np.float64),
+            h_end=np.zeros(3, dtype=np.float64),
+            dh_initial=0.0,
+            dh_min=0.0,
+            dh_max=0.0,
+            maxhextsteps=0,
+            dm_min=0.0,
+            dm_target=0.0,
+            dm_reject=0.0,
+            dh_grow=0.0,
+            dh_shrink=0.0,
+            switch_refine_dh=0.0,
+            use_switch_refine=0,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
@@ -754,6 +1030,8 @@ class MicromagProblem:
             nlmax=self.nlmax,
             allow_fmm_short_circuit=self.allow_fmm_short_circuit,
             fmm_min_n=self.fmm_min_n,
+            fmm_nterms=self.fmm_nterms,
+            usefmm=self.use_fmm,
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,
@@ -761,13 +1039,194 @@ class MicromagProblem:
             window_interval=self.window_interval,
             trace_enabled=self.trace_enabled,
             flush_each=self.flush_each,
-            trace_verbose=self.trace_verbose
+            trace_verbose=self.trace_verbose,
+            rng_seed=self.rng_seed
         )
 
-        n_tot_Exch = result[7]
         result = list(result)
+        result.pop(7)  # n_Hext_accepted is only public for adaptive hysteresis.
+        n_tot_Exch = result[7]
         result[8] = result[8][:n_tot_Exch]  # ExchMat_r
         result[9] = result[9][:n_tot_Exch]  # ExchMat_c
         result[10] = result[10][:n_tot_Exch]  # ExchMat_v
 
         return result
+
+    def run_hysteresis_adaptive(
+            self,
+            H_start: np.ndarray,
+            H_end: np.ndarray,
+            dH_initial: float,
+            dH_min: float,
+            dH_max: float,
+            max_steps: int,
+            dM_min: float = 1e-3,
+            dM_target: float = 1e-2,
+            dM_reject: float = 5e-2,
+            dH_grow: float = 1.5,
+            dH_shrink: float = 0.75,
+            switch_refine_dH: float | None = None,
+    ) -> list[np.ndarray | int]:
+        """
+        Run a micromagnetic hysteresis simulation with adaptive external-field steps.
+
+        The adaptive accept/reject loop is executed by the Fortran backend in a
+        single call. Output arrays are preallocated to ``max_steps`` in Fortran
+        and sliced here to include only accepted field steps.
+        """
+
+        if self.hysteresis_solver != 2:
+            raise ValueError(
+                "run_hysteresis_adaptive requires hysteresis_solver='adaptive'"
+            )
+        if self.solver != 1:
+            raise ValueError("Adaptive hysteresis requires the explicit solver")
+
+        H_start = np.asarray(H_start, dtype=np.float64)
+        H_end = np.asarray(H_end, dtype=np.float64)
+        if H_start.shape != (3,) or H_end.shape != (3,):
+            raise ValueError("H_start and H_end must be 3-vectors")
+        if max_steps <= 0:
+            raise ValueError("max_steps must be positive")
+        if dH_initial <= 0 or dH_min <= 0 or dH_max <= 0:
+            raise ValueError("dH_initial, dH_min and dH_max must be positive")
+        if dH_min > dH_max:
+            raise ValueError("dH_min must be smaller than or equal to dH_max")
+        if np.allclose(H_start, H_end, rtol=0.0, atol=0.0):
+            raise ValueError("H_start and H_end must differ")
+        if dH_grow <= 1.0:
+            raise ValueError("dH_grow must be larger than 1")
+        if not (0.0 < dH_shrink < 1.0):
+            raise ValueError("dH_shrink must be between 0 and 1")
+
+        # The Fortran loop records the starting field in slot 1 and then one slot per accepted
+        # step, so it needs max_steps + 1 slots. Sizing these to max_steps overran problem%Hext
+        # by one row on the last step and left the returned M/H arrays one field short of
+        # solution%M_out, which made the copy-out a non-conforming array assignment.
+        nt_h_ext = int(max_steps) + 1
+        nt_h_ext_out = int(max_steps) + 1
+        use_switch_refine = switch_refine_dH is not None
+        switch_refine_value = float(switch_refine_dH) if use_switch_refine else 0.0
+        if use_switch_refine and switch_refine_value <= 0:
+            raise ValueError("switch_refine_dH must be positive when provided")
+
+        h_ext = np.zeros(shape=(nt_h_ext, 4), dtype=np.float64, order="F")
+        h_ext[:, 1:4] = H_start
+
+        result = magtensesource.fortrantopythonio.runmicromagsimulation(
+            ntot=self.ntot,
+            grid_type=self.grid_type,
+            grid_n=self.grid_n,
+            grid_l=self.grid_L,
+            u_ea=self.u_ea,
+            problemmode=self.prob_mode,
+            solver=self.solver,
+            a0=self.A0,
+            ms=self.Ms,
+            k0=self.K0,
+            k1=self.K1,
+            k2=self.K2,
+            k0_arr=self.K0_arr,
+            crysaxis=self.CrysAxis,
+            gamma=self.gamma,
+            alpha_mm=self.alpha_mm,
+            temperature=self.T,
+            maxt0=self.max_T0,
+            nt_hext=nt_h_ext,
+            nt_hext_out=nt_h_ext_out,
+            hext=h_ext,
+            nt=self.nt,
+            t=self.t,
+            m0=np.concatenate((self.m0[:, 0], self.m0[:, 1], self.m0[:, 2]), axis=None),
+            dem_thres=self.dem_thres,
+            usecuda=self.cuda,
+            dem_appr=self.dem_appr,
+            n_ret=self.N_ret,
+            n_file_out=self.N_file_out,
+            n_load=self.N_load,
+            n_file_in=self.N_file_in,
+            settimedis=self.setTimeDis,
+            nt_alpha=self.nt_alpha,
+            alphat=self.alphat,
+            tol=self.tol,
+            thres=self.thres,
+            usecvode=self.cvode,
+            usedemag=self.usedemag,
+            nt_conv=self.nt_conv,
+            t_conv=self.t_conv,
+            conv_tol=self.conv_tol,
+            grid_pts=self.grid_pts,
+            grid_ele=self.grid_ele,
+            grid_nod=self.grid_nod,
+            grid_nnod=self.grid_nnod,
+            exch_nval=self.exch_nval,
+            exch_nrow=self.exch_nrow,
+            exch_val=self.exch_val,
+            exch_rows=self.exch_rows,
+            exch_cols=self.exch_cols,
+            grid_abc=self.grid_abc,
+            useprecision=self.precision,
+            nthreadsmatlab=self.n_threads,
+            n_ave=self.N_ave,
+            cv=self.cv,
+            usereturnhall=self.usereturnhall,
+            useavgn=self.useavgn,
+            demigstp=self.demigstp,
+            exch_weigh=self.exch_weigh,
+            exch_meth=self.exch_meth,
+            exch_intpn=self.exch_intpn,
+            passexch=self.passexch,
+            exch_ncols=self.exch_ncols,
+            exch_presize=self.exch_presize,
+            n_macro=self.n_macro,
+            shiftvec=self.shiftVec,
+            macroshape=self.macroShape,
+            sampleshape=self.sampleShape,
+            exchpbc=self.exchPBC,
+            hysteresis_solver=self.hysteresis_solver,
+            h_start=H_start,
+            h_end=H_end,
+            dh_initial=float(dH_initial),
+            dh_min=float(dH_min),
+            dh_max=float(dH_max),
+            maxhextsteps=int(max_steps),
+            dm_min=float(dM_min),
+            dm_target=float(dM_target),
+            dm_reject=float(dM_reject),
+            dh_grow=float(dH_grow),
+            dh_shrink=float(dH_shrink),
+            switch_refine_dh=switch_refine_value,
+            use_switch_refine=int(use_switch_refine),
+            dummy_run=self.dummy_run,
+            fmm_cells_per_node=self.fmm_cells_per_node,
+            eps_fmm=self.fmm_eps,
+            ifunif=self.ifunif,
+            nlmin=self.nlmin,
+            nlmax=self.nlmax,
+            allow_fmm_short_circuit=self.allow_fmm_short_circuit,
+            fmm_min_n=self.fmm_min_n,
+            fmm_nterms=self.fmm_nterms,
+            usefmm=self.use_fmm,
+            log_dir=self.log_dir,
+            timer_log_file=self.timer_log_file,
+            trace_log_file=self.trace_log_file,
+            window_enabled=self.window_enabled,
+            window_interval=self.window_interval,
+            trace_enabled=self.trace_enabled,
+            flush_each=self.flush_each,
+            trace_verbose=self.trace_verbose,
+            rng_seed=self.rng_seed
+        )
+
+        result = list(result)
+        n_accepted = int(result[7])
+        n_tot_Exch = result[8]
+
+        fixed_order_result = result[0:7] + result[8:14] + [n_accepted]
+        for idx in (1, 3, 4, 5, 6):
+            fixed_order_result[idx] = fixed_order_result[idx][:, :, :n_accepted, :]
+        fixed_order_result[8] = fixed_order_result[8][:n_tot_Exch]  # ExchMat_r
+        fixed_order_result[9] = fixed_order_result[9][:n_tot_Exch]  # ExchMat_c
+        fixed_order_result[10] = fixed_order_result[10][:n_tot_Exch]  # ExchMat_v
+
+        return fixed_order_result

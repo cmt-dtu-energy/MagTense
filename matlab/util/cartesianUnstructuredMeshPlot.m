@@ -2,6 +2,10 @@ function cartesianUnstructuredMeshPlot(pos, dims, GridInfo, iIn, fnamesave,hF)
 %
 % CartesianUnstructuredMeshPlot   plots Cartesian unstructured mesh
 
+if (~issparse(GridInfo.TheSigns))
+    GridInfo.TheSigns = sparse(GridInfo.TheSigns(:,1),GridInfo.TheSigns(:,2),single(GridInfo.TheSigns(:,3)));
+end
+
 if ~exist('hF','var')
     hF = figure('position',[0 0 600 600],'Color',[1 1 1]);
     ppsz = .2.*[20,19] ;

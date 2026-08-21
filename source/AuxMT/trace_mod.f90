@@ -91,7 +91,10 @@ CONTAINS
     !-------------------- Allocate per-thread state ----------------------------
     if (allocated(trace%t)) deallocate(trace%t)
 
-    trace%nthreads = omp%max_threads
+    ! Guard against omp%max_threads still being -1 (its default) when trace is
+    ! used via the lazy-init path before omp%init() has run; otherwise the array
+    ! would be allocated with extent 0 and trace%t(0) would be out of bounds.
+    trace%nthreads = max(1, omp%max_threads)
     allocate(trace%t(0:trace%nthreads-1))
     trace%t(:)%level = 0
     !---------------------------------------------------------------------------
@@ -113,14 +116,17 @@ CONTAINS
 !=============================================================================
 !> Finalise trace logging (writes timer summary and closes file)
 !=============================================================================
-  subroutine finalize()
+subroutine finalize()
     !DEC$ ATTRIBUTES ALIAS:"finalize_" :: finalize
     if (.not. trace%initialized) return
 
     !---------------------- Write timer summary -------------------------------
     if (trace%enabled .and. trace%unit > 0) then
       call trace_write_line("INFO ", "TIMER SUMMARY", 0, force_master=.true.)
-      call timer%print(unit=trace%unit, tid=0)
+      
+      ! Calling without tid triggers the aggregated sum over all threads
+      call timer%print(unit=trace%unit) 
+      
       if (trace%flush_each) flush(trace%unit)
     end if
     !---------------------------------------------------------------------------
@@ -142,7 +148,6 @@ CONTAINS
 
     trace%nthreads     = 1
     trace%initialized = .false.
-
   end subroutine finalize
 
 

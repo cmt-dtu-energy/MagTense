@@ -5,7 +5,7 @@
   </picture>
   <br>
 </div>
-
+ 
 # MagTense
 
 MagTense is a framework for magnetostatic and micromagnetic calculations.
