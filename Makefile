@@ -481,9 +481,12 @@ endef
 build-cvode: build-env
 	wget https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz
 	tar -xf cvode-7.4.0.tar.gz
-	rm -rf ${CVODE_ROOT}
-	mkdir -p ${CVODE_ROOT}
-	mv ${MKFILE_PATH}/cvode-7.4.0 ${CVODE_ROOT}/src
+# Copy the extracted source into cvode/src instead of moving it, so this rule
+# never deletes anything. The trailing "/." copies the *contents* of the
+# versioned dir (overwriting in place), so re-runs are idempotent without an rm.
+# To fully reset CVODE (e.g. on a version bump), run "make clean".
+	mkdir -p ${CVODE_ROOT}/src
+	cp -r ${MKFILE_PATH}/cvode-7.4.0/. ${CVODE_ROOT}/src/
 	$(run-cmake-cvode)
 
 ENV_NAME := magtense-env
