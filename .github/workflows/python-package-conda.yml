@@ -212,7 +212,9 @@ jobs:
         sparse-checkout: |
           python/tests/
           python/src/utils/
+          python/examples/
           documentation/examples_FEM_validation/
+          documentation/examples_mumag_validation/
 
     - name: Download a single artifact
       uses: actions/download-artifact@v4
@@ -232,6 +234,35 @@ jobs:
         python -m pip install '${{ github.workspace }}'/*.whl
         python -m pip install pytest
         python -m pytest python/tests/test_magtense.py
+
+    # python/examples/micromagnetism/testMagTenseFunctions.py is the combined micromagnetic
+    # suite and the counterpart of matlab/util/testMagTenseFunctions. It runs the validation
+    # examples, compares every measure with the limit that belongs to it, and exits non zero
+    # when one of them is over its limit, so this step fails on a numerical regression and not
+    # only on a crash. matplotlib and scipy are not dependencies of the wheel, but the examples
+    # need them.
+    #
+    # Standard problem 6 is about seventy percent of the running time of the suite, so it is
+    # left out on most of the matrix and the whole suite runs on one leg of it.
+    - name: Run the combined micromagnetic test suite
+      if: ${{ !(matrix.os == 'ubuntu-latest' && matrix.py-version.id == '3.13' && matrix.mt-punit.name == 'cpu') }}
+      run: |
+        python -m pip install matplotlib scipy
+        python python/examples/micromagnetism/testMagTenseFunctions.py --skip std_problem_6
+
+    - name: Run the whole combined micromagnetic test suite
+      if: ${{ matrix.os == 'ubuntu-latest' && matrix.py-version.id == '3.13' && matrix.mt-punit.name == 'cpu' }}
+      run: |
+        python -m pip install matplotlib scipy
+        python python/examples/micromagnetism/testMagTenseFunctions.py
+
+    - name: Upload the overview of the test suite
+      if: ${{ always() && matrix.os == 'ubuntu-latest' && matrix.py-version.id == '3.13' && matrix.mt-punit.name == 'cpu' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-suite-py${{ matrix.py-version.name }}-${{ matrix.mt-punit.name }}-${{ runner.os }}
+        path: python/examples/micromagnetism/results/*
+        if-no-files-found: ignore
 
 
   test-wheel-fmm-cuda:
@@ -259,7 +290,9 @@ jobs:
         sparse-checkout: |
           python/tests/
           python/src/utils/
+          python/examples/
           documentation/examples_FEM_validation/
+          documentation/examples_mumag_validation/
 
     - name: Download cu12-fmm artifact
       uses: actions/download-artifact@v4
@@ -439,6 +472,15 @@ jobs:
         "$PYTHON_EXE" -m pip install pytest
         "$PYTHON_EXE" -m pytest python/tests/fmm_test/test_fmm_workflow.py
 
+    # The same combined suite as in test-wheel, but on a machine that has a GPU, so this is
+    # where the CUDA path of the solver is exercised. Standard problem 6 is left out for the
+    # reason given there
+    - name: Run the combined micromagnetic test suite with CUDA
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
+      run: |
+        "$PYTHON_EXE" -m pip install matplotlib scipy
+        "$PYTHON_EXE" python/examples/micromagnetism/testMagTenseFunctions.py --cuda --skip std_problem_6
+
     - name: Install pip-wheel and pytest (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
       # The self-hosted runner has a Restricted execution policy and a user
@@ -475,6 +517,17 @@ jobs:
 
         & $env:PYTHON_EXE -m pip install pytest
         & $env:PYTHON_EXE -m pytest python/tests/fmm_test/test_fmm_workflow.py
+
+    - name: Run the combined micromagnetic test suite with CUDA (Windows)
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      env:
+        PYTHONUTF8: 1
+      run: |
+        $ErrorActionPreference = "Stop"
+
+        & $env:PYTHON_EXE -m pip install matplotlib scipy
+        & $env:PYTHON_EXE python/examples/micromagnetism/testMagTenseFunctions.py --cuda --skip std_problem_6
 
 
   cache-conda-win:

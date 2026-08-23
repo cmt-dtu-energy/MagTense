@@ -36,6 +36,7 @@ Usage
     python testMagTenseFunctions.py --include-slow  # add standard problem 3 (very slow)
     python testMagTenseFunctions.py --list          # show the available tests
     python testMagTenseFunctions.py --tests temperature_test,std_problem_4
+    python testMagTenseFunctions.py --skip std_problem_6   # all but the slowest one
 """
 
 import argparse
@@ -214,7 +215,7 @@ TESTS = {
     ),
     'periodic_exchange_test': (
         _periodic_exchange_test, False,
-        'Periodic exchange coupling, uniform grid and unstructured mesh',
+        'Periodic exchange coupling, uniform grid, unstructured mesh and grain mesh',
     ),
     'shape_correction_test': (
         _shape_correction_test, False,
@@ -424,6 +425,9 @@ def main() -> int:
     parser.add_argument('--tests', type=str, default=None,
                         help="Comma separated subset of tests to run "
                              "(default: all but the slow ones)")
+    parser.add_argument('--skip', type=str, default=None,
+                        help="Comma separated tests to leave out. Used by the workflow, "
+                             "where standard problem 6 is most of the running time")
     parser.add_argument('--include-slow', action='store_true',
                         help="Also run the tests marked slow")
     parser.add_argument('--cuda', action='store_true',
@@ -455,9 +459,19 @@ def main() -> int:
                     if args.include_slow or not slow]
         skipped = [name for name in TESTS if name not in selected]
 
+    if args.skip is not None:
+        dropped = [name.strip() for name in args.skip.split(',') if name.strip()]
+        unknown = [name for name in dropped if name not in TESTS]
+        if unknown:
+            print(f"Unknown test(s) in --skip: {', '.join(unknown)}. "
+                  "Use --list to see the available ones.")
+            return 2
+        selected = [name for name in selected if name not in dropped]
+        skipped = [name for name in TESTS if name not in selected]
+
     print(f"Running {len(selected)} test(s): {', '.join(selected)}")
     if skipped:
-        print(f"Skipping {len(skipped)} slow test(s): {', '.join(skipped)}")
+        print(f"Skipping {len(skipped)} test(s): {', '.join(skipped)}")
 
     records = run_tests(selected)
     print_table(records, skipped)

@@ -37,6 +37,15 @@ micromagnetism_dir = fullfile(util_dir, '..', 'examples', 'Micromagnetism');
 % enclose an area of 5 % of the area under the FEM curve
 field_error_limit = 5;
 
+% The workflow runs this suite once per CUDA and CVODE variant of the MEX files, so both
+% switches are taken from the environment: MAGTENSE_TEST_CUDA and MAGTENSE_TEST_CVODE, each 0
+% or 1. A variable that is not set leaves every test with the default it has on its own, which
+% is what a plain call from the editor gets. MAGTENSE_TESTS runs only the tests it names and
+% MAGTENSE_SKIP runs all but those, for the legs of the workflow that cannot afford the whole
+% suite; standard problem 6 alone is four fifths of its running time.
+cuda_args = environmentFlag('use_CUDA', 'MAGTENSE_TEST_CUDA');
+cvode_args = environmentFlag('use_CVODE', 'MAGTENSE_TEST_CVODE');
+
 %% The tests
 % Each row is {name, function returning the checks, one line description}
 
@@ -67,30 +76,33 @@ tests = {
         'Field of a tetrahedron vs FEM'
     'macrogeometry_PBC_test', ...
         @() micromagTestChecks(fullfile(micromagnetism_dir, 'MagTense_tests'), ...
-                               'macrogeometry_PBC_test'), ...
+                               'macrogeometry_PBC_test', cuda_args), ...
         'Periodic boundaries by the macrogeometry method, along x, y and z'
     'periodic_exchange_test', ...
         @() micromagTestChecks(fullfile(micromagnetism_dir, 'MagTense_tests'), ...
-                               'periodic_exchange_test'), ...
-        'Periodic exchange coupling, uniform grid and unstructured mesh'
+                               'periodic_exchange_test', cuda_args), ...
+        'Periodic exchange coupling, uniform grid, unstructured mesh and grain mesh'
     'shape_correction_test', ...
         @() micromagTestChecks(fullfile(micromagnetism_dir, 'MagTense_tests'), ...
-                               'shape_correction_test'), ...
+                               'shape_correction_test', cuda_args), ...
         'Shape correction field of the sample geometry'
     'temperature_test', ...
         @() micromagTestChecks(fullfile(micromagnetism_dir, 'MagTense_tests'), ...
-                               'temperature_test'), ...
+                               'temperature_test', cuda_args), ...
         'Thermal fluctuations against the analytical angular diffusion'
     'std_problem_4', ...
-        @() stdProblem4Checks(fullfile(micromagnetism_dir, 'mumag_micromag_Std_problem_4')), ...
+        @() stdProblem4Checks(fullfile(micromagnetism_dir, 'mumag_micromag_Std_problem_4'), ...
+                              [cuda_args, cvode_args]), ...
         'mumag standard problem 4 against the published mean solutions'
     'std_problem_6', ...
-        @() stdProblem6Checks(fullfile(micromagnetism_dir, 'mumag_micromag_Std_problem_6')), ...
+        @() stdProblem6Checks(fullfile(micromagnetism_dir, 'mumag_micromag_Std_problem_6'), ...
+                              cvode_args), ...
         'mumag standard problem 6, domain wall depinning fields'
     };
 
 %% Run them
 
+tests = selectTests(tests, getenv('MAGTENSE_TESTS'), getenv('MAGTENSE_SKIP'));
 records = runAllTests(tests);
 
 %% Report
@@ -109,6 +121,70 @@ disp('All tests passed')
 %% ----------------------------------------------------------------------------------
 %  Running the tests
 %  ----------------------------------------------------------------------------------
+
+function args = environmentFlag(name, variable)
+    % {name, value} for a name value argument taken from an environment variable, or {} when
+    % the variable is not set, so that the test keeps the default it has on its own
+
+    text = strtrim(getenv(variable));
+    if isempty(text)
+        args = {};
+        return
+    end
+
+    switch lower(text)
+        case {'1', 'true', 'yes', 'on'}
+            args = {name, true};
+        case {'0', 'false', 'no', 'off'}
+            args = {name, false};
+        otherwise
+            error('testMagTenseFunctions:badFlag', ...
+                  '%s has to be 0 or 1, not "%s"', variable, text);
+    end
+end
+
+function tests = selectTests(tests, selection, skipped)
+    % Keep the tests named in a comma separated list and drop the ones named in another, in the
+    % order they are listed above. Both lists are normally empty, which runs everything
+
+    names = string(tests(:, 1));
+    keep = true(size(names));
+
+    wanted = testNames(selection, names, 'MAGTENSE_TESTS');
+    if ~isempty(wanted)
+        keep = keep & ismember(names, wanted);
+    end
+
+    dropped = testNames(skipped, names, 'MAGTENSE_SKIP');
+    if ~isempty(dropped)
+        keep = keep & ~ismember(names, dropped);
+    end
+
+    if all(keep)
+        return
+    end
+
+    tests = tests(keep, :);
+    fprintf('Running %d of the tests: %s\n', size(tests, 1), strjoin(tests(:, 1)', ', '));
+end
+
+function names = testNames(list, known, variable)
+    % The names in a comma separated list, checked against the tests that exist
+
+    names = strings(0, 1);
+    if isempty(strtrim(list))
+        return
+    end
+
+    names = strtrim(split(string(list), ','));
+    names(names == "") = [];
+    unknown = setdiff(names, known);
+    if ~isempty(unknown)
+        error('testMagTenseFunctions:unknownTest', ...
+              '%s names tests that do not exist: %s', variable, ...
+              strjoin(cellstr(unknown), ', '));
+    end
+end
 
 function records = runAllTests(tests)
     % Run every test, catching errors so that one broken test does not hide the rest
@@ -172,25 +248,39 @@ function checks = validationChecks(exampleDir, functionName, limit)
     end
 end
 
-function checks = micromagTestChecks(exampleDir, functionName)
+function checks = micromagTestChecks(exampleDir, functionName, solverArgs)
     % Run one of the micromagnetic test functions in MagTense_tests from its own directory.
     % Each of them already returns the check struct array this suite expects, and each has a
     % python counterpart in python/examples/micromagnetism with the same limits.
 
+    if nargin < 3
+        solverArgs = {};
+    end
+
     oldDir = cd(exampleDir);
     cleanupObj = onCleanup(@() cd(oldDir));
 
-    checks = feval(functionName);
+    checks = feval(functionName, solverArgs{:});
 end
 
-function checks = stdProblem4Checks(exampleDir)
+function checks = stdProblem4Checks(exampleDir, solverArgs)
     % Standard problem 4, first NIST field. The limit of 100 % is loose because <My>
     % and <Mz> average close to zero, so the relative measure has a small denominator.
 
+    if nargin < 2
+        solverArgs = {};
+    end
+
     oldDir = cd(exampleDir);
     cleanupObj = onCleanup(@() cd(oldDir));
 
-    [~, ~, ~, ~, ~, ~, relativeError] = Standard_problem_4(1);
+    if isempty(solverArgs)
+        [~, ~, ~, ~, ~, ~, relativeError] = Standard_problem_4(1);
+    else
+        % The resolution has to be spelled out, since the options can only follow the
+        % positional arguments. [36 9 1] is the default of Standard_problem_4
+        [~, ~, ~, ~, ~, ~, relativeError] = Standard_problem_4(1, [36 9 1], solverArgs{:});
+    end
 
     componentNames = {'<Mx>', '<My>', '<Mz>'};
     checks = emptyChecks();
@@ -200,10 +290,14 @@ function checks = stdProblem4Checks(exampleDir)
     end
 end
 
-function checks = stdProblem6Checks(exampleDir)
+function checks = stdProblem6Checks(exampleDir, solverArgs)
     % Standard problem 6, comparing the depinning field with the analytical values for
     % the parameter variations, for the three sample orientations, and on an
     % unstructured mesh
+
+    if nargin < 2
+        solverArgs = {};
+    end
 
     oldDir = cd(exampleDir);
     cleanupObj = onCleanup(@() cd(oldDir));
@@ -221,7 +315,7 @@ function checks = stdProblem6Checks(exampleDir)
     % Parameter variations, all along x
     for i = 1:numel(variations)
         HP = Standard_problem_6(variations{i}, x_steps, field_steps, 'x', ...
-                                'ShowTheResult', false);
+                                'ShowTheResult', false, solverArgs{:});
         checks(end + 1) = makeCheck(sprintf('depinning field, variation "%s"', variations{i}), ...
                                     relativeErrorPercent(HP, theory(i)), limit); %#ok<AGROW>
     end
@@ -232,14 +326,14 @@ function checks = stdProblem6Checks(exampleDir)
     directions = {'x', 'y', 'z'};
     for i = 1:numel(directions)
         HP = Standard_problem_6('akj', x_steps, field_steps, directions{i}, ...
-                                'ShowTheResult', false);
+                                'ShowTheResult', false, solverArgs{:});
         checks(end + 1) = makeCheck(sprintf('depinning field along %s', directions{i}), ...
                                     relativeErrorPercent(HP, theory(1)), limit); %#ok<AGROW>
     end
 
     % Unstructured mesh, which only works in the x direction
     HP = Standard_problem_6('akj', x_steps, field_steps, 'x', ...
-                            'use_uniform_mesh', false, 'ShowTheResult', false);
+                            'use_uniform_mesh', false, 'ShowTheResult', false, solverArgs{:});
     checks(end + 1) = makeCheck('depinning field, unstructured mesh', ...
                                 relativeErrorPercent(HP, theory(1)), limit);
 end
