@@ -41,6 +41,7 @@ arguments
     field_steps (1,1) {mustBeNumeric}                  = 201;          %--- The field resolution
     cart_dir (1,1) string                              = 'x';          %--- The directions along which the geometry is oriented. Has no influence on the results, but can test the physics is correct in different directions
     options.use_uniform_mesh {mustBeNumericOrLogical}  = true;         %--- Use a uniform or unstructured mesh
+    options.use_CUDA {mustBeNumericOrLogical}          = true;         %--- Use CUDA for the calculations
     options.use_CVODE {mustBeNumericOrLogical}         = false         %--- Use CVODE for the numerical time evolution
     options.ShowTheResult {mustBeNumericOrLogical}     = true;         %--- Show the result
     options.TwoDsim {mustBeNumericOrLogical}           = false;        %--- Run a 2D simulation in x,y
@@ -209,6 +210,7 @@ else
 end
 
 % Time/field grid on which to solve the problems
+problem = problem.setUseCuda( options.use_CUDA );
 problem = problem.setUseCVODE( options.use_CVODE );
 problem = problem.setUseDemag( false );
 problem = problem.setTime( linspace(0,100e-9,field_steps) );
@@ -217,7 +219,7 @@ problem = problem.setTime( linspace(0,100e-9,field_steps) );
 %% Run simulation
 solution = struct();
 prob_struct = struct(problem);  %convert the class obj to a struct so it can be loaded into fortran
-[solution, GridInfo] = MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+[solution, GridInfo] = problem.MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
 
 [Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution.M,GridInfo.Volumes) ;
 

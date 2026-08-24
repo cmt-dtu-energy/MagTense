@@ -77,10 +77,19 @@ dependencies:
   - vc=14.3=h41ae7f8_31
   - vc14_runtime=14.44.35208=h818238b_31
   - vcomp14=14.44.35208=h818238b_31
+  # Do not add vs2017_win-64 back. It drops a standalone
+  # etc/conda/activate.d/vs2017_get_vsinstall_dir.bat into the env, and that
+  # script exits 1 when it finds neither a VS 2017 install nor the v141
+  # toolset - which is the case on the windows-2022 runner image. Conda now
+  # propagates a failing activate.d script, and because post-link scripts run
+  # inside an activated env, the intel-opencl-rt post-link then dies with a
+  # LinkError and takes the whole "conda env update" with it. Nothing needs
+  # it: ifx_win-64 and dpcpp_win-64 2025.2.1 require vs_win-64, which resolves
+  # to vs2022_win-64. vs2022_compiler_vars.bat is self-contained and always
+  # exits 0.
   - vs2022_win-64=19.44.35207=ha74f236_31
   - vs_win-64=2022.14=ha74f236_31
   - vs2015_runtime=14.44.35208=h38c0c73_31
-  - vs2017_win-64=19.16.27032.1=hb4161e2_3
   - vswhere=3.1.7=h40126e0_1
   - pip:
       - build==1.3.0
