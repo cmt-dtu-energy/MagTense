@@ -49,8 +49,8 @@ end
 
 mu0 = 4*pi*1e-7;
 
-addpath('../../../../../MagTense/matlab/MEX_files');
-addpath('../../../../../MagTense/matlab/util');
+addpath('../../../MEX_files');
+addpath('../../../util');
 
 %% Known analytical solutions
 HPs=containers.Map({'akj','ak','aj','a','kj','k','j',''},[1.568,1.089,1.206,0.838,1.005,0.565,0,0]); % Theoretical pinning fields for the different cases.

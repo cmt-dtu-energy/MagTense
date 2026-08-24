@@ -202,27 +202,7 @@ jobs:
       run: |
         dir ${{ github.workspace }}\matlab\MEX_files 
     
-    # matlab/util/testMagTenseFunctions is the combined suite, which replaces the bare
-    # Standard_problem_4 call: it runs every test to the end, prints a table of the measures
-    # against their limits, and raises an error if any of them is over its limit, so the step
-    # fails on a numerical regression and not only on a crash. MAGTENSE_TEST_CUDA and
-    # MAGTENSE_TEST_CVODE hand it this leg of the matrix, and MAGTENSE_SKIP leaves out tests.
-    #
-    # Standard problem 6 is four fifths of the running time of the suite on its own, so it is
-    # left out here and the whole suite is pinned to one release below, in the same way as the
-    # FMM test. The remaining eleven tests take about the same time as the old step did.
-    - name: Run the combined test suite without standard problem 6
-      if: ${{ matrix.mat-version != 'R2024b' }}
-      env:
-        MAGTENSE_TEST_CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
-        MAGTENSE_TEST_CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }}
-        MAGTENSE_SKIP: std_problem_6
-      shell: cmd /C CALL {0}
-      run: |
-        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "cd('C:\actions-runner\_work\MagTense\MagTense\matlab\util'); testMagTenseFunctions"
-
     - name: Run the whole combined test suite
-      if: ${{ matrix.mat-version == 'R2024b' }}
       env:
         MAGTENSE_TEST_CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
         MAGTENSE_TEST_CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }}
@@ -238,16 +218,7 @@ jobs:
         path: ${{ github.workspace }}/matlab/util/results/*
         if-no-files-found: ignore
 
-    # Pinned to one MATLAB release: the multi-version matrix exists to catch
-    # MEX compatibility problems, which Standard_problem_4 already covers.
-    # This step validates FMM numerics, so running it 6 more times per CUDA
-    # variant would double the job time for no extra signal.
-    #
-    # Runs on both the CUDA and noCUDA legs. The CPU near-field path was
-    # verified against the CUDA one after the sign fix in add_near_field:
-    # both agree with the direct reference to ~2e-4 at fmm_nterms = 6.
     - name: Run the FMM accuracy test
-      if: ${{ matrix.mat-version == 'R2024b' }}
       env:
         CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
       shell: cmd /C CALL {0}
@@ -390,21 +361,8 @@ jobs:
       with:
         release: "${{ matrix.mat-version }}"
 
-    # The combined suite, as in the Windows job above. R2024a is the release that runs the
-    # whole of it, since it is also the one the FMM test is pinned to
-    - name: Run the combined test suite without standard problem 6
-      if: ${{ matrix.os-version == 'ubuntu-latest' && matrix.mat-version != 'R2024a' }}
-      continue-on-error: true
-      uses: matlab-actions/run-command@v2
-      env:
-        MAGTENSE_TEST_CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
-        MAGTENSE_TEST_CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }}
-        MAGTENSE_SKIP: std_problem_6
-      with:
-        command: cd('matlab/util'); testMagTenseFunctions;
-
     - name: Run the whole combined test suite
-      if: ${{ matrix.os-version == 'ubuntu-latest' && matrix.mat-version == 'R2024a' }}
+      if: ${{ matrix.os-version == 'ubuntu-latest' }}
       continue-on-error: true
       uses: matlab-actions/run-command@v2
       env:
@@ -412,19 +370,9 @@ jobs:
         MAGTENSE_TEST_CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }}
       with:
         command: cd('matlab/util'); testMagTenseFunctions;
-
-    - name: Run the combined test suite without standard problem 6, with CUDA
-      if: ${{ matrix.os-version == 'ubuntu_CUDA' && matrix.mat-version != 'R2024a' }}
-      continue-on-error: true
-      env:
-        MAGTENSE_TEST_CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
-        MAGTENSE_TEST_CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }}
-        MAGTENSE_SKIP: std_problem_6
-      run: |
-        /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "cd('matlab/util'); testMagTenseFunctions";
 
     - name: Run the whole combined test suite with CUDA
-      if: ${{ matrix.os-version == 'ubuntu_CUDA' && matrix.mat-version == 'R2024a' }}
+      if: ${{ matrix.os-version == 'ubuntu_CUDA' }}
       continue-on-error: true
       env:
         MAGTENSE_TEST_CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
@@ -433,7 +381,7 @@ jobs:
         /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "cd('matlab/util'); testMagTenseFunctions";
 
     - name: Run the FMM accuracy test
-      if: ${{ matrix.os-version == 'ubuntu-latest' && matrix.mat-version == 'R2024a' }}
+      if: ${{ matrix.os-version == 'ubuntu-latest' }}
       continue-on-error: true
       uses: matlab-actions/run-command@v2
       env:
@@ -442,7 +390,7 @@ jobs:
         command: USE_CUDA = logical(str2num(getenv('CUDA'))); cd('matlab/tests/fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA);
 
     - name: Run the FMM accuracy test with CUDA
-      if: ${{ matrix.os-version == 'ubuntu_CUDA' && matrix.mat-version == 'R2024a' }}
+      if: ${{ matrix.os-version == 'ubuntu_CUDA' }}
       continue-on-error: true
       env:
         CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
