@@ -19,7 +19,16 @@ dependencies:
   - cuda-cudart-static=12.8.90=0
   - cuda-cudart-static_win-64=12.8.90=0
   - cuda-cudart_win-64=12.8.90=0
-  - cuda-nvcc=12.8.93=0
+  # cuda-nvcc, the metapackage, is deliberately absent. On win-64 it is nothing
+  # but "cuda-nvcc_win-64 + vs2017_win-64", and vs2017_win-64 (from defaults)
+  # drops etc/conda/activate.d/vs2017_get_vsinstall_dir.bat into the env. Conda
+  # runs every .bat in activate.d, that one exits 1 when it finds neither a
+  # VS 2017 install nor the v141 toolset - the case on the windows-2022 runner
+  # image - and conda now propagates a failing activation script. Post-link
+  # scripts run inside an activated env, so the intel-opencl-rt post-link then
+  # dies with a LinkError and takes the whole "conda env update" with it.
+  # nvcc itself is untouched: it comes from cuda-nvcc_win-64, which pulls
+  # cuda-nvcc-dev_win-64 / -impl / -tools, all pinned right below.
   - cuda-nvcc-dev_win-64=12.8.93=0
   - cuda-nvcc-impl=12.8.93=0
   - cuda-nvcc-tools=12.8.93=0
@@ -77,10 +86,13 @@ dependencies:
   - vc=14.3=h41ae7f8_31
   - vc14_runtime=14.44.35208=h818238b_31
   - vcomp14=14.44.35208=h818238b_31
+  # Do not add vs2017_win-64 back, and do not let anything pull it in either -
+  # see the cuda-nvcc note above. ifx_win-64 and dpcpp_win-64 2025.2.1 need only
+  # vs_win-64, which resolves to vs2022_win-64, and vs2022_compiler_vars.bat is
+  # self-contained and always exits 0.
   - vs2022_win-64=19.44.35207=ha74f236_31
   - vs_win-64=2022.14=ha74f236_31
   - vs2015_runtime=14.44.35208=h38c0c73_31
-  - vs2017_win-64=19.16.27032.1=hb4161e2_3
   - vswhere=3.1.7=h40126e0_1
   - pip:
       - build==1.3.0

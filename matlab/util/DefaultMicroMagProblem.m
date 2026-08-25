@@ -421,7 +421,9 @@ methods
         %initial value of the useAvgN is true
         obj.useAvgN = int32(1);
         %set use cuda to default not
-        obj.useCuda = int32(0);
+        %--- setUseCuda also picks the MEX file that matches, so it has to go through
+        %--- the setter: a bare obj.useCuda would leave the solver handle empty
+        obj = obj.setUseCuda(false);
 		%set use CVODE to default
         obj.useCVODE = int32(0);
 		%set use Demag to default

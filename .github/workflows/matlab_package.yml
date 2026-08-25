@@ -202,29 +202,28 @@ jobs:
       run: |
         dir ${{ github.workspace }}\matlab\MEX_files 
     
-    - name: Run different Matlab versions and test the MEX-files with and without CUDA
+    - name: Run the whole combined test suite
       env:
-        CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }} 
-        CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }} 
+        MAGTENSE_TEST_CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
+        MAGTENSE_TEST_CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }}
       shell: cmd /C CALL {0}
       run: |
-        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE)"
+        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "cd('C:\actions-runner\_work\MagTense\MagTense\matlab\util'); testMagTenseFunctions"
 
-    # Pinned to one MATLAB release: the multi-version matrix exists to catch
-    # MEX compatibility problems, which Standard_problem_4 already covers.
-    # This step validates FMM numerics, so running it 6 more times per CUDA
-    # variant would double the job time for no extra signal.
-    #
-    # Runs on both the CUDA and noCUDA legs. The CPU near-field path was
-    # verified against the CUDA one after the sign fix in add_near_field:
-    # both agree with the direct reference to ~2e-4 at fmm_nterms = 6.
-    - name: Run the FMM accuracy test
-      if: ${{ matrix.mat-version == 'R2024b' }}
-      env:
-        CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
-      shell: cmd /C CALL {0}
-      run: |
-        "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "USE_CUDA = logical(str2num(getenv('CUDA'))); cd('C:\actions-runner\_work\MagTense\MagTense\matlab\tests\fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA)"
+    - name: Upload the overview of the test suite
+      if: ${{ always() && matrix.mat-version == 'R2024b' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-suite-Windows_${{ matrix.CVODE-compile }}_${{ matrix.CVODE-run }}_${{ matrix.CUDA-run }}
+        path: ${{ github.workspace }}/matlab/util/results/*
+        if-no-files-found: ignore
+
+    #- name: Run the FMM accuracy test
+    #  env:
+    #    CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
+    #  shell: cmd /C CALL {0}
+    #  run: |
+    #    "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "USE_CUDA = logical(str2num(getenv('CUDA'))); cd('C:\actions-runner\_work\MagTense\MagTense\matlab\tests\fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA)"
 
 #################################
 
@@ -362,41 +361,41 @@ jobs:
       with:
         release: "${{ matrix.mat-version }}"
 
-    - name: Run test script on download MEX-file without CUDA
+    - name: Run the whole combined test suite
       if: ${{ matrix.os-version == 'ubuntu-latest' }}
       continue-on-error: true
       uses: matlab-actions/run-command@v2
       env:
-        CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }} 
-        CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }} 
+        MAGTENSE_TEST_CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
+        MAGTENSE_TEST_CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }}
       with:
-        command: USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE);
+        command: cd('matlab/util'); testMagTenseFunctions;
 
-    - name: Run test script on download MEX-file with CUDA
+    - name: Run the whole combined test suite with CUDA
       if: ${{ matrix.os-version == 'ubuntu_CUDA' }}
       continue-on-error: true
       env:
-        CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }} 
-        CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }} 
+        MAGTENSE_TEST_CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
+        MAGTENSE_TEST_CVODE: ${{ matrix.CVODE-run == 'noCVODE' && '0' || '1' }}
       run: |
-        /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE')); cd('matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4'); [~,~,~,~,~,~,int_error] = Standard_problem_4('USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE)";
+        /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "cd('matlab/util'); testMagTenseFunctions";
 
-    - name: Run the FMM accuracy test
-      if: ${{ matrix.os-version == 'ubuntu-latest' && matrix.mat-version == 'R2024a' }}
-      continue-on-error: true
-      uses: matlab-actions/run-command@v2
-      env:
-        CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
-      with:
-        command: USE_CUDA = logical(str2num(getenv('CUDA'))); cd('matlab/tests/fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA);
+    #- name: Run the FMM accuracy test
+    #  if: ${{ matrix.os-version == 'ubuntu-latest' }}
+    #  continue-on-error: true
+    #  uses: matlab-actions/run-command@v2
+    #  env:
+    #    CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
+    #  with:
+    #    command: USE_CUDA = logical(str2num(getenv('CUDA'))); cd('matlab/tests/fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA);
 
-    - name: Run the FMM accuracy test with CUDA
-      if: ${{ matrix.os-version == 'ubuntu_CUDA' && matrix.mat-version == 'R2024a' }}
-      continue-on-error: true
-      env:
-        CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
-      run: |
-        /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "USE_CUDA = logical(str2num(getenv('CUDA'))); cd('matlab/tests/fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA)";
+    #- name: Run the FMM accuracy test with CUDA
+    #  if: ${{ matrix.os-version == 'ubuntu_CUDA' }}
+    #  continue-on-error: true
+    #  env:
+    #    CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
+    #  run: |
+    #    /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "USE_CUDA = logical(str2num(getenv('CUDA'))); cd('matlab/tests/fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA)";
 
 
   build-cvode:

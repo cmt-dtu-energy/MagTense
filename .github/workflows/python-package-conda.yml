@@ -1,103 +1,575 @@
-name: Building & testing Python package using Conda
+name: Python pip-wheel with conda build and test on Windows and Linux
 
-on: [push]
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_call:
+    inputs:
+      tag:
+        required: false
+        type: string
+  workflow_dispatch:
 
 jobs:
-  build-win:
-    runs-on: windows-latest
+  build-wheel:
+    strategy:
+      matrix:
+        py-version: [312, 313, 314]
+        cvode: [1]
+        sys:
+          # Pinned to the last VS 2022 image: windows-latest and windows-2025
+          # moved to VS 2026 in June 2026, which oneAPI 2025.0 predates and
+          # CUDA 12.8's nvcc rejects. Keep this in step with the cvode libs
+          # this job links against.
+          - { os: windows-2022, name: win, whl-arch: win_amd64 }
+          - { os: ubuntu-latest, name: linux, whl-arch: manylinux1_x86_64 }
+
+    runs-on: ${{ matrix.sys.os }}
+
+    # Workaround: Issue with msvc-dev-cmd and new conda installation
+    needs: [cache-conda-win, build-cvode]
+
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    env:
+      build_file: python/.build/env-${{ matrix.py-version }}-${{ matrix.sys.name }}.yml
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Conda with Python 3.12
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Linux - Select FMM3D make.inc
+      if: ${{ runner.os == 'Linux' }}
+      run: cp external/FMM3D/make.inc.linux external/FMM3D/make.inc
+
+    - name: Win - Select FMM3D make.inc
+      if: ${{ runner.os == 'Windows' }}
+      run: cp external/FMM3D/make.inc.windows external/FMM3D/make.inc
+
+    - name: Fetch tags
+      if: "${{ inputs.tag == '' }}"
+      run: git fetch --tags origin
+
+    - name: Get latest release tag
+      id: previoustag
+      if: "${{ inputs.tag == '' }}"
+      uses: WyriHaximus/github-action-get-previous-tag@v1
+      with:
+        fallback: 1.0.0
+
+    - name: Setup msvc-dev-cmd
+      if: ${{ runner.os == 'Windows' }}
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: amd64
+
+    - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v3
       with:
+        miniforge-version: latest
         activate-environment: magtense-env
-        environment-file: python/environment_win.yml
-        python-version: 3.12
-        auto-activate-base: false
+        use-mamba: true
 
-    # - name: Compile Fortran source code and build Python wrapper
-    #   shell: bash -el {0}
-    #   working-directory: ${{ github.workspace }}/python/src/magtense/lib/
-    #   run: make
-    
-    - name: Compile Fortran files in Developer PowerShell for VS 2022
-      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+    - name: Install compiler in base (Linux)
+      if: runner.os == 'Linux'
+      run: conda install -n base -c conda-forge gxx_linux-64 -y
+
+    - name: Cache conda
+      uses: actions/cache@v4
+      env:
+        cache_number: 0
+      with:
+        path: ${{ env.CONDA }}/envs
+        key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
+      id: cache
+
+    - name: Update environment
+      run: conda env update -f ${{ env.build_file }}
+      if: steps.cache.outputs.cache-hit != 'true'
+
+    - name: Download cvode (sundials-7.2.1)
+      if: ${{ matrix.cvode == 1 }}
+      uses: actions/download-artifact@v4
+      with:
+        name: cvode-${{ runner.os }}
+        path: ${{ github.workspace }}/cvode/
+
+    - name: Create directory for wrappers of compiled Fortran source code
       run: |
-        cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-        .\Launch-VsDevShell.ps1
-        cd ${{ github.workspace }}/python/src/magtense/lib/
-        make ps
-    
-    - name: Compile with nvcc in Bash
-      shell: bash -el {0}
-      working-directory: ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
-      run: nvcc -c MagTenseCudaBlas.cu -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.42.34433\bin\Hostx64\x64" -o MagTenseCudaBlas.o
-  
-    - name: Link Cuda wrapper in Developer PowerShell for VS 2022
-      shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
+        mkdir '${{ github.workspace }}'/python/cpu_libs
+        mkdir '${{ github.workspace }}'/python/cu12_libs
+        mkdir '${{ github.workspace }}'/python/cu12-fmm_libs
+
+    - name: Win - Delete link.exe
+      if: ${{ runner.os == 'Windows' }}
+      run: rm '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
+
+    - name: Win - Compile Fortran source code and build Python wrapper
+      if: ${{ runner.os == 'Windows' }}
+      # -NoExit was masking the script's exit code, so a failed make still
+      # passed this step and produced a wheel with no extension module in it.
+      # $LASTEXITCODE has to be checked explicitly: a non-zero exit from a
+      # native command does not trip $ErrorActionPreference.
+      shell: pwsh -ExecutionPolicy ByPass -File {0}
+      working-directory: ${{ github.workspace }}
       run: |
-        cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-        .\Launch-VsDevShell.ps1
-        cd ${{ github.workspace }}/source/MagTenseFortranCuda/cuda
-        make wrap
+        $ErrorActionPreference = "Stop"
 
-    - name: Build Python wrapper in Command Prompt
-      shell: cmd /C CALL {0}
-      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
-      run: >-
-        make cmdx64
+        make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
+        if ($LASTEXITCODE -ne 0) { throw "make python failed for the cpu variant (exit $LASTEXITCODE)" }
+        cp magtensesource.* ${{ github.workspace }}/python/cpu_libs/
+        make clean
 
-    # - name: Build Python wrapper in Developer PowerShell for VS 2022
-    #   shell: pwsh -NoExit -ExecutionPolicy ByPass -File {0}
-    #   run: |
-    #     cd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\"
-    #     .\Launch-VsDevShell.ps1
-    #     cd ${{ github.workspace }}/python/src/magtense/lib/
-    #     conda deactivate
-    #     conda activate magtense-env
-    #     make cmdx64
+        make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
+        if ($LASTEXITCODE -ne 0) { throw "make python failed for the cu12 variant (exit $LASTEXITCODE)" }
+        cp magtensesource.* ${{ github.workspace }}/python/cu12_libs/
+        make clean
 
-    # - name: Build Python wrapper in x64 Native Tools Command Prompt for VS 2022
-    #   shell: cmd /k "{0}" -arch=amd64 -host_arch=x64
-    #   working-directory: ${{ github.workspace }}/python/src/magtense/lib/
-    #   run: |
-    #     call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
-    #     make cmdx64
+        make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0 USE_FMM3D=1
+        if ($LASTEXITCODE -ne 0) { throw "make python failed for the cu12-fmm variant (exit $LASTEXITCODE)" }
+        cp magtensesource.* ${{ github.workspace }}/python/cu12-fmm_libs/
+        cp external/FMM3D/local/libfmm3d.dll ${{ github.workspace }}/python/cu12-fmm_libs/
+        make clean
 
-    - name: Install local magtense package with pip
-      run: python -m pip install -e ${{ github.workspace }}/python
-
-    - name: Test with pytest
+    - name: Linux - Compile Fortran source code and build Python wrapper
+      if: ${{ runner.os == 'Linux' }}
+      working-directory: ${{ github.workspace }}
       run: |
-        conda install pytest
-        pytest
+        make python USE_CUDA=0 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
+        cp magtensesource.* '${{ github.workspace }}'/python/cpu_libs/
+        make clean
+
+        make python USE_CUDA=1 USE_CVODE=${{ matrix.cvode }} USE_MATLAB=0
+        cp magtensesource.* '${{ github.workspace }}'/python/cu12_libs/
+        make clean
+
+        make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0 USE_FMM3D=1
+        cp magtensesource.* '${{ github.workspace }}'/python/cu12-fmm_libs/
+        cp external/FMM3D/local/libfmm3d.so '${{ github.workspace }}'/python/cu12-fmm_libs/
+        make clean
+
+    - name: Build pip-wheels
+      if: "${{ inputs.tag == '' }}"
+      working-directory: ${{ github.workspace }}/python/
+      run: |
+        sed -i 's/1.0.0/${{ steps.previoustag.outputs.tag }}/' src/magtense/__init__.py
+        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu,cu12,cu12-fmm --platform ${{ matrix.sys.name }} --pkg_version ${{ steps.previoustag.outputs.tag }}
+
+    - name: Deployment - Build pip-wheels
+      if: "${{ inputs.tag != '' }}"
+      working-directory: ${{ github.workspace }}/python/
+      run: |
+        sed -i 's/1.0.0/${{ inputs.tag }}/' src/magtense/__init__.py
+        python .build/dist_pypi.py --py_version ${{ matrix.py-version }} --cu_version cpu,cu12,cu12-fmm --platform ${{ matrix.sys.name }} --pkg_version ${{ inputs.tag }}
+
+    - name: cpu - Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version }}-cpu-${{ runner.os }}
+        path: ${{ github.workspace }}/python/dist/magtense-*-0-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
+
+    - name: cu12 - Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version }}-cu12-${{ runner.os }}
+        path: ${{ github.workspace }}/python/dist/magtense-*-1-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
+
+    - name: cu12-fmm - Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version }}-cu12-fmm-${{ runner.os }}
+        path: ${{ github.workspace }}/python/dist/magtense-*-3-py${{ matrix.py-version }}-none-${{ matrix.sys.whl-arch }}.whl
 
 
-  build-linux:
-    runs-on: ubuntu-latest
+  test-wheel:
+    strategy:
+      matrix:
+        mt-punit:
+          - { name: cpu, fmm3d: 0 }
+          - { name: cu12, fmm3d: 0 }
+        py-version:
+          - { name: 312, id: "3.12" }
+          - { name: 313, id: "3.13" }
+          - { name: 314, id: "3.14" }
+        os: [windows-2022, ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    needs: build-wheel
+
     defaults:
       run:
         shell: bash -el {0}
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Conda with Python 3.12
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/tests/
+          python/src/utils/
+          python/examples/
+          documentation/examples_FEM_validation/
+          documentation/examples_mumag_validation/
+
+    - name: Download a single artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version.name }}-${{ matrix.mt-punit.name }}-${{ runner.os }}
+
+    - name: Setup python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.py-version.id }}
+
+    - name: Install pip-wheel and pytest
+      env:
+        MAGTENSE_USE_FMM3D: ${{ matrix.mt-punit.fmm3d }}
+        MAGTENSE_WHEEL_VARIANT: ${{ matrix.mt-punit.name }}
+      run: |
+        python -m pip install '${{ github.workspace }}'/*.whl
+        python -m pip install pytest
+        python -m pytest python/tests/test_magtense.py
+
+    # python/examples/micromagnetism/testMagTenseFunctions.py is the combined micromagnetic
+    # suite and the counterpart of matlab/util/testMagTenseFunctions. It runs the validation
+    # examples, compares every measure with the limit that belongs to it, and exits non zero
+    # when one of them is over its limit, so this step fails on a numerical regression and not
+    # only on a crash. matplotlib and scipy are not dependencies of the wheel, but the examples
+    # need them.
+    #
+    # Standard problem 6 is about seventy percent of the running time of the suite, so it is
+    # left out on most of the matrix and the whole suite runs on one leg of it.
+    - name: Run the combined micromagnetic test suite
+      if: ${{ !(matrix.os == 'ubuntu-latest' && matrix.py-version.id == '3.13' && matrix.mt-punit.name == 'cpu') }}
+      run: |
+        python -m pip install matplotlib scipy
+        python python/examples/micromagnetism/testMagTenseFunctions.py --skip std_problem_6
+
+    - name: Run the whole combined micromagnetic test suite
+      if: ${{ matrix.os == 'ubuntu-latest' && matrix.py-version.id == '3.13' && matrix.mt-punit.name == 'cpu' }}
+      run: |
+        python -m pip install matplotlib scipy
+        python python/examples/micromagnetism/testMagTenseFunctions.py
+
+    - name: Upload the overview of the test suite
+      if: ${{ always() && matrix.os == 'ubuntu-latest' && matrix.py-version.id == '3.13' && matrix.mt-punit.name == 'cpu' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-suite-py${{ matrix.py-version.name }}-${{ matrix.mt-punit.name }}-${{ runner.os }}
+        path: python/examples/micromagnetism/results/*
+        if-no-files-found: ignore
+
+
+  test-wheel-fmm-cuda:
+    strategy:
+      matrix:
+        py-version:
+          - { name: 312, id: "3.12" }
+          - { name: 313, id: "3.13" }
+          - { name: 314, id: "3.14" }
+        fmm_runner:
+          - { os_name: linux, labels: '["self-hosted", "Linux", "CUDA"]' }
+          - { os_name: windows, labels: '["self-hosted", "Windows", "CUDA"]' }
+
+    runs-on: ${{ fromJSON(matrix.fmm_runner.labels) }}
+
+    needs: build-wheel
+
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/tests/
+          python/src/utils/
+          python/examples/
+          documentation/examples_FEM_validation/
+          documentation/examples_mumag_validation/
+
+    - name: Download cu12-fmm artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version.name }}-cu12-fmm-${{ runner.os }}
+
+    - name: Diagnose Windows self-hosted runner identity
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      shell: cmd /C CALL {0}
+      run: |
+        echo RUNNER_NAME=%RUNNER_NAME%
+        echo RUNNER_OS=%RUNNER_OS%
+        echo RUNNER_ARCH=%RUNNER_ARCH%
+        echo USERNAME=%USERNAME%
+        echo USERDOMAIN=%USERDOMAIN%
+        echo USERPROFILE=%USERPROFILE%
+        whoami
+
+        echo.
+        echo Checking expected Conda path:
+        dir C:\Users\github_runner\miniconda3\condabin\conda.bat || echo Conda path is not accessible from this runner process.
+
+        echo.
+        echo Runner services:
+        powershell -NoProfile -Command "Get-CimInstance Win32_Service | Where-Object { $_.Name -like 'actions.runner*' } | Select-Object Name,State,StartName,PathName | Format-List"
+
+    - name: Setup python (Linux self-hosted)
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.py-version.id }}
+        check-latest: true
+
+    - name: Select python (Linux self-hosted)
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
+      run: |
+        echo "PYTHON_EXE=$(command -v python)" >> "$GITHUB_ENV"
+
+    - name: Bootstrap existing Miniconda Python (Windows self-hosted)
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      shell: cmd /C CALL {0}
+      run: |
+        echo Bootstrapping Python from existing Miniconda installation
+        echo USERNAME=%USERNAME%
+        echo USERPROFILE=%USERPROFILE%
+        whoami
+
+        set CONDA_ROOT=C:\Users\github_runner\miniconda3
+        set CONDA_BAT=C:\Users\github_runner\miniconda3\condabin\conda.bat
+
+        if not exist "%CONDA_BAT%" (
+          echo Expected Conda at "%CONDA_BAT%", but it was not found or is not accessible.
+          exit /b 1
+        )
+
+        call "%CONDA_BAT%" activate base
+        if errorlevel 1 (
+          echo Failed to activate Conda base environment.
+          exit /b 1
+        )
+
+        set ENV_NAME=magtense-test-py${{ matrix.py-version.name }}
+        set WANTED=${{ matrix.py-version.id }}
+
+        echo Requested Python version: %WANTED%
+        echo Conda environment: %ENV_NAME%
+
+        call conda env list | findstr /C:"%ENV_NAME%" >nul
+        if errorlevel 1 (
+          echo Creating Conda environment %ENV_NAME%
+          call conda create -y -n %ENV_NAME% python=%WANTED% pip
+          if errorlevel 1 (
+            echo Failed to create Conda environment %ENV_NAME%.
+            exit /b 1
+          )
+        )
+
+        call conda activate %ENV_NAME%
+        if errorlevel 1 (
+          echo Failed to activate Conda environment %ENV_NAME%.
+          exit /b 1
+        )
+
+        python -c "import sys; raise SystemExit(0 if f'{sys.version_info.major}.{sys.version_info.minor}' == '%WANTED%' else 1)"
+        if errorlevel 1 (
+          echo Environment %ENV_NAME% does not have Python %WANTED%; updating it.
+          call conda install -y -n %ENV_NAME% python=%WANTED% pip
+          if errorlevel 1 (
+            echo Failed to update Conda environment %ENV_NAME% to Python %WANTED%.
+            exit /b 1
+          )
+
+          call conda activate %ENV_NAME%
+          if errorlevel 1 (
+            echo Failed to reactivate Conda environment %ENV_NAME%.
+            exit /b 1
+          )
+
+          python -c "import sys; raise SystemExit(0 if f'{sys.version_info.major}.{sys.version_info.minor}' == '%WANTED%' else 1)"
+          if errorlevel 1 (
+            echo Conda environment %ENV_NAME% still does not have Python %WANTED%.
+            exit /b 1
+          )
+        )
+
+        for /f "delims=" %%i in ('python -c "import sys; print(sys.executable)"') do set PYTHON_EXE=%%i
+
+        echo Selected Python: %PYTHON_EXE%
+        python --version
+
+        echo CONDA=%CONDA_ROOT%>> "%GITHUB_ENV%"
+        echo MAGTENSE_CONDA_ENV=%ENV_NAME%>> "%GITHUB_ENV%"
+        echo PYTHON_EXE=%PYTHON_EXE%>> "%GITHUB_ENV%"
+
+        echo %CONDA_ROOT%\envs\%ENV_NAME%>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Scripts>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Library\mingw-w64\bin>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Library\usr\bin>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Library\bin>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\condabin>> "%GITHUB_PATH%"
+
+    - name: Python diagnostics after setup
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
+      run: |
+        echo "PYTHON_EXE=$PYTHON_EXE"
+        "$PYTHON_EXE" --version
+        which "$PYTHON_EXE"
+        "$PYTHON_EXE" -c "import sys; print('selected:', sys.executable)"
+
+    - name: Python diagnostics after setup (Windows)
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      # The self-hosted runner has a Restricted execution policy and a user
+      # profile.ps1, neither of which the built-in "powershell" shell copes
+      # with, so invoke it explicitly.
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      run: |
+        $ErrorActionPreference = "Stop"
+
+        Write-Host "CONDA=$env:CONDA"
+        Write-Host "MAGTENSE_CONDA_ENV=$env:MAGTENSE_CONDA_ENV"
+        Write-Host "PYTHON_EXE=$env:PYTHON_EXE"
+
+        & where.exe python
+        & $env:PYTHON_EXE --version
+        & $env:PYTHON_EXE -c "import sys; print('selected:', sys.executable)"
+
+    - name: Show CUDA device info
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
+      run: |
+        "$PYTHON_EXE" -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
+        nvidia-smi
+
+    - name: Show CUDA device info (Windows)
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      # The self-hosted runner has a Restricted execution policy and a user
+      # profile.ps1, neither of which the built-in "powershell" shell copes
+      # with, so invoke it explicitly.
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      run: |
+        $ErrorActionPreference = "Stop"
+
+        & $env:PYTHON_EXE -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
+        & nvidia-smi
+
+    - name: Install pip-wheel and pytest
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
+      env:
+        MAGTENSE_USE_FMM3D: 1
+        MAGTENSE_WHEEL_VARIANT: cu12-fmm
+      run: |
+        # Same staleness hazard as the Windows leg below: this is a persistent
+        # self-hosted runner and the wheel version does not change between
+        # builds, so pip would skip the install and keep the previous wheel.
+        "$PYTHON_EXE" -m pip uninstall -y magtense
+        "$PYTHON_EXE" -m pip install '${{ github.workspace }}'/*.whl
+        "$PYTHON_EXE" -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
+        "$PYTHON_EXE" -m pip install pytest
+        "$PYTHON_EXE" -m pytest python/tests/fmm_test/test_fmm_workflow.py
+
+    # The same combined suite as in test-wheel, but on a machine that has a GPU, so this is
+    # where the CUDA path of the solver is exercised. Standard problem 6 is left out for the
+    # reason given there
+    - name: Run the combined micromagnetic test suite with CUDA
+      if: ${{ matrix.fmm_runner.os_name == 'linux' }}
+      run: |
+        "$PYTHON_EXE" -m pip install matplotlib scipy
+        "$PYTHON_EXE" python/examples/micromagnetism/testMagTenseFunctions.py --cuda --skip std_problem_6
+
+    - name: Install pip-wheel and pytest (Windows)
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      # The self-hosted runner has a Restricted execution policy and a user
+      # profile.ps1, neither of which the built-in "powershell" shell copes
+      # with, so invoke it explicitly.
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      env:
+        MAGTENSE_USE_FMM3D: 1
+        MAGTENSE_WHEEL_VARIANT: cu12-fmm
+        # pytest's stdout is a pipe here, so without UTF-8 mode it encodes with
+        # cp1252 and dies on the non-ASCII status markers it echoes from the
+        # test subprocess. UTF-8 mode also makes text=True decode the child's
+        # output as UTF-8 rather than cp1252, so the table stays readable.
+        PYTHONUTF8: 1
+      run: |
+        $ErrorActionPreference = "Stop"
+
+        Write-Host "Using Python:"
+        Write-Host "  $env:PYTHON_EXE"
+        & $env:PYTHON_EXE --version
+
+        # These runners keep their conda envs between runs, and the wheel
+        # version string does not change from build to build, so a plain
+        # install is a no-op and silently leaves the previous wheel in place.
+        # Uninstall first rather than --force-reinstall, which would also
+        # redownload the ~1 GB of CUDA dependency wheels every run.
+        & $env:PYTHON_EXE -m pip uninstall -y magtense
+
+        Get-ChildItem "$env:GITHUB_WORKSPACE\*.whl" | ForEach-Object {
+          & $env:PYTHON_EXE -m pip install $_.FullName
+        }
+
+        & $env:PYTHON_EXE -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
+
+        & $env:PYTHON_EXE -m pip install pytest
+        & $env:PYTHON_EXE -m pytest python/tests/fmm_test/test_fmm_workflow.py
+
+    - name: Run the combined micromagnetic test suite with CUDA (Windows)
+      if: ${{ matrix.fmm_runner.os_name == 'windows' }}
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      env:
+        PYTHONUTF8: 1
+      run: |
+        $ErrorActionPreference = "Stop"
+
+        & $env:PYTHON_EXE -m pip install matplotlib scipy
+        & $env:PYTHON_EXE python/examples/micromagnetism/testMagTenseFunctions.py --cuda --skip std_problem_6
+
+
+  cache-conda-win:
+    strategy:
+      matrix:
+        py-version: [312, 313, 314]
+
+    runs-on: windows-2022
+
+    env:
+      build_file: python/.build/env-${{ matrix.py-version }}-win.yml
+
+    steps:
+    - name: Checkout environment file
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/.build/
+
+    - name: Setup Miniforge
       uses: conda-incubator/setup-miniconda@v3
       with:
+        miniforge-version: latest
         activate-environment: magtense-env
-        environment-file: python/environment_linux.yml
-        python-version: 3.12
-        auto-activate-base: false
+        use-mamba: true
 
-    - name: Compile Fortran source code and build Python wrapper
-      working-directory: ${{ github.workspace }}/python/src/magtense/lib/
-      run: make
+    - name: Cache conda
+      uses: actions/cache@v4
+      env:
+        cache_number: 0
+      with:
+        path: ${{ env.CONDA }}/envs
+        key: conda-${{ runner.os }}-${{ hashFiles(env.build_file) }}-${{ env.cache_number }}
+      id: cache
 
-    - name: Install local magtense package with pip
-      run: python -m pip install -e ${{ github.workspace }}/python
-      
-    - name: Test with pytest
-      run: |
-        conda install pytest
-        pytest
+    - name: Update environment
+      run: conda env update -f ${{ env.build_file }}
+      if: steps.cache.outputs.cache-hit != 'true'
+
+
+  build-cvode:
+    name: cvode
+    uses: ./.github/workflows/cmake-sundials-cvode.yml
