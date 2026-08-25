@@ -16,19 +16,78 @@ FC = ifx
 MKFILE_PATH := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CVODE_ROOT = ${MKFILE_PATH}/cvode
 
-# Location where Miniconda will be installed
-CONDA_DIR := $(HOME)/miniconda3
-CONDA_BIN := $(CONDA_DIR)/bin/conda
+# Name of the conda environment the build lives in
+ENV_NAME := magtense-env
+
+# Location of the conda installation. Resolution order, first hit wins:
+#   1. CONDA_DIR / CONDA_BIN given on the command line or in the environment
+#   2. $CONDA_EXE, set by any activated conda/mamba shell
+#   3. "conda info --base" / "mamba info --base" from PATH
+#   4. $(HOME)/miniconda3 - the historical default, and where install-miniconda
+#      puts a fresh Miniconda when no existing installation was found
+# The origin guard (rather than ?=) keeps the probe a one-shot at parse time
+# while still letting an environment or command-line value win.
+DEFAULT_CONDA_DIR := $(HOME)/miniconda3
+
+ifeq ($(OS),Windows_NT)
+CONDA_DIR ?= $(DEFAULT_CONDA_DIR)
+CONDA_BIN ?= $(CONDA_DIR)/bin/conda
+else
+
+ifeq ($(origin CONDA_DIR),undefined)
+CONDA_DIR := $(shell \
+	if [ -n "$$CONDA_EXE" ] && [ -x "$$CONDA_EXE" ]; then \
+		dirname "$$(dirname "$$CONDA_EXE")"; \
+	elif command -v conda >/dev/null 2>&1; then \
+		conda info --base; \
+	elif command -v mamba >/dev/null 2>&1; then \
+		mamba info --base; \
+	else \
+		echo "$(DEFAULT_CONDA_DIR)"; \
+	fi)
+endif
+CONDA_DIR := $(if $(strip $(CONDA_DIR)),$(CONDA_DIR),$(DEFAULT_CONDA_DIR))
+
+# The conda front-end inside that installation. Miniconda/Anaconda keep it in
+# bin/, a miniforge user may only have mamba or micromamba; every sub-command
+# used here (env create -f, env remove, env list, run -n) is common to all of
+# them. Falls back to bin/conda when nothing is installed yet, so
+# install-miniconda has a path to test and to install into.
+ifeq ($(origin CONDA_BIN),undefined)
+CONDA_BIN := $(shell \
+	for c in "$(CONDA_DIR)/bin/conda" "$(CONDA_DIR)/condabin/conda" \
+		 "$(CONDA_DIR)/bin/mamba" "$(CONDA_DIR)/bin/micromamba"; do \
+		if [ -x "$$c" ]; then echo "$$c"; exit 0; fi; \
+	done; \
+	echo "$(CONDA_DIR)/bin/conda")
+endif
+
+endif
+
+# Marker written by install-miniconda, recording that the installation at
+# CONDA_DIR belongs to this Makefile. rm-conda refuses to delete without it.
+CONDA_MARKER := $(CONDA_DIR)/.magtense-installed
 
 # Python bound to the conda env by absolute path so f2py uses the env
 # interpreter regardless of PATH. "conda run -- python" is still a name lookup
 # and can be shadowed by version managers (e.g. mise) that front-load PATH;
-# the absolute path cannot. On Windows the build runs inside an already-
-# activated env (CONDA_PREFIX), so plain python is correct there.
+# the absolute path cannot. The env is not assumed to sit under
+# $(CONDA_DIR)/envs either - a .condarc with envs_dirs puts it elsewhere - so
+# the prefix is asked of conda itself, with the usual layout as a fast path.
+# Recursively expanded (=, not :=) so the lookup runs when a recipe runs, i.e.
+# after build-env has created the env. On Windows the build runs inside an
+# already-activated env (CONDA_PREFIX), so plain python is correct there.
 ifeq ($(OS),Windows_NT)
   PYTHON := python
 else
-  PYTHON := $(CONDA_DIR)/envs/magtense-env/bin/python
+CONDA_ENV_PREFIX = $(shell \
+	if [ -x "$(CONDA_DIR)/envs/$(ENV_NAME)/bin/python" ]; then \
+		echo "$(CONDA_DIR)/envs/$(ENV_NAME)"; \
+	else \
+		p=$$("$(CONDA_BIN)" env list 2>/dev/null | awk '$$1=="$(ENV_NAME)"{print $$NF}'); \
+		echo "$${p:-$(CONDA_DIR)/envs/$(ENV_NAME)}"; \
+	fi)
+  PYTHON = $(CONDA_ENV_PREFIX)/bin/python
 endif
 #=======================================================================
 #                    Recursive make on Windows
@@ -320,7 +379,7 @@ check-flags:
 #=======================================================================
 #							Targets
 #=======================================================================
-.PHONY: all clean install-miniconda build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL} rm-conda rm-env python-interface-win 
+.PHONY: all clean install-miniconda build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL} rm-conda rm-env python-interface-win info print-%
 
 all: $(ALL_DEPS) ${AUXMT} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} 
 
@@ -390,8 +449,16 @@ standalone:
 	mkdir build
 	cp $(STANDALONE_PATH)/MagTense.x build/MagTense.x
 
+# Lets scripts and CI ask for a resolved value (make -s print-PYTHON,
+# print-CONDA_DIR, print-CONDA_BIN, ...) instead of duplicating the detection.
+print-%:
+	@echo '$($*)'
+
 info:
 	@echo Using Fortran compiler: $(FC)
+	@echo Conda installation: $(CONDA_DIR) \($(CONDA_BIN)\)
+	@echo Conda environment: $(ENV_NAME)
+	@echo Python interpreter: $(PYTHON)
 	@echo Fortran flags: $(FFLAGS)
 	@echo Linker flags: $(LDFLAGS)
 	@echo MKL flags: $(MKL)
@@ -424,35 +491,54 @@ ${PYTHON_MODN_ALL}: check-flags
 		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${FMM3D}
 	cp *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/
 
-# Rule that installs Miniconda only if "conda" is not found
+# Rule that installs Miniconda only if no conda was found - see the detection
+# of CONDA_DIR/CONDA_BIN at the top of this file. The marker file records that
+# the installation is ours, which is what allows rm-conda to remove it.
 install-miniconda:
 	@if [ -x "$(CONDA_BIN)" ]; then \
-			echo "Conda already installed at $(CONDA_DIR)."; \
+			echo "Conda already installed at $(CONDA_DIR) (using $(CONDA_BIN))."; \
 	else \
 			echo "Conda not found at $(CONDA_DIR). Installing Miniconda..."; \
 			curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o miniconda.sh; \
 			bash miniconda.sh -b -p $(CONDA_DIR) && rm miniconda.sh; \
+			touch $(CONDA_MARKER); \
 			echo "Miniconda installed at $(CONDA_DIR)."; \
 	fi
 
+# Removes only an installation this Makefile created. CONDA_DIR is detected and
+# can therefore point at a system-wide or shared conda, which must never be
+# deleted from here.
 rm-conda:
-	rm -rf $(CONDA_DIR)
+	@if [ -z "$(CONDA_DIR)" ] || [ "$(CONDA_DIR)" = "/" ]; then \
+		echo "Refusing to remove CONDA_DIR='$(CONDA_DIR)'."; \
+		exit 1; \
+	elif [ ! -f "$(CONDA_MARKER)" ]; then \
+		echo "Refusing to remove $(CONDA_DIR): it was not installed by this Makefile"; \
+		echo "(no $(CONDA_MARKER)). Remove it by hand if that is really what you want."; \
+		exit 1; \
+	else \
+		rm -rf $(CONDA_DIR); \
+		echo "Removed $(CONDA_DIR)."; \
+	fi
 
 build-env: install-miniconda
-# Check if the "magtense-env" environment already exists before creating it
-	@if ! conda env list  | grep -q "magtense-env"; then \
-		$(CONDA_BIN) env create -n magtense-env -f ${MKFILE_PATH}/python/.build/env-$(PY_VERSION)-linux.yml; \
+# Check if the environment already exists before creating it. The name is
+# matched exactly - a plain grep would also match longer names sharing the
+# prefix - and it is looked up through $(CONDA_BIN) rather than whatever conda
+# happens to be on PATH.
+	@if ! $(CONDA_BIN) env list | awk '$$1=="$(ENV_NAME)"{found=1} END{exit !found}'; then \
+		$(CONDA_BIN) env create -n $(ENV_NAME) -f ${MKFILE_PATH}/python/.build/env-$(PY_VERSION)-linux.yml; \
 	else \
-		echo "magtense-env environment already exists."; \
+		echo "$(ENV_NAME) environment already exists."; \
 	fi
 
 
 rm-env:
-	$(CONDA_BIN) env remove -n magtense-env -y
+	$(CONDA_BIN) env remove -n $(ENV_NAME) -y
 
-CMAKE = $(CONDA_BIN) run -n magtense-env -- cmake
-IFX = $(CONDA_BIN) run -n magtense-env which ifx
-ICX = $(CONDA_BIN) run -n magtense-env which icx
+CMAKE = $(CONDA_BIN) run -n $(ENV_NAME) -- cmake
+IFX = $(CONDA_BIN) run -n $(ENV_NAME) which ifx
+ICX = $(CONDA_BIN) run -n $(ENV_NAME) which icx
 
 
 define run-cmake-cvode
@@ -489,8 +575,6 @@ build-cvode: build-env
 	cp -r ${MKFILE_PATH}/cvode-7.4.0/. ${CVODE_ROOT}/src/
 	$(run-cmake-cvode)
 
-ENV_NAME := magtense-env
-
 python-interface: build-env
 	@if [ ! -d "${CVODE_ROOT}/build" ] || [ -z "$$(ls -A ${CVODE_ROOT}/build)" ]; then \
 		$(MAKE) build-cvode; \
@@ -500,7 +584,7 @@ python-interface: build-env
 	@if [ "$$CONDA_DEFAULT_ENV" = "$(ENV_NAME)" ]; then \
 		$(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0; \
 	else \
-		$(CONDA_BIN) run -n magtense-env $(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0; \
+		$(CONDA_BIN) run -n $(ENV_NAME) $(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0; \
 	fi
 # Install into the conda env via its absolute interpreter path. A bare "python"
 # or "conda run -- python" is a name lookup that version managers (e.g. mise)

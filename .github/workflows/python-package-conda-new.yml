@@ -45,9 +45,13 @@ jobs:
       with:
         fallback: 1.0.0
 
+    # CONDA_DIR is pinned so the job keeps exercising the "no conda present ->
+    # install Miniconda" path. The runner image ships a conda at
+    # /usr/share/miniconda and the login shell exports CONDA_EXE, which the
+    # Makefile would otherwise detect and reuse.
     - name: Build Python interface via make python-interface
       working-directory: ${{ github.workspace }}
-      run: make python-interface USE_CUDA=${{ matrix.cuda.use }} PY_VERSION=${{ matrix.py-version.version }}
+      run: make python-interface CONDA_DIR=$HOME/miniconda3 USE_CUDA=${{ matrix.cuda.use }} PY_VERSION=${{ matrix.py-version.version }}
 
     - name: Stage .so for dist_pypi.py
       working-directory: ${{ github.workspace }}
@@ -60,8 +64,8 @@ jobs:
       working-directory: ${{ github.workspace }}/python/
       run: |
         sed -i 's/1.0.0/${{ steps.previoustag.outputs.tag }}/' src/magtense/__init__.py
-        $HOME/miniconda3/bin/conda run -n magtense-env -- \
-          python .build/dist_pypi.py \
+        PY=$(make -s -C .. print-PYTHON CONDA_DIR=$HOME/miniconda3)
+        "$PY" .build/dist_pypi.py \
             --py_version ${{ matrix.py-version.version }} --cu_version ${{ matrix.cuda.name }} --platform linux \
             --pkg_version ${{ steps.previoustag.outputs.tag }}
 
@@ -70,8 +74,8 @@ jobs:
       working-directory: ${{ github.workspace }}/python/
       run: |
         sed -i 's/1.0.0/${{ inputs.tag }}/' src/magtense/__init__.py
-        $HOME/miniconda3/bin/conda run -n magtense-env -- \
-          python .build/dist_pypi.py \
+        PY=$(make -s -C .. print-PYTHON CONDA_DIR=$HOME/miniconda3)
+        "$PY" .build/dist_pypi.py \
             --py_version ${{ matrix.py-version.version }} --cu_version ${{ matrix.cuda.name }} --platform linux \
             --pkg_version ${{ inputs.tag }}
 

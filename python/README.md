@@ -24,19 +24,25 @@ make python-interface [PY_VERSION=314(default) | 313 | 312] [USE_CUDA=1(default)
 
 This will:
 
-- Download [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main) if you don't have it already (by default it assumes the installation lives at `~/miniconda3`);
+- Download [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main) if you don't have one already. An existing installation is detected automatically, in this order: a `CONDA_DIR` (or `CONDA_BIN`) you pass yourself, the `$CONDA_EXE` of an activated conda/mamba shell, `conda info --base`/`mamba info --base` from your `PATH`, and finally `~/miniconda3`. Only when none of those turns up a conda is Miniconda downloaded, into `~/miniconda3`. To point the build at a specific installation, pass it explicitly:
+
+  ```shell
+  make python-interface CONDA_DIR=/path/to/your/conda
+  ```
+
+  You can check what was picked up with `make -s print-CONDA_DIR`, `make -s print-CONDA_BIN` and `make -s print-PYTHON` (or all of it at once with `make info`);
 - Create the conda environment `magtense-env` with all the dependencies for building the Python interface, using the specified Python vesrsion
 - Build the MagTense Fortran core and the CVODE library, using CUDA by default (if you have an NVIDIA GPU and the CUDA toolkit installed) - set `USE_CUDA=0` to disable CUDA support
 - Build the Python interface and install it in the `magtense-env` conda environment
 
-There are also Make targets `rm-env` and `rm-conda` to clean up your installation. The Make rules should be smart enough to not do unnecessary work; for instance, if you modify some part of the Python interface, `make python` will re-build the wheel and re-install it on the environment, without re-downloading Miniconda. In case of errors, the simplest first step probably is to run `make rm-env` and `make rm-conda` to start from a clean slate.
+There are also Make targets `rm-env` and `rm-conda` to clean up your installation. `rm-conda` only removes a Miniconda that this Makefile installed itself; it refuses to touch a conda that was already on your machine. The Make rules should be smart enough to not do unnecessary work; for instance, if you modify some part of the Python interface, `make python` will re-build the wheel and re-install it on the environment, without re-downloading Miniconda. In case of errors, the simplest first step probably is to run `make rm-env` and `make rm-conda` to start from a clean slate.
 
 To test if the interface was built correctly, run `make pytest`.
 
 Note that all automated commands are run by subshells managed by Make. To actually use conda and explore the Python files, you have to first initialize conda in your current shell:
 
 ```shell
-$HOME/miniconda3/bin/conda init --all
+$(make -s print-CONDA_BIN) init --all
 ```
 
 Then, *create a new shell*, and activate the `magtense-env` conda environment:
