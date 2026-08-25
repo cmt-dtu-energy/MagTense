@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import matplotlib.pyplot as plt
 from magtense.magstatics import Tiles, run_simulation
@@ -82,7 +84,12 @@ for easy_axis in easy_axes:
 
     data.append(H_demag*mu0)
 
-val_path = "../../../documentation/examples_FEM_validation/Validation_avgprism/"
+# Resolve the reference data from this file rather than the cwd, so the script
+# runs from anywhere.
+val_path = str(
+    Path(__file__).resolve().parents[3]
+    / "documentation" / "examples_FEM_validation" / "Validation_avgprism"
+) + "/"
 data=np.array(data)
 xs_comsol = read_three_columns(val_path+"Avg_validation_comsol.txt")[0]
 xx_comsol = read_three_columns(val_path+"Avg_validation_comsol.txt")[1]

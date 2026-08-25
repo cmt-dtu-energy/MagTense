@@ -3,11 +3,7 @@
 The Fortran code is compiled and wrapped to a module that can be directly called from Python.
 The tool `f2py` of the NumPy package is used to wrap the [interface file](./FortranToPythonIO.f90).
 
-## Deployment with Conda (Intel architectures)
-
-### Create an importable Python module from Fortran source code
-
-#### Linux
+## Linux
 
 - New Conda environment from [env-313-linux.yml](./.build/env-313-linux.yml)
 
@@ -87,168 +83,65 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 To compile with FMM3D `$(MagTense-Folder)/external/FMM3D/local` must be in the `LD_Library_PATH` (replace MagTense-Folder with the actual path to the MagTense destiation).
 After this compile as above but with `USE_FMM3D=1`
 
-#### Windows
+## Windows
 
-- Conda environment from `env-313-win.yml`
-
-  ```bash
-  conda env create -f python/.build/env-313-win.yml
-  ```
-
-  OR
-
-  ```bash
-  conda create -y -n magtense-env
-  conda activate magtense-env
-  conda config --env --add channels conda-forge
-  conda install -y python=3.13
-  python -m pip install numpy meson charset-normalizer build
-  conda config --env --add channels https://software.repos.intel.com/python/conda/
-  conda install -y mkl mkl-devel mkl-static "dpcpp_win-64" intel-fortran-rt "ifx_win-64"
-  conda config --env --add channels nvidia/label/cuda-12.9.1
-  conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
-  conda install -y git make
-  ```
-  and then `conda env export | grep -v "^prefix: " > env-313-win.yml` to create a new environment file
-
-- Required modules for `cvode` from sundials-7.4.0
+- Requiments
 
   - Installation of [Visual Studio 2022](https://visualstudio.microsoft.com) (Desktop development with C++ and `cmake`)
 
   - Installation of [Intel oneAPI](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html) (both C++ and Fortran)
 
-  - Download [sundials-7.4.0](https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz) and unzip it.
-  
+  - Installation of Miniconda or Anaconda
 
-  Open a "Intel oneAPI command prompt for Intel 64 for Visual Studio 2022" as administrator and then do:
+  - Download of MagTense and [FMM3D](https://github.com/Ximtecs/FMM3D). Unzip the latter in `external\FMM3D`
+
+
+- Conda environment `magtense-env` is created from `env-313-win.yml` in a `Powershell` as
+
   ```bash
-  "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -G "Ninja" -B C:/CVODE_temp -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_ARKODE=OFF -DBUILD_CVODE=ON -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON
-
-  cmake --build C:/CVODE_temp --config RELEASE --verbose
-  cmake --install C:/CVODE_temp --verbose
+  conda env create -f python/.build/env-313-win.yml
+  conda activate magtense-env
   ```
-  where the `CVODE_temp` is a temporary directory that can be removed after installation.
-  *Note: The commands below assume the `Enterprise` version of Visual Studio being installed - if you have the free community edition, simply change `Enterprise` to `Community` in the path.*
+  All commands below, except for CVODE compilation, takes place in the `magtense-env` environment
 
-  - The installed CVODE files will be located in `"C:\Program Files (x86)\SUNDIALS"` but should be moved to a folder named `cvode` at the top-level of the MagTense repository:
-
-    ```bash
-    mkdir cvode
-    xcopy "C:\Program Files (x86)\SUNDIALS\*" cvode /s /i
-    ```
-
-- Compile Fortran source files
-  
-  - Installation of [Visual Studio 2022](https://visualstudio.microsoft.com) / Desktop development with C++
-
-  - Setting up customized versions of `Developer PowerShell` and `x64 Native Tools Command Prompt for VS 2022`:
-
-    - In [VS Code](https://code.visualstudio.com), these integrated terminals can be added to your profiles by editing `settings.json`. Further, the Python extension ensures that the correct Conda environment is activated in all terminals.
-
-      ```bash
-      "terminal.integrated.profiles.windows": {
-          "Developer PowerShell for VS 2022": {
-              "source": "PowerShell",
-              "icon": "terminal-powershell",
-              "args": [
-              "-NoExit",
-              "-ExecutionPolicy",
-              "ByPass",
-              "-File",
-              "C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/Launch-VsDevShell.ps1"
-              ]
-          },
-          "DevCmdx64": {
-              "path": [
-                  "${env:windir}\\Sysnative\\cmd.exe",
-                  "${env:windir}\\System32\\cmd.exe"
-              ],
-              "args": [
-                  "/k",
-                  "C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/Tools/VsDevCmd.bat",
-                  "-startdir=None",
-                  "-arch=amd64",
-                  "-host_arch=x64"
-              ],
-              "icon": "terminal-cmd"
-          },
-      },
-      ```
-
-    - Alternatively, customized profiles can be set up in the `Windows Terminal` app with the following guide: https://learn.microsoft.com/en-us/windows/terminal/install#settings-json-file
-
-      Further, `conda` has to be initialized in these terminals to have access to the `make` executable and other necessary packages.
-
-  - Open a `Developer PowerShell` and run:
-
-    ```bash
-    conda activate magtense-env
-    make magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
-    ```
-
-  - Compilation with `nvcc` should be executed in `x64 Native Tools Command Prompt for VS 2022`.
-    Otherwise, `x86` will be silently used, which results in `error: asm operand type size(8) does not match type/size implied by constraint 'r'` in `cuda_bf16.hpp`.
+- *Optional* CUDA plugin installation.
+    Open an `x64 Native Tools Command Prompt for VS 2022` and do:
 
     ```bash
     cd source/MagTenseFortranCuda/cuda
     make
     ```
+	
+- *Optional* CVODE plugin installation
 
-    - **Note:** In case the error `nvcc fatal   : Could not set up the environment for Microsoft Visual Studio [...]` shows up, the environment path in the active Conda environment prevents `nvcc` to work correctly. A quick fix to compile `MagTenseCudaBlas` is to initialize a `x64 Native Tools Command Prompt for VS 2022` without `conda`:
-
-      ```bash
-      "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin\nvcc.exe" -c MagTenseCudaBlas.cu -o MagTenseCudaBlas.o
-      ```
-
-      And then only compile `MagTenseCudaBlasICLWrapper.cxx` before creating `libCuda` in the activated environment:
-
-      ```bash
-      cd source/MagTenseFortranCuda/cuda
-      make wrap
-      ```
-
-  - Linking and wrapping libraries with `f2py` needs to be run in `x64 Native Tools Command Prompt for VS 2022` to make `ifx` compiler available for `meson`:
+  - Download [sundials-7.4.0](https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz) and unzip it.
+  
+  - Install [choco](https://chocolatey.org/install) and then Ninja as `choco install ninja`
+  
+  - Open a `Intel oneAPI command prompt for Intel 64 for Visual Studio 2022` as administrator and do:
+  
+  ```bash
+  cd cvode-7.4.0 
+  mkdir install
+  "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -G "Ninja" -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_ARKODE=OFF -DBUILD_CVODE=ON -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_INSTALL_PREFIX=install -DEXAMPLES_INSTALL_PATH=install/examples -DCMAKE_C_FLAGS=-Wno-deprecated-declarations -DCMAKE_C_COMPILER=icx-cl -DCMAKE_CXX_COMPILER=icx-cl -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON
+  "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build build --config Release --verbose
+  "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --install build --verbose
+  ```
+  
+- Compile Fortran source files
+  
+  - Open a `x64 Native Tools Command Prompt for VS 2022` and run:
 
     ```bash
-	  conda activate magtense-env
-    make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
+    make fmm3d USE_FMM3D=1
+    make auxmt magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=1 CVODE_ROOT="cvode-7.4.0/install"
+	make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=1 CVODE_ROOT="cvode-7.4.0/install"
     ```
 
-    - **Note:** In case error `meson.build:1:0: ERROR: Unknown compiler(s): [['ifx']]` shows up, it should help to reinitialize your Conda environment to ensure having the correct environment path:
-
-      ```bash
-      conda deactivate
-      conda activate magtense-env
-      ```
-
-### Install local editable magtense package
-To install the compiled MagTense package locally, so that simulations can be run, do
-```bash
-cp python/.build/requirements-py3-dev.txt python/requirements.txt
-python -m pip install -e ./python
-```
-
-### Required packages at runtime
-
-The `python/.build/` contains requirement-files, which are shipped with the respective pip-wheel.
-
-```bash
-python3 -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm importlib_resources ipympl
-python3 -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cusparse-cu12 nvidia-nvjitlink-cu12 # only required for cuda support
-```
-
-### Latest versions of required packages
-
-- CUDA - Available [CUDA versions](https://anaconda.org/nvidia/cuda) and location of corresponding [pip-wheels](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels) (deployment)
+- Install local editable magtense package
+  To install the compiled MagTense package locally, so that simulations can be run, do
 
   ```bash
-  conda config --env --add channels nvidia/label/cuda-12.9.1
-  conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
-  ```
-
-- Intel compilers and `mkl` - More information about [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
-
-  ```bash
-  conda config --env --add channels https://software.repos.intel.com/python/conda/
-  conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" "ifx_linux-64"
+  cp python/.build/requirements-py3-dev.txt python/requirements.txt
+  python -m pip install -e ./python
   ```

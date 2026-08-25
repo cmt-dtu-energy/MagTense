@@ -223,7 +223,7 @@ jobs:
     #    CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
     #  shell: cmd /C CALL {0}
     #  run: |
-    #    "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "USE_CUDA = logical(str2num(getenv('CUDA'))); cd('C:\actions-runner\_work\MagTense\MagTense\matlab\tests\fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA)"
+    #    "C:\Program Files\MATLAB\${{ matrix.mat-version}}\bin\matlab.exe" -batch "USE_CUDA = logical(str2num(getenv('CUDA'))); cd('C:\actions-runner\_work\MagTense\MagTense\matlab\examples\Micromagnetism\MagTense_tests'); run_fmm_test('USE_CUDA', USE_CUDA)"
 
 #################################
 
@@ -387,7 +387,7 @@ jobs:
     #  env:
     #    CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
     #  with:
-    #    command: USE_CUDA = logical(str2num(getenv('CUDA'))); cd('matlab/tests/fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA);
+    #    command: USE_CUDA = logical(str2num(getenv('CUDA'))); cd('matlab/examples/Micromagnetism/MagTense_tests'); run_fmm_test('USE_CUDA', USE_CUDA);
 
     #- name: Run the FMM accuracy test with CUDA
     #  if: ${{ matrix.os-version == 'ubuntu_CUDA' }}
@@ -395,7 +395,7 @@ jobs:
     #  env:
     #    CUDA: ${{ matrix.CUDA-run == 'noCUDA' && '0' || '1' }}
     #  run: |
-    #    /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "USE_CUDA = logical(str2num(getenv('CUDA'))); cd('matlab/tests/fmm_test'); run_fmm_test('USE_CUDA', USE_CUDA)";
+    #    /usr/local/MATLAB/${{ matrix.mat-version}}/bin/matlab -batch "USE_CUDA = logical(str2num(getenv('CUDA'))); cd('matlab/examples/Micromagnetism/MagTense_tests'); run_fmm_test('USE_CUDA', USE_CUDA)";
 
 
   build-cvode:

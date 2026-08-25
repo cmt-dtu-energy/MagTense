@@ -54,13 +54,14 @@ venv.bak/
 # Visual Studio Code configurations
 .vscode/
 
+# JetBrains IDE configurations (PyCharm, IntelliJ)
+.idea/
+
 # Data from DL scripts
 data/
 demag/
 evals/
 figs/
-
-examples/micromagnetism/.idea/
 
 # Requirement file
 requirements.txt
