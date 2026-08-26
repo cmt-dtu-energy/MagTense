@@ -55,7 +55,10 @@ classdef MagTenseTilesUtil
             stateFcn = MagTenseTilesUtil.getDefaultMagStatStateFunction();
             %%setup the state function
             
-            k = load([mfilename('fullpath') '/../../../documentation\MH_Comsol_low_carb_annealed_extrap.txt']);            
+            % fullfile keeps this working on both Windows and Linux; mfilename gives the
+            % path of this file without its extension, so its folder is matlab/util
+            util_dir = fileparts(mfilename('fullpath'));
+            k = load(fullfile(util_dir, '..', '..', 'documentation', 'MH_Comsol_low_carb_annealed_extrap.txt'));
             
             stateFcn.nT = int32(3);
             stateFcn.nH = int32(length(k(:,1)));
