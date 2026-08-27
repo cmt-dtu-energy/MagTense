@@ -21,17 +21,18 @@ ENV_NAME := magtense-env
 
 # Location of the conda installation. Resolution order, first hit wins:
 #   1. CONDA_DIR / CONDA_BIN given on the command line or in the environment
-#   2. $CONDA_EXE, set by any activated conda/mamba shell
-#   3. "conda info --base" / "mamba info --base" from PATH
+#   2. $CONDA_EXE, set by an activated conda shell
+#   3. "conda info --base" from PATH
 #   4. $(HOME)/miniconda3 - the historical default, and where install-miniconda
 #      puts a fresh Miniconda when no existing installation was found
+# Only Miniconda/Anaconda installations are supported, so the front-end is
+# always $(CONDA_DIR)/bin/conda; pass CONDA_BIN explicitly for anything else.
 # The origin guard (rather than ?=) keeps the probe a one-shot at parse time
 # while still letting an environment or command-line value win.
 DEFAULT_CONDA_DIR := $(HOME)/miniconda3
 
 ifeq ($(OS),Windows_NT)
 CONDA_DIR ?= $(DEFAULT_CONDA_DIR)
-CONDA_BIN ?= $(CONDA_DIR)/bin/conda
 else
 
 ifeq ($(origin CONDA_DIR),undefined)
@@ -40,29 +41,16 @@ CONDA_DIR := $(shell \
 		dirname "$$(dirname "$$CONDA_EXE")"; \
 	elif command -v conda >/dev/null 2>&1; then \
 		conda info --base; \
-	elif command -v mamba >/dev/null 2>&1; then \
-		mamba info --base; \
 	else \
 		echo "$(DEFAULT_CONDA_DIR)"; \
 	fi)
 endif
+# Guards an empty result, e.g. a "conda" on PATH that prints nothing
 CONDA_DIR := $(if $(strip $(CONDA_DIR)),$(CONDA_DIR),$(DEFAULT_CONDA_DIR))
 
-# The conda front-end inside that installation. Miniconda/Anaconda keep it in
-# bin/, a miniforge user may only have mamba or micromamba; every sub-command
-# used here (env create -f, env remove, env list, run -n) is common to all of
-# them. Falls back to bin/conda when nothing is installed yet, so
-# install-miniconda has a path to test and to install into.
-ifeq ($(origin CONDA_BIN),undefined)
-CONDA_BIN := $(shell \
-	for c in "$(CONDA_DIR)/bin/conda" "$(CONDA_DIR)/condabin/conda" \
-		 "$(CONDA_DIR)/bin/mamba" "$(CONDA_DIR)/bin/micromamba"; do \
-		if [ -x "$$c" ]; then echo "$$c"; exit 0; fi; \
-	done; \
-	echo "$(CONDA_DIR)/bin/conda")
 endif
 
-endif
+CONDA_BIN ?= $(CONDA_DIR)/bin/conda
 
 # Marker written by install-miniconda, recording that the installation at
 # CONDA_DIR belongs to this Makefile. rm-conda refuses to delete without it.
