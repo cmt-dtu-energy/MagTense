@@ -78,6 +78,52 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
   LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0
   ```
 
+- Compile with the dip-fmm micromagnetic demagnetisation backend
+
+  Place or clone dip-fmm at `dip-fmm/` in the MagTense repository. The build
+  below uses dip-fmm's `release` preset, with CUDA and oneMKL enabled, installs
+  its shared C API under `dip-fmm/local`, and links the MagTense Python
+  extension against it. Override `CDFMM_DIR`, `CDFMM_ROOT`, or
+  `CDFMM_CUDA_ARCHITECTURES` when a different checkout, installation, or GPU
+  architecture list is required.
+
+  On workstations where CUDA is provided as an environment module:
+
+  ```bash
+  module load cuda
+  LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LIBRARY_PATH" \
+    make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 USE_CDFMM=1
+  ```
+
+  To link an already compiled dip-fmm installation without rebuilding it, set
+  `BUILD_CDFMM=0` and point `CDFMM_ROOT` at its install prefix:
+
+  ```bash
+  LD_LIBRARY_PATH="$CDFMM_ROOT/lib:$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" \
+    make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 \
+      USE_CDFMM=1 BUILD_CDFMM=0 CDFMM_ROOT="$CDFMM_ROOT"
+  ```
+
+  The readable comparison example and its notebook are under
+  [`examples/micromagnetism/FMM`](./examples/micromagnetism/FMM). The default
+  sets the normal MagTense `cuda` input to true. When MagTense was compiled
+  with `USE_CUDA=1`, this also selects dip-fmm's CUDA-full backend:
+
+  ```bash
+  LD_LIBRARY_PATH="$PWD/dip-fmm/local/lib:$CONDA_PREFIX/lib:$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LIBRARY_PATH" \
+    python python/examples/micromagnetism/FMM/fmm_vs_regular.py
+  ```
+
+  For a CPU-only integration smoke test, set the normal MagTense `cuda` input
+  to false. dip-fmm then prefers oneMKL and falls back to its portable CPU
+  implementation when oneMKL is unavailable:
+
+  ```bash
+  MAGTENSE_USE_CUDA=0 \
+  LD_LIBRARY_PATH="$PWD/dip-fmm/local/lib:$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" \
+    python python/examples/micromagnetism/FMM/fmm_vs_regular.py
+  ```
+
 - Compiling with FMM3D backend
 
 To compile with FMM3D `$(MagTense-Folder)/external/FMM3D/local` must be in the `LD_Library_PATH` (replace MagTense-Folder with the actual path to the MagTense destiation).
