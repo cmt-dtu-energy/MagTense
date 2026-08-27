@@ -7,6 +7,7 @@ USE_MICROMAG = 1
 USE_MATLAB = 0
 MATLAB_INCLUDE ?=
 USE_FMM3D ?= 0
+USE_CDFMM ?= 0
 
 # /usr/local/MATLAB/<version>/extern/include (Linux)
 # "C:\Program Files\MATLAB\<version>\extern\include" (Win)
@@ -18,6 +19,15 @@ MKFILE_PATH := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 # environment and the command line to override it, e.g.
 #   make ... USE_CVODE=1 CVODE_ROOT="C:/Program Files (x86)/sundials-7.2.1"
 CVODE_ROOT ?= ${MKFILE_PATH}/cvode
+
+# dip-fmm is a shared C ABI library. Its native Fortran convenience module is
+# compiled again by MagTense with the same compiler and flags as the solver.
+CDFMM_DIR ?= dip-fmm
+CDFMM_ROOT ?= $(abspath $(CDFMM_DIR)/local)
+CDFMM_BUILD_DIR ?= $(abspath $(CDFMM_DIR)/build-release)
+CDFMM_CUDA_ARCHITECTURES ?= 75;80;86;89;90
+BUILD_CDFMM ?= 1
+CUDA_HOST_COMPILER ?= ${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++
 
 #=======================================================================
 #                    Recursive make on Windows
@@ -74,13 +84,16 @@ else
 	@echo "USE_FMM3D=0 -> skipping FMM3D build"
 endif
 
-# Make high-level targets depend on FMM only when enabled
-ifeq ($(USE_FMM3D),1)
-ALL_DEPS := fmm3d
-PY_DEPS  := fmm3d
-else
+# Make high-level targets depend on optional FMM libraries only when enabled.
 ALL_DEPS :=
-PY_DEPS  :=
+PY_DEPS :=
+ifeq ($(USE_FMM3D),1)
+ALL_DEPS += fmm3d
+PY_DEPS  += fmm3d
+endif
+ifeq ($(USE_CDFMM),1)
+ALL_DEPS += cdfmm
+PY_DEPS  += cdfmm
 endif
 #=======================================================================
 
@@ -96,18 +109,21 @@ ifeq (${FC}, ifx)
 	ifeq ($(OS),Windows_NT)
 		FFLAGS = /O3 /fpp /real-size:64 /Qopenmp /assume:nocc_omp /fpe:0 \
 			/fp:source /nologo /DUSE_CVODE=${USE_CVODE} /DUSE_MATLAB=${USE_MATLAB} \
-			/DUSE_CUDA=${USE_CUDA} /DUSE_MICROMAG=${USE_MICROMAG} /DUSE_FMM3D=${USE_FMM3D}
+			/DUSE_CUDA=${USE_CUDA} /DUSE_MICROMAG=${USE_MICROMAG} /DUSE_FMM3D=${USE_FMM3D} \
+			/DUSE_CDFMM=${USE_CDFMM}
 	else
 		FFLAGS = -O3 -fpp -real-size 64 -qopenmp -assume nocc_omp -fpe0 \
 			-heap-arrays 1024 -traceback \
 			-fp-model=source -fpic -nologo -DUSE_CVODE=${USE_CVODE} \
 			-DUSE_MATLAB=${USE_MATLAB} -DUSE_CUDA=${USE_CUDA} \
-			-DUSE_MICROMAG=${USE_MICROMAG} -DUSE_FMM3D=${USE_FMM3D}
+			-DUSE_MICROMAG=${USE_MICROMAG} -DUSE_FMM3D=${USE_FMM3D} \
+			-DUSE_CDFMM=${USE_CDFMM}
 
 	endif
 else ifeq (${FC}, gfortran)
 	FFLAGS = -O3 -fdefault-real-8 -fopenmp -ffree-line-length-512 -cpp -fPIC \
-		-DUSE_MICROMAG=0 -DUSE_CVODE=${USE_CVODE} -DUSE_FMM3D=${USE_FMM3D}
+		-DUSE_MICROMAG=0 -DUSE_CVODE=${USE_CVODE} -DUSE_FMM3D=${USE_FMM3D} \
+		-DUSE_CDFMM=${USE_CDFMM}
 
 endif
 
@@ -235,6 +251,23 @@ else
 endif
 #===================================================================
 
+#===================== dip-fmm Integration ==========================
+ifeq ($(USE_CDFMM),0)
+  CDFMM =
+else
+  ifeq ($(OS),Windows_NT)
+    CDFMM = -L"${CDFMM_ROOT}/lib" -lcdfmm_c
+  else
+    CDFMM = -L${CDFMM_ROOT}/lib -lcdfmm_c
+    ifeq ($(USE_FMM3D),1)
+      LDFLAGS = "-Wl,-z,noexecstack -Wl,-rpath,${FMM3D_LIB} -Wl,-rpath,${CDFMM_ROOT}/lib"
+    else
+      LDFLAGS = "-Wl,-z,noexecstack -Wl,-rpath,${CDFMM_ROOT}/lib"
+    endif
+  endif
+endif
+#===================================================================
+
 
 
 ifeq ($(USE_MATLAB),0)
@@ -292,7 +325,7 @@ PYTHON_MODN_ALL = _${PYTHON_MODN}${PY_MOD_SUFFIX}
 # flags that caused it.
 #=======================================================================
 BUILD_FLAGS_FILE := .build_flags
-BUILD_FLAGS := USE_CUDA=${USE_CUDA} USE_CVODE=${USE_CVODE} USE_MATLAB=${USE_MATLAB} USE_MICROMAG=${USE_MICROMAG} USE_FMM3D=${USE_FMM3D}
+BUILD_FLAGS := USE_CUDA=${USE_CUDA} USE_CVODE=${USE_CVODE} USE_MATLAB=${USE_MATLAB} USE_MICROMAG=${USE_MICROMAG} USE_FMM3D=${USE_FMM3D} USE_CDFMM=${USE_CDFMM}
 
 # Written by the library targets once they have succeeded
 RECORD_FLAGS = @echo "${BUILD_FLAGS}" > ${BUILD_FLAGS_FILE}
@@ -356,11 +389,61 @@ ifeq ($(USE_MATLAB),1)
 		exit 1; \
 	fi
 endif
-
 #=======================================================================
 #							Targets
 #=======================================================================
-.PHONY: all clean
+.PHONY: all clean cdfmm
+
+cdfmm:
+ifeq ($(USE_CDFMM),1)
+ifeq ($(BUILD_CDFMM),1)
+ifeq ($(OS),Windows_NT)
+	@echo "ERROR: automatic dip-fmm builds are currently implemented for Linux only."
+	@echo "       Set BUILD_CDFMM=0 and CDFMM_ROOT to an existing Windows installation."
+	@exit 1
+else
+	cd "${CDFMM_DIR}" && CPATH= CPLUS_INCLUDE_PATH= cmake --preset release \
+		-B "${CDFMM_BUILD_DIR}" \
+		-DCMAKE_INSTALL_PREFIX="${CDFMM_ROOT}" \
+		-DCMAKE_C_COMPILER="${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-gcc" \
+		-DCMAKE_CXX_COMPILER="${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++" \
+		-DCMAKE_CUDA_COMPILER="${CONDA_PREFIX}/bin/nvcc" \
+		-DCMAKE_CUDA_HOST_COMPILER="${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++" \
+		-DCMAKE_CUDA_ARCHITECTURES="${CDFMM_CUDA_ARCHITECTURES}" \
+		-DCDFMM_ENABLE_CUDA=ON \
+		-DCDFMM_ENABLE_MKL=ON \
+		-DMKL_DIR="${CONDA_PREFIX}/lib/cmake/mkl" \
+		-DMKL_INTERFACE=lp64 \
+		-DMKL_THREADING=intel_thread \
+		-DCDFMM_ENABLE_OPENMP=OFF \
+		-DCDFMM_INSTALL_PYTHON_TO_ENV=OFF \
+		-DCDFMM_BUILD_PYTHON=OFF \
+		-DCDFMM_BUILD_FORTRAN_INTERFACE=OFF \
+		-DCDFMM_BUILD_TESTS=OFF \
+		-DCDFMM_BUILD_EXAMPLES=OFF \
+		-DCDFMM_BUILD_BENCHMARKS=OFF
+	CPATH= CPLUS_INCLUDE_PATH= cmake --build "${CDFMM_BUILD_DIR}" --parallel
+	cmake --install "${CDFMM_BUILD_DIR}"
+endif
+else
+	@echo "BUILD_CDFMM=0 -> linking the existing dip-fmm installation at ${CDFMM_ROOT}"
+endif
+else
+	@echo "USE_CDFMM=0 -> skipping dip-fmm build"
+endif
+
+.PHONY: check-cdfmm
+check-cdfmm: $(if $(filter 1,${USE_CDFMM}),cdfmm)
+ifeq ($(USE_CDFMM),1)
+	@if [ ! -f "${CDFMM_ROOT}/lib/libcdfmm_c.so" ]; then \
+		echo "ERROR: USE_CDFMM=1 but libcdfmm_c.so is missing under ${CDFMM_ROOT}/lib."; \
+		exit 1; \
+	fi
+	@if [ ! -f "${CDFMM_ROOT}/share/cdfmm/fortran/cdfmm_fortran.f90" ]; then \
+		echo "ERROR: the installed dip-fmm Fortran wrapper is missing under ${CDFMM_ROOT}/share."; \
+		exit 1; \
+	fi
+endif
 
 all: $(ALL_DEPS) ${AUXMT} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} 
 
@@ -411,12 +494,12 @@ magnetostatic: check-config
 	cd ${DEMAG_FIELD_PATH}  && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
 	${RECORD_FLAGS}
 
-micromagnetism: check-config
-	cd ${MICROMAG_PATH} && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
+micromagnetism: check-config $(if $(filter 1,${USE_CDFMM}),check-cdfmm)
+	cd ${MICROMAG_PATH} && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)" USE_CDFMM=$(USE_CDFMM) CDFMM_ROOT="$(CDFMM_ROOT)"
 	${RECORD_FLAGS}
 
 cuda:
-	cd ${FORTRAN_CUDA_PATH} && $(MAKE) CPP=$(CPP)
+	cd ${FORTRAN_CUDA_PATH} && CPATH= CPLUS_INCLUDE_PATH= $(MAKE) CPP=$(CPP) CUDA_HOST_COMPILER="$(CUDA_HOST_COMPILER)"
 
 forceintegrator: check-config
 	cd $(FORCEINTEGRATOR_PATH) && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
@@ -435,6 +518,9 @@ info:
 	@echo CVODE enabled: $(USE_CVODE)
 	@echo Micromagnetics enabled: $(USE_MICROMAG)
 	@echo FMM3D enabled: $(USE_FMM3D)
+	@echo dip-fmm enabled: $(USE_CDFMM)
+	@echo build dip-fmm: $(BUILD_CDFMM)
+	@echo dip-fmm root: $(CDFMM_ROOT)
 	@echo MATLAB enabled: $(USE_MATLAB)
 	@echo MATLAB include: $(MATLAB_INCLUDE)
 	@echo CVODE root: $(CVODE_ROOT)
@@ -454,10 +540,10 @@ test:
 
 
 
-${PYTHON_MODN_ALL}: check-config check-flags
+${PYTHON_MODN_ALL}: check-config check-flags $(if $(filter 1,${USE_CDFMM}),check-cdfmm)
 	${CP_LIB}
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
 		python -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} \
-		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${FMM3D}
+		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${FMM3D} ${CDFMM}
 	cp *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/

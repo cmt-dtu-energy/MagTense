@@ -7,11 +7,21 @@ USE_CVODE =
 CVODE_ROOT =
 USE_MATLAB =
 MATLAB_INCLUDE =
+USE_CDFMM = 0
+CDFMM_ROOT =
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
 
 LIBSRC_SOURCES = fmm3d_tree_mod MicroMagParameters fmm_nbor_tensor_mod util_micromag DemagAuxFunctions FortranCuda ComputeDifferentialOperatorsFromMesh UnstructuredMeshAnalysis
+
+ifeq (${USE_CDFMM},1)
+    CDFMM_FORTRAN_SOURCE = ${CDFMM_ROOT}/share/cdfmm/fortran/cdfmm_fortran.f90
+    CDFMM_FORTRAN_OBJECT = cdfmm_fortran.o
+    LIBSRC_SOURCES += DipFmmDemag
+else
+    CDFMM_FORTRAN_OBJECT =
+endif
 
 ifeq (${USE_MATLAB},1)
     OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
@@ -25,7 +35,7 @@ endif
 
 
 LIBSRC_SOURCES += LandauLifshitzEquationSolver
-LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
+LIBSRC_OBJECTS = ${CDFMM_FORTRAN_OBJECT} $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	CONDA_PATH = $(subst \,/,${CONDA_PREFIX})
@@ -71,6 +81,14 @@ all: pre-build ${STATIC_LIB}
 
 .f90.o:
 	${FC} ${FFLAGS} -I${MKL_ROOT}/include -I${MKL_ROOT}/include/intel64/lp64 -I${AUXMT_PATH} -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} -I${DEMAG_FIELD_PATH} ${OPT} ${MATLAB_OPT} ${OPT} -c $< -o $@
+
+ifeq (${USE_CDFMM},1)
+cdfmm_fortran.o: ${CDFMM_FORTRAN_SOURCE}
+	${FC} ${FFLAGS} -c $< -o $@
+
+DipFmmDemag.o: cdfmm_fortran.o MicroMagParameters.o
+LandauLifshitzEquationSolver.o: DipFmmDemag.o
+endif
 
 pre-build:
 	cd ${NUM_INT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
