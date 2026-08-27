@@ -32,6 +32,9 @@
     use fmm3d_tree_mod
     use fmm_nbor_tensor_mod
 #endif
+#if USE_CDFMM
+    use DipFmmDemag
+#endif
 
     use trace_mod
     implicit none          
@@ -73,16 +76,18 @@
     logical :: is_dup_t                                  !> Whether a convergence time coincides with a requested output time
     integer,dimension(:),allocatable :: seed_arr         !> Seed array for the stochastic thermal field
     integer :: seed_n, seed_clock                        !> Size of the seed array and a clock value to seed it from
-    character*(100) :: prog_str 
-    real :: rate
-    integer :: c1,c2,cr,cm 
+    character*(100) :: prog_str
+    integer(int64) :: full_start, eval_start, eval_end, clock_rate
+    real(DP) :: full_seconds, evaluation_seconds, initialization_seconds
+    real(DP) :: evaluation_initialization_ratio
     integer, save :: itimer = 0
     call trace%begin( "SolveLandauLifshitzEquation", itimer=itimer, verbose=1 )
-    
-    ! First initialize the system_clock
-    call system_clock(count_rate=cr)
-    call system_clock(count_max=cm)
-    rate = REAL(cr)
+    call system_clock(count=full_start, count_rate=clock_rate)
+#if USE_CDFMM
+    ! A previous solve may have returned through a non-standard path. Begin from
+    ! a known state before constructing this solve's fixed-geometry plan.
+    call destroyDipFmm()
+#endif
     
     write(prog_str,'(A37, A8, A12)') 'MagTense version 2.3.0, compiled on: ', __TIME__, __DATE__ 
     call displayGUIMessage( trim(prog_str) ) 
@@ -161,6 +166,13 @@
     if ( gb_problem%useDemag .eq. useDemagTrue ) then
         !Copy the demag tensor to CUDA
         if ( gb_problem%useCuda .eq. useCudaTrue ) then
+#if USE_CDFMM
+          if (gb_problem%use_cdfmm) then
+            ! dip-fmm owns its CUDA buffers and handles. The legacy dense/sparse
+            ! MagTense CUDA matrices are intentionally not initialised.
+            call displayGUIMessage( 'dip-fmm owns the CUDA demag state' )
+          else
+#endif
             call displayGUIMessage( 'Copying to CUDA' ) 
 #if USE_CUDA
 #if USE_FMM3D 
@@ -205,6 +217,9 @@
 #else
             call displayGUIMessage( 'MagTense not compiled with CUDA - exiting!' )
             stop
+#endif
+#if USE_CDFMM
+          endif
 #endif
         endif
     endif
@@ -377,12 +392,20 @@
         gb_solution%H_ani(:,:,:,:) = 0
     endif
 
+    ! Everything before this boundary is one-time solver initialization. The
+    ! timed evaluation phase contains the actual ODE solve and all effective
+    ! field evaluations, but excludes construction of the dense tensor/FMM plan.
+    call system_clock(count=eval_start)
+    initialization_seconds = real(eval_start - full_start, DP) / real(clock_rate, DP)
+    write(prog_str,'(A,F12.6,A)') 'Initialization took: ', initialization_seconds, ' seconds'
+    call displayGUIMessage(trim(prog_str))
+
     !loop over the range of applied fields
     if ( gb_problem%dummy_run .eq. 1) then
        call displayGUIMessage( 'Performing dummy run - skipping time evolution ' )
+       eval_end = eval_start
     else 
 
-        !CALL SYSTEM_CLOCK(c1)
     !$omp parallel default(shared)
     !$omp master
         
@@ -400,15 +423,20 @@
           nt_Hext = gb_problem%nHextAccepted
       endif
 
-      
-        !CALL SYSTEM_CLOCK(c2)
-        !call displayGUIMessage( 'Time simulation time integration:' )
-        !write (prog_str,'(f10.3)') (c2 - c1)/rate
-        !call displayGUIMessage( prog_str )
+      call system_clock(count=eval_end)
 
 
       !clean up
-      deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
+      if (allocated(crossX)) deallocate(crossX)
+      if (allocated(crossY)) deallocate(crossY)
+      if (allocated(crossZ)) deallocate(crossZ)
+      if (allocated(HeffX)) deallocate(HeffX)
+      if (allocated(HeffY)) deallocate(HeffY)
+      if (allocated(HeffZ)) deallocate(HeffZ)
+      if (allocated(HeffX2)) deallocate(HeffX2)
+      if (allocated(HeffY2)) deallocate(HeffY2)
+      if (allocated(HeffZ2)) deallocate(HeffZ2)
+      if (allocated(M_out)) deallocate(M_out)
       
       !clean up
       if (gb_problem%CV > 0) then
@@ -418,6 +446,28 @@
       !clean-up
       stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
   end if
+
+    evaluation_seconds = real(eval_end - eval_start, DP) / real(clock_rate, DP)
+    full_seconds = initialization_seconds + evaluation_seconds
+    if (initialization_seconds > tiny(1.0_DP)) then
+        evaluation_initialization_ratio = evaluation_seconds / initialization_seconds
+    else
+        evaluation_initialization_ratio = 0.0_DP
+    end if
+
+    call displayGUIMessage('Finished simulation:')
+    write(prog_str,'(A,F12.6,A)') 'Full time: ', full_seconds, ' seconds'
+    call displayGUIMessage(trim(prog_str))
+    write(prog_str,'(A,F12.6,A)') 'Evaluation time: ', evaluation_seconds, ' seconds'
+    call displayGUIMessage(trim(prog_str))
+    write(prog_str,'(A,F12.6,A)') 'Initialization time: ', initialization_seconds, ' seconds'
+    call displayGUIMessage(trim(prog_str))
+    write(prog_str,'(A,F12.6)') 'Eval/init ratio: ', evaluation_initialization_ratio
+    call displayGUIMessage(trim(prog_str))
+
+#if USE_CDFMM
+    call destroyDipFmm()
+#endif
 
     #if USE_CUDA
       if ( gb_problem%useCuda .eqv. useCudaTrue ) then
@@ -710,6 +760,11 @@
         !-------------- add demagnetization field --------------------
                 ! NOTE - we don't run updateDemagfield as a task as this is the most expensive part
                 ! instead, we run this on the main thread and then.
+#if USE_CDFMM
+        if (gb_problem%use_cdfmm) then
+          call updateDemagfieldDipFmm(gb_problem, gb_solution)
+        else
+#endif
 #if USE_FMM3D
         !-------------------- if use_fmm then use FMM otherwise shortcircuit to normal demag field --------------
         if ( gb_problem%use_fmm)  then
@@ -720,6 +775,9 @@
         !--------------------------------------------------------------------------------------------------------------
 #else
          call updateDemagfield( gb_problem, gb_solution )
+#endif
+#if USE_CDFMM
+        endif
 #endif
         !-------------------------------------------------------------
         !------------------ wait for all task to finish before calculating the effective field and the dm/dt ----------------
@@ -821,6 +879,11 @@
         !Anisotropy term
         call updateAnisotropy(  gb_problem, gb_solution )
         !Demag. field
+#if USE_CDFMM
+        if (gb_problem%use_cdfmm) then
+          call updateDemagfieldDipFmm(gb_problem, gb_solution)
+        else
+#endif
 #if USE_FMM3D
         if ( gb_problem%use_fmm)  then
           call updateDemagfieldFMM( gb_problem, gb_solution )
@@ -829,6 +892,9 @@
         end if
 #else
         call updateDemagfield( gb_problem, gb_solution )
+#endif
+#if USE_CDFMM
+        endif
 #endif
 
     
@@ -1202,6 +1268,40 @@
     subroutine updateThermal_wrapper()
         call updateThermalField( gb_problem, gb_solution)
     end subroutine updateThermal_wrapper
+
+
+#if USE_CDFMM
+subroutine updateDemagfieldDipFmm(problem, solution)
+  type(MicroMagProblem), intent(inout) :: problem
+  type(MicroMagSolution), intent(inout) :: solution
+  integer :: ierr
+  character(len=512) :: message
+
+  call evaluateDipFmm(problem, solution, ierr, message)
+  if (ierr /= 0) then
+      ! Evaluation errors are rare and normally indicate a lost CUDA context.
+      ! Preserve the Python process and complete the solve with the established
+      ! CPU demag implementation instead of invoking STOP/ERROR STOP.
+      !$omp taskwait
+      call displayGUIMessage('dip-fmm evaluation failed: '//trim(message))
+      call displayGUIMessage('Falling back to the regular CPU demag calculation')
+      call destroyDipFmm()
+      problem%use_cdfmm = .false.
+      problem%useCuda = useCudaFalse
+      call ComputeDemagfieldTensor(problem)
+      call updateDemagfield(problem, solution)
+      return
+  end if
+
+  call applyShapeCorrection(problem, solution)
+
+  if (problem%CV > 0) then
+      solution%HmX = solution%HmX + solution%HmX*problem%CV*sqrt(-2d0*log(solution%u1))*cos(2d0*pi*solution%u2)
+      solution%HmY = solution%HmY + solution%HmY*problem%CV*sqrt(-2d0*log(solution%u3))*cos(2d0*pi*solution%u4)
+      solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
+  end if
+end subroutine updateDemagfieldDipFmm
+#endif
 
 
 subroutine updateDemagfieldFMM(problem, solution)
@@ -1635,10 +1735,25 @@ end subroutine updateDemagfieldFMM
     type(MicroMagSolution),intent(inout) :: solution        !> Solution data structure
 
     integer, save :: itimer = 0
+#if USE_CDFMM
+    integer :: cdfmm_ierr
+    character(len=512) :: cdfmm_message
+#endif
     call trace%begin( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     
     if ( problem%useDemag .eq. useDemagTrue ) then
         !Demagnetization tensor matrix
+#if USE_CDFMM
+        if (problem%use_cdfmm) then
+            call initialiseDipFmm(problem, cdfmm_ierr, cdfmm_message)
+            if (cdfmm_ierr /= 0) then
+                call displayGUIMessage('dip-fmm plan creation failed: '//trim(cdfmm_message))
+                call displayGUIMessage('Falling back to the regular demag calculation')
+                problem%use_cdfmm = .false.
+                call ComputeDemagfieldTensor(problem)
+            end if
+        else
+#endif
 #if USE_FMM3D
         !------------- build neighbour demag tensor -------------------------------------------------------------------
         if (problem%use_fmm) then
@@ -1653,6 +1768,9 @@ end subroutine updateDemagfieldFMM
         !---------------------------------------------------------------------------------------------------------------
 #else
         call ComputeDemagfieldTensor( problem )
+#endif
+#if USE_CDFMM
+        endif
 #endif
     endif
     
@@ -3027,4 +3145,3 @@ end subroutine add_near_field
 
     
 end module LandauLifshitzSolution
-    
