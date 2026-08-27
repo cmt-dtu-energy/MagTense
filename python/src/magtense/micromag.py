@@ -93,6 +93,14 @@ class MicromagProblem:
         shiftVec: How far to shift domain copies along x, y and z when constructing the macrogeometry
         macroShape: Sidelengths of a prism representing the shape of the macrogeometry.
         sampleShape: Sidelengths of a prism representing the sample shape.
+        use_cdfmm: Use dip-fmm instead of the regular dense demagnetisation
+            calculation. Currently supported for uniform cuboid grids only.
+            Backend selection follows MagTense: CUDA requires both a
+            CUDA-enabled build and ``cuda=True``; otherwise dip-fmm prefers
+            oneMKL and falls back to portable CPU execution.
+        cdfmm_order: Expansion order used by dip-fmm.
+        cdfmm_depth: Fixed octree depth used by dip-fmm.
+        cdfmm_basis: Expansion basis, either ``"spherical"`` or ``"cartesian"``.
     """
 
     def __init__(
@@ -159,6 +167,10 @@ class MicromagProblem:
             n_macro: list | np.ndarray | None = np.zeros(3),
             hysteresis_solver: str = "static",
             rng_seed: int = 0,
+            use_cdfmm: bool = False,
+            cdfmm_order: int = 6,
+            cdfmm_depth: int = 4,
+            cdfmm_basis: str | int = "spherical",
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -295,6 +307,26 @@ class MicromagProblem:
         # library is rebuilt with FMM enabled. Set `problem.use_fmm = 1` to use it.
         self.use_fmm = 0
         #--------------------------------------------------
+
+        # dip-fmm is independent of the legacy FMM3D backend above. Its current
+        # MagTense adapter supports uniform cuboids and FP32 field arrays.
+        basis_values = {"spherical": 0, "cartesian": 1}
+        if isinstance(cdfmm_basis, str):
+            if cdfmm_basis not in basis_values:
+                raise ValueError(f"Unknown dip-fmm basis: {cdfmm_basis}")
+            cdfmm_basis = basis_values[cdfmm_basis]
+        if use_cdfmm and self.grid_type != 1:
+            raise ValueError("dip-fmm currently requires grid_type='uniform'")
+        if cdfmm_order < 1 or cdfmm_depth < 1:
+            raise ValueError("cdfmm_order and cdfmm_depth must be positive")
+        if int(cdfmm_basis) not in basis_values.values():
+            raise ValueError("cdfmm_basis must be 0 (spherical) or 1 (cartesian)")
+
+        self.use_cdfmm = int(use_cdfmm)
+        self.cdfmm_order = int(cdfmm_order)
+        self.cdfmm_depth = int(cdfmm_depth)
+        self.cdfmm_basis = int(cdfmm_basis)
+        self.cdfmm_precision = 0  # MagTense stores the demag field in FP32.
 
         #---------- timer and trace parameters ----------
         self.log_dir = "logs"
@@ -879,6 +911,11 @@ class MicromagProblem:
             fmm_min_n=self.fmm_min_n,
             fmm_nterms=self.fmm_nterms,
             usefmm=self.use_fmm,
+            usecdfmm=self.use_cdfmm,
+            cdfmm_order=self.cdfmm_order,
+            cdfmm_depth=self.cdfmm_depth,
+            cdfmm_basis=self.cdfmm_basis,
+            cdfmm_precision=self.cdfmm_precision,
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,
@@ -1036,6 +1073,11 @@ class MicromagProblem:
             fmm_min_n=self.fmm_min_n,
             fmm_nterms=self.fmm_nterms,
             usefmm=self.use_fmm,
+            usecdfmm=self.use_cdfmm,
+            cdfmm_order=self.cdfmm_order,
+            cdfmm_depth=self.cdfmm_depth,
+            cdfmm_basis=self.cdfmm_basis,
+            cdfmm_precision=self.cdfmm_precision,
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,
@@ -1211,6 +1253,11 @@ class MicromagProblem:
             fmm_min_n=self.fmm_min_n,
             fmm_nterms=self.fmm_nterms,
             usefmm=self.use_fmm,
+            usecdfmm=self.use_cdfmm,
+            cdfmm_order=self.cdfmm_order,
+            cdfmm_depth=self.cdfmm_depth,
+            cdfmm_basis=self.cdfmm_basis,
+            cdfmm_precision=self.cdfmm_precision,
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,

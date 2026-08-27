@@ -236,6 +236,14 @@ include "mkl_dfti.f90"
         integer :: allow_fmm_short_circuit = 0
         integer :: fmm_min_n = 20000    !> Minimum number of cells to use FMM
 
+        ! dip-fmm uses an independent persistent cuboid FMM plan. These integer
+        ! values match the public constants in cdfmm_fortran.
+        logical :: use_cdfmm = .false.
+        integer :: cdfmm_order = 6
+        integer :: cdfmm_depth = 4
+        integer :: cdfmm_basis = 0       !> 0 spherical, 1 Cartesian
+        integer :: cdfmm_precision = 0   !> 0 FP32; MagTense demag arrays are FP32
+
         integer, dimension(:,:), pointer :: nbr_idx(:,:) => null()    !> Neighbour indices for each target cell
         integer, dimension(:), pointer :: n_nbors(:) => null()
         real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:) => null()
@@ -316,5 +324,5 @@ include "mkl_dfti.f90"
     integer,parameter :: useFMMTrue=1,useFMMFalse=0
     integer,parameter :: useDemagTrue=1,useDemagFalse=0
     integer, parameter :: useAvgNTrue=1, useAvgNFalse=0
-    
-end module MicroMagParameters    
+
+end module MicroMagParameters
