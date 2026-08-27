@@ -2,6 +2,7 @@
 # Compiler names and flags
 #==========================
 CPP = icx
+CUDA_HOST_COMPILER ?=
 #=======================================================================
 #       List all source files required for the project
 #=======================================================================
@@ -25,6 +26,9 @@ ifeq ($(OS),Windows_NT)
 else
     OBJ_SUFFIX = .o
     CUFLAGS = -shared -Xcompiler -fPIC -I ${CONDA_PREFIX}/include
+    ifneq (${CUDA_HOST_COMPILER},)
+        CUFLAGS += -ccbin ${CUDA_HOST_COMPILER}
+    endif
     CPPFLAGS = ${CFLAGS}
     CPPFLAGS_OUT = -o 
     LIB_SUFFIX = .a
