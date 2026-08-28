@@ -50,12 +50,17 @@ channels:
   - nvidia/label/${CUDA_LABEL}
   - conda-forge
 dependencies:
-  - python=${PY}
+  # Take the interpreter from conda-forge by name. The Intel channel is first
+  # for the compilers and MKL, and it also ships its own python - which then
+  # wins on channel priority and held 3.12 back at 3.12.8 while conda-forge had
+  # 3.12.11. Qualifying just this one package keeps Intel's priority everywhere
+  # else.
+  - conda-forge::python=${PY}
   # Pin the GIL ABI explicitly. "python=3.14" alone lets conda-forge resolve to
   # the free-threading build, whose EXT_SUFFIX is .cpython-314t-... - a distinct
   # ABI that dist_pypi.py and deployment.yml have no notion of, and against
   # which the OpenMP Fortran core is untested.
-  - python_abi=${PY}=*_cp${V}
+  - conda-forge::python_abi=${PY}=*_cp${V}
   - pip
   - cmake
 
