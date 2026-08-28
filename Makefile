@@ -26,7 +26,6 @@ CDFMM_DIR ?= dip-fmm
 CDFMM_ROOT ?= $(abspath $(CDFMM_DIR)/local)
 CDFMM_BUILD_DIR ?= $(abspath $(CDFMM_DIR)/build-release)
 CDFMM_CUDA_ARCHITECTURES ?= 75;80;86;89;90
-BUILD_CDFMM ?= 1
 CUDA_HOST_COMPILER ?= ${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++
 
 #=======================================================================
@@ -392,14 +391,19 @@ endif
 #=======================================================================
 #							Targets
 #=======================================================================
-.PHONY: all clean cdfmm
+.PHONY: all clean clean_cdfmm cdfmm
+
+clean_cdfmm:
+	@echo "Removing bundled dip-fmm release build: ${MKFILE_PATH}/dip-fmm/build-release"
+	cmake -E remove_directory "${MKFILE_PATH}/dip-fmm/build-release"
+	@echo "Removing bundled dip-fmm local installation: ${MKFILE_PATH}/dip-fmm/local"
+	cmake -E remove_directory "${MKFILE_PATH}/dip-fmm/local"
+	@echo "Preserved dip-fmm caches under ${MKFILE_PATH}/dip-fmm/caches"
 
 cdfmm:
 ifeq ($(USE_CDFMM),1)
-ifeq ($(BUILD_CDFMM),1)
 ifeq ($(OS),Windows_NT)
 	@echo "ERROR: automatic dip-fmm builds are currently implemented for Linux only."
-	@echo "       Set BUILD_CDFMM=0 and CDFMM_ROOT to an existing Windows installation."
 	@exit 1
 else
 	cd "${CDFMM_DIR}" && CPATH= CPLUS_INCLUDE_PATH= cmake --preset release \
@@ -424,9 +428,6 @@ else
 		-DCDFMM_BUILD_BENCHMARKS=OFF
 	CPATH= CPLUS_INCLUDE_PATH= cmake --build "${CDFMM_BUILD_DIR}" --parallel
 	cmake --install "${CDFMM_BUILD_DIR}"
-endif
-else
-	@echo "BUILD_CDFMM=0 -> linking the existing dip-fmm installation at ${CDFMM_ROOT}"
 endif
 else
 	@echo "USE_CDFMM=0 -> skipping dip-fmm build"
@@ -519,7 +520,6 @@ info:
 	@echo Micromagnetics enabled: $(USE_MICROMAG)
 	@echo FMM3D enabled: $(USE_FMM3D)
 	@echo dip-fmm enabled: $(USE_CDFMM)
-	@echo build dip-fmm: $(BUILD_CDFMM)
 	@echo dip-fmm root: $(CDFMM_ROOT)
 	@echo MATLAB enabled: $(USE_MATLAB)
 	@echo MATLAB include: $(MATLAB_INCLUDE)
