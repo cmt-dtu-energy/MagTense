@@ -95,13 +95,11 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
     make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 USE_CDFMM=1
   ```
 
-  To link an already compiled dip-fmm installation without rebuilding it, set
-  `BUILD_CDFMM=0` and point `CDFMM_ROOT` at its install prefix:
+  Remove the bundled dip-fmm release build and local installation without
+  deleting its persistent caches:
 
   ```bash
-  LD_LIBRARY_PATH="$CDFMM_ROOT/lib:$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" \
-    make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 \
-      USE_CDFMM=1 BUILD_CDFMM=0 CDFMM_ROOT="$CDFMM_ROOT"
+  make clean_cdfmm
   ```
 
   The readable comparison example and its notebook are under
