@@ -116,14 +116,20 @@ def main(
                 check=False,
             )
             if cuda == "cpu":
-                subprocess.run(
-                    [
-                        "sed",
-                        "-i",
-                        "'/^nvidia-/d'",
-                        f"{py_folder}/requirements.txt",
-                    ],
-                    check=False,
+                # The CUDA wheels are the only ones that need the nvidia-*
+                # runtime libraries, so drop them from the cpu variant. Done in
+                # Python rather than by shelling out to sed: the argument list
+                # form passes the expression through literally, so the quotes
+                # that used to wrap it were part of the script and sed rejected
+                # it every time - silently, because check=False. The cpu wheels
+                # therefore shipped the nvidia-* dependencies.
+                req = Path(f"{py_folder}/requirements.txt")
+                req.write_text(
+                    "".join(
+                        line
+                        for line in req.read_text().splitlines(keepends=True)
+                        if not line.startswith("nvidia-")
+                    )
                 )
             subprocess.run(
                 ["python", "-m", "build", "--wheel"],

@@ -89,12 +89,24 @@ for V in "${VERSIONS[@]}"; do
 done
 
 step "wheel metadata (python ${LAST_V}, cpu variant)"
-# The loop above runs `make clean` between versions and finishes each one on a
-# CPU build, so only the last version's cpu extension module is still on disk.
-# That is enough to check what this change actually affects: whether the new
-# packages reach the wheel's Requires-Dist.
-"$PYTHON" python/.build/dist_pypi.py \
+# dist_pypi.py does not read the extension module from where the build leaves
+# it. It expects it staged under python/<variant>_libs/, the way the CI job
+# does it (python-package-conda-new.yml:59-60), and it clears
+# src/magtense/lib/*.so before copying the staged file in. So stage it here,
+# and keep a copy to put back afterwards - otherwise this step silently breaks
+# the editable install that the steps above just validated.
+BACKUP="$(mktemp -d)"
+cp python/src/magtense/lib/magtensesource*.so "$BACKUP/"
+mkdir -p python/cpu_libs
+cp python/src/magtense/lib/magtensesource*.so python/cpu_libs/
+
+# Run through conda so that the bare "python -m build" inside dist_pypi.py
+# resolves to the environment interpreter rather than whatever is on PATH.
+"$CONDA_BIN" run -n "$ENV_NAME" python python/.build/dist_pypi.py \
     --py_version "$LAST_V" --cu_version cpu --platform linux
+
+cp "$BACKUP"/magtensesource*.so python/src/magtense/lib/
+rm -rf "$BACKUP" python/cpu_libs
 
 shopt -s nullglob
 WHEELS=(python/dist/*.whl)
