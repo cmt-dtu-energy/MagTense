@@ -100,6 +100,22 @@ cp python/src/magtense/lib/magtensesource*.so "$BACKUP/"
 mkdir -p python/cpu_libs
 cp python/src/magtense/lib/magtensesource*.so python/cpu_libs/
 
+# f2py names the module from the interpreter's EXT_SUFFIX, while dist_pypi.py
+# reconstructs the name as cpython-<ver>-x86_64-linux-gnu. A free-threaded or
+# otherwise non-standard interpreter makes those disagree, and dist_pypi.py
+# reports it only as "the compile step did not produce it", which sends you
+# looking at the build instead of at the name.
+EXPECTED="magtensesource.cpython-${LAST_V}-x86_64-linux-gnu.so"
+if [ ! -f "python/cpu_libs/${EXPECTED}" ]; then
+    echo "The staged extension module is not named what dist_pypi.py expects." >&2
+    echo "  expected: python/cpu_libs/${EXPECTED}" >&2
+    echo "  actually staged:" >&2
+    ls -1 python/cpu_libs/ | sed 's/^/    /' >&2
+    echo "  interpreter EXT_SUFFIX: $("$PYTHON" -c \
+        'import sysconfig; print(sysconfig.get_config_var("EXT_SUFFIX"))')" >&2
+    fail "extension module name does not match dist_pypi.py's expectation"
+fi
+
 # Run through conda so that the bare "python -m build" inside dist_pypi.py
 # resolves to the environment interpreter rather than whatever is on PATH.
 "$CONDA_BIN" run -n "$ENV_NAME" python python/.build/dist_pypi.py \
