@@ -543,9 +543,21 @@ test:
 
 
 
+# f2py is invoked with FC/FFLAGS/LDFLAGS as environment assignments in front of
+# the command, so a value holding a space has to be quoted or the shell takes
+# everything after the space as the command to run. FFLAGS carries its own
+# quotes (EXTRA_FFLAGS above), and so does the Windows LDFLAGS; the Linux one is
+# assembled in pieces - USE_FMM3D=1 appends an -Wl,-rpath to the -z noexecstack
+# it starts out as - so it is quoted here instead.
+ifeq ($(OS),Windows_NT)
+  LDFLAGS_ENV = LDFLAGS=${LDFLAGS}
+else
+  LDFLAGS_ENV = LDFLAGS="${LDFLAGS}"
+endif
+
 ${PYTHON_MODN_ALL}: check-config check-flags
 	${CP_LIB}
-	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
+	FC=${FC} FFLAGS=${EXTRA_FFLAGS} ${LDFLAGS_ENV} \
 		$(PYTHON) -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} \
 		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${FMM3D}

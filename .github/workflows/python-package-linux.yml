@@ -18,6 +18,9 @@ jobs:
   build-wheel:
     runs-on: ubuntu-latest
     strategy:
+      # The legs are independent wheels, and a transient conda/anaconda.org
+      # failure on one of them should not cancel the other eight.
+      fail-fast: false
       matrix:
         # An explicit list rather than a cuda x fmm cross product: cu12-fmm is
         # the only FMM variant and it is built without CVODE, so two of the four
@@ -137,6 +140,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-wheel
     strategy:
+      fail-fast: false
       matrix:
         variant:
           - { name: cu12, build_tag: 1 }
@@ -215,6 +219,7 @@ jobs:
     runs-on: [self-hosted, Linux, CUDA]
     needs: build-wheel
     strategy:
+      fail-fast: false
       matrix:
         py-version:
           - { version: "312", semver: "3.12" }
