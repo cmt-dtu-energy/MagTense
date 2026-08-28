@@ -9,8 +9,13 @@ On a Debian/Ubuntu system, first install the build prerequisites:
 
 ```shell
 sudo apt-get update
-sudo apt-get install -y git curl build-essential
+sudo apt-get install -y git curl wget unzip build-essential
 ```
+
+`curl` fetches Miniconda and `wget` fetches the CVODE source tarball; `unzip` is only
+needed if you run [test-envs-linux.sh](./.build/test-envs-linux.sh), which inspects wheel
+metadata. Everything else - the Intel and GNU compilers, CMake, CUDA - comes from the conda
+environment, so no system toolchain beyond `build-essential` is required.
 
 Then you can simply run
 
