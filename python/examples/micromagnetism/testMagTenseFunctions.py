@@ -54,7 +54,7 @@ import matplotlib as mpl
 # The suite writes figures rather than showing them, so no interactive backend is
 # needed. This has to happen before the examples are imported, since they create
 # figures at call time.
-mpl.use("Agg")
+mpl.use(os.environ.get("MPLBACKEND", "Agg"))
 
 import matplotlib.pyplot as plt
 import numpy as np
