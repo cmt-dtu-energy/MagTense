@@ -1,9 +1,10 @@
 """Combined micromagnetic test suite for the python version of MagTense.
 
 This is the python counterpart of matlab/util/testMagTenseFunctions.m. It runs the
-validation examples in this folder, collects the numerical measure each of them
-produces, compares it with the acceptance limit that belongs to it, and prints a table
-plus a figure showing which tests passed.
+validation examples in the directories next to this file, collects the numerical
+measure each of them produces, compares it with the acceptance limit that belongs to
+it, and prints a table plus a figure showing which tests passed. Each example is run
+from its own directory, so whatever it writes lands beside it.
 
 Coverage compared with the MATLAB suite
 ---------------------------------------
@@ -13,7 +14,8 @@ Shared with MATLAB : macrogeometry periodic boundary conditions, periodic exchan
                      MATLAB counterparts live in
                      matlab/examples/Micromagnetism/MagTense_tests and use the same
                      geometries and the same acceptance limits.
-Only in python     : standard problem 3.
+Only in python     : standard problem 3, and the point dipole far field of a
+                     magnetised cube.
 Only in MATLAB     : the six magnetostatic field validations (cylindrical slice, prism,
                      sphere, spheroid, tetrahedron), and the standard problem 6
                      direction and unstructured mesh variants. The python examples for
@@ -40,9 +42,11 @@ Usage
 """
 
 import argparse
+import os
 import sys
 import time
 import traceback
+from contextlib import contextmanager
 from pathlib import Path
 
 import matplotlib as mpl
@@ -50,17 +54,41 @@ import matplotlib as mpl
 # The suite writes figures rather than showing them, so no interactive backend is
 # needed. This has to happen before the examples are imported, since they create
 # figures at call time.
-mpl.use("Agg")
+mpl.use(os.environ.get("MPLBACKEND", "Agg"))
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-# The examples live next to this file and are imported as plain modules
-EXAMPLE_DIR = Path(__file__).resolve().parent
-if str(EXAMPLE_DIR) not in sys.path:
-    sys.path.insert(0, str(EXAMPLE_DIR))
+# Every example has its own directory, the same as in
+# matlab/examples/Micromagnetism, and writes what it produces beside itself.
+EXAMPLE_ROOT = Path(__file__).resolve().parent
+TESTS_DIR = EXAMPLE_ROOT / "MagTense_tests"
+STD3_DIR = EXAMPLE_ROOT / "mumag_micromag_Std_problem_3"
+STD4_DIR = EXAMPLE_ROOT / "mumag_micromag_Std_problem_4"
+STD6_DIR = EXAMPLE_ROOT / "mumag_micromag_Std_problem_6"
 
-RESULTS_DIR = EXAMPLE_DIR / "results"
+
+@contextmanager
+def example_dir(directory: Path):
+    """Import from and run inside one example directory.
+
+    The examples name their timer logs with a bare relative filename, so the
+    directory the interpreter runs in decides where those land. The MATLAB suite
+    solves this by entering each example folder before calling it, and this does
+    the same, which also keeps the figures next to the example that made them.
+    """
+    entry = str(directory)
+    added = entry not in sys.path
+    if added:
+        sys.path.insert(0, entry)
+    previous = Path.cwd()
+    os.chdir(directory)
+    try:
+        yield directory
+    finally:
+        os.chdir(previous)
+        if added:
+            sys.path.remove(entry)
 
 # Passed on to the examples that accept it. The examples that do not take a cuda
 # argument set it themselves; MicromagProblem falls back to the CPU when no GPU is
@@ -75,23 +103,33 @@ STD3_SINGLE_DOMAIN_LIMIT = 8.47
 
 
 def _macrogeometry_PBC_test() -> list[dict]:
-    import macrogeometry_PBC_test as mod
-    return mod.run_test()
+    with example_dir(TESTS_DIR):
+        import macrogeometry_PBC_test as mod
+        return mod.run_test()
 
 
 def _periodic_exchange_test() -> list[dict]:
-    import periodic_exchange_test as mod
-    return mod.run_test(cuda=USE_CUDA)
+    with example_dir(TESTS_DIR):
+        import periodic_exchange_test as mod
+        return mod.run_test(cuda=USE_CUDA)
 
 
 def _shape_correction_test() -> list[dict]:
-    import shape_correction_test as mod
-    return mod.run_test()
+    with example_dir(TESTS_DIR):
+        import shape_correction_test as mod
+        return mod.run_test()
 
 
 def _temperature_test() -> list[dict]:
-    import temperature_test as mod
-    return mod.run_test()
+    with example_dir(TESTS_DIR):
+        import temperature_test as mod
+        return mod.run_test()
+
+
+def _dipole_field_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import dipole_field_test as mod
+        return mod.run_test()
 
 
 def _std_problem_4() -> list[dict]:
@@ -100,28 +138,29 @@ def _std_problem_4() -> list[dict]:
     The limit of 100 % is the one used by the MATLAB suite. It is loose because <My> and
     <Mz> average close to zero, so the relative measure has a small denominator.
     """
-    from std_problem_4 import std_prob_4
+    with example_dir(STD4_DIR):
+        from std_problem_4 import std_prob_4
 
-    checks = []
-    for field in (1, 2):
-        _, rel_int_error = std_prob_4(
-            NIST_field=field,
-            cuda=USE_CUDA,
-            cvode=False,
-            unstructured=False,
-            plotting=True,
-            figpath=RESULTS_DIR,
-        )
-        checks.extend(
-            {
-                'check': f'field {field}: <M{component}> vs mumag',
-                'value': error,
-                'limit': 100.0,
-                'passed': error < 100.0,
-            }
-            for component, error in zip("xyz", rel_int_error, strict=True)
-        )
-    return checks
+        checks = []
+        for field in (1, 2):
+            _, rel_int_error = std_prob_4(
+                NIST_field=field,
+                cuda=USE_CUDA,
+                cvode=False,
+                unstructured=False,
+                plotting=True,
+                figpath=STD4_DIR,
+            )
+            checks.extend(
+                {
+                    'check': f'field {field}: <M{component}> vs mumag',
+                    'value': error,
+                    'limit': 100.0,
+                    'passed': error < 100.0,
+                }
+                for component, error in zip("xyz", rel_int_error, strict=True)
+            )
+        return checks
 
 
 def _std_problem_6() -> list[dict]:
@@ -131,36 +170,37 @@ def _std_problem_6() -> list[dict]:
     MATLAB additionally runs the field along y and z and on an unstructured mesh; the
     python std_prob_6 does not offer those options, so they are not covered.
     """
-    from std_problem_6 import THEORETICAL_PINNING_FIELDS, std_prob_6
+    with example_dir(STD6_DIR):
+        from std_problem_6 import THEORETICAL_PINNING_FIELDS, std_prob_6
 
-    checks = []
-    for settings in ("akj", "ak", "aj", "a", "kj", "k"):
-        theory = THEORETICAL_PINNING_FIELDS[settings]
-        switching_field = std_prob_6(
-            settings=settings,
-            x_steps=80,
-            field_steps=201,
-            cuda=USE_CUDA,
-            cvode=False,
-            plotting=True,
-            figpath=RESULTS_DIR,
-        )
-        if switching_field is None:
-            # No switching at all is a failure whatever the limit is
-            error = float('inf')
-            print(f'settings="{settings}": no switching observed '
-                  f'(theory {theory:.3f} T)')
-        else:
-            error = abs(switching_field - theory) / theory * 100
-            print(f'settings="{settings}": switching field = {switching_field:.4f} T '
-                  f'(theory {theory:.3f} T, error {error:.1f} %)')
-        checks.append({
-            'check': f'depinning field, variation "{settings}"',
-            'value': error,
-            'limit': 5.0,
-            'passed': error < 5.0,
-        })
-    return checks
+        checks = []
+        for settings in ("akj", "ak", "aj", "a", "kj", "k"):
+            theory = THEORETICAL_PINNING_FIELDS[settings]
+            switching_field = std_prob_6(
+                settings=settings,
+                x_steps=80,
+                field_steps=201,
+                cuda=USE_CUDA,
+                cvode=False,
+                plotting=True,
+                figpath=STD6_DIR,
+            )
+            if switching_field is None:
+                # No switching at all is a failure whatever the limit is
+                error = float('inf')
+                print(f'settings="{settings}": no switching observed '
+                      f'(theory {theory:.3f} T)')
+            else:
+                error = abs(switching_field - theory) / theory * 100
+                print(f'settings="{settings}": switching field = {switching_field:.4f} T '
+                      f'(theory {theory:.3f} T, error {error:.1f} %)')
+            checks.append({
+                'check': f'depinning field, variation "{settings}"',
+                'value': error,
+                'limit': 5.0,
+                'passed': error < 5.0,
+            })
+        return checks
 
 
 def _std_problem_3() -> list[dict]:
@@ -170,16 +210,17 @@ def _std_problem_3() -> list[dict]:
     exchange lengths. The crossing of the two total energies is found by linear
     interpolation, so the simulated cube sizes have to bracket it.
     """
-    from std_problem_3 import std_prob_3
-
     L_loop = np.linspace(8, 9, 6)
-    L_loop, E_arr = std_prob_3(
-        L_loop=L_loop,
-        cuda=USE_CUDA,
-        cvode=False,
-        plotting=True,
-        figpath=RESULTS_DIR,
-    )
+    with example_dir(STD3_DIR):
+        from std_problem_3 import std_prob_3
+
+        L_loop, E_arr = std_prob_3(
+            L_loop=L_loop,
+            cuda=USE_CUDA,
+            cvode=False,
+            plotting=True,
+            figpath=STD3_DIR,
+        )
 
     E_flower = np.sum(E_arr[:, :, 0], axis=0)
     E_vortex = np.sum(E_arr[:, :, 1], axis=0)
@@ -224,6 +265,10 @@ TESTS = {
     'temperature_test': (
         _temperature_test, False,
         'Thermal fluctuations against the analytical angular diffusion',
+    ),
+    'dipole_field_test': (
+        _dipole_field_test, False,
+        'Far field of a magnetised cube against the analytical point dipole',
     ),
     'std_problem_4': (
         _std_problem_4, False,
@@ -478,7 +523,7 @@ def main() -> int:
 
     if not args.no_figure:
         plot_overview(records, skipped,
-                      RESULTS_DIR / 'testMagTenseFunctions_overview.png')
+                      EXAMPLE_ROOT / 'testMagTenseFunctions_overview.png')
 
     failed = [r['name'] for r in records if r['status'] != 'PASS']
     if failed:

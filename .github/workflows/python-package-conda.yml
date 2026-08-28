@@ -211,8 +211,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         sparse-checkout: |
-          python/tests/
-          python/src/utils/
+          python/util/
           python/examples/
           documentation/examples_FEM_validation/
           documentation/examples_mumag_validation/
@@ -234,7 +233,7 @@ jobs:
       run: |
         python -m pip install '${{ github.workspace }}'/*.whl
         python -m pip install pytest
-        python -m pytest python/tests/test_magtense.py
+        python -m pytest python/examples/magnetostatics/test_magtense.py
 
     # python/examples/micromagnetism/testMagTenseFunctions.py is the combined micromagnetic
     # suite and the counterpart of matlab/util/testMagTenseFunctions. It runs the validation
@@ -262,7 +261,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: test-suite-py${{ matrix.py-version.name }}-${{ matrix.mt-punit.name }}-${{ runner.os }}
-        path: python/examples/micromagnetism/results/*
+        path: python/examples/micromagnetism/testMagTenseFunctions_overview.png
         if-no-files-found: ignore
 
 
@@ -290,8 +289,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         sparse-checkout: |
-          python/tests/
-          python/src/utils/
+          python/util/
           python/examples/
           documentation/examples_FEM_validation/
           documentation/examples_mumag_validation/
@@ -472,7 +470,7 @@ jobs:
         "$PYTHON_EXE" -m pip install '${{ github.workspace }}'/*.whl
         "$PYTHON_EXE" -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
         "$PYTHON_EXE" -m pip install pytest
-        "$PYTHON_EXE" -m pytest python/tests/fmm_test/test_fmm_workflow.py
+        "$PYTHON_EXE" -m pytest python/examples/micromagnetism/MagTense_tests/fmm_test/test_fmm_workflow.py
 
     # The same combined suite as in test-wheel, but on a machine that has a GPU, so this is
     # where the CUDA path of the solver is exercised. Standard problem 6 is left out for the
@@ -518,7 +516,7 @@ jobs:
         & $env:PYTHON_EXE -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
 
         & $env:PYTHON_EXE -m pip install pytest
-        & $env:PYTHON_EXE -m pytest python/tests/fmm_test/test_fmm_workflow.py
+        & $env:PYTHON_EXE -m pytest python/examples/micromagnetism/MagTense_tests/fmm_test/test_fmm_workflow.py
 
     - name: Run the combined micromagnetic test suite with CUDA (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}

@@ -112,7 +112,7 @@ nt_h_ext = 2    # Two samples completely define the constant field
 # Where to save
 save = False    # Whether to save the raw simulation output as json
 savename = 'temperature_example_calc'
-results_dir = Path(__file__).resolve().parent / "results"
+output_dir = Path(__file__).resolve().parent
 
 # Plot settings
 Nbin = 20           # Number of histogram bins
@@ -216,7 +216,9 @@ def run_test(plotting: bool = True) -> list[dict]:
         dataDict['results'] = {'t_n': t_n[::dataperiod], 'M_npv': M_npv[::dataperiod]}
 
         # Store data dictionary
-        write_json(str(results_dir / 'data' / f'{savename}_dataDict.json'), dataDict)
+        data_dir = output_dir / 'data'
+        data_dir.mkdir(parents=True, exist_ok=True)
+        write_json(str(data_dir / f'{savename}_dataDict.json'), dataDict)
 
     #%% Analytical result
 
@@ -321,10 +323,9 @@ def run_test(plotting: bool = True) -> list[dict]:
         ax.set_xticklabels([r'$0$', r'$\pi/4$', r'$\pi/2$', r'$3\pi/4$', r'$\pi$'])
         ax.set_ylabel(r'Probabililty distribution, $P(\theta)$')
 
-        # Save the figure beside the other micromagnetic example results and close it so the
-        # script does not open an interactive plotting window.
-        results_dir.mkdir(parents=True, exist_ok=True)
-        figure_path = results_dir / 'temperature_test.png'
+        # Save the figure beside this script and close it so the script does not
+        # open an interactive plotting window.
+        figure_path = output_dir / 'temperature_test.png'
         fig.savefig(figure_path, dpi=300, bbox_inches='tight')
         plt.close(fig)
         print(f'Saved figure to {figure_path}')
@@ -338,7 +339,7 @@ def run_test(plotting: bool = True) -> list[dict]:
             ax.set_xlabel(r'$\text{Time, } t\ [\mathrm{ns}]$')
             ax.set_ylabel(r'$\text{Average magnetisation, } \langle M_z\rangle/M_s$')
             ax.legend(loc='best')
-            figure_path = results_dir / 'temperature_test_langevin.png'
+            figure_path = output_dir / 'temperature_test_langevin.png'
             fig.savefig(figure_path, dpi=300, bbox_inches='tight')
             plt.close(fig)
             print(f'Saved figure to {figure_path}')

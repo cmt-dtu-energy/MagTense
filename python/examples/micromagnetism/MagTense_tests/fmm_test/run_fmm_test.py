@@ -1,13 +1,21 @@
 
+import sys
+from pathlib import Path
+
+# python/util holds the shared helper modules (utils, grain_generator and
+# friends). Resolve it from this file rather than the cwd, so the module
+# imports from wherever it is run.
+_UTIL = Path(__file__).resolve().parents[4] / "util"
+if str(_UTIL) not in sys.path:
+    sys.path.append(str(_UTIL))
+
 import numpy as np
 from grain_generator import AdaptiveGrainGenerator
 from magtense.micromag import MicromagProblem
 from fmm_test_setup import fmm_test_setup
 from experiment_io import save_experiment_data
 from auxiliary_functions import calculate_error_metrics, plot_all_comparisons, validate_results
-import sys
 import argparse
-from pathlib import Path
 from itertools import product
 
 # The results table uses non-ASCII status markers. When this script runs under

@@ -6,7 +6,7 @@ PY_VERSION ?= 314
 USE_CVODE = 0
 USE_MICROMAG = 1
 USE_MATLAB = 0
-MATLAB_INCLUDE =
+MATLAB_INCLUDE ?=
 USE_FMM3D ?= 0
 
 # /usr/local/MATLAB/<version>/extern/include (Linux)
@@ -14,7 +14,11 @@ USE_FMM3D ?= 0
 CPP = icx
 FC = ifx
 MKFILE_PATH := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
-CVODE_ROOT = ${MKFILE_PATH}/cvode
+# The CI job unpacks the sundials artifact into <repo>/cvode, so that is the
+# default. A local sundials install lives somewhere else, so allow both the
+# environment and the command line to override it, e.g.
+#   make ... USE_CVODE=1 CVODE_ROOT="C:/Program Files (x86)/sundials-7.2.1"
+CVODE_ROOT ?= ${MKFILE_PATH}/cvode
 
 # Name of the conda environment the build lives in
 ENV_NAME := magtense-env
@@ -93,6 +97,22 @@ ifeq ($(OS),Windows_NT)
 	ifneq ($(CONDA_MAKE),)
 		MAKE := $(CONDA_MAKE)
 	endif
+
+	# The include paths are passed to the compiler unquoted, and they have to
+	# stay that way: a quote is what makes make hand the recipe to msys sh
+	# instead of exec'ing it, and that shell rewrites every /-leading argument
+	# of a native program into a path, so /O3, /fpp and the /D defines silently
+	# turn into C:/.../Library/O3 and friends and the build comes out wrong.
+	# Unquoted, a path with a space is split into two arguments instead, so the
+	# space is taken out of the path rather than quoted around, by asking for
+	# the 8.3 short form. CI passes paths that have no spaces and never gets here.
+	SPACE :=
+	SPACE := $(SPACE) $(SPACE)
+	short_path = $(if $(findstring $(SPACE),$1),$(or $(shell cygpath -d -m "$1"),$1),$1)
+	ifneq ($(MATLAB_INCLUDE),)
+		override MATLAB_INCLUDE := $(call short_path,$(MATLAB_INCLUDE))
+	endif
+	override CVODE_ROOT := $(call short_path,$(CVODE_ROOT))
 endif
 
 #=======================================================================
@@ -365,6 +385,56 @@ check-flags:
 	fi
 
 #=======================================================================
+#                    Optional dependency locations
+#
+# USE_CVODE=1 needs a sundials install and USE_MATLAB=1 needs MATLAB's extern
+# headers, neither of which the repository carries. CI supplies both - it
+# unpacks the sundials artifact into <repo>/cvode and passes MATLAB_INCLUDE on
+# the command line - so a local build that leaves them unset is the only way to
+# reach these paths, and the failures are unrecognisable without this check:
+# a missing CVODE_ROOT surfaces as "error #7002" on every sundials module, and
+# an empty MATLAB_INCLUDE expands to a bare -I that swallows the following -c,
+# turning the compile into a link and burying the build under
+# "libifcoremt.lib(for_main.obj) : error LNK2019: unresolved external MAIN__".
+#=======================================================================
+.PHONY: check-config
+check-config:
+ifeq ($(OS),Windows_NT)
+	@case "${CVODE_ROOT}${MATLAB_INCLUDE}" in *" "*) \
+		echo "ERROR: a dependency path still contains a space after 8.3 shortening."; \
+		echo "       CVODE_ROOT     = ${CVODE_ROOT}"; \
+		echo "       MATLAB_INCLUDE = ${MATLAB_INCLUDE}"; \
+		echo "       The compiler is invoked without quotes - see the note at the top"; \
+		echo "       of this Makefile - so the path is split on the space. Either move"; \
+		echo "       the dependency somewhere without spaces, or enable 8.3 names on"; \
+		echo "       the volume (fsutil 8dot3name set 0) and recreate the directory."; \
+		exit 1;; \
+	esac
+endif
+ifeq ($(USE_CVODE),1)
+	@if [ ! -d "${CVODE_ROOT}/fortran" ]; then \
+		echo "ERROR: USE_CVODE=1 but no sundials Fortran modules under CVODE_ROOT."; \
+		echo "       CVODE_ROOT = ${CVODE_ROOT}"; \
+		echo "       Point it at your sundials install, e.g."; \
+		echo "         make ... USE_CVODE=1 CVODE_ROOT=\"C:/Program Files (x86)/sundials-7.2.1\""; \
+		exit 1; \
+	fi
+endif
+ifeq ($(USE_MATLAB),1)
+	@if [ -z "${MATLAB_INCLUDE}" ]; then \
+		echo "ERROR: USE_MATLAB=1 requires MATLAB_INCLUDE to be set."; \
+		echo "       Point it at MATLAB's extern/include, e.g."; \
+		echo "         make ... USE_MATLAB=1 MATLAB_INCLUDE=\"C:/Program Files/MATLAB/R2024b/extern/include\""; \
+		exit 1; \
+	fi
+	@if [ ! -f "${MATLAB_INCLUDE}/fintrf.h" ]; then \
+		echo "ERROR: no fintrf.h under MATLAB_INCLUDE."; \
+		echo "       MATLAB_INCLUDE = ${MATLAB_INCLUDE}"; \
+		exit 1; \
+	fi
+endif
+
+#=======================================================================
 #							Targets
 #=======================================================================
 .PHONY: all clean install-miniconda build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL} rm-conda rm-env python-interface-win info print-%
@@ -408,7 +478,7 @@ clean_full:
 	rm -rf ${PYTHON_LIBPATH}/build
 	rm -f ${BUILD_FLAGS_FILE}
 
-auxmt:
+auxmt: check-config
 	cd ${AUXMT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
 	${RECORD_FLAGS}
 
@@ -416,20 +486,20 @@ clean-build:
 	rm -f ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
 	rm -rf ${PYTHON_LIBPATH}/build
 
-magnetostatic:
+magnetostatic: check-config
 	cd ${NUM_INT_PATH} $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 	cd ${TILE_DEMAG_TENSOR_PATH} $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 	cd ${DEMAG_FIELD_PATH}  $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 	${RECORD_FLAGS}
 
-micromagnetism:
+micromagnetism: check-config
 	cd ${MICROMAG_PATH} $(SEP) $(MAKE) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 	${RECORD_FLAGS}
 
 cuda:
 	cd ${FORTRAN_CUDA_PATH} $(SEP) $(MAKE) CPP=$(CPP)
 
-forceintegrator:
+forceintegrator: check-config
 	cd $(FORCEINTEGRATOR_PATH) $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 
 standalone:
@@ -455,6 +525,8 @@ info:
 	@echo Micromagnetics enabled: $(USE_MICROMAG)
 	@echo FMM3D enabled: $(USE_FMM3D)
 	@echo MATLAB enabled: $(USE_MATLAB)
+	@echo MATLAB include: $(MATLAB_INCLUDE)
+	@echo CVODE root: $(CVODE_ROOT)
 	@echo Include paths: -I$(INCLUDE_OBJ)
 	@echo Libraries: -L${MKFILE_PATH} ${LIB_OPT}
 
@@ -471,7 +543,7 @@ test:
 
 
 
-${PYTHON_MODN_ALL}: check-flags
+${PYTHON_MODN_ALL}: check-config check-flags
 	${CP_LIB}
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
 		$(PYTHON) -m numpy.f2py -c -m ${PYTHON_MODN} \

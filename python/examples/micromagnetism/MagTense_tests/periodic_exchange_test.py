@@ -105,7 +105,7 @@ plt.rcParams['text.usetex'] = False
 
 #%% Settings
 
-results_dir = Path(__file__).resolve().parent / "results"
+output_dir = Path(__file__).resolve().parent
 
 # The two grid types that MagTense assembles the exchange operator for
 GRID_TYPES = ('uniform', 'unstructuredPrisms')
@@ -1001,8 +1001,7 @@ def plot_results(deviations, operators, res, a, pbc, supercells, grains):
         ax.set_xlabel('Tile index')
         ax.set_ylabel('Tile index')
 
-    results_dir.mkdir(parents=True, exist_ok=True)
-    figure_path = results_dir / 'periodic_exchange_test.png'
+    figure_path = output_dir / 'periodic_exchange_test.png'
     fig.savefig(figure_path, dpi=200, bbox_inches='tight')
     plt.close(fig)
     print(f"\nSaved figure to {figure_path}")
@@ -1103,7 +1102,7 @@ def plot_grain_figure(grains):
     fig.suptitle(f'The irregular mesh of the periodic exchange test, cross section at '
                  f'z = {z0:.2e} m')
 
-    figure_path = results_dir / 'periodic_exchange_test_grains.png'
+    figure_path = output_dir / 'periodic_exchange_test_grains.png'
     fig.savefig(figure_path, dpi=200, bbox_inches='tight')
     plt.close(fig)
     print(f"Saved figure to {figure_path}")

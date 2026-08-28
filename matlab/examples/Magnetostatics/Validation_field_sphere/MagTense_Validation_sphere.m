@@ -87,15 +87,15 @@ plot(fig3,z,H((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)),2),'g.');
 plot(fig3,z,H((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z)),3),'b.');
 
 %Load comparison data from FEM simulation
-data_FEM_Hx_x = load('..\..\..\..\documentation\examples_FEM_validation\Validation_sphere\Validation_sphere_Hx_x.txt');
-data_FEM_Hx_y = load('..\..\..\..\documentation\examples_FEM_validation\Validation_sphere\Validation_sphere_Hx_y.txt');
-data_FEM_Hx_z = load('..\..\..\..\documentation\examples_FEM_validation\Validation_sphere\Validation_sphere_Hx_z.txt');
-data_FEM_Hy_x = load('..\..\..\..\documentation\examples_FEM_validation\Validation_sphere\Validation_sphere_Hy_x.txt');
-data_FEM_Hy_y = load('..\..\..\..\documentation\examples_FEM_validation\Validation_sphere\Validation_sphere_Hy_y.txt');
-data_FEM_Hy_z = load('..\..\..\..\documentation\examples_FEM_validation\Validation_sphere\Validation_sphere_Hy_z.txt');
-data_FEM_Hz_x = load('..\..\..\..\documentation\examples_FEM_validation\Validation_sphere\Validation_sphere_Hz_x.txt');
-data_FEM_Hz_y = load('..\..\..\..\documentation\examples_FEM_validation\Validation_sphere\Validation_sphere_Hz_y.txt');
-data_FEM_Hz_z = load('..\..\..\..\documentation\examples_FEM_validation\Validation_sphere\Validation_sphere_Hz_z.txt');
+data_FEM_Hx_x = load('../../../../documentation/examples_FEM_validation/Validation_sphere/Validation_sphere_Hx_x.txt');
+data_FEM_Hx_y = load('../../../../documentation/examples_FEM_validation/Validation_sphere/Validation_sphere_Hx_y.txt');
+data_FEM_Hx_z = load('../../../../documentation/examples_FEM_validation/Validation_sphere/Validation_sphere_Hx_z.txt');
+data_FEM_Hy_x = load('../../../../documentation/examples_FEM_validation/Validation_sphere/Validation_sphere_Hy_x.txt');
+data_FEM_Hy_y = load('../../../../documentation/examples_FEM_validation/Validation_sphere/Validation_sphere_Hy_y.txt');
+data_FEM_Hy_z = load('../../../../documentation/examples_FEM_validation/Validation_sphere/Validation_sphere_Hy_z.txt');
+data_FEM_Hz_x = load('../../../../documentation/examples_FEM_validation/Validation_sphere/Validation_sphere_Hz_x.txt');
+data_FEM_Hz_y = load('../../../../documentation/examples_FEM_validation/Validation_sphere/Validation_sphere_Hz_y.txt');
+data_FEM_Hz_z = load('../../../../documentation/examples_FEM_validation/Validation_sphere/Validation_sphere_Hz_z.txt');
 
 plot(fig1,data_FEM_Hx_x(:,1),data_FEM_Hx_x(:,2),'ro')
 plot(fig1,data_FEM_Hy_x(:,1),data_FEM_Hy_x(:,2),'go')

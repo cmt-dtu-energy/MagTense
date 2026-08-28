@@ -63,6 +63,7 @@ def test_prism(shape="prism", model_offset=[0, 0, 0], unit: str = ("A/m",)):
         Path(__file__).parent.absolute()
         / ".."
         / ".."
+        / ".."
         / "documentation"
         / "examples_FEM_validation"
         / f"Validation_{shape}"

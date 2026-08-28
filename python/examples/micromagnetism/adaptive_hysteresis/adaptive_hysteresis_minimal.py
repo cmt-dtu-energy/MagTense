@@ -14,7 +14,7 @@ import numpy as np
 
 
 # Allow this file to be run directly from a MagTense source checkout.
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 PYTHON_SOURCE = REPOSITORY_ROOT / "python" / "src"
 for search_path in (REPOSITORY_ROOT, PYTHON_SOURCE):
     if str(search_path) not in sys.path:

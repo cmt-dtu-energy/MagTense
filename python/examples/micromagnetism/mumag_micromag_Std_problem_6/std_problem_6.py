@@ -226,7 +226,7 @@ if __name__ == "__main__":
             cvode=False,
             plotting=True,
             #figpath=None,
-            figpath= Path.cwd() / "results"
+            figpath=Path(__file__).resolve().parent,
         )
         _theory = THEORETICAL_PINNING_FIELDS[_s]
         if _sw is not None:

@@ -107,7 +107,8 @@ jobs:
       uses: actions/checkout@v4
       with:
         sparse-checkout: |
-          python/tests/
+          python/util/
+          python/examples/
           documentation/examples_FEM_validation/
 
     - name: Download wheel artifact
@@ -124,4 +125,5 @@ jobs:
       run: |
         python3 -m pip install ${{ github.workspace }}/magtense-*-${{ matrix.cuda.build_tag }}-py${{ matrix.py-version.version }}-none-manylinux1_x86_64.whl
         python3 -m pip install pytest
-        pytest
+        python3 -m pytest python/examples/magnetostatics/test_magtense.py \
+                          python/examples/micromagnetism/MagTense_tests

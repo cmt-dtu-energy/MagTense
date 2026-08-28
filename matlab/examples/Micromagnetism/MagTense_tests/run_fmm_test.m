@@ -31,11 +31,11 @@ arguments
 end
 
 thisDir = fileparts(mfilename('fullpath'));
-addpath(fullfile(thisDir, '..', '..', 'MEX_files'));
-addpath(fullfile(thisDir, '..', '..', 'util'));
+addpath(fullfile(thisDir, '..', '..', '..', 'MEX_files'));
+addpath(fullfile(thisDir, '..', '..', '..', 'util'));
 
 if isempty(options.mesh_file)
-    options.mesh_file = fullfile(thisDir, '..', '..', 'examples', 'Micromagnetism', ...
+    options.mesh_file = fullfile(thisDir, '..', ...
         'mumag_micromag_Std_problem_4', ...
         'Std_prob_4_unstructured_mesh_grains_6_res_80_20_ref_2.mat');
 end

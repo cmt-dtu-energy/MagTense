@@ -59,9 +59,13 @@ class MicromagProblem:
         hysteresis_solver: External-field stepping mode. Options are 'static'
             and 'adaptive'. The default 'static' mode preserves the predefined
             field sequence used by existing simulations.
-        A0: Anisotropy constant.
+        A0: Exchange stiffness constant [J/m].
         Ms: Saturation magnetization [A/m].
-        K0: Exchange constant.
+        K0: Uniaxial anisotropy constant [J/m^3], used together with u_ea.
+            Mutually exclusive with K1, K2 and K0_arr.
+        K1, K2: Cubic anisotropy constants [J/m^3], used together with CrysAxis.
+        K0_arr: General anisotropy expansion [J/m^3], an (ntot, 6, 3) array.
+        CrysAxis: Local crystal coordinate system, an (ntot, 3, 3) array.
         alpha: Dampening constant [m/(A*s)]. Product of Gilbert damping and precession parameter.
         T: Temperature [K] ('temp' in fortran part)
         gamma: Gyromagnetic factor [m/(A*s)].

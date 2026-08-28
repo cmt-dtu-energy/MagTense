@@ -47,7 +47,12 @@ endif
 #=======================================================================
 #							Targets
 #=======================================================================
-.SUFFIXES: .f90
+# Clear the built-in suffix list before adding .f90. GNU make ships a .mod.o
+# rule (Modula-2, m2c) and .mod comes before .f90 in the default list, so a
+# leftover Fortran .mod file - which every interrupted build leaves behind -
+# makes make build the object with m2c instead of the compiler.
+.SUFFIXES:
+.SUFFIXES: .f90 .o
 .PHONY: all clean
 
 all: ${STATIC_LIB}

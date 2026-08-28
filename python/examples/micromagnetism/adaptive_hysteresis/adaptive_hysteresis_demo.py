@@ -27,7 +27,7 @@ import numpy as np
 # Make direct execution work from either the repository root or this folder.
 # An installed MagTense package remains usable because these paths merely point
 # at the same source tree and compiled extension in a development checkout.
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 PYTHON_SOURCE = REPOSITORY_ROOT / "python" / "src"
 for search_path in (REPOSITORY_ROOT, PYTHON_SOURCE):
     if str(search_path) not in sys.path:

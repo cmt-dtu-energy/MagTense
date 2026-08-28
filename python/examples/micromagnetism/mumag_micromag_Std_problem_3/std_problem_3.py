@@ -146,6 +146,6 @@ if __name__ == "__main__":
         cvode=False,
         plotting=True,
         plot_details=False,
-        #figpath=Path(__file__).parent.absolute().joinpath("..", "figs"),
+        #figpath=Path(__file__).resolve().parent,
         figpath=None,
     )

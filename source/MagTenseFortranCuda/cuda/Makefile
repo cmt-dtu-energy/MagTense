@@ -15,6 +15,9 @@ CUDA_WRAP_FILE = $(CUDA_WRAP_SOURCE).cxx
 
 ifeq ($(OS),Windows_NT)
     OBJ_SUFFIX = .obj
+    # Use the environment of the surrounding developer shell rather than letting
+    # nvcc call vcvars64.bat again, which fails from inside an initialised one.
+    CUFLAGS = --use-local-env
     CPPFLAGS = /nologo
     CPPFLAGS_OUT = /Fo:
     LIBTOOL = LIB $^ /NOLOGO /OUT:$@
@@ -46,10 +49,12 @@ all: cuda $(STATIC_LIB)
 
 wrap: $(STATIC_LIB)
 
-cuda:
+cuda: $(CUDA_OBJECT)
+
+$(CUDA_OBJECT): $(CUDA_FILE)
 	nvcc $(CUFLAGS) -c $(CUDA_FILE) -o $(CUDA_OBJECT)
 
-$(CUDA_WRAP):
+$(CUDA_WRAP): $(CUDA_WRAP_FILE)
 	$(CPP) $(CPPFLAGS) $(CPPFLAGS_OUT)$@ -c $(CUDA_WRAP_FILE)
 
 $(STATIC_LIB): $(CUDA_OBJECT) $(CUDA_WRAP)

@@ -35,7 +35,7 @@ def std_prob_4(
         grid_type = "unstructuredPrisms"
         # Load unstructured mesh points and grain data
         mesh_data = np.loadtxt(
-            Path(__file__).parent.absolute() / ".." / "meshes" / f"{mesh_file}.txt"
+            Path(__file__).parent.absolute() / "meshes" / f"{mesh_file}.txt"
         )
         grid_pts = np.array(mesh_data[:, :3])
         grid_abc = np.array(mesh_data[:, 3:])
@@ -155,6 +155,7 @@ def std_prob_4(
         / ".."
         / ".."
         / ".."
+        / ".."
         / "documentation"
         / "examples_mumag_validation"
         / "Validation_standard_problem_4"
@@ -256,7 +257,6 @@ if __name__ == "__main__":
         unstructured=False,
         plotting=True,
         useavgn=True,
-        #figpath= Path.cwd() / "results"
-        #figpath=Path(__file__).parent.absolute().joinpath("..", "figs"),
+        #figpath=Path(__file__).resolve().parent,
         figpath=None,
     )

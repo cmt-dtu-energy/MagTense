@@ -355,7 +355,17 @@ subroutine BuildNeighbourDemagTensor(problem)
   allocate(offset(ntot,3))
   allocate(size_cell(ntot,3))
   offset(:,:)    = problem%grid%pts(:,:)
-  size_cell(:,:) = problem%grid%abc(:,:)
+
+
+  if (problem%grid%gridType .eq. gridTypeUniform) then
+      size_cell(:,1) = problem%grid%dx
+      size_cell(:,2) = problem%grid%dy
+      size_cell(:,3) = problem%grid%dz
+  elseif (problem%grid%gridType .eq. gridTypeUnstructuredPrisms) then
+      size_cell(:,:) = problem%grid%abc(:,:)
+  else
+      error stop "BuildNeighbourDemagTensor: unsupported grid type"
+  end if
 
   do d = 1, 3
     pitch(d) = sum(size_cell(:,d)) / real(ntot, DP)

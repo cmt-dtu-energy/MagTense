@@ -2,8 +2,8 @@ import numpy as np
 from magtense.micromag import MicromagProblem
 from typing import Optional
 
-from .load_matlab_struct import load_matlab_struct
-from .rand_spherical_cap import rand_spherical_cap
+from load_matlab_struct import load_matlab_struct
+from rand_spherical_cap import rand_spherical_cap
 
 def setup_grain_problem_from_matfile(
                     fname : str,                                # matlab file name

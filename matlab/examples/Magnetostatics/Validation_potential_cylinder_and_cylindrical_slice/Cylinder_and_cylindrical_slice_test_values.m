@@ -122,12 +122,12 @@ for m = 4%1:length(Mxp)
     disp('---------------')
     
     if (slice == 1)
-        MagTense_path = '..\..\..\..\..\MagTense\documentation\examples_FEM_validation\Validation_potential_cylinder_slice';
-        data = load([MagTense_path '\Line' sprintf('%02.2i',j) '_' file '.txt']);
+        MagTense_path = '../../../../documentation/examples_FEM_validation/Validation_potential_cylinder_slice';
+        data = load([MagTense_path '/Line' sprintf('%02.2i',j) '_' file '.txt']);
     end
     if (slice == 0)
-        MagTense_path = '..\..\..\..\..\MagTense\documentation\examples_FEM_validation\Validation_potential_cylinder';
-        data = load([MagTense_path '\Line' sprintf('%02.2i',j) '.txt']);
+        MagTense_path = '../../../../documentation/examples_FEM_validation/Validation_potential_cylinder';
+        data = load([MagTense_path '/Line' sprintf('%02.2i',j) '.txt']);
     end
    
     plot(data(:,1),data(:,1+m),'.','markersize',3,'Color',colorarr(j,:));

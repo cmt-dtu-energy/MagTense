@@ -67,9 +67,9 @@ plot(y,4*pi*1e-7*Hnorm((numel(x)+1):(numel(x)+numel(y))),'g.');
 plot(z,4*pi*1e-7*Hnorm((numel(x)+1+numel(y)):(numel(x)+numel(y)+numel(z))),'b.');
 
 %Load comparison data from FEM simulation
-data_FEM_x = load('..\..\..\..\documentation\examples_FEM_validation\Validation_tetrahedron\Validation_tetrahedron_normH_x.txt');
-data_FEM_y = load('..\..\..\..\documentation\examples_FEM_validation\Validation_tetrahedron\Validation_tetrahedron_normH_y.txt');
-data_FEM_z = load('..\..\..\..\documentation\examples_FEM_validation\Validation_tetrahedron\Validation_tetrahedron_normH_z.txt');
+data_FEM_x = load('../../../../documentation/examples_FEM_validation/Validation_tetrahedron/Validation_tetrahedron_normH_x.txt');
+data_FEM_y = load('../../../../documentation/examples_FEM_validation/Validation_tetrahedron/Validation_tetrahedron_normH_y.txt');
+data_FEM_z = load('../../../../documentation/examples_FEM_validation/Validation_tetrahedron/Validation_tetrahedron_normH_z.txt');
 
 plot(data_FEM_x(:,1),data_FEM_x(:,2),'ro');
 plot(data_FEM_y(:,1),data_FEM_y(:,2),'go');

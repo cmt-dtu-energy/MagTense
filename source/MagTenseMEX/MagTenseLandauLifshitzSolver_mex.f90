@@ -16,7 +16,7 @@
       use LandauLifshitzSolution
       use integrationDataTypes
       use MagTenseMicroMagIO
-      use auxInit_mod
+      use auxInit_mod, only: auxInit_t, initAux
       use timer_mod
       use trace_mod
     
@@ -29,6 +29,7 @@
       mwSize,dimension(3) :: dims               !>Used for copying back to ML
       integer*4 ComplexFlag,classid             !>Flags for communicating with ML
       integer*4 mxIsDouble, mxIsInt32, mxIsStruct, mxClassIDFromClassName  !>Various MEX functions
+      type(auxInit_t) :: auxInit                !> The auxiliary init structure
       type(MicroMagProblem) :: problem          !> The problem structure
       type(MicroMagSolution) :: solution        !> The solution structure
       type(MicroMagGridInfo) :: gridinfo        !> The grid information structure

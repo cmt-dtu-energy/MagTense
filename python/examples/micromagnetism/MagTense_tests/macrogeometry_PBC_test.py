@@ -77,7 +77,7 @@ angle_tol = 2e-2
 control_tol = 0.1
 
 # Plot settings
-results_dir = Path(__file__).resolve().parent / "results"
+output_dir = Path(__file__).resolve().parent
 
 # Micromagnetic solver settings
 cuda = False
@@ -322,8 +322,6 @@ def run_test(plotting: bool = True) -> list[dict]:
 
 def plot_results(results) -> None:
     """Two figures: the critical case against its controls, and the drift along each axis."""
-    results_dir.mkdir(parents=True, exist_ok=True)
-
     # ---- The critical spacing against the two controls, periodicity along x ----------------
     fig, ax = plt.subplots(layout='constrained', figsize=(6, 4))
     # Plot control tests with non-critical spacing
@@ -343,9 +341,9 @@ def plot_results(results) -> None:
     ax.set_yticklabels(['0', r'$\pi/4$', r'$\pi/2$'])
     ax.legend(loc='best', fontsize='14')
 
-    # Save the figure beside the other micromagnetic example results and close it so the
-    # script does not open an interactive plotting window.
-    figure_path = results_dir / "macrogeometry_PBC_test_periodic_along_x.png"
+    # Save the figure beside this script and close it so the script does not
+    # open an interactive plotting window.
+    figure_path = output_dir / "macrogeometry_PBC_test_periodic_along_x.png"
     fig.savefig(figure_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved figure to {figure_path}")
@@ -370,7 +368,7 @@ def plot_results(results) -> None:
                     alpha=0.2, color='gray', label='Accepted interval')
     ax.legend(loc='best', fontsize='14')
 
-    figure_path = results_dir / "macrogeometry_PBC_test_periodic_along_x_y_or_z.png"
+    figure_path = output_dir / "macrogeometry_PBC_test_periodic_along_x_y_or_z.png"
     fig.savefig(figure_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved figure to {figure_path}")

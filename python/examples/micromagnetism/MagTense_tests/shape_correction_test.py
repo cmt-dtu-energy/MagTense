@@ -55,7 +55,7 @@ nTimesteps = int(round(t_end / t_step)) + 1  # Include both time endpoints
 # Plot settings
 Ndata = 200
 dataperiod = int(nTimesteps / Ndata)
-results_dir = Path(__file__).resolve().parent / "results"
+output_dir = Path(__file__).resolve().parent
 
 # How far the magnetisation may deviate from uniform to count as passed [-]
 uniformity_tol = 1e-4
@@ -198,10 +198,9 @@ def run_test(plotting: bool = True) -> list[dict]:
                         alpha=0.2, color='forestgreen', label='Accepted interval')
         ax.legend(loc='best')
 
-        # Save the validation figure beside the other micromagnetic example results
-        # and close it so the script does not open an interactive plotting window.
-        results_dir.mkdir(parents=True, exist_ok=True)
-        figure_path = results_dir / "shape_correction_test.png"
+        # Save the validation figure beside this script and close it so the script
+        # does not open an interactive plotting window.
+        figure_path = output_dir / "shape_correction_test.png"
         fig.savefig(figure_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
         print(f"Saved figure to {figure_path}")

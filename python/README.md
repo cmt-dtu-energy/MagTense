@@ -3,11 +3,7 @@
 The Fortran code is compiled and wrapped to a module that can be directly called from Python.
 The tool `f2py` of the NumPy package is used to wrap the [interface file](./FortranToPythonIO.f90).
 
-## Deployment with Conda (Intel architectures)
-
-### Create an importable Python module from Fortran source code
-
-#### Linux
+## Linux
 
 On a Debian/Ubuntu system, first install the build prerequisites:
 
@@ -62,9 +58,9 @@ As a starting point, you can run the example scripts in [python/examples/](./pyt
 To compile with FMM3D `$(MagTense-Folder)/external/FMM3D/local` must be in the `LD_Library_PATH` (replace MagTense-Folder with the actual path to the MagTense repo).
 After this modify the Makefile to replace `USE_FMM3D=0` with `USE_FMM3D=1`.
 
-#### Windows
+## Windows
 
-Installation on Windows is a but more contrived because of the way Windows handles environments and privileges, so the user has to do more steps manually. Fortunately, the user who wants to customize and develop MagTense will likely handle the [pre-requisites](#pre-requisites) only once, to set up the development environment, and then the build process when the Fortran or Python parts are modified should be straightforward.
+Installation on Windows is a but more contrived because of the way Windows handles environments and privileges, so the user has to do more steps manually. Fortunately, the user who wants to customize and develop MagTense will likely handle the [pre-requisites](#pre-requisites-setting-up-the-development-environment) only once, to set up the development environment, and then the build process when the Fortran or Python parts are modified should be straightforward.
 
 ##### Pre-requisites (setting up the development environment)
 
@@ -76,6 +72,7 @@ Then, install the prerequisites:
 - [Visual Studio 2022](https://visualstudio.microsoft.com/vs/older-downloads/#visual-studio-2022-and-other-products) - select the option for desktop development with C++ and `cmake`
 - [Intel oneAPI](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html) (both C++ and Fortran)
 - [sundials-7.4.0](https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz) - unzip to a folder of your choice
+- *Only if you want the FMM3D backend*: [FMM3D](https://github.com/Ximtecs/FMM3D), unzipped into `external\FMM3D`
 
 With the above install, there's a new application in the start menu called "Intel oneAPI command prompt for Intel 64 for Visual Studio 2022" - this is a terminal with all the necessary environment variables set up to use the Intel compilers and tools. Find it and open it as administrator (right-click -> "Run as administrator"). Then, navigate to the folder where you unzipped the `cvode-7.4.0` source code and build it with the following commands:
 
@@ -96,7 +93,18 @@ mkdir cvode
 xcopy "C:\Program Files (x86)\SUNDIALS\*" cvode /s /i
 ```
 
-After that, you can close the Intel oneAPI command prompt.
+This is the default location the build looks for, so `CVODE_ROOT` does not have to be passed anywhere below. After that, you can close the Intel oneAPI command prompt.
+
+##### Optional: the CUDA plugin
+
+The CUDA plugin is built with `nvcc` and therefore needs the MSVC toolchain rather than the conda environment. Open an `x64 Native Tools Command Prompt for VS 2022` and run:
+
+```bash
+cd source/MagTenseFortranCuda/cuda
+make
+```
+
+Skip this if you intend to build with `USE_CUDA=0`.
 
 ##### Building the Fortran core and Python interface
 
@@ -108,34 +116,20 @@ conda env create -f python/.build/env-314-win.yml
 
 Then, activate the environment with `conda activate magtense-env`.
 
-## Read-in customized M-H-curve
+With the environment active, build the Fortran core and then the Python module:
 
-This feature is currently only supported for soft magnetic tiles ([type=2](magtense/magtense.py#L49)).
-
-In  [iterate_magnetization()](magtense/magtense.py#L611), an arbitrary number of state functions (M-H-curves) can be defined:
-
-```python
-mu_r = 100
-datapath = f'./magtense/mat/Fe_mur_{mu_r}_Ms_2_1.csv'
-
- ...
-
-data_statefcn = numpy.genfromtxt(datapath, delimiter=';')
-n_statefcn = 1
+```shell
+make auxmt magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
+make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
 ```
 
-[Here](magtense/mat), three sample M-H-curves for Fe with different relative permeabilities and a saturation magnetization of 2.1 T are stored as CSV-files. The data format is as follows:
+Pass `USE_CUDA=0` if you skipped the CUDA plugin, and add `USE_FMM3D=1` (after `make fmm3d USE_FMM3D=1`) if you unzipped FMM3D. The same flags have to be given to both commands.
 
-```csv
-0; Temp0; Temp1; ...
-H0-field; M0@Temp0; M0@Temp1;...
-H1-field; M1@Temp0; M1@Temp1;...
-.
-.
-H100-field; M100@Temp0; M100@Temp1; ...
-.
+Finally, install the compiled package into the environment so that simulations can be run:
+
+```shell
+cp python/.build/requirements-py3-dev.txt python/requirements.txt
+python -m pip install -e ./python
 ```
 
-With only one state function given, the same M-H-curve applies to all tiles of type 2.
-
-When the soft tiles differ in their M-H-curves, multiple state function can be combined. In order to match a specific M-H-curve with the corresponding tile, the variable [stfcn_index](magtense/magtense.py#L54) can be set.
+As a starting point, you can run the example scripts in [python/examples/](./examples/).

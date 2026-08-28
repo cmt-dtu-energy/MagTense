@@ -1,8 +1,16 @@
+import sys
+from pathlib import Path
+
+# python/util holds the shared helper modules (utils, grain_generator and
+# friends). Resolve it from this file rather than the cwd, so the module
+# imports from wherever it is run.
+_UTIL = Path(__file__).resolve().parents[4] / "util"
+if str(_UTIL) not in sys.path:
+    sys.path.append(str(_UTIL))
+
 import numpy as np
 from magtense.micromag import MicromagProblem
 from grain_generator import AdaptiveGrainGenerator
-import sys
-sys.path.append("../../src")
 from utils import *
 from typing import Optional
 
