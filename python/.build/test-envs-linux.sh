@@ -91,9 +91,9 @@ done
 step "wheel metadata (python ${LAST_V}, cpu variant)"
 # dist_pypi.py does not read the extension module from where the build leaves
 # it. It expects it staged under python/<variant>_libs/, the way the CI job
-# does it (python-package-conda-new.yml:59-60), and it clears
-# src/magtense/lib/*.so before copying the staged file in. So stage it here,
-# and keep a copy to put back afterwards - otherwise this step silently breaks
+# does it (python-package-linux.yml, the "Stage .so for dist_pypi.py" step),
+# and it clears src/magtense/lib/*.so before copying the staged file in. So
+# stage it here, and keep a copy to put back afterwards - otherwise this breaks
 # the editable install that the steps above just validated.
 BACKUP="$(mktemp -d)"
 cp python/src/magtense/lib/magtensesource*.so "$BACKUP/"

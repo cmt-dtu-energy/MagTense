@@ -1,0 +1,284 @@
+name: Python pip-wheel via make python-interface (Linux)
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_call:
+    inputs:
+      tag:
+        required: false
+        type: string
+  push:
+    branches:
+      - fabio
+  workflow_dispatch:
+
+jobs:
+  build-wheel:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # An explicit list rather than a cuda x fmm cross product: cu12-fmm is
+        # the only FMM variant and it is built without CVODE, so two of the four
+        # combinations do not exist. build_tag and libs_dir have to agree with
+        # the build_tag map and the <variant>_libs layout in .build/dist_pypi.py.
+        variant:
+          - { cuda: 1, fmm: 0, cvode: 1, name: cu12,     build_tag: 1, libs_dir: cu12_libs     }
+          - { cuda: 0, fmm: 0, cvode: 1, name: cpu,      build_tag: 0, libs_dir: cpu_libs      }
+          - { cuda: 1, fmm: 1, cvode: 0, name: cu12-fmm, build_tag: 3, libs_dir: cu12-fmm_libs }
+        py-version:
+          - { version: "312", semver: "3.12" }
+          - { version: "313", semver: "3.13" }
+          - { version: "314", semver: "3.14" }
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Select FMM3D make.inc
+      if: ${{ matrix.variant.fmm == 1 }}
+      run: cp external/FMM3D/make.inc.linux external/FMM3D/make.inc
+
+    - name: Fetch tags
+      if: "${{ inputs.tag == '' }}"
+      run: git fetch --tags origin
+
+    - name: Get latest release tag
+      id: previoustag
+      if: "${{ inputs.tag == '' }}"
+      uses: WyriHaximus/github-action-get-previous-tag@v1
+      with:
+        fallback: 1.0.0
+
+    # make python-interface builds sundials itself when cvode/build is empty, so
+    # a cache hit here takes a full sundials compile out of every CVODE leg. The
+    # key follows the version the build-cvode rule downloads.
+    - name: Cache cvode
+      if: ${{ matrix.variant.cvode == 1 }}
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/cvode
+        key: cvode-7.4.0-${{ runner.os }}-py${{ matrix.py-version.version }}
+
+    # CONDA_DIR is pinned so the job keeps exercising the "no conda present ->
+    # install Miniconda" path. The runner image ships a conda at
+    # /usr/share/miniconda and the login shell exports CONDA_EXE, which the
+    # Makefile would otherwise detect and reuse.
+    - name: Build Python interface via make python-interface
+      working-directory: ${{ github.workspace }}
+      run: |
+        make python-interface CONDA_DIR=$HOME/miniconda3 \
+            USE_CUDA=${{ matrix.variant.cuda }} \
+            USE_CVODE=${{ matrix.variant.cvode }} \
+            USE_FMM3D=${{ matrix.variant.fmm }} \
+            PY_VERSION=${{ matrix.py-version.version }}
+
+    - name: Stage .so for dist_pypi.py
+      working-directory: ${{ github.workspace }}
+      run: |
+        mkdir -p python/${{ matrix.variant.libs_dir }}
+        cp python/src/magtense/lib/magtensesource*.so python/${{ matrix.variant.libs_dir }}/
+
+    # dist_pypi.py copies libfmm3d.so out of the same <variant>_libs directory
+    # as the extension module and packs it next to it in the wheel.
+    - name: Stage libfmm3d.so
+      if: ${{ matrix.variant.fmm == 1 }}
+      working-directory: ${{ github.workspace }}
+      run: cp external/FMM3D/local/libfmm3d.so python/${{ matrix.variant.libs_dir }}/
+
+    - name: Build pip-wheel
+      if: "${{ inputs.tag == '' }}"
+      working-directory: ${{ github.workspace }}/python/
+      run: |
+        sed -i 's/1.0.0/${{ steps.previoustag.outputs.tag }}/' src/magtense/__init__.py
+        PY=$(make -s -C .. print-PYTHON CONDA_DIR=$HOME/miniconda3)
+        # dist_pypi.py shells out to patchelf to set the rpath of the extension
+        # module, and patchelf lives in the conda env, which is not on PATH here
+        # because the interpreter is invoked by absolute path. The call is
+        # check=False, so a missing patchelf is silent and the wheel comes out
+        # with no rpath - fatal for cu12-fmm, which finds libfmm3d.so through
+        # $ORIGIN.
+        export PATH="$(dirname "$PY"):$PATH"
+        "$PY" .build/dist_pypi.py \
+            --py_version ${{ matrix.py-version.version }} --cu_version ${{ matrix.variant.name }} --platform linux \
+            --pkg_version ${{ steps.previoustag.outputs.tag }}
+
+    - name: Deployment - Build pip-wheel
+      if: "${{ inputs.tag != '' }}"
+      working-directory: ${{ github.workspace }}/python/
+      run: |
+        sed -i 's/1.0.0/${{ inputs.tag }}/' src/magtense/__init__.py
+        PY=$(make -s -C .. print-PYTHON CONDA_DIR=$HOME/miniconda3)
+        # dist_pypi.py shells out to patchelf to set the rpath of the extension
+        # module, and patchelf lives in the conda env, which is not on PATH here
+        # because the interpreter is invoked by absolute path. The call is
+        # check=False, so a missing patchelf is silent and the wheel comes out
+        # with no rpath - fatal for cu12-fmm, which finds libfmm3d.so through
+        # $ORIGIN.
+        export PATH="$(dirname "$PY"):$PATH"
+        "$PY" .build/dist_pypi.py \
+            --py_version ${{ matrix.py-version.version }} --cu_version ${{ matrix.variant.name }} --platform linux \
+            --pkg_version ${{ inputs.tag }}
+
+    - name: Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version.version }}-${{ matrix.variant.name }}-Linux
+        path: ${{ github.workspace }}/python/dist/magtense-*-${{ matrix.variant.build_tag }}-py${{ matrix.py-version.version }}-none-manylinux1_x86_64.whl
+
+
+  test-wheel:
+    runs-on: ubuntu-latest
+    needs: build-wheel
+    strategy:
+      matrix:
+        variant:
+          - { name: cu12, build_tag: 1 }
+          - { name: cpu,  build_tag: 0 }
+        py-version:
+          - { version: "312", semver: "3.12" }
+          - { version: "313", semver: "3.13" }
+          - { version: "314", semver: "3.14" }
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/util/
+          python/examples/
+          documentation/examples_FEM_validation/
+          documentation/examples_mumag_validation/
+
+    - name: Download wheel artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version.version }}-${{ matrix.variant.name }}-Linux
+
+    - name: Setup python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "${{ matrix.py-version.semver }}"
+
+    # MAGTENSE_USE_FMM3D / MAGTENSE_WHEEL_VARIANT are what makes the FMM suite
+    # under MagTense_tests skip itself on a wheel that has no FMM3D in it.
+    - name: Install pip-wheel and run pytest
+      env:
+        MAGTENSE_USE_FMM3D: 0
+        MAGTENSE_WHEEL_VARIANT: ${{ matrix.variant.name }}
+      run: |
+        python3 -m pip install ${{ github.workspace }}/magtense-*-${{ matrix.variant.build_tag }}-py${{ matrix.py-version.version }}-none-manylinux1_x86_64.whl
+        python3 -m pip install pytest
+        python3 -m pytest python/examples/magnetostatics/test_magtense.py \
+                          python/examples/micromagnetism/MagTense_tests
+
+    # python/examples/micromagnetism/testMagTenseFunctions.py is the combined micromagnetic
+    # suite and the counterpart of matlab/util/testMagTenseFunctions. It runs the validation
+    # examples, compares every measure with the limit that belongs to it, and exits non zero
+    # when one of them is over its limit, so this step fails on a numerical regression and not
+    # only on a crash. matplotlib and scipy are not dependencies of the wheel, but the examples
+    # need them.
+    #
+    # Standard problem 6 is about seventy percent of the running time of the suite, so it is
+    # left out on most of the matrix and the whole suite runs on one leg of it.
+    - name: Run the combined micromagnetic test suite
+      if: ${{ !(matrix.py-version.semver == '3.13' && matrix.variant.name == 'cpu') }}
+      run: |
+        python3 -m pip install matplotlib scipy
+        python3 python/examples/micromagnetism/testMagTenseFunctions.py --skip std_problem_6
+
+    - name: Run the whole combined micromagnetic test suite
+      if: ${{ matrix.py-version.semver == '3.13' && matrix.variant.name == 'cpu' }}
+      run: |
+        python3 -m pip install matplotlib scipy
+        python3 python/examples/micromagnetism/testMagTenseFunctions.py
+
+    - name: Upload the overview of the test suite
+      if: ${{ always() && matrix.py-version.semver == '3.13' && matrix.variant.name == 'cpu' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-suite-py${{ matrix.py-version.version }}-${{ matrix.variant.name }}-${{ runner.os }}
+        path: python/examples/micromagnetism/testMagTenseFunctions_overview.png
+        if-no-files-found: ignore
+
+
+  test-wheel-fmm-cuda:
+    runs-on: [self-hosted, Linux, CUDA]
+    needs: build-wheel
+    strategy:
+      matrix:
+        py-version:
+          - { version: "312", semver: "3.12" }
+          - { version: "313", semver: "3.13" }
+          - { version: "314", semver: "3.14" }
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/util/
+          python/examples/
+          documentation/examples_FEM_validation/
+          documentation/examples_mumag_validation/
+
+    - name: Download cu12-fmm artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version.version }}-cu12-fmm-Linux
+
+    - name: Setup python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.py-version.semver }}
+        check-latest: true
+
+    - name: Select python
+      run: echo "PYTHON_EXE=$(command -v python)" >> "$GITHUB_ENV"
+
+    - name: Python diagnostics after setup
+      run: |
+        echo "PYTHON_EXE=$PYTHON_EXE"
+        "$PYTHON_EXE" --version
+        which "$PYTHON_EXE"
+        "$PYTHON_EXE" -c "import sys; print('selected:', sys.executable)"
+
+    - name: Show CUDA device info
+      run: |
+        "$PYTHON_EXE" -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
+        nvidia-smi
+
+    - name: Install pip-wheel and pytest
+      env:
+        MAGTENSE_USE_FMM3D: 1
+        MAGTENSE_WHEEL_VARIANT: cu12-fmm
+      run: |
+        # This is a persistent self-hosted runner and the wheel version does not
+        # change between builds, so pip would skip the install and keep the
+        # previous wheel. Uninstall first rather than --force-reinstall, which
+        # would also redownload the ~1 GB of CUDA dependency wheels every run.
+        "$PYTHON_EXE" -m pip uninstall -y magtense
+        "$PYTHON_EXE" -m pip install '${{ github.workspace }}'/*.whl
+        "$PYTHON_EXE" -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
+        "$PYTHON_EXE" -m pip install pytest
+        "$PYTHON_EXE" -m pytest python/examples/micromagnetism/MagTense_tests/fmm_test/test_fmm_workflow.py
+
+    # The same combined suite as in test-wheel, but on a machine that has a GPU, so this is
+    # where the CUDA path of the solver is exercised. Standard problem 6 is left out for the
+    # reason given there.
+    - name: Run the combined micromagnetic test suite with CUDA
+      run: |
+        "$PYTHON_EXE" -m pip install matplotlib scipy
+        "$PYTHON_EXE" python/examples/micromagnetism/testMagTenseFunctions.py --cuda --skip std_problem_6

@@ -635,16 +635,23 @@ build-cvode: build-env
 	cp -r ${MKFILE_PATH}/cvode-7.4.0/. ${CVODE_ROOT}/src/
 	$(run-cmake-cvode)
 
+# The CVODE-enabled, FMM3D-free variant is the default. The CI matrix overrides
+# both for the cu12-fmm wheel, which is built with USE_FMM3D=1 USE_CVODE=0.
+# Target-specific "=" and not "?=": both variables are already defined at the top
+# of this file, so "?=" would never fire. A command line USE_CVODE=/USE_FMM3D=
+# still wins over a target-specific assignment.
+python-interface: USE_CVODE = 1
+python-interface: USE_FMM3D = 0
 python-interface: build-env
-	@if [ ! -d "${CVODE_ROOT}/build" ] || [ -z "$$(ls -A ${CVODE_ROOT}/build)" ]; then \
+	@if [ "$(USE_CVODE)" = "1" ] && { [ ! -d "${CVODE_ROOT}/build" ] || [ -z "$$(ls -A ${CVODE_ROOT}/build)" ]; }; then \
 		$(MAKE) build-cvode; \
 	fi
 	cp python/.build/requirements-py3-dev.txt python/requirements.txt
-	
+
 	@if [ "$$CONDA_DEFAULT_ENV" = "$(ENV_NAME)" ]; then \
-		$(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0; \
+		$(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=$(USE_CVODE) USE_MATLAB=0 USE_FMM3D=$(USE_FMM3D); \
 	else \
-		$(CONDA_BIN) run -n $(ENV_NAME) $(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0; \
+		$(CONDA_BIN) run -n $(ENV_NAME) $(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=$(USE_CVODE) USE_MATLAB=0 USE_FMM3D=$(USE_FMM3D); \
 	fi
 # Install into the conda env via its absolute interpreter path. A bare "python"
 # or "conda run -- python" is a name lookup that version managers (e.g. mise)
