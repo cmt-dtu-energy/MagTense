@@ -1,7 +1,6 @@
 h5py>=3.14.0
 importlib_resources>=6.5.2
 intel-fortran-rt>=2025.2.0
-ipympl>=0.9.7
 matplotlib>=3.10.5
 mkl>=2025.2.0
 notebook>=7.4.5
@@ -10,6 +9,5 @@ nvidia-cublas-cu12==12.*
 nvidia-cuda-runtime-cu12==12.*
 nvidia-cusparse-cu12==12.*
 nvidia-nvjitlink-cu12==12.*
-pycairo>=1.28.0
 scipy>=1.16.0
 tqdm>=4.67.1

@@ -27,6 +27,14 @@ Installation is recommended via `pip` (requires >=**Python 3.12**):
 pip install magtense
 ```
 
+For interactive plotting in Jupyter notebooks, install the `notebook` extra, which adds [ipympl](https://matplotlib.org/ipympl/) and [pycairo](https://pycairo.readthedocs.io/):
+
+```
+pip install magtense[notebook]
+```
+
+pycairo publishes no Linux wheels and is built from source, so this extra needs the cairo development files on the machine (`libcairo2-dev` and `pkg-config` on Debian/Ubuntu). That is why it is opt-in: a plain `pip install magtense` needs nothing beyond Python.
+
 Examples of how to calculate magnetostatic and micromagnetic problems using the Python interface can be found [python/examples/](./python/examples/).
 
 ## Installation and usage with the Matlab interface

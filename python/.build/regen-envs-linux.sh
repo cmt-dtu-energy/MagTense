@@ -83,7 +83,11 @@ dependencies:
   - libcusparse-dev
   - libnvjitlink-dev
 
-  # Numerics and visualisation, mirroring requirements-py3.txt
+  # Numerics and visualisation, mirroring requirements-py3.txt. ipympl and
+  # pycairo are the exception: for wheel users they are the "notebook" extra
+  # rather than required dependencies (pycairo has no manylinux wheels), but a
+  # developer environment gets them unconditionally - conda-forge ships the
+  # compiled cairo, so nothing has to be installed system-wide here.
   - numpy=2.3.2
   - scipy>=1.16.0
   - h5py>=3.14.0

@@ -173,4 +173,6 @@ cp python/.build/requirements-py3-dev.txt python/requirements.txt
 python -m pip install -e ./python
 ```
 
+The developer requirements already contain `ipympl` and `pycairo`, which the released wheel offers as the optional `notebook` extra, so there is no need to ask for `[notebook]` here. conda-forge provides the compiled cairo, so nothing has to be installed system-wide.
+
 As a starting point, you can run the example scripts in [python/examples/](./examples/).

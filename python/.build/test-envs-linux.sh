@@ -68,7 +68,9 @@ for V in "${VERSIONS[@]}"; do
     fi
 
     step "python ${V}: importing the added packages"
-    # pycairo's import name is cairo.
+    # pycairo's import name is cairo. ipympl and pycairo are not dependencies of
+    # the wheel any more - they are the notebook extra - but they are still part
+    # of the developer environment, which is what this checks.
     "$PYTHON" -c "import h5py, scipy, matplotlib, tqdm, importlib_resources, notebook, ipympl, cairo; print('imports OK')" \
         || fail "one of the added packages failed to import"
 
@@ -130,11 +132,21 @@ WHEELS=(python/dist/*.whl)
 for whl in "${WHEELS[@]}"; do
     echo "--- $(basename "$whl")"
     META="$(unzip -p "$whl" '*/METADATA')"
-    echo "$META" | grep '^Requires-Dist' || true
-    echo "$META" | grep -q '^Requires-Dist: ipympl' \
-        || fail "ipympl missing from ${whl} metadata"
-    echo "$META" | grep -q '^Requires-Dist: pycairo' \
-        || fail "pycairo missing from ${whl} metadata"
+    echo "$META" | grep -E '^(Requires-Dist|Provides-Extra)' || true
+    # ipympl and pycairo belong to the notebook extra, not to the required set:
+    # pycairo builds from source on Linux and a bare "pip install magtense" has
+    # to work without the cairo development headers. Assert both halves - the
+    # extra is declared and carries them, and neither leaks back into the
+    # unconditional dependencies.
+    echo "$META" | grep -q '^Provides-Extra: notebook' \
+        || fail "notebook extra missing from ${whl} metadata"
+    for extra_pkg in ipympl pycairo; do
+        echo "$META" | grep -q "^Requires-Dist: ${extra_pkg}.*; extra == \"notebook\"" \
+            || fail "${extra_pkg} missing from the notebook extra of ${whl}"
+        if echo "$META" | grep -E "^Requires-Dist: ${extra_pkg}[^;]*$" | grep -q .; then
+            fail "${extra_pkg} is an unconditional dependency of ${whl}"
+        fi
+    done
     # dist_pypi.py:124 strips nvidia-* for the cpu variant.
     if echo "$META" | grep -q '^Requires-Dist: nvidia-'; then
         fail "cpu wheel ${whl} still declares nvidia-* dependencies"
