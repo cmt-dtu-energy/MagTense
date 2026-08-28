@@ -94,7 +94,15 @@ endif
 
 ifeq (${FC}, ifx)
 	ifeq ($(OS),Windows_NT)
+		# /heap-arrays and /traceback match the Linux flags below. Without /heap-arrays
+		# ifx puts array temporaries on the stack, and create_CSR_matrix builds three of
+		# them at once - pack(rows), pack(columns), pack(values) - sized by the length of
+		# the interpolation stencil list. That list grows as ~51x the number of tiles, so
+		# from roughly 15000 tiles the three temporaries exceed the stack and the process
+		# dies with STATUS_STACK_OVERFLOW (0xC00000FD) inside computeDifferentialOperators-
+		# FromMesh_DirectLap. /traceback is what makes any such abort say where it happened.
 		FFLAGS = /O3 /fpp /real-size:64 /Qopenmp /assume:nocc_omp /fpe:0 \
+			/heap-arrays:1024 /traceback \
 			/fp:source /nologo /DUSE_CVODE=${USE_CVODE} /DUSE_MATLAB=${USE_MATLAB} \
 			/DUSE_CUDA=${USE_CUDA} /DUSE_MICROMAG=${USE_MICROMAG} /DUSE_FMM3D=${USE_FMM3D}
 	else

@@ -107,7 +107,7 @@ module DifferentialOperators
 
         ! Unpack the variables
         real(dp), dimension(:),allocatable :: NX, NY, NZ, Areas, Volumes, Xel, Yel, Zel, Xf, Yf, Zf
-        integer, dimension(:,:),allocatable :: Signs, D, T, el2fa
+        integer, dimension(:,:),allocatable :: Signs, D, el2fa
         real(dp), dimension(:), allocatable :: Aexch_local
         integer :: i,j,dims, N, K, kk, k_mask1D, k_i, lind, indx, k_j, k_row, info, n_unique
         real(dp), dimension(:),allocatable :: VolCoeff, AX, AY, AZ, w
@@ -116,6 +116,12 @@ module DifferentialOperators
         real(dp), dimension(:), allocatable :: Amat
         integer, dimension(:), allocatable :: ind, IPIV
         logical, allocatable :: mask1D(:), mask_int2log(:)
+        !--- face -> incidence index, built once in O(M) ---
+        integer, allocatable :: fptr(:), felem(:), fsign(:), fcnt(:)
+        logical, allocatable :: edgeFace(:)
+        real(dp), allocatable :: Amat_face(:)
+        integer :: kf, ip, nface_cells, e1, e2
+        real(dp) :: asum, aprd
         real(dp), dimension(:), allocatable :: ddxA, ddyA, ddzA, ddx, ddy, ddz, dx, dy, dz, vx, vy, vz, vw, dks, dxk, dyk, dzk, nns
         real(dp), dimension(:), allocatable :: dxk2, dyk2, dzk2, Wk, Wk2, e
         real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T, GkRed, HkRed, Wktmp
@@ -127,6 +133,7 @@ module DifferentialOperators
         type(sparse_matrix_t) :: DDXA_sparse, FX_sparse, DDYA_sparse, FY_sparse, DDZA_sparse, FZ_sparse
         type(sparse_matrix_t) :: DDX_sparse, DDY_sparse, DDZ_sparse, W_sparse        
         integer, save :: itimer=0
+        !>------------------------------------------------------------------------------
         integer, dimension(:), allocatable :: sorted_indices
         integer :: u 
 
@@ -146,7 +153,9 @@ module DifferentialOperators
         Xf = GridInfo%Xf
         Yf = GridInfo%Yf
         Zf = GridInfo%Zf
-        T = GridInfo%TheTs
+        !GridInfo%TheTs is not read anywhere in this routine - only TheDs (through el2fa)
+        !and TheSigns are. Copying it cost a full allocation and copy of a 2 x 29*Nel
+        !integer array, about 26 MB at Nel = 110592, for nothing.
         D = GridInfo%TheDs
         Signs = GridInfo%TheSigns
         Aexch_local = Jfact_local
@@ -177,6 +186,45 @@ module DifferentialOperators
         ns = Signs(:,1)
         ks = Signs(:,2)
 
+        !>-----------------------------------------
+        ! Face -> incidence index.
+        !
+        ! Two loops below used to answer "which cells touch face k?" by scanning the whole
+        ! of Signs, once per incidence and once per face. Both were therefore O(M^2) and
+        ! O(K*M), and together they were ~97% of this routine, growing as N^2.1. Signs(:,2)
+        ! is a face index in [1,K], so one counting sort turns the same question into an
+        ! O(1) lookup: the incidences of face kf are fptr(kf) .. fptr(kf+1)-1, holding the
+        ! cell in felem and the sign in fsign. Building it is a single O(M) pass.
+        allocate(fcnt(K), fptr(K+1))
+        fcnt = 0
+        do i = 1, size(ks)
+            fcnt(ks(i)) = fcnt(ks(i)) + 1
+        end do
+        fptr(1) = 1
+        do i = 1, K
+            fptr(i+1) = fptr(i) + fcnt(i)
+        end do
+        allocate(felem(size(ks)), fsign(size(ks)))
+        fcnt = 0
+        do i = 1, size(ks)
+            kf = ks(i)
+            felem(fptr(kf) + fcnt(kf)) = ns(i)
+            fsign(fptr(kf) + fcnt(kf)) = ss(i)
+            fcnt(kf) = fcnt(kf) + 1
+        end do
+
+        ! A face lies on the boundary when exactly one cell claims it. The original test,
+        ! sum(abs(Signs(:,3)) over the incidences of the face) == 1, is the same statement
+        ! because every sign is +1 or -1.
+        allocate(edgeFace(K))
+        do kf = 1, K
+            indx = 0
+            do ip = fptr(kf), fptr(kf+1)-1
+                indx = indx + abs(fsign(ip))
+            end do
+            edgeFace(kf) = (indx .eq. 1)
+        end do
+
 
         !>-----------------------------------------
         ! Constructing summing matrix according to reference
@@ -185,29 +233,40 @@ module DifferentialOperators
         if ( method .eq. MicroMagExchMethodDirectLaplacianNeumann ) then
             ! Setting up exchange interaction strength matrix for heterogeneous materials. Also works for homogeneous materials. [2]
             allocate(Amat(size(ns)))
-            allocate(mask1D(size(Signs(:,1))))
-        
-            do kk = 1, size(ks)
-                
-                mask1D = (ks(kk) .eq. Signs(:,2))
-                k_mask1D = count(mask1D)
-                                
-                if (k_mask1D == 1) then
-                    Amat(kk) = Aexch_local(ns(kk))
-                elseif (k_mask1D > 2) then
+
+            ! The exchange value depends only on the face, so it is computed once per face
+            ! (K of them) and then scattered over the incidences, rather than recomputed
+            ! identically for every incidence of the same face.
+            allocate(Amat_face(K))
+            Amat_face = 0.0_dp
+            do kf = 1, K
+                nface_cells = fptr(kf+1) - fptr(kf)
+                if (nface_cells == 1) then
+                    Amat_face(kf) = Aexch_local(felem(fptr(kf)))
+                elseif (nface_cells > 2) then
+                    ! Reported once per face now, where the scan reported it once per
+                    ! incidence of that face. The mesh is invalid either way.
                     write(*,*) 'Warning: more than two cells share a face!'
-                else
-                    ns_packed = pack(ns,mask1D)
-                    
-                    Amat(kk) = 2.0 * product(Aexch_local(ns_packed)) / sum(Aexch_local(ns_packed))
+                elseif (nface_cells == 2) then
+                    e1 = felem(fptr(kf))
+                    e2 = felem(fptr(kf)+1)
+                    ! product() and sum() over the two-element pack, written out. The pack
+                    ! preserved the order of Signs, which the counting sort above also does,
+                    ! so the two operands are multiplied and added in the same order.
+                    aprd = Aexch_local(e1) * Aexch_local(e2)
+                    asum = Aexch_local(e1) + Aexch_local(e2)
+                    Amat_face(kf) = 2.0 * aprd / asum
                     !IMPLEMENT THE CHECK BELOW
                     !if all(Aexch_local(mask1D) == 0.0_wp .and. Aexch_local(tmp2) == 0.0_wp) then
-                    !    Amat(kk) = 0.0_wp
+                    !    Amat_face(kf) = 0.0_wp
                     !end if
                 end if
             end do
 
-            deallocate(mask1D)
+            do kk = 1, size(ks)
+                Amat(kk) = Amat_face(ks(kk))
+            end do
+            deallocate(Amat_face)
              
             ! Having constructed the exchange values for each face/tile pair, we build the summing matrix.
             allocate(ddxA(size(ns)))
@@ -373,7 +432,6 @@ module DifferentialOperators
         ! Calculated by solving
         ! Gk * [phi(faces);dphi(faces)]_k = Hk ( * phi(elements) )
         ! for each face, ks. Details can be found in [2].
-        allocate(mask1D(size(Signs(:,1))))
         
 
         do kk = 1, K
@@ -419,14 +477,13 @@ module DifferentialOperators
             if (dims > 1) dyk = dyk / scale
             dxk = dxk / scale
 
-            mask1D = (kk .eq. Signs(:,2))
            
             nns = [NX(kk), NY(kk), NZ(kk)]   ! normal vector at the edge
             
             lind = size(ind)
             
             ! Mirror trick to enforce Neumann b.c. Creates a set of virtual nodes on the other side of an edge face.
-            if (sum(abs(pack(Signs(:,3),mask1D))) == 1) then     ! edge face. 
+            if (edgeFace(kk)) then     ! edge face. 
                 
                 if ((dims .eq. 1 .and. abs(nns(1)) < eps_criteria) .or. (dims .eq. 2 .and. abs(nns(1)) < eps_criteria .and. abs(nns(2)) < eps_criteria)) then
                     deallocate(ind)
@@ -538,7 +595,7 @@ module DifferentialOperators
             
             call dgesv( size(GkRed,1), size(Wktmp,2), GkRed, size(GkRed,1), IPIV, Wktmp, size(Wktmp,1), INFO )
             
-            if (sum(abs(pack(Signs(:,3),mask1D))) == 1) then
+            if (edgeFace(kk)) then
                 vw(ind) = Wktmp(1,1:lind)+Wktmp(1,lind+1:size(Wktmp,2))                 ! Interpolated face values
                 if (abs(nns(1)) > eps_criteria) then                                    ! Interpolated x-components of face gradients
                     vx(ind)=(Wktmp(2,1:lind)+Wktmp(2,lind+1:size(Wktmp,2)))/scale       ! rescaled
@@ -641,9 +698,8 @@ module DifferentialOperators
         call create_COO_values_from_CSR(Aexch_matrix,GridInfo)
         
         stat = mkl_sparse_destroy(DX_matrix)
-                
 
-
+    
         call trace%end( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
     end subroutine computeDifferentialOperatorsFromMesh_DirectLap
