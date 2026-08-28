@@ -51,6 +51,11 @@ channels:
   - conda-forge
 dependencies:
   - python=${PY}
+  # Pin the GIL ABI explicitly. "python=3.14" alone lets conda-forge resolve to
+  # the free-threading build, whose EXT_SUFFIX is .cpython-314t-... - a distinct
+  # ABI that dist_pypi.py and deployment.yml have no notion of, and against
+  # which the OpenMP Fortran core is untested.
+  - python_abi=${PY}=*_cp${V}
   - pip
   - cmake
 
@@ -113,6 +118,14 @@ SPEC_EOF
     fi
     if ! grep -q "cuda-version=" "$TARGET"; then
         echo "ERROR: ${TARGET} has no cuda-version pin." >&2
+        exit 1
+    fi
+    # A free-threading interpreter builds an extension module with a "t" ABI
+    # suffix (cpython-314t-...), which dist_pypi.py and deployment.yml do not
+    # recognise, and which the OpenMP Fortran core is untested against.
+    if grep -qE '^\s*-\s*python_abi=[0-9.]+=.*t$' "$TARGET"; then
+        echo "ERROR: ${TARGET} resolved to a free-threading Python." >&2
+        grep -E '^\s*-\s*(python|python_abi)=' "$TARGET" >&2
         exit 1
     fi
 
