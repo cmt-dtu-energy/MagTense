@@ -1,10 +1,10 @@
-# dip-fmm micromagnetism example
+# dip-fmm micromagnetism sweep
 
-`fmm_vs_regular.py` and `fmm_vs_regular.ipynb` evolve the same small uniform
-micromagnetic problem for 40 ns twice:
+The examples use non-periodic spherical dip-fmm plans for all combinations of:
 
-1. with the regular MagTense dense demag calculation; and
-2. with the persistent dip-fmm plan enabled by `use_cdfmm=True`.
+- grids: `15^3`, `20^3`, `25^3`, and `30^3` cells;
+- expansion orders: 1 through 10; and
+- tree depths: 2 through 5.
 
 Build the Python extension from the repository root first:
 
@@ -14,30 +14,29 @@ LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LI
   make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 USE_CDFMM=1
 ```
 
-Run the CUDA-full example:
+Prepare all 160 persistent plans without running time evolution:
+
+```bash
+LD_LIBRARY_PATH="$PWD/dip-fmm/local/lib:$CONDA_PREFIX/lib:$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LIBRARY_PATH" \
+  python python/examples/micromagnetism/FMM/prepare_fmm_cache.py
+```
+
+dip-fmm validates and loads an existing plan instead of rebuilding it. Plans
+are backend-independent, so preparation uses the CPU by default and avoids
+needless GPU transfers. Set `MAGTENSE_USE_CUDA=1` only if you also want to
+exercise the production CUDA setup path while warming the cache.
+
+Run the 40 ns comparison sweep:
 
 ```bash
 LD_LIBRARY_PATH="$PWD/dip-fmm/local/lib:$CONDA_PREFIX/lib:$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LIBRARY_PATH" \
   python python/examples/micromagnetism/FMM/fmm_vs_regular.py
 ```
 
-The same MagTense `cuda=True` input enables the regular CUDA path and selects
-dip-fmm's CUDA-full backend, provided MagTense was compiled with `USE_CUDA=1`.
+The regular demagnetisation result is evaluated once per grid size, then reused
+for all order/depth comparisons. The core reports evaluation time separately
+from initialization time. Set `MAGTENSE_USE_CUDA=0` for CPU execution; dip-fmm
+then prefers oneMKL and falls back to its portable CPU backend.
 
-Or perform a CPU-only smoke test without an NVIDIA device. This sets the normal
-MagTense `cuda` input to false; dip-fmm then selects oneMKL when it was compiled
-in and otherwise uses the portable CPU implementation:
-
-```bash
-MAGTENSE_USE_CUDA=0 \
-LD_LIBRARY_PATH="$PWD/dip-fmm/local/lib:$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" \
-  python python/examples/micromagnetism/FMM/fmm_vs_regular.py
-```
-
-The core solver prints initialization and evaluation times separately for each
-run. `Evaluation time` covers the ODE solve and its repeated effective-field
-evaluations; it excludes construction of the regular demag tensor or persistent
-dip-fmm plan. `Full time` is the sum of those two measured phases. The notebook
-contains the same calls split into cells so that the regular and FMM
-magnetisation trajectories, timings, and final-state difference can be
-inspected interactively.
+`fmm_vs_regular.ipynb` runs the same sweep interactively and plots final-state
+relative RMS error versus order for every grid size and depth.

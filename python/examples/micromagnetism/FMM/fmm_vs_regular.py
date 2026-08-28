@@ -1,13 +1,13 @@
-"""Compare dip-fmm and the regular MagTense demagnetisation calculation.
+"""Sweep dip-fmm order/depth and compare with regular MagTense demag.
 
-Build MagTense with ``USE_CDFMM=1`` before running this file. The ordinary
-MagTense ``cuda`` setting controls both demagnetisation paths. Set
-``MAGTENSE_USE_CUDA=0`` for a CPU-only smoke test.
+The regular result is computed once per grid. Every dip-fmm run uses the same
+physical problem and the persistent plans prepared by ``prepare_fmm_cache.py``.
+Build MagTense with ``USE_CDFMM=1`` before running this file.
 """
 
-from pathlib import Path
 import os
 import sys
+from pathlib import Path
 
 import numpy as np
 
@@ -21,7 +21,10 @@ if str(PYTHON_SOURCE) not in sys.path:
 from magtense.micromag import MicromagProblem  # noqa: E402
 
 
-GRID = (20, 20, 20)
+GRID_SIZES = (15, 20, 25, 30)
+ORDERS = tuple(range(1, 11))
+DEPTHS = (2, 3, 4, 5)
+
 CELL_SIZE = 5.0e-9
 SATURATION_MAGNETISATION = 8.0e5
 SIMULATION_TIME = 40.0e-9
@@ -31,9 +34,17 @@ USE_CUDA = os.environ.get("MAGTENSE_USE_CUDA", "1").lower() not in {
 }
 
 
-def make_problem(*, use_dip_fmm: bool) -> MicromagProblem:
-    """Return the same fixed micromagnetic problem with one demag backend changed."""
-    cell_count = int(np.prod(GRID))
+def make_problem(
+    grid_size: int,
+    *,
+    use_dip_fmm: bool,
+    order: int = 1,
+    depth: int = 2,
+    use_cuda: bool = USE_CUDA,
+) -> MicromagProblem:
+    """Create one cubic, non-periodic micromagnetic problem."""
+    grid = (grid_size,) * 3
+    cell_count = grid_size**3
     initial_magnetisation = np.zeros((cell_count, 3))
     initial_magnetisation[:, 0] = 1.0
     initial_magnetisation[:, 2] = np.linspace(-0.1, 0.1, cell_count)
@@ -42,8 +53,8 @@ def make_problem(*, use_dip_fmm: bool) -> MicromagProblem:
     )
 
     problem = MicromagProblem(
-        res=list(GRID),
-        grid_L=np.asarray(GRID) * CELL_SIZE,
+        res=list(grid),
+        grid_L=np.asarray(grid) * CELL_SIZE,
         grid_type="uniform",
         solver="dynamic",
         m0=initial_magnetisation,
@@ -51,14 +62,14 @@ def make_problem(*, use_dip_fmm: bool) -> MicromagProblem:
         Ms=SATURATION_MAGNETISATION,
         K0=0.0,
         alpha=4.42e3,
-        gamma=0.0,  # Pure relaxation keeps this long demonstration inexpensive.
+        gamma=0.0,  # Pure relaxation keeps the sweep inexpensive.
         tol=1.0e-3,
-        cuda=USE_CUDA,
+        cuda=use_cuda,
         cvode=False,
         usereturnhall=False,
         use_cdfmm=use_dip_fmm,
-        cdfmm_order=6,
-        cdfmm_depth=3,
+        cdfmm_order=order,
+        cdfmm_depth=depth,
         cdfmm_basis="spherical",
     )
     problem.window_enabled = 0
@@ -71,38 +82,82 @@ def zero_external_field(times: np.ndarray) -> np.ndarray:
     return np.zeros((len(times), 3))
 
 
-def run_problem(*, use_dip_fmm: bool) -> tuple[np.ndarray, np.ndarray]:
-    """Run 40 ns and return the output times and magnetisation trajectory."""
-    problem = make_problem(use_dip_fmm=use_dip_fmm)
+def run_problem(
+    grid_size: int,
+    *,
+    use_dip_fmm: bool,
+    order: int = 1,
+    depth: int = 2,
+    use_cuda: bool = USE_CUDA,
+) -> np.ndarray:
+    """Run 40 ns and return only the final magnetisation state."""
+    problem = make_problem(
+        grid_size,
+        use_dip_fmm=use_dip_fmm,
+        order=order,
+        depth=depth,
+        use_cuda=use_cuda,
+    )
     result = problem.run_simulation(
         t_end=SIMULATION_TIME,
         nt=OUTPUT_STEPS,
         fct_h_ext=zero_external_field,
         nt_h_ext=2,
     )
-
     # M_out axes are (time, cell, applied-field index, Cartesian component).
-    times = np.asarray(result[0])
-    magnetisation = np.asarray(result[1][:, :, 0, :])
-    return times, magnetisation
+    return np.asarray(result[1][-1, :, 0, :]).copy()
+
+
+def run_sweep(
+    grid_sizes=GRID_SIZES,
+    orders=ORDERS,
+    depths=DEPTHS,
+    *,
+    use_cuda: bool = USE_CUDA,
+) -> list[dict[str, int | float]]:
+    """Run one regular reference per grid and every requested dip-fmm case."""
+    rows = []
+    for grid_size in grid_sizes:
+        print(f"\n=== {grid_size}^3 regular reference ===", flush=True)
+        regular_final = run_problem(
+            grid_size, use_dip_fmm=False, use_cuda=use_cuda
+        )
+
+        for order in orders:
+            for depth in depths:
+                print(
+                    f"\n=== {grid_size}^3, order={order}, depth={depth} ===",
+                    flush=True,
+                )
+                fmm_final = run_problem(
+                    grid_size,
+                    use_dip_fmm=True,
+                    order=order,
+                    depth=depth,
+                    use_cuda=use_cuda,
+                )
+                relative_rms = np.linalg.norm(
+                    fmm_final - regular_final
+                ) / np.linalg.norm(regular_final)
+                row = {
+                    "grid_size": grid_size,
+                    "particles": grid_size**3,
+                    "order": order,
+                    "depth": depth,
+                    "relative_rms": float(relative_rms),
+                }
+                rows.append(row)
+                print(f"relative RMS: {relative_rms:.3e}", flush=True)
+    return rows
 
 
 if __name__ == "__main__":
-    # Regular MagTense call: dense demag tensor followed by its ordinary CPU path.
-    print("\n=== Regular MagTense demag ===", flush=True)
-    regular_times, regular_magnetisation = run_problem(use_dip_fmm=False)
+    results = run_sweep()
 
-    # FMM call: the physical problem is identical; only this flag changes.
-    print("\n=== dip-fmm demag ===", flush=True)
-    fmm_times, fmm_magnetisation = run_problem(use_dip_fmm=True)
-
-    difference = fmm_magnetisation[-1] - regular_magnetisation[-1]
-    relative_rms = np.linalg.norm(difference) / np.linalg.norm(
-        regular_magnetisation[-1]
-    )
-
-    print(f"Cells: {int(np.prod(GRID))}")
-    print(f"Simulated time: {SIMULATION_TIME * 1.0e9:.1f} ns")
-    print(f"Output states: {len(regular_times)}")
-    print(f"MagTense cuda setting: {USE_CUDA}")
-    print(f"Final-state relative RMS difference: {relative_rms:.3e}")
+    print("\nGrid     N  Order  Depth  Relative RMS")
+    for row in results:
+        print(
+            f"{row['grid_size']:>2}^3  {row['particles']:>5}"
+            f"  {row['order']:>5}  {row['depth']:>5}"
+            f"  {row['relative_rms']:.3e}"
+        )
