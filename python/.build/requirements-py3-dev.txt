@@ -37,6 +37,8 @@ notebook
 h5py
 tqdm
 importlib_resources
+ipympl
+pycairo
 nvidia-cuda-runtime-cu12
 nvidia-cublas-cu12
 nvidia-cusparse-cu12

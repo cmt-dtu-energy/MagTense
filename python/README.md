@@ -53,6 +53,42 @@ conda activate magtense-env
 
 As a starting point, you can run the example scripts in [python/examples/](./python/examples/).
 
+### Maintaining the Linux environment files
+
+The `magtense-env` environment is created from `python/.build/env-<PY_VERSION>-linux.yml`.
+These are fully-pinned `conda env export` dumps and are **not meant to be edited by hand** -
+doing so is how they drifted apart in the past. To change the CUDA version or add a package,
+edit the spec at the top of [regen-envs-linux.sh](./.build/regen-envs-linux.sh) and run it on a
+Linux x86 machine:
+
+```shell
+bash python/.build/regen-envs-linux.sh          # all of 312, 313, 314
+bash python/.build/regen-envs-linux.sh 313      # or just one
+```
+
+The CUDA version lives on a single line in that script (`CUDA_LABEL`). Nothing else in the
+build references a CUDA version: the Makefiles call bare `nvcc` and link `-lcublas -lcudart
+-lcusparse` out of `$CONDA_PREFIX`.
+
+Packages that end users of the PyPI wheel should get belong in
+[requirements-py3.txt](./.build/requirements-py3.txt) as well - that file becomes the wheel's
+`Requires-Dist`. Build-time-only and developer tooling belongs in
+[requirements-py3-dev.txt](./.build/requirements-py3-dev.txt). Do not edit `python/requirements.txt`;
+it is generated from one of those two depending on whether you are doing a dev install or a
+distribution build.
+
+After regenerating, validate the result end to end:
+
+```shell
+bash python/.build/test-envs-linux.sh
+```
+
+This rebuilds each Python version from scratch with CUDA on and off, checks that `nvcc` and the
+conda `cuda-version` pin actually moved, that the compiled extension resolves its CUDA libraries,
+that the added packages import, and that they reach the wheel metadata. It starts by running
+`make rm-env`, which matters: `make` only creates `magtense-env` when it does not already exist,
+so an edited environment file has no effect against a stale environment.
+
 **Note: Compiling with FMM3D backend**
 
 To compile with FMM3D `$(MagTense-Folder)/external/FMM3D/local` must be in the `LD_Library_PATH` (replace MagTense-Folder with the actual path to the MagTense repo).
