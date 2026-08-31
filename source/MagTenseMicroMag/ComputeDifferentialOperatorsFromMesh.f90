@@ -96,12 +96,17 @@ module DifferentialOperators
     !>  
     !> Aexch_matrix - The sparse CSR matrix of the exchange coupling
     !---------------------------------------------------------------------------
-    subroutine computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, interpn, weight, method, Jfact_local, Aexch_matrix)
+    subroutine computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, interpn, weight, method, Jfact_local, phase_local, A_int_local, Aexch_matrix)
         type(MicroMagGridInfo), intent(inout) :: GridInfo
         integer, intent(in) :: interpn
         integer, intent(in) :: method
         real(dp), intent(inout) :: weight
         real(dp), dimension(:), intent(in) :: Jfact_local
+        integer, dimension(:), intent(in) :: phase_local     !> Material index of each tile
+        real(dp), dimension(:,:), intent(in) :: A_int_local  !> Interface exchange per pair of
+                                                             !> phases, normalised the same way
+                                                             !> as Jfact_local. Negative means
+                                                             !> 'use the harmonic mean'.
         type(sparse_matrix_t),intent(out) :: Aexch_matrix
         type(sparse_matrix_t) :: DX_matrix, DY_matrix, DZ_matrix, A2
 
@@ -116,12 +121,14 @@ module DifferentialOperators
         real(dp), dimension(:), allocatable :: Amat
         integer, dimension(:), allocatable :: ind, IPIV
         logical, allocatable :: mask1D(:), mask_int2log(:)
+        logical, allocatable :: liveNode(:)
+        integer :: n_singular
         !--- face -> incidence index, built once in O(M) ---
         integer, allocatable :: fptr(:), felem(:), fsign(:), fcnt(:)
         logical, allocatable :: edgeFace(:)
         real(dp), allocatable :: Amat_face(:)
         integer :: kf, ip, nface_cells, e1, e2
-        real(dp) :: asum, aprd
+        real(dp) :: asum, aprd, A_face_ovr
         real(dp), dimension(:), allocatable :: ddxA, ddyA, ddzA, ddx, ddy, ddz, dx, dy, dz, vx, vy, vz, vw, dks, dxk, dyk, dzk, nns
         real(dp), dimension(:), allocatable :: dxk2, dyk2, dzk2, Wk, Wk2, e
         real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T, GkRed, HkRed, Wktmp
@@ -250,16 +257,40 @@ module DifferentialOperators
                 elseif (nface_cells == 2) then
                     e1 = felem(fptr(kf))
                     e2 = felem(fptr(kf)+1)
+
+                    ! A face between two different materials can carry an exchange value the
+                    ! user specified for that pair, instead of the harmonic mean of the two
+                    ! cells. Every internal face joins exactly two cells, so the pair is
+                    ! unambiguous however many materials the mesh contains.
+                    !
+                    ! A cell with A0 = 0 is not magnetic and carries no exchange, so a face
+                    ! touching one stays uncoupled whatever the table says. The harmonic mean
+                    ! already behaves that way - 2*A1*A2/(A1+A2) vanishes as soon as either
+                    ! side is zero - and matching it here keeps the override consistent both
+                    ! with the default and with the uniform grid.
+                    A_face_ovr = -1.0_dp
+                    if ( size(A_int_local,1) .gt. 1 ) then
+                        if ( phase_local(e1) .ne. phase_local(e2) .and. &
+                             Aexch_local(e1) .gt. 0.0_dp .and. Aexch_local(e2) .gt. 0.0_dp ) &
+                            A_face_ovr = A_int_local(phase_local(e1),phase_local(e2))
+                    endif
+                    if ( A_face_ovr .ge. 0.0_dp ) then
+                        Amat_face(kf) = A_face_ovr
+                    else
                     ! product() and sum() over the two-element pack, written out. The pack
                     ! preserved the order of Signs, which the counting sort above also does,
                     ! so the two operands are multiplied and added in the same order.
                     aprd = Aexch_local(e1) * Aexch_local(e2)
                     asum = Aexch_local(e1) + Aexch_local(e2)
-                    Amat_face(kf) = 2.0 * aprd / asum
-                    !IMPLEMENT THE CHECK BELOW
-                    !if all(Aexch_local(mask1D) == 0.0_wp .and. Aexch_local(tmp2) == 0.0_wp) then
-                    !    Amat_face(kf) = 0.0_wp
-                    !end if
+                    if ( asum .gt. 0.0_dp ) then
+                        Amat_face(kf) = 2.0 * aprd / asum
+                    else
+                        !Both cells are non-magnetic, where the harmonic mean is 0/0 - an
+                        !invalid operation under /fpe:0, not a quiet NaN. Two cells with no
+                        !exchange are not exchange coupled, so the face carries nothing.
+                        Amat_face(kf) = 0.0_dp
+                    endif
+                    endif
                 end if
             end do
 
@@ -351,8 +382,16 @@ module DifferentialOperators
             where ( dz .lt. -0.5*GridInfo%Lper(3) ) dz = dz + GridInfo%Lper(3)
         endif
 
+       ! A cell with no exchange stiffness must not take part in the interpolation either.
+       ! Its own faces already carry no coupling, because the harmonic mean vanishes, but it
+       ! would otherwise still sit in the least squares stencil of the faces around it and
+       ! pull on their gradient estimates. Zero weight removes it from those stencils exactly:
+       ! it drops out of the weighted Gram matrix Gk and its column of Hk is zero, so the
+       ! solve returns a zero interpolation weight for it and it never enters the operator.
+       ! A mesh whose cells all have A0 > 0 is untouched.
        ! Determines which weights are to be used in the first interpolation step
         allocate(w(size(ns)))
+        allocate(liveNode(size(ns)))
         if (dims == 1) then
             w = (dx**2)**(-weight/2.0)
         else if (dims == 2) then
@@ -363,6 +402,11 @@ module DifferentialOperators
 
 
         
+        do i = 1, size(w)
+            liveNode(i) = ( Aexch_local(ns_sorted(i)) .gt. 0.0_dp )
+            if ( .not. liveNode(i) ) w(i) = 0.0_dp
+        end do
+
         !>-----------------------------------------
         ! Prepare distances for the interpolation.       
         !-------------------------------------------------------------------------------------------
@@ -434,6 +478,7 @@ module DifferentialOperators
         ! for each face, ks. Details can be found in [2].
         
 
+        n_singular = 0
         do kk = 1, K
             
             allocate(ind(inds2(kk)-inds1(kk)+1))
@@ -594,6 +639,17 @@ module DifferentialOperators
             allocate(IPIV(size(GkRed,1)))
             
             call dgesv( size(GkRed,1), size(Wktmp,2), GkRed, size(GkRed,1), IPIV, Wktmp, size(Wktmp,1), INFO )
+
+            !A face whose stencil has too few live cells leaves the least squares system
+            !singular, and dgesv then returns whatever it has. That only happens where every
+            !useful neighbour has A0 = 0, in which case the face carries no exchange anyway
+            !and these weights are multiplied by zero; stopping here keeps a NaN out of the
+            !sparse product rather than salvaging the face.
+            if ( INFO .ne. 0 ) then
+                n_singular = n_singular + 1
+                deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)
+                cycle
+            endif
             
             if (edgeFace(kk)) then
                 vw(ind) = Wktmp(1,1:lind)+Wktmp(1,lind+1:size(Wktmp,2))                 ! Interpolated face values
@@ -626,6 +682,11 @@ module DifferentialOperators
             deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)        
         
         end do
+
+        if ( n_singular .gt. 0 ) then
+            write (prog_str,'(I10)') n_singular
+            call displayGUIMessage( 'Faces left uninterpolated (no live neighbours): '//trim(adjustl(prog_str)) )
+        endif
                 
         ! Final operation, summing interpolated values according to either ...
         if ( method .eq. MicroMagExchMethodGGNeumann ) then

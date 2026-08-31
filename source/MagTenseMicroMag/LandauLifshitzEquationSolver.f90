@@ -134,6 +134,8 @@
         
         !Set up the mesh for a uniform grid
         allocate( gb_problem%A0_map(gb_problem%grid%nx,gb_problem%grid%ny,gb_problem%grid%nz) )
+        if ( allocated(gb_problem%phase_id) ) &
+            allocate( gb_problem%phase_map(gb_problem%grid%nx,gb_problem%grid%ny,gb_problem%grid%nz) )
         if ( gb_problem%grid%gridType .eq. gridTypeUniform ) then   
             do k=1,gb_problem%grid%nz
                 do j=1,gb_problem%grid%ny            
@@ -144,6 +146,8 @@
                         gb_solution%pts(ind,3) = gb_problem%grid%z(i,j,k)
                     
                         gb_problem%A0_map(i,j,k) = gb_problem%A0(ind)
+                        if ( allocated(gb_problem%phase_id) ) &
+                            gb_problem%phase_map(i,j,k) = gb_problem%phase_id(ind)
                     end do
                 end do
             end do
@@ -2216,12 +2220,37 @@ end subroutine updateDemagfieldFMM
     type(MicroMagProblem),intent(inout) :: problem      !> Problem data structure    
     type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
     real(DP),dimension(:),allocatable :: A0_normalized  !> Normalized A0 for uneven anisotropy
+    real(DP),dimension(:,:),allocatable :: A_int_normalized  !> Interface exchange, same scaling
+    integer,dimension(:),allocatable :: phase_local     !> Material index of each tile
         
 
     if ( problem%passExch .eq. passExchTrue) return ! Skip this if the exchange has already been passed from outside
 
     allocate( A0_normalized(size(problem%A0)) )  
     A0_normalized = problem%A0 / ( maxval(problem%A0) )   ! Normalized by the largest exchange factor
+
+    !The interface values have to be scaled exactly as A0 is, since they replace a harmonic
+    !mean of the scaled values. The negative entries are sentinels meaning 'use the harmonic
+    !mean' and are passed through untouched so that they stay recognisable after scaling.
+    if ( allocated(problem%A_int) ) then
+        allocate( A_int_normalized(size(problem%A_int,1),size(problem%A_int,2)) )
+        where ( problem%A_int .ge. 0.0_DP )
+            A_int_normalized = problem%A_int / ( maxval(problem%A0) )
+        elsewhere
+            A_int_normalized = -1.0_DP
+        end where
+    else
+        allocate( A_int_normalized(1,1) )
+        A_int_normalized = -1.0_DP
+    endif
+
+    if ( allocated(problem%phase_id) ) then
+        allocate( phase_local(size(problem%phase_id)) )
+        phase_local = problem%phase_id
+    else
+        allocate( phase_local(size(problem%A0)) )
+        phase_local = 1
+    endif
         
     if ( grid%gridType .eq. gridTypeUniform ) then
         call ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
@@ -2240,7 +2269,7 @@ end subroutine updateDemagfieldFMM
             endif
             call displayGUIMessage( 'Using periodic exchange boundary conditions' )
         endif
-        call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, problem%A_exch)
+        call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, phase_local, A_int_normalized, problem%A_exch)
     endif
 
     
@@ -2329,26 +2358,25 @@ end subroutine updateDemagfieldFMM
                     ! MKL's sparse routines take sorted column indices within a row as given.
 
                     ! Current tile
-                    d2dx2%values(ind) = 2*(-( problem%A0_map(nx,j,k)/(problem%A0_map(nx,j,k)+problem%A0_map(1,j,k)) &
-                            + problem%A0_map(2,j,k)/(problem%A0_map(2,j,k)+problem%A0_map(1,j,k)) ))
+                    d2dx2%values(ind) = -( exchCoeff( problem, 1,j,k, nx,j,k ) + exchCoeff( problem, 1,j,k, 2,j,k ) )
                     d2dx2%cols(ind) = colInd
                     d2dx2%rows_start(rowInd) = ind
                     ind = ind + 1
 
                     ! Coupling to the right
-                    d2dx2%values(ind) = 2*problem%A0_map(2,j,k)/(problem%A0_map(2,j,k)+problem%A0_map(1,j,k))
+                    d2dx2%values(ind) = exchCoeff( problem, 1,j,k, 2,j,k )
                     d2dx2%cols(ind) = colInd + 1
                     ind = ind + 1
 
                     ! Coupling to the left (loops around and connects with rightmost tile)
-                    d2dx2%values(ind) = 2*problem%A0_map(nx,j,k)/(problem%A0_map(nx,j,k)+problem%A0_map(1,j,k))
+                    d2dx2%values(ind) = exchCoeff( problem, 1,j,k, nx,j,k )
                     d2dx2%cols(ind) = colInd + nx - 1
                     d2dx2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
                     ind = ind + 1
                 else
                     !The left boundary
-                    const = 2 *  problem%A0_map(2,j,k) / (problem%A0_map(2,j,k) + problem%A0_map(1,j,k))
+                    const = exchCoeff( problem, 1,j,k, 2,j,k )
 
                     d2dx2%values(ind) = -const
                     d2dx2%cols(ind) = colInd
@@ -2367,7 +2395,7 @@ end subroutine updateDemagfieldFMM
                 do i=2,nx-1
                             
                     !Left-most point
-                    d2dx2%values( ind ) = 2 * problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))
+                    d2dx2%values( ind ) = exchCoeff( problem, i,j,k, i-1,j,k )
                     
                     d2dx2%cols(ind) = colInd
                     !update where the row starts
@@ -2375,12 +2403,12 @@ end subroutine updateDemagfieldFMM
                     ind = ind + 1
                 
                     !Center point
-                    d2dx2%values( ind ) = 2 * ( -(problem%A0_map(i-1,j,k)/(problem%A0_map(i-1,j,k)+problem%A0_map(i,j,k))+problem%A0_map(i+1,j,k)/(problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k))))
+                    d2dx2%values( ind ) = -( exchCoeff( problem, i,j,k, i-1,j,k ) + exchCoeff( problem, i,j,k, i+1,j,k ) )
                     d2dx2%cols(ind) = colInd + 1
                     ind = ind + 1
                 
                     !Right-most point
-                    d2dx2%values( ind ) = 2 * problem%A0_map(i+1,j,k)/(problem%A0_map(i+1,j,k)+problem%A0_map(i,j,k))
+                    d2dx2%values( ind ) = exchCoeff( problem, i,j,k, i+1,j,k )
                     d2dx2%cols(ind) = colInd + 2
                     d2dx2%rows_end(rowInd) = ind+1
                     rowInd = rowInd + 1
@@ -2395,20 +2423,19 @@ end subroutine updateDemagfieldFMM
                     ! so it is the smallest column index and comes first.
 
                     ! Coupling to the right (loops around and connects with leftmost tile)
-                    d2dx2%values(ind) = 2*problem%A0_map(1,j,k)/(problem%A0_map(1,j,k)+problem%A0_map(nx,j,k))
+                    d2dx2%values(ind) = exchCoeff( problem, nx,j,k, 1,j,k )
                     d2dx2%cols(ind) = colInd - nx + 2
                     ! Update where the row starts
                     d2dx2%rows_start(rowInd) = ind
                     ind = ind + 1
 
                     ! Coupling to the left
-                    d2dx2%values(ind) = 2*problem%A0_map(nx-1,j,k)/(problem%A0_map(nx-1,j,k)+problem%A0_map(nx,j,k))
+                    d2dx2%values(ind) = exchCoeff( problem, nx,j,k, nx-1,j,k )
                     d2dx2%cols(ind) = colInd
                     ind = ind + 1
 
                     ! Current tile
-                    d2dx2%values(ind) = 2*(-( problem%A0_map(nx-1,j,k)/(problem%A0_map(nx-1,j,k)+problem%A0_map(nx,j,k)) &
-                            + problem%A0_map(1,j,k)/(problem%A0_map(1,j,k)+problem%A0_map(nx,j,k)) ))
+                    d2dx2%values(ind) = -( exchCoeff( problem, nx,j,k, nx-1,j,k ) + exchCoeff( problem, nx,j,k, 1,j,k ) )
                     d2dx2%cols(ind) = colInd + 1
                     d2dx2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
@@ -2416,7 +2443,7 @@ end subroutine updateDemagfieldFMM
 
                     colInd = colInd + 2
                 else
-                    const = 2 * problem%A0_map(nx-1,j,k) / (problem%A0_map(nx-1,j,k) + problem%A0_map(nx,j,k))
+                    const = exchCoeff( problem, nx,j,k, nx-1,j,k )
                     !The right boundary
                     d2dx2%values(ind) = const 
                     d2dx2%cols(ind) = colInd
@@ -2468,19 +2495,18 @@ end subroutine updateDemagfieldFMM
                     ! therefore has the largest column index, so it is emitted last.
 
                     ! Current tile
-                    d2dy2%values(ind) = 2*(-(problem%A0_map(i,ny,k)/(problem%A0_map(i,ny,k)+problem%A0_map(i,1,k)) &
-                            + problem%A0_map(i,2,k)/(problem%A0_map(i,2,k)+problem%A0_map(i,1,k))))
+                    d2dy2%values(ind) = -( exchCoeff( problem, i,1,k, i,ny,k ) + exchCoeff( problem, i,1,k, i,2,k ) )
                     d2dy2%cols(ind) = colInd
                     d2dy2%rows_start(rowInd) = ind
                     ind = ind + 1  ! Increment to next element
 
                     ! Forwards coupling
-                    d2dy2%values(ind) = 2*problem%A0_map(i,2,k)/(problem%A0_map(i,2,k)+problem%A0_map(i,1,k))
+                    d2dy2%values(ind) = exchCoeff( problem, i,1,k, i,2,k )
                     d2dy2%cols(ind) = colInd + nx
                     ind = ind + 1  ! Increment to next element
 
                     ! Backwards coupling (loops around and couples to forwardmost tile)
-                    d2dy2%values(ind) = 2*problem%A0_map(i,ny,k)/(problem%A0_map(i,ny,k)+problem%A0_map(i,1,k))
+                    d2dy2%values(ind) = exchCoeff( problem, i,1,k, i,ny,k )
                     d2dy2%cols(ind) = colInd + nx*(ny-1)
                     d2dy2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
@@ -2490,7 +2516,7 @@ end subroutine updateDemagfieldFMM
             else
             
                 do i=1,nx
-                    const = 2 * problem%A0_map(i,2,k) / (problem%A0_map(i,2,k) + problem%A0_map(i,1,k))
+                    const = exchCoeff( problem, i,1,k, i,2,k )
 
                     d2dy2%values(ind) = -const
                     d2dy2%cols(ind) = colInd
@@ -2516,19 +2542,19 @@ end subroutine updateDemagfieldFMM
                 do i=1,nx
                 
                     !lower value
-                    d2dy2%values(ind) = 2 * problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))
+                    d2dy2%values(ind) = exchCoeff( problem, i,j,k, i,j-1,k )
                     d2dy2%cols(ind) = colInd-nx
                     d2dy2%rows_start(rowInd) = ind
                     ind = ind + 1  ! Increment to next element
                 
                     !central value
-                    d2dy2%values(ind) = 2*(-(problem%A0_map(i,j-1,k)/(problem%A0_map(i,j-1,k)+problem%A0_map(i,j,k))+problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k))))
+                    d2dy2%values(ind) = -( exchCoeff( problem, i,j,k, i,j-1,k ) + exchCoeff( problem, i,j,k, i,j+1,k ) )
                     d2dy2%cols(ind) = colInd
                     ind = ind + 1  ! Increment to next element
             
             
                     !upper value
-                    d2dy2%values(ind) = 2 * problem%A0_map(i,j+1,k)/(problem%A0_map(i,j+1,k)+problem%A0_map(i,j,k))
+                    d2dy2%values(ind) = exchCoeff( problem, i,j,k, i,j+1,k )
                     d2dy2%cols(ind) = colInd + nx
                     d2dy2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
@@ -2544,19 +2570,18 @@ end subroutine updateDemagfieldFMM
                     ! therefore has the smallest column index, so it is emitted first.
 
                     ! Forwards coupling (loops around and couples to backmost tile)
-                    d2dy2%values(ind) = 2*problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k))
+                    d2dy2%values(ind) = exchCoeff( problem, i,ny,k, i,1,k )
                     d2dy2%cols(ind) = colInd - nx*(ny-1)
                     d2dy2%rows_start(rowInd) = ind
                     ind = ind + 1  ! Increment to next element
 
                     ! Backwards coupling
-                    d2dy2%values(ind) = 2*problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k))
+                    d2dy2%values(ind) = exchCoeff( problem, i,ny,k, i,ny-1,k )
                     d2dy2%cols(ind) = colInd - nx
                     ind = ind + 1  ! Increment to next element
 
                     ! Current tile
-                    d2dy2%values(ind) = 2*(-(problem%A0_map(i,ny-1,k)/(problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k)) &
-                            + problem%A0_map(i,1,k)/(problem%A0_map(i,1,k) + problem%A0_map(i,ny,k))))
+                    d2dy2%values(ind) = -( exchCoeff( problem, i,ny,k, i,ny-1,k ) + exchCoeff( problem, i,ny,k, i,1,k ) )
                     d2dy2%cols(ind) = colInd
                     d2dy2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
@@ -2565,7 +2590,7 @@ end subroutine updateDemagfieldFMM
                 enddo
             else
                 do i=1,nx
-                   const = 2 * problem%A0_map(i,ny-1,k) / (problem%A0_map(i,ny-1,k) + problem%A0_map(i,ny,k))
+                   const = exchCoeff( problem, i,ny,k, i,ny-1,k )
                     !lower element
                     d2dy2%values(ind) = const
                     d2dy2%cols(ind) = colInd - nx
@@ -2617,19 +2642,18 @@ end subroutine updateDemagfieldFMM
                     ! therefore has the largest column index, so it is emitted last.
 
                     ! Current tile
-                    d2dz2%values(ind) = 2*(-(problem%A0_map(i,j,nz)/(problem%A0_map(i,j,nz) + problem%A0_map(i,j,1)) &
-                            + problem%A0_map(i,j,2)/(problem%A0_map(i,j,2) + problem%A0_map(i,j,1))))
+                    d2dz2%values(ind) = -( exchCoeff( problem, i,j,1, i,j,nz ) + exchCoeff( problem, i,j,1, i,j,2 ) )
                     d2dz2%cols(ind) = colInd
                     d2dz2%rows_start(rowInd) = ind
                     ind = ind + 1   ! Increment to next element
 
                     ! Upwards coupling
-                    d2dz2%values(ind) = 2*problem%A0_map(i,j,2)/(problem%A0_map(i,j,2)+problem%A0_map(i,j,1))
+                    d2dz2%values(ind) = exchCoeff( problem, i,j,1, i,j,2 )
                     d2dz2%cols(ind) = nx*ny + colInd
                     ind = ind + 1   ! Increment to next element
 
                     ! Downwards coupling (loops around and couples to topmost tile)
-                    d2dz2%values(ind) = 2*problem%A0_map(i,j,nz)/(problem%A0_map(i,j,nz)+problem%A0_map(i,j,1))
+                    d2dz2%values(ind) = exchCoeff( problem, i,j,1, i,j,nz )
                     d2dz2%cols(ind) = colInd + ny*nx*(nz-1)
                     d2dz2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
@@ -2640,7 +2664,7 @@ end subroutine updateDemagfieldFMM
         else
             do j=1,ny
                 do i=1,nx
-                    const = 2 * problem%A0_map(i,j,2) / (problem%A0_map(i,j,2) + problem%A0_map(i,j,1))
+                    const = exchCoeff( problem, i,j,1, i,j,2 )
                     !central value
                     d2dz2%values(ind) = -const
                     d2dz2%cols(ind) = colInd
@@ -2667,18 +2691,18 @@ end subroutine updateDemagfieldFMM
             do j=1,ny
                 do i=1,nx
                     !left-most value
-                    d2dz2%values(ind) = 2 * problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))
+                    d2dz2%values(ind) = exchCoeff( problem, i,j,k, i,j,k-1 )
                     d2dz2%cols(ind) = colInd - nx * ny
                     d2dz2%rows_start(rowInd) = ind
                     ind = ind + 1   ! Increment to next element
                 
                     !central value
-                    d2dz2%values(ind) = 2 * (-(problem%A0_map(i,j,k-1)/(problem%A0_map(i,j,k-1)+problem%A0_map(i,j,k))+problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k))))
+                    d2dz2%values(ind) = -( exchCoeff( problem, i,j,k, i,j,k-1 ) + exchCoeff( problem, i,j,k, i,j,k+1 ) )
                     d2dz2%cols(ind) = colInd
                     ind = ind + 1   ! Increment to next element
                 
                     !right-most value
-                    d2dz2%values(ind) = 2 * problem%A0_map(i,j,k+1)/(problem%A0_map(i,j,k+1)+problem%A0_map(i,j,k))
+                    d2dz2%values(ind) = exchCoeff( problem, i,j,k, i,j,k+1 )
                     d2dz2%cols(ind) = colInd + nx * ny
                     d2dz2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
@@ -2696,19 +2720,18 @@ end subroutine updateDemagfieldFMM
                     ! therefore has the smallest column index, so it is emitted first.
 
                     ! Upwards coupling (loops around and couples to bottommost tile)
-                    d2dz2%values(ind) = 2*problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz))
+                    d2dz2%values(ind) = exchCoeff( problem, i,j,nz, i,j,1 )
                     d2dz2%cols(ind) = colInd - nx*ny*(nz - 1)
                     d2dz2%rows_start(rowInd) = ind
                     ind = ind + 1   ! Increment to next element
 
                     ! Downwards coupling
-                    d2dz2%values(ind) = 2*problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz))
+                    d2dz2%values(ind) = exchCoeff( problem, i,j,nz, i,j,nz-1 )
                     d2dz2%cols(ind) = colInd - nx*ny
                     ind = ind + 1   ! Increment to next element
 
                     ! Current tile
-                    d2dz2%values(ind) = 2*(-(problem%A0_map(i,j,nz-1)/(problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz)) &
-                            + problem%A0_map(i,j,1)/(problem%A0_map(i,j,1) + problem%A0_map(i,j,nz))))
+                    d2dz2%values(ind) = -( exchCoeff( problem, i,j,nz, i,j,nz-1 ) + exchCoeff( problem, i,j,nz, i,j,1 ) )
                     d2dz2%cols(ind) = colInd
                     d2dz2%rows_end(rowInd) = ind + 1
                     rowInd = rowInd + 1
@@ -2719,7 +2742,7 @@ end subroutine updateDemagfieldFMM
         else
             do j=1,ny
                 do i=1,nx
-                    const = 2 * problem%A0_map(i,j,nz-1) / (problem%A0_map(i,j,nz-1) + problem%A0_map(i,j,nz))
+                    const = exchCoeff( problem, i,j,nz, i,j,nz-1 )
 
                     !left-most value
                     d2dz2%values(ind) = const
@@ -2842,6 +2865,71 @@ end subroutine updateDemagfieldFMM
 
     call trace%end( "ComputeExchangeTerm3D_Uniform", itimer=itimer, verbose=1 )
     end subroutine ComputeExchangeTerm3D_Uniform
+
+
+    !>-----------------------------------------
+    !> @brief
+    !> Pairwise exchange coefficient between a cell and one of its neighbours on a uniform
+    !> grid, following Heistracher et al., DOI: 10.1016/j.jmmm.2021.168875.
+    !>
+    !> This is the harmonic mean of the two exchange stiffnesses divided by the stiffness of
+    !> the cell owning the matrix row, 2*A_nb/(A_nb + A_self) = A_harm/A_self. The division by
+    !> A_self is there because Jfact on a uniform grid is A0/(mu0*Ms) per cell, whereas the
+    !> unstructured mesh normalises by the global A0_max instead and so uses A_harm directly.
+    !>
+    !> The expression used to be written out by hand at 39 places in the routine above, which
+    !> made any change to it - such as an interface value specified per pair of materials -
+    !> 39 chances to introduce an inconsistency that no test would localise.
+    !> @param[in] A_self exchange stiffness of the cell owning the row
+    !> @param[in] A_nb exchange stiffness of the neighbouring cell
+    !>-----------------------------------------
+    !> If the two cells belong to different materials and the user has given an interface
+    !> value for that pair, that value replaces the harmonic mean. The coefficient is still
+    !> divided by A_self, because Jfact on a uniform grid carries the per-cell A0.
+    !>
+    !> A cell with A0 = 0 is not magnetic, so a face touching one ignores the interface table
+    !> entirely and keeps the ordinary formula. That already leaves the magnetic side
+    !> uncoupled, since 2*A_nb/(A_nb + A_self) vanishes when the neighbour is dead, and it is
+    !> the same rule the unstructured mesh follows, so the two grid types agree.
+    pure function exchCoeff( problem, i_s, j_s, k_s, i_n, j_n, k_n ) result( coeff )
+    type(MicroMagProblem),intent(in) :: problem        !> Problem, for A0_map and the phases
+    integer,intent(in) :: i_s, j_s, k_s                !> Grid index of the cell owning the row
+    integer,intent(in) :: i_n, j_n, k_n                !> Grid index of the neighbouring cell
+    real(DP) :: coeff
+    real(DP) :: A_self, A_nb, A_face
+    integer :: p_self, p_nb
+
+    A_self = problem%A0_map(i_s,j_s,k_s)
+    A_nb   = problem%A0_map(i_n,j_n,k_n)
+
+    A_face = -1.0_DP
+    if ( problem%n_phase .gt. 1 .and. allocated(problem%A_int) &
+         .and. allocated(problem%phase_map) ) then
+        p_self = problem%phase_map(i_s,j_s,k_s)
+        p_nb   = problem%phase_map(i_n,j_n,k_n)
+        !A cell with A0 = 0 is not magnetic, so the override is simply not taken for a face
+        !touching one and the ordinary formula below applies unchanged - which already gives
+        !no coupling to the magnetic side, since 2*A_nb/(A_nb + A_self) vanishes when A_nb is
+        !zero. Declining the override rather than forcing the coefficient to zero is what
+        !makes the interface value have no effect at all on such a face, and it mirrors what
+        !the unstructured mesh does. It also guarantees A_self > 0 wherever the override is
+        !used, so the division below is safe.
+        if ( p_self .ne. p_nb .and. A_self .gt. 0.0_DP .and. A_nb .gt. 0.0_DP ) &
+            A_face = problem%A_int(p_self,p_nb)
+    endif
+
+    if ( A_face .ge. 0.0_DP ) then
+        coeff = A_face / A_self
+    else if ( ( A_nb + A_self ) .gt. 0.0_DP ) then
+        coeff = 2 * A_nb / ( A_nb + A_self )
+    else
+        !Two neighbouring cells that are both non-magnetic. The harmonic mean is 0/0 there,
+        !which with /fpe:0 is an invalid operation rather than a quiet NaN. Two cells with no
+        !exchange are not exchange coupled, so the coefficient is zero.
+        coeff = 0.0_DP
+    endif
+
+    end function exchCoeff
        
     !>-----------------------------------------
     !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020

@@ -241,6 +241,19 @@ properties
     %that value, so runs are reproducible but differ from each other. A negative
     %value seeds from the clock, which is what independent Monte-Carlo runs need.
     rng_seed
+
+    %Optional exchange stiffness at the interface between two materials. phase_id gives
+    %the material index (1..n_phase) of every tile and A_int is a symmetric
+    %n_phase-by-n_phase table of interface exchange values in J/m. A negative entry means
+    %'use the harmonic mean of the two tiles', which is the default everywhere, so a table
+    %can override only the pairs of interest. Entries on the diagonal are never used, as
+    %two tiles of the same material always use the harmonic mean.
+    %A tile with A0 = 0 is not magnetic, so a face touching one stays uncoupled whatever
+    %the table says, which is what the harmonic mean does by itself.
+    %n_phase = 1 disables the feature.
+    n_phase
+    phase_id
+    A_int
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -510,6 +523,11 @@ methods
 
         %Thermal-field RNG seed. Default 0 preserves the previous behaviour.
         obj.rng_seed = int32(0);
+
+        %One material, i.e. the harmonic mean everywhere, which is the previous behaviour.
+        obj.n_phase = int32(1);
+        obj.phase_id = ones(obj.ntot,1);
+        obj.A_int = -1;
 
     end
     

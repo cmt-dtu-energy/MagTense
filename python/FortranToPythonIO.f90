@@ -661,7 +661,8 @@ end subroutine getHFromTilesFMM
         H_start, H_end, dH_initial, dH_min, dH_max, maxHextSteps, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH, use_switch_refine, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, n_Hext_accepted, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useFMM, &
-        log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, useDemag, rng_seed )
+        log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, useDemag, rng_seed, &
+        n_phase, phase_id, A_int )
 
         !nt_Hext is the number of rows in the Hext array; nt_Hext_out is the third extent of the
         !returned M and H arrays. There used to be a third, n_Hext, which was accepted and declared
@@ -692,6 +693,10 @@ end subroutine getHFromTilesFMM
 		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch, useDemag
         real(8),intent(in) :: gamma, alpha_mm, MaxT0, tol, thres, conv_tol, dem_thres
 		real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2, temperature
+        !> Optional interface exchange between materials. n_phase = 1 disables it.
+        integer(4),intent(in) :: n_phase
+        integer(4),dimension(ntot),intent(in) :: phase_id
+        real(8),dimension(n_phase,n_phase),intent(in) :: A_int
         real(8),dimension(ntot,6,3),intent(in) :: K0_arr
         real(8),dimension(ntot,3,3),intent(in):: CrysAxis
         character*256,intent(in) :: N_file_in, N_file_out
@@ -769,7 +774,7 @@ end subroutine getHFromTilesFMM
             exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
             CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
             n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
-            passExch, exch_ncols, CrysAxis, K0_arr, K1, K2, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
+            passExch, exch_ncols, CrysAxis, K0_arr, K1, K2, n_phase, phase_id, A_int, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
             useDemag, rng_seed)
 
         if (hysteresis_solver .eq. 2) then

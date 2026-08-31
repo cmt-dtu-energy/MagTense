@@ -26,6 +26,10 @@
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: exch_weightProblemPtr, exch_methodProblemPtr, exch_interpnProblemPtr
         mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, K1ProblemPtr, K2ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
+        mwPointer :: nPhaseProblemPtr, phaseIdProblemPtr, AIntProblemPtr
+        real(DP),dimension(:),allocatable :: A_int_flat
+        real(DP),dimension(:),allocatable :: phase_id_real
+        integer :: ip, jp
         mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr, usePassExchPtr, useAvgNProblemPtr
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
         mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr, CVThresProblemPtr
@@ -152,6 +156,57 @@
         A0ProblemPtr = mxGetField( prhs, i, problemFields(7) )
         call mxCopyPtrToReal8(mxGetPr(A0ProblemPtr), problem%A0, sx )
         
+        !----------------- Interface exchange between two materials ------------------------
+        !Every field above is required, but these three are not: a problem struct saved
+        !before the feature existed, or built by hand, will not have them and mxGetField
+        !returns a null pointer. Reading through that would be a hard crash, so the absence
+        !is treated as 'one material', which is exactly the previous behaviour.
+        problem%n_phase = 1
+        nPhaseProblemPtr = mxGetField( prhs, i, problemFields(105) )
+        phaseIdProblemPtr = mxGetField( prhs, i, problemFields(106) )
+        AIntProblemPtr = mxGetField( prhs, i, problemFields(107) )
+        if ( nPhaseProblemPtr .ne. 0 .and. phaseIdProblemPtr .ne. 0 .and. AIntProblemPtr .ne. 0 ) then
+            sx = 1
+            call mxCopyPtrToInteger4(mxGetPr(nPhaseProblemPtr), problem%n_phase, sx )
+
+            if ( problem%n_phase .gt. 1 ) then
+                !MATLAB hands over doubles, so the phase indices arrive as reals and are
+                !rounded rather than truncated - 2.9999999 has to become 3, not 2.
+                allocate( phase_id_real(ntot) )
+                sx = ntot
+                call mxCopyPtrToReal8(mxGetPr(phaseIdProblemPtr), phase_id_real, sx )
+                allocate( problem%phase_id(ntot) )
+                problem%phase_id = nint(phase_id_real)
+                deallocate( phase_id_real )
+
+                if ( minval(problem%phase_id) .lt. 1 .or. maxval(problem%phase_id) .gt. problem%n_phase ) then
+                    call displayGUIMessage( 'MagTense: phase_id must be between 1 and n_phase' )
+                    error stop 'loadMicroMagProblem: phase_id out of range'
+                endif
+
+                !A MATLAB matrix arrives in column-major order, which is also how the
+                !n_phase x n_phase table is stored here, so the flat copy reshapes directly.
+                allocate( A_int_flat(problem%n_phase*problem%n_phase) )
+                sx = problem%n_phase*problem%n_phase
+                call mxCopyPtrToReal8(mxGetPr(AIntProblemPtr), A_int_flat, sx )
+                allocate( problem%A_int(problem%n_phase,problem%n_phase) )
+                do jp = 1, problem%n_phase
+                    do ip = 1, problem%n_phase
+                        problem%A_int(ip,jp) = A_int_flat(ip + (jp-1)*problem%n_phase)
+                    end do
+                end do
+                deallocate( A_int_flat )
+
+                !An asymmetric table would make the exchange across a face depend on which of
+                !the two cells is asked, which is not a physical operator.
+                if ( maxval(abs(problem%A_int - transpose(problem%A_int))) .gt. 0.0_DP ) then
+                    call displayGUIMessage( 'MagTense: the interface exchange table must be symmetric' )
+                    error stop 'loadMicroMagProblem: A_int is not symmetric'
+                endif
+            endif
+        endif
+        !-----------------------------------------------------------------------------------
+
         allocate( problem%Ms(ntot) )
         sx = ntot
         MsProblemPtr = mxGetField( prhs, i, problemFields(8) )
@@ -644,7 +699,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=104
+        integer,parameter :: nf=107
         character(len=12),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -755,6 +810,12 @@
         fieldnames(102) = 'switch_refdH'
         fieldnames(103) = 'use_sw_ref'
         fieldnames(104) = 'rng_seed'
+
+        !Optional exchange at the interface between two materials. A problem struct that
+        !predates the feature simply does not have these, which the loader handles.
+        fieldnames(105) = 'n_phase'
+        fieldnames(106) = 'phase_id'
+        fieldnames(107) = 'A_int'
 
     end subroutine getProblemFieldnames
     

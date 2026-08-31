@@ -159,6 +159,8 @@ class MicromagProblem:
             n_macro: list | np.ndarray | None = np.zeros(3),
             hysteresis_solver: str = "static",
             rng_seed: int = 0,
+            phase_id: np.ndarray | None = None,
+            A_int: np.ndarray | None = None,
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -211,6 +213,7 @@ class MicromagProblem:
 
         # Set material parameters
         self.A0 = A0
+        self.set_interface_exchange(phase_id, A_int)
         self.Ms = Ms
         self.K0 = K0
         self.K1 = K1
@@ -405,6 +408,70 @@ class MicromagProblem:
         else:
             assert np.asarray(val).shape == (self.ntot, 3)
             self._grid_abc = np.asarray(val, dtype=np.float64, order="F")
+
+    def set_interface_exchange(self, phase_id=None, A_int=None) -> None:
+        """Exchange stiffness to use at the interface between two materials.
+
+        By default the exchange across a face between cells of different materials is the
+        harmonic mean of their two A0 values. This specifies it explicitly instead.
+
+        Params:
+            phase_id: (ntot,) integer material index of every cell, 1..n_phase.
+            A_int: (n_phase, n_phase) symmetric table of interface exchange values in J/m.
+                A negative entry means "use the harmonic mean" for that pair, so a table may
+                override only the pairs of interest. Diagonal entries are never used - two
+                cells of the same material always use the harmonic mean.
+
+        The value is keyed on the pair of materials rather than being one global number, which
+        keeps it well defined for any number of materials: every internal face lies between
+        exactly two cells, so even a triple junction is unambiguous face by face.
+
+        A cell with A0 = 0 is not magnetic, so a face touching one is left uncoupled whatever
+        the table says. That matches the default harmonic mean, which already vanishes as
+        soon as either side is zero, and it behaves the same on both grid types.
+        """
+        if phase_id is None or A_int is None:
+            # One material: no interfaces, so the harmonic mean is used everywhere.
+            self._n_phase = 1
+            self._phase_id = np.ones(self.ntot, dtype=np.int32, order="F")
+            self._A_int = np.full((1, 1), -1.0, dtype=np.float64, order="F")
+            return
+
+        pid = np.asarray(phase_id, dtype=np.int32).ravel()
+        if pid.size != self.ntot:
+            raise ValueError(f"phase_id must have {self.ntot} entries, got {pid.size}")
+
+        tab = np.asarray(A_int, dtype=np.float64)
+        if tab.ndim != 2 or tab.shape[0] != tab.shape[1]:
+            raise ValueError("A_int must be a square (n_phase, n_phase) array")
+        if not np.array_equal(tab, tab.T):
+            raise ValueError(
+                "A_int must be symmetric: the exchange across a face cannot depend on which "
+                "of the two cells it is asked from"
+            )
+        n_phase = tab.shape[0]
+        if n_phase < 2:
+            raise ValueError("A_int needs at least two materials to describe an interface")
+        if pid.min() < 1 or pid.max() > n_phase:
+            raise ValueError(
+                f"phase_id entries must lie in 1..{n_phase}, got {pid.min()}..{pid.max()}"
+            )
+
+        self._n_phase = n_phase
+        self._phase_id = np.asfortranarray(pid, dtype=np.int32)
+        self._A_int = np.asfortranarray(tab, dtype=np.float64)
+
+    @property
+    def n_phase(self) -> int:
+        return self._n_phase
+
+    @property
+    def phase_id(self) -> np.ndarray:
+        return self._phase_id
+
+    @property
+    def A_int(self) -> np.ndarray:
+        return self._A_int
 
     @property
     def A0(self) -> int | float | list | np.ndarray | None:
@@ -887,7 +954,10 @@ class MicromagProblem:
             trace_enabled=self.trace_enabled,
             flush_each=self.flush_each,
             trace_verbose=self.trace_verbose,
-            rng_seed=self.rng_seed
+            rng_seed=self.rng_seed,
+            n_phase=self.n_phase,
+            phase_id=self.phase_id,
+            a_int=self.A_int,
         )
 
         result = list(result)
@@ -1044,7 +1114,10 @@ class MicromagProblem:
             trace_enabled=self.trace_enabled,
             flush_each=self.flush_each,
             trace_verbose=self.trace_verbose,
-            rng_seed=self.rng_seed
+            rng_seed=self.rng_seed,
+            n_phase=self.n_phase,
+            phase_id=self.phase_id,
+            a_int=self.A_int,
         )
 
         result = list(result)
@@ -1219,7 +1292,10 @@ class MicromagProblem:
             trace_enabled=self.trace_enabled,
             flush_each=self.flush_each,
             trace_verbose=self.trace_verbose,
-            rng_seed=self.rng_seed
+            rng_seed=self.rng_seed,
+            n_phase=self.n_phase,
+            phase_id=self.phase_id,
+            a_int=self.A_int,
         )
 
         result = list(result)

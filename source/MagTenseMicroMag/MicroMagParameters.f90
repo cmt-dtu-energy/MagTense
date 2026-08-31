@@ -219,6 +219,19 @@ include "mkl_dfti.f90"
         real(DP),dimension(:,:,:),allocatable :: CrystalAxis, K0_arr !> The local crystal coordinates and the local anisotropy constants. See updateAnisotropy for details        
         real(DP),dimension(:,:,:),allocatable :: A0_map     !> The specified exchange constant, mapped out on a grid, for computing the finite difference exchange operator for uniform grids        
         
+        !> Optional user-specified exchange coupling at the interface between two materials.
+        !> phase_id holds the material index (1..n_phase) of every cell and A_int is a symmetric
+        !> n_phase x n_phase table of interface exchange values in J/m. A negative entry means
+        !> 'use the harmonic mean of the two cells', which is the behaviour everywhere when the
+        !> feature is not used. The value is keyed on the pair of phases rather than on a single
+        !> global number, which keeps it well defined for any number of materials: every internal
+        !> face joins exactly two cells, so even a triple junction is unambiguous face by face.
+        !> Faces between two cells of the same phase always use the harmonic mean.
+        integer :: n_phase = 1                              !> No. of distinct materials; 1 disables the feature
+        integer,dimension(:),allocatable :: phase_id        !> Material index of each cell, 1..n_phase
+        integer,dimension(:,:,:),allocatable :: phase_map   !> phase_id mapped onto a uniform grid
+        real(DP),dimension(:,:),allocatable :: A_int        !> Interface exchange per pair of phases [J/m]
+        
         type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H       !> Handle for the FFT MKL stuff
 
 
