@@ -36,6 +36,16 @@ This will:
   The supported distributions are **Miniconda and Anaconda**: the conda front-end is assumed to be at `$(CONDA_DIR)/bin/conda`. Other front-ends (mamba, micromamba) are untested, but you can point the build at one with `CONDA_BIN=/path/to/mamba`.
 
   Note that `CONDA_DIR` is not remembered between invocations - every target has to be given the same value, so a later `make pytest` from a plain shell needs `make pytest CONDA_DIR=/path/to/your/conda` too. If you always build against the same installation, export `CONDA_DIR` from your `~/.bashrc` instead of passing it each time.
+- Ask you, once per machine, to accept the [Anaconda Terms of Service](https://www.anaconda.com/legal/terms/terms-of-service) for the default channels (`repo.anaconda.com/pkgs/main` and `/pkgs/r`). The environment files carry `nodefaults`, so no package is actually taken from those channels, but recent conda versions run the terms check over the *configured* channel list - and a stock Miniconda has `defaults` there as a built-in, with no `~/.condarc` to remove it from. Accepting is a licensing decision - Anaconda requires a paid licence for those channels above a certain organisation size - so the build asks instead of accepting on your behalf, and records your answer in `~/.conda/.magtense-tos-accepted` so you are only asked the first time.
+
+  Pass `ACCEPT_CONDA_TOS=1` to accept without the prompt, which is what CI does; there is no tty to ask on there. If you would rather not use the default channels at all, answer no and drop them from your conda configuration instead:
+
+  ```shell
+  $(make -s print-CONDA_BIN) config --append channels conda-forge
+  $(make -s print-CONDA_BIN) config --remove channels defaults
+  ```
+
+  That edits `~/.condarc` and so affects every environment for your user, not just `magtense-env`.
 - Create the conda environment `magtense-env` with all the dependencies for building the Python interface, using the specified Python vesrsion
 - Build the MagTense Fortran core and the CVODE library, using CUDA by default (if you have an NVIDIA GPU and the CUDA toolkit installed) - set `USE_CUDA=0` to disable CUDA support
 - Build the Python interface and install it in the `magtense-env` conda environment

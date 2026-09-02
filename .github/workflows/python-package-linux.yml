@@ -73,10 +73,16 @@ jobs:
     # install Miniconda" path. The runner image ships a conda at
     # /usr/share/miniconda and the login shell exports CONDA_EXE, which the
     # Makefile would otherwise detect and reuse.
+    # ACCEPT_CONDA_TOS=1 accepts the Anaconda Terms of Service for the default
+    # channels non-interactively. The env files carry "nodefaults", but conda
+    # runs the terms check over the configured channel list, where a stock
+    # Miniconda has "defaults" as a built-in; with no tty to prompt on, the
+    # build would otherwise stop at build-env.
     - name: Build Python interface via make python-interface
       working-directory: ${{ github.workspace }}
       run: |
         make python-interface CONDA_DIR=$HOME/miniconda3 \
+            ACCEPT_CONDA_TOS=1 \
             USE_CUDA=${{ matrix.variant.cuda }} \
             USE_CVODE=${{ matrix.variant.cvode }} \
             USE_FMM3D=${{ matrix.variant.fmm }} \

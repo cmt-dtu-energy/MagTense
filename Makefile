@@ -437,7 +437,7 @@ endif
 #=======================================================================
 #							Targets
 #=======================================================================
-.PHONY: all clean install-miniconda build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL} rm-conda rm-env python-interface-win info print-%
+.PHONY: all clean install-miniconda accept-conda-tos build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL} rm-conda rm-env python-interface-win info print-%
 
 all: $(ALL_DEPS) ${AUXMT} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} 
 
@@ -577,6 +577,71 @@ install-miniconda:
 			echo "Miniconda installed at $(CONDA_DIR)."; \
 	fi
 
+# Anaconda's default channels (repo.anaconda.com/pkgs/main and /pkgs/r) require
+# their Terms of Service to be accepted before conda will solve against them.
+# Conda raises CondaToSNonInteractiveError from inside "env create" rather than
+# asking, so a fresh VM stops dead at build-env. The env files carry
+# "nodefaults", but that only keeps packages from being *taken* from those
+# channels: the ToS check runs over the configured channel list, and a stock
+# Miniconda has "defaults" there as a built-in with no ~/.condarc to edit. So
+# the gate fires even though nothing resolves against Anaconda's channels.
+#
+# Accepting is a licensing decision, not a build step: Anaconda requires a paid
+# licence for the default channels above their organisation-size threshold. So
+# this asks, once, rather than accepting silently. Set ACCEPT_CONDA_TOS=1 to
+# accept without a prompt (CI, or anyone who already knows their answer).
+CONDA_TOS_CHANNELS := https://repo.anaconda.com/pkgs/main https://repo.anaconda.com/pkgs/r
+CONDA_TOS_DIR := $(HOME)/.conda
+CONDA_TOS_MARKER := $(CONDA_TOS_DIR)/.magtense-tos-accepted
+
+define accept-conda-tos-now
+	for ch in $(CONDA_TOS_CHANNELS); do \
+		$(CONDA_BIN) tos accept --override-channels --channel "$$ch" || exit 1; \
+	done; \
+	mkdir -p "$(CONDA_TOS_DIR)" && touch "$(CONDA_TOS_MARKER)"
+endef
+
+accept-conda-tos: install-miniconda
+	@if [ -f "$(CONDA_TOS_MARKER)" ]; then \
+		:; \
+	elif ! $(CONDA_BIN) tos --help >/dev/null 2>&1; then \
+		echo "This conda has no 'tos' subcommand; nothing to accept."; \
+	elif [ "$(ACCEPT_CONDA_TOS)" = "1" ]; then \
+		echo "ACCEPT_CONDA_TOS=1: accepting the Anaconda Terms of Service."; \
+		$(accept-conda-tos-now); \
+	elif [ -r /dev/tty ]; then \
+		echo ""; \
+		echo "Conda needs the Anaconda Terms of Service accepted for:"; \
+		for ch in $(CONDA_TOS_CHANNELS); do echo "    $$ch"; done; \
+		echo ""; \
+		echo "These are Anaconda's default channels. Their terms are at"; \
+		echo "https://www.anaconda.com/legal/terms/terms-of-service and require a"; \
+		echo "paid licence for larger organisations. Accept only if that is your"; \
+		echo "call to make; otherwise answer no and see the note printed below."; \
+		echo ""; \
+		printf "Accept the Terms of Service for these channels? [y/N] "; \
+		read -r ans < /dev/tty; \
+		case "$$ans" in \
+			[yY]|[yY][eE][sS]) $(accept-conda-tos-now);; \
+			*) \
+				echo ""; \
+				echo "Not accepted. To build without the default channels, drop them"; \
+				echo "from the conda configuration instead:"; \
+				echo "    $(CONDA_BIN) config --append channels conda-forge"; \
+				echo "    $(CONDA_BIN) config --remove channels defaults"; \
+				echo "and re-run. Note this edits ~/.condarc, which affects every"; \
+				echo "environment for this user, not just $(ENV_NAME)."; \
+				exit 1;; \
+		esac; \
+	else \
+		echo "Conda needs the Anaconda Terms of Service accepted, and there is no"; \
+		echo "terminal to ask on. Re-run with ACCEPT_CONDA_TOS=1, or run:"; \
+		for ch in $(CONDA_TOS_CHANNELS); do \
+			echo "    $(CONDA_BIN) tos accept --override-channels --channel $$ch"; \
+		done; \
+		exit 1; \
+	fi
+
 # Removes only an installation this Makefile created. CONDA_DIR is detected and
 # can therefore point at a system-wide or shared conda, which must never be
 # deleted from here.
@@ -593,7 +658,7 @@ rm-conda:
 		echo "Removed $(CONDA_DIR)."; \
 	fi
 
-build-env: install-miniconda
+build-env: install-miniconda accept-conda-tos
 # Check if the environment already exists before creating it. The name is
 # matched exactly - a plain grep would also match longer names sharing the
 # prefix - and it is looked up through $(CONDA_BIN) rather than whatever conda
