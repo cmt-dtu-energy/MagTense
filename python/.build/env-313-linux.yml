@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - https://software.repos.intel.com/python/conda
   - nvidia/label/cuda-12.9.2
-  - defaults
+  - nodefaults
 dependencies:
   - _openmp_mutex=4.5=20_gnu
   - _python_abi3_support=1.0=hd8ed1ab_3
