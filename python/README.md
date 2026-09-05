@@ -5,143 +5,184 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
 ## Linux
 
-- New Conda environment from [env-313-linux.yml](./.build/env-313-linux.yml)
+On a Debian/Ubuntu system, first install the build prerequisites:
 
-  ```bash
-  conda env create -n magtense-env -f python/.build/env-313-linux.yml
-  conda activate magtense-env
+```shell
+sudo apt-get update
+sudo apt-get install -y git curl wget unzip build-essential
+```
+
+`curl` fetches Miniconda and `wget` fetches the CVODE source tarball; `unzip` is only
+needed if you run [test-envs-linux.sh](./.build/test-envs-linux.sh), which inspects wheel
+metadata. Everything else - the Intel and GNU compilers, CMake, CUDA - comes from the conda
+environment, so no system toolchain beyond `build-essential` is required.
+
+Then you can simply run
+
+```shell
+make python-interface [PY_VERSION=314(default) | 313 | 312] [USE_CUDA=1(default) | 0]
+```
+
+This will:
+
+- Download [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main) if you don't have one already. An existing installation is detected automatically, in this order: a `CONDA_DIR` (or `CONDA_BIN`) you pass yourself, the `$CONDA_EXE` of an activated conda shell, `conda info --base` from your `PATH`, and finally `~/miniconda3`. Only when none of those turns up a conda is Miniconda downloaded, into `~/miniconda3`. To point the build at a specific installation, pass it explicitly:
+
+  ```shell
+  make python-interface CONDA_DIR=/path/to/your/conda
   ```
 
-  OR
-  
-  Make your own enviroment with the required python packages for CUDA, Intel compilers (`ifx` and `icx`), `mkl` and `cmake`:
-  - Available [CUDA versions](https://anaconda.org/nvidia/cuda) and location of corresponding [pip-wheels](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels) (deployment)
-  - More information about [Intel® C++ Compiler](https://www.intel.com/content/www/us/en/developer/tools/oneapi/dpc-compiler.html) and [Intel® Fortran Compiler](https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran)
+  You can check what was picked up with `make -s print-CONDA_DIR`, `make -s print-CONDA_BIN` and `make -s print-PYTHON` (or all of it at once with `make info`);
 
-  ```bash
-  conda create -y -n magtense-env && conda activate magtense-env
-  conda config --env --add channels conda-forge
-  conda install -y python=3.13
-  python3 -m pip install numpy meson ninja charset-normalizer build
-  conda config --env --add channels nvidia/label/cuda-12.9.1
-  conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
-  conda config --env --add channels https://software.repos.intel.com/python/conda/
-  conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" "ifx_linux-64"
-  conda install -y cmake
+  The supported distributions are **Miniconda and Anaconda**: the conda front-end is assumed to be at `$(CONDA_DIR)/bin/conda`. Other front-ends (mamba, micromamba) are untested, but you can point the build at one with `CONDA_BIN=/path/to/mamba`.
+
+  Note that `CONDA_DIR` is not remembered between invocations - every target has to be given the same value, so a later `make pytest` from a plain shell needs `make pytest CONDA_DIR=/path/to/your/conda` too. If you always build against the same installation, export `CONDA_DIR` from your `~/.bashrc` instead of passing it each time.
+- Ask you, once per machine, to accept the [Anaconda Terms of Service](https://www.anaconda.com/legal/terms/terms-of-service) for the default channels (`repo.anaconda.com/pkgs/main` and `/pkgs/r`). The environment files carry `nodefaults`, so no package is actually taken from those channels, but recent conda versions run the terms check over the *configured* channel list - and a stock Miniconda has `defaults` there as a built-in, with no `~/.condarc` to remove it from. Accepting is a licensing decision - Anaconda requires a paid licence for those channels above a certain organisation size - so the build asks instead of accepting on your behalf, and records your answer in `~/.conda/.magtense-tos-accepted` so you are only asked the first time.
+
+  Pass `ACCEPT_CONDA_TOS=1` to accept without the prompt, which is what CI does; there is no tty to ask on there. If you would rather not use the default channels at all, answer no and drop them from your conda configuration instead:
+
+  ```shell
+  $(make -s print-CONDA_BIN) config --append channels conda-forge
+  $(make -s print-CONDA_BIN) config --remove channels defaults
   ```
 
-- Required modules for `cvode` from sundials-7.4.0
-    Prerequisites, e.g. `ifx`, `icx` and `cmake`, have already been installed in the previous steps.
+  That edits `~/.condarc` and so affects every environment for your user, not just `magtense-env`.
+- Create the conda environment `magtense-env` with all the dependencies for building the Python interface, using the specified Python vesrsion
+- Build the MagTense Fortran core and the CVODE library, using CUDA by default (if you have an NVIDIA GPU and the CUDA toolkit installed) - set `USE_CUDA=0` to disable CUDA support
+- Build the Python interface and install it in the `magtense-env` conda environment
 
-  - Download version 7.4.0 of `cvode`:
+There are also Make targets `rm-env` and `rm-conda` to clean up your installation. `rm-conda` only removes a Miniconda that this Makefile installed itself; it refuses to touch a conda that was already on your machine. The Make rules should be smart enough to not do unnecessary work; for instance, if you modify some part of the Python interface, `make python` will re-build the wheel and re-install it on the environment, without re-downloading Miniconda. In case of errors, the simplest first step probably is to run `make rm-env` and `make rm-conda` to start from a clean slate.
 
-    ```bash
-    wget https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz
-    tar -xf cvode-7.4.0.tar.gz
-    ```
+To test if the interface was built correctly, run `make pytest`.
 
-  - Prepare folder structure
+Note that all automated commands are run by subshells managed by Make. To actually use conda and explore the Python files, you have to first initialize conda in your current shell:
 
-    ```bash
-    mkdir cvode
-    mv cvode-7.4.0 cvode/src
-    ```
+```shell
+$(make -s print-CONDA_BIN) init --all
+```
 
-  - Run `cmake` and `make`for installation
+Then, *create a new shell*, and activate the `magtense-env` conda environment:
 
-    ```bash
-    cmake \
-    -B cvode/build \
-    -S cvode/src \
-    -D CMAKE_BUILD_TYPE=Release \
-    -D BUILD_ARKODE=OFF \
-    -D BUILD_CVODE=ON \
-    -D BUILD_CVODES=OFF \
-    -D BUILD_IDA=OFF \
-    -D BUILD_IDAS=OFF \
-    -D BUILD_KINSOL=OFF \
-    -D BUILD_SHARED_LIBS=OFF \
-    -D BUILD_STATIC_LIBS=ON \
-    -D CMAKE_INSTALL_PREFIX=cvode \
-    -D EXAMPLES_INSTALL_PATH=cvode/examples \
-    -D CMAKE_C_COMPILER=$(which icx) \
-    -D CMAKE_Fortran_COMPILER=$(which ifx) \
-    -D BUILD_FORTRAN_MODULE_INTERFACE=ON \
-    -D ENABLE_OPENMP=ON
-    cmake --build cvode/build --config Release --verbose
-    cmake --install cvode/build --verbose
-    ```
+```shell
+conda activate magtense-env
+```
 
-- Compile Fortran source files
+As a starting point, you can run the example scripts in [python/examples/](./python/examples/).
 
-  ```bash
-  LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0
-  ```
+### Maintaining the Linux environment files
 
-- Compiling with FMM3D backend
+The `magtense-env` environment is created from `python/.build/env-<PY_VERSION>-linux.yml`.
+These are fully-pinned `conda env export` dumps and are **not meant to be edited by hand** -
+doing so is how they drifted apart in the past. To change the CUDA version or add a package,
+edit the spec at the top of [regen-envs-linux.sh](./.build/regen-envs-linux.sh) and run it on a
+Linux x86 machine:
 
-To compile with FMM3D `$(MagTense-Folder)/external/FMM3D/local` must be in the `LD_Library_PATH` (replace MagTense-Folder with the actual path to the MagTense destiation).
-After this compile as above but with `USE_FMM3D=1`
+```shell
+bash python/.build/regen-envs-linux.sh          # all of 312, 313, 314
+bash python/.build/regen-envs-linux.sh 313      # or just one
+```
+
+The CUDA version lives on a single line in that script (`CUDA_LABEL`). Nothing else in the
+build references a CUDA version: the Makefiles call bare `nvcc` and link `-lcublas -lcudart
+-lcusparse` out of `$CONDA_PREFIX`.
+
+Packages that end users of the PyPI wheel should get belong in
+[requirements-py3.txt](./.build/requirements-py3.txt) as well - that file becomes the wheel's
+`Requires-Dist`. Build-time-only and developer tooling belongs in
+[requirements-py3-dev.txt](./.build/requirements-py3-dev.txt). Do not edit `python/requirements.txt`;
+it is generated from one of those two depending on whether you are doing a dev install or a
+distribution build.
+
+After regenerating, validate the result end to end:
+
+```shell
+bash python/.build/test-envs-linux.sh
+```
+
+This rebuilds each Python version from scratch with CUDA on and off, checks that `nvcc` and the
+conda `cuda-version` pin actually moved, that the compiled extension resolves its CUDA libraries,
+that the added packages import, and that they reach the wheel metadata. It starts by running
+`make rm-env`, which matters: `make` only creates `magtense-env` when it does not already exist,
+so an edited environment file has no effect against a stale environment.
+
+**Note: Compiling with FMM3D backend**
+
+To compile with FMM3D `$(MagTense-Folder)/external/FMM3D/local` must be in the `LD_Library_PATH` (replace MagTense-Folder with the actual path to the MagTense repo).
+After this modify the Makefile to replace `USE_FMM3D=0` with `USE_FMM3D=1`.
 
 ## Windows
 
-- Requiments
+Installation on Windows is a but more contrived because of the way Windows handles environments and privileges, so the user has to do more steps manually. Fortunately, the user who wants to customize and develop MagTense will likely handle the [pre-requisites](#pre-requisites-setting-up-the-development-environment) only once, to set up the development environment, and then the build process when the Fortran or Python parts are modified should be straightforward.
 
-  - Installation of [Visual Studio 2022](https://visualstudio.microsoft.com) (Desktop development with C++ and `cmake`)
+##### Pre-requisites (setting up the development environment)
 
-  - Installation of [Intel oneAPI](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html) (both C++ and Fortran)
+First, clone this repo.
 
-  - Installation of Miniconda or Anaconda
+Then, install the prerequisites:
 
-  - Download of MagTense and [FMM3D](https://github.com/Ximtecs/FMM3D). Unzip the latter in `external\FMM3D`
+- [The Anaconda distribution](https://www.anaconda.com/download)
+- [Visual Studio 2022](https://visualstudio.microsoft.com/vs/older-downloads/#visual-studio-2022-and-other-products) - select the option for desktop development with C++ and `cmake`
+- [Intel oneAPI](https://www.intel.com/content/www/us/en/developer/tools/oneapi/toolkits.html) (both C++ and Fortran)
+- [sundials-7.4.0](https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz) - unzip to a folder of your choice
+- *Only if you want the FMM3D backend*: [FMM3D](https://github.com/Ximtecs/FMM3D), unzipped into `external\FMM3D`
 
+With the above install, there's a new application in the start menu called "Intel oneAPI command prompt for Intel 64 for Visual Studio 2022" - this is a terminal with all the necessary environment variables set up to use the Intel compilers and tools. Find it and open it as administrator (right-click -> "Run as administrator"). Then, navigate to the folder where you unzipped the `cvode-7.4.0` source code and build it with the following commands:
 
-- Conda environment `magtense-env` is created from `env-313-win.yml` in a `Powershell` as
+```bash
+cmake -G "Ninja" -B C:/CVODE_temp -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_ARKODE=OFF -DBUILD_CVODE=ON -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON
 
-  ```bash
-  conda env create -f python/.build/env-313-win.yml
-  conda activate magtense-env
-  ```
-  All commands below, except for CVODE compilation, takes place in the `magtense-env` environment
+cmake --build C:/CVODE_temp --config RELEASE --verbose
+cmake --install C:/CVODE_temp --verbose
+```
+where the `CVODE_temp` is a temporary directory that can be removed after installation.
 
-- *Optional* CUDA plugin installation.
-    Open an `x64 Native Tools Command Prompt for VS 2022` and do:
+(**Tip**: opening the app as described above will open a rudimentary terminal with a sub-optimal UI. In the new Windows Terminal app, you can create a new profile that runs the above command to open the "Intel oneAPI command prompt for Intel 64 for Visual Studio 2022" in a more user-friendly terminal. See [this guide](https://docs.microsoft.com/en-us/windows/terminal/customize-settings/profile-settings-guide) on how to do this. The *command* to run in this new profile is `C:\Windows\System32\cmd.exe /E:ON /K ""C:\Program Files (x86)\Intel\oneAPI\setvars.bat" intel64 vs2022"`, and don't forget to check the "Run this profile as administrator" option in the profile settings.)
 
-    ```bash
-    cd source/MagTenseFortranCuda/cuda
-    make
-    ```
-	
-- *Optional* CVODE plugin installation
+The installed CVODE files will be located in `"C:\Program Files (x86)\SUNDIALS"` but should be moved to a folder named `cvode` at the top-level of the MagTense repository:
 
-  - Download [sundials-7.4.0](https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz) and unzip it.
-  
-  - Install [choco](https://chocolatey.org/install) and then Ninja as `choco install ninja`
-  
-  - Open a `Intel oneAPI command prompt for Intel 64 for Visual Studio 2022` as administrator and do:
-  
-  ```bash
-  cd cvode-7.4.0 
-  mkdir install
-  "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -G "Ninja" -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_ARKODE=OFF -DBUILD_CVODE=ON -DBUILD_CVODES=OFF -DBUILD_IDA=OFF -DBUILD_IDAS=OFF -DBUILD_KINSOL=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_INSTALL_PREFIX=install -DEXAMPLES_INSTALL_PATH=install/examples -DCMAKE_C_FLAGS=-Wno-deprecated-declarations -DCMAKE_C_COMPILER=icx-cl -DCMAKE_CXX_COMPILER=icx-cl -DCMAKE_Fortran_COMPILER=ifx -DBUILD_FORTRAN_MODULE_INTERFACE=ON -DENABLE_OPENMP=ON
-  "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build build --config Release --verbose
-  "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --install build --verbose
-  ```
-  
-- Compile Fortran source files
-  
-  - Open a `x64 Native Tools Command Prompt for VS 2022` and run:
+```bash
+mkdir cvode
+xcopy "C:\Program Files (x86)\SUNDIALS\*" cvode /s /i
+```
 
-    ```bash
-    make fmm3d USE_FMM3D=1
-    make auxmt magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=1 CVODE_ROOT="cvode-7.4.0/install"
-	make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=1 CVODE_ROOT="cvode-7.4.0/install"
-    ```
+This is the default location the build looks for, so `CVODE_ROOT` does not have to be passed anywhere below. After that, you can close the Intel oneAPI command prompt.
 
-- Install local editable magtense package
-  To install the compiled MagTense package locally, so that simulations can be run, do
+##### Optional: the CUDA plugin
 
-  ```bash
-  cp python/.build/requirements-py3-dev.txt python/requirements.txt
-  python -m pip install -e ./python
-  ```
+The CUDA plugin is built with `nvcc` and therefore needs the MSVC toolchain rather than the conda environment. Open an `x64 Native Tools Command Prompt for VS 2022` and run:
+
+```bash
+cd source/MagTenseFortranCuda/cuda
+make
+```
+
+Skip this if you intend to build with `USE_CUDA=0`.
+
+##### Building the Fortran core and Python interface
+
+On modern Windows distributions, the above development environment setup should create a new profile on the Windows Terminal app, called "Anaconda Powershell Prompt", with Anaconda already configured. *All commands below should be issued from this terminal, and in the MagTense directory (where you cloned the repo)*.
+
+```shell
+conda env create -f python/.build/env-314-win.yml
+```
+
+Then, activate the environment with `conda activate magtense-env`.
+
+With the environment active, build the Fortran core and then the Python module:
+
+```shell
+make auxmt magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
+make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
+```
+
+Pass `USE_CUDA=0` if you skipped the CUDA plugin, and add `USE_FMM3D=1` (after `make fmm3d USE_FMM3D=1`) if you unzipped FMM3D. The same flags have to be given to both commands.
+
+Finally, install the compiled package into the environment so that simulations can be run:
+
+```shell
+cp python/.build/requirements-py3-dev.txt python/requirements.txt
+python -m pip install -e ./python
+```
+
+The developer requirements already contain `ipympl` and `pycairo`, which the released wheel offers as the optional `notebook` extra, so there is no need to ask for `[notebook]` here. conda-forge provides the compiled cairo, so nothing has to be installed system-wide.
+
+As a starting point, you can run the example scripts in [python/examples/](./examples/).

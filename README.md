@@ -27,6 +27,14 @@ Installation is recommended via `pip` (requires >=**Python 3.12**):
 pip install magtense
 ```
 
+For interactive plotting in Jupyter notebooks, install the `notebook` extra, which adds [ipympl](https://matplotlib.org/ipympl/) and [pycairo](https://pycairo.readthedocs.io/):
+
+```
+pip install magtense[notebook]
+```
+
+pycairo publishes no Linux wheels and is built from source, so this extra needs the cairo development files on the machine (`libcairo2-dev` and `pkg-config` on Debian/Ubuntu). That is why it is opt-in: a plain `pip install magtense` needs nothing beyond Python.
+
 Examples of how to calculate magnetostatic and micromagnetic problems using the Python interface can be found [python/examples/](./python/examples/).
 
 ## Installation and usage with the Matlab interface
@@ -37,19 +45,30 @@ Examples of how to calculate magnetostatic and micromagnetic problems using the 
 
 ## Building from source
 
-If you want to build MagTense yourself this is certainly also an option. If you want to compile MagTense on Linux we provide a Makefile, which also works on Windows, where we also provide a Visual Studio project file, [MagTense.sln](MagTense.sln).
+If you want to build MagTense yourself this is certainly also an option.
 
-For Python you can find detailed instructions for building the Python interface with the Fortran core [here](/python/README.md).
+If you want to compile the MagTense core on Linux we provide a Makefile, which also works on Windows, where we also provide a Visual Studio project file, [MagTense.sln](MagTense.sln).
+
+For the higher-level interfaces, the instructions depend on which one you want to build. 
+
+### Python interface
+
+For customizing and developing MagTense to use with the Python interface, check out the [python/README.md](python/README.md) file.
+
+
+
+### MATLAB interface
 
 For Matlab MEX-files, we provide a Matlab function called [buildMagTenseMEX.m](matlab/buildMagTenseMEX.m) that works on both OS. You can find more information [here](/matlab/README.md).
 
 ## Further documentation
 
-The webpage of the code is available at https://www.magtense.org.
+The webpage of the code is available at <https://www.magtense.org>.
 
-The TechManual on the code is available at https://cmt-dtu-energy.github.io/MagTense.
+The TechManual on the code is available at <https://cmt-dtu-energy.github.io/MagTense>.
 
 ## Citation
+
 If you use this package in a publication, or simply want to refer to it, please cite the paper below:
 
 ```bibtex

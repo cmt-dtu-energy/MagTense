@@ -2,6 +2,7 @@
 #                       compiler names and flags
 #=======================================================================
 USE_CUDA = 1
+PY_VERSION ?= 314
 USE_CVODE = 0
 USE_MICROMAG = 1
 USE_MATLAB = 0
@@ -19,6 +20,67 @@ MKFILE_PATH := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 #   make ... USE_CVODE=1 CVODE_ROOT="C:/Program Files (x86)/sundials-7.2.1"
 CVODE_ROOT ?= ${MKFILE_PATH}/cvode
 
+# Name of the conda environment the build lives in
+ENV_NAME := magtense-env
+
+# Location of the conda installation. Resolution order, first hit wins:
+#   1. CONDA_DIR / CONDA_BIN given on the command line or in the environment
+#   2. $CONDA_EXE, set by an activated conda shell
+#   3. "conda info --base" from PATH
+#   4. $(HOME)/miniconda3 - the historical default, and where install-miniconda
+#      puts a fresh Miniconda when no existing installation was found
+# Only Miniconda/Anaconda installations are supported, so the front-end is
+# always $(CONDA_DIR)/bin/conda; pass CONDA_BIN explicitly for anything else.
+# The origin guard (rather than ?=) keeps the probe a one-shot at parse time
+# while still letting an environment or command-line value win.
+DEFAULT_CONDA_DIR := $(HOME)/miniconda3
+
+ifeq ($(OS),Windows_NT)
+CONDA_DIR ?= $(DEFAULT_CONDA_DIR)
+else
+
+ifeq ($(origin CONDA_DIR),undefined)
+CONDA_DIR := $(shell \
+	if [ -n "$$CONDA_EXE" ] && [ -x "$$CONDA_EXE" ]; then \
+		dirname "$$(dirname "$$CONDA_EXE")"; \
+	elif command -v conda >/dev/null 2>&1; then \
+		conda info --base; \
+	else \
+		echo "$(DEFAULT_CONDA_DIR)"; \
+	fi)
+endif
+# Guards an empty result, e.g. a "conda" on PATH that prints nothing
+CONDA_DIR := $(if $(strip $(CONDA_DIR)),$(CONDA_DIR),$(DEFAULT_CONDA_DIR))
+
+endif
+
+CONDA_BIN ?= $(CONDA_DIR)/bin/conda
+
+# Marker written by install-miniconda, recording that the installation at
+# CONDA_DIR belongs to this Makefile. rm-conda refuses to delete without it.
+CONDA_MARKER := $(CONDA_DIR)/.magtense-installed
+
+# Python bound to the conda env by absolute path so f2py uses the env
+# interpreter regardless of PATH. "conda run -- python" is still a name lookup
+# and can be shadowed by version managers (e.g. mise) that front-load PATH;
+# the absolute path cannot. The env is not assumed to sit under
+# $(CONDA_DIR)/envs either - a .condarc with envs_dirs puts it elsewhere - so
+# the prefix is asked of conda itself, with the usual layout as a fast path.
+# Recursively expanded (=, not :=) so the lookup runs when a recipe runs, i.e.
+# after build-env has created the env. On Windows the build runs inside an
+# already-activated env (CONDA_PREFIX), so plain python is correct there.
+ifeq ($(OS),Windows_NT)
+  PYTHON := python
+else
+CONDA_ENV_PREFIX = $(shell \
+	if [ -x "$(CONDA_DIR)/envs/$(ENV_NAME)/bin/python" ]; then \
+		echo "$(CONDA_DIR)/envs/$(ENV_NAME)"; \
+	else \
+		p=$$("$(CONDA_BIN)" env list 2>/dev/null | awk '$$1=="$(ENV_NAME)"{print $$NF}'); \
+		echo "$${p:-$(CONDA_DIR)/envs/$(ENV_NAME)}"; \
+	fi)
+  PYTHON = $(CONDA_ENV_PREFIX)/bin/python
+endif
 #=======================================================================
 #                    Recursive make on Windows
 #
@@ -64,9 +126,36 @@ FMM3D_DIR      ?= external/FMM3D
 FMM3D_ROOT     := $(abspath $(FMM3D_DIR))
 FMM3D_LIB      := $(FMM3D_ROOT)/local
 
+ifeq ($(OS),Windows_NT)
+  SEP = ;
+else
+  SEP = &&
+endif
+
 .PHONY: fmm3d
 fmm3d:
 ifeq ($(USE_FMM3D),1)
+# .gitmodules only exists on branches that carry the submodule, so a
+# "git clone --recursive" made from a branch without it, followed by a checkout,
+# leaves this directory empty - git does not initialise submodules on checkout.
+# Without this guard the bare "make install" below runs in an empty directory,
+# and GNU make reports "No rule to make target 'install'", which says nothing
+# about the actual cause.
+	@if [ ! -e "$(FMM3D_DIR)/makefile" ] && [ ! -e "$(FMM3D_DIR)/Makefile" ]; then \
+		echo "ERROR: no makefile in $(FMM3D_DIR) - the FMM3D submodule is not checked out."; \
+		echo "       Run: git submodule update --init --recursive"; \
+		echo "       ('git submodule status' shows a leading '-' while it is uninitialised.)"; \
+		exit 1; \
+	fi
+# A warning and not an error: CI always copies a make.inc in (the "Select FMM3D
+# make.inc" step), but whether the upstream makefile can fall back to its own
+# defaults without one is not something this Makefile should decide. If the
+# build below fails with missing compiler settings, this is the first thing to
+# check.
+	@if [ ! -e "$(FMM3D_DIR)/make.inc" ]; then \
+		echo "WARNING: no $(FMM3D_DIR)/make.inc - FMM3D will fall back to its own defaults."; \
+		echo "         On Linux, CI uses: cp $(FMM3D_DIR)/make.inc.linux $(FMM3D_DIR)/make.inc"; \
+	fi
 	@echo "==> FMM3D: building via upstream makefile (install)"
 	@cd "$(FMM3D_DIR)" && \
 	  $(MAKE) install PREFIX=$(abspath $(FMM3D_DIR)/local) DO_DEBUG=$(FMM3D_DEBUG) FAST_KER=OFF
@@ -90,6 +179,12 @@ ifeq (${UNAME}, Darwin)
 	USE_MKL = 0
 	USE_MICROMAG = 0
 	USE_MATLAB = 0
+endif
+
+# OS-specific shell
+ifeq ($(OS),Windows_NT)
+  SHELL := powershell.exe
+  .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 endif
 
 ifeq (${FC}, ifx)
@@ -162,8 +257,11 @@ ifeq ($(OS),Windows_NT)
 else
  	MKL = -L${CONDA_PREFIX}/lib -lmkl_rt -liomp5 -lmkl_blas95_lp64 -lpthread -lm -ldl
 	CUDA_ROOT = ${CONDA_PREFIX}/lib
-# adding LD flags here to aviod "cannot enable executable stack as shared object requires" on newer Linux distributions.
-	LDFLAGS = "-Wl,-z,noexecstack"
+	# Mark the produced .so as needing a non-executable stack. Fortran objects
+	# otherwise leave GNU_STACK executable, and recent Linux kernels refuse to
+	# dlopen such a library ("cannot enable executable stack as shared object
+	# requires: Invalid argument").
+	LDFLAGS = -Wl,-z,noexecstack
 #	LDFLAGS += '-lstdc++ -liomp5'
 	LIB_SUFFIX = .a
 	PY_MOD_SUFFIX = .so
@@ -237,7 +335,7 @@ else
     CP_LIB += && cp "${FMM3D_LIB}/libfmm3d.lib" ./fmm3d.lib
   else
     FMM3D = -L${FMM3D_LIB} -lfmm3d
-    LDFLAGS = "-Wl,-z,noexecstack -Wl,-rpath,${FMM3D_LIB}"
+    LDFLAGS += -Wl,-rpath,${FMM3D_LIB}
     CP_LIB += && cp ${FMM3D_LIB}/libfmm3d${LIB_SUFFIX} .
   endif
 endif
@@ -368,18 +466,17 @@ endif
 #=======================================================================
 #							Targets
 #=======================================================================
-.PHONY: all clean
+.PHONY: all clean install-miniconda accept-conda-tos build-env build-cvode ${MICROMAG_PATH} test standalone python_ python python-win ${PYTHON_MODN_ALL} rm-conda rm-env python-interface-win info print-%
 
 all: $(ALL_DEPS) ${AUXMT} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} 
 
-standalone: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} standalone
+standalone: magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR}
 
 python: $(PY_DEPS) ${AUXMT} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${PYTHON_MODN_ALL}
 
 python-win: $(PY_DEPS) ${PYTHON_MODN_ALL}
 
-clean:
-	cd ${AUXMT_PATH} && ${MAKE} clean
+define clean-subdirs
 	cd ${NUM_INT_PATH} && ${MAKE} clean
 	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} clean
 	cd ${DEMAG_FIELD_PATH} && ${MAKE} clean
@@ -387,8 +484,13 @@ clean:
 	cd ${FORTRAN_CUDA_PATH} && ${MAKE} clean
 	cd $(STANDALONE_PATH) && ${MAKE} clean
 	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
+endef
+
+clean:
+	$(clean-subdirs)
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
 	rm -rf ${PYTHON_LIBPATH}/build
+	rm -rf cvode*
 	rm -f ${BUILD_FLAGS_FILE}
 
 clean_full:
@@ -414,28 +516,36 @@ clean-build:
 	rm -rf ${PYTHON_LIBPATH}/build
 
 magnetostatic: check-config
-	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
-	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
-	cd ${DEMAG_FIELD_PATH}  && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
+	cd ${NUM_INT_PATH} $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd ${TILE_DEMAG_TENSOR_PATH} $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd ${DEMAG_FIELD_PATH}  $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 	${RECORD_FLAGS}
 
 micromagnetism: check-config
-	cd ${MICROMAG_PATH} && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
+	cd ${MICROMAG_PATH} $(SEP) $(MAKE) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT=$(CVODE_ROOT) USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 	${RECORD_FLAGS}
 
 cuda:
-	cd ${FORTRAN_CUDA_PATH} && $(MAKE) CPP=$(CPP)
+	cd ${FORTRAN_CUDA_PATH} $(SEP) $(MAKE) CPP=$(CPP)
 
 forceintegrator: check-config
-	cd $(FORCEINTEGRATOR_PATH) && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
+	cd $(FORCEINTEGRATOR_PATH) $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' MATLAB_INCLUDE=$(MATLAB_INCLUDE)
 
 standalone:
-	cd $(STANDALONE_PATH) && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}'
+	cd $(STANDALONE_PATH) $(SEP) $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}'
 	mkdir build
 	cp $(STANDALONE_PATH)/MagTense.x build/MagTense.x
 
+# Lets scripts and CI ask for a resolved value (make -s print-PYTHON,
+# print-CONDA_DIR, print-CONDA_BIN, ...) instead of duplicating the detection.
+print-%:
+	@echo '$($*)'
+
 info:
 	@echo Using Fortran compiler: $(FC)
+	@echo Conda installation: $(CONDA_DIR) \($(CONDA_BIN)\)
+	@echo Conda environment: $(ENV_NAME)
+	@echo Python interpreter: $(PYTHON)
 	@echo Fortran flags: $(FFLAGS)
 	@echo Linker flags: $(LDFLAGS)
 	@echo MKL flags: $(MKL)
@@ -462,10 +572,201 @@ test:
 
 
 
+# f2py is invoked with FC/FFLAGS/LDFLAGS as environment assignments in front of
+# the command, so a value holding a space has to be quoted or the shell takes
+# everything after the space as the command to run. FFLAGS carries its own
+# quotes (EXTRA_FFLAGS above), and so does the Windows LDFLAGS; the Linux one is
+# assembled in pieces - USE_FMM3D=1 appends an -Wl,-rpath to the -z noexecstack
+# it starts out as - so it is quoted here instead.
+ifeq ($(OS),Windows_NT)
+  LDFLAGS_ENV = LDFLAGS=${LDFLAGS}
+else
+  LDFLAGS_ENV = LDFLAGS="${LDFLAGS}"
+endif
+
 ${PYTHON_MODN_ALL}: check-config check-flags
 	${CP_LIB}
-	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
-		python -m numpy.f2py -c -m ${PYTHON_MODN} \
+	FC=${FC} FFLAGS=${EXTRA_FFLAGS} ${LDFLAGS_ENV} \
+		$(PYTHON) -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} \
 		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${FMM3D}
 	cp *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/
+
+# Rule that installs Miniconda only if no conda was found - see the detection
+# of CONDA_DIR/CONDA_BIN at the top of this file. The marker file records that
+# the installation is ours, which is what allows rm-conda to remove it.
+install-miniconda:
+	@if [ -x "$(CONDA_BIN)" ]; then \
+			echo "Conda already installed at $(CONDA_DIR) (using $(CONDA_BIN))."; \
+	else \
+			echo "Conda not found at $(CONDA_DIR). Installing Miniconda..."; \
+			curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o miniconda.sh; \
+			bash miniconda.sh -b -p $(CONDA_DIR) && rm miniconda.sh; \
+			touch $(CONDA_MARKER); \
+			echo "Miniconda installed at $(CONDA_DIR)."; \
+	fi
+
+# Anaconda's default channels (repo.anaconda.com/pkgs/main and /pkgs/r) require
+# their Terms of Service to be accepted before conda will solve against them.
+# Conda raises CondaToSNonInteractiveError from inside "env create" rather than
+# asking, so a fresh VM stops dead at build-env. The env files carry
+# "nodefaults", but that only keeps packages from being *taken* from those
+# channels: the ToS check runs over the configured channel list, and a stock
+# Miniconda has "defaults" there as a built-in with no ~/.condarc to edit. So
+# the gate fires even though nothing resolves against Anaconda's channels.
+#
+# Accepting is a licensing decision, not a build step: Anaconda requires a paid
+# licence for the default channels above their organisation-size threshold. So
+# this asks, once, rather than accepting silently. Set ACCEPT_CONDA_TOS=1 to
+# accept without a prompt (CI, or anyone who already knows their answer).
+CONDA_TOS_CHANNELS := https://repo.anaconda.com/pkgs/main https://repo.anaconda.com/pkgs/r
+CONDA_TOS_DIR := $(HOME)/.conda
+CONDA_TOS_MARKER := $(CONDA_TOS_DIR)/.magtense-tos-accepted
+
+define accept-conda-tos-now
+	for ch in $(CONDA_TOS_CHANNELS); do \
+		$(CONDA_BIN) tos accept --override-channels --channel "$$ch" || exit 1; \
+	done; \
+	mkdir -p "$(CONDA_TOS_DIR)" && touch "$(CONDA_TOS_MARKER)"
+endef
+
+accept-conda-tos: install-miniconda
+	@if [ -f "$(CONDA_TOS_MARKER)" ]; then \
+		:; \
+	elif ! $(CONDA_BIN) tos --help >/dev/null 2>&1; then \
+		echo "This conda has no 'tos' subcommand; nothing to accept."; \
+	elif [ "$(ACCEPT_CONDA_TOS)" = "1" ]; then \
+		echo "ACCEPT_CONDA_TOS=1: accepting the Anaconda Terms of Service."; \
+		$(accept-conda-tos-now); \
+	elif [ -r /dev/tty ]; then \
+		echo ""; \
+		echo "Conda needs the Anaconda Terms of Service accepted for:"; \
+		for ch in $(CONDA_TOS_CHANNELS); do echo "    $$ch"; done; \
+		echo ""; \
+		echo "These are Anaconda's default channels. Their terms are at"; \
+		echo "https://www.anaconda.com/legal/terms/terms-of-service and require a"; \
+		echo "paid licence for larger organisations. Accept only if that is your"; \
+		echo "call to make; otherwise answer no and see the note printed below."; \
+		echo ""; \
+		printf "Accept the Terms of Service for these channels? [y/N] "; \
+		read -r ans < /dev/tty; \
+		case "$$ans" in \
+			[yY]|[yY][eE][sS]) $(accept-conda-tos-now);; \
+			*) \
+				echo ""; \
+				echo "Not accepted. To build without the default channels, drop them"; \
+				echo "from the conda configuration instead:"; \
+				echo "    $(CONDA_BIN) config --append channels conda-forge"; \
+				echo "    $(CONDA_BIN) config --remove channels defaults"; \
+				echo "and re-run. Note this edits ~/.condarc, which affects every"; \
+				echo "environment for this user, not just $(ENV_NAME)."; \
+				exit 1;; \
+		esac; \
+	else \
+		echo "Conda needs the Anaconda Terms of Service accepted, and there is no"; \
+		echo "terminal to ask on. Re-run with ACCEPT_CONDA_TOS=1, or run:"; \
+		for ch in $(CONDA_TOS_CHANNELS); do \
+			echo "    $(CONDA_BIN) tos accept --override-channels --channel $$ch"; \
+		done; \
+		exit 1; \
+	fi
+
+# Removes only an installation this Makefile created. CONDA_DIR is detected and
+# can therefore point at a system-wide or shared conda, which must never be
+# deleted from here.
+rm-conda:
+	@if [ -z "$(CONDA_DIR)" ] || [ "$(CONDA_DIR)" = "/" ]; then \
+		echo "Refusing to remove CONDA_DIR='$(CONDA_DIR)'."; \
+		exit 1; \
+	elif [ ! -f "$(CONDA_MARKER)" ]; then \
+		echo "Refusing to remove $(CONDA_DIR): it was not installed by this Makefile"; \
+		echo "(no $(CONDA_MARKER)). Remove it by hand if that is really what you want."; \
+		exit 1; \
+	else \
+		rm -rf $(CONDA_DIR); \
+		echo "Removed $(CONDA_DIR)."; \
+	fi
+
+build-env: install-miniconda accept-conda-tos
+# Check if the environment already exists before creating it. The name is
+# matched exactly - a plain grep would also match longer names sharing the
+# prefix - and it is looked up through $(CONDA_BIN) rather than whatever conda
+# happens to be on PATH.
+	@if ! $(CONDA_BIN) env list | awk '$$1=="$(ENV_NAME)"{found=1} END{exit !found}'; then \
+		$(CONDA_BIN) env create -n $(ENV_NAME) -f ${MKFILE_PATH}/python/.build/env-$(PY_VERSION)-linux.yml; \
+	else \
+		echo "$(ENV_NAME) environment already exists."; \
+	fi
+
+
+rm-env:
+	$(CONDA_BIN) env remove -n $(ENV_NAME) -y
+
+CMAKE = $(CONDA_BIN) run -n $(ENV_NAME) -- cmake
+IFX = $(CONDA_BIN) run -n $(ENV_NAME) which ifx
+ICX = $(CONDA_BIN) run -n $(ENV_NAME) which icx
+
+
+define run-cmake-cvode
+	$(CMAKE) \
+	-B ${CVODE_ROOT}/build \
+	-S ${CVODE_ROOT}/src \
+	-D CMAKE_BUILD_TYPE=Release \
+	-D BUILD_ARKODE=OFF \
+	-D BUILD_CVODE=ON \
+	-D BUILD_CVODES=OFF \
+	-D BUILD_IDA=OFF \
+	-D BUILD_IDAS=OFF \
+	-D BUILD_KINSOL=OFF \
+	-D BUILD_SHARED_LIBS=OFF \
+	-D BUILD_STATIC_LIBS=ON \
+	-D CMAKE_INSTALL_PREFIX=${CVODE_ROOT} \
+	-D EXAMPLES_INSTALL_PATH=${CVODE_ROOT}/examples \
+	-D CMAKE_C_COMPILER=$$($(ICX)) \
+	-D CMAKE_Fortran_COMPILER=$$($(IFX)) \
+	-D BUILD_FORTRAN_MODULE_INTERFACE=ON \
+	-D ENABLE_OPENMP=ON
+	$(CMAKE) --build ${CVODE_ROOT}/build --config Release --verbose
+	$(CMAKE) --install ${CVODE_ROOT}/build --verbose
+endef
+
+build-cvode: build-env
+	wget https://github.com/LLNL/sundials/releases/download/v7.4.0/cvode-7.4.0.tar.gz
+	tar -xf cvode-7.4.0.tar.gz
+# Copy the extracted source into cvode/src instead of moving it, so this rule
+# never deletes anything. The trailing "/." copies the *contents* of the
+# versioned dir (overwriting in place), so re-runs are idempotent without an rm.
+# To fully reset CVODE (e.g. on a version bump), run "make clean".
+	mkdir -p ${CVODE_ROOT}/src
+	cp -r ${MKFILE_PATH}/cvode-7.4.0/. ${CVODE_ROOT}/src/
+	$(run-cmake-cvode)
+
+# The CVODE-enabled, FMM3D-free variant is the default. The CI matrix overrides
+# both for the cu12-fmm wheel, which is built with USE_FMM3D=1 USE_CVODE=0.
+# Target-specific "=" and not "?=": both variables are already defined at the top
+# of this file, so "?=" would never fire. A command line USE_CVODE=/USE_FMM3D=
+# still wins over a target-specific assignment.
+python-interface: USE_CVODE = 1
+python-interface: USE_FMM3D = 0
+python-interface: build-env
+	@if [ "$(USE_CVODE)" = "1" ] && { [ ! -d "${CVODE_ROOT}/build" ] || [ -z "$$(ls -A ${CVODE_ROOT}/build)" ]; }; then \
+		$(MAKE) build-cvode; \
+	fi
+	cp python/.build/requirements-py3-dev.txt python/requirements.txt
+
+	@if [ "$$CONDA_DEFAULT_ENV" = "$(ENV_NAME)" ]; then \
+		$(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=$(USE_CVODE) USE_MATLAB=0 USE_FMM3D=$(USE_FMM3D); \
+	else \
+		$(CONDA_BIN) run -n $(ENV_NAME) $(MAKE) python USE_CUDA=$(USE_CUDA) USE_CVODE=$(USE_CVODE) USE_MATLAB=0 USE_FMM3D=$(USE_FMM3D); \
+	fi
+# Install into the conda env via its absolute interpreter path. A bare "python"
+# or "conda run -- python" is a name lookup that version managers (e.g. mise)
+# can shadow by front-loading PATH, which would install the requirements into
+# the wrong Python. The absolute path cannot be shadowed. See $(PYTHON) above.
+	$(PYTHON) -m pip install -e ./python
+
+pytest:
+	$(PYTHON) -m pytest
+
+python-interface-win: 
+	make magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0

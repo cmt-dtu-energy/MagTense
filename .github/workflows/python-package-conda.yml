@@ -15,7 +15,7 @@ jobs:
   build-wheel:
     strategy:
       matrix:
-        py-version: [312, 313]
+        py-version: [312, 313, 314]
         cvode: [1]
         sys:
           # Pinned to the last VS 2022 image: windows-latest and windows-2025
@@ -195,6 +195,7 @@ jobs:
         py-version:
           - { name: 312, id: "3.12" }
           - { name: 313, id: "3.13" }
+          - { name: 314, id: "3.14" }
         os: [windows-2022, ubuntu-latest]
 
     runs-on: ${{ matrix.os }}
@@ -270,6 +271,7 @@ jobs:
         py-version:
           - { name: 312, id: "3.12" }
           - { name: 313, id: "3.13" }
+          - { name: 314, id: "3.14" }
         fmm_runner:
           - { os_name: linux, labels: '["self-hosted", "Linux", "CUDA"]' }
           - { os_name: windows, labels: '["self-hosted", "Windows", "CUDA"]' }
@@ -531,7 +533,7 @@ jobs:
   cache-conda-win:
     strategy:
       matrix:
-        py-version: [312, 313]
+        py-version: [312, 313, 314]
 
     runs-on: windows-2022
 

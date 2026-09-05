@@ -1,8 +1,13 @@
 h5py>=3.14.0
 importlib_resources>=6.5.2
-intel-fortran-rt==2025.2.0
+intel-fortran-rt>=2025.2.0
 matplotlib>=3.10.5
-mkl==2025.2.0
+# Upper bound is a soname bound, not caution: mkl ships libmkl_rt.so.2 up to
+# 2025.3.1 and libmkl_rt.so.3 from 2026.0.0 on. The extension is linked
+# against the conda mkl 2025.3.1 that env-3XX-linux.yml pins, so a 2026 runtime
+# resolves and then fails at import with "libmkl_rt.so.2: cannot open shared
+# object file". Raise both ends together with the pin in the env files.
+mkl>=2025.2.0,<2026
 notebook>=7.4.5
 numpy==2.3.2
 nvidia-cublas-cu12==12.*
