@@ -135,6 +135,27 @@ endif
 .PHONY: fmm3d
 fmm3d:
 ifeq ($(USE_FMM3D),1)
+# .gitmodules only exists on branches that carry the submodule, so a
+# "git clone --recursive" made from a branch without it, followed by a checkout,
+# leaves this directory empty - git does not initialise submodules on checkout.
+# Without this guard the bare "make install" below runs in an empty directory,
+# and GNU make reports "No rule to make target 'install'", which says nothing
+# about the actual cause.
+	@if [ ! -e "$(FMM3D_DIR)/makefile" ] && [ ! -e "$(FMM3D_DIR)/Makefile" ]; then \
+		echo "ERROR: no makefile in $(FMM3D_DIR) - the FMM3D submodule is not checked out."; \
+		echo "       Run: git submodule update --init --recursive"; \
+		echo "       ('git submodule status' shows a leading '-' while it is uninitialised.)"; \
+		exit 1; \
+	fi
+# A warning and not an error: CI always copies a make.inc in (the "Select FMM3D
+# make.inc" step), but whether the upstream makefile can fall back to its own
+# defaults without one is not something this Makefile should decide. If the
+# build below fails with missing compiler settings, this is the first thing to
+# check.
+	@if [ ! -e "$(FMM3D_DIR)/make.inc" ]; then \
+		echo "WARNING: no $(FMM3D_DIR)/make.inc - FMM3D will fall back to its own defaults."; \
+		echo "         On Linux, CI uses: cp $(FMM3D_DIR)/make.inc.linux $(FMM3D_DIR)/make.inc"; \
+	fi
 	@echo "==> FMM3D: building via upstream makefile (install)"
 	@cd "$(FMM3D_DIR)" && \
 	  $(MAKE) install PREFIX=$(abspath $(FMM3D_DIR)/local) DO_DEBUG=$(FMM3D_DEBUG) FAST_KER=OFF
