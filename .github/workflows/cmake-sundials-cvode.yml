@@ -11,9 +11,9 @@ jobs:
     strategy:
       matrix:
         # windows-latest and windows-2025 both moved to Visual Studio 2026 in
-        # June 2026. oneAPI 2025.0 predates it, and CUDA 12.8's nvcc rejects it
-        # outright in matlab_package.yml, so pin the whole pipeline to the last
-        # VS 2022 image. See the CUDA note in matlab_package.yml.
+        # June 2026. oneAPI 2025.0 predates it, and the pinned CUDA toolkit's
+        # nvcc has to accept the host MSVC in matlab_package.yml, so pin the
+        # whole pipeline to the last VS 2022 image. See the note there.
         os: [windows-2022, ubuntu-latest]
     runs-on: ${{ matrix.os }}
 
@@ -36,7 +36,7 @@ jobs:
     # - uses: Jimver/cuda-toolkit@v0.2.22
     #   id: cuda-toolkit
     #   with:
-    #     cuda: '12.8.1'
+    #     cuda: '13.3.1'
     #     # sub-packages: '["nvcc", "cusparse", "cublas", "cudart", "nvjitlink"]'
 
     - name: Install Ninja
