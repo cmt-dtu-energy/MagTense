@@ -126,10 +126,14 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
         !The number of nodes in the tetrahedron mesh
         problem%grid%nnodes = grid_nnod
         
-        !The nodes of all the tetrahedron elements
+        !The nodes of all the tetrahedron elements. grid_nnod x 3 is passed in, to match the way
+        !every other array of positions crosses the python interface, while the rest of MagTense
+        !holds the nodes as 3 x grid_nnod, so the transpose is needed here. Note that assigning
+        !grid_nod directly would not have been caught by the compiler: nodes is allocatable, so
+        !the assignment would silently reallocate it to grid_nnod x 3 instead.
         allocate( problem%grid%nodes(3,grid_nnod) )
-        problem%grid%nodes = grid_nod
-        
+        problem%grid%nodes = transpose( grid_nod )
+
         !the number of nodes in the tetrahedron mesh
         problem%grid%nnodes = grid_nnod
     endif

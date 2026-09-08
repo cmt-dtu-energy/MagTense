@@ -70,6 +70,19 @@ function checks = periodic_exchange_test(options)
 % is run without exchPBC as a control, which is what shows that the gap really does cut the mesh
 % in two.
 %
+% The tetrahedral mesh
+% ---------------------
+% Both meshes above are made of prisms and go through UnstructuredMeshAnalysis.f90, which decides
+% who is a neighbour geometrically and links a periodic boundary by matching faces. A tetrahedral
+% mesh goes through TetrahedralMeshAnalysis.f90 instead, which decides it from the connectivity
+% and links a periodic boundary by identifying the nodes on the two boundary planes, so it is a
+% different implementation of the same requirement and gets its own checks. The mesh is a cubic
+% lattice split into six tetrahedra per cube by the Kuhn subdivision, generated here so that the
+% test depends on no mesh generator, and periodic as a mesh because that subdivision is
+% translation invariant. The vanishing row sums, the supercell reference and the gap simulation
+% all carry over; the plane wave test does not, since six tetrahedra share every cube and a plain
+% plane wave is then no longer an eigenvector.
+%
 % Returns a struct array of checks with the fields 'check', 'value', 'limit' and 'passed',
 % where a check passes when value < limit. That is the contract used by testMagTenseFunctions.m.
 
@@ -77,6 +90,7 @@ arguments
     options.ShowTheResult {mustBeNumericOrLogical} = true;   % Save the validation figure
     options.use_CUDA {mustBeNumericOrLogical} = false;
     options.Grains {mustBeNumericOrLogical} = true;         % Also test the irregular grain mesh
+    options.Tetra {mustBeNumericOrLogical} = true;          % Also test the tetrahedral mesh
 end
 
 mu0 = 4*pi*1e-7;
@@ -121,6 +135,16 @@ GRAIN_REFINEMENTS = 1;      % Number of times a cell at a grain boundary is spli
 GRAIN_OFFSET = 0.10;        % Half thickness of the refined layer at a boundary, in base cells
 GRAIN_RES_SECTION = 5;      % Base cells per side, sectioned simulation (odd, see grain_gap_mask)
 GRAIN_RES_OPERATOR = 3;     % Base cells per side, exchange operator test
+
+% The tetrahedral mesh. Unlike the two meshes above it is not made of prisms at all, so it goes
+% through TetrahedralMeshAnalysis.f90 rather than UnstructuredMeshAnalysis.f90 and links its
+% periodic boundaries by identifying the nodes on the two boundary planes rather than
+% geometrically. A cubic lattice split into six tetrahedra per cube by the Kuhn subdivision is
+% used, which is translation invariant and therefore periodic as a mesh. It is generated here
+% rather than loaded so that the test has no dependency on a mesh generator.
+TETRA_LABEL = 'tetrahedral mesh';
+TETRA_RES_SPLIT = [5 3 3];      % Cubes per side for the gap simulation, odd along x
+TETRA_RES_OPERATOR = [3 3 3];   % Cubes per side for the exchange operator and the supercell
 
 % The two halves of the split grain mesh, in units where |m| = 1: the distance between their mean
 % magnetisations, and the spread of the moments over both of them. Both are far below 1e-2 when
@@ -379,6 +403,107 @@ if options.Grains
                     'supercell', grain_supercell, 'grid_L', gL, 'a', a, 'nGrains', GRAIN_COUNT);
 end
 
+
+%% The tetrahedral mesh
+% The mesh independent checks, on a mesh that goes through a different mesh analysis and links
+% its periodic boundaries by identifying nodes rather than by matching faces geometrically. The
+% plane wave test of method 2 is not among them: six tetrahedra share every cube, so the
+% repeating unit of the lattice holds six elements and a plain plane wave is no longer an
+% eigenvector - Bloch's theorem gives six bands, not one.
+tetra = struct();
+if options.Tetra
+    fprintf('\n==============================\n%s\n==============================\n', TETRA_LABEL);
+
+    % ---- The gap simulation ------------------------------------------------------------------
+    [tnodes, telements, tpts] = build_tetra_mesh(TETRA_RES_SPLIT, a, true);
+    tL = TETRA_RES_SPLIT * a;
+    fprintf('Split mesh: %d tetrahedra, the middle layer of cubes left out to split it in two\n', ...
+            size(tpts,1));
+
+    rng(7);
+    m0_tetra = 2*rand(size(tpts,1),3) - 1;
+    m0_tetra = m0_tetra ./ vecnorm(m0_tetra, 2, 2);
+    tparams = struct('Ms', Ms, 'eta', eta, 'Aex', Aex, 'm0', m0_tetra, 't_end', t_end, ...
+                     'nTimesteps', nTimesteps);
+
+    fprintf('Run simulation on the %s, exchPBC = [1 0 0]\n', TETRA_LABEL);
+    [t_deviation, t_spread, tM_pbc] = tetra_split_deviations(tnodes, telements, tpts, tL, ...
+                                                             [1 0 0], options.use_CUDA, tparams);
+    fprintf('Run simulation on the %s, exchPBC = [0 0 0]\n', TETRA_LABEL);
+    [t_deviation_free, ~, tM_free] = tetra_split_deviations(tnodes, telements, tpts, tL, ...
+                                                            [0 0 0], options.use_CUDA, tparams);
+
+    if t_deviation < SPLIT_TOL
+        verdict = 'works';
+    else
+        verdict = 'FAILED';
+    end
+    fprintf('  Exchange coupling through the periodic boundary %s: %.3e between the halves, spread %.3e\n', ...
+            verdict, t_deviation, t_spread);
+    if t_deviation_free > SPLIT_CONTROL_MIN
+        verdict = 'as expected';
+    else
+        verdict = 'FAILED';
+    end
+    fprintf('  The same halves without periodic boundaries are decoupled, %s: %.3e\n', ...
+            verdict, t_deviation_free);
+
+    checks(end+1) = struct('check', ...
+        sprintf('%s: halves coupled through the periodic boundary', TETRA_LABEL), ...
+        'value', t_deviation, 'limit', SPLIT_TOL, 'passed', t_deviation < SPLIT_TOL);
+    checks(end+1) = struct('check', ...
+        sprintf('%s: both halves relax to the same direction', TETRA_LABEL), ...
+        'value', t_spread, 'limit', SPLIT_TOL, 'passed', t_spread < SPLIT_TOL);
+    % The control has to fail the test above, which is what shows that the gap really does cut
+    % the mesh in two. It is written as a ratio so that it fits the value < limit contract
+    checks(end+1) = struct('check', ...
+        sprintf('%s: halves decoupled without periodic boundaries (control)', TETRA_LABEL), ...
+        'value', SPLIT_CONTROL_MIN/max(t_deviation_free, 1e-300), 'limit', 1.0, ...
+        'passed', t_deviation_free > SPLIT_CONTROL_MIN);
+
+    % The couplings that the linking added, drawn in the figure
+    A_split_t = full(exchange_matrix_tetra(tnodes, telements, tpts, tL, [1 0 0], options.use_CUDA));
+    [link_i, link_j, link_d] = periodic_links(A_split_t, tpts, tL, [1 0 0]);
+    fprintf('  %d pairs of tetrahedra are coupled through the periodic boundary\n', numel(link_i));
+
+    % ---- Row sums and the supercell reference, on a smaller mesh -----------------------------
+    [tnodes_o, telements_o, tpts_o] = build_tetra_mesh(TETRA_RES_OPERATOR, op_a);
+    tL_o = TETRA_RES_OPERATOR * op_a;
+
+    A_pbc_t = full(exchange_matrix_tetra(tnodes_o, telements_o, tpts_o, tL_o, op_pbc, options.use_CUDA));
+    A_free_t = full(exchange_matrix_tetra(tnodes_o, telements_o, tpts_o, tL_o, [0 0 0], options.use_CUDA));
+    scale = max(abs(A_pbc_t(:)));
+    row_sum = max(abs(sum(A_pbc_t, 2))) / scale;
+    nnzRow = sum(A_pbc_t ~= 0, 2);
+
+    fprintf('\nExchange operator on %d tetrahedra, exchPBC = [%d %d %d]\n', ...
+            size(tpts_o,1), op_pbc(1), op_pbc(2), op_pbc(3));
+    fprintf('  matrix          : %d x %d, %d nonzeros\n', size(A_pbc_t,1), size(A_pbc_t,2), nnz(A_pbc_t));
+    fprintf('  couplings/row   : %d (min) %d (max)\n', min(nnzRow), max(nnzRow));
+    fprintf('  max |row sum|   : %.3e [%s]\n', row_sum, passFail(row_sum < ROW_SUM_TOL));
+    fprintf('  linking changes : %.3e of the largest coupling\n', ...
+            max(abs(A_pbc_t(:) - A_free_t(:)))/scale);
+    checks(end+1) = struct('check', ...
+        sprintf('%s: exchange operator has vanishing row sums', TETRA_LABEL), ...
+        'value', row_sum, 'limit', ROW_SUM_TOL, 'passed', row_sum < ROW_SUM_TOL);
+
+    tetra_supercell = NaN;
+    if any(op_pbc)
+        [tetra_supercell, nCopies] = tetra_supercell_deviation(tnodes_o, telements_o, tpts_o, ...
+                                                               tL_o, op_pbc, op_a, options.use_CUDA);
+        fprintf('  supercell       : %.3e away from the operator on %d welded copies of the mesh [%s]\n', ...
+                tetra_supercell, nCopies, passFail(tetra_supercell < SUPERCELL_TOL));
+        checks(end+1) = struct('check', ...
+            sprintf('%s: periodic operator matches the supercell reference', TETRA_LABEL), ...
+            'value', tetra_supercell, 'limit', SUPERCELL_TOL, ...
+            'passed', tetra_supercell < SUPERCELL_TOL);
+    end
+
+    tetra = struct('pts', tpts, 'grid_L', tL, 'a', a, 'M_pbc', tM_pbc, 'M_free', tM_free, ...
+                   'deviation', t_deviation, 'spread', t_spread, ...
+                   'deviation_free', t_deviation_free, 'supercell', tetra_supercell, ...
+                   'link_i', link_i, 'link_j', link_j, 'link_d', link_d, 'A_split', A_split_t);
+end
 %% Plot the results
 if options.ShowTheResult
     results_dir = fullfile(fileparts(mfilename('fullpath')), 'results');
@@ -501,6 +626,10 @@ if options.ShowTheResult
 
     if options.Grains
         plot_grain_figure(grains, results_dir);
+    end
+
+    if options.Tetra
+        plot_tetra_figure(tetra, results_dir);
     end
 end
 
@@ -805,6 +934,340 @@ residual = norm(Aphi - lam*phi) / max(norm(Aphi), 1e-300);
 end
 
 
+function plot_tetra_figure(tetra, results_dir)
+% Three panels showing what the periodic boundary does to the tetrahedral mesh.
+%
+% The left panel draws the mesh and, for every pair of tetrahedra that the linking couples across
+% the boundary, a stub from one of them to where the periodic image of its partner actually sits,
+% just outside the domain. Those stubs are the periodic boundary made visible: they are exactly
+% the couplings that exchPBC adds to the operator, and they only appear at the two ends of the
+% periodic direction.
+%
+% The other two panels are what those couplings are worth. The mesh is split in two by a gap down
+% the middle, so the halves touch one another only through the boundary. With the linking they
+% relax to one common direction; without it they keep the unrelated directions they started from.
+
+pts = tetra.pts;
+grid_L = tetra.grid_L;
+a = tetra.a;
+lo = -grid_L/(2*a);
+hi =  grid_L/(2*a);
+
+% One slab of tetrahedra, so that the arrows do not sit on top of one another
+slab = abs(pts(:,3) - mean(pts(:,3))) < a/2;
+
+fig = figure('Visible', 'off', 'Color', 'w', 'Position', [100 100 1900 480]);
+
+% ---- The periodic couplings ------------------------------------------------------------------
+% Thinned to the strong couplings: the stencil reaches every element sharing a vertex with a
+% face, so the linking creates hundreds of weak couplings as well and drawing all of them would
+% be a solid block of colour rather than a picture
+ax = subplot(1, 3, 1, 'Parent', fig);
+hold(ax, 'on')
+fill(ax, [-0.5 0.5 0.5 -0.5], [lo(2) lo(2) hi(2) hi(2)], [0.9 0.9 0.9], 'EdgeColor', 'none');
+scatter(ax, pts(slab,1)/a, pts(slab,2)/a, 10, [0.7 0.7 0.7], 'filled');
+
+strength = abs(A_split_entries(tetra));
+strong = find(strength > 0.03*max(strength));
+nDrawn = 0;
+for n = strong'
+    % Both ends of the pair, so that the stubs leave the domain on both sides: the image of j
+    % nearest to i sits at x_i + d, and the image of i nearest to j at x_j - d
+    for which = 1:2
+        if which == 1
+            base = tetra.link_i(n); sgn = +1;
+        else
+            base = tetra.link_j(n); sgn = -1;
+        end
+        if ~slab(base)
+            continue
+        end
+        startP = pts(base,:)/a;
+        endP = (pts(base,:) + sgn*tetra.link_d(n,:))/a;
+        plot(ax, [startP(1) endP(1)], [startP(2) endP(2)], '-', 'Color', [0.85 0.2 0.2 0.6], ...
+             'LineWidth', 0.8);
+        nDrawn = nDrawn + 1;
+    end
+end
+
+rectangle(ax, 'Position', [lo(1) lo(2) hi(1)-lo(1) hi(2)-lo(2)], 'EdgeColor', [0.3 0.3 0.3], ...
+          'LineWidth', 1.2);
+axis(ax, 'equal')
+xlim(ax, [lo(1)-1.3 hi(1)+1.3]);
+ylim(ax, [lo(2)-0.3 hi(2)+0.3]);
+xlabel(ax, 'x / a'); ylabel(ax, 'y / a');
+title(ax, {sprintf('%d couplings across the boundary,', numel(tetra.link_i)), ...
+           sprintf('the %d strongest in this slab drawn', nDrawn)});
+hold(ax, 'off')
+
+% ---- The two relaxed states ------------------------------------------------------------------
+states = {tetra.M_pbc, tetra.M_free};
+titles = {{'exchPBC = [1 0 0]', sprintf('halves agree to %.1e', tetra.deviation)}, ...
+          {'exchPBC = [0 0 0] (control)', sprintf('halves differ by %.1e', tetra.deviation_free)}};
+for panel = 1:2
+    ax = subplot(1, 3, panel+1, 'Parent', fig);
+    hold(ax, 'on')
+    fill(ax, [-0.5 0.5 0.5 -0.5], [lo(2) lo(2) hi(2) hi(2)], [0.9 0.9 0.9], 'EdgeColor', 'none');
+    M = states{panel};
+    colours = 0.5*(M(slab,:) + 1);
+    x = pts(slab,1)/a;
+    y = pts(slab,2)/a;
+    u = M(slab,1);
+    v = M(slab,2);
+    % quiver takes a single colour, so the arrows are drawn one direction at a time, grouped by
+    % the colour that stands for that direction. The autoscaling has to be switched off and the
+    % length applied here instead: quiver scales each call against its own data, so leaving it on
+    % would size the arrows of a group holding one or two elements differently from the rest.
+    arrowLen = 0.5;
+    [uc, ~, ic] = unique(round(colours, 3), 'rows');
+    for c = 1:size(uc,1)
+        sel = (ic == c);
+        quiver(ax, x(sel), y(sel), arrowLen*u(sel), arrowLen*v(sel), 0, 'Color', uc(c,:), ...
+               'LineWidth', 1.1, 'MaxHeadSize', 0.5);
+    end
+    axis(ax, 'equal')
+    xlim(ax, [lo(1)-0.3 hi(1)+0.3]);
+    ylim(ax, [lo(2)-0.3 hi(2)+0.3]);
+    xlabel(ax, 'x / a'); ylabel(ax, 'y / a');
+    title(ax, titles{panel});
+    hold(ax, 'off')
+end
+
+sgtitle(fig, sprintf('Periodic exchange on a tetrahedral mesh of %d elements', size(pts,1)));
+figure_path = fullfile(results_dir, 'periodic_exchange_test_tetra.png');
+exportgraphics(fig, figure_path, 'Resolution', 200);
+close(fig);
+fprintf('Saved figure to %s\n', figure_path);
+end
+
+
+function s = A_split_entries(tetra)
+% The coupling strength of each periodic pair, used to thin the stubs in the figure
+
+idx = sub2ind(size(tetra.A_split), tetra.link_i, tetra.link_j);
+s = tetra.A_split(idx);
+end
+function [nodes, elements, pts] = build_tetra_mesh(res, a, dropMiddleX)
+% A cubic lattice of tetrahedra, centred on the origin.
+%
+% Returns the nodes as a 3 x M array, the 1-based connectivity as a 4 x N array and the element
+% centres as an N x 3 array, which is the layout MagTense wants for a tetrahedral grid. Every
+% cube is split into six tetrahedra the same way, by the Kuhn subdivision, so the subdivision
+% commutes with a translation by one cube and the mesh is periodic: the surface triangulation on
+% the two boundary planes is a translated copy, which is what the node identification in
+% TetrahedralMeshAnalysis.f90 needs.
+%
+% dropMiddleX leaves out the middle layer of cubes along x, which is how the gap below is cut.
+% The nodes of a dropped cube stay in the node array; they are simply no longer referenced, and
+% the mesh analysis ignores nodes that no element uses.
+
+if nargin < 3
+    dropMiddleX = false;
+end
+
+nx = res(1); ny = res(2); nz = res(3);
+
+% The six tetrahedra of a cube, as indices into its eight corners numbered by the bits of
+% (i,j,k) with i running fastest
+kuhn = [1 2 4 8; 1 2 6 8; 1 5 6 8; 1 3 4 8; 1 3 7 8; 1 5 7 8];
+
+[ii, jj, kk] = ndgrid(0:nx, 0:ny, 0:nz);
+nodes = [ii(:) jj(:) kk(:)]' * a;
+nodes = nodes - (res(:) * a / 2);          % Centre, so the halves are x < 0 and x > 0
+nid = reshape(1:size(nodes,2), [nx+1, ny+1, nz+1]);
+
+elements = zeros(4, 6*nx*ny*nz);
+n = 0;
+for ic = 1:nx
+    if dropMiddleX && ic == ceil(nx/2)
+        continue
+    end
+    for jc = 1:ny
+        for kc = 1:nz
+            corners = zeros(1,8);
+            m = 0;
+            for k = 0:1
+                for j = 0:1
+                    for i = 0:1
+                        m = m + 1;
+                        corners(m) = nid(ic+i, jc+j, kc+k);
+                    end
+                end
+            end
+            for t = 1:6
+                n = n + 1;
+                elements(:,n) = corners(kuhn(t,:))';
+            end
+        end
+    end
+end
+elements = elements(:, 1:n);
+
+pts = squeeze(mean(reshape(nodes(:, elements(:))', [4, n, 3]), 1));
+if n == 1
+    pts = pts(:)';
+end
+end
+
+
+function [nodes, elements] = weld_nodes(nodes, elements, tol)
+% Merge nodes that sit on top of one another and renumber the connectivity accordingly.
+%
+% Needed when a mesh is replicated for the supercell reference: the copies only touch, and the
+% tetrahedral mesh analysis decides who is a neighbour from the connectivity alone, so without
+% welding the copies would come out as separate meshes that are not coupled to each other. The
+% prism mesh needs nothing of the sort, because it is analysed geometrically.
+%
+% Coordinates are snapped to a grid of spacing tol and used as the key. The nodes involved are
+% multiples of the cell size and the copies are shifted by a whole period, so coincident nodes
+% agree to within rounding, far inside one snapping step.
+
+key = round(nodes' / tol);
+[~, first, inverse] = unique(key, 'rows');
+nodes = nodes(:, first);
+elements = reshape(inverse(elements(:)), size(elements));
+end
+
+
+function A = exchange_matrix_tetra(nodes, elements, pts, grid_L, pbc, use_CUDA)
+% The exchange matrix of a tetrahedral mesh given by its nodes and its connectivity.
+
+ntot = size(pts,1);
+problem = DefaultMicroMagProblem(ntot, 1, 1);
+problem = problem.setMicroMagGridType('tetrahedron');
+problem.grid_pts = pts;
+problem.grid_nod = nodes;
+problem.grid_ele = int32(elements);
+problem.grid_nnod = int32(size(nodes,2));
+problem.grid_L = grid_L;
+A = solve_for_exchange(problem, ntot, pbc, use_CUDA);
+end
+
+
+function [deviation, nCopies] = tetra_supercell_deviation(nodes, elements, pts, grid_L, pbc, a, use_CUDA)
+% The supercell reference of method 3, on a tetrahedral mesh.
+%
+% Identical in idea to supercell_deviation, with the one difference that the copies have to be
+% welded together first. A prism mesh is analysed geometrically, so two copies that touch are
+% found to be neighbours on their own, but a tetrahedral mesh is analysed from its connectivity,
+% and two copies that merely touch share no node indices at all. Without welding the supercell
+% would be a set of 27 meshes that ignore one another, and the reference would be the free
+% operator rather than the bulk one.
+
+ntot = size(pts,1);
+A_pbc = exchange_matrix_tetra(nodes, elements, pts, grid_L, pbc, use_CUDA);
+
+offsets = cell(1,3);
+for d = 1:3
+    if pbc(d)
+        offsets{d} = [-1 0 1];
+    else
+        offsets{d} = 0;
+    end
+end
+[X, Y, Z] = ndgrid(offsets{1}, offsets{2}, offsets{3});
+shifts = [X(:) Y(:) Z(:)] .* grid_L(:)';
+nCopies = size(shifts,1);
+central = find(all(shifts == 0, 2), 1);
+
+nNodes = size(nodes,2);
+super_nodes = zeros(3, nCopies*nNodes);
+super_elements = zeros(4, nCopies*ntot);
+super_pts = zeros(nCopies*ntot, 3);
+for c = 1:nCopies
+    super_nodes(:, (c-1)*nNodes + (1:nNodes)) = nodes + shifts(c,:)';
+    super_elements(:, (c-1)*ntot + (1:ntot)) = elements + (c-1)*nNodes;
+    super_pts((c-1)*ntot + (1:ntot), :) = pts + shifts(c,:);
+end
+[super_nodes, super_elements] = weld_nodes(super_nodes, super_elements, a*1e-6);
+
+super_L = grid_L;
+super_L(logical(pbc)) = 3*grid_L(logical(pbc));
+A_super = exchange_matrix_tetra(super_nodes, super_elements, super_pts, super_L, [0 0 0], use_CUDA);
+
+% Fold the rows of the central copy back onto the original mesh. The copies are stored as
+% consecutive blocks of ntot tiles, so column c of the supercell is tile mod(c-1,ntot)+1
+[r, c, v] = find(A_super);
+keep = r > (central-1)*ntot & r <= central*ntot;
+A_folded = sparse(r(keep) - (central-1)*ntot, mod(c(keep)-1, ntot) + 1, v(keep), ntot, ntot);
+
+deviation = full( max(max(abs(A_folded - A_pbc))) / max(max(abs(A_pbc))) );   % max of a sparse matrix stays sparse
+end
+
+
+function [deviation, spread, M_end] = tetra_split_deviations(nodes, elements, pts, grid_L, pbc, use_CUDA, params)
+% The gap simulation of the grain mesh, on a tetrahedral mesh.
+%
+% A slab of cubes through the middle of the mesh is left out, so the two halves touch one another
+% only through the periodic boundary along x, and they relax to one common direction if and only
+% if the linking works.
+
+ntot = size(pts,1);
+problem = DefaultMicroMagProblem(ntot, 1, 1);
+problem = problem.setMicroMagGridType('tetrahedron');
+problem.grid_pts = pts;
+problem.grid_nod = nodes;
+problem.grid_ele = int32(elements);
+problem.grid_nnod = int32(size(nodes,2));
+problem.grid_L = grid_L;
+problem = problem.setUseCuda(use_CUDA);
+problem = problem.setUseCVODE(false);
+problem = problem.setUseDemag(false);
+problem = problem.setMicroMagSolver('Dynamic');
+
+problem.gamma = 2.21e5;
+problem.alpha = params.eta;
+problem.Ms = params.Ms*ones(ntot,1);
+problem.A0 = params.Aex*ones(ntot,1);
+problem.K0 = zeros(ntot,1);
+problem.m0 = params.m0;
+problem.exchPBC = int32(pbc);
+
+HextFct = @(t) (t>=0)' * [0, 0, 0];
+problem = problem.setHext( HextFct, linspace(0, params.t_end, 2) );
+problem = problem.setTime( linspace(0, params.t_end, params.nTimesteps) );
+
+solution = struct();
+prob_struct = struct(problem);
+solution = problem.MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+
+M_npv = squeeze(solution.M(:,:,1,:));
+M_end = squeeze(M_npv(end,:,:));
+
+left = pts(:,1) < 0;
+right = pts(:,1) > 0;
+deviation = norm(mean(M_end(left,:), 1) - mean(M_end(right,:), 1));
+spread = max( sqrt(sum((M_end - mean(M_end, 1)).^2, 2)) );
+end
+
+
+function [li, lj, ld] = periodic_links(A, pts, grid_L, pbc)
+% The pairs of elements that the operator couples only through a periodic boundary.
+%
+% A pair whose separation is more than half a period along a periodic direction is not a pair of
+% neighbours inside the domain: it is a pair that the linking has joined across the boundary.
+% These are exactly the couplings that exchPBC adds, and drawing them is what makes the periodic
+% boundary visible in the figure.
+%
+% Returns the pairs and, for each, the minimum image separation, so that the partner can be drawn
+% where the periodic image of it actually sits, just outside the domain.
+
+[i_n, j_n] = find(A);
+delta = pts(j_n,:) - pts(i_n,:);
+wrapped = delta;
+for d = 1:3
+    if pbc(d)
+        wrapped(:,d) = wrapped(:,d) - grid_L(d)*round(delta(:,d)/grid_L(d));
+    end
+end
+
+across = any(abs(wrapped - delta) > 0.5*max(grid_L)*1e-6, 2);
+% Each pair appears twice, since the operator is structurally symmetric
+keep = across & (i_n < j_n);
+li = i_n(keep);
+lj = j_n(keep);
+ld = wrapped(keep,:);
+end
 function pts = build_prism_mesh(res, a)
 % Centres of a regular lattice of cubes, ordered with x running fastest so that the unstructured
 % mesh and the uniform grid put their tiles in the same places

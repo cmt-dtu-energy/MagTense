@@ -43,13 +43,16 @@ class MicromagProblem:
     Args:
         grid_type: Currently supports 'uniform', 'tetrahedron' and 'unstructuredPrisms'.
             If 'uniform', grid is inferred from res and grid_L.
-            If 'tetrahedron', grid is specified by grid_pts, grid_nnod and grid_ele.
+            If 'tetrahedron', grid is specified by grid_pts, grid_nnod, grid_nod and grid_ele.
             If 'unstructuredPrisms', grid is specified by grid_pts and grid_abc.
         res: Resolution of grid, i.e. number of micromagnetic tiles along x, y and z.
         grid_L: Spatial extension of simulated domain along x, y and z.
         grid_nnod: Number of nodes in the tetrahedron mesh
-        grid_pts: xyz coordinates of micromagnetic tiles
+        grid_pts: xyz coordinates of micromagnetic tiles. For a tetrahedral grid it defaults to
+            the element centres derived from grid_nod and grid_ele
         grid_abc: sidelengths of prism tiles
+        grid_nod: xyz coordinates of the nodes of a tetrahedral mesh, one node per row
+        grid_ele: the four corner nodes of each tetrahedron, 1-based, shape (4, ntot)
         prob_mode:
         solver: Options are 'explicit', 'dynamic' and 'implicit'.
             If solver = 'dynamic', a single time-varying magnetic field is constructed
@@ -125,6 +128,8 @@ class MicromagProblem:
             cv: float = 0.0,
             grid_pts: list | np.ndarray | None = None,
             grid_abc: list | np.ndarray | None = None,
+            grid_nod: list | np.ndarray | None = None,
+            grid_ele: list | np.ndarray | None = None,
             exch_val: list | np.ndarray | None = None,
             exch_rows: list | np.ndarray | None = None,
             exch_cols: list | np.ndarray | None = None,
@@ -199,10 +204,33 @@ class MicromagProblem:
         self.grid_pts = grid_pts
         # Prism grid
         self.grid_abc = grid_abc
-        # Tetrahedron grid
+        # Tetrahedron grid. grid_ele is the 1-based connectivity, four corner nodes per element,
+        # and grid_nod holds the node coordinates one node per row, the same way grid_pts does.
+        # Both stay as the zero arrays below when the grid is not a tetrahedral one, since the
+        # generated interface passes them whatever the grid type is.
+        #
+        # Giving the mesh is all that is needed, exactly as giving grid_pts and grid_abc is for a
+        # grid of unstructured prisms: MagTense analyses the mesh and builds the exchange operator
+        # itself. Do not also pass an exchange matrix through exch_val and passexch, which tells
+        # MagTense the operator comes from outside and makes it skip the mesh analysis.
         self.grid_nnod = grid_nnod
-        self.grid_ele = np.zeros(shape=(4, ntot), dtype=np.float64, order="F")
-        self.grid_nod = np.zeros(shape=(grid_nnod, 3), dtype=np.float64, order="F")
+        if grid_ele is None:
+            self.grid_ele = np.zeros(shape=(4, ntot), dtype=np.float64, order="F")
+        else:
+            self.grid_ele = np.asfortranarray(grid_ele, dtype=np.float64)
+        if grid_nod is None:
+            self.grid_nod = np.zeros(shape=(grid_nnod, 3), dtype=np.float64, order="F")
+        else:
+            self.grid_nod = np.asfortranarray(grid_nod, dtype=np.float64)
+            if grid_nnod == 0:
+                self.grid_nnod = len(self.grid_nod)
+            # The centre of each tetrahedron, so that grid_pts cannot fall out of step with the
+            # mesh it is supposed to describe. An explicit grid_pts still wins.
+            if grid_pts is None and grid_ele is not None:
+                conn = np.asarray(grid_ele, dtype=np.int64)
+                if conn.shape[0] != 4 and conn.shape[1] == 4:
+                    conn = conn.T
+                self.grid_pts = self.grid_nod[conn[:4, :].T - 1, :].mean(axis=1)
 
         # Set macrogeometry
         self.n_macro = n_macro

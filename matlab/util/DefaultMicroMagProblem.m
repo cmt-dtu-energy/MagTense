@@ -709,14 +709,74 @@ methods
 
     function obj = setMicroMagGridType( obj, type_var )
     % maps the grid type from name to internal int value
-        
+
         switch type_var
-            case 'uniform' 
+            case 'uniform'
                 obj.grid_type = int32(1);
-            case 'tetrahedron' 
+            case 'tetrahedron'
                 obj.grid_type = int32(2);
-            case 'unstructuredPrisms' 
+            case 'unstructuredPrisms'
                 obj.grid_type = int32(3);
+        end
+    end
+
+    function obj = setMicroMagGridTetrahedron( obj, nodes, elements )
+    % Set up a tetrahedral grid from a mesh, i.e. its nodes and its connectivity
+    %
+    % This is the tetrahedral counterpart of setting grid_pts and grid_abc for a grid of
+    % unstructured prisms: the mesh is all that has to be given, and MagTense analyses it and
+    % builds the exchange operator itself. Do not call setExchangeMatrixSparse or
+    % setExchangeMatrixCOO afterwards - those switch on passExch, which tells MagTense that the
+    % exchange operator is supplied from the outside and makes it skip the mesh analysis.
+    %
+    % nodes is 3 x M, or M x 3, holding the coordinates of the mesh nodes.
+    % elements is 4 x N, or N x 4, holding the four corner nodes of each tetrahedron, 1-based.
+    % A mesh from the PDE Toolbox is passed straight through as
+    %   problem = problem.setMicroMagGridTetrahedron(model.Mesh.Nodes, model.Mesh.Elements);
+    % including a quadratic one, of which only the corner nodes are used.
+    %
+    % The element centres are computed here, so that grid_pts cannot fall out of step with the
+    % mesh it is supposed to describe.
+
+        % Both arrays are accepted either way round, since getting them transposed is a silent
+        % error rather than a loud one: only the orientation that cannot be told apart is
+        % rejected
+        if size(nodes,1) ~= 3 && size(nodes,2) == 3
+            nodes = nodes';
+        end
+        if size(nodes,1) ~= 3
+            error('DefaultMicroMagProblem:nodeShape', ...
+                  'nodes has to be 3 x M or M x 3, but it is %d x %d', size(nodes,1), size(nodes,2));
+        end
+        if size(elements,1) ~= 4 && size(elements,2) == 4
+            elements = elements';
+        end
+        if size(elements,1) < 4
+            error('DefaultMicroMagProblem:elementShape', ...
+                  'elements has to be 4 x N or N x 4, but it is %d x %d', ...
+                  size(elements,1), size(elements,2));
+        end
+        elements = elements(1:4,:);   % A quadratic mesh is used as its linear counterpart
+
+        if min(elements(:)) < 1 || max(elements(:)) > size(nodes,2)
+            error('DefaultMicroMagProblem:connectivityRange', ...
+                  'the connectivity refers to nodes outside the node array, and has to be 1-based');
+        end
+        if size(elements,2) ~= obj.ntot
+            error('DefaultMicroMagProblem:elementCount', ...
+                  'the mesh has %d elements but the problem was created for %d tiles', ...
+                  size(elements,2), obj.ntot);
+        end
+
+        obj = obj.setMicroMagGridType('tetrahedron');
+        obj.grid_nod  = double(nodes);
+        obj.grid_ele  = int32(elements);
+        obj.grid_nnod = int32(size(nodes,2));
+
+        % The centre of each tetrahedron, which is the point MagTense places the tile at
+        obj.grid_pts = squeeze(mean(reshape(nodes(:, elements(:))', [4, size(elements,2), 3]), 1));
+        if size(elements,2) == 1
+            obj.grid_pts = obj.grid_pts(:)';
         end
     end
 

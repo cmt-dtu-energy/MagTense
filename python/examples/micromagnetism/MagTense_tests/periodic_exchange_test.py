@@ -74,16 +74,40 @@ the halves relax to one common direction if, and only if, the linking works. The
 is run without exchPBC as a control, which is what shows that the gap really does cut the mesh
 in two.
 
+The tetrahedral mesh
+--------------------
+Both meshes above are made of prisms and go through UnstructuredMeshAnalysis.f90, which decides
+who is a neighbour geometrically and links a periodic boundary by matching faces. A tetrahedral
+mesh goes through TetrahedralMeshAnalysis.f90 instead, which decides it from the connectivity
+and links a periodic boundary by identifying the nodes on the two boundary planes, so it is a
+different implementation of the same requirement and gets its own checks.
+
+The mesh is a cubic lattice split into six tetrahedra per cube by the Kuhn subdivision, which is
+generated here so that the test depends on no mesh generator. Being translation invariant it is
+also periodic as a mesh, which is what the node identification needs. Two of the methods above
+carry over unchanged: the vanishing row sums, and the supercell reference of method 3, which
+assumes nothing about the mesh. The one addition is that the copies making up the supercell have
+to be welded together first - two copies that merely touch share no node indices, and a
+connectivity based analysis would leave them uncoupled. The gap simulation of the irregular mesh
+carries over as well.
+
+The plane wave test of method 2 does not carry over. Six tetrahedra share every cube, so the
+repeating unit of the lattice holds six elements and a plain plane wave is no longer an
+eigenvector: Bloch's theorem gives six bands rather than one.
+
 NOTE: the Fortran library has to be rebuilt for the unstructured part of this test to run.
 
-Running the file executes the test and saves two figures, one of the measures and one
-of the irregular mesh and the states it relaxes to. ``run_test()`` returns the same result as
-a list of checks, which is the contract the combined suite in testMagTenseFunctions.py expects.
+Running the file executes the test and saves three figures: one of the measures, one of the
+irregular mesh and the states it relaxes to, and one of the tetrahedral mesh showing the
+couplings that the periodic linking adds and the two states they decide between.
+``run_test()`` returns the same result as a list of checks, which is the contract the combined
+suite in testMagTenseFunctions.py expects.
 
 Usage:
     python periodic_exchange_test.py                  # 6 x 6 x 6 cells, PBC along x, y and z
     python periodic_exchange_test.py --res 8 4 4 --pbc 1 0 0
     python periodic_exchange_test.py --no-grains     # Skip the irregular mesh
+    python periodic_exchange_test.py --no-tetra      # Skip the tetrahedral mesh
 """
 
 # General modules
@@ -123,6 +147,18 @@ GRAIN_OFFSET = 0.10       # Half thickness of the refined layer at a boundary, i
 GRAIN_RES_SECTION = 5     # Base cells per side, sectioned simulation (odd, see grain_gap_mask)
 GRAIN_RES_OPERATOR = 3    # Base cells per side, exchange operator test
 
+# The tetrahedral mesh. Unlike the two meshes above it is not built from prisms at all, so it
+# goes through TetrahedralMeshAnalysis.f90 rather than UnstructuredMeshAnalysis.f90 and links
+# its periodic boundaries by identifying the nodes on the two boundary planes rather than
+# geometrically. A cubic lattice split into six tetrahedra per cube by the Kuhn subdivision is
+# used, which is translation invariant and therefore periodic as a mesh: the surface
+# triangulation on the two boundary planes is a translated copy, which is what the node
+# identification needs. The mesh is generated here rather than loaded so that the test has no
+# dependency on a mesh generator.
+TETRA_LABEL = 'tetrahedral mesh'
+TETRA_RES_SPLIT = (5, 3, 3)     # Cubes per side for the gap simulation, odd along x
+TETRA_RES_OPERATOR = (3, 3, 3)  # Cubes per side for the exchange operator and the supercell
+
 # ---- Acceptance thresholds --------------------------------------------------------------
 # Spread of the unit magnetisation vectors within a periodically connected section. A section
 # that is not coupled at all keeps its random initial directions and has a spread of order 1,
@@ -148,6 +184,10 @@ SPLIT_CONTROL_MIN = 1e-1
 # so it is far wider than the seven point stencil of the uniform grid. MagTense silently
 # returns zeros if this is too small, which is caught below.
 EXCH_PRESIZE = 64
+# The tetrahedral stencil is wider still: every element sharing a vertex with a face enters it,
+# and a node of a tetrahedral mesh is shared by far more elements than a corner of a prism, so a
+# Kuhn subdivided lattice needs about 71 entries per element where the prisms need under 64.
+TETRA_EXCH_PRESIZE = 128
 
 #%% Fixed settings (don't change these)
 
@@ -348,6 +388,66 @@ def grain_gap_mask(pts, a_base):
     return np.abs(pts[:, 0]) < a_base / 2
 
 
+# The six tetrahedra of the Kuhn subdivision of a cube, as indices into its eight corners
+# numbered by the bits of (i, j, k) with i running fastest. Every cube is split the same way, so
+# the subdivision commutes with a translation by one cube and the mesh is periodic.
+KUHN_TETS = np.array([[1, 2, 4, 8], [1, 2, 6, 8], [1, 5, 6, 8],
+                      [1, 3, 4, 8], [1, 3, 7, 8], [1, 5, 7, 8]]) - 1
+
+
+def build_tetra_mesh(res, a, drop=None):
+    """A cubic lattice of tetrahedra, centered on the origin.
+
+    Returns the nodes as an (M, 3) array, the 1-based connectivity as an (N, 4) array and the
+    element centers as an (N, 3) array, which is what MagTense wants for a tetrahedral grid.
+
+    ``drop`` is an optional callable taking the (nx, ny, nz) index of a cube and returning True
+    for the cubes to leave out, which is how the gap below is cut. Nodes of a dropped cube stay
+    in the node array; they are simply no longer referenced, and the mesh analysis ignores nodes
+    that no element uses.
+    """
+    nx, ny, nz = res
+    ii, jj, kk = np.meshgrid(np.arange(nx + 1), np.arange(ny + 1), np.arange(nz + 1),
+                             indexing='ij')
+    nodes = np.stack([ii.ravel(), jj.ravel(), kk.ravel()], axis=1) * float(a)
+    # Center on the origin, so that the two halves of the split mesh are x < 0 and x > 0
+    nodes -= np.array(res, dtype=float) * a / 2
+    nid = np.arange(nodes.shape[0]).reshape((nx + 1, ny + 1, nz + 1))
+
+    elements = []
+    for ic in range(nx):
+        for jc in range(ny):
+            for kc in range(nz):
+                if drop is not None and drop(ic, jc, kc):
+                    continue
+                corners = np.array([nid[ic + i, jc + j, kc + k]
+                                    for k in (0, 1) for j in (0, 1) for i in (0, 1)])
+                for t in range(6):
+                    elements.append(corners[KUHN_TETS[t]])
+
+    elements = np.array(elements)
+    pts = nodes[elements, :].mean(axis=1)
+
+    return nodes, elements + 1, pts
+
+
+def weld_nodes(nodes, elements, tol):
+    """Merge nodes that sit on top of one another, and renumber the connectivity accordingly.
+
+    Needed when a mesh is replicated for the supercell reference: the copies only touch, and the
+    tetrahedral mesh analysis decides who is a neighbour from the connectivity alone, so without
+    welding the copies would come out as separate meshes that are not coupled to each other.
+
+    Coordinates are snapped to a grid of spacing tol and used as the key. The nodes involved are
+    multiples of the cell size and the copies are shifted by a whole period, so coincident nodes
+    agree to within rounding, far inside one snapping step.
+    """
+    key = np.round(nodes / tol).astype(np.int64)
+    _, first, inverse = np.unique(key, axis=0, return_index=True, return_inverse=True)
+
+    return nodes[first, :], inverse.reshape(-1)[elements - 1] + 1
+
+
 #%% Method 1: the sectioned simulation
 
 def section_deviations(grid_type, cuda=False, cvode=False):
@@ -483,13 +583,17 @@ def split_deviations(pts, abc, grid_L, pbc, cuda=False, cvode=False):
 
 #%% Method 2: the exchange operator
 
-def exchange_triplets(problem_res, grid_type, grid_pts, grid_abc, grid_L, pbc, cuda=False):
+def exchange_triplets(problem_res, grid_type, grid_pts, grid_abc, grid_L, pbc, cuda=False,
+                      grid_nod=None, grid_ele=None, exch_presize=EXCH_PRESIZE):
     """Run a minimal simulation and return the assembled exchange matrix in COO form.
 
     Only the setup of the problem is of interest here, so the simulation is run for a couple of
     trivial timesteps with the demagnetisation field and the external field switched off. The
     triplets are returned rather than a dense array because the supercell reference assembles
     matrices with up to 27 times as many rows as the one they are compared with.
+
+    grid_nod and grid_ele carry the mesh of a tetrahedral grid, which is described by its nodes
+    and its connectivity rather than by cell sizes.
     """
     ntot = int(np.prod(problem_res))
 
@@ -499,6 +603,9 @@ def exchange_triplets(problem_res, grid_type, grid_pts, grid_abc, grid_L, pbc, c
         grid_type=grid_type,
         grid_pts=grid_pts,
         grid_abc=grid_abc,
+        grid_nod=grid_nod,
+        grid_ele=grid_ele,
+        grid_nnod=0 if grid_nod is None else len(grid_nod),
         m0=1 / np.sqrt(3),
         A0=1.3e-11,
         Ms=8e5,
@@ -510,7 +617,7 @@ def exchange_triplets(problem_res, grid_type, grid_pts, grid_abc, grid_L, pbc, c
         cuda=cuda,
         cvode=False,
         solver='dynamic',
-        exch_presize=EXCH_PRESIZE,
+        exch_presize=exch_presize,
     )
 
     result = problem.run_simulation(
@@ -523,10 +630,10 @@ def exchange_triplets(problem_res, grid_type, grid_pts, grid_abc, grid_L, pbc, c
     n_exch, rows, cols, vals, nr, nc = result[7:13]
     if n_exch == 0:
         raise RuntimeError("MagTense returned an empty exchange matrix")
-    if n_exch > EXCH_PRESIZE * ntot:
+    if n_exch > exch_presize * ntot:
         raise RuntimeError(
-            f"The exchange matrix has {n_exch} entries but only {EXCH_PRESIZE * ntot} were "
-            f"reserved, so MagTense has returned zeros. Increase EXCH_PRESIZE."
+            f"The exchange matrix has {n_exch} entries but only {exch_presize * ntot} were "
+            f"reserved, so MagTense has returned zeros. Increase the exch_presize passed in."
         )
 
     # The matrix is exported from MKL in COO format with Fortran (one based) indexing
@@ -548,6 +655,13 @@ def mesh_exchange_triplets(pts, abc, grid_L, pbc, cuda=False):
     """The exchange matrix of an unstructured mesh given by its centers and its side lengths."""
     return exchange_triplets((len(pts), 1, 1), 'unstructuredPrisms', pts, abc, grid_L, pbc,
                              cuda=cuda)
+
+
+def tetra_exchange_triplets(nodes, elements, pts, grid_L, pbc, cuda=False):
+    """The exchange matrix of a tetrahedral mesh given by its nodes and its connectivity."""
+    return exchange_triplets((len(pts), 1, 1), 'tetrahedron', pts, None, grid_L, pbc, cuda=cuda,
+                             grid_nod=nodes, grid_ele=elements.T,
+                             exch_presize=TETRA_EXCH_PRESIZE)
 
 
 def exchange_matrix(res, a, pbc, grid_type, cuda=False):
@@ -641,6 +755,240 @@ def supercell_check(pts, abc, grid_L, pbc, label, cuda=False):
         'limit': SUPERCELL_TOL,
         'passed': deviation < SUPERCELL_TOL,
     }
+
+
+def tetra_supercell_deviation(nodes, elements, pts, grid_L, pbc, a, cuda=False):
+    """The supercell reference of method 3, on a tetrahedral mesh.
+
+    Identical in idea to supercell_deviation: the mesh is copied once in each direction along
+    every periodic direction, the operator is assembled on the copies without periodic boundary
+    conditions, and the rows of the central copy are folded back onto the original mesh.
+
+    The one difference is that the copies have to be welded together. A prism mesh is analysed
+    geometrically, so two copies that touch are found to be neighbours on their own, but a
+    tetrahedral mesh is analysed from its connectivity, and two copies that merely touch share no
+    node indices at all. Without welding the supercell would be a set of 27 meshes that ignore
+    one another, and the reference would be the free operator rather than the bulk one.
+    """
+    ntot = len(pts)
+    grid_L = np.asarray(grid_L, dtype=float)
+    pbc = np.asarray(pbc)
+
+    A_pbc = dense_matrix(*tetra_exchange_triplets(nodes, elements, pts, grid_L, pbc, cuda=cuda))
+
+    shifts_cd = np.array(list(itertools.product(*[(-1., 0., 1.) if p else (0.,) for p in pbc])))
+    shifts_cd = shifts_cd * grid_L
+    central = int(np.flatnonzero((shifts_cd == 0).all(axis=1))[0])
+
+    n_nodes = len(nodes)
+    super_nodes = np.concatenate([nodes + shift_d for shift_d in shifts_cd], axis=0)
+    super_elements = np.concatenate([elements + c * n_nodes for c in range(len(shifts_cd))],
+                                    axis=0)
+    super_nodes, super_elements = weld_nodes(super_nodes, super_elements, a * 1e-6)
+    super_pts = np.concatenate([pts + shift_d for shift_d in shifts_cd], axis=0)
+    super_L = grid_L * np.where(pbc != 0, 3, 1)
+
+    rows, cols, vals, _, _ = tetra_exchange_triplets(super_nodes, super_elements, super_pts,
+                                                     super_L, [0, 0, 0], cuda=cuda)
+
+    in_copy = np.logical_and(rows >= central * ntot, rows < (central + 1) * ntot)
+    A_folded = np.zeros((ntot, ntot))
+    np.add.at(A_folded, (rows[in_copy] - central * ntot, cols[in_copy] % ntot), vals[in_copy])
+
+    return np.abs(A_folded - A_pbc).max() / np.abs(A_pbc).max(), len(shifts_cd)
+
+
+def tetra_split_deviations(nodes, elements, pts, grid_L, pbc, cuda=False, cvode=False):
+    """The gap simulation of the grain mesh, on a tetrahedral mesh.
+
+    A slab of cubes through the middle of the mesh is left out, so the two halves touch one
+    another only through the periodic boundary along x, and they relax to one common direction
+    if and only if the linking works.
+    """
+    ntot = len(pts)
+    m0_pv = random_directions(ntot)
+
+    problem = MicromagProblem(
+        res=(ntot, 1, 1),
+        grid_type='tetrahedron',
+        grid_pts=pts,
+        grid_nod=nodes,
+        grid_ele=elements.T,
+        grid_nnod=len(nodes),
+        grid_L=list(grid_L),
+        A0=Aex * np.ones((ntot, 1)),
+        Ms=Ms * np.ones((ntot, 1)),
+        K0=K,
+        alpha=eta,
+        gamma=gamma,
+        m0=m0_pv,
+        exchPBC=np.asarray(pbc, dtype=np.int32),
+        cuda=cuda,
+        cvode=cvode,
+        usereturnhall=True,
+        solver='dynamic',
+        T=T,
+        usedemag=0,
+        exch_presize=TETRA_EXCH_PRESIZE,
+    )
+
+    print(f'Run simulation on the {TETRA_LABEL}, exchPBC = {list(pbc)}')
+    result = problem.run_simulation(
+        t_end=t_end,
+        nt=nTimesteps,
+        fct_h_ext=fct_h_ext,
+        nt_h_ext=2,
+    )
+    print('Done running simulation')
+
+    M_pv = result[1][-1, :, 0, :]
+    left_n = pts[:, 0] < 0
+    right_n = pts[:, 0] > 0
+
+    difference = np.linalg.norm(np.mean(M_pv[left_n, :], axis=0)
+                                - np.mean(M_pv[right_n, :], axis=0))
+    Mavg_dv = np.mean(M_pv, axis=0, keepdims=True)
+    spread = np.max(np.sqrt(np.sum((M_pv - Mavg_dv)**2, axis=1)))
+
+    return float(difference), float(spread), M_pv
+
+
+def periodic_links(A, pts, grid_L, pbc):
+    """The pairs of elements that the operator couples only through a periodic boundary.
+
+    A pair whose separation is more than half a period along a periodic direction is not a pair
+    of neighbours inside the domain: it is a pair that the linking has joined across the
+    boundary. These are exactly the couplings that exchPBC adds, and drawing them is what makes
+    the periodic boundary visible in the figure.
+
+    Returns the pairs and, for each, the minimum image separation, so that the partner can be
+    drawn where the periodic image of it actually sits, just outside the domain.
+    """
+    grid_L = np.asarray(grid_L, dtype=float)
+    pbc = np.asarray(pbc)
+
+    i_n, j_n = np.nonzero(A)
+    delta_nd = pts[j_n, :] - pts[i_n, :]
+    wrapped_nd = delta_nd.copy()
+    for d in range(3):
+        if pbc[d]:
+            wrapped_nd[:, d] -= grid_L[d] * np.round(delta_nd[:, d] / grid_L[d])
+
+    across_n = np.any(np.abs(wrapped_nd - delta_nd) > 0.5 * grid_L.max() * 1e-6, axis=1)
+    # Each pair appears twice, since the operator is structurally symmetric
+    keep_n = np.logical_and(across_n, i_n < j_n)
+
+    return i_n[keep_n], j_n[keep_n], wrapped_nd[keep_n, :]
+
+
+def tetra_analysis(pbc, cuda=False, cvode=False):
+    """Repeat the mesh independent tests on a tetrahedral mesh.
+
+    The tetrahedral mesh goes through a different mesh analysis from either of the meshes above,
+    and links its periodic boundaries by identifying nodes rather than by matching faces
+    geometrically, so it is worth its own set of checks. The plane wave test of method 2 is not
+    among them: six tetrahedra share every cube, so the repeating unit of the lattice holds six
+    elements and a plain plane wave is no longer an eigenvector - Bloch's theorem gives six
+    bands, not one. The two checks that assume nothing about the mesh, the vanishing row sums
+    and the supercell reference, carry over unchanged, and the gap simulation carries over from
+    the grain mesh.
+    """
+    print(f"\n{'=' * 78}\n{TETRA_LABEL}\n{'=' * 78}")
+    checks = []
+
+    # ---- The gap simulation ----------------------------------------------------------------
+    nx = TETRA_RES_SPLIT[0]
+    nodes, elements, pts = build_tetra_mesh(TETRA_RES_SPLIT, a_section,
+                                            drop=lambda ic, jc, kc: ic == nx // 2)
+    grid_L = [TETRA_RES_SPLIT[d] * a_section for d in range(3)]
+    print(f"Split mesh: {len(pts)} tetrahedra, the middle layer of cubes left out to split it "
+          f"in two")
+
+    deviation, spread, M_pbc = tetra_split_deviations(nodes, elements, pts, grid_L, [1, 0, 0],
+                                                      cuda=cuda, cvode=cvode)
+    deviation_free, _, M_free = tetra_split_deviations(nodes, elements, pts, grid_L, [0, 0, 0],
+                                                       cuda=cuda, cvode=cvode)
+
+    verdict = 'works' if deviation < SPLIT_TOL else 'FAILED'
+    print(f"  Exchange coupling through the periodic boundary {verdict}: {deviation:.3e} between "
+          f"the halves, spread {spread:.3e}")
+    verdict = 'as expected' if deviation_free > SPLIT_CONTROL_MIN else 'FAILED'
+    print(f"  The same halves without periodic boundaries are decoupled, {verdict}: "
+          f"{deviation_free:.3e}")
+
+    checks.append({
+        'check': f'{TETRA_LABEL}: halves coupled through the periodic boundary',
+        'value': deviation,
+        'limit': SPLIT_TOL,
+        'passed': deviation < SPLIT_TOL,
+    })
+    checks.append({
+        'check': f'{TETRA_LABEL}: both halves relax to the same direction',
+        'value': spread,
+        'limit': SPLIT_TOL,
+        'passed': spread < SPLIT_TOL,
+    })
+    checks.append({
+        'check': f'{TETRA_LABEL}: halves decoupled without periodic boundaries (control)',
+        'value': SPLIT_CONTROL_MIN / max(deviation_free, 1e-300),
+        'limit': 1.0,
+        'passed': deviation_free > SPLIT_CONTROL_MIN,
+    })
+
+    # The couplings that the linking added, drawn in the figure
+    A_split = dense_matrix(*tetra_exchange_triplets(nodes, elements, pts, grid_L, [1, 0, 0],
+                                                    cuda=cuda))
+    link_i, link_j, link_d = periodic_links(A_split, pts, grid_L, [1, 0, 0])
+    print(f"  {len(link_i)} pairs of tetrahedra are coupled through the periodic boundary")
+
+    # ---- Row sums and the supercell reference, on a smaller mesh ----------------------------
+    nodes_o, elements_o, pts_o = build_tetra_mesh(TETRA_RES_OPERATOR, a_operator)
+    grid_L_o = [TETRA_RES_OPERATOR[d] * a_operator for d in range(3)]
+
+    A_pbc = dense_matrix(*tetra_exchange_triplets(nodes_o, elements_o, pts_o, grid_L_o, pbc,
+                                                  cuda=cuda))
+    A_free = dense_matrix(*tetra_exchange_triplets(nodes_o, elements_o, pts_o, grid_L_o,
+                                                   [0, 0, 0], cuda=cuda))
+    scale = np.abs(A_pbc).max()
+    row_sum = np.abs(A_pbc.sum(axis=1)).max() / scale
+
+    print(f"\nExchange operator on {len(pts_o)} tetrahedra, exchPBC = {pbc}")
+    print(f"  matrix          : {A_pbc.shape[0]} x {A_pbc.shape[1]}, "
+          f"{np.count_nonzero(A_pbc)} nonzeros")
+    print(f"  couplings/row   : {np.count_nonzero(A_pbc, axis=1).min()} (min) "
+          f"{np.count_nonzero(A_pbc, axis=1).max()} (max)")
+    status = "pass" if row_sum < ROW_SUM_TOL else "FAIL"
+    print(f"  max |row sum|   : {row_sum:.3e} [{status}]")
+    print(f"  linking changes : {np.abs(A_pbc - A_free).max() / scale:.3e} of the largest "
+          f"coupling")
+
+    checks.append({
+        'check': f'{TETRA_LABEL}: exchange operator has vanishing row sums',
+        'value': row_sum,
+        'limit': ROW_SUM_TOL,
+        'passed': row_sum < ROW_SUM_TOL,
+    })
+
+    supercell = None
+    if any(pbc):
+        deviation_sc, n_copies = tetra_supercell_deviation(nodes_o, elements_o, pts_o, grid_L_o,
+                                                           pbc, a_operator, cuda=cuda)
+        status = "pass" if deviation_sc < SUPERCELL_TOL else "FAIL"
+        print(f"  supercell       : {deviation_sc:.3e} away from the operator on {n_copies} "
+              f"welded copies of the mesh [{status}]")
+        supercell = deviation_sc
+        checks.append({
+            'check': f'{TETRA_LABEL}: periodic operator matches the supercell reference',
+            'value': deviation_sc,
+            'limit': SUPERCELL_TOL,
+            'passed': deviation_sc < SUPERCELL_TOL,
+        })
+
+    return {'checks': checks, 'deviation': deviation, 'spread': spread,
+            'deviation_free': deviation_free, 'supercell': supercell,
+            'nodes': nodes, 'elements': elements, 'pts': pts, 'grid_L': grid_L,
+            'a': a_section, 'M_pbc': M_pbc, 'M_free': M_free,
+            'link_i': link_i, 'link_j': link_j, 'link_d': link_d, 'A_split': A_split}
 
 
 def analyse(A, res, a, pbc, label):
@@ -820,7 +1168,7 @@ def grain_analysis(pbc, cuda=False, cvode=False):
 #%% Run the test
 
 def run_test(res=(6, 6, 6), a=a_operator, pbc=(1, 1, 1), cuda=False, cvode=False,
-             plotting: bool = True, grains: bool = True) -> list[dict]:
+             plotting: bool = True, grains: bool = True, tetra: bool = True) -> list[dict]:
     """Run all three methods on both grid types and return the checks they consist of.
 
     Each check is a dict with the keys 'check', 'value', 'limit' and 'passed', where the test
@@ -886,6 +1234,11 @@ def run_test(res=(6, 6, 6), a=a_operator, pbc=(1, 1, 1), cuda=False, cvode=False
                                                            cuda=cuda)
             checks.append(check)
 
+    tetra_results = None
+    if tetra:
+        tetra_results = tetra_analysis(pbc, cuda=cuda, cvode=cvode)
+        checks.extend(tetra_results['checks'])
+
     grain_results = None
     if grains:
         grain_results = grain_analysis(pbc, cuda=cuda, cvode=cvode)
@@ -893,6 +1246,8 @@ def run_test(res=(6, 6, 6), a=a_operator, pbc=(1, 1, 1), cuda=False, cvode=False
 
     if plotting:
         plot_results(deviations, operators, res, a, pbc, supercells, grain_results)
+        if tetra_results is not None:
+            plot_tetra_figure(tetra_results)
 
     return checks
 
@@ -1010,6 +1365,93 @@ def plot_results(deviations, operators, res, a, pbc, supercells, grains):
         plot_grain_figure(grains)
 
 
+def plot_tetra_figure(tetra):
+    """Three panels showing what the periodic boundary does to the tetrahedral mesh.
+
+    The left panel draws the mesh and, for every pair of tetrahedra that the linking couples
+    across the boundary, a stub from one of them to where the periodic image of its partner
+    actually sits, just outside the domain. Those stubs are the periodic boundary made visible:
+    they are exactly the couplings that exchPBC adds to the operator, and they only appear at
+    the two ends of the periodic direction.
+
+    The other two panels are what those couplings are worth. The mesh is split in two by a gap
+    down the middle, so the halves touch one another only through the boundary. With the linking
+    they relax to one common direction; without it they keep the unrelated directions they
+    started from.
+    """
+    pts = tetra['pts']
+    grid_L = np.asarray(tetra['grid_L'])
+    a = tetra['a']
+
+    fig = plt.figure(figsize=(16, 5.2))
+
+    # ---- The periodic couplings ------------------------------------------------------------
+    # Drawn in the same slab as the two panels beside it, so that the three read together, and
+    # thinned to the strong couplings. The stencil reaches every element sharing a vertex with a
+    # face, so the linking creates hundreds of weak couplings as well and drawing all of them
+    # would be a solid block of colour rather than a picture.
+    lo_d, hi_d = -grid_L / (2 * a), grid_L / (2 * a)
+    slab_n = np.abs(pts[:, 2] - pts[:, 2].mean()) < a / 2
+
+    ax = fig.add_subplot(1, 3, 1)
+    ax.scatter(pts[slab_n, 0] / a, pts[slab_n, 1] / a, s=8, c='0.7', zorder=2)
+
+    link_i, link_j, link_d = tetra['link_i'], tetra['link_j'], tetra['link_d']
+    A_split = tetra['A_split']
+    strength_n = np.abs(A_split[link_i, link_j])
+    strong_n = strength_n > 0.03 * strength_n.max()
+    n_drawn = 0
+    for n in np.flatnonzero(strong_n):
+        # Both ends of the pair, so that the stubs leave the domain on both sides: the image of
+        # j nearest to i sits at x_i + d, and the image of i nearest to j at x_j - d
+        for base, sign in ((link_i[n], +1.0), (link_j[n], -1.0)):
+            if not slab_n[base]:
+                continue
+            start_d = pts[base, :] / a
+            end_d = (pts[base, :] + sign * link_d[n, :]) / a
+            ax.plot([start_d[0], end_d[0]], [start_d[1], end_d[1]],
+                    color='tab:red', linewidth=0.8, alpha=0.6, zorder=1)
+            n_drawn += 1
+
+    ax.add_patch(Rectangle((lo_d[0], lo_d[1]), hi_d[0] - lo_d[0], hi_d[1] - lo_d[1],
+                           fill=False, edgecolor='0.3', linewidth=1.2, zorder=3))
+    ax.axvspan(-0.5, 0.5, color='0.9', zorder=0)
+    ax.set_xlim(lo_d[0] - 1.3, hi_d[0] + 1.3)
+    ax.set_ylim(lo_d[1] - 0.3, hi_d[1] + 0.3)
+    ax.set_aspect('equal')
+    ax.set_xlabel('x / a')
+    ax.set_ylabel('y / a')
+    ax.set_title(f"{len(link_i)} couplings across the boundary,\n"
+                 f"the {n_drawn} strongest in this slab drawn", fontsize=11)
+
+    # ---- The two relaxed states ------------------------------------------------------------
+    for panel, (M_pv, title) in enumerate([
+            (tetra['M_pbc'], f"exchPBC = [1 0 0]\nhalves agree to {tetra['deviation']:.1e}"),
+            (tetra['M_free'], f"exchPBC = [0 0 0] (control)\nhalves differ by "
+                              f"{tetra['deviation_free']:.1e}")]):
+        ax = fig.add_subplot(1, 3, panel + 2)
+        # One slab of tetrahedra, so that the arrows do not sit on top of one another
+        slab_n = np.abs(pts[:, 2] - pts[:, 2].mean()) < a / 2
+        colours = 0.5 * (M_pv[slab_n, :] + 1)
+        ax.quiver(pts[slab_n, 0] / a, pts[slab_n, 1] / a, M_pv[slab_n, 0], M_pv[slab_n, 1],
+                  color=colours, angles='xy', scale=25, width=0.006)
+        ax.axvspan(-0.5, 0.5, color='0.9', zorder=0)
+        ax.text(0, hi_d[1] * 0.92, 'gap', ha='center', va='top', fontsize=9, color='0.4')
+        ax.set_xlim(lo_d[0] - 0.3, hi_d[0] + 0.3)
+        ax.set_ylim(lo_d[1] - 0.3, hi_d[1] + 0.3)
+        ax.set_aspect('equal')
+        ax.set_xlabel('x / a')
+        ax.set_ylabel('y / a')
+        ax.set_title(title, fontsize=11)
+
+    fig.suptitle(f"Periodic exchange on a {TETRA_LABEL} of {len(pts)} elements", fontsize=13)
+    fig.tight_layout()
+    figure_path = output_dir / 'periodic_exchange_test_tetra.png'
+    fig.savefig(figure_path, dpi=200, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Saved figure to {figure_path}")
+
+
 def draw_cells(ax, pts, abc, colours, edgecolour='black', linewidth=0.4):
     """Draw the cross sections of a set of cells as rectangles in the xy plane."""
     cells = [Rectangle((x - dx / 2, y - dy / 2), dx, dy) for x, y, dx, dy
@@ -1120,10 +1562,12 @@ def main():
     parser.add_argument('--cuda', action='store_true', help="Use the CUDA solver")
     parser.add_argument('--no-grains', action='store_true',
                         help="Skip the irregular mesh of grains")
+    parser.add_argument('--no-tetra', action='store_true',
+                        help="Skip the tetrahedral mesh")
     args = parser.parse_args()
 
     checks = run_test(res=args.res, a=args.a, pbc=args.pbc, cuda=args.cuda,
-                      grains=not args.no_grains)
+                      grains=not args.no_grains, tetra=not args.no_tetra)
 
     print(f"\n{'=' * 78}")
     for check in checks:

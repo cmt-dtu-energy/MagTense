@@ -26,6 +26,7 @@
     use IO_GENERAL
     use iso_fortran_env
     use UnstructuredMeshAnalysis
+    use TetrahedralMeshAnalysis
     use DifferentialOperators
 
 #if USE_FMM3D
@@ -110,13 +111,20 @@
     allocate( gb_solution%pts(ntot,3) )
     
     !Analyze the mesh, if needed
-    if ( gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
+    if (( gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) .or. &
+        ( gb_problem%grid%gridType .eq. gridTypeTetrahedron )) then
         if ( gb_problem%passExch .eq. passExchTrue) then
             call displayGUIMessage( 'Passing exchange matrix' )
             call passDifferentialOperators(gb_problem)
-        else    
+        elseif ( gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
             call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gb_solution%gridinfo, &
                 gb_problem%macrogrid%exchPBC)
+        else
+            !A tetrahedral mesh is given by its nodes and connectivity rather than by positions
+            !and sizes, so it has its own analysis. It fills the same GridInfo, which means the
+            !exchange operator below is built in exactly the same way as for the prisms.
+            call TetrahedralUnstructuredMeshAnalysis(gb_problem%grid%nodes, gb_problem%grid%elements, &
+                gb_solution%gridinfo, gb_problem%macrogrid%exchPBC)
         endif
     endif
 
@@ -2260,13 +2268,9 @@ end subroutine updateDemagfieldFMM
             !The tiles at the two ends of each periodic direction have been linked together in the mesh
             !analysis, i.e. they share a face and enter each others interpolation stencils, so the
             !exchange operator below is computed in exactly the same way as without periodic boundaries.
-            !This is only done for the unstructured prisms, as the mesh analysis is not run for a
-            !tetrahedral mesh. An exchange matrix passed from the outside carries its own boundary
-            !conditions and has already returned above.
-            if ( grid%gridType .ne. gridTypeUnstructuredPrisms ) then
-                call displayGUIMessage( 'Periodic exchange boundary conditions are only supported for unstructured prisms - exiting!' )
-                stop
-            endif
+            !Both mesh analyses do this, the prisms geometrically and the tetrahedra by identifying the
+            !nodes on the two boundary planes. An exchange matrix passed from the outside carries its
+            !own boundary conditions and has already returned above.
             call displayGUIMessage( 'Using periodic exchange boundary conditions' )
         endif
         call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, phase_local, A_int_normalized, problem%A_exch)

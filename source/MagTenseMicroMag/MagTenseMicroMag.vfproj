@@ -287,6 +287,7 @@
 				</FileConfiguration>
 			</File>
 			<File RelativePath=".\MicroMagParameters.f90"/>
+			<File RelativePath=".\TetrahedralMeshAnalysis.f90"/>
 			<File RelativePath=".\UnstructuredMeshAnalysis.f90"/>
 			<File RelativePath=".\util_micromag.f90"/>
 		</Filter>
