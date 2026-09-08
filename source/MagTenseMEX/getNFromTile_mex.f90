@@ -30,6 +30,7 @@
       integer*4 :: n_ele
       mwSize,dimension(3) :: dims  
       mwSize sizevars    
+      mwSize ndim               !>Rank of the returned array; must be mwSize
       
 !     Check for proper number of arguments. 
       if( nrhs .ne. 3) then
@@ -93,7 +94,8 @@
       classid = mxClassIDFromClassName('double')
       
       !Return the N field
-      plhs(1) = mxCreateNumericArray( 3, dims, classid, ComplexFlag )
+      ndim = 3
+      plhs(1) = mxCreateNumericArray( ndim, dims, classid, ComplexFlag )
       sizevars = 3*3*n_ele
       call mxCopyReal8ToPtr( N, mxGetPr( plhs(1) ), sizevars )
       

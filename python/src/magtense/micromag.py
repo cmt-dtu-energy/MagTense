@@ -17,7 +17,11 @@ if hasattr(os, "add_dll_directory"):
         Path(sys.prefix) / "Library" / "bin",
     ]
 
+    # The CUDA wheels changed layout between the two major versions: cu12 gave
+    # every library its own nvidia/<name>/bin, cu13 puts them all together in
+    # nvidia/cu13/bin/x86_64. Offer both so either generation of wheel resolves.
     nvidia_path = Path(__file__).parent / ".." / "nvidia"
+    dll_paths.append(nvidia_path / "cu13" / "bin" / "x86_64")
     dll_paths += [
         nvidia_path / lib / "bin"
         for lib in ["cublas", "cuda_runtime", "cusparse", "nvjitlink"]

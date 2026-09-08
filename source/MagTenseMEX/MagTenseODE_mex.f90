@@ -25,7 +25,7 @@
       real,dimension(:),allocatable :: t,y0     !>Time and y0 arrays
       real,dimension(:),allocatable :: t_out    !>Time out array
       real,dimension(:,:),allocatable :: y_out  !>y output array
-      mwSize :: sx, sizevars                    !>MEX integer for keeping the size correct
+      mwSize :: sx, sizevars, ndim                   !>MEX integer for keeping the size correct
       mwSize,dimension(3) :: dims               !>Used for copying back to ML
       integer*4 ComplexFlag,classid             !>Flags for communicating with ML
       integer*4 mxIsDouble, mxIsInt32, mxIsStruct, mxClassIDFromClassName  !>Various MEX functions
@@ -78,14 +78,16 @@
       
       !The time output
       dims(1) = nt
-      plhs(1) = mxCreateNumericArray( 1, dims, classid, ComplexFlag )
+      ndim = 1
+      plhs(1) = mxCreateNumericArray( ndim, dims, classid, ComplexFlag )
       sx = nt      
       call mxCopyReal8ToPtr( t_out, mxGetPr( plhs(1) ), sx )
       
       !The y output
       dims(1) = neq
       dims(2) = nt
-      plhs(2) = mxCreateNumericArray( 2, dims, classid, ComplexFlag )
+      ndim = 2
+      plhs(2) = mxCreateNumericArray( ndim, dims, classid, ComplexFlag )
       sx = neq * nt      
       call mxCopyReal8ToPtr( y_out, mxGetPr( plhs(2) ), sx )
       
