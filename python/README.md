@@ -7,6 +7,9 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
 - New Conda environment from [env-313-linux.yml](./.build/env-313-linux.yml)
 
+  Environment files exist for Python 3.12, 3.13 and 3.14 (`env-312`, `env-313`,
+  `env-314`); pick the one matching the Python version you want to build for.
+
   ```bash
   conda env create -n magtense-env -f python/.build/env-313-linux.yml
   conda activate magtense-env
@@ -23,7 +26,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
   conda config --env --add channels conda-forge
   conda install -y python=3.13
   python3 -m pip install numpy meson ninja charset-normalizer build
-  conda config --env --add channels nvidia/label/cuda-12.9.1
+  conda config --env --add channels nvidia/label/cuda-13.3.1
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   conda config --env --add channels https://software.repos.intel.com/python/conda/
   conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" "ifx_linux-64"

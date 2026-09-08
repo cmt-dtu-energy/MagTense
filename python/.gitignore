@@ -10,7 +10,7 @@ __pycache__/
 .Python
 build/
 cpu_libs/
-cu12_libs/
+cu13_libs/
 develop-eggs/
 dist/
 downloads/

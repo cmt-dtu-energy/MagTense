@@ -7,7 +7,7 @@
 		<Configuration Name="Debug|x64" UseCompiler="ifxCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Debug/;..\NumericalIntegration\x64\Debug\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_CUDA;USE_MATLAB;USE_FMM3D" OpenMP="OpenMPParallelCode" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2022a\extern\include\;..\NumericalIntegration\x64\debug\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug\;..\DemagField\x64\Debug\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug\;..\DemagField\x64\Debug\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -17,7 +17,7 @@
 		</Configuration>
 		<Configuration Name="Release|x64" UseCompiler="ifxCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Release/;..\NumericalIntegration\x64\Release\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_CUDA;USE_MATLAB;USE_FMM3D" OpenMP="OpenMPParallelCode" UseMkl="mklParallel"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\release\;..\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\mkl\intel64\lp64" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\release\;..\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\mkl\intel64\lp64" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -27,7 +27,7 @@
 		</Configuration>
 		<Configuration Name="Release_no_CUDA|x64" UseCompiler="ifxCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Release/;..\NumericalIntegration\x64\Release\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_MATLAB;USE_FMM3D" OpenMP="OpenMPParallelCode" UseMkl="mklParallel"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\release\;..\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\release\;..\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -38,7 +38,7 @@
 		<Configuration Name="Debug_no_CUDA|x64" UseCompiler="ifxCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Debug/;..\NumericalIntegration\x64\Debug\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_MATLAB;USE_FMM3D" OpenMP="OpenMPParallelCode" WarnInterfaces="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2022a\extern\include\;..\NumericalIntegration\x64\debug\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug\;..\DemagField\x64\Debug\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug\;..\DemagField\x64\Debug\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -50,7 +50,7 @@
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Debug/;..\NumericalIntegration\x64\Debug_no_CVODE\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_MATLAB;USE_FMM3D" OpenMP="OpenMPParallelCode" WarnInterfaces="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2022a\extern\include\;..\NumericalIntegration\x64\debug\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 			<Tool Name="VFLinkerTool" SuppressStartupBanner="true"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug_no_CVODE\;..\DemagField\x64\Debug_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug_no_CVODE\;..\DemagField\x64\Debug_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -63,7 +63,7 @@
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2024b\extern\include\;../AuxMT/x64/Debug/;..\NumericalIntegration\x64\debug_no_CVODE\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_CUDA;USE_MATLAB;USE_FMM3D" OpenMP="OpenMPParallelCode" WarnInterfaces="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2022a\extern\include\;..\NumericalIntegration\x64\debug\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 			<Tool Name="VFLinkerTool" SuppressStartupBanner="true"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug_no_CVODE\;..\DemagField\x64\Debug_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug_no_CVODE\;..\DemagField\x64\Debug_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -75,7 +75,7 @@
 		<Configuration Name="Release_no_CUDA_no_CVODE|x64" UseCompiler="ifxCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Release/;..\NumericalIntegration\x64\Release_no_CVODE\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_MATLAB;USE_FMM3D" OpenMP="OpenMPParallelCode" UseMkl="mklParallel"/>
 			<Tool Name="VFLinkerTool" SuppressStartupBanner="true"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Release_no_CVODE\;..\DemagField\x64\Release_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Release_no_CVODE\;..\DemagField\x64\Release_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -87,7 +87,7 @@
 		<Configuration Name="Release_no_CVODE|x64" UseCompiler="ifxCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Release/;..\NumericalIntegration\x64\Release_no_CVODE\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_CUDA;USE_MATLAB;USE_FMM3D" OpenMP="OpenMPParallelCode" UseMkl="mklParallel"/>
 			<Tool Name="VFLinkerTool" SuppressStartupBanner="true"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Release_no_CVODE\;..\DemagField\x64\Release_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Release_no_CVODE\;..\DemagField\x64\Release_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -98,7 +98,7 @@
 		</Configuration>
 		<Configuration Name="Release_Standalone_exe|x64" UseCompiler="ifortCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2022a\extern\include\;..\NumericalIntegration\x64\Release_Standalone_exe\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_CUDA;USE_MATLAB" OpenMP="OpenMPParallelCode" UseMkl="mklParallel"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\release\;..\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\lib\x64\;..\MagTenseFortranCuda\cuda\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\intel64\lp64" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\release\;..\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\intel64\lp64" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -108,7 +108,7 @@
 		</Configuration>
 		<Configuration Name="Release_no_FMM|x64" UseCompiler="ifxCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Release/;..\NumericalIntegration\x64\Release\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_CUDA;USE_MATLAB;" OpenMP="OpenMPParallelCode" UseMkl="mklParallel"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\release\;..\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\mkl\intel64\lp64" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\release\;..\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\mkl\intel64\lp64" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -118,7 +118,7 @@
 		</Configuration>
 		<Configuration Name="Release_no_CUDA_no_FMM|x64" UseCompiler="ifxCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Release/;..\NumericalIntegration\x64\Release\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_MATLAB" OpenMP="OpenMPParallelCode" UseMkl="mklParallel"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\release\;..\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\release\;..\DemagField\x64\release\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -129,7 +129,7 @@
 		<Configuration Name="Release_no_CUDA_no_CVODE_no_FMM|x64" UseCompiler="ifxCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Release/;..\NumericalIntegration\x64\Release_no_CVODE\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_MATLAB" OpenMP="OpenMPParallelCode" UseMkl="mklParallel"/>
 			<Tool Name="VFLinkerTool" SuppressStartupBanner="true"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Release_no_CVODE\;..\DemagField\x64\Release_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Release_no_CVODE\;..\DemagField\x64\Release_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -141,7 +141,7 @@
 		<Configuration Name="Release_no_CVODE_no_FMM|x64" UseCompiler="ifxCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Release/;..\NumericalIntegration\x64\Release_no_CVODE\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_CUDA;USE_MATLAB" OpenMP="OpenMPParallelCode" UseMkl="mklParallel"/>
 			<Tool Name="VFLinkerTool" SuppressStartupBanner="true"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Release_no_CVODE\;..\DemagField\x64\Release_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Release_no_CVODE\;..\DemagField\x64\Release_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -153,7 +153,7 @@
 		<Configuration Name="Debug_no_FMM|x64" UseCompiler="ifxCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" Optimization="optimizeFull" MatrixLibrary="mlYes" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Debug/;..\NumericalIntegration\x64\Debug\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_CUDA;USE_MATLAB" OpenMP="OpenMPParallelCode" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2022a\extern\include\;..\NumericalIntegration\x64\debug\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug\;..\DemagField\x64\Debug\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug\;..\DemagField\x64\Debug\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\" LinkLibraryDependencies="true" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -164,7 +164,7 @@
 		<Configuration Name="Debug_no_CUDA_no_FMM|x64" UseCompiler="ifxCompiler" DeleteExtensionsOnClean="*.obj;*.mod;*.pdb;*.asm;*.map;*.dyn;*.dpi;*.tmp;*.log;*.ilk;*.exe;$(TargetPath)" ConfigurationType="typeStaticLibrary">
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Debug/;..\NumericalIntegration\x64\Debug\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_MATLAB" OpenMP="OpenMPParallelCode" WarnInterfaces="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2022a\extern\include\;..\NumericalIntegration\x64\debug\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug\;..\DemagField\x64\Debug\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug\;..\DemagField\x64\Debug\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -176,7 +176,7 @@
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2025b\extern\include\;../AuxMT/x64/Debug/;..\NumericalIntegration\x64\Debug_no_CVODE\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_MATLAB" OpenMP="OpenMPParallelCode" WarnInterfaces="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2022a\extern\include\;..\NumericalIntegration\x64\debug\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 			<Tool Name="VFLinkerTool" SuppressStartupBanner="true"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug_no_CVODE\;..\DemagField\x64\Debug_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug_no_CVODE\;..\DemagField\x64\Debug_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
@@ -189,7 +189,7 @@
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" AdditionalOptions="/Qopenmp" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2024b\extern\include\;../AuxMT/x64/Debug/;..\NumericalIntegration\x64\debug_no_CVODE\;C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\" PreprocessorDefinitions="USE_CUDA;USE_MATLAB" OpenMP="OpenMPParallelCode" WarnInterfaces="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 			<Tool Name="VFFortranCompilerTool" HeapArrays="1024" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" AdditionalIncludeDirectories="c:\Program Files\MATLAB\R2022a\extern\include\;..\NumericalIntegration\x64\debug\" WarnInterfaces="true" RealKIND="realKIND8" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug" UseMkl="mklParallel"/>
 			<Tool Name="VFLinkerTool" SuppressStartupBanner="true"/>
-			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug_no_CVODE\;..\DemagField\x64\Debug_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\lib\x64\;..\MagTenseFortranCuda\cuda\" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
+			<Tool Name="VFLibrarianTool" AdditionalLibraryDirectories="..\NumericalIntegration\x64\Debug_no_CVODE\;..\DemagField\x64\Debug_no_CVODE\;c:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64\;..\MagTenseFortranCuda\cuda\" AdditionalDependencies="cublas.lib  MagTenseCudaBlas.obj MagTenseCudaBlasICLWrapper.obj"/>
 			<Tool Name="VFResourceCompilerTool"/>
 			<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 			<Tool Name="VFCustomBuildTool"/>
