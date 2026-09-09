@@ -99,10 +99,10 @@ After this compile as above but with `USE_FMM3D=1`
   - Download of MagTense and [FMM3D](https://github.com/Ximtecs/FMM3D). Unzip the latter in `external\FMM3D`
 
 
-- Conda environment `magtense-env` is created from `env-313-win.yml` in a `Powershell` as
+- Conda environment `magtense-env` is created from `env-314-win.yml` in a `Powershell` as
 
   ```bash
-  conda env create -f python/.build/env-313-win.yml
+  conda env create -f python/.build/env-314-win.yml
   conda activate magtense-env
   ```
   All commands below, except for CVODE compilation, takes place in the `magtense-env` environment

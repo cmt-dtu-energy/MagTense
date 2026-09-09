@@ -287,8 +287,13 @@
         
             lambdaCnt = lambdaCnt + 1
 
-            write(prog_str,'(A7, F15.7, A13, F15.7)') 'Error: ', err, ' Max. Error: ', err_max * lambda
-            call displayGUIMessage( trim(prog_str) )
+            !! err is only assigned in the cnt > 2 branch above, so reporting it before
+            !! then reads an uninitialised local - it printed as "Error: NaN" for the
+            !! first two iterations of every call.
+            if ( cnt .gt. 2 ) then
+                write(prog_str,'(A7, F15.7, A13, F15.7)') 'Error: ', err, ' Max. Error: ', err_max * lambda
+                call displayGUIMessage( trim(prog_str) )
+            endif
              
         enddo    
         deallocate(H,H_old,Hnorm,Hnorm_old,Nstore,err_val,Mnorm,Mnorm_old)
