@@ -33,8 +33,7 @@ Tile Types
 ----------------------------------------
 Offset
 ----------------------------------------
-The offset is a three-dimensional vector, which determines the difference 
-between the origin of the global coordinate system to the local coordinate system.
+The offset is a three-dimensional displacement vector, from the origin of the global coordinate system to origin of the local coordinates. Thus the offset vectors give the center positions of each tile
 
 
 ----------------------------------------
@@ -52,7 +51,7 @@ y-axis, :math:`\theta`) and roll (rotation around local x-axis, :math:`\phi`).
     Rotations of a tile are performed in its local coordinate system. 
     Firstly, the tile is rotated with :math:`\phi` around its local x-axis.
     Secondly, the local y-axis is rotated by :math:`\theta`.
-    Eventually, the angle :math:`\psi` is performed around the local z-axis.
+    Finally, the angle :math:`\psi` is performed around the local z-axis.
 
 
 ----------------------------------------
