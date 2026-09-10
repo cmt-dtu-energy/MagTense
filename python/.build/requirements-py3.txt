@@ -10,9 +10,13 @@ matplotlib>=3.10.5
 mkl>=2025.2.0,<2026
 notebook>=7.4.5
 numpy==2.3.2
-nvidia-cublas-cu12==12.*
-nvidia-cuda-runtime-cu12==12.*
-nvidia-cusparse-cu12==12.*
-nvidia-nvjitlink-cu12==12.*
+# CUDA 13 dropped the -cuXX suffix from these wheels; the -cu13 names on PyPI
+# are unrelated 0.0.1 placeholders. cusparse is pinned to its own 12.8 line on
+# purpose - the cuSPARSE library version is independent of the toolkit version,
+# and 12.8.2.51 is the build that ships inside CUDA 13.3.
+nvidia-cublas==13.*
+nvidia-cuda-runtime==13.*
+nvidia-cusparse==12.8.*
+nvidia-nvjitlink==13.*
 scipy>=1.16.0
 tqdm>=4.67.1

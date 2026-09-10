@@ -132,6 +132,20 @@ else
   SEP = &&
 endif
 
+# The upstream makefile has no record of what it last built with, and 'clean'
+# deliberately leaves the submodule alone so an ordinary rebuild does not pay
+# for FMM3D again. Object files from a different compiler therefore survive a
+# toolchain change and are silently reused, and the mismatch surfaces only when
+# the shared library is linked: constant-pool symbols named __xmm@<hex>, which
+# the Intel compilers emit, make ld read the @ as a symbol version and fail with
+#   ld: libfmm3d.so: version node not found for symbol __xmm@4022dcdf...
+#   ld: failed to set dynamic section sizes: bad value
+# Record the toolchain FMM3D was built with and clean the submodule when it
+# changes. The stamp lives in the MagTense tree, next to ${BUILD_FLAGS_FILE},
+# so that it does not show up as untracked content inside the submodule.
+FMM3D_STAMP := $(MKFILE_PATH)/.fmm3d_toolchain
+FMM3D_TOOLCHAIN = FC=$(FC) DEBUG=$(FMM3D_DEBUG) `$(FC) --version 2>/dev/null | head -1`
+
 .PHONY: fmm3d
 fmm3d:
 ifeq ($(USE_FMM3D),1)
@@ -157,8 +171,13 @@ ifeq ($(USE_FMM3D),1)
 		echo "         On Linux, CI uses: cp $(FMM3D_DIR)/make.inc.linux $(FMM3D_DIR)/make.inc"; \
 	fi
 	@echo "==> FMM3D: building via upstream makefile (install)"
+	@if [ ! -f "$(FMM3D_STAMP)" ] || [ "`cat "$(FMM3D_STAMP)"`" != "$(FMM3D_TOOLCHAIN)" ]; then \
+		echo "==> FMM3D: toolchain changed since the last build, cleaning it first"; \
+		cd "$(FMM3D_DIR)" && $(MAKE) clean; \
+	fi
 	@cd "$(FMM3D_DIR)" && \
 	  $(MAKE) install PREFIX=$(abspath $(FMM3D_DIR)/local) DO_DEBUG=$(FMM3D_DEBUG) FAST_KER=OFF
+	@echo "$(FMM3D_TOOLCHAIN)" > "$(FMM3D_STAMP)"
 else
 	@echo "USE_FMM3D=0 -> skipping FMM3D build"
 endif
@@ -189,7 +208,15 @@ endif
 
 ifeq (${FC}, ifx)
 	ifeq ($(OS),Windows_NT)
+		# /heap-arrays and /traceback match the Linux flags below. Without /heap-arrays
+		# ifx puts array temporaries on the stack, and create_CSR_matrix builds three of
+		# them at once - pack(rows), pack(columns), pack(values) - sized by the length of
+		# the interpolation stencil list. That list grows as ~51x the number of tiles, so
+		# from roughly 15000 tiles the three temporaries exceed the stack and the process
+		# dies with STATUS_STACK_OVERFLOW (0xC00000FD) inside computeDifferentialOperators-
+		# FromMesh_DirectLap. /traceback is what makes any such abort say where it happened.
 		FFLAGS = /O3 /fpp /real-size:64 /Qopenmp /assume:nocc_omp /fpe:0 \
+			/heap-arrays:1024 /traceback \
 			/fp:source /nologo /DUSE_CVODE=${USE_CVODE} /DUSE_MATLAB=${USE_MATLAB} \
 			/DUSE_CUDA=${USE_CUDA} /DUSE_MICROMAG=${USE_MICROMAG} /DUSE_FMM3D=${USE_FMM3D}
 	else
@@ -223,7 +250,13 @@ ${MICROMAG_PATH}:${FORTRAN_CUDA_PATH}:${STANDALONE_PATH}:${FORCEINTEGRATOR_PATH}
 
 ifeq ($(OS),Windows_NT)
 	CONDA_PATH = $(subst \,/,${CONDA_PREFIX})
-	CUDA_ROOT = ${CONDA_PATH}/Library/lib
+	# CUDA 13 moved the win-64 import libraries from Library/lib into the
+	# Library/lib/x64 subdirectory that the standalone toolkit installer has
+	# always used, and the conda activation script only extends INCLUDE, not
+	# LIB - so nothing else puts that directory on the linker's search path and
+	# the python link dies with "LNK1181: cannot open input file 'cublas.lib'".
+	# Probe for it rather than pin it, so a CUDA 12 environment still works.
+	CUDA_ROOT = $(if $(wildcard ${CONDA_PATH}/Library/lib/x64/cudart.lib),${CONDA_PATH}/Library/lib/x64,${CONDA_PATH}/Library/lib)
 	MKL = -L${CONDA_PATH}/Library/lib -lmkl_intel_lp64_dll -lmkl_intel_thread_dll \
 		-lmkl_core_dll -lmkl_blas95_lp64 -llibiomp5md
 		
@@ -498,6 +531,7 @@ clean_full:
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
 	rm -rf ${PYTHON_LIBPATH}/build
 	rm -f ${BUILD_FLAGS_FILE}
+	rm -f ${FMM3D_STAMP}
 
 auxmt: check-config
 	cd ${AUXMT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"

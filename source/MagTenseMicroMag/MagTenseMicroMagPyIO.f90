@@ -15,10 +15,14 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
 	CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
 	n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
-    passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
+    passExch, exch_ncols, crysaxis, k0_arr, k1, k2, n_phase, phase_id, A_int, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
     useDemag, rng_seed)
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
     integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols
+    integer(4), intent(in) :: n_phase                            !> No. of materials; 1 = feature off
+    integer(4),dimension(ntot),intent(in) :: phase_id            !> Material index of each cell
+    real(8),dimension(n_phase,n_phase),intent(in) :: A_int       !> Interface exchange [J/m],
+                                                                 !> negative = use harmonic mean
     integer(4),dimension(3),intent(in) :: grid_n
     real(8),dimension(3),intent(in) :: grid_L
     real(8),dimension(ntot, 3),intent(in) :: grid_pts
@@ -122,10 +126,14 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
         !The number of nodes in the tetrahedron mesh
         problem%grid%nnodes = grid_nnod
         
-        !The nodes of all the tetrahedron elements
+        !The nodes of all the tetrahedron elements. grid_nnod x 3 is passed in, to match the way
+        !every other array of positions crosses the python interface, while the rest of MagTense
+        !holds the nodes as 3 x grid_nnod, so the transpose is needed here. Note that assigning
+        !grid_nod directly would not have been caught by the compiler: nodes is allocatable, so
+        !the assignment would silently reallocate it to grid_nnod x 3 instead.
         allocate( problem%grid%nodes(3,grid_nnod) )
-        problem%grid%nodes = grid_nod
-        
+        problem%grid%nodes = transpose( grid_nod )
+
         !the number of nodes in the tetrahedron mesh
         problem%grid%nnodes = grid_nnod
     endif
@@ -298,6 +306,29 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     problem%K0_arr = k0_arr
     problem%K1 = k1	
     problem%K2 = k2
+
+    !----------------- Interface exchange between two materials -----------------------
+    !Only stored when there is more than one material, so that a problem that does not use
+    !the feature leaves phase_id and A_int unallocated and takes exactly the old code path.
+    problem%n_phase = n_phase
+    if ( n_phase .gt. 1 ) then
+        if ( minval(phase_id) .lt. 1 .or. maxval(phase_id) .gt. n_phase ) then
+            call displayGUIMessage( 'MagTense: phase_id must be between 1 and n_phase' )
+            error stop 'loadMicroMagProblem: phase_id out of range'
+        endif
+        !An asymmetric table would make the exchange across a face depend on which of the two
+        !cells is asked, which is not a physical operator, so it is rejected rather than
+        !silently symmetrised.
+        if ( maxval(abs(A_int - transpose(A_int))) .gt. 0.0_DP ) then
+            call displayGUIMessage( 'MagTense: the interface exchange table must be symmetric' )
+            error stop 'loadMicroMagProblem: A_int is not symmetric'
+        endif
+        allocate( problem%phase_id(ntot) )
+        problem%phase_id = phase_id
+        allocate( problem%A_int(n_phase,n_phase) )
+        problem%A_int = A_int
+    endif
+    !----------------------------------------------------------------------------------
 
     call trace%end("loadMicroMagProblem", itimer=itimer, verbose=1)
 end subroutine loadMicroMagProblem

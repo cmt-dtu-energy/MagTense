@@ -229,3 +229,4 @@ cvode*/
 
 # Build configuration stamp written by the Makefile
 .build_flags
+.fmm3d_toolchain

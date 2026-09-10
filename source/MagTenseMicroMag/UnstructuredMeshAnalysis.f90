@@ -100,12 +100,36 @@ module UnstructuredMeshAnalysis
     real(dp), allocatable :: shiftList(:,:)
     integer :: nShifts, ishift, ia, ib, ic
     integer, allocatable :: theseNumMax(:)
+    !--- A-face lookup grid for the containment search ---
+    integer, allocatable :: aCellCnt(:), aCellStart(:), aCellItem(:)
+    integer, allocatable :: aStamp(:), candA(:), abList(:), baList(:)
+    integer :: nAGrid(3), nAGridTot, aReg, nCandA, nAB, nBA
+    integer :: ax1, ax2, ax3, ja0(3), ja1(3), jc, ju, jv, jj, aidx, itmpv, nsh, ish2
+    real(dp) :: aH(3), aLo(3), aHi(3), aBox0(3), aBox1(3), cShift(3), dcoord
+    logical :: okSame, okAB, okBA
+    !--- first-index buckets for the mutual-pair test ---
+    integer, allocatable :: pairCnt(:), pairStart(:), pairSecond(:)
+    integer :: nPair, pa, pb, jp
+    logical :: isMutual
+    !--- element lookup grid for the T/D construction ---
+    integer :: nFace, nGrid(3), nGridTot, nReg, icell, gi0(3), gi1(3)
+    integer :: gx, gy, gz, iCell0, iv, ish, nn, ncand, idx, numMax
+    integer :: nHit, capHit, capCand, iT, iD, ipos
+    integer, allocatable :: cellCnt(:), cellStart(:), cellItem(:)
+    integer, allocatable :: stampGen(:), stampIdx(:)
+    integer, allocatable :: candElem(:), candCnt(:,:)
+    integer, allocatable :: hitElem(:), hitFace(:), hitNum(:)
+    integer, allocatable :: elemFill(:), elemStart(:), hitOrder(:)
+    integer, allocatable :: igrow(:), igrow2(:,:)
+    real(dp) :: gridH(3), pq(3), vtx(3,4), eMin(3), eMax(3)
+    real(dp), parameter :: regPad = 1.0e-6_dp
     character*(40) :: prog_str
     integer, save :: itimer=0
     
     call trace%begin( "CartesianUnstructuredMeshAnalysis", itimer=itimer )
     
     call displayGUIMessage( 'Starting mesh analysis' )
+
     
     ! Initialize some variables
     Nel = size(pos, 1)
@@ -213,6 +237,28 @@ module UnstructuredMeshAnalysis
     allocate(AcontainsB(Nel), BcontainsA(Nel), stat=alloc_stat)
     call checkAllocation( alloc_stat, 'AcontainsB/BcontainsA' )
     
+    !------------------------------------------------------------------------------------------
+    ! Face containment.
+    !
+    ! Comparing every B face against every A face is O(3*Nel^2); measured, it was ~25% of this
+    ! routine before the T/D loop was fixed and the largest remaining term afterwards. Both
+    ! containment directions require the two (u,v) rectangles to overlap and the two faces to
+    ! sit in the same plane, so the A faces are put in a uniform grid once per dimension and
+    ! each B face then only examines the A faces sharing one of its cells.
+    !
+    ! As in the T/D construction, correctness does not depend on the cell size: two boxes that
+    ! intersect have a point in common, and the cell holding that point is covered by both, so
+    ! an overlapping A face is always among the candidates. The padding is far above rounding
+    ! and far below a cell, making the candidate set a superset; the exact tests below then
+    ! decide, written exactly as before against the same UminA/UmaxA/VminA/VmaxA arrays.
+    !
+    ! Output order is unchanged: dimensions outer, B faces ascending, and within each B face
+    ! the "A contains B" rows in ascending A order followed by the "B contains A" rows, which
+    ! is what the two pack() calls produced.
+    !------------------------------------------------------------------------------------------
+    allocate(aStamp(Nel), candA(Nel), abList(Nel), baList(Nel), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'aStamp/candA/abList/baList' )
+
    k = 1;
     do idim = 1, 3
       ! along a given dimension
@@ -223,69 +269,172 @@ module UnstructuredMeshAnalysis
       UmaxA = XXf(Aindex,TheNot(idim,1)) + 0.5_dp * DimsF(Aindex,TheNot(idim,1))
       VminA = XXf(Aindex,TheNot(idim,2)) - 0.5_dp * DimsF(Aindex,TheNot(idim,2))
       VmaxA = XXf(Aindex,TheNot(idim,2)) + 0.5_dp * DimsF(Aindex,TheNot(idim,2))
-      
+
       UminB = XXf(Bindex,TheNot(idim,1)) - 0.5_dp * DimsF(Bindex,TheNot(idim,1))
       UmaxB = XXf(Bindex,TheNot(idim,1)) + 0.5_dp * DimsF(Bindex,TheNot(idim,1))
       VminB = XXf(Bindex,TheNot(idim,2)) - 0.5_dp * DimsF(Bindex,TheNot(idim,2))
       VmaxB = XXf(Bindex,TheNot(idim,2)) + 0.5_dp * DimsF(Bindex,TheNot(idim,2))
-      
-      !Note: indexItContainsTrue is defined to be an array that is (2*Nel, 2) to ensure that there is enough room for the elements. 
-      !These are assigned sequentially, and afterwards make a copy of the array to ensure that it is the right size.
-      
+
+      !--- grid axes: 1 = the plane normal, 2 and 3 = the two in-plane directions ------------
+      ax1 = idim
+      ax2 = TheNot(idim,1)
+      ax3 = TheNot(idim,2)
+      aLo = [globMin(ax1), globMin(ax2), globMin(ax3)]
+      aHi = [globMax(ax1), globMax(ax2), globMax(ax3)]
+      aH(1) = minval(dimscopy(:,ax1))
+      aH(2) = minval(dimscopy(:,ax2))
+      aH(3) = minval(dimscopy(:,ax3))
+      do i = 1, 3
+          if (aH(i) .le. 0.0_dp) aH(i) = 1.0_dp
+          if (aHi(i) .gt. aLo(i)) then
+              nAGrid(i) = max(1, int((aHi(i) - aLo(i)) / aH(i)))
+          else
+              nAGrid(i) = 1
+          endif
+      end do
+      do while ( (real(nAGrid(1),dp)*real(nAGrid(2),dp)*real(nAGrid(3),dp)) .gt. &
+                 (4.0_dp * real(Nel,dp) + 1024.0_dp) )
+          if ( all(nAGrid .le. 1) ) exit
+          nAGrid = max(1, nAGrid / 2)
+      end do
+      do i = 1, 3
+          if (aHi(i) .gt. aLo(i)) then
+              aH(i) = (aHi(i) - aLo(i)) / real(nAGrid(i), dp)
+          else
+              aH(i) = 1.0_dp
+          endif
+      end do
+      nAGridTot = nAGrid(1) * nAGrid(2) * nAGrid(3)
+
+      !--- register the A faces ---------------------------------------------------------------
+      allocate(aCellCnt(nAGridTot), aCellStart(nAGridTot+1), stat=alloc_stat)
+      call checkAllocation( alloc_stat, 'aCellCnt/aCellStart' )
+      aCellCnt = 0
       do kb = 1, Nel
-        SamePosAlongDim = (abs(XXf(Aindex,idim) - XXf(Bindex(kb),idim)) < 1e-9) ;
+          aBox0 = [XXf(Aindex(kb),ax1), UminA(kb), VminA(kb)] - regPad
+          aBox1 = [XXf(Aindex(kb),ax1), UmaxA(kb), VmaxA(kb)] + regPad
+          do i = 1, 3
+              ja0(i) = min(max(int(floor((aBox0(i) - aLo(i)) / aH(i))), 0), nAGrid(i)-1)
+              ja1(i) = min(max(int(floor((aBox1(i) - aLo(i)) / aH(i))), 0), nAGrid(i)-1)
+          end do
+          do jv = ja0(3), ja1(3)
+            do ju = ja0(2), ja1(2)
+              do jc = ja0(1), ja1(1)
+                jj = 1 + jc + nAGrid(1)*(ju + nAGrid(2)*jv)
+                aCellCnt(jj) = aCellCnt(jj) + 1
+              end do
+            end do
+          end do
+      end do
+      aCellStart(1) = 1
+      do i = 1, nAGridTot
+          aCellStart(i+1) = aCellStart(i) + aCellCnt(i)
+      end do
+      aReg = aCellStart(nAGridTot+1) - 1
+      allocate(aCellItem(max(1,aReg)), stat=alloc_stat)
+      call checkAllocation( alloc_stat, 'aCellItem' )
+      aCellCnt = 0
+      do kb = 1, Nel
+          aBox0 = [XXf(Aindex(kb),ax1), UminA(kb), VminA(kb)] - regPad
+          aBox1 = [XXf(Aindex(kb),ax1), UmaxA(kb), VmaxA(kb)] + regPad
+          do i = 1, 3
+              ja0(i) = min(max(int(floor((aBox0(i) - aLo(i)) / aH(i))), 0), nAGrid(i)-1)
+              ja1(i) = min(max(int(floor((aBox1(i) - aLo(i)) / aH(i))), 0), nAGrid(i)-1)
+          end do
+          do jv = ja0(3), ja1(3)
+            do ju = ja0(2), ja1(2)
+              do jc = ja0(1), ja1(1)
+                jj = 1 + jc + nAGrid(1)*(ju + nAGrid(2)*jv)
+                aCellItem(aCellStart(jj) + aCellCnt(jj)) = kb
+                aCellCnt(jj) = aCellCnt(jj) + 1
+              end do
+            end do
+          end do
+      end do
 
-        !With periodic boundary conditions a face at one end of the domain is also considered to be
-        !at the same position as a face at the other end. The A faces have their normal along -idim
-        !and the B faces along +idim, so this links the element at the low end of the domain with the
-        !element at the high end. The containment tests below only involve the two dimensions
-        !orthogonal to idim and are thus unaffected by the periodic shift.
-        if ( PBC(idim) ) then
-            SamePosAlongDim = SamePosAlongDim .or. &
-                (abs( abs(XXf(Aindex,idim) - XXf(Bindex(kb),idim)) - Lper(idim) ) < 1e-9)
-        endif
+      !The periodic image of a B face along the plane normal. A face at one end of the domain is
+      !also at "the same position" as a face at the other end, which is what the Lper term in the
+      !original SamePosAlongDim test expressed; here it is one extra query per direction.
+      nsh = 1
+      cShift(1) = 0.0_dp
+      if ( PBC(idim) ) then
+          cShift(2) =  Lper(idim)
+          cShift(3) = -Lper(idim)
+          nsh = 3
+      endif
 
-        UAcontainsUB = (((UminA - UminB(kb)) < +1e-9) .and. ((UmaxA - UmaxB(kb)) > -1e-9))
-        VAcontainsVB = (((VminA - VminB(kb)) < +1e-9) .and. ((VmaxA - VmaxB(kb)) > -1e-9))
-       
-        UBcontainsUA = (((UminB(kb) - UminA) < +1e-9) .and. ((UmaxB(kb) - UmaxA) > -1e-9))
-        VBcontainsVA = (((VminB(kb) - VminA) < +1e-9) .and. ((VmaxB(kb) - VmaxA) > -1e-9))
-        
-        AcontainsB = (SamePosAlongDim .and. UAcontainsUB .and. VAcontainsVB)
-        BcontainsA = (SamePosAlongDim .and. UBcontainsUA .and. VBcontainsVA)
-        
-        allocate(indxAB(count(AcontainsB)), indxBA(count(BcontainsA)), stat=alloc_stat)
-        call checkAllocation( alloc_stat, 'indxAB/indxBA' )
-        indxAB = pack(Aindex, AcontainsB)
-        indxBA = pack(Aindex, BcontainsA)
+      aStamp = 0
 
-        allocate(firstindx(size(indxAB)+size(indxBA)), secondindx(size(indxAB)+size(indxBA)), stat=alloc_stat)
-        call checkAllocation( alloc_stat, 'firstindx/secondindx' )
+      do kb = 1, Nel
+        !--- gather the A faces that could possibly overlap this B face -----------------------
+        nCandA = 0
+        do ish2 = 1, nsh
+            aBox0 = [XXf(Bindex(kb),ax1) + cShift(ish2), UminB(kb), VminB(kb)] - regPad
+            aBox1 = [XXf(Bindex(kb),ax1) + cShift(ish2), UmaxB(kb), VmaxB(kb)] + regPad
+            do i = 1, 3
+                ja0(i) = min(max(int(floor((aBox0(i) - aLo(i)) / aH(i))), 0), nAGrid(i)-1)
+                ja1(i) = min(max(int(floor((aBox1(i) - aLo(i)) / aH(i))), 0), nAGrid(i)-1)
+            end do
+            do jv = ja0(3), ja1(3)
+              do ju = ja0(2), ja1(2)
+                do jc = ja0(1), ja1(1)
+                  jj = 1 + jc + nAGrid(1)*(ju + nAGrid(2)*jv)
+                  do i = aCellStart(jj), aCellStart(jj+1)-1
+                      aidx = aCellItem(i)
+                      if (aStamp(aidx) .ne. kb) then
+                          aStamp(aidx) = kb
+                          nCandA = nCandA + 1
+                          candA(nCandA) = aidx
+                      endif
+                  end do
+                end do
+              end do
+            end do
+        end do
 
-        firstindx(1:size(indxAB)) = indxAB
-        firstindx(size(indxAB)+1:size(firstindx)) = Bindex(kb)
-        !k_i = 1
-        !do i = 1,size(indxAB)
-        !    firstindx(i) = indxAB(i)
-        !    k_i = k_i+1
-        !enddo
-        !do i = k_i,k_i+(size(indxBA)-1)
-        !    firstindx(i) = Bindex(kb)
-        !enddo
-        
-        secondindx(1:size(indxAB)) = Bindex(kb)
-        !k_i = 1
-        !do i = 1,size(indxAB)
-        !    secondindx(i) = Bindex(kb)
-        !    k_i = k_i+1
-        !enddo
-        do i = size(indxAB)+1,size(indxAB)+size(indxBA)
-            secondindx(i) = indxBA(i-size(indxAB))
-        enddo
-        
+        !--- ascending A order, as pack() over Aindex produced -------------------------------
+        do i = 2, nCandA
+            itmpv = candA(i)
+            jj = i - 1
+            do while (jj .ge. 1)
+                if (candA(jj) .le. itmpv) exit
+                candA(jj+1) = candA(jj)
+                jj = jj - 1
+            end do
+            candA(jj+1) = itmpv
+        end do
+
+        !--- exact tests, written as in the original ----------------------------------------
+        nAB = 0
+        nBA = 0
+        do i = 1, nCandA
+            aidx = candA(i)
+            dcoord = XXf(Aindex(aidx),idim) - XXf(Bindex(kb),idim)
+
+            okSame = (abs(dcoord) < 1e-9)
+            if ( PBC(idim) ) then
+                okSame = okSame .or. (abs( abs(dcoord) - Lper(idim) ) < 1e-9)
+            endif
+            if (.not. okSame) cycle
+
+            okAB = (((UminA(aidx) - UminB(kb)) < +1e-9) .and. ((UmaxA(aidx) - UmaxB(kb)) > -1e-9)) &
+             .and. (((VminA(aidx) - VminB(kb)) < +1e-9) .and. ((VmaxA(aidx) - VmaxB(kb)) > -1e-9))
+            okBA = (((UminB(kb) - UminA(aidx)) < +1e-9) .and. ((UmaxB(kb) - UmaxA(aidx)) > -1e-9)) &
+             .and. (((VminB(kb) - VminA(aidx)) < +1e-9) .and. ((VmaxB(kb) - VmaxA(aidx)) > -1e-9))
+
+            if (okAB) then
+                nAB = nAB + 1
+                abList(nAB) = aidx
+            endif
+            if (okBA) then
+                nBA = nBA + 1
+                baList(nBA) = aidx
+            endif
+        end do
+
         !Grow the buffer (by doubling) if the entries about to be added do not fit
-        if ((k + size(firstindx) - 1) .gt. Ncap) then
-            do while ((k + size(firstindx) - 1) .gt. Ncap)
+        if ((k + nAB + nBA - 1) .gt. Ncap) then
+            do while ((k + nAB + nBA - 1) .gt. Ncap)
                 Ncap = 2 * Ncap
             enddo
             allocate(grow_temp(Ncap,2), stat=alloc_stat)
@@ -294,16 +443,22 @@ module UnstructuredMeshAnalysis
             call move_alloc(grow_temp, indexItContainsTrue_temp)
         endif
 
-        do i = 1,size(firstindx)
-            indexItContainsTrue_temp(k,1) = firstindx(i)
-            indexItContainsTrue_temp(k,2) = secondindx(i)
-            k = k+1;
-        enddo
-                
-        deallocate(firstindx, secondindx)
-        deallocate(indxAB,indxBA)
-      end do               
+        do i = 1, nAB
+            indexItContainsTrue_temp(k,1) = Aindex(abList(i))
+            indexItContainsTrue_temp(k,2) = Bindex(kb)
+            k = k+1
+        end do
+        do i = 1, nBA
+            indexItContainsTrue_temp(k,1) = Bindex(kb)
+            indexItContainsTrue_temp(k,2) = Aindex(baList(i))
+            k = k+1
+        end do
+      end do
+
+      deallocate(aCellCnt, aCellStart, aCellItem)
     end do
+
+    deallocate(aStamp, candA, abList, baList)
     
     allocate(indexItContainsTrue(k-1,2), stat=alloc_stat)
     call checkAllocation( alloc_stat, 'indexItContainsTrue' )
@@ -318,26 +473,59 @@ module UnstructuredMeshAnalysis
     call checkAllocation( alloc_stat, 'kNonMut_F_temp' )
     kNonMut_F_temp(:,:) = 0
 
-    allocate(mask1D(size(indexItContainsTrue(:,1))), stat=alloc_stat)
-    call checkAllocation( alloc_stat, 'mask1D' )
-    mask1D = .false.
-    
+    !------------------------------------------------------------------------------------------
+    ! A pair (a,b) is mutual when the reversed pair (b,a) also appears in the list. Asking that
+    ! by scanning the whole list for every row is O(P^2), and P grows as ~5.8*Nel, which made
+    ! this loop ~32% of the routine at Nel = 32768.
+    !
+    ! Both columns hold face indices in [1, n_faces], so the rows are bucketed once by their
+    ! first column and the query becomes "does bucket b contain the second value a?". The
+    ! buckets hold well under one entry each on average (P < n_faces), so each lookup is O(1).
+    ! Rows are still visited in ascending order, so kMut_F and kNonMut_F come out unchanged.
+    !------------------------------------------------------------------------------------------
+    nPair = size(indexItContainsTrue,1)
+    allocate(pairCnt(n_faces), pairStart(n_faces+1), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'pairCnt/pairStart' )
+    pairCnt = 0
+    do i = 1, nPair
+        pairCnt(indexItContainsTrue(i,1)) = pairCnt(indexItContainsTrue(i,1)) + 1
+    end do
+    pairStart(1) = 1
+    do i = 1, n_faces
+        pairStart(i+1) = pairStart(i) + pairCnt(i)
+    end do
+    allocate(pairSecond(max(1,nPair)), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'pairSecond' )
+    pairCnt = 0
+    do i = 1, nPair
+        pa = indexItContainsTrue(i,1)
+        pairSecond(pairStart(pa) + pairCnt(pa)) = indexItContainsTrue(i,2)
+        pairCnt(pa) = pairCnt(pa) + 1
+    end do
+
     k1 = 1
     k2 = 1
-    do i = 1,size(indexItContainsTrue(:,1))
-        
-        mask1D = ((indexItContainsTrue(i,1) .eq. indexItContainsTrue(:,2)) .and. (indexItContainsTrue(i,2) .eq. indexItContainsTrue(:,1)))
-        
-        if (any(mask1D, DIM = 1)) then            
-            kMut_F_temp(k1,:) = [indexItContainsTrue(i,1), indexItContainsTrue(i,2)]
+    do i = 1, nPair
+        pa = indexItContainsTrue(i,1)
+        pb = indexItContainsTrue(i,2)
+
+        isMutual = .false.
+        do jp = pairStart(pb), pairStart(pb+1)-1
+            if (pairSecond(jp) .eq. pa) then
+                isMutual = .true.
+                exit
+            endif
+        end do
+
+        if (isMutual) then
+            kMut_F_temp(k1,:) = [pa, pb]
             k1 = k1+1
         else 
-            kNonMut_F_temp(k2,:) = [indexItContainsTrue(i,1), indexItContainsTrue(i,2)]
+            kNonMut_F_temp(k2,:) = [pa, pb]
             k2 = k2+1
         end if
-        
     end do
-    deallocate(mask1D)
+    deallocate(pairCnt, pairStart, pairSecond)
                 
     !Allocate temporary arrays to reduce the size of the original arrays
     allocate(kMut_F(k1-1,2), stat=alloc_stat)
@@ -536,30 +724,9 @@ module UnstructuredMeshAnalysis
     xxMinEl(:,:) = XXel(:,:) - dimscopy(:,:)/2.0 
     xxMaxEl(:,:) = XXel(:,:) + dimscopy(:,:)/2.0 
     
-    k = size(Xf)
-    allocate(TheseMinXXel(k,3), TheseMaxXXel(k,3), stat=alloc_stat)
-    call checkAllocation( alloc_stat, 'TheseMinXXel/TheseMaxXXel' )
-    allocate(theseA(k),theseB(K),theseC(k),theseD(k),theseA_int(k),theseB_int(k),theseC_int(k),theseD_int(k), stat=alloc_stat)
-    call checkAllocation( alloc_stat, 'theseA/theseB/theseC/theseD' )
-    allocate(theseNum(k),count1D(k), stat=alloc_stat)
-    call checkAllocation( alloc_stat, 'theseNum/count1D' )
-    TheseMinXXel(:,:) = 0
-    
-    do n=1,k
-        count1D(n) = n
-    end do
-    
-    !TheTs_indices and TheDs_indices are also grown by doubling rather than being reallocated
-    !and copied in full on every pass through the loop below, which made the loop O(Nel^2) in
-    !both time and allocator traffic. N_T and N_D count the entries actually stored so far.
-    Ncap_T = 32 * Nel
-    Ncap_D = 64 * Nel
+    nFace = size(Xf)
     N_T = 0
     N_D = 0
-    allocate(TheTs_indices(Ncap_T,2), stat=alloc_stat)
-    call checkAllocation( alloc_stat, 'TheTs_indices' )
-    allocate(TheDs_indices(Ncap_D,2), stat=alloc_stat)
-    call checkAllocation( alloc_stat, 'TheDs_indices' )
 
     !The list of periodic images that each element is tested against below. Without periodic
     !boundary conditions this is just the single zero shift, and the loop below is then identical to
@@ -579,108 +746,255 @@ module UnstructuredMeshAnalysis
       end do
     end do
 
-    allocate(theseNumMax(k), stat=alloc_stat)
-    call checkAllocation( alloc_stat, 'theseNumMax' )
+    !------------------------------------------------------------------------------------------
+    ! T and D construction.
+    !
+    ! The direct formulation - for every element, test every face's four vertices - is
+    ! O(Nel * nFace). Measured, it was ~60% of this routine and grew as Nel^2.1. The test is a
+    ! point-in-box query, so it is inverted here: every element is registered once in a uniform
+    ! lookup grid, and each face vertex then examines only the elements sharing its own cell.
+    !
+    ! Correctness does not depend on the cell size. If an element's padded box contains the
+    ! query point p, then that box and the cell holding p have p in common, so the element was
+    ! registered in that cell and is always among the candidates. The cell size therefore only
+    ! trades memory against candidates per cell, and is picked to keep the grid near Nel cells.
+    ! The padding used when registering (regPad) is far larger than any rounding difference
+    ! between the two ways of writing the containment test, and far smaller than a cell, so the
+    ! candidate set is always a superset of the true one; the exact test below then decides,
+    ! written with the same arithmetic as the original so the accept/reject boundary is bit
+    ! identical.
+    !
+    ! Output order is preserved exactly. Faces are visited in ascending order, and the
+    ! (element, face) hits are then counting-sorted by element. That sort is stable, so faces
+    ! stay ascending inside each element - reproducing the original "for each element n, faces
+    ! in ascending order" layout row for row.
+    !------------------------------------------------------------------------------------------
 
-    do n=1,Nel
-        theseNumMax(:) = 0
+    !--- choose the grid ----------------------------------------------------------------------
+    do i = 1, 3
+        gridH(i) = minval(dimscopy(:,i))
+        if (gridH(i) .le. 0.0_dp) gridH(i) = 1.0_dp
+        if (globMax(i) .gt. globMin(i)) then
+            nGrid(i) = max(1, int((globMax(i) - globMin(i)) / gridH(i)))
+        else
+            nGrid(i) = 1
+        endif
+    end do
+    do while ( (real(nGrid(1),dp) * real(nGrid(2),dp) * real(nGrid(3),dp)) .gt. &
+               (4.0_dp * real(Nel,dp) + 1024.0_dp) )
+        if ( all(nGrid .le. 1) ) exit
+        nGrid = max(1, nGrid / 2)
+    end do
+    do i = 1, 3
+        if (globMax(i) .gt. globMin(i)) then
+            gridH(i) = (globMax(i) - globMin(i)) / real(nGrid(i), dp)
+        else
+            gridH(i) = 1.0_dp
+        endif
+    end do
+    nGridTot = nGrid(1) * nGrid(2) * nGrid(3)
 
-        do ishift = 1, nShifts
-            sVec = shiftList(ishift,:)
-
-            !Skip the image if the shifted element falls entirely outside the mesh. This keeps the
-            !cost of the periodic images negligible, as only the elements at a boundary have an
-            !image that can touch a face at the opposite boundary. The zero shift is never skipped.
-            if ( any( (xxMinEl(n,:) + sVec) .gt. (globMax + 1e-9) ) .or. &
-                 any( (xxMaxEl(n,:) + sVec) .lt. (globMin - 1e-9) ) ) cycle
-
-            TheseMinXXel(:,1) = xxMinEl(n,1) + sVec(1)
-            TheseMinXXel(:,2) = xxMinEl(n,2) + sVec(2)
-            TheseMinXXel(:,3) = xxMinEl(n,3) + sVec(3)
-            TheseMaxXXel(:,1) = xxMaxEl(n,1) + sVec(1)
-            TheseMaxXXel(:,2) = xxMaxEl(n,2) + sVec(2)
-            TheseMaxXXel(:,3) = xxMaxEl(n,3) + sVec(3)
-
-            theseA = all((((TheseMinXXel - xVertA) < +1e-9 ) .and. ((TheseMaxXXel - xVertA ) > -1e-9)) ,2)
-            theseB = all((((TheseMinXXel - xVertB) < +1e-9 ) .and. ((TheseMaxXXel - xVertB ) > -1e-9)) ,2)
-            theseC = all((((TheseMinXXel - xVertC) < +1e-9 ) .and. ((TheseMaxXXel - xVertC ) > -1e-9)) ,2)
-            theseD = all((((TheseMinXXel - xVertD) < +1e-9 ) .and. ((TheseMaxXXel - xVertD ) > -1e-9)) ,2)
-
-            theseA_int(:) = 0
-            theseB_int(:) = 0
-            theseC_int(:) = 0
-            theseD_int(:) = 0
-
-            where (theseA) theseA_int = 1
-            where (theseB) theseB_int = 1
-            where (theseC) theseC_int = 1
-            where (theseD) theseD_int = 1
-
-            theseNum = theseA_int + theseB_int + theseC_int + theseD_int
-
-            !The maximum, and not the sum, over the images ensures that an element is only entered
-            !once in TheTs and TheDs, even if it touches the face both directly and through one of
-            !its periodic images
-            theseNumMax = max(theseNumMax, theseNum)
+    !--- register every element in the cells its padded box overlaps --------------------------
+    allocate(cellCnt(nGridTot), cellStart(nGridTot+1), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'cellCnt/cellStart' )
+    cellCnt = 0
+    do n = 1, Nel
+        do i = 1, 3
+            gi0(i) = min(max(int(floor((xxMinEl(n,i) - regPad - globMin(i)) / gridH(i))), 0), nGrid(i)-1)
+            gi1(i) = min(max(int(floor((xxMaxEl(n,i) + regPad - globMin(i)) / gridH(i))), 0), nGrid(i)-1)
         end do
-
-        mask1D = (theseNumMax >= 2)
-
-        !Instead of assigning the values to a TheTs matrix, we simply find the indices and save those.
-        !The TheTs matrix would have been assigned as "where (mask1D) TheTs(:,n) = .true."
-        !Instead we use an array going from 1:N and the use the mask1D to find the indices to be saved.
-        !This is done in the temporary array TheTs_indices_this
-        !These are then appended to the TheTs_indices buffer, which is doubled when it runs full.
-        if (any(mask1D)) then
-            TheTs_indices_this = pack(count1D, mask1D)
-            Nadd = size(TheTs_indices_this)
-            if ((N_T + Nadd) .gt. Ncap_T) then
-                do while ((N_T + Nadd) .gt. Ncap_T)
-                    Ncap_T = 2 * Ncap_T
-                enddo
-                allocate(TheTs_temp(Ncap_T,2), stat=alloc_stat)
-                call checkAllocation( alloc_stat, 'TheTs_indices' )
-                TheTs_temp(1:N_T,:) = TheTs_indices(1:N_T,:)
-                call move_alloc (TheTs_temp, TheTs_indices)
-            endif
-            TheTs_indices((N_T+1):(N_T+Nadd),1) = TheTs_indices_this
-            TheTs_indices((N_T+1):(N_T+Nadd),2) = n
-            N_T = N_T + Nadd
-        endif
-
-        mask1D = (theseNumMax >= 1)
-
-        !The same logic as for TheTs is applied here for the TheDs.
-        !The code mimics "where (mask1D) TheDs(:,n) = .true." but operates only on indices
-        if (any(mask1D)) then
-            TheDs_indices_this = pack(count1D, mask1D)
-            Nadd = size(TheDs_indices_this)
-            if ((N_D + Nadd) .gt. Ncap_D) then
-                do while ((N_D + Nadd) .gt. Ncap_D)
-                    Ncap_D = 2 * Ncap_D
-                enddo
-                allocate(TheDs_temp(Ncap_D,2), stat=alloc_stat)
-                call checkAllocation( alloc_stat, 'TheDs_indices' )
-                TheDs_temp(1:N_D,:) = TheDs_indices(1:N_D,:)
-                call move_alloc (TheDs_temp, TheDs_indices)
-            endif
-            TheDs_indices((N_D+1):(N_D+Nadd),1) = TheDs_indices_this
-            TheDs_indices((N_D+1):(N_D+Nadd),2) = n
-            N_D = N_D + Nadd
-        endif
-
+        do gz = gi0(3), gi1(3)
+          do gy = gi0(2), gi1(2)
+            do gx = gi0(1), gi1(1)
+              icell = 1 + gx + nGrid(1)*(gy + nGrid(2)*gz)
+              cellCnt(icell) = cellCnt(icell) + 1
+            end do
+          end do
+        end do
     end do
 
-    !Trim the two index buffers down to the number of entries actually found
-    allocate(TheTs_temp(N_T,2), stat=alloc_stat)
-    call checkAllocation( alloc_stat, 'TheTs_indices' )
-    TheTs_temp(:,:) = TheTs_indices(1:N_T,:)
-    call move_alloc (TheTs_temp, TheTs_indices)
+    cellStart(1) = 1
+    do i = 1, nGridTot
+        cellStart(i+1) = cellStart(i) + cellCnt(i)
+    end do
+    nReg = cellStart(nGridTot+1) - 1
+    allocate(cellItem(max(1,nReg)), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'cellItem' )
 
-    allocate(TheDs_temp(N_D,2), stat=alloc_stat)
+    cellCnt = 0
+    do n = 1, Nel
+        do i = 1, 3
+            gi0(i) = min(max(int(floor((xxMinEl(n,i) - regPad - globMin(i)) / gridH(i))), 0), nGrid(i)-1)
+            gi1(i) = min(max(int(floor((xxMaxEl(n,i) + regPad - globMin(i)) / gridH(i))), 0), nGrid(i)-1)
+        end do
+        do gz = gi0(3), gi1(3)
+          do gy = gi0(2), gi1(2)
+            do gx = gi0(1), gi1(1)
+              icell = 1 + gx + nGrid(1)*(gy + nGrid(2)*gz)
+              cellItem(cellStart(icell) + cellCnt(icell)) = n
+              cellCnt(icell) = cellCnt(icell) + 1
+            end do
+          end do
+        end do
+    end do
+
+    !--- collect the (element, face) hits, faces in ascending order ---------------------------
+    allocate(stampGen(Nel), stampIdx(Nel), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'stampGen/stampIdx' )
+    stampGen = 0
+
+    capCand = 64
+    allocate(candElem(capCand), candCnt(capCand, max(1,nShifts)), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'candElem/candCnt' )
+
+    capHit = 64 * Nel
+    nHit = 0
+    allocate(hitElem(capHit), hitFace(capHit), hitNum(capHit), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'hitElem/hitFace/hitNum' )
+
+    do k = 1, nFace
+        vtx(:,1) = xVertA(k,:)
+        vtx(:,2) = xVertB(k,:)
+        vtx(:,3) = xVertC(k,:)
+        vtx(:,4) = xVertD(k,:)
+        ncand = 0
+
+        do ish = 1, nShifts
+            sVec = shiftList(ish,:)
+
+            do iv = 1, 4
+                pq = vtx(:,iv) - sVec
+
+                !A point outside the mesh bounding box cannot lie in any element, since globMin
+                !and globMax are the extremes of the element boxes themselves. Skipping it also
+                !keeps the clamped cell index below meaningful.
+                if ( any(pq .lt. (globMin - 1e-9)) .or. any(pq .gt. (globMax + 1e-9)) ) cycle
+
+                do i = 1, 3
+                    gi0(i) = min(max(int(floor((pq(i) - globMin(i)) / gridH(i))), 0), nGrid(i)-1)
+                end do
+                iCell0 = 1 + gi0(1) + nGrid(1)*(gi0(2) + nGrid(2)*gi0(3))
+
+                do ipos = cellStart(iCell0), cellStart(iCell0+1) - 1
+                    nn = cellItem(ipos)
+
+                    eMin = xxMinEl(nn,:) + sVec
+                    eMax = xxMaxEl(nn,:) + sVec
+
+                    !Skip the image if the shifted element falls entirely outside the mesh, exactly
+                    !as the element-major version did. Only elements at a boundary have an image
+                    !that can touch a face at the opposite boundary; the zero shift never skips.
+                    if ( any( eMin .gt. (globMax + 1e-9) ) .or. &
+                         any( eMax .lt. (globMin - 1e-9) ) ) cycle
+
+                    if ( all( ((eMin - vtx(:,iv)) .lt. +1e-9) .and. &
+                              ((eMax - vtx(:,iv)) .gt. -1e-9) ) ) then
+                        if (stampGen(nn) .ne. k) then
+                            ncand = ncand + 1
+                            if (ncand .gt. capCand) then
+                                allocate(igrow(2*capCand), stat=alloc_stat)
+                                call checkAllocation( alloc_stat, 'candElem' )
+                                igrow(1:capCand) = candElem(1:capCand)
+                                call move_alloc(igrow, candElem)
+                                allocate(igrow2(2*capCand, max(1,nShifts)), stat=alloc_stat)
+                                call checkAllocation( alloc_stat, 'candCnt' )
+                                igrow2(1:capCand,:) = candCnt(1:capCand,:)
+                                call move_alloc(igrow2, candCnt)
+                                capCand = 2 * capCand
+                            endif
+                            stampGen(nn) = k
+                            stampIdx(nn) = ncand
+                            candElem(ncand) = nn
+                            candCnt(ncand,1:nShifts) = 0
+                        endif
+                        idx = stampIdx(nn)
+                        candCnt(idx,ish) = candCnt(idx,ish) + 1
+                    endif
+                end do
+            end do
+        end do
+
+        !The maximum, and not the sum, over the images ensures that an element is only entered
+        !once in TheTs and TheDs, even if it touches the face both directly and through one of
+        !its periodic images
+        do idx = 1, ncand
+            numMax = maxval(candCnt(idx,1:nShifts))
+            if (numMax .ge. 1) then
+                nHit = nHit + 1
+                if (nHit .gt. capHit) then
+                    capHit = 2 * capHit
+                    allocate(igrow(capHit), stat=alloc_stat)
+                    call checkAllocation( alloc_stat, 'hitElem' )
+                    igrow(1:nHit-1) = hitElem(1:nHit-1)
+                    call move_alloc(igrow, hitElem)
+                    allocate(igrow(capHit), stat=alloc_stat)
+                    call checkAllocation( alloc_stat, 'hitFace' )
+                    igrow(1:nHit-1) = hitFace(1:nHit-1)
+                    call move_alloc(igrow, hitFace)
+                    allocate(igrow(capHit), stat=alloc_stat)
+                    call checkAllocation( alloc_stat, 'hitNum' )
+                    igrow(1:nHit-1) = hitNum(1:nHit-1)
+                    call move_alloc(igrow, hitNum)
+                endif
+                hitElem(nHit) = candElem(idx)
+                hitFace(nHit) = k
+                hitNum(nHit)  = numMax
+            endif
+        end do
+    end do
+
+    !--- stable counting sort by element, so the rows come out element-major -------------------
+    allocate(elemFill(Nel), elemStart(Nel+1), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'elemFill/elemStart' )
+    elemFill = 0
+    do i = 1, nHit
+        elemFill(hitElem(i)) = elemFill(hitElem(i)) + 1
+    end do
+    elemStart(1) = 1
+    do n = 1, Nel
+        elemStart(n+1) = elemStart(n) + elemFill(n)
+    end do
+    allocate(hitOrder(max(1,nHit)), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'hitOrder' )
+    elemFill = 0
+    do i = 1, nHit
+        n = hitElem(i)
+        hitOrder(elemStart(n) + elemFill(n)) = i
+        elemFill(n) = elemFill(n) + 1
+    end do
+
+    !--- emit TheTs and TheDs -----------------------------------------------------------------
+    N_D = nHit
+    N_T = 0
+    do i = 1, nHit
+        if (hitNum(i) .ge. 2) N_T = N_T + 1
+    end do
+
+    allocate(TheTs_indices(N_T,2), stat=alloc_stat)
+    call checkAllocation( alloc_stat, 'TheTs_indices' )
+    allocate(TheDs_indices(N_D,2), stat=alloc_stat)
     call checkAllocation( alloc_stat, 'TheDs_indices' )
-    TheDs_temp(:,:) = TheDs_indices(1:N_D,:)
-    call move_alloc (TheDs_temp, TheDs_indices)
+
+    iT = 0
+    iD = 0
+    do j = 1, nHit
+        i = hitOrder(j)
+        iD = iD + 1
+        TheDs_indices(iD,1) = hitFace(i)
+        TheDs_indices(iD,2) = hitElem(i)
+        if (hitNum(i) .ge. 2) then
+            iT = iT + 1
+            TheTs_indices(iT,1) = hitFace(i)
+            TheTs_indices(iT,2) = hitElem(i)
+        endif
+    end do
+
+    deallocate(cellCnt, cellStart, cellItem, stampGen, stampIdx)
+    deallocate(candElem, candCnt, hitElem, hitFace, hitNum)
+    deallocate(elemFill, elemStart, hitOrder)
+
+    !TheTs_indices and TheDs_indices are already allocated at exactly N_T and N_D rows
+    !by the construction above, so no trimming pass is needed.
 
     ! Rescaling (inverse)
     Xel = Xel * DimsScales(1)
@@ -717,6 +1031,7 @@ module UnstructuredMeshAnalysis
     !of elements linked across a periodic boundary has to be measured through that boundary.
     GridInfo%exchPBC = PBC
     GridInfo%Lper = Lper * DimsScales
+
 
     call displayGUIMessage( 'Mesh analysis done' )
 

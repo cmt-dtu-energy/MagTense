@@ -96,18 +96,23 @@ module DifferentialOperators
     !>  
     !> Aexch_matrix - The sparse CSR matrix of the exchange coupling
     !---------------------------------------------------------------------------
-    subroutine computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, interpn, weight, method, Jfact_local, Aexch_matrix)
+    subroutine computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, interpn, weight, method, Jfact_local, phase_local, A_int_local, Aexch_matrix)
         type(MicroMagGridInfo), intent(inout) :: GridInfo
         integer, intent(in) :: interpn
         integer, intent(in) :: method
         real(dp), intent(inout) :: weight
         real(dp), dimension(:), intent(in) :: Jfact_local
+        integer, dimension(:), intent(in) :: phase_local     !> Material index of each tile
+        real(dp), dimension(:,:), intent(in) :: A_int_local  !> Interface exchange per pair of
+                                                             !> phases, normalised the same way
+                                                             !> as Jfact_local. Negative means
+                                                             !> 'use the harmonic mean'.
         type(sparse_matrix_t),intent(out) :: Aexch_matrix
         type(sparse_matrix_t) :: DX_matrix, DY_matrix, DZ_matrix, A2
 
         ! Unpack the variables
         real(dp), dimension(:),allocatable :: NX, NY, NZ, Areas, Volumes, Xel, Yel, Zel, Xf, Yf, Zf
-        integer, dimension(:,:),allocatable :: Signs, D, T, el2fa
+        integer, dimension(:,:),allocatable :: Signs, D, el2fa
         real(dp), dimension(:), allocatable :: Aexch_local
         integer :: i,j,dims, N, K, kk, k_mask1D, k_i, lind, indx, k_j, k_row, info, n_unique
         real(dp), dimension(:),allocatable :: VolCoeff, AX, AY, AZ, w
@@ -116,6 +121,14 @@ module DifferentialOperators
         real(dp), dimension(:), allocatable :: Amat
         integer, dimension(:), allocatable :: ind, IPIV
         logical, allocatable :: mask1D(:), mask_int2log(:)
+        logical, allocatable :: liveNode(:)
+        integer :: n_singular
+        !--- face -> incidence index, built once in O(M) ---
+        integer, allocatable :: fptr(:), felem(:), fsign(:), fcnt(:)
+        logical, allocatable :: edgeFace(:)
+        real(dp), allocatable :: Amat_face(:)
+        integer :: kf, ip, nface_cells, e1, e2
+        real(dp) :: asum, aprd, A_face_ovr
         real(dp), dimension(:), allocatable :: ddxA, ddyA, ddzA, ddx, ddy, ddz, dx, dy, dz, vx, vy, vz, vw, dks, dxk, dyk, dzk, nns
         real(dp), dimension(:), allocatable :: dxk2, dyk2, dzk2, Wk, Wk2, e
         real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T, GkRed, HkRed, Wktmp
@@ -127,6 +140,7 @@ module DifferentialOperators
         type(sparse_matrix_t) :: DDXA_sparse, FX_sparse, DDYA_sparse, FY_sparse, DDZA_sparse, FZ_sparse
         type(sparse_matrix_t) :: DDX_sparse, DDY_sparse, DDZ_sparse, W_sparse        
         integer, save :: itimer=0
+        !>------------------------------------------------------------------------------
         integer, dimension(:), allocatable :: sorted_indices
         integer :: u 
 
@@ -146,7 +160,9 @@ module DifferentialOperators
         Xf = GridInfo%Xf
         Yf = GridInfo%Yf
         Zf = GridInfo%Zf
-        T = GridInfo%TheTs
+        !GridInfo%TheTs is not read anywhere in this routine - only TheDs (through el2fa)
+        !and TheSigns are. Copying it cost a full allocation and copy of a 2 x 29*Nel
+        !integer array, about 26 MB at Nel = 110592, for nothing.
         D = GridInfo%TheDs
         Signs = GridInfo%TheSigns
         Aexch_local = Jfact_local
@@ -177,6 +193,45 @@ module DifferentialOperators
         ns = Signs(:,1)
         ks = Signs(:,2)
 
+        !>-----------------------------------------
+        ! Face -> incidence index.
+        !
+        ! Two loops below used to answer "which cells touch face k?" by scanning the whole
+        ! of Signs, once per incidence and once per face. Both were therefore O(M^2) and
+        ! O(K*M), and together they were ~97% of this routine, growing as N^2.1. Signs(:,2)
+        ! is a face index in [1,K], so one counting sort turns the same question into an
+        ! O(1) lookup: the incidences of face kf are fptr(kf) .. fptr(kf+1)-1, holding the
+        ! cell in felem and the sign in fsign. Building it is a single O(M) pass.
+        allocate(fcnt(K), fptr(K+1))
+        fcnt = 0
+        do i = 1, size(ks)
+            fcnt(ks(i)) = fcnt(ks(i)) + 1
+        end do
+        fptr(1) = 1
+        do i = 1, K
+            fptr(i+1) = fptr(i) + fcnt(i)
+        end do
+        allocate(felem(size(ks)), fsign(size(ks)))
+        fcnt = 0
+        do i = 1, size(ks)
+            kf = ks(i)
+            felem(fptr(kf) + fcnt(kf)) = ns(i)
+            fsign(fptr(kf) + fcnt(kf)) = ss(i)
+            fcnt(kf) = fcnt(kf) + 1
+        end do
+
+        ! A face lies on the boundary when exactly one cell claims it. The original test,
+        ! sum(abs(Signs(:,3)) over the incidences of the face) == 1, is the same statement
+        ! because every sign is +1 or -1.
+        allocate(edgeFace(K))
+        do kf = 1, K
+            indx = 0
+            do ip = fptr(kf), fptr(kf+1)-1
+                indx = indx + abs(fsign(ip))
+            end do
+            edgeFace(kf) = (indx .eq. 1)
+        end do
+
 
         !>-----------------------------------------
         ! Constructing summing matrix according to reference
@@ -185,29 +240,64 @@ module DifferentialOperators
         if ( method .eq. MicroMagExchMethodDirectLaplacianNeumann ) then
             ! Setting up exchange interaction strength matrix for heterogeneous materials. Also works for homogeneous materials. [2]
             allocate(Amat(size(ns)))
-            allocate(mask1D(size(Signs(:,1))))
-        
-            do kk = 1, size(ks)
-                
-                mask1D = (ks(kk) .eq. Signs(:,2))
-                k_mask1D = count(mask1D)
-                                
-                if (k_mask1D == 1) then
-                    Amat(kk) = Aexch_local(ns(kk))
-                elseif (k_mask1D > 2) then
+
+            ! The exchange value depends only on the face, so it is computed once per face
+            ! (K of them) and then scattered over the incidences, rather than recomputed
+            ! identically for every incidence of the same face.
+            allocate(Amat_face(K))
+            Amat_face = 0.0_dp
+            do kf = 1, K
+                nface_cells = fptr(kf+1) - fptr(kf)
+                if (nface_cells == 1) then
+                    Amat_face(kf) = Aexch_local(felem(fptr(kf)))
+                elseif (nface_cells > 2) then
+                    ! Reported once per face now, where the scan reported it once per
+                    ! incidence of that face. The mesh is invalid either way.
                     write(*,*) 'Warning: more than two cells share a face!'
-                else
-                    ns_packed = pack(ns,mask1D)
-                    
-                    Amat(kk) = 2.0 * product(Aexch_local(ns_packed)) / sum(Aexch_local(ns_packed))
-                    !IMPLEMENT THE CHECK BELOW
-                    !if all(Aexch_local(mask1D) == 0.0_wp .and. Aexch_local(tmp2) == 0.0_wp) then
-                    !    Amat(kk) = 0.0_wp
-                    !end if
+                elseif (nface_cells == 2) then
+                    e1 = felem(fptr(kf))
+                    e2 = felem(fptr(kf)+1)
+
+                    ! A face between two different materials can carry an exchange value the
+                    ! user specified for that pair, instead of the harmonic mean of the two
+                    ! cells. Every internal face joins exactly two cells, so the pair is
+                    ! unambiguous however many materials the mesh contains.
+                    !
+                    ! A cell with A0 = 0 is not magnetic and carries no exchange, so a face
+                    ! touching one stays uncoupled whatever the table says. The harmonic mean
+                    ! already behaves that way - 2*A1*A2/(A1+A2) vanishes as soon as either
+                    ! side is zero - and matching it here keeps the override consistent both
+                    ! with the default and with the uniform grid.
+                    A_face_ovr = -1.0_dp
+                    if ( size(A_int_local,1) .gt. 1 ) then
+                        if ( phase_local(e1) .ne. phase_local(e2) .and. &
+                             Aexch_local(e1) .gt. 0.0_dp .and. Aexch_local(e2) .gt. 0.0_dp ) &
+                            A_face_ovr = A_int_local(phase_local(e1),phase_local(e2))
+                    endif
+                    if ( A_face_ovr .ge. 0.0_dp ) then
+                        Amat_face(kf) = A_face_ovr
+                    else
+                    ! product() and sum() over the two-element pack, written out. The pack
+                    ! preserved the order of Signs, which the counting sort above also does,
+                    ! so the two operands are multiplied and added in the same order.
+                    aprd = Aexch_local(e1) * Aexch_local(e2)
+                    asum = Aexch_local(e1) + Aexch_local(e2)
+                    if ( asum .gt. 0.0_dp ) then
+                        Amat_face(kf) = 2.0 * aprd / asum
+                    else
+                        !Both cells are non-magnetic, where the harmonic mean is 0/0 - an
+                        !invalid operation under /fpe:0, not a quiet NaN. Two cells with no
+                        !exchange are not exchange coupled, so the face carries nothing.
+                        Amat_face(kf) = 0.0_dp
+                    endif
+                    endif
                 end if
             end do
 
-            deallocate(mask1D)
+            do kk = 1, size(ks)
+                Amat(kk) = Amat_face(ks(kk))
+            end do
+            deallocate(Amat_face)
              
             ! Having constructed the exchange values for each face/tile pair, we build the summing matrix.
             allocate(ddxA(size(ns)))
@@ -292,8 +382,16 @@ module DifferentialOperators
             where ( dz .lt. -0.5*GridInfo%Lper(3) ) dz = dz + GridInfo%Lper(3)
         endif
 
+       ! A cell with no exchange stiffness must not take part in the interpolation either.
+       ! Its own faces already carry no coupling, because the harmonic mean vanishes, but it
+       ! would otherwise still sit in the least squares stencil of the faces around it and
+       ! pull on their gradient estimates. Zero weight removes it from those stencils exactly:
+       ! it drops out of the weighted Gram matrix Gk and its column of Hk is zero, so the
+       ! solve returns a zero interpolation weight for it and it never enters the operator.
+       ! A mesh whose cells all have A0 > 0 is untouched.
        ! Determines which weights are to be used in the first interpolation step
         allocate(w(size(ns)))
+        allocate(liveNode(size(ns)))
         if (dims == 1) then
             w = (dx**2)**(-weight/2.0)
         else if (dims == 2) then
@@ -304,6 +402,11 @@ module DifferentialOperators
 
 
         
+        do i = 1, size(w)
+            liveNode(i) = ( Aexch_local(ns_sorted(i)) .gt. 0.0_dp )
+            if ( .not. liveNode(i) ) w(i) = 0.0_dp
+        end do
+
         !>-----------------------------------------
         ! Prepare distances for the interpolation.       
         !-------------------------------------------------------------------------------------------
@@ -373,9 +476,9 @@ module DifferentialOperators
         ! Calculated by solving
         ! Gk * [phi(faces);dphi(faces)]_k = Hk ( * phi(elements) )
         ! for each face, ks. Details can be found in [2].
-        allocate(mask1D(size(Signs(:,1))))
         
 
+        n_singular = 0
         do kk = 1, K
             
             allocate(ind(inds2(kk)-inds1(kk)+1))
@@ -419,14 +522,13 @@ module DifferentialOperators
             if (dims > 1) dyk = dyk / scale
             dxk = dxk / scale
 
-            mask1D = (kk .eq. Signs(:,2))
            
             nns = [NX(kk), NY(kk), NZ(kk)]   ! normal vector at the edge
             
             lind = size(ind)
             
             ! Mirror trick to enforce Neumann b.c. Creates a set of virtual nodes on the other side of an edge face.
-            if (sum(abs(pack(Signs(:,3),mask1D))) == 1) then     ! edge face. 
+            if (edgeFace(kk)) then     ! edge face. 
                 
                 if ((dims .eq. 1 .and. abs(nns(1)) < eps_criteria) .or. (dims .eq. 2 .and. abs(nns(1)) < eps_criteria .and. abs(nns(2)) < eps_criteria)) then
                     deallocate(ind)
@@ -537,8 +639,19 @@ module DifferentialOperators
             allocate(IPIV(size(GkRed,1)))
             
             call dgesv( size(GkRed,1), size(Wktmp,2), GkRed, size(GkRed,1), IPIV, Wktmp, size(Wktmp,1), INFO )
+
+            !A face whose stencil has too few live cells leaves the least squares system
+            !singular, and dgesv then returns whatever it has. That only happens where every
+            !useful neighbour has A0 = 0, in which case the face carries no exchange anyway
+            !and these weights are multiplied by zero; stopping here keeps a NaN out of the
+            !sparse product rather than salvaging the face.
+            if ( INFO .ne. 0 ) then
+                n_singular = n_singular + 1
+                deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)
+                cycle
+            endif
             
-            if (sum(abs(pack(Signs(:,3),mask1D))) == 1) then
+            if (edgeFace(kk)) then
                 vw(ind) = Wktmp(1,1:lind)+Wktmp(1,lind+1:size(Wktmp,2))                 ! Interpolated face values
                 if (abs(nns(1)) > eps_criteria) then                                    ! Interpolated x-components of face gradients
                     vx(ind)=(Wktmp(2,1:lind)+Wktmp(2,lind+1:size(Wktmp,2)))/scale       ! rescaled
@@ -569,6 +682,11 @@ module DifferentialOperators
             deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)        
         
         end do
+
+        if ( n_singular .gt. 0 ) then
+            write (prog_str,'(I10)') n_singular
+            call displayGUIMessage( 'Faces left uninterpolated (no live neighbours): '//trim(adjustl(prog_str)) )
+        endif
                 
         ! Final operation, summing interpolated values according to either ...
         if ( method .eq. MicroMagExchMethodGGNeumann ) then
@@ -641,9 +759,8 @@ module DifferentialOperators
         call create_COO_values_from_CSR(Aexch_matrix,GridInfo)
         
         stat = mkl_sparse_destroy(DX_matrix)
-                
 
-
+    
         call trace%end( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
     end subroutine computeDifferentialOperatorsFromMesh_DirectLap
