@@ -9,7 +9,7 @@ calculation consists of three parts:
 * Evaluation points
 * State function
 
-As result, the three-dimensional H-field vector in 
+As output, the three-dimensional H-field vector in 
 the evaluation points is returned.
 
 Examples of how to calculate magnetostatic and micromagnetic 
