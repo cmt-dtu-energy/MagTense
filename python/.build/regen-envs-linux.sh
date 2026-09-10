@@ -21,29 +21,41 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT_DIR="${REPO_ROOT}/python/.build"
 
 # Latest CUDA 12.x on the nvidia channel. Bump this one line to move CUDA.
-CUDA_LABEL="cuda-12.9.2"
+CUDA_LABEL="cuda-13.3.1"
 
 VERSIONS=("$@")
 [ ${#VERSIONS[@]} -eq 0 ] && VERSIONS=(312 313 314)
 
 for V in "${VERSIONS[@]}"; do
-    case "$V" in
-        312) PY=3.12; ONEAPI="2025.2.*" ;;
-        313) PY=3.13; ONEAPI="2025.2.*" ;;
-        314) PY=3.14; ONEAPI="2025.3.*" ;;
-        *)   echo "unknown python version: $V" >&2; exit 1 ;;
-    esac
+  case "$V" in
+  312)
+    PY=3.12
+    ONEAPI="2025.2.*"
+    ;;
+  313)
+    PY=3.13
+    ONEAPI="2025.2.*"
+    ;;
+  314)
+    PY=3.14
+    ONEAPI="2025.3.*"
+    ;;
+  *)
+    echo "unknown python version: $V" >&2
+    exit 1
+    ;;
+  esac
 
-    ENV_NAME="magtense-regen-${V}"
-    SPEC="$(mktemp -t "spec-${V}-XXXXXX.yml")"
-    trap 'rm -f "$SPEC"' EXIT
+  ENV_NAME="magtense-regen-${V}"
+  SPEC="$(mktemp -t "spec-${V}-XXXXXX.yml")"
+  trap 'rm -f "$SPEC"' EXIT
 
-    # Direct dependencies only - conda solves the rest, which is what keeps the
-    # export clean. numpy is a conda dependency here rather than a pip one:
-    # scipy/matplotlib/h5py pull conda's numpy in regardless, and mixing that
-    # with a pip-installed numpy in the same prefix is how you get an f2py build
-    # that links one ABI and imports another.
-    cat > "$SPEC" <<SPEC_EOF
+  # Direct dependencies only - conda solves the rest, which is what keeps the
+  # export clean. numpy is a conda dependency here rather than a pip one:
+  # scipy/matplotlib/h5py pull conda's numpy in regardless, and mixing that
+  # with a pip-installed numpy in the same prefix is how you get an f2py build
+  # that links one ABI and imports another.
+  cat >"$SPEC" <<SPEC_EOF
 name: ${ENV_NAME}
 channels:
   - https://software.repos.intel.com/python/conda
@@ -108,42 +120,42 @@ dependencies:
       - pyproject-hooks>=1.2.0
 SPEC_EOF
 
-    echo "==> regenerating env-${V}-linux.yml (python ${PY}, ${CUDA_LABEL})"
-    "$CONDA_BIN" env remove -n "$ENV_NAME" -y >/dev/null 2>&1 || true
-    "$CONDA_BIN" env create -n "$ENV_NAME" -f "$SPEC"
+  echo "==> regenerating env-${V}-linux.yml (python ${PY}, ${CUDA_LABEL})"
+  "$CONDA_BIN" env remove -n "$ENV_NAME" -y >/dev/null 2>&1 || true
+  "$CONDA_BIN" env create -n "$ENV_NAME" -f "$SPEC"
 
-    TARGET="${OUT_DIR}/env-${V}-linux.yml"
-    "$CONDA_BIN" env export -n "$ENV_NAME" \
-        | grep -v '^prefix: ' \
-        | sed "s/^name: ${ENV_NAME}$/name: magtense-env/" \
-        > "$TARGET"
+  TARGET="${OUT_DIR}/env-${V}-linux.yml"
+  "$CONDA_BIN" env export -n "$ENV_NAME" |
+    grep -v '^prefix: ' |
+    sed "s/^name: ${ENV_NAME}$/name: magtense-env/" \
+      >"$TARGET"
 
-    # The export must describe a *build* environment. magtense appearing in its
-    # own build env means the export came from a polluted prefix - the exact
-    # failure mode that produced the old env-314-linux.yml.
-    if grep -qiE '^\s*-\s*magtense([=<> ]|$)' "$TARGET"; then
-        echo "ERROR: ${TARGET} contains magtense itself - refusing to write." >&2
-        exit 1
-    fi
-    if ! grep -q "cuda-version=" "$TARGET"; then
-        echo "ERROR: ${TARGET} has no cuda-version pin." >&2
-        exit 1
-    fi
-    # A free-threading interpreter builds an extension module with a "t" ABI
-    # suffix (cpython-314t-...), which dist_pypi.py and deployment.yml do not
-    # recognise, and which the OpenMP Fortran core is untested against.
-    if grep -qE '^\s*-\s*python_abi=[0-9.]+=.*t$' "$TARGET"; then
-        echo "ERROR: ${TARGET} resolved to a free-threading Python." >&2
-        grep -E '^\s*-\s*(python|python_abi)=' "$TARGET" >&2
-        exit 1
-    fi
+  # The export must describe a *build* environment. magtense appearing in its
+  # own build env means the export came from a polluted prefix - the exact
+  # failure mode that produced the old env-314-linux.yml.
+  if grep -qiE '^\s*-\s*magtense([=<> ]|$)' "$TARGET"; then
+    echo "ERROR: ${TARGET} contains magtense itself - refusing to write." >&2
+    exit 1
+  fi
+  if ! grep -q "cuda-version=" "$TARGET"; then
+    echo "ERROR: ${TARGET} has no cuda-version pin." >&2
+    exit 1
+  fi
+  # A free-threading interpreter builds an extension module with a "t" ABI
+  # suffix (cpython-314t-...), which dist_pypi.py and deployment.yml do not
+  # recognise, and which the OpenMP Fortran core is untested against.
+  if grep -qE '^\s*-\s*python_abi=[0-9.]+=.*t$' "$TARGET"; then
+    echo "ERROR: ${TARGET} resolved to a free-threading Python." >&2
+    grep -E '^\s*-\s*(python|python_abi)=' "$TARGET" >&2
+    exit 1
+  fi
 
-    echo "    wrote ${TARGET}"
-    grep -E '^\s+- (cuda-version|cuda-nvcc|libcublas|libcusparse|libnvjitlink)=' "$TARGET" || true
+  echo "    wrote ${TARGET}"
+  grep -E '^\s+- (cuda-version|cuda-nvcc|libcublas|libcusparse|libnvjitlink)=' "$TARGET" || true
 
-    "$CONDA_BIN" env remove -n "$ENV_NAME" -y >/dev/null 2>&1 || true
-    rm -f "$SPEC"
-    trap - EXIT
+  "$CONDA_BIN" env remove -n "$ENV_NAME" -y >/dev/null 2>&1 || true
+  rm -f "$SPEC"
+  trap - EXIT
 done
 
 echo

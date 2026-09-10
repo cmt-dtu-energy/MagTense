@@ -17,7 +17,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-EXPECTED_CUDA="${EXPECTED_CUDA:-12.9}"
+EXPECTED_CUDA="${EXPECTED_CUDA:-13.3}"
 MAKE_ARGS=()
 [ -n "${CONDA_DIR:-}" ] && MAKE_ARGS+=("CONDA_DIR=${CONDA_DIR}")
 
@@ -27,67 +27,73 @@ ENV_NAME=magtense-env
 VERSIONS=("$@")
 [ ${#VERSIONS[@]} -eq 0 ] && VERSIONS=(312 313 314)
 
-fail() { echo "FAIL: $*" >&2; exit 1; }
-step() { echo; echo "=== $* ==="; }
+fail() {
+  echo "FAIL: $*" >&2
+  exit 1
+}
+step() {
+  echo
+  echo "=== $* ==="
+}
 
 for V in "${VERSIONS[@]}"; do
-    step "python ${V}: rebuilding environment from env-${V}-linux.yml"
+  step "python ${V}: rebuilding environment from env-${V}-linux.yml"
 
-    # Makefile:590 only creates the env when it does not already exist, so an
-    # edited yml is silently ignored against a stale magtense-env. Removing it
-    # first is what makes this test meaningful rather than a false pass.
-    make rm-env "${MAKE_ARGS[@]}" || true
-    make clean
+  # Makefile:590 only creates the env when it does not already exist, so an
+  # edited yml is silently ignored against a stale magtense-env. Removing it
+  # first is what makes this test meaningful rather than a false pass.
+  make rm-env "${MAKE_ARGS[@]}" || true
+  make clean
 
-    step "python ${V}: building with CUDA"
-    make python-interface PY_VERSION="$V" USE_CUDA=1 "${MAKE_ARGS[@]}"
+  step "python ${V}: building with CUDA"
+  make python-interface PY_VERSION="$V" USE_CUDA=1 "${MAKE_ARGS[@]}"
 
-    PYTHON="$(make -s print-PYTHON PY_VERSION="$V" "${MAKE_ARGS[@]}")"
+  PYTHON="$(make -s print-PYTHON PY_VERSION="$V" "${MAKE_ARGS[@]}")"
 
-    step "python ${V}: asserting CUDA toolchain moved to ${EXPECTED_CUDA}"
-    NVCC_VER="$("$CONDA_BIN" run -n "$ENV_NAME" nvcc --version \
-        | sed -n 's/.*release \([0-9.]*\),.*/\1/p')"
-    echo "nvcc release: ${NVCC_VER}"
-    [ "$NVCC_VER" = "$EXPECTED_CUDA" ] \
-        || fail "nvcc reports ${NVCC_VER}, expected ${EXPECTED_CUDA}"
+  step "python ${V}: asserting CUDA toolchain moved to ${EXPECTED_CUDA}"
+  NVCC_VER="$("$CONDA_BIN" run -n "$ENV_NAME" nvcc --version |
+    sed -n 's/.*release \([0-9.]*\),.*/\1/p')"
+  echo "nvcc release: ${NVCC_VER}"
+  [ "$NVCC_VER" = "$EXPECTED_CUDA" ] ||
+    fail "nvcc reports ${NVCC_VER}, expected ${EXPECTED_CUDA}"
 
-    CUDA_PIN="$("$CONDA_BIN" list -n "$ENV_NAME" '^cuda-version$' | awk '/^cuda-version/{print $2}')"
-    echo "conda cuda-version: ${CUDA_PIN}"
-    [ "$CUDA_PIN" = "$EXPECTED_CUDA" ] \
-        || fail "conda cuda-version is ${CUDA_PIN}, expected ${EXPECTED_CUDA}"
+  CUDA_PIN="$("$CONDA_BIN" list -n "$ENV_NAME" '^cuda-version$' | awk '/^cuda-version/{print $2}')"
+  echo "conda cuda-version: ${CUDA_PIN}"
+  [ "$CUDA_PIN" = "$EXPECTED_CUDA" ] ||
+    fail "conda cuda-version is ${CUDA_PIN}, expected ${EXPECTED_CUDA}"
 
-    step "python ${V}: checking the extension links CUDA out of the conda prefix"
-    SO="$(ls python/src/magtense/lib/magtensesource.cpython-*-x86_64-linux-gnu.so)"
-    echo "extension: ${SO}"
-    LDD="$(ldd "$SO")"
-    echo "$LDD" | grep -E 'libcublas|libcudart|libcusparse' \
-        || fail "extension does not link the CUDA libraries"
-    if echo "$LDD" | grep -q 'not found'; then
-        echo "$LDD" | grep 'not found' >&2
-        fail "unresolved shared libraries in ${SO}"
-    fi
+  step "python ${V}: checking the extension links CUDA out of the conda prefix"
+  SO="$(ls python/src/magtense/lib/magtensesource.cpython-*-x86_64-linux-gnu.so)"
+  echo "extension: ${SO}"
+  LDD="$(ldd "$SO")"
+  echo "$LDD" | grep -E 'libcublas|libcudart|libcusparse' ||
+    fail "extension does not link the CUDA libraries"
+  if echo "$LDD" | grep -q 'not found'; then
+    echo "$LDD" | grep 'not found' >&2
+    fail "unresolved shared libraries in ${SO}"
+  fi
 
-    step "python ${V}: importing the added packages"
-    # pycairo's import name is cairo. ipympl and pycairo are not dependencies of
-    # the wheel any more - they are the notebook extra - but they are still part
-    # of the developer environment, which is what this checks.
-    "$PYTHON" -c "import h5py, scipy, matplotlib, tqdm, importlib_resources, notebook, ipympl, cairo; print('imports OK')" \
-        || fail "one of the added packages failed to import"
+  step "python ${V}: importing the added packages"
+  # pycairo's import name is cairo. ipympl and pycairo are not dependencies of
+  # the wheel any more - they are the notebook extra - but they are still part
+  # of the developer environment, which is what this checks.
+  "$PYTHON" -c "import h5py, scipy, matplotlib, tqdm, importlib_resources, notebook, ipympl, cairo; print('imports OK')" ||
+    fail "one of the added packages failed to import"
 
-    step "python ${V}: import magtense and run the test suite"
-    "$PYTHON" -c "import magtense; print('magtense', magtense.__file__)"
-    make pytest PY_VERSION="$V" "${MAKE_ARGS[@]}"
+  step "python ${V}: import magtense and run the test suite"
+  "$PYTHON" -c "import magtense; print('magtense', magtense.__file__)"
+  make pytest PY_VERSION="$V" "${MAKE_ARGS[@]}"
 
-    step "python ${V}: rebuilding CPU-only"
-    # USE_CUDA changes BUILD_FLAGS, and check-flags hard-errors on a mismatch
-    # against the previously built libraries, so a clean is required here.
-    make clean
-    make python-interface PY_VERSION="$V" USE_CUDA=0 "${MAKE_ARGS[@]}"
-    "$PYTHON" -c "import magtense; print('cpu build imports OK')"
+  step "python ${V}: rebuilding CPU-only"
+  # USE_CUDA changes BUILD_FLAGS, and check-flags hard-errors on a mismatch
+  # against the previously built libraries, so a clean is required here.
+  make clean
+  make python-interface PY_VERSION="$V" USE_CUDA=0 "${MAKE_ARGS[@]}"
+  "$PYTHON" -c "import magtense; print('cpu build imports OK')"
 
-    echo
-    echo "### python ${V}: PASS"
-    LAST_V="$V"
+  echo
+  echo "### python ${V}: PASS"
+  LAST_V="$V"
 done
 
 step "wheel metadata (python ${LAST_V}, cpu variant)"
@@ -109,19 +115,19 @@ cp python/src/magtense/lib/magtensesource*.so python/cpu_libs/
 # looking at the build instead of at the name.
 EXPECTED="magtensesource.cpython-${LAST_V}-x86_64-linux-gnu.so"
 if [ ! -f "python/cpu_libs/${EXPECTED}" ]; then
-    echo "The staged extension module is not named what dist_pypi.py expects." >&2
-    echo "  expected: python/cpu_libs/${EXPECTED}" >&2
-    echo "  actually staged:" >&2
-    ls -1 python/cpu_libs/ | sed 's/^/    /' >&2
-    echo "  interpreter EXT_SUFFIX: $("$PYTHON" -c \
-        'import sysconfig; print(sysconfig.get_config_var("EXT_SUFFIX"))')" >&2
-    fail "extension module name does not match dist_pypi.py's expectation"
+  echo "The staged extension module is not named what dist_pypi.py expects." >&2
+  echo "  expected: python/cpu_libs/${EXPECTED}" >&2
+  echo "  actually staged:" >&2
+  ls -1 python/cpu_libs/ | sed 's/^/    /' >&2
+  echo "  interpreter EXT_SUFFIX: $("$PYTHON" -c \
+    'import sysconfig; print(sysconfig.get_config_var("EXT_SUFFIX"))')" >&2
+  fail "extension module name does not match dist_pypi.py's expectation"
 fi
 
 # Run through conda so that the bare "python -m build" inside dist_pypi.py
 # resolves to the environment interpreter rather than whatever is on PATH.
 "$CONDA_BIN" run -n "$ENV_NAME" python python/.build/dist_pypi.py \
-    --py_version "$LAST_V" --cu_version cpu --platform linux
+  --py_version "$LAST_V" --cu_version cpu --platform linux
 
 cp "$BACKUP"/magtensesource*.so python/src/magtense/lib/
 rm -rf "$BACKUP" python/cpu_libs
@@ -130,27 +136,27 @@ shopt -s nullglob
 WHEELS=(python/dist/*.whl)
 [ ${#WHEELS[@]} -gt 0 ] || fail "dist_pypi.py produced no wheel"
 for whl in "${WHEELS[@]}"; do
-    echo "--- $(basename "$whl")"
-    META="$(unzip -p "$whl" '*/METADATA')"
-    echo "$META" | grep -E '^(Requires-Dist|Provides-Extra)' || true
-    # ipympl and pycairo belong to the notebook extra, not to the required set:
-    # pycairo builds from source on Linux and a bare "pip install magtense" has
-    # to work without the cairo development headers. Assert both halves - the
-    # extra is declared and carries them, and neither leaks back into the
-    # unconditional dependencies.
-    echo "$META" | grep -q '^Provides-Extra: notebook' \
-        || fail "notebook extra missing from ${whl} metadata"
-    for extra_pkg in ipympl pycairo; do
-        echo "$META" | grep -q "^Requires-Dist: ${extra_pkg}.*; extra == \"notebook\"" \
-            || fail "${extra_pkg} missing from the notebook extra of ${whl}"
-        if echo "$META" | grep -E "^Requires-Dist: ${extra_pkg}[^;]*$" | grep -q .; then
-            fail "${extra_pkg} is an unconditional dependency of ${whl}"
-        fi
-    done
-    # dist_pypi.py:124 strips nvidia-* for the cpu variant.
-    if echo "$META" | grep -q '^Requires-Dist: nvidia-'; then
-        fail "cpu wheel ${whl} still declares nvidia-* dependencies"
+  echo "--- $(basename "$whl")"
+  META="$(unzip -p "$whl" '*/METADATA')"
+  echo "$META" | grep -E '^(Requires-Dist|Provides-Extra)' || true
+  # ipympl and pycairo belong to the notebook extra, not to the required set:
+  # pycairo builds from source on Linux and a bare "pip install magtense" has
+  # to work without the cairo development headers. Assert both halves - the
+  # extra is declared and carries them, and neither leaks back into the
+  # unconditional dependencies.
+  echo "$META" | grep -q '^Provides-Extra: notebook' ||
+    fail "notebook extra missing from ${whl} metadata"
+  for extra_pkg in ipympl pycairo; do
+    echo "$META" | grep -q "^Requires-Dist: ${extra_pkg}.*; extra == \"notebook\"" ||
+      fail "${extra_pkg} missing from the notebook extra of ${whl}"
+    if echo "$META" | grep -E "^Requires-Dist: ${extra_pkg}[^;]*$" | grep -q .; then
+      fail "${extra_pkg} is an unconditional dependency of ${whl}"
     fi
+  done
+  # dist_pypi.py:124 strips nvidia-* for the cpu variant.
+  if echo "$META" | grep -q '^Requires-Dist: nvidia-'; then
+    fail "cpu wheel ${whl} still declares nvidia-* dependencies"
+  fi
 done
 
 echo
