@@ -41,6 +41,20 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 
+# pycairo has no manylinux wheels, so as a required dependency it made every
+# Linux "pip install magtense" build it from source and fail without the cairo
+# development headers. Nothing in the package imports either of these - they are
+# for interactive plotting in a notebook - so they are opt-in via
+# "pip install magtense[notebook]". Declared statically rather than through
+# [tool.setuptools.dynamic]: the dynamic "dependencies" exist because
+# .build/dist_pypi.py rewrites requirements.txt per wheel variant, and the extra
+# is the same for all of them.
+[project.optional-dependencies]
+notebook = [
+    "ipympl>=0.9.7",
+    "pycairo>=1.28.0",
+]
+
 [project.urls]
 "Homepage" = "https://www.magtense.org/"
 "Source" = "https://github.com/cmt-dtu-energy/MagTense"

@@ -48,6 +48,10 @@ jobs:
         repository: LLNL/sundials
         ref: 'v7.2.1'
 
+    - name: Setup MSVC environment
+      if: ${{ runner.os == 'Windows' }}
+      uses: ilammy/msvc-dev-cmd@v1
+
     - name: Win - Configure CMake
       if: ${{ runner.os == 'Windows' }}
       run: |
