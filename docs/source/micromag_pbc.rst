@@ -8,7 +8,7 @@ this gap in length scale, and they can be combined:
 #. a **macrogeometry** that repeats the simulated domain when the
    demagnetization tensor is built;
 #. a **shape correction** that replaces the demagnetization field from the average magnetisation 
-	with that of the real sample shape;
+   with that of the real sample shape;
 #. **periodic exchange boundaries** that couple the cells at opposite ends of
    the domain.
 
@@ -22,10 +22,10 @@ Python.
 That average magnetisation is enough to fully account for shape effects is proven 
 in Durhuus *et al.*, "Including sample shape in micromagnetics with 3D periodic 
 boundary conditions" (see :ref:`Publications`). 
-The idea is that the field from the average magnetisation :math:'H_\mathrm{avg}' 
-is longer-ranged than the field from the non-uniform remainder, :math:'H_\mathrm{rest}'. 
-Consequently, :math:'H_\mathrm{avg}' depends on the macroscopic distribution of magnetic 
-material (sample-shape), while :math:'H_\mathrm{rest}' just depends on the local environment.
+The idea is that the field from the average magnetisation :math:`H_\mathrm{avg}` 
+is longer-ranged than the field from the non-uniform remainder, :math:`H_\mathrm{rest}`. 
+Consequently, :math:`H_\mathrm{avg}` depends on the macroscopic distribution of magnetic 
+material (sample-shape), while :math:`H_\mathrm{rest}` just depends on the local environment.
 Thus for simulating the bulk of a sample, i.e. a simulation domain far from the surface,
 one can use the macrogeometry method for the local environment, and the shape correction
 field for the distant sample regions, including sample-shape effects.
@@ -108,11 +108,11 @@ Here :math:`\langle \mathbf{M} \rangle` is the average magnetization of the
 simulated cells multiplied by the volume fraction of the domain that is
 actually occupied by magnetic material. That fraction is computed from the cell
 volumes and from ``macroShape``, so voids and non-magnetic regions are
-accounted for. :math:'\mathrm{N}_\mathrm{sample}' is the 
-demagnetisation tensor for the sample and :math:'\mathrm{N}_\mathrm{macro}' for 
+accounted for. :math:`\mathrm{N}_\mathrm{sample}` is the 
+demagnetisation tensor for the sample and :math:`\mathrm{N}_\mathrm{macro}` for 
 the macrogeometry. Note that the absolute size of the sample matters for the spatial
-distribution of :math:'\mathrm{N}_\mathrm{sample}'. For a sample orders of magnitude
-larger than the simulation domain, :math:'\mathrm{N}_\mathrm{sample}' is spatially uniform.
+distribution of :math:`\mathrm{N}_\mathrm{sample}`. For a sample orders of magnitude
+larger than the simulation domain, :math:`\mathrm{N}_\mathrm{sample}` is spatially uniform.
 
 .. list-table::
    :widths: 22 22 56
