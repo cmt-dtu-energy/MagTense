@@ -22,14 +22,14 @@ jobs:
       # failure on one of them should not cancel the other eight.
       fail-fast: false
       matrix:
-        # An explicit list rather than a cuda x fmm cross product: cu12-fmm is
+        # An explicit list rather than a cuda x fmm cross product: cu13-fmm is
         # the only FMM variant and it is built without CVODE, so two of the four
         # combinations do not exist. build_tag and libs_dir have to agree with
         # the build_tag map and the <variant>_libs layout in .build/dist_pypi.py.
         variant:
-          - { cuda: 1, fmm: 0, cvode: 1, name: cu12,     build_tag: 1, libs_dir: cu12_libs     }
+          - { cuda: 1, fmm: 0, cvode: 1, name: cu13,     build_tag: 1, libs_dir: cu13_libs     }
           - { cuda: 0, fmm: 0, cvode: 1, name: cpu,      build_tag: 0, libs_dir: cpu_libs      }
-          - { cuda: 1, fmm: 1, cvode: 0, name: cu12-fmm, build_tag: 3, libs_dir: cu12-fmm_libs }
+          - { cuda: 1, fmm: 1, cvode: 0, name: cu13-fmm, build_tag: 3, libs_dir: cu13-fmm_libs }
         py-version:
           - { version: "312", semver: "3.12" }
           - { version: "313", semver: "3.13" }
@@ -111,7 +111,7 @@ jobs:
         # module, and patchelf lives in the conda env, which is not on PATH here
         # because the interpreter is invoked by absolute path. The call is
         # check=False, so a missing patchelf is silent and the wheel comes out
-        # with no rpath - fatal for cu12-fmm, which finds libfmm3d.so through
+        # with no rpath - fatal for cu13-fmm, which finds libfmm3d.so through
         # $ORIGIN.
         export PATH="$(dirname "$PY"):$PATH"
         "$PY" .build/dist_pypi.py \
@@ -128,7 +128,7 @@ jobs:
         # module, and patchelf lives in the conda env, which is not on PATH here
         # because the interpreter is invoked by absolute path. The call is
         # check=False, so a missing patchelf is silent and the wheel comes out
-        # with no rpath - fatal for cu12-fmm, which finds libfmm3d.so through
+        # with no rpath - fatal for cu13-fmm, which finds libfmm3d.so through
         # $ORIGIN.
         export PATH="$(dirname "$PY"):$PATH"
         "$PY" .build/dist_pypi.py \
@@ -149,7 +149,7 @@ jobs:
       fail-fast: false
       matrix:
         variant:
-          - { name: cu12, build_tag: 1 }
+          - { name: cu13, build_tag: 1 }
           - { name: cpu,  build_tag: 0 }
         py-version:
           - { version: "312", semver: "3.12" }
@@ -245,10 +245,10 @@ jobs:
           documentation/examples_FEM_validation/
           documentation/examples_mumag_validation/
 
-    - name: Download cu12-fmm artifact
+    - name: Download cu13-fmm artifact
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-py${{ matrix.py-version.version }}-cu12-fmm-Linux
+        name: pip-wheel-py${{ matrix.py-version.version }}-cu13-fmm-Linux
 
     - name: Setup python
       uses: actions/setup-python@v5
@@ -274,7 +274,7 @@ jobs:
     - name: Install pip-wheel and pytest
       env:
         MAGTENSE_USE_FMM3D: 1
-        MAGTENSE_WHEEL_VARIANT: cu12-fmm
+        MAGTENSE_WHEEL_VARIANT: cu13-fmm
       run: |
         # This is a persistent self-hosted runner and the wheel version does not
         # change between builds, so pip would skip the install and keep the
