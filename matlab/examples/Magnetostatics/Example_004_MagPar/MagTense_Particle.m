@@ -24,9 +24,9 @@ Mrem = 1.2;%R
 mu0 = 4*pi*1e-7;
 
 %get the default tile
-tile1 = getDefaultMagTile();
+tile1 = DefaultMagTile();
 %set the tile type to cylinder
-tile1.tileType = getMagTileType('prism');
+tile1 = tile1.setMagTileType('prism');
 %set the remanence 
 tile1.Mrem = Mrem/mu0;%A/m
 %the easy axis permeability
@@ -34,7 +34,7 @@ tile1.mu_r_ea = 1.05;
 %the hard axes permeabilities
 tile1.mu_r_oa = 1.18;
 %ensure the tile is a permanent magnet
-tile1.magnetType = getMagnetType('hard');
+tile1 = tile1.setMagnetType('hard');
 %the size of the tile
 tile1.abc = [d,d,d];
 %set the easy axis and the hard axes
@@ -59,12 +59,37 @@ z = 0.0001;
 
 %use meshgrid to fill out the span
 [X,Y,Z] = meshgrid(x,y,z);
+pts = zeros( numel(X), 3 );
+pts(:,1) = reshape(X,[numel(X),1]);
+pts(:,2) = reshape(Y,[numel(Y),1]);
+pts(:,3) = reshape(Z,[numel(Z),1]);
 
-
-%get the field
-[H,Hnorm] = getHMagTense( tiles, X, Y, Z );
+H = getHFromTiles_mex( tiles, pts, int32( length(tiles) ), int32( length(pts(:,1)) ) );
 H = H .* mu0;
-Hnorm = Hnorm .* mu0;
+
+%convert H back to the same format as the input X,Y and Z
+sx = size(X);
+
+nx = sx(1);
+ny = 1;
+nz = 1;
+
+if length(sx)==3
+    nz = sx(3);
+end
+if length(sx)>=2
+    ny = sx(2);
+end
+
+Hout = zeros( nx, ny, numel(z), 3 );
+    
+Hout(:,:,:,1) = reshape( H(:,1), nx, ny, nz );
+Hout(:,:,:,2) = reshape( H(:,2), nx, ny, nz );
+Hout(:,:,:,3) = reshape( H(:,3), nx, ny, nz );
+
+%Find the norm of the field
+Hnorm = squeeze( sqrt( sum(Hout.^2,4) ) );
+Hout = squeeze(Hout);
 
 %plot the field
 surf_and_con(squeeze(X),squeeze(Y),Hnorm);

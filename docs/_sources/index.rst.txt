@@ -25,6 +25,8 @@ Content
    installation
    calculations
    micromagnetism
+   demag_fmm
+   timing_and_trace
    documentation
    theory
    publications

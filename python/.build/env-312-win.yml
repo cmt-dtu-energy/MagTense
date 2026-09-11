@@ -1,7 +1,7 @@
 name: magtense-env
 channels:
   - https://software.repos.intel.com/python/conda
-  - nvidia/label/cuda-12.8.1
+  - nvidia/label/cuda-13.3.1
   - https://software.repos.intel.com/python/conda/
   - conda-forge
   - defaults
@@ -10,25 +10,34 @@ dependencies:
   - bzip2=1.0.8=h2466b09_7
   - ca-certificates=2025.8.3=h4c7d964_0
   - compiler_shared=2025.2.1=intel_1000
-  - cuda-cccl_win-64=12.8.90=0
-  - cuda-crt-dev_win-64=12.8.93=0
-  - cuda-crt-tools=12.8.93=0
-  - cuda-cudart=12.8.90=0
-  - cuda-cudart-dev=12.8.90=0
-  - cuda-cudart-dev_win-64=12.8.90=0
-  - cuda-cudart-static=12.8.90=0
-  - cuda-cudart-static_win-64=12.8.90=0
-  - cuda-cudart_win-64=12.8.90=0
-  - cuda-nvcc=12.8.93=0
-  - cuda-nvcc-dev_win-64=12.8.93=0
-  - cuda-nvcc-impl=12.8.93=0
-  - cuda-nvcc-tools=12.8.93=0
-  - cuda-nvcc_win-64=12.8.93=0
-  - cuda-nvrtc=12.8.93=0
-  - cuda-nvvm-dev_win-64=12.8.93=0
-  - cuda-nvvm-impl=12.8.93=0
-  - cuda-nvvm-tools=12.8.93=0
-  - cuda-version=12.8=3
+  - cuda-cccl_win-64=13.3.3.4.1=hc667259_0
+  - cuda-crt-dev_win-64=13.3.73=0
+  - cuda-crt-tools=13.3.73=0
+  - cuda-cudart=13.3.29=hd7d98ca_0
+  - cuda-cudart-dev=13.3.29=hd7d98ca_0
+  - cuda-cudart-dev_win-64=13.3.29=hd7d98ca_0
+  - cuda-cudart-static=13.3.29=hd7d98ca_0
+  - cuda-cudart-static_win-64=13.3.29=hd7d98ca_0
+  - cuda-cudart_win-64=13.3.29=hd7d98ca_0
+  # cuda-nvcc, the metapackage, is deliberately absent. On win-64 it is nothing
+  # but "cuda-nvcc_win-64 + vs2017_win-64", and vs2017_win-64 (from defaults)
+  # drops etc/conda/activate.d/vs2017_get_vsinstall_dir.bat into the env. Conda
+  # runs every .bat in activate.d, that one exits 1 when it finds neither a
+  # VS 2017 install nor the v141 toolset - the case on the windows-2022 runner
+  # image - and conda now propagates a failing activation script. Post-link
+  # scripts run inside an activated env, so the intel-opencl-rt post-link then
+  # dies with a LinkError and takes the whole "conda env update" with it.
+  # nvcc itself is untouched: it comes from cuda-nvcc_win-64, which pulls
+  # cuda-nvcc-dev_win-64 / -impl / -tools, all pinned right below.
+  - cuda-nvcc-dev_win-64=13.3.73=hd050e5e_0
+  - cuda-nvcc-impl=13.3.73=h18d4ee3_0
+  - cuda-nvcc-tools=13.3.73=hccd50d6_0
+  - cuda-nvcc_win-64=13.3.73=hfa58973_0
+  - cuda-nvrtc=13.3.33=hd7d98ca_0
+  - cuda-nvvm-dev_win-64=13.3.73=0
+  - cuda-nvvm-impl=13.3.73=haac1185_0
+  - cuda-nvvm-tools=13.3.73=haac1185_0
+  - cuda-version=13.3=h87dbc72_3
   - dpcpp-cpp-rt=2025.2.1=intel_1000
   - dpcpp_impl_win-64=2025.2.1=intel_1000
   - dpcpp_win-64=2025.2.1=intel_1000
@@ -42,17 +51,17 @@ dependencies:
   - intel-opencl-rt=2025.2.1=intel_1000
   - intel-openmp=2025.2.1=intel_1000
   - intel-sycl-rt=2025.2.1=intel_1000
-  - libcublas=12.8.4.1=0
-  - libcublas-dev=12.8.4.1=0
-  - libcusparse=12.5.8.93=0
-  - libcusparse-dev=12.5.8.93=0
+  - libcublas=13.6.0.2=hd7d98ca_0
+  - libcublas-dev=13.6.0.2=hd7d98ca_0
+  - libcusparse=12.8.2.51=hd7d98ca_0
+  - libcusparse-dev=12.8.2.51=hd7d98ca_0
   - libexpat=2.7.1=hac47afa_0
   - libffi=3.4.6=h537db12_1
   - libgcc=15.1.0=h1383e82_4
   - libgomp=15.1.0=h1383e82_4
   - liblzma=5.8.1=h2466b09_2
-  - libnvjitlink=12.8.93=1
-  - libnvjitlink-dev=12.8.93=1
+  - libnvjitlink=13.3.33=hd7d98ca_0
+  - libnvjitlink-dev=13.3.33=h4a4a63e_0
   - libsqlite=3.50.4=hf5d6505_0
   - libwinpthread=12.0.0.r4.gg4f2fc60ca=h57928b3_9
   - libzlib=1.3.1=h2466b09_2
@@ -77,7 +86,10 @@ dependencies:
   - vc14_runtime=14.44.35208=h818238b_31
   - vcomp14=14.44.35208=h818238b_31
   - vs2015_runtime=14.44.35208=h38c0c73_31
-  - vs2017_win-64=19.16.27032.1=hb4161e2_3
+  # Do not add vs2017_win-64 back, and do not let anything pull it in either -
+  # see the cuda-nvcc note above. ifx_win-64 and dpcpp_win-64 2025.2.1 need only
+  # vs_win-64, which resolves to vs2022_win-64, and vs2022_compiler_vars.bat is
+  # self-contained and always exits 0.
   - vs2022_win-64=19.44.35207=ha74f236_31
   - vs_win-64=2022.14=ha74f236_31
   - vswhere=3.1.7=h40126e0_1
@@ -86,6 +98,7 @@ dependencies:
       - build==1.3.0
       - charset-normalizer==3.4.3
       - meson==1.8.3
+      - ninja==1.13.0
       - numpy==2.3.2
       - packaging==25.0
       - pyproject-hooks==1.2.0

@@ -2,6 +2,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <wchar.h>
+#include <stdint.h>
 #include <cusparse.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
@@ -16,11 +18,73 @@ void __checkCudaErrors( int err, const char *file, const int line )
     if( 0 != err) {
 		FILE *fp;
 
+		// Report on stderr as well as in error.txt. When MagTense runs inside
+		// MATLAB the exit(-1) below takes the whole session down with nothing
+		// but "Exit Status: 0xffffffff", so the message has to reach the
+		// console before we go - error.txt alone is invisible to the user and
+		// ends up in whatever the current directory happens to be.
+		fprintf(stderr, "MagTense CUDA error in file <%s>, line %i: error code %d (%s)\n",
+		        file, line, err, cudaGetErrorString((cudaError_t)err) );
+		fflush(stderr);
+
 		fp = fopen("error.txt", "w+");
-		fprintf(fp,"Error in file <%s>, line %i:  Error code %d\n", file, line, err );
-		fclose(fp);
+		if ( fp != NULL ) {
+			fprintf(fp,"Error in file <%s>, line %i:  Error code %d\n", file, line, err );
+			fclose(fp);
+		}
         exit(-1);
     }
+}
+
+// Lowest compute capability this build is expected to run on. CUDA 13 dropped
+// Maxwell, Pascal and Volta, so a card below 7.5 cannot execute these binaries
+// no matter how the driver reports itself.
+#if CUDART_VERSION >= 13000
+#define MAGTENSE_MIN_SM_MAJOR 7
+#define MAGTENSE_MIN_SM_MINOR 5
+#else
+#define MAGTENSE_MIN_SM_MAJOR 3
+#define MAGTENSE_MIN_SM_MINOR 5
+#endif
+
+// Check up front that there is a usable device, and say why if there is not.
+// Without this the first cudaMalloc/cublasCreate simply returns an error that
+// nothing looks at, and the failure only surfaces much later - or, in the
+// checked calls, as a bare exit(-1).
+static void cu_requireDevice()
+{
+	static int checked = 0;
+	if ( checked ) return;
+	checked = 1;
+
+	int n_dev = 0;
+	cudaError_t err = cudaGetDeviceCount( &n_dev );
+	if ( err != cudaSuccess || n_dev < 1 ) {
+		fprintf(stderr, "MagTense: no usable CUDA device (%s). This build needs CUDA "
+		                "runtime %d.%d and a matching driver.\n",
+		        cudaGetErrorString(err), CUDART_VERSION / 1000, (CUDART_VERSION % 1000) / 10 );
+		fflush(stderr);
+		exit(-1);
+	}
+
+	// cudaDeviceGetAttribute rather than cudaGetDeviceProperties: the latter is a
+	// versioned alias (cudaGetDeviceProperties_v2 under CUDA 12, plain under 13),
+	// so it fails to link whenever the toolkit that compiles this file is not the
+	// one whose cudart.lib the MEX ends up linked against.
+	int major = 0, minor = 0;
+	if ( cudaDeviceGetAttribute( &major, cudaDevAttrComputeCapabilityMajor, 0 ) == cudaSuccess &&
+	     cudaDeviceGetAttribute( &minor, cudaDevAttrComputeCapabilityMinor, 0 ) == cudaSuccess ) {
+		if ( major < MAGTENSE_MIN_SM_MAJOR ||
+		    (major == MAGTENSE_MIN_SM_MAJOR && minor < MAGTENSE_MIN_SM_MINOR) ) {
+			fprintf(stderr, "MagTense: GPU 0 has compute capability %d.%d, but this build "
+			                "requires %d.%d or newer. Use a CUDA %d.x build of MagTense, "
+			                "or run without CUDA.\n",
+			        major, minor,
+			        MAGTENSE_MIN_SM_MAJOR, MAGTENSE_MIN_SM_MINOR, CUDART_VERSION / 1000 );
+			fflush(stderr);
+			exit(-1);
+		}
+	}
 }
 
  /**
@@ -107,6 +171,8 @@ void __checkCudaErrors( int err, const char *file, const int line )
  {
 	
 	
+	 cu_requireDevice();
+
 	 //should only be done once
 	 if ( sparse_handle == NULL )
 	 {
@@ -314,17 +380,19 @@ void __checkCudaErrors( int err, const char *file, const int line )
 	fclose(fp);
 	 */
 	 
+	 cu_requireDevice();
+
 	 n_K = *n;
 	 
 	 //Allocate the device (GPU) arrays
 	 size_t bytes = n_K * n_K * sizeof(float);
 	 
-	 cudaMalloc( &d_Kxx, bytes );
-	 cudaMalloc( &d_Kxy, bytes );
-	 cudaMalloc( &d_Kxz, bytes );
-	 cudaMalloc( &d_Kyy, bytes );
-	 cudaMalloc( &d_Kyz, bytes );
-	 cudaMalloc( &d_Kzz, bytes );
+	 checkCudaErrors(cudaMalloc( &d_Kxx, bytes ));
+	 checkCudaErrors(cudaMalloc( &d_Kxy, bytes ));
+	 checkCudaErrors(cudaMalloc( &d_Kxz, bytes ));
+	 checkCudaErrors(cudaMalloc( &d_Kyy, bytes ));
+	 checkCudaErrors(cudaMalloc( &d_Kyz, bytes ));
+	 checkCudaErrors(cudaMalloc( &d_Kzz, bytes ));
 	 
 	 
 	 
@@ -338,16 +406,16 @@ void __checkCudaErrors( int err, const char *file, const int line )
 	 
 	//allocate the internal M and H vectors
 	bytes = n_K * sizeof(float);
-	cudaMalloc( &d_Mx, bytes );
-	cudaMalloc( &d_My, bytes );
-	cudaMalloc( &d_Mz, bytes );
+	checkCudaErrors(cudaMalloc( &d_Mx, bytes ));
+	checkCudaErrors(cudaMalloc( &d_My, bytes ));
+	checkCudaErrors(cudaMalloc( &d_Mz, bytes ));
 
-	cudaMalloc( &d_Hx, bytes );
-	cudaMalloc( &d_Hy, bytes );
-	cudaMalloc( &d_Hz, bytes );
+	checkCudaErrors(cudaMalloc( &d_Hx, bytes ));
+	checkCudaErrors(cudaMalloc( &d_Hy, bytes ));
+	checkCudaErrors(cudaMalloc( &d_Hz, bytes ));
 	
 	//initialize the cuBlas handle
-	cublasCreate(&handle);
+	checkCudaErrors(cublasCreate(&handle));
 	 
  }
  
@@ -508,4 +576,61 @@ void freeSparseMatrix( CUSparse* mat )
 		checkCudaErrors(cudaFree( mat->rows ));
 		mat->rows = NULL;
 	}
+}
+
+
+// --- CROSS-PLATFORM 64-BIT FILE SETUP ---
+#if defined(_WIN32) || defined(_WIN64)
+    #define FSEEK64 _fseeki64
+    typedef __int64 file_offset_t;
+#else
+    // Ensure 64-bit offsets on Linux (must be defined before certain system headers)
+    #ifndef _FILE_OFFSET_BITS
+        #define _FILE_OFFSET_BITS 64
+    #endif
+    #include <sys/types.h>
+    #define FSEEK64 fseeko
+    typedef off_t file_offset_t;
+#endif
+// ----------------------------------------
+
+
+void cu_dumpDemagMatrices_dense(const char* filename)
+{
+    if (!filename || n_K <= 0) return;
+    if (!d_Kxx || !d_Kxy || !d_Kxz || !d_Kyy || !d_Kyz || !d_Kzz) return;
+
+    const size_t nElem  = (size_t)n_K * (size_t)n_K;
+    const size_t nBytes = nElem * sizeof(float);
+
+    FILE* fp = fopen(filename, "wb");
+    if (!fp) return;
+
+    float* h = (float*)malloc(nBytes);
+    if (!h) { 
+        fclose(fp); 
+        return; 
+    }
+
+    // Helper lambda for dumping individual matrices
+    auto dump_one = [&](float* d_mat, int rec_idx) {
+        file_offset_t offset = (file_offset_t)(rec_idx - 1) * (file_offset_t)nBytes;
+        
+        if (FSEEK64(fp, offset, SEEK_SET) != 0) return;
+        
+        checkCudaErrors(cudaMemcpy(h, d_mat, nBytes, cudaMemcpyDeviceToHost));
+        
+        fwrite(h, sizeof(float), nElem, fp);
+    };
+
+    dump_one(d_Kxx, 1);
+    dump_one(d_Kxy, 2);
+    dump_one(d_Kxz, 3);
+    dump_one(d_Kyy, 4);
+    dump_one(d_Kyz, 5);
+    dump_one(d_Kzz, 6);
+
+    fflush(fp);
+    free(h);
+    fclose(fp);
 }

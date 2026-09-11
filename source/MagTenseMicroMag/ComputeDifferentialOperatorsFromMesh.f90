@@ -6,14 +6,18 @@ module DifferentialOperators
   use IO_GENERAL
   use ISO_C_BINDING
   use UTIL_CALL
+  use UTIL_MICROMAG
+
+  use sort_mod
+  use trace_mod
   
   implicit none
 
     contains
 
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2025
-    !> Original Matlab implementation by Emil Jørgensen
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2025
+    !> Original Matlab implementation by Emil Jï¿½rgensen
     !> @brief
     !> computeDifferentialOperatorsFromMesh_DirectLap computes the exchange operator for an unstructured mesh
     !> 
@@ -92,18 +96,23 @@ module DifferentialOperators
     !>  
     !> Aexch_matrix - The sparse CSR matrix of the exchange coupling
     !---------------------------------------------------------------------------
-    subroutine computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, interpn, weight, method, Jfact_local, Aexch_matrix)
+    subroutine computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, interpn, weight, method, Jfact_local, phase_local, A_int_local, Aexch_matrix)
         type(MicroMagGridInfo), intent(inout) :: GridInfo
         integer, intent(in) :: interpn
         integer, intent(in) :: method
         real(dp), intent(inout) :: weight
         real(dp), dimension(:), intent(in) :: Jfact_local
+        integer, dimension(:), intent(in) :: phase_local     !> Material index of each tile
+        real(dp), dimension(:,:), intent(in) :: A_int_local  !> Interface exchange per pair of
+                                                             !> phases, normalised the same way
+                                                             !> as Jfact_local. Negative means
+                                                             !> 'use the harmonic mean'.
         type(sparse_matrix_t),intent(out) :: Aexch_matrix
         type(sparse_matrix_t) :: DX_matrix, DY_matrix, DZ_matrix, A2
 
         ! Unpack the variables
         real(dp), dimension(:),allocatable :: NX, NY, NZ, Areas, Volumes, Xel, Yel, Zel, Xf, Yf, Zf
-        integer, dimension(:,:),allocatable :: Signs, D, T, el2fa
+        integer, dimension(:,:),allocatable :: Signs, D, el2fa
         real(dp), dimension(:), allocatable :: Aexch_local
         integer :: i,j,dims, N, K, kk, k_mask1D, k_i, lind, indx, k_j, k_row, info, n_unique
         real(dp), dimension(:),allocatable :: VolCoeff, AX, AY, AZ, w
@@ -112,6 +121,14 @@ module DifferentialOperators
         real(dp), dimension(:), allocatable :: Amat
         integer, dimension(:), allocatable :: ind, IPIV
         logical, allocatable :: mask1D(:), mask_int2log(:)
+        logical, allocatable :: liveNode(:)
+        integer :: n_singular
+        !--- face -> incidence index, built once in O(M) ---
+        integer, allocatable :: fptr(:), felem(:), fsign(:), fcnt(:)
+        logical, allocatable :: edgeFace(:)
+        real(dp), allocatable :: Amat_face(:)
+        integer :: kf, ip, nface_cells, e1, e2
+        real(dp) :: asum, aprd, A_face_ovr
         real(dp), dimension(:), allocatable :: ddxA, ddyA, ddzA, ddx, ddy, ddz, dx, dy, dz, vx, vy, vz, vw, dks, dxk, dyk, dzk, nns
         real(dp), dimension(:), allocatable :: dxk2, dyk2, dzk2, Wk, Wk2, e
         real(dp), dimension(:,:), allocatable :: Gkl1, Gk, Hk, Gkl1_temp, Gkl1_T, GkRed, HkRed, Wktmp
@@ -122,6 +139,12 @@ module DifferentialOperators
         type(MATRIX_DESCR) :: descr_copy
         type(sparse_matrix_t) :: DDXA_sparse, FX_sparse, DDYA_sparse, FY_sparse, DDZA_sparse, FZ_sparse
         type(sparse_matrix_t) :: DDX_sparse, DDY_sparse, DDZ_sparse, W_sparse        
+        integer, save :: itimer=0
+        !>------------------------------------------------------------------------------
+        integer, dimension(:), allocatable :: sorted_indices
+        integer :: u 
+
+        call trace%begin( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
         eps_criteria = 1.0e-12
         const = 1.
@@ -137,7 +160,9 @@ module DifferentialOperators
         Xf = GridInfo%Xf
         Yf = GridInfo%Yf
         Zf = GridInfo%Zf
-        T = GridInfo%TheTs
+        !GridInfo%TheTs is not read anywhere in this routine - only TheDs (through el2fa)
+        !and TheSigns are. Copying it cost a full allocation and copy of a 2 x 29*Nel
+        !integer array, about 26 MB at Nel = 110592, for nothing.
         D = GridInfo%TheDs
         Signs = GridInfo%TheSigns
         Aexch_local = Jfact_local
@@ -169,35 +194,110 @@ module DifferentialOperators
         ks = Signs(:,2)
 
         !>-----------------------------------------
+        ! Face -> incidence index.
+        !
+        ! Two loops below used to answer "which cells touch face k?" by scanning the whole
+        ! of Signs, once per incidence and once per face. Both were therefore O(M^2) and
+        ! O(K*M), and together they were ~97% of this routine, growing as N^2.1. Signs(:,2)
+        ! is a face index in [1,K], so one counting sort turns the same question into an
+        ! O(1) lookup: the incidences of face kf are fptr(kf) .. fptr(kf+1)-1, holding the
+        ! cell in felem and the sign in fsign. Building it is a single O(M) pass.
+        allocate(fcnt(K), fptr(K+1))
+        fcnt = 0
+        do i = 1, size(ks)
+            fcnt(ks(i)) = fcnt(ks(i)) + 1
+        end do
+        fptr(1) = 1
+        do i = 1, K
+            fptr(i+1) = fptr(i) + fcnt(i)
+        end do
+        allocate(felem(size(ks)), fsign(size(ks)))
+        fcnt = 0
+        do i = 1, size(ks)
+            kf = ks(i)
+            felem(fptr(kf) + fcnt(kf)) = ns(i)
+            fsign(fptr(kf) + fcnt(kf)) = ss(i)
+            fcnt(kf) = fcnt(kf) + 1
+        end do
+
+        ! A face lies on the boundary when exactly one cell claims it. The original test,
+        ! sum(abs(Signs(:,3)) over the incidences of the face) == 1, is the same statement
+        ! because every sign is +1 or -1.
+        allocate(edgeFace(K))
+        do kf = 1, K
+            indx = 0
+            do ip = fptr(kf), fptr(kf+1)-1
+                indx = indx + abs(fsign(ip))
+            end do
+            edgeFace(kf) = (indx .eq. 1)
+        end do
+
+
+        !>-----------------------------------------
         ! Constructing summing matrix according to reference
         ! Constructing N times K sparse matrix DDXA: DDXA*dphi(faces) = d2phi(elements)
         ! This takes the exchange stiffness Jfact_local into account to form the second part of the operator div(A grad(phi))
         if ( method .eq. MicroMagExchMethodDirectLaplacianNeumann ) then
             ! Setting up exchange interaction strength matrix for heterogeneous materials. Also works for homogeneous materials. [2]
             allocate(Amat(size(ns)))
-            allocate(mask1D(size(Signs(:,1))))
-        
-            do kk = 1, size(ks)
-                
-                mask1D = (ks(kk) .eq. Signs(:,2))
-                k_mask1D = count(mask1D)
-                                
-                if (k_mask1D == 1) then
-                    Amat(kk) = Aexch_local(ns(kk))
-                elseif (k_mask1D > 2) then
+
+            ! The exchange value depends only on the face, so it is computed once per face
+            ! (K of them) and then scattered over the incidences, rather than recomputed
+            ! identically for every incidence of the same face.
+            allocate(Amat_face(K))
+            Amat_face = 0.0_dp
+            do kf = 1, K
+                nface_cells = fptr(kf+1) - fptr(kf)
+                if (nface_cells == 1) then
+                    Amat_face(kf) = Aexch_local(felem(fptr(kf)))
+                elseif (nface_cells > 2) then
+                    ! Reported once per face now, where the scan reported it once per
+                    ! incidence of that face. The mesh is invalid either way.
                     write(*,*) 'Warning: more than two cells share a face!'
-                else
-                    ns_packed = pack(ns,mask1D)
-                    
-                    Amat(kk) = 2.0 * product(Aexch_local(ns_packed)) / sum(Aexch_local(ns_packed))
-                    !IMPLEMENT THE CHECK BELOW
-                    !if all(Aexch_local(mask1D) == 0.0_wp .and. Aexch_local(tmp2) == 0.0_wp) then
-                    !    Amat(kk) = 0.0_wp
-                    !end if
+                elseif (nface_cells == 2) then
+                    e1 = felem(fptr(kf))
+                    e2 = felem(fptr(kf)+1)
+
+                    ! A face between two different materials can carry an exchange value the
+                    ! user specified for that pair, instead of the harmonic mean of the two
+                    ! cells. Every internal face joins exactly two cells, so the pair is
+                    ! unambiguous however many materials the mesh contains.
+                    !
+                    ! A cell with A0 = 0 is not magnetic and carries no exchange, so a face
+                    ! touching one stays uncoupled whatever the table says. The harmonic mean
+                    ! already behaves that way - 2*A1*A2/(A1+A2) vanishes as soon as either
+                    ! side is zero - and matching it here keeps the override consistent both
+                    ! with the default and with the uniform grid.
+                    A_face_ovr = -1.0_dp
+                    if ( size(A_int_local,1) .gt. 1 ) then
+                        if ( phase_local(e1) .ne. phase_local(e2) .and. &
+                             Aexch_local(e1) .gt. 0.0_dp .and. Aexch_local(e2) .gt. 0.0_dp ) &
+                            A_face_ovr = A_int_local(phase_local(e1),phase_local(e2))
+                    endif
+                    if ( A_face_ovr .ge. 0.0_dp ) then
+                        Amat_face(kf) = A_face_ovr
+                    else
+                    ! product() and sum() over the two-element pack, written out. The pack
+                    ! preserved the order of Signs, which the counting sort above also does,
+                    ! so the two operands are multiplied and added in the same order.
+                    aprd = Aexch_local(e1) * Aexch_local(e2)
+                    asum = Aexch_local(e1) + Aexch_local(e2)
+                    if ( asum .gt. 0.0_dp ) then
+                        Amat_face(kf) = 2.0 * aprd / asum
+                    else
+                        !Both cells are non-magnetic, where the harmonic mean is 0/0 - an
+                        !invalid operation under /fpe:0, not a quiet NaN. Two cells with no
+                        !exchange are not exchange coupled, so the face carries nothing.
+                        Amat_face(kf) = 0.0_dp
+                    endif
+                    endif
                 end if
             end do
 
-            deallocate(mask1D)
+            do kk = 1, size(ks)
+                Amat(kk) = Amat_face(ks(kk))
+            end do
+            deallocate(Amat_face)
              
             ! Having constructed the exchange values for each face/tile pair, we build the summing matrix.
             allocate(ddxA(size(ns)))
@@ -243,54 +343,105 @@ module DifferentialOperators
             call displayGUIMessage( 'Warning: untested method: compact' )
         endif
 
-        !>-----------------------------------------
-        ! Calculating weights
+        ! !>-----------------------------------------
+        ! ! Calculating weights
         deallocate(ns,ks)
         allocate(ns(size(el2fa,1)),ks(size(el2fa,1)))
-        ns = el2fa(:,1)
-        ks = el2fa(:,2)
-               
-        ! Sort the indices of the faces and tiles
-        allocate(mask1D(size(ks)))    
-        mask1D(:) = .true.
         allocate(ks_sorted(size(ks)))
         allocate(ns_sorted(size(ks)))
-        do i = 1, size(ks)
-            indx = minloc(ks, 1, mask1D)
-            ks_sorted(i) = ks(indx)
-            ns_sorted(i) = ns(indx)
-            mask1D(MINLOC(ks,mask1D)) = .false.
-        end do    
-        deallocate(mask1D) 
-        
-       ! Determines which weights are to be used in the first interpolation step 
-        allocate(w(size(ns)))
-        if (dims == 1) then
-            w = ((Xel(ns_sorted) - Xf(ks_sorted))**2)**(-weight/2.0)
-        else if (dims == 2) then
-            w = ((Xel(ns_sorted) - Xf(ks_sorted))**2 + (Yel(ns_sorted) - Yf(ks_sorted))**2)**(-weight/2.0)
-        else
-            w = ((Xel(ns_sorted) - Xf(ks_sorted))**2 + (Yel(ns_sorted) - Yf(ks_sorted))**2 + (Zel(ns_sorted) - Zf(ks_sorted))**2)**(-weight/2.0)
-        end if
-        
-        !>-----------------------------------------
-        ! Prepare distances for the interpolation.       
-        allocate(inds2_vals_temp(size(ns)))
-        call unique_sort(ks_sorted, inds2_vals_temp, n_unique)
-        allocate(inds2_vals, source=inds2_vals_temp(1:n_unique))
-        deallocate(inds2_vals_temp)
-             
-        allocate(inds2(size(inds2_vals)))
-        do i = 1, size(inds2_vals)
-            inds2(i) = minloc(ks_sorted, 1, mask=ks_sorted .eq. inds2_vals(i), back=.true.)
-        end do    
-        
-        allocate(inds1(size(inds2)+1))
-        inds1(1) = 1
-        inds1(2:size(inds1)) = inds2(:) + 1
+        ns = el2fa(:,1)
+        ks = el2fa(:,2)
+
+        allocate(sorted_indices(size(ks)))
+        call argsort(ks, sorted_indices, algo="quicksort")
+        call apply_perm(ks, sorted_indices, ks_sorted)
+        call apply_perm(ns, sorted_indices, ns_sorted)
+        deallocate(sorted_indices)
+
+        ! Distances from the centers of the tiles to the centers of the faces
         dx = Xel(ns_sorted) - Xf(ks_sorted)
         dy = Yel(ns_sorted) - Yf(ks_sorted)
         dz = Zel(ns_sorted) - Zf(ks_sorted)
+
+        ! Along a periodic direction the tiles at the two ends of the domain have been linked together
+        ! in the mesh analysis. The distance between such a linked pair of tiles has to be measured
+        ! through the boundary, i.e. using the minimum image convention, and not across the entire
+        ! domain. A tile in the interpolation stencil of a face is never further away from that face
+        ! than the largest tile size, and the mesh analysis has verified that the period is larger
+        ! than twice the largest tile, so only the linked pairs are affected by the wrapping below.
+        if ( GridInfo%exchPBC(1) ) then
+            where ( dx .gt.  0.5*GridInfo%Lper(1) ) dx = dx - GridInfo%Lper(1)
+            where ( dx .lt. -0.5*GridInfo%Lper(1) ) dx = dx + GridInfo%Lper(1)
+        endif
+        if ( GridInfo%exchPBC(2) ) then
+            where ( dy .gt.  0.5*GridInfo%Lper(2) ) dy = dy - GridInfo%Lper(2)
+            where ( dy .lt. -0.5*GridInfo%Lper(2) ) dy = dy + GridInfo%Lper(2)
+        endif
+        if ( GridInfo%exchPBC(3) ) then
+            where ( dz .gt.  0.5*GridInfo%Lper(3) ) dz = dz - GridInfo%Lper(3)
+            where ( dz .lt. -0.5*GridInfo%Lper(3) ) dz = dz + GridInfo%Lper(3)
+        endif
+
+       ! A cell with no exchange stiffness must not take part in the interpolation either.
+       ! Its own faces already carry no coupling, because the harmonic mean vanishes, but it
+       ! would otherwise still sit in the least squares stencil of the faces around it and
+       ! pull on their gradient estimates. Zero weight removes it from those stencils exactly:
+       ! it drops out of the weighted Gram matrix Gk and its column of Hk is zero, so the
+       ! solve returns a zero interpolation weight for it and it never enters the operator.
+       ! A mesh whose cells all have A0 > 0 is untouched.
+       ! Determines which weights are to be used in the first interpolation step
+        allocate(w(size(ns)))
+        allocate(liveNode(size(ns)))
+        if (dims == 1) then
+            w = (dx**2)**(-weight/2.0)
+        else if (dims == 2) then
+            w = (dx**2 + dy**2)**(-weight/2.0)
+        else
+            w = (dx**2 + dy**2 + dz**2)**(-weight/2.0)
+        end if
+
+
+        
+        do i = 1, size(w)
+            liveNode(i) = ( Aexch_local(ns_sorted(i)) .gt. 0.0_dp )
+            if ( .not. liveNode(i) ) w(i) = 0.0_dp
+        end do
+
+        !>-----------------------------------------
+        ! Prepare distances for the interpolation.       
+        !-------------------------------------------------------------------------------------------
+        ! Count unique values
+        !-------------------------------------------------------------------------------------------
+        n_unique = 0
+        if (size(ks_sorted) > 0) then
+            n_unique = 1
+            do i = 2, size(ks_sorted)
+                if (ks_sorted(i) /= ks_sorted(i-1)) n_unique = n_unique + 1
+            end do
+        end if
+        !-------------------------------------------------------------------------------------------
+        allocate(inds2_vals(n_unique))
+        allocate(inds2(n_unique))
+        !-------------------------------------------------------------------------------------------
+        ! Fill unique values and record the last index for each (equivalent to minloc(..., back=.true.))
+        !-------------------------------------------------------------------------------------------
+        if (n_unique > 0) then
+            u = 1
+            inds2_vals(u) = ks_sorted(1)
+
+            do i = 2, size(ks_sorted)
+                if (ks_sorted(i) /= ks_sorted(i-1)) then
+                    inds2(u) = i - 1
+                    u = u + 1
+                    inds2_vals(u) = ks_sorted(i)
+                end if
+            end do
+            inds2(u) = size(ks_sorted)
+        end if
+
+        allocate(inds1(size(inds2)+1))
+        inds1(1) = 1
+        inds1(2:size(inds1)) = inds2(:) + 1
         allocate(vw(size(w)))
         allocate(vx(size(w)))
         allocate(vy(size(w)))
@@ -325,8 +476,9 @@ module DifferentialOperators
         ! Calculated by solving
         ! Gk * [phi(faces);dphi(faces)]_k = Hk ( * phi(elements) )
         ! for each face, ks. Details can be found in [2].
-        allocate(mask1D(size(Signs(:,1))))
         
+
+        n_singular = 0
         do kk = 1, K
             
             allocate(ind(inds2(kk)-inds1(kk)+1))
@@ -341,31 +493,42 @@ module DifferentialOperators
             dxk = dx(ind)                ! relevant subset of x-distances
             dyk = dy(ind)
             dzk = dz(ind)
-            scale_local = sum(abs(dxk))/size(dxk)
-            scale = 10.0 ** nint(log10(scale_local))    ! Local distance scaling (see above for global alternative)
-          
-            if (dims > 1) then
+            ! Local distance scaling (see above for the global alternative). The set of distances
+            ! the scale is derived from is assembled once for the actual dimensionality, rather
+            ! than computing log10 for x, then for xy, then for xyz and keeping only the last.
+            ! That ordering evaluated log10(scale_local) before the dims tests, so a stencil whose
+            ! x-distances all vanish - possible for a face whose neighbours share its x coordinate -
+            ! raised a divide-by-zero and handed -Inf to nint, whose result is undefined.
+            if (dims == 1) then
+                dks = dxk
+            else if (dims == 2) then
                 dks = [dxk, dyk]
-                scale_local = sum(abs(dks))/size(dks)
-                scale = 10.0 ** nint(log10(scale_local))
-                if (dims > 2) then
-                    dks = [dks, dzk]
-                    scale_local = sum(abs(dks))/size(dks)
-                    scale = 10.0 ** nint(log10(scale_local))
-                    dzk = dzk / scale   ! Scale distances to avoid ill conditioning
-                end if
-                dyk = dyk / scale       ! Scale distances to avoid ill conditioning
+            else
+                dks = [dxk, dyk, dzk]
             end if
-            dxk = dxk / scale           ! Scale distances to avoid ill conditioning
+            scale_local = sum(abs(dks))/size(dks)
 
-            mask1D = (kk .eq. Signs(:,2))
+            if (scale_local > 0.0_dp) then
+                scale = 10.0 ** nint(log10(scale_local))
+            else
+                ! Every distance in the stencil is zero, so there is no length to normalise by and
+                ! nothing to gain from scaling. Leaving the distances alone keeps the least squares
+                ! system exactly as it was rather than multiplying it by an arbitrary factor.
+                scale = 1.0_dp
+            end if
+
+            ! Scale distances to avoid ill conditioning
+            if (dims > 2) dzk = dzk / scale
+            if (dims > 1) dyk = dyk / scale
+            dxk = dxk / scale
+
            
             nns = [NX(kk), NY(kk), NZ(kk)]   ! normal vector at the edge
             
             lind = size(ind)
             
             ! Mirror trick to enforce Neumann b.c. Creates a set of virtual nodes on the other side of an edge face.
-            if (sum(abs(pack(Signs(:,3),mask1D))) == 1) then     ! edge face. 
+            if (edgeFace(kk)) then     ! edge face. 
                 
                 if ((dims .eq. 1 .and. abs(nns(1)) < eps_criteria) .or. (dims .eq. 2 .and. abs(nns(1)) < eps_criteria .and. abs(nns(2)) < eps_criteria)) then
                     deallocate(ind)
@@ -467,16 +630,28 @@ module DifferentialOperators
             Wktmp(:,:) = HkRed(:,:)
                 
             !Taken from https://www.intel.com/content/www/us/en/docs/onemkl/code-samples-lapack/2025-0/dgesv-example-fortran.html
-            if (kk == 1) then
-                allocate(IPIV(size(GkRed,1)))
-            else
-                deallocate(IPIV)
-                allocate(IPIV(size(GkRed,1)))
-            endif
+            !Keyed off the allocation status rather than off kk == 1. The loop can reach the cycle
+            !above before ever allocating IPIV - an edge face pointing purely in an extradimensional
+            !direction is skipped - so if that happened on the first face, the kk /= 1 branch would
+            !deallocate an unallocated array. Face ordering happens to put an x-normal face first
+            !today, which is the only reason this never fired.
+            if (allocated(IPIV)) deallocate(IPIV)
+            allocate(IPIV(size(GkRed,1)))
             
             call dgesv( size(GkRed,1), size(Wktmp,2), GkRed, size(GkRed,1), IPIV, Wktmp, size(Wktmp,1), INFO )
+
+            !A face whose stencil has too few live cells leaves the least squares system
+            !singular, and dgesv then returns whatever it has. That only happens where every
+            !useful neighbour has A0 = 0, in which case the face carries no exchange anyway
+            !and these weights are multiplied by zero; stopping here keeps a NaN out of the
+            !sparse product rather than salvaging the face.
+            if ( INFO .ne. 0 ) then
+                n_singular = n_singular + 1
+                deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)
+                cycle
+            endif
             
-            if (sum(abs(pack(Signs(:,3),mask1D))) == 1) then
+            if (edgeFace(kk)) then
                 vw(ind) = Wktmp(1,1:lind)+Wktmp(1,lind+1:size(Wktmp,2))                 ! Interpolated face values
                 if (abs(nns(1)) > eps_criteria) then                                    ! Interpolated x-components of face gradients
                     vx(ind)=(Wktmp(2,1:lind)+Wktmp(2,lind+1:size(Wktmp,2)))/scale       ! rescaled
@@ -507,6 +682,11 @@ module DifferentialOperators
             deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)        
         
         end do
+
+        if ( n_singular .gt. 0 ) then
+            write (prog_str,'(I10)') n_singular
+            call displayGUIMessage( 'Faces left uninterpolated (no live neighbours): '//trim(adjustl(prog_str)) )
+        endif
                 
         ! Final operation, summing interpolated values according to either ...
         if ( method .eq. MicroMagExchMethodGGNeumann ) then
@@ -579,7 +759,9 @@ module DifferentialOperators
         call create_COO_values_from_CSR(Aexch_matrix,GridInfo)
         
         stat = mkl_sparse_destroy(DX_matrix)
-                
+
+    
+        call trace%end( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
     end subroutine computeDifferentialOperatorsFromMesh_DirectLap
 
@@ -591,91 +773,13 @@ module DifferentialOperators
     
         eps_criteria = 1.0e-12
         call displayGUIMessage( 'Creating Exchange matrix start' )
-        call create_CSR_matrix(problem%grid%A_exch_load%rows_start, problem%grid%A_exch_load%cols, problem%grid%A_exch_load%values, problem%grid%A_exch_load%nrows, problem%grid%A_exch_load%ncols, eps_criteria, problem%A_exch)
+        call create_CSR_matrix(problem%grid%A_exch_load%rows, problem%grid%A_exch_load%cols, problem%grid%A_exch_load%values, problem%grid%A_exch_load%nrows, problem%grid%A_exch_load%ncols, eps_criteria, problem%A_exch)
         call displayGUIMessage( 'Creating Exchange matrix end' )
     
     end subroutine passDifferentialOperators
 
     
-    subroutine create_CSR_matrix(rows, columns, values, K, N, eps_criteria, CSR_matrix)
-        implicit none
-        integer, dimension(:), intent(in) :: rows, columns
-        real(dp), dimension(:), intent(in) :: values
-        integer, intent(in) :: K, N
-        real(dp), intent(in) :: eps_criteria
-        type(sparse_matrix_t), intent(out) :: CSR_matrix
-        integer :: nnz, stat
-        integer, dimension(:), allocatable :: rows_reduced_COO, columns_reduced_COO
-        real(dp), dimension(:), allocatable :: values_reduced_COO
-        logical, allocatable :: mask1D(:)
-        type(sparse_matrix_t) :: COO_matrix
     
-        !Find the non-zero values of values
-        allocate(mask1D(size(values)))    
-        mask1D(:) = .false.
-        mask1D = (abs(values) .gt. eps_criteria)
-        
-        !Then reduce the size of the arrays
-        rows_reduced_COO    = pack(rows,mask1D)
-        columns_reduced_COO = pack(columns,mask1D)
-        values_reduced_COO  = pack(values,mask1D)
-        deallocate(mask1D)
-
-        ! Create a sparse matrix in COO format from the reduced arrays
-        ! See https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-fortran/2023-1/mkl-sparse-create-coo.html
-        nnz = size(values_reduced_COO)
-        stat = mkl_sparse_d_create_coo (COO_matrix, SPARSE_INDEX_BASE_ONE, K, N, nnz, rows_reduced_COO, columns_reduced_COO, values_reduced_COO)
-
-        ! Create a sparse matrix in CSR format from COO format
-        ! See https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-fortran/2025-1/mkl-sparse-convert-csr.html
-        stat = mkl_sparse_convert_csr (COO_matrix, SPARSE_OPERATION_NON_TRANSPOSE, CSR_matrix)
-    
-        stat = mkl_sparse_destroy(COO_matrix)
-        
-    end subroutine create_CSR_matrix
-
-
-    subroutine create_COO_values_from_CSR(CSR_matrix, GridInfo)
-        implicit none
-
-        type(sparse_matrix_t), intent(inout) :: CSR_matrix
-        type(MicroMagGridInfo), intent(inout) :: GridInfo
-        type(sparse_matrix_t) :: CSR_copy_matrix
-        type(sparse_matrix_t) :: COO_matrix
-        integer :: N, K, stat, nnz, indexing
-        type(MATRIX_DESCR) :: descr
-        type(C_PTR)    :: rows_c, cols_c, values_c
-        integer, POINTER :: rows(:), cols(:)
-        real(dp), POINTER :: values(:)
-        
-        descr%type = SPARSE_MATRIX_TYPE_GENERAL 
-
-        !Copy the CSR matrix, convert it to COO, then export this
-        stat = mkl_sparse_copy (CSR_matrix, descr, CSR_copy_matrix)
-    
-        stat = mkl_sparse_convert_coo (CSR_copy_matrix, SPARSE_OPERATION_NON_TRANSPOSE, COO_matrix)
-    
-        stat = mkl_sparse_destroy (CSR_copy_matrix)
-    
-        stat = mkl_sparse_d_export_coo (COO_matrix, indexing, K, N, nnz, rows_c, cols_c, values_c)
-    
-        stat = mkl_sparse_destroy (COO_matrix)
-    
-        !   Converting C into Fortran pointers
-        call C_F_POINTER(rows_c  , rows  , [nnz])
-        call C_F_POINTER(cols_c  , cols  , [nnz])
-        call C_F_POINTER(values_c    , values    , [nnz])
-    
-        ! Save the COO matrix in GridInfo
-        allocate(GridInfo%Exch_mat_r(nnz),GridInfo%Exch_mat_c(nnz),GridInfo%Exch_mat_v(nnz))
-        GridInfo%Exch_mat_nr = K
-        GridInfo%Exch_mat_nc = N
-        GridInfo%Exch_mat_ntot = size(rows)
-        GridInfo%Exch_mat_r(:) = rows(:)
-        GridInfo%Exch_mat_c(:) = cols(:)
-        GridInfo%Exch_mat_v(:) = values(:)
-            
-    end subroutine create_COO_values_from_CSR
 
     
     ! For debugging, save the sparse matrix as a dense by multiplying it with the identity matrix

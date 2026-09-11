@@ -116,18 +116,18 @@ for m = 4%1:length(Mxp)
             [phi_arr(i),r_arr(i),z_arr(i)] = cart2pol(xpoint(i),ypoint(i),zpoint(i));
         end
         
-        [Psi_tot, Psi_z_arr, Psi_r_arr, Psi_phi_arr] = MagTense_Validation_cylinder_and_clyndrical_slice_potential(Ro, Ri, phi1, phi2, z1, z2, [Mxp(m) Myp(m) Mzp(m)], r_arr, phi_arr, z_arr, slice, info);
+        [Psi_tot, Psi_z_arr, Psi_r_arr, Psi_phi_arr] = MagTense_Validation_cylinder_and_cylindrical_slice_potential(Ro, Ri, phi1, phi2, z1, z2, [Mxp(m) Myp(m) Mzp(m)], r_arr, phi_arr, z_arr, slice, info);
     
     end
     disp('---------------')
     
     if (slice == 1)
-        MagTense_path = '..\..\..\..\..\MagTense\documentation\examples_FEM_validation\Validation_potential_cylinder_slice';
-        data = load([MagTense_path '\Line' sprintf('%02.2i',j) '_' file '.txt']);
+        MagTense_path = '../../../../documentation/examples_FEM_validation/Validation_potential_cylinder_slice';
+        data = load([MagTense_path '/Line' sprintf('%02.2i',j) '_' file '.txt']);
     end
     if (slice == 0)
-        MagTense_path = '..\..\..\..\..\MagTense\documentation\examples_FEM_validation\Validation_potential_cylinder';
-        data = load([MagTense_path '\Line' sprintf('%02.2i',j) '.txt']);
+        MagTense_path = '../../../../documentation/examples_FEM_validation/Validation_potential_cylinder';
+        data = load([MagTense_path '/Line' sprintf('%02.2i',j) '.txt']);
     end
    
     plot(data(:,1),data(:,1+m),'.','markersize',3,'Color',colorarr(j,:));

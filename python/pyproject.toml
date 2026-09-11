@@ -9,7 +9,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-"magtense.lib" = ["*.pyd", "*.so"]
+"magtense.lib" = ["*.pyd", "*.so", "*.dll"]
 "magtense.mat" = ["*.csv"]
 
 [tool.setuptools.dynamic]
@@ -37,6 +37,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
 ]
 

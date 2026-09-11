@@ -32,7 +32,14 @@ module DemagAuxFunctions
     !The demag tensor is considered as a whole, and the fraction specified concern the number of elements greater than epsilon
     if ( problem%demag_approximation .eq. DemagApproximationThresholdFraction ) then
             
-        !Make a mask for each demag tensor with only the elements larger than zero
+        !Make a mask for each demag tensor with only the elements larger than zero.
+        !The magnitude is what matters: FindThresholdFraction is documented to take absolute
+        !values, and the threshold it returns is applied by ConvertDenseToSparse_s as
+        !abs(D) > threshold. Sampling the signed values instead dropped every negative entry
+        !- and the demag tensor diagonal is predominantly negative - so the bisection ran on
+        !a biased subset and against the wrong population size, and the fraction actually
+        !removed was not the fraction requested. ApplyThresholdFFT below always did this
+        !correctly, because a complex tensor leaves no choice.
         !Make the masks only once - this is memory intensive, but computationally efficient
         nx_K = size(problem%Kxx(:,1))
         ny_K = size(problem%Kxx(1,:))
@@ -43,12 +50,12 @@ module DemagAuxFunctions
         allocate(mask_yz(nx_K,ny_K))
         allocate(mask_zz(nx_K,ny_K))
             
-        mask_xx = problem%Kxx .gt. 0
-        mask_xy = problem%Kxy .gt. 0
-        mask_xz = problem%Kxz .gt. 0
-        mask_yy = problem%Kyy .gt. 0
-        mask_yz = problem%Kyz .gt. 0
-        mask_zz = problem%Kzz .gt. 0
+        mask_xx = abs(problem%Kxx) .gt. 0
+        mask_xy = abs(problem%Kxy) .gt. 0
+        mask_xz = abs(problem%Kxz) .gt. 0
+        mask_yy = abs(problem%Kyy) .gt. 0
+        mask_yz = abs(problem%Kyz) .gt. 0
+        mask_zz = abs(problem%Kzz) .gt. 0
             
         !Make a copy (pack) of the tensors for speed so that the mask only has to be applied once
         allocate(Kxx_abs(count( mask_xx )))
@@ -68,27 +75,27 @@ module DemagAuxFunctions
         do i=1,nx_K
             do j=1,ny_K
                 if (mask_xx(i,j)) then
-                    Kxx_abs(k_xx) = problem%Kxx(i,j) 
+                    Kxx_abs(k_xx) = abs(problem%Kxx(i,j))
                     k_xx = k_xx + 1
                 endif
                 if (mask_xy(i,j)) then
-                    Kxy_abs(k_xy) = problem%Kxy(i,j) 
+                    Kxy_abs(k_xy) = abs(problem%Kxy(i,j))
                     k_xy = k_xy + 1
                 endif
                 if (mask_xz(i,j)) then
-                    Kxz_abs(k_xz) = problem%Kxz(i,j) 
+                    Kxz_abs(k_xz) = abs(problem%Kxz(i,j))
                     k_xz = k_xz + 1
                 endif
                 if (mask_yy(i,j)) then
-                    Kyy_abs(k_yy) = problem%Kyy(i,j) 
+                    Kyy_abs(k_yy) = abs(problem%Kyy(i,j))
                     k_yy = k_yy + 1
                 endif
                 if (mask_yz(i,j)) then
-                    Kyz_abs(k_yz) = problem%Kyz(i,j) 
+                    Kyz_abs(k_yz) = abs(problem%Kyz(i,j))
                     k_yz = k_yz + 1
                 endif
                 if (mask_zz(i,j)) then
-                    Kzz_abs(k_zz) = problem%Kzz(i,j) 
+                    Kzz_abs(k_zz) = abs(problem%Kzz(i,j))
                     k_zz = k_zz + 1
                 endif
             enddo
@@ -118,6 +125,8 @@ module DemagAuxFunctions
     call ConvertDenseToSparse_s( problem%Kyy, problem%K_s(4), threshold_var)
     call ConvertDenseToSparse_s( problem%Kyz, problem%K_s(5), threshold_var)
     call ConvertDenseToSparse_s( problem%Kzz, problem%K_s(6), threshold_var)
+
+    !TODO - potential memory leak - deallocate the dense matrices here?
     
     end subroutine ApplyThresholdDense
     
@@ -325,6 +334,9 @@ module DemagAuxFunctions
     call ConvertDenseToSparse_c( Kyy_c, problem%K_s_c(4), thres)
     call ConvertDenseToSparse_c( Kyz_c, problem%K_s_c(5), thres)
     call ConvertDenseToSparse_c( Kzz_c, problem%K_s_c(6), thres)
+
+        !TODO - potential memory leak - deallocate the dense matrices here?
+
         
     !then use problem%K_s(1..6) with cuda or MKL to do the sparse matrix-vector product with the FFT(M) and subsequently the IFT on the whole thing to get H
         
@@ -429,7 +441,7 @@ module DemagAuxFunctions
     
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2024
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2024
     !> @brief
     !> Change the demag field based on a error drawn from a standard distribution  
     !> @param[inout] problem the data structure containing the problem
@@ -465,7 +477,7 @@ module DemagAuxFunctions
     
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2024
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2024
     !> @brief
     !> Reduce the size of the demag tensor by figuring out which tiles will have the same demag tensor 
     !> @param[inout] problem the data structure containing the problem
@@ -596,7 +608,7 @@ module DemagAuxFunctions
     
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2024
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2024
     !> @brief
     !> Calculate a hash array for each tile to all field evaluation points
     !> @param[inout] problem the data structure containing the problem
@@ -642,7 +654,7 @@ module DemagAuxFunctions
 
     
     !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2024
+    !> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2024
     !> @brief
     !> Calculate a hash value for an array of floats
     !> @param[inout] problem the data structure containing the problem

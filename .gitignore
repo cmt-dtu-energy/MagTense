@@ -6,6 +6,19 @@
 *.user
 *.sln.docstates
 
+# private files for MagTense
+MagTense_private/
+
+#image files
+*.png
+*.pdf
+*.svg
+
+# data files
+*.mat
+*.bin
+*.npz
+
 # Build results
 
 [Dd]ebug/
@@ -212,3 +225,8 @@ error.txt
 # CVODE downloaded files and folders
 cvode*/
 *tar.gz
+.vs/
+
+# Build configuration stamp written by the Makefile
+.build_flags
+.fmm3d_toolchain

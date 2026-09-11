@@ -1,5 +1,6 @@
 numpy>=2.3.2
 pyproject_hooks>=1.2.0
+scipy>=1.16.0
 setuptools>=80.9.0
 
 # f2py

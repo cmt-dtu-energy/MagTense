@@ -57,6 +57,12 @@ implicit none
         
         end subroutine cu_icl_MVMult_GetH_sparse
         
+
+        subroutine cu_icl_dumpDemagMatrices_dense(filename) bind(C, name="icl_dumpDemagMatrices_dense")
+            use, intrinsic :: iso_c_binding, only: c_char
+            character(kind=c_char, len=1), intent(in) :: filename(*)
+        end subroutine cu_icl_dumpDemagMatrices_dense
+
     end interface
 
     contains
@@ -188,6 +194,29 @@ implicit none
     !call cuda to do the matrix-vector multiplication
     call cu_icl_MVMult_GetH( Mx_in, My_in, Mz_in, Hx, Hy, Hz, n, pref )
     end subroutine cudaMatrVecMult
+
+
+    !> Dump the dense demag matrices currently resident on the GPU.
+    !> Writes 6 contiguous blocks (Kxx,Kxy,Kxz,Kyy,Kyz,Kzz) as float32 to the file.
+    subroutine cudaDumpDemagDense(filename)
+    use, intrinsic :: iso_c_binding, only: c_char, c_null_char
+    implicit none
+    character(len=*), intent(in) :: filename
+
+    integer :: n, i
+    character(kind=c_char, len=1) :: c_filename(len_trim(filename) + 1)
+
+    n = len_trim(filename)
+
+    do i = 1, n
+        c_filename(i) = filename(i:i)
+    end do
+    c_filename(n+1) = c_null_char
+
+    call cu_icl_dumpDemagMatrices_dense(c_filename)
+    end subroutine cudaDumpDemagDense
+
+
 
 #endif    
 end module FortranCuda

@@ -14,13 +14,13 @@ mur = 20;
 Ms = 2.1;
 
 %%Get a default tile from MagTense
-tile = getDefaultMagTile();
+tile = DefaultMagTile();
     
 %ensure the tile is a permanent magnet
-tile.magnetType = getMagnetType('hard');
+tile = tile.setMagnetType('hard');
 
 %set the geometry to be a rectangular prism
-tile.tileType = getMagTileType('prism');
+tile = tile.setMagTileType('prism');
 
 %set the dimensions of the prism (5 mm on either side)
 d = 0.005;
@@ -84,7 +84,7 @@ for i=1:n_r
     end  
     tiles_tmp(ind).color = [0,0,1];
     
-    tiles_tmp(ind).magnetType = getMagnetType('soft');
+    tiles_tmp(ind) = tile.setMagnetType('soft');
     
     
     tiles = [tiles, refineTiles( tiles_tmp(ind), res )];
@@ -100,11 +100,11 @@ tiles(ind_lst) = [];
 %%is reached. Finally, 100 reflects the max. no. of allowed iterations
 
 %load the const mur state function
-stFcn=MakeMH_Fe_const_mur( mur, Ms );
+stFcn=MagTenseTilesUtil.MakeMH_Fe_const_mur( mur, Ms );
 
 tiles = IterateMagnetization( tiles, stFcn, 300, 1e-3, 100 );
 
-close all;plotTiles(tiles,true);axis equal;alpha 0.3
+close all;MagTenseTilesPlot.plotTiles(tiles,true);axis equal;alpha 0.3
 %%Now find the field in a set of points
 %define a range of points spanning the xy plane at z=0
 x = linspace( -0.05,0.05, 20);
@@ -113,23 +113,50 @@ z = 0.0251;
 
 %use meshgrid to fill out the span
 [X,Y,Z] = meshgrid(x,y,z);
+pts = zeros( numel(X), 3 );
+pts(:,1) = reshape(X,[numel(X),1]);
+pts(:,2) = reshape(Y,[numel(Y),1]);
+pts(:,3) = reshape(Z,[numel(Z),1]);
 
-
-%get the field
-[H,Hnorm] = getHMagTense( tile, X, Y, Z );
+H = getHFromTiles_mex( tiles, pts, int32( length(tiles) ), int32( length(pts(:,1)) ) );
 H = H .* mu0;
-Hnorm = Hnorm .* mu0;
+
+%convert H back to the same format as the input X,Y and Z
+sx = size(X);
+
+nx = sx(1);
+ny = 1;
+nz = 1;
+
+if length(sx)==3
+    nz = sx(3);
+end
+if length(sx)>=2
+    ny = sx(2);
+end
+
+Hout = zeros( nx, ny, numel(z), 3 );
+    
+Hout(:,:,:,1) = reshape( H(:,1), nx, ny, nz );
+Hout(:,:,:,2) = reshape( H(:,2), nx, ny, nz );
+Hout(:,:,:,3) = reshape( H(:,3), nx, ny, nz );
+
+%Find the norm of the field
+Hnorm = squeeze( sqrt( sum(Hout.^2,4) ) );
+Hout = squeeze(Hout);
+
 %Plot the solution in a contour map
-surf_and_con( X,Y,Hnorm);
+figure;
+surf( X,Y,Hnorm);
 xlabel('x');
 ylabel('y');
 
 %%plot the magnetic field (H). Notice how the field opposes the
 %%magnetization inside the cube.
-getFigure();
-quiver(X,Y,H(:,:,1),H(:,:,2),2,'linewidth',2);
+figure; hold all;
+quiver(X,Y,Hout(:,:,1),Hout(:,:,2),2,'linewidth',2);
 contour(X,Y,Hnorm,'linewidth',2);
-plotTiles(tile,true);
+MagTenseTilesPlot.plotTiles(tile,true);
 alpha 0.3;
 axis equal;
 xlabel('x');
@@ -143,12 +170,37 @@ z = linspace( -0.06,0.06, 21);
 
 %use meshgrid to fill out the span
 [X,Y,Z] = meshgrid(x,y,z);
+pts = zeros( numel(X), 3 );
+pts(:,1) = reshape(X,[numel(X),1]);
+pts(:,2) = reshape(Y,[numel(Y),1]);
+pts(:,3) = reshape(Z,[numel(Z),1]);
 
-
-%get the field
-[H,Hnorm] = getHMagTense( tile, X, Y, Z );
+H = getHFromTiles_mex( tiles, pts, int32( length(tiles) ), int32( length(pts(:,1)) ) );
 H = H .* mu0;
-Hnorm = Hnorm .* mu0;
+
+%convert H back to the same format as the input X,Y and Z
+sx = size(X);
+
+nx = sx(1);
+ny = 1;
+nz = 1;
+
+if length(sx)==3
+    nz = sx(3);
+end
+if length(sx)>=2
+    ny = sx(2);
+end
+
+Hout = zeros( nx, ny, numel(z), 3 );
+    
+Hout(:,:,:,1) = reshape( H(:,1), nx, ny, nz );
+Hout(:,:,:,2) = reshape( H(:,2), nx, ny, nz );
+Hout(:,:,:,3) = reshape( H(:,3), nx, ny, nz );
+
+%Find the norm of the field
+Hnorm = squeeze( sqrt( sum(Hout.^2,4) ) );
+Hout = squeeze(Hout);
 
 %Plot the solution in a contour map
 surf_and_con( squeeze(X),squeeze(Z),Hnorm);
@@ -156,8 +208,8 @@ xlabel('x');
 ylabel('z');
 
 
-getFigure();
-quiver(squeeze(X),squeeze(Z),H(:,:,1),H(:,:,3),2,'linewidth',2);
+figure; hold all;
+quiver(squeeze(X),squeeze(Z),Hout(:,:,1),Hout(:,:,3),2,'linewidth',2);
 contour(squeeze(X),squeeze(Z),Hnorm,'linewidth',2);
 
 alpha 0.3;
@@ -165,7 +217,8 @@ axis equal;
 xlabel('x');
 ylabel('z');
 
-getFigure();contour(squeeze(X),squeeze(Z),H(:,:,1),'linewidth',2,'showtext','on');
+figure; hold all;
+contour(squeeze(X),squeeze(Z),Hout(:,:,1),'linewidth',2,'showtext','on');
 xlabel('x');
 ylabel('z');
 end

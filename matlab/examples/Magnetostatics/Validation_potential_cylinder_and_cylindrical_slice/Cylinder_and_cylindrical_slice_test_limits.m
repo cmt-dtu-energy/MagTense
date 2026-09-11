@@ -24,7 +24,7 @@ function Cylinder_and_cylindrical_slice_test_limits
         z2   = z2_t(i);
         slice = slice_t(i);
         
-        [Psi_tot, Psi_z_arr, Psi_r_arr, Psi_phi_arr] = MagTense_Validation_cylinder_and_clyndrical_slice_potential(Ro, Ri, phi1, phi2, z1, z2, M, r, phi, z, slice, info);
+        [Psi_tot, Psi_z_arr, Psi_r_arr, Psi_phi_arr] = MagTense_Validation_cylinder_and_cylindrical_slice_potential(Ro, Ri, phi1, phi2, z1, z2, M, r, phi, z, slice, info);
             
         disp([Psi_tot(1,1) Psi_z_arr(1,1) Psi_r_arr(1,1) Psi_phi_arr(1,1)]);
         disp([Psi_tot(1,2) Psi_z_arr(1,2) Psi_r_arr(1,2) Psi_phi_arr(1,2)]);

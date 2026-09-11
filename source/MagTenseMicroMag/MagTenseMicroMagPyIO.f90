@@ -1,5 +1,7 @@
 module MagTenseMicroMagPyIO
 use MicroMagParameters
+use trace_mod
+use IO_GENERAL
     
 implicit none
 
@@ -7,14 +9,20 @@ contains
 
 
 subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-    gamma, alpha, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+    gamma, alpha, temperature, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
     N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-    exch_rowe, exch_col, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
-	CV, useReturnHall, demigstp, exch_weigh, exch_meth, exch_intpn, &
-	passExch, exch_ncols, crysaxis, k0_arr, k1, k2, problem )
+    exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
+	CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
+	n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
+    passExch, exch_ncols, crysaxis, k0_arr, k1, k2, n_phase, phase_id, A_int, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
+    useDemag, rng_seed)
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
     integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols
+    integer(4), intent(in) :: n_phase                            !> No. of materials; 1 = feature off
+    integer(4),dimension(ntot),intent(in) :: phase_id            !> Material index of each cell
+    real(8),dimension(n_phase,n_phase),intent(in) :: A_int       !> Interface exchange [J/m],
+                                                                 !> negative = use harmonic mean
     integer(4),dimension(3),intent(in) :: grid_n
     real(8),dimension(3),intent(in) :: grid_L
     real(8),dimension(ntot, 3),intent(in) :: grid_pts
@@ -26,24 +34,56 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     real(8),dimension(nt),intent(in) :: t
     real(8),dimension(3*ntot),intent(in) :: m0
     real(8),dimension(nt_alpha,2),intent(in) :: alphat
-    integer(4),dimension(exch_nval),intent(in) :: exch_val
-    integer(4),dimension(exch_nval),intent(in) :: exch_rows
-	integer(4),dimension(exch_nrow),intent(in) :: exch_rowe
-    integer(4),dimension(exch_nval),intent(in) :: exch_col
+    !exch_val holds the non-zero entries of the exchange operator and lands in
+    !problem%grid%A_exch_load%values, which is real(DP). It used to be declared integer(4) here, so
+    !f2py force-cast the float64 array the caller passes down to int32 - and the entries scale as
+    !1/dx**2, i.e. ~1e17 on a nanometre mesh, so they overflowed outright.
+    real(8),dimension(exch_nval),intent(in) :: exch_val
+    integer(4),dimension(exch_nval),intent(in) :: exch_rows, exch_cols
     real(8),dimension(nt_conv),intent(in) :: t_conv
     integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
-    integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch
+    integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, useAvgN, useDemag, demigstp, exch_meth, exch_intpn, passExch
     real(8),intent(in) :: gamma, alpha, MaxT0, tol, thres, conv_tol, dem_thres
-	real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2
+	real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2, temperature
 	real(8),dimension(ntot,6,3),intent(in) :: K0_arr
 	real(8),dimension(ntot,3,3),intent(in):: crysaxis
     integer(4), dimension(3) :: N_ave
-    real(8) :: demag_fac, pi, mu0
+    real(8) :: demag_fac
 	real(8), intent(in) :: CV, exch_weigh
-	
+    integer(4),dimension(3),intent(in) :: n_macro
+    real(8),dimension(3),intent(in) :: shiftVec, macroShape, sampleShape
+    integer(4),dimension(3),intent(in) :: exchPBC
+
     character*256,intent(in) :: N_file_in, N_file_out
 
     type(MicroMagProblem),intent(inout) :: problem
+
+    integer, intent(in) :: dummy_run
+    integer(4), intent(in) :: fmm_cells_per_node
+    real(8), intent(in) :: eps_fmm
+    integer(4), intent(in) :: ifunif
+    integer(4), intent(in) :: nlmin
+    integer(4), intent(in) :: nlmax
+    integer(4), intent(in) :: allow_fmm_short_circuit
+    integer(4), intent(in) :: fmm_min_n
+    integer(4), intent(in) :: fmm_nterms
+    logical, intent(in) :: use_fmm
+    integer(4), intent(in) :: rng_seed
+    logical :: ex
+    integer, save :: itimer = 0
+
+    call trace%begin("loadMicroMagProblem", itimer=itimer, verbose=1)
+
+    problem%dummy_run = dummy_run
+    problem%fmm_cells_per_node = fmm_cells_per_node
+    problem%fmm_eps = eps_fmm
+    problem%ifunif = ifunif
+    problem%nlmin = nlmin
+    problem%nlmax = nlmax
+    problem%allow_fmm_short_circuit = allow_fmm_short_circuit
+    problem%fmm_min_n = fmm_min_n
+    problem%fmm_nterms = fmm_nterms
+    problem%use_fmm = use_fmm
 
     problem%grid%nx = grid_n(1)
     problem%grid%ny = grid_n(2)
@@ -59,6 +99,20 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 
     problem%grid%gridType = grid_type
 
+    !Seed for the stochastic thermal field
+    problem%rng_seed = rng_seed
+
+    !Load macrogeometry information
+    problem%macrogrid%n_macro = n_macro
+    problem%macrogrid%shiftVec = shiftVec
+    problem%macrogrid%macroShape = macroShape
+
+    !Load sample shape information
+    problem%macrogrid%sampleShape = sampleShape
+
+    !Load periodic boundary conditions on the exchange coupling
+    problem%macrogrid%exchPBC = exchPBC
+
     !Load additional things for a tetrahedron grid
     if ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
         !The center points of all the tetrahedron elements           
@@ -72,10 +126,14 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
         !The number of nodes in the tetrahedron mesh
         problem%grid%nnodes = grid_nnod
         
-        !The nodes of all the tetrahedron elements
+        !The nodes of all the tetrahedron elements. grid_nnod x 3 is passed in, to match the way
+        !every other array of positions crosses the python interface, while the rest of MagTense
+        !holds the nodes as 3 x grid_nnod, so the transpose is needed here. Note that assigning
+        !grid_nod directly would not have been caught by the compiler: nodes is allocatable, so
+        !the assignment would silently reallocate it to grid_nnod x 3 instead.
         allocate( problem%grid%nodes(3,grid_nnod) )
-        problem%grid%nodes = grid_nod
-        
+        problem%grid%nodes = transpose( grid_nod )
+
         !the number of nodes in the tetrahedron mesh
         problem%grid%nnodes = grid_nnod
     endif
@@ -98,7 +156,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     !Allocate memory for the easy axis vectors
     allocate( problem%u_ea(ntot,3) )
     problem%u_ea = u_ea
-    
+
     problem%ProblemMode = ProblemMode
     problem%solver = solver
     problem%A0 = A0
@@ -108,12 +166,13 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     problem%K0 = K0
     problem%gamma = gamma
     problem%alpha0 = alpha
+    allocate( problem%temperature(ntot) )
+    problem%temperature = temperature
     problem%MaxT0 = MaxT0
     
     !Applied field as a function of time evaluated at the timesteps specified in nt_Hext
     !problem%Hext(:,1) is the time grid while problem%Hext(:,2:4) are the x-,y- and z-components of the applied field
     problem%Hext = Hext
-    
     allocate( problem%t(nt) )
     problem%t = t
     
@@ -144,11 +203,17 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     
     !flag whether the demag tensor should be loaded
     problem%demagTensorLoadState = N_load
-    
     !File for loading the demag tensor to a file on disk (has to have length>2)
     if ( problem%demagTensorLoadState .gt. 2 ) then
-        !Length of the file name
-        problem%demagTensorFileIn = N_file_in
+
+        inquire(file=trim(N_file_in), exist=ex)
+        if (.not. ex ) then
+            problem%demagTensorLoadState = 0
+        else
+            !Length of the file name
+            problem%demagTensorFileIn = N_file_in
+
+        end if 
     endif
     
     problem%setTimeDisplay = 100
@@ -168,6 +233,13 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     else
         problem%useCVODE = useCVODEFalse
     endif
+    
+    if ( useDemag .eq. 1 ) then
+        problem%useDemag = useDemagTrue
+    else
+        problem%useDemag = useDemagFalse
+        call displayGUIMessage( 'NOT using demag field in calculations' )
+    endif
 	
 	if ( passExch .eq. 1 ) then
 		problem%passExch = passExchTrue
@@ -184,28 +256,13 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 			problem%grid%A_exch_load%ncols = exch_ncols
 			
 			allocate( problem%grid%A_exch_load%values(exch_nval))
-			allocate(problem%grid%A_exch_load%rows_start(exch_nval))
+			allocate(problem%grid%A_exch_load%rows(exch_nval))
 			allocate(problem%grid%A_exch_load%cols(exch_nval))
 
 			problem%grid%A_exch_load%values = exch_val
-			problem%grid%A_exch_load%rows_start = exch_rows
-			problem%grid%A_exch_load%cols = exch_col
-			
-		else
-			! Pass the exchange matrix in CSR sparse information - deprecated feature
-			problem%grid%A_exch_load%nvalues = exch_nval
-			problem%grid%A_exch_load%nrows = exch_nrow
-			
-			allocate( problem%grid%A_exch_load%values(exch_nval) )
-			allocate( problem%grid%A_exch_load%rows_start(exch_nval) )
-			allocate( problem%grid%A_exch_load%rows_end(exch_nrow) )
-			allocate( problem%grid%A_exch_load%cols(exch_nval) )
-				
-			problem%grid%A_exch_load%values = exch_val
-			problem%grid%A_exch_load%rows_start = exch_rows
-			problem%grid%A_exch_load%rows_end = exch_rowe
-			problem%grid%A_exch_load%cols = exch_col
-		endif
+			problem%grid%A_exch_load%rows = exch_rows
+			problem%grid%A_exch_load%cols = exch_cols
+        endif
     endif
         
     !Load the no. of time steps in the time convergence array        
@@ -229,6 +286,12 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 	else
 		problem%useReturnHall = useReturnHallFalse
 	endif
+
+    if ( useAvgN .eq. 1 ) then
+		problem%useAvgN = useAvgNTrue
+	else
+		problem%useAvgN = useAvgNFalse
+	endif
 	
 	problem%demag_ignore_steps = demigstp
 	problem%exch_weight = exch_weigh
@@ -243,18 +306,31 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     problem%K0_arr = k0_arr
     problem%K1 = k1	
     problem%K2 = k2
-        
-	!>-----------------------------------------
-	!Calculate the local scaled coefficients for the LLG equation
-	!"J" : exchange term
-	pi = 3.141592653589793
-	mu0 = 4*pi*1e-7
-	problem%Jfact = problem%A0 / ( mu0 * problem%Ms )
-	!"M" : demagnetization term
-	problem%Mfact = problem%Ms
-	!"K" : anisotropy term
-	problem%Kfact = problem%K0 / ( mu0 * problem%Ms )
 
+    !----------------- Interface exchange between two materials -----------------------
+    !Only stored when there is more than one material, so that a problem that does not use
+    !the feature leaves phase_id and A_int unallocated and takes exactly the old code path.
+    problem%n_phase = n_phase
+    if ( n_phase .gt. 1 ) then
+        if ( minval(phase_id) .lt. 1 .or. maxval(phase_id) .gt. n_phase ) then
+            call displayGUIMessage( 'MagTense: phase_id must be between 1 and n_phase' )
+            error stop 'loadMicroMagProblem: phase_id out of range'
+        endif
+        !An asymmetric table would make the exchange across a face depend on which of the two
+        !cells is asked, which is not a physical operator, so it is rejected rather than
+        !silently symmetrised.
+        if ( maxval(abs(A_int - transpose(A_int))) .gt. 0.0_DP ) then
+            call displayGUIMessage( 'MagTense: the interface exchange table must be symmetric' )
+            error stop 'loadMicroMagProblem: A_int is not symmetric'
+        endif
+        allocate( problem%phase_id(ntot) )
+        problem%phase_id = phase_id
+        allocate( problem%A_int(n_phase,n_phase) )
+        problem%A_int = A_int
+    endif
+    !----------------------------------------------------------------------------------
+
+    call trace%end("loadMicroMagProblem", itimer=itimer, verbose=1)
 end subroutine loadMicroMagProblem
 
 

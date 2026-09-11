@@ -35,8 +35,7 @@ properties
     exch_ncol
     exch_val
     exch_rows
-    exch_rowe
-    exch_col
+    exch_cols
 
     exch_weigh
     exch_meth
@@ -122,6 +121,9 @@ properties
     % are returned from Fortran
     ReturnHall
     
+    %A parameter that determines if the average of the prism is used or not
+    useAvgN
+
     %defines which approximation (if any) to use for the demag tensor 
     dem_appr
     
@@ -186,6 +188,72 @@ properties
 
     %The number of threads used by OpenMP for building the demag tensor
     nThreads = int32(1);
+
+    %FMM parameters
+    fmm_cells
+    fmm_eps
+    ifunif
+    nlmin
+    nlmax
+    use_fmm
+    fmm_short
+    fmm_min_n
+
+    temperature
+    n_macro
+    shiftVec
+    macroShape
+    sampleShape
+    exchPBC
+    dummy_run
+    fmm_nterms
+
+    log_dir char = '';
+    timer_log char = '';
+    trace_log char = '';
+    window_ena
+    window_int
+    trace_ena
+    flush_each
+    trace_verb
+    N_log_dir
+    N_timer_log
+    N_trace_log
+
+    %Adaptive hysteresis parameters
+    adaptiveHext
+    maxHextSteps
+    H_start
+    H_end
+    dH_initial
+    dH_min
+    dH_max
+    dH_grow
+    dH_shrink
+    dM_min
+    dM_target
+    dM_reject
+    switch_refdH
+    use_sw_ref
+
+    %Seed for the stochastic thermal field. 0 keeps the compiler default sequence,
+    %which is identical on every run. A positive value seeds deterministically with
+    %that value, so runs are reproducible but differ from each other. A negative
+    %value seeds from the clock, which is what independent Monte-Carlo runs need.
+    rng_seed
+
+    %Optional exchange stiffness at the interface between two materials. phase_id gives
+    %the material index (1..n_phase) of every tile and A_int is a symmetric
+    %n_phase-by-n_phase table of interface exchange values in J/m. A negative entry means
+    %'use the harmonic mean of the two tiles', which is the default everywhere, so a table
+    %can override only the pairs of interest. Entries on the diagonal are never used, as
+    %two tiles of the same material always use the harmonic mean.
+    %A tile with A0 = 0 is not magnetic, so a face touching one stays uncoupled whatever
+    %the table says, which is what the harmonic mean does by itself.
+    %n_phase = 1 disables the feature.
+    n_phase
+    phase_id
+    A_int
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -231,6 +299,9 @@ properties (SetAccess=private,GetAccess=public)
     %1 for do use (int32). Currently implemented alternative is RK_SUITE,
     %active if CVODE is not used.
     useCVODE
+
+    %defines if the demagnetization field is calculated or not
+    useDemag
 
     %defines what precision is used for the demag tensor. Right now only
     %single is supported. All other varibales are double.
@@ -304,8 +375,7 @@ methods
         obj.exch_ncol = 0;
         obj.exch_val = 0;
         obj.exch_rows = 0;
-        obj.exch_rowe = 0;
-        obj.exch_col = 0;
+        obj.exch_cols = 0;
 
         % Exchange term constant
         obj.A0 = 1.3e-11;
@@ -317,10 +387,10 @@ methods
         obj.K2 = zeros(obj.ntot,1);
 
         %precession constant
-        obj.gamma = 0; %m/A*s
+        obj.gamma = 2.21e5; %m/A*s
 
         %
-        obj.alpha = 0.02;
+        obj.alpha = 4.42e3;
 
         %if set to zero then the alpha parameter remains constant.
         %if MaxT0 > 0 then alpha = alpha0 * 10^( 7 * min(t,MaxT0)/MaxT0 )
@@ -361,10 +431,16 @@ methods
         obj.CV = 0;
         %initial value of the ReturnHall is zero, i.e. the specific fields are not returned
         obj.ReturnHall = int32(0);
+        %initial value of the useAvgN is true
+        obj.useAvgN = int32(1);
         %set use cuda to default not
-        obj.useCuda = int32(0);
+        %--- setUseCuda also picks the MEX file that matches, so it has to go through
+        %--- the setter: a bare obj.useCuda would leave the solver handle empty
+        obj = obj.setUseCuda(false);
 		%set use CVODE to default
         obj.useCVODE = int32(0);
+		%set use Demag to default
+        obj.useDemag = int32(1);
         %set use CVODE to default
         obj.usePres = int32(0);
         %set the demag approximation to the default, i.e. use no
@@ -401,6 +477,58 @@ methods
         obj.MeshType = '' ;
         obj.ExternalMeshFileName = '' ;
         obj.DemagTensorFileName = 0 ;
+
+        obj.fmm_cells = int32(100);
+        obj.fmm_eps = 1e-4;
+        obj.ifunif = int32(1);
+        obj.nlmin = int32(1);
+        obj.nlmax = int32(5);
+        obj.use_fmm = int32(0);
+        obj.fmm_short = int32(1);
+        obj.fmm_min_n = int32(20000);
+
+        obj.temperature	 = zeros(obj.ntot,1);
+        obj.n_macro	= int32([0 0 0]);
+        obj.shiftVec = ([0 0 0]);
+        obj.macroShape = [1 1 1];
+        obj.sampleShape = [1 1 1];
+        obj.exchPBC	= int32([0 0 0]);
+        obj.dummy_run = 0;
+        obj.fmm_nterms = -1;
+
+        obj = obj.setLogDirFilename( 'logs' );
+        obj = obj.setTimerLogFilename( 'timing.log' );
+        obj = obj.setTraceLogFilename( 'trace.log' );
+        obj.window_ena = int32(1);
+        obj.window_int = 30.0;
+        obj.trace_ena = int32(0);
+        obj.flush_each = int32(1);
+        obj.trace_verb = int32(1);
+
+        %Adaptive hysteresis defaults (disabled by default)
+        obj.adaptiveHext = int32(0);
+        obj.maxHextSteps = int32(1000);
+        obj.H_start = [0, 0, 0];
+        obj.H_end = [0, 0, 0];
+        obj.dH_initial = 1e3;
+        obj.dH_min = 1e1;
+        obj.dH_max = 1e5;
+        obj.dH_grow = 1.25;
+        obj.dH_shrink = 0.5;
+        obj.dM_min = 1e-3;
+        obj.dM_target = 1e-2;
+        obj.dM_reject = 5e-2;
+        obj.switch_refdH = 0.0;
+        obj.use_sw_ref = int32(0);
+
+        %Thermal-field RNG seed. Default 0 preserves the previous behaviour.
+        obj.rng_seed = int32(0);
+
+        %One material, i.e. the harmonic mean everywhere, which is the previous behaviour.
+        obj.n_phase = int32(1);
+        obj.phase_id = ones(obj.ntot,1);
+        obj.A_int = -1;
+
     end
     
     %%Calculates the applied field as a function of time on the time grid
@@ -467,6 +595,14 @@ methods
            obj.useCVODE = int32(0);
        end
     end
+
+    function obj = setUseDemag( obj, enabled )
+       if enabled
+           obj.useDemag = int32(1);
+       else
+           obj.useDemag = int32(0);
+       end
+    end
     
     function obj = setLoadNFilename( obj, filename )
         obj.N_load = int32(length(filename));
@@ -476,6 +612,21 @@ methods
     function obj = setReturnNFilename( obj, filename )
         obj.N_ret = int32(length(filename));
         obj.N_file_out = filename;
+    end
+
+    function obj = setLogDirFilename( obj, filename )
+        obj.N_log_dir = int32(length(filename));
+        obj.log_dir = filename;
+    end
+
+    function obj = setTimerLogFilename( obj, filename )
+        obj.N_timer_log = int32(length(filename));
+        obj.timer_log = filename;
+    end
+
+    function obj = setTraceLogFilename( obj, filename )
+        obj.N_trace_log = int32(length(filename));
+        obj.trace_log = filename;
     end
     
     function obj = setSaveTheResult( obj, enabled )
@@ -507,20 +658,6 @@ methods
         end
     end
 
-    function obj = setExchangeMatrixSparse( obj, ExchangeMatrix )
-    % Convert the Exchange matrix to CSR and store it in the problem statement
-        [v,c,rs,re]   = convertToCSR(ExchangeMatrix);
-        obj.exch_nval = int32(numel(v));
-        obj.exch_nrow = int32(numel(rs));
-        obj.exch_val  = double(v);
-        obj.exch_rows = int32(rs);
-        obj.exch_rowe = int32(re);
-        obj.exch_col  = int32(c);
-        obj.exch_ncol = int32(0);
-
-        disp(['The demag tensor will require around ' num2str(((3*numel(rs)*(3*numel(rs) + 1)/2))*4/(2^30)) ' Gb'])
-    end
-
     function obj = setExchangeMatrixCOO( obj, nrows, ncols, rows, cols, values )
     % Pass the Exchange matrix to Fortran in COO format
         obj = obj.setMicroMagpassExch( true );
@@ -529,7 +666,7 @@ methods
         obj.exch_nval = int32(numel(rows));
         obj.exch_val  = double(values);
         obj.exch_rows = int32(rows);
-        obj.exch_col  = int32(cols);
+        obj.exch_cols  = int32(cols);
     end
 
     function obj = setMicroMagDemagApproximation( obj, type_var )
@@ -572,14 +709,74 @@ methods
 
     function obj = setMicroMagGridType( obj, type_var )
     % maps the grid type from name to internal int value
-        
+
         switch type_var
-            case 'uniform' 
+            case 'uniform'
                 obj.grid_type = int32(1);
-            case 'tetrahedron' 
+            case 'tetrahedron'
                 obj.grid_type = int32(2);
-            case 'unstructuredPrisms' 
+            case 'unstructuredPrisms'
                 obj.grid_type = int32(3);
+        end
+    end
+
+    function obj = setMicroMagGridTetrahedron( obj, nodes, elements )
+    % Set up a tetrahedral grid from a mesh, i.e. its nodes and its connectivity
+    %
+    % This is the tetrahedral counterpart of setting grid_pts and grid_abc for a grid of
+    % unstructured prisms: the mesh is all that has to be given, and MagTense analyses it and
+    % builds the exchange operator itself. Do not call setExchangeMatrixSparse or
+    % setExchangeMatrixCOO afterwards - those switch on passExch, which tells MagTense that the
+    % exchange operator is supplied from the outside and makes it skip the mesh analysis.
+    %
+    % nodes is 3 x M, or M x 3, holding the coordinates of the mesh nodes.
+    % elements is 4 x N, or N x 4, holding the four corner nodes of each tetrahedron, 1-based.
+    % A mesh from the PDE Toolbox is passed straight through as
+    %   problem = problem.setMicroMagGridTetrahedron(model.Mesh.Nodes, model.Mesh.Elements);
+    % including a quadratic one, of which only the corner nodes are used.
+    %
+    % The element centres are computed here, so that grid_pts cannot fall out of step with the
+    % mesh it is supposed to describe.
+
+        % Both arrays are accepted either way round, since getting them transposed is a silent
+        % error rather than a loud one: only the orientation that cannot be told apart is
+        % rejected
+        if size(nodes,1) ~= 3 && size(nodes,2) == 3
+            nodes = nodes';
+        end
+        if size(nodes,1) ~= 3
+            error('DefaultMicroMagProblem:nodeShape', ...
+                  'nodes has to be 3 x M or M x 3, but it is %d x %d', size(nodes,1), size(nodes,2));
+        end
+        if size(elements,1) ~= 4 && size(elements,2) == 4
+            elements = elements';
+        end
+        if size(elements,1) < 4
+            error('DefaultMicroMagProblem:elementShape', ...
+                  'elements has to be 4 x N or N x 4, but it is %d x %d', ...
+                  size(elements,1), size(elements,2));
+        end
+        elements = elements(1:4,:);   % A quadratic mesh is used as its linear counterpart
+
+        if min(elements(:)) < 1 || max(elements(:)) > size(nodes,2)
+            error('DefaultMicroMagProblem:connectivityRange', ...
+                  'the connectivity refers to nodes outside the node array, and has to be 1-based');
+        end
+        if size(elements,2) ~= obj.ntot
+            error('DefaultMicroMagProblem:elementCount', ...
+                  'the mesh has %d elements but the problem was created for %d tiles', ...
+                  size(elements,2), obj.ntot);
+        end
+
+        obj = obj.setMicroMagGridType('tetrahedron');
+        obj.grid_nod  = double(nodes);
+        obj.grid_ele  = int32(elements);
+        obj.grid_nnod = int32(size(nodes,2));
+
+        % The centre of each tetrahedron, which is the point MagTense places the tile at
+        obj.grid_pts = squeeze(mean(reshape(nodes(:, elements(:))', [4, size(elements,2), 3]), 1));
+        if size(elements,2) == 1
+            obj.grid_pts = obj.grid_pts(:)';
         end
     end
 
@@ -651,17 +848,36 @@ methods
         mnorm=vecnorm(obj.m0,2,2); % Check if input array is normalized
         normcondfail=abs(mnorm-ones(obj.ntot,1)) >= obj.tol;
         if any(normcondfail)
-            if all(mnorm(normcondfail)==0*mnorm(normcondfail))
+            % Rows of zero length have no direction to normalise to. Dividing them
+            % would produce NaN, so they are reported and then left alone -- the
+            % previous version only reported them when *every* failing row was zero,
+            % and otherwise divided the whole array, NaN-ing the zero rows.
+            zerorow = (mnorm == 0);
+            if any(zerorow)
                 warning('Zero magnetization in initial array')
-            else
-                warning('Initial array not normalized -- Normalizing')
-                obj.m0=obj.m0./mnorm;
             end
+            if any(normcondfail & ~zerorow)
+                warning('Initial array not normalized -- Normalizing')
+                obj.m0(~zerorow,:) = obj.m0(~zerorow,:)./mnorm(~zerorow);
+            end
+        end
+        if (obj.useDemag)
+           disp(['The demag tensor will require around ' num2str(((3*numel(obj.m0)*(3*numel(obj.m0) + 1)/2))*4/(2^30)) ' Gb'])
         end
         warning('off','MATLAB:structOnObject')
         obj2=builtin('struct',obj); % Actual struct conversion
         warning('on','MATLAB:structOnObject')
     end
     
+end
+
+methods (Static)
+    function [v,c,rs,re] = convertToCSR(B)
+        [c,r,v] = find(B');
+        dr = diff(r);
+        rtmp = repelem(find(dr > 0)+1,dr(dr>0));
+        rs = [1; rtmp];
+        re = [rtmp; length(r)+1];
+    end
 end
 end

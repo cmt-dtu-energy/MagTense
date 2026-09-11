@@ -2,7 +2,7 @@ name: magtense-env
 channels:
   - https://software.repos.intel.com/python/conda
   - https://software.repos.intel.com/python/conda/
-  - nvidia/label/cuda-12.8.1
+  - nvidia/label/cuda-13.3.1
   - conda-forge
   - https://repo.anaconda.com/pkgs/main
   - https://repo.anaconda.com/pkgs/r
@@ -16,26 +16,26 @@ dependencies:
   - ca-certificates=2025.8.3=hbd8a1cb_0
   - cmake=4.1.0=hc85cc9f_0
   - compiler_shared=2025.2.1=intel_7
-  - cuda-cccl_linux-64=12.8.90=0
-  - cuda-crt-dev_linux-64=12.8.93=0
-  - cuda-crt-tools=12.8.93=0
-  - cuda-cudart=12.8.90=0
-  - cuda-cudart-dev=12.8.90=0
-  - cuda-cudart-dev_linux-64=12.8.90=0
-  - cuda-cudart-static=12.8.90=0
-  - cuda-cudart-static_linux-64=12.8.90=0
-  - cuda-cudart_linux-64=12.8.90=0
-  - cuda-driver-dev_linux-64=12.8.90=0
-  - cuda-nvcc=12.8.93=0
-  - cuda-nvcc-dev_linux-64=12.8.93=0
-  - cuda-nvcc-impl=12.8.93=0
-  - cuda-nvcc-tools=12.8.93=0
-  - cuda-nvcc_linux-64=12.8.93=0
-  - cuda-nvrtc=12.8.93=0
-  - cuda-nvvm-dev_linux-64=12.8.93=0
-  - cuda-nvvm-impl=12.8.93=0
-  - cuda-nvvm-tools=12.8.93=0
-  - cuda-version=12.8=3
+  - cuda-cccl_linux-64=13.3.3.4.1=0
+  - cuda-crt-dev_linux-64=13.3.73=0
+  - cuda-crt-tools=13.3.73=0
+  - cuda-cudart=13.3.29=h159e8ec_0
+  - cuda-cudart-dev=13.3.29=hfa86176_0
+  - cuda-cudart-dev_linux-64=13.3.29=h74be60c_0
+  - cuda-cudart-static=13.3.29=hfa86176_0
+  - cuda-cudart-static_linux-64=13.3.29=h74be60c_0
+  - cuda-cudart_linux-64=13.3.29=h32d0467_0
+  - cuda-driver-dev_linux-64=13.3.29=h74be60c_0
+  - cuda-nvcc=13.3.73=h36385b3_0
+  - cuda-nvcc-dev_linux-64=13.3.73=0
+  - cuda-nvcc-impl=13.3.73=h74be60c_0
+  - cuda-nvcc-tools=13.3.73=hfa86176_0
+  - cuda-nvcc_linux-64=13.3.73=h7001b23_0
+  - cuda-nvrtc=13.3.33=h8187d64_0
+  - cuda-nvvm-dev_linux-64=13.3.73=0
+  - cuda-nvvm-impl=13.3.73=h5a35853_0
+  - cuda-nvvm-tools=13.3.73=h5a35853_0
+  - cuda-version=13.3=h87dbc72_3
   - dpcpp-cpp-rt=2025.2.1=intel_7
   - dpcpp_impl_linux-64=2025.2.1=intel_7
   - dpcpp_linux-64=2025.2.1=intel_7
@@ -56,11 +56,11 @@ dependencies:
   - keyutils=1.6.3=hb9d3cd8_0
   - krb5=1.21.3=h659f571_0
   - ld_impl_linux-64=2.44=h1423503_1
-  - libcublas=12.8.4.1=0
-  - libcublas-dev=12.8.4.1=0
+  - libcublas=13.6.0.2=h2ef3463_0
+  - libcublas-dev=13.6.0.2=h2ef3463_0
   - libcurl=8.14.1=h332b0f4_0
-  - libcusparse=12.5.8.93=0
-  - libcusparse-dev=12.5.8.93=0
+  - libcusparse=12.8.2.51=hf6fa245_0
+  - libcusparse-dev=12.8.2.51=hf6fa245_0
   - libedit=3.1.20250104=pl5321h7949ede_0
   - libev=4.33=hd590300_2
   - libexpat=2.7.1=hecca717_0
@@ -72,8 +72,8 @@ dependencies:
   - liblzma=5.8.1=hb9d3cd8_2
   - libnghttp2=1.64.0=h161d5f1_0
   - libnsl=2.0.1=hb9d3cd8_1
-  - libnvjitlink=12.8.93=1
-  - libnvjitlink-dev=12.8.93=1
+  - libnvjitlink=13.3.33=h8187d64_0
+  - libnvjitlink-dev=13.3.33=h8187d64_0
   - libsanitizer=13.4.0=h14bf0c3_4
   - libsqlite=3.50.4=h0c1763c_0
   - libssh2=1.11.1=hcf80075_0

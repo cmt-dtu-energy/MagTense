@@ -1,4 +1,4 @@
-function MagTense_Validation_spheroid()
+function [rel_int_error] = MagTense_Validation_spheroid()
 
 clearvars
 close all
@@ -13,16 +13,17 @@ use_existing_FEM_oblate  = 0;
 %make sure to source the right path for the generic Matlab routines
 addpath(genpath('../../../util/'));
 addpath('../../../MEX_files/');
+addpath('../../../../documentation/examples_FEM_validation/');
 
 %% Geometric parameters
 %%Get a default tile from MagTense
-tile = getDefaultMagTile();
+tile = DefaultMagTile();
 
 %ensure the tile is a permanent magnet
-tile.magnetType = getMagnetType('hard');
+tile = tile.setMagnetType('hard');
 
 %set the geometry to be a rectangular prism
-tile.tileType = getMagTileType('spheroid');
+tile = tile.setMagTileType('spheroid');
 
 %use existing FEM data or run a random model in Comsol to compare against
 if use_existing_FEM_prolate
@@ -106,9 +107,9 @@ if (do_Comsol_model == 1)
 end
 
 if use_existing_FEM_prolate
-    data_FEM_coor = load('..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_prolate_surface_coordinates.txt');
+    data_FEM_coor = load('../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_prolate_surface_coordinates.txt');
 elseif use_existing_FEM_oblate
-    data_FEM_coor = load('..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_oblate_surface_coordinates.txt');
+    data_FEM_coor = load('../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_oblate_surface_coordinates.txt');
 else
     data_FEM_coor = load('Comsol_spheroid_surface.txt');
 end
@@ -184,15 +185,15 @@ if use_existing_FEM_prolate
     FEM_str = 'prolate';
 end
 if (use_existing_FEM_oblate || use_existing_FEM_prolate)
-    data_FEM_Hx_x = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hx_x.txt']);
-    data_FEM_Hx_y = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hx_y.txt']);
-    data_FEM_Hx_z = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hx_z.txt']);
-    data_FEM_Hy_x = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hy_x.txt']);
-    data_FEM_Hy_y = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hy_y.txt']);
-    data_FEM_Hy_z = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hy_z.txt']);
-    data_FEM_Hz_x = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hz_x.txt']);
-    data_FEM_Hz_y = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hz_y.txt']);
-    data_FEM_Hz_z = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hz_z.txt']);
+    data_FEM_Hx_x = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hx_x.txt']);
+    data_FEM_Hx_y = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hx_y.txt']);
+    data_FEM_Hx_z = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hx_z.txt']);
+    data_FEM_Hy_x = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hy_x.txt']);
+    data_FEM_Hy_y = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hy_y.txt']);
+    data_FEM_Hy_z = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hy_z.txt']);
+    data_FEM_Hz_x = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hz_x.txt']);
+    data_FEM_Hz_y = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hz_y.txt']);
+    data_FEM_Hz_z = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hz_z.txt']);
     xlim(fig1,[-0.09 -0.03])
     xlim(fig2,[-0.02 0.04])
     xlim(fig3,[-0.02 0.04])
@@ -289,5 +290,12 @@ if ~(use_existing_FEM_oblate || use_existing_FEM_prolate)
     delete('Comsol_spheroid_Hz_y.txt');
     delete('Comsol_spheroid_Hz_z.txt');
 end
+
+% Interpolate the MagTense solution to the FEM solution and calculate the relative error in percent
+rel_int_error(1) = calculate_relative_integral_error(data_FEM_Hx_x(:,1),data_FEM_Hx_x(:,2),x,H(1:numel(x),1));
+rel_int_error(2) = calculate_relative_integral_error(data_FEM_Hy_x(:,1),data_FEM_Hy_x(:,2),y,H(1:numel(x),2));
+rel_int_error(3) = calculate_relative_integral_error(data_FEM_Hz_x(:,1),data_FEM_Hz_x(:,2),z,H(1:numel(x),3));
+
+disp(['Relative integrated error between MagTense and FEM is Mx = ' num2str(rel_int_error(1)) ', My = ' num2str(rel_int_error(2)) ', Mz = ' num2str(rel_int_error(3)) ])
 
 end

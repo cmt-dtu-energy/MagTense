@@ -5,7 +5,7 @@
   </picture>
   <br>
 </div>
-
+ 
 # MagTense
 
 MagTense is a framework for magnetostatic and micromagnetic calculations.
@@ -21,7 +21,7 @@ MagTense is a framework for magnetostatic and micromagnetic calculations.
 
 ## Installation and usage with the Python interface
 
-Installation is recommended via `pip` (requires >=**Python 3.12**):
+Installation is recommended via `pip` (requires >=**Python 3.12**; wheels are built for Python 3.12, 3.13 and 3.14):
 
 ```
 pip install magtense

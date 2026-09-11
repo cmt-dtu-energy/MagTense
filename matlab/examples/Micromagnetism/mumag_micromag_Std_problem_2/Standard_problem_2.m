@@ -1,36 +1,19 @@
-function [elapsedTime,problem,solution,results] = Standard_problem_2(resolution, use_CUDA, ShowTheResult, SaveTheResult, run_single_curve, run_MrHc )
+function [elapsedTime,problem,solution,results] = Standard_problem_2(resolution, d_loop, options)
 
-clearvars -except resolution use_CUDA SaveTheResult ShowTheResult run_single_curve run_MrHc
-% close all
+arguments
+    resolution (1,3) {mustBeInteger}                = [20,4,1];     %--- [nx,ny,nz] of the grid
+    d_loop (1,:) {mustBeNumeric}                    = linspace(0.05,0.5,10); %--- The values of d to run the model for
+    options.use_CUDA {mustBeNumericOrLogical}       = true          %--- Use CUDA for the calculations
+    options.use_CVODE {mustBeNumericOrLogical}      = false;        %--- Use CVODE for the numerical time evolution
+    options.ShowTheResult {mustBeNumericOrLogical}  = true          %--- Show the result
+end
 
-if ~exist('resolution','var')
-    resolution = [20,4,1];
-end
-if ~exist('use_CUDA','var')
-    use_CUDA = false;
-end
-if ~exist('ShowTheResult','var')
-    ShowTheResult = 1;
-end
-if ~exist('SaveTheResult','var')
-    SaveTheResult = 0;
-end
-if ~exist('run_single_curve','var')
+if (isscalar(d_loop) && d_loop == 0.5)
     run_single_curve = 1;
-end
-if ~exist('run_MrHc','var')
-    run_MrHc = 0;
-end
-
-if use_CUDA
-    dir_m = 'GPU';
 else
-    dir_m = 'CPU';
+    run_single_curve = 0;
 end
 
-if (ShowTheResult)
-    figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
-end
 mu0 = 4*pi*1e-7;
 
 addpath('../../../MEX_files');
@@ -43,7 +26,8 @@ addpath('../../../util');
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
 problem = problem.setMicroMagDemagApproximation('none');
-problem = problem.setUseCuda( use_CUDA );
+problem = problem.setUseCuda( options.use_CUDA );
+problem = problem.setUseCVODE( options.use_CVODE );
 problem.alpha = 1e3;
 % problem.gamma = 2.21e5;
 
@@ -73,17 +57,8 @@ AlphaFct = @(t) problem.alpha * 10.^( 5 * min(t,2e-9)/2e-9 );
 problem = problem.setAlpha( AlphaFct, linspace(0,10e-9,100) );
 problem.alpha = 0;
 
-if run_single_curve
-    %% Run a single hysterhesis curve for standard problem 2
-    d_loop = 0.5;
-end
-if run_MrHc
-    d_loop = linspace(0.05,0.5,10);
-end
-
 tic
 for i = 1:length(d_loop)
-
     problem.grid_L = [5e-6,1e-6,1e-7]*d_loop(i);%m
     results.dlex(i) = problem.grid_L(2)/sqrt(problem.A0/(1/2*mu0*problem.Ms^2));
     
@@ -104,9 +79,6 @@ for i = 1:length(d_loop)
         Mz(j) = mean(Mz_arr./MN) ;
         M(j) = Mx(j)*HystDir(1) + My(j)*HystDir(2) + Mz(j)*HystDir(3) ;
     end
-    if (ShowTheResult)
-        plot(fig1,sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,mu0*M,'rp') %Minus signs added to correspond to regular hysteresis plots.
-    end
     
     results.Mxr(i) = interp1(sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,Mx,0);
     results.Myr(i) = interp1(sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,My,0);
@@ -114,11 +86,25 @@ for i = 1:length(d_loop)
 end
 elapsedTime = toc
 
-if run_MrHc
-    if (ShowTheResult)
-        figure; plot(results.dlex,results.Mxr,'.'); xlabel('d/l_{ex}'); ylabel('M_{xr}/M_s');
-        figure; plot(results.dlex,results.Myr,'.'); xlabel('d/l_{ex}'); ylabel('M_{yr}/M_s');
-        figure; plot(results.dlex,abs(results.Hc),'.'); xlabel('d/l_{ex}'); ylabel('|H_c|/M_s');
+
+if (options.ShowTheResult)
+    figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
+    figure2= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig2 = axes('Parent',figure2,'Layer','top','FontSize',16); hold on; grid on; box on
+    figure3= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig3 = axes('Parent',figure3,'Layer','top','FontSize',16); hold on; grid on; box on
+    
+    plot(fig1,results.dlex,results.Mxr,'k.','Markersize',20); xlabel(fig1,'d/l_{ex}'); ylabel(fig1,'M_{xr}/M_s');
+    plot(fig2,results.dlex,results.Myr,'k.','Markersize',20); xlabel(fig2,'d/l_{ex}'); ylabel(fig2,'M_{yr}/M_s');
+    plot(fig3,results.dlex,abs(results.Hc),'k.','Markersize',20); xlabel(fig3,'d/l_{ex}'); ylabel(fig3,'|H_c|/M_s');
+    
+    %% --------------------------------------------------------------------------------------------------------------------------------------
+    %% --------------------------------------------------------------------  mumag -----------------------------------------------------------
+    %% --------------------------------------------------------------------------------------------------------------------------------------
+    mumag_data_names = {'Streibl','McMichael','Lopez-Diaz','Donahue'};
+    for i = 1:length(mumag_data_names)
+        mumag_data = load(['../../../../documentation/examples_mumag_validation/Validation_standard_problem_2/' mumag_data_names{i} '.txt']);
+        plot(fig1,mumag_data(:,1),mumag_data(:,2),'d');
+        plot(fig2,mumag_data(:,1),mumag_data(:,3),'d');
+        plot(fig3,mumag_data(:,1),mumag_data(:,4),'d');
     end
 end
 
@@ -127,19 +113,20 @@ if run_single_curve
 %% --------------------------------------------------------------------  mumag -----------------------------------------------------------
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% Compare with published solutions available from mumag webpage for single curve for d/l_ex = 30
-    load('OOMMF_Hysteresis2D_dlex30.mat');
-    plot(fig1,mu0*H,M,'k>');
-    load('OOMMF_HysteresisQuasi3D_dlex30.mat');
-    plot(fig1,mu0*H,M,'k<');
-    load('OOMMF_Hysteresis3D_dlex30.mat');
-    plot(fig1,mu0*H,M,'k^');
+    figure4= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig4 = axes('Parent',figure4,'Layer','top','FontSize',16); hold on; grid on; box on
+    plot(fig1,sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,mu0*M,'rp') %Minus signs added to correspond to regular hysteresis plots.
 
-    % legend(fig1,'Fortran Mx','Fortran My','Fortran Mz','Matlab Mx','Matlab My','Matlab Mz','\mu{}mag \sigma{}(Mx)','\mu{}mag <Mx>','\mu{}mag \sigma{}(My)','\mu{}mag <My>','\mu{}mag \sigma{}(Mz)','\mu{}mag <Mz>');
-    legend(fig1,'"Fortran Explicit method"','OOMMF 2D','OOMMF Quasi3D','OOMMF 3D','Location','SouthEast');
-    ylabel(fig1,'<M_i>/M_s')
-    xlabel(fig1,'\mu_{0}H_{applied} [T]')
-    xlim(fig1,[-0.1 0.1])
-    figure(figure1)
+    load('OOMMF_Hysteresis2D_dlex30.mat');
+    plot(fig4,mu0*H,M,'k>');
+    load('OOMMF_HysteresisQuasi3D_dlex30.mat');
+    plot(fig4,mu0*H,M,'k<');
+    load('OOMMF_Hysteresis3D_dlex30.mat');
+    plot(fig4,mu0*H,M,'k^');
+
+    legend(fig4,'"MagTense"','OOMMF 2D','OOMMF Quasi3D','OOMMF 3D','Location','SouthEast');
+    ylabel(fig4,'<M_i>/M_s')
+    xlabel(fig4,'\mu_{0}H_{applied} [T]')
+    xlim(fig4,[-0.1 0.1])
 end
 
 end

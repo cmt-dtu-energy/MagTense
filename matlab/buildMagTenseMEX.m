@@ -5,15 +5,25 @@ arguments
     options.USE_RELEASE {mustBeNumericOrLogical} = true;
     options.USE_CUDA {mustBeNumericOrLogical}    = true;
     options.USE_CVODE {mustBeNumericOrLogical}   = true;
-    
+    options.USE_FMM3D {mustBeNumericOrLogical}   = false;
+
     %--- Set the right include paths on Windows or allow the user to set them manually
     options.mkl_include   = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include"';
     options.mkl_lp64      = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\mkl\intel64\lp64"';
     options.mkl_lib       = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\lib"';
-    options.cuda_root     = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\lib\x64"';
+    %--- CUDA 13 keeps the import libraries in lib\x64, as the standalone
+    %--- toolkit always has. A Conda environment puts them in
+    %--- <env>\Library\lib\x64 instead, so pass that as cuda_root when linking
+    %--- against the Conda toolkit rather than a standalone installation - up
+    %--- to CUDA 12 they sat directly in <env>\Library\lib and were picked up
+    %--- from the mkl_lib search path by accident.
+    options.cuda_root     = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64"';
     options.cvode_include = '"C:\Program Files (x86)\sundials-7.2.1\fortran"';
     options.cvode_lib     = '"C:\Program Files (x86)\sundials-7.2.1\lib"';
-    
+
+    %--- The static FMM3D archive produced by 'make fmm3d USE_FMM3D=1'
+    options.fmm3d_lib     = '../external/FMM3D/lib-static';
+
     options.VS_STUDIO {mustBeNumericOrLogical} = false;
 end
 
@@ -21,15 +31,18 @@ end
 USE_RELEASE   = options.USE_RELEASE;
 USE_CUDA      = options.USE_CUDA;
 USE_CVODE     = options.USE_CVODE;
+USE_FMM3D     = options.USE_FMM3D;
 VS_STUDIO     = options.VS_STUDIO;
+fmm3d_lib     = options.fmm3d_lib;
 
 pause_time = 1; %Time to wait between making and moving the generated files
-mex_root                    = '../source/MagTenseMEX/MagTenseMEX/';
-NumericalIntegration_path   = '../source/NumericalIntegration/NumericalIntegration';
-DemagField_path             = '../source/DemagField/DemagField';
-TileDemagTensor_path        = '../source/TileDemagTensor/TileDemagTensor';
+mex_root                    = '../source/MagTenseMEX/';
+AuxMT_path                  = '../source/AuxMT';
+NumericalIntegration_path   = '../source/NumericalIntegration';
+DemagField_path             = '../source/DemagField';
+TileDemagTensor_path        = '../source/TileDemagTensor';
 MagTenseMicroMag_path       = '../source/MagTenseMicroMag';
-ForceIntegrator_path        = '../source/MagneticForceIntegrator/MagneticForceIntegrator';
+ForceIntegrator_path        = '../source/MagneticForceIntegrator';
 FortranCuda_path            = '../source/MagTenseFortranCuda/cuda';
 
 if (ispc)
@@ -53,19 +66,23 @@ else
         share_dir = system('ls /usr/share/miniconda/envs/magtense-env/');
     
         if (share_dir == 0)
-            pre_str = '/usr/share/miniconda';
+            pre_str = '/usr/share/miniconda/envs/magtense-env';
         else
             %--- Get the username of the current user, which is where the miniconda is installed
             [~,username] = system('whoami');
             user = username(1:(end-1));
-            pre_str = ['/home/' user '/miniconda3'];
+            pre_str = ['/home/' user '/miniconda3/envs/magtense-env'];
+        end
+    else
+        if isempty(strfind(pre_str,'magtense-env'))
+            pre_str = [pre_str '/envs/magtense-env'];
         end
     end
 
-    compiler_root = [pre_str '/envs/magtense-env'];
-    mkl_root = [pre_str '/envs/magtense-env'];
-    mkl_lib = [pre_str '/envs/magtense-env/lib'];
-    cuda_root = [pre_str '/envs/magtense-env/lib'];
+    compiler_root = pre_str;
+    mkl_root = pre_str;
+    mkl_lib = [pre_str '/lib'];
+    cuda_root = [pre_str '/lib'];
     cvode_include = '/home/runner/work/MagTense/MagTense/cvode/fortran';
     cvode_lib = '/home/runner/work/MagTense/MagTense/cvode/lib';
     mex_suffix = 'a';
@@ -79,10 +96,20 @@ else
     BUILD = '/x64/Debug';
 end
 
+if (VS_STUDIO)
+    BUILD_AuxMT = [BUILD ' '];
+else
+    BUILD_AuxMT = ' ';
+end
+
 if (USE_CUDA)
     if (ispc)
         CUDA = ['-L' cuda_root ' -lcublas -lcudart -lcuda -lcusparse'];
-        OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.obj ' FortranCuda_path '/MagTenseCudaBlas.obj" '];
+        % if (VS_STUDIO)
+            OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.obj ' FortranCuda_path '/MagTenseCudaBlas.obj" '];
+        % else
+            % OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.o ' FortranCuda_path '/MagTenseCudaBlas.o" '];
+        % end
     else
         CUDA = ['-Wl,-Bdynamic ' '-L' cuda_root ' -lcublas -lcudart -lcusparse'];
         OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.o ' FortranCuda_path '/MagTenseCudaBlas.o" '];
@@ -103,7 +130,6 @@ if (USE_CVODE)
     
     if (ispc)
         CVODE = ['-L' cvode_lib ' -lsundials_core_static -lsundials_cvode_static -lsundials_fcore_mod -lsundials_fcvode_mod_static -lsundials_fnvecserial_mod_static -lsundials_fsunmatrixdense_mod_static -lsundials_fsunlinsolspgmr_mod_static'];
-        CVODE = [CVODE ' LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"'];
     else
         CVODE = [' -Wl,--start-group ' cvode_lib '/libsundials_core.a ' cvode_lib '/libsundials_cvode.a ' cvode_lib '/libsundials_fcore_mod.a ' cvode_lib '/libsundials_fcvode_mod.a ' cvode_lib '/libsundials_fnvecserial_mod.a ' cvode_lib '/libsundials_fsunmatrixdense_mod.a ' cvode_lib '/libsundials_fsunlinsolspgmr_mod.a' ' -Wl,--end-group'];
     end
@@ -113,6 +139,27 @@ else
     if (VS_STUDIO)
         BUILD = [BUILD '_no_CVODE'];
         BUILD_MagTenseMicroMag = [BUILD_MagTenseMicroMag '_no_CVODE'];
+    end
+end
+
+if (USE_FMM3D)
+    if (ispc)
+        %--- mex maps -lfoo to foo.lib and the archive is named libfmm3d.lib
+        FMM3D = ['-L' fmm3d_lib ' -llibfmm3d'];
+        fmm3d_file = fullfile(fmm3d_lib, 'libfmm3d.lib');
+    else
+        FMM3D = ['-L' fmm3d_lib ' -lfmm3d'];
+        fmm3d_file = fullfile(fmm3d_lib, 'libfmm3d.a');
+    end
+
+    if (~isfile(fmm3d_file))
+        error(['FMM3D library not found: ' fmm3d_file '. Build it with ' ...
+            '''make fmm3d USE_FMM3D=1'' before building the MEX files.'])
+    end
+else
+    FMM3D = '';
+    if (VS_STUDIO)
+        BUILD_MagTenseMicroMag = [BUILD_MagTenseMicroMag '_no_FMM'];
     end
 end
 
@@ -130,10 +177,11 @@ if (ispc)
     if (USE_CUDA)
         FFLAGS = [FFLAGS(1:(end-1)) ' /libs:static"'];
     end
-    INCLUDE = ['-I' mkl_include ' -I' mkl_lp64 ' -I' NumericalIntegration_path BUILD '-I' DemagField_path BUILD '-I' TileDemagTensor_path ...
+    INCLUDE = ['-I' mkl_include ' -I' mkl_lp64 ' -I' NumericalIntegration_path BUILD ' -I' AuxMT_path BUILD_AuxMT ' -I' DemagField_path BUILD '-I' TileDemagTensor_path ...
         BUILD '-I' MagTenseMicroMag_path BUILD_MagTenseMicroMag '-I' ForceIntegrator_path BUILD CVODE_include];
     LIBS = ['-L' MagTenseMicroMag_path BUILD_MagTenseMicroMag '-lMagTenseMicroMag -L' DemagField_path BUILD ...
-        ' -lDemagField -L' TileDemagTensor_path BUILD ' -lTileDemagTensor -L' NumericalIntegration_path BUILD ...
+        ' -lDemagField -L' TileDemagTensor_path BUILD ' -lTileDemagTensor -L' AuxMT_path BUILD_AuxMT ...
+        ' -lAuxMT -L' NumericalIntegration_path BUILD ...
         ' -lNumericalIntegration -L' ForceIntegrator_path BUILD ' -lMagneticForceIntegrator'];
     
     if (MKL_STATIC)
@@ -143,12 +191,13 @@ if (ispc)
     end
 else
     DEFINES = ['FC="' compiler_root '/bin/ifx" DEFINES="-DMATLAB_DEFAULT_RELEASE=R2018a"'];
-    INCLUDE = ['INCLUDE="$INCLUDE -I' NumericalIntegration_path ' -I' DemagField_path ...
+    INCLUDE = ['INCLUDE="$INCLUDE -I' AuxMT_path ' -I'  NumericalIntegration_path ' -I' DemagField_path ...
         ' -I' TileDemagTensor_path ' -I' MagTenseMicroMag_path ' -I' ForceIntegrator_path ... 
         ' -I' mkl_root '/include' ' -I' mkl_root '/include/intel64/lp64'];
     LIBS = ['LINKLIBS=''$LINKLIBS ' '-L' MagTenseMicroMag_path ' -lMagTenseMicroMag -L' ...
         ForceIntegrator_path ' -lMagneticForceIntegrator -L' DemagField_path ' -lDemagField -L' ...
-        TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration'''];
+        TileDemagTensor_path ' -lTileDemagTensor -L' NumericalIntegration_path ' -lNumericalIntegration -L' ...
+        AuxMT_path ' -lAuxMT'''];
     if (MKL_STATIC)
         LIBS = [LIBS(1:(end-1)) ' ' mkl_lib '/libmkl_blas95_lp64.a -Wl,--start-group ' ...
                mkl_lib '/libmkl_intel_lp64.a ' mkl_lib '/libmkl_intel_thread.a ' ...
@@ -176,8 +225,23 @@ else
         LIBS = [LIBS(1:(end-1)) ' ' CVODE ''''];
         CVODE = '';
     end
+    if (USE_FMM3D)
+        LIBS = [LIBS(1:(end-1)) ' ' FMM3D ''''];
+        FMM3D = '';
+    end
     INCLUDE = [INCLUDE CVODE_include '"'];
     FFLAGS = ['FFLAGS="-O3 -fpp -real-size 64 -fpe0 -fp-model=source -fPIC -nologo -diag-disable 10006"'];
+end
+
+LINKFLAGS = ' LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"';
+
+%--- FMM3D is built with /MD, so the static runtime pulled in by /libs:static
+%--- has to be kept out of the link - see LDFLAGS in the root Makefile
+if (ispc && USE_FMM3D)
+    LINKFLAGS = [LINKFLAGS(1:(end-1)) ' /NODEFAULTLIB:libcmt.lib"'];
+    if (~USE_RELEASE)
+        LINKFLAGS = [LINKFLAGS(1:(end-1)) ' /NODEFAULTLIB:libcmtd.lib"'];
+    end
 end
 
 %%------------------------------------------------------------------
@@ -196,7 +260,7 @@ for i = 1:length(names)
         source = [mex_root names(i) '_mex.f90'];
         orig_name = names(i);
     end
-    mex_str = ['mex' DEBUG DEFINES FFLAGS INCLUDE OBJS LIBS MKL CUDA CVODE join(source, '')];
+    mex_str = ['mex' DEBUG DEFINES FFLAGS INCLUDE OBJS LIBS MKL CUDA CVODE FMM3D LINKFLAGS join(source, '')];
 
     disp(join(mex_str, ' '))
     eval_MEX(join(mex_str, ' '))
