@@ -12,9 +12,15 @@ calculation consists of three parts:
 As output, the three-dimensional H-field vector in 
 the evaluation points is returned.
 
-Examples of how to calculate magnetostatic and micromagnetic 
-problems can be found for `Matlab <https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples>`_ 
-and `python <https://github.com/cmt-dtu-energy/MagTense/tree/master/python/examples>`_.
+Examples of how to calculate magnetostatic and micromagnetic
+problems can be found for `Matlab <https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples>`_
+and `python <https://github.com/cmt-dtu-energy/MagTense/tree/master/python/examples>`_,
+and the micromagnetic ones are described in
+:ref:`Micromagnetic examples and validation`.
+
+The parameters of a micromagnetic problem are of a different kind than the
+MagTile properties below, and are documented separately in
+:ref:`Micromagnetic parameter reference`.
 
 
 ========================================

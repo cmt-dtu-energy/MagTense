@@ -1,94 +1,175 @@
 Demag field - FMM
 =================
 
-Calculating the demagnetization (stray) field is typically the most computationally demanding part of a micromagnetic simulation. While MagTense’s default analytical approach is exact, its $O(N^2)$ scaling can be prohibitive for very large systems. 
+Calculating the demagnetization (stray) field is typically the most
+computationally demanding part of a micromagnetic simulation. MagTense's
+default approach - the fully analytical demagnetization tensor - is exact, but
+its :math:`O(N^2)` memory and work scaling becomes prohibitive for very large
+systems.
 
-To address this, MagTense includes an implementation of the **Fast Multipole Method (FMM)**, which reduces the computational complexity to $O(N)$.
+To address this, MagTense includes an implementation of the **Fast Multipole
+Method (FMM)**, which reduces the computational complexity to :math:`O(N)`.
 
-Implementation & Attribution
----------------------------
-The FMM acceleration in MagTense is built upon the **FMM3D** library developed by the **FlatIron Institute**. 
+.. note::
+   The FMM path is **off by default**. It has to be enabled explicitly with
+   ``use_fmm``, and it is ignored altogether unless the library was built with
+   ``USE_FMM3D=1``. Opting in explicitly means that a problem does not silently
+   change its demagnetization path when the library is rebuilt with FMM
+   support.
 
-* **Core Library:** `FlatIron Institute FMM3D <https://github.com/flatironinstitute/fmm3d>`_
-* **Linking:** MagTense is linked with a specialized fork, `Ximtecs/FMM3D <https://github.com/Ximtecs/FMM3D>`_, which contains updated build configurations and makefiles to allow seamless integration with the MagTense Fortran core.
+Implementation and attribution
+------------------------------
+
+The FMM acceleration in MagTense is built upon the **FMM3D** library developed
+by the **Flatiron Institute**.
+
+* **Core library:** `Flatiron Institute FMM3D <https://github.com/flatironinstitute/fmm3d>`_
+* **Linking:** MagTense links against a fork, `Ximtecs/FMM3D
+  <https://github.com/Ximtecs/FMM3D>`_, which contains updated build
+  configurations and makefiles to allow integration with the MagTense Fortran
+  core.
 
 Compilation
 -----------
-To enable FMM support during the build process, you must explicitly include the FMM flag in your make command. This ensures the compiler links the necessary FMM3D libraries and enables the specialized Fortran modules.
+
+To enable FMM support during the build, include the FMM flag in the make
+command. This links the FMM3D libraries and enables the specialised Fortran
+modules:
 
 .. code-block:: bash
 
     make USE_FMM3D=1
 
-Optimization: Persistent Tree Structure
---------------------------------------
-In micromagnetic simulations, the spatial distribution of cells (the mesh) is typically static throughout the simulation. To maximize efficiency, MagTense utilizes a **"magtense-local"** tree structure. 
+On Linux, ``$(MagTense)/external/FMM3D/local`` must be on ``LD_LIBRARY_PATH``
+when building. Without ``USE_FMM3D=1`` the FMM source is not compiled at all
+and the ``use_fmm`` flag has no effect.
 
-This structure caches the octree setup between consecutive calls to the solver. By reusing the tree, the overhead of re-partitioning space is eliminated for every time step, significantly accelerating the total simulation time. 
+Optimization: persistent tree structure
+---------------------------------------
+
+In micromagnetic simulations the spatial distribution of cells is static
+throughout the simulation. To exploit this, MagTense uses a *magtense-local*
+tree structure that caches the octree setup between consecutive calls to the
+solver. By reusing the tree, the cost of re-partitioning space at every time
+step is eliminated.
 
 .. note::
-   The current implementation requires a fully grown tree. Therefore, **ifunif** must always be set to **1**.
+   The current implementation requires a fully grown tree, so **ifunif** must
+   always be set to **1**.
 
-Near-Field Evaluation & Neighbor Tensors
-----------------------------------------
-In standard FMM implementations, near-field interactions are usually handled by a direct "Point-to-Point" (P2P) evaluation. In MagTense, this standard P2P evaluation is **disabled**. 
+Near-field evaluation and neighbour tensors
+-------------------------------------------
 
-Instead, MagTense utilizes its high-precision analytical demagnetization tensors for all near-field interactions:
+In standard FMM implementations, near-field interactions are handled by a
+direct point-to-point (P2P) evaluation. In MagTense this standard P2P
+evaluation is **disabled**, and the high-precision analytical demagnetization
+tensors are used for all near-field interactions instead:
 
-1. **Neighbor Identification:** Based on **List 1** from the FMM tree creation, MagTense identifies "neighbor" pairs (cells within the same or adjacent leaf nodes).
-2. **Sparse Neighbor Tensor:** A sparse tensor structure is created to map these neighbor interactions.
-3. **Analytical Calculation:** The exact analytical demagnetization tensor is calculated for every neighbor pair.
-4. **Sparse Matrix Storage:** These values are converted into a sparse matrix. 
-   - On **CPU**, this is stored as an **Intel MKL sparse matrix**.
-   - On **GPU**, it is stored persistently in global memory for **CUDA** evaluation in each timestep.
+1. **Neighbour identification:** based on *List 1* from the FMM tree creation,
+   MagTense identifies neighbour pairs, i.e. cells within the same or adjacent
+   leaf nodes.
+2. **Sparse neighbour tensor:** a sparse tensor structure is created to map
+   these neighbour interactions.
+3. **Analytical calculation:** the exact analytical demagnetization tensor is
+   evaluated for every neighbour pair.
+4. **Sparse matrix storage:** the values are converted into a sparse matrix. On
+   **CPU** this is an Intel MKL sparse matrix; on **GPU** it is stored
+   persistently in global memory for **CUDA** evaluation at each time step.
 
-Input Variables
----------------
+The macrogeometry and sample :ref:`Sample shape correction` are applied on the
+FMM path as well, so switching to FMM does not change those terms.
+
+FMM input variables
+-------------------
 
 .. list-table::
-   :widths: 25 10 65
+   :widths: 24 22 8 46
    :header-rows: 1
 
-   * - Variable
+   * - Python
+     - Matlab
      - Type
      - Description
-   * - **fmm_cells_per_node**
+   * - ``use_fmm``
+     - ``use_fmm``
      - int
-     - Maximum cells in a leaf node before splitting.
-   * - **eps_fmm**
+     - **1** to use the FMM demagnetization path, **0** for the dense
+       analytical tensor. Default **0**.
+   * - ``fmm_eps``
+     - ``fmm_eps``
      - float
-     - Controls the **exponential order** (plane-wave expansion).
-   * - **fmm_nterms**
+     - Requested accuracy, which controls the exponential order of the
+       plane-wave expansion. Default ``1e-4``.
+   * - ``fmm_nterms``
+     - ``fmm_nterms``
      - int
-     - Sets the **multipole expansion order**. (0 = auto).
-   * - **ifunif**
+     - Multipole expansion order. A negative value (default ``-1``) derives the
+       order from ``fmm_eps`` during the tree build.
+   * - ``ifunif``
+     - ``ifunif``
      - int
-     - **Tree Type:** Must be **1** (Uniform tree).
-   * - **nlmin**
+     - Tree type. Must be **1** (uniform tree).
+   * - ``nlmin``
+     - ``nlmin``
      - int
-     - Minimum level of the octree hierarchy.
-   * - **nlmax**
+     - Minimum level of the octree hierarchy. Default 1.
+   * - ``nlmax``
+     - ``nlmax``
      - int
-     - Maximum level (dictates the depth of the uniform tree).
-   * - **allow_fmm_short_circuit**
+     - Maximum level of the octree hierarchy. For the required uniform tree,
+       this parameter controls the tree depth. Default 5.
+   * - ``allow_fmm_short_circuit``
+     - ``fmm_short``
      - int
-     - **1** to allow direct calculation for small problems; **0** to force FMM.
-   * - **fmm_min_n**
+     - **1** to fall back to the direct calculation for small problems, **0**
+       to force FMM. Default 1.
+   * - ``fmm_min_n``
+     - ``fmm_min_n``
      - int
-     - Cell count threshold required to activate FMM.
+     - Cell count below which FMM is disabled when the short circuit is
+       allowed. Default 20000.
 
-Python Usage Example
---------------------
+When the short circuit triggers, the solver reports
+``MagTense: problem smaller than fmm_min_n - disabling FMM and using the full
+demag tensor`` and continues with the dense tensor. The test is made before the
+octree is built, so a small or effectively one-dimensional geometry never
+reaches the tree construction.
+
+.. warning::
+   The FMM implementation is currently configured for rectangular-prism cells,
+   corresponding to the MagTense grid types ``gridTypeUniform`` and
+   ``gridTypeUnstructuredPrisms``. Cell dimensions may be supplied either
+   through the uniform-grid dimensions ``dx``, ``dy``, and ``dz``, or through
+   the per-cell ``grid_abc`` dimensions for unstructured prism grids.
+
+FMM Python example
+------------------
 
 .. code-block:: python
 
-    problem.fmm_cells_per_node = 10
-    problem.eps_fmm = 1e-4          
-    problem.fmm_nterms = 12         
-    problem.ifunif = 1              
+    problem.use_fmm = 1
+    problem.fmm_eps = 1e-4
+    problem.fmm_nterms = 12
+    problem.ifunif = 1
     problem.nlmin = 1
     problem.nlmax = 2
     problem.allow_fmm_short_circuit = 1
-    problem.fmm_min_n = 20000        
+    problem.fmm_min_n = 20000
 
-    RunMicroMagSimulation(problem)
+    result = problem.run_simulation(
+        t_end=t_end, nt=nt, fct_h_ext=h_ext_fct, nt_h_ext=nt_h_ext
+    )
+
+FMM Matlab example
+------------------
+
+.. code-block:: matlab
+
+    problem.use_fmm    = int32(1);
+    problem.fmm_eps    = 1e-4;
+    problem.fmm_nterms = int32(12);
+    problem.ifunif     = int32(1);
+    problem.nlmin      = int32(1);
+    problem.nlmax      = int32(2);
+    problem.fmm_short  = int32(1);
+    problem.fmm_min_n  = int32(20000);

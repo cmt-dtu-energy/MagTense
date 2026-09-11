@@ -28,14 +28,22 @@ Tile Types
 * 5 = tetrahedron
 * 6 = sphere
 * 7 = spheroid
-* 8 = avgPrism
+* 8 = avgPrism, i.e. a prism whose demagnetization tensor is averaged over the
+  volume of the receiving tile rather than evaluated at its centre
+* 101 = planar coil
+
+The tile types are defined as parameters in
+`TileNComponents.f90 <https://github.com/cmt-dtu-energy/MagTense/blob/master/source/TileDemagTensor/TileNComponents.f90>`_.
+The micromagnetic model uses type 2 or type 8 for prismatic cells - selected
+with ``useAvgN``, see
+:ref:`Cell-averaged versus point-evaluated tensor` - and type 5 for a
+tetrahedral mesh.
 
 
 ----------------------------------------
 Offset
 ----------------------------------------
-The offset is a three-dimensional vector, which determines the difference 
-between the origin of the global coordinate system to the local coordinate system.
+The offset is a three-dimensional displacement vector, from the origin of the global coordinate system to origin of the local coordinates. Thus the offset vectors give the center positions of each tile
 
 
 ----------------------------------------
@@ -53,7 +61,7 @@ y-axis, :math:`\theta`) and roll (rotation around local x-axis, :math:`\phi`).
     Rotations of a tile are performed in its local coordinate system. 
     Firstly, the tile is rotated with :math:`\phi` around its local x-axis.
     Secondly, the local y-axis is rotated by :math:`\theta`.
-    Eventually, the angle :math:`\psi` is performed around the local z-axis.
+    Finally, the angle :math:`\psi` is performed around the local z-axis.
 
 
 ----------------------------------------
@@ -74,8 +82,8 @@ Cylindrical Tile
     and :math:`dz`, respectively.
 
 Examples of how to compute the magnetic field from such a tile are given in `Matlab 
-<https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_cylindrical_slice>`_
-and `python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_cylinder.py>`_.
+<https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_cylindrical_slice>`__
+and `python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_cylinder.py>`__.
 
 
 ========================================
@@ -88,10 +96,12 @@ Prism
     The prism is defined by the side lengths :math:`a, b` and :math:`c`.
     Its center coordinate is :math:`(x_{off}, y_{off}, z_{off})` in the 
     global coordinate system.
+    (Note that this is opposed to the definition in the original `publication
+    <https://doi.org/10.1063/1.3385387>`__ which uses side lengths of [2a, 2b, 2c])
 
 Examples of how to compute the magnetic field from such a tile are given in `Matlab 
-<https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_prism>`_
-and `python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_prism.py>`_.
+<https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_prism>`__
+and `python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_prism.py>`__.
 
 
 ========================================
@@ -109,7 +119,7 @@ Circular Piece
     In contrast to the cylindrial tile, the inner edges are parallel to the local x-axis and y-axis and from a right angle. 
 
 Examples of how to compute the magnetic field from such a tile are given in
-`python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_circpiece.py>`_.
+`python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_circpiece.py>`__.
 
 
 ========================================
@@ -127,7 +137,7 @@ Inverted Circular Piece
     from a right angle. Therefore, its naming is "inverted circular piece".
 
 Examples of how to compute the magnetic field from such a tile are given in
-`python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_circpiece_inv.py>`_.
+`python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_circpiece_inv.py>`__.
 
 
 ========================================
@@ -141,8 +151,8 @@ Tetrahedron
 
 
 Examples of how to compute the magnetic field from such a tile are given in `Matlab 
-<https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_tetrahedron>`_
-and `python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_tetrahedron.py>`_.
+<https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_tetrahedron>`__
+and `python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_tetrahedron.py>`__.
 
 
 ========================================
@@ -157,8 +167,8 @@ Sphere
     global coordinate system.
 
 Examples of how to compute the magnetic field from such a tile are given in `Matlab 
-<https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_sphere>`_
-and `python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_sphere.py>`_.
+<https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_sphere>`__
+and `python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_sphere.py>`__.
 
 .. role:: raw-html(raw)
     :format: html
@@ -189,5 +199,5 @@ The arguments are defined in the interfaces and are translated to the
 corresponding rotation angles in the local coordinate system.
 
 Examples of how to compute the magnetic field from such a tile are given in `Matlab 
-<https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_spheroid>`_
-and `python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_spheroid.py>`_.
+<https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_spheroid>`__
+and `python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/validation_spheroid.py>`__.
