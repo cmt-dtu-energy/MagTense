@@ -7,7 +7,7 @@ for MagTense is explained in:
 Bjørk, R. and Hattel, J.: The demagnetizing field of a 
 non-uniform rectangular prism, Journal of Applied Physics, 
 107, 103910, 2010. <http://dx.doi.org/10.1063/1.3385387>`_ [or 
-`arXiv <https://arxiv.org/abs/2004.11700>`_]
+`arXiv <https://arxiv.org/abs/2004.11700>`__]
 
 The demagnetization calculation of the tetrahedron tile for 
 MagTense is explained in:
@@ -21,9 +21,9 @@ The accuracy of the demagnetization tensor calculation are verified in:
 `Bjørk, R., & d’Aquino, M. (2023). Accuracy of the analytical demagnetization tensor for various geometries. Journal of Magnetism and Magnetic Materials, 587, 171245. <https://www.sciencedirect.com/science/article/pii/S0304885323008958>`_
 
 
-The micromagnetic model and its validation again the mumag standard problems is discussed in:
+The micromagnetic model and its validation against the mumag standard problems is discussed in:
 `Bjørk, R., Poulsen, E. B., Nielsen, K. K. and Insinga, A. R.: MagTense: A micromagnetic framework using the analytical demagnetization tensor, Journal of Magnetism and Magnetic Materials, 535, 168057, 2021. <https://www.sciencedirect.com/science/article/pii/S0304885321003334>`_
-[or `arXiv <http://arxiv.org/abs/2107.05364>`_]
+[or `arXiv <http://arxiv.org/abs/2107.05364>`__]
 
 
 with additional details on computational issues in:

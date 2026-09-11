@@ -15,9 +15,9 @@
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=5929fcd5"></script>
-      <script src="_static/doctools.js?v=9bcbadda"></script>
-      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="author" title="About these documents" href="about.html" />
     <link rel="index" title="Index" href="genindex.html" />
@@ -62,6 +62,8 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
 <li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
@@ -96,11 +98,16 @@ calculation consists of three parts:</p>
 <li><p>Evaluation points</p></li>
 <li><p>State function</p></li>
 </ul>
-<p>As result, the three-dimensional H-field vector in
+<p>As output, the three-dimensional H-field vector in
 the evaluation points is returned.</p>
 <p>Examples of how to calculate magnetostatic and micromagnetic
 problems can be found for <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples">Matlab</a>
-and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/python/examples">python</a>.</p>
+and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/python/examples">python</a>,
+and the micromagnetic ones are described in
+<a class="reference internal" href="micromag_examples.html#micromagnetic-examples-and-validation"><span class="std std-ref">Micromagnetic examples and validation</span></a>.</p>
+<p>The parameters of a micromagnetic problem are of a different kind than the
+MagTile properties below, and are documented separately in
+<a class="reference internal" href="micromag_parameters.html#micromagnetic-parameter-reference"><span class="std std-ref">Micromagnetic parameter reference</span></a>.</p>
 <section id="magtile">
 <h2>MagTile<a class="headerlink" href="#magtile" title="Link to this heading"></a></h2>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nb">type</span><span class="p">(</span><span class="n">MagTile</span><span class="p">),</span><span class="n">dimension</span><span class="p">(</span><span class="n">n_tiles</span><span class="p">)</span> <span class="p">::</span> <span class="n">tiles</span>

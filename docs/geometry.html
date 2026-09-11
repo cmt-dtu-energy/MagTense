@@ -15,9 +15,9 @@
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=5929fcd5"></script>
-      <script src="_static/doctools.js?v=9bcbadda"></script>
-      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="author" title="About these documents" href="about.html" />
     <link rel="index" title="Index" href="genindex.html" />
@@ -72,6 +72,8 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
 <li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
@@ -122,12 +124,20 @@ For each tile an individual local coordinate system is created.</p>
 <li><p>5 = tetrahedron</p></li>
 <li><p>6 = sphere</p></li>
 <li><p>7 = spheroid</p></li>
+<li><p>8 = avgPrism, i.e. a prism whose demagnetization tensor is averaged over the
+volume of the receiving tile rather than evaluated at its centre</p></li>
+<li><p>101 = planar coil</p></li>
 </ul>
+<p>The tile types are defined as parameters in
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/source/TileDemagTensor/TileNComponents.f90">TileNComponents.f90</a>.
+The micromagnetic model uses type 2 or type 8 for prismatic cells - selected
+with <code class="docutils literal notranslate"><span class="pre">useAvgN</span></code>, see
+<a class="reference internal" href="micromag_demag.html#cell-averaged-versus-point-evaluated-tensor"><span class="std std-ref">Cell-averaged versus point-evaluated tensor</span></a> - and type 5 for a
+tetrahedral mesh.</p>
 </section>
 <section id="offset">
 <h3>Offset<a class="headerlink" href="#offset" title="Link to this heading"></a></h3>
-<p>The offset is a three-dimensional vector, which determines the difference
-between the origin of the global coordinate system to the local coordinate system.</p>
+<p>The offset is a three-dimensional displacement vector, from the origin of the global coordinate system to origin of the local coordinates. Thus the offset vectors give the center positions of each tile</p>
 </section>
 <section id="rotation-angles">
 <h3>Rotation Angles<a class="headerlink" href="#rotation-angles" title="Link to this heading"></a></h3>
@@ -135,14 +145,14 @@ between the origin of the global coordinate system to the local coordinate syste
 coordinate system. A tile can be rotated around its local axis with yaw
 (rotation around local z-axis, <span class="math notranslate nohighlight">\(\psi\)</span>), pitch (rotation around local
 y-axis, <span class="math notranslate nohighlight">\(\theta\)</span>) and roll (rotation around local x-axis, <span class="math notranslate nohighlight">\(\phi\)</span>).</p>
-<figure class="align-default" id="id11">
+<figure class="align-default" id="id1">
 <a class="reference internal image-reference" href="_images/local_rotations.png"><img alt="Local rotations" src="_images/local_rotations.png" style="width: 400px;" />
 </a>
 <figcaption>
 <p><span class="caption-text">Rotations of a tile are performed in its local coordinate system.
 Firstly, the tile is rotated with <span class="math notranslate nohighlight">\(\phi\)</span> around its local x-axis.
 Secondly, the local y-axis is rotated by <span class="math notranslate nohighlight">\(\theta\)</span>.
-Eventually, the angle <span class="math notranslate nohighlight">\(\psi\)</span> is performed around the local z-axis.</span><a class="headerlink" href="#id11" title="Link to this image"></a></p>
+Finally, the angle <span class="math notranslate nohighlight">\(\psi\)</span> is performed around the local z-axis.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 </section>
@@ -152,7 +162,7 @@ Eventually, the angle <span class="math notranslate nohighlight">\(\psi\)</span>
 </section>
 <section id="cylindrical-tile">
 <h2>Cylindrical Tile<a class="headerlink" href="#cylindrical-tile" title="Link to this heading"></a></h2>
-<figure class="align-default" id="id12">
+<figure class="align-default" id="id2">
 <a class="reference internal image-reference" href="_images/cylindrical_tile.png"><img alt="Cylindrical Tile" src="_images/cylindrical_tile.png" style="width: 400px;" />
 </a>
 <figcaption>
@@ -160,7 +170,7 @@ Eventually, the angle <span class="math notranslate nohighlight">\(\psi\)</span>
 to its local coordinate system.
 The center point is located at <span class="math notranslate nohighlight">\((r_0, \theta_0, z_0)\)</span>.
 The extensions in each direction are given with <span class="math notranslate nohighlight">\(dr, d\theta\)</span>
-and <span class="math notranslate nohighlight">\(dz\)</span>, respectively.</span><a class="headerlink" href="#id12" title="Link to this image"></a></p>
+and <span class="math notranslate nohighlight">\(dz\)</span>, respectively.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 <p>Examples of how to compute the magnetic field from such a tile are given in <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_cylindrical_slice">Matlab</a>
@@ -168,13 +178,14 @@ and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTen
 </section>
 <section id="prism">
 <h2>Prism<a class="headerlink" href="#prism" title="Link to this heading"></a></h2>
-<figure class="align-default" id="id13">
+<figure class="align-default" id="id3">
 <a class="reference internal image-reference" href="_images/prism.png"><img alt="Prism" src="_images/prism.png" style="width: 400px;" />
 </a>
 <figcaption>
 <p><span class="caption-text">The prism is defined by the side lengths <span class="math notranslate nohighlight">\(a, b\)</span> and <span class="math notranslate nohighlight">\(c\)</span>.
 Its center coordinate is <span class="math notranslate nohighlight">\((x_{off}, y_{off}, z_{off})\)</span> in the
-global coordinate system.</span><a class="headerlink" href="#id13" title="Link to this image"></a></p>
+global coordinate system.
+(Note that this is opposed to the definition in the original <a class="reference external" href="https://doi.org/10.1063/1.3385387">publication</a> which uses side lengths of [2a, 2b, 2c])</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 <p>Examples of how to compute the magnetic field from such a tile are given in <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_prism">Matlab</a>
@@ -182,7 +193,7 @@ and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTen
 </section>
 <section id="circular-piece">
 <h2>Circular Piece<a class="headerlink" href="#circular-piece" title="Link to this heading"></a></h2>
-<figure class="align-default" id="id14">
+<figure class="align-default" id="id4">
 <a class="reference internal image-reference" href="_images/circpiece.png"><img alt="Circular Piece" src="_images/circpiece.png" style="width: 400px;" />
 </a>
 <figcaption>
@@ -191,7 +202,7 @@ in the local coordinate system.
 The midpoint of the outer circular edge is given with a translation of
 <span class="math notranslate nohighlight">\(\frac{dr}{2}\)</span> from the center point.
 The extensions in the others directions are given with <span class="math notranslate nohighlight">\(d\theta\)</span> and <span class="math notranslate nohighlight">\(dz\)</span>.
-In contrast to the cylindrial tile, the inner edges are parallel to the local x-axis and y-axis and from a right angle.</span><a class="headerlink" href="#id14" title="Link to this image"></a></p>
+In contrast to the cylindrial tile, the inner edges are parallel to the local x-axis and y-axis and from a right angle.</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 <p>Examples of how to compute the magnetic field from such a tile are given in
@@ -199,7 +210,7 @@ In contrast to the cylindrial tile, the inner edges are parallel to the local x-
 </section>
 <section id="inverted-circular-piece">
 <h2>Inverted Circular Piece<a class="headerlink" href="#inverted-circular-piece" title="Link to this heading"></a></h2>
-<figure class="align-default" id="id15">
+<figure class="align-default" id="id5">
 <a class="reference internal image-reference" href="_images/circpiece_inv.png"><img alt="Inverted Circular Piece" src="_images/circpiece_inv.png" style="width: 400px;" />
 </a>
 <figcaption>
@@ -208,7 +219,7 @@ In contrast to the cylindrial tile, the inner edges are parallel to the local x-
 The angular extension in each direction is <span class="math notranslate nohighlight">\(\frac{d\theta}{2}\)</span>
 extensions and the height of such a tile is <span class="math notranslate nohighlight">\(dz\)</span>.
 The outer edges are parallel to the local x-axis and y-axis and
-from a right angle. Therefore, its naming is “inverted circular piece”.</span><a class="headerlink" href="#id15" title="Link to this image"></a></p>
+from a right angle. Therefore, its naming is “inverted circular piece”.</span><a class="headerlink" href="#id5" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 <p>Examples of how to compute the magnetic field from such a tile are given in
@@ -216,11 +227,11 @@ from a right angle. Therefore, its naming is “inverted circular piece”.</spa
 </section>
 <section id="tetrahedron">
 <h2>Tetrahedron<a class="headerlink" href="#tetrahedron" title="Link to this heading"></a></h2>
-<figure class="align-default" id="id16">
+<figure class="align-default" id="id6">
 <a class="reference internal image-reference" href="_images/tetrahedron.png"><img alt="Tetrahedron" src="_images/tetrahedron.png" style="width: 400px;" />
 </a>
 <figcaption>
-<p><span class="caption-text">A tetrahedron is specified by its four vertices in the global coordinate system.</span><a class="headerlink" href="#id16" title="Link to this image"></a></p>
+<p><span class="caption-text">A tetrahedron is specified by its four vertices in the global coordinate system.</span><a class="headerlink" href="#id6" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 <p>Examples of how to compute the magnetic field from such a tile are given in <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_tetrahedron">Matlab</a>
@@ -228,13 +239,13 @@ and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTen
 </section>
 <section id="sphere">
 <h2>Sphere<a class="headerlink" href="#sphere" title="Link to this heading"></a></h2>
-<figure class="align-default" id="id17">
+<figure class="align-default" id="id7">
 <a class="reference internal image-reference" href="_images/sphere.png"><img alt="Sphere" src="_images/sphere.png" style="width: 400px;" />
 </a>
 <figcaption>
 <p><span class="caption-text">A sphere is fully defined by its radius <span class="math notranslate nohighlight">\(a\)</span>.
 Its center coordinate is <span class="math notranslate nohighlight">\((x_{off}, y_{off}, z_{off})\)</span> in the
-global coordinate system.</span><a class="headerlink" href="#id17" title="Link to this image"></a></p>
+global coordinate system.</span><a class="headerlink" href="#id7" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 <p>Examples of how to compute the magnetic field from such a tile are given in <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Validation_sphere">Matlab</a>
@@ -242,7 +253,7 @@ and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTen
 </section>
 <section id="spheroid">
 <h2>Spheroid<a class="headerlink" href="#spheroid" title="Link to this heading"></a></h2>
-<figure class="align-default" id="id18">
+<figure class="align-default" id="id8">
 <a class="reference internal image-reference" href="_images/spheroid_oblate.png"><img alt="Oblate Spheroid" src="_images/spheroid_oblate.png" style="width: 400px;" />
 </a>
 <figcaption>
@@ -255,7 +266,7 @@ If <span class="math notranslate nohighlight">\(b &lt; a\)</span>, then we have 
 <span class="raw-html"><br /></span>
 If <span class="math notranslate nohighlight">\(b &gt; a\)</span>, then a prolate spheroid is constructed.
 <span class="raw-html"><br /></span>
-In praxis, any of the axial radii can be chosen to differ from the others.</span><a class="headerlink" href="#id18" title="Link to this image"></a></p>
+In praxis, any of the axial radii can be chosen to differ from the others.</span><a class="headerlink" href="#id8" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 <p>As a specialty of this geometry, rotation may be also defined as a rotation

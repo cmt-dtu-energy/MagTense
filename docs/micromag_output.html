@@ -1,0 +1,309 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Micromagnetic output &mdash; MagTense TechManual  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/techmanual.css?v=903b4c53" />
+
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Micromagnetic parameter reference" href="micromag_parameters.html" />
+    <link rel="prev" title="Thermal fluctuations" href="micromag_thermal.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/MagTense_logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="micromag_setup.html">Setting up a micromagnetic problem</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_grid.html">Grids and meshes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_material.html">Material parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html">Exchange interaction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html">Demagnetization field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_solvers.html">Solvers and time integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_pbc.html">Periodic boundaries and macrogeometry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_thermal.html">Thermal fluctuations</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Micromagnetic output</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#matlab-solution-struct">Matlab solution struct</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#python-result-list">Python result list</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dry-runs">Dry runs</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html">Micromagnetic parameter reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html">Micromagnetic examples and validation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#the-equation-that-is-solved">The equation that is solved</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #cccccc" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTense>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="micromagnetic-output">
+<h1>Micromagnetic output<a class="headerlink" href="#micromagnetic-output" title="Link to this heading"></a></h1>
+<section id="matlab-solution-struct">
+<h2>Matlab solution struct<a class="headerlink" href="#matlab-solution-struct" title="Link to this heading"></a></h2>
+<p>The MEX-file returns the solution struct, and optionally the grid information
+as a second output:</p>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">solution</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">struct</span><span class="p">();</span>
+<span class="p">[</span><span class="n">solution</span><span class="p">,</span><span class="w"> </span><span class="n">GridInfo</span><span class="p">]</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">MagTenseLandauLifshitzSolver_mex</span><span class="p">(</span><span class="w"> </span><span class="nb">struct</span><span class="p">(</span><span class="n">problem</span><span class="p">),</span><span class="w"> </span><span class="n">solution</span><span class="w"> </span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The solution struct contains</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 16.0%" />
+<col style="width: 30.0%" />
+<col style="width: 54.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Size</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">t</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(nt)</span></code></p></td>
+<td><p>The times at which the solution was stored.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">M</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(nt,</span> <span class="pre">ntot,</span> <span class="pre">nt_Hext,</span> <span class="pre">3)</span></code></p></td>
+<td><p>The reduced magnetization. The third dimension is the applied-field
+index, which is 1 for the dynamic solver and the number of field steps
+for the explicit solver.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">pts</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(ntot,</span> <span class="pre">3)</span></code></p></td>
+<td><p>Centre coordinates of the cells, in the same order as the other per-cell
+arrays.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">H_exc</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(nt,</span> <span class="pre">ntot,</span> <span class="pre">nt_Hext,</span> <span class="pre">3)</span></code></p></td>
+<td><p>Exchange field in A/m. Only filled when <code class="docutils literal notranslate"><span class="pre">ReturnHall</span></code> is set.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">H_ext</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(nt,</span> <span class="pre">ntot,</span> <span class="pre">nt_Hext,</span> <span class="pre">3)</span></code></p></td>
+<td><p>Applied field in A/m. Only filled when <code class="docutils literal notranslate"><span class="pre">ReturnHall</span></code> is set.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">H_dem</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(nt,</span> <span class="pre">ntot,</span> <span class="pre">nt_Hext,</span> <span class="pre">3)</span></code></p></td>
+<td><p>Demagnetization field in A/m. Only filled when <code class="docutils literal notranslate"><span class="pre">ReturnHall</span></code> is set.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">H_ani</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(nt,</span> <span class="pre">ntot,</span> <span class="pre">nt_Hext,</span> <span class="pre">3)</span></code></p></td>
+<td><p>Anisotropy field in A/m. Only filled when <code class="docutils literal notranslate"><span class="pre">ReturnHall</span></code> is set.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">n_Hext_acc</span></code></p></td>
+<td><p>scalar</p></td>
+<td><p>Number of accepted applied-field steps. Only meaningful for
+<a class="reference internal" href="micromag_solvers.html#adaptive-hysteresis"><span class="std std-ref">Adaptive hysteresis</span></a>.</p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">ReturnHall</span></code> (Python <code class="docutils literal notranslate"><span class="pre">usereturnhall</span></code>) is off by default. Turning it on
+costs four additional <code class="docutils literal notranslate"><span class="pre">(nt,</span> <span class="pre">ntot,</span> <span class="pre">nt_Hext,</span> <span class="pre">3)</span></code> arrays, which for a large
+problem is substantial, so leave it off unless the individual field terms are
+actually needed.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The four <code class="docutils literal notranslate"><span class="pre">H_*</span></code> arrays are <strong>not</strong> the fields the integrator ran on. They
+are recomputed from the stored solution at the <code class="docutils literal notranslate"><span class="pre">nt</span></code> output times after the
+integration has finished, because the integrator’s last right-hand-side
+evaluation is at an internal step rather than at the requested output state.</p>
+</div>
+<p>The optional <code class="docutils literal notranslate"><span class="pre">GridInfo</span></code> output carries the analysed mesh - face normals,
+face areas, cell volumes, cell and face centres, the interpolation index
+arrays, and the assembled exchange matrix in COO form (<code class="docutils literal notranslate"><span class="pre">ExchMat_r</span></code>,
+<code class="docutils literal notranslate"><span class="pre">ExchMat_c</span></code>, <code class="docutils literal notranslate"><span class="pre">ExchMat_v</span></code>, <code class="docutils literal notranslate"><span class="pre">ExchMat_nr</span></code>, <code class="docutils literal notranslate"><span class="pre">ExchMat_nc</span></code>). It is what
+<code class="docutils literal notranslate"><span class="pre">cartesianUnstructuredMeshPlot</span></code> plots.</p>
+<p>The Matlab helper <code class="docutils literal notranslate"><span class="pre">computeMagneticMomentGeneralMesh</span></code> converts a solution into
+the volume-averaged magnetic moment, and <code class="docutils literal notranslate"><span class="pre">computeMagneticEnergy</span></code> evaluates
+the energy terms.</p>
+</section>
+<section id="python-result-list">
+<h2>Python result list<a class="headerlink" href="#python-result-list" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">run_simulation</span></code> and <code class="docutils literal notranslate"><span class="pre">run_hysteresis</span></code> return a list:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 10.0%" />
+<col style="width: 22.0%" />
+<col style="width: 68.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Index</p></th>
+<th class="head"><p>Name</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">t_out</span></code></p></td>
+<td><p>Output times.</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">M_out</span></code></p></td>
+<td><p>Reduced magnetization, <code class="docutils literal notranslate"><span class="pre">(nt,</span> <span class="pre">ntot,</span> <span class="pre">nt_h_ext,</span> <span class="pre">3)</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">pts</span></code></p></td>
+<td><p>Cell centres, <code class="docutils literal notranslate"><span class="pre">(ntot,</span> <span class="pre">3)</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>3</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">H_exc</span></code></p></td>
+<td><p>Exchange field, same shape as <code class="docutils literal notranslate"><span class="pre">M_out</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p>4</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">H_ext</span></code></p></td>
+<td><p>Applied field.</p></td>
+</tr>
+<tr class="row-odd"><td><p>5</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">H_dem</span></code></p></td>
+<td><p>Demagnetization field.</p></td>
+</tr>
+<tr class="row-even"><td><p>6</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">H_ani</span></code></p></td>
+<td><p>Anisotropy field.</p></td>
+</tr>
+<tr class="row-odd"><td><p>7</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Exch_mat_ntot</span></code></p></td>
+<td><p>Number of non-zero entries in the exchange matrix.</p></td>
+</tr>
+<tr class="row-even"><td><p>8, 9, 10</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Exch_mat_r</span></code>, <code class="docutils literal notranslate"><span class="pre">Exch_mat_c</span></code>, <code class="docutils literal notranslate"><span class="pre">Exch_mat_v</span></code></p></td>
+<td><p>The exchange matrix in COO form, already sliced to
+<code class="docutils literal notranslate"><span class="pre">Exch_mat_ntot</span></code> entries.</p></td>
+</tr>
+<tr class="row-odd"><td><p>11, 12</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Exch_mat_nr</span></code>, <code class="docutils literal notranslate"><span class="pre">Exch_mat_nc</span></code></p></td>
+<td><p>Number of rows and columns of the exchange matrix.</p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">run_hysteresis_adaptive</span></code> returns the same twelve entries followed by one
+extra element, the number of accepted field steps, and the arrays with an
+applied-field dimension are already sliced to that number.</p>
+<p>A typical unpacking is</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">t_out</span><span class="p">,</span> <span class="n">M_out</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">run_simulation</span><span class="p">(</span>
+    <span class="n">t_end</span><span class="o">=</span><span class="mf">1e-9</span><span class="p">,</span> <span class="n">nt</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">fct_h_ext</span><span class="o">=</span><span class="n">h_ext_fct</span><span class="p">,</span> <span class="n">nt_h_ext</span><span class="o">=</span><span class="mi">2000</span>
+<span class="p">)[:</span><span class="mi">2</span><span class="p">]</span>
+
+<span class="c1"># Volume-averaged reduced magnetization as a function of time</span>
+<span class="n">M_avg</span> <span class="o">=</span> <span class="n">M_out</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The helper <code class="docutils literal notranslate"><span class="pre">magtense.utils.plot_M_thin_film</span></code> plots the magnetization of a
+thin-film problem, and <code class="docutils literal notranslate"><span class="pre">magtense.utils.create_plot</span></code> handles the magnetostatic
+tile plots.</p>
+</section>
+<section id="dry-runs">
+<h2>Dry runs<a class="headerlink" href="#dry-runs" title="Link to this heading"></a></h2>
+<p>Setting <code class="docutils literal notranslate"><span class="pre">dummy_run</span> <span class="pre">=</span> <span class="pre">1</span></code> builds the problem, the mesh, the exchange operator
+and the demagnetization tensor, but skips the time integration. This is useful
+for timing the setup phase, for checking the memory footprint of a large
+problem, and for extracting the exchange matrix or the demagnetization tensor
+without paying for a solve. The returned magnetization arrays are zeroed in
+that case.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="micromag_thermal.html" class="btn btn-neutral float-left" title="Thermal fluctuations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="micromag_parameters.html" class="btn btn-neutral float-right" title="Micromagnetic parameter reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright MagTense Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>  
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>

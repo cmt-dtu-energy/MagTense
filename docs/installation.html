@@ -15,9 +15,9 @@
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=5929fcd5"></script>
-      <script src="_static/doctools.js?v=9bcbadda"></script>
-      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="author" title="About these documents" href="about.html" />
     <link rel="index" title="Index" href="genindex.html" />
@@ -49,21 +49,22 @@
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#python">Python</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#installing-the-python-package">Installing the Python package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#usage">Usage</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#matlab">Matlab</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#python">Python</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#id1">Prerequisites</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#required-packages">Required Packages</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#prepare-terminal">Prepare terminal</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#build-python-module">Build Python module</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="#building-from-source">Building from source</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
 <li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
@@ -90,53 +91,150 @@
              
   <section id="installation">
 <h1>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h1>
+<p>MagTense consists of a Fortran core with a Matlab MEX interface and a Python
+interface. Neither interface requires building anything from source: prebuilt
+MEX-files are attached to every release, and the Python interface is available
+as a wheel on PyPI.</p>
+<p>MagTense is tested on Linux and on Windows 11. macOS is not supported at the
+moment.</p>
+<section id="python">
+<h2>Python<a class="headerlink" href="#python" title="Link to this heading"></a></h2>
+<section id="installing-the-python-package">
+<h3>Installing the Python package<a class="headerlink" href="#installing-the-python-package" title="Link to this heading"></a></h3>
+<p>Requires <strong>Python</strong> <span class="math notranslate nohighlight">\(\geq\)</span> <strong>3.12</strong> - wheels are published for Python 3.12, 3.13 and 3.14:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>magtense
+</pre></div>
+</div>
+<p>The wheel ships the compiled Fortran core together with the Intel MKL and
+Intel Fortran runtime it needs, so no compiler is required.</p>
+<p>For GPU support, the CUDA runtime libraries have to be present as well:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>nvidia-cuda-runtime<span class="w"> </span>nvidia-cublas<span class="w"> </span>nvidia-cusparse<span class="w"> </span>nvidia-nvjitlink
+</pre></div>
+</div>
+</section>
+<section id="usage">
+<h3>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h3>
+<p>The magnetostatic framework lives in <code class="docutils literal notranslate"><span class="pre">magtense.magstatics</span></code> and the
+micromagnetic framework in <code class="docutils literal notranslate"><span class="pre">magtense.micromag</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">magtense.magstatics</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tiles</span><span class="p">,</span> <span class="n">run_simulation</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">magtense.micromag</span><span class="w"> </span><span class="kn">import</span> <span class="n">MicromagProblem</span>
+</pre></div>
+</div>
+<p>Examples for both are in
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/python/examples">python/examples</a>.</p>
+</section>
+</section>
 <section id="matlab">
 <h2>Matlab<a class="headerlink" href="#matlab" title="Link to this heading"></a></h2>
 <section id="prerequisites">
 <h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"></a></h3>
 <ul class="simple">
-<li><p>Matlab <span class="math notranslate nohighlight">\(\geq\)</span> 2018a</p></li>
+<li><p>Matlab <span class="math notranslate nohighlight">\(\geq\)</span> 2023a</p></li>
+<li><p>An installation of the CUDA toolkit, if the CUDA-enabled MEX-files are to be
+used</p></li>
 </ul>
-<p>MagTense is directly useable in Matlab by downloading the already compiled
-<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/releases">MEX-files</a>.</p>
+<p>MagTense is directly usable in Matlab by downloading the already compiled
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/releases">MEX-files</a>, which are
+provided for both Windows and Linux. Add the folder holding the MEX-files and
+the <code class="docutils literal notranslate"><span class="pre">matlab/util</span></code> folder to the Matlab path:</p>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="nb">addpath</span><span class="p">(</span><span class="s">'MagTense/matlab/MEX_files'</span><span class="p">);</span>
+<span class="nb">addpath</span><span class="p">(</span><span class="s">'MagTense/matlab/util'</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The MEX-files are</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 40.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>MEX-file</p></th>
+<th class="head"><p>Purpose</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MagTenseLandauLifshitzSolver_mex</span></code></p></td>
+<td><p>Micromagnetic solver, CUDA-enabled</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MagTenseLandauLifshitzSolverNoCUDA_mex</span></code></p></td>
+<td><p>Micromagnetic solver without CUDA</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">IterateMagnetization_mex</span></code></p></td>
+<td><p>Iterate the magnetization of soft magnetic tiles</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">getHFromTiles_mex</span></code></p></td>
+<td><p>H-field from a set of tiles</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">getNFromTile_mex</span></code></p></td>
+<td><p>Demagnetization tensor of a single tile</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">getMagForce_mex</span></code></p></td>
+<td><p>Magnetic force on a tile</p></td>
+</tr>
+</tbody>
+</table>
+<p>Examples are in
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples">matlab/examples</a>.</p>
 </section>
 </section>
-<section id="python">
-<h2>Python<a class="headerlink" href="#python" title="Link to this heading"></a></h2>
-<section id="id1">
-<h3>Prerequisites<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<section id="building-from-source">
+<h2>Building from source<a class="headerlink" href="#building-from-source" title="Link to this heading"></a></h2>
+<p>Building is only necessary in order to modify the Fortran core, or to enable an
+optional component that the prebuilt binaries do not carry. The optional
+components are selected with make flags:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 24.0%" />
+<col style="width: 76.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Flag</p></th>
+<th class="head"><p>Effect</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">USE_CUDA=1</span></code></p></td>
+<td><p>GPU acceleration of the demagnetization field through CUDA.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">USE_CVODE=1</span></code></p></td>
+<td><p>The CVODE time integrator from SUNDIALS, see
+<a class="reference internal" href="micromag_solvers.html#ode-solver-settings"><span class="std std-ref">ODE solver settings</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">USE_FMM3D=1</span></code></p></td>
+<td><p>The FMM demagnetization path, see <a class="reference internal" href="demag_fmm.html#demag-field-fmm"><span class="std std-ref">Demag field - FMM</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">USE_MATLAB=1</span></code></p></td>
+<td><p>Compile the Fortran objects needed by the Matlab MEX-files.</p></td>
+</tr>
+</tbody>
+</table>
+<p>A typical Linux build of the Python module with everything enabled is</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>magtense-env<span class="w"> </span>-f<span class="w"> </span>python/.build/env-313-linux.yml
+conda<span class="w"> </span>activate<span class="w"> </span>magtense-env
+make<span class="w"> </span>python<span class="w"> </span><span class="nv">USE_CUDA</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">USE_CVODE</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">USE_MATLAB</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="nv">USE_FMM3D</span><span class="o">=</span><span class="m">0</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>./python
+</pre></div>
+</div>
+<p>The environment files come in one variant per Python version and platform,
+<code class="docutils literal notranslate"><span class="pre">env-312</span></code>, <code class="docutils literal notranslate"><span class="pre">env-313</span></code> and <code class="docutils literal notranslate"><span class="pre">env-314</span></code> times <code class="docutils literal notranslate"><span class="pre">-linux</span></code> and <code class="docutils literal notranslate"><span class="pre">-win</span></code>.</p>
+<p>The full, up-to-date build instructions - including the Conda environment
+files, the CVODE and CUDA prerequisites, the Windows toolchain and the
+Visual Studio solution <code class="docutils literal notranslate"><span class="pre">MagTense.sln</span></code> - are kept next to the code, since they
+change with the compiler versions:</p>
 <ul class="simple">
-<li><p>Python <span class="math notranslate nohighlight">\(\geq\)</span> 3.9</p></li>
-<li><p><a class="reference external" href="https://www.intel.com/content/www/us/en/developer/articles/tool/oneapi-standalone-components.html#fortran">Intel® Fortran Compiler</a></p></li>
-<li><p><a class="reference external" href="https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html">Intel® oneAPI Math Kernel Library</a></p></li>
+<li><p>Python: <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/README.md">python/README.md</a></p></li>
+<li><p>Matlab: <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/README.md">matlab/README.md</a></p></li>
+<li><p>The <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/.github/workflows">GitHub workflow files</a>
+are always a working reference, since they are what builds and tests every
+commit.</p></li>
 </ul>
-</section>
-<section id="required-packages">
-<h3>Required Packages<a class="headerlink" href="#required-packages" title="Link to this heading"></a></h3>
-<p>[Info] On Linux, Make utility is pre-installed.</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">y</span> <span class="n">numpy</span> <span class="n">matplotlib</span>
-<span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">y</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">make</span>
+<p>For Matlab, the Fortran objects are built first and the MEX-files are then
+produced from Matlab itself with
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/buildMagTenseMEX.m">buildMagTenseMEX.m</a>:</p>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="nb">mex</span><span class="w"> </span><span class="o">-</span><span class="nb">setup</span><span class="w"> </span><span class="n">FORTRAN</span>
+<span class="n">buildMagTenseMEX</span><span class="p">(</span><span class="s">'USE_RELEASE'</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="s">'USE_CUDA'</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="s">'USE_CVODE'</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">)</span>
 </pre></div>
 </div>
-</section>
-<section id="prepare-terminal">
-<h3>Prepare terminal<a class="headerlink" href="#prepare-terminal" title="Link to this heading"></a></h3>
-<p>Setting environment variables to recognize ifort and MKL.
-[Info] On Windows, the environment variables might be set already.</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">.</span> <span class="o">~/</span><span class="n">intel</span><span class="o">/</span><span class="n">oneapi</span><span class="o">/</span><span class="n">setvars</span><span class="o">.</span><span class="n">sh</span>
-</pre></div>
-</div>
-</section>
-<section id="build-python-module">
-<h3>Build Python module<a class="headerlink" href="#build-python-module" title="Link to this heading"></a></h3>
-<p>Fortran source code becomes accessible from Python.</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="o">/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">repo</span><span class="o">/</span><span class="n">python</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">magtense</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span>
-<span class="n">make</span> <span class="n">SHELL</span><span class="o">=</span><span class="n">cmd</span>
-<span class="n">cd</span> <span class="o">/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">repo</span><span class="o">/</span><span class="n">python</span><span class="o">/</span>
-<span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="o">.</span>
-</pre></div>
-</div>
-</section>
 </section>
 </section>
 

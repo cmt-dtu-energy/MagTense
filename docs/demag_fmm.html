@@ -1,0 +1,317 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demag field - FMM &mdash; MagTense TechManual  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/techmanual.css?v=903b4c53" />
+
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Performance, Timing &amp; Trace Logging" href="timing_and_trace.html" />
+    <link rel="prev" title="Micromagnetic examples and validation" href="micromag_examples.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/MagTense_logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Demag field - FMM</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#implementation-and-attribution">Implementation and attribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#compilation">Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#optimization-persistent-tree-structure">Optimization: persistent tree structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#near-field-evaluation-and-neighbour-tensors">Near-field evaluation and neighbour tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#fmm-input-variables">FMM input variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#fmm-python-example">FMM Python example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#fmm-matlab-example">FMM Matlab example</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #cccccc" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTense>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="demag-field-fmm">
+<h1>Demag field - FMM<a class="headerlink" href="#demag-field-fmm" title="Link to this heading"></a></h1>
+<p>Calculating the demagnetization (stray) field is typically the most
+computationally demanding part of a micromagnetic simulation. MagTense’s
+default approach - the fully analytical demagnetization tensor - is exact, but
+its <span class="math notranslate nohighlight">\(O(N^2)\)</span> memory and work scaling becomes prohibitive for very large
+systems.</p>
+<p>To address this, MagTense includes an implementation of the <strong>Fast Multipole
+Method (FMM)</strong>, which reduces the computational complexity to <span class="math notranslate nohighlight">\(O(N)\)</span>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The FMM path is <strong>off by default</strong>. It has to be enabled explicitly with
+<code class="docutils literal notranslate"><span class="pre">use_fmm</span></code>, and it is ignored altogether unless the library was built with
+<code class="docutils literal notranslate"><span class="pre">USE_FMM3D=1</span></code>. Opting in explicitly means that a problem does not silently
+change its demagnetization path when the library is rebuilt with FMM
+support.</p>
+</div>
+<section id="implementation-and-attribution">
+<h2>Implementation and attribution<a class="headerlink" href="#implementation-and-attribution" title="Link to this heading"></a></h2>
+<p>The FMM acceleration in MagTense is built upon the <strong>FMM3D</strong> library developed
+by the <strong>Flatiron Institute</strong>.</p>
+<ul class="simple">
+<li><p><strong>Core library:</strong> <a class="reference external" href="https://github.com/flatironinstitute/fmm3d">Flatiron Institute FMM3D</a></p></li>
+<li><p><strong>Linking:</strong> MagTense links against a fork, <a class="reference external" href="https://github.com/Ximtecs/FMM3D">Ximtecs/FMM3D</a>, which contains updated build
+configurations and makefiles to allow integration with the MagTense Fortran
+core.</p></li>
+</ul>
+</section>
+<section id="compilation">
+<h2>Compilation<a class="headerlink" href="#compilation" title="Link to this heading"></a></h2>
+<p>To enable FMM support during the build, include the FMM flag in the make
+command. This links the FMM3D libraries and enables the specialised Fortran
+modules:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span><span class="nv">USE_FMM3D</span><span class="o">=</span><span class="m">1</span>
+</pre></div>
+</div>
+<p>On Linux, <code class="docutils literal notranslate"><span class="pre">$(MagTense)/external/FMM3D/local</span></code> must be on <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code>
+when building. Without <code class="docutils literal notranslate"><span class="pre">USE_FMM3D=1</span></code> the FMM source is not compiled at all
+and the <code class="docutils literal notranslate"><span class="pre">use_fmm</span></code> flag has no effect.</p>
+</section>
+<section id="optimization-persistent-tree-structure">
+<h2>Optimization: persistent tree structure<a class="headerlink" href="#optimization-persistent-tree-structure" title="Link to this heading"></a></h2>
+<p>In micromagnetic simulations the spatial distribution of cells is static
+throughout the simulation. To exploit this, MagTense uses a <em>magtense-local</em>
+tree structure that caches the octree setup between consecutive calls to the
+solver. By reusing the tree, the cost of re-partitioning space at every time
+step is eliminated.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The current implementation requires a fully grown tree, so <strong>ifunif</strong> must
+always be set to <strong>1</strong>.</p>
+</div>
+</section>
+<section id="near-field-evaluation-and-neighbour-tensors">
+<h2>Near-field evaluation and neighbour tensors<a class="headerlink" href="#near-field-evaluation-and-neighbour-tensors" title="Link to this heading"></a></h2>
+<p>In standard FMM implementations, near-field interactions are handled by a
+direct point-to-point (P2P) evaluation. In MagTense this standard P2P
+evaluation is <strong>disabled</strong>, and the high-precision analytical demagnetization
+tensors are used for all near-field interactions instead:</p>
+<ol class="arabic simple">
+<li><p><strong>Neighbour identification:</strong> based on <em>List 1</em> from the FMM tree creation,
+MagTense identifies neighbour pairs, i.e. cells within the same or adjacent
+leaf nodes.</p></li>
+<li><p><strong>Sparse neighbour tensor:</strong> a sparse tensor structure is created to map
+these neighbour interactions.</p></li>
+<li><p><strong>Analytical calculation:</strong> the exact analytical demagnetization tensor is
+evaluated for every neighbour pair.</p></li>
+<li><p><strong>Sparse matrix storage:</strong> the values are converted into a sparse matrix. On
+<strong>CPU</strong> this is an Intel MKL sparse matrix; on <strong>GPU</strong> it is stored
+persistently in global memory for <strong>CUDA</strong> evaluation at each time step.</p></li>
+</ol>
+<p>The macrogeometry and sample <a class="reference internal" href="micromag_pbc.html#sample-shape-correction"><span class="std std-ref">Sample shape correction</span></a> are applied on the
+FMM path as well, so switching to FMM does not change those terms.</p>
+</section>
+<section id="fmm-input-variables">
+<h2>FMM input variables<a class="headerlink" href="#fmm-input-variables" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 24.0%" />
+<col style="width: 22.0%" />
+<col style="width: 8.0%" />
+<col style="width: 46.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Python</p></th>
+<th class="head"><p>Matlab</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_fmm</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">use_fmm</span></code></p></td>
+<td><p>int</p></td>
+<td><p><strong>1</strong> to use the FMM demagnetization path, <strong>0</strong> for the dense
+analytical tensor. Default <strong>0</strong>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fmm_eps</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fmm_eps</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Requested accuracy, which controls the exponential order of the
+plane-wave expansion. Default <code class="docutils literal notranslate"><span class="pre">1e-4</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fmm_nterms</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fmm_nterms</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Multipole expansion order. A negative value (default <code class="docutils literal notranslate"><span class="pre">-1</span></code>) derives the
+order from <code class="docutils literal notranslate"><span class="pre">fmm_eps</span></code> during the tree build.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ifunif</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ifunif</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Tree type. Must be <strong>1</strong> (uniform tree).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nlmin</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nlmin</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Minimum level of the octree hierarchy. Default 1.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nlmax</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nlmax</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Maximum level of the octree hierarchy. For the required uniform tree,
+this parameter controls the tree depth. Default 5.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">allow_fmm_short_circuit</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fmm_short</span></code></p></td>
+<td><p>int</p></td>
+<td><p><strong>1</strong> to fall back to the direct calculation for small problems, <strong>0</strong>
+to force FMM. Default 1.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fmm_min_n</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">fmm_min_n</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Cell count below which FMM is disabled when the short circuit is
+allowed. Default 20000.</p></td>
+</tr>
+</tbody>
+</table>
+<p>When the short circuit triggers, the solver reports
+<code class="docutils literal notranslate"><span class="pre">MagTense:</span> <span class="pre">problem</span> <span class="pre">smaller</span> <span class="pre">than</span> <span class="pre">fmm_min_n</span> <span class="pre">-</span> <span class="pre">disabling</span> <span class="pre">FMM</span> <span class="pre">and</span> <span class="pre">using</span> <span class="pre">the</span> <span class="pre">full</span>
+<span class="pre">demag</span> <span class="pre">tensor</span></code> and continues with the dense tensor. The test is made before the
+octree is built, so a small or effectively one-dimensional geometry never
+reaches the tree construction.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The FMM implementation is currently configured for rectangular-prism cells,
+corresponding to the MagTense grid types <code class="docutils literal notranslate"><span class="pre">gridTypeUniform</span></code> and
+<code class="docutils literal notranslate"><span class="pre">gridTypeUnstructuredPrisms</span></code>. Cell dimensions may be supplied either
+through the uniform-grid dimensions <code class="docutils literal notranslate"><span class="pre">dx</span></code>, <code class="docutils literal notranslate"><span class="pre">dy</span></code>, and <code class="docutils literal notranslate"><span class="pre">dz</span></code>, or through
+the per-cell <code class="docutils literal notranslate"><span class="pre">grid_abc</span></code> dimensions for unstructured prism grids.</p>
+</div>
+</section>
+<section id="fmm-python-example">
+<h2>FMM Python example<a class="headerlink" href="#fmm-python-example" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="o">.</span><span class="n">use_fmm</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">fmm_eps</span> <span class="o">=</span> <span class="mf">1e-4</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">fmm_nterms</span> <span class="o">=</span> <span class="mi">12</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">ifunif</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">nlmin</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">nlmax</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">allow_fmm_short_circuit</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">fmm_min_n</span> <span class="o">=</span> <span class="mi">20000</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">run_simulation</span><span class="p">(</span>
+    <span class="n">t_end</span><span class="o">=</span><span class="n">t_end</span><span class="p">,</span> <span class="n">nt</span><span class="o">=</span><span class="n">nt</span><span class="p">,</span> <span class="n">fct_h_ext</span><span class="o">=</span><span class="n">h_ext_fct</span><span class="p">,</span> <span class="n">nt_h_ext</span><span class="o">=</span><span class="n">nt_h_ext</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="fmm-matlab-example">
+<h2>FMM Matlab example<a class="headerlink" href="#fmm-matlab-example" title="Link to this heading"></a></h2>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="p">.</span><span class="n">use_fmm</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">fmm_eps</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="mf">1e-4</span><span class="p">;</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">fmm_nterms</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">12</span><span class="p">);</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">ifunif</span><span class="w">     </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">nlmin</span><span class="w">      </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">nlmax</span><span class="w">      </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">fmm_short</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">fmm_min_n</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">20000</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="micromag_examples.html" class="btn btn-neutral float-left" title="Micromagnetic examples and validation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="timing_and_trace.html" class="btn btn-neutral float-right" title="Performance, Timing &amp; Trace Logging" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright MagTense Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>  
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>

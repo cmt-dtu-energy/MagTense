@@ -15,14 +15,14 @@
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=5929fcd5"></script>
-      <script src="_static/doctools.js?v=9bcbadda"></script>
-      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="author" title="About these documents" href="about.html" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Documentation" href="documentation.html" />
+    <link rel="next" title="Setting up a micromagnetic problem" href="micromag_setup.html" />
     <link rel="prev" title="Other parameters" href="other_parameters.html" /> 
 </head>
 
@@ -51,12 +51,22 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Micromagnetism</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#basic-input">Basic input</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#anisotropy-constants">Anisotropy constants</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#dynamic-simulations">Dynamic simulations</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#hysteresis-loop-simulation">Hysteresis loop simulation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_setup.html">Setting up a micromagnetic problem</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_grid.html">Grids and meshes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_material.html">Material parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html">Exchange interaction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html">Demagnetization field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_solvers.html">Solvers and time integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_pbc.html">Periodic boundaries and macrogeometry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_thermal.html">Thermal fluctuations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_output.html">Micromagnetic output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html">Micromagnetic parameter reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html">Micromagnetic examples and validation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#the-equation-that-is-solved">The equation that is solved</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
 <li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
@@ -83,83 +93,135 @@
              
   <section id="micromagnetism">
 <h1>Micromagnetism<a class="headerlink" href="#micromagnetism" title="Link to this heading"></a></h1>
-<section id="basic-input">
-<h2>Basic input<a class="headerlink" href="#basic-input" title="Link to this heading"></a></h2>
-<p>The matlab file <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/util/DefaultMicroMagProblem.m">DefaultMicroMagProblem.m</a> and similarly the python file <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/src/magtense/micromag.py">micromag.py</a> contains an updated list of all parameters that can be specified in a micromagnetic problem.</p>
-<p>The micromagnetic model automatically generates a rectangular grid, if not provided with a grid. See the example files for how to do this.</p>
-<p>The common parameters are:</p>
-<ul class="simple">
-<li><p>Grid resolution</p></li>
-<li><p>Grid size</p></li>
-<li><p>Exchange constant</p></li>
-<li><p>Saturation magnetization</p></li>
-<li><p>Anisotropy constant</p></li>
-<li><p>Damping constant, <span class="math notranslate nohighlight">\(\alpha\)</span></p></li>
-<li><p>Precession constant, <span class="math notranslate nohighlight">\(\gamma\)</span></p></li>
+<p>MagTense solves the Landau-Lifshitz (LL) equation on a mesh of tetrahedral or rectangular prism
+cells, using the same fully analytical demagnetization tensor that
+is used by the magnetostatic framework. The micromagnetic model is implemented
+in Fortran (sub-project <code class="docutils literal notranslate"><span class="pre">MagTenseMicroMag</span></code>) and is driven either from Matlab
+through the <code class="docutils literal notranslate"><span class="pre">MagTenseLandauLifshitzSolver_mex</span></code> MEX-file, or from Python
+through the <code class="code docutils literal notranslate"><span class="pre">magtense.micromag.MicromagProblem</span></code> class.</p>
+<p>This part of the manual describes the input parameters and features of the
+micromagnetic model. The pages below go through the model one topic at a time;
+<a class="reference internal" href="micromag_parameters.html#micromagnetic-parameter-reference"><span class="std std-ref">Micromagnetic parameter reference</span></a> lists every parameter with its Matlab
+name, its Python name and its default value.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="micromag_setup.html">Setting up a micromagnetic problem</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="micromag_setup.html#matlab-problem-setup">Matlab problem setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_setup.html#python-problem-setup">Python problem setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_setup.html#units-and-conventions">Units and conventions</a></li>
 </ul>
-</section>
-<section id="anisotropy-constants">
-<h2>Anisotropy constants<a class="headerlink" href="#anisotropy-constants" title="Link to this heading"></a></h2>
-<p>The anisotropy can be specified as a local uniaxial anisotropy, <span class="math notranslate nohighlight">\(problem.K_0(i)\)</span> at every grid point along with an anisotropy vector, <span class="math notranslate nohighlight">\(problem.u_{ea}(i,:)=[easyX(i),easyY(i),easyZ(i)]\)</span> in matlab notation. The anisotropy can also be specified as a cubic anisotropy with <span class="math notranslate nohighlight">\(problem.K_1(i)\)</span> and <span class="math notranslate nohighlight">\(problem.K_2(i)\)</span> at every grid point along with a local coordinate system:</p>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromag_grid.html">Grids and meshes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="micromag_grid.html#uniform-grid">Uniform grid</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_grid.html#unstructured-prisms">Unstructured prisms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_grid.html#tetrahedral-grid">Tetrahedral grid</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_grid.html#passing-an-externally-computed-exchange-matrix">Passing an externally computed exchange matrix</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromag_material.html">Material parameters</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="micromag_material.html#magnetocrystalline-anisotropy">Magnetocrystalline anisotropy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_material.html#time-dependent-damping">Time-dependent damping</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromag_exchange.html">Exchange interaction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html#exchange-on-a-uniform-grid">Exchange on a uniform grid</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html#exchange-on-unstructured-meshes">Exchange on unstructured meshes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html#exchange-across-a-material-interface">Exchange across a material interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html#supplying-the-exchange-matrix-directly">Supplying the exchange matrix directly</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html#returning-the-exchange-matrix">Returning the exchange matrix</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromag_demag.html">Demagnetization field</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html#switching-the-demagnetization-off">Switching the demagnetization off</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html#cell-averaged-versus-point-evaluated-tensor">Cell-averaged versus point-evaluated tensor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html#approximating-the-tensor">Approximating the tensor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html#adding-noise-to-the-demagnetization-field">Adding noise to the demagnetization field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html#storing-and-reusing-the-tensor">Storing and reusing the tensor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html#parallelism-and-hardware">Parallelism and hardware</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromag_solvers.html">Solvers and time integration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="micromag_solvers.html#solver-type">Solver type</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_solvers.html#time-grid-and-applied-field">Time grid and applied field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_solvers.html#ode-solver-settings">ODE solver settings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_solvers.html#adaptive-hysteresis">Adaptive hysteresis</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromag_pbc.html">Periodic boundaries and macrogeometry</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="micromag_pbc.html#macrogeometry">Macrogeometry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_pbc.html#sample-shape-correction">Sample shape correction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_pbc.html#periodic-exchange-boundaries">Periodic exchange boundaries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_pbc.html#periodic-boundaries-on-a-tetrahedral-mesh">Periodic boundaries on a tetrahedral mesh</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromag_thermal.html">Thermal fluctuations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="micromag_thermal.html#the-stochastic-field">The stochastic field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_thermal.html#reproducible-random-numbers">Reproducible random numbers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_thermal.html#validation">Validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromag_output.html">Micromagnetic output</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="micromag_output.html#matlab-solution-struct">Matlab solution struct</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_output.html#python-result-list">Python result list</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_output.html#dry-runs">Dry runs</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromag_parameters.html">Micromagnetic parameter reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html#grid-and-geometry">Grid and geometry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html#material-and-anisotropy">Material and anisotropy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html#solver-time-and-applied-field">Solver, time and applied field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html#adaptive-hysteresis-parameters">Adaptive hysteresis parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html#exchange">Exchange</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html#demagnetization">Demagnetization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html#macrogeometry-and-shape-correction">Macrogeometry and shape correction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html#thermal-parameters">Thermal parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html#fmm-demagnetization">FMM demagnetization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html#output-tracing-and-timing">Output, tracing and timing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html#matlab-only-convenience-fields">Matlab-only convenience fields</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="micromag_examples.html">Micromagnetic examples and validation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html#mumag-standard-problems">muMag standard problems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html#feature-tests">Feature tests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html#other-examples">Other examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html#running-the-test-suites">Running the test suites</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<section id="the-equation-that-is-solved">
+<h2>The equation that is solved<a class="headerlink" href="#the-equation-that-is-solved" title="Link to this heading"></a></h2>
+<p>MagTense integrates the Landau-Lifshitz equation in the form</p>
 <div class="math notranslate nohighlight">
-\[\begin{split}problem.CrystalAxis(i,:,:)
-=
-\begin{pmatrix}
-x_1 &amp;  x_2 &amp;  x_3 \\
-    y_1 &amp;  y_2 &amp;  y_3 \\
-    z_1 &amp;  z_2 &amp;  z_3
-\end{pmatrix}\end{split}\]</div>
-<p>However, if the anisotropy is not uniaxial, a general matrix formulation with the anisotropy energy density given by [following Eq. (2) in <a class="reference external" href="https://doi.org/10.1088/1361-665X/aafff8">https://doi.org/10.1088/1361-665X/aafff8</a>]:</p>
+\[\frac{\partial \mathbf{m}}{\partial t} = -\gamma \, \mathbf{m} \times \mathbf{H}_\mathrm{eff}
+- \alpha \, \mathbf{m} \times \left( \mathbf{m} \times \mathbf{H}_\mathrm{eff} \right),\]</div>
+<p>where <span class="math notranslate nohighlight">\(\mathbf{m} = \mathbf{M}/M_s\)</span> is the reduced magnetization of a
+cell, i.e. a unit vector. Both the precession constant <span class="math notranslate nohighlight">\(\gamma\)</span> and the
+damping constant <span class="math notranslate nohighlight">\(\alpha\)</span> are given in units of <span class="math notranslate nohighlight">\(\mathrm{m/(A\,s)}\)</span>,
+i.e. this is the Landau-Lifshitz form and <em>not</em> the Gilbert form. They are
+related to the dimensionless Gilbert damping <span class="math notranslate nohighlight">\(\alpha_\mathrm{G}\)</span> by</p>
 <div class="math notranslate nohighlight">
-\[\begin{split}f_{an}(\mathbf{m}) = \alpha_{1,x}m_x^2 +  \alpha_{1,y}m_y^2 +  \alpha_{1,z}m_z^2 + \alpha_{11,x}m_x^4 + \alpha_{11,y}m_y^4 + \alpha_{11,z}m_z^4 \\
-    + \alpha_{12,x}m_y^2m_z^2 + \alpha_{12,y}m_z^2m_x^2 + \alpha_{12,z}m_x^2m_y^2 + \alpha_{111,x}m_x^6 + \alpha_{111,y}m_y^6 + \alpha_{111,z}m_z^6 \\
-    + \alpha_{112,x}m_x^4(m_y^2 + m_z^2) + \alpha_{112,y}m_y^4(m_z^2 + m_x^2) + \alpha_{112,z}m_z^4(m_x^2 + m_y^2) \\
-    + \alpha_{123}(m_x^2m_y^2m_z^2)\end{split}\]</div>
-<p>In this case the anisotropy constants are specified locally at each grid point in a 6x3 matrix as</p>
+\[\alpha = \frac{\gamma \, \alpha_\mathrm{G}}{1 + \alpha_\mathrm{G}^2}.\]</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Setting <span class="math notranslate nohighlight">\(\gamma = 0\)</span> removes the precession term. Several of the
+quasi-static examples do this - among them the relaxation stage of standard
+problem 4 and the adaptive hysteresis example - since only the relaxed state
+is of interest there and dropping the precession makes the relaxation much
+faster.</p>
+</div>
+<p>The effective field is the sum of five contributions, all in <span class="math notranslate nohighlight">\(\mathrm{A/m}\)</span>,</p>
 <div class="math notranslate nohighlight">
-\[\begin{split}K_{0,arr}
-=
-\begin{pmatrix}
-\alpha_{1,x} &amp;   \alpha_{1,y} &amp;   \alpha_{1,z} \\
-    \alpha_{11,x} &amp;  \alpha_{11,y} &amp;  \alpha_{11,z} \\
-    \alpha_{12,x} &amp;  \alpha_{12,y} &amp;  \alpha_{12,z} \\
-    \alpha_{111,x} &amp;  \alpha_{111,y} &amp;  \alpha_{111,z} \\
-    \alpha_{112,x} &amp;  \alpha_{112,y} &amp;  \alpha_{112,z} \\
-    \alpha_{123,x} &amp;  0 &amp;  0
-\end{pmatrix}\end{split}\]</div>
-<p>In the above matrix notation, a uniaxial anisotropy in the z-direction is given by:</p>
-<div class="math notranslate nohighlight">
-\[\begin{split}K_{0,arr}
- =
-     \begin{pmatrix}
-     0 &amp; 0 &amp; K_0 \\
- 0 &amp; 0 &amp; 0  \\
- 0 &amp; 0 &amp; 0  \\
- 0 &amp; 0 &amp; 0  \\
- 0 &amp; 0 &amp; 0  \\
- 0 &amp; 0 &amp; 0
- \end{pmatrix}\end{split}\]</div>
-<p>and a cubic anisotropy is given by:</p>
-<div class="math notranslate nohighlight">
-\[\begin{split}K_{0,arr}
- =
-     \begin{pmatrix}
- 0 &amp; 0 &amp; 0 \\
- 0 &amp; 0 &amp; 0  \\
- K_1 &amp; K_1 &amp; K_1 \\
- 0 &amp; 0 &amp; 0 \\
- 0 &amp; 0 &amp; 0 \\
- K_2 &amp; 0 &amp; 0
- \end{pmatrix}\end{split}\]</div>
-<p>For the general anisotropy the crystal axis must also be specified in a format similar to the cubic anisotropy.</p>
-</section>
-<section id="dynamic-simulations">
-<h2>Dynamic simulations<a class="headerlink" href="#dynamic-simulations" title="Link to this heading"></a></h2>
-<p>An example of how to run a dynamic simulation in Matlab is given <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_2/Standard_problem_2.m">here</a>.</p>
-</section>
-<section id="hysteresis-loop-simulation">
-<h2>Hysteresis loop simulation<a class="headerlink" href="#hysteresis-loop-simulation" title="Link to this heading"></a></h2>
-<p>An example of how to run a hysteresis loop simulation in Matlab is given <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4/Standard_problem_4.m">here</a> and in python <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/std_problem_4.py">here</a>.</p>
+\[\mathbf{H}_\mathrm{eff} = \mathbf{H}_\mathrm{ext} + \mathbf{H}_\mathrm{exc}
++ \mathbf{H}_\mathrm{dem} + \mathbf{H}_\mathrm{ani} + \mathbf{H}_\mathrm{th},\]</div>
+<p>being the applied (external) field, the exchange field, the demagnetization
+field, the magnetocrystalline anisotropy field and the stochastic thermal
+field. Each term is described on its own page below. The thermal term is only
+included when a non-zero temperature is specified, see
+<a class="reference internal" href="micromag_thermal.html#thermal-fluctuations"><span class="std std-ref">Thermal fluctuations</span></a>.</p>
+<p>All quantities are in SI units. Note in particular that fields and
+magnetizations are in <span class="math notranslate nohighlight">\(\mathrm{A/m}\)</span> and not in tesla; multiply by
+<span class="math notranslate nohighlight">\(\mu_0\)</span> to convert.</p>
 </section>
 </section>
 
@@ -168,7 +230,7 @@ x_1 &amp;  x_2 &amp;  x_3 \\
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="other_parameters.html" class="btn btn-neutral float-left" title="Other parameters" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="documentation.html" class="btn btn-neutral float-right" title="Documentation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="micromag_setup.html" class="btn btn-neutral float-right" title="Setting up a micromagnetic problem" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

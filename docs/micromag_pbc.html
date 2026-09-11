@@ -1,0 +1,465 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Periodic boundaries and macrogeometry &mdash; MagTense TechManual  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/techmanual.css?v=903b4c53" />
+
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Thermal fluctuations" href="micromag_thermal.html" />
+    <link rel="prev" title="Solvers and time integration" href="micromag_solvers.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/MagTense_logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="micromag_setup.html">Setting up a micromagnetic problem</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_grid.html">Grids and meshes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_material.html">Material parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html">Exchange interaction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html">Demagnetization field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_solvers.html">Solvers and time integration</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Periodic boundaries and macrogeometry</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#macrogeometry">Macrogeometry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#sample-shape-correction">Sample shape correction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#periodic-exchange-boundaries">Periodic exchange boundaries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#periodic-boundaries-on-a-tetrahedral-mesh">Periodic boundaries on a tetrahedral mesh</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#periodic-mesh-node-identification">Periodic mesh: node identification</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#non-periodic-mesh-mortar-coupling">Non-periodic mesh: mortar coupling</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mixing-the-two">Mixing the two</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#when-it-cannot-be-done-at-all">When it cannot be done at all</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_thermal.html">Thermal fluctuations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_output.html">Micromagnetic output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html">Micromagnetic parameter reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html">Micromagnetic examples and validation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#the-equation-that-is-solved">The equation that is solved</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #cccccc" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTense>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="periodic-boundaries-and-macrogeometry">
+<h1>Periodic boundaries and macrogeometry<a class="headerlink" href="#periodic-boundaries-and-macrogeometry" title="Link to this heading"></a></h1>
+<p>Micromagnetic simulations are generally limited to sub-mm magnetic domains,
+but real samples tend to be macroscopic. MagTense offers three separate methods for bridging
+this gap in length scale, and they can be combined:</p>
+<ol class="arabic simple">
+<li><p>a <strong>macrogeometry</strong> that repeats the simulated domain when the
+demagnetization tensor is built;</p></li>
+<li><p>a <strong>shape correction</strong> that replaces the demagnetization field from the average magnetisation
+with that of the real sample shape;</p></li>
+<li><p><strong>periodic exchange boundaries</strong> that couple the cells at opposite ends of
+the domain.</p></li>
+</ol>
+<p>The periodic demgnetization field is verified against an analytical result from
+Durhuus <em>et al.</em>, “Exact demagnetisation field for periodic
+one-dimensional array of rectangular prisms” (see <a class="reference internal" href="publications.html#publications"><span class="std std-ref">Publications</span></a>). The
+implementation is validated by the <code class="docutils literal notranslate"><span class="pre">macrogeometry_PBC_test</span></code> and
+<code class="docutils literal notranslate"><span class="pre">shape_correction_test</span></code> examples that ship with MagTense in both Matlab and
+Python.</p>
+<p>That average magnetisation is enough to fully account for shape effects is proven
+in Durhuus <em>et al.</em>, “Including sample shape in micromagnetics with 3D periodic
+boundary conditions” (see <a class="reference internal" href="publications.html#publications"><span class="std std-ref">Publications</span></a>).
+The idea is that the field from the average magnetisation <span class="math notranslate nohighlight">\(H_\mathrm{avg}\)</span>
+is longer-ranged than the field from the non-uniform remainder, <span class="math notranslate nohighlight">\(H_\mathrm{rest}\)</span>.
+Consequently, <span class="math notranslate nohighlight">\(H_\mathrm{avg}\)</span> depends on the macroscopic distribution of magnetic
+material (sample-shape), while <span class="math notranslate nohighlight">\(H_\mathrm{rest}\)</span> just depends on the local environment.
+Thus for simulating the bulk of a sample, i.e. a simulation domain far from the surface,
+one can use the macrogeometry method for the local environment, and the shape correction
+field for the distant sample regions, including sample-shape effects.</p>
+<section id="macrogeometry">
+<h2>Macrogeometry<a class="headerlink" href="#macrogeometry" title="Link to this heading"></a></h2>
+<p>The macrogeometry is a regular array of copies of the simulated domain. Its
+effect is included when the demagnetization tensor is built: for every copy the
+tensor is evaluated with the evaluation points shifted by the copy offset, and
+the contributions are summed. The magnetization of every copy is by
+construction identical to that of the simulated domain, so the cost is one
+extra tensor evaluation per copy and no extra memory.
+Note that, since the material properties and magnetisation distribution is copy-pasted,
+the macrogeometry method assumes the simulated domain is representative of the
+whole bulk sample, and that the simulated domain is large enough to contain all
+features of interest, e.g. long domain walls.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 22.0%" />
+<col style="width: 56.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Matlab</p></th>
+<th class="head"><p>Python</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">n_macro</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">n_macro</span></code></p></td>
+<td><p>Number of copies on <strong>each</strong> side of the simulated domain along x, y and
+z. The macrogeometry therefore contains
+<span class="math notranslate nohighlight">\((2n_x+1)(2n_y+1)(2n_z+1)\)</span> copies in total. The default
+<code class="docutils literal notranslate"><span class="pre">[0</span> <span class="pre">0</span> <span class="pre">0]</span></code> means no macrogeometry.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">shiftVec</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">shiftVec</span></code></p></td>
+<td><p>Distance in metres between neighbouring copies along x, y and z.</p></td>
+</tr>
+</tbody>
+</table>
+<p>A one-dimensional array of period <span class="math notranslate nohighlight">\(A\)</span> along x, with 50 copies on either
+side, is therefore</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">n_macro</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">n_macro</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">50</span>
+<span class="n">shift_vec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">shift_vec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">A</span>
+
+<span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span><span class="n">res</span><span class="o">=</span><span class="n">res</span><span class="p">,</span> <span class="n">n_macro</span><span class="o">=</span><span class="n">n_macro</span><span class="p">,</span> <span class="n">shiftVec</span><span class="o">=</span><span class="n">shift_vec</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="p">.</span><span class="n">n_macro</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">([</span><span class="mi">50</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="mi">0</span><span class="p">]);</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">shiftVec</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="n">A</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="mi">0</span><span class="p">];</span>
+</pre></div>
+</div>
+<p>Note that <code class="docutils literal notranslate"><span class="pre">shiftVec</span></code> is the <em>spacing between copies</em>, not the size of the
+domain: setting it larger than the domain leaves a gap between the copies,
+which is exactly how a periodic array of separated particles is modelled.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Some analytical benchmarks for the periodic field are derived for the
+demagnetization tensor evaluated at the cell centres rather than averaged
+over the cell. Those cases need <code class="docutils literal notranslate"><span class="pre">useAvgN</span></code> switched off, see
+<a class="reference internal" href="micromag_demag.html#cell-averaged-versus-point-evaluated-tensor"><span class="std std-ref">Cell-averaged versus point-evaluated tensor</span></a>.</p>
+</div>
+</section>
+<section id="sample-shape-correction">
+<h2>Sample shape correction<a class="headerlink" href="#sample-shape-correction" title="Link to this heading"></a></h2>
+<p>Even with the macrogeometry method, it can be difficult to represent a macroscopic sample,
+especially for 3D structures, as opposed to wires and thin-films. The shape
+correction adds the difference between the demagnetization field of the <strong>real
+sample</strong> and that of the <strong>macrogeometry</strong>, both approximated by rectangular
+prisms centred on the mesh:</p>
+<div class="math notranslate nohighlight">
+\[\mathbf{H}_\mathrm{shape} = \left( \mathrm{N}_\mathrm{sample}
+    - \mathrm{N}_\mathrm{macro} \right) \langle \mathbf{M} \rangle.\]</div>
+<p>Here <span class="math notranslate nohighlight">\(\langle \mathbf{M} \rangle\)</span> is the average magnetization of the
+simulated cells multiplied by the volume fraction of the domain that is
+actually occupied by magnetic material. That fraction is computed from the cell
+volumes and from <code class="docutils literal notranslate"><span class="pre">macroShape</span></code>, so voids and non-magnetic regions are
+accounted for. <span class="math notranslate nohighlight">\(\mathrm{N}_\mathrm{sample}\)</span> is the
+demagnetisation tensor for the sample and <span class="math notranslate nohighlight">\(\mathrm{N}_\mathrm{macro}\)</span> for
+the macrogeometry. Note that the absolute size of the sample matters for the spatial
+distribution of <span class="math notranslate nohighlight">\(\mathrm{N}_\mathrm{sample}\)</span>. For a sample orders of magnitude
+larger than the simulation domain, <span class="math notranslate nohighlight">\(\mathrm{N}_\mathrm{sample}\)</span> is spatially uniform.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 22.0%" />
+<col style="width: 56.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Matlab</p></th>
+<th class="head"><p>Python</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">macroShape</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">macroShape</span></code></p></td>
+<td><p>Side lengths of the prism that approximates the whole macrogeometry, in
+metres. Default <code class="docutils literal notranslate"><span class="pre">[1</span> <span class="pre">1</span> <span class="pre">1]</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">sampleShape</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sampleShape</span></code></p></td>
+<td><p>Side lengths of the prism that approximates the physical sample, in
+metres. Default <code class="docutils literal notranslate"><span class="pre">[1</span> <span class="pre">1</span> <span class="pre">1]</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Leaving both at their defaults makes the two tensors identical, so the
+correction vanishes. A zero side length in <code class="docutils literal notranslate"><span class="pre">macroShape</span></code> disables the
+correction and prints <code class="docutils literal notranslate"><span class="pre">MagTense:</span> <span class="pre">macroShape</span> <span class="pre">has</span> <span class="pre">a</span> <span class="pre">zero</span> <span class="pre">side</span> <span class="pre">length</span> <span class="pre">-</span>
+<span class="pre">disabling</span> <span class="pre">the</span> <span class="pre">shape</span> <span class="pre">correction</span></code>.</p>
+<p>The evaluation points are shifted into a frame centred on the bounding box of
+the mesh before the two tensors are evaluated, so an externally supplied mesh
+that runs from 0 to L is handled the same way as the internally generated
+uniform grid, which is centred on the origin.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The correction is applied on both the dense and the FMM demagnetization
+paths. It cannot be used with a tetrahedral mesh, since the occupied volume
+fraction cannot be determined there.</p>
+</div>
+</section>
+<section id="periodic-exchange-boundaries">
+<h2>Periodic exchange boundaries<a class="headerlink" href="#periodic-exchange-boundaries" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">exchPBC</span></code> is a three-element integer array of 0/1 flags that makes the
+exchange coupling periodic along x, y and z. It is independent of the
+macrogeometry: a domain can be exchange-periodic without a macrogeometry and
+vice versa.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span>
+    <span class="n">res</span><span class="o">=</span><span class="n">res</span><span class="p">,</span> <span class="n">exchPBC</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span> <span class="o">...</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="p">.</span><span class="n">exchPBC</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">([</span><span class="mi">1</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="mi">1</span><span class="p">]);</span>
+</pre></div>
+</div>
+<p>How it is realised depends on the grid:</p>
+<ul class="simple">
+<li><p><strong>Uniform grid</strong> - the finite-difference stencil wraps around, so the cell at
+one end of a periodic direction gets the cell at the other end as its
+neighbour instead of a free boundary.</p></li>
+<li><p><strong>Unstructured prisms</strong> - the mesh analysis links the cells at the two ends of
+each periodic direction, i.e. they are treated as sharing a face and enter
+each other’s interpolation stencils. The exchange operator is then assembled
+exactly as it is without periodic boundaries. The period is taken as the
+extent of the mesh along that direction.</p></li>
+<li><p><strong>Tetrahedral mesh</strong> - the mesh analysis links the two boundary planes of each
+periodic direction, by one of two mechanisms chosen per direction depending on
+whether the mesh itself is periodic. Both are described in
+<a class="reference internal" href="#periodic-boundaries-on-a-tetrahedral-mesh"><span class="std std-ref">Periodic boundaries on a tetrahedral mesh</span></a> below. The period is taken as
+the extent of the mesh along that direction, as for the prisms.</p></li>
+<li><p>An exchange matrix <strong>passed in from outside</strong> carries its own boundary
+conditions, so <code class="docutils literal notranslate"><span class="pre">exchPBC</span></code> does not apply to it.</p></li>
+</ul>
+<p>Two constraints apply:</p>
+<ul class="simple">
+<li><p>A periodic direction needs at least <strong>three</strong> cells. With exactly two, the
+wrap-around neighbour and the ordinary neighbour of a boundary cell are the
+same cell, which is not a valid sparse row, and the solver stops with
+<code class="docutils literal notranslate"><span class="pre">MagTense:</span> <span class="pre">periodic</span> <span class="pre">exchange</span> <span class="pre">requires</span> <span class="pre">at</span> <span class="pre">least</span> <span class="pre">three</span> <span class="pre">cells</span> <span class="pre">along</span> <span class="pre">a</span> <span class="pre">periodic</span>
+<span class="pre">direction</span></code>. A single cell along a direction is fine - the direction is
+simply dropped, which is the correct periodic answer for one cell.</p></li>
+<li><p>For an unstructured mesh the extent along a periodic direction must be larger
+than twice the largest cell size along that direction.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">periodic_exchange_test</span></code> example verifies that exchange-coupled moments
+across a periodic boundary end up identical, on a uniform grid, on an
+unstructured mesh of prisms and on a tetrahedral mesh.</p>
+</section>
+<section id="periodic-boundaries-on-a-tetrahedral-mesh">
+<h2>Periodic boundaries on a tetrahedral mesh<a class="headerlink" href="#periodic-boundaries-on-a-tetrahedral-mesh" title="Link to this heading"></a></h2>
+<p>A prism mesh is analysed geometrically, so linking a periodic boundary is a
+matter of finding which faces at one end of the domain overlap which faces at
+the other. A tetrahedral mesh is analysed from its connectivity instead - two
+tetrahedra are neighbours when they share three nodes - and that changes what
+the periodic boundary needs. <code class="docutils literal notranslate"><span class="pre">TetrahedralMeshAnalysis.f90</span></code> therefore has two
+mechanisms, and picks between them separately for each periodic direction.</p>
+<section id="periodic-mesh-node-identification">
+<h3>Periodic mesh: node identification<a class="headerlink" href="#periodic-mesh-node-identification" title="Link to this heading"></a></h3>
+<p>A mesh is <em>periodic along a direction</em> when the surface triangulation on the two
+boundary planes normal to it is a translated copy of itself: every node on one
+plane has a partner on the other, and the triangles match one for one. This is
+what a mesh generator produces when it is asked for a periodic mesh - in gmsh
+through <code class="docutils literal notranslate"><span class="pre">Periodic</span> <span class="pre">Surface</span></code>, in COMSOL through a Copy Face mesh operation.</p>
+<p>When that holds, each pair of boundary nodes is merged into a single node and
+the whole analysis runs on the resulting connectivity. Two tetrahedra on
+opposite sides of the domain then share three nodes and are found to be
+neighbours in exactly the same way as any interior pair: they share one face,
+with one area and one normal, and they enter each other’s interpolation
+stencils. Nothing downstream distinguishes them from an interior pair, apart
+from measuring their separation through the boundary rather than across the
+domain.</p>
+<p>This mechanism involves no geometry beyond pairing the nodes, and it is exact.
+When it is used, the analysis reports:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Periodic</span> <span class="n">exchange</span> <span class="n">along</span> <span class="n">x</span><span class="p">:</span> <span class="n">mesh</span> <span class="ow">is</span> <span class="n">periodic</span><span class="p">,</span> <span class="mi">16</span> <span class="n">node</span> <span class="n">pairs</span> <span class="n">merged</span>
+</pre></div>
+</div>
+<p>Nodes on an edge or a corner of the domain have more than one partner - three
+with two periodic directions, seven with three - and the merging is transitive,
+so they collapse to a single node rather than to a set of pairs.</p>
+</section>
+<section id="non-periodic-mesh-mortar-coupling">
+<h3>Non-periodic mesh: mortar coupling<a class="headerlink" href="#non-periodic-mesh-mortar-coupling" title="Link to this heading"></a></h3>
+<p>Most meshes are <em>not</em> periodic. A mesh generated without asking for periodicity
+triangulates the two boundary planes independently, so the triangles do not
+match and no node pairing exists. Matlab’s own <code class="docutils literal notranslate"><span class="pre">generateMesh</span></code>, used by
+<code class="docutils literal notranslate"><span class="pre">CreateTetraMesh</span></code>, cannot produce a periodic mesh at all.</p>
+<p>In that case the boundary faces are <strong>mortar coupled</strong>. Every boundary triangle
+on one plane is clipped against the triangles it overlaps on the other, and each
+intersection polygon becomes a <em>sub-face</em> shared by the two elements on either
+side, carrying its own area and centroid. A triangle that straddles three
+triangles on the opposite plane therefore contributes three sub-faces rather
+than one face.</p>
+<p>This is well behaved because a periodic boundary is a special case of a
+non-conforming interface: once the period is subtracted the two planes are
+<em>exactly coplanar</em>, so the clipping is a plain two-dimensional intersection of
+two triangles in the plane of the boundary, with no projection error. The
+sub-faces therefore tile both parent triangles exactly - no gaps and no overlaps
+- and the flux leaving an element through its boundary face is the sum over its
+sub-faces and equals what enters on the other side. <strong>Flux conservation is
+exact.</strong></p>
+<p>The interpolation stencil is where the two mechanisms differ. A sub-face has no
+nodes of its own, so its stencil is taken as the union of the stencils of its
+two parent triangles. That is a superset of what a matching face would give, and
+it needs no geometric search or tolerance, but it is not the same stencil. The
+consequence is that the operator is <strong>less accurate on a mortar coupled plane
+than in the interior of the mesh</strong>: it stays conservative, but the local
+truncation error there is larger. For a problem in which the periodic plane is
+meant to be invisible this is worth being aware of, and worth measuring - for
+instance by comparing a domain wall energy with the wall on the plane against
+the same wall in the interior.</p>
+<p>Because it is a fallback rather than a free choice, it is announced as a
+warning:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">***</span> <span class="n">MagTense</span> <span class="n">WARNING</span><span class="p">:</span> <span class="n">the</span> <span class="n">mesh</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">periodic</span> <span class="o">***</span>
+<span class="n">Periodic</span> <span class="n">boundary</span> <span class="n">conditions</span> <span class="n">were</span> <span class="n">requested</span> <span class="n">along</span> <span class="n">x</span><span class="p">,</span> <span class="n">but</span> <span class="n">the</span> <span class="n">mesh</span>
+<span class="n">does</span> <span class="ow">not</span> <span class="n">match</span> <span class="n">across</span> <span class="n">it</span><span class="p">:</span> <span class="n">the</span> <span class="n">two</span> <span class="n">planes</span> <span class="n">hold</span> <span class="mi">16</span> <span class="ow">and</span> <span class="mi">34</span> <span class="n">nodes</span><span class="p">,</span>
+<span class="ow">and</span> <span class="n">only</span> <span class="mi">16</span> <span class="n">of</span> <span class="n">them</span> <span class="n">could</span> <span class="n">be</span> <span class="n">paired</span> <span class="n">up</span><span class="o">.</span>
+<span class="n">Falling</span> <span class="n">back</span> <span class="n">to</span> <span class="n">MORTAR</span> <span class="n">COUPLING</span> <span class="n">of</span> <span class="n">the</span> <span class="n">boundary</span> <span class="n">faces</span><span class="o">.</span>
+<span class="n">The</span> <span class="n">exchange</span> <span class="n">operator</span> <span class="n">stays</span> <span class="n">conservative</span><span class="p">,</span> <span class="n">but</span> <span class="n">it</span> <span class="ow">is</span> <span class="n">less</span>
+<span class="n">accurate</span> <span class="n">on</span> <span class="n">that</span> <span class="n">plane</span> <span class="n">than</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">interior</span> <span class="n">of</span> <span class="n">the</span> <span class="n">mesh</span><span class="o">.</span>
+<span class="n">For</span> <span class="n">full</span> <span class="n">accuracy</span><span class="p">,</span> <span class="n">mesh</span> <span class="n">the</span> <span class="n">geometry</span> <span class="n">periodically</span> <span class="n">along</span> <span class="n">x</span><span class="p">:</span>
+<span class="n">gmsh</span> <span class="s1">'Periodic Surface'</span><span class="p">,</span> <span class="ow">or</span> <span class="n">a</span> <span class="n">COMSOL</span> <span class="s1">'Copy Face'</span> <span class="n">operation</span><span class="o">.</span>
+<span class="o">**************************************************</span>
+<span class="n">Mortar</span> <span class="n">coupling</span><span class="p">:</span> <span class="mi">72</span> <span class="n">boundary</span> <span class="n">faces</span> <span class="n">split</span> <span class="n">into</span> <span class="mi">54</span> <span class="n">sub</span><span class="o">-</span><span class="n">faces</span>
+<span class="n">Mortar</span> <span class="n">coupling</span><span class="p">:</span> <span class="n">worst</span> <span class="n">relative</span> <span class="n">area</span> <span class="n">mismatch</span>   <span class="mf">2.84E-15</span>
+</pre></div>
+</div>
+<p>The last line is the check that the tiling really is exact: the summed sub-face
+area of every parent triangle is compared with the area of that triangle, and
+the worst relative mismatch is reported. It is a rounding level number for a
+mesh that can be coupled at all.</p>
+</section>
+<section id="mixing-the-two">
+<h3>Mixing the two<a class="headerlink" href="#mixing-the-two" title="Link to this heading"></a></h3>
+<p>The choice is made per direction, so a mesh that is periodic along one direction
+and not along another uses the exact path where it can and falls back only where
+it must. A single run can report:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">***</span> <span class="n">MagTense</span> <span class="n">WARNING</span><span class="p">:</span> <span class="n">the</span> <span class="n">mesh</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">periodic</span> <span class="o">***</span>
+<span class="o">...</span> <span class="p">(</span><span class="n">mortar</span> <span class="n">coupling</span> <span class="n">along</span> <span class="n">x</span><span class="p">)</span>
+<span class="n">Periodic</span> <span class="n">exchange</span> <span class="n">along</span> <span class="n">y</span><span class="p">:</span> <span class="n">mesh</span> <span class="ow">is</span> <span class="n">periodic</span><span class="p">,</span> <span class="mi">20</span> <span class="n">node</span> <span class="n">pairs</span> <span class="n">merged</span>
+<span class="n">Periodic</span> <span class="n">exchange</span> <span class="n">along</span> <span class="n">z</span><span class="p">:</span> <span class="n">mesh</span> <span class="ow">is</span> <span class="n">periodic</span><span class="p">,</span> <span class="mi">20</span> <span class="n">node</span> <span class="n">pairs</span> <span class="n">merged</span>
+</pre></div>
+</div>
+<p>A partial merge along one direction never happens: the node pairing is only
+applied when <em>every</em> node on the plane has a partner, since half a merged
+boundary would be worse than either mechanism on its own.</p>
+</section>
+<section id="when-it-cannot-be-done-at-all">
+<h3>When it cannot be done at all<a class="headerlink" href="#when-it-cannot-be-done-at-all" title="Link to this heading"></a></h3>
+<p>Mortar coupling repairs a mesh that does not match. It cannot repair a
+<em>geometry</em> that does not match. If the two boundary planes do not cover the same
+cross section - the sample is wider at one end than the other, say - then part
+of a boundary face has nothing on the opposite plane to be coupled to, the
+summed sub-face area falls short of the parent area, and the analysis stops
+with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">MagTense</span><span class="p">:</span> <span class="n">worst</span> <span class="n">relative</span> <span class="n">area</span> <span class="n">mismatch</span> <span class="n">on</span> <span class="n">a</span> <span class="n">periodic</span> <span class="n">plane</span><span class="p">:</span> <span class="o">...</span>
+<span class="n">MagTense</span><span class="p">:</span> <span class="n">the</span> <span class="n">two</span> <span class="n">boundary</span> <span class="n">planes</span> <span class="n">do</span> <span class="ow">not</span> <span class="n">cover</span> <span class="n">the</span> <span class="n">same</span> <span class="n">cross</span> <span class="n">section</span>
+<span class="n">MagTense</span><span class="p">:</span> <span class="n">the</span> <span class="n">geometry</span><span class="p">,</span> <span class="ow">not</span> <span class="n">just</span> <span class="n">the</span> <span class="n">mesh</span><span class="p">,</span> <span class="n">has</span> <span class="n">to</span> <span class="n">be</span> <span class="n">periodic</span>
+</pre></div>
+</div>
+<p>Together with the thickness requirement listed above - the extent along a
+periodic direction has to exceed twice the largest element extent along it -
+these are the conditions a tetrahedral mesh has to meet to be made periodic.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="micromag_solvers.html" class="btn btn-neutral float-left" title="Solvers and time integration" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="micromag_thermal.html" class="btn btn-neutral float-right" title="Thermal fluctuations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright MagTense Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>  
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>

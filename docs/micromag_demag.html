@@ -1,0 +1,310 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demagnetization field &mdash; MagTense TechManual  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/techmanual.css?v=903b4c53" />
+
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Solvers and time integration" href="micromag_solvers.html" />
+    <link rel="prev" title="Exchange interaction" href="micromag_exchange.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/MagTense_logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="micromag_setup.html">Setting up a micromagnetic problem</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_grid.html">Grids and meshes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_material.html">Material parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html">Exchange interaction</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Demagnetization field</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#switching-the-demagnetization-off">Switching the demagnetization off</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#cell-averaged-versus-point-evaluated-tensor">Cell-averaged versus point-evaluated tensor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#approximating-the-tensor">Approximating the tensor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adding-noise-to-the-demagnetization-field">Adding noise to the demagnetization field</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#storing-and-reusing-the-tensor">Storing and reusing the tensor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#parallelism-and-hardware">Parallelism and hardware</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_solvers.html">Solvers and time integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_pbc.html">Periodic boundaries and macrogeometry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_thermal.html">Thermal fluctuations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_output.html">Micromagnetic output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html">Micromagnetic parameter reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html">Micromagnetic examples and validation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#the-equation-that-is-solved">The equation that is solved</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #cccccc" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTense>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="demagnetization-field">
+<h1>Demagnetization field<a class="headerlink" href="#demagnetization-field" title="Link to this heading"></a></h1>
+<p>The demagnetization (stray) field is the most computationally expensive part of micromagnetics.
+MagTense computes it from the <strong>fully analytical demagnetization tensor</strong> of
+the cell shape; a rectangular prism for the uniform and unstructured-prism
+grids, and a tetrahedron for the tetrahedral grid. The accuracy of these tensors is documented in
+<a class="reference external" href="https://www.sciencedirect.com/science/article/pii/S0304885323008958">Bjørk, R. and d’Aquino, M.: Accuracy of the analytical demagnetization tensor
+for various geometries, Journal of Magnetism and Magnetic Materials, 587,
+171245, 2023</a>.</p>
+<p>The tensor is symmetric, so it is stored as the six components
+<span class="math notranslate nohighlight">\(K_{xx}, K_{xy}, K_{xz}, K_{yy}, K_{yz}, K_{zz}\)</span>, each a dense
+<span class="math notranslate nohighlight">\(n_\mathrm{tot} \times n_\mathrm{tot}\)</span> matrix in <strong>single precision</strong>.
+The memory requirement is therefore approximately
+<span class="math notranslate nohighlight">\(24\,n_\mathrm{tot}^2\)</span> bytes, which is what limits the problem size; the
+Matlab interface prints an estimate when the problem struct is created. The
+saturation magnetization is folded into the tensor when it is built, so a
+spatially varying <span class="math notranslate nohighlight">\(M_s\)</span> costs nothing extra.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The parameter <code class="docutils literal notranslate"><span class="pre">usePres</span></code> (Python <code class="docutils literal notranslate"><span class="pre">precision</span></code>) is accepted but has no
+effect - the demagnetization tensor is always kept in single precision,
+while everything else is double precision.</p>
+</div>
+<section id="switching-the-demagnetization-off">
+<h2>Switching the demagnetization off<a class="headerlink" href="#switching-the-demagnetization-off" title="Link to this heading"></a></h2>
+<p>Setting <code class="docutils literal notranslate"><span class="pre">useDemag</span></code> (Matlab <code class="docutils literal notranslate"><span class="pre">setUseDemag</span></code>, Python <code class="docutils literal notranslate"><span class="pre">usedemag</span></code>) to False removes the
+demagnetization field from the effective field and skips building the tensor
+altogether.</p>
+</section>
+<section id="cell-averaged-versus-point-evaluated-tensor">
+<h2>Cell-averaged versus point-evaluated tensor<a class="headerlink" href="#cell-averaged-versus-point-evaluated-tensor" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">useAvgN</span></code> (Python <code class="docutils literal notranslate"><span class="pre">useavgn</span></code>, default <strong>on</strong>) selects the <em>volume-averaged</em>
+prism tensor, i.e. the tensor averaged over the receiving cell rather than
+evaluated at its centre. This is the more accurate choice for a uniform mesh
+and is the default, but it is only implemented for the rectangular prism tile
+(tile_type = 8).</p>
+<p>Some analytical benchmarks are formulated for the tensor evaluated at
+the cell centre, and for those <code class="docutils literal notranslate"><span class="pre">useAvgN</span></code> must be switched off. This includes the
+macrogeometry and shape-correction tests.</p>
+<p>For the <code class="docutils literal notranslate"><span class="pre">unstructuredPrisms</span></code> grid the tensor may additionally be averaged
+numerically over the receiving cell using <code class="docutils literal notranslate"><span class="pre">N_ave</span> <span class="pre">=</span> <span class="pre">[nx,</span> <span class="pre">ny,</span> <span class="pre">nz]</span></code>, which
+evaluates the tensor on an <code class="docutils literal notranslate"><span class="pre">nx*ny*nz</span></code> sub-grid inside each receiving prism
+and averages. The default <code class="docutils literal notranslate"><span class="pre">[1</span> <span class="pre">1</span> <span class="pre">1]</span></code> means no averaging. This is not supported
+for tetrahedral meshes.</p>
+</section>
+<section id="approximating-the-tensor">
+<h2>Approximating the tensor<a class="headerlink" href="#approximating-the-tensor" title="Link to this heading"></a></h2>
+<p>The dense tensor may be sparsified, which trades accuracy for memory and speed.
+The approximation is selected with <code class="docutils literal notranslate"><span class="pre">setMicroMagDemagApproximation</span></code> in Matlab
+and with <code class="docutils literal notranslate"><span class="pre">demag_approx</span></code> in Python, and the associated cut-off is
+<code class="docutils literal notranslate"><span class="pre">dem_thres</span></code>.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 28.0%" />
+<col style="width: 8.0%" />
+<col style="width: 64.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">none</span></code> (Python <code class="docutils literal notranslate"><span class="pre">None</span></code>)</p></td>
+<td><p>1</p></td>
+<td><p>Default. The dense tensor is used as is.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">threshold</span></code></p></td>
+<td><p>2</p></td>
+<td><p>Every element with <span class="math notranslate nohighlight">\(|K| &lt;\)</span> <code class="docutils literal notranslate"><span class="pre">dem_thres</span></code> is set to zero and the
+six matrices are converted to MKL sparse matrices.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">threshold_fraction</span></code></p></td>
+<td><p>4</p></td>
+<td><p>As above, but <code class="docutils literal notranslate"><span class="pre">dem_thres</span></code> is interpreted as the <em>fraction</em> of tensor
+elements to discard. The cut-off value is found by bisection. A value
+<span class="math notranslate nohighlight">\(\geq 1\)</span> zeroes the demagnetization field entirely.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fft_thres</span></code></p></td>
+<td><p>3</p></td>
+<td><p>Threshold applied in Fourier space. <strong>Stale, do not use.</strong></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fft_threshold_fraction</span></code></p></td>
+<td><p>5</p></td>
+<td><p>Fractional threshold applied in Fourier space. <strong>Stale, do not use.</strong></p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The two Fourier-space approximations are not maintained. The solver prints a
+loud warning if they are selected: the transformed field is never mapped
+back onto the demagnetization field and the tensor is not corrected for a
+spatially varying <span class="math notranslate nohighlight">\(M_s\)</span>, so the result is wrong. Use <code class="docutils literal notranslate"><span class="pre">none</span></code>,
+<code class="docutils literal notranslate"><span class="pre">threshold</span></code> or <code class="docutils literal notranslate"><span class="pre">threshold_fraction</span></code>.</p>
+</div>
+</section>
+<section id="adding-noise-to-the-demagnetization-field">
+<h2>Adding noise to the demagnetization field<a class="headerlink" href="#adding-noise-to-the-demagnetization-field" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">CV</span></code> (Python <code class="docutils literal notranslate"><span class="pre">cv</span></code>) adds a normally distributed relative error to the
+demagnetization field, with <code class="docutils literal notranslate"><span class="pre">CV</span></code> being the coefficient of variation, i.e. the
+ratio of the standard deviation to the mean. The default of zero disables it.
+The draw is controlled by the same random seed as the thermal field, see
+<a class="reference internal" href="micromag_thermal.html#reproducible-random-numbers"><span class="std std-ref">Reproducible random numbers</span></a>.</p>
+</section>
+<section id="storing-and-reusing-the-tensor">
+<h2>Storing and reusing the tensor<a class="headerlink" href="#storing-and-reusing-the-tensor" title="Link to this heading"></a></h2>
+<p>Because building the tensor can dominate the run time of a short simulation,
+it can be written to disk and read back:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 22.0%" />
+<col style="width: 56.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Matlab</p></th>
+<th class="head"><p>Python</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">N_ret</span></code>, <code class="docutils literal notranslate"><span class="pre">N_file_out</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">N_ret</span></code>, <code class="docutils literal notranslate"><span class="pre">N_file_out</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code> does not return the tensor, <code class="docutils literal notranslate"><span class="pre">2</span></code> returns it in memory, and a
+value <code class="docutils literal notranslate"><span class="pre">&gt;</span> <span class="pre">2</span></code> writes it to the file named by <code class="docutils literal notranslate"><span class="pre">N_file_out</span></code>. The value
+is the length of that filename.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">N_load</span></code>, <code class="docutils literal notranslate"><span class="pre">N_file_in</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">N_load</span></code>, <code class="docutils literal notranslate"><span class="pre">N_file_in</span></code></p></td>
+<td><p>The same encoding for loading a previously stored tensor instead of
+computing it.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The Matlab helpers <code class="docutils literal notranslate"><span class="pre">setReturnNFilename</span></code> and <code class="docutils literal notranslate"><span class="pre">setLoadNFilename</span></code> set the
+filename and the matching length in one call. In Python the <code class="docutils literal notranslate"><span class="pre">filename</span></code>
+constructor argument sets all four fields; its default <code class="docutils literal notranslate"><span class="pre">&quot;t&quot;</span></code> has length one
+and therefore means “do not return and do not load”.</p>
+</section>
+<section id="parallelism-and-hardware">
+<h2>Parallelism and hardware<a class="headerlink" href="#parallelism-and-hardware" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">nThreads</span></code> (Python <code class="docutils literal notranslate"><span class="pre">n_threads</span></code>) is the number of OpenMP threads used when
+building the demagnetization tensor.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">useCuda</span></code> (Matlab <code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code>, Python <code class="docutils literal notranslate"><span class="pre">cuda</span></code>) evaluates the
+tensor-vector product on an NVIDIA GPU at every time step. The Python
+interface checks for <code class="docutils literal notranslate"><span class="pre">nvidia-smi</span></code> and falls back to the CPU with a warning
+if no GPU is present. In Matlab, <code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code> also picks the matching
+MEX-file.</p></li>
+<li><p>The <strong>Fast Multipole Method</strong> replaces the dense tensor by an <span class="math notranslate nohighlight">\(O(N)\)</span>
+evaluation and is described in <a class="reference internal" href="demag_fmm.html#demag-field-fmm"><span class="std std-ref">Demag field - FMM</span></a>. It is off by
+default and requires a build with <code class="docutils literal notranslate"><span class="pre">USE_FMM3D=1</span></code>.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The parameter <code class="docutils literal notranslate"><span class="pre">demigstp</span></code> (<code class="docutils literal notranslate"><span class="pre">demag_ignore_steps</span></code>), intended to recompute
+the demagnetization tensor only every n’th step of a hysteresis
+calculation, is accepted by both interfaces but is not acted on by the
+current solver.</p>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="micromag_exchange.html" class="btn btn-neutral float-left" title="Exchange interaction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="micromag_solvers.html" class="btn btn-neutral float-right" title="Solvers and time integration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright MagTense Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>  
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>

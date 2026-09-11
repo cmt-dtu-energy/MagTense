@@ -1,0 +1,361 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Material parameters &mdash; MagTense TechManual  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/techmanual.css?v=903b4c53" />
+
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Exchange interaction" href="micromag_exchange.html" />
+    <link rel="prev" title="Grids and meshes" href="micromag_grid.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/MagTense_logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="micromag_setup.html">Setting up a micromagnetic problem</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_grid.html">Grids and meshes</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Material parameters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#magnetocrystalline-anisotropy">Magnetocrystalline anisotropy</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#uniaxial-anisotropy">Uniaxial anisotropy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cubic-anisotropy">Cubic anisotropy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#general-anisotropy">General anisotropy</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#time-dependent-damping">Time-dependent damping</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html">Exchange interaction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html">Demagnetization field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_solvers.html">Solvers and time integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_pbc.html">Periodic boundaries and macrogeometry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_thermal.html">Thermal fluctuations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_output.html">Micromagnetic output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html">Micromagnetic parameter reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html">Micromagnetic examples and validation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#the-equation-that-is-solved">The equation that is solved</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #cccccc" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTense>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="material-parameters">
+<h1>Material parameters<a class="headerlink" href="#material-parameters" title="Link to this heading"></a></h1>
+<p>All material parameters may be specified per cell, i.e. as an array with one
+entry per grid cell, which is what makes it possible to model composite
+materials, grain structures and phase boundaries. In Matlab a scalar value is
+expanded to a full array by <code class="docutils literal notranslate"><span class="pre">struct(problem)</span></code>; in Python a scalar passed to
+the constructor is expanded on assignment.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 14.0%" />
+<col style="width: 14.0%" />
+<col style="width: 12.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Matlab</p></th>
+<th class="head"><p>Python</p></th>
+<th class="head"><p>Unit</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Ms</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Ms</span></code></p></td>
+<td><p>A/m</p></td>
+<td><p>Saturation magnetization. Enters the demagnetization field directly and
+scales the exchange and anisotropy fields.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">A0</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">A0</span></code></p></td>
+<td><p>J/m</p></td>
+<td><p>Exchange stiffness constant. Where two cells with different values
+share a face, the coupling between them is the harmonic mean of the
+two, which can be overridden as seen in
+<a class="reference internal" href="micromag_exchange.html#exchange-across-a-material-interface"><span class="std std-ref">Exchange across a material interface</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">K0</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">K0</span></code></p></td>
+<td><p>J/m<sup>3</sup></p></td>
+<td><p>Uniaxial anisotropy constant, used together with the easy axis <code class="docutils literal notranslate"><span class="pre">u_ea</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">K1</span></code>, <code class="docutils literal notranslate"><span class="pre">K2</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">K1</span></code>, <code class="docutils literal notranslate"><span class="pre">K2</span></code></p></td>
+<td><p>J/m<sup>3</sup></p></td>
+<td><p>Cubic anisotropy constants, used together with <code class="docutils literal notranslate"><span class="pre">CrysAxis</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">K0_arr</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">K0_arr</span></code></p></td>
+<td><p>J/m<sup>3</sup></p></td>
+<td><p>General anisotropy expansion, an <code class="docutils literal notranslate"><span class="pre">(ntot,6,3)</span></code> array.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">CrysAxis</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">CrysAxis</span></code></p></td>
+<td><p>-</p></td>
+<td><p>Local crystal coordinate system, an <code class="docutils literal notranslate"><span class="pre">(ntot,3,3)</span></code> array.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">u_ea</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">u_ea</span></code></p></td>
+<td><p>-</p></td>
+<td><p>Uniaxial easy-axis direction of every cell, an <code class="docutils literal notranslate"><span class="pre">(ntot,3)</span></code> array.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">alpha</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">alpha</span></code></p></td>
+<td><p>m/(A s)</p></td>
+<td><p>Damping constant of the Landau-Lifshitz equation.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">gamma</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">gamma</span></code></p></td>
+<td><p>m/(A s)</p></td>
+<td><p>Precession constant. Set to zero to remove precession.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">temperature</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">T</span></code></p></td>
+<td><p>K</p></td>
+<td><p>Per-cell temperature, see <a class="reference internal" href="micromag_thermal.html#thermal-fluctuations"><span class="std std-ref">Thermal fluctuations</span></a>.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Internally the solver forms the scaled coefficients
+<span class="math notranslate nohighlight">\(J = A_0/(\mu_0 M_s)\)</span>, <span class="math notranslate nohighlight">\(K = K_0/(\mu_0 M_s)\)</span> and
+<span class="math notranslate nohighlight">\(M = M_s\)</span>, so that all field terms come out in A/m.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For the <code class="docutils literal notranslate"><span class="pre">tetrahedron</span></code> and <code class="docutils literal notranslate"><span class="pre">unstructuredPrisms</span></code> grids the exchange
+prefactor is normalised by the largest value of <span class="math notranslate nohighlight">\(A_0\)</span> in the mesh, and
+the spatial variation of <span class="math notranslate nohighlight">\(A_0\)</span> is instead carried inside the exchange
+operator itself. On a uniform grid the local <span class="math notranslate nohighlight">\(A_0\)</span> enters the
+prefactor directly.</p>
+</div>
+<p>The exchange length that sets the required cell size follows from <span class="math notranslate nohighlight">\(A_0\)</span>
+and <span class="math notranslate nohighlight">\(M_s\)</span>,</p>
+<div class="math notranslate nohighlight">
+\[l_\mathrm{ex} = \sqrt{\frac{A_0}{\tfrac{1}{2}\mu_0 M_s^2}} .\]</div>
+<section id="magnetocrystalline-anisotropy">
+<h2>Magnetocrystalline anisotropy<a class="headerlink" href="#magnetocrystalline-anisotropy" title="Link to this heading"></a></h2>
+<p>MagTense offers three ways of specifying the anisotropy. They are <strong>mutually
+exclusive in the following sense</strong>: the uniaxial constant <code class="docutils literal notranslate"><span class="pre">K0</span></code> cannot be
+combined with <code class="docutils literal notranslate"><span class="pre">K1</span></code>, <code class="docutils literal notranslate"><span class="pre">K2</span></code> or <code class="docutils literal notranslate"><span class="pre">K0_arr</span></code>. Doing so aborts the solve with</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">MagTense</span><span class="p">:</span> <span class="n">the</span> <span class="n">uniaxial</span> <span class="n">anisotropy</span> <span class="n">K0</span> <span class="n">cannot</span> <span class="n">be</span> <span class="n">combined</span> <span class="k">with</span> <span class="n">K1</span><span class="p">,</span> <span class="n">K2</span> <span class="ow">or</span> <span class="n">K0_arr</span>
+<span class="n">MagTense</span><span class="p">:</span> <span class="n">express</span> <span class="n">the</span> <span class="n">uniaxial</span> <span class="n">term</span> <span class="n">through</span> <span class="n">K0_arr</span><span class="p">(:,</span><span class="mi">1</span><span class="p">,:)</span> <span class="n">instead</span><span class="p">,</span> <span class="ow">or</span> <span class="nb">set</span> <span class="n">K0</span> <span class="n">to</span> <span class="n">zero</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">K1</span></code>/<code class="docutils literal notranslate"><span class="pre">K2</span></code> and <code class="docutils literal notranslate"><span class="pre">K0_arr</span></code> <em>are</em> compatible - they are expressed in the same
+rotated frame and are summed.</p>
+<section id="uniaxial-anisotropy">
+<h3>Uniaxial anisotropy<a class="headerlink" href="#uniaxial-anisotropy" title="Link to this heading"></a></h3>
+<p>Specify a local anisotropy constant <code class="docutils literal notranslate"><span class="pre">K0(i)</span></code> at every grid point together with
+an easy axis <code class="docutils literal notranslate"><span class="pre">u_ea(i,:)</span> <span class="pre">=</span> <span class="pre">[easyX(i),</span> <span class="pre">easyY(i),</span> <span class="pre">easyZ(i)]</span></code>. The anisotropy
+field is then</p>
+<div class="math notranslate nohighlight">
+\[\mathbf{H}_\mathrm{ani} = \frac{2 K_0}{\mu_0 M_s}
+    \left( \mathbf{u}_\mathrm{ea}\cdot\mathbf{m} \right) \mathbf{u}_\mathrm{ea},\]</div>
+<p>i.e. a positive <span class="math notranslate nohighlight">\(K_0\)</span> makes <span class="math notranslate nohighlight">\(\mathbf{u}_\mathrm{ea}\)</span> an easy axis.
+This path does not use <code class="docutils literal notranslate"><span class="pre">CrysAxis</span></code>.</p>
+</section>
+<section id="cubic-anisotropy">
+<h3>Cubic anisotropy<a class="headerlink" href="#cubic-anisotropy" title="Link to this heading"></a></h3>
+<p>Specify <code class="docutils literal notranslate"><span class="pre">K1(i)</span></code> and <code class="docutils literal notranslate"><span class="pre">K2(i)</span></code> at every grid point together with a local
+coordinate system</p>
+<div class="math notranslate nohighlight">
+\[\mathrm{CrysAxis}(i,:,:)
+=
+\begin{pmatrix}
+x_1 &amp;  x_2 &amp;  x_3 \
+y_1 &amp;  y_2 &amp;  y_3 \
+z_1 &amp;  z_2 &amp;  z_3
+\end{pmatrix},\]</div>
+<p>whose rows are the crystal axes of cell <span class="math notranslate nohighlight">\(i\)</span> expressed in the global
+coordinate system. The default is the three Cartesian axes. The energy density
+follows the standard convention</p>
+<div class="math notranslate nohighlight">
+\[E_\mathrm{cubic} = K_1 \left( m_x^2m_y^2 + m_y^2m_z^2 + m_z^2m_x^2 \right)
+    + K_2\, m_x^2m_y^2m_z^2 ,\]</div>
+<p>with <span class="math notranslate nohighlight">\(m\)</span> expressed in the local crystal frame, so that <span class="math notranslate nohighlight">\(K_1 &gt; 0\)</span>
+gives easy axes along <span class="math notranslate nohighlight">\(\langle 100 \rangle\)</span>.</p>
+</section>
+<section id="general-anisotropy">
+<h3>General anisotropy<a class="headerlink" href="#general-anisotropy" title="Link to this heading"></a></h3>
+<p>If the anisotropy is neither uniaxial nor cubic, a general matrix formulation
+is available. The anisotropy energy density is written as a polynomial
+expansion [following Eq. (2) in <a class="reference external" href="https://doi.org/10.1088/1361-665X/aafff8">https://doi.org/10.1088/1361-665X/aafff8</a>,
+generalized to independent coordinates]</p>
+<div class="math notranslate nohighlight">
+\[E_\mathrm{an}(\mathbf{m}) = - \big[ \alpha_{1,x}m_x^2 +  \alpha_{1,y}m_y^2 +  \alpha_{1,z}m_z^2 + \alpha_{11,x}m_x^4 + \alpha_{11,y}m_y^4 + \alpha_{11,z}m_z^4 \
++ \alpha_{12,x}m_y^2m_z^2 + \alpha_{12,y}m_z^2m_x^2 + \alpha_{12,z}m_x^2m_y^2 + \alpha_{111,x}m_x^6 + \alpha_{111,y}m_y^6 + \alpha_{111,z}m_z^6 \
++ \alpha_{112,x}m_x^4(m_y^2 + m_z^2) + \alpha_{112,y}m_y^4(m_z^2 + m_x^2) + \alpha_{112,z}m_z^4(m_x^2 + m_y^2) \
++ \alpha_{123}(m_x^2m_y^2m_z^2) \big],\]</div>
+<p>again with <span class="math notranslate nohighlight">\(\mathbf{m}\)</span> in the local crystal frame given by
+<code class="docutils literal notranslate"><span class="pre">CrysAxis</span></code>. The anisotropy field is
+<span class="math notranslate nohighlight">\(\mathbf{H}_\mathrm{ani} = -\frac{1}{\mu_0 M_s}\,\partial E_\mathrm{an}/\partial \mathbf{m}\)</span>.
+The overall minus sign in front of the bracket is what makes a <em>positive</em>
+coefficient an easy direction, consistent with the uniaxial convention above.</p>
+<p>The coefficients are specified per grid point as a 6x3 matrix</p>
+<div class="math notranslate nohighlight">
+\[K_{0,arr}(i,:,:)
+=
+\begin{pmatrix}
+\alpha_{1,x} &amp;   \alpha_{1,y} &amp;   \alpha_{1,z} \
+\alpha_{11,x} &amp;  \alpha_{11,y} &amp;  \alpha_{11,z} \
+\alpha_{12,x} &amp;  \alpha_{12,y} &amp;  \alpha_{12,z} \
+\alpha_{111,x} &amp;  \alpha_{111,y} &amp;  \alpha_{111,z} \
+\alpha_{112,x} &amp;  \alpha_{112,y} &amp;  \alpha_{112,z} \
+\alpha_{123} &amp;  0 &amp;  0
+\end{pmatrix}.\]</div>
+<p>In this notation a uniaxial anisotropy along the local z-direction is</p>
+<div class="math notranslate nohighlight">
+\[K_{0,arr}
+ =
+ \begin{pmatrix}
+ 0 &amp; 0 &amp; K_0 \
+ 0 &amp; 0 &amp; 0  \
+ 0 &amp; 0 &amp; 0  \
+ 0 &amp; 0 &amp; 0  \
+ 0 &amp; 0 &amp; 0  \
+ 0 &amp; 0 &amp; 0
+ \end{pmatrix},\]</div>
+<p>and a cubic anisotropy with the standard sign convention is</p>
+<div class="math notranslate nohighlight">
+\[K_{0,arr}
+ =
+ \begin{pmatrix}
+ 0 &amp; 0 &amp; 0 \
+ 0 &amp; 0 &amp; 0  \
+ -K_1 &amp; -K_1 &amp; -K_1 \
+ 0 &amp; 0 &amp; 0 \
+ 0 &amp; 0 &amp; 0 \
+ -K_2 &amp; 0 &amp; 0
+ \end{pmatrix},\]</div>
+<p>which is exactly what the solver inserts when <code class="docutils literal notranslate"><span class="pre">K1</span></code> and <code class="docutils literal notranslate"><span class="pre">K2</span></code> are given
+directly. Because the two are added, an arbitrary higher-order term may be
+placed in <code class="docutils literal notranslate"><span class="pre">K0_arr</span></code> while the cubic part is still given through <code class="docutils literal notranslate"><span class="pre">K1</span></code> and
+<code class="docutils literal notranslate"><span class="pre">K2</span></code>.</p>
+</section>
+</section>
+<section id="time-dependent-damping">
+<h2>Time-dependent damping<a class="headerlink" href="#time-dependent-damping" title="Link to this heading"></a></h2>
+<p>The damping constant may be made a function of time. This is used to speed up
+relaxation towards an equilibrium state: a large damping early on kills the
+precession quickly, and it is then lowered towards the physical value.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">alpha</span></code> is set to zero, the solver instead interpolates the tabulated
+values in <code class="docutils literal notranslate"><span class="pre">alphat</span></code>. In Matlab this table is filled by</p>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setAlpha</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="n">alpha_of_t</span><span class="p">(</span><span class="n">t</span><span class="p">),</span><span class="w"> </span><span class="n">t_alpha</span><span class="w"> </span><span class="p">);</span>
+</pre></div>
+</div>
+<p>and in Python through the <code class="docutils literal notranslate"><span class="pre">t_alpha</span></code> and <code class="docutils literal notranslate"><span class="pre">alpha_fct</span></code> constructor arguments.
+If <code class="docutils literal notranslate"><span class="pre">alpha</span></code> is non-zero it is used as a constant and the table is ignored.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The parameter <code class="docutils literal notranslate"><span class="pre">MaxT0</span></code> is accepted by both interfaces for backward
+compatibility but is not used by the current solver. Use the tabulated
+<code class="docutils literal notranslate"><span class="pre">alphat</span></code> above instead.</p>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="micromag_grid.html" class="btn btn-neutral float-left" title="Grids and meshes" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="micromag_exchange.html" class="btn btn-neutral float-right" title="Exchange interaction" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright MagTense Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>  
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>
