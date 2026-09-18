@@ -1031,6 +1031,57 @@ def get_demag_tensor(tiles: Tiles, pts: np.ndarray,obs_size: np.ndarray = None) 
     return demag_tensor
 
 
+def get_demag_tensor_tetrahedron_pair(
+    source_vertices: np.ndarray, target_vertices: np.ndarray
+) -> np.ndarray:
+    """
+    Analytically exact, target-volume-averaged demagnetization tensor between
+    two tetrahedra.
+
+    The returned tensor N satisfies ``<H>_{V_target} = N @ M``, i.e. it maps the
+    uniform magnetization of the source tetrahedron to the demagnetizing field
+    averaged over the volume of the receiving tetrahedron. It is the
+    finite-target counterpart of the tetrahedron-source to point-target tensor
+    obtained from :func:`get_demag_tensor` with ``tile_type=5``.
+
+    The tensor is evaluated in closed form from sixteen analytical
+    triangle-pair Laplace integrals over the outward-oriented faces of the two
+    tetrahedra; no numerical quadrature is involved. The result does not depend
+    on the orientation or on the permutation of the supplied vertices.
+
+    Args:
+        source_vertices: (4, 3) array with the four vertices of the source
+            tetrahedron as rows, in absolute coordinates.
+        target_vertices: (4, 3) array with the four vertices of the receiving
+            tetrahedron as rows, in the same coordinate system.
+
+    Returns:
+        (3, 3) demagnetization tensor.
+
+    Raises:
+        ValueError: If either tetrahedron is degenerate or the analytical
+            evaluation did not produce a finite result.
+    """
+    src = np.asarray(source_vertices, dtype=np.float64)
+    tgt = np.asarray(target_vertices, dtype=np.float64)
+
+    if src.shape != (4, 3) or tgt.shape != (4, 3):
+        raise ValueError("Both tetrahedra have to be given as (4, 3) vertex arrays")
+
+    demag_tensor, ierr = magtensesource.fortrantopythonio.getntensortetrahedronpair(
+        source_vertices=np.asfortranarray(src.T),
+        target_vertices=np.asfortranarray(tgt.T),
+    )
+
+    if ierr != 0:
+        raise ValueError(
+            "Exact tetrahedron-tetrahedron demagnetization tensor failed "
+            f"with status {int(ierr)}"
+        )
+
+    return np.asarray(demag_tensor, dtype=np.float64)
+
+
 def get_H_field(
     tiles: Tiles, pts: np.ndarray, demag_tensor: np.ndarray | None = None
 ) -> np.ndarray:

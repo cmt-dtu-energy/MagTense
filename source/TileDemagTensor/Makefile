@@ -12,6 +12,7 @@ MATLAB_INCLUDE =
 #=======================================================================
 LIBSRC_SOURCES = TileTensorHelperFunctions TileCylPieceTensor \
 	TileRectangularPrismTensor TilePlanarCoilTensor TileTriangle \
+	TileTriangleTriangle TileTetrahedronPairTensor \
 	TileRectangularPrismAvgTensor TileCircPieceTensor TileNComponents
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 

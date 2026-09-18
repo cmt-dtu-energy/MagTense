@@ -3,6 +3,7 @@ module FortranToPythonIO
     use timer_mod
     use trace_mod
     use TileNComponents
+    use TileTetrahedronPairTensor
     use MagParameters
     use DemagFieldGetSolution
     use IterateMagnetSolution
@@ -104,6 +105,34 @@ module FortranToPythonIO
         ! $OMP END PARALLEL DO
 
     end subroutine getNFromTiles
+
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !< Function getNTensorTetrahedronPair
+    !! Analytically exact, target-volume-averaged demagnetization tensor between a
+    !! uniformly magnetized SOURCE tetrahedron and a TARGET tetrahedron, i.e. the
+    !! tensor N with < H >_{V_target} = N M. This is the finite-target counterpart
+    !! of the tetrahedron-source to POINT-target tensor reached through
+    !! getNFromTiles with tileType = 5, which is unchanged.
+    !!
+    !! @param source_vertices - (3,4) vertices of the source tetrahedron, column k being vertex k
+    !! @param target_vertices - (3,4) vertices of the receiving tetrahedron, same layout and frame
+    !! @param N - the resulting (3,3) tensor
+    !! @param ierr - 0 on success, non-zero for a degenerate tetrahedron or a non-finite result
+    !!
+    subroutine getNTensorTetrahedronPair( source_vertices, target_vertices, N, ierr )
+
+        real(8),dimension(3,4),intent(in) :: source_vertices
+        real(8),dimension(3,4),intent(in) :: target_vertices
+        real(8),dimension(3,3),intent(out) :: N
+        integer(4),intent(out) :: ierr
+
+        integer :: status
+
+        call getN_tensor_tetrahedron_tetrahedron( source_vertices, target_vertices, N, status )
+
+        ierr = status
+
+    end subroutine getNTensorTetrahedronPair
 
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !< Function getHFromTiles

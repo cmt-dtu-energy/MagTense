@@ -20,6 +20,7 @@
     use UTIL_MICROMAG
     use DemagAuxFunctions
     use DemagFieldGetSolution
+    use TileTetrahedronPairTensor
     use FortranCuda
     !use, intrinsic :: omp_lib
     use omp_lib
@@ -1878,6 +1879,12 @@ end subroutine updateDemagfieldFMM
     real(DP), dimension(:,:),allocatable :: obs_size_arr          !> Array containing the size of the observation tile for the average prism demag tensor
     real(DP),dimension(:,:,:,:),allocatable :: Nout,Noutave       !> Temporary storage for the demag tensor            
     integer,dimension(4) :: indx_ele
+    integer,dimension(4) :: indx_ele_tgt                          !> Node indices of the receiving tetrahedron
+    real(DP),dimension(3,4) :: vert_src, vert_tgt                 !> Vertices of the source and receiving tetrahedron
+    real(DP),dimension(3,3) :: N_tet                              !> Exact tetrahedron-tetrahedron averaged demag tensor
+    integer :: ierr_tet                                           !> Status of the exact tetrahedron-tetrahedron tensor
+    integer :: n_tet_pair_err                                     !> Number of element pairs the exact tensor could not evaluate
+    character(200) :: tet_err_str
     real :: rate
     !integer :: c1,c2,cr,cm
     character(10) :: prog_str
@@ -2017,61 +2024,117 @@ end subroutine updateDemagfieldFMM
             
             deallocate(obs_size_arr)
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
-        
-            if (nx_ave*ny_ave*nz_ave > 1) then
-                call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
+
+            if ( problem%useAvgN .eq. useAvgNTrue ) then
+
+                !Exact, analytically averaged tetrahedron-source to
+                !tetrahedron-target demagnetization tensor. Both the source and
+                !the receiving cell are finite tetrahedra here, so the tensor is
+                !the one that satisfies < H >_{V_t} = N M rather than the field
+                !of the source evaluated at the receiving centroid.
+                !
+                !The average is analytical, so the nx_ave/ny_ave/nz_ave
+                !sub-sampling counts play no role for this grid type.
+                !
+                !This is markedly more expensive than the centroid evaluation
+                !below (sixteen analytical face-pair integrals per element pair
+                !instead of four face solutions per point), which is the price
+                !of the exact average. Setting useAvgN to false selects the
+                !previous centroid behaviour.
+
+                !displayGUIMessage performs Fortran I/O, which must not be called
+                !from inside the parallel region, so failures are counted here
+                !and reported once the loop has finished.
+                n_tet_pair_err = 0
+
+                !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, i, j, indx_ele, indx_ele_tgt, vert_src, vert_tgt, N_tet, ierr_tet) REDUCTION(+:n_tet_pair_err)
+                do i=1,nx
+                    indx_ele = problem%grid%elements(:,i)
+                    vert_src = problem%grid%nodes(:,indx_ele)
+
+                    ind = i
+
+                    do j=1,ntot
+                        indx_ele_tgt = problem%grid%elements(:,j)
+                        vert_tgt = problem%grid%nodes(:,indx_ele_tgt)
+
+                        call getN_tensor_tetrahedron_tetrahedron( vert_src, vert_tgt, N_tet, ierr_tet )
+
+                        if ( ierr_tet .ne. tetPairOk ) then
+                            n_tet_pair_err = n_tet_pair_err + 1
+                        endif
+
+                        problem%Kxx(j,ind) = sngl(N_tet(1,1))
+                        problem%Kxy(j,ind) = sngl(N_tet(1,2))
+                        problem%Kxz(j,ind) = sngl(N_tet(1,3))
+
+                        !Not stored due to symmetry  (Kxy = Kyx)
+                        problem%Kyy(j,ind) = sngl(N_tet(2,2))
+                        problem%Kyz(j,ind) = sngl(N_tet(2,3))
+
+                        !Not stored due to symmetry (Kxz = Kzx, Kyz = Kzy)
+                        problem%Kzz(j,ind) = sngl(N_tet(3,3))
+                    enddo
+                enddo
+                !$OMP END PARALLEL DO
+
+                if ( n_tet_pair_err .gt. 0 ) then
+                    write(tet_err_str,'(A,I0,A)') 'Exact tetrahedron-tetrahedron demag tensor failed for ', &
+                        n_tet_pair_err, ' element pairs - check the mesh for degenerate elements'
+                    call displayGUIMessage( trim(tet_err_str) )
+                endif
+
+            else
+
+                if (nx_ave*ny_ave*nz_ave > 1) then
+                    call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
+                endif
+
+                !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, indx_ele, tile, H, Nout, pts_arr, i)
+
+                !for each tile find the tensor for all evaluation points (i.e. all tiles)
+                do i=1,nx
+                    !Setup template tile
+                    tile(1)%tileType = 5 !(for tetrahedron)
+                    tile(1)%exploitSymmetry = 0 !0 for no and this is important
+                    tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+                    tile(1)%M(:) = 0.
+
+                    indx_ele = problem%grid%elements(:,i)
+                    tile(1)%vert(:,:) = problem%grid%nodes(:,indx_ele)
+
+                    allocate(Nout(1,ntot,3,3))
+                    allocate(H(ntot,3))
+
+                    call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+
+                    !Copy Nout into the proper structure used by the micro mag model
+                    ind = i
+
+                    problem%Kxx(:,ind) = sngl(Nout(1,:,1,1))
+                    problem%Kxy(:,ind) = sngl(Nout(1,:,1,2))
+                    problem%Kxz(:,ind) = sngl(Nout(1,:,1,3))
+
+                    !Not stored due to symmetry  (Kxy = Kyx)
+                    !Kyx(ind,:) = Nout(1,:,2,1)
+                    problem%Kyy(:,ind) = sngl(Nout(1,:,2,2))
+                    problem%Kyz(:,ind) = sngl(Nout(1,:,2,3))
+
+                    !Not stored due to symmetry (Kxz = Kzx)
+                    !Kzx(ind,:) = Nout(1,:,3,1)
+                    !Not stored due to symmetry (Kyz = Kzy)
+                    !Kzy(ind,:) = Nout(1,:,3,2)
+                    problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
+
+                    !Clean up
+                    deallocate(Nout)
+                    deallocate(H)
+                end do
+
+                !$OMP END PARALLEL DO
+
             endif
-    
-            !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, indx_ele, tile, H, Nout, pts_arr, i)
-                        
-            !for each tile find the tensor for all evaluation points (i.e. all tiles)
-            do i=1,nx
-                !Setup template tile
-                tile(1)%tileType = 5 !(for tetrahedron)
-                tile(1)%exploitSymmetry = 0 !0 for no and this is important
-                tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
-                tile(1)%M(:) = 0.
-            
-                indx_ele = problem%grid%elements(:,i)
-                tile(1)%vert(:,:) = problem%grid%nodes(:,indx_ele)   
-                
-                allocate(Nout(1,ntot,3,3))
-                allocate(H(ntot,3))
-                
-                !allocate(pts_arr(ntot,3))
-                !pts_arr(:,1) =  problem%grid%pts(:,1)
-                !pts_arr(:,2) =  problem%grid%pts(:,2)
-                !pts_arr(:,3) =  problem%grid%pts(:,3)
-                
-                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
-                !call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
-                    
-                !Copy Nout into the proper structure used by the micro mag model
-                ind = i
-                    
-                problem%Kxx(:,ind) = sngl(Nout(1,:,1,1))
-                problem%Kxy(:,ind) = sngl(Nout(1,:,1,2))
-                problem%Kxz(:,ind) = sngl(Nout(1,:,1,3))
-                    
-                !Not stored due to symmetry  (Kxy = Kyx)
-                !Kyx(ind,:) = Nout(1,:,2,1)
-                problem%Kyy(:,ind) = sngl(Nout(1,:,2,2))
-                problem%Kyz(:,ind) = sngl(Nout(1,:,2,3))
-                    
-                !Not stored due to symmetry (Kxz = Kzx)
-                !Kzx(ind,:) = Nout(1,:,3,1)
-                !Not stored due to symmetry (Kyz = Kzy)
-                !Kzy(ind,:) = Nout(1,:,3,2)
-                problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
-                
-                !Clean up
-                !deallocate(pts_arr)
-                deallocate(Nout)
-                deallocate(H)
-            end do
-            
-            !$OMP END PARALLEL DO
-            
+
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
             !call displayGUIMessage( 'Constructing the Tensormap' )
             !call ConstructDemagTensorMap( problem )
