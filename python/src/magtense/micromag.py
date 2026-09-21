@@ -58,10 +58,13 @@ class MicromagProblem:
         grid_nod: xyz coordinates of the nodes of a tetrahedral mesh, one node per row
         grid_ele: the four corner nodes of each tetrahedron, 1-based, shape (4, ntot)
         prob_mode:
-        solver: Options are 'explicit', 'dynamic' and 'implicit'.
+        solver: Options are 'explicit', 'dynamic' and 'minimizer'.
             If solver = 'dynamic', a single time-varying magnetic field is constructed
             If solver = 'explicit', the equilibrium configuration is computed at several constant fields
-            solver = 'implicit' has not been implemented.
+            by integrating the Landau-Lifshitz equation in time.
+            If solver = 'minimizer', the equilibrium at each constant field is found by the energy
+            minimizer (steepest descent on the sphere with Barzilai-Borwein steps) instead of the time
+            integration. 'implicit' is accepted as an old name for 'minimizer'.
             See documentation under run_simulation for details.
         hysteresis_solver: External-field stepping mode. Options are 'static'
             and 'adaptive'. The default 'static' mode preserves the predefined
@@ -100,6 +103,25 @@ class MicromagProblem:
         shiftVec: How far to shift domain copies along x, y and z when constructing the macrogeometry
         macroShape: Sidelengths of a prism representing the shape of the macrogeometry.
         sampleShape: Sidelengths of a prism representing the sample shape.
+        min_tol: Minimizer convergence criterion: the largest torque max_i |m_i x H_i| over the
+            cells, divided by max(Ms), must fall below this.
+        min_maxiter: Maximum number of minimizer iterations per applied field.
+        min_maxrot: Largest rotation of any cell in one minimizer iteration [rad].
+        min_fallback: If True, a minimizer that stalls or hits min_maxiter falls back to the
+            Landau-Lifshitz time integration over the requested time window and restarts.
+        min_saddle_check: If True (default), a converged state is nudged by a small random
+            rotation and relaxed again, so that a saddle point - which a symmetric starting
+            state such as the canonical vortex sits on - is not mistaken for a minimum.
+
+    After a run the following diagnostics are available as attributes:
+        E_out: (nt, nt_h_ext, 4) energies [J] in the order exchange, external, demagnetization,
+            anisotropy. Filled at every output time when usereturnhall is set, otherwise only at
+            the last output time (the other entries are zero).
+        n_feval: (nt_h_ext,) number of effective-field evaluations spent relaxing at each field.
+        min_iter: (nt_h_ext,) minimizer iterations at each field (0 for the LL solver).
+        min_torque: (nt_h_ext,) final max_i |m_i x H_i| / max(Ms) at each field.
+        min_status: (nt_h_ext,) -1 LL time integration, 0 minimizer converged, 1 converged after
+            an LL fallback, 2 not converged.
     """
 
     def __init__(
@@ -170,6 +192,11 @@ class MicromagProblem:
             rng_seed: int = 0,
             phase_id: np.ndarray | None = None,
             A_int: np.ndarray | None = None,
+            min_tol: float = 1e-5,
+            min_maxiter: int = 10000,
+            min_maxrot: float = 0.3,
+            min_fallback: bool = True,
+            min_saddle_check: bool = True,
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -306,6 +333,21 @@ class MicromagProblem:
             self.cuda = int(cuda)
 
         self.cvode = int(cvode)
+
+        # Energy minimizer settings, used when solver = 'minimizer'
+        self.min_tol = float(min_tol)
+        self.min_maxiter = int(min_maxiter)
+        self.min_maxrot = float(min_maxrot)
+        self.min_fallback = int(bool(min_fallback))
+        self.min_saddle_check = int(bool(min_saddle_check))
+
+        # Energies and relaxation diagnostics of the last run, see the class docstring
+        self.E_out = None
+        self.n_feval = None
+        self.min_iter = None
+        self.min_torque = None
+        self.min_status = None
+
         self.usedemag = int(usedemag)
         self.useavgn = int(useavgn)
         self.usereturnhall = int(usereturnhall)
@@ -742,7 +784,33 @@ class MicromagProblem:
 
     @solver.setter
     def solver(self, val: str | None = None) -> None:
-        self._solver = {None: -1, "explicit": 1, "dynamic": 2, "implicit": 3}[val]
+        # 'implicit' is the old name of the third slot, which is now the energy minimizer
+        self._solver = {None: -1, "explicit": 1, "dynamic": 2, "minimizer": 3, "implicit": 3}[val]
+
+    def _store_diagnostics(self, result: list, n_accepted: int | None = None) -> None:
+        """Pop the five trailing diagnostics off a Fortran result list onto the problem.
+
+        The Fortran entry point returns E_out, n_feval, min_iter, min_torque and min_status after
+        the historical outputs. They are kept off the returned list so that its layout, which
+        callers index by position, does not change. For an adaptive run only the accepted field
+        steps are kept.
+        """
+        min_status = np.asarray(result.pop())
+        min_torque = np.asarray(result.pop())
+        min_iter = np.asarray(result.pop())
+        n_feval = np.asarray(result.pop())
+        E_out = np.asarray(result.pop())
+        if n_accepted is not None:
+            E_out = E_out[:, :n_accepted, :]
+            n_feval = n_feval[:n_accepted]
+            min_iter = min_iter[:n_accepted]
+            min_torque = min_torque[:n_accepted]
+            min_status = min_status[:n_accepted]
+        self.E_out = E_out
+        self.n_feval = n_feval
+        self.min_iter = min_iter
+        self.min_torque = min_torque
+        self.min_status = min_status
 
     @property
     def hysteresis_solver(self) -> int:
@@ -881,8 +949,8 @@ class MicromagProblem:
         else:
             nt_h_ext_out = nt_h_ext 
 
-        if self.solver not in (1, 2):
-            print("Only 'dynamic' and 'explicit' solvers are implemented")
+        if self.solver not in (1, 2, 3):
+            raise ValueError("solver must be 'explicit', 'dynamic' or 'minimizer'")
 
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
             ntot=self.ntot,
@@ -968,6 +1036,11 @@ class MicromagProblem:
             dh_shrink=0.0,
             switch_refine_dh=0.0,
             use_switch_refine=0,
+            min_tol=self.min_tol,
+            min_maxiter=self.min_maxiter,
+            min_maxrot=self.min_maxrot,
+            min_fallback=self.min_fallback,
+            min_saddle_check=self.min_saddle_check,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
@@ -993,6 +1066,7 @@ class MicromagProblem:
         )
 
         result = list(result)
+        self._store_diagnostics(result)
         result.pop(7)  # n_Hext_accepted is only public for adaptive hysteresis.
         n_tot_Exch = result[7]
         result[8] = result[8][:n_tot_Exch]  # ExchMat_r
@@ -1040,8 +1114,8 @@ class MicromagProblem:
         nt_h_ext = H_ext.shape[0]
         nt_h_ext_out = nt_h_ext
 
-        if self.solver not in (1, 2):
-            print("Only 'dynamic' and 'explicit' solvers are implemented")
+        if self.solver not in (1, 2, 3):
+            raise ValueError("solver must be 'explicit', 'dynamic' or 'minimizer'")
 
 
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
@@ -1128,6 +1202,11 @@ class MicromagProblem:
             dh_shrink=0.0,
             switch_refine_dh=0.0,
             use_switch_refine=0,
+            min_tol=self.min_tol,
+            min_maxiter=self.min_maxiter,
+            min_maxrot=self.min_maxrot,
+            min_fallback=self.min_fallback,
+            min_saddle_check=self.min_saddle_check,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
@@ -1153,6 +1232,7 @@ class MicromagProblem:
         )
 
         result = list(result)
+        self._store_diagnostics(result)
         result.pop(7)  # n_Hext_accepted is only public for adaptive hysteresis.
         n_tot_Exch = result[7]
         result[8] = result[8][:n_tot_Exch]  # ExchMat_r
@@ -1188,8 +1268,8 @@ class MicromagProblem:
             raise ValueError(
                 "run_hysteresis_adaptive requires hysteresis_solver='adaptive'"
             )
-        if self.solver != 1:
-            raise ValueError("Adaptive hysteresis requires the explicit solver")
+        if self.solver not in (1, 3):
+            raise ValueError("Adaptive hysteresis requires the explicit or the minimizer solver")
 
         H_start = np.asarray(H_start, dtype=np.float64)
         H_end = np.asarray(H_end, dtype=np.float64)
@@ -1306,6 +1386,11 @@ class MicromagProblem:
             dh_shrink=float(dH_shrink),
             switch_refine_dh=switch_refine_value,
             use_switch_refine=int(use_switch_refine),
+            min_tol=self.min_tol,
+            min_maxiter=self.min_maxiter,
+            min_maxrot=self.min_maxrot,
+            min_fallback=self.min_fallback,
+            min_saddle_check=self.min_saddle_check,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
@@ -1332,6 +1417,7 @@ class MicromagProblem:
 
         result = list(result)
         n_accepted = int(result[7])
+        self._store_diagnostics(result, n_accepted)
         n_tot_Exch = result[8]
 
         fixed_order_result = result[0:7] + result[8:14] + [n_accepted]

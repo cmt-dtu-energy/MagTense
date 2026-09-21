@@ -14,7 +14,7 @@
     <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/documentation_options.js?v=7f41d439"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
@@ -119,7 +119,7 @@ other, so the same physics is checked from both interfaces.</p>
 <tbody>
 <tr class="row-even"><td><p>Standard problem 2</p></td>
 <td><p><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_2/Standard_problem_2.m">Standard_problem_2.m</a></p></td>
-<td><p>-</p></td>
+<td><p><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/mumag_micromag_Std_problem_2/std_problem_2.py">std_problem_2.py</a></p></td>
 </tr>
 <tr class="row-odd"><td><p>Standard problem 3</p></td>
 <td><p><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_3/Standard_problem_3.m">Standard_problem_3.m</a>,
@@ -158,6 +158,25 @@ as the initial condition for the <strong>dynamic</strong> run.</p></li>
 the test of the spatially varying <span class="math notranslate nohighlight">\(A_0\)</span>, <span class="math notranslate nohighlight">\(K_0\)</span> and <span class="math notranslate nohighlight">\(M_s\)</span>
 and of the modified exchange stencil.</p></li>
 </ul>
+<p>Standard problems 2, 3 and 6 take a <code class="docutils literal notranslate"><span class="pre">use_minimizer</span></code> switch in both languages
+(<code class="docutils literal notranslate"><span class="pre">options.use_minimizer</span></code> in Matlab, the <code class="docutils literal notranslate"><span class="pre">use_minimizer</span></code> argument in Python).
+With it set, the equilibrium at each field is found by the
+<a class="reference internal" href="micromag_solvers.html#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a> instead of the Landau-Lifshitz time integration, and
+the scripts print the number of effective-field evaluations spent either way,
+which is the cost to compare. Problem 3 reads its energies from the <code class="docutils literal notranslate"><span class="pre">E</span></code>
+output of the solver in both cases. In problem 6 the switch replaces the time
+ramp of the applied field by the same field values visited as constant
+fields, so the depinning field it reports is the static one, which is what the
+analytical values of the reference paper are; the ramp gives a rate-dependent
+one. Problem 2 additionally takes <code class="docutils literal notranslate"><span class="pre">use_adaptive</span></code>, which replaces the fixed
+table of 40 fields by the <a class="reference internal" href="micromag_solvers.html#adaptive-hysteresis"><span class="std std-ref">Adaptive hysteresis</span></a> stepping, refining the
+field step to 0.0005 T across the coercive field.</p>
+<p>The Python script
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/minimizer/minimizer_vs_llg.py">minimizer_vs_llg.py</a>
+runs the single-grain hysteresis loop and standard problem 3 with both the
+Landau-Lifshitz relaxation and the <a class="reference internal" href="micromag_solvers.html#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a>, and prints the
+switching fields, the energies and the number of field evaluations each method
+needed.</p>
 </section>
 <section id="feature-tests">
 <h2>Feature tests<a class="headerlink" href="#feature-tests" title="Link to this heading"></a></h2>

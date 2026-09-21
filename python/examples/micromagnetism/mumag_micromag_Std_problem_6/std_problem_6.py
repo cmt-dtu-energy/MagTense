@@ -12,6 +12,11 @@ that increases linearly with time is applied along the easy axis.  At the
 depinning field the domain wall sweeps through the hard phase and the full
 sample aligns with the field.
 
+With ``use_minimizer`` the same 201 field values are visited as a sequence of
+constant fields and the equilibrium at each is found by the energy minimizer.
+That gives the static depinning field, which is what the analytical values in
+the reference are, whereas the time ramp gives a rate-dependent one.
+
 Reference
 ---------
 Heistracher et al., "Proposal for a micromagnetic standard problem:
@@ -47,6 +52,7 @@ def std_prob_6(
     cvode: bool = False,
     plotting: bool = True,
     figpath: Path | None = None,
+    use_minimizer: bool = False,
 ) -> float | None:
     """Simulate the muMag standard problem 6.
 
@@ -61,6 +67,11 @@ def std_prob_6(
         plotting:    Show or save a plot of ⟨m_x⟩ vs applied field.
         figpath:     Directory for saving the figure.  ``None`` → show
                      interactively.
+        use_minimizer: Visit the same field values as constant fields and relax
+                     at each with the energy minimizer instead of integrating
+                     the Landau-Lifshitz equation along the time ramp.  The
+                     number of effective-field evaluations spent is printed
+                     either way.
 
     Returns:
         The depinning (switching) field in Tesla, or ``None`` if no
@@ -104,6 +115,7 @@ def std_prob_6(
     problem = MicromagProblem(
         res=res,
         grid_L=grid_L,
+        solver="minimizer" if use_minimizer else "dynamic",
         alpha=alpha,
         gamma=gamma,
         Ms=Ms_arr,
@@ -160,21 +172,41 @@ def std_prob_6(
 
     # ── Run ───────────────────────────────────────────────────────────────
     t_end = 100e-9
-    result = problem.run_simulation(
-        t_end=t_end,
-        nt=field_steps,
-        fct_h_ext=h_ext_fct,
-        nt_h_ext=2001,
-    )
-    t_out, M_out = result[0], result[1]
+    if use_minimizer:
+        # The field values the time ramp passes through at the output times, visited as a
+        # sequence of constant fields. Column 0 is only a label; the solver reads the H vector.
+        t_fields = np.linspace(0, t_end, field_steps)
+        H_ext = np.zeros((field_steps, 4))
+        H_ext[:, 0] = t_fields
+        H_ext[:, 1:4] = h_ext_fct(t_fields)
+        # The time window is only used if the minimizer has to fall back to the time integration
+        problem.t = np.linspace(0, 10e-9, 2)
+        problem.nt = 2
+        M_out = problem.run_hysteresis(H_ext)[1]
+        # The final state at each field, averaged over the cells
+        M_avg = np.mean(M_out[-1, :, :, 0], axis=0)   # shape (field_steps,)
+        mu0_H = 4 * np.pi * 1e-7 * (field_rate * t_fields + H_offset)
+        print(
+            f'   settings="{settings}", minimizer: {int(problem.n_feval.sum())} field evaluations, '
+            f"{int(problem.min_iter.sum())} iterations, "
+            f"{int(np.sum(problem.min_status == 2))} fields not converged"
+        )
+    else:
+        result = problem.run_simulation(
+            t_end=t_end,
+            nt=field_steps,
+            fct_h_ext=h_ext_fct,
+            nt_h_ext=2001,
+        )
+        t_out, M_out = result[0], result[1]
 
-    # ── Post-processing ───────────────────────────────────────────────────
-    # Average magnetisation along x (easy axis) at each output time
-    M_sq = np.squeeze(M_out.copy(), axis=2)   # shape (nt, ntot, 3)
-    M_avg = np.mean(M_sq[:, :, 0], axis=1)    # shape (nt,)
+        # Average magnetisation along x (easy axis) at each output time
+        M_sq = np.squeeze(M_out.copy(), axis=2)   # shape (nt, ntot, 3)
+        M_avg = np.mean(M_sq[:, :, 0], axis=1)    # shape (nt,)
 
-    # Applied field in Tesla at each output time
-    mu0_H = 4*np.pi*1e-7*(field_rate * t_out + H_offset)
+        # Applied field in Tesla at each output time
+        mu0_H = 4*np.pi*1e-7*(field_rate * t_out + H_offset)
+        print(f'   settings="{settings}", LL time ramp: {int(problem.n_feval.sum())} field evaluations')
 
     # Depinning field: first instant when ⟨m_x⟩ > 1 − 10⁻³
     switched = M_avg > (1.0 - 1e-3)
@@ -202,19 +234,22 @@ def std_prob_6(
             )
         ax.set_xlabel(r"$\mu_0 H_{\rm app}$ [T]")
         ax.set_ylabel(r"$\langle m_x \rangle$ [−]")
-        ax.set_title(f'Standard problem 6, settings="{settings}"')
+        method = "energy minimizer" if use_minimizer else "LL time ramp"
+        ax.set_title(f'Standard problem 6, settings="{settings}", {method}')
         ax.legend()
         if figpath is None:
             plt.show()
         else:
             figpath.mkdir(parents=True, exist_ok=True)
-            plt.savefig(figpath / f"6_settings_{settings}.png")
+            suffix = "_minimizer" if use_minimizer else ""
+            plt.savefig(figpath / f"6_settings_{settings}{suffix}.png")
         plt.close()
 
     return switching_field
 
 
 if __name__ == "__main__":
+    use_minimizer = False   # set True to relax with the energy minimizer at each field instead
     for _s in ("akj", "ak", "a", "k"):
     # iterate over the single settings string "akj" (not its characters)
     #for _s in ("akj",):
@@ -227,6 +262,7 @@ if __name__ == "__main__":
             plotting=True,
             #figpath=None,
             figpath=Path(__file__).resolve().parent,
+            use_minimizer=use_minimizer,
         )
         _theory = THEORETICAL_PINNING_FIELDS[_s]
         if _sw is not None:

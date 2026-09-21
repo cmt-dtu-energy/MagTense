@@ -14,7 +14,7 @@
     <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/documentation_options.js?v=7f41d439"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
@@ -60,6 +60,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#solver-type">Solver type</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#time-grid-and-applied-field">Time grid and applied field</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#ode-solver-settings">ODE solver settings</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#energy-minimizer">Energy minimizer</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#hysteresis-simulations">Hysteresis simulations</a></li>
 </ul>
 </li>
@@ -132,10 +133,12 @@ field and relaxes the magnetization to equilibrium for each of them in
 turn, starting from the state reached at the previous field. This is the
 quasi-static mode used for hysteresis loops.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Implicit</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Minimizer</span></code></p></td>
 <td><p>3</p></td>
-<td><p>Not implemented. Selecting it prints a message and produces no field
-update.</p></td>
+<td><p>Reads the applied-field table exactly as <code class="docutils literal notranslate"><span class="pre">Explicit</span></code> does, one constant
+field per row, but finds the equilibrium at each field with the
+<a class="reference internal" href="#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a> instead of integrating the Landau-Lifshitz
+equation in time. <code class="docutils literal notranslate"><span class="pre">Implicit</span></code> is accepted as the old name of this slot.</p></td>
 </tr>
 </tbody>
 </table>
@@ -155,7 +158,7 @@ returned;</p></li>
 <p>In Matlab both are set through helper methods:</p>
 <div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTime</span><span class="p">(</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">200</span><span class="p">)</span><span class="w"> </span><span class="p">);</span><span class="w">          </span><span class="c">% output times</span>
 <span class="n">HystDir</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">1</span><span class="o">/</span><span class="n">mu0</span><span class="o">*</span><span class="p">[</span><span class="o">-</span><span class="mf">24.6</span><span class="p">,</span><span class="mf">4.3</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span><span class="o">/</span><span class="mi">1000</span><span class="p">;</span><span class="w">                         </span><span class="c">% A/m</span>
-<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">&gt;-</span><span class="mi">1</span><span class="p">)</span><span class="o">'.*</span><span class="n">HystDir</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">2000</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">&gt;-</span><span class="mi">1</span><span class="p">)</span><span class="o">&#39;.*</span><span class="n">HystDir</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">2000</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">setHext(fct,</span> <span class="pre">t_Hext)</span></code> evaluates the function handle on the given time array
@@ -215,25 +218,243 @@ treated as zero by RKSuite.</p></td>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">t_conv</span></code>, <code class="docutils literal notranslate"><span class="pre">nt_conv</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">0</span></code>, <code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
 <td><p>Times at which the solution is checked for convergence against the
-previous step.</p></td>
+state at the previous convergence time.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">conv_tol</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-4</span></code></p></td>
-<td><p>Convergence criterion, i.e. the maximum allowed change in magnetization
-between two steps.</p></td>
+<td><p>Convergence criterion: when the largest change of any magnetization
+component between two convergence times is below this, the integration
+stops and the converged state is held at the remaining output times.</p></td>
 </tr>
 </tbody>
 </table>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p><code class="docutils literal notranslate"><span class="pre">t_conv</span></code> and <code class="docutils literal notranslate"><span class="pre">conv_tol</span></code> are accepted by both interfaces, but the
-early-exit convergence test inside the RKSuite driver is currently disabled
-in the source, and the CVODE path never receives them. The times in
-<code class="docutils literal notranslate"><span class="pre">t_conv</span></code> <em>are</em> merged into the integration grid, which matters for the
-thermal field because it is redrawn once per grid time, see
+<p>The convergence test is what lets a relaxation to equilibrium stop when it is
+done instead of always running to the last output time. With the default
+<code class="docutils literal notranslate"><span class="pre">t_conv</span> <span class="pre">=</span> <span class="pre">0</span></code> it never fires. To use it, make <code class="docutils literal notranslate"><span class="pre">t_conv</span></code> the output times (or
+a subset of them) and choose <code class="docutils literal notranslate"><span class="pre">conv_tol</span></code>; in Python this is</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="o">.</span><span class="n">t_conv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">t_end</span><span class="p">,</span> <span class="n">nt</span><span class="p">)</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">nt_conv</span> <span class="o">=</span> <span class="n">nt</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">conv_tol</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mf">1e-6</span><span class="p">,</span> <span class="n">nt</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The test is skipped in a thermal run, where the noise never settles. Both the
+RKSuite and the CVODE driver apply it; CVODE only steps to the output times, so
+a convergence time that is not also an output time is never visited there. The
+times in <code class="docutils literal notranslate"><span class="pre">t_conv</span></code> <em>are</em> merged into the RKSuite integration grid, which
+matters for the thermal field because it is redrawn once per grid time, see
 <a class="reference internal" href="micromag_thermal.html#thermal-fluctuations"><span class="std std-ref">Thermal fluctuations</span></a>. Keep <code class="docutils literal notranslate"><span class="pre">t_conv</span></code> a subset of <code class="docutils literal notranslate"><span class="pre">t</span></code> unless you
 specifically want to add integration times.</p>
-</div>
+<section id="energy-minimizer">
+<h3>Energy minimizer<a class="headerlink" href="#energy-minimizer" title="Link to this heading"></a></h3>
+<p>With <code class="docutils literal notranslate"><span class="pre">solver</span> <span class="pre">=</span> <span class="pre">Minimizer</span></code> (Python <code class="docutils literal notranslate"><span class="pre">solver=&quot;minimizer&quot;</span></code>) the equilibrium at
+each constant applied field is found by minimizing the energy directly rather
+than by integrating the Landau-Lifshitz equation with a large damping. The
+method is steepest descent on the unit sphere with Barzilai-Borwein step
+lengths, following Exl et al., <em>J. Appl. Phys.</em> <strong>115</strong>, 17D118 (2014). The
+descent direction of cell <span class="math notranslate nohighlight">\(i\)</span> is <span class="math notranslate nohighlight">\(\mathbf{m}_i \times
+(\mathbf{m}_i \times \mathbf{H}_i)\)</span>, the same vector that drives the damping
+term of the Landau-Lifshitz equation, and the update</p>
+<div class="math notranslate nohighlight">
+\[\mathbf{m}^{k+1} = \frac{(1 - \tau^2 |\mathbf{t}|^2/4)\,\mathbf{m}^k
+  - \tau\, \mathbf{m}^k \times \mathbf{t}}{1 + \tau^2 |\mathbf{t}|^2/4},
+\qquad \mathbf{t} = \mathbf{m}^k \times \mathbf{H}^k ,\]</div>
+<p>is the exact solution of the midpoint rule, so <span class="math notranslate nohighlight">\(|\mathbf{m}| = 1\)</span> is
+preserved to rounding. Each iteration costs <strong>one</strong> effective-field
+evaluation, against about six per accepted step of the RK(4,5) time
+integration, and the step length adapts to the local curvature instead of
+being bounded by the stability limit of an explicit integrator, which for a
+fine grid is set by the exchange stiffness whatever the distance from
+equilibrium.</p>
+<p>Convergence is declared when the largest torque over the cells,
+<span class="math notranslate nohighlight">\(\max_i |\mathbf{m}_i \times \mathbf{H}_i| / \max(M_s)\)</span>, falls below
+<code class="docutils literal notranslate"><span class="pre">min_tol</span></code>. Two safeguards keep the non-monotone Barzilai-Borwein iteration
+in check:</p>
+<ul class="simple">
+<li><p>no cell rotates by more than <code class="docutils literal notranslate"><span class="pre">min_maxrot</span></code> in one iteration, and</p></li>
+<li><p>the energy may not rise above the largest of the last ten iterates by more
+than a small fraction of the energy scale; if it would, the step is halved
+and retried.</p></li>
+</ul>
+<p>If the iteration cap <code class="docutils literal notranslate"><span class="pre">min_maxiter</span></code> is hit, or the watchdog stalls, and
+<code class="docutils literal notranslate"><span class="pre">min_fallback</span></code> is set, the Landau-Lifshitz time integration is run once over
+the requested time window from the current state and the minimizer is
+restarted from where it ends up. This is what carries a hysteresis loop
+through a switching event, where the state sits near a saddle point.</p>
+<p>A vanishing torque is also what a saddle point looks like, and a symmetric
+starting state sits on one: the canonical vortex of standard problem 3, or a
+magnetization exactly antiparallel to the applied field. Steepest descent
+converges onto such a point, whereas the time integration only leaves it
+through rounding noise, slowly. With <code class="docutils literal notranslate"><span class="pre">min_saddle_check</span></code> set, which is the
+default, a converged state is therefore nudged by a random tilt of about half
+a degree, common to all cells with a smaller independent part per cell, and
+relaxed again for up to a hundred iterations. A minimum keeps the energy above
+the unperturbed value throughout and is returned unperturbed; a saddle lets the
+energy fall below it, at which point the descent continues to the lower
+minimum, which is then checked in the same way, up to three times. The check
+costs up to a hundred field evaluations per applied field.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 18.0%" />
+<col style="width: 12.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_tol</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-5</span></code></p></td>
+<td><p>Convergence criterion on the largest relative torque.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_maxiter</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">10000</span></code></p></td>
+<td><p>Maximum number of iterations per applied field.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_maxrot</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.3</span></code></p></td>
+<td><p>Largest rotation of any cell in one iteration [rad].</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_fallback</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Fall back to the time integration when the minimizer stalls (1) or give
+up and report it (0).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_saddle_check</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Nudge a converged state and relax again to make sure it is a minimum
+(1) or accept it as it is (0). Matlab: <code class="docutils literal notranslate"><span class="pre">min_saddle</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The minimizer works with every grid type, with CUDA and with FMM, because it
+calls the same field routines as the time integration. It cannot be combined
+with a finite temperature, since a stochastic field has no stationary point;
+the solve stops with a message. The thermal, <code class="docutils literal notranslate"><span class="pre">dynamic</span></code> and time-dependent
+<code class="docutils literal notranslate"><span class="pre">alpha</span></code> settings are ignored by it.</p>
+<p>The output has the layout of the time integration: the first output time holds
+the starting state and every later one the converged state. In addition every
+run, with either method, returns the energies and a few diagnostics per applied
+field, see <a class="reference internal" href="micromag_output.html#micromagnetic-output"><span class="std std-ref">Micromagnetic output</span></a>: <code class="docutils literal notranslate"><span class="pre">n_feval</span></code> is the number of
+effective-field evaluations spent relaxing at that field, which is the fair
+cost measure between the two methods, and <code class="docutils literal notranslate"><span class="pre">min_status</span></code> records whether the
+minimizer converged directly, needed the fallback, or failed.</p>
+<p>How much cheaper it is depends on the problem. On the shipped examples,
+measured in field evaluations per applied field on a CPU:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 40.0%" />
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Problem</p></th>
+<th class="head"><p>LL relaxation</p></th>
+<th class="head"><p>Minimizer</p></th>
+<th class="head"><p>Ratio</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Single 10 nm grain, 5<sup>3</sup> cells, adaptive hysteresis loop,
+1 ns relaxation window</p></td>
+<td><p>28695</p></td>
+<td><p>1877</p></td>
+<td><p>15</p></td>
+</tr>
+<tr class="row-odd"><td><p>Same, LL window extended to 100 ns so that its switching field agrees
+with the minimizer</p></td>
+<td><p>240624</p></td>
+<td><p>1877</p></td>
+<td><p>128</p></td>
+</tr>
+<tr class="row-even"><td><p>Standard problem 3, 10<sup>3</sup> cells, flower state</p></td>
+<td><p>988</p></td>
+<td><p>177</p></td>
+<td><p>5.6</p></td>
+</tr>
+<tr class="row-odd"><td><p>Standard problem 3, 10<sup>3</sup> cells, vortex state</p></td>
+<td><p>12660</p></td>
+<td><p>337</p></td>
+<td><p>38</p></td>
+</tr>
+</tbody>
+</table>
+<p>Roughly a hundred of the minimizer’s evaluations per applied field go into the
+saddle check; without it the flower state takes 39 evaluations and the vortex
+156. The energies agree to six digits in the vortex case and the minimizer
+finds a marginally lower flower energy than the time integration did in its
+10 ns window. On the grain the 1 ns time integration is not relaxed near the
+switching field and overshoots the Stoner-Wohlfarth value by ten percent; the
+minimizer lands within one field step of it. The script
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/minimizer/minimizer_vs_llg.py">minimizer_vs_llg.py</a>
+reproduces these numbers.</p>
+<p>Standard problem 6 shows the same picture on a domain wall pinned at a phase
+boundary. The reference values are static depinning fields, the example’s time
+ramp of 0.02 T per ns gives rate-dependent ones, and the minimizer visiting the
+same 201 field values as constant fields lands within the 0.01 T field
+resolution of the analytical value in every setting, at a few hundred times
+fewer field evaluations:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 16.7%" />
+<col style="width: 16.7%" />
+<col style="width: 20.8%" />
+<col style="width: 20.8%" />
+<col style="width: 25.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Analytical [T]</p></th>
+<th class="head"><p>LL time ramp [T]</p></th>
+<th class="head"><p>Minimizer [T]</p></th>
+<th class="head"><p>Field evaluations LL / minimizer</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">akj</span></code></p></td>
+<td><p>1.568</p></td>
+<td><p>1.590</p></td>
+<td><p>1.580</p></td>
+<td><p>2 872 407 / 18 979</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ak</span></code></p></td>
+<td><p>1.089</p></td>
+<td><p>1.120</p></td>
+<td><p>1.110</p></td>
+<td><p>2 850 968 / 17 067</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">aj</span></code></p></td>
+<td><p>1.206</p></td>
+<td><p>1.260</p></td>
+<td><p>1.240</p></td>
+<td><p>3 049 920 / 17 205</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">a</span></code></p></td>
+<td><p>0.838</p></td>
+<td><p>0.870</p></td>
+<td><p>0.860</p></td>
+<td><p>2 845 165 / 12 866</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">kj</span></code></p></td>
+<td><p>1.005</p></td>
+<td><p>1.020</p></td>
+<td><p>1.010</p></td>
+<td><p>11 088 509 / 28 309</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">k</span></code></p></td>
+<td><p>0.565</p></td>
+<td><p>0.590</p></td>
+<td><p>0.570</p></td>
+<td><p>2 848 863 / 13 982</p></td>
+</tr>
+</tbody>
+</table>
+<p>The time integration remains the method of choice for dynamics, for thermal
+runs, and as a robust reference when the minimizer reports a failure.</p>
+</section>
 <section id="hysteresis-simulations">
 <h3>Hysteresis simulations<a class="headerlink" href="#hysteresis-simulations" title="Link to this heading"></a></h3>
 <p>A hysteresis loop is computed with the <strong>explicit</strong> solver: a sequence of
@@ -243,16 +464,18 @@ found at each of them, starting from the previous equilibrium state. Setting
 cheaper when only the equilibrium state matters.</p>
 <p>In Matlab this is just the explicit solver with a field table that walks the
 loop, as in the standard problem 2 example:</p>
-<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagSolver</span><span class="p">(</span><span class="w"> </span><span class="s">'Explicit'</span><span class="w"> </span><span class="p">);</span>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagSolver</span><span class="p">(</span><span class="w"> </span><span class="s">&#39;Explicit&#39;</span><span class="w"> </span><span class="p">);</span>
 <span class="n">HystDir</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">1</span><span class="o">/</span><span class="n">mu0</span><span class="o">*</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span><span class="o">/</span><span class="nb">sqrt</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span>
-<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="n">HystDir</span><span class="o">.*</span><span class="n">t</span><span class="o">'</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="n">MaxH</span><span class="p">,</span><span class="o">-</span><span class="n">MaxH</span><span class="p">,</span><span class="mi">40</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="n">HystDir</span><span class="o">.*</span><span class="n">t</span><span class="o">&#39;</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="n">MaxH</span><span class="p">,</span><span class="o">-</span><span class="n">MaxH</span><span class="p">,</span><span class="mi">40</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
 <span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTime</span><span class="p">(</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">40e-9</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
 </pre></div>
 </div>
+<p>Either the <code class="docutils literal notranslate"><span class="pre">Explicit</span></code> solver or the <code class="docutils literal notranslate"><span class="pre">Minimizer</span></code> can be used for the
+relaxation at each field; see <a class="reference internal" href="#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a> for the trade-off.</p>
 <p>In Python the dedicated method <code class="docutils literal notranslate"><span class="pre">run_hysteresis</span></code> takes the field table
 directly as an <code class="docutils literal notranslate"><span class="pre">(n,4)</span></code> array, and requires <code class="docutils literal notranslate"><span class="pre">hysteresis_solver='static'</span></code>,
 which is the default:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span><span class="n">res</span><span class="o">=</span><span class="n">res</span><span class="p">,</span> <span class="n">solver</span><span class="o">=</span><span class="s1">'explicit'</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span><span class="n">res</span><span class="o">=</span><span class="n">res</span><span class="p">,</span> <span class="n">solver</span><span class="o">=</span><span class="s1">&#39;explicit&#39;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
 <span class="n">H_ext</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">40</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 <span class="n">H_ext</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">max_H</span><span class="p">,</span> <span class="o">-</span><span class="n">max_H</span><span class="p">,</span> <span class="mi">40</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">hyst_dir</span>
 <span class="n">result</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">run_hysteresis</span><span class="p">(</span><span class="n">H_ext</span><span class="p">)</span>
@@ -268,7 +491,8 @@ adaptive hysteresis solver walks from <code class="docutils literal notranslate"
 step length itself, based on how much the volume-averaged magnetization moved.</p>
 <p>The whole accept/reject loop runs inside Fortran in a single call. It is
 available from Python through <code class="docutils literal notranslate"><span class="pre">run_hysteresis_adaptive</span></code> and requires
-<code class="docutils literal notranslate"><span class="pre">hysteresis_solver='adaptive'</span></code> together with <code class="docutils literal notranslate"><span class="pre">solver='explicit'</span></code>. In Matlab
+<code class="docutils literal notranslate"><span class="pre">hysteresis_solver='adaptive'</span></code> together with <code class="docutils literal notranslate"><span class="pre">solver='explicit'</span></code> or
+<code class="docutils literal notranslate"><span class="pre">solver='minimizer'</span></code>. In Matlab
 the same parameters exist on the problem object (<code class="docutils literal notranslate"><span class="pre">adaptiveHext</span></code>,
 <code class="docutils literal notranslate"><span class="pre">maxHextSteps</span></code>, <code class="docutils literal notranslate"><span class="pre">H_start</span></code>, <code class="docutils literal notranslate"><span class="pre">H_end</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_initial</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_min</span></code>,
 <code class="docutils literal notranslate"><span class="pre">dH_max</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_grow</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_shrink</span></code>, <code class="docutils literal notranslate"><span class="pre">dM_min</span></code>, <code class="docutils literal notranslate"><span class="pre">dM_target</span></code>,
@@ -358,8 +582,8 @@ list. A minimal, self-contained example is
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span>
     <span class="n">res</span><span class="o">=</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span>
     <span class="n">grid_L</span><span class="o">=</span><span class="p">[</span><span class="mf">10e-9</span><span class="p">,</span> <span class="mf">10e-9</span><span class="p">,</span> <span class="mf">10e-9</span><span class="p">],</span>
-    <span class="n">solver</span><span class="o">=</span><span class="s2">"explicit"</span><span class="p">,</span>
-    <span class="n">hysteresis_solver</span><span class="o">=</span><span class="s2">"adaptive"</span><span class="p">,</span>
+    <span class="n">solver</span><span class="o">=</span><span class="s2">&quot;explicit&quot;</span><span class="p">,</span>
+    <span class="n">hysteresis_solver</span><span class="o">=</span><span class="s2">&quot;adaptive&quot;</span><span class="p">,</span>
     <span class="n">Ms</span><span class="o">=</span><span class="mf">2.4</span> <span class="o">/</span> <span class="n">mu0</span><span class="p">,</span> <span class="n">K0</span><span class="o">=</span><span class="mf">1e6</span><span class="p">,</span> <span class="n">A0</span><span class="o">=</span><span class="mf">7e-12</span><span class="p">,</span>
     <span class="n">alpha</span><span class="o">=</span><span class="mf">4000.0</span><span class="p">,</span> <span class="n">gamma</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
     <span class="n">usereturnhall</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>

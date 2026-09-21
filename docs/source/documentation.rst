@@ -218,6 +218,12 @@ constructor arguments are plain attributes and are listed there as well.
         shiftVec=np.zeros(3), n_macro=np.zeros(3),
         hysteresis_solver: str = "static",
         rng_seed: int = 0,
+        phase_id=None, A_int=None,
+        min_tol: float = 1e-5,
+        min_maxiter: int = 10000,
+        min_maxrot: float = 0.3,
+        min_fallback: bool = True,
+        min_saddle_check: bool = True,
     ) -> None
 
 ----------------------------------------
@@ -233,10 +239,11 @@ Micromagnetic run methods
         nt_h_ext: int
     ) -> list
 
-A single solve, used for both the ``dynamic`` and the ``explicit`` solver.
-``fct_h_ext`` is evaluated on ``nt_h_ext`` uniformly spaced times between 0 and
-``t_end`` and must return an ``(nt_h_ext, 3)`` array. The returned list is
-described in :ref:`Micromagnetic output`.
+A single solve, used for the ``dynamic``, the ``explicit`` and the
+``minimizer`` solver. ``fct_h_ext`` is evaluated on ``nt_h_ext`` uniformly
+spaced times between 0 and ``t_end`` and must return an ``(nt_h_ext, 3)``
+array. The returned list is described in :ref:`Micromagnetic output`, and the
+energies and relaxation diagnostics land on the problem object.
 
 ::
 

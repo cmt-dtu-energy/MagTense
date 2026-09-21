@@ -166,6 +166,14 @@ include "mkl_dfti.f90"
         real(DP) :: dM_reject = 5.0e-2_DP                 !> Magnetisation-change threshold for rejecting adaptive field steps.
         real(DP) :: switch_refine_dH = 0.0_DP             !> Maximum accepted step across magnetisation sign changes [A/m].
         logical :: use_switch_refine = .false.            !> Enable adaptive sign-change refinement.
+
+        !> Settings for the energy minimizer (solver = MicroMagSolverMinimizer). The minimizer replaces
+        !> the Landau-Lifshitz time integration when relaxing to equilibrium at a constant applied field.
+        real(DP) :: min_tol = 1.0e-5_DP                   !> Convergence criterion: max_i |m_i x H_eff,i| / max(Ms) must fall below this
+        integer  :: min_maxiter = 10000                   !> Maximum number of minimizer iterations per applied field
+        real(DP) :: min_maxrot = 0.3_DP                   !> Largest rotation of any cell in one iteration [rad]
+        integer  :: min_fallback = 1                      !> 1: fall back to LL time integration if the minimizer stalls, 0: give up
+        integer  :: min_saddle_check = 1                  !> 1: nudge a converged state and relax again to make sure it is a minimum, 0: accept it as it is
         real(DP),dimension(:,:),allocatable :: alpha      !> A time dependent damping parameter, i.e. as a function of time. Size (nt,1).
         
         real(DP),dimension(:),allocatable :: t              !> Time array for the desired output times
@@ -300,6 +308,16 @@ include "mkl_dfti.f90"
         real(DP),dimension(:,:,:,:),allocatable :: H_ani    !> The anisotropy field at each of these times (nt,ntot,nt_Hext,3)
         
         real(DP),dimension(:,:),allocatable :: pts          !> n,3 array with the points (x,y,z) of the centers of the tiles
+
+        !> Energies and relaxation diagnostics. The last index of E_out is the term:
+        !> 1 exchange, 2 external (Zeeman), 3 demagnetization, 4 anisotropy, all in J.
+        !> E_out is filled at every output time when useReturnHall is set and otherwise
+        !> only at the last output time (the remaining entries stay zero).
+        real(DP),dimension(:,:,:),allocatable :: E_out      !> Energies (nt,nt_Hext,4) [J]
+        integer,dimension(:),allocatable :: n_feval         !> Effective-field evaluations spent relaxing at each applied field (nt_Hext)
+        integer,dimension(:),allocatable :: min_iter        !> Minimizer iterations at each applied field (nt_Hext), 0 for the LL solver
+        real(DP),dimension(:),allocatable :: min_torque     !> Final max_i |m_i x H_i| / max(Ms) at each applied field (nt_Hext)
+        integer,dimension(:),allocatable :: min_status      !> -1 LL time integration, 0 minimizer converged, 1 converged after LL fallback, 2 not converged
         
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         
@@ -316,7 +334,9 @@ include "mkl_dfti.f90"
     
     integer,parameter :: gridTypeUniform=1,gridTypeTetrahedron=2,gridTypeUnstructuredPrisms=3
     integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
-    integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverImplicit=3
+    integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverMinimizer=3
+    !MicroMagSolverImplicit is the old name of the unimplemented solver slot, kept so that existing code compiles
+    integer,parameter :: MicroMagSolverImplicit=MicroMagSolverMinimizer
     integer,parameter :: MicroMagExchMethodDirectLaplacianNeumann=1,MicroMagExchMethodGGNeumann=2
     integer,parameter :: MicroMagExchInterpnExtended=1,MicroMagExchInterpnCompact=2
     integer,parameter :: useCudaTrue=1,useCudaFalse=0

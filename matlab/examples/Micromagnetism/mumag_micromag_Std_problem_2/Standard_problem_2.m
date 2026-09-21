@@ -1,11 +1,13 @@
 function [elapsedTime,problem,solution,results] = Standard_problem_2(resolution, d_loop, options)
 
 arguments
-    resolution (1,3) {mustBeInteger}                = [20,4,1];     %--- [nx,ny,nz] of the grid
+    resolution (1,3) {mustBeInteger}                = [5*20,5*4,1];     %--- [nx,ny,nz] of the grid
     d_loop (1,:) {mustBeNumeric}                    = linspace(0.05,0.5,10); %--- The values of d to run the model for
     options.use_CUDA {mustBeNumericOrLogical}       = true          %--- Use CUDA for the calculations
     options.use_CVODE {mustBeNumericOrLogical}      = false;        %--- Use CVODE for the numerical time evolution
     options.ShowTheResult {mustBeNumericOrLogical}  = true          %--- Show the result
+    options.use_minimizer {mustBeNumericOrLogical}  = true;         %--- Relax with the energy minimizer instead of integrating the LL equation in time
+    options.use_adaptive {mustBeNumericOrLogical}   = true;        %--- Sweep the field with the adaptive stepping instead of the fixed table of 40 fields
 end
 
 if (isscalar(d_loop) && d_loop == 0.5)
@@ -41,9 +43,40 @@ HextFct = @(t) HystDir .* t';
 problem.m0(:) = 1/sqrt(3);
 
 problem = problem.setSolverType( 'UseExplicitSolver' );
-problem = problem.setMicroMagSolver( 'Explicit' );
+%--- The field table below is a list of constant fields either way; the choice is how the
+%--- equilibrium at each of them is found: by integrating the LL equation over the time window set
+%--- with setTime ('Explicit'), or by the Barzilai-Borwein energy minimizer ('Minimizer'), which
+%--- ignores the time window and stops when the largest torque is below problem.min_tol.
+if options.use_minimizer
+    problem = problem.setMicroMagSolver( 'Minimizer' );
+else
+    problem = problem.setMicroMagSolver( 'Explicit' );
+end
 
 problem = problem.setHext( HextFct, linspace(MaxH,-MaxH,40) );
+if options.use_adaptive
+    %--- The adaptive sweep walks from H_start to H_end and picks the step itself: it starts at the
+    %--- spacing of the fixed table, grows to dH_max where the magnetization hardly changes, and is
+    %--- refined to dH_min across the coercive field, where the mean magnetization along the field
+    %--- changes sign. The accepted fields come back in solution.H_ext, which needs ReturnHall.
+    problem.adaptiveHext = int32(1);
+    problem.maxHextSteps = int32(400);
+    problem.H_start      =  MaxH*HystDir;
+    problem.H_end        = -MaxH*HystDir;
+    problem.dH_initial   = 0.005/mu0;
+    problem.dH_min       = 0.0005/mu0;
+    problem.dH_max       = 0.02/mu0;
+    problem.switch_refdH = 0.0005/mu0;
+    problem.use_sw_ref   = int32(1);
+    %--- The step-control thresholds on the change of the mean magnetization. The defaults suit a
+    %--- hard grain that barely moves between switching events; this soft bar changes by a few
+    %--- percent per step everywhere, so looser thresholds keep the step at the table spacing in
+    %--- the smooth parts and leave the refinement to the switch test.
+    problem.dM_min       = 0.01;
+    problem.dM_target    = 0.05;
+    problem.dM_reject    = 0.15;
+    problem.ReturnHall   = int32(1);
+end
 problem = problem.setTime( linspace(0,40e-9,2) );
 problem = problem.setConvergenceCheckTime( linspace(0,40e-9,2) );
 problem.conv_tol = 1e-6;
@@ -69,7 +102,29 @@ for i = 1:length(d_loop)
     
     solution = problem.MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
 
-    for j = 1:problem.nt_Hext 
+    %--- The cost of the relaxation at each field is measured in effective-field evaluations,
+    %--- which is what scales with the problem size, so it is the number to compare between the
+    %--- two relaxation methods. The minimizer also reports its iterations and whether it converged.
+    results.n_feval(i) = sum(solution.n_feval);
+    if options.use_minimizer
+        disp(['   Minimizer: ' num2str(sum(solution.n_feval)) ' field evaluations, ' num2str(sum(solution.min_iter)) ...
+              ' iterations, ' num2str(sum(solution.min_status == 2)) ' fields not converged'])
+    else
+        disp(['   LL relaxation: ' num2str(sum(solution.n_feval)) ' field evaluations'])
+    end
+
+    %--- The fields that were visited, signed along the sweep direction, in units of Ms
+    if options.use_adaptive
+        n_fields = double(solution.n_Hext_acc);
+        H_acc = squeeze(solution.H_ext(end,1,1:n_fields,:));            % n_fields x 3 [A/m]
+        Hn = (H_acc * HystDir') * mu0 / problem.Ms;                     % HystDir has the magnitude 1/mu0
+        disp(['   ' num2str(n_fields) ' adaptive field steps'])
+    else
+        n_fields = problem.nt_Hext;
+        Hn = sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms;
+    end
+    Mx = zeros(n_fields,1); My = Mx; Mz = Mx; M = Mx;
+    for j = 1:n_fields
         Mx_arr = solution.M(end,:,j,1) ;
         My_arr = solution.M(end,:,j,2) ;
         Mz_arr = solution.M(end,:,j,3) ;
@@ -80,9 +135,11 @@ for i = 1:length(d_loop)
         M(j) = Mx(j)*HystDir(1) + My(j)*HystDir(2) + Mz(j)*HystDir(3) ;
     end
     
-    results.Mxr(i) = interp1(sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,Mx,0);
-    results.Myr(i) = interp1(sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,My,0);
-    results.Hc(i)  = interp1(M,sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,0);
+    results.Mxr(i) = interp1(Hn,Mx,0);
+    results.Myr(i) = interp1(Hn,My,0);
+    results.Hc(i)  = interp1(M,Hn,0);
+    results.n_fields(i) = n_fields;
+    results.Hn = Hn;
 end
 elapsedTime = toc
 
@@ -114,7 +171,7 @@ if run_single_curve
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% Compare with published solutions available from mumag webpage for single curve for d/l_ex = 30
     figure4= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig4 = axes('Parent',figure4,'Layer','top','FontSize',16); hold on; grid on; box on
-    plot(fig1,sign(problem.Hext(:,1)).*sqrt(problem.Hext(:,2).^2+problem.Hext(:,3).^2+problem.Hext(:,4).^2)/problem.Ms,mu0*M,'rp') %Minus signs added to correspond to regular hysteresis plots.
+    plot(fig4,mu0*problem.Ms*results.Hn,mu0*M,'rp') %The loop in T, the fields as visited (fixed table or adaptive steps)
 
     load('OOMMF_Hysteresis2D_dlex30.mat');
     plot(fig4,mu0*H,M,'k>');

@@ -46,6 +46,7 @@ arguments
     options.ShowTheResult {mustBeNumericOrLogical}     = true;         %--- Show the result
     options.TwoDsim {mustBeNumericOrLogical}           = false;        %--- Run a 2D simulation in x,y
     options.TwoDsize {mustBeNumeric}                   = 5;            %--- Size of second dimension in 2D
+    options.use_minimizer {mustBeNumericOrLogical}     = false;        %--- Visit the field values as constant fields and relax at each with the energy minimizer instead of integrating along the time ramp
 end
 
 mu0 = 4*pi*1e-7;
@@ -121,7 +122,15 @@ if ~(options.use_uniform_mesh)
     problem.grid_abc = dims_out ;
 end
 problem = problem.setSolverType( 'UseDynamicSolver' );
-problem = problem.setMicroMagSolver( 'Dynamic' );
+%--- The time ramp below is integrated by the dynamic solver. With the minimizer the same field
+%--- table is read as a sequence of constant fields and the equilibrium at each is found by the
+%--- energy minimizer, which gives the static depinning field - the quantity the analytical values
+%--- above are - rather than the rate-dependent one of the ramp.
+if options.use_minimizer
+    problem = problem.setMicroMagSolver( 'Minimizer' );
+else
+    problem = problem.setMicroMagSolver( 'Dynamic' );
+end
 problem.ReturnHall = int32(1);
 problem.grid_L   = thisGridL ;
 
@@ -213,7 +222,12 @@ end
 problem = problem.setUseCuda( options.use_CUDA );
 problem = problem.setUseCVODE( options.use_CVODE );
 problem = problem.setUseDemag( false );
-problem = problem.setTime( linspace(0,100e-9,field_steps) );
+if options.use_minimizer
+    %--- Only used if the minimizer has to fall back to the time integration
+    problem = problem.setTime( linspace(0,10e-9,2) );
+else
+    problem = problem.setTime( linspace(0,100e-9,field_steps) );
+end
 
 
 %% Run simulation
@@ -233,7 +247,16 @@ case 'z'
 end
 
 %% Plot average magnetization
-H = mu0*solution.H_ext(:,1,1,dim);
+if options.use_minimizer
+    %--- One equilibrium per field: computeMagneticMomentGeneralMesh has returned the mean of the
+    %--- final state at each of them, and the field index is the third one of H_ext
+    H = mu0*squeeze(solution.H_ext(end,1,:,dim));
+    disp(['   Minimizer: ' num2str(sum(solution.n_feval)) ' field evaluations, ' num2str(sum(solution.min_iter)) ...
+          ' iterations, ' num2str(sum(solution.min_status == 2)) ' fields not converged'])
+else
+    H = mu0*solution.H_ext(:,1,1,dim);
+    disp(['   LL time ramp: ' num2str(sum(solution.n_feval)) ' field evaluations'])
+end
 Switching_field = min(H(M > 1-1e-3));
 
 if (options.ShowTheResult)

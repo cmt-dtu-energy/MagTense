@@ -14,7 +14,7 @@
     <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/documentation_options.js?v=7f41d439"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
@@ -161,7 +161,7 @@ is described under <a class="reference internal" href="geometry.html#geometry"><
     <span class="n">area</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">filled_pos</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">n_pts</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
-    <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"uniform"</span><span class="p">,</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;uniform&quot;</span><span class="p">,</span>
     <span class="n">n_tiles</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">mag_angles</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">B_rem</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.2</span><span class="p">,</span>
@@ -237,9 +237,9 @@ constructor arguments are plain attributes and are listed there as well.</p>
     <span class="n">res</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
     <span class="n">grid_L</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">500e-9</span><span class="p">,</span> <span class="mf">125e-9</span><span class="p">,</span> <span class="mf">3e-9</span><span class="p">),</span>
     <span class="n">grid_nnod</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
-    <span class="n">grid_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"uniform"</span><span class="p">,</span>
-    <span class="n">prob_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"new"</span><span class="p">,</span>
-    <span class="n">solver</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"dynamic"</span><span class="p">,</span>
+    <span class="n">grid_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;uniform&quot;</span><span class="p">,</span>
+    <span class="n">prob_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;new&quot;</span><span class="p">,</span>
+    <span class="n">solver</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;dynamic&quot;</span><span class="p">,</span>
     <span class="n">m0</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">A0</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">Ms</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">K0</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">K1</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">K2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">T</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">K0_arr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">CrysAxis</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">4.42e3</span><span class="p">,</span>
@@ -256,13 +256,13 @@ constructor arguments are plain attributes and are listed there as well.</p>
     <span class="n">grid_pts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">grid_abc</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">exch_val</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exch_rows</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exch_cols</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">exch_nval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">exch_nrow</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">exch_ncols</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="n">exch_intpn</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"extended"</span><span class="p">,</span>
-    <span class="n">exch_meth</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"directlaplacianneumann"</span><span class="p">,</span>
+    <span class="n">exch_intpn</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;extended&quot;</span><span class="p">,</span>
+    <span class="n">exch_meth</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;directlaplacianneumann&quot;</span><span class="p">,</span>
     <span class="n">exch_weigh</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">8</span><span class="p">,</span>
     <span class="n">exch_presize</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">12</span><span class="p">,</span>
     <span class="n">demigstp</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
     <span class="n">passexch</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
-    <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"t"</span><span class="p">,</span>
+    <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;t&quot;</span><span class="p">,</span>
     <span class="n">cuda</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">cvode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">usedemag</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
@@ -275,8 +275,14 @@ constructor arguments are plain attributes and are listed there as well.</p>
     <span class="n">alpha_fct</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">atleast_2d</span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="mi">0</span><span class="p">,</span>
     <span class="n">sampleShape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exchPBC</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">macroShape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">shiftVec</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span> <span class="n">n_macro</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
-    <span class="n">hysteresis_solver</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"static"</span><span class="p">,</span>
+    <span class="n">hysteresis_solver</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;static&quot;</span><span class="p">,</span>
     <span class="n">rng_seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">phase_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">A_int</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">min_tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
+    <span class="n">min_maxiter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">,</span>
+    <span class="n">min_maxrot</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">,</span>
+    <span class="n">min_fallback</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">min_saddle_check</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </pre></div>
 </div>
@@ -290,10 +296,11 @@ constructor arguments are plain attributes and are listed there as well.</p>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span>
 </pre></div>
 </div>
-<p>A single solve, used for both the <code class="docutils literal notranslate"><span class="pre">dynamic</span></code> and the <code class="docutils literal notranslate"><span class="pre">explicit</span></code> solver.
-<code class="docutils literal notranslate"><span class="pre">fct_h_ext</span></code> is evaluated on <code class="docutils literal notranslate"><span class="pre">nt_h_ext</span></code> uniformly spaced times between 0 and
-<code class="docutils literal notranslate"><span class="pre">t_end</span></code> and must return an <code class="docutils literal notranslate"><span class="pre">(nt_h_ext,</span> <span class="pre">3)</span></code> array. The returned list is
-described in <a class="reference internal" href="micromag_output.html#micromagnetic-output"><span class="std std-ref">Micromagnetic output</span></a>.</p>
+<p>A single solve, used for the <code class="docutils literal notranslate"><span class="pre">dynamic</span></code>, the <code class="docutils literal notranslate"><span class="pre">explicit</span></code> and the
+<code class="docutils literal notranslate"><span class="pre">minimizer</span></code> solver. <code class="docutils literal notranslate"><span class="pre">fct_h_ext</span></code> is evaluated on <code class="docutils literal notranslate"><span class="pre">nt_h_ext</span></code> uniformly
+spaced times between 0 and <code class="docutils literal notranslate"><span class="pre">t_end</span></code> and must return an <code class="docutils literal notranslate"><span class="pre">(nt_h_ext,</span> <span class="pre">3)</span></code>
+array. The returned list is described in <a class="reference internal" href="micromag_output.html#micromagnetic-output"><span class="std std-ref">Micromagnetic output</span></a>, and the
+energies and relaxation diagnostics land on the problem object.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">run_hysteresis</span><span class="p">(</span><span class="n">H_ext</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span>
 </pre></div>
 </div>

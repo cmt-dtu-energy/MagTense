@@ -14,7 +14,7 @@
     <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/documentation_options.js?v=7f41d439"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
@@ -201,9 +201,9 @@ more detail.</p>
 </section>
 <section id="python-trace-example">
 <h2>Python trace example<a class="headerlink" href="#python-trace-example" title="Link to this heading"></a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="o">.</span><span class="n">log_dir</span> <span class="o">=</span> <span class="s2">"./logs"</span>
-<span class="n">problem</span><span class="o">.</span><span class="n">timer_log_file</span> <span class="o">=</span> <span class="s2">"timing.log"</span>
-<span class="n">problem</span><span class="o">.</span><span class="n">trace_log_file</span> <span class="o">=</span> <span class="s2">"trace.log"</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="o">.</span><span class="n">log_dir</span> <span class="o">=</span> <span class="s2">&quot;./logs&quot;</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">timer_log_file</span> <span class="o">=</span> <span class="s2">&quot;timing.log&quot;</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">trace_log_file</span> <span class="o">=</span> <span class="s2">&quot;trace.log&quot;</span>
 
 <span class="c1"># Timing window: output stats every 60 seconds</span>
 <span class="n">problem</span><span class="o">.</span><span class="n">window_enabled</span> <span class="o">=</span> <span class="mi">1</span>
@@ -222,9 +222,9 @@ more detail.</p>
 </section>
 <section id="matlab-trace-example">
 <h2>Matlab trace example<a class="headerlink" href="#matlab-trace-example" title="Link to this heading"></a></h2>
-<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setLogDirFilename</span><span class="p">(</span><span class="w"> </span><span class="s">'logs'</span><span class="w"> </span><span class="p">);</span>
-<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTimerLogFilename</span><span class="p">(</span><span class="w"> </span><span class="s">'timing.log'</span><span class="w"> </span><span class="p">);</span>
-<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTraceLogFilename</span><span class="p">(</span><span class="w"> </span><span class="s">'trace.log'</span><span class="w"> </span><span class="p">);</span>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setLogDirFilename</span><span class="p">(</span><span class="w"> </span><span class="s">&#39;logs&#39;</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTimerLogFilename</span><span class="p">(</span><span class="w"> </span><span class="s">&#39;timing.log&#39;</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTraceLogFilename</span><span class="p">(</span><span class="w"> </span><span class="s">&#39;trace.log&#39;</span><span class="w"> </span><span class="p">);</span>
 
 <span class="n">problem</span><span class="p">.</span><span class="n">window_ena</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
 <span class="n">problem</span><span class="p">.</span><span class="n">window_int</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="mf">60.0</span><span class="p">;</span>

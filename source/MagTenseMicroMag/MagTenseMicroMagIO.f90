@@ -51,6 +51,7 @@
         mwPointer :: dH_initialPtr, dH_minPtr, dH_maxPtr, dH_growPtr, dH_shrinkPtr
         mwPointer :: dM_minPtr, dM_targetPtr, dM_rejectPtr, switch_refine_dHPtr, use_switch_refinePtr
         mwPointer :: rng_seedPtr
+        mwPointer :: minimizerPtr
         integer :: use_switch_refine
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
@@ -686,6 +687,20 @@
         rng_seedPtr = mxGetField( prhs, i, problemFields(104) )
         call mxCopyPtrToInteger4(mxGetPr(rng_seedPtr), problem%rng_seed, sx )
 
+        !Energy minimizer settings. Optional in the struct, so that a problem struct from an older
+        !DefaultMicroMagProblem keeps working with the defaults of the Fortran type.
+        sx = 1
+        minimizerPtr = mxGetField( prhs, i, problemFields(108) )
+        if ( minimizerPtr .ne. 0 ) call mxCopyPtrToReal8(mxGetPr(minimizerPtr), problem%min_tol, sx )
+        minimizerPtr = mxGetField( prhs, i, problemFields(109) )
+        if ( minimizerPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(minimizerPtr), problem%min_maxiter, sx )
+        minimizerPtr = mxGetField( prhs, i, problemFields(110) )
+        if ( minimizerPtr .ne. 0 ) call mxCopyPtrToReal8(mxGetPr(minimizerPtr), problem%min_maxrot, sx )
+        minimizerPtr = mxGetField( prhs, i, problemFields(111) )
+        if ( minimizerPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(minimizerPtr), problem%min_fallback, sx )
+        minimizerPtr = mxGetField( prhs, i, problemFields(112) )
+        if ( minimizerPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(minimizerPtr), problem%min_saddle_check, sx )
+
         !Clean-up
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -699,7 +714,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=107
+        integer,parameter :: nf=112
         character(len=12),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -817,6 +832,13 @@
         fieldnames(106) = 'phase_id'
         fieldnames(107) = 'A_int'
 
+        !Energy minimizer settings, optional as well
+        fieldnames(108) = 'min_tol'
+        fieldnames(109) = 'min_maxiter'
+        fieldnames(110) = 'min_maxrot'
+        fieldnames(111) = 'min_fallback'
+        fieldnames(112) = 'min_saddle'
+
     end subroutine getProblemFieldnames
     
     
@@ -835,7 +857,9 @@
         mwSize,dimension(1) :: dims
         mwSize :: s1,s2,sx,ndim
         mwSize,dimension(4) :: dims_4
+        mwSize,dimension(3) :: dims_3
         mwPointer :: pt,pm,pp,pdem,pext,pexc,pani,pnHext
+        mwPointer :: pE,pnfe,pmit,pmtq,pmst
         mwPointer :: mxCreateStructArray, mxCreateDoubleMatrix,mxGetPr,mxCreateNumericMatrix,mxCreateNumericArray
         mwIndex :: ind
         character(len=10),dimension(:),allocatable :: fieldnames    
@@ -943,6 +967,37 @@
         call mxCopyInteger4ToPtr( problem%nHextAccepted, mxGetPr( pnHext ), sx )
         call mxSetField( plhs, ind, fieldnames(8), pnHext )
 
+        !Energies (nt, nt_Hext, 4): exchange, external, demag, anisotropy [J]
+        ndim = 3
+        dims_3(1) = size( solution%E_out, 1 )
+        dims_3(2) = size( solution%E_out, 2 )
+        dims_3(3) = size( solution%E_out, 3 )
+        classid = mxClassIDFromClassName( 'double' )
+        pE = mxCreateNumericArray( ndim, dims_3, classid, ComplexFlag)
+        sx = dims_3(1) * dims_3(2) * dims_3(3)
+        call mxCopyReal8ToPtr( solution%E_out, mxGetPr( pE ), sx )
+        call mxSetField( plhs, ind, fieldnames(9), pE )
+
+        !Relaxation diagnostics, one entry per applied field
+        s1 = size( solution%n_feval )
+        s2 = 1
+        sx = s1 * s2
+        pnfe = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)
+        call mxCopyInteger4ToPtr( solution%n_feval, mxGetPr( pnfe ), sx )
+        call mxSetField( plhs, ind, fieldnames(10), pnfe )
+
+        pmit = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)
+        call mxCopyInteger4ToPtr( solution%min_iter, mxGetPr( pmit ), sx )
+        call mxSetField( plhs, ind, fieldnames(11), pmit )
+
+        pmtq = mxCreateDoubleMatrix(s1, s2, ComplexFlag)
+        call mxCopyReal8ToPtr( solution%min_torque, mxGetPr( pmtq ), sx )
+        call mxSetField( plhs, ind, fieldnames(12), pmtq )
+
+        pmst = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)
+        call mxCopyInteger4ToPtr( solution%min_status, mxGetPr( pmst ), sx )
+        call mxSetField( plhs, ind, fieldnames(13), pmst )
+
         !Clean up
         deallocate(fieldnames)
 
@@ -957,7 +1012,7 @@
     !>-----------------------------------------
     subroutine getSolutionFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=8
+        integer,parameter :: nf=13
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
 
         nfields = nf
@@ -972,6 +1027,12 @@
         fieldnames(6) = 'H_dem'
         fieldnames(7) = 'H_ani'
         fieldnames(8) = 'n_Hext_acc'
+        !Energies and relaxation diagnostics
+        fieldnames(9) = 'E'
+        fieldnames(10) = 'n_feval'
+        fieldnames(11) = 'min_iter'
+        fieldnames(12) = 'min_torque'
+        fieldnames(13) = 'min_status'
 
     end subroutine getSolutionFieldnames
     

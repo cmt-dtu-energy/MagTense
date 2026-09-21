@@ -26,10 +26,12 @@ The solver is selected with ``setMicroMagSolver`` in Matlab and with the
        field and relaxes the magnetization to equilibrium for each of them in
        turn, starting from the state reached at the previous field. This is the
        quasi-static mode used for hysteresis loops.
-   * - ``Implicit``
+   * - ``Minimizer``
      - 3
-     - Not implemented. Selecting it prints a message and produces no field
-       update.
+     - Reads the applied-field table exactly as ``Explicit`` does, one constant
+       field per row, but finds the equilibrium at each field with the
+       :ref:`Energy minimizer` instead of integrating the Landau-Lifshitz
+       equation in time. ``Implicit`` is accepted as the old name of this slot.
 
 ``ProblemMod`` (Python ``prob_mode``) selects ``new`` (1) or ``old`` (2). Use
 ``new``, which is the default; ``old`` skips the allocation of the solution
@@ -110,20 +112,216 @@ Two time integrators are available:
    * - ``t_conv``, ``nt_conv``
      - ``0``, ``1``
      - Times at which the solution is checked for convergence against the
-       previous step.
+       state at the previous convergence time.
    * - ``conv_tol``
      - ``1e-4``
-     - Convergence criterion, i.e. the maximum allowed change in magnetization
-       between two steps.
+     - Convergence criterion: when the largest change of any magnetization
+       component between two convergence times is below this, the integration
+       stops and the converged state is held at the remaining output times.
 
-.. note::
-   ``t_conv`` and ``conv_tol`` are accepted by both interfaces, but the
-   early-exit convergence test inside the RKSuite driver is currently disabled
-   in the source, and the CVODE path never receives them. The times in
-   ``t_conv`` *are* merged into the integration grid, which matters for the
-   thermal field because it is redrawn once per grid time, see
-   :ref:`Thermal fluctuations`. Keep ``t_conv`` a subset of ``t`` unless you
-   specifically want to add integration times.
+The convergence test is what lets a relaxation to equilibrium stop when it is
+done instead of always running to the last output time. With the default
+``t_conv = 0`` it never fires. To use it, make ``t_conv`` the output times (or
+a subset of them) and choose ``conv_tol``; in Python this is
+
+.. code-block:: python
+
+    problem.t_conv = np.linspace(0, t_end, nt)
+    problem.nt_conv = nt
+    problem.conv_tol = np.repeat(1e-6, nt)
+
+The test is skipped in a thermal run, where the noise never settles. Both the
+RKSuite and the CVODE driver apply it; CVODE only steps to the output times, so
+a convergence time that is not also an output time is never visited there. The
+times in ``t_conv`` *are* merged into the RKSuite integration grid, which
+matters for the thermal field because it is redrawn once per grid time, see
+:ref:`Thermal fluctuations`. Keep ``t_conv`` a subset of ``t`` unless you
+specifically want to add integration times.
+
+========================================
+Energy minimizer
+========================================
+
+With ``solver = Minimizer`` (Python ``solver="minimizer"``) the equilibrium at
+each constant applied field is found by minimizing the energy directly rather
+than by integrating the Landau-Lifshitz equation with a large damping. The
+method is steepest descent on the unit sphere with Barzilai-Borwein step
+lengths, following Exl et al., *J. Appl. Phys.* **115**, 17D118 (2014). The
+descent direction of cell :math:`i` is :math:`\mathbf{m}_i \times
+(\mathbf{m}_i \times \mathbf{H}_i)`, the same vector that drives the damping
+term of the Landau-Lifshitz equation, and the update
+
+.. math::
+
+    \mathbf{m}^{k+1} = \frac{(1 - \tau^2 |\mathbf{t}|^2/4)\,\mathbf{m}^k
+      - \tau\, \mathbf{m}^k \times \mathbf{t}}{1 + \tau^2 |\mathbf{t}|^2/4},
+    \qquad \mathbf{t} = \mathbf{m}^k \times \mathbf{H}^k ,
+
+is the exact solution of the midpoint rule, so :math:`|\mathbf{m}| = 1` is
+preserved to rounding. Each iteration costs **one** effective-field
+evaluation, against about six per accepted step of the RK(4,5) time
+integration, and the step length adapts to the local curvature instead of
+being bounded by the stability limit of an explicit integrator, which for a
+fine grid is set by the exchange stiffness whatever the distance from
+equilibrium.
+
+Convergence is declared when the largest torque over the cells,
+:math:`\max_i |\mathbf{m}_i \times \mathbf{H}_i| / \max(M_s)`, falls below
+``min_tol``. Two safeguards keep the non-monotone Barzilai-Borwein iteration
+in check:
+
+* no cell rotates by more than ``min_maxrot`` in one iteration, and
+* the energy may not rise above the largest of the last ten iterates by more
+  than a small fraction of the energy scale; if it would, the step is halved
+  and retried.
+
+If the iteration cap ``min_maxiter`` is hit, or the watchdog stalls, and
+``min_fallback`` is set, the Landau-Lifshitz time integration is run once over
+the requested time window from the current state and the minimizer is
+restarted from where it ends up. This is what carries a hysteresis loop
+through a switching event, where the state sits near a saddle point.
+
+A vanishing torque is also what a saddle point looks like, and a symmetric
+starting state sits on one: the canonical vortex of standard problem 3, or a
+magnetization exactly antiparallel to the applied field. Steepest descent
+converges onto such a point, whereas the time integration only leaves it
+through rounding noise, slowly. With ``min_saddle_check`` set, which is the
+default, a converged state is therefore nudged by a random tilt of about half
+a degree, common to all cells with a smaller independent part per cell, and
+relaxed again for up to a hundred iterations. A minimum keeps the energy above
+the unperturbed value throughout and is returned unperturbed; a saddle lets the
+energy fall below it, at which point the descent continues to the lower
+minimum, which is then checked in the same way, up to three times. The check
+costs up to a hundred field evaluations per applied field.
+
+.. list-table::
+   :widths: 18 12 70
+   :header-rows: 1
+
+   * - Parameter
+     - Default
+     - Description
+   * - ``min_tol``
+     - ``1e-5``
+     - Convergence criterion on the largest relative torque.
+   * - ``min_maxiter``
+     - ``10000``
+     - Maximum number of iterations per applied field.
+   * - ``min_maxrot``
+     - ``0.3``
+     - Largest rotation of any cell in one iteration [rad].
+   * - ``min_fallback``
+     - ``1``
+     - Fall back to the time integration when the minimizer stalls (1) or give
+       up and report it (0).
+   * - ``min_saddle_check``
+     - ``1``
+     - Nudge a converged state and relax again to make sure it is a minimum
+       (1) or accept it as it is (0). Matlab: ``min_saddle``.
+
+The minimizer works with every grid type, with CUDA and with FMM, because it
+calls the same field routines as the time integration. It cannot be combined
+with a finite temperature, since a stochastic field has no stationary point;
+the solve stops with a message. The thermal, ``dynamic`` and time-dependent
+``alpha`` settings are ignored by it.
+
+The output has the layout of the time integration: the first output time holds
+the starting state and every later one the converged state. In addition every
+run, with either method, returns the energies and a few diagnostics per applied
+field, see :ref:`Micromagnetic output`: ``n_feval`` is the number of
+effective-field evaluations spent relaxing at that field, which is the fair
+cost measure between the two methods, and ``min_status`` records whether the
+minimizer converged directly, needed the fallback, or failed.
+
+How much cheaper it is depends on the problem. On the shipped examples,
+measured in field evaluations per applied field on a CPU:
+
+.. list-table::
+   :widths: 40 20 20 20
+   :header-rows: 1
+
+   * - Problem
+     - LL relaxation
+     - Minimizer
+     - Ratio
+   * - Single 10 nm grain, 5\ :sup:`3` cells, adaptive hysteresis loop,
+       1 ns relaxation window
+     - 28695
+     - 1877
+     - 15
+   * - Same, LL window extended to 100 ns so that its switching field agrees
+       with the minimizer
+     - 240624
+     - 1877
+     - 128
+   * - Standard problem 3, 10\ :sup:`3` cells, flower state
+     - 988
+     - 177
+     - 5.6
+   * - Standard problem 3, 10\ :sup:`3` cells, vortex state
+     - 12660
+     - 337
+     - 38
+
+Roughly a hundred of the minimizer's evaluations per applied field go into the
+saddle check; without it the flower state takes 39 evaluations and the vortex
+156. The energies agree to six digits in the vortex case and the minimizer
+finds a marginally lower flower energy than the time integration did in its
+10 ns window. On the grain the 1 ns time integration is not relaxed near the
+switching field and overshoots the Stoner-Wohlfarth value by ten percent; the
+minimizer lands within one field step of it. The script
+`minimizer_vs_llg.py <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/minimizer/minimizer_vs_llg.py>`_
+reproduces these numbers.
+
+Standard problem 6 shows the same picture on a domain wall pinned at a phase
+boundary. The reference values are static depinning fields, the example's time
+ramp of 0.02 T per ns gives rate-dependent ones, and the minimizer visiting the
+same 201 field values as constant fields lands within the 0.01 T field
+resolution of the analytical value in every setting, at a few hundred times
+fewer field evaluations:
+
+.. list-table::
+   :widths: 16 16 20 20 24
+   :header-rows: 1
+
+   * - Setting
+     - Analytical [T]
+     - LL time ramp [T]
+     - Minimizer [T]
+     - Field evaluations LL / minimizer
+   * - ``akj``
+     - 1.568
+     - 1.590
+     - 1.580
+     - 2 872 407 / 18 979
+   * - ``ak``
+     - 1.089
+     - 1.120
+     - 1.110
+     - 2 850 968 / 17 067
+   * - ``aj``
+     - 1.206
+     - 1.260
+     - 1.240
+     - 3 049 920 / 17 205
+   * - ``a``
+     - 0.838
+     - 0.870
+     - 0.860
+     - 2 845 165 / 12 866
+   * - ``kj``
+     - 1.005
+     - 1.020
+     - 1.010
+     - 11 088 509 / 28 309
+   * - ``k``
+     - 0.565
+     - 0.590
+     - 0.570
+     - 2 848 863 / 13 982
+
+The time integration remains the method of choice for dynamics, for thermal
+runs, and as a robust reference when the minimizer reports a failure.
 
 ========================================
 Hysteresis simulations
@@ -144,6 +342,9 @@ loop, as in the standard problem 2 example:
     HystDir = 1/mu0*[1,1,1]/sqrt(3);
     problem = problem.setHext( @(t) HystDir.*t', linspace(MaxH,-MaxH,40) );
     problem = problem.setTime( linspace(0,40e-9,2) );
+
+Either the ``Explicit`` solver or the ``Minimizer`` can be used for the
+relaxation at each field; see :ref:`Energy minimizer` for the trade-off.
 
 In Python the dedicated method ``run_hysteresis`` takes the field table
 directly as an ``(n,4)`` array, and requires ``hysteresis_solver='static'``,
@@ -167,7 +368,8 @@ step length itself, based on how much the volume-averaged magnetization moved.
 
 The whole accept/reject loop runs inside Fortran in a single call. It is
 available from Python through ``run_hysteresis_adaptive`` and requires
-``hysteresis_solver='adaptive'`` together with ``solver='explicit'``. In Matlab
+``hysteresis_solver='adaptive'`` together with ``solver='explicit'`` or
+``solver='minimizer'``. In Matlab
 the same parameters exist on the problem object (``adaptiveHext``,
 ``maxHextSteps``, ``H_start``, ``H_end``, ``dH_initial``, ``dH_min``,
 ``dH_max``, ``dH_grow``, ``dH_shrink``, ``dM_min``, ``dM_target``,
