@@ -10,12 +10,6 @@ arguments
     options.use_adaptive {mustBeNumericOrLogical}   = true;        %--- Sweep the field with the adaptive stepping instead of the fixed table of 40 fields
 end
 
-if (isscalar(d_loop) && d_loop == 0.5)
-    run_single_curve = 1;
-else
-    run_single_curve = 0;
-end
-
 mu0 = 4*pi*1e-7;
 
 addpath('../../../MEX_files');
@@ -163,27 +157,6 @@ if (options.ShowTheResult)
         plot(fig2,mumag_data(:,1),mumag_data(:,3),'d');
         plot(fig3,mumag_data(:,1),mumag_data(:,4),'d');
     end
-end
-
-if run_single_curve
-%% --------------------------------------------------------------------------------------------------------------------------------------
-%% --------------------------------------------------------------------  mumag -----------------------------------------------------------
-%% --------------------------------------------------------------------------------------------------------------------------------------
-%% Compare with published solutions available from mumag webpage for single curve for d/l_ex = 30
-    figure4= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig4 = axes('Parent',figure4,'Layer','top','FontSize',16); hold on; grid on; box on
-    plot(fig4,mu0*problem.Ms*results.Hn,mu0*M,'rp') %The loop in T, the fields as visited (fixed table or adaptive steps)
-
-    load('OOMMF_Hysteresis2D_dlex30.mat');
-    plot(fig4,mu0*H,M,'k>');
-    load('OOMMF_HysteresisQuasi3D_dlex30.mat');
-    plot(fig4,mu0*H,M,'k<');
-    load('OOMMF_Hysteresis3D_dlex30.mat');
-    plot(fig4,mu0*H,M,'k^');
-
-    legend(fig4,'"MagTense"','OOMMF 2D','OOMMF Quasi3D','OOMMF 3D','Location','SouthEast');
-    ylabel(fig4,'<M_i>/M_s')
-    xlabel(fig4,'\mu_{0}H_{applied} [T]')
-    xlim(fig4,[-0.1 0.1])
 end
 
 end

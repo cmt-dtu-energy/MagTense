@@ -99,9 +99,9 @@ include "mkl_dfti.f90"
         integer, allocatable  :: AllFaces(:,:)                                   !> K x 3 node indices of each face. Only filled for a tetrahedral mesh
         logical  :: exchPBC(3) = .false.         !> Periodic boundary conditions along x, y and z for the exchange coupling
         real(dp) :: Lper(3) = 0.                 !> Period, i.e. the extent of the mesh, along x, y and z. Only used when exchPBC is set
-        integer :: Exch_mat_nr                   !> Number of rows in the exchange coupling matrix
-        integer :: Exch_mat_nc                   !> Number of columns in the exchange coupling matrix
-        integer :: Exch_mat_ntot                 !> Number of elements in the exchange coupling matrix
+        integer :: Exch_mat_nr = 0                   !> Number of rows in the exchange coupling matrix
+        integer :: Exch_mat_nc = 0                   !> Number of columns in the exchange coupling matrix
+        integer :: Exch_mat_ntot = 0                 !> Number of elements in the exchange coupling matrix
         integer, allocatable  :: Exch_mat_r(:)   !> Row indices for the exchange coupling matrix
         integer, allocatable  :: Exch_mat_c(:)   !> Column indices for the exchange coupling matrix
         real(dp), allocatable :: Exch_mat_v(:)   !> Values for the exchange coupling matrix
@@ -138,7 +138,7 @@ include "mkl_dfti.f90"
         integer  :: exch_method                           !> Determines what type of exchange operator method to use
         integer  :: exch_interpn                          !> Determines what type of exchange interpolation method to use
     
-        real(DP) :: gamma,alpha0,MaxT0                    !> User defined coefficients determining part of the problem.
+        real(DP) :: gamma,alpha0                          !> User defined coefficients determining part of the problem.
         real(DP) :: tol,thres_value                       !> User defined coefficients for the ODE solver
         real(DP),dimension(:),allocatable :: Jfact,Kfact
         real(SP),dimension(:),allocatable :: Mfact
@@ -186,20 +186,17 @@ include "mkl_dfti.f90"
         
         real(SP) :: demag_threshold                        !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         real(SP) :: CV                                   !> The coefficient of variation (CV), i.e. the ratio of the standard deviation to the mean, which can be used to add an error to the demag field
-        integer :: demag_ignore_steps                    !> Only compute the demag tensor every demag_ignore_steps'th-step in a calculation using the hysteresis-model. Otherwise the parameter is ignore (i.e. in the dynamic solver)
         
         integer :: setTimeDisplay                               !> Determines how often the timestep is shown in Matlab
         integer :: useCuda                                      !> Defines whether to attempt using CUDA or not
         integer :: useCVODE                                     !> Defines whether to attempt using CVODE or not
         integer :: useDemag                                     !> Defines whether to include the demagnetization field in the calculations or not
-        integer :: usePrecision                                 !> Defines whether to use single (false) or double precision (true)
         integer :: useReturnHall                                !> Defines whether to return all the specific H-fields (exchange, demag) �(true) or not (false)
         integer :: useAvgN                                      !> Defines wether to use volume avergared demag tensor for the prism (True) or not (False)
         integer :: passExch                                     !> Defines whether the exchange matrix is passed from Matlab/Python (true) or calculated localled (false).
         integer :: demag_approximation                          !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         integer :: demagTensorReturnState                       !> Flag describing how or if the demag tensor should be returned
         integer :: demagTensorLoadState                         !> Flag describing how or if to load the demag tensor (from disk e.g.)
-        integer :: nThreadsMatlab                               !> Number of threads to use in the OpenMP demag tensor allocation
         integer,dimension(3) :: N_ave                           !> Number of points to average the demag tensor in in the recieving tile, N_ave(1) = N_x etc
         character*256 :: demagTensorFileOut, demagTensorFileIn  !> Filename (including path) for output (input) of demag tensor if it is to be returned as a file (demagTensorReturnState >2 and the value is equal to the length of the file including path)
         
@@ -241,7 +238,7 @@ include "mkl_dfti.f90"
         integer,dimension(:,:,:),allocatable :: phase_map   !> phase_id mapped onto a uniform grid
         real(DP),dimension(:,:),allocatable :: A_int        !> Interface exchange per pair of phases [J/m]
         
-        type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H       !> Handle for the FFT MKL stuff
+        type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H => null()      !> Handle for the FFT MKL stuff
 
 
 
@@ -275,6 +272,7 @@ include "mkl_dfti.f90"
         integer :: window_ena
         real(DP) :: window_int
         integer :: trace_ena
+        integer :: timer_ena = 0                                !> 1 writes the timing log file, 0 (default) does not
         integer :: flush_each
         integer :: trace_verb
         character*256 :: log_dir
@@ -335,8 +333,6 @@ include "mkl_dfti.f90"
     integer,parameter :: gridTypeUniform=1,gridTypeTetrahedron=2,gridTypeUnstructuredPrisms=3
     integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
     integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverMinimizer=3
-    !MicroMagSolverImplicit is the old name of the unimplemented solver slot, kept so that existing code compiles
-    integer,parameter :: MicroMagSolverImplicit=MicroMagSolverMinimizer
     integer,parameter :: MicroMagExchMethodDirectLaplacianNeumann=1,MicroMagExchMethodGGNeumann=2
     integer,parameter :: MicroMagExchInterpnExtended=1,MicroMagExchInterpnCompact=2
     integer,parameter :: useCudaTrue=1,useCudaFalse=0
@@ -345,7 +341,6 @@ include "mkl_dfti.f90"
     !!@todo Do NOT have useCVODETrue/-False variables both here and in IntegrationDataTypes.
     integer,parameter :: useCVODETrue=1,useCVODEFalse=0
     integer,parameter :: passExchTrue=1,passExchFalse=0
-    integer,parameter :: usePrecisionTrue=1,usePrecisionFalse=0
     integer,parameter :: useReturnHallTrue=1,useReturnHallFalse=0
     integer,parameter :: useFMMTrue=1,useFMMFalse=0
     integer,parameter :: useDemagTrue=1,useDemagFalse=0

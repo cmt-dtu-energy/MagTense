@@ -42,6 +42,11 @@ Trace and timing variables
      - ``window_int``
      - float
      - Timing output frequency in **seconds**. Default 30.
+   * - ``timer_enabled``
+     - ``timer_ena``
+     - ``0``
+     - Write the timing log file. Off by default; without it no log directory is
+       created and the periodic windows are not written.
    * - ``trace_enabled``
      - ``trace_ena``
      - int
@@ -112,6 +117,9 @@ Python trace example
     problem.log_dir = "./logs"
     problem.timer_log_file = "timing.log"
     problem.trace_log_file = "trace.log"
+
+    # Timing log: off unless asked for, like the trace
+    problem.timer_enabled = 1
 
     # Timing window: output stats every 60 seconds
     problem.window_enabled = 1

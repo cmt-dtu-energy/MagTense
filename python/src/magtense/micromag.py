@@ -64,7 +64,7 @@ class MicromagProblem:
             by integrating the Landau-Lifshitz equation in time.
             If solver = 'minimizer', the equilibrium at each constant field is found by the energy
             minimizer (steepest descent on the sphere with Barzilai-Borwein steps) instead of the time
-            integration. 'implicit' is accepted as an old name for 'minimizer'.
+            integration.
             See documentation under run_simulation for details.
         hysteresis_solver: External-field stepping mode. Options are 'static'
             and 'adaptive'. The default 'static' mode preserves the predefined
@@ -79,7 +79,6 @@ class MicromagProblem:
         alpha: Dampening constant [m/(A*s)]. Product of Gilbert damping and precession parameter.
         T: Temperature [K] ('temp' in fortran part)
         gamma: Gyromagnetic factor [m/(A*s)].
-        max_T0:
         nt_conv:
         conv_tol: The convergence tolerance, which is the maximum change in
                   magnetization between two timesteps.
@@ -94,8 +93,6 @@ class MicromagProblem:
         filename:
         cuda: Optional GPU support via CUDA.
         cvode:
-        precision: Precision for the demag tensor. Only SP is supported.
-        n_threads: Number of threads used by OpenMP for building the demag tensor.
         N_ave:
         t_alpha:
         alpha_fct:
@@ -143,7 +140,6 @@ class MicromagProblem:
             CrysAxis: np.ndarray | None = None,
             alpha: float = 4.42e3,
             gamma: float = 2.21e5,
-            max_T0: float = 2.0,
             nt_conv: int = 1,
             conv_tol: float = 1e-4,
             tol: float = 1e-4,
@@ -166,7 +162,6 @@ class MicromagProblem:
             exch_meth: str | None = "directlaplacianneumann",
             exch_weigh: float = 8,
             exch_presize: int = 12,
-            demigstp: int = 0,
             passexch: int = 0,
             filename: str = "t",
             cuda: bool = False,
@@ -178,8 +173,6 @@ class MicromagProblem:
             # Set it to True to have run_simulation return H_exc/H_ext/H_dem/H_ani; leaving it
             # off also avoids allocating four more (nt, ntot, nt_h_ext, 3) arrays.
             usereturnhall: bool = False,
-            precision: bool = False,
-            n_threads: int = 1,
             N_ave: tuple[int] = (1, 1, 1),
             t_alpha: np.ndarray = np.zeros(1),  # noqa: B008
             alpha_fct=lambda t: np.atleast_2d(t).T * 0,
@@ -209,7 +202,6 @@ class MicromagProblem:
         self.exch_meth = exch_meth
         self.exch_weigh = exch_weigh
         self.passexch = passexch
-        self.demigstp = demigstp
         self.usereturnhall = usereturnhall
         self.useavgn = useavgn
         self.exch_presize = exch_presize
@@ -217,7 +209,6 @@ class MicromagProblem:
         self.nt_conv = nt_conv
 
         self.usereturnhall = usereturnhall
-        self.demigstp = demigstp
         self.usereturnhall = usereturnhall
         self.exch_presize = exch_presize
 
@@ -289,7 +280,6 @@ class MicromagProblem:
 
         self.alpha_mm = alpha
         self.gamma = gamma
-        self.max_T0 = max_T0
 
         self.t_conv = np.zeros(shape=(nt_conv), dtype=np.float64, order="F")
         self.conv_tol = np.array(
@@ -351,8 +341,6 @@ class MicromagProblem:
         self.usedemag = int(usedemag)
         self.useavgn = int(useavgn)
         self.usereturnhall = int(usereturnhall)
-        self.precision = int(precision)
-        self.n_threads = n_threads
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")
 
 
@@ -380,6 +368,7 @@ class MicromagProblem:
         self.window_enabled = 1
         self.window_interval = 30.0
         self.trace_enabled = 0
+        self.timer_enabled = 0   # 1 writes the timing log file; off by default like the trace
         self.flush_each = 1
         self.trace_verbose = 1
         #-----------------------------------------------
@@ -784,8 +773,7 @@ class MicromagProblem:
 
     @solver.setter
     def solver(self, val: str | None = None) -> None:
-        # 'implicit' is the old name of the third slot, which is now the energy minimizer
-        self._solver = {None: -1, "explicit": 1, "dynamic": 2, "minimizer": 3, "implicit": 3}[val]
+        self._solver = {None: -1, "explicit": 1, "dynamic": 2, "minimizer": 3}[val]
 
     def _store_diagnostics(self, result: list, n_accepted: int | None = None) -> None:
         """Pop the five trailing diagnostics off a Fortran result list onto the problem.
@@ -970,7 +958,6 @@ class MicromagProblem:
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
             temperature=self.T,
-            maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             nt_hext_out = nt_h_ext_out,
             hext=h_ext,
@@ -1004,13 +991,10 @@ class MicromagProblem:
             exch_rows=self.exch_rows,
             exch_cols=self.exch_cols,
             grid_abc=self.grid_abc,
-            useprecision=self.precision,
-            nthreadsmatlab=self.n_threads,
             n_ave=self.N_ave,
             cv=self.cv,
             usereturnhall=self.usereturnhall,
             useavgn=self.useavgn,
-            demigstp=self.demigstp,
             exch_weigh=self.exch_weigh,
             exch_meth=self.exch_meth,
             exch_intpn=self.exch_intpn,
@@ -1057,6 +1041,7 @@ class MicromagProblem:
             window_enabled=self.window_enabled,
             window_interval=self.window_interval,
             trace_enabled=self.trace_enabled,
+            timer_enabled=self.timer_enabled,
             flush_each=self.flush_each,
             trace_verbose=self.trace_verbose,
             rng_seed=self.rng_seed,
@@ -1136,7 +1121,6 @@ class MicromagProblem:
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
             temperature=self.T,
-            maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             nt_hext_out = nt_h_ext_out,
             hext=H_ext,
@@ -1170,13 +1154,10 @@ class MicromagProblem:
             exch_rows=self.exch_rows,
             exch_cols=self.exch_cols,
             grid_abc=self.grid_abc,
-            useprecision=self.precision,
-            nthreadsmatlab=self.n_threads,
             n_ave=self.N_ave,
             cv=self.cv,
             usereturnhall=self.usereturnhall,
             useavgn=self.useavgn,
-            demigstp=self.demigstp,
             exch_weigh=self.exch_weigh,
             exch_meth=self.exch_meth,
             exch_intpn=self.exch_intpn,
@@ -1223,6 +1204,7 @@ class MicromagProblem:
             window_enabled=self.window_enabled,
             window_interval=self.window_interval,
             trace_enabled=self.trace_enabled,
+            timer_enabled=self.timer_enabled,
             flush_each=self.flush_each,
             trace_verbose=self.trace_verbose,
             rng_seed=self.rng_seed,
@@ -1252,8 +1234,8 @@ class MicromagProblem:
             dM_min: float = 1e-3,
             dM_target: float = 1e-2,
             dM_reject: float = 5e-2,
-            dH_grow: float = 1.5,
-            dH_shrink: float = 0.75,
+            dH_grow: float = 1.25,
+            dH_shrink: float = 0.5,
             switch_refine_dH: float | None = None,
     ) -> list[np.ndarray | int]:
         """
@@ -1320,7 +1302,6 @@ class MicromagProblem:
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
             temperature=self.T,
-            maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             nt_hext_out=nt_h_ext_out,
             hext=h_ext,
@@ -1354,13 +1335,10 @@ class MicromagProblem:
             exch_rows=self.exch_rows,
             exch_cols=self.exch_cols,
             grid_abc=self.grid_abc,
-            useprecision=self.precision,
-            nthreadsmatlab=self.n_threads,
             n_ave=self.N_ave,
             cv=self.cv,
             usereturnhall=self.usereturnhall,
             useavgn=self.useavgn,
-            demigstp=self.demigstp,
             exch_weigh=self.exch_weigh,
             exch_meth=self.exch_meth,
             exch_intpn=self.exch_intpn,
@@ -1407,6 +1385,7 @@ class MicromagProblem:
             window_enabled=self.window_enabled,
             window_interval=self.window_interval,
             trace_enabled=self.trace_enabled,
+            timer_enabled=self.timer_enabled,
             flush_each=self.flush_each,
             trace_verbose=self.trace_verbose,
             rng_seed=self.rng_seed,

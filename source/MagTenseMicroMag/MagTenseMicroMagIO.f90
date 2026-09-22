@@ -22,15 +22,15 @@
         character(len=12),dimension(:),allocatable :: problemFields
         mwIndex :: i
         mwSize :: sx
-        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, usePrecision, useReturnHall, passExch, UseFMM, useDemag, useAvgN
+        integer :: nFieldsProblem, ntot, nt, nt_Hext, useCuda, status, nt_alpha, useCVODE, nt_conv, nnodes, nvalues, nrows, useReturnHall, passExch, UseFMM, useDemag, useAvgN
         mwPointer :: nGridPtr, LGridPtr, dGridPtr, typeGridPtr, ueaProblemPtr, modeProblemPtr, solverProblemPtr
         mwPointer :: exch_weightProblemPtr, exch_methodProblemPtr, exch_interpnProblemPtr
-        mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, K1ProblemPtr, K2ProblemPtr, gammaProblemPtr, alpha0ProblemPtr, MaxT0ProblemPtr
+        mwPointer :: A0ProblemPtr, MsProblemPtr, K0ProblemPtr, K1ProblemPtr, K2ProblemPtr, gammaProblemPtr, alpha0ProblemPtr
         mwPointer :: nPhaseProblemPtr, phaseIdProblemPtr, AIntProblemPtr
         real(DP),dimension(:),allocatable :: A_int_flat
         real(DP),dimension(:),allocatable :: phase_id_real
         integer :: ip, jp
-        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, nThreadPtr, usePassExchPtr, useAvgNProblemPtr
+        mwPointer :: ntProblemPtr, m0ProblemPtr, HextProblemPtr, alphaProblemPtr, tProblemPtr, useCudaPtr, useCVODEPtr, usePassExchPtr, useAvgNProblemPtr
         mwPointer :: mxGetField, mxGetPr, mxGetM, mxGetN, mxGetNzmax, mxGetIr, mxGetJc
         mwPointer :: ntHextProblemPtr, demThresProblemPtr, demApproxPtr, setTimeDisplayProblemPtr, CVThresProblemPtr
         mwPointer :: NFileReturnPtr, NReturnPtr, NLoadPtr, mxGetString, NFileLoadPtr
@@ -40,8 +40,8 @@
         mwPointer :: genericProblemPtr
         mwPointer :: ptsGridPtr, nodesGridPtr, elementsGridPtr, nnodesGridPtr
         mwPointer :: valuesPtr, rowsPtr, colsPtr, nValuesSparsePtr, nRowsSparsePtr, nColsSparsePtr
-        mwPointer :: usePrecisionPtr, N_aveProblemPtr, useReturnHallProblemPtr
-        mwPointer :: demag_ignore_stepsProblemPtr, CrystalAxisProblemPtr, K0_arrProblemPtr
+        mwPointer :: N_aveProblemPtr, useReturnHallProblemPtr
+        mwPointer :: CrystalAxisProblemPtr, K0_arrProblemPtr
         mwPointer :: fmm_cellsProblemPtr,fmm_epsProblemPtr,ifunifProblemPtr,nlminProblemPtr,nlmaxProblemPtr,use_fmmlProblemPtr,fmm_shortProblemPtr,fmm_min_nProblemPtr
         mwPointer :: useDemagPtr
         mwPointer :: window_enaProblemPtr, window_intProblemPtr, trace_enaProblemPtr, flush_eachProblemPtr, trace_verbProblemPtr
@@ -91,30 +91,30 @@
             !The center points of all the tetrahedron elements           
             allocate( problem%grid%pts(ntot,3) )
             sx = ntot * 3
-            ptsGridPtr = mxGetField( prhs, i, problemFields(35) )
+            ptsGridPtr = mxGetField( prhs, i, problemFields(34) )
             call mxCopyPtrToReal8(mxGetPr(ptsGridPtr), problem%grid%pts, sx )
             
             !The elements of all the tetrahedron elements
             allocate( problem%grid%elements(4,ntot) )
             sx = ntot * 4
-            nodesGridPtr = mxGetField( prhs, i, problemFields(36) )
+            nodesGridPtr = mxGetField( prhs, i, problemFields(35) )
             call mxCopyPtrToInteger4(mxGetPr(nodesGridPtr), problem%grid%elements, sx )
             
             !The number of nodes in the tetrahedron mesh
             sx = 1
-            nnodesGridPtr = mxGetField( prhs, i, problemFields(38) )
+            nnodesGridPtr = mxGetField( prhs, i, problemFields(37) )
             call mxCopyPtrToInteger4(mxGetPr(nnodesGridPtr), problem%grid%nnodes, sx )
             
             !The nodes of all the tetrahedron elements
             nnodes = problem%grid%nnodes
             allocate( problem%grid%nodes(3,nnodes) )
             sx = nnodes * 3
-            nodesGridPtr = mxGetField( prhs, i, problemFields(37) )
+            nodesGridPtr = mxGetField( prhs, i, problemFields(36) )
             call mxCopyPtrToReal8(mxGetPr(nodesGridPtr), problem%grid%nodes, sx )
             
             !the number of nodes in the tetrahedron mesh
             sx = 1
-            nnodesGridPtr = mxGetField( prhs, i, problemFields(38) )
+            nnodesGridPtr = mxGetField( prhs, i, problemFields(37) )
             call mxCopyPtrToInteger4(mxGetPr(nnodesGridPtr), problem%grid%nnodes, sx )
         endif
         
@@ -123,14 +123,14 @@
             !The center points of all the prisms elements           
             allocate( problem%grid%pts(ntot,3) )
             sx = ntot * 3
-            ptsGridPtr = mxGetField( prhs, i, problemFields(35) )
+            ptsGridPtr = mxGetField( prhs, i, problemFields(34) )
             call mxCopyPtrToReal8(mxGetPr(ptsGridPtr), problem%grid%pts, sx )
             
             
             !The side lengths of all the prisms
             allocate( problem%grid%abc(ntot,3) )
             sx = ntot * 3
-            nodesGridPtr = mxGetField( prhs, i, problemFields(45) )
+            nodesGridPtr = mxGetField( prhs, i, problemFields(43) )
             call mxCopyPtrToReal8(mxGetPr(nodesGridPtr), problem%grid%abc, sx )
             
         endif
@@ -163,9 +163,9 @@
         !returns a null pointer. Reading through that would be a hard crash, so the absence
         !is treated as 'one material', which is exactly the previous behaviour.
         problem%n_phase = 1
-        nPhaseProblemPtr = mxGetField( prhs, i, problemFields(105) )
-        phaseIdProblemPtr = mxGetField( prhs, i, problemFields(106) )
-        AIntProblemPtr = mxGetField( prhs, i, problemFields(107) )
+        nPhaseProblemPtr = mxGetField( prhs, i, problemFields(100) )
+        phaseIdProblemPtr = mxGetField( prhs, i, problemFields(101) )
+        AIntProblemPtr = mxGetField( prhs, i, problemFields(102) )
         if ( nPhaseProblemPtr .ne. 0 .and. phaseIdProblemPtr .ne. 0 .and. AIntProblemPtr .ne. 0 ) then
             sx = 1
             call mxCopyPtrToInteger4(mxGetPr(nPhaseProblemPtr), problem%n_phase, sx )
@@ -226,47 +226,43 @@
         alpha0ProblemPtr = mxGetField( prhs, i, problemFields(11) )
         call mxCopyPtrToReal8(mxGetPr(alpha0ProblemPtr), problem%alpha0, sx )
         
-        sx = 1
-        MaxT0ProblemPtr = mxGetField( prhs, i, problemFields(12) )
-        call mxCopyPtrToReal8(mxGetPr(MaxT0ProblemPtr), problem%MaxT0, sx )       
-                
         !load the no. of time steps in the applied field
         sx = 1
-        ntHextProblemPtr = mxGetField( prhs, i, problemFields(13) )
+        ntHextProblemPtr = mxGetField( prhs, i, problemFields(12) )
         call mxCopyPtrToInteger4(mxGetPr(ntHextProblemPtr), nt_Hext, sx )
         
         !Applied field as a function of time evaluated at the timesteps specified in nt_Hext
         !problem%Hext(:,1) is the time grid while problem%Hext(:,2:4) are the x-,y- and z-components of the applied field
         sx = nt_Hext * 4
         allocate( problem%Hext(nt_Hext,4) )
-        HextProblemPtr = mxGetField( prhs, i, problemFields(14) )
+        HextProblemPtr = mxGetField( prhs, i, problemFields(13) )
         call mxCopyPtrToReal8(mxGetPr(HextProblemPtr), problem%Hext, sx )
                 
         !Load the no. of time steps required
         sx = 1
-        ntProblemPtr = mxGetField( prhs, i, problemFields(15) )
+        ntProblemPtr = mxGetField( prhs, i, problemFields(14) )
         call mxCopyPtrToInteger4(mxGetPr(ntProblemPtr), nt, sx )
         
         allocate( problem%t(nt) )
-        tProblemPtr = mxGetField(prhs,i,problemFields(16) )
+        tProblemPtr = mxGetField(prhs,i,problemFields(15) )
         sx = nt
         call mxCopyPtrToReal8(mxGetPr(tProblemPtr), problem%t, sx )
         
         !Initial magnetization
         allocate( problem%m0(3*ntot) )
-        m0ProblemPtr = mxGetField(prhs,i,problemFields(17))
+        m0ProblemPtr = mxGetField(prhs,i,problemFields(16))
         sx = ntot * 3
         call mxCopyPtrToReal8(mxGetPr(m0ProblemPtr), problem%m0, sx )
         
         !Demagnetization threshold value        
-        demThresProblemPtr = mxGetField(prhs,i,problemFields(18))
+        demThresProblemPtr = mxGetField(prhs,i,problemFields(17))
         sx = 1
         call mxCopyPtrToReal8(mxGetPr(demThresProblemPtr), demag_fac, sx )
             
         problem%demag_threshold = sngl(demag_fac)
         
         sx = 1
-        useCudaPtr = mxGetField( prhs, i, problemFields(19) )
+        useCudaPtr = mxGetField( prhs, i, problemFields(18) )
         call mxCopyPtrToInteger4(mxGetPr(useCudaPtr), useCuda, sx )
         if ( useCuda .eq. 1 ) then
             problem%useCuda = useCudaTrue
@@ -275,32 +271,32 @@
         endif
                
         sx = 1
-        demApproxPtr = mxGetField( prhs, i, problemFields(20) )
+        demApproxPtr = mxGetField( prhs, i, problemFields(19) )
         call mxCopyPtrToInteger4(mxGetPr(demApproxPtr), problem%demag_approximation, sx )
         
         !flag whether the demag tensor should be returned and if so how
         sx = 1
-        NReturnPtr = mxGetField( prhs, i, problemFields(21) )
+        NReturnPtr = mxGetField( prhs, i, problemFields(20) )
         call mxCopyPtrToInteger4(mxGetPr(NReturnPtr), problem%demagTensorReturnState, sx )
         
         !File for returning the demag tensor to a file on disk (has to have length>2)
         if ( problem%demagTensorReturnState .gt. 2 ) then
             !Length of the file name
             sx = problem%demagTensorReturnState
-            NFileReturnPtr = mxGetField( prhs, i, problemFields(22) )            
+            NFileReturnPtr = mxGetField( prhs, i, problemFields(21) )            
             status = mxGetString( NFileReturnPtr, problem%demagTensorFileOut, sx )
         endif
         
         !flag whether the demag tensor should be loaded
         sx = 1
-        NLoadPtr = mxGetField( prhs, i, problemFields(23) )
+        NLoadPtr = mxGetField( prhs, i, problemFields(22) )
         call mxCopyPtrToInteger4(mxGetPr(NLoadPtr), problem%demagTensorLoadState, sx )
         
         !File for loading the demag tensor to a file on disk (has to have length>2)
         if ( problem%demagTensorLoadState .gt. 2 ) then
             !Length of the file name
             sx = problem%demagTensorLoadState
-            NFileLoadPtr = mxGetField( prhs, i, problemFields(24) )            
+            NFileLoadPtr = mxGetField( prhs, i, problemFields(23) )            
             status = mxGetString( NFileLoadPtr, problem%demagTensorFileIn, sx )
         endif
         
@@ -309,31 +305,31 @@
         
         !Set how often to display the timestep in Matlab
         sx = 1
-        setTimeDisplayProblemPtr = mxGetField( prhs, i, problemFields(25) )
+        setTimeDisplayProblemPtr = mxGetField( prhs, i, problemFields(24) )
         call mxCopyPtrToInteger4(mxGetPr(setTimeDisplayProblemPtr), problem%setTimeDisplay, sx )
         
         !Load the no. of times in the alpha function
         sx = 1
-        ntProblemPtr = mxGetField( prhs, i, problemFields(26) )
+        ntProblemPtr = mxGetField( prhs, i, problemFields(25) )
         call mxCopyPtrToInteger4(mxGetPr(ntProblemPtr), nt_alpha, sx )
         
         !alpha as a function of time evaluated at the timesteps
         !problem%alpha(:,1) is the time grid while problem%alpha(:,2) are the alpha values
         sx = nt_alpha * 2
         allocate( problem%alpha(nt_alpha,2) )
-        alphaProblemPtr = mxGetField( prhs, i, problemFields(27) )
+        alphaProblemPtr = mxGetField( prhs, i, problemFields(26) )
         call mxCopyPtrToReal8(mxGetPr(alphaProblemPtr), problem%alpha, sx )
         
         sx = 1
-        tolProblemPtr = mxGetField( prhs, i, problemFields(28) )
+        tolProblemPtr = mxGetField( prhs, i, problemFields(27) )
         call mxCopyPtrToReal8(mxGetPr(tolProblemPtr), problem%tol, sx )
         
         sx = 1
-        thres_valueProblemPtr = mxGetField( prhs, i, problemFields(29) )
+        thres_valueProblemPtr = mxGetField( prhs, i, problemFields(28) )
         call mxCopyPtrToReal8(mxGetPr(thres_valueProblemPtr), problem%thres_value, sx )
 
         sx = 1
-        useCVODEPtr = mxGetField( prhs, i, problemFields(30) )
+        useCVODEPtr = mxGetField( prhs, i, problemFields(29) )
         call mxCopyPtrToInteger4(mxGetPr(useCVODEPtr), useCVODE, sx )
         if ( useCVODE .eq. 1 ) then
             problem%useCVODE = useCVODETrue
@@ -342,7 +338,7 @@
         endif
         
         sx = 1
-        usePassExchPtr = mxGetField( prhs, i, problemFields(55) )
+        usePassExchPtr = mxGetField( prhs, i, problemFields(50) )
         call mxCopyPtrToInteger4(mxGetPr(usePassExchPtr), passExch, sx )
         if ( passExch .eq. 1 ) then
             problem%passExch = passExchTrue
@@ -355,75 +351,62 @@
         if (( problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
             if (problem%passExch .eq. passExchTrue ) then
                 sx = 1
-                nRowsSparsePtr = mxGetField( prhs, i, problemFields(40) )
+                nRowsSparsePtr = mxGetField( prhs, i, problemFields(39) )
                 call mxCopyPtrToInteger4(mxGetPr(nRowsSparsePtr), problem%grid%A_exch_load%nrows, sx )
                 
                 sx = 1
-                nColsSparsePtr = mxGetField( prhs, i, problemFields(56) )
+                nColsSparsePtr = mxGetField( prhs, i, problemFields(51) )
                 call mxCopyPtrToInteger4(mxGetPr(nColsSparsePtr), problem%grid%A_exch_load%ncols, sx )
                 
                 sx = 1
-                nValuesSparsePtr = mxGetField( prhs, i, problemFields(39) )
+                nValuesSparsePtr = mxGetField( prhs, i, problemFields(38) )
                 call mxCopyPtrToInteger4(mxGetPr(nValuesSparsePtr), problem%grid%A_exch_load%nvalues, sx )
                 
                 nvalues = problem%grid%A_exch_load%nvalues
                 allocate( problem%grid%A_exch_load%values(nvalues), problem%grid%A_exch_load%rows(nvalues) , problem%grid%A_exch_load%cols(nvalues) )
                
                 sx = nvalues
-                valuesPtr = mxGetField( prhs, i, problemFields(41) )
+                valuesPtr = mxGetField( prhs, i, problemFields(40) )
                 call mxCopyPtrToReal8(mxGetPr(valuesPtr), problem%grid%A_exch_load%values, sx )
             
                 sx = nvalues
-                rowsPtr = mxGetField( prhs, i, problemFields(42) )
+                rowsPtr = mxGetField( prhs, i, problemFields(41) )
                 call mxCopyPtrToInteger4(mxGetPr(rowsPtr), problem%grid%A_exch_load%rows, sx )
         
                 sx = nvalues
-                colsPtr = mxGetField( prhs, i, problemFields(44) )
+                colsPtr = mxGetField( prhs, i, problemFields(42) )
                 call mxCopyPtrToInteger4(mxGetPr(colsPtr), problem%grid%A_exch_load%cols, sx )       
             endif
         endif
           
         !Load the no. of time steps in the time convergence array
         sx = 1
-        ntProblemPtr = mxGetField( prhs, i, problemFields(32) )
+        ntProblemPtr = mxGetField( prhs, i, problemFields(31) )
         call mxCopyPtrToInteger4(mxGetPr(ntProblemPtr), nt_conv, sx )
         
         allocate( problem%t_conv(nt_conv) )
-        genericProblemPtr = mxGetField(prhs,i,problemFields(33) )
+        genericProblemPtr = mxGetField(prhs,i,problemFields(32) )
         sx = nt_conv
         call mxCopyPtrToReal8(mxGetPr(genericProblemPtr), problem%t_conv, sx )
         
         sx = 1
-        genericProblemPtr = mxGetField( prhs, i, problemFields(34) )
+        genericProblemPtr = mxGetField( prhs, i, problemFields(33) )
         call mxCopyPtrToReal8(mxGetPr(genericProblemPtr), problem%conv_tol, sx )
 
-        sx = 1
-        usePrecisionPtr = mxGetField( prhs, i, problemFields(46) )
-        call mxCopyPtrToInteger4(mxGetPr(usePrecisionPtr), usePrecision, sx )
-        if ( usePrecision .eq. 1 ) then
-            problem%usePrecision = usePrecisionTrue
-        else
-            problem%usePrecision = usePrecisionFalse
-        endif
-        
-        sx = 1
-        nThreadPtr = mxGetField( prhs, i, problemFields(47) )
-        call mxCopyPtrToInteger4(mxGetPr(nThreadPtr), problem%nThreadsMatlab, sx )
-        
         sx = 3
-        N_aveProblemPtr = mxGetField( prhs, i, problemFields(48) )
+        N_aveProblemPtr = mxGetField( prhs, i, problemFields(44) )
         call mxCopyPtrToInteger4(mxGetPr(N_aveProblemPtr), problem%N_ave, sx )
         
         !Coefficient of variation value       
         sx = 1
-        CVThresProblemPtr = mxGetField(prhs,i,problemFields(49))
+        CVThresProblemPtr = mxGetField(prhs,i,problemFields(45))
         call mxCopyPtrToReal8(mxGetPr(CVThresProblemPtr), CV, sx )
             
         problem%CV = sngl(CV)
         
         !Parameter to determine if the specific H_fields are returned (exchange, demag, etc.)
         sx = 1
-        useReturnHallProblemPtr = mxGetField(prhs,i,problemFields(50))
+        useReturnHallProblemPtr = mxGetField(prhs,i,problemFields(46))
         call mxCopyPtrToInteger4(mxGetPr(useReturnHallProblemPtr), useReturnHall, sx )
         if ( useReturnHall .eq. 1 ) then
             problem%useReturnHall = useReturnHallTrue
@@ -431,49 +414,45 @@
             problem%useReturnHall = useReturnHallFalse
         endif
               
-        sx = 1
-        demag_ignore_stepsProblemPtr = mxGetField( prhs, i, problemFields(51) )
-        call mxCopyPtrToInteger4(mxGetPr(demag_ignore_stepsProblemPtr), problem%demag_ignore_steps, sx )
-        
         ! 3x3 matrix specifying the local coordinate system
         !                             [v1_x v2_x v3_x]
         !problem%CrystalAxis(i,:,:) = [v1_y v2_y v3_y]
         !                             [v1_z v2_z v3_z]
         sx = ntot * 3 * 3
         allocate( problem%CrystalAxis(ntot,3,3) )
-        CrystalAxisProblemPtr = mxGetField( prhs, i, problemFields(57) )
+        CrystalAxisProblemPtr = mxGetField( prhs, i, problemFields(52) )
         call mxCopyPtrToReal8(mxGetPr(CrystalAxisProblemPtr), problem%CrystalAxis, sx )
         
         sx = ntot * 6 * 3
         allocate( problem%K0_arr(ntot,6,3) )
-        K0_arrProblemPtr = mxGetField( prhs, i, problemFields(58) )
+        K0_arrProblemPtr = mxGetField( prhs, i, problemFields(53) )
         call mxCopyPtrToReal8(mxGetPr(K0_arrProblemPtr), problem%K0_arr, sx )
         
         allocate( problem%K1(ntot) )
         sx = ntot
-        K1ProblemPtr = mxGetField( prhs, i, problemFields(59) )
+        K1ProblemPtr = mxGetField( prhs, i, problemFields(54) )
         call mxCopyPtrToReal8(mxGetPr(K1ProblemPtr), problem%K1, sx )
         
         allocate( problem%K2(ntot) )
         sx = ntot
-        K2ProblemPtr = mxGetField( prhs, i, problemFields(60) )
+        K2ProblemPtr = mxGetField( prhs, i, problemFields(55) )
         call mxCopyPtrToReal8(mxGetPr(K2ProblemPtr), problem%K2, sx )
         
         sx = 1
-        exch_weightProblemPtr = mxGetField( prhs, i, problemFields(52) )
+        exch_weightProblemPtr = mxGetField( prhs, i, problemFields(47) )
         call mxCopyPtrToReal8(mxGetPr(exch_weightProblemPtr), problem%exch_weight, sx )
         
         sx = 1
-        exch_methodProblemPtr = mxGetField( prhs, i, problemFields(53) )
+        exch_methodProblemPtr = mxGetField( prhs, i, problemFields(48) )
         call mxCopyPtrToInteger4(mxGetPr(exch_methodProblemPtr), problem%exch_method, sx )
         
         sx = 1
-        exch_interpnProblemPtr = mxGetField( prhs, i, problemFields(54) )
+        exch_interpnProblemPtr = mxGetField( prhs, i, problemFields(49) )
         call mxCopyPtrToInteger4(mxGetPr(exch_interpnProblemPtr), problem%exch_interpn, sx )
         
         !Parameter to determine if the average tensor is used for the prisms
         sx = 1
-        useAvgNProblemPtr = mxGetField(prhs,i,problemFields(70))
+        useAvgNProblemPtr = mxGetField(prhs,i,problemFields(65))
         call mxCopyPtrToInteger4(mxGetPr(useAvgNProblemPtr), useAvgN, sx )
         if ( useAvgN .eq. 1 ) then
             problem%useAvgN = useAvgNTrue
@@ -494,27 +473,27 @@
         
         !FMM parameters
         sx = 1
-        fmm_cellsProblemPtr = mxGetField( prhs, i, problemFields(61) )
+        fmm_cellsProblemPtr = mxGetField( prhs, i, problemFields(56) )
         call mxCopyPtrToInteger4(mxGetPr(fmm_cellsProblemPtr), problem%fmm_cells_per_node, sx )
         
         sx = 1
-        fmm_epsProblemPtr = mxGetField( prhs, i, problemFields(62) )
+        fmm_epsProblemPtr = mxGetField( prhs, i, problemFields(57) )
         call mxCopyPtrToReal8(mxGetPr(fmm_epsProblemPtr), problem%fmm_eps, sx )
         
         sx = 1
-        ifunifProblemPtr = mxGetField( prhs, i, problemFields(63) )
+        ifunifProblemPtr = mxGetField( prhs, i, problemFields(58) )
         call mxCopyPtrToInteger4(mxGetPr(ifunifProblemPtr), problem%ifunif, sx )
         
         sx = 1
-        nlminProblemPtr = mxGetField( prhs, i, problemFields(64) )
+        nlminProblemPtr = mxGetField( prhs, i, problemFields(59) )
         call mxCopyPtrToInteger4(mxGetPr(nlminProblemPtr), problem%nlmin, sx )
         
         sx = 1
-        nlmaxProblemPtr = mxGetField( prhs, i, problemFields(65) )
+        nlmaxProblemPtr = mxGetField( prhs, i, problemFields(60) )
         call mxCopyPtrToInteger4(mxGetPr(nlmaxProblemPtr), problem%nlmax, sx )
         
         sx = 1
-        use_fmmlProblemPtr = mxGetField(prhs,i,problemFields(66))
+        use_fmmlProblemPtr = mxGetField(prhs,i,problemFields(61))
         call mxCopyPtrToInteger4(mxGetPr(use_fmmlProblemPtr), UseFMM, sx )
         if ( UseFMM .eq. 1 ) then
             problem%use_fmm = useFMMTrue
@@ -523,15 +502,15 @@
         endif
         
         sx = 1
-        fmm_shortProblemPtr = mxGetField( prhs, i, problemFields(67) )
+        fmm_shortProblemPtr = mxGetField( prhs, i, problemFields(62) )
         call mxCopyPtrToInteger4(mxGetPr(fmm_shortProblemPtr), problem%allow_fmm_short_circuit, sx )
         
         sx = 1
-        fmm_min_nProblemPtr = mxGetField( prhs, i, problemFields(68) )
+        fmm_min_nProblemPtr = mxGetField( prhs, i, problemFields(63) )
         call mxCopyPtrToInteger4(mxGetPr(fmm_min_nProblemPtr), problem%fmm_min_n, sx )
         
         sx = 1
-        useDemagPtr = mxGetField( prhs, i, problemFields(69) )
+        useDemagPtr = mxGetField( prhs, i, problemFields(64) )
         call mxCopyPtrToInteger4(mxGetPr(useDemagPtr), useDemag, sx )
         if ( useDemag .eq. 1 ) then
             problem%useDemag = useDemagTrue
@@ -542,164 +521,168 @@
         
         allocate( problem%temperature(ntot) )
         sx = ntot
-        temperatureProblemPtr = mxGetField( prhs, i, problemFields(71) )
+        temperatureProblemPtr = mxGetField( prhs, i, problemFields(66) )
         call mxCopyPtrToReal8(mxGetPr(temperatureProblemPtr), problem%temperature, sx )
        
         sx = 3
-        n_macroVecProblemPtr = mxGetField( prhs, i, problemFields(72) )
+        n_macroVecProblemPtr = mxGetField( prhs, i, problemFields(67) )
         call mxCopyPtrToInteger4(mxGetPr(n_macroVecProblemPtr), problem%macrogrid%n_macro, sx )
         
         sx = 3
-        shiftVecProblemPtr = mxGetField( prhs, i, problemFields(73) )
+        shiftVecProblemPtr = mxGetField( prhs, i, problemFields(68) )
         call mxCopyPtrToReal8(mxGetPr(shiftVecProblemPtr), problem%macrogrid%shiftVec, sx )
         
         sx = 3
-        macroShapeProblemPtr = mxGetField( prhs, i, problemFields(74) )
+        macroShapeProblemPtr = mxGetField( prhs, i, problemFields(69) )
         call mxCopyPtrToReal8(mxGetPr(macroShapeProblemPtr), problem%macrogrid%macroShape, sx )
         
         sx = 3
-        sampleShapeProblemPtr = mxGetField( prhs, i, problemFields(75) )
+        sampleShapeProblemPtr = mxGetField( prhs, i, problemFields(70) )
         call mxCopyPtrToReal8(mxGetPr(sampleShapeProblemPtr), problem%macrogrid%sampleShape, sx )
         
         ! exchPBC has one entry per direction, like n_macro and shiftVec above. Copying only a
         ! single element left the y and z entries at zero, so from MATLAB the periodic exchange
         ! could only ever be switched on along x.
         sx = 3
-        exchPBCProblemPtr = mxGetField( prhs, i, problemFields(76) )
+        exchPBCProblemPtr = mxGetField( prhs, i, problemFields(71) )
         call mxCopyPtrToInteger4(mxGetPr(exchPBCProblemPtr), problem%macrogrid%exchPBC, sx )
         
         sx = 1
-        dummy_runProblemPtr = mxGetField( prhs, i, problemFields(77) )
+        dummy_runProblemPtr = mxGetField( prhs, i, problemFields(72) )
         call mxCopyPtrToInteger4(mxGetPr(dummy_runProblemPtr), problem%dummy_run, sx )
         
         sx = 1
-        fmm_ntermsProblemPtr = mxGetField( prhs, i, problemFields(78) )
+        fmm_ntermsProblemPtr = mxGetField( prhs, i, problemFields(73) )
         call mxCopyPtrToInteger4(mxGetPr(fmm_ntermsProblemPtr), problem%fmm_nterms, sx )
         
         sx = 1
-        window_enaProblemPtr = mxGetField( prhs, i, problemFields(82) )
+        window_enaProblemPtr = mxGetField( prhs, i, problemFields(77) )
         call mxCopyPtrToInteger4(mxGetPr(window_enaProblemPtr), problem%window_ena, sx )
         
         sx = 1
-        window_intProblemPtr = mxGetField( prhs, i, problemFields(83) )
+        window_intProblemPtr = mxGetField( prhs, i, problemFields(78) )
         call mxCopyPtrToReal8(mxGetPr(window_intProblemPtr), problem%window_int, sx )
         
         sx = 1
-        trace_enaProblemPtr = mxGetField( prhs, i, problemFields(84) )
+        trace_enaProblemPtr = mxGetField( prhs, i, problemFields(79) )
         call mxCopyPtrToInteger4(mxGetPr(trace_enaProblemPtr), problem%trace_ena, sx )
         
         sx = 1
-        flush_eachProblemPtr = mxGetField( prhs, i, problemFields(85) )
+        flush_eachProblemPtr = mxGetField( prhs, i, problemFields(80) )
         call mxCopyPtrToInteger4(mxGetPr(flush_eachProblemPtr), problem%flush_each, sx )
         
         sx = 1
-        trace_verbProblemPtr = mxGetField( prhs, i, problemFields(86) )
+        trace_verbProblemPtr = mxGetField( prhs, i, problemFields(81) )
         call mxCopyPtrToInteger4(mxGetPr(trace_verbProblemPtr), problem%trace_verb, sx )
         
         !flag whether the demag tensor should be loaded
         sx = 1
-        N_log_dirPtr = mxGetField( prhs, i, problemFields(87) )
+        N_log_dirPtr = mxGetField( prhs, i, problemFields(82) )
         call mxCopyPtrToInteger4(mxGetPr(N_log_dirPtr), N_log_dir, sx )
         !Length of the file name
         sx = N_log_dir
-        log_dirPtr = mxGetField( prhs, i, problemFields(79) )            
+        log_dirPtr = mxGetField( prhs, i, problemFields(74) )            
         status = mxGetString( log_dirPtr, problem%log_dir, sx )
         
         !flag whether the demag tensor should be loaded
         sx = 1
-        N_timer_logPtr = mxGetField( prhs, i, problemFields(88) )
+        N_timer_logPtr = mxGetField( prhs, i, problemFields(83) )
         call mxCopyPtrToInteger4(mxGetPr(N_timer_logPtr), N_timer_log, sx )
         !Length of the file name
         sx = N_timer_log
-        timer_logPtr = mxGetField( prhs, i, problemFields(80) )            
+        timer_logPtr = mxGetField( prhs, i, problemFields(75) )            
         status = mxGetString( timer_logPtr, problem%timer_log, sx )
         
         !flag whether the demag tensor should be loaded
         sx = 1
-        N_trace_logPtr = mxGetField( prhs, i, problemFields(89) )
+        N_trace_logPtr = mxGetField( prhs, i, problemFields(84) )
         call mxCopyPtrToInteger4(mxGetPr(N_trace_logPtr), N_trace_log, sx )
         !Length of the file name
         sx = N_trace_log
-        trace_logPtr = mxGetField( prhs, i, problemFields(81) )            
+        trace_logPtr = mxGetField( prhs, i, problemFields(76) )            
         status = mxGetString( trace_logPtr, problem%trace_log, sx )
         
         !Load adaptive hysteresis parameters
         sx = 1
-        adaptiveHextPtr = mxGetField( prhs, i, problemFields(90) )
+        adaptiveHextPtr = mxGetField( prhs, i, problemFields(85) )
         call mxCopyPtrToInteger4(mxGetPr(adaptiveHextPtr), use_switch_refine, sx )
         problem%adaptiveHext = (use_switch_refine .ne. 0)
 
         sx = 1
-        maxHextStepsPtr = mxGetField( prhs, i, problemFields(91) )
+        maxHextStepsPtr = mxGetField( prhs, i, problemFields(86) )
         call mxCopyPtrToInteger4(mxGetPr(maxHextStepsPtr), problem%maxHextSteps, sx )
 
         sx = 3
-        H_startPtr = mxGetField( prhs, i, problemFields(92) )
+        H_startPtr = mxGetField( prhs, i, problemFields(87) )
         call mxCopyPtrToReal8(mxGetPr(H_startPtr), problem%H_start, sx )
 
         sx = 3
-        H_endPtr = mxGetField( prhs, i, problemFields(93) )
+        H_endPtr = mxGetField( prhs, i, problemFields(88) )
         call mxCopyPtrToReal8(mxGetPr(H_endPtr), problem%H_end, sx )
 
         sx = 1
-        dH_initialPtr = mxGetField( prhs, i, problemFields(94) )
+        dH_initialPtr = mxGetField( prhs, i, problemFields(89) )
         call mxCopyPtrToReal8(mxGetPr(dH_initialPtr), problem%dH_initial, sx )
 
         sx = 1
-        dH_minPtr = mxGetField( prhs, i, problemFields(95) )
+        dH_minPtr = mxGetField( prhs, i, problemFields(90) )
         call mxCopyPtrToReal8(mxGetPr(dH_minPtr), problem%dH_min, sx )
 
         sx = 1
-        dH_maxPtr = mxGetField( prhs, i, problemFields(96) )
+        dH_maxPtr = mxGetField( prhs, i, problemFields(91) )
         call mxCopyPtrToReal8(mxGetPr(dH_maxPtr), problem%dH_max, sx )
 
         sx = 1
-        dH_growPtr = mxGetField( prhs, i, problemFields(97) )
+        dH_growPtr = mxGetField( prhs, i, problemFields(92) )
         call mxCopyPtrToReal8(mxGetPr(dH_growPtr), problem%dH_grow, sx )
 
         sx = 1
-        dH_shrinkPtr = mxGetField( prhs, i, problemFields(98) )
+        dH_shrinkPtr = mxGetField( prhs, i, problemFields(93) )
         call mxCopyPtrToReal8(mxGetPr(dH_shrinkPtr), problem%dH_shrink, sx )
 
         sx = 1
-        dM_minPtr = mxGetField( prhs, i, problemFields(99) )
+        dM_minPtr = mxGetField( prhs, i, problemFields(94) )
         call mxCopyPtrToReal8(mxGetPr(dM_minPtr), problem%dM_min, sx )
 
         sx = 1
-        dM_targetPtr = mxGetField( prhs, i, problemFields(100) )
+        dM_targetPtr = mxGetField( prhs, i, problemFields(95) )
         call mxCopyPtrToReal8(mxGetPr(dM_targetPtr), problem%dM_target, sx )
 
         sx = 1
-        dM_rejectPtr = mxGetField( prhs, i, problemFields(101) )
+        dM_rejectPtr = mxGetField( prhs, i, problemFields(96) )
         call mxCopyPtrToReal8(mxGetPr(dM_rejectPtr), problem%dM_reject, sx )
 
         sx = 1
-        switch_refine_dHPtr = mxGetField( prhs, i, problemFields(102) )
+        switch_refine_dHPtr = mxGetField( prhs, i, problemFields(97) )
         call mxCopyPtrToReal8(mxGetPr(switch_refine_dHPtr), problem%switch_refine_dH, sx )
 
         sx = 1
-        use_switch_refinePtr = mxGetField( prhs, i, problemFields(103) )
+        use_switch_refinePtr = mxGetField( prhs, i, problemFields(98) )
         call mxCopyPtrToInteger4(mxGetPr(use_switch_refinePtr), use_switch_refine, sx )
         problem%use_switch_refine = (use_switch_refine .ne. 0)
 
         !Seed for the stochastic thermal field
         sx = 1
-        rng_seedPtr = mxGetField( prhs, i, problemFields(104) )
+        rng_seedPtr = mxGetField( prhs, i, problemFields(99) )
         call mxCopyPtrToInteger4(mxGetPr(rng_seedPtr), problem%rng_seed, sx )
 
         !Energy minimizer settings. Optional in the struct, so that a problem struct from an older
         !DefaultMicroMagProblem keeps working with the defaults of the Fortran type.
         sx = 1
-        minimizerPtr = mxGetField( prhs, i, problemFields(108) )
+        minimizerPtr = mxGetField( prhs, i, problemFields(103) )
         if ( minimizerPtr .ne. 0 ) call mxCopyPtrToReal8(mxGetPr(minimizerPtr), problem%min_tol, sx )
-        minimizerPtr = mxGetField( prhs, i, problemFields(109) )
+        minimizerPtr = mxGetField( prhs, i, problemFields(104) )
         if ( minimizerPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(minimizerPtr), problem%min_maxiter, sx )
-        minimizerPtr = mxGetField( prhs, i, problemFields(110) )
+        minimizerPtr = mxGetField( prhs, i, problemFields(105) )
         if ( minimizerPtr .ne. 0 ) call mxCopyPtrToReal8(mxGetPr(minimizerPtr), problem%min_maxrot, sx )
-        minimizerPtr = mxGetField( prhs, i, problemFields(111) )
+        minimizerPtr = mxGetField( prhs, i, problemFields(106) )
         if ( minimizerPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(minimizerPtr), problem%min_fallback, sx )
-        minimizerPtr = mxGetField( prhs, i, problemFields(112) )
+        minimizerPtr = mxGetField( prhs, i, problemFields(107) )
         if ( minimizerPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(minimizerPtr), problem%min_saddle_check, sx )
+
+        !Timing log switch (optional in the struct; the Fortran default is off)
+        minimizerPtr = mxGetField( prhs, i, problemFields(108) )
+        if ( minimizerPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(minimizerPtr), problem%timer_ena, sx )
 
         !Clean-up
         deallocate(problemFields)
@@ -714,7 +697,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=112
+        integer,parameter :: nf=108
         character(len=12),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -732,112 +715,110 @@
         fieldnames(9) = 'K0'
         fieldnames(10) = 'gamma'
         fieldnames(11) = 'alpha'
-        fieldnames(12) = 'MaxT0'
-        fieldnames(13) = 'nt_Hext'
-        fieldnames(14) = 'Hext'    
-        fieldnames(15) = 'nt'
-        fieldnames(16) = 't'
-        fieldnames(17) = 'm0'
-        fieldnames(18) = 'dem_thres'
-        fieldnames(19) = 'useCuda'
-        fieldnames(20) = 'dem_appr'        
-        fieldnames(21) = 'N_ret'
-        fieldnames(22) = 'N_file_out'
-        fieldnames(23) = 'N_load'
-        fieldnames(24) = 'N_file_in'
-        fieldnames(25) = 'setTimeDis'
-        fieldnames(26) = 'nt_alpha'
-        fieldnames(27) = 'alphat'
-        fieldnames(28) = 'tol'
-        fieldnames(29) = 'thres'
-        fieldnames(30) = 'useCVODE'
-        fieldnames(31) = 'exch_mat'
-        fieldnames(32) = 'nt_conv'
-        fieldnames(33) = 't_conv'
-        fieldnames(34) = 'conv_tol'
-        fieldnames(35) = 'grid_pts'
-        fieldnames(36) = 'grid_ele'
-        fieldnames(37) = 'grid_nod'
-        fieldnames(38) = 'grid_nnod'
-        fieldnames(39) = 'exch_nval'
-        fieldnames(40) = 'exch_nrow'
-        fieldnames(41) = 'exch_val'
-        fieldnames(42) = 'exch_rows'
-        fieldnames(43) = 'UNUSED'       ! Unused field name
-        fieldnames(44) = 'exch_cols'
-        fieldnames(45) = 'grid_abc'
-        fieldnames(46) = 'usePres'
-        fieldnames(47) = 'nThreads'
-        fieldnames(48) = 'N_ave'
-        fieldnames(49) = 'CV'
-        fieldnames(50) = 'ReturnHall'
-        fieldnames(51) = 'demigstp'
-        fieldnames(52) = 'exch_weigh'
-        fieldnames(53) = 'exch_meth'
-        fieldnames(54) = 'exch_intpn'
-        fieldnames(55) = 'passExch'
-        fieldnames(56) = 'exch_ncol'
-        fieldnames(57) = 'CrysAxis'
-        fieldnames(58) = 'K0_arr'
-        fieldnames(59) = 'K1'
-        fieldnames(60) = 'K2'
-        fieldnames(61) = 'fmm_cells'
-        fieldnames(62) = 'fmm_eps'
-        fieldnames(63) = 'ifunif'
-        fieldnames(64) = 'nlmin'
-        fieldnames(65) = 'nlmax'
-        fieldnames(66) = 'use_fmm'
-        fieldnames(67) = 'fmm_short'
-        fieldnames(68) = 'fmm_min_n'
-        fieldnames(69) = 'useDemag'
-        fieldnames(70) = 'useAvgN'
-        fieldnames(71) = 'temperature'
-        fieldnames(72) = 'n_macro'
-        fieldnames(73) = 'shiftVec'
-        fieldnames(74) = 'macroShape'
-        fieldnames(75) = 'sampleShape'
-        fieldnames(76) = 'exchPBC'
-        fieldnames(77) = 'dummy_run'
-        fieldnames(78) = 'fmm_nterms'
-        fieldnames(79) = 'log_dir'
-        fieldnames(80) = 'timer_log'
-        fieldnames(81) = 'trace_log'
-        fieldnames(82) = 'window_ena'
-        fieldnames(83) = 'window_int'
-        fieldnames(84) = 'trace_ena'
-        fieldnames(85) = 'flush_each'
-        fieldnames(86) = 'trace_verb'
-        fieldnames(87) = 'N_log_dir'
-        fieldnames(88) = 'N_timer_log'
-        fieldnames(89) = 'N_trace_log'
-        fieldnames(90) = 'adaptiveHext'
-        fieldnames(91) = 'maxHextSteps'
-        fieldnames(92) = 'H_start'
-        fieldnames(93) = 'H_end'
-        fieldnames(94) = 'dH_initial'
-        fieldnames(95) = 'dH_min'
-        fieldnames(96) = 'dH_max'
-        fieldnames(97) = 'dH_grow'
-        fieldnames(98) = 'dH_shrink'
-        fieldnames(99) = 'dM_min'
-        fieldnames(100) = 'dM_target'
-        fieldnames(101) = 'dM_reject'
-        fieldnames(102) = 'switch_refdH'
-        fieldnames(103) = 'use_sw_ref'
-        fieldnames(104) = 'rng_seed'
+        fieldnames(12) = 'nt_Hext'
+        fieldnames(13) = 'Hext'    
+        fieldnames(14) = 'nt'
+        fieldnames(15) = 't'
+        fieldnames(16) = 'm0'
+        fieldnames(17) = 'dem_thres'
+        fieldnames(18) = 'useCuda'
+        fieldnames(19) = 'dem_appr'        
+        fieldnames(20) = 'N_ret'
+        fieldnames(21) = 'N_file_out'
+        fieldnames(22) = 'N_load'
+        fieldnames(23) = 'N_file_in'
+        fieldnames(24) = 'setTimeDis'
+        fieldnames(25) = 'nt_alpha'
+        fieldnames(26) = 'alphat'
+        fieldnames(27) = 'tol'
+        fieldnames(28) = 'thres'
+        fieldnames(29) = 'useCVODE'
+        fieldnames(30) = 'exch_mat'
+        fieldnames(31) = 'nt_conv'
+        fieldnames(32) = 't_conv'
+        fieldnames(33) = 'conv_tol'
+        fieldnames(34) = 'grid_pts'
+        fieldnames(35) = 'grid_ele'
+        fieldnames(36) = 'grid_nod'
+        fieldnames(37) = 'grid_nnod'
+        fieldnames(38) = 'exch_nval'
+        fieldnames(39) = 'exch_nrow'
+        fieldnames(40) = 'exch_val'
+        fieldnames(41) = 'exch_rows'
+        fieldnames(42) = 'exch_cols'
+        fieldnames(43) = 'grid_abc'
+        fieldnames(44) = 'N_ave'
+        fieldnames(45) = 'CV'
+        fieldnames(46) = 'ReturnHall'
+        fieldnames(47) = 'exch_weigh'
+        fieldnames(48) = 'exch_meth'
+        fieldnames(49) = 'exch_intpn'
+        fieldnames(50) = 'passExch'
+        fieldnames(51) = 'exch_ncol'
+        fieldnames(52) = 'CrysAxis'
+        fieldnames(53) = 'K0_arr'
+        fieldnames(54) = 'K1'
+        fieldnames(55) = 'K2'
+        fieldnames(56) = 'fmm_cells'
+        fieldnames(57) = 'fmm_eps'
+        fieldnames(58) = 'ifunif'
+        fieldnames(59) = 'nlmin'
+        fieldnames(60) = 'nlmax'
+        fieldnames(61) = 'use_fmm'
+        fieldnames(62) = 'fmm_short'
+        fieldnames(63) = 'fmm_min_n'
+        fieldnames(64) = 'useDemag'
+        fieldnames(65) = 'useAvgN'
+        fieldnames(66) = 'temperature'
+        fieldnames(67) = 'n_macro'
+        fieldnames(68) = 'shiftVec'
+        fieldnames(69) = 'macroShape'
+        fieldnames(70) = 'sampleShape'
+        fieldnames(71) = 'exchPBC'
+        fieldnames(72) = 'dummy_run'
+        fieldnames(73) = 'fmm_nterms'
+        fieldnames(74) = 'log_dir'
+        fieldnames(75) = 'timer_log'
+        fieldnames(76) = 'trace_log'
+        fieldnames(77) = 'window_ena'
+        fieldnames(78) = 'window_int'
+        fieldnames(79) = 'trace_ena'
+        fieldnames(80) = 'flush_each'
+        fieldnames(81) = 'trace_verb'
+        fieldnames(82) = 'N_log_dir'
+        fieldnames(83) = 'N_timer_log'
+        fieldnames(84) = 'N_trace_log'
+        fieldnames(85) = 'adaptiveHext'
+        fieldnames(86) = 'maxHextSteps'
+        fieldnames(87) = 'H_start'
+        fieldnames(88) = 'H_end'
+        fieldnames(89) = 'dH_initial'
+        fieldnames(90) = 'dH_min'
+        fieldnames(91) = 'dH_max'
+        fieldnames(92) = 'dH_grow'
+        fieldnames(93) = 'dH_shrink'
+        fieldnames(94) = 'dM_min'
+        fieldnames(95) = 'dM_target'
+        fieldnames(96) = 'dM_reject'
+        fieldnames(97) = 'switch_refdH'
+        fieldnames(98) = 'use_sw_ref'
+        fieldnames(99) = 'rng_seed'
 
         !Optional exchange at the interface between two materials. A problem struct that
         !predates the feature simply does not have these, which the loader handles.
-        fieldnames(105) = 'n_phase'
-        fieldnames(106) = 'phase_id'
-        fieldnames(107) = 'A_int'
+        fieldnames(100) = 'n_phase'
+        fieldnames(101) = 'phase_id'
+        fieldnames(102) = 'A_int'
 
         !Energy minimizer settings, optional as well
-        fieldnames(108) = 'min_tol'
-        fieldnames(109) = 'min_maxiter'
-        fieldnames(110) = 'min_maxrot'
-        fieldnames(111) = 'min_fallback'
-        fieldnames(112) = 'min_saddle'
+        fieldnames(103) = 'min_tol'
+        fieldnames(104) = 'min_maxiter'
+        fieldnames(105) = 'min_maxrot'
+        fieldnames(106) = 'min_fallback'
+        fieldnames(107) = 'min_saddle'
+
+        !Timing log switch, optional so that older problem structs keep working
+        fieldnames(108) = 'timer_ena'
 
     end subroutine getProblemFieldnames
     
@@ -1156,19 +1137,25 @@
         call mxCopyInteger4ToPtr( gridinfo%TheSigns, mxGetPr( ptTheSigns ), sx )
         call mxSetField( plhs, ind, fieldnames(15), ptTheSigns )
         
-        s1 = size(gridinfo%Exch_mat_r,1)
+        !The COO exchange matrix only exists when the solver built the exchange operator itself;
+        !with passExch it came from Matlab and these arrays are unallocated, so return them empty.
+        if ( allocated(gridinfo%Exch_mat_r) ) then
+            s1 = size(gridinfo%Exch_mat_r,1)
+        else
+            s1 = 0
+        endif
         s2 = 1
-        ptExch_mat_r = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)    
         sx = s1 * s2
-        call mxCopyInteger4ToPtr( gridinfo%Exch_mat_r, mxGetPr( ptExch_mat_r ), sx )
-        call mxSetField( plhs, ind, fieldnames(16), ptExch_mat_r )
-        
+        ptExch_mat_r = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)    
         ptExch_mat_c = mxCreateNumericMatrix(s1, s2, mxClassIDFromClassName('int32'), ComplexFlag)    
-        call mxCopyInteger4ToPtr( gridinfo%Exch_mat_c, mxGetPr( ptExch_mat_c ), sx )
-        call mxSetField( plhs, ind, fieldnames(17), ptExch_mat_c )
-        
         ptExch_mat_v = mxCreateDoubleMatrix(s1, s2, ComplexFlag)    
-        call mxCopyReal8ToPtr( gridinfo%Exch_mat_v, mxGetPr( ptExch_mat_v ), sx )
+        if ( s1 .gt. 0 ) then
+            call mxCopyInteger4ToPtr( gridinfo%Exch_mat_r, mxGetPr( ptExch_mat_r ), sx )
+            call mxCopyInteger4ToPtr( gridinfo%Exch_mat_c, mxGetPr( ptExch_mat_c ), sx )
+            call mxCopyReal8ToPtr( gridinfo%Exch_mat_v, mxGetPr( ptExch_mat_v ), sx )
+        endif
+        call mxSetField( plhs, ind, fieldnames(16), ptExch_mat_r )
+        call mxSetField( plhs, ind, fieldnames(17), ptExch_mat_c )
         call mxSetField( plhs, ind, fieldnames(18), ptExch_mat_v )
         
         s1 = 1

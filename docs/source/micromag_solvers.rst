@@ -430,10 +430,10 @@ the run.
      - ``5e-2``
      - Above this change the step is rejected and retried.
    * - ``dH_grow``
-     - ``1.5``
+     - ``1.25``
      - Growth factor, must be larger than 1.
    * - ``dH_shrink``
-     - ``0.75``
+     - ``0.5``
      - Shrink factor, must be between 0 and 1.
    * - ``switch_refine_dH``
      - ``None``

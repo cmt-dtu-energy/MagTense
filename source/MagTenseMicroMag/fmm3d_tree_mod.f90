@@ -765,9 +765,7 @@ module fmm3d_tree_mod
 
       integer ntj
       integer ifnear
-      double precision expcsort(3,self%nexpc)
       double complex, contiguous, pointer ::  tsort(:,:,:,:)
-      double precision scjsort(self%nexpc)
 
       integer nboxes
       integer(kind=8) lmptot
@@ -925,7 +923,13 @@ module fmm3d_tree_mod
 
       ntarg = self%ntarg
       nexpc = self%nexpc
-      expcsort(:,1) = self%expcsort(:)
+      !The expansion-centre arrays of the upstream FMM3D driver are not used by MagTense: nexpc
+      !stays 0, so the automatic arrays expcsort(3,nexpc) and scjsort(nexpc) that used to be
+      !declared here were zero-sized heap blocks, and the copy 'expcsort(:,1) = self%expcsort(:)'
+      !wrote 24 bytes past such a block into the heap header of its neighbour. The corruption
+      !surfaced later as a heap-corruption abort when that neighbour was freed, on meshes where
+      !the neighbour happened to be another of these automatic arrays. Both arrays and both
+      !copies are removed; nothing in this routine read them.
 
 
 
@@ -956,7 +960,6 @@ module fmm3d_tree_mod
       grad => self%gradsort
       ntj = self%ntj
 
-      scjsort = self%scjsort
       ifnear = self%ifnear
       timeinfo = self%timeinfo
       ier = self%ier
@@ -1610,26 +1613,62 @@ module fmm3d_tree_mod
         !DEC$ ATTRIBUTES ALIAS:"fmm3d_tree_mod_mp_eval_local_" :: eval_local
         class(FMM3DTree), intent(inout) :: self
         !--------------------------------------------
-        integer :: ilev,ibox,istart,iend,i,npts
-        integer :: nchild
+        integer :: ilev,ibox,istart,iend,npts
+        integer :: nchild, nd, nlege
+        integer(8) :: ip4
+        integer, contiguous, pointer :: itree(:), isrcse(:,:), nterms(:), laddr(:,:)
+        integer(8), contiguous, pointer :: iaddr(:,:)
+        double precision, contiguous, pointer :: scales(:), centers(:,:), rmlexp(:)
+        double precision, contiguous, pointer :: sourcesort(:,:), gradsort(:,:,:), wlege(:)
         integer, save :: itimer = 0
         !--------------------------------------------
 
         call trace%begin('FMM3DTree:eval_local', itimer=itimer, verbose=3)
 
+        !Local aliases of the tree components, as lfmm3dmain_tree does before its taskloops.
+        !The taskloop body below is outlined into a task routine that the OpenMP runtime calls
+        !with two arguments (thread id, task). Referencing the components as self%... inside
+        !that body made ifx 2025.2 create copy-in/copy-out temporaries for the array-element
+        !actual arguments of l3dtaevalg_grad and hoist the descriptors of those temporaries into
+        !three extra parameters that the runtime never passes, so the body wrote through
+        !whatever the runtime happened to leave in those registers. In the Python process that
+        !landed on harmless memory; under MATLAB, which ships an older libiomp5md, it was a null
+        !pointer, and MATLAB died with an access violation on the first FMM field evaluation.
+        !Contiguous local pointers need no temporaries and give a plain two-argument task body.
+        nd    = self%nd
+        nlege = self%nlege
+        ip4   = self%ipointer(4)
+        itree      => self%itree
+        isrcse     => self%isrcse
+        nterms     => self%nterms
+        laddr      => self%laddr
+        iaddr      => self%iaddr
+        scales     => self%scales
+        centers    => self%centers
+        rmlexp     => self%rmlexp
+        sourcesort => self%sourcesort
+        gradsort   => self%gradsort
+        wlege      => self%wlege
+
         do ilev = 0,self%nlevels
           !$OMP TASKLOOP DEFAULT(SHARED) &
-          !$OMP PRIVATE(ibox,nchild,istart,iend,i,npts) 
-          do ibox = self%laddr(1,ilev),self%laddr(2,ilev)
-            nchild=self%itree(self%ipointer(4)+ibox-1)
-            if(nchild.eq.0) then 
-              istart = self%isrcse(1,ibox) 
-              iend = self%isrcse(2,ibox)
+          !$OMP PRIVATE(ibox,nchild,istart,iend,npts)
+          do ibox = laddr(1,ilev),laddr(2,ilev)
+            nchild = itree(ip4+ibox-1)
+            if(nchild.eq.0) then
+              istart = isrcse(1,ibox)
+              iend = isrcse(2,ibox)
               npts = iend-istart+1
 
-              call l3dtaevalg_grad(self%nd,self%scales(ilev),self%centers(1,ibox), &
-     &    self%rmlexp(self%iaddr(2,ibox)),self%nterms(ilev),self%sourcesort(1,istart), &
-     &    npts,self%gradsort(1,1,istart),self%wlege,self%nlege)
+              !A leaf box without points has istart = nsource+1, so the array-element
+              !actual arguments below would point one past the end of sourcesort and
+              !gradsort. The kernel would not touch them with npts = 0, but the reference
+              !itself is out of bounds, so skip such boxes as lfmm3dmain_tree does.
+              if (npts .le. 0) cycle
+
+              call l3dtaevalg_grad(nd,scales(ilev),centers(1,ibox), &
+     &    rmlexp(iaddr(2,ibox)),nterms(ilev),sourcesort(1,istart), &
+     &    npts,gradsort(1,1,istart),wlege,nlege)
             endif
           enddo
           !$OMP END TASKLOOP

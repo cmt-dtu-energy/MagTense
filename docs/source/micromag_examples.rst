@@ -3,7 +3,50 @@ Micromagnetic examples and validation
 
 The examples below ship with MagTense and are the recommended starting point.
 The Matlab and the Python versions of each test are written to mirror each
-other, so the same physics is checked from both interfaces.
+other, so the same physics is checked from both interfaces. The standard
+problems take the same options in both languages, with the same defaults:
+
+.. list-table::
+   :widths: 30 30 40
+   :header-rows: 1
+
+   * - Matlab option
+     - Python argument
+     - Meaning
+   * - ``use_CUDA``
+     - ``cuda``
+     - Use CUDA for the calculations (default true)
+   * - ``use_CVODE``
+     - ``cvode``
+     - Use CVODE for the time integration (default false)
+   * - ``ShowTheResult``
+     - ``plotting``, ``figpath``
+     - Show the result, or in Python save it to ``figpath``
+   * - ``use_minimizer``
+     - ``use_minimizer``
+     - Relax with the :ref:`Energy minimizer` instead of the time integration
+   * - ``use_adaptive``
+     - ``use_adaptive``
+     - Problem 2: adaptive field stepping instead of the fixed table
+   * - ``mesh_type``
+     - ``mesh_type``
+     - ``'uniform'``, ``'unstructuredPrisms'`` or, in problem 3, ``'tetrahedron'``
+   * - ``mesh_file``
+     - ``mesh_file``
+     - The text file with the unstructured Cartesian mesh
+   * - ``mesh_res_param``
+     - ``mesh_res_param``
+     - Problem 3: tetrahedra per edge length
+   * - ``use_AvgN``
+     - ``use_avgn``
+     - Problem 4: the averaged prism tensor for the demag field
+   * - ``cart_dir``, ``TwoDsim``, ``TwoDsize``
+     - ``cart_dir``, ``two_d_sim``, ``two_d_size``
+     - Problem 6: the axis of the sample and the 2D strip
+
+The unstructured Cartesian meshes are text files, one prism per row with its
+centre and its side lengths, and both languages read the same files from
+``documentation/examples_mumag_validation``.
 
 ----------------------------------------
 muMag standard problems
@@ -20,9 +63,7 @@ muMag standard problems
      - `Standard_problem_2.m <https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_2/Standard_problem_2.m>`_
      - `std_problem_2.py <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/mumag_micromag_Std_problem_2/std_problem_2.py>`_
    * - Standard problem 3
-     - `Standard_problem_3.m <https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_3/Standard_problem_3.m>`_,
-       ``Standard_problem_3_unstructured_cart.m``,
-       ``Standard_problem_3_tetra.m``
+     - `Standard_problem_3.m <https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_3/Standard_problem_3.m>`_
      - `std_problem_3.py <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/mumag_micromag_Std_problem_3/std_problem_3.py>`_
    * - Standard problem 4
      - `Standard_problem_4.m <https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_4/Standard_problem_4.m>`_
@@ -38,19 +79,28 @@ What each of these exercises do:
   bar in units of the exchange length. This is the example to copy for a
   hysteresis calculation.
 * **Standard problem 3** - the flower/vortex energy crossover of a cube as a
-  function of its size in units of the exchange length. It is run on a uniform
-  grid, on an unstructured Cartesian mesh and on a tetrahedral mesh, so it is
-  also the example to copy for either kind of unstructured mesh.
-  ``Standard_problem_3_tetra.m`` is the shortest illustration of a tetrahedral
-  problem: it meshes the cube with ``CreateTetraMesh``, hands the mesh over with
-  a single call to ``setMicroMagGridTetrahedron``, and lets MagTense do the rest.
+  function of its size in units of the exchange length. The ``mesh_type``
+  option runs it on a uniform grid (``'uniform'``, the default), on an
+  unstructured Cartesian mesh read from a text file
+  (``'unstructuredPrisms'``) or on a tetrahedral mesh (``'tetrahedron'``), so
+  it is also the example to copy for either kind of unstructured mesh. The
+  tetrahedral branch is the shortest illustration of a tetrahedral problem: it
+  meshes the cube with ``CreateTetraMesh`` (Matlab, PDE Toolbox) or
+  ``magtense.utils.create_tetra_mesh`` (Python), hands the mesh over with a
+  single call to ``setMicroMagGridTetrahedron`` or the ``grid_nod`` and
+  ``grid_ele`` arguments of ``MicromagProblem``, and lets MagTense do the rest.
 * **Standard problem 4** - the switching dynamics of a thin film under a
   reversed field, compared against the published mean solutions. It is a
   two-stage calculation: first an s-state is relaxed, then that state is used
-  as the initial condition for the **dynamic** run.
+  as the initial condition for the **dynamic** run. With
+  ``mesh_type = 'unstructuredPrisms'`` it runs on an unstructured Cartesian
+  mesh, and the exchange operator MagTense builds in the first stage is handed
+  to the second, so the mesh is analysed only once.
 * **Standard problem 6** - domain-wall pinning at a phase boundary, which is
   the test of the spatially varying :math:`A_0`, :math:`K_0` and :math:`M_s`
-  and of the modified exchange stencil.
+  and of the modified exchange stencil. ``cart_dir`` orients the sample along
+  x, y or z, which must not change the result, and ``mesh_type`` runs the same
+  chain of cells as unstructured prisms.
 
 Standard problems 2, 3 and 6 take a ``use_minimizer`` switch in both languages
 (``options.use_minimizer`` in Matlab, the ``use_minimizer`` argument in Python).

@@ -192,9 +192,8 @@ class HysteresisSolverTests(unittest.TestCase):
         np.testing.assert_array_equal(problem.min_torque, [1e-6, 1e-6])
 
     def test_minimizer_solver_maps_to_slot_three(self) -> None:
-        """'minimizer' and its old name 'implicit' both select the third solver slot."""
+        """'minimizer' selects the third solver slot."""
         self.assertEqual(MicromagProblem(res=[1, 1, 1], solver="minimizer").solver, 3)
-        self.assertEqual(MicromagProblem(res=[1, 1, 1], solver="implicit").solver, 3)
         problem = MicromagProblem(
             res=[1, 1, 1], solver="minimizer", min_tol=2e-6, min_maxiter=50,
             min_maxrot=0.1, min_fallback=False, min_saddle_check=False,

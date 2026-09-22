@@ -675,17 +675,17 @@ end subroutine getHFromTilesFMM
 
 
     subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-        K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, temperature, MaxT0, nt_Hext, nt_Hext_out, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+        K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, temperature, nt_Hext, nt_Hext_out, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
         N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-        exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, useAvgN, demigstp, & 
+        exch_cols, grid_abc, N_ave, CV, useReturnHall, useAvgN, & 
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
         n_macro, shiftVec, macroShape, sampleShape, exchPBC, hysteresis_solver, &
         H_start, H_end, dH_initial, dH_min, dH_max, maxHextSteps, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH, use_switch_refine, &
         min_tol, min_maxiter, min_maxrot, min_fallback, min_saddle_check, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, n_Hext_accepted, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useFMM, &
-        log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, useDemag, rng_seed, &
+        log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, timer_enabled, useDemag, rng_seed, &
         n_phase, phase_id, A_int, &
         E_out, n_feval, min_iter, min_torque, min_status )
 
@@ -717,9 +717,9 @@ end subroutine getHFromTilesFMM
         real(8),dimension(exch_nval),intent(in) :: exch_val
         integer(4),dimension(exch_nval),intent(in) :: exch_cols, exch_rows
         real(8),dimension(nt_conv),intent(in) :: t_conv
-		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab, useAvgN
-		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch, useDemag
-        real(8),intent(in) :: gamma, alpha_mm, MaxT0, tol, thres, conv_tol, dem_thres
+		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, useAvgN
+		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, exch_meth, exch_intpn, passExch, useDemag
+        real(8),intent(in) :: gamma, alpha_mm, tol, thres, conv_tol, dem_thres
 		real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2, temperature
         !> Optional interface exchange between materials. n_phase = 1 disables it.
         integer(4),intent(in) :: n_phase
@@ -773,6 +773,7 @@ end subroutine getHFromTilesFMM
         !-------------------- timer and trace modules --------------------------------------
         character*256,intent(in) :: timer_log_file, trace_log_file, log_dir
         integer, intent(in) :: window_enabled, trace_enabled, flush_each
+        integer, intent(in) :: timer_enabled                 !> 1 writes the timing log file
         real(8), intent(in) :: window_interval
         integer, intent(in) :: trace_verbose
         !-----------------------------------------------------------------------------------
@@ -791,7 +792,7 @@ end subroutine getHFromTilesFMM
 
         !---------------------- initiaize auxiliary modules -----------------------------
         call initAux(auxInit_local, log_dir, timer_log_file, trace_log_file, window_enabled, &
-            window_interval, trace_enabled, flush_each, trace_verbose)
+            window_interval, trace_enabled, flush_each, trace_verbose, timer_enabled)
         !---------------------------------------------------------------------------------
 
 
@@ -804,11 +805,11 @@ end subroutine getHFromTilesFMM
         !only compiles as an Intel extension and that gfortran rejects outright.
         use_fmm = merge(.true., .false., useFMM /= 0)
         call loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-            gamma, alpha_mm, temperature, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+            gamma, alpha_mm, temperature, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-            exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
-            CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
+            exch_cols, grid_abc, N_ave, &
+            CV, useReturnHall, useAvgN, exch_weigh, exch_meth, exch_intpn, &
             n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
             passExch, exch_ncols, CrysAxis, K0_arr, K1, K2, n_phase, phase_id, A_int, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
             useDemag, rng_seed)
@@ -880,7 +881,18 @@ end subroutine getHFromTilesFMM
             H_ani = 0.
         endif
 		n_Hext_accepted = problem%nHextAccepted
-				n_tot_Exch = solution%gridinfo%Exch_mat_ntot
+        !The exchange matrix in COO form only exists when the solver built the exchange operator
+        !itself. With passExch the matrix comes from the caller and these arrays stay unallocated,
+        !so return an empty matrix instead of reading them (the bounds-checked build stops here).
+        if (.not. allocated(solution%gridinfo%Exch_mat_r)) then
+            n_tot_Exch = 0
+            ExchMat_r = 0
+            ExchMat_c = 0
+            ExchMat_v = 0.
+            ExchMat_nr = 0
+            ExchMat_nc = 0
+        else
+        n_tot_Exch = solution%gridinfo%Exch_mat_ntot
 
 		if (exch_presize*ntot < n_tot_Exch) then
             write(*,*) 'ExchMat_presize is too small to copy all exchange matrix values. It is set to ', exch_presize*ntot, ' but the exchange matrix has ', n_tot_Exch, ' entries.'
@@ -897,6 +909,7 @@ end subroutine getHFromTilesFMM
 
         ExchMat_nr = solution%gridinfo%Exch_mat_nr
 		ExchMat_nc = solution%gridinfo%Exch_mat_nc
+        end if
 #else
         write(*,*) 'Compiled without micromagnetic part. Returning zeros.'
         n_tot_Exch = 0

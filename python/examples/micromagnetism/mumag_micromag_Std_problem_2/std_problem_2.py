@@ -4,7 +4,7 @@ The bar has the aspect ratio 5 : 1 : 0.1 and is swept over its width d in units 
 length. For every d the remanent magnetization components and the coercive field are read off the
 loop and compared with the published solutions. This is the Python counterpart of
 matlab/examples/Micromagnetism/mumag_micromag_Std_problem_2/Standard_problem_2.m and uses the same
-grid, field schedule and damping ramp.
+grid, field schedule and damping ramp, and takes the same options.
 
 The equilibrium at each field is found either by integrating the Landau-Lifshitz equation in time
 (solver 'explicit') or by the energy minimizer (solver 'minimizer'), selected with use_minimizer.
@@ -28,18 +28,15 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 MUMAG_DIR = (
     REPOSITORY_ROOT / "documentation" / "examples_mumag_validation" / "Validation_standard_problem_2"
 )
-OOMMF_DIR = (
-    REPOSITORY_ROOT / "matlab" / "examples" / "Micromagnetism" / "mumag_micromag_Std_problem_2"
-)
 
 
 def std_prob_2(
-    res: tuple[int, int, int] = (20, 4, 1),
+    res: tuple[int, int, int] = (100, 20, 1),
     d_loop: np.ndarray | None = None,
-    cuda: bool = False,
+    cuda: bool = True,
     cvode: bool = False,
-    use_minimizer: bool = False,
-    use_adaptive: bool = False,
+    use_minimizer: bool = True,
+    use_adaptive: bool = True,
     plotting: bool = True,
     figpath: Path | None = None,
 ) -> dict:
@@ -48,8 +45,9 @@ def std_prob_2(
     Args:
         res: cells along x, y and z.
         d_loop: scale factors of the bar; the width is 1e-6 m times the factor. The default is
-            the ten values of the Matlab example. A single value of 0.5 (d/l_ex = 30) also plots
-            the loop itself against the OOMMF reference curves.
+            the ten values of the Matlab example.
+        cuda: use CUDA for the calculations.
+        cvode: use CVODE for the numerical time evolution.
         use_minimizer: relax with the energy minimizer instead of the time integration. The
             minimizer ignores the time window and the damping ramp and stops when the largest
             torque is below problem.min_tol.
@@ -57,6 +55,9 @@ def std_prob_2(
             40 fields. The step starts at the fixed-table spacing of 0.005 T, grows to at most
             0.02 T where the magnetization hardly changes, and is refined to 0.0005 T across the
             coercive field, which locates Hc ten times more precisely for a few times the cost.
+        plotting: show (or save, with figpath) the remanence and the coercive field against d/l_ex
+            together with the published solutions.
+        figpath: directory to save the figure in. None shows it interactively.
 
     Returns:
         A dict with d/l_ex, the remanence components Mxr and Myr, the coercive field Hc (all in
@@ -206,43 +207,15 @@ def std_prob_2(
             figpath.mkdir(parents=True, exist_ok=True)
             fig.savefig(figpath / "2_remanence_coercivity.png")
 
-        if len(d_loop) == 1 and np.isclose(d_loop[0], 0.5):
-            _plot_single_loop(H_T, results["M"], use_minimizer, figpath)
-
     return results
-
-
-def _plot_single_loop(H_T: np.ndarray, M_par: np.ndarray, use_minimizer: bool, figpath: Path | None) -> None:
-    """Plot the d/l_ex = 30 loop against the OOMMF reference curves shipped with the Matlab example."""
-    fig, ax = plt.subplots()
-    ax.plot(H_T, M_par, "rp", label="MagTense")
-    try:
-        from scipy.io import loadmat
-
-        mu0 = 4 * np.pi * 1e-7
-        for name, marker in (("2D", "k>"), ("Quasi3D", "k<"), ("3D", "k^")):
-            data = loadmat(OOMMF_DIR / f"OOMMF_Hysteresis{name}_dlex30.mat")
-            ax.plot(mu0 * data["H"].ravel(), data["M"].ravel(), marker, label=f"OOMMF {name}")
-    except ImportError:
-        print("scipy is not available, so the OOMMF reference curves are not plotted")
-    ax.set_xlabel(r"$\mu_0 H_{applied}$ [T]")
-    ax.set_ylabel(r"$\langle M_i \rangle / M_s$")
-    ax.set_xlim(-0.1, 0.1)
-    ax.grid(True)
-    ax.legend(loc="lower right")
-    ax.set_title("Standard problem 2 at d/l_ex = 30, " + ("energy minimizer" if use_minimizer else "LL relaxation"))
-    if figpath is None:
-        plt.show()
-    else:
-        fig.savefig(figpath / "2_loop_dlex30.png")
 
 
 if __name__ == "__main__":
     std_prob_2(
-        cuda=False,
+        cuda=True,
         cvode=False,
-        use_minimizer=False,   # set True to relax with the energy minimizer instead
-        use_adaptive=False,    # set True to sweep the field with adaptive steps instead of the fixed table
+        use_minimizer=True,   # set False to relax by integrating the LL equation in time instead
+        use_adaptive=True,    # set False to sweep the fixed table of 40 fields instead
         plotting=True,
         figpath=None,
     )

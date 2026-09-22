@@ -18,11 +18,6 @@ Matlab interface prints an estimate when the problem struct is created. The
 saturation magnetization is folded into the tensor when it is built, so a
 spatially varying :math:`M_s` costs nothing extra.
 
-.. note::
-   The parameter ``usePres`` (Python ``precision``) is accepted but has no
-   effect - the demagnetization tensor is always kept in single precision,
-   while everything else is double precision.
-
 ----------------------------------------
 Switching the demagnetization off
 ----------------------------------------
@@ -136,8 +131,6 @@ and therefore means "do not return and do not load".
 Parallelism and hardware
 ----------------------------------------
 
-* ``nThreads`` (Python ``n_threads``) is the number of OpenMP threads used when
-  building the demagnetization tensor.
 * ``useCuda`` (Matlab ``setUseCuda``, Python ``cuda``) evaluates the
   tensor-vector product on an NVIDIA GPU at every time step. The Python
   interface checks for ``nvidia-smi`` and falls back to the CPU with a warning
@@ -146,9 +139,3 @@ Parallelism and hardware
 * The **Fast Multipole Method** replaces the dense tensor by an :math:`O(N)`
   evaluation and is described in :ref:`Demag field - FMM`. It is off by
   default and requires a build with ``USE_FMM3D=1``.
-
-.. note::
-   The parameter ``demigstp`` (``demag_ignore_steps``), intended to recompute
-   the demagnetization tensor only every n'th step of a hysteresis
-   calculation, is accepted by both interfaces but is not acted on by the
-   current solver.

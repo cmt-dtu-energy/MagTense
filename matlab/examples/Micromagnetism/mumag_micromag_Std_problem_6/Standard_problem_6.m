@@ -13,7 +13,7 @@ function Switching_field = Standard_problem_6(settings, x_steps, field_steps, ca
 %   Standard_problem_6() 
 %       Uses the default parameters to solve mumag problem 6 and displays the results on screen
 %
-%   Standard_problem_4( settings, xsteps, tsteps, cart_dir, options)
+%   Standard_problem_6( settings, xsteps, tsteps, cart_dir, options)
 %       Takes 1 or 2 input argument which specifies the material parameters varied in the left side of the modelled domain, the time and space discretization, and the sample orientation. Additional options can also be specified
 %
 %   Switching_field = Standard_problem_6( settings, xsteps, tsteps, cart_dir, options)
@@ -27,20 +27,32 @@ function Switching_field = Standard_problem_6(settings, x_steps, field_steps, ca
 %      k: Anisotropy constant
 %      j: Saturation magnetization
 %      any combination may be used, such as 'ak', 'km', 'akj', '', etc.
-
+%
+%   x_steps : The number of cells along the easy axis (default 80)
+%   field_steps : The number of time / field steps (default 201)
+%   cart_dir : 'x', 'y' or 'z', the axis the sample and the field lie along (default 'x')
+%
+%Options:
+%-------
+%   mesh_type : 'uniform' (default) or 'unstructuredPrisms'. The unstructured mesh only works along x
+%   use_CUDA, use_CVODE, ShowTheResult : as in the other standard problems
+%   TwoDsim, TwoDsize : run a 2D strip of TwoDsize chains along y, on the uniform grid along x
+%   use_minimizer : visit the field values as constant fields and relax at each with the energy minimizer
+%
+%Detailed description:
 %-------
 %   The script setups up and runs the mumag standard problem 6
 %
-%Version: 1.1.0
+%Version: 1.2.0
 %Author:  Rasmus Bjørk
-%Date:    2026.01.19
+%Date:    2026.09.22
 
 arguments
     settings char                                      = 'akj';        %--- Parameter controlling the experiment
     x_steps (1,1) {mustBeNumeric}                      = 80;           %--- The spatial resolution
     field_steps (1,1) {mustBeNumeric}                  = 201;          %--- The field resolution
     cart_dir (1,1) string                              = 'x';          %--- The directions along which the geometry is oriented. Has no influence on the results, but can test the physics is correct in different directions
-    options.use_uniform_mesh {mustBeNumericOrLogical}  = true;         %--- Use a uniform or unstructured mesh
+    options.mesh_type {mustBeMember(options.mesh_type,{'uniform','unstructuredPrisms'})} = 'uniform' %--- The type of mesh to run on. The unstructured mesh only works along x
     options.use_CUDA {mustBeNumericOrLogical}          = true;         %--- Use CUDA for the calculations
     options.use_CVODE {mustBeNumericOrLogical}         = false         %--- Use CVODE for the numerical time evolution
     options.ShowTheResult {mustBeNumericOrLogical}     = true;         %--- Show the result
@@ -86,7 +98,7 @@ switch cart_dir
         dim = 3;
 end
 
-if (options.use_uniform_mesh)
+if strcmp(options.mesh_type,'uniform')
     if (options.TwoDsim)
         resolution = [x_steps options.TwoDsize 1];
     else
@@ -112,7 +124,7 @@ thisGridL(dim)  = 80e-9;
 problem = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 problem = problem.setMicroMagDemagApproximation('threshold_fraction');  % Turn off demag field
 problem.dem_thres = 2;                                                  % Turn off demag field
-if ~(options.use_uniform_mesh)
+if strcmp(options.mesh_type,'unstructuredPrisms')
     problem = problem.setMicroMagGridType('unstructuredPrisms');
     problem.exch_weigh = 8;
     problem = problem.setMicroMagExchMethod( 'DirectLaplacianNeumann'  );
@@ -213,7 +225,9 @@ problem.m0(:,2) = init_stat(2)/norm(init_stat) ;
 problem.m0(:,3) = init_stat(3)/norm(init_stat) ;
 
 if (options.TwoDsim)
-    problem.m0(x_steps*(i-1)+[1:n_middle],dim) = -problem.m0(x_steps*(i-1)+[1:n_middle],dim);
+    for i = 1:options.TwoDsize
+        problem.m0(x_steps*(i-1)+[1:n_middle],dim) = -problem.m0(x_steps*(i-1)+[1:n_middle],dim);
+    end
 else
     problem.m0(1:n_middle,dim) = -problem.m0(1:n_middle,dim);
 end

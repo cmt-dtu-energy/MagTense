@@ -223,8 +223,3 @@ values in ``alphat``. In Matlab this table is filled by
 
 and in Python through the ``t_alpha`` and ``alpha_fct`` constructor arguments.
 If ``alpha`` is non-zero it is used as a constant and the table is ignored.
-
-.. note::
-   The parameter ``MaxT0`` is accepted by both interfaces for backward
-   compatibility but is not used by the current solver. Use the tabulated
-   ``alphat`` above instead.

@@ -448,8 +448,8 @@
           deallocate(gb_solution%u1, gb_solution%u2, gb_solution%u3, gb_solution%u4, gb_solution%u5, gb_solution%u6)
       endif
       
-      !clean-up
-      stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
+      !clean-up. The descriptor only exists for the FFT demag approximations
+      if ( associated(gb_problem%desc_hndl_FFT_M_H) ) stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
   end if
 
     !The cell volumes are cached by computeEnergies for the grid of this solve; the next solve in the
@@ -457,7 +457,7 @@
     if ( allocated(gb_cellVol) ) deallocate( gb_cellVol )
 
     #if USE_CUDA
-      if ( gb_problem%useCuda .eqv. useCudaTrue ) then
+      if ( gb_problem%useCuda .eq. useCudaTrue ) then
           call cudaDestroy()
       endif
     #endif
@@ -1008,12 +1008,14 @@
     gb_solution%min_torque(i_field) = result%torque
     gb_solution%min_status(i_field) = result%status
 
-    if ( result%status .le. 1 ) then
-        !write(prog_str,'(A,I7,A,I7,A,ES9.2)') 'Minimizer converged: iter ', result%n_iter, ' feval ', n_feval_count, ' torque/Ms ', result%torque
-    else
+    !Only the failure is reported; a converged relaxation stays quiet. The report used to sit
+    !after the if with the converged message commented out, so on convergence an
+    !uninitialised buffer went to displayGUIMessage. Python printed the garbage silently,
+    !but in the MEX mxCreateString asserts on non-UTF-8 input and takes MATLAB down.
+    if ( result%status .gt. 1 ) then
         write(prog_str,'(A,I7,A,I7,A,ES9.2)') 'Minimizer NOT converged: iter ', result%n_iter, ' feval ', n_feval_count, ' torque/Ms ', result%torque
+        call displayGUIMessage( trim(prog_str) )
     endif
-    call displayGUIMessage( trim(prog_str) )
 
     deallocate( m )
     call trace%end( "minimizeAtField", itimer=itimer, verbose=1 )
@@ -2057,8 +2059,6 @@ end subroutine updateDemagfieldFMM
 
         !CALL SYSTEM_CLOCK(c1)
  
-        !call mkl_set_num_threads(problem%nThreadsMatlab)
-        !call omp_set_num_threads(problem%nThreadsMatlab)
         !call omp_set_num_threads(1)               
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
             
@@ -3294,23 +3294,30 @@ subroutine add_near_field(problem, solution)
 
 
 #if USE_CUDA
-    allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) )
-    hx_tmp = 0.0_SP
-    hy_tmp = 0.0_SP
-    hz_tmp = 0.0_SP
+    !The GPU holds the near-field matrices only when the solver was asked to use CUDA
+    !(cudaInit_sparse is called on problem%useCuda, not on the build flag), so a CUDA build
+    !with useCuda off must take the MKL path below like any other build.
+    if ( problem%useCuda .eq. useCudaTrue ) then
+        allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) )
+        hx_tmp = 0.0_SP
+        hy_tmp = 0.0_SP
+        hz_tmp = 0.0_SP
 
-    pref = sngl(1.0)
-    call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
+        pref = sngl(1.0)
+        call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
 
-    !$omp critical (solution_update)
-    solution%HmX = solution%HmX + hx_tmp 
-    solution%HmY = solution%HmY + hy_tmp 
-    solution%HmZ = solution%HmZ + hz_tmp 
-    !$omp end critical (solution_update)
+        !$omp critical (solution_update)
+        solution%HmX = solution%HmX + hx_tmp 
+        solution%HmY = solution%HmY + hy_tmp 
+        solution%HmZ = solution%HmZ + hz_tmp 
+        !$omp end critical (solution_update)
 
-    deallocate(hx_tmp, hy_tmp, hz_tmp)
+        deallocate(hx_tmp, hy_tmp, hz_tmp)
 
-#else
+        call trace%end( "add_near_field", itimer=itimer, verbose=2 )
+        return
+    endif
+#endif
     allocate(temp(ntot))
 
     alpha = 1.0_SP
@@ -3351,7 +3358,6 @@ subroutine add_near_field(problem, solution)
     solution%HmZ = solution%HmZ + temp
     !$omp end critical (solution_update)
     deallocate(temp)
-#endif
 
     call trace%end( "add_near_field", itimer=itimer, verbose=2 )
 end subroutine add_near_field

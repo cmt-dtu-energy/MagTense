@@ -93,8 +93,6 @@ properties
     %
     alpha
 
-    MaxT0
-
     %Sets how often timestep is displayed from Fortran
     setTimeDis
     
@@ -167,10 +165,6 @@ properties
     %magnetization between two timesteps
     conv_tol = 1e-4;
     
-    %defines how often to calculate the demagnetization tensor in
-    %hysteresis problems. Zero is every step
-    demigstp = int32(0) ;
-    
     %defines whether to use an External Mesh or not
     ExternalMesh = 0 ; 
     
@@ -185,9 +179,6 @@ properties
    
     % function handle for external field
     HextFct = [] ;
-
-    %The number of threads used by OpenMP for building the demag tensor
-    nThreads = int32(1);
 
     %FMM parameters
     fmm_cells
@@ -214,6 +205,8 @@ properties
     window_ena
     window_int
     trace_ena
+    %Write the timing log file (1) or not (0, default). Same idea as trace_ena.
+    timer_ena
     flush_each
     trace_verb
     N_log_dir
@@ -318,10 +311,6 @@ properties (SetAccess=private,GetAccess=public)
     %defines if the demagnetization field is calculated or not
     useDemag
 
-    %defines what precision is used for the demag tensor. Right now only
-    %single is supported. All other varibales are double.
-    usePres
-    
     %defines whether to save the result or not
     SaveTheResult
     
@@ -407,12 +396,6 @@ methods
         %
         obj.alpha = 4.42e3;
 
-        %if set to zero then the alpha parameter remains constant.
-        %if MaxT0 > 0 then alpha = alpha0 * 10^( 7 * min(t,MaxT0)/MaxT0 )
-        %thus scaling with the solution time. This is used in the explicit
-        %solver for tuning into the correct time scale of the problem
-        obj.MaxT0 = 2;
-        
         %solution times
         obj.nt = int32(1000);
         obj.t = linspace(0,1,obj.nt);
@@ -456,8 +439,6 @@ methods
         obj.useCVODE = int32(0);
 		%set use Demag to default
         obj.useDemag = int32(1);
-        %set use CVODE to default
-        obj.usePres = int32(0);
         %set the demag approximation to the default, i.e. use no
         %approximation
         obj = obj.setMicroMagDemagApproximation('none');
@@ -487,7 +468,6 @@ methods
         obj.ShowTheResult = int32(1);
 
         obj.DirectoryFilename = '';
-        obj.demigstp = int32(0) ;
         obj.ExternalMesh = int32(0) ;
         obj.MeshType = '' ;
         obj.ExternalMeshFileName = '' ;
@@ -517,6 +497,7 @@ methods
         obj.window_ena = int32(1);
         obj.window_int = 30.0;
         obj.trace_ena = int32(0);
+        obj.timer_ena = int32(0);
         obj.flush_each = int32(1);
         obj.trace_verb = int32(1);
 
@@ -813,9 +794,6 @@ methods
             case 'Minimizer'
                 %Energy minimizer: reads the field table like 'Explicit' but relaxes to
                 %equilibrium by steepest descent instead of integrating the LL equation
-                obj.solver = int32(3);
-            case 'Implicit'
-                %Old name of the third slot, kept for existing scripts
                 obj.solver = int32(3);
             otherwise
                 error('Unknown solver type ''%s''. Use ''Explicit'', ''Dynamic'' or ''Minimizer''.', type_var);

@@ -40,7 +40,6 @@ to the MEX-file:
     problem = problem.setMicroMagSolver( 'Dynamic' );
     problem = problem.setUseCuda( true );
     problem = problem.setUseCVODE( false );
-    problem.nThreads = int32(8);
 
     % Material parameters
     problem.A0    = 1.3e-11;                            % J/m

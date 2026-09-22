@@ -115,10 +115,6 @@ Material and anisotropy
      - ``t_alpha``, ``alpha_fct``
      - ``0``
      - Tabulated time-dependent damping. Matlab: ``setAlpha``.
-   * - ``MaxT0``
-     - ``max_T0``
-     - ``2``
-     - Legacy, not used by the current solver.
    * - ``m0``
      - ``m0``
      - random
@@ -246,14 +242,12 @@ Adaptive hysteresis parameters
      - Smallest and largest allowed field step [A/m].
    * - ``dH_grow``
      - ``dH_grow``
-     - ``1.25`` / ``1.5``
-     - Growth factor. The Matlab default is 1.25, the Python method default is
-       1.5.
+     - ``1.25``
+     - Growth factor.
    * - ``dH_shrink``
      - ``dH_shrink``
-     - ``0.5`` / ``0.75``
-     - Shrink factor. The Matlab default is 0.5, the Python method default is
-       0.75.
+     - ``0.5``
+     - Shrink factor.
    * - ``dM_min``
      - ``dM_min``
      - ``1e-3``
@@ -374,18 +368,6 @@ Demagnetization
      - ``filename``
      - ``1``, ``'t'``
      - Load a stored demagnetization tensor. Matlab: ``setLoadNFilename``.
-   * - ``nThreads``
-     - ``n_threads``
-     - ``1``
-     - OpenMP threads used when building the tensor.
-   * - ``usePres``
-     - ``precision``
-     - ``0``
-     - Accepted but not used; the tensor is always single precision.
-   * - ``demigstp``
-     - ``demigstp``
-     - ``0``
-     - Accepted but not used by the current solver.
 
 See :ref:`Demagnetization field`.
 
@@ -536,6 +518,10 @@ Output, tracing and timing
      - ``trace_enabled``
      - ``0``
      - Enable the execution trace. Significant performance cost.
+   * - ``timer_ena``
+     - ``timer_enabled``
+     - ``0``
+     - Write the timing log file. Off by default.
    * - ``flush_each``
      - ``flush_each``
      - ``1``
