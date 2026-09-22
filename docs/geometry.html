@@ -68,6 +68,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="calculations.html#evaluation-points">Evaluation points</a></li>
 <li class="toctree-l2"><a class="reference internal" href="calculations.html#state-function">State function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calculations.html#applied-field">Applied field</a></li>
 <li class="toctree-l2"><a class="reference internal" href="calculations.html#h-field">H-field</a></li>
 </ul>
 </li>
@@ -127,6 +128,8 @@ For each tile an individual local coordinate system is created.</p>
 <li><p>8 = avgPrism, i.e. a prism whose demagnetization tensor is averaged over the
 volume of the receiving tile rather than evaluated at its centre</p></li>
 <li><p>101 = planar coil</p></li>
+<li><p>102 = uniform applied field. <strong>Not a geometry</strong>: a field source that adds
+the same field everywhere, see <a class="reference internal" href="calculations.html#applied-field"><span class="std std-ref">Applied field</span></a>.</p></li>
 </ul>
 <p>The tile types are defined as parameters in
 <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/source/TileDemagTensor/TileNComponents.f90">TileNComponents.f90</a>.

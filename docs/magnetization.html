@@ -65,6 +65,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="calculations.html#evaluation-points">Evaluation points</a></li>
 <li class="toctree-l2"><a class="reference internal" href="calculations.html#state-function">State function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calculations.html#applied-field">Applied field</a></li>
 <li class="toctree-l2"><a class="reference internal" href="calculations.html#h-field">H-field</a></li>
 </ul>
 </li>
@@ -119,6 +120,19 @@ which relates the magnetization of the tile to the currently H-field.
 The third option describes a softmagnet with a constant permeability
 <span class="math notranslate nohighlight">\(\mu \equiv \mu_0 ( 1 + \chi_m)\)</span> and therefore a linear relationship
 for the magnetization with the H-field: <span class="math notranslate nohighlight">\(M = \chi_m H\)</span></p>
+<p>For both kinds of soft tile the iteration solves the tile’s own self-consistency
+at every step: the internal field is <span class="math notranslate nohighlight">\(\mathbf{H} = \mathbf{H}_\mathrm{others} +
+N\,\mathbf{M}(\mathbf{H})\)</span>, with <span class="math notranslate nohighlight">\(\mathbf{H}_\mathrm{others}\)</span> the field of all
+other tiles (and of an <a class="reference internal" href="calculations.html#applied-field"><span class="std std-ref">Applied field</span></a>), <span class="math notranslate nohighlight">\(N\)</span> the tile’s own
+demagnetization tensor at its centre and <span class="math notranslate nohighlight">\(\mathbf{M}(\mathbf{H})\)</span> the tile’s
+material law. The internal field is taken parallel to
+<span class="math notranslate nohighlight">\(\mathbf{H}_\mathrm{others}\)</span>, which is exact for spheres and cubes and a
+small approximation for elongated tiles. For a constant permeability this is a
+closed form; for a state function the magnitude is found numerically on the
+curve itself. The permeabilities <span class="math notranslate nohighlight">\(\mu_{r\_ea}\)</span> and <span class="math notranslate nohighlight">\(\mu_{r\_oa}\)</span> are
+therefore used by hard tiles and constant-permeability tiles only, and are
+ignored by a state-function tile, whose material is fully described by its
+curve.</p>
 </section>
 <section id="easy-axis-and-other-axes">
 <h2>Easy axis and other axes<a class="headerlink" href="#easy-axis-and-other-axes" title="Link to this heading"></a></h2>

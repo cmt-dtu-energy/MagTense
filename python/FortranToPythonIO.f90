@@ -98,6 +98,8 @@ module FortranToPythonIO
                 call getFieldFromTetrahedronTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case (tileTypePlanarCoil )
                 call getFieldFromPlanarCoilTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+            case (tileTypeUniformField )
+                call getFieldFromUniformFieldTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case default
             end select
         enddo
@@ -236,6 +238,13 @@ module FortranToPythonIO
                 else
                     call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts )
                 endif
+            case ( tileTypeUniformField )
+                !Not a geometry: a uniform applied field, the same at every point
+                if ( useStoredN .eqv. .true. ) then
+                    call getFieldFromUniformFieldTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
+                else
+                    call getFieldFromUniformFieldTile( tiles(i), H_tmp, pts, n_pts )
+                endif
 
             case default
 
@@ -369,8 +378,10 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
         vol_i = real(tile_size(i,1), DP) * &
                 real(tile_size(i,2), DP) * &
                 real(tile_size(i,3), DP)
- 
-      !------------------------------------------------------------------------------------
+        !A uniform applied-field source carries no moment; its field is added after the FMM pass
+        if ( tileType(i) .eq. tileTypeUniformField ) vol_i = 0.0d0
+
+!------------------------------------------------------------------------------------
       !------------- convert magnetization to dipole moment --------------
       dipvec(1,1,i) = Mag(i,1) * vol_i !* Mrem(i)
       dipvec(1,2,i) = Mag(i,2) * vol_i !* Mrem(i)
@@ -419,6 +430,15 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
             H(j,3) = grad(1,3,j) / fourpi
         end do
     end if
+
+    !The uniform applied-field sources, which the multipole pass cannot represent
+    do i = 1, n_tiles
+        if ( tileType(i) .eq. tileTypeUniformField ) then
+            H(:,1) = H(:,1) + Mag(i,1)
+            H(:,2) = H(:,2) + Mag(i,2)
+            H(:,3) = H(:,3) + Mag(i,3)
+        endif
+    end do
 
     if (associated(source)) deallocate(source)
     deallocate(dipvec, grad)
@@ -631,6 +651,9 @@ end subroutine getHFromTilesFMM
                     call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts )
                 case (tileTypePlanarCoil )
                     call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts )
+                case (tileTypeUniformField )
+                    !Not a geometry: a uniform applied field, the same at every point
+                    call getFieldFromUniformFieldTile( tiles(i), H_tmp, pts, n_pts )
                 case default
                 end select
                 

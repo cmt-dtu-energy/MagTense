@@ -768,6 +768,9 @@ def create_plot(
                 # TODO plot_ellipsoid()
                 pass
 
+            elif tiles.tile_type[i] == 102:
+                # A uniform applied-field source has no geometry to draw
+                continue
             else:
                 value_err = f"Tile type {tiles.tile_type[i]} not supported!"
                 raise ValueError(value_err)

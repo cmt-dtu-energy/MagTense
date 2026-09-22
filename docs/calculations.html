@@ -58,6 +58,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#evaluation-points">Evaluation points</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#state-function">State function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#applied-field">Applied field</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#h-field">H-field</a></li>
 </ul>
 </li>
@@ -167,13 +168,53 @@ and temperatures can be given and used if the given MagTile
 is representing a soft magnet, where <strong>n_stf</strong> is the number of
 given state functions.</p>
 </section>
+<section id="applied-field">
+<h2>Applied field<a class="headerlink" href="#applied-field" title="Link to this heading"></a></h2>
+<p>An external field that is the same at every point, such as the field of a
+large electromagnet or a Helmholtz coil, is entered as a tile of type 102.
+This tile is <strong>not a geometry</strong>. It has no size, position or orientation; it
+is a field source, and its <code class="docutils literal notranslate"><span class="pre">M</span></code> vector holds the applied field
+<span class="math notranslate nohighlight">\(\mathbf{H}_\mathrm{app}\)</span> in A/m. Like the planar coil it is never
+updated by the iteration. It acts in two places:</p>
+<ul class="simple">
+<li><p>it is part of the field that magnetizes every other tile in the iteration,
+which is what lets a soft magnet alone in space acquire a magnetization, and
+it enters before the self-consistent field of a soft tile is formed, so the
+permeability of the tile sees the total field;</p></li>
+<li><p>it is added to the H-field returned at the evaluation points, so the
+returned field is the total field, applied plus that of the tiles.</p></li>
+</ul>
+<p>The value is an H field. The source is by definition outside all tiles, where
+<span class="math notranslate nohighlight">\(\mathbf{B}/\mu_0\)</span> and <span class="math notranslate nohighlight">\(\mathbf{H}\)</span> coincide, so a field known as
+<span class="math notranslate nohighlight">\(\mathbf{B}\)</span> in tesla is divided by <span class="math notranslate nohighlight">\(\mu_0\)</span> before it is entered.
+A field evaluated inside a magnetized body is not an applied field: for the
+cylindrical tile MagTense computes <span class="math notranslate nohighlight">\(\mathbf{B}/\mu_0\)</span> inside the tile
+and subtracts <span class="math notranslate nohighlight">\(\mathbf{M}\)</span> to get <span class="math notranslate nohighlight">\(\mathbf{H}\)</span> there, and that
+correction belongs to the tile’s own field, not to this one. The field of other
+MagTense tiles is not entered this way either: put those tiles in the same
+problem, with <code class="docutils literal notranslate"><span class="pre">includeInIteration</span></code> set to zero if they are permanent magnets
+whose magnetization should stay fixed, and the iteration uses their field
+directly, correction included.</p>
+<p>In Python the source is appended with <code class="docutils literal notranslate"><span class="pre">tiles.add_uniform_field(H_app)</span></code>, in
+Matlab with <code class="docutils literal notranslate"><span class="pre">tile.setMagTileType('Uniformfield')</span></code> and <code class="docutils literal notranslate"><span class="pre">tile.M</span> <span class="pre">=</span> <span class="pre">H_app</span></code>, and
+in the standalone input file with tile type 102 and the field in the <code class="docutils literal notranslate"><span class="pre">M</span></code>
+line. A soft sphere with constant permeability <span class="math notranslate nohighlight">\(\mu_r\)</span> in such a field is
+the standard check: its magnetization is
+<span class="math notranslate nohighlight">\(\mathbf{M} = 3 (\mu_r - 1)/(\mu_r + 2)\,\mathbf{H}_\mathrm{app}\)</span>, and
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/magnetostatics/soft_sphere_in_uniform_field.py">soft_sphere_in_uniform_field.py</a>
+and its Matlab counterpart
+<code class="docutils literal notranslate"><span class="pre">Example_005_soft_sphere_in_uniform_field</span></code> reproduce it.</p>
+<p>A field that differs from tile to tile cannot be entered this way; that is a
+separate, per-tile applied field, which is not available yet.</p>
+</section>
 <section id="h-field">
 <h2>H-field<a class="headerlink" href="#h-field" title="Link to this heading"></a></h2>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">real</span><span class="p">,</span><span class="n">dimension</span><span class="p">(</span><span class="n">n_ele</span><span class="p">,</span><span class="mi">3</span><span class="p">)</span> <span class="p">::</span> <span class="n">H</span>
 </pre></div>
 </div>
 <p>The three-dimensional H-field is returned in the unit <span class="math notranslate nohighlight">\([A/m]\)</span>
-and its vector is given with respect to the global coordinate system.</p>
+and its vector is given with respect to the global coordinate system. It is
+the total field: the field of the tiles plus any <a class="reference internal" href="#applied-field"><span class="std std-ref">Applied field</span></a>.</p>
 </section>
 </section>
 
