@@ -7,6 +7,7 @@ arguments
     options.ShowTheResult {mustBeNumericOrLogical}          = true              %--- Show the result
     options.ShowTheResultDetails {mustBeNumericOrLogical}   = false             %--- Show the magnetization at each L
     options.use_CVODE {mustBeNumericOrLogical}              = false;            %--- Use CVODE for the numerical time evolution
+    options.use_minimizer {mustBeNumericOrLogical}          = true;            %--- Relax with the energy minimizer instead of integrating the LL equation in time
 end
 
 if (options.ShowTheResult)
@@ -40,6 +41,13 @@ addpath('../../../util');
     problem = problem.setMicroMagDemagApproximation('none');
     problem = problem.setUseCuda( options.use_CUDA );
     problem = problem.setUseCVODE( options.use_CVODE );
+    %--- The equilibrium is found either by integrating the LL equation in time at zero field over
+    %--- the window set with setTime (the default 'Dynamic' solver of this example) or by the
+    %--- energy minimizer ('Minimizer'), which ignores the time window and stops when the largest
+    %--- torque is below problem.min_tol. The energies come back in solution.E in both cases.
+    if options.use_minimizer
+        problem = problem.setMicroMagSolver( 'Minimizer' );
+    end
     problem.ReturnHall = int32(1);
 
     %--- Save the parameters
@@ -86,8 +94,13 @@ for i = 1:length(L_loop)
         %time grid on which to solve the problem
         problem = problem.setTime( linspace(0,t_end,50) );
 
-        %time-dependent applied field
-        problem = problem.setHext( HextFct, linspace(0,t_end,2) );
+        %applied field (zero). The minimizer treats every row of the field table as a separate
+        %field to relax at, so it gets a single row.
+        if options.use_minimizer
+            problem = problem.setHext( HextFct, 0 );
+        else
+            problem = problem.setHext( HextFct, linspace(0,t_end,2) );
+        end
         
         problem.grid_L = [lex,lex,lex]*L_loop(i);%m
         tile_volumes = repmat(prod(problem.grid_L)/(prod(resolution)),prod(resolution),1);
@@ -119,12 +132,25 @@ for i = 1:length(L_loop)
             legend(fig1,'<m_x>','<m_y>','<m_z>')         
         end
         
-        %--- Calculate the energy terms
-        [E_dem_red, E_exc_red, E_ani_red, E_ext_red] = computeMagneticEnergy(solution,tile_volumes,problem,Ms);
-        E_arr(:,i,j) = [E_dem_red(end) E_exc_red(end) E_ani_red(end) E_ext_red(end)];
+        %--- The energy terms. solution.E holds them in J as (time, field, term) with the terms in
+        %--- the order exchange, external, demag, anisotropy, evaluated in Fortran from the fields
+        %--- the solver ran on. Divided by Km*V they are the reduced energies of the mumag problem
+        %--- (this is what computeMagneticEnergy computed from the returned fields before).
+        Km = 1/2*mu0*Ms^2;
+        E_red = squeeze(solution.E(end,1,:)) / (Km*prod(problem.grid_L));
+        E_arr(:,i,j) = [E_red(3) E_red(1) E_red(4) E_red(2)];   % dem, exc, ani, ext - the order this example has always used
+
+        n_feval(i,j) = sum(solution.n_feval);
+        if options.use_minimizer
+            disp(['   Minimizer: ' num2str(sum(solution.n_feval)) ' field evaluations, ' num2str(sum(solution.min_iter)) ...
+                  ' iterations, status ' num2str(solution.min_status(end)) ', E/(Km V) = ' num2str(sum(E_red))])
+        else
+            disp(['   LL relaxation: ' num2str(sum(solution.n_feval)) ' field evaluations, E/(Km V) = ' num2str(sum(E_red))])
+        end
     end
 end
 elapsedTime = toc
+disp(['Total field evaluations: ' num2str(sum(n_feval(:)))])
 
 if (options.ShowTheResult)
     plot(fig10,L_loop,sum(E_arr(:,:,1),1),'.')

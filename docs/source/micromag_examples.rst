@@ -18,7 +18,7 @@ muMag standard problems
      - Python
    * - Standard problem 2
      - `Standard_problem_2.m <https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_2/Standard_problem_2.m>`_
-     - \-
+     - `std_problem_2.py <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/mumag_micromag_Std_problem_2/std_problem_2.py>`_
    * - Standard problem 3
      - `Standard_problem_3.m <https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_3/Standard_problem_3.m>`_,
        ``Standard_problem_3_unstructured_cart.m``,
@@ -51,6 +51,27 @@ What each of these exercises do:
 * **Standard problem 6** - domain-wall pinning at a phase boundary, which is
   the test of the spatially varying :math:`A_0`, :math:`K_0` and :math:`M_s`
   and of the modified exchange stencil.
+
+Standard problems 2, 3 and 6 take a ``use_minimizer`` switch in both languages
+(``options.use_minimizer`` in Matlab, the ``use_minimizer`` argument in Python).
+With it set, the equilibrium at each field is found by the
+:ref:`Energy minimizer` instead of the Landau-Lifshitz time integration, and
+the scripts print the number of effective-field evaluations spent either way,
+which is the cost to compare. Problem 3 reads its energies from the ``E``
+output of the solver in both cases. In problem 6 the switch replaces the time
+ramp of the applied field by the same field values visited as constant
+fields, so the depinning field it reports is the static one, which is what the
+analytical values of the reference paper are; the ramp gives a rate-dependent
+one. Problem 2 additionally takes ``use_adaptive``, which replaces the fixed
+table of 40 fields by the :ref:`Adaptive hysteresis` stepping, refining the
+field step to 0.0005 T across the coercive field.
+
+The Python script
+`minimizer_vs_llg.py <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/minimizer/minimizer_vs_llg.py>`_
+runs the single-grain hysteresis loop and standard problem 3 with both the
+Landau-Lifshitz relaxation and the :ref:`Energy minimizer`, and prints the
+switching fields, the energies and the number of field evaluations each method
+needed.
 
 ----------------------------------------
 Feature tests

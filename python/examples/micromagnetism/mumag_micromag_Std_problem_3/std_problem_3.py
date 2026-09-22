@@ -5,7 +5,6 @@ import numpy as np
 
 from magtense.micromag import MicromagProblem
 from magtense.utils import plot_M_avg_seq, plot_M_thin_film
-from magtense.computeMagneticEnergy import compute_magnetic_energy
 
 def std_prob_3(
     res: tuple[int, int, int] = (10, 10, 10),
@@ -15,8 +14,16 @@ def std_prob_3(
     plotting: bool = True,
     figpath: Path | None = None,
     plot_details: bool = False,
+    use_minimizer: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Run the muMag standard problem 3 for a range of cube sizes.
+
+    Args:
+        use_minimizer: relax each state with the energy minimizer (solver 'minimizer') instead of
+            integrating the Landau-Lifshitz equation in time at zero field over t_end (the default
+            'dynamic' solver). The minimizer ignores t_end and stops when the largest torque is
+            below problem.min_tol. Either way the number of effective-field evaluations spent is
+            printed, which is the cost to compare.
 
     Returns:
         L_loop: the cube edge lengths in units of the exchange length that were simulated.
@@ -33,13 +40,15 @@ def std_prob_3(
 
     problem = MicromagProblem(
         res=res,
+        solver="minimizer" if use_minimizer else "dynamic",
         A0=A0,
         Ms=Ms,
         K0=0.1 * 0.5 * mu0 * Ms**2,
         alpha=1e3,
+        gamma=0.0,
         cuda=cuda,
         cvode=cvode,
-        usereturnhall=True ,
+        usereturnhall=plot_details,
     )
 
     #--------- disable fmm -----
@@ -91,13 +100,19 @@ def std_prob_3(
                 t_end = 200e-9
 
             problem.grid_L = np.array([lex, lex, lex]) * L_loop[i]
-            tile_volumes = np.full(int(np.prod(res)), np.prod(problem.grid_L) / np.prod(res))
 
-            t, M_out, _, H_exc, H_ext, H_dem, H_ani = (
-                problem.run_simulation(
-                    t_end=t_end, nt=50, fct_h_ext=h_ext_fct, nt_h_ext=2
-                )
-            )[:7]
+            # For the LL relaxation a convergence check at every output time lets the integration
+            # stop as soon as the magnetization is stationary instead of running to t_end.
+            nt = 50
+            problem.t_conv = np.linspace(0, t_end, nt)
+            problem.nt_conv = nt
+            problem.conv_tol = np.repeat(1e-6, nt)
+
+            # The minimizer treats every row of the field table as a separate field to relax at,
+            # so it gets a single row; the dynamic solver interpolates the table in time.
+            t, M_out = problem.run_simulation(
+                t_end=t_end, nt=nt, fct_h_ext=h_ext_fct, nt_h_ext=1 if use_minimizer else 2
+            )[:2]
 
             if plot_details:
                 M_sq = np.squeeze(M_out, axis=2)
@@ -105,17 +120,28 @@ def std_prob_3(
                 plot_M_thin_film(M_sq[0], res, title="3_start", figpath=figpath)
                 plot_M_thin_film(M_sq[-1], res, title="3_end", figpath=figpath)
 
-            # Calculate the energy terms
-            E_exc, E_ext, E_dem, E_ani = compute_magnetic_energy(
-                M=M_out, H_exc=H_exc, H_ext=H_ext, H_dem=H_dem, H_ani=H_ani, Vols=tile_volumes, problem=problem, Ms=Ms
-            )
+            # The energy terms come back from Fortran in J as (time, field, term) with the terms in
+            # the order exchange, external, demag, anisotropy. Divided by Km*V they are the reduced
+            # energies of the mumag problem. The last output time is always filled; the earlier
+            # ones only when usereturnhall is set, which plot_details turns on.
+            Km = 0.5 * mu0 * Ms**2
+            E_red = problem.E_out[:, 0, :] / (Km * np.prod(problem.grid_L))
+            E_exc, E_ext, E_dem, E_ani = E_red.T
 
-            E_arr[:, i, j] = np.array([E_exc[-1].item(), E_ext[-1].item(), E_dem[-1].item(), E_ani[-1].item()])
+            E_arr[:, i, j] = np.array([E_exc[-1], E_ext[-1], E_dem[-1], E_ani[-1]])
+
+            method = "minimizer" if use_minimizer else "LL relaxation"
+            print(
+                f"   {method}: {int(problem.n_feval.sum())} field evaluations, "
+                f"E/(Km V) = {E_arr[:, i, j].sum():.6f}"
+                + (f", {int(problem.min_iter.sum())} iterations, status {int(problem.min_status[-1])}"
+                   if use_minimizer else "")
+            )
 
             if plot_details:
                 plt.clf()
                 for E_x in [E_exc, E_ext, E_dem, E_ani]:
-                    plt.plot(t, mu0 * E_x - mu0 * E_x[0], ".")
+                    plt.plot(t, E_x - E_x[0], ".")
                 plt.xlabel("Time [s]")
                 plt.ylabel("Energy [-]")
                 plt.legend([r"$E_{exc}$", r"$E_{ext}$", r"$E_{dem}$", r"$E_{ani}$"])
@@ -148,4 +174,5 @@ if __name__ == "__main__":
         plot_details=False,
         #figpath=Path(__file__).resolve().parent,
         figpath=None,
+        use_minimizer=False,   # set True to relax with the energy minimizer instead
     )

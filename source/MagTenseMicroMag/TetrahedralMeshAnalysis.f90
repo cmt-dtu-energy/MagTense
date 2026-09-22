@@ -1,6 +1,7 @@
 module TetrahedralMeshAnalysis
   use MicroMagParameters
   use IO_GENERAL
+  use UTIL_MICROMAG, only: tetrahedronVolume
   use trace_mod
 
   implicit none
@@ -132,8 +133,7 @@ module TetrahedralMeshAnalysis
         Yel(j) = ( ax(2) + bx(2) + cx(2) + dx(2) ) / 4.0_dp
         Zel(j) = ( ax(3) + bx(3) + cx(3) + dx(3) ) / 4.0_dp
 
-        cr = crossProduct( bx - dx, cx - dx )
-        Volumes(j) = abs( dot_product( ax - dx, cr ) ) / 6.0_dp
+        Volumes(j) = tetrahedronVolume( ax, bx, cx, dx )
     end do
 
     if ( any( Volumes .le. 0.0_dp ) ) then

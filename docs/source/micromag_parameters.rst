@@ -141,8 +141,8 @@ Solver, time and applied field
    * - ``solver``
      - ``solver``
      - ``Dynamic``
-     - ``Explicit`` (1), ``Dynamic`` (2), ``Implicit`` (3, not implemented).
-       Matlab: ``setMicroMagSolver``.
+     - ``Explicit`` (1), ``Dynamic`` (2), ``Minimizer`` (3, ``Implicit`` is
+       its old name). Matlab: ``setMicroMagSolver``.
    * - ``ProblemMod``
      - ``prob_mode``
      - ``new``
@@ -171,6 +171,28 @@ Solver, time and applied field
      - ``0``, ``1``
      - Convergence-check times. Matlab:
        ``setConvergenceCheckTime``.
+   * - ``min_tol``
+     - ``min_tol``
+     - ``1e-5``
+     - Minimizer convergence criterion on the largest relative torque, see
+       :ref:`Energy minimizer`.
+   * - ``min_maxiter``
+     - ``min_maxiter``
+     - ``10000``
+     - Minimizer iteration cap per applied field.
+   * - ``min_maxrot``
+     - ``min_maxrot``
+     - ``0.3``
+     - Largest rotation of a cell per minimizer iteration [rad].
+   * - ``min_fallback``
+     - ``min_fallback``
+     - ``1``
+     - Fall back to the time integration when the minimizer stalls.
+   * - ``min_saddle``
+     - ``min_saddle_check``
+     - ``1``
+     - Nudge a converged state and relax again, so that a saddle point is not
+       mistaken for a minimum.
    * - ``conv_tol``
      - ``conv_tol``
      - ``1e-4``

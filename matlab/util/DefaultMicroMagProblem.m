@@ -48,7 +48,7 @@ properties
     u_ea
     %new or old problem
     ProblemMod
-    %solver type ('Explicit', 'Implicit' or 'Dynamic')
+    %solver type ('Explicit', 'Dynamic' or 'Minimizer')
     solver
 
     %Exchange term constant
@@ -242,6 +242,21 @@ properties
     %value seeds from the clock, which is what independent Monte-Carlo runs need.
     rng_seed
 
+    %Energy minimizer settings, used when the solver is 'Minimizer' (setMicroMagSolver).
+    %min_tol: convergence criterion, the largest torque max_i |m_i x H_i| over the cells
+    %divided by max(Ms) must fall below it. min_maxiter: iteration cap per applied field.
+    %min_maxrot: largest rotation of any cell in one iteration [rad]. min_fallback: 1 to
+    %fall back to the Landau-Lifshitz time integration when the minimizer stalls, 0 to
+    %give up. min_saddle: 1 to nudge a converged state and relax again, so that a saddle
+    %point (which a symmetric starting state sits on) is not mistaken for a minimum, 0 to
+    %accept the state as it is. The solution struct returns E (energies), n_feval,
+    %min_iter, min_torque and min_status, see the TechManual.
+    min_tol
+    min_maxiter
+    min_maxrot
+    min_fallback
+    min_saddle
+
     %Optional exchange stiffness at the interface between two materials. phase_id gives
     %the material index (1..n_phase) of every tile and A_int is a symmetric
     %n_phase-by-n_phase table of interface exchange values in J/m. A negative entry means
@@ -363,7 +378,7 @@ methods
         obj.u_ea = zeros( obj.ntot, 3 );
         %new or old problem
         obj = obj.setMicroMagProblemMode( 'new' );
-        %solver type ('Explicit', 'Implicit' or 'Dynamic')
+        %solver type ('Explicit', 'Dynamic' or 'Minimizer')
         obj = obj.setMicroMagSolver( 'Dynamic' );
 
         obj.exch_weigh = 8.0;
@@ -523,6 +538,13 @@ methods
 
         %Thermal-field RNG seed. Default 0 preserves the previous behaviour.
         obj.rng_seed = int32(0);
+
+        %Energy minimizer defaults
+        obj.min_tol = 1e-5;
+        obj.min_maxiter = int32(10000);
+        obj.min_maxrot = 0.3;
+        obj.min_fallback = int32(1);
+        obj.min_saddle = int32(1);
 
         %One material, i.e. the harmonic mean everywhere, which is the previous behaviour.
         obj.n_phase = int32(1);
@@ -788,8 +810,15 @@ methods
                 obj.solver = int32(1);
             case 'Dynamic'
                 obj.solver = int32(2);
-            case 'Implicit'
+            case 'Minimizer'
+                %Energy minimizer: reads the field table like 'Explicit' but relaxes to
+                %equilibrium by steepest descent instead of integrating the LL equation
                 obj.solver = int32(3);
+            case 'Implicit'
+                %Old name of the third slot, kept for existing scripts
+                obj.solver = int32(3);
+            otherwise
+                error('Unknown solver type ''%s''. Use ''Explicit'', ''Dynamic'' or ''Minimizer''.', type_var);
         end
             
     end
