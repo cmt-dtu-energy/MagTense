@@ -1,0 +1,274 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grids and meshes &mdash; MagTense TechManual  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/techmanual.css?v=903b4c53" />
+
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Material parameters" href="micromag_material.html" />
+    <link rel="prev" title="Setting up a micromagnetic problem" href="micromag_setup.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/MagTense_logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="micromag_setup.html">Setting up a micromagnetic problem</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Grids and meshes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#uniform-grid">Uniform grid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#unstructured-prisms">Unstructured prisms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tetrahedral-grid">Tetrahedral grid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#passing-an-externally-computed-exchange-matrix">Passing an externally computed exchange matrix</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_material.html">Material parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html">Exchange interaction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html">Demagnetization field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_solvers.html">Solvers and time integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_pbc.html">Periodic boundaries and macrogeometry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_thermal.html">Thermal fluctuations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_output.html">Micromagnetic output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html">Micromagnetic parameter reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html">Micromagnetic examples and validation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#the-equation-that-is-solved">The equation that is solved</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #cccccc" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTense>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="grids-and-meshes">
+<h1>Grids and meshes<a class="headerlink" href="#grids-and-meshes" title="Link to this heading"></a></h1>
+<p>The micromagnetic model supports three grid types. The grid type is selected
+with <code class="docutils literal notranslate"><span class="pre">problem.setMicroMagGridType(...)</span></code> in Matlab and with the <code class="docutils literal notranslate"><span class="pre">grid_type</span></code>
+argument in Python, and it decides which of the geometry parameters are read.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 8.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Grid type</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Required geometry input</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">uniform</span></code></p></td>
+<td><p>1</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">grid_n</span></code> (<code class="docutils literal notranslate"><span class="pre">res</span></code> in Python) and <code class="docutils literal notranslate"><span class="pre">grid_L</span></code>. The grid is generated
+internally.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tetrahedron</span></code></p></td>
+<td><p>2</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">grid_pts</span></code>, <code class="docutils literal notranslate"><span class="pre">grid_nod</span></code>, <code class="docutils literal notranslate"><span class="pre">grid_ele</span></code> and <code class="docutils literal notranslate"><span class="pre">grid_nnod</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">unstructuredPrisms</span></code></p></td>
+<td><p>3</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">grid_pts</span></code> and <code class="docutils literal notranslate"><span class="pre">grid_abc</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+<section id="uniform-grid">
+<h2>Uniform grid<a class="headerlink" href="#uniform-grid" title="Link to this heading"></a></h2>
+<p>This is the default grid type, and by far the simplest. The domain is a
+rectangular box of size <code class="docutils literal notranslate"><span class="pre">grid_L</span></code> <span class="math notranslate nohighlight">\(= (L_x, L_y, L_z)\)</span> divided into
+<code class="docutils literal notranslate"><span class="pre">grid_n</span></code> <span class="math notranslate nohighlight">\(= (n_x, n_y, n_z)\)</span> identical rectangular prism cells, so that
+<span class="math notranslate nohighlight">\(\Delta x = L_x/n_x\)</span> and similarly for <span class="math notranslate nohighlight">\(y\)</span> and <span class="math notranslate nohighlight">\(z\)</span>. The box is
+centred on the origin, i.e. it spans <span class="math notranslate nohighlight">\([-L_x/2, L_x/2]\)</span> and so on, and the
+cell centres are placed at the centre of each cell. A direction with a single
+cell is placed at zero and given the full length of the domain as its cell
+size.</p>
+<p>The cells are ordered with <span class="math notranslate nohighlight">\(x\)</span> running fastest and <span class="math notranslate nohighlight">\(z\)</span> slowest,</p>
+<div class="math notranslate nohighlight">
+\[\mathrm{ind} = i + (j-1)\,n_x + (k-1)\,n_x n_y .\]</div>
+<p>The same ordering applies to every array of single-cell properties (<code class="docutils literal notranslate"><span class="pre">Ms</span></code>, <code class="docutils literal notranslate"><span class="pre">K0</span></code>, <code class="docutils literal notranslate"><span class="pre">u_ea</span></code>,
+<code class="docutils literal notranslate"><span class="pre">m0</span></code>, <code class="docutils literal notranslate"><span class="pre">temperature</span></code>, …) and to the returned magnetization.</p>
+<p>For a uniform grid the exchange operator is built as a finite-difference
+Laplacian, see <a class="reference internal" href="micromag_exchange.html#exchange-interaction"><span class="std std-ref">Exchange interaction</span></a>.</p>
+</section>
+<section id="unstructured-prisms">
+<h2>Unstructured prisms<a class="headerlink" href="#unstructured-prisms" title="Link to this heading"></a></h2>
+<p>The unstructuredPrisms grid is a mesh of rectangular prisms of varying size.
+The prisms are all aligned in the sense their faces are perpendicular to the global xyz-axes,
+so every face is either parallel or perpendicular to every other.
+The mesh is specified through</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">grid_pts</span></code> - an <code class="docutils literal notranslate"><span class="pre">(ntot,3)</span></code> array with the centre of every prism;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">grid_abc</span></code> - an <code class="docutils literal notranslate"><span class="pre">(ntot,3)</span></code> array with the full side lengths
+<span class="math notranslate nohighlight">\((a,b,c)\)</span> of every prism.</p></li>
+</ul>
+<p>The problem resolution must be set to <code class="docutils literal notranslate"><span class="pre">[ntot,1,1]</span></code>, since the number of cells
+is what the solver uses, not a rectangular subdivision:</p>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">resolution</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="nb">length</span><span class="p">(</span><span class="nb">mesh</span><span class="p">.</span><span class="n">pos_out</span><span class="p">)</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="mi">1</span><span class="p">];</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">DefaultMicroMagProblem</span><span class="p">(</span><span class="w"> </span><span class="n">resolution</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span><span class="w"> </span><span class="n">resolution</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span><span class="w"> </span><span class="n">resolution</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagGridType</span><span class="p">(</span><span class="s">'unstructuredPrisms'</span><span class="p">);</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">grid_pts</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">mesh</span><span class="p">.</span><span class="n">pos_out</span><span class="p">;</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">grid_abc</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">mesh</span><span class="p">.</span><span class="n">dims_out</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span>
+    <span class="n">res</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">grid_pts</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="n">grid_type</span><span class="o">=</span><span class="s2">"unstructuredPrisms"</span><span class="p">,</span>
+    <span class="n">grid_pts</span><span class="o">=</span><span class="n">grid_pts</span><span class="p">,</span>
+    <span class="n">grid_abc</span><span class="o">=</span><span class="n">grid_abc</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>For this grid type the mesh is analysed by
+<code class="docutils literal notranslate"><span class="pre">CartesianUnstructuredMeshAnalysis</span></code>, which finds the faces, face normals,
+face areas, cell volumes and the interpolation stencils that the exchange
+operator is built from. The result is returned to Matlab as the <code class="docutils literal notranslate"><span class="pre">GridInfo</span></code>
+struct. The mesh analysis is also where periodic exchange boundaries are
+resolved, see <a class="reference internal" href="micromag_pbc.html#periodic-exchange-boundaries"><span class="std std-ref">Periodic exchange boundaries</span></a>.</p>
+<p>An unstructured mesh may be plotted from Matlab with
+<code class="docutils literal notranslate"><span class="pre">cartesianUnstructuredMeshPlot</span></code>.</p>
+</section>
+<section id="tetrahedral-grid">
+<h2>Tetrahedral grid<a class="headerlink" href="#tetrahedral-grid" title="Link to this heading"></a></h2>
+<p>A tetrahedral mesh is specified through the node coordinates <code class="docutils literal notranslate"><span class="pre">grid_nod</span></code>, the
+number of nodes <code class="docutils literal notranslate"><span class="pre">grid_nnod</span></code>, the element definitions <code class="docutils literal notranslate"><span class="pre">grid_ele</span></code> (the four
+node indices of each element) and the element centres <code class="docutils literal notranslate"><span class="pre">grid_pts</span></code>. As for the
+unstructured prisms, the resolution is <code class="docutils literal notranslate"><span class="pre">[ntot,1,1]</span></code>.</p>
+<p>Giving the mesh is all that is required. MagTense analyses it and builds the
+exchange operator itself, exactly as it does for a grid of unstructured prisms
+given its centres and sizes. In MATLAB the whole grid is set up by</p>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagGridTetrahedron</span><span class="p">(</span><span class="n">model</span><span class="p">.</span><span class="n">Mesh</span><span class="p">.</span><span class="n">Nodes</span><span class="p">,</span><span class="w"> </span><span class="n">model</span><span class="p">.</span><span class="n">Mesh</span><span class="p">.</span><span class="n">Elements</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>which fills in <code class="docutils literal notranslate"><span class="pre">grid_nod</span></code>, <code class="docutils literal notranslate"><span class="pre">grid_ele</span></code>, <code class="docutils literal notranslate"><span class="pre">grid_nnod</span></code> and the element centres
+<code class="docutils literal notranslate"><span class="pre">grid_pts</span></code>, and in Python by passing <code class="docutils literal notranslate"><span class="pre">grid_nod</span></code> and <code class="docutils literal notranslate"><span class="pre">grid_ele</span></code> to
+<code class="docutils literal notranslate"><span class="pre">MicromagProblem</span></code>, where <code class="docutils literal notranslate"><span class="pre">grid_nnod</span></code> and <code class="docutils literal notranslate"><span class="pre">grid_pts</span></code> likewise default to the
+mesh. A quadratic mesh is accepted and analysed as its linear counterpart.</p>
+<p>The mesh analysis is in <code class="docutils literal notranslate"><span class="pre">TetrahedralMeshAnalysis.f90</span></code>. It works from the
+connectivity rather than from the geometry: two tetrahedra are neighbours when
+they share three nodes, and the face they share is the one opposite the node
+that they do not.</p>
+<p>Periodic exchange boundaries are requested through <code class="docutils literal notranslate"><span class="pre">exchPBC</span></code>. They are linked
+either by identifying the nodes on the two boundary planes, when the mesh is
+periodic along that direction, or by mortar coupling the boundary faces when it
+is not, with the choice made per direction and a warning printed when the
+fallback is used. See <a class="reference internal" href="micromag_pbc.html#periodic-boundaries-on-a-tetrahedral-mesh"><span class="std std-ref">Periodic boundaries on a tetrahedral mesh</span></a> for what
+each mechanism does and what the fallback costs.</p>
+<p>The demagnetization tensor is computed from the analytical tetrahedron tensor.
+Note the following limitations of this grid type:</p>
+<ul class="simple">
+<li><p>Averaging of the demagnetization tensor over the receiving cell (<code class="docutils literal notranslate"><span class="pre">N_ave</span></code>)
+is not supported and a warning is printed if it is requested.</p></li>
+<li><p>The shape correction is disabled, because a tetrahedral mesh carries no
+per-element size array from which the occupied volume fraction can be found.</p></li>
+</ul>
+</section>
+<section id="passing-an-externally-computed-exchange-matrix">
+<h2>Passing an externally computed exchange matrix<a class="headerlink" href="#passing-an-externally-computed-exchange-matrix" title="Link to this heading"></a></h2>
+<p>For any grid type the exchange operator may be computed outside MagTense and
+passed in directly, which bypasses the mesh analysis entirely. This is
+described in <a class="reference internal" href="micromag_exchange.html#supplying-the-exchange-matrix-directly"><span class="std std-ref">Supplying the exchange matrix directly</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="micromag_setup.html" class="btn btn-neutral float-left" title="Setting up a micromagnetic problem" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="micromag_material.html" class="btn btn-neutral float-right" title="Material parameters" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright MagTense Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>  
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>

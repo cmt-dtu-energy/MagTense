@@ -15,14 +15,15 @@
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=5929fcd5"></script>
-      <script src="_static/doctools.js?v=9bcbadda"></script>
-      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="author" title="About these documents" href="about.html" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Theoretical aspects" href="theory.html" />
-    <link rel="prev" title="Micromagnetism" href="micromagnetism.html" /> 
+    <link rel="prev" title="Performance, Timing &amp; Trace Logging" href="timing_and_trace.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -50,20 +51,19 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Documentation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#python">Python</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#tiles-source">Tiles [source]</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#functions">Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#magnetostatics">Magnetostatics</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tiles-class">Tiles class</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#magnetostatic-functions">Magnetostatic functions</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#grid-config-source">grid_config [source]</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#iterate-magnetization-source">iterate_magnetization [source]</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#get-demag-tensor-source">get_demag_tensor [source]</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#get-h-field-source">get_H_field [source]</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#run-simulation-source">run_simulation [source]</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#create-plot-source">create_plot [source]</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#micromagnetic-problem-class">Micromagnetic problem class</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#micromagnetic-run-methods">Micromagnetic run methods</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#plotting-utilities">Plotting utilities</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
@@ -91,120 +91,277 @@
              
   <section id="documentation">
 <h1>Documentation<a class="headerlink" href="#documentation" title="Link to this heading"></a></h1>
-<section id="python">
-<h2>Python<a class="headerlink" href="#python" title="Link to this heading"></a></h2>
-<section id="tiles-source">
-<h3>Tiles [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L9">source</a>]<a class="headerlink" href="#tiles-source" title="Link to this heading"></a></h3>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="bp">self</span><span class="o">.</span><span class="n">init</span><span class="p">(</span>
+<p>This page lists the public Python API. The authoritative source is always the
+code itself, which carries full docstrings:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/src/magtense/magstatics.py">magstatics.py</a>
+- the magnetostatic framework</p></li>
+<li><p><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/src/magtense/micromag.py">micromag.py</a>
+- the micromagnetic framework</p></li>
+<li><p><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/src/magtense/utils.py">utils.py</a>
+- plotting and helper routines</p></li>
+</ul>
+<p>For the Matlab interface, the corresponding entry points are the MEX-files
+listed under <a class="reference internal" href="installation.html#matlab"><span class="std std-ref">Matlab</span></a> and the helper functions in
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/util">matlab/util</a>.</p>
+<section id="magnetostatics">
+<h2>Magnetostatics<a class="headerlink" href="#magnetostatics" title="Link to this heading"></a></h2>
+<section id="tiles-class">
+<h3>Tiles class<a class="headerlink" href="#tiles-class" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">magtense.magstatics.Tiles</span></code> holds a collection of <code class="docutils literal notranslate"><span class="pre">n</span></code> magnetic tiles. Every
+per-tile property is exposed as an array attribute, and <code class="docutils literal notranslate"><span class="pre">tiles[i]</span></code> returns a
+view of a single tile.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Tiles</span><span class="p">(</span>
     <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
-    <span class="n">center_pos</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">dev_center</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">vertices</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">tile_type</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">offset</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">rot</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">M_rem</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">easy_axis</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">color</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">magnet_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">mag_angle</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
-
-<span class="bp">self</span><span class="o">.</span><span class="n">set_easy_axis</span><span class="p">(</span>
-    <span class="n">val</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">idx</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">center_pos</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">dev_center</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">size</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">vertices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">M_rem</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">easy_axis</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">mag_angle</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">mu_r_ea</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">mu_r_oa</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">tile_type</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">offset</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">rot</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">color</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">magnet_type</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Attributes: <code class="docutils literal notranslate"><span class="pre">n</span></code>, <code class="docutils literal notranslate"><span class="pre">center_pos</span></code>, <code class="docutils literal notranslate"><span class="pre">dev_center</span></code>, <code class="docutils literal notranslate"><span class="pre">size</span></code>, <code class="docutils literal notranslate"><span class="pre">vertices</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tile_type</span></code>, <code class="docutils literal notranslate"><span class="pre">offset</span></code>, <code class="docutils literal notranslate"><span class="pre">rot</span></code>, <code class="docutils literal notranslate"><span class="pre">M</span></code>, <code class="docutils literal notranslate"><span class="pre">u_ea</span></code>, <code class="docutils literal notranslate"><span class="pre">u_oa1</span></code>, <code class="docutils literal notranslate"><span class="pre">u_oa2</span></code>,
+<code class="docutils literal notranslate"><span class="pre">mu_r_ea</span></code>, <code class="docutils literal notranslate"><span class="pre">mu_r_oa</span></code>, <code class="docutils literal notranslate"><span class="pre">M_rem</span></code>, <code class="docutils literal notranslate"><span class="pre">color</span></code>, <code class="docutils literal notranslate"><span class="pre">magnet_type</span></code>,
+<code class="docutils literal notranslate"><span class="pre">stfcn_index</span></code>, <code class="docutils literal notranslate"><span class="pre">incl_it</span></code>, <code class="docutils literal notranslate"><span class="pre">M_rel</span></code>, <code class="docutils literal notranslate"><span class="pre">use_sym</span></code>, <code class="docutils literal notranslate"><span class="pre">sym_op</span></code>. Their meaning
+is described under <a class="reference internal" href="geometry.html#geometry"><span class="std std-ref">Geometry</span></a>, <a class="reference internal" href="magnetization.html#magnetization"><span class="std std-ref">Magnetization</span></a> and
+<a class="reference internal" href="other_parameters.html#other-parameters"><span class="std std-ref">Other parameters</span></a>.</p>
+<p>Methods:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">set_easy_axis</span><span class="p">(</span>
+    <span class="n">val</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">idx</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
-
-<span class="bp">self</span><span class="o">.</span><span class="n">refine_prism</span><span class="p">(</span>
-    <span class="n">idx</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">List</span><span class="p">],</span>
-    <span class="n">mat</span><span class="p">:</span> <span class="n">List</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </pre></div>
 </div>
-<section id="functions">
-<h4>Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h4>
+<p>Sets the easy axis from a polar angle in <span class="math notranslate nohighlight">\([0,\pi]\)</span> and an azimuth in
+<span class="math notranslate nohighlight">\([0, 2\pi]\)</span>, drawing them at random if <code class="docutils literal notranslate"><span class="pre">val</span></code> is omitted.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">refine_prism</span><span class="p">(</span>
+    <span class="n">idx</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">list</span><span class="p">,</span>
+    <span class="n">mat</span><span class="p">:</span> <span class="nb">list</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</pre></div>
+</div>
+<p>Subdivides one or more prism tiles into <code class="docutils literal notranslate"><span class="pre">mat</span> <span class="pre">=</span> <span class="pre">[nx,</span> <span class="pre">ny,</span> <span class="pre">nz]</span></code> sub-prisms.</p>
 </section>
-</section>
-<section id="grid-config-source">
-<h3>grid_config [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L528">source</a>]<a class="headerlink" href="#grid-config-source" title="Link to this heading"></a></h3>
+<section id="magnetostatic-functions">
+<h3>Magnetostatic functions<a class="headerlink" href="#magnetostatic-functions" title="Link to this heading"></a></h3>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">grid_config</span><span class="p">(</span>
-    <span class="n">spots</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
-    <span class="n">area</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
-    <span class="n">filled_pos</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">n_pts</span><span class="p">:</span> <span class="n">List</span> <span class="o">=</span> <span class="p">[</span><span class="mi">20</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
-    <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;uniform&quot;</span><span class="p">,</span>
-    <span class="n">n_tiles</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">mag_angles</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">spots</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">area</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">filled_pos</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">n_pts</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"uniform"</span><span class="p">,</span>
+    <span class="n">n_tiles</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">mag_angles</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">B_rem</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.2</span><span class="p">,</span>
     <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Tiles</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
 </pre></div>
 </div>
-</section>
-<section id="iterate-magnetization-source">
-<h3>iterate_magnetization [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L666">source</a>]<a class="headerlink" href="#iterate-magnetization-source" title="Link to this heading"></a></h3>
-<p>Iterate through tiles to determine their influence on each other.</p>
+<p>Builds a grid of prism tiles together with a set of evaluation points.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">run_simulation</span><span class="p">(</span>
+    <span class="n">tiles</span><span class="p">:</span> <span class="n">Tiles</span><span class="p">,</span>
+    <span class="n">pts</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">obs_size</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">max_error</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
+    <span class="n">max_it</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
+    <span class="n">T</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">300.0</span><span class="p">,</span>
+    <span class="n">mu_r</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Tiles</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Iterates the magnetization of the tiles and returns them together with the
+H-field in the evaluation points. <code class="docutils literal notranslate"><span class="pre">obs_size</span></code> is an optional argument which
+gives the size of the observation cell, when using the volume-averaged prism
+(tile_type = 8) tensor.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">iterate_magnetization</span><span class="p">(</span>
     <span class="n">tiles</span><span class="p">:</span> <span class="n">Tiles</span><span class="p">,</span>
     <span class="n">max_error</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
     <span class="n">max_it</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
-    <span class="n">T</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">300.</span><span class="p">,</span>
+    <span class="n">T</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">300.0</span><span class="p">,</span>
     <span class="n">mu_r</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">20</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tiles</span>
 </pre></div>
 </div>
-</section>
-<section id="get-demag-tensor-source">
-<h3>get_demag_tensor [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L724">source</a>]<a class="headerlink" href="#get-demag-tensor-source" title="Link to this heading"></a></h3>
-<p>Get demagnetization tensor of tiles and the specified evaluation points.</p>
+<p>Iterates through the tiles to determine their influence on each other.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_demag_tensor</span><span class="p">(</span>
     <span class="n">tiles</span><span class="p">:</span> <span class="n">Tiles</span><span class="p">,</span>
-    <span class="n">pts</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="n">pts</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">obs_size</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
 </pre></div>
 </div>
-</section>
-<section id="get-h-field-source">
-<h3>get_H_field [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L763">source</a>]<a class="headerlink" href="#get-h-field-source" title="Link to this heading"></a></h3>
-<p>Calculate the demagnetizing field strength of a magnetic setup.</p>
+<p>Returns the demagnetization tensor of the tiles at the evaluation points.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_H_field</span><span class="p">(</span>
     <span class="n">tiles</span><span class="p">:</span> <span class="n">Tiles</span><span class="p">,</span>
     <span class="n">pts</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
-    <span class="n">demag_tensor</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">demag_tensor</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
 </pre></div>
 </div>
-</section>
-<section id="run-simulation-source">
-<h3>run_simulation [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/magstatics.py#L601">source</a>]<a class="headerlink" href="#run-simulation-source" title="Link to this heading"></a></h3>
-<p>Run MagTense with the Fortran source code as Python module.</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">run_simulation</span><span class="p">(</span>
-    <span class="n">tiles</span><span class="p">:</span> <span class="n">Tiles</span><span class="p">,</span>
-    <span class="n">pts</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
-    <span class="n">max_error</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
-    <span class="n">max_it</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
-    <span class="n">T</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">300.</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Tiles</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<p>Calculates the demagnetizing field of a magnetic setup. Passing a
+precalculated <code class="docutils literal notranslate"><span class="pre">demag_tensor</span></code> avoids recomputing it when the geometry does not
+change.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_H_field_fmm</span><span class="p">(</span>
+    <span class="n">tiles</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span> <span class="n">nterms_in</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">cells_per_node</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">nlmin</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">nlmax</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ifunif</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">do_target</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">do_FI</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_pts</span><span class="o">=-</span><span class="mi">1</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
 </pre></div>
 </div>
+<p>FMM-backed H-field. This is a test version that uses a single dipole per tile
+and requires a build with <code class="docutils literal notranslate"><span class="pre">USE_FMM3D=1</span></code>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_rotmat</span><span class="p">(</span><span class="n">rot</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+</pre></div>
+</div>
+<p>Rotation matrix corresponding to the three rotation angles of a tile.</p>
 </section>
-<section id="create-plot-source">
-<h3>create_plot [<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/00179ccaa29a5c452de1aa1f6991df2bdc9ed9e1/python/src/magtense/utils.py#L452">source</a>]<a class="headerlink" href="#create-plot-source" title="Link to this heading"></a></h3>
-<p>Creates a plot with the iterated tiles and the calculated magnetic field H at the
-evaluation points as quiver plot. Additionally, an optional grid can be displayed.
-<strong>Tile types</strong>: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv, 5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">create_plot</span><span class="p">(</span>
-    <span class="n">tiles</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tiles</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">eval_pts</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">field</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">spots</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">area</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</section>
+<section id="micromagnetic-problem-class">
+<h2>Micromagnetic problem class<a class="headerlink" href="#micromagnetic-problem-class" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">magtense.micromag.MicromagProblem</span></code> defines and runs a micromagnetic problem.
+Every constructor argument is documented in
+<a class="reference internal" href="micromag_parameters.html#micromagnetic-parameter-reference"><span class="std std-ref">Micromagnetic parameter reference</span></a>; the parameters that are not
+constructor arguments are plain attributes and are listed there as well.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">MicromagProblem</span><span class="p">(</span>
+    <span class="n">res</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">grid_L</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">500e-9</span><span class="p">,</span> <span class="mf">125e-9</span><span class="p">,</span> <span class="mf">3e-9</span><span class="p">),</span>
+    <span class="n">grid_nnod</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">grid_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"uniform"</span><span class="p">,</span>
+    <span class="n">prob_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"new"</span><span class="p">,</span>
+    <span class="n">solver</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"dynamic"</span><span class="p">,</span>
+    <span class="n">m0</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">A0</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">Ms</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">K0</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">K1</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">K2</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">T</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">K0_arr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">CrysAxis</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">4.42e3</span><span class="p">,</span>
+    <span class="n">gamma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.21e5</span><span class="p">,</span>
+    <span class="n">max_T0</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">,</span>
+    <span class="n">nt_conv</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">conv_tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span><span class="p">,</span>
+    <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span><span class="p">,</span>
+    <span class="n">thres</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-6</span><span class="p">,</span>
+    <span class="n">setTimeDis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">dem_thres</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">demag_approx</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">cv</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">grid_pts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">grid_abc</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">exch_val</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exch_rows</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exch_cols</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">exch_nval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">exch_nrow</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">exch_ncols</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">exch_intpn</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"extended"</span><span class="p">,</span>
+    <span class="n">exch_meth</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"directlaplacianneumann"</span><span class="p">,</span>
+    <span class="n">exch_weigh</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">8</span><span class="p">,</span>
+    <span class="n">exch_presize</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">12</span><span class="p">,</span>
+    <span class="n">demigstp</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">passexch</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"t"</span><span class="p">,</span>
+    <span class="n">cuda</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">cvode</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">usedemag</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">useavgn</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">usereturnhall</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">precision</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">n_threads</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">N_ave</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="n">t_alpha</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span>
+    <span class="n">alpha_fct</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">atleast_2d</span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">sampleShape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exchPBC</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">macroShape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">shiftVec</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span> <span class="n">n_macro</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
+    <span class="n">hysteresis_solver</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"static"</span><span class="p">,</span>
+    <span class="n">rng_seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </pre></div>
 </div>
+<section id="micromagnetic-run-methods">
+<h3>Micromagnetic run methods<a class="headerlink" href="#micromagnetic-run-methods" title="Link to this heading"></a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">run_simulation</span><span class="p">(</span>
+    <span class="n">t_end</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">nt</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">fct_h_ext</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+    <span class="n">nt_h_ext</span><span class="p">:</span> <span class="nb">int</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span>
+</pre></div>
+</div>
+<p>A single solve, used for both the <code class="docutils literal notranslate"><span class="pre">dynamic</span></code> and the <code class="docutils literal notranslate"><span class="pre">explicit</span></code> solver.
+<code class="docutils literal notranslate"><span class="pre">fct_h_ext</span></code> is evaluated on <code class="docutils literal notranslate"><span class="pre">nt_h_ext</span></code> uniformly spaced times between 0 and
+<code class="docutils literal notranslate"><span class="pre">t_end</span></code> and must return an <code class="docutils literal notranslate"><span class="pre">(nt_h_ext,</span> <span class="pre">3)</span></code> array. The returned list is
+described in <a class="reference internal" href="micromag_output.html#micromagnetic-output"><span class="std std-ref">Micromagnetic output</span></a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">run_hysteresis</span><span class="p">(</span><span class="n">H_ext</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span>
+</pre></div>
+</div>
+<p>A predefined sequence of applied fields, given as an <code class="docutils literal notranslate"><span class="pre">(n,4)</span></code> array of
+<code class="docutils literal notranslate"><span class="pre">[t,</span> <span class="pre">Hx,</span> <span class="pre">Hy,</span> <span class="pre">Hz]</span></code> rows. Requires <code class="docutils literal notranslate"><span class="pre">hysteresis_solver=&quot;static&quot;</span></code>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">run_hysteresis_adaptive</span><span class="p">(</span>
+    <span class="n">H_start</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">H_end</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">dH_initial</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">dH_min</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">dH_max</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">max_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">dM_min</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-3</span><span class="p">,</span>
+    <span class="n">dM_target</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-2</span><span class="p">,</span>
+    <span class="n">dM_reject</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-2</span><span class="p">,</span>
+    <span class="n">dH_grow</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.5</span><span class="p">,</span>
+    <span class="n">dH_shrink</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.75</span><span class="p">,</span>
+    <span class="n">switch_refine_dH</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span>
+</pre></div>
+</div>
+<p>A field sweep in which the solver picks the field steps itself. Requires
+<code class="docutils literal notranslate"><span class="pre">hysteresis_solver=&quot;adaptive&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">solver=&quot;explicit&quot;</span></code>. See
+<a class="reference internal" href="micromag_solvers.html#adaptive-hysteresis"><span class="std std-ref">Adaptive hysteresis</span></a>.</p>
 </section>
+</section>
+<section id="plotting-utilities">
+<h2>Plotting utilities<a class="headerlink" href="#plotting-utilities" title="Link to this heading"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">create_plot</span><span class="p">(</span>
+    <span class="n">tiles</span><span class="p">:</span> <span class="n">Tiles</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">eval_pts</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">field</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">spots</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">area</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">show</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</pre></div>
+</div>
+<p>Plots the tiles together with the calculated H-field at the evaluation points
+as a quiver plot, and optionally a grid.</p>
+<p><strong>Tile types</strong>: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
+5 = tetrahedron, 6 = sphere, 7 = spheroid, 8 = avg_prism, 10 = ellipsoid</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">plot_M_thin_film</span><span class="p">(</span>
+    <span class="n">m</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">res</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">width</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.002</span><span class="p">,</span>
+    <span class="n">headwidth</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="n">headlength</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="n">figpath</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</pre></div>
+</div>
+<p>Plots the in-plane magnetization of a thin-film micromagnetic problem.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">plot_magfield</span><span class="p">(</span>
+    <span class="n">field</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">magnet</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">vmax</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</pre></div>
+</div>
+<p>Plots the components of a field on a regular grid as images.</p>
+<p>Further helpers in <code class="docutils literal notranslate"><span class="pre">magtense.utils</span></code> include <code class="docutils literal notranslate"><span class="pre">plot_M_avg_seq</span></code>,
+<code class="docutils literal notranslate"><span class="pre">plot_field</span></code>, <code class="docutils literal notranslate"><span class="pre">plot_grid</span></code>, <code class="docutils literal notranslate"><span class="pre">plot_Halbach</span></code>, <code class="docutils literal notranslate"><span class="pre">load_COMSOL</span></code> and
+<code class="docutils literal notranslate"><span class="pre">validation</span></code>, as well as the individual tile plotting routines
+<code class="docutils literal notranslate"><span class="pre">plot_cube</span></code>, <code class="docutils literal notranslate"><span class="pre">plot_sphere</span></code>, <code class="docutils literal notranslate"><span class="pre">plot_spheroid</span></code>, <code class="docutils literal notranslate"><span class="pre">plot_tetrahedron</span></code>,
+<code class="docutils literal notranslate"><span class="pre">plot_cylindrical</span></code> and <code class="docutils literal notranslate"><span class="pre">plot_circpiece</span></code>.</p>
 </section>
 </section>
 
@@ -212,7 +369,7 @@ evaluation points as quiver plot. Additionally, an optional grid can be displaye
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="micromagnetism.html" class="btn btn-neutral float-left" title="Micromagnetism" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="timing_and_trace.html" class="btn btn-neutral float-left" title="Performance, Timing &amp; Trace Logging" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="theory.html" class="btn btn-neutral float-right" title="Theoretical aspects" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

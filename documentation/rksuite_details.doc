@@ -1,6 +1,6 @@
 *********************** Organization of details.doc ***************************
 
- In this file, details.doc, DETAILS are provided about how the codes are 
+ In this file, details.doc, details are provided about how the codes are 
  organized.  Included are:
  (1) The ordering of the subroutines in the file rksuite.for.
  (2) For each subroutine, there is a brief description, a list of the

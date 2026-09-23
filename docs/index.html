@@ -15,8 +15,9 @@
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=5929fcd5"></script>
-      <script src="_static/doctools.js?v=9bcbadda"></script>
-      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="author" title="About these documents" href="about.html" />
     <link rel="index" title="Index" href="genindex.html" />
@@ -49,6 +50,8 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
 <li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
@@ -75,24 +78,42 @@
              
   <section id="welcome-to-magtense">
 <h1>Welcome to MagTense!<a class="headerlink" href="#welcome-to-magtense" title="Link to this heading"></a></h1>
-<p>The magnetostatic and a micromagnetism calculation framework.</p>
-<p>The magnetostatic framework is fully implemented in Fortran
-and has a Matlab MEX interface, as well as python interface.</p>
-<p>The micromagnetism model utilizes the magnetostatic framework
-for calculating the demagnetization tensor.</p>
-<p>MagTense supports both Intel MKL, CUDA and CVODE.</p>
+<p>A magnetostatic and micromagnetic calculation framework.</p>
+<p>The magnetostatic framework is fully implemented in Fortran and has both a
+Matlab MEX interface and a Python interface. It calculates the demagnetization
+tensor fully analytically for cylinders, pieces of cylinders, prisms, circular
+pieces, tetrahedra, spheres and spheroids.</p>
+<p>The micromagnetic framework solves the Landau-Lifshitz equation using that same
+analytical demagnetization tensor. It supports uniform, unstructured-prism and
+tetrahedral meshes, spatially varying material parameters, general
+magnetocrystalline anisotropy, thermal fluctuations, periodic boundary
+conditions and adaptive hysteresis calculations.</p>
+<p>MagTense uses Intel MKL, and can optionally be built with CUDA for GPU
+acceleration, with CVODE as the time integrator and with FMM3D for an
+<span class="math notranslate nohighlight">\(O(N)\)</span> demagnetization field.</p>
 <div class="line-block">
 <div class="line">Github: <a class="reference external" href="http://github.com/cmt-dtu-energy/MagTense">http://github.com/cmt-dtu-energy/MagTense</a></div>
 <div class="line">Webpage: <a class="reference external" href="http://www.magtense.org">http://www.magtense.org</a></div>
 </div>
+<section id="getting-started">
+<h2>Getting started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>magtense
+</pre></div>
+</div>
+<p>For Matlab, download the compiled MEX-files from the
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/releases">releases</a>. See
+<a class="reference internal" href="installation.html#installation"><span class="std std-ref">Installation</span></a> for details, and
+<a class="reference internal" href="micromag_setup.html#setting-up-a-micromagnetic-problem"><span class="std std-ref">Setting up a micromagnetic problem</span></a> for a first micromagnetic
+calculation.</p>
 <section id="content">
-<h2>Content<a class="headerlink" href="#content" title="Link to this heading"></a></h2>
+<h3>Content<a class="headerlink" href="#content" title="Link to this heading"></a></h3>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="installation.html#matlab">Matlab</a></li>
 <li class="toctree-l2"><a class="reference internal" href="installation.html#python">Python</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#matlab">Matlab</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#building-from-source">Building from source</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a><ul>
@@ -103,14 +124,42 @@ for calculating the demagnetization tensor.</p>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#basic-input">Basic input</a></li>
-<li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#anisotropy-constants">Anisotropy constants</a></li>
-<li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#dynamic-simulations">Dynamic simulations</a></li>
-<li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#hysteresis-loop-simulation">Hysteresis loop simulation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_setup.html">Setting up a micromagnetic problem</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_grid.html">Grids and meshes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_material.html">Material parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html">Exchange interaction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html">Demagnetization field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_solvers.html">Solvers and time integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_pbc.html">Periodic boundaries and macrogeometry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_thermal.html">Thermal fluctuations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_output.html">Micromagnetic output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html">Micromagnetic parameter reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html">Micromagnetic examples and validation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#the-equation-that-is-solved">The equation that is solved</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="demag_fmm.html#implementation-and-attribution">Implementation and attribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="demag_fmm.html#compilation">Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="demag_fmm.html#optimization-persistent-tree-structure">Optimization: persistent tree structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="demag_fmm.html#near-field-evaluation-and-neighbour-tensors">Near-field evaluation and neighbour tensors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="demag_fmm.html#fmm-input-variables">FMM input variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="demag_fmm.html#fmm-python-example">FMM Python example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="demag_fmm.html#fmm-matlab-example">FMM Matlab example</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="timing_and_trace.html#trace-and-timing-variables">Trace and timing variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="timing_and_trace.html#timing-windowing">Timing &amp; Windowing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="timing_and_trace.html#developer-integration-trace-api">Developer integration: trace API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="timing_and_trace.html#python-trace-example">Python trace example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="timing_and_trace.html#matlab-trace-example">Matlab trace example</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="documentation.html#python">Python</a></li>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#magnetostatics">Magnetostatics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#micromagnetic-problem-class">Micromagnetic problem class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#plotting-utilities">Plotting utilities</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a><ul>
@@ -126,6 +175,7 @@ for calculating the demagnetization tensor.</p>
 </li>
 </ul>
 </div>
+</section>
 </section>
 </section>
 

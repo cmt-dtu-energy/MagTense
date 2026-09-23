@@ -1,0 +1,374 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exchange interaction &mdash; MagTense TechManual  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/techmanual.css?v=903b4c53" />
+
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Demagnetization field" href="micromag_demag.html" />
+    <link rel="prev" title="Material parameters" href="micromag_material.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/MagTense_logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="micromag_setup.html">Setting up a micromagnetic problem</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_grid.html">Grids and meshes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_material.html">Material parameters</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Exchange interaction</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#exchange-on-a-uniform-grid">Exchange on a uniform grid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#exchange-on-unstructured-meshes">Exchange on unstructured meshes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#exchange-across-a-material-interface">Exchange across a material interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#supplying-the-exchange-matrix-directly">Supplying the exchange matrix directly</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#returning-the-exchange-matrix">Returning the exchange matrix</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html">Demagnetization field</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_solvers.html">Solvers and time integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_pbc.html">Periodic boundaries and macrogeometry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_thermal.html">Thermal fluctuations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_output.html">Micromagnetic output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html">Micromagnetic parameter reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html">Micromagnetic examples and validation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#the-equation-that-is-solved">The equation that is solved</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #cccccc" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTense>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="exchange-interaction">
+<h1>Exchange interaction<a class="headerlink" href="#exchange-interaction" title="Link to this heading"></a></h1>
+<p>The exchange field is computed as</p>
+<div class="math notranslate nohighlight">
+\[\mathbf{H}_\mathrm{exc} = \frac{2}{\mu_0 M_s}\, \nabla\cdot\left( A_0 \nabla \mathbf{m} \right),\]</div>
+<p>which the solver evaluates as a sparse matrix - the <em>exchange operator</em> -
+acting on each Cartesian component of <span class="math notranslate nohighlight">\(\mathbf{m}\)</span>. How that matrix is
+built depends on the grid type.</p>
+<section id="exchange-on-a-uniform-grid">
+<h2>Exchange on a uniform grid<a class="headerlink" href="#exchange-on-a-uniform-grid" title="Link to this heading"></a></h2>
+<p>On a uniform grid the operator is the finite-difference Laplacian
+<span class="math notranslate nohighlight">\(\partial^2/\partial x^2 + \partial^2/\partial y^2 + \partial^2/\partial z^2\)</span>
+with Neumann (free) boundary conditions, assembled directly in CSR format. A
+direction with a single cell is dropped from the operator.</p>
+<p>A spatially varying exchange stiffness is handled through the modified stencil
+of Heistracher <em>et al.</em>, <a class="reference external" href="https://doi.org/10.1016/j.jmmm.2021.168875">Proposal for a micromagnetic standard problem: domain
+wall pinning at phase boundaries</a>, so that a phase boundary
+between two materials with different <span class="math notranslate nohighlight">\(A_0\)</span> is treated correctly. This is
+what the standard problem 6 example tests.</p>
+<p>Periodic boundaries along any subset of the three directions are available on
+the uniform grid, see <a class="reference internal" href="micromag_pbc.html#periodic-exchange-boundaries"><span class="std std-ref">Periodic exchange boundaries</span></a>.</p>
+</section>
+<section id="exchange-on-unstructured-meshes">
+<h2>Exchange on unstructured meshes<a class="headerlink" href="#exchange-on-unstructured-meshes" title="Link to this heading"></a></h2>
+<p>For the <code class="docutils literal notranslate"><span class="pre">unstructuredPrisms</span></code> and <code class="docutils literal notranslate"><span class="pre">tetrahedron</span></code> grids the operator is built
+from the mesh by <code class="docutils literal notranslate"><span class="pre">computeDifferentialOperatorsFromMesh_DirectLap</span></code>, which is
+given the faces, face normals, areas, volumes and interpolation stencils that a
+mesh analysis has worked out beforehand. There is one analysis per grid type:
+<code class="docutils literal notranslate"><span class="pre">UnstructuredMeshAnalysis.f90</span></code> for the prisms works from the cell
+centres and sizes and finds the neighbours geometrically.
+<code class="docutils literal notranslate"><span class="pre">TetrahedralMeshAnalysis.f90</span></code> for the tetrahedra works from the
+connectivity - two tetrahedra are neighbours when they share three nodes, and
+the face they share is the one opposite the node they do not. Both are run by
+MagTense itself, so giving the mesh is all that is needed; see
+<a class="reference internal" href="micromag_grid.html#tetrahedral-grid"><span class="std std-ref">Tetrahedral grid</span></a> for how a tetrahedral mesh is passed in.</p>
+<p>The method used to turn that into the operator is described in</p>
+<p><a class="reference external" href="https://www.sciencedirect.com/science/article/pii/S0304885322000671">Poulsen, E. B., Insinga, A. R. and Bjørk, R.: Direct exchange calculation for
+unstructured micromagnetic meshes, Journal of Magnetism and Magnetic Materials,
+551, 169093, 2022</a></p>
+<p>and in the <code class="docutils literal notranslate"><span class="pre">DifferentialOperatorMeshes</span></code> note in the <code class="docutils literal notranslate"><span class="pre">documentation</span></code> folder
+of the repository. Three parameters control it.</p>
+<p><strong>Exchange method</strong> - <code class="docutils literal notranslate"><span class="pre">exch_meth</span></code> (Matlab
+<code class="docutils literal notranslate"><span class="pre">setMicroMagExchMethod</span></code>, Python <code class="docutils literal notranslate"><span class="pre">exch_meth</span></code>):</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 8.0%" />
+<col style="width: 62.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DirectLaplacianNeumann</span></code></p></td>
+<td><p>1</p></td>
+<td><p>Default. The face interpolation produces the <em>gradient</em> on each face and
+the second step assembles <span class="math notranslate nohighlight">\(\nabla\cdot(A\nabla\phi)\)</span> directly,
+taking the local exchange stiffness into account.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">GGNeumann</span></code></p></td>
+<td><p>2</p></td>
+<td><p>Green-Gauss. The face interpolation produces <span class="math notranslate nohighlight">\(\phi\)</span> on each face
+and the operator is formed as the product of two first-order operators.</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Interpolation stencil</strong> - <code class="docutils literal notranslate"><span class="pre">exch_intpn</span></code> (Matlab
+<code class="docutils literal notranslate"><span class="pre">setMicroMagExchInterpn</span></code>, Python <code class="docutils literal notranslate"><span class="pre">exch_intpn</span></code>):</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 8.0%" />
+<col style="width: 62.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Extended</span></code></p></td>
+<td><p>1</p></td>
+<td><p>Default. The face value is interpolated from all elements that share at
+least a vertex with the face, which gives a wide and robust stencil on
+an irregular mesh.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Compact</span></code></p></td>
+<td><p>2</p></td>
+<td><p>Only the elements immediately adjacent to the face are used. The solver
+prints <code class="docutils literal notranslate"><span class="pre">Warning:</span> <span class="pre">untested</span> <span class="pre">method:</span> <span class="pre">compact</span></code> when this is selected.</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Weighting</strong> - <code class="docutils literal notranslate"><span class="pre">exch_weigh</span></code> (default <code class="docutils literal notranslate"><span class="pre">8.0</span></code>) is the exponent of the
+inverse-distance weighting used in the face interpolation. A large exponent
+makes the interpolation approach a nearest-neighbour average.</p>
+</section>
+<section id="exchange-across-a-material-interface">
+<h2>Exchange across a material interface<a class="headerlink" href="#exchange-across-a-material-interface" title="Link to this heading"></a></h2>
+<p>Where two cells with different exchange stiffness share a face, the exchange
+that couples them is by default the harmonic mean of the two values,</p>
+<div class="math notranslate nohighlight">
+\[A_\mathrm{face} = \frac{2 A_1 A_2}{A_1 + A_2} ,\]</div>
+<p>on both grid types. The harmonic mean is the natural choice when the two
+materials are simply different regions of one exchange-coupled body, but it is
+a modelling assumption rather than a measured quantity: the exchange across a
+real phase boundary depends on the interface itself and is often weaker than
+either bulk value. It can therefore be specified directly.</p>
+<p>The interface value is given per <strong>pair of materials</strong>, not as a single number.
+Each cell is labelled with a material index, and a table gives the exchange to
+use for each pair of labels:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 22.0%" />
+<col style="width: 12.0%" />
+<col style="width: 44.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Matlab</p></th>
+<th class="head"><p>Python</p></th>
+<th class="head"><p>Unit</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">n_phase</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">n_phase</span></code></p></td>
+<td><p>-</p></td>
+<td><p>Number of distinct materials. The default of 1 disables the feature.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">phase_id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">phase_id</span></code></p></td>
+<td><p>-</p></td>
+<td><p>Material index of every cell, an <code class="docutils literal notranslate"><span class="pre">(ntot,1)</span></code> array with entries in
+<code class="docutils literal notranslate"><span class="pre">1..n_phase</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">A_int</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">A_int</span></code></p></td>
+<td><p>J/m</p></td>
+<td><p>Symmetric <code class="docutils literal notranslate"><span class="pre">(n_phase,</span> <span class="pre">n_phase)</span></code> table of interface exchange values. A
+negative entry means <em>use the harmonic mean</em> for that pair.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Keying the value on the pair of materials keeps it well defined for any number
+of materials. Every internal face lies between exactly two cells, so even where
+three or more materials meet, each individual face is still an unambiguous
+two-material interface.</p>
+<p>Only pairs of <em>different</em> materials are consulted: two cells of the same
+material always use the harmonic mean, so the diagonal of <code class="docutils literal notranslate"><span class="pre">A_int</span></code> is never
+read. Because a negative entry falls back to the harmonic mean, a table can
+override only the pairs of interest and leave the rest at the default.</p>
+<p>In Matlab:</p>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="p">.</span><span class="n">n_phase</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">phase_id</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">phase_id</span><span class="p">;</span><span class="w">            </span><span class="c">% 1 or 2 for every tile</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">A_int</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="w">   </span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mf">3e-12</span><span class="p">;</span><span class="w"> </span><span class="k">...</span><span class="c">   % 3 pJ/m across the 1-2 interface</span>
+<span class="w">                    </span><span class="mf">3e-12</span><span class="p">,</span><span class="w">    </span><span class="o">-</span><span class="mi">1</span><span class="p">];</span><span class="w">      </span><span class="c">% diagonal unused, negative = default</span>
+</pre></div>
+</div>
+<p>and in Python, either as constructor arguments or afterwards:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">phase_id</span><span class="o">=</span><span class="n">phase_id</span><span class="p">,</span> <span class="n">A_int</span><span class="o">=</span><span class="n">A_int</span><span class="p">)</span>
+<span class="c1"># or</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">set_interface_exchange</span><span class="p">(</span><span class="n">phase_id</span><span class="p">,</span> <span class="n">A_int</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The table must be symmetric. An asymmetric table would make the exchange across
+a face depend on which of the two cells it is asked from, which is not a
+physical operator, so it is rejected with an error rather than silently
+symmetrised. Out-of-range or wrongly sized <code class="docutils literal notranslate"><span class="pre">phase_id</span></code> arrays are rejected in
+the same way.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Setting <code class="docutils literal notranslate"><span class="pre">A_int</span></code> to the harmonic mean of the two materials reproduces the
+default operator exactly, to the last bit, on both grid types. That makes it
+easy to confirm a model has been set up as intended before changing the
+interface value.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A cell with <span class="math notranslate nohighlight">\(A_0 = 0\)</span> is not magnetic and carries no exchange, so a
+face touching one stays uncoupled whatever the table says. This is what the
+harmonic mean does by itself, since it vanishes as soon as either side is
+zero, and it holds on both grid types. Such a cell also takes no part in the
+face interpolation on an unstructured mesh, so nothing in the mesh depends on
+its magnetisation.</p>
+</div>
+</section>
+<section id="supplying-the-exchange-matrix-directly">
+<h2>Supplying the exchange matrix directly<a class="headerlink" href="#supplying-the-exchange-matrix-directly" title="Link to this heading"></a></h2>
+<p>The exchange operator may be computed outside MagTense and passed in, which
+skips the mesh analysis entirely. The matrix is given in coordinate (COO)
+format. In Matlab:</p>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setExchangeMatrixCOO</span><span class="p">(</span><span class="w"> </span><span class="n">nrows</span><span class="p">,</span><span class="w"> </span><span class="n">ncols</span><span class="p">,</span><span class="w"> </span><span class="n">rows</span><span class="p">,</span><span class="w"> </span><span class="n">cols</span><span class="p">,</span><span class="w"> </span><span class="nb">values</span><span class="w"> </span><span class="p">);</span>
+</pre></div>
+</div>
+<p>which sets <code class="docutils literal notranslate"><span class="pre">passExch</span> <span class="pre">=</span> <span class="pre">1</span></code> together with <code class="docutils literal notranslate"><span class="pre">exch_nrow</span></code>, <code class="docutils literal notranslate"><span class="pre">exch_ncol</span></code>,
+<code class="docutils literal notranslate"><span class="pre">exch_nval</span></code>, <code class="docutils literal notranslate"><span class="pre">exch_rows</span></code>, <code class="docutils literal notranslate"><span class="pre">exch_cols</span></code> and <code class="docutils literal notranslate"><span class="pre">exch_val</span></code>. In Python the
+same fields are constructor arguments (<code class="docutils literal notranslate"><span class="pre">exch_val</span></code>, <code class="docutils literal notranslate"><span class="pre">exch_rows</span></code>,
+<code class="docutils literal notranslate"><span class="pre">exch_cols</span></code>, <code class="docutils literal notranslate"><span class="pre">exch_nval</span></code>, <code class="docutils literal notranslate"><span class="pre">exch_nrow</span></code>, <code class="docutils literal notranslate"><span class="pre">exch_ncols</span></code>) together with
+<code class="docutils literal notranslate"><span class="pre">passexch=1</span></code>.</p>
+<p>A matrix passed in this way carries its own boundary conditions, so the
+<code class="docutils literal notranslate"><span class="pre">exchPBC</span></code> setting is not applied to it.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Row and column indices are 1-based, as in Fortran and Matlab.</p>
+</div>
+</section>
+<section id="returning-the-exchange-matrix">
+<h2>Returning the exchange matrix<a class="headerlink" href="#returning-the-exchange-matrix" title="Link to this heading"></a></h2>
+<p>The assembled exchange matrix is returned to the caller, which is useful both
+for inspection and for reusing the same operator in a later run. In Matlab it
+is part of the <code class="docutils literal notranslate"><span class="pre">GridInfo</span></code> output as <code class="docutils literal notranslate"><span class="pre">ExchMat_r</span></code>, <code class="docutils literal notranslate"><span class="pre">ExchMat_c</span></code>,
+<code class="docutils literal notranslate"><span class="pre">ExchMat_v</span></code>, <code class="docutils literal notranslate"><span class="pre">ExchMat_nr</span></code> and <code class="docutils literal notranslate"><span class="pre">ExchMat_nc</span></code>. In Python the same arrays are
+elements 7-12 of the result list returned by <code class="docutils literal notranslate"><span class="pre">run_simulation</span></code>.</p>
+<p>Because Python has to preallocate the arrays that the values are copied into,
+the parameter <code class="docutils literal notranslate"><span class="pre">exch_presize</span></code> sets their length as <code class="docutils literal notranslate"><span class="pre">exch_presize</span> <span class="pre">*</span> <span class="pre">ntot</span></code>.
+The default of 12 is enough for a uniform grid; unstructured meshes with wide
+stencils need more, and the solver prints the required value if the array is
+too small:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="o">.</span><span class="n">exch_presize</span> <span class="o">=</span> <span class="mi">28</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="micromag_material.html" class="btn btn-neutral float-left" title="Material parameters" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="micromag_demag.html" class="btn btn-neutral float-right" title="Demagnetization field" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright MagTense Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>  
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>

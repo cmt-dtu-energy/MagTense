@@ -1,0 +1,282 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Performance, Timing &amp; Trace Logging &mdash; MagTense TechManual  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/techmanual.css?v=903b4c53" />
+
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Documentation" href="documentation.html" />
+    <link rel="prev" title="Demag field - FMM" href="demag_fmm.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/MagTense_logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a></li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Performance, Timing &amp; Trace Logging</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#trace-and-timing-variables">Trace and timing variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#timing-windowing">Timing &amp; Windowing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#developer-integration-trace-api">Developer integration: trace API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#python-trace-example">Python trace example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#matlab-trace-example">Matlab trace example</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #cccccc" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTense>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="performance-timing-trace-logging">
+<h1>Performance, Timing &amp; Trace Logging<a class="headerlink" href="#performance-timing-trace-logging" title="Link to this heading"></a></h1>
+<p>MagTense includes a <strong>trace and timing module</strong> (in the <code class="docutils literal notranslate"><span class="pre">AuxMT</span></code> sub-project)
+for performance profiling of the Fortran core. Note that because parameters are
+passed between Matlab/Python and Fortran, boolean flags are represented as
+integers: <strong>1 for true, 0 for false</strong>.</p>
+<section id="trace-and-timing-variables">
+<h2>Trace and timing variables<a class="headerlink" href="#trace-and-timing-variables" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 20.0%" />
+<col style="width: 8.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Python</p></th>
+<th class="head"><p>Matlab</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">log_dir</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">log_dir</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Directory that both log files are written to. Default <code class="docutils literal notranslate"><span class="pre">&quot;logs&quot;</span></code>. In
+Matlab set it with <code class="docutils literal notranslate"><span class="pre">setLogDirFilename</span></code>, which also stores the string
+length in <code class="docutils literal notranslate"><span class="pre">N_log_dir</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">timer_log_file</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">timer_log</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Name of the timing log file. Default <code class="docutils literal notranslate"><span class="pre">&quot;timing.log&quot;</span></code>. Matlab:
+<code class="docutils literal notranslate"><span class="pre">setTimerLogFilename</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">trace_log_file</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">trace_log</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Name of the trace log file. Default <code class="docutils literal notranslate"><span class="pre">&quot;trace.log&quot;</span></code>. Matlab:
+<code class="docutils literal notranslate"><span class="pre">setTraceLogFilename</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">window_enabled</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">window_ena</span></code></p></td>
+<td><p>int</p></td>
+<td><p><strong>1</strong> to enable windowed timing, <strong>0</strong> to output only at the end.
+Default 1.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">window_interval</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">window_int</span></code></p></td>
+<td><p>float</p></td>
+<td><p>Timing output frequency in <strong>seconds</strong>. Default 30.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">trace_enabled</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">trace_ena</span></code></p></td>
+<td><p>int</p></td>
+<td><p><strong>1</strong> to enable the execution trace. <strong>Warning: significant performance
+cost.</strong> Default 0.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">flush_each</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">flush_each</span></code></p></td>
+<td><p>int</p></td>
+<td><p><strong>1</strong> to flush the file after every trace entry: safe but slow. Default
+1.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">trace_verbose</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">trace_verb</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Only trace events with a verbosity <span class="math notranslate nohighlight">\(\geq\)</span> this value are logged.
+Default 1.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The log directory is created if it does not exist, on both Windows and
+Unix-like systems. If the creation fails, the module writes
+<code class="docutils literal notranslate"><span class="pre">TRACE:</span> <span class="pre">failed</span> <span class="pre">to</span> <span class="pre">create</span> <span class="pre">log</span> <span class="pre">directory</span></code> to standard error and the run
+continues.</p>
+</div>
+</section>
+<section id="timing-windowing">
+<h2>Timing &amp; Windowing<a class="headerlink" href="#timing-windowing" title="Link to this heading"></a></h2>
+<p>If <code class="docutils literal notranslate"><span class="pre">window_enabled</span> <span class="pre">=</span> <span class="pre">1</span></code>, the module tracks elapsed time. Once
+<code class="docutils literal notranslate"><span class="pre">window_interval</span></code> is exceeded, the next recorded event triggers a flush of
+the accumulated timing data for that window into the timing log. This gives a
+running picture of where the time goes in a long simulation, rather than a
+single summary at the end.</p>
+<p>The instrumented regions correspond to the main phases of the solver, such as
+<code class="docutils literal notranslate"><span class="pre">SolveLandauLifshitzEquation</span></code>, <code class="docutils literal notranslate"><span class="pre">ComputeDemagfieldTensor</span></code>,
+<code class="docutils literal notranslate"><span class="pre">ComputeExchangeTerm3D_Uniform</span></code>, <code class="docutils literal notranslate"><span class="pre">dmdt_fct</span></code>, <code class="docutils literal notranslate"><span class="pre">updateDemagfield</span></code>,
+<code class="docutils literal notranslate"><span class="pre">updateExchangeTerms</span></code> and <code class="docutils literal notranslate"><span class="pre">updateAnisotropy</span></code>, so the log shows directly
+whether a run is dominated by tensor construction or by the time integration.</p>
+</section>
+<section id="developer-integration-trace-api">
+<h2>Developer integration: trace API<a class="headerlink" href="#developer-integration-trace-api" title="Link to this heading"></a></h2>
+<p>When adding new Fortran code, use the following paired call structure:</p>
+<div class="highlight-fortran notranslate"><div class="highlight"><pre><span></span><span class="k">call </span><span class="n">trace</span><span class="p">%</span><span class="n">begin</span><span class="p">(</span><span class="n">label</span><span class="p">,</span><span class="w"> </span><span class="n">itimer</span><span class="o">=</span><span class="n">itime_counter</span><span class="p">,</span><span class="w"> </span><span class="n">verbose</span><span class="o">=</span><span class="n">int_value</span><span class="p">)</span>
+<span class="c">! ... [computational code] ...</span>
+<span class="k">call </span><span class="n">trace</span><span class="p">%</span><span class="k">end</span><span class="p">(</span><span class="n">label</span><span class="p">,</span><span class="w"> </span><span class="n">itimer</span><span class="o">=</span><span class="n">itime_counter</span><span class="p">,</span><span class="w"> </span><span class="n">verbose</span><span class="o">=</span><span class="n">int_value</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Requirements:</strong></p>
+<ul class="simple">
+<li><p>The <strong>label</strong>, <strong>itimer</strong> and <strong>verbose</strong> value <strong>must</strong> be identical in both
+calls.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">itimer</span></code> must be a saved integer within the function scope:</p></li>
+</ul>
+<div class="highlight-fortran notranslate"><div class="highlight"><pre><span></span><span class="kt">integer</span><span class="p">,</span><span class="w"> </span><span class="k">save</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">itimer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+</pre></div>
+</div>
+<p>Verbosity 1 is used for the top-level phases and 2 for the inner routines, so
+<code class="docutils literal notranslate"><span class="pre">trace_verbose</span> <span class="pre">=</span> <span class="pre">1</span></code> gives a coarse picture and higher values progressively
+more detail.</p>
+</section>
+<section id="python-trace-example">
+<h2>Python trace example<a class="headerlink" href="#python-trace-example" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="o">.</span><span class="n">log_dir</span> <span class="o">=</span> <span class="s2">"./logs"</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">timer_log_file</span> <span class="o">=</span> <span class="s2">"timing.log"</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">trace_log_file</span> <span class="o">=</span> <span class="s2">"trace.log"</span>
+
+<span class="c1"># Timing window: output stats every 60 seconds</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">window_enabled</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">window_interval</span> <span class="o">=</span> <span class="mf">60.0</span>
+
+<span class="c1"># Trace configuration</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">trace_enabled</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># Disabled for speed</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">trace_verbose</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">flush_each</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">run_simulation</span><span class="p">(</span>
+    <span class="n">t_end</span><span class="o">=</span><span class="n">t_end</span><span class="p">,</span> <span class="n">nt</span><span class="o">=</span><span class="n">nt</span><span class="p">,</span> <span class="n">fct_h_ext</span><span class="o">=</span><span class="n">h_ext_fct</span><span class="p">,</span> <span class="n">nt_h_ext</span><span class="o">=</span><span class="n">nt_h_ext</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="matlab-trace-example">
+<h2>Matlab trace example<a class="headerlink" href="#matlab-trace-example" title="Link to this heading"></a></h2>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setLogDirFilename</span><span class="p">(</span><span class="w"> </span><span class="s">'logs'</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTimerLogFilename</span><span class="p">(</span><span class="w"> </span><span class="s">'timing.log'</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTraceLogFilename</span><span class="p">(</span><span class="w"> </span><span class="s">'trace.log'</span><span class="w"> </span><span class="p">);</span>
+
+<span class="n">problem</span><span class="p">.</span><span class="n">window_ena</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">window_int</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="mf">60.0</span><span class="p">;</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">trace_ena</span><span class="w">   </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">flush_each</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="n">problem</span><span class="p">.</span><span class="n">trace_verb</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="demag_fmm.html" class="btn btn-neutral float-left" title="Demag field - FMM" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="documentation.html" class="btn btn-neutral float-right" title="Documentation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright MagTense Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>  
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>

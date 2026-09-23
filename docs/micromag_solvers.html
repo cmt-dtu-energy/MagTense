@@ -1,0 +1,427 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Solvers and time integration &mdash; MagTense TechManual  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/techmanual.css?v=903b4c53" />
+
+  
+    <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Periodic boundaries and macrogeometry" href="micromag_pbc.html" />
+    <link rel="prev" title="Demagnetization field" href="micromag_demag.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #cccccc" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/MagTense_logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calculations.html">Calculations</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="micromagnetism.html">Micromagnetism</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="micromag_setup.html">Setting up a micromagnetic problem</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_grid.html">Grids and meshes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_material.html">Material parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_exchange.html">Exchange interaction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_demag.html">Demagnetization field</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Solvers and time integration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#solver-type">Solver type</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#time-grid-and-applied-field">Time grid and applied field</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ode-solver-settings">ODE solver settings</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#hysteresis-simulations">Hysteresis simulations</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#adaptive-hysteresis">Adaptive hysteresis</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_pbc.html">Periodic boundaries and macrogeometry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_thermal.html">Thermal fluctuations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_output.html">Micromagnetic output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_parameters.html">Micromagnetic parameter reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromag_examples.html">Micromagnetic examples and validation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="micromagnetism.html#the-equation-that-is-solved">The equation that is solved</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="demag_fmm.html">Demag field - FMM</a></li>
+<li class="toctree-l1"><a class="reference internal" href="timing_and_trace.html">Performance, Timing &amp; Trace Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="theory.html">Theoretical aspects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gallery.html">Gallery</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #cccccc" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MagTense TechManual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div class=techmanualtop>
+    <a href=http://www.magtense.org>webpage</a>
+    | <a href=http://github.com/cmt-dtu-energy/MagTense>github</a>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="solvers-and-time-integration">
+<h1>Solvers and time integration<a class="headerlink" href="#solvers-and-time-integration" title="Link to this heading"></a></h1>
+<section id="solver-type">
+<h2>Solver type<a class="headerlink" href="#solver-type" title="Link to this heading"></a></h2>
+<p>The solver is selected with <code class="docutils literal notranslate"><span class="pre">setMicroMagSolver</span></code> in Matlab and with the
+<code class="docutils literal notranslate"><span class="pre">solver</span></code> argument in Python.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 8.0%" />
+<col style="width: 72.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Dynamic</span></code></p></td>
+<td><p>2</p></td>
+<td><p>Integrates the Landau-Lifshitz equation in time under a single,
+time-varying applied field. The field is linearly interpolated from the
+tabulated values at the requested time.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Explicit</span></code></p></td>
+<td><p>1</p></td>
+<td><p>Treats every row of the applied-field table as a separate, <em>constant</em>
+field and relaxes the magnetization to equilibrium for each of them in
+turn, starting from the state reached at the previous field. This is the
+quasi-static mode used for hysteresis loops.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Implicit</span></code></p></td>
+<td><p>3</p></td>
+<td><p>Not implemented. Selecting it prints a message and produces no field
+update.</p></td>
+</tr>
+</tbody>
+</table>
+<p><code class="docutils literal notranslate"><span class="pre">ProblemMod</span></code> (Python <code class="docutils literal notranslate"><span class="pre">prob_mode</span></code>) selects <code class="docutils literal notranslate"><span class="pre">new</span></code> (1) or <code class="docutils literal notranslate"><span class="pre">old</span></code> (2). Use
+<code class="docutils literal notranslate"><span class="pre">new</span></code>, which is the default; <code class="docutils literal notranslate"><span class="pre">old</span></code> skips the allocation of the solution
+arrays and only makes sense for continuing a solution inside the same process.</p>
+</section>
+<section id="time-grid-and-applied-field">
+<h2>Time grid and applied field<a class="headerlink" href="#time-grid-and-applied-field" title="Link to this heading"></a></h2>
+<p>Two independent time arrays are involved:</p>
+<ul class="simple">
+<li><p>the <strong>output times</strong> <code class="docutils literal notranslate"><span class="pre">t</span></code> (<code class="docutils literal notranslate"><span class="pre">nt</span></code> entries), at which the solution is
+returned;</p></li>
+<li><p>the <strong>applied-field table</strong> <code class="docutils literal notranslate"><span class="pre">Hext</span></code> (<code class="docutils literal notranslate"><span class="pre">nt_Hext</span></code> rows of
+<span class="math notranslate nohighlight">\([t, H_x, H_y, H_z]\)</span>).</p></li>
+</ul>
+<p>In Matlab both are set through helper methods:</p>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTime</span><span class="p">(</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">200</span><span class="p">)</span><span class="w"> </span><span class="p">);</span><span class="w">          </span><span class="c">% output times</span>
+<span class="n">HystDir</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">1</span><span class="o">/</span><span class="n">mu0</span><span class="o">*</span><span class="p">[</span><span class="o">-</span><span class="mf">24.6</span><span class="p">,</span><span class="mf">4.3</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span><span class="o">/</span><span class="mi">1000</span><span class="p">;</span><span class="w">                         </span><span class="c">% A/m</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">&gt;-</span><span class="mi">1</span><span class="p">)</span><span class="o">'.*</span><span class="n">HystDir</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">2000</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">setHext(fct,</span> <span class="pre">t_Hext)</span></code> evaluates the function handle on the given time array
+and stores the result together with the times, so the applied field can be an
+arbitrary function of time.</p>
+<p>In Python the output times follow from <code class="docutils literal notranslate"><span class="pre">t_end</span></code> and <code class="docutils literal notranslate"><span class="pre">nt</span></code>. The field
+function is passed to the run method, which evaluates it on <code class="docutils literal notranslate"><span class="pre">nt_h_ext</span></code>
+uniformly spaced times between 0 and <code class="docutils literal notranslate"><span class="pre">t_end</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">result</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">run_simulation</span><span class="p">(</span>
+    <span class="n">t_end</span><span class="o">=</span><span class="mf">1e-9</span><span class="p">,</span> <span class="n">nt</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">fct_h_ext</span><span class="o">=</span><span class="n">h_ext_fct</span><span class="p">,</span> <span class="n">nt_h_ext</span><span class="o">=</span><span class="mi">2000</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The field function must return an <code class="docutils literal notranslate"><span class="pre">(nt_h_ext,</span> <span class="pre">3)</span></code> array.</p>
+<p>For the <strong>explicit</strong> solver the same table is read differently: the time column
+is ignored and each row is one constant field to relax at. <code class="docutils literal notranslate"><span class="pre">nt_h_ext</span></code> is
+therefore the number of points on the hysteresis curve, and <code class="docutils literal notranslate"><span class="pre">t_end</span></code>/<code class="docutils literal notranslate"><span class="pre">nt</span></code>
+only control how long each relaxation is integrated and how densely the hysteresis curve is
+sampled.</p>
+<p><code class="docutils literal notranslate"><span class="pre">setTimeDis</span></code> (Python <code class="docutils literal notranslate"><span class="pre">setTimeDis</span></code>, default 10) controls how often the
+solver reports progress: a message is printed every <code class="docutils literal notranslate"><span class="pre">setTimeDis</span></code>’th
+integration step.</p>
+</section>
+<section id="ode-solver-settings">
+<h2>ODE solver settings<a class="headerlink" href="#ode-solver-settings" title="Link to this heading"></a></h2>
+<p>Two time integrators are available:</p>
+<ul class="simple">
+<li><p><strong>RKSuite</strong> - the default explicit Runge-Kutta suite, always available.</p></li>
+<li><p><strong>CVODE</strong> - from <a class="reference external" href="https://computing.llnl.gov/projects/sundials/cvode">SUNDIALS</a>,
+enabled with <code class="docutils literal notranslate"><span class="pre">setUseCVODE(true)</span></code> in Matlab or <code class="docutils literal notranslate"><span class="pre">cvode=True</span></code> in Python.
+It requires a build with <code class="docutils literal notranslate"><span class="pre">USE_CVODE=1</span></code> and is the better choice for stiff
+problems; RKSuite prints a warning suggesting CVODE when it detects
+stiffness.</p></li>
+</ul>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 18.0%" />
+<col style="width: 12.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tol</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-4</span></code></p></td>
+<td><p>Relative tolerance of the ODE solver.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">thres</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
+<td><p>Threshold value: a solution component smaller in magnitude than this is
+treated as zero by RKSuite.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">t_conv</span></code>, <code class="docutils literal notranslate"><span class="pre">nt_conv</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code>, <code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Times at which the solution is checked for convergence against the
+previous step.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">conv_tol</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-4</span></code></p></td>
+<td><p>Convergence criterion, i.e. the maximum allowed change in magnetization
+between two steps.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">t_conv</span></code> and <code class="docutils literal notranslate"><span class="pre">conv_tol</span></code> are accepted by both interfaces, but the
+early-exit convergence test inside the RKSuite driver is currently disabled
+in the source, and the CVODE path never receives them. The times in
+<code class="docutils literal notranslate"><span class="pre">t_conv</span></code> <em>are</em> merged into the integration grid, which matters for the
+thermal field because it is redrawn once per grid time, see
+<a class="reference internal" href="micromag_thermal.html#thermal-fluctuations"><span class="std std-ref">Thermal fluctuations</span></a>. Keep <code class="docutils literal notranslate"><span class="pre">t_conv</span></code> a subset of <code class="docutils literal notranslate"><span class="pre">t</span></code> unless you
+specifically want to add integration times.</p>
+</div>
+<section id="hysteresis-simulations">
+<h3>Hysteresis simulations<a class="headerlink" href="#hysteresis-simulations" title="Link to this heading"></a></h3>
+<p>A hysteresis loop is computed with the <strong>explicit</strong> solver: a sequence of
+constant applied fields is stepped through and the equilibrium magnetization is
+found at each of them, starting from the previous equilibrium state. Setting
+<code class="docutils literal notranslate"><span class="pre">gamma</span> <span class="pre">=</span> <span class="pre">0</span></code> removes the precession, which makes each relaxation considerably
+cheaper when only the equilibrium state matters.</p>
+<p>In Matlab this is just the explicit solver with a field table that walks the
+loop, as in the standard problem 2 example:</p>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagSolver</span><span class="p">(</span><span class="w"> </span><span class="s">'Explicit'</span><span class="w"> </span><span class="p">);</span>
+<span class="n">HystDir</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">1</span><span class="o">/</span><span class="n">mu0</span><span class="o">*</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span><span class="o">/</span><span class="nb">sqrt</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="n">HystDir</span><span class="o">.*</span><span class="n">t</span><span class="o">'</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="n">MaxH</span><span class="p">,</span><span class="o">-</span><span class="n">MaxH</span><span class="p">,</span><span class="mi">40</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTime</span><span class="p">(</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">40e-9</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+</pre></div>
+</div>
+<p>In Python the dedicated method <code class="docutils literal notranslate"><span class="pre">run_hysteresis</span></code> takes the field table
+directly as an <code class="docutils literal notranslate"><span class="pre">(n,4)</span></code> array, and requires <code class="docutils literal notranslate"><span class="pre">hysteresis_solver='static'</span></code>,
+which is the default:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span><span class="n">res</span><span class="o">=</span><span class="n">res</span><span class="p">,</span> <span class="n">solver</span><span class="o">=</span><span class="s1">'explicit'</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+<span class="n">H_ext</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">40</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="n">H_ext</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">max_H</span><span class="p">,</span> <span class="o">-</span><span class="n">max_H</span><span class="p">,</span> <span class="mi">40</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">hyst_dir</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">run_hysteresis</span><span class="p">(</span><span class="n">H_ext</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="adaptive-hysteresis">
+<h2>Adaptive hysteresis<a class="headerlink" href="#adaptive-hysteresis" title="Link to this heading"></a></h2>
+<p>Choosing the field steps of a loop by hand is wasteful: most of the curve is
+smooth and needs few points, while the switching region needs many. The
+adaptive hysteresis solver walks from <code class="docutils literal notranslate"><span class="pre">H_start</span></code> to <code class="docutils literal notranslate"><span class="pre">H_end</span></code> and picks the
+step length itself, based on how much the volume-averaged magnetization moved.</p>
+<p>The whole accept/reject loop runs inside Fortran in a single call. It is
+available from Python through <code class="docutils literal notranslate"><span class="pre">run_hysteresis_adaptive</span></code> and requires
+<code class="docutils literal notranslate"><span class="pre">hysteresis_solver='adaptive'</span></code> together with <code class="docutils literal notranslate"><span class="pre">solver='explicit'</span></code>. In Matlab
+the same parameters exist on the problem object (<code class="docutils literal notranslate"><span class="pre">adaptiveHext</span></code>,
+<code class="docutils literal notranslate"><span class="pre">maxHextSteps</span></code>, <code class="docutils literal notranslate"><span class="pre">H_start</span></code>, <code class="docutils literal notranslate"><span class="pre">H_end</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_initial</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_min</span></code>,
+<code class="docutils literal notranslate"><span class="pre">dH_max</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_grow</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_shrink</span></code>, <code class="docutils literal notranslate"><span class="pre">dM_min</span></code>, <code class="docutils literal notranslate"><span class="pre">dM_target</span></code>,
+<code class="docutils literal notranslate"><span class="pre">dM_reject</span></code>, <code class="docutils literal notranslate"><span class="pre">switch_refdH</span></code>, <code class="docutils literal notranslate"><span class="pre">use_sw_ref</span></code>).</p>
+<p>The step metric is the length of the change of the cell-averaged reduced
+magnetization vector across the trial field step,</p>
+<div class="math notranslate nohighlight">
+\[\mathrm{d}M = \left| \langle\mathbf{m}\rangle_\mathrm{trial}
+                   - \langle\mathbf{m}\rangle_\mathrm{before} \right| .\]</div>
+<p>The step-control logic is then</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\mathrm{d}M &gt;\)</span> <code class="docutils literal notranslate"><span class="pre">dM_reject</span></code> and <span class="math notranslate nohighlight">\(\mathrm{d}H &gt;\)</span> <code class="docutils literal notranslate"><span class="pre">dH_min</span></code>:
+the step is <strong>rejected</strong>, <code class="docutils literal notranslate"><span class="pre">dH</span></code> is multiplied by <code class="docutils literal notranslate"><span class="pre">dH_shrink</span></code> (never below
+<code class="docutils literal notranslate"><span class="pre">dH_min</span></code>) and the step is retried from the same state.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\mathrm{d}M &gt;\)</span> <code class="docutils literal notranslate"><span class="pre">dM_target</span></code>: the step is accepted but <code class="docutils literal notranslate"><span class="pre">dH</span></code> is
+reduced for the next step.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\mathrm{d}M &lt;\)</span> <code class="docutils literal notranslate"><span class="pre">dM_min</span></code>: the step is accepted and <code class="docutils literal notranslate"><span class="pre">dH</span></code> is
+multiplied by <code class="docutils literal notranslate"><span class="pre">dH_grow</span></code> for the next step, capped at <code class="docutils literal notranslate"><span class="pre">dH_max</span></code>.</p></li>
+<li><p>Optionally, if <code class="docutils literal notranslate"><span class="pre">use_sw_ref</span></code> is set, a step across which the mean
+magnetization <em>along the field direction</em> changes sign is rejected whenever
+<code class="docutils literal notranslate"><span class="pre">dH</span></code> exceeds <code class="docutils literal notranslate"><span class="pre">switch_refdH</span></code>. This forces fine sampling right at the
+switching field, which is what a coercivity calculation needs.</p></li>
+</ul>
+<p>At <code class="docutils literal notranslate"><span class="pre">dH_min</span></code> a large change is accepted rather than looping forever, and the
+solver says so in its progress output. Too many rejected steps in total aborts
+the run.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 18.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Argument</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">H_start</span></code>, <code class="docutils literal notranslate"><span class="pre">H_end</span></code></p></td>
+<td><p>-</p></td>
+<td><p>Start and end field vectors in A/m. They must differ.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dH_initial</span></code></p></td>
+<td><p>-</p></td>
+<td><p>First step length in A/m.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dH_min</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_max</span></code></p></td>
+<td><p>-</p></td>
+<td><p>Smallest and largest allowed step length in A/m.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max_steps</span></code></p></td>
+<td><p>-</p></td>
+<td><p>Maximum number of accepted field states, excluding the initial one.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dM_min</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-3</span></code></p></td>
+<td><p>Below this change the step is grown.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dM_target</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-2</span></code></p></td>
+<td><p>Above this change the step is shrunk.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dM_reject</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">5e-2</span></code></p></td>
+<td><p>Above this change the step is rejected and retried.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dH_grow</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.5</span></code></p></td>
+<td><p>Growth factor, must be larger than 1.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dH_shrink</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.75</span></code></p></td>
+<td><p>Shrink factor, must be between 0 and 1.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">switch_refine_dH</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>When given, the largest step accepted across a sign change of the mean
+magnetization along the field, in A/m.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The output arrays are preallocated to <code class="docutils literal notranslate"><span class="pre">max_steps</span></code> in Fortran and sliced on
+return, and the number of accepted steps is the last element of the returned
+list. A minimal, self-contained example is
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/adaptive_hysteresis/adaptive_hysteresis_minimal.py">adaptive_hysteresis_minimal.py</a>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span>
+    <span class="n">res</span><span class="o">=</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span>
+    <span class="n">grid_L</span><span class="o">=</span><span class="p">[</span><span class="mf">10e-9</span><span class="p">,</span> <span class="mf">10e-9</span><span class="p">,</span> <span class="mf">10e-9</span><span class="p">],</span>
+    <span class="n">solver</span><span class="o">=</span><span class="s2">"explicit"</span><span class="p">,</span>
+    <span class="n">hysteresis_solver</span><span class="o">=</span><span class="s2">"adaptive"</span><span class="p">,</span>
+    <span class="n">Ms</span><span class="o">=</span><span class="mf">2.4</span> <span class="o">/</span> <span class="n">mu0</span><span class="p">,</span> <span class="n">K0</span><span class="o">=</span><span class="mf">1e6</span><span class="p">,</span> <span class="n">A0</span><span class="o">=</span><span class="mf">7e-12</span><span class="p">,</span>
+    <span class="n">alpha</span><span class="o">=</span><span class="mf">4000.0</span><span class="p">,</span> <span class="n">gamma</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">usereturnhall</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">u_ea</span><span class="p">[:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">run_hysteresis_adaptive</span><span class="p">(</span>
+    <span class="n">H_start</span><span class="o">=</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">mu0</span> <span class="o">*</span> <span class="n">field_direction</span><span class="p">,</span>
+    <span class="n">H_end</span><span class="o">=-</span><span class="mf">2.0</span> <span class="o">/</span> <span class="n">mu0</span> <span class="o">*</span> <span class="n">field_direction</span><span class="p">,</span>
+    <span class="n">dH_initial</span><span class="o">=</span><span class="mf">0.5</span> <span class="o">/</span> <span class="n">mu0</span><span class="p">,</span>
+    <span class="n">dH_min</span><span class="o">=</span><span class="mf">0.01</span> <span class="o">/</span> <span class="n">mu0</span><span class="p">,</span>
+    <span class="n">dH_max</span><span class="o">=</span><span class="mf">0.5</span> <span class="o">/</span> <span class="n">mu0</span><span class="p">,</span>
+    <span class="n">max_steps</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
+    <span class="n">switch_refine_dH</span><span class="o">=</span><span class="mf">0.01</span> <span class="o">/</span> <span class="n">mu0</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">n_accepted</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="micromag_demag.html" class="btn btn-neutral float-left" title="Demagnetization field" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="micromag_pbc.html" class="btn btn-neutral float-right" title="Periodic boundaries and macrogeometry" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright MagTense Developers.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>  
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #404040;
+    }
+    /* Sidebar */
+    .wy-nav-side {
+      background: #404040;
+    }
+  </style>
+
+
+</body>
+</html>
