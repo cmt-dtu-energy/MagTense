@@ -98,6 +98,14 @@ tests = {
         @() stdProblem6Checks(fullfile(micromagnetism_dir, 'mumag_micromag_Std_problem_6'), ...
                               [cuda_args, cvode_args]), ...
         'mumag standard problem 6, domain wall depinning fields'
+    'std_problem_6_minimizer', ...
+        @() stdProblem6Checks(fullfile(micromagnetism_dir, 'mumag_micromag_Std_problem_6'), ...
+                              [cuda_args, cvode_args, {'use_minimizer', true}], true), ...
+        'mumag standard problem 6 relaxed with the energy minimizer at each field, akj and k along x'
+    'std_problem_3_minimizer', ...
+        @() stdProblem3Checks(fullfile(micromagnetism_dir, 'mumag_micromag_Std_problem_3'), ...
+                              [cuda_args, cvode_args, {'use_minimizer', true}]), ...
+        'mumag standard problem 3 relaxed with the energy minimizer, single domain limit'
     };
 
 %% Run them
@@ -290,13 +298,52 @@ function checks = stdProblem4Checks(exampleDir, solverArgs)
     end
 end
 
-function checks = stdProblem6Checks(exampleDir, solverArgs)
-    % Standard problem 6, comparing the depinning field with the analytical values for
-    % the parameter variations, for the three sample orientations, and on an
-    % unstructured mesh
+function checks = stdProblem3Checks(exampleDir, solverArgs)
+    % Standard problem 3: the flower and the vortex state swap their role as the ground
+    % state at L = 8.47 exchange lengths. The crossing of the two total energies is found
+    % by linear interpolation over six cube sizes bracketing it, the same as the python
+    % suite, and compared with the accepted value with a 5 % limit.
 
     if nargin < 2
         solverArgs = {};
+    end
+
+    oldDir = cd(exampleDir);
+    cleanupObj = onCleanup(@() cd(oldDir));
+
+    singleDomainLimit = 8.47;                       % Accepted value [l_ex]
+    L_loop = linspace(8, 9, 6);
+    [~, ~, ~, E_arr, L_loop] = Standard_problem_3([10 10 10], L_loop, 'ShowTheResult', false, solverArgs{:});
+
+    % E_arr(:,i,j) holds the reduced energies at L_loop(i) for the flower (j=1) and the
+    % vortex (j=2) state; their sum is the total energy, negative difference while the
+    % flower is the ground state
+    difference = sum(E_arr(:,:,1), 1) - sum(E_arr(:,:,2), 1);
+    if difference(1) >= 0 || difference(end) <= 0
+        fprintf('The simulated cube sizes do not bracket the crossing: E_flower - E_vortex goes from %.3e to %.3e\n', ...
+                difference(1), difference(end));
+        L_cross = NaN;
+    else
+        L_cross = interp1(difference, L_loop, 0);
+        fprintf('Single domain limit: L = %.3f l_ex (accepted value %.2f)\n', L_cross, singleDomainLimit);
+    end
+
+    checks = emptyChecks();
+    checks(end + 1) = makeCheck('single domain limit L/l_ex', relativeErrorPercent(L_cross, singleDomainLimit), 5);
+end
+
+function checks = stdProblem6Checks(exampleDir, solverArgs, reduced)
+    % Standard problem 6, comparing the depinning field with the analytical values for
+    % the parameter variations, for the three sample orientations, and on an
+    % unstructured mesh. With reduced set, only the 'akj' and 'k' variations along x are
+    % run, which is what the minimizer variant of the suite does to keep its running time
+    % down
+
+    if nargin < 2
+        solverArgs = {};
+    end
+    if nargin < 3
+        reduced = false;
     end
 
     oldDir = cd(exampleDir);
@@ -309,6 +356,10 @@ function checks = stdProblem6Checks(exampleDir, solverArgs)
     % Theoretical pinning fields [T] for the different parameter variations
     variations = {'akj', 'ak', 'aj', 'a', 'kj', 'k'};
     theory = [1.568, 1.089, 1.206, 0.838, 1.005, 0.565];
+    if reduced
+        variations = variations([1 6]);
+        theory = theory([1 6]);
+    end
 
     checks = emptyChecks();
 
@@ -318,6 +369,9 @@ function checks = stdProblem6Checks(exampleDir, solverArgs)
                                 'ShowTheResult', false, solverArgs{:});
         checks(end + 1) = makeCheck(sprintf('depinning field, variation "%s"', variations{i}), ...
                                     relativeErrorPercent(HP, theory(i)), limit); %#ok<AGROW>
+    end
+    if reduced
+        return
     end
 
     % The same problem rotated onto each axis. The result must not depend on the
@@ -333,7 +387,7 @@ function checks = stdProblem6Checks(exampleDir, solverArgs)
 
     % Unstructured mesh, which only works in the x direction
     HP = Standard_problem_6('akj', x_steps, field_steps, 'x', ...
-                            'use_uniform_mesh', false, 'ShowTheResult', false, solverArgs{:});
+                            'mesh_type', 'unstructuredPrisms', 'ShowTheResult', false, solverArgs{:});
     checks(end + 1) = makeCheck('depinning field, unstructured mesh', ...
                                 relativeErrorPercent(HP, theory(1)), limit);
 end

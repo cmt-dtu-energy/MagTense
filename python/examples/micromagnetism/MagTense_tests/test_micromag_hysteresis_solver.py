@@ -11,6 +11,8 @@ The suite verifies four public contracts:
 * Both Python hysteresis methods call the same ``runmicromagsimulation`` symbol.
 * Static callers retain the historical 13-item result layout.
 * Adaptive callers receive only accepted field steps plus the accepted count.
+* The energies and relaxation diagnostics that Fortran returns after the historical
+  outputs land on the problem object, sliced to the accepted steps for adaptive runs.
 """
 
 import unittest
@@ -40,9 +42,10 @@ def _problem(hysteresis_solver: str = "static") -> MicromagProblem:
 def _fortran_result(n_fields: int, n_accepted: int) -> list:
     """Build a recognizable result in the unified f2py output order.
 
-    ``RunMicroMagSimulation`` now always returns 14 values. Index 7 is the new
-    accepted-field count, while indices 8-13 contain the exchange-matrix data
-    that historically started at index 7 for static simulations.
+    ``RunMicroMagSimulation`` returns 19 values. Index 7 is the accepted-field
+    count, indices 8-13 contain the exchange-matrix data that historically started
+    at index 7 for static simulations, and indices 14-18 are the energies and the
+    relaxation diagnostics, which the wrapper moves onto the problem object.
     """
     field_shape = (2, 1, n_fields, 3)
     return [
@@ -60,6 +63,11 @@ def _fortran_result(n_fields: int, n_accepted: int) -> list:
         np.arange(12, dtype=float) + 60.0,        # exchange values
         70,                                       # exchange row dimension
         80,                                       # exchange column dimension
+        np.full((2, n_fields, 4), 90.0),          # energies
+        np.arange(n_fields) + 100,                # field evaluations
+        np.arange(n_fields) + 200,                # minimizer iterations
+        np.full(n_fields, 1e-6),                  # final torque
+        np.full(n_fields, -1),                    # status
     ]
 
 
@@ -84,10 +92,17 @@ class HysteresisSolverTests(unittest.TestCase):
             fortrantopythonio=SimpleNamespace(runmicromagsimulation=fake_run)
         )
         h_ext = np.arange(12, dtype=np.float64).reshape(3, 4)
+        problem = _problem("static")
         with patch.object(micromag_module, "magtensesource", fake_source):
-            result = _problem("static").run_hysteresis(h_ext)
+            result = problem.run_hysteresis(h_ext)
 
         self.assertEqual(captured["hysteresis_solver"], 1)
+        # The minimizer settings travel with every call, at their defaults here
+        self.assertEqual(captured["min_tol"], 1e-5)
+        self.assertEqual(captured["min_maxiter"], 10000)
+        self.assertEqual(captured["min_maxrot"], 0.3)
+        self.assertEqual(captured["min_fallback"], 1)
+        self.assertEqual(captured["min_saddle_check"], 1)
         np.testing.assert_array_equal(captured["hext"], h_ext)
         self.assertEqual(captured["nt_hext_out"], 3)
         self.assertEqual(captured["maxhextsteps"], 0)
@@ -105,6 +120,12 @@ class HysteresisSolverTests(unittest.TestCase):
         self.assertEqual(result[11], 70)
         self.assertEqual(result[12], 80)
 
+        # The diagnostics are not in the list but on the problem, unsliced for a static run
+        self.assertEqual(problem.E_out.shape, (2, 3, 4))
+        np.testing.assert_array_equal(problem.n_feval, [100, 101, 102])
+        np.testing.assert_array_equal(problem.min_iter, [200, 201, 202])
+        np.testing.assert_array_equal(problem.min_status, [-1, -1, -1])
+
     def test_adaptive_hysteresis_uses_unified_fortran_entry_point(self) -> None:
         """Adaptive mode forwards controls and slices all field-dependent data."""
         captured = {}
@@ -116,8 +137,9 @@ class HysteresisSolverTests(unittest.TestCase):
         fake_source = SimpleNamespace(
             fortrantopythonio=SimpleNamespace(runmicromagsimulation=fake_run)
         )
+        problem = _problem("adaptive")
         with patch.object(micromag_module, "magtensesource", fake_source):
-            result = _problem("adaptive").run_hysteresis_adaptive(
+            result = problem.run_hysteresis_adaptive(
                 H_start=np.array([0.0, 0.0, 1.0]),
                 H_end=np.array([0.0, 0.0, -1.0]),
                 dH_initial=0.5,
@@ -164,6 +186,52 @@ class HysteresisSolverTests(unittest.TestCase):
         np.testing.assert_array_equal(result[9], [40, 41])
         np.testing.assert_array_equal(result[10], [60.0, 61.0])
 
+        # The diagnostics are sliced to the accepted steps as well
+        self.assertEqual(problem.E_out.shape, (2, 2, 4))
+        np.testing.assert_array_equal(problem.n_feval, [100, 101])
+        np.testing.assert_array_equal(problem.min_torque, [1e-6, 1e-6])
+
+    def test_minimizer_solver_maps_to_slot_three(self) -> None:
+        """'minimizer' selects the third solver slot."""
+        self.assertEqual(MicromagProblem(res=[1, 1, 1], solver="minimizer").solver, 3)
+        problem = MicromagProblem(
+            res=[1, 1, 1], solver="minimizer", min_tol=2e-6, min_maxiter=50,
+            min_maxrot=0.1, min_fallback=False, min_saddle_check=False,
+        )
+        self.assertEqual(problem.min_tol, 2e-6)
+        self.assertEqual(problem.min_maxiter, 50)
+        self.assertEqual(problem.min_maxrot, 0.1)
+        self.assertEqual(problem.min_fallback, 0)
+        self.assertEqual(problem.min_saddle_check, 0)
+
+    def test_adaptive_accepts_the_minimizer(self) -> None:
+        """The adaptive field stepping works with either equilibrium solver."""
+        captured = {}
+
+        def fake_run(**kwargs):
+            captured.update(kwargs)
+            return _fortran_result(n_fields=3, n_accepted=1)
+
+        fake_source = SimpleNamespace(
+            fortrantopythonio=SimpleNamespace(runmicromagsimulation=fake_run)
+        )
+        problem = MicromagProblem(
+            res=[1, 1, 1], solver="minimizer", hysteresis_solver="adaptive", min_tol=3e-6
+        )
+        problem.nt = 2
+        problem.t = np.linspace(0.0, 1e-9, problem.nt)
+        with patch.object(micromag_module, "magtensesource", fake_source):
+            problem.run_hysteresis_adaptive(
+                H_start=np.array([0.0, 0.0, 1.0]),
+                H_end=np.array([0.0, 0.0, -1.0]),
+                dH_initial=0.5,
+                dH_min=0.1,
+                dH_max=1.0,
+                max_steps=2,
+            )
+        self.assertEqual(captured["solver"], 3)
+        self.assertEqual(captured["min_tol"], 3e-6)
+
     def test_methods_reject_the_wrong_mode(self) -> None:
         """Each public method rejects a problem configured for the other mode."""
         with self.assertRaisesRegex(ValueError, "hysteresis_solver='static'"):
@@ -185,7 +253,7 @@ class HysteresisSolverTests(unittest.TestCase):
             solver="dynamic",
             hysteresis_solver="adaptive",
         )
-        with self.assertRaisesRegex(ValueError, "explicit solver"):
+        with self.assertRaisesRegex(ValueError, "explicit or the minimizer solver"):
             problem.run_hysteresis_adaptive(
                 H_start=np.array([0.0, 0.0, 1.0]),
                 H_end=np.array([0.0, 0.0, -1.0]),

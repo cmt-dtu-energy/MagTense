@@ -98,6 +98,8 @@ module FortranToPythonIO
                 call getFieldFromTetrahedronTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case (tileTypePlanarCoil )
                 call getFieldFromPlanarCoilTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+            case (tileTypeUniformField )
+                call getFieldFromUniformFieldTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case default
             end select
         enddo
@@ -236,6 +238,13 @@ module FortranToPythonIO
                 else
                     call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts )
                 endif
+            case ( tileTypeUniformField )
+                !Not a geometry: a uniform applied field, the same at every point
+                if ( useStoredN .eqv. .true. ) then
+                    call getFieldFromUniformFieldTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
+                else
+                    call getFieldFromUniformFieldTile( tiles(i), H_tmp, pts, n_pts )
+                endif
 
             case default
 
@@ -369,8 +378,10 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
         vol_i = real(tile_size(i,1), DP) * &
                 real(tile_size(i,2), DP) * &
                 real(tile_size(i,3), DP)
- 
-      !------------------------------------------------------------------------------------
+        !A uniform applied-field source carries no moment; its field is added after the FMM pass
+        if ( tileType(i) .eq. tileTypeUniformField ) vol_i = 0.0d0
+
+!------------------------------------------------------------------------------------
       !------------- convert magnetization to dipole moment --------------
       dipvec(1,1,i) = Mag(i,1) * vol_i !* Mrem(i)
       dipvec(1,2,i) = Mag(i,2) * vol_i !* Mrem(i)
@@ -419,6 +430,15 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
             H(j,3) = grad(1,3,j) / fourpi
         end do
     end if
+
+    !The uniform applied-field sources, which the multipole pass cannot represent
+    do i = 1, n_tiles
+        if ( tileType(i) .eq. tileTypeUniformField ) then
+            H(:,1) = H(:,1) + Mag(i,1)
+            H(:,2) = H(:,2) + Mag(i,2)
+            H(:,3) = H(:,3) + Mag(i,3)
+        endif
+    end do
 
     if (associated(source)) deallocate(source)
     deallocate(dipvec, grad)
@@ -631,6 +651,9 @@ end subroutine getHFromTilesFMM
                     call getFieldFromTetrahedronTile( tiles(i), H_tmp, pts, n_pts )
                 case (tileTypePlanarCoil )
                     call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_pts )
+                case (tileTypeUniformField )
+                    !Not a geometry: a uniform applied field, the same at every point
+                    call getFieldFromUniformFieldTile( tiles(i), H_tmp, pts, n_pts )
                 case default
                 end select
                 
@@ -652,17 +675,19 @@ end subroutine getHFromTilesFMM
 
 
     subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-        K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, temperature, MaxT0, nt_Hext, nt_Hext_out, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+        K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, temperature, nt_Hext, nt_Hext_out, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
         N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-        exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, CV, useReturnHall, useAvgN, demigstp, & 
+        exch_cols, grid_abc, N_ave, CV, useReturnHall, useAvgN, & 
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
         n_macro, shiftVec, macroShape, sampleShape, exchPBC, hysteresis_solver, &
         H_start, H_end, dH_initial, dH_min, dH_max, maxHextSteps, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH, use_switch_refine, &
+        min_tol, min_maxiter, min_maxrot, min_fallback, min_saddle_check, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, n_Hext_accepted, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useFMM, &
-        log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, useDemag, rng_seed, &
-        n_phase, phase_id, A_int )
+        log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, timer_enabled, useDemag, rng_seed, &
+        n_phase, phase_id, A_int, &
+        E_out, n_feval, min_iter, min_torque, min_status )
 
         !nt_Hext is the number of rows in the Hext array; nt_Hext_out is the third extent of the
         !returned M and H arrays. There used to be a third, n_Hext, which was accepted and declared
@@ -676,6 +701,9 @@ end subroutine getHFromTilesFMM
         real(8),dimension(3),intent(in) :: H_start, H_end
         real(8),intent(in) :: dH_initial, dH_min, dH_max, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH
         integer(4),intent(in) :: hysteresis_solver, maxHextSteps, use_switch_refine
+        !> Energy minimizer settings (solver = 3), see MicroMagProblem
+        real(8),intent(in) :: min_tol, min_maxrot
+        integer(4),intent(in) :: min_maxiter, min_fallback, min_saddle_check
         real(8),dimension(ntot,3),intent(in) :: grid_pts
         integer(4),dimension(4,ntot),intent(in) :: grid_ele
         real(8),dimension(grid_nnod,3),intent(in) :: grid_nod
@@ -689,9 +717,9 @@ end subroutine getHFromTilesFMM
         real(8),dimension(exch_nval),intent(in) :: exch_val
         integer(4),dimension(exch_nval),intent(in) :: exch_cols, exch_rows
         real(8),dimension(nt_conv),intent(in) :: t_conv
-		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab, useAvgN
-		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, demigstp, exch_meth, exch_intpn, passExch, useDemag
-        real(8),intent(in) :: gamma, alpha_mm, MaxT0, tol, thres, conv_tol, dem_thres
+		integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, useAvgN
+		integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, exch_meth, exch_intpn, passExch, useDemag
+        real(8),intent(in) :: gamma, alpha_mm, tol, thres, conv_tol, dem_thres
 		real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2, temperature
         !> Optional interface exchange between materials. n_phase = 1 disables it.
         integer(4),intent(in) :: n_phase
@@ -712,6 +740,14 @@ end subroutine getHFromTilesFMM
         real(8),dimension(nt,ntot,nt_Hext_out,3),intent(out) :: H_exc, H_ext, H_dem, H_ani
         integer(4),intent(out) :: n_Hext_accepted
         real(8),dimension(ntot,3),intent(out) :: pts
+        !> Energies (exchange, external, demag, anisotropy) [J] at the output times and applied fields,
+        !> and the relaxation diagnostics per applied field: field evaluations spent, minimizer
+        !> iterations, final max relative torque and status (-1 LL integration, 0 converged, 1 converged
+        !> after an LL fallback, 2 not converged)
+        real(8),dimension(nt,nt_Hext_out,4),intent(out) :: E_out
+        integer(4),dimension(nt_Hext_out),intent(out) :: n_feval, min_iter, min_status
+        real(8),dimension(nt_Hext_out),intent(out) :: min_torque
+        integer :: n_copy
 		
 		integer,intent(out) :: n_tot_Exch
 		integer,dimension(exch_presize*ntot),intent(out)  :: ExchMat_r
@@ -737,6 +773,7 @@ end subroutine getHFromTilesFMM
         !-------------------- timer and trace modules --------------------------------------
         character*256,intent(in) :: timer_log_file, trace_log_file, log_dir
         integer, intent(in) :: window_enabled, trace_enabled, flush_each
+        integer, intent(in) :: timer_enabled                 !> 1 writes the timing log file
         real(8), intent(in) :: window_interval
         integer, intent(in) :: trace_verbose
         !-----------------------------------------------------------------------------------
@@ -755,7 +792,7 @@ end subroutine getHFromTilesFMM
 
         !---------------------- initiaize auxiliary modules -----------------------------
         call initAux(auxInit_local, log_dir, timer_log_file, trace_log_file, window_enabled, &
-            window_interval, trace_enabled, flush_each, trace_verbose)
+            window_interval, trace_enabled, flush_each, trace_verbose, timer_enabled)
         !---------------------------------------------------------------------------------
 
 
@@ -768,11 +805,11 @@ end subroutine getHFromTilesFMM
         !only compiles as an Intel extension and that gfortran rejects outright.
         use_fmm = merge(.true., .false., useFMM /= 0)
         call loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-            gamma, alpha_mm, temperature, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+            gamma, alpha_mm, temperature, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
             N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
             conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-            exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
-            CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
+            exch_cols, grid_abc, N_ave, &
+            CV, useReturnHall, useAvgN, exch_weigh, exch_meth, exch_intpn, &
             n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
             passExch, exch_ncols, CrysAxis, K0_arr, K1, K2, n_phase, phase_id, A_int, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
             useDemag, rng_seed)
@@ -799,7 +836,28 @@ end subroutine getHFromTilesFMM
             error stop 'hysteresis_solver must be 1 (static) or 2 (adaptive)'
         end if
 
+        problem%min_tol = min_tol
+        problem%min_maxiter = min_maxiter
+        problem%min_maxrot = min_maxrot
+        problem%min_fallback = min_fallback
+        problem%min_saddle_check = min_saddle_check
+
         call SolveLandauLifshitzEquation( problem, solution )
+
+        !The solver sizes these by the number of applied fields it allocated, which matches
+        !nt_Hext_out for every calling mode; the min() only guards against a caller that sizes the
+        !output differently.
+        E_out = 0.
+        n_feval = 0
+        min_iter = 0
+        min_torque = 0.
+        min_status = 0
+        n_copy = min( size(solution%n_feval), nt_Hext_out )
+        E_out(:,1:n_copy,:) = solution%E_out(:,1:n_copy,:)
+        n_feval(1:n_copy) = solution%n_feval(1:n_copy)
+        min_iter(1:n_copy) = solution%min_iter(1:n_copy)
+        min_torque(1:n_copy) = solution%min_torque(1:n_copy)
+        min_status(1:n_copy) = solution%min_status(1:n_copy)
 
 
         t_out = solution%t_out
@@ -823,7 +881,18 @@ end subroutine getHFromTilesFMM
             H_ani = 0.
         endif
 		n_Hext_accepted = problem%nHextAccepted
-				n_tot_Exch = solution%gridinfo%Exch_mat_ntot
+        !The exchange matrix in COO form only exists when the solver built the exchange operator
+        !itself. With passExch the matrix comes from the caller and these arrays stay unallocated,
+        !so return an empty matrix instead of reading them (the bounds-checked build stops here).
+        if (.not. allocated(solution%gridinfo%Exch_mat_r)) then
+            n_tot_Exch = 0
+            ExchMat_r = 0
+            ExchMat_c = 0
+            ExchMat_v = 0.
+            ExchMat_nr = 0
+            ExchMat_nc = 0
+        else
+        n_tot_Exch = solution%gridinfo%Exch_mat_ntot
 
 		if (exch_presize*ntot < n_tot_Exch) then
             write(*,*) 'ExchMat_presize is too small to copy all exchange matrix values. It is set to ', exch_presize*ntot, ' but the exchange matrix has ', n_tot_Exch, ' entries.'
@@ -840,6 +909,7 @@ end subroutine getHFromTilesFMM
 
         ExchMat_nr = solution%gridinfo%Exch_mat_nr
 		ExchMat_nc = solution%gridinfo%Exch_mat_nc
+        end if
 #else
         write(*,*) 'Compiled without micromagnetic part. Returning zeros.'
         n_tot_Exch = 0
@@ -857,6 +927,11 @@ end subroutine getHFromTilesFMM
         H_dem(:,:,:,:) = 0.
         H_ani(:,:,:,:) = 0.
         n_Hext_accepted = 0
+        E_out = 0.
+        n_feval = 0
+        min_iter = 0
+        min_torque = 0.
+        min_status = 0
 #endif
 
 

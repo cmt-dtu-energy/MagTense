@@ -48,7 +48,7 @@ properties
     u_ea
     %new or old problem
     ProblemMod
-    %solver type ('Explicit', 'Implicit' or 'Dynamic')
+    %solver type ('Explicit', 'Dynamic' or 'Minimizer')
     solver
 
     %Exchange term constant
@@ -92,8 +92,6 @@ properties
 
     %
     alpha
-
-    MaxT0
 
     %Sets how often timestep is displayed from Fortran
     setTimeDis
@@ -167,10 +165,6 @@ properties
     %magnetization between two timesteps
     conv_tol = 1e-4;
     
-    %defines how often to calculate the demagnetization tensor in
-    %hysteresis problems. Zero is every step
-    demigstp = int32(0) ;
-    
     %defines whether to use an External Mesh or not
     ExternalMesh = 0 ; 
     
@@ -185,9 +179,6 @@ properties
    
     % function handle for external field
     HextFct = [] ;
-
-    %The number of threads used by OpenMP for building the demag tensor
-    nThreads = int32(1);
 
     %FMM parameters
     fmm_cells
@@ -214,6 +205,8 @@ properties
     window_ena
     window_int
     trace_ena
+    %Write the timing log file (1) or not (0, default). Same idea as trace_ena.
+    timer_ena
     flush_each
     trace_verb
     N_log_dir
@@ -241,6 +234,21 @@ properties
     %that value, so runs are reproducible but differ from each other. A negative
     %value seeds from the clock, which is what independent Monte-Carlo runs need.
     rng_seed
+
+    %Energy minimizer settings, used when the solver is 'Minimizer' (setMicroMagSolver).
+    %min_tol: convergence criterion, the largest torque max_i |m_i x H_i| over the cells
+    %divided by max(Ms) must fall below it. min_maxiter: iteration cap per applied field.
+    %min_maxrot: largest rotation of any cell in one iteration [rad]. min_fallback: 1 to
+    %fall back to the Landau-Lifshitz time integration when the minimizer stalls, 0 to
+    %give up. min_saddle: 1 to nudge a converged state and relax again, so that a saddle
+    %point (which a symmetric starting state sits on) is not mistaken for a minimum, 0 to
+    %accept the state as it is. The solution struct returns E (energies), n_feval,
+    %min_iter, min_torque and min_status, see the TechManual.
+    min_tol
+    min_maxiter
+    min_maxrot
+    min_fallback
+    min_saddle
 
     %Optional exchange stiffness at the interface between two materials. phase_id gives
     %the material index (1..n_phase) of every tile and A_int is a symmetric
@@ -303,10 +311,6 @@ properties (SetAccess=private,GetAccess=public)
     %defines if the demagnetization field is calculated or not
     useDemag
 
-    %defines what precision is used for the demag tensor. Right now only
-    %single is supported. All other varibales are double.
-    usePres
-    
     %defines whether to save the result or not
     SaveTheResult
     
@@ -363,7 +367,7 @@ methods
         obj.u_ea = zeros( obj.ntot, 3 );
         %new or old problem
         obj = obj.setMicroMagProblemMode( 'new' );
-        %solver type ('Explicit', 'Implicit' or 'Dynamic')
+        %solver type ('Explicit', 'Dynamic' or 'Minimizer')
         obj = obj.setMicroMagSolver( 'Dynamic' );
 
         obj.exch_weigh = 8.0;
@@ -392,12 +396,6 @@ methods
         %
         obj.alpha = 4.42e3;
 
-        %if set to zero then the alpha parameter remains constant.
-        %if MaxT0 > 0 then alpha = alpha0 * 10^( 7 * min(t,MaxT0)/MaxT0 )
-        %thus scaling with the solution time. This is used in the explicit
-        %solver for tuning into the correct time scale of the problem
-        obj.MaxT0 = 2;
-        
         %solution times
         obj.nt = int32(1000);
         obj.t = linspace(0,1,obj.nt);
@@ -441,8 +439,6 @@ methods
         obj.useCVODE = int32(0);
 		%set use Demag to default
         obj.useDemag = int32(1);
-        %set use CVODE to default
-        obj.usePres = int32(0);
         %set the demag approximation to the default, i.e. use no
         %approximation
         obj = obj.setMicroMagDemagApproximation('none');
@@ -472,7 +468,6 @@ methods
         obj.ShowTheResult = int32(1);
 
         obj.DirectoryFilename = '';
-        obj.demigstp = int32(0) ;
         obj.ExternalMesh = int32(0) ;
         obj.MeshType = '' ;
         obj.ExternalMeshFileName = '' ;
@@ -502,6 +497,7 @@ methods
         obj.window_ena = int32(1);
         obj.window_int = 30.0;
         obj.trace_ena = int32(0);
+        obj.timer_ena = int32(0);
         obj.flush_each = int32(1);
         obj.trace_verb = int32(1);
 
@@ -523,6 +519,13 @@ methods
 
         %Thermal-field RNG seed. Default 0 preserves the previous behaviour.
         obj.rng_seed = int32(0);
+
+        %Energy minimizer defaults
+        obj.min_tol = 1e-5;
+        obj.min_maxiter = int32(10000);
+        obj.min_maxrot = 0.3;
+        obj.min_fallback = int32(1);
+        obj.min_saddle = int32(1);
 
         %One material, i.e. the harmonic mean everywhere, which is the previous behaviour.
         obj.n_phase = int32(1);
@@ -788,8 +791,12 @@ methods
                 obj.solver = int32(1);
             case 'Dynamic'
                 obj.solver = int32(2);
-            case 'Implicit'
+            case 'Minimizer'
+                %Energy minimizer: reads the field table like 'Explicit' but relaxes to
+                %equilibrium by steepest descent instead of integrating the LL equation
                 obj.solver = int32(3);
+            otherwise
+                error('Unknown solver type ''%s''. Use ''Explicit'', ''Dynamic'' or ''Minimizer''.', type_var);
         end
             
     end

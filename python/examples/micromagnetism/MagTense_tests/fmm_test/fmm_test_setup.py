@@ -161,6 +161,7 @@ def fmm_test_setup(
 
         problem.log_dir = "timer_logs"
         problem.timer_log_file = timer_log_file
+        problem.timer_enabled = 1   # the test reads these logs back
         problem.trace_log_file = trace_log_file
         problem.window_enabled = 1
         problem.window_interval = 5.0

@@ -14,7 +14,7 @@
     <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/documentation_options.js?v=7f41d439"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
@@ -279,8 +279,8 @@ only.</p></td>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">solver</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">solver</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">Dynamic</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">Explicit</span></code> (1), <code class="docutils literal notranslate"><span class="pre">Dynamic</span></code> (2), <code class="docutils literal notranslate"><span class="pre">Implicit</span></code> (3, not implemented).
-Matlab: <code class="docutils literal notranslate"><span class="pre">setMicroMagSolver</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Explicit</span></code> (1), <code class="docutils literal notranslate"><span class="pre">Dynamic</span></code> (2), <code class="docutils literal notranslate"><span class="pre">Minimizer</span></code> (3, <code class="docutils literal notranslate"><span class="pre">Implicit</span></code> is
+its old name). Matlab: <code class="docutils literal notranslate"><span class="pre">setMicroMagSolver</span></code>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ProblemMod</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">prob_mode</span></code></p></td>
@@ -316,22 +316,49 @@ Matlab: <code class="docutils literal notranslate"><span class="pre">setMicroMag
 <td><p>Convergence-check times. Matlab:
 <code class="docutils literal notranslate"><span class="pre">setConvergenceCheckTime</span></code>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">conv_tol</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_tol</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">min_tol</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-5</span></code></p></td>
+<td><p>Minimizer convergence criterion on the largest relative torque, see
+<a class="reference internal" href="micromag_solvers.html#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_maxiter</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">min_maxiter</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">10000</span></code></p></td>
+<td><p>Minimizer iteration cap per applied field.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_maxrot</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">min_maxrot</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.3</span></code></p></td>
+<td><p>Largest rotation of a cell per minimizer iteration [rad].</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_fallback</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">min_fallback</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Fall back to the time integration when the minimizer stalls.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_saddle</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">min_saddle_check</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Nudge a converged state and relax again, so that a saddle point is not
+mistaken for a minimum.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">conv_tol</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">conv_tol</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-4</span></code></p></td>
 <td><p>Convergence criterion.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">setTimeDis</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">setTimeDis</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">setTimeDis</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
 <td><p>Progress is reported every n’th step.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">useCVODE</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">useCVODE</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">cvode</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
 <td><p>Use CVODE instead of RKSuite. Matlab: <code class="docutils literal notranslate"><span class="pre">setUseCVODE</span></code>.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">useCuda</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">useCuda</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">cuda</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
 <td><p>Evaluate the demagnetization field on a GPU. Matlab: <code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code>.</p></td>

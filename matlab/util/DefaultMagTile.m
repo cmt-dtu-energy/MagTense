@@ -176,6 +176,12 @@ methods
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Spheroid' );
             case {'Planarcoil','planarcoil'}
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Planarcoil' );
+            case {'Uniformfield','uniformfield'}
+                %Not a geometry: a uniform applied field that is the same at every point. Set
+                %tile.M to the field H_app in A/m. It magnetizes the other tiles in the
+                %iteration and is included in the field at the evaluation points.
+                obj.tileType = MagTenseTilesUtil.getMagTileType( 'Uniformfield' );
+                obj.inclIter = int32(0);
         end
     end
 
@@ -197,6 +203,8 @@ methods
                 res = 'Spheroid';
             case MagTenseTilesUtil.getMagTileType( 'Planarcoil' )
                 res = 'Planarcoil';
+            case MagTenseTilesUtil.getMagTileType( 'Uniformfield' )
+                res = 'Uniformfield';
         end
     end
 

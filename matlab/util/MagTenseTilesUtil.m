@@ -24,6 +24,9 @@ classdef MagTenseTilesUtil
                     type = int32( 7 );
                 case 'Planarcoil'
                     type = int32( 101 );
+                case 'Uniformfield'
+                    %Not a geometry: a uniform applied field, held in M in A/m
+                    type = int32( 102 );
             end
         end
        

@@ -86,7 +86,9 @@ class Tiles:
         mu_r_oa: Relative permeability in other axis.
         M_rem: Remanent magnetization.
         tile_type: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
-                   5 = tetrahedron, 6 = sphere, 7 = spheroid, 8 = avg prism, 10 = ellipsoid
+                   5 = tetrahedron, 6 = sphere, 7 = spheroid, 8 = avg prism, 10 = ellipsoid,
+                   101 = planar coil, 102 = uniform applied field (not a geometry, see
+                   add_uniform_field)
         offset: Offset of global coordinates.
         rot: Rotation in local coordinate system.
         color: Color in visualization.
@@ -686,6 +688,31 @@ class Tiles:
             self._M_rel, np.zeros(shape=(n), dtype=np.float64, order="F"), axis=0
         )
         self._n += n
+
+    def add_uniform_field(self, H_app: list | np.ndarray) -> int:
+        """Append a uniform applied-field source and return its index.
+
+        The source is a tile of type 102. It is not a geometry: it stands for an external
+        field that is the same at every point, such as the field of a large electromagnet
+        or a Helmholtz coil, and its ``M`` entry holds that field ``H_app`` in A/m. It is
+        added to the field at every evaluation point, and it is part of the field that
+        magnetizes every other tile in ``iterate_magnetization`` and ``run_simulation``,
+        so a soft tile alone in such a field acquires the magnetization it should.
+
+        The value is an H field. A field known as B in tesla is divided by mu0 first; a
+        field evaluated inside a magnetized body is not an applied field. The field of
+        other MagTense tiles is not entered this way either: put those tiles in the same
+        ``Tiles`` object, with ``incl_it`` zero if they are not to be iterated.
+        """
+        H_app = np.asarray(H_app, dtype=np.float64).reshape(3)
+        self._add_tiles(1)
+        i = self.n - 1
+        self._tile_type[i] = 102
+        self._M[i] = H_app
+        self._magnet_type[i] = 1
+        self._incl_it[i] = 0
+        self._color[i] = [0.5, 0.5, 0.5]
+        return i
 
     def refine_prism(self, idx: int | float | list, mat: list) -> None:
         if isinstance(idx, (int, float)):

@@ -35,25 +35,24 @@ addpath(fullfile(thisDir, '..', '..', '..', 'MEX_files'));
 addpath(fullfile(thisDir, '..', '..', '..', 'util'));
 
 if isempty(options.mesh_file)
-    options.mesh_file = fullfile(thisDir, '..', ...
-        'mumag_micromag_Std_problem_4', ...
-        'Std_prob_4_unstructured_mesh_grains_6_res_80_20_ref_2.mat');
+    options.mesh_file = '../../../../documentation/examples_mumag_validation/Validation_standard_problem_4/Std_prob_4_unstructured_mesh_grains_6_res_80_20_ref_2.txt';
 end
 
 mu0 = 4 * pi * 1e-7;
 
 %% ---------------------------------------------------------------- Problem
 loaded = load(options.mesh_file);
-mesh = loaded.mesh;
-ntot = size(mesh.pos_out, 1);
+pos_out  = loaded(:,1:3);
+dims_out = loaded(:,4:6);
+ntot = size(pos_out, 1);
 [~, meshName, meshExt] = fileparts(options.mesh_file);
 fprintf('FMM test: %d unstructured prisms from %s\n', ntot, [meshName meshExt]);
 
     function problem = buildProblem(useFmm, nterms)
         problem = DefaultMicroMagProblem(ntot, 1, 1);
         problem = problem.setMicroMagGridType('unstructuredPrisms');
-        problem.grid_pts = mesh.pos_out;
-        problem.grid_abc = mesh.dims_out;
+        problem.grid_pts = pos_out;
+        problem.grid_abc = dims_out;
 
         problem = problem.setMicroMagDemagApproximation('none');
         problem = problem.setUseCuda(options.USE_CUDA);

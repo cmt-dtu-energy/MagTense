@@ -50,11 +50,45 @@ The solution struct contains
      - scalar
      - Number of accepted applied-field steps. Only meaningful for
        :ref:`Adaptive hysteresis`.
+   * - ``E``
+     - ``(nt, nt_Hext, 4)``
+     - Energies in J in the order exchange, external (Zeeman),
+       demagnetization, anisotropy. Always filled at the last output time; at
+       the other output times only when ``ReturnHall`` is set (the entries are
+       zero otherwise).
+   * - ``n_feval``
+     - ``(nt_Hext)``
+     - Number of effective-field evaluations spent relaxing at each applied
+       field. This is the cost measure that scales with the problem size, and
+       the one to compare between the time integration and the minimizer.
+   * - ``min_iter``
+     - ``(nt_Hext)``
+     - Minimizer iterations at each applied field, 0 for the time integration.
+   * - ``min_torque``
+     - ``(nt_Hext)``
+     - Final largest relative torque :math:`\max_i |\mathbf{m}_i \times
+       \mathbf{H}_i| / \max(M_s)`, minimizer only.
+   * - ``min_status``
+     - ``(nt_Hext)``
+     - ``-1`` relaxed by the time integration (or, in an adaptive run, the
+       unrelaxed starting state in the first slot), ``0`` minimizer converged,
+       ``1`` converged after a fallback to the time integration, ``2`` not
+       converged.
 
 ``ReturnHall`` (Python ``usereturnhall``) is off by default. Turning it on
 costs four additional ``(nt, ntot, nt_Hext, 3)`` arrays, which for a large
 problem is substantial, so leave it off unless the individual field terms are
 actually needed.
+
+The energies are evaluated in Fortran from the same fields the solver ran on.
+The exchange, external and demagnetization terms are :math:`-\tfrac{1}{2}\mu_0
+\sum_i M_{s,i} V_i\, \mathbf{m}_i\cdot\mathbf{H}_i` (without the one half for
+the external field). The anisotropy term is the energy density integrated over
+the cells: :math:`K_0 (1 - (\mathbf{u}\cdot\mathbf{m})^2)` for the uniaxial
+case, so that it is non-negative, and the polynomial documented in
+:ref:`Magnetocrystalline anisotropy` plus the cubic :math:`K_1`, :math:`K_2`
+terms otherwise. Dividing by :math:`\tfrac{1}{2}\mu_0 M_s^2 V` gives the
+reduced energies used by the mumag standard problems.
 
 .. note::
    The four ``H_*`` arrays are **not** the fields the integrator ran on. They
@@ -120,6 +154,21 @@ Python result list
 ``run_hysteresis_adaptive`` returns the same twelve entries followed by one
 extra element, the number of accepted field steps, and the arrays with an
 applied-field dimension are already sliced to that number.
+
+The energies and the relaxation diagnostics are not part of the list, so that
+its layout does not change; after any of the three run methods they are
+attributes of the problem object, with the meaning given in the Matlab table
+above:
+
+.. code-block:: python
+
+    problem.E_out       # (nt, nt_h_ext, 4): exchange, external, demag, anisotropy [J]
+    problem.n_feval     # (nt_h_ext,) effective-field evaluations per applied field
+    problem.min_iter    # (nt_h_ext,) minimizer iterations
+    problem.min_torque  # (nt_h_ext,) final largest relative torque
+    problem.min_status  # (nt_h_ext,) -1 LL, 0 converged, 1 after fallback, 2 failed
+
+For an adaptive run they are sliced to the accepted field steps.
 
 A typical unpacking is
 

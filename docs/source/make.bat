@@ -59,7 +59,7 @@ del /q "%PUBLISHDIR%\*.js" >NUL 2>NUL
 del /q "%PUBLISHDIR%\*.inv" >NUL 2>NUL
 del /q "%PUBLISHDIR%\.buildinfo" >NUL 2>NUL
 
-xcopy "%BUILDDIR%\html" "%PUBLISHDIR%" /e /i /y /q >NUL
+xcopy "%BUILDDIR%\html" "%PUBLISHDIR%" /s /i /y /q >NUL
 if errorlevel 1 (
 	echo.
 	echo.Copying the built pages into %PUBLISHDIR% failed.
@@ -77,7 +77,9 @@ REM Build for inspection only. Nothing outside _build is touched, so this is
 REM always safe to run, and warnings do not stop it producing output.
 %SPHINXBUILD% --version >NUL 2>NUL
 if errorlevel 1 goto nosphinx
-%SPHINXBUILD% -b html "%SOURCEDIR%" "%BUILDDIR%\html" %SPHINXOPTS% %O%
+REM -d keeps the doctree cache out of the html output, where the html target would otherwise
+REM copy it into the published docs\ folder along with the pages.
+%SPHINXBUILD% -b html -d "%BUILDDIR%\doctrees" "%SOURCEDIR%" "%BUILDDIR%\html" %SPHINXOPTS% %O%
 if errorlevel 1 goto buildfailed
 echo.
 echo.Open this file in a browser:
@@ -89,7 +91,7 @@ goto end
 :check
 %SPHINXBUILD% --version >NUL 2>NUL
 if errorlevel 1 goto nosphinx
-%SPHINXBUILD% -b html -W -n "%SOURCEDIR%" "%BUILDDIR%\html" %SPHINXOPTS% %O%
+%SPHINXBUILD% -b html -W -n -d "%BUILDDIR%\doctrees" "%SOURCEDIR%" "%BUILDDIR%\html" %SPHINXOPTS% %O%
 if errorlevel 1 goto buildfailed
 echo.
 echo.Build is clean. Nothing was published - run "make html" for that.

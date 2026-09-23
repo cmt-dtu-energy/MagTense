@@ -144,10 +144,10 @@ def _std_problem_4() -> list[dict]:
         checks = []
         for field in (1, 2):
             _, rel_int_error = std_prob_4(
-                NIST_field=field,
+                mumag_field=field,
                 cuda=USE_CUDA,
                 cvode=False,
-                unstructured=False,
+                mesh_type="uniform",
                 plotting=True,
                 figpath=STD4_DIR,
             )
@@ -163,18 +163,19 @@ def _std_problem_4() -> list[dict]:
         return checks
 
 
-def _std_problem_6() -> list[dict]:
+def _std_problem_6(use_minimizer: bool = False, reduced: bool = False) -> list[dict]:
     """Compare the depinning field of standard problem 6 with the analytical values.
 
-    The parameter variations and the 5 % limit are the same as in the MATLAB suite.
-    MATLAB additionally runs the field along y and z and on an unstructured mesh; the
-    python std_prob_6 does not offer those options, so they are not covered.
+    The parameter variations, the runs along y and z, the run on the unstructured mesh and the
+    5 % limit are the same as in the MATLAB suite. With use_minimizer the field values are
+    visited as constant fields and relaxed with the energy minimizer instead of integrating
+    along the time ramp; reduced runs only the 'akj' and 'k' variations along x, which is
+    what the minimizer variant of the suite does to keep its running time down.
     """
     with example_dir(STD6_DIR):
         from std_problem_6 import THEORETICAL_PINNING_FIELDS, std_prob_6
 
-        checks = []
-        for settings in ("akj", "ak", "aj", "a", "kj", "k"):
+        def check(name: str, settings: str, **kwargs) -> dict:
             theory = THEORETICAL_PINNING_FIELDS[settings]
             switching_field = std_prob_6(
                 settings=settings,
@@ -184,31 +185,44 @@ def _std_problem_6() -> list[dict]:
                 cvode=False,
                 plotting=True,
                 figpath=STD6_DIR,
+                use_minimizer=use_minimizer,
+                **kwargs,
             )
             if switching_field is None:
                 # No switching at all is a failure whatever the limit is
                 error = float('inf')
-                print(f'settings="{settings}": no switching observed '
-                      f'(theory {theory:.3f} T)')
+                print(f'{name}: no switching observed (theory {theory:.3f} T)')
             else:
                 error = abs(switching_field - theory) / theory * 100
-                print(f'settings="{settings}": switching field = {switching_field:.4f} T '
+                print(f'{name}: switching field = {switching_field:.4f} T '
                       f'(theory {theory:.3f} T, error {error:.1f} %)')
-            checks.append({
-                'check': f'depinning field, variation "{settings}"',
-                'value': error,
-                'limit': 5.0,
-                'passed': error < 5.0,
-            })
+            return {'check': name, 'value': error, 'limit': 5.0, 'passed': error < 5.0}
+
+        checks = []
+        if reduced:
+            for settings in ("akj", "k"):
+                checks.append(check(f'depinning field, variation "{settings}"', settings))
+            return checks
+        # Parameter variations, all along x
+        for settings in ("akj", "ak", "aj", "a", "kj", "k"):
+            checks.append(check(f'depinning field, variation "{settings}"', settings))
+        # The same problem rotated onto each axis. The result must not depend on the
+        # orientation, so this tests that the physics is implemented correctly in all three
+        # directions
+        for cart_dir in ("x", "y", "z"):
+            checks.append(check(f'depinning field along {cart_dir}', "akj", cart_dir=cart_dir))
+        # Unstructured mesh, which only works in the x direction
+        checks.append(check('depinning field, unstructured mesh', "akj", mesh_type="unstructuredPrisms"))
         return checks
 
 
-def _std_problem_3() -> list[dict]:
+def _std_problem_3(use_minimizer: bool = True) -> list[dict]:
     """Locate the single domain limit of standard problem 3, compare with the reference.
 
     The flower and the vortex state swap their role as the ground state at L = 8.47
     exchange lengths. The crossing of the two total energies is found by linear
-    interpolation, so the simulated cube sizes have to bracket it.
+    interpolation, so the simulated cube sizes have to bracket it. Each state is relaxed
+    either with the energy minimizer or by integrating the Landau-Lifshitz equation in time.
     """
     L_loop = np.linspace(8, 9, 6)
     with example_dir(STD3_DIR):
@@ -218,6 +232,7 @@ def _std_problem_3() -> list[dict]:
             L_loop=L_loop,
             cuda=USE_CUDA,
             cvode=False,
+            use_minimizer=use_minimizer,
             plotting=True,
             figpath=STD3_DIR,
         )
@@ -239,7 +254,7 @@ def _std_problem_3() -> list[dict]:
               f"(accepted value {STD3_SINGLE_DOMAIN_LIMIT}, error {error:.1f} %)")
 
     return [{
-        'check': 'single domain limit L/l_ex',
+        'check': 'single domain limit L/l_ex' + (' (minimizer)' if use_minimizer else ' (LL)'),
         'value': error,
         'limit': 5.0,
         'passed': error < 5.0,
@@ -278,9 +293,17 @@ TESTS = {
         _std_problem_6, False,
         'muMag standard problem 6, domain wall depinning fields',
     ),
+    'std_problem_6_minimizer': (
+        lambda: _std_problem_6(use_minimizer=True, reduced=True), False,
+        'muMag standard problem 6 relaxed with the energy minimizer at each field, akj and k along x',
+    ),
     'std_problem_3': (
-        _std_problem_3, True,
-        'muMag standard problem 3, single domain limit (slow, tens of minutes)',
+        lambda: _std_problem_3(use_minimizer=False), True,
+        'muMag standard problem 3 by LL time integration, single domain limit (slow, tens of minutes)',
+    ),
+    'std_problem_3_minimizer': (
+        lambda: _std_problem_3(use_minimizer=True), False,
+        'muMag standard problem 3 relaxed with the energy minimizer, single domain limit',
     ),
 }
 

@@ -31,6 +31,8 @@ Tile Types
 * 8 = avgPrism, i.e. a prism whose demagnetization tensor is averaged over the
   volume of the receiving tile rather than evaluated at its centre
 * 101 = planar coil
+* 102 = uniform applied field. **Not a geometry**: a field source that adds
+  the same field everywhere, see :ref:`Applied field`.
 
 The tile types are defined as parameters in
 `TileNComponents.f90 <https://github.com/cmt-dtu-energy/MagTense/blob/master/source/TileDemagTensor/TileNComponents.f90>`_.
