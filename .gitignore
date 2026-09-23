@@ -224,7 +224,7 @@ error.txt
 
 # CVODE downloaded files and folders
 cvode*/
-*tar.gz
+*tar.gz*
 .vs/
 
 # Build configuration stamp written by the Makefile
