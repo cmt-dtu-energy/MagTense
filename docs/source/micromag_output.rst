@@ -70,8 +70,7 @@ The solution struct contains
        \mathbf{H}_i| / \max(M_s)`, minimizer only.
    * - ``min_status``
      - ``(nt_Hext)``
-     - ``-1`` relaxed by the time integration (or, in an adaptive run, the
-       unrelaxed starting state in the first slot), ``0`` minimizer converged,
+     - ``-1`` relaxed by the time integration, ``0`` minimizer converged,
        ``1`` converged after a fallback to the time integration, ``2`` not
        converged.
 

@@ -376,6 +376,16 @@ the same parameters exist on the problem object (``adaptiveHext``,
 ``dH_max``, ``dH_grow``, ``dH_shrink``, ``dM_min``, ``dM_target``,
 ``dM_reject``, ``switch_refdH``, ``use_sw_ref``).
 
+The sweep first relaxes the starting state ``m0`` at ``H_start`` and stores
+the result as the first field state, so every entry of the output, including
+the first, is an equilibrium (and the first entry of ``n_feval``,
+``min_iter``, ``min_torque`` and ``min_status`` describes that relaxation).
+Every step is measured against the last accepted state, and measuring the
+first one against an ``m0`` far from equilibrium - for example ``m0`` along a
+field well away from the easy axis and below the anisotropy field - would make
+it look like a switch. There is therefore no need to relax ``m0`` in a
+separate solve before the sweep.
+
 The step metric is the length of the change of the cell-averaged reduced
 magnetization vector across the trial field step,
 
@@ -397,6 +407,21 @@ The step-control logic is then
   magnetization *along the field direction* changes sign is rejected whenever
   ``dH`` exceeds ``switch_refdH``. This forces fine sampling right at the
   switching field, which is what a coercivity calculation needs.
+* Recovery from the floor: once ``dH`` has been driven down to ``dH_min``
+  (by rejections or by the ``dM_target`` rule, e.g. around a fast change of
+  the magnetization) or to ``switch_refdH`` by the switch refinement, ``dH``
+  also grows by ``dH_grow`` after every accepted step with
+  :math:`\mathrm{d}M \le` ``dM_target``, not only below ``dM_min``. After a
+  switch refinement this waits until the step across the sign change has
+  been accepted. The first step above ``dM_target`` after ``dH`` has grown
+  ends the recovery and divides ``dH`` by ``dH_grow``, back to the last step
+  length that stayed within ``dM_target``, and the rules above take over
+  again. Without it, a
+  smooth stretch that follows would give a :math:`\mathrm{d}M` between
+  ``dM_min`` and ``dM_target`` at the floor and keep the rest of the sweep
+  there: in a hard-axis loop that is about a thousand steps of ``dH_min``.
+  Until ``dH`` first reaches its floor the step control is exactly the rules
+  above.
 
 At ``dH_min`` a large change is accepted rather than looping forever, and the
 solver says so in its progress output. Too many rejected steps in total aborts

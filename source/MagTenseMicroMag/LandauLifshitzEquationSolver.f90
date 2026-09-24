@@ -516,11 +516,12 @@
     procedure(callback_fct),pointer :: cb_fct
     real(DP),dimension(:,:,:),intent(inout) :: M_out
     integer,intent(in) :: ntot, nt, n_reject_max
-    integer :: i_acc, i_trial, n_reject, n_reject_total, ti
+    integer :: i_acc, i_trial, n_reject, n_reject_total
     real(DP) :: H_delta(3), H_dir(3), H_current(3), H_trial(3), H_remaining(3)
     real(DP) :: H_distance, remaining_distance, dH, dH_initial, dH_step, dH_initial_T, dH_T, dH_step_T, dM, m_parallel_before, m_parallel_trial
     real(DP),dimension(:),allocatable :: m_before, m_accepted, m_trial
-    logical :: reject_step, reached_end
+    logical :: reject_step, reached_end, sign_change, switch_reject
+    logical :: recover_armed, recover_grown, refine_pending
     character*(256) :: prog_str
 
       if (gb_problem%maxHextSteps <= 0) then
@@ -550,23 +551,34 @@
       allocate(m_before(3*ntot), m_accepted(3*ntot), m_trial(3*ntot))
       m_accepted = gb_problem%m0
 
-    ! Save the starting field and magnetisation state (store at first time index)
-    i_acc = 1
-    gb_solution%HextInd = i_acc
-    gb_problem%Hext(i_acc,1) = 0.0_DP
-    gb_problem%Hext(i_acc,2:4) = H_current
-    ! Store the initial condition for all time indices so the returned
-    ! `gb_solution%M_out` contains a valid time-series for the initial field.
-    do ti = 1, size(gb_problem%t)
-        gb_solution%M_out(ti,:,i_acc,1) = m_accepted(1:ntot)
-        gb_solution%M_out(ti,:,i_acc,2) = m_accepted(ntot+1:2*ntot)
-        gb_solution%M_out(ti,:,i_acc,3) = m_accepted(2*ntot+1:3*ntot)
-    end do
-    call StoreHeffComponents ( gb_problem, gb_solution )
+      ! Relax the starting state at H_start and store it in the first slot. Every trial step's dM is
+      ! measured against the last accepted state, so that state has to be an equilibrium: an m0 far
+      ! from equilibrium at H_start (e.g. m0 along a field well away from the easy axis, below the
+      ! anisotropy field) makes the first step look like a switch, is rejected down to dH_min and
+      ! leaves the rest of the sweep there. Relaxing an m0 that is already an equilibrium is cheap.
+      i_acc = 1
+      gb_solution%HextInd = i_acc
+      gb_problem%Hext(i_acc,1) = 0.0_DP
+      gb_problem%Hext(i_acc,2:4) = H_current
+      gb_problem%m0 = m_accepted
+      write(prog_str,'(A,3F10.6)') 'Relaxing at H_start, mu0 H [T] = ', mu0*H_current(1), mu0*H_current(2), mu0*H_current(3)
+      call displayGUIMessage( trim(prog_str) )
 
-    n_reject = 0
+      call relaxAtField( fct, fct_thermal, cb_fct, M_out(:,:,i_acc), ntot, nt, i_acc )
+
+      m_accepted = M_out(:,nt,i_acc)
+      gb_problem%m0 = m_accepted
+      gb_solution%M_out(:,:,i_acc,1) =  transpose( M_out(1:ntot,:,i_acc) )
+      gb_solution%M_out(:,:,i_acc,2) =  transpose( M_out((ntot+1):2*ntot,:,i_acc) )
+      gb_solution%M_out(:,:,i_acc,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i_acc)  )
+      call StoreHeffComponents ( gb_problem, gb_solution )
+
+      n_reject = 0
       n_reject_total = 0
       reached_end = .false.
+      recover_armed = .false.
+      recover_grown = .false.
+      refine_pending = .false.
 
       do while (.not. reached_end .and. i_acc < gb_problem%maxHextSteps + 1)
           remaining_distance = dot_product(gb_problem%H_end - H_current, H_dir)
@@ -602,10 +614,15 @@
 
           m_parallel_before = meanMagnetisationAlongField(m_before, ntot, H_dir)
           m_parallel_trial = meanMagnetisationAlongField(m_trial, ntot, H_dir)
+          sign_change = m_parallel_before * m_parallel_trial < 0.0_DP
           reject_step = .false.
+          switch_reject = .false.
           if (dM > gb_problem%dM_reject .and. dH > gb_problem%dH_min) reject_step = .true.
           if (gb_problem%use_switch_refine) then
-              if (m_parallel_before * m_parallel_trial < 0.0_DP .and. dH > gb_problem%switch_refine_dH .and. dH > gb_problem%dH_min) reject_step = .true.
+              if (sign_change .and. dH > gb_problem%switch_refine_dH .and. dH > gb_problem%dH_min) then
+                  reject_step = .true.
+                  switch_reject = .true.
+              endif
           endif
 
           if (reject_step) then
@@ -613,6 +630,14 @@
                   reject_step = .false.
               else
                   dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+                  !dH is being driven to its floor, so arm the recovery (see the step control below).
+                  !Across a sign change the floor is switch_refine_dH, and the recovery waits until
+                  !the step across the sign change has been accepted
+                  if (switch_reject) refine_pending = .true.
+                  if (switch_reject .or. dH <= gb_problem%dH_min) then
+                      recover_armed = .true.
+                      recover_grown = .false.
+                  endif
                   dH_T = mu0 * dH
                   write(prog_str,'(A27,F10.6,A4)') '   Retrying with lower dH = ', dH_T, ' T'
                   call displayGUIMessage( trim(prog_str) )
@@ -652,14 +677,36 @@
           H_remaining = gb_problem%H_end - H_current
           reached_end = sqrt(sum(H_remaining**2)) <= max(1.0e-10_DP * H_distance, 1.0e-9_DP)
 
+          !Step control for the next step: grow below dM_min, shrink above dM_target. On its own this
+          !band can leave dH at its floor for the rest of the sweep once something has driven it there
+          !(the switch refinement, or the shrinking around a large, fast change): in a smooth region a
+          !step that small gives a dM between dM_min and dM_target, so dH never grows again. In a
+          !hard-axis loop that is ~1000 steps of dH_min. So when dH reaches its floor the recovery is
+          !armed, and while it is armed dH also grows whenever dM <= dM_target. The first step above
+          !dM_target after it has grown disarms it and sets dH back by one dH_grow, to the last
+          !step length that was within dM_target, and the band takes over from there. Until dH
+          !reaches its floor the step control is exactly the band.
+          if (sign_change) refine_pending = .false.
           if (dM < gb_problem%dM_min) then
               dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
+              if (recover_armed) recover_grown = .true.
           else if (dM > gb_problem%dM_target) then
-              dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+              if (recover_armed .and. recover_grown) then
+                  !The recovery has overshot: go back to the previous step length, which was within
+                  !dM_target, rather than shrinking by dH_shrink below it
+                  recover_armed = .false.
+                  dH = max(dH / gb_problem%dH_grow, gb_problem%dH_min)
+              else
+                  dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+              endif
+              if (dH <= gb_problem%dH_min) then
+                  recover_armed = .true.
+                  recover_grown = .false.
+              endif
+          else if (recover_armed .and. .not. refine_pending) then
+              dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
+              recover_grown = .true.
           endif
-
-          
-          
       enddo
 
       gb_problem%nHextAccepted = i_acc

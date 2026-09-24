@@ -1251,6 +1251,10 @@ class MicromagProblem:
         The adaptive accept/reject loop is executed by the Fortran backend in a
         single call. Output arrays are preallocated to ``max_steps`` in Fortran
         and sliced here to include only accepted field steps.
+
+        The first field state is ``m0`` relaxed at ``H_start``, so it is an
+        equilibrium like every later one and the first step is measured
+        against it; ``m0`` does not need to be relaxed beforehand.
         """
 
         if self.hysteresis_solver != 2:
