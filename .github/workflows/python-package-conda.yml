@@ -45,7 +45,18 @@ jobs:
 
     - name: Linux - Select FMM3D make.inc
       if: ${{ runner.os == 'Linux' }}
-      run: cp external/FMM3D/make.inc.linux external/FMM3D/make.inc
+      # make.inc.linux builds with -march=native, which ties libfmm3d.so to the
+      # CPU of whichever hosted VM ran this leg. A leg that lands on an AVX-512
+      # host ships a wheel that dies with SIGILL on machines without AVX-512
+      # (as the self-hosted CUDA runner does), so pin a portable baseline.
+      run: |
+        cp external/FMM3D/make.inc.linux external/FMM3D/make.inc
+        sed -i 's/-march=native/-march=x86-64-v3/g' external/FMM3D/make.inc
+        if grep -n 'march=native' external/FMM3D/make.inc; then
+          echo "::error::-march=native is still set in external/FMM3D/make.inc"
+          exit 1
+        fi
+        grep -n '^FFLAGS' external/FMM3D/make.inc
 
     - name: Win - Select FMM3D make.inc
       if: ${{ runner.os == 'Windows' }}
