@@ -88,7 +88,7 @@
     call system_clock(count_max=cm)
     rate = REAL(cr)
     
-    write(prog_str,'(A37, A8, A12)') 'MagTense version 3.0.0, compiled on: ', __TIME__, __DATE__ 
+    write(prog_str,'(A37, A8, A12)') 'MagTense version 3.0.1, compiled on: ', __TIME__, __DATE__ 
     call displayGUIMessage( trim(prog_str) ) 
     
     !Save internal representation of the problem and the solution

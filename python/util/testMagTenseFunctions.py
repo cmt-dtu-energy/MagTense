@@ -1,26 +1,32 @@
-"""Combined micromagnetic test suite for the python version of MagTense.
+"""Combined test suite for the python version of MagTense.
 
-This is the python counterpart of matlab/util/testMagTenseFunctions.m. It runs the
-validation examples in the directories next to this file, collects the numerical
-measure each of them produces, compares it with the acceptance limit that belongs to
-it, and prints a table plus a figure showing which tests passed. Each example is run
-from its own directory, so whatever it writes lands beside it.
+This is the python counterpart of matlab/util/testMagTenseFunctions.m, and lives in
+python/util just as that one lives in matlab/util. It runs the validation examples in
+python/examples/magnetostatics and python/examples/micromagnetism, collects the
+numerical measure each of them produces, compares it with the acceptance limit that
+belongs to it, and prints a table plus a figure showing which tests passed. Each example
+is run from its own directory, so whatever it writes lands beside it. The overview
+figure is written to results/ next to this file, as the MATLAB suite does.
 
 Coverage compared with the MATLAB suite
 ---------------------------------------
-Shared with MATLAB : macrogeometry periodic boundary conditions, periodic exchange on
+The two suites run the same tests, under the same names, in the same order, with the
+same checks and the same limits. Every example is a port of its MATLAB counterpart
+with the same geometry and evaluation points, and the magnetostatic validations give
+the same errors to three significant figures. Standard problem 3 by time integration
+is marked slow in both: it runs here with --include-slow and in MATLAB with
+MAGTENSE_INCLUDE_SLOW=1, or in either when it is asked for by name.
+
+Magnetostatics     : the field of each tile type (cylindrical slice, prism, circular
+                     piece, inverted circular piece, averaged prism, sphere, spheroid,
+                     tetrahedron) against FEM, from
+                     python/examples/magnetostatics/Validation_field_*.
+Micromagnetism     : macrogeometry periodic boundary conditions, periodic exchange on
                      both the uniform grid and the unstructured mesh, shape correction,
-                     thermal fluctuations, standard problem 4, standard problem 6. The
-                     MATLAB counterparts live in
-                     matlab/examples/Micromagnetism/MagTense_tests and use the same
-                     geometries and the same acceptance limits.
-Only in python     : standard problem 3, and the point dipole far field of a
-                     magnetised cube.
-Only in MATLAB     : the six magnetostatic field validations (cylindrical slice, prism,
-                     sphere, spheroid, tetrahedron), and the standard problem 6
-                     direction and unstructured mesh variants. The python examples for
-                     these do not exist or do not expose a comparable error measure, so
-                     they are not covered here.
+                     thermal fluctuations, the point dipole far field of a magnetised
+                     cube, standard problem 4, standard problem 6 by time integration
+                     and with the energy minimizer, and standard problem 3 by time
+                     integration and with the energy minimizer.
 
 How a test reports its result
 -----------------------------
@@ -42,6 +48,7 @@ Usage
 """
 
 import argparse
+import importlib
 import os
 import sys
 import time
@@ -61,7 +68,10 @@ import numpy as np
 
 # Every example has its own directory, the same as in
 # matlab/examples/Micromagnetism, and writes what it produces beside itself.
-EXAMPLE_ROOT = Path(__file__).resolve().parent
+UTIL_DIR = Path(__file__).resolve().parent
+EXAMPLE_ROOT = UTIL_DIR.parent / "examples" / "micromagnetism"
+MAGSTAT_ROOT = UTIL_DIR.parent / "examples" / "magnetostatics"
+RESULTS_DIR = UTIL_DIR / "results"
 TESTS_DIR = EXAMPLE_ROOT / "MagTense_tests"
 STD3_DIR = EXAMPLE_ROOT / "mumag_micromag_Std_problem_3"
 STD4_DIR = EXAMPLE_ROOT / "mumag_micromag_Std_problem_4"
@@ -95,11 +105,38 @@ def example_dir(directory: Path):
 # present anyway.
 USE_CUDA = False
 
+# The integrated field errors are in percent, so 5 means the MagTense and the FEM curve
+# enclose an area of 5 % of the area under the FEM curve. The same as in MATLAB.
+FIELD_ERROR_LIMIT = 5.0
+
 # Single domain limit of the muMag standard problem 3, in units of the exchange length
 STD3_SINGLE_DOMAIN_LIMIT = 8.47
 
 
 #%% Wrappers turning each example into a list of checks
+
+
+def _validation_checks(directory: str, function: str) -> list[dict]:
+    """Run one magnetostatic validation from its own directory.
+
+    They all return the relative integrated error against FEM in percent, one value per
+    field component or evaluation line, and are named the way the MATLAB suite names
+    them.
+    """
+    with example_dir(MAGSTAT_ROOT / directory):
+        module = importlib.import_module(function)
+        errors = getattr(module, function)(show_plot=False)
+    labels = ['Hx', 'Hy', 'Hz']
+    return [
+        {
+            'check': 'rel. integrated error, '
+                     + (labels[i] if i < len(labels) else f'component {i + 1}'),
+            'value': float(error),
+            'limit': FIELD_ERROR_LIMIT,
+            'passed': error < FIELD_ERROR_LIMIT,
+        }
+        for i, error in enumerate(errors)
+    ]
 
 
 def _macrogeometry_PBC_test() -> list[dict]:
@@ -265,6 +302,42 @@ def _std_problem_3(use_minimizer: bool = True) -> list[dict]:
 
 # name -> (function, slow, one line description)
 TESTS = {
+    'magnetostatics_cylindrical_slice_1': (
+        lambda: _validation_checks('Validation_field_cylindrical_slice', 'validation_cylindrical_slice_example_1'), False,
+        'Field of a cylindrical slice vs FEM, example 1',
+    ),
+    'magnetostatics_cylindrical_slice_2': (
+        lambda: _validation_checks('Validation_field_cylindrical_slice', 'validation_cylindrical_slice_example_2'), False,
+        'Field of a cylindrical slice vs FEM, example 2',
+    ),
+    'magnetostatics_prism': (
+        lambda: _validation_checks('Validation_field_prism', 'validation_prism'), False,
+        'Field of a rectangular prism vs FEM',
+    ),
+    'magnetostatics_circpiece': (
+        lambda: _validation_checks('Validation_field_circpiece', 'validation_circpiece'), False,
+        'Field of a circular piece vs FEM',
+    ),
+    'magnetostatics_circpiece_inverted': (
+        lambda: _validation_checks('Validation_field_circpiece_inverted', 'validation_circpiece_inverted'), False,
+        'Field of an inverted circular piece vs FEM',
+    ),
+    'magnetostatics_avgprism': (
+        lambda: _validation_checks('Validation_field_avgprism', 'validation_avgprism'), False,
+        'Field of a prism averaged over observation volumes vs FEM, x and y components',
+    ),
+    'magnetostatics_sphere': (
+        lambda: _validation_checks('Validation_field_sphere', 'validation_sphere'), False,
+        'Field of a sphere vs FEM',
+    ),
+    'magnetostatics_spheroid': (
+        lambda: _validation_checks('Validation_field_spheroid', 'validation_spheroid'), False,
+        'Field of a spheroid vs FEM',
+    ),
+    'magnetostatics_tetrahedron': (
+        lambda: _validation_checks('Validation_field_tetrahedron', 'validation_tetrahedron'), False,
+        'Field of a tetrahedron vs FEM',
+    ),
     'macrogeometry_PBC_test': (
         _macrogeometry_PBC_test, False,
         'Periodic boundaries by the macrogeometry method, along x, y and z',
@@ -521,7 +594,9 @@ def main() -> int:
             print(f"Unknown test(s): {', '.join(unknown)}. "
                   "Use --list to see the available ones.")
             return 2
-        selected, skipped = requested, []
+        # Every test that is not run is reported as skipped, as in the MATLAB suite
+        selected = [name for name in TESTS if name in requested]
+        skipped = [name for name in TESTS if name not in selected]
     else:
         selected = [name for name, (_, slow, _) in TESTS.items()
                     if args.include_slow or not slow]
@@ -546,7 +621,7 @@ def main() -> int:
 
     if not args.no_figure:
         plot_overview(records, skipped,
-                      EXAMPLE_ROOT / 'testMagTenseFunctions_overview.png')
+                      RESULTS_DIR / 'testMagTenseFunctions_overview.png')
 
     failed = [r['name'] for r in records if r['status'] != 'PASS']
     if failed:

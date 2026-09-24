@@ -567,7 +567,7 @@ class MicromagProblem:
             self._T = val + np.zeros(self.ntot, dtype=np.float64, order="F")
 
         else:
-            assert np.asarray(val).shape == self.ntot
+            assert np.asarray(val).shape == (self.ntot,)
             self._T = np.asarray(val, dtype=np.float64, order="F")
 
     @property
@@ -773,7 +773,14 @@ class MicromagProblem:
 
     @solver.setter
     def solver(self, val: str | None = None) -> None:
-        self._solver = {None: -1, "explicit": 1, "dynamic": 2, "minimizer": 3}[val]
+        solvers = {None: -1, "explicit": 1, "dynamic": 2, "minimizer": 3}
+        if val not in solvers:
+            msg = (
+                f"Unknown solver type {val!r}. Use 'explicit', 'dynamic' or "
+                "'minimizer'."
+            )
+            raise ValueError(msg)
+        self._solver = solvers[val]
 
     def _store_diagnostics(self, result: list, n_accepted: int | None = None) -> None:
         """Pop the five trailing diagnostics off a Fortran result list onto the problem.

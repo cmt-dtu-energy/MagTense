@@ -1,138 +1,106 @@
-from pathlib import Path
-
-import numpy as np
-
-from magtense.magstatics import Tiles, run_simulation
-from magtense.utils import create_plot
-
-
-def load_COMSOL(
-    fname: str,
-    eval_offset: list,
-    COMSOL_eval_path: Path,
-    model_offset: list,
-    unit: str,
-    pts_special: np.ndarray | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Load reference points from COMSOL calculation
-    """
-    with Path.open(Path(COMSOL_eval_path, fname), "r") as file:
-        T = file.readlines()[8:]
-
-    T_split = np.asarray([line.split() for line in T], dtype=np.float64)
-    H_norm_COMSOL = T_split[:, 1]
-    if unit == "T":
-        H_norm_COMSOL *= 4 * np.pi * 1e-7
-    pts_coor = T_split[:, 0] if pts_special is None else pts_special
-    struc = np.ones(len(pts_coor))
-
-    if fname[-5] == "x":
-        pts = np.c_[
-            pts_coor - model_offset[0], struc * eval_offset[1], struc * eval_offset[2]
-        ]
-    elif fname[-5] == "y":
-        pts = np.c_[
-            struc * eval_offset[0], pts_coor - model_offset[1], struc * eval_offset[2]
-        ]
-    elif fname[-5] == "z":
-        pts = np.c_[
-            struc * eval_offset[0], struc * eval_offset[1], pts_coor - model_offset[2]
-        ]
-
-    return pts, H_norm_COMSOL
-
-
-def test_prism(
-    shape: str = "prism", model_offset: tuple = (0, 0, 0), unit: str = ("A/m",)
-) -> None:
-    mu0 = 4 * np.pi * 1e-7
-    tile = Tiles(
-        n=1,
-        size=[0.6, 0.1, 0.3],
-        offset=[0.5, 0.4, 0.1],
-        rot=[np.pi / 2, -np.pi / 3, np.pi / 4],
-        tile_type=2,
-        M_rem=1.2 / mu0,
-        easy_axis=[0.35355339, 0.61237244, 0.70710678],
-        color=[1, 0, 0],
-    )
-    offset = [0.5, 0.4, 0.1]
-
-    mu0 = 4 * np.pi * 1e-7
-    prefix = "py_" if "spher" in shape else ""
-    suffix = "_prolate" if shape == "spheroid" else ""
-    COMSOL_eval_path = (
-        Path(__file__).parent.absolute()
-        / ".."
-        / ".."
-        / ".."
-        / "documentation"
-        / "examples_FEM_validation"
-        / f"Validation_{shape}"
-    )
-
-    for coord in ["x", "y", "z"]:
-        fname = f"{prefix}Validation_{shape}{suffix}_normH_{coord}.txt"
-        pts, H_n_COMSOL = load_COMSOL(
-            fname, offset, COMSOL_eval_path, model_offset, unit
-        )
-        _, H_mt = run_simulation(tile, pts)
-        H_n_mt = [np.linalg.norm(H_point) * mu0 for H_point in H_mt]
-
-        print(f"Ten largest errors ({coord}): ", np.sort(abs(H_n_COMSOL - H_n_mt))[-5:])
-        assert np.any(np.sort(abs(H_n_COMSOL - H_n_mt))[:-1] < 5e-3)
-
-
-def test_plot_fn() -> None:
-    """
-    Test the plot function
-    """
-    mu0 = 4 * np.pi * 1e-7
-    tiles = Tiles(
-        n=6,
-        M_rem=1.2 / mu0,
-        tile_type=[2, 1, 3, 4, 5, 7],
-        color=[
-            [1, 0, 0],
-            [0, 0, 1],
-            [1, 0.5, 0],
-            [0.3, 0.8, 0.2],
-            [0, 0, 0],
-            [1, 0, 1],
-        ],
-    )
-
-    # 0: Prism
-    tiles.size = ([0.1, 0.3, 0.2], 0)
-    tiles.offset = ([0.1, 0.2, 0.1], 0)
-
-    # 1: Cylindrical Tiles
-    tiles.center_pos = ([1, 0, 0.3], 1)
-    tiles.dev_center = ([0.15, np.pi / 9, 0.3], 1)
-
-    # 2: Circpiece
-    tiles.center_pos = ([0.85, np.pi / 5, 1.2], 2)
-    tiles.dev_center = ([0.15, np.pi / 7, 0.25], 2)
-
-    # 3: Inverted Circpiece
-    tiles.center_pos = ([0.2, np.pi / 6, 0.75], 3)
-    tiles.dev_center = ([0.05, np.pi / 4, 0.4], 3)
-
-    # 4: Tetrahedron
-    tiles.vertices = (
-        np.array(
-            [[0.65, 0.9, 0.5], [0.8, 0.9, 0.7], [0.85, 0.55, 0.25], [0.95, 0.85, 0.15]]
-        ),
-        4,
-    )
-
-    # 5: Prolate Spheroid
-    tiles.size = ([0.1, 0.3, 0.1], 5)
-    tiles.offset = ([0.1, 0.6, 0.7], 5)
-    tiles.rot = ([0, 0, 2], 5)
-
-    # Call the plot function
+import importlib.util
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from magtense.magstatics import Tiles, run_simulation
+from magtense.utils import create_plot
+
+
+# The examples live in one directory each, like matlab/examples/Magnetostatics
+EXAMPLES = Path(__file__).resolve().parent
+
+# The acceptance limit of the MATLAB suite (matlab/util/testMagTenseFunctions.m), in percent
+FIELD_ERROR_LIMIT = 5
+
+VALIDATIONS = [
+    ("Validation_field_cylindrical_slice", "validation_cylindrical_slice_example_1"),
+    ("Validation_field_cylindrical_slice", "validation_cylindrical_slice_example_2"),
+    ("Validation_field_prism", "validation_prism"),
+    ("Validation_field_circpiece", "validation_circpiece"),
+    ("Validation_field_circpiece_inverted", "validation_circpiece_inverted"),
+    ("Validation_field_sphere", "validation_sphere"),
+    ("Validation_field_spheroid", "validation_spheroid"),
+    ("Validation_field_tetrahedron", "validation_tetrahedron"),
+    ("Validation_field_avgprism", "validation_avgprism"),
+]
+
+
+def _load_example(directory: str, name: str):
+    """Import an example by path; the example directories are not packages."""
+    spec = importlib.util.spec_from_file_location(name, EXAMPLES / directory / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.parametrize(("directory", "name"), VALIDATIONS)
+def test_validation_against_fem(directory: str, name: str) -> None:
+    """The field of each tile type against its FEM reference.
+
+    Each validation returns the relative integrated error along its evaluation lines, the
+    measure the MATLAB validations return, and is held to the same limit.
+    """
+    errors = getattr(_load_example(directory, name), name)(show_plot=False)
+    assert max(errors) < FIELD_ERROR_LIMIT
+
+
+def test_planar_coil() -> None:
+    """A planar coil tile against the Biot-Savart law for the same 100 loops."""
+    module = _load_example("Example_006_planar_coil", "planar_coil")
+    assert max(module.planar_coil(show_plot=False)) < 1e-10
+
+
+def test_plot_fn() -> None:
+    """
+    Test the plot function
+    """
+    mu0 = 4 * np.pi * 1e-7
+    tiles = Tiles(
+        n=6,
+        M_rem=1.2 / mu0,
+        tile_type=[2, 1, 3, 4, 5, 7],
+        color=[
+            [1, 0, 0],
+            [0, 0, 1],
+            [1, 0.5, 0],
+            [0.3, 0.8, 0.2],
+            [0, 0, 0],
+            [1, 0, 1],
+        ],
+    )
+
+    # 0: Prism
+    tiles.size = ([0.1, 0.3, 0.2], 0)
+    tiles.offset = ([0.1, 0.2, 0.1], 0)
+
+    # 1: Cylindrical Tiles
+    tiles.center_pos = ([1, 0, 0.3], 1)
+    tiles.dev_center = ([0.15, np.pi / 9, 0.3], 1)
+
+    # 2: Circpiece
+    tiles.center_pos = ([0.85, np.pi / 5, 1.2], 2)
+    tiles.dev_center = ([0.15, np.pi / 7, 0.25], 2)
+
+    # 3: Inverted Circpiece
+    tiles.center_pos = ([0.2, np.pi / 6, 0.75], 3)
+    tiles.dev_center = ([0.05, np.pi / 4, 0.4], 3)
+
+    # 4: Tetrahedron
+    tiles.vertices = (
+        np.array(
+            [[0.65, 0.9, 0.5], [0.8, 0.9, 0.7], [0.85, 0.55, 0.25], [0.95, 0.85, 0.15]]
+        ),
+        4,
+    )
+
+    # 5: Prolate Spheroid
+    tiles.size = ([0.1, 0.3, 0.1], 5)
+    tiles.offset = ([0.1, 0.6, 0.7], 5)
+    tiles.rot = ([0, 0, 2], 5)
+
+    # Call the plot function
     create_plot(tiles, show=False)
 
 
@@ -171,7 +139,7 @@ def test_state_function_sphere_independent_of_mu_r() -> None:
     linearizing the self-consistency with mu_r_ea, which made the same sphere give anything
     from 0.06 T to 1.9 T depending on that parameter.
     """
-    import importlib_resources
+    import importlib.resources as importlib_resources
 
     from magtense.magstatics import iterate_magnetization
 

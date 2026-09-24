@@ -104,7 +104,7 @@ in the standalone input file with tile type 102 and the field in the ``M``
 line. A soft sphere with constant permeability :math:`\mu_r` in such a field is
 the standard check: its magnetization is
 :math:`\mathbf{M} = 3 (\mu_r - 1)/(\mu_r + 2)\,\mathbf{H}_\mathrm{app}`, and
-`soft_sphere_in_uniform_field.py <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/magnetostatics/soft_sphere_in_uniform_field.py>`_
+`soft_sphere_in_uniform_field.py <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/magnetostatics/Example_005_soft_sphere_in_uniform_field/soft_sphere_in_uniform_field.py>`_
 and its Matlab counterpart
 ``Example_005_soft_sphere_in_uniform_field`` reproduce it.
 

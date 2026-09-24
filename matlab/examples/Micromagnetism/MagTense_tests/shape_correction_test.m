@@ -2,7 +2,7 @@ function checks = shape_correction_test(options)
 %SHAPE_CORRECTION_TEST
 % Test if the shape correction field is implemented correctly in the MagTense micromagnetics
 % solver. This is the MATLAB counterpart of
-% python/examples/micromagnetism/shape_correction_test.py and uses the same geometry, the same
+% python/examples/micromagnetism/MagTense_tests/shape_correction_test.py and uses the same geometry, the same
 % material parameters and the same acceptance limits.
 %
 % The system is a uniform grid of micromagnetic tiles forming a rectangular prism. The

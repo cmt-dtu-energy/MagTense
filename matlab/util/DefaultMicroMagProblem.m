@@ -548,16 +548,11 @@ methods
     function obj = setddHext( obj, fct, t_ddHext )
         obj.nt_ddHext = int32(length(t_ddHext));
         
-        obj.ddHext = zeros( obj.nt_Hext, 4 );
+        obj.ddHext = zeros( obj.nt_ddHext, 4 );
         obj.ddHext(:,1) = t_ddHext;
         obj.ddHext(:,2:4) = fct( t_ddHext );
     end
         
-    function obj = setHextTime( obj, nt )
-        obj.nt_Hext = int32( nt );
-        obj.t_Hext  = linspace( obj.t(1), obj.t(end), obj.nt_Hext );
-    end
-    
     function obj = setTime( obj, t )
         obj.t  = t;
         obj.nt = int32(length(t));

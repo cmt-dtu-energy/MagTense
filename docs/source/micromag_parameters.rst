@@ -137,8 +137,8 @@ Solver, time and applied field
    * - ``solver``
      - ``solver``
      - ``Dynamic``
-     - ``Explicit`` (1), ``Dynamic`` (2), ``Minimizer`` (3, ``Implicit`` is
-       its old name). Matlab: ``setMicroMagSolver``.
+     - ``Explicit`` (1), ``Dynamic`` (2), ``Minimizer`` (3; the old name
+       ``Implicit`` is no longer accepted). Matlab: ``setMicroMagSolver``.
    * - ``ProblemMod``
      - ``prob_mode``
      - ``new``

@@ -1,8 +1,8 @@
 """
 Test the far field of a uniformly magnetised cube against the analytical point dipole.
 
-A single cubic prism of side L, magnetised along z, is evaluated at random points on spheres
-of increasing radius. Far from the cube the field has to approach that of a point dipole of
+A single cubic prism of side L, magnetised along z, is evaluated at points on spheres of
+increasing radius. Far from the cube the field has to approach that of a point dipole of
 moment m = M*L^3, and the way it approaches it is itself a check: a cube has no quadrupole
 moment by symmetry, so the leading correction is the octupole and the relative deviation from
 the dipole has to fall as R^-4.
@@ -13,7 +13,9 @@ structure, which a plain threshold at one distance would not catch.
 
 Running the file executes the test and saves a figure. ``run_test()`` returns the same result
 as a list of checks, which is the contract the combined suite in testMagTenseFunctions.py
-expects.
+expects. The MATLAB counterpart is
+matlab/examples/Micromagnetism/MagTense_tests/dipole_field_test.m, with the same points and
+the same limits.
 """
 
 # General modules
@@ -42,11 +44,9 @@ M_rem = 1.2 / mu0       # Remanent magnetisation, along z [A/m]
 # floor of the kernel itself.
 distances = np.array([5, 10, 20, 30, 50])
 
-# Number of random directions per distance. They are drawn from a normal distribution and
-# normalised, which is uniform on the sphere, so the test covers all orientations relative to
-# the magnetisation rather than only the symmetry axes.
+# Number of directions per distance. They are spread evenly over the unit sphere, so the test
+# covers all orientations relative to the magnetisation rather than only the symmetry axes.
 n_points = 40
-seed = 42
 
 # The far field is compared at this distance, in units of L
 far_field_distance = 30
@@ -98,11 +98,16 @@ def deviation_at(distance: float, directions: np.ndarray) -> np.ndarray:
 
 
 def run_test(plotting: bool = True) -> list[dict]:
-    rng = np.random.default_rng(seed)
-    directions = rng.normal(size=(n_points, 3))
-    directions /= np.linalg.norm(directions, axis=1, keepdims=True)
+    # Directions evenly spread over the unit sphere (a Fibonacci sphere), so the test is
+    # the same in every language and on every run
+    k = np.arange(n_points)
+    z = 1 - 2 * (k + 0.5) / n_points
+    phi = k * np.pi * (3 - np.sqrt(5))
+    directions = np.column_stack(
+        [np.sqrt(1 - z**2) * np.cos(phi), np.sqrt(1 - z**2) * np.sin(phi), z]
+    )
 
-    print(f'Comparing the field of a cube with a point dipole at {n_points} random '
+    print(f'Comparing the field of a cube with a point dipole at {n_points} '
           f'directions per distance')
     print(f"{'R / L':>8} {'max deviation [%]':>20} {'mean deviation [%]':>20}")
     print('-' * 50)

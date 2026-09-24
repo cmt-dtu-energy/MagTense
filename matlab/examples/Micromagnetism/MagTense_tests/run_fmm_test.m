@@ -1,7 +1,8 @@
 function [metrics, allPassed] = run_fmm_test(options)
 %RUN_FMM_TEST Validate the FMM demag field against the direct calculation.
 %
-%   The MATLAB counterpart of python/tests/fmm_test. The same unstructured
+%   The MATLAB counterpart of
+%   python/examples/micromagnetism/MagTense_tests/fmm_test. The same unstructured
 %   prism problem is solved twice: once with the direct demag tensor
 %   (use_fmm = 0) as the reference, and once per FMM configuration with the
 %   short-circuit disabled so FMM is genuinely exercised. The FMM fields are
@@ -62,7 +63,7 @@ fprintf('FMM test: %d unstructured prisms from %s\n', ntot, [meshName meshExt]);
         %    them, are not returned to MATLAB at all.
         problem.ReturnHall = int32(1);
 
-        %--- Material properties, as in Standard_problem_4_unstructured_cart
+        %--- Material properties, as in mumag standard problem 4
         problem.alpha = 4.42e3;
         problem.gamma = 0;
         problem.Ms = 8e5 * ones(ntot, 1);
@@ -155,7 +156,7 @@ for nterms = options.nterms
 end
 
 %% ------------------------------------------------------------- Validation
-%--- Same thresholds as python/tests/fmm_test/run_fmm_test.py
+%--- Same thresholds as python/examples/micromagnetism/MagTense_tests/fmm_test/run_fmm_test.py
 thresholds = struct( ...
     'L2', struct('Hdem_rel_avg', 1e-3, 'Hdem_rel_max', 0.05, 'Mout_max', 0.03), ...
     'L3', struct('Hdem_rel_avg', 1e-2, 'Hdem_rel_max', 0.40, 'Mout_max', 0.25));

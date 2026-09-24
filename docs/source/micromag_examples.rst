@@ -172,7 +172,10 @@ Running the test suites
 ----------------------------------------
 
 Both interfaces ship a runner that executes the examples, turns each of them
-into a set of pass/fail checks and prints a summary table.
+into a set of pass/fail checks and prints a summary table. The two run the
+same tests - the magnetostatic field of every tile type against FEM, and the
+micromagnetic tests and standard problems - under the same names, with the
+same checks and limits.
 
 In Matlab, from ``matlab/util``:
 
@@ -182,10 +185,12 @@ In Matlab, from ``matlab/util``:
 
 The tests to run can be restricted with the environment variables
 ``MAGTENSE_TESTS`` and ``MAGTENSE_SKIP``, and the CUDA and CVODE variants are
-selected with ``MAGTENSE_TEST_CUDA`` and ``MAGTENSE_TEST_CVODE``. Standard
-problem 6 alone accounts for most of the running time.
+selected with ``MAGTENSE_TEST_CUDA`` and ``MAGTENSE_TEST_CVODE``.
+``MAGTENSE_INCLUDE_SLOW=1`` adds standard problem 3 by time integration,
+which is very slow. Standard problem 6 accounts for most of the running time
+of the rest.
 
-In Python, from ``python/examples/micromagnetism``:
+In Python, from ``python/util``:
 
 .. code-block:: bash
 
@@ -205,7 +210,8 @@ In Python, from ``python/examples/micromagnetism``:
 
 ``--include-slow`` adds standard problem 3, which is very slow. Each example
 lives in its own directory and is run from there, so the figures and timer logs
-it produces land beside it, and the overview figure of the suite is written next
-to ``testMagTenseFunctions.py``. There are in addition ``pytest`` suites in
+it produces land beside it, and the overview figure of the suite is written to
+``python/util/results``, as the Matlab suite writes to ``matlab/util/results``.
+There are in addition ``pytest`` suites in
 ``python/examples/magnetostatics`` and
 ``python/examples/micromagnetism/MagTense_tests``.

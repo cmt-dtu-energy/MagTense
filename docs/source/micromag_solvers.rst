@@ -31,7 +31,8 @@ The solver is selected with ``setMicroMagSolver`` in Matlab and with the
      - Reads the applied-field table exactly as ``Explicit`` does, one constant
        field per row, but finds the equilibrium at each field with the
        :ref:`Energy minimizer` instead of integrating the Landau-Lifshitz
-       equation in time. ``Implicit`` is accepted as the old name of this slot.
+       equation in time. The old name ``Implicit`` for this slot is no longer
+       accepted.
 
 ``ProblemMod`` (Python ``prob_mode``) selects ``new`` (1) or ``old`` (2). Use
 ``new``, which is the default; ``old`` skips the allocation of the solution

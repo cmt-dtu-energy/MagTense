@@ -1,7 +1,7 @@
 function checks = temperature_test(options)
 %TEMPERATURE_TEST
 % Test the thermal fluctuation implementation. This is the MATLAB counterpart of
-% python/examples/micromagnetism/temperature_test.py and uses the same geometry, the same
+% python/examples/micromagnetism/MagTense_tests/temperature_test.py and uses the same geometry, the same
 % material parameters and the same acceptance limits.
 %
 % The system is a collection of non-interacting, uniformly magnetised micromagnetic cells whose

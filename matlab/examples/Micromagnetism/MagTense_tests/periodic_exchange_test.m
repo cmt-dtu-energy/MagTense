@@ -1,7 +1,7 @@
 function checks = periodic_exchange_test(options)
 %PERIODIC_EXCHANGE_TEST
 % Test the implementation of periodic exchange coupling on both grid types of MagTense. This is
-% the MATLAB counterpart of python/examples/micromagnetism/periodic_exchange_test.py and uses the
+% the MATLAB counterpart of python/examples/micromagnetism/MagTense_tests/periodic_exchange_test.py and uses the
 % same geometry, the same material parameters and the same acceptance limits.
 %
 % MagTense builds the exchange operator in two entirely different ways: from a stencil on a
@@ -60,7 +60,7 @@ function checks = periodic_exchange_test(options)
 % ------------------
 % Both unstructured tests above use a regular lattice of identical cubes, which is the easy case
 % for the mesh analysis. They are therefore repeated on an irregular mesh of Voronoi grains of the
-% kind used in python/experiments/Grain_perf, where the cells differ in size and a face at one end
+% kind used in python/util/grain_generator.py, where the cells differ in size and a face at one end
 % of the domain is linked to several smaller faces at the other end. Method 1 does not carry over,
 % since its spacer pattern is built for a 6 x 6 x 6 grid, but its idea does: a slab of cells one
 % base cell thick is left out of the mesh, so that what remains falls into two halves which touch
@@ -125,7 +125,7 @@ EIGENVECTOR_TOL = 1e-8;     % Relative residual of the plane wave eigenvectors
 SUPERCELL_TOL = 1e-10;      % Deviation from the supercell operator, relative to the largest coupling
 
 % The irregular mesh. A base grid that is refined once wherever a grain boundary passes through a
-% cell, which is the mesh type used in python/experiments/Grain_perf. Two sizes are needed: the
+% cell, which is the mesh type used in python/util/grain_generator.py. Two sizes are needed: the
 % sectioned simulation wants a few cells on either side of the gap, while the supercell reference
 % replicates the mesh 27 times and has to stay small enough to assemble quickly.
 GRAIN_LABEL = 'grain mesh';
@@ -787,7 +787,7 @@ function [pts, abc, grid_L, grainIdx] = build_grain_mesh(res_base, a_base, nGrai
 % A base grid of res_base^3 cubes is refined recursively: a cell is split into eight whenever it
 % is close enough to the boundary between two grains that the boundary can pass through it. The
 % grains are the Voronoi cells of a set of random points, so the result is the mesh type used in
-% python/experiments/Grain_perf, without the grain bookkeeping. The mesh is centred on the origin
+% python/util/grain_generator.py, without the grain bookkeeping. The mesh is centred on the origin
 % and is reproducible for a given seed.
 
 rng(seed);
