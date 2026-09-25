@@ -10,48 +10,63 @@ CUDA_WRAP_SOURCE = MagTenseCudaBlasICLWrapper
 #=======================================================================
 #                 Relevant suffixes
 #=======================================================================
-CUDA_FILE = $(addsuffix .cu, ${CUDA_SOURCE})
-CUDA_WRAP_FILE = $(addsuffix .cxx, ${CUDA_WRAP_SOURCE})
-CUDA_OBJECT = $(addsuffix .o, ${CUDA_SOURCE})
-CUDA_WRAP = $(addsuffix .o, ${CUDA_WRAP_SOURCE})
-#=======================================================================
-#
-#=======================================================================
+CUDA_FILE = $(CUDA_SOURCE).cu
+CUDA_WRAP_FILE = $(CUDA_WRAP_SOURCE).cxx
+
 ifeq ($(OS),Windows_NT)
-	CPPFLAGS = /nologo /Fo:${CUDA_WRAP}
-	LIBTOOL = LIB $? /NOLOGO /OUT:$@
-	LIB_SUFFIX = .lib
+    OBJ_SUFFIX = .obj
+    # Use the environment of the surrounding developer shell rather than letting
+    # nvcc call vcvars64.bat again, which fails from inside an initialised one.
+    NVCC = nvcc
+    CUFLAGS = --use-local-env
+    CPPFLAGS = /nologo
+    CPPFLAGS_OUT = /Fo:
+    LIBTOOL = LIB $^ /NOLOGO /OUT:$@
+    LIB_SUFFIX = .lib
 else
-	CUFLAGS = -shared -Xcompiler -fPIC -I ${CONDA_PREFIX}/include
-	CPPFLAGS = ${CFLAGS} -o ${CUDA_WRAP}
-	LIB_SUFFIX = .a
-	ifeq (${UNAME}, Darwin)
-  		LIBTOOL = libtool -static -o $@ $?
-	else
-  		LIBTOOL = ar src $@ $?
-	endif
+    OBJ_SUFFIX = .o
+    # The headers already come from the conda environment, so the compiler has
+    # to come from there too. Left to the PATH, a system-wide /usr/local/cuda-*
+    # ahead of the environment wins and its nvcc is used against the pinned
+    # headers and libraries - an older one then also rejects the environment's
+    # gcc outright ("unsupported GNU version"). Fall back to the PATH when the
+    # environment has no nvcc of its own.
+    NVCC = $(if $(wildcard ${CONDA_PREFIX}/bin/nvcc),${CONDA_PREFIX}/bin/nvcc,nvcc)
+    CUFLAGS = -shared -Xcompiler -fPIC -I ${CONDA_PREFIX}/include
+    CPPFLAGS = ${CFLAGS}
+    CPPFLAGS_OUT = -o 
+    LIB_SUFFIX = .a
+    ifeq (${UNAME}, Darwin)
+        LIBTOOL = libtool -static -o $@ $^
+    else
+        LIBTOOL = ar src $@ $?
+    endif
 endif
 
-CLEAN_FILES = -rm *.o
-STATIC_LIB = libCuda${LIB_SUFFIX}
+CUDA_OBJECT = $(CUDA_SOURCE)$(OBJ_SUFFIX)
+CUDA_WRAP   = $(CUDA_WRAP_SOURCE)$(OBJ_SUFFIX)
+
+STATIC_LIB = libCuda$(LIB_SUFFIX)
 
 #=======================================================================
 #							Targets
 #=======================================================================
-.PHONY: all clean
+.PHONY: all clean wrap cuda
 
-all: cuda ${STATIC_LIB}
+all: cuda $(STATIC_LIB)
 
-wrap: ${STATIC_LIB}
+wrap: $(STATIC_LIB)
+
+cuda: $(CUDA_OBJECT)
+
+$(CUDA_OBJECT): $(CUDA_FILE)
+	$(NVCC) $(CUFLAGS) -c $(CUDA_FILE) -o $(CUDA_OBJECT)
+
+$(CUDA_WRAP): $(CUDA_WRAP_FILE)
+	$(CPP) $(CPPFLAGS) $(CPPFLAGS_OUT)$@ -c $(CUDA_WRAP_FILE)
+
+$(STATIC_LIB): $(CUDA_OBJECT) $(CUDA_WRAP)
+	$(LIBTOOL)
 
 clean:
-	${CLEAN_FILES}
-
-cuda: 
-	nvcc ${CUFLAGS} -c ${CUDA_FILE} -o ${CUDA_OBJECT}
-
-${CUDA_WRAP}: 
-	${CPP} ${CPPFLAGS} -c ${CUDA_WRAP_FILE} -o $@
-
-${STATIC_LIB}: ${CUDA_OBJECT} ${CUDA_WRAP}
-	${LIBTOOL}
+	rm -f *.o *.obj *.a *.lib

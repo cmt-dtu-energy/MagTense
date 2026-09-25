@@ -25,7 +25,7 @@ LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 
 ifeq ($(OS),Windows_NT)
 	OPT = -I${CONDA_PREFIX}/opt/compiler/include/intel64
-	LIBTOOL = LIB $? /OUT:$@
+	LIBTOOL = LIB $^ /OUT:$@
 	LIB_SUFFIX = .lib
 	RM = Remove-Item -Force -ErrorAction SilentlyContinue
 else
@@ -33,7 +33,7 @@ else
 	LIB_SUFFIX = .a
 
 	ifeq (${UNAME}, Darwin)
-  		LIBTOOL = libtool -static -o $@ $?
+  		LIBTOOL = libtool -static -o $@ $^
 	else
   		LIBTOOL = ar src $@ $?
 	endif
@@ -52,7 +52,12 @@ AUXMT_LIB = ${AUXMT_PATH}/libAuxMT${LIB_SUFFIX}
 #=======================================================================
 #							Targets
 #=======================================================================
-.SUFFIXES: .f90
+# Clear the built-in suffix list before adding .f90. GNU make ships a .mod.o
+# rule (Modula-2, m2c) and .mod comes before .f90 in the default list, so a
+# leftover Fortran .mod file - which every interrupted build leaves behind -
+# makes make build the object with m2c instead of the compiler.
+.SUFFIXES:
+.SUFFIXES: .f90 .o
 .PHONY: all clean
 
 all: pre-build ${STATIC_LIB}
@@ -61,7 +66,7 @@ all: pre-build ${STATIC_LIB}
 	$(FC) $(FFLAGS) -I${AUXMT_PATH} -I${NUM_INT_PATH} -I${TILE_DEMAG_TENSOR_PATH} ${OPT} ${MATLAB_OPT} -c $< -o $@
 
 pre-build:
-	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE=$(MATLAB_INCLUDE)
+	cd ${NUM_INT_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
 	cd ${TILE_DEMAG_TENSOR_PATH} && $(MAKE) FC=$(FC) FFLAGS="$(FFLAGS)" USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
 
 ${STATIC_LIB}: ${AUXMT_LIB} ${TILE_DEMAG_TENSOR_LIB} ${LIBSRC_OBJECTS}

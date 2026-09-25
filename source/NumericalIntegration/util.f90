@@ -37,10 +37,13 @@ end subroutine getBilinInterp
 
 
 subroutine interp1_MagTense( x, y, xval, n, yval)
-real,dimension(n),intent(in) :: x,y
-real,intent(in) :: xval
-integer,intent(in) :: n
-real,intent(inout) :: yval
+    !:: Given a set coordintaes x, y and a given x-coordinate, xval, estimate the corresponding y-value.
+    !:: Uses a linear interpolation from (x_n, y_n) to (x_{n+1}, y_{n+1}) where x_n and x_{n+1}
+    !:: are the x-values closest to xval
+real,dimension(n),intent(in) :: x,y ! Coordinates
+real,intent(in) :: xval ! x-value to estimate y at
+integer,intent(in) :: n ! Number of xy coordinates
+real,intent(inout) :: yval  ! Estimated y value
 
 integer :: ind_x
 real :: x_lin
@@ -51,7 +54,9 @@ real :: x_lin
     if ( ind_x .eq. 0 ) return
     
     x_lin = ( xval - x(ind_x) ) / ( x(ind_x+1) - x(ind_x) )
-    
+
+    ! Note how yval = y(ind_x) when xval = x(ind_x) and yval = y(ind_x + 1) when xval = x(ind_x+1)
+    ! Linear interpolation applies between these two extremes
     yval = ( 1 - x_lin ) * y(ind_x) + x_lin * y(ind_x+1)
     
 end subroutine interp1_MagTense
@@ -86,7 +91,7 @@ end subroutine locate
 
 
 !>-----------------------------------------
-!> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2025
+!> @author Rasmus Bjï¿½rk, rabj@dtu.dk, DTU, 2025
 !> @brief
 !> unique_sort sorts a 1D array and returns only the unique values
 !> 

@@ -24,22 +24,32 @@ jobs:
     - name: Win - Download py312 pip-wheel
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-py312-cu12-Windows
+        name: pip-wheel-py312-cu13-Windows
 
     - name: Win - Download py313 pip-wheel
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-py313-cu12-Windows
+        name: pip-wheel-py313-cu13-Windows
+
+    - name: Win - Download py314 pip-wheel
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py314-cu13-Windows
 
     - name: Linux - Download py312 pip-wheel
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-py312-cu12-Linux
+        name: pip-wheel-py312-cu13-Linux
 
     - name: Linux - Download py313 pip-wheel
       uses: actions/download-artifact@v4
       with:
-        name: pip-wheel-py313-cu12-Linux
+        name: pip-wheel-py313-cu13-Linux
+
+    - name: Linux - Download py314 pip-wheel
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py314-cu13-Linux
 
     - name: Move wheels to dist/
       run: |

@@ -6,14 +6,82 @@ module UTIL_MICROMAG
     use ISO_C_BINDING
     
     implicit none
-    
+
     contains
+
+    !>-----------------------------------------
+    !> Volume of the tetrahedron with the vertices a, b, c and d, i.e. |(a-d) . ((b-d) x (c-d))| / 6.
+    !> The absolute value makes the result independent of the orientation of the connectivity.
+    !>-----------------------------------------
+    pure function tetrahedronVolume( a, b, c, d ) result( vol )
+    real(DP),dimension(3),intent(in) :: a, b, c, d
+    real(DP) :: vol
+    real(DP),dimension(3) :: u, v, cr
+
+    u = b - d
+    v = c - d
+    cr(1) = u(2)*v(3) - u(3)*v(2)
+    cr(2) = u(3)*v(1) - u(1)*v(3)
+    cr(3) = u(1)*v(2) - u(2)*v(1)
+    vol = abs( dot_product( a - d, cr ) ) / 6.0_DP
+    end function tetrahedronVolume
+
+    !>-----------------------------------------
+    !> Volumes of all the elements of a tetrahedral mesh.
+    !> @param[in] nodes the node coordinates, (3, nnodes)
+    !> @param[in] elements the 1-based node indices of every element, (4, nelements)
+    !> @param[out] vol the element volumes, (nelements)
+    !>-----------------------------------------
+    subroutine tetrahedronVolumes( nodes, elements, vol )
+    real(DP),dimension(:,:),intent(in) :: nodes
+    integer,dimension(:,:),intent(in) :: elements
+    real(DP),dimension(:),intent(out) :: vol
+    integer :: i
+
+    do i = 1, size( elements, 2 )
+        vol(i) = tetrahedronVolume( nodes(:,elements(1,i)), nodes(:,elements(2,i)), &
+                                    nodes(:,elements(3,i)), nodes(:,elements(4,i)) )
+    end do
+    end subroutine tetrahedronVolumes
+
+    !>-----------------------------------------
+    !> Returns the volume of every cell [m^3] for any of the grid types: the constant cell volume of a
+    !> uniform grid, the side-length products of unstructured prisms, and the element volumes of a
+    !> tetrahedral mesh. For the latter the volumes computed by the mesh analysis are used when they
+    !> are available; otherwise, e.g. when the exchange matrix was passed in and the analysis skipped,
+    !> they are computed from the nodes and the connectivity.
+    !>-----------------------------------------
+    subroutine cellVolumes( problem, solution, vol )
+    type(MicroMagProblem),intent(in) :: problem
+    type(MicroMagSolution),intent(in) :: solution
+    real(DP),dimension(:),intent(out) :: vol
+    integer :: ntot
+
+    ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+
+    if ( problem%grid%gridType .eq. gridTypeUniform ) then
+        vol = problem%grid%dx * problem%grid%dy * problem%grid%dz
+    else if ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
+        if ( allocated(solution%gridinfo%Volumes) ) then
+            if ( size(solution%gridinfo%Volumes) .eq. ntot ) then
+                vol = solution%gridinfo%Volumes
+                return
+            endif
+        endif
+        call tetrahedronVolumes( problem%grid%nodes, problem%grid%elements, vol )
+    else if ( allocated(problem%grid%abc) ) then
+        vol = problem%grid%abc(:,1) * problem%grid%abc(:,2) * problem%grid%abc(:,3)
+    else
+        call displayGUIMessage( 'MagTense: cannot determine the cell volumes for this grid type' )
+        error stop 'cellVolumes: unknown grid'
+    endif
+    end subroutine cellVolumes
 
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
     !> @brief
     !> Converts the dense matrix D (size nx,ny) to a sparse matrix K (size nx,y) )
-    !> @params[in] threshold a number specifying the lower limit of values in D that should be considered non-zero
+!> @params[in] threshold a number specifying the lower limit of values in D that should be considered non-zero
     !> Double precision
     !>-----------------------------------------
     subroutine ConvertDenseToSparse_d( D, K, threshold)

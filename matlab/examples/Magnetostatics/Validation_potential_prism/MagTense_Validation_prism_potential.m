@@ -86,8 +86,8 @@ for m = 1:length(Mxp)
         end
         disp('---------------')
         
-        MagTense_path = '..\..\..\..\..\MagTense\documentation\examples_FEM_validation\Validation_potential_prism';
-        data = load([MagTense_path '\Line' sprintf('%02.2i',j) '.txt']);
+        MagTense_path = '../../../../documentation/examples_FEM_validation/Validation_potential_prism';
+        data = load([MagTense_path '/Line' sprintf('%02.2i',j) '.txt']);
         plot(fig1,data(:,1),data(:,1+m),'-');
         
         % plot(sqrt(xpoint.^2+ypoint.^2+zpoint.^2),phi_sx_int,'d')

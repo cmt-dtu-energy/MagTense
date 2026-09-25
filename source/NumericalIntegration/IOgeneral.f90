@@ -68,6 +68,10 @@ module IO_GENERAL
 
         tmp = mexCallMATLAB(nlhs_cb, plhs_cb, nrhs_cb, prhs_cb, "disp")
 
+        !! mexCallMATLAB does not take ownership of prhs. MATLAB reclaims the
+        !! string when the MEX call returns, but a solve is one long call that
+        !! emits a message per field step, so release it here instead.
+        call mxDestroyArray( prhs_cb(1) )
 
     end subroutine displayMatlabMessage
 

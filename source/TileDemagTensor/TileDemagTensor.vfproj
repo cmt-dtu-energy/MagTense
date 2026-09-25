@@ -65,6 +65,7 @@
 			<File RelativePath=".\TileCylPieceTensor.f90"/>
 			<File RelativePath=".\TileNComponents.f90"/>
 			<File RelativePath=".\TilePlanarCoilTensor.f90"/>
+			<File RelativePath=".\TileRectangularPrismAvgTensor.f90"/>
 			<File RelativePath=".\TileRectangularPrismTensor.f90"/>
 			<File RelativePath=".\TileTensorHelperFunctions.f90"/>
 			<File RelativePath=".\TileTriangle.f90"/>

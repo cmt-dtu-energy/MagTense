@@ -107,9 +107,9 @@ if (do_Comsol_model == 1)
 end
 
 if use_existing_FEM_prolate
-    data_FEM_coor = load('..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_prolate_surface_coordinates.txt');
+    data_FEM_coor = load('../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_prolate_surface_coordinates.txt');
 elseif use_existing_FEM_oblate
-    data_FEM_coor = load('..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_oblate_surface_coordinates.txt');
+    data_FEM_coor = load('../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_oblate_surface_coordinates.txt');
 else
     data_FEM_coor = load('Comsol_spheroid_surface.txt');
 end
@@ -185,15 +185,15 @@ if use_existing_FEM_prolate
     FEM_str = 'prolate';
 end
 if (use_existing_FEM_oblate || use_existing_FEM_prolate)
-    data_FEM_Hx_x = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hx_x.txt']);
-    data_FEM_Hx_y = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hx_y.txt']);
-    data_FEM_Hx_z = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hx_z.txt']);
-    data_FEM_Hy_x = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hy_x.txt']);
-    data_FEM_Hy_y = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hy_y.txt']);
-    data_FEM_Hy_z = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hy_z.txt']);
-    data_FEM_Hz_x = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hz_x.txt']);
-    data_FEM_Hz_y = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hz_y.txt']);
-    data_FEM_Hz_z = load(['..\..\..\..\documentation\examples_FEM_validation\Validation_spheroid\Validation_spheroid_' FEM_str '_Hz_z.txt']);
+    data_FEM_Hx_x = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hx_x.txt']);
+    data_FEM_Hx_y = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hx_y.txt']);
+    data_FEM_Hx_z = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hx_z.txt']);
+    data_FEM_Hy_x = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hy_x.txt']);
+    data_FEM_Hy_y = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hy_y.txt']);
+    data_FEM_Hy_z = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hy_z.txt']);
+    data_FEM_Hz_x = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hz_x.txt']);
+    data_FEM_Hz_y = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hz_y.txt']);
+    data_FEM_Hz_z = load(['../../../../documentation/examples_FEM_validation/Validation_spheroid/Validation_spheroid_' FEM_str '_Hz_z.txt']);
     xlim(fig1,[-0.09 -0.03])
     xlim(fig2,[-0.02 0.04])
     xlim(fig3,[-0.02 0.04])

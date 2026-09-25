@@ -20,28 +20,25 @@
     !!@param n_ele, the number of points at which to evaluate the field
     !!@param Nout the demag tensor calculated by this function (size (n_tiles,n_pts,3,3) )
     !!
-    subroutine getFieldFromTiles( tiles, H, pts, n_tiles, n_ele, Nout, useStoredNorg )
+    subroutine getFieldFromTiles( tiles, H, pts, n_tiles, n_ele, Nout, useStoredNorg, Obs_size, includeUniform )
         type(MagTile),intent(inout),dimension(n_tiles) :: tiles
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3),intent(in) :: pts
         integer(4),intent(in) :: n_tiles,n_ele
-        real(8),dimension(:,:,:,:),allocatable,optional :: Nout
+        real(8),dimension(:,:,:,:),allocatable,optional,intent(inout) :: Nout
         logical,optional :: useStoredNorg
+        logical,optional,intent(in) :: includeUniform  !> .false. leaves the uniform applied-field sources out, which the periodic copies in getFieldFromTiles_PBC need so the field is counted once
+        logical :: incUniform
+        real(8),dimension(n_ele,3),optional :: Obs_size
     
         integer(4) :: i,prgCnt,tid,prog,OMP_GET_THREAD_NUM
         real(8),dimension(:,:),allocatable :: H_tmp
         integer(4),parameter :: cbCnt = 10
-        logical :: useStoredN,localFieldSoft    !>Indicates whether the local field of the tile should be found as if the tile is made of a soft ferromagnetic material
-        real(8),dimension(3,3) :: N_current_tile   !>The tensor for the current tile where the field has to be handled differently (see below)
-        real(8),dimension(3) :: mur                !>The permeability tensor
-        real(8) :: Happ_nrm,Hnorm
-        real(8),dimension(3) :: Happ_un,NHapp,v1,v2
+        logical :: useStoredN
         integer, save :: itimer = 0
 
         call trace%begin("getFieldFromTiles", itimer=itimer, verbose=4)
             
-        !set to false by default and update later
-        localFieldSoft = .false.
         
         !!If Nout is provided, the function uses this for calculations
         if ( present( Nout ) ) then 
@@ -60,6 +57,9 @@
             useStoredN = useStoredNorg;
         endif
         
+        incUniform = .true.
+        if ( present(includeUniform) ) incUniform = includeUniform
+
         allocate(H_tmp(n_ele,3))
         H(:,:) = 0.
         
@@ -72,7 +72,12 @@
             !Make sure to allocate H_tmp on the heap and for each thread
             ! $OMP CRITICAL
             H_tmp(:,:) = 0.        
-        
+            
+            !Hard-code tile choice for debugging:
+            !tiles(i)%tileType = tileTypeAvgPrism
+
+
+            
             ! $OMP END CRITICAL
             !! Here a selection of which subroutine to use should be done, i.e. whether the tile
             !! is cylindrical, a prism or an ellipsoid or another geometry
@@ -85,9 +90,23 @@
                 endif
             case (tileTypePrism)
                 if ( present(Nout) ) then
-                    call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+                   call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )  
+                else 
+                   call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele)
+                endif
+            case (tileTypeAvgPrism)
+                if ( present(Nout) ) then
+                   if (present(Obs_size)) then
+                   call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN,Obs_size=Obs_size)
+                   else
+                   call getAvgFieldFromRPT( tiles(i),  H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+                   endif
                 else
-                    call getFieldFromRectangularPrismTile( tiles(i), H_tmp, pts, n_ele )
+                   if (present(Obs_size)) then
+                   call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_ele, Obs_size=Obs_size )
+                   else
+                   call getAvgFieldFromRPT( tiles(i), H_tmp, pts, n_ele)
+                   endif
                 endif
             case (tileTypeSphere)
                 if ( present(Nout) ) then
@@ -123,70 +142,38 @@
                 if ( present(Nout) ) then
                     call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
                 else
-                    call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_ele )            
+                    call getFieldFromPlanarCoilTile( tiles(i), H_tmp, pts, n_ele )
                 endif
-            
-            case default        
-            
+            case (tileTypeUniformField )
+                !The applied field enters here, i.e. before the self-consistent field of a soft tile is
+                !formed further down, which is what makes it magnetize the soft tiles as well as show up
+                !in the field at the evaluation points
+                if ( incUniform ) then
+                    if ( present(Nout) ) then
+                        call getFieldFromUniformFieldTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+                    else
+                        call getFieldFromUniformFieldTile( tiles(i), H_tmp, pts, n_ele )
+                    endif
+                endif
+
+            case default
+
             end select
         
+            !A tile that is excluded from the summation is the soft tile whose own internal field the
+            !iteration is about to solve for: its field is left out here, and the demagnetization tensor
+            !the tile routine has just put in Nout(i,:,:,:) is what the iteration uses for that. The
+            !self-consistent field used to be formed in this routine with the tile's constant
+            !permeability, whatever its material law; it now lives with the material laws in
+            !IterateMagnetSolution (selfConsistentFieldConstMur, selfConsistentFieldStateFunction).
             if ( tiles(i)%excludeFromSummation .eqv. .false. ) then
                 H = H + H_tmp
-            else
-                !this happens if the local tile is made of soft ferromagnetic material and should be treated specially
-                localFieldSoft = .true.
-                !then also store the demag tensor for later use
-                if ( useStoredN .eqv. .true. ) then
-                    N_current_tile = Nout(i,1,:,:)
-                    mur(1) = tiles(i)%mu_r_ea
-                    mur(2) = tiles(i)%mu_r_oa
-                    mur(3) = tiles(i)%mu_r_oa
-               endif
             endif
-        
-        
+
+
         enddo
         ! $OMP END PARALLEL DO
-    
-        !Finally include the field of the tile itself (if assuming constant permeability)
-        !B = mu0 * (H + M) = mu0 * mur * H => M = H * (mur - 1) =>
-        !H = Happ + N * M = Happ + N * H * (mur-1) =>
-        !note that this is a vector equation that is not trivial to solve for the vector H
-        !We assume the local field to be parallel to the applied field (as the tile is soft), i.e. H = Hnorm * Happ_un (Happ_un = unit vector of applied field)
-        !The applied field is the vector sum of the fields from all other tiles
-        !We then get: 
-        !Hnorm * Happ_un = Happ_norm * Happ_un + Hnorm*(mur-1) * N * Happ_un =>
-        !0 = (Happ_norm - Hnorm) * Happ_un + Hnorm*(mur-1) * N * Happ_un = K
-        !We then wish to solve this equation (finding that K-vector = zero-vector) and do this by finding the square-norm of K:
-        !||K||^2 = ( ( Happ_norm - Hnorm ) * Happ_un(1) + Hnorm(mur-1) (N*Happ_un)(1) )^2 + ( ( Happ_norm - Hnorm ) * Happ_un(2) + Hnorm(mur-1) (N*Happ_un)(2) )^2 + ( ( Happ_norm - Hnorm ) * Happ_un(3) + Hnorm(mur-1) (N*Happ_un)(3) )^2
-        ! Finding the minimum: d( ||K||^2 ) / dHnorm = 0 => Hnorm_min = -Happ_norm * (v1 dot v2 ) / ||v1||^2 with
-        !v1 = ((mur-1) * N*Happ) - Happ_un
-        !v2 = Happ_un
-        
-        !Note that N is likely negative as we by convention absorb the sign into the demag tensor
-        if ( localFieldSoft .eqv. .true. )  then
-            
-            
-            !norm of applied field
-            Happ_nrm = sqrt( H(1,1)**2 + H(1,2)**2 + H(1,3)**2 )
-            if ( Happ_nrm .ne. 0 ) then
-                !unit vector of applied field
-                Happ_un = H(1,:) / Happ_nrm
-                !demag tensor product
-                NHapp = matmul( N_current_tile, Happ_un )
-            
-                !temp vector 1
-                v1 = (mur-1.) * NHapp - Happ_un
-                !temp vector 2
-                v2 = Happ_un
-                Hnorm = -Happ_nrm * dot_product(v1,v2) / ( v1(1)**2 + v1(2)**2 + v1(3)**2 )
-            
-                !Update the resulting field
-                H(:,1) = Happ_un(1) * Hnorm
-                H(:,2) = Happ_un(2) * Hnorm
-                H(:,3) = Happ_un(3) * Hnorm
-            endif
-        endif
+
         deallocate(H_tmp)
         
         !!Subtract M of a tile in points that are inside that tile in order to actually get H (only for CylindricalTiles as these actually calculate the B-field (divided by mu0)
@@ -196,8 +183,75 @@
 
         call trace%end("getFieldFromTiles", itimer=itimer, verbose=4)
     end subroutine getFieldFromTiles
-    
-    
+
+    ! Implement periodic boundary conditions by the macrogeometry method, i.e. calculate the
+    ! field and demagnetisation tensor from shifted copies of the simulated domain and add
+    ! together the contribution from each copy.
+    ! Note that instead of shifting the tiles, the evaluation points are shifted in the opposite
+    ! direction, which is equivalent
+    subroutine getFieldFromTiles_PBC(tiles, H, pts, n_tiles, n_ele, n_macro, shiftVec, Nout, useStoredNorg, Obs_size)
+        type(MagTile),intent(inout),dimension(n_tiles) :: tiles
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: Htemp
+        real(8),dimension(n_ele,3),intent(in) :: pts
+        real(8),dimension(n_ele,3) :: pts_temp
+        integer(4),intent(in) :: n_tiles,n_ele
+        integer(4),dimension(3),intent(in) :: n_macro
+        real(8),dimension(3),intent(in) :: shiftVec
+        integer(4) :: nx_macro, ny_macro, nz_macro
+        real(8),dimension(:,:,:,:),intent(inout) :: Nout
+        real(8),dimension(:,:,:,:),allocatable :: Ntemp
+        logical,optional :: useStoredNorg
+        real(8),dimension(n_ele,3),optional,intent(in) :: Obs_size
+        integer(4) :: i, j, l
+
+        H(:,:) = 0.0d0
+        Nout(:,:,:,:) = 0.0d0
+
+        nx_macro = n_macro(1)
+        ny_macro = n_macro(2)
+        nz_macro = n_macro(3)
+
+        allocate(Ntemp(n_tiles,n_ele,3,3))
+
+        do l = -nz_macro, nz_macro
+            do j = -ny_macro, ny_macro
+                do i = -nx_macro, nx_macro
+
+                    Htemp(:,:) = 0.0d0
+                    Ntemp(:,:,:,:) = 0.0d0
+
+                    ! Shift evaluation points. This is equivalent to shifting the
+                    ! periodic copies of the source tiles in the opposite direction.
+                    pts_temp = pts
+                    pts_temp(:,1) = pts_temp(:,1) - dble(i) * shiftVec(1)
+                    pts_temp(:,2) = pts_temp(:,2) - dble(j) * shiftVec(2)
+                    pts_temp(:,3) = pts_temp(:,3) - dble(l) * shiftVec(3)
+
+                    ! Evaluate field and demagnetisation tensor with shifted
+                    ! evaluation points. If Obs_size is present, getFieldFromTiles
+                    ! uses the averaged prism tensor path for tileTypeAvgPrism.
+                    !A uniform applied field is the same in every periodic copy, so it is counted for
+                    !the original domain only
+                    if (present(Obs_size)) then
+                        call getFieldFromTiles(tiles, Htemp, pts_temp, n_tiles, n_ele, &
+                            Ntemp, .false., Obs_size=Obs_size, &
+                            includeUniform=( i .eq. 0 .and. j .eq. 0 .and. l .eq. 0 ))
+                    else
+                        call getFieldFromTiles(tiles, Htemp, pts_temp, n_tiles, n_ele, &
+                            Ntemp, .false., includeUniform=( i .eq. 0 .and. j .eq. 0 .and. l .eq. 0 ))
+                    end if
+
+                    H = H + Htemp
+                    Nout = Nout + Ntemp
+
+                end do
+            end do
+        end do
+
+        deallocate(Ntemp)
+
+    end subroutine getFieldFromTiles_PBC
     
 !---------------------------------------------------------------------------------------!
 !------------------------ Specific tile geometries -------------------------------------!
@@ -233,6 +287,49 @@
         !H = -1. * H
     
     end subroutine getFieldFromRectangularPrismTile      
+
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the magnetic field from a rectangular prism using averaged demag tensor
+    !! RPT = rectangular prism tile
+    !!
+
+    subroutine getAvgFieldFromRPT( prismTile, H, pts, n_ele, N_out, useStoredN, Obs_size )
+        !DEC$ ATTRIBUTES ALIAS:"getavgfieldfromrpt_" :: getAvgFieldFromRPT
+        type(MagTile),intent(in) :: prismTile
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
+        logical,intent(in),optional :: useStoredN
+        real,intent(in),dimension(n_ele,3), optional :: Obs_size
+
+    
+        !print *, "test test test"
+        procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
+        N_tensor => getAvgN_prism_3D
+        
+        !! Check to see if we should use symmetry
+        if ( prismTile%exploitSymmetry .eq. 1 ) then 
+            if (present(Obs_size)) then     
+                call getFieldFromTile_symm(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN, Obs_size )
+            else
+                call getFieldFromTile_symm(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN)
+            endif
+        else
+            if (present(Obs_size)) then       
+                call getFieldFromTile(prismTile, H, pts, n_ele, N_tensor, N_out, useStoredN, Obs_size )     
+            else
+                call getFieldFromTile(prismTile, H, pts, N_ele, N_tensor, N_out, useStoredN)  
+            endif
+        endif
+    
+        !!@todo Can this be removed?
+        !! The minus sign comes from the definition of the demag tensor (the demagfield is assumed negative)
+        !! Change in the tensor subroutine in order to make the behavior of the tensor components of the various geometries conform
+        !H = -1. * H
+    
+    end subroutine getAvgFieldFromRPT   
         
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>
@@ -676,6 +773,40 @@
             H(i,:) = dotProd
         enddo
     end subroutine getFieldFromPlanarCoilTile
+
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !! Returns the field of a uniform applied-field source. This tile is not a geometry: it stands for an
+    !! external field that is the same at every point, such as the field of a large electromagnet or a
+    !! Helmholtz coil, and its M vector holds that field H_app in A/m. It adds H_app at every evaluation
+    !! point, and through getFieldFromTiles it is part of the field that magnetizes every other tile in
+    !! the iteration. The source sits outside all tiles, where B/mu0 and H coincide, so the value is an
+    !! H field: a field given as B in tesla is divided by mu0 before it goes in here, and a field
+    !! evaluated inside a magnetized body is not an applied field at all. Fields of other MagTiles are
+    !! not to be entered this way either; they are simply included as tiles.
+    !! The demagnetization tensor of this tile is the identity, so that H = N M holds for it too, which
+    !! keeps the stored-tensor path of the iteration consistent.
+    subroutine getFieldFromUniformFieldTile( tile, H, pts, n_ele, N_out, useStoredN )
+        !DEC$ ATTRIBUTES ALIAS:"getfieldfromuniformfieldtile_" :: getFieldFromUniformFieldTile
+        type(MagTile),intent(in) :: tile
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3),intent(in) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
+        logical,intent(in),optional :: useStoredN
+        integer(4) :: k
+
+        do k = 1, 3
+            H(:,k) = H(:,k) + tile%M(k)
+        end do
+
+        if ( present(N_out) ) then
+            N_out(:,:,:) = 0.
+            do k = 1, 3
+                N_out(:,k,k) = 1.
+            end do
+        endif
+    end subroutine getFieldFromUniformFieldTile
     
 
     
@@ -688,7 +819,7 @@
     !>
     !!Calculates the actual field from a tile of a given geometry
     !!
-    subroutine getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+    subroutine getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN, Obs_size )
         type(MagTile),intent(in) :: tile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3),intent(in) :: pts
@@ -699,7 +830,11 @@
             
         real(8),dimension(3,3) :: rotMat,rotMatInv,N
         integer(4) :: i
-        real(8),dimension(3) :: diffPos,dotProd        
+        real(8),dimension(3) :: diffPos,dotProd   
+        real,intent(in),dimension(n_ele,3), optional :: Obs_size  
+        real, dimension(3) :: Obs_size_ele
+        !Print *, "Using getFieldFromTile from DemagFieldGetSolution" 
+        !Print *, "Using Obs_size: ", Obs_size(1,:)  
     
         !! get the rotation matrices
         call getRotationMatrices( tile, rotMat, rotMatInv)
@@ -710,27 +845,37 @@
         
             !! Rotate the position vector according to the rotation of the prism
             diffPos = matmul( rotMat, diffPos )
+
+            if (present(obs_size)) then
+            Obs_size_ele = obs_size(i,:)
+            else 
+            Obs_size_ele = 0.0 !Maybe use different default here instead of checking for 0 later?
+            endif
         
             !! Get the demag tensor                
             if ( present( useStoredN ) .eqv. .true. ) then
                 if ( useStoredN .eqv. .false. ) then
-                     call N_tensor( tile, diffPos, N )
+                     call N_tensor( tile, diffPos, N ,Obs_size_ele)
                      N_out(i,:,:) = N
                 else
                     N = N_out(i,:,:)
                 endif
             else
-                call N_tensor( tile, diffPos, N )
+                call N_tensor( tile, diffPos, N ,Obs_size_ele)
             endif
-
+            !print *, "M for dotprod: ", tile%M !Why is this NAN for tiletype 8?
+            !print *, "rotmat for dotprod: ", rotMat
+            !print *, "N for dotprod: ", N
             !! Rotate the magnetization vector from the global system to the rotated frame and get the field (dotProd)
             call getDotProd( N, matmul( rotMat, tile%M ), dotProd )
+            !print *, "DotProd from line 804: ", dotProd
 
             !! Rotate the resulting field back to the global coordinate system
             dotProd = matmul( rotMatInv, dotProd )        
         
             !! Update the solution.
             H(i,:) = dotProd
+            !print *, "H from line 812: ", H
         enddo
 
     end subroutine getFieldFromTile
@@ -747,7 +892,7 @@
     !! @N_out the resulting demag tensor for each of the points in question 
     !! @ useStoredN logical. If true then use the values in N_out else calculate the tensor
     !!
-    subroutine getFieldFromTile_symm(tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+    subroutine getFieldFromTile_symm(tile, H, pts, n_ele, N_tensor, N_out, useStoredN, Obs_size )
         type(MagTile),intent(in) :: tile
         real(8),dimension(n_ele,3),intent(inout) :: H
         real(8),dimension(n_ele,3),intent(in) :: pts
@@ -763,6 +908,7 @@
         real(8),dimension(8,3,3) :: symm_op_M, symm_op_H
         !!@todo Why is this temporary variable used instead of just useStoredN
         logical :: useStoredN_tmp
+        real,intent(in),dimension(n_ele,3), optional :: Obs_size
     
         !! get the rotation matrices for the tile
         call getRotationMatrices( tile, rotMat, rotMatInv)
@@ -902,7 +1048,67 @@
         symm_H(8,:,:) = matmul( symm_H(2,:,:), matmul( symm_H(3,:,:), symm_H(4,:,:) ) )
     
     end subroutine getSymmOpMatrices
-    
+
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !> Returns the shape correction tensor which maps the average magnetisation onto the shape correction field
+    !! Note that the getN_prism_3D subroutine takes a MagTile object as input, but
+    !! it only uses the a, b, c values so all other parameters can be left at their defaults
+    !! @param pts : Array of positions for all micromagnetic tiles
+    !! @param n_ele : Number of elements (micromagnetic tiles) to evaluate field at
+    !! @param aMacro, bMacro, cMacro : length of macrogeometry prism along x, y and z
+    !! @param aShape, bShape, cShape : length of sample prism along x, y and z
+    !!
+    subroutine getShapeTensor( pts, n_ele, aMacro, bMacro, cMacro, aSample, bSample, cSample, Nshape )
+        real(8),dimension(n_ele,3),intent(in) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),intent(in) :: aMacro,bMacro,cMacro,aSample,bSample,cSample
+        real(8),dimension(n_ele,3,3) :: Nshape
+
+        !type(MagTile),dimension(1) :: prismMacro, prismSample !> This format does not match the one in getN_prism_3D
+        type(MagTile) :: prismMacro, prismSample
+        real(8),dimension(3) :: posMacro, posSample
+        integer :: i
+        real(8),dimension(3) :: diffPosMacro, diffPosSample
+        real(8),dimension(3,3) :: Nmacro, Nsample
+
+        ! Center positions of macrogeometry and sample
+        posMacro = 0.0      !Assume centered on the origin
+        posSample = 0.0     !Assume centered on the origin
+
+        !Setup template tile for macrogeometry
+        prismMacro%tileType = 2 !(for prism)
+        !dimensions of the tile
+        prismMacro%a = aMacro
+        prismMacro%b = bMacro
+        prismMacro%c = cMacro
+
+        !Setup template tile for sample geometry
+        prismSample%tileType = 2 !(for prism)
+        !dimensions of the tile
+        prismSample%a = aSample
+        prismSample%b = bSample
+        prismSample%c = cSample
+        !prismSample%exploitSymmetry = 0 !Irrelevant
+        !prismSample%rotAngles(:) = 0.   !Irrelevant
+        !prismSample%M(:) = 0.           !Irrelevant
+
+        do i=1,n_ele
+            !! The relative position vectors between the origin of the macrogeometry/sample and the evaluation point
+            diffPosMacro = pts(i,:) - posMacro
+            diffPosSample = pts(i,:) - posSample
+
+            !! Compute tensors for element i
+            call getN_prism_3D( prismMacro, diffPosMacro, Nmacro )
+            call getN_prism_3D( prismSample, diffPosSample, Nsample )
+
+            !! Store shape correction tensor (difference between sample- and macrogeometry tensors)
+            Nshape(i,:,:) = Nsample - Nmacro
+
+        end do
+
+!        deallocate(Nsample, Nmacro)
+
+    end subroutine getShapeTensor
 
 !---------------------------------------------------------------------------------------!
 !------------------------------ Helper routines ----------------------------------------!

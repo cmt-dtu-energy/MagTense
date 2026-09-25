@@ -69,7 +69,7 @@
                      call mexErrMsgIdAndTxt ('MATLAB:Matlab_single_mex:DataType', 'Input eight (optional) should be a real')                      
                  else
                      sizevars = 1
-                     call mxCopyPtrToReal8(mxGetPr(prhs(8)), resumeIteration,1)
+                     call mxCopyPtrToReal8(mxGetPr(prhs(8)), resumeIteration,sizevars)
                  endif            
            endif          
       endif                  

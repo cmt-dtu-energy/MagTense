@@ -32,7 +32,7 @@ classdef MagTenseTilesPlot
             end
             
             if arrows
-                plotFieldArrows( tiles );
+                MagTenseTilesPlot.plotFieldArrows( tiles );
             end
         end
         
@@ -457,7 +457,7 @@ classdef MagTenseTilesPlot
         function [ver] = rotateVertices( rot, ver, order )
         
         
-        RotOut = MagTenseTilesUtil.getRotationMatrices( rot );
+        RotOut = MagTenseTilesPlot.getRotationMatrices( rot );
         
         for i=1:length(order)
             %rotation about the axis defined in order    
@@ -641,7 +641,7 @@ classdef MagTenseTilesPlot
                 v(:,i) = v(:,i) - p1(i);
             end
             %rotate
-            v = MagTenseTilesUtil.rotateVertices( rot, v, order );
+            v = MagTenseTilesPlot.rotateVertices( rot, v, order );
             %move it back again
             for i=1:length(p1)
                 v(:,i) = v(:,i) + p1(i);

@@ -24,7 +24,7 @@
   conda config --env --add channels conda-forge
   conda install -y python=3.13
   python3 -m pip install numpy meson ninja charset-normalizer build
-  conda config --env --add channels nvidia/label/cuda-12.9.1
+  conda config --env --add channels nvidia/label/cuda-12.9.2
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   conda config --env --add channels https://software.repos.intel.com/python/conda/
   conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" "ifx_linux-64"
@@ -225,7 +225,7 @@ python -m pip install -e ./python
 The `python/.build/` contains requirement-files, which are shipped with the respective pip-wheel.
 
 ```bash
-python -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm importlib_resources
+python -m pip install numpy mkl intel-fortran-rt matplotlib notebook h5py tqdm importlib_resources ipympl pycairo
 python -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cusparse-cu12 nvidia-nvjitlink-cu12 # only required for cuda support
 ```
 
@@ -234,7 +234,7 @@ python -m pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cuspars
 - CUDA - Available [CUDA versions](https://anaconda.org/nvidia/cuda) and location of corresponding [pip-wheels](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/#pip-wheels) (deployment)
 
   ```bash
-  conda config --env --add channels nvidia/label/cuda-12.9.1
+  conda config --env --add channels nvidia/label/cuda-12.9.2
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   ```
 

@@ -5,7 +5,7 @@
   </picture>
   <br>
 </div>
-
+ 
 # MagTense
 
 MagTense is a framework for magnetostatic and micromagnetic calculations.
@@ -21,11 +21,19 @@ MagTense is a framework for magnetostatic and micromagnetic calculations.
 
 ## Installation and usage with the Python interface
 
-Installation is recommended via `pip` (requires >=**Python 3.12**):
+Installation is recommended via `pip` (requires >=**Python 3.12**; wheels are built for Python 3.12, 3.13 and 3.14):
 
 ```
 pip install magtense
 ```
+
+For interactive plotting in Jupyter notebooks, install the `notebook` extra, which adds [ipympl](https://matplotlib.org/ipympl/) and [pycairo](https://pycairo.readthedocs.io/):
+
+```
+pip install magtense[notebook]
+```
+
+pycairo publishes no Linux wheels and is built from source, so this extra needs the cairo development files on the machine (`libcairo2-dev` and `pkg-config` on Debian/Ubuntu). That is why it is opt-in: a plain `pip install magtense` needs nothing beyond Python.
 
 Examples of how to calculate magnetostatic and micromagnetic problems using the Python interface can be found [python/examples/](./python/examples/).
 

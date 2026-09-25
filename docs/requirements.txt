@@ -1,0 +1,9 @@
+# Everything needed to build the MagTense TechManual.
+#
+#   pip install -r docs/requirements.txt
+#
+# Sphinx 8.1 is the floor because the build relies on --keep-going being the
+# default behaviour of -W, and sphinx-rtd-theme 3.0 is the floor because it is
+# the first release that supports Sphinx 8.
+sphinx>=8.1,<10
+sphinx-rtd-theme>=3.0

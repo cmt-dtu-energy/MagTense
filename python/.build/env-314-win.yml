@@ -58,7 +58,10 @@ dependencies:
   - vc14_runtime=14.44.35208=h818238b_34
   - vcomp14=14.44.35208=h818238b_34
   - vs2015_runtime=14.44.35208=h38c0c73_34
-  - vs2017_win-64=19.16.27032.1=hb4161e2_3
+  # Do not add vs2017_win-64 back, and do not let anything pull it in either -
+  # see the CUDA note below. ifx_win-64 and dpcpp_win-64 2025.2.1 need only
+  # vs_win-64, which resolves to vs2022_win-64, and vs2022_compiler_vars.bat is
+  # self-contained and always exits 0.
   - vs2022_win-64=19.44.35207=ha74f236_34
   - vs_win-64=2022.14=ha74f236_34
   - vswhere=3.1.7=h40126e0_1
@@ -68,6 +71,17 @@ dependencies:
   # channel and no longer solve. The -dev packages ship the Windows
   # import libs (Library/lib/x64/*.lib) MSVC needs; conda pulls nvcc,
   # the CUDA runtime and cuda-version transitively.
+  #
+  # Watch what cuda-nvcc resolves to. On win-64 the nvidia-channel
+  # cuda-nvcc metapackage is "cuda-nvcc_win-64 + vs2017_win-64", and
+  # vs2017_win-64 drops etc/conda/activate.d/vs2017_get_vsinstall_dir.bat
+  # into the env; conda runs every .bat in activate.d, that one exits 1
+  # when it finds neither a VS 2017 install nor the v141 toolset, and
+  # conda propagates the failure - which then kills the intel-opencl-rt
+  # post-link (it runs inside an activated env) and the whole env create.
+  # The conda-forge build resolved here does not pull it in. If a solve
+  # ever drags vs2017_win-64 back, ask for cuda-nvcc_win-64 instead of
+  # the metapackage.
   - cuda-nvcc
   - cuda-cudart-dev
   - libcublas-dev

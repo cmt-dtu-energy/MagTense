@@ -1,4 +1,4 @@
-module TileRectanagularPrismTensor
+module TileRectangularPrismTensor
 
     implicit none
     
@@ -148,5 +148,5 @@ module TileRectanagularPrismTensor
     return
     end function HH_3D
     
-end module TileRectanagularPrismTensor
+end module TileRectangularPrismTensor
     

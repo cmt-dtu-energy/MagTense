@@ -59,6 +59,9 @@ html_theme_options = {
 html_logo = './static/MagTense_logo.png'
 html_favicon = './static/MagTense_logo.ico'
 html_show_sourcelink = False
+# No "View page source" link means nothing refers to the _sources copies of the .rst files, so
+# do not generate them; they were only adding 25 files to the published docs/ folder.
+html_copy_source = False
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

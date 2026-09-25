@@ -53,6 +53,9 @@ CONTAINS
     error stop "OpenMP 5.0+ required (_OPENMP >= 201811)."
 #endif
 
+    !----------- we need to set active levels to >1 to enable nested parallelism -----------
+    call omp_set_max_active_levels(2)
+    !---------------------------------------------------------------------------------------
 
     ! Set default schedule if needed - Should be called before any parallel region
     ! For more dynamic control use the "export OMP_SCHEDULE="static,4" " environment variable 

@@ -1,8 +1,36 @@
-from typing import List, Optional, Tuple, Union
-import importlib_resources
+import os
+import sys
+from pathlib import Path
 
 import importlib_resources
 import numpy as np
+
+# Windows only
+if hasattr(os, "add_dll_directory"):
+    # First entry is the installed layout
+    # (<prefix>/Lib/site-packages/magtense/../../../Library/bin), the second the
+    # active environment prefix, which is what applies when running from source.
+    dll_paths = [
+        Path(__file__).parent / ".." / ".." / ".." / "Library" / "bin",
+        Path(sys.prefix) / "Library" / "bin",
+    ]
+
+    # The CUDA wheels changed layout between the two major versions: cu12 gave
+    # every library its own nvidia/<name>/bin, cu13 puts them all together in
+    # nvidia/cu13/bin/x86_64. Offer both so either generation of wheel resolves.
+    nvidia_path = Path(__file__).parent / ".." / "nvidia"
+    dll_paths.append(nvidia_path / "cu13" / "bin" / "x86_64")
+    dll_paths += [
+        nvidia_path / lib / "bin"
+        for lib in ["cublas", "cuda_runtime", "cusparse", "nvjitlink"]
+    ]
+
+    for dll_path in dll_paths:
+        if Path.is_dir(dll_path):
+            os.add_dll_directory(dll_path)
+            # libifcoremd.dll resolves its own dependency on libmmd.dll through
+            # PATH, which add_dll_directory does not cover.
+            os.environ["PATH"] = f"{dll_path.resolve()}{os.pathsep}{os.environ['PATH']}"
 
 from magtense.lib import magtensesource
 
@@ -58,7 +86,9 @@ class Tiles:
         mu_r_oa: Relative permeability in other axis.
         M_rem: Remanent magnetization.
         tile_type: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
-                   5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
+                   5 = tetrahedron, 6 = sphere, 7 = spheroid, 8 = avg prism, 10 = ellipsoid,
+                   101 = planar coil, 102 = uniform applied field (not a geometry, see
+                   add_uniform_field)
         offset: Offset of global coordinates.
         rot: Rotation in local coordinate system.
         color: Color in visualization.
@@ -659,6 +689,31 @@ class Tiles:
         )
         self._n += n
 
+    def add_uniform_field(self, H_app: list | np.ndarray) -> int:
+        """Append a uniform applied-field source and return its index.
+
+        The source is a tile of type 102. It is not a geometry: it stands for an external
+        field that is the same at every point, such as the field of a large electromagnet
+        or a Helmholtz coil, and its ``M`` entry holds that field ``H_app`` in A/m. It is
+        added to the field at every evaluation point, and it is part of the field that
+        magnetizes every other tile in ``iterate_magnetization`` and ``run_simulation``,
+        so a soft tile alone in such a field acquires the magnetization it should.
+
+        The value is an H field. A field known as B in tesla is divided by mu0 first; a
+        field evaluated inside a magnetized body is not an applied field. The field of
+        other MagTense tiles is not entered this way either: put those tiles in the same
+        ``Tiles`` object, with ``incl_it`` zero if they are not to be iterated.
+        """
+        H_app = np.asarray(H_app, dtype=np.float64).reshape(3)
+        self._add_tiles(1)
+        i = self.n - 1
+        self._tile_type[i] = 102
+        self._M[i] = H_app
+        self._magnet_type[i] = 1
+        self._incl_it[i] = 0
+        self._color[i] = [0.5, 0.5, 0.5]
+        return i
+
     def refine_prism(self, idx: int | float | list, mat: list) -> None:
         if isinstance(idx, (int, float)):
             self._refine_prism_i(idx, mat)
@@ -843,6 +898,7 @@ def grid_config(
 def run_simulation(
     tiles: Tiles,
     pts: np.ndarray,
+    obs_size: np.ndarray = None,
     max_error: float = 1e-5,
     max_it: int = 500,
     T: float = 300.0,
@@ -896,10 +952,12 @@ def run_simulation(
         nitemax=max_it,
         iteratesolution=True,
         returnsolution=True,
+        obs_size=obs_size
     )
-
+   
     tiles.M = M_out
     tiles.M_rel = Mrel_out
+    #print("obs_size:", obs_size, type(obs_size))
 
     return tiles, H_out
 
@@ -963,13 +1021,14 @@ def iterate_magnetization(
     return tiles
 
 
-def get_demag_tensor(tiles: Tiles, pts: np.ndarray) -> np.ndarray:
+def get_demag_tensor(tiles: Tiles, pts: np.ndarray,obs_size: np.ndarray = None) -> np.ndarray:
     """
     Get demagnetization tensor of tiles and the specified evaluation points.
 
     Args:
         tiles: Magnetic tiles to produce magnetic field.
         pts: Evaluation points.
+        obs_size : optional, used for averaging
 
     Returns:
         Demagnetization tensor.
@@ -997,6 +1056,7 @@ def get_demag_tensor(tiles: Tiles, pts: np.ndarray) -> np.ndarray:
         symmetryops=tiles.sym_op,
         mrel=tiles.M_rel,
         pts=pts,
+        obs_size=obs_size
     )
 
     return demag_tensor
@@ -1057,7 +1117,10 @@ def get_H_field(
 
 
 def get_H_field_fmm(
-    tiles, pts, eps=1e-6
+    tiles, pts, eps=1e-6,
+    nterms_in=10, cells_per_node=10, nlmin=0, nlmax=2, ifunif=1,
+    do_target=0, do_FI=1, n_pts=-1
+
 ) -> np.ndarray:
     """
     FMM-backed H-field, test version.
@@ -1068,6 +1131,11 @@ def get_H_field_fmm(
       - 'demag_tensor' is ignored here (no tensor reuse in this FMM path).
       - 'eps' controls FMM accuracy.
     """
+
+    if n_pts > 0:
+        n_pts_in = np.int32(n_pts)
+    else:
+        n_pts_in = np.int32(len(pts))
 
     H_out = magtensesource.fortrantopythonio.gethfromtilesfmm(
         centerpos=tiles.center_pos,
@@ -1093,43 +1161,17 @@ def get_H_field_fmm(
         mrel=tiles.M_rel,
         pts=pts,
         n_tiles=np.int32(tiles.n),
-        n_pts=np.int32(len(pts)),
-        eps=np.float64(eps),     # FMM precision
+        n_pts=n_pts_in,
+        fmm_eps=np.float64(eps),     # FMM precision
+        fmm_nterms_in=np.int32(nterms_in),
+        fmm_cells_per_node=np.int32(cells_per_node),
+        fmm_nlmin=np.int32(nlmin),
+        fmm_nlmax=np.int32(nlmax),
+        fmm_ifunif=np.int32(ifunif),
+        do_target=np.int32(do_target),
+        do_fi=np.int32(do_FI)
     )
     return H_out
 
 
-def get_H_on_sources_fmm(tiles, eps=1e-6) -> np.ndarray:
-    """
-    H field evaluated at tile centres using FMM (dipoles-only, sources->sources).
-
-    Returns:
-        H_src: (n_tiles, 3) ndarray, field at each tile centre.
-    """
-    H_src = magtensesource.fortrantopythonio.gethonsourcesfmm(
-        centerpos=tiles.center_pos,
-        dev_center=tiles.dev_center,
-        tile_size=tiles.size,
-        vertices=tiles.vertices,
-        mag=tiles.M,
-        u_ea=tiles.u_ea,
-        u_oa1=tiles.u_oa1,
-        u_oa2=tiles.u_oa2,
-        mu_r_ea=tiles.mu_r_ea,
-        mu_r_oa=tiles.mu_r_oa,
-        mrem=tiles.M_rem,
-        tiletype=tiles.tile_type,
-        offset=tiles.offset,
-        rotangles=tiles.rot,
-        color=tiles.color,
-        magnettype=tiles.magnet_type,
-        statefunctionindex=tiles.stfcn_index,
-        includeiniteration=tiles.incl_it,
-        exploitsymmetry=tiles.use_sym,
-        symmetryops=tiles.sym_op,
-        mrel=tiles.M_rel,
-        n_tiles=np.int32(tiles.n),
-        eps=np.float64(eps),
-    )
-    return H_src
 
