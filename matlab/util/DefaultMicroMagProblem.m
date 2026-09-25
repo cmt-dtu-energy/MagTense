@@ -48,7 +48,7 @@ properties
     u_ea
     %new or old problem
     ProblemMod
-    %solver type ('Explicit', 'Dynamic' or 'Minimizer')
+    %solver type ('Dynamic', 'Explicit' or 'ExplicitLL'), see setMicroMagSolver
     solver
 
     %Exchange term constant
@@ -235,7 +235,7 @@ properties
     %value seeds from the clock, which is what independent Monte-Carlo runs need.
     rng_seed
 
-    %Energy minimizer settings, used when the solver is 'Minimizer' (setMicroMagSolver).
+    %Energy minimizer settings, used when the solver is 'Explicit' (setMicroMagSolver).
     %min_tol: convergence criterion, the largest torque max_i |m_i x H_i| over the cells
     %divided by max(Ms) must fall below it. min_maxiter: iteration cap per applied field.
     %min_maxrot: largest rotation of any cell in one iteration [rad]. min_fallback: 1 to
@@ -367,7 +367,7 @@ methods
         obj.u_ea = zeros( obj.ntot, 3 );
         %new or old problem
         obj = obj.setMicroMagProblemMode( 'new' );
-        %solver type ('Explicit', 'Dynamic' or 'Minimizer')
+        %solver type ('Dynamic', 'Explicit' or 'ExplicitLL')
         obj = obj.setMicroMagSolver( 'Dynamic' );
 
         obj.exch_weigh = 8.0;
@@ -781,17 +781,22 @@ methods
     function obj = setMicroMagSolver( obj, type_var  )
     %the following maps from naming to internal (fortran) representation of the solver type
         
+    %'Dynamic': one time-varying applied field, the LL equation integrated in time.
+    %'Explicit': the equilibrium at each of a list of constant fields, found by the energy
+    %   minimizer. The minimizer cannot include the thermal field, so a finite temperature
+    %   in any cell is an error (checked in struct(), just before the Fortran call).
+    %'ExplicitLL': the equilibrium at each constant field found by integrating the LL
+    %   equation over the time window, which is what 'Explicit' did before the minimizer
+    %   became its default. Use it for thermal runs.
         switch type_var
             case 'Explicit'
+                obj.solver = int32(3);
+            case 'ExplicitLL'
                 obj.solver = int32(1);
             case 'Dynamic'
                 obj.solver = int32(2);
-            case 'Minimizer'
-                %Energy minimizer: reads the field table like 'Explicit' but relaxes to
-                %equilibrium by steepest descent instead of integrating the LL equation
-                obj.solver = int32(3);
             otherwise
-                error('Unknown solver type ''%s''. Use ''Explicit'', ''Dynamic'' or ''Minimizer''.', type_var);
+                error('Unknown solver type ''%s''. Use ''Explicit'', ''ExplicitLL'' or ''Dynamic''.', type_var);
         end
             
     end
@@ -862,6 +867,12 @@ methods
                 warning('Initial array not normalized -- Normalizing')
                 obj.m0(~zerorow,:) = obj.m0(~zerorow,:)./mnorm(~zerorow);
             end
+        end
+        if obj.solver == 3 && any(obj.temperature(:) > 0)
+            error(['The ''Explicit'' solver uses the energy minimizer, which cannot include ' ...
+                   'the thermal field, but the temperature is above zero. Use ' ...
+                   'setMicroMagSolver(''ExplicitLL'') to relax by integrating the ' ...
+                   'Landau-Lifshitz equation instead.']);
         end
         if (obj.useDemag)
            disp(['The demag tensor will require around ' num2str(((3*numel(obj.m0)*(3*numel(obj.m0) + 1)/2))*4/(2^30)) ' Gb'])

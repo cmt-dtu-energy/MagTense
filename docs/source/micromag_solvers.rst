@@ -21,18 +21,24 @@ The solver is selected with ``setMicroMagSolver`` in Matlab and with the
        time-varying applied field. The field is linearly interpolated from the
        tabulated values at the requested time.
    * - ``Explicit``
-     - 1
+     - 3
      - Treats every row of the applied-field table as a separate, *constant*
        field and relaxes the magnetization to equilibrium for each of them in
        turn, starting from the state reached at the previous field. This is the
-       quasi-static mode used for hysteresis loops.
-   * - ``Minimizer``
-     - 3
-     - Reads the applied-field table exactly as ``Explicit`` does, one constant
-       field per row, but finds the equilibrium at each field with the
-       :ref:`Energy minimizer` instead of integrating the Landau-Lifshitz
-       equation in time. The old name ``Implicit`` for this slot is no longer
-       accepted.
+       quasi-static mode used for hysteresis loops. The equilibrium is found
+       with the :ref:`Energy minimizer`. The minimizer cannot include the
+       thermal field, so a finite temperature in any cell is an error, raised
+       just before the Fortran call with a message pointing to ``ExplicitLL``.
+   * - ``ExplicitLL``
+     - 1
+     - Reads the applied-field table as ``Explicit`` does, but finds the
+       equilibrium at each field by integrating the Landau-Lifshitz equation in
+       time. This is what ``Explicit`` did before the minimizer became its
+       default, and the choice for thermal runs. Python
+       ``solver="explicit_ll"``.
+
+The names ``Minimizer`` and ``Implicit`` are no longer accepted; use
+``Explicit``.
 
 ``ProblemMod`` (Python ``prob_mode``) selects ``new`` (1) or ``old`` (2). Use
 ``new``, which is the default; ``old`` skips the allocation of the solution
@@ -73,11 +79,12 @@ uniformly spaced times between 0 and ``t_end``:
 
 The field function must return an ``(nt_h_ext, 3)`` array.
 
-For the **explicit** solver the same table is read differently: the time column
-is ignored and each row is one constant field to relax at. ``nt_h_ext`` is
-therefore the number of points on the hysteresis curve, and ``t_end``/``nt``
-only control how long each relaxation is integrated and how densely the hysteresis curve is
-sampled.
+For the **explicit** solvers (``Explicit`` and ``ExplicitLL``)
+the same table is read differently: the time column is ignored and each row is
+one constant field to relax at. ``nt_h_ext`` is therefore the number of points
+on the hysteresis curve, and ``t_end``/``nt`` only control how long each
+relaxation is integrated (for the minimizer, only when it falls back to the
+time integration) and how densely the hysteresis curve is sampled.
 
 ``setTimeDis`` (Python ``setTimeDis``, default 10) controls how often the
 solver reports progress: a message is printed every ``setTimeDis``'th
@@ -143,7 +150,7 @@ specifically want to add integration times.
 Energy minimizer
 ========================================
 
-With ``solver = Minimizer`` (Python ``solver="minimizer"``) the equilibrium at
+With ``solver = Explicit`` (Python ``solver="explicit"``) the equilibrium at
 each constant applied field is found by minimizing the energy directly rather
 than by integrating the Landau-Lifshitz equation with a large damping. The
 method is steepest descent on the unit sphere with Barzilai-Borwein step
@@ -344,8 +351,9 @@ loop, as in the standard problem 2 example:
     problem = problem.setHext( @(t) HystDir.*t', linspace(MaxH,-MaxH,40) );
     problem = problem.setTime( linspace(0,40e-9,2) );
 
-Either the ``Explicit`` solver or the ``Minimizer`` can be used for the
-relaxation at each field; see :ref:`Energy minimizer` for the trade-off.
+``Explicit`` relaxes at each field with the energy minimizer. Use
+``ExplicitLL`` to integrate the Landau-Lifshitz equation instead; see
+:ref:`Energy minimizer` for the trade-off.
 
 In Python the dedicated method ``run_hysteresis`` takes the field table
 directly as an ``(n,4)`` array, and requires ``hysteresis_solver='static'``,
@@ -370,7 +378,7 @@ step length itself, based on how much the volume-averaged magnetization moved.
 The whole accept/reject loop runs inside Fortran in a single call. It is
 available from Python through ``run_hysteresis_adaptive`` and requires
 ``hysteresis_solver='adaptive'`` together with ``solver='explicit'`` or
-``solver='minimizer'``. In Matlab
+``solver='explicit_ll'``. In Matlab
 the same parameters exist on the problem object (``adaptiveHext``,
 ``maxHextSteps``, ``H_start``, ``H_end``, ``dH_initial``, ``dH_min``,
 ``dH_max``, ``dH_grow``, ``dH_shrink``, ``dM_min``, ``dM_target``,

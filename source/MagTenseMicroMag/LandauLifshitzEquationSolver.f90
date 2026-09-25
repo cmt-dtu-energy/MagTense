@@ -286,7 +286,8 @@
     !The minimizer has no notion of a stochastic field: it looks for a stationary point of the energy,
     !which a thermal run never reaches.
     if ( gb_problem%includeThermal .and. gb_problem%solver .eq. MicroMagSolverMinimizer ) then
-        call displayGUIMessage( 'MagTense: the energy minimizer cannot be combined with a finite temperature - use the explicit solver' )
+        call displayGUIMessage( 'MagTense: the energy minimizer (''Explicit'') cannot be combined with a finite ' // &
+                                'temperature - use ''ExplicitLL'' (Python solver=''explicit_ll'')' )
         error stop 'SolveLandauLifshitzEquation: minimizer with thermal field'
     endif
 

@@ -7,7 +7,7 @@ matlab/examples/Micromagnetism/mumag_micromag_Std_problem_2/Standard_problem_2.m
 grid, field schedule and damping ramp, and takes the same options.
 
 The equilibrium at each field is found either by integrating the Landau-Lifshitz equation in time
-(solver 'explicit') or by the energy minimizer (solver 'minimizer'), selected with use_minimizer.
+(solver 'explicit_ll') or by the energy minimizer (solver 'explicit'), selected with use_minimizer.
 Either way the number of effective-field evaluations spent is printed, which is the cost to compare
 between the two methods.
 
@@ -83,7 +83,7 @@ def std_prob_2(
 
     problem = MicromagProblem(
         res=res,
-        solver="minimizer" if use_minimizer else "explicit",
+        solver="explicit" if use_minimizer else "explicit_ll",
         hysteresis_solver="adaptive" if use_adaptive else "static",
         A0=A0,
         Ms=Ms,

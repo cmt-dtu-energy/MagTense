@@ -266,7 +266,8 @@ A predefined sequence of applied fields, given as an ``(n,4)`` array of
     ) -> list
 
 A field sweep in which the solver picks the field steps itself. Requires
-``hysteresis_solver="adaptive"`` and ``solver="explicit"``. See
+``hysteresis_solver="adaptive"`` and ``solver="explicit"`` (the energy
+minimizer) or ``"explicit_ll"`` (Landau-Lifshitz time integration). See
 :ref:`Adaptive hysteresis`.
 
 ========================================

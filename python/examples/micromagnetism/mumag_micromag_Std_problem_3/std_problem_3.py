@@ -64,7 +64,7 @@ def std_prob_3(
         mesh_res_param: tetrahedra per edge length, used with mesh_type='tetrahedron'.
         cuda: use CUDA for the calculations.
         cvode: use CVODE for the numerical time evolution.
-        use_minimizer: relax each state with the energy minimizer (solver 'minimizer') instead of
+        use_minimizer: relax each state with the energy minimizer (solver 'explicit') instead of
             integrating the Landau-Lifshitz equation in time at zero field over t_end (the
             'dynamic' solver). The minimizer ignores t_end and stops when the largest torque is
             below problem.min_tol. Either way the number of effective-field evaluations spent is
@@ -163,7 +163,7 @@ def std_prob_3(
         problem = MicromagProblem(
             res=res if mesh_type == "uniform" else (ntot, 1, 1),
             grid_L=grid_L,
-            solver="minimizer" if use_minimizer else "dynamic",
+            solver="explicit" if use_minimizer else "dynamic",
             A0=A0,
             Ms=Ms,
             K0=K0,

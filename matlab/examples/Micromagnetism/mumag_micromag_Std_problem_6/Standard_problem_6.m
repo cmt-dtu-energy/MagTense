@@ -134,12 +134,12 @@ if strcmp(options.mesh_type,'unstructuredPrisms')
     problem.grid_abc = dims_out ;
 end
 problem = problem.setSolverType( 'UseDynamicSolver' );
-%--- The time ramp below is integrated by the dynamic solver. With the minimizer the same field
-%--- table is read as a sequence of constant fields and the equilibrium at each is found by the
-%--- energy minimizer, which gives the static depinning field - the quantity the analytical values
-%--- above are - rather than the rate-dependent one of the ramp.
+%--- The time ramp below is integrated by the dynamic solver. With the minimizer ('Explicit') the
+%--- same field table is read as a sequence of constant fields and the equilibrium at each is found
+%--- by the energy minimizer, which gives the static depinning field - the quantity the analytical
+%--- values above are - rather than the rate-dependent one of the ramp.
 if options.use_minimizer
-    problem = problem.setMicroMagSolver( 'Minimizer' );
+    problem = problem.setMicroMagSolver( 'Explicit' );
 else
     problem = problem.setMicroMagSolver( 'Dynamic' );
 end

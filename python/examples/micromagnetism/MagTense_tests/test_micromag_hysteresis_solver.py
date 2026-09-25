@@ -191,11 +191,10 @@ class HysteresisSolverTests(unittest.TestCase):
         np.testing.assert_array_equal(problem.n_feval, [100, 101])
         np.testing.assert_array_equal(problem.min_torque, [1e-6, 1e-6])
 
-    def test_minimizer_solver_maps_to_slot_three(self) -> None:
-        """'minimizer' selects the third solver slot."""
-        self.assertEqual(MicromagProblem(res=[1, 1, 1], solver="minimizer").solver, 3)
+    def test_minimizer_settings_are_stored(self) -> None:
+        """The minimizer settings land on the problem as given."""
         problem = MicromagProblem(
-            res=[1, 1, 1], solver="minimizer", min_tol=2e-6, min_maxiter=50,
+            res=[1, 1, 1], solver="explicit", min_tol=2e-6, min_maxiter=50,
             min_maxrot=0.1, min_fallback=False, min_saddle_check=False,
         )
         self.assertEqual(problem.min_tol, 2e-6)
@@ -203,6 +202,44 @@ class HysteresisSolverTests(unittest.TestCase):
         self.assertEqual(problem.min_maxrot, 0.1)
         self.assertEqual(problem.min_fallback, 0)
         self.assertEqual(problem.min_saddle_check, 0)
+
+    def test_explicit_uses_the_minimizer(self) -> None:
+        """'explicit' relaxes with the minimizer, 'explicit_ll' with the LL integration."""
+        self.assertEqual(MicromagProblem(res=[1, 1, 1]).solver, 2)
+        self.assertEqual(MicromagProblem(res=[1, 1, 1], solver="explicit").solver, 3)
+        self.assertEqual(MicromagProblem(res=[1, 1, 1], solver="explicit_ll").solver, 1)
+        for removed in ("minimizer", "implicit"):
+            with self.assertRaisesRegex(ValueError, "explicit_ll"):
+                MicromagProblem(res=[1, 1, 1], solver=removed)
+
+        captured = {}
+
+        def fake_run(**kwargs):
+            captured.update(kwargs)
+            return _fortran_result(n_fields=2, n_accepted=0)
+
+        fake_source = SimpleNamespace(
+            fortrantopythonio=SimpleNamespace(runmicromagsimulation=fake_run)
+        )
+        h_ext = np.zeros((2, 4))
+        with patch.object(micromag_module, "magtensesource", fake_source):
+            _problem().run_hysteresis(h_ext)
+            self.assertEqual(captured["solver"], 3)
+
+            # The minimizer cannot include the thermal field, so a finite temperature, even one
+            # set after the solver, stops 'explicit' before Fortran is called and points the
+            # user to 'explicit_ll' ...
+            captured.clear()
+            problem = _problem()
+            problem.T = 300.0
+            with self.assertRaisesRegex(ValueError, "solver='explicit_ll'"):
+                problem.run_hysteresis(h_ext)
+            self.assertEqual(captured, {})
+
+            # ... which accepts it.
+            problem.solver = "explicit_ll"
+            problem.run_hysteresis(h_ext)
+            self.assertEqual(captured["solver"], 1)
 
     def test_adaptive_accepts_the_minimizer(self) -> None:
         """The adaptive field stepping works with either equilibrium solver."""
@@ -216,7 +253,7 @@ class HysteresisSolverTests(unittest.TestCase):
             fortrantopythonio=SimpleNamespace(runmicromagsimulation=fake_run)
         )
         problem = MicromagProblem(
-            res=[1, 1, 1], solver="minimizer", hysteresis_solver="adaptive", min_tol=3e-6
+            res=[1, 1, 1], solver="explicit", hysteresis_solver="adaptive", min_tol=3e-6
         )
         problem.nt = 2
         problem.t = np.linspace(0.0, 1e-9, problem.nt)
@@ -253,7 +290,7 @@ class HysteresisSolverTests(unittest.TestCase):
             solver="dynamic",
             hysteresis_solver="adaptive",
         )
-        with self.assertRaisesRegex(ValueError, "explicit or the minimizer solver"):
+        with self.assertRaisesRegex(ValueError, "solver='explicit' or 'explicit_ll'"):
             problem.run_hysteresis_adaptive(
                 H_start=np.array([0.0, 0.0, 1.0]),
                 H_end=np.array([0.0, 0.0, -1.0]),

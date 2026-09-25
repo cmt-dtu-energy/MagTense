@@ -58,13 +58,16 @@ class MicromagProblem:
         grid_nod: xyz coordinates of the nodes of a tetrahedral mesh, one node per row
         grid_ele: the four corner nodes of each tetrahedron, 1-based, shape (4, ntot)
         prob_mode:
-        solver: Options are 'explicit', 'dynamic' and 'minimizer'.
-            If solver = 'dynamic', a single time-varying magnetic field is constructed
-            If solver = 'explicit', the equilibrium configuration is computed at several constant fields
-            by integrating the Landau-Lifshitz equation in time.
-            If solver = 'minimizer', the equilibrium at each constant field is found by the energy
-            minimizer (steepest descent on the sphere with Barzilai-Borwein steps) instead of the time
-            integration.
+        solver: Options are 'dynamic', 'explicit' and 'explicit_ll'.
+            If solver = 'dynamic', a single time-varying magnetic field is constructed and the
+            Landau-Lifshitz equation is integrated in time.
+            If solver = 'explicit', the equilibrium configuration is computed at several constant
+            fields, each found by the energy minimizer (steepest descent on the sphere with
+            Barzilai-Borwein steps). The minimizer has no notion of a stochastic field, so a
+            finite temperature T in any cell is an error; use 'explicit_ll' for thermal runs.
+            If solver = 'explicit_ll', the equilibrium at each constant field is found by
+            integrating the Landau-Lifshitz equation in time, which was the behaviour of
+            'explicit' before the minimizer became the default.
             See documentation under run_simulation for details.
         hysteresis_solver: External-field stepping mode. Options are 'static'
             and 'adaptive'. The default 'static' mode preserves the predefined
@@ -324,7 +327,7 @@ class MicromagProblem:
 
         self.cvode = int(cvode)
 
-        # Energy minimizer settings, used when solver = 'minimizer'
+        # Energy minimizer settings, used when solver = 'explicit'
         self.min_tol = float(min_tol)
         self.min_maxiter = int(min_maxiter)
         self.min_maxrot = float(min_maxrot)
@@ -773,14 +776,28 @@ class MicromagProblem:
 
     @solver.setter
     def solver(self, val: str | None = None) -> None:
-        solvers = {None: -1, "explicit": 1, "dynamic": 2, "minimizer": 3}
+        # 'explicit' is the constant-field problem and relaxes with the minimizer (slot 3);
+        # 'explicit_ll' keeps the Landau-Lifshitz time integration (slot 1).
+        solvers = {None: -1, "explicit": 3, "explicit_ll": 1, "dynamic": 2}
         if val not in solvers:
             msg = (
-                f"Unknown solver type {val!r}. Use 'explicit', 'dynamic' or "
-                "'minimizer'."
+                f"Unknown solver type {val!r}. Use 'explicit', 'explicit_ll' or 'dynamic'."
             )
             raise ValueError(msg)
         self._solver = solvers[val]
+
+    def _run_solver(self) -> int:
+        """The solver slot handed to Fortran, after checking it suits the temperature.
+
+        Checked at run time because T may be set after the solver.
+        """
+        if self._solver == 3 and np.any(np.asarray(self.T) > 0):
+            raise ValueError(
+                "solver='explicit' uses the energy minimizer, which cannot include the thermal "
+                "field, but the temperature T is above zero. Use solver='explicit_ll' to relax "
+                "by integrating the Landau-Lifshitz equation instead."
+            )
+        return self._solver
 
     def _store_diagnostics(self, result: list, n_accepted: int | None = None) -> None:
         """Pop the five trailing diagnostics off a Fortran result list onto the problem.
@@ -915,8 +932,10 @@ class MicromagProblem:
                       Evaluation times are uniformly distributed from t=0 to t=t_end
                       If solver = "dynamic", a single time-varying magnetic field is constructed
                        by linear interpolation of the evaluation points.
-                      If solver = "explicit", then each of the nt_h_ext field evaluations are treated
-                       as a distinct, constant field and the equilibrium solution is computed for each field
+                      If solver = "explicit" or "explicit_ll", then each of the nt_h_ext field
+                       evaluations are treated as a distinct, constant field and the equilibrium
+                       solution is computed for each field, by the energy minimizer ("explicit")
+                       or by integrating the Landau-Lifshitz equation ("explicit_ll")
 
         Outputs:
             A list containing the simulation results.
@@ -945,7 +964,7 @@ class MicromagProblem:
             nt_h_ext_out = nt_h_ext 
 
         if self.solver not in (1, 2, 3):
-            raise ValueError("solver must be 'explicit', 'dynamic' or 'minimizer'")
+            raise ValueError("solver must be 'explicit', 'explicit_ll' or 'dynamic'")
 
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
             ntot=self.ntot,
@@ -954,7 +973,7 @@ class MicromagProblem:
             grid_l=self.grid_L,
             u_ea=self.u_ea,
             problemmode=self.prob_mode,
-            solver=self.solver,
+            solver=self._run_solver(),
             a0=self.A0,
             ms=self.Ms,
             k0=self.K0,
@@ -1107,7 +1126,7 @@ class MicromagProblem:
         nt_h_ext_out = nt_h_ext
 
         if self.solver not in (1, 2, 3):
-            raise ValueError("solver must be 'explicit', 'dynamic' or 'minimizer'")
+            raise ValueError("solver must be 'explicit', 'explicit_ll' or 'dynamic'")
 
 
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
@@ -1117,7 +1136,7 @@ class MicromagProblem:
             grid_l=self.grid_L,
             u_ea=self.u_ea,
             problemmode=self.prob_mode,
-            solver=self.solver,
+            solver=self._run_solver(),
             a0=self.A0,
             ms=self.Ms,
             k0=self.K0,
@@ -1262,7 +1281,7 @@ class MicromagProblem:
                 "run_hysteresis_adaptive requires hysteresis_solver='adaptive'"
             )
         if self.solver not in (1, 3):
-            raise ValueError("Adaptive hysteresis requires the explicit or the minimizer solver")
+            raise ValueError("Adaptive hysteresis requires solver='explicit' or 'explicit_ll'")
 
         H_start = np.asarray(H_start, dtype=np.float64)
         H_end = np.asarray(H_end, dtype=np.float64)
@@ -1302,7 +1321,7 @@ class MicromagProblem:
             grid_l=self.grid_L,
             u_ea=self.u_ea,
             problemmode=self.prob_mode,
-            solver=self.solver,
+            solver=self._run_solver(),
             a0=self.A0,
             ms=self.Ms,
             k0=self.K0,

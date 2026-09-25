@@ -179,7 +179,7 @@ def main() -> None:
     print("1. Single-grain hysteresis, adaptive field stepping")
     print("=" * 90)
     rows = []
-    for solver in ("explicit", "minimizer"):
+    for solver in ("explicit_ll", "explicit"):
         r = single_grain(solver, args.cuda, n=args.ngrain)
         rows.append(r)
         print(
@@ -201,7 +201,7 @@ def main() -> None:
     print(f"2. Standard problem 3, {res3}^3 cells, L = 8.5 l_ex")
     print("=" * 90)
     res = {}
-    for solver in ("explicit", "minimizer"):
+    for solver in ("explicit_ll", "explicit"):
         res[solver] = std_problem_3(solver, args.cuda, res=res3)
         for state in ("flower", "vortex"):
             r = res[solver][state]
@@ -212,8 +212,8 @@ def main() -> None:
                 f"iters {r['iters']}, status {r['status']}, torque {r['torque']:.1e}"
             )
     for state in ("flower", "vortex"):
-        dE = res["minimizer"][state]["E_tot"] - res["explicit"][state]["E_tot"]
-        ratio = res["explicit"][state]["n_feval"] / max(res["minimizer"][state]["n_feval"], 1)
+        dE = res["explicit"][state]["E_tot"] - res["explicit_ll"][state]["E_tot"]
+        ratio = res["explicit_ll"][state]["n_feval"] / max(res["explicit"][state]["n_feval"], 1)
         print(f"   {state:>7s}: E_min - E_LL = {dE:+.2e} (reduced units), field-evaluation ratio LL / minimizer: {ratio:.1f}")
 
 
