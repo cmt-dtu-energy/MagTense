@@ -435,11 +435,28 @@ PYTHON_MODN_ALL = _${PYTHON_MODN}${PY_MOD_SUFFIX}
 BUILD_FLAGS_FILE := .build_flags
 BUILD_FLAGS := USE_CUDA=${USE_CUDA} USE_CVODE=${USE_CVODE} USE_MATLAB=${USE_MATLAB} USE_MICROMAG=${USE_MICROMAG} USE_FMM3D=${USE_FMM3D}
 
-# Written by the library targets once they have succeeded
-RECORD_FLAGS = @echo "${BUILD_FLAGS}" > ${BUILD_FLAGS_FILE}
+# Written by the library targets once they have succeeded.
+#
+# Both the writer and the reader below have to exist twice, because on Windows
+# SHELL is powershell.exe (see the top of this file) and none of the POSIX form
+# survives there: "[ -f x ]" is not a PowerShell command, backticks are its
+# escape character rather than command substitution, and make passes
+# backslash-newline through to the shell - which PowerShell does not accept as a
+# continuation, so a Windows recipe has to be a single physical line. On top of
+# that, PowerShell's ">" is Out-File, which in Windows PowerShell 5.1 writes
+# UTF-16LE with a BOM; the flags file would then never compare equal to the
+# plain string built above, so it is written with an explicit ascii encoding.
+ifeq ($(OS),Windows_NT)
+  RECORD_FLAGS = @Set-Content -Path '${BUILD_FLAGS_FILE}' -Value '${BUILD_FLAGS}' -Encoding ascii
+else
+  RECORD_FLAGS = @echo "${BUILD_FLAGS}" > ${BUILD_FLAGS_FILE}
+endif
 
 .PHONY: check-flags
 check-flags:
+ifeq ($(OS),Windows_NT)
+	@if ((Test-Path '${BUILD_FLAGS_FILE}') -and ((Get-Content -Raw '${BUILD_FLAGS_FILE}').Trim() -ne '${BUILD_FLAGS}')) { Write-Host "ERROR: the libraries and this link step were configured differently."; Write-Host ("       libraries built with: " + (Get-Content -Raw '${BUILD_FLAGS_FILE}').Trim()); Write-Host "       linking with:         ${BUILD_FLAGS}"; Write-Host "       Re-run both steps with the same USE_* settings, or 'make clean' first."; exit 1 }
+else
 	@if [ -f ${BUILD_FLAGS_FILE} ] && [ "`cat ${BUILD_FLAGS_FILE}`" != "${BUILD_FLAGS}" ]; then \
 		echo "ERROR: the libraries and this link step were configured differently."; \
 		echo "       libraries built with: `cat ${BUILD_FLAGS_FILE}`"; \
@@ -447,6 +464,7 @@ check-flags:
 		echo "       Re-run both steps with the same USE_* settings, or 'make clean' first."; \
 		exit 1; \
 	fi
+endif
 
 #=======================================================================
 #                    Optional dependency locations
@@ -461,20 +479,21 @@ check-flags:
 # turning the compile into a link and burying the build under
 # "libifcoremt.lib(for_main.obj) : error LNK2019: unresolved external MAIN__".
 #=======================================================================
+# Each check exists in a PowerShell and a POSIX form - see the note on
+# RECORD_FLAGS above for why the Windows recipes have to be single-line
+# PowerShell rather than the POSIX text they were originally written in.
 .PHONY: check-config
 check-config:
 ifeq ($(OS),Windows_NT)
-	@case "${CVODE_ROOT}${MATLAB_INCLUDE}" in *" "*) \
-		echo "ERROR: a dependency path still contains a space after 8.3 shortening."; \
-		echo "       CVODE_ROOT     = ${CVODE_ROOT}"; \
-		echo "       MATLAB_INCLUDE = ${MATLAB_INCLUDE}"; \
-		echo "       The compiler is invoked without quotes - see the note at the top"; \
-		echo "       of this Makefile - so the path is split on the space. Either move"; \
-		echo "       the dependency somewhere without spaces, or enable 8.3 names on"; \
-		echo "       the volume (fsutil 8dot3name set 0) and recreate the directory."; \
-		exit 1;; \
-	esac
+	@if ('${CVODE_ROOT}${MATLAB_INCLUDE}' -match ' ') { Write-Host "ERROR: a dependency path still contains a space after 8.3 shortening."; Write-Host "       CVODE_ROOT     = ${CVODE_ROOT}"; Write-Host "       MATLAB_INCLUDE = ${MATLAB_INCLUDE}"; Write-Host "       The compiler is invoked without quotes - see the note at the top"; Write-Host "       of this Makefile - so the path is split on the space. Either move"; Write-Host "       the dependency somewhere without spaces, or enable 8.3 names on"; Write-Host "       the volume (fsutil 8dot3name set 0) and recreate the directory."; exit 1 }
+ifeq ($(USE_CVODE),1)
+	@if (-not (Test-Path -PathType Container '${CVODE_ROOT}/fortran')) { Write-Host "ERROR: USE_CVODE=1 but no sundials Fortran modules under CVODE_ROOT."; Write-Host "       CVODE_ROOT = ${CVODE_ROOT}"; Write-Host "       Point it at your sundials install, or let install/windows/install-magtense.ps1 build it."; exit 1 }
 endif
+ifeq ($(USE_MATLAB),1)
+	@if ('${MATLAB_INCLUDE}'.Trim() -eq '') { Write-Host "ERROR: USE_MATLAB=1 requires MATLAB_INCLUDE to be set."; Write-Host "       Point it at MATLAB's extern/include."; exit 1 }
+	@if (-not (Test-Path -PathType Leaf '${MATLAB_INCLUDE}/fintrf.h')) { Write-Host "ERROR: no fintrf.h under MATLAB_INCLUDE."; Write-Host "       MATLAB_INCLUDE = ${MATLAB_INCLUDE}"; exit 1 }
+endif
+else
 ifeq ($(USE_CVODE),1)
 	@if [ ! -d "${CVODE_ROOT}/fortran" ]; then \
 		echo "ERROR: USE_CVODE=1 but no sundials Fortran modules under CVODE_ROOT."; \
@@ -496,6 +515,7 @@ ifeq ($(USE_MATLAB),1)
 		echo "       MATLAB_INCLUDE = ${MATLAB_INCLUDE}"; \
 		exit 1; \
 	fi
+endif
 endif
 
 #=======================================================================
