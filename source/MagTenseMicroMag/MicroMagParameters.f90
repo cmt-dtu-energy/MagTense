@@ -174,6 +174,7 @@ include "mkl_dfti.f90"
         real(DP) :: min_maxrot = 0.3_DP                   !> Largest rotation of any cell in one iteration [rad]
         integer  :: min_fallback = 1                      !> 1: fall back to LL time integration if the minimizer stalls, 0: give up
         integer  :: min_saddle_check = 1                  !> 1: nudge a converged state and relax again to make sure it is a minimum, 0: accept it as it is
+        integer  :: min_predictor = 0                     !> 1: start each applied field from the secant extrapolation of the two previous equilibria, 0: from the previous equilibrium
         real(DP),dimension(:,:),allocatable :: alpha      !> A time dependent damping parameter, i.e. as a function of time. Size (nt,1).
         
         real(DP),dimension(:),allocatable :: t              !> Time array for the desired output times

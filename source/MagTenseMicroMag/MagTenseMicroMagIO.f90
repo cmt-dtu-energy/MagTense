@@ -679,6 +679,8 @@
         if ( minimizerPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(minimizerPtr), problem%min_fallback, sx )
         minimizerPtr = mxGetField( prhs, i, problemFields(107) )
         if ( minimizerPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(minimizerPtr), problem%min_saddle_check, sx )
+        minimizerPtr = mxGetField( prhs, i, problemFields(109) )
+        if ( minimizerPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(minimizerPtr), problem%min_predictor, sx )
 
         !Timing log switch (optional in the struct; the Fortran default is off)
         minimizerPtr = mxGetField( prhs, i, problemFields(108) )
@@ -697,7 +699,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=108
+        integer,parameter :: nf=109
         character(len=12),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -816,6 +818,7 @@
         fieldnames(105) = 'min_maxrot'
         fieldnames(106) = 'min_fallback'
         fieldnames(107) = 'min_saddle'
+        fieldnames(109) = 'min_pred'
 
         !Timing log switch, optional so that older problem structs keep working
         fieldnames(108) = 'timer_ena'

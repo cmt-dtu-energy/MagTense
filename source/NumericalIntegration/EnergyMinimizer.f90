@@ -61,6 +61,7 @@ module EnergyMinimizer
         real :: H_scale = 1.0         !> Field scale that makes the torque criterion dimensionless, e.g. max(Ms)
         real :: E_scale = 1.0         !> Energy scale for the watchdog tolerance, e.g. 1/2 mu0 Ms^2 V
         integer :: display_every = 100 !> Progress message every this many iterations
+        real :: tau_init = 0.0        !> Step length of the first iteration [rad per field unit]; 0 rotates the most-torqued vector by rot_init instead
     end type MinimizerSettings
 
     !> What the minimizer reports back
@@ -68,6 +69,7 @@ module EnergyMinimizer
         integer :: n_iter = 0         !> Iterations over all rounds
         real :: torque = 0.0          !> Final max_i |m_i x H_i| / H_scale
         integer :: status = 2         !> 0 converged, 1 converged after an ODE fallback, 2 not converged
+        real :: tau_last = 0.0        !> Step length of the last iteration, a curvature estimate the next call can start from (tau_init)
     end type MinimizerResult
 
     integer,parameter,private :: n_hist = 10         !> Window of the non-monotone energy watchdog
@@ -210,6 +212,7 @@ module EnergyMinimizer
     result%n_iter = result%n_iter + n_iter_total
     result%torque = tq_rel
     result%status = status
+    result%tau_last = tau
 
     deallocate( H, m_prev, g, g_prev, tq, tq_prev, m_best )
 
@@ -225,7 +228,14 @@ module EnergyMinimizer
         tq_rel = tq_max / settings%H_scale
         converged = tq_rel .lt. settings%tol
         stalled = .false.
-        tau = rot_init / max( tq_max, tiny(1.0) )
+        !The first step: rot_init on the most-torqued vector, unless the caller hands over the step
+        !length of a previous, similar minimization - a start close to the minimum (the secant
+        !predictor) has a torque far smaller than the curvature, and a fixed rotation overshoots it
+        if ( settings%tau_init .gt. 0.0 ) then
+            tau = min( settings%tau_init, settings%maxrot / max( tq_max, tiny(1.0) ) )
+        else
+            tau = rot_init / max( tq_max, tiny(1.0) )
+        endif
         k = 0
     end subroutine startState
 

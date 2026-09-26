@@ -242,13 +242,17 @@ properties
     %fall back to the Landau-Lifshitz time integration when the minimizer stalls, 0 to
     %give up. min_saddle: 1 to nudge a converged state and relax again, so that a saddle
     %point (which a symmetric starting state sits on) is not mistaken for a minimum, 0 to
-    %accept the state as it is. The solution struct returns E (energies), n_feval,
-    %min_iter, min_torque and min_status, see the TechManual.
+    %accept the state as it is. min_pred: 1 to start the minimizer at each applied field
+    %from the secant extrapolation of the two previous equilibria and with the step length
+    %the previous field ended with (free, skipped across a switching event), 0 to start
+    %from the previous equilibrium. The solution struct
+    %returns E (energies), n_feval, min_iter, min_torque and min_status, see the TechManual.
     min_tol
     min_maxiter
     min_maxrot
     min_fallback
     min_saddle
+    min_pred
 
     %Optional exchange stiffness at the interface between two materials. phase_id gives
     %the material index (1..n_phase) of every tile and A_int is a symmetric
@@ -526,6 +530,7 @@ methods
         obj.min_maxrot = 0.3;
         obj.min_fallback = int32(1);
         obj.min_saddle = int32(1);
+        obj.min_pred = int32(0);
 
         %One material, i.e. the harmonic mean everywhere, which is the previous behaviour.
         obj.n_phase = int32(1);

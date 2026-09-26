@@ -103,6 +103,7 @@ class HysteresisSolverTests(unittest.TestCase):
         self.assertEqual(captured["min_maxrot"], 0.3)
         self.assertEqual(captured["min_fallback"], 1)
         self.assertEqual(captured["min_saddle_check"], 1)
+        self.assertEqual(captured["min_predictor"], 0)
         np.testing.assert_array_equal(captured["hext"], h_ext)
         self.assertEqual(captured["nt_hext_out"], 3)
         self.assertEqual(captured["maxhextsteps"], 0)
@@ -195,13 +196,14 @@ class HysteresisSolverTests(unittest.TestCase):
         """The minimizer settings land on the problem as given."""
         problem = MicromagProblem(
             res=[1, 1, 1], solver="explicit", min_tol=2e-6, min_maxiter=50,
-            min_maxrot=0.1, min_fallback=False, min_saddle_check=False,
+            min_maxrot=0.1, min_fallback=False, min_saddle_check=False, min_predictor=True,
         )
         self.assertEqual(problem.min_tol, 2e-6)
         self.assertEqual(problem.min_maxiter, 50)
         self.assertEqual(problem.min_maxrot, 0.1)
         self.assertEqual(problem.min_fallback, 0)
         self.assertEqual(problem.min_saddle_check, 0)
+        self.assertEqual(problem.min_predictor, 1)
 
     def test_explicit_uses_the_minimizer(self) -> None:
         """'explicit' relaxes with the minimizer, 'explicit_ll' with the LL integration."""

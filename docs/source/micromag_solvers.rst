@@ -226,6 +226,13 @@ costs up to a hundred field evaluations per applied field.
      - ``1``
      - Nudge a converged state and relax again to make sure it is a minimum
        (1) or accept it as it is (0). Matlab: ``min_saddle``.
+   * - ``min_predictor``
+     - ``0``
+     - Start the minimizer at each applied field from the secant extrapolation
+       of the two previous equilibria (1) instead of from the previous one (0),
+       with the first step taken at the step length the previous field ended
+       with. Costs no field evaluation; the extrapolation is skipped across a
+       switching event. Matlab: ``min_pred``.
 
 The minimizer works with every grid type, with CUDA and with FMM, because it
 calls the same field routines as the time integration. It cannot be combined

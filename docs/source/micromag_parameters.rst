@@ -189,6 +189,11 @@ Solver, time and applied field
      - ``1``
      - Nudge a converged state and relax again, so that a saddle point is not
        mistaken for a minimum.
+   * - ``min_pred``
+     - ``min_predictor``
+     - ``0``
+     - Start each applied field from the secant extrapolation of the two
+       previous equilibria instead of from the previous one.
    * - ``conv_tol``
      - ``conv_tol``
      - ``1e-4``

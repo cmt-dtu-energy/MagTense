@@ -46,7 +46,8 @@ def quiet(problem: MicromagProblem) -> None:
 # ----------------------------------------------------------------------------------------------
 # 1. Single grain hysteresis with adaptive field stepping
 # ----------------------------------------------------------------------------------------------
-def single_grain(solver: str, cuda: bool, n: int = 5, tilt_deg: float = 3.0) -> dict:
+def single_grain(solver: str, cuda: bool, n: int = 5, tilt_deg: float = 3.0, predictor: bool = False,
+                 saddle_check: bool = True) -> dict:
     Bs, K0, A0 = 2.4, 1.0e6, 7.0e-12
     Ms = Bs / MU0
     L = 10.0e-9
@@ -63,6 +64,8 @@ def single_grain(solver: str, cuda: bool, n: int = 5, tilt_deg: float = 3.0) -> 
         alpha=4000.0, gamma=0.0,
         cuda=cuda,
         usereturnhall=True,
+        min_predictor=predictor,
+        min_saddle_check=saddle_check,
     )
     problem.u_ea[:, :] = [0.0, 0.0, 1.0]
     # Two output times and a convergence check at the second one, so the LL relaxation can stop

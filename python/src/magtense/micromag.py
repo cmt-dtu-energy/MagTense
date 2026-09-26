@@ -112,6 +112,10 @@ class MicromagProblem:
         min_saddle_check: If True (default), a converged state is nudged by a small random
             rotation and relaxed again, so that a saddle point - which a symmetric starting
             state such as the canonical vortex sits on - is not mistaken for a minimum.
+        min_predictor: If True, the minimizer at each applied field starts from the secant
+            extrapolation of the two previous equilibria instead of from the previous one, and
+            takes its first step with the step length the previous field ended with. Costs
+            nothing; the extrapolation is skipped automatically across a switching event.
 
     After a run the following diagnostics are available as attributes:
         E_out: (nt, nt_h_ext, 4) energies [J] in the order exchange, external, demagnetization,
@@ -193,6 +197,7 @@ class MicromagProblem:
             min_maxrot: float = 0.3,
             min_fallback: bool = True,
             min_saddle_check: bool = True,
+            min_predictor: bool = False,
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -333,6 +338,7 @@ class MicromagProblem:
         self.min_maxrot = float(min_maxrot)
         self.min_fallback = int(bool(min_fallback))
         self.min_saddle_check = int(bool(min_saddle_check))
+        self.min_predictor = int(bool(min_predictor))
 
         # Energies and relaxation diagnostics of the last run, see the class docstring
         self.E_out = None
@@ -1051,6 +1057,7 @@ class MicromagProblem:
             min_maxrot=self.min_maxrot,
             min_fallback=self.min_fallback,
             min_saddle_check=self.min_saddle_check,
+            min_predictor=self.min_predictor,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
@@ -1214,6 +1221,7 @@ class MicromagProblem:
             min_maxrot=self.min_maxrot,
             min_fallback=self.min_fallback,
             min_saddle_check=self.min_saddle_check,
+            min_predictor=self.min_predictor,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
@@ -1399,6 +1407,7 @@ class MicromagProblem:
             min_maxrot=self.min_maxrot,
             min_fallback=self.min_fallback,
             min_saddle_check=self.min_saddle_check,
+            min_predictor=self.min_predictor,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
