@@ -109,14 +109,14 @@ class MicromagProblem:
         min_maxrot: Largest rotation of any cell in one minimizer iteration [rad].
         min_fallback: If True, a minimizer that stalls or hits min_maxiter falls back to the
             Landau-Lifshitz time integration over the requested time window and restarts.
-        min_saddle_check: 1 or True (default): a converged state is nudged by a small random
+        min_saddle_check: 1 or True: a converged state is nudged by a small random
             rotation and relaxed again, so that a saddle point - which a symmetric starting
             state such as the canonical vortex sits on - is not mistaken for a minimum.
-            2: the lowest eigenvalue of the energy Hessian is computed instead (Lanczos with
+            2 (default): the lowest eigenvalue of the energy Hessian is computed instead (Lanczos with
             matrix-free products, one field evaluation each); a negative value marks a saddle
             and the state is pushed along the eigenvector and relaxed again. The eigenvalue is
             returned in min_eig. 0 or False: the converged state is accepted as it is.
-        min_predictor: If True, the minimizer at each applied field starts from the secant
+        min_predictor: If True (default), the minimizer at each applied field starts from the secant
             extrapolation of the two previous equilibria instead of from the previous one, and
             takes its first step with the step length the previous field ended with. Costs
             nothing; the extrapolation is skipped automatically across a switching event.
@@ -202,8 +202,8 @@ class MicromagProblem:
             min_maxiter: int = 10000,
             min_maxrot: float = 0.3,
             min_fallback: bool = True,
-            min_saddle_check: bool | int = True,
-            min_predictor: bool = False,
+            min_saddle_check: bool | int = 2,
+            min_predictor: bool = True,
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot

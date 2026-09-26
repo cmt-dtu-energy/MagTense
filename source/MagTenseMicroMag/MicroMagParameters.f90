@@ -173,8 +173,8 @@ include "mkl_dfti.f90"
         integer  :: min_maxiter = 10000                   !> Maximum number of minimizer iterations per applied field
         real(DP) :: min_maxrot = 0.3_DP                   !> Largest rotation of any cell in one iteration [rad]
         integer  :: min_fallback = 1                      !> 1: fall back to LL time integration if the minimizer stalls, 0: give up
-        integer  :: min_saddle_check = 1                  !> 0: accept a converged state as it is, 1: nudge it and relax again, 2: lowest Hessian eigenvalue by Lanczos (rigorous, and reported in min_eig)
-        integer  :: min_predictor = 0                     !> 1: start each applied field from the secant extrapolation of the two previous equilibria, 0: from the previous equilibrium
+        integer  :: min_saddle_check = 2                  !> 0: accept a converged state as it is, 1: nudge it and relax again, 2: lowest Hessian eigenvalue by Lanczos (rigorous, and reported in min_eig)
+        integer  :: min_predictor = 1                     !> 1: start each applied field from the secant extrapolation of the two previous equilibria, 0: from the previous equilibrium
         real(DP),dimension(:,:),allocatable :: alpha      !> A time dependent damping parameter, i.e. as a function of time. Size (nt,1).
         
         real(DP),dimension(:),allocatable :: t              !> Time array for the desired output times

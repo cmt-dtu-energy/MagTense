@@ -532,8 +532,8 @@ methods
         obj.min_maxiter = int32(10000);
         obj.min_maxrot = 0.3;
         obj.min_fallback = int32(1);
-        obj.min_saddle = int32(1);
-        obj.min_pred = int32(0);
+        obj.min_saddle = int32(2);
+        obj.min_pred = int32(1);
 
         %One material, i.e. the harmonic mean everywhere, which is the previous behaviour.
         obj.n_phase = int32(1);

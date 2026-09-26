@@ -186,13 +186,13 @@ Solver, time and applied field
      - Fall back to the time integration when the minimizer stalls.
    * - ``min_saddle``
      - ``min_saddle_check``
-     - ``1``
+     - ``2``
      - 1: nudge a converged state and relax again, so that a saddle point is not
        mistaken for a minimum. 2: compute the lowest eigenvalue of the energy
        Hessian instead (returned as ``min_eig``). 0: accept the state.
    * - ``min_pred``
      - ``min_predictor``
-     - ``0``
+     - ``1``
      - Start each applied field from the secant extrapolation of the two
        previous equilibria instead of from the previous one.
    * - ``conv_tol``

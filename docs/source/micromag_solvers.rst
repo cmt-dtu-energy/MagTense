@@ -193,8 +193,8 @@ A vanishing torque is also what a saddle point looks like, and a symmetric
 starting state sits on one: the canonical vortex of standard problem 3, or a
 magnetization exactly antiparallel to the applied field. Steepest descent
 converges onto such a point, whereas the time integration only leaves it
-through rounding noise, slowly. With ``min_saddle_check`` set, which is the
-default, a converged state is therefore nudged by a random tilt of about half
+through rounding noise, slowly. With ``min_saddle_check = 1``, a converged
+state is therefore nudged by a random tilt of about half
 a degree, common to all cells with a smaller independent part per cell, and
 relaxed again for up to a hundred iterations. A minimum keeps the energy above
 the unperturbed value throughout and is returned unperturbed; a saddle lets the
@@ -202,7 +202,8 @@ energy fall below it, at which point the descent continues to the lower
 minimum, which is then checked in the same way, up to three times. The check
 costs up to a hundred field evaluations per applied field.
 
-With ``min_saddle_check = 2`` the question is answered rigorously instead: the
+With ``min_saddle_check = 2``, the default, the question is answered rigorously
+instead: the
 lowest eigenvalue of the energy Hessian in the tangent space of the converged
 state is computed by the Lanczos iteration, each step costing one field
 evaluation, since the Hessian applied to a tangent displacement is the
@@ -240,12 +241,12 @@ flower-vortex transition, which relaxes to the lower twisted flower.
      - Fall back to the time integration when the minimizer stalls (1) or give
        up and report it (0).
    * - ``min_saddle_check``
-     - ``1``
+     - ``2``
      - Nudge a converged state and relax again to make sure it is a minimum
        (1), compute the lowest eigenvalue of the energy Hessian instead (2, see
        below) or accept the state as it is (0). Matlab: ``min_saddle``.
    * - ``min_predictor``
-     - ``0``
+     - ``1``
      - Start the minimizer at each applied field from the secant extrapolation
        of the two previous equilibria (1) instead of from the previous one (0),
        with the first step taken at the step length the previous field ended
