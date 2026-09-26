@@ -843,7 +843,7 @@
         mwSize,dimension(4) :: dims_4
         mwSize,dimension(3) :: dims_3
         mwPointer :: pt,pm,pp,pdem,pext,pexc,pani,pnHext
-        mwPointer :: pE,pnfe,pmit,pmtq,pmst
+        mwPointer :: pE,pnfe,pmit,pmtq,pmst,pmeg
         mwPointer :: mxCreateStructArray, mxCreateDoubleMatrix,mxGetPr,mxCreateNumericMatrix,mxCreateNumericArray
         mwIndex :: ind
         character(len=10),dimension(:),allocatable :: fieldnames    
@@ -982,6 +982,10 @@
         call mxCopyInteger4ToPtr( solution%min_status, mxGetPr( pmst ), sx )
         call mxSetField( plhs, ind, fieldnames(13), pmst )
 
+        pmeg = mxCreateDoubleMatrix(s1, s2, ComplexFlag)
+        call mxCopyReal8ToPtr( solution%min_eig, mxGetPr( pmeg ), sx )
+        call mxSetField( plhs, ind, fieldnames(14), pmeg )
+
         !Clean up
         deallocate(fieldnames)
 
@@ -996,7 +1000,7 @@
     !>-----------------------------------------
     subroutine getSolutionFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields
-        integer,parameter :: nf=13
+        integer,parameter :: nf=14
         character(len=10),dimension(:),intent(out),allocatable :: fieldnames
 
         nfields = nf
@@ -1017,6 +1021,7 @@
         fieldnames(11) = 'min_iter'
         fieldnames(12) = 'min_torque'
         fieldnames(13) = 'min_status'
+        fieldnames(14) = 'min_eig'
 
     end subroutine getSolutionFieldnames
     

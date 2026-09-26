@@ -56,12 +56,16 @@ module EnergyMinimizer
         integer :: maxiter = 10000    !> Iteration cap per call (per round when the fallback is used)
         real :: maxrot = 0.3          !> Largest rotation of any vector in one iteration [rad]
         integer :: fallback = 1       !> 1: fall back to the ODE integration when stalled, 0: give up
-        integer :: saddle_check = 1   !> 1: nudge a converged state and relax again to make sure it is a minimum, 0: skip
+        integer :: saddle_check = 1   !> 0: accept a converged state as it is, 1: nudge it and relax again, 2: lowest Hessian eigenvalue by Lanczos, descending along the eigenvector when it is negative
         real :: saddle_pert = 1.0e-2  !> Size of that nudge, the rotation of each vector [rad]
         real :: H_scale = 1.0         !> Field scale that makes the torque criterion dimensionless, e.g. max(Ms)
         real :: E_scale = 1.0         !> Energy scale for the watchdog tolerance, e.g. 1/2 mu0 Ms^2 V
         integer :: display_every = 100 !> Progress message every this many iterations
         real :: tau_init = 0.0        !> Step length of the first iteration [rad per field unit]; 0 rotates the most-torqued vector by rot_init instead
+        real :: eig_tol = 1.0e-2      !> saddle_check 2: relative accuracy of the lowest Hessian eigenvalue (absolute floor eig_tol * H_scale / 100)
+        integer :: eig_maxiter = 60   !> saddle_check 2: cap on the Lanczos steps per check (one field evaluation each)
+        real,dimension(:),allocatable :: weights !> saddle_check 2: weight of every vector in the energy, Ms_i V_i; uniform when not allocated
+        real,dimension(:),allocatable :: eig_start !> saddle_check 2: Lanczos start vector (3n), e.g. the eigenvector of a similar state; random when not allocated
     end type MinimizerSettings
 
     !> What the minimizer reports back
@@ -70,6 +74,9 @@ module EnergyMinimizer
         real :: torque = 0.0          !> Final max_i |m_i x H_i| / H_scale
         integer :: status = 2         !> 0 converged, 1 converged after an ODE fallback, 2 not converged
         real :: tau_last = 0.0        !> Step length of the last iteration, a curvature estimate the next call can start from (tau_init)
+        real :: eig_min = 0.0         !> saddle_check 2: lowest Hessian eigenvalue of the returned state, relative to H_scale
+        integer :: n_eig = 0          !> saddle_check 2: Lanczos steps spent over all checks
+        real,dimension(:),allocatable :: eig_vec !> saddle_check 2: the eigenvector of eig_min (3n), tangent to the returned state
     end type MinimizerResult
 
     integer,parameter,private :: n_hist = 10         !> Window of the non-monotone energy watchdog
@@ -79,6 +86,10 @@ module EnergyMinimizer
     integer,parameter,private :: n_saddle_iter = 100 !> Iterations a perturbed state gets to fall below the unperturbed energy
     real,parameter,private :: rot_init = 1.0e-3      !> Rotation of the most-torqued vector in the first step [rad]
     real,parameter,private :: E_rise_rel = 1.0e-6    !> Allowed energy rise per step, relative to E_scale
+    real,parameter,private :: eig_step = 1.0e-4      !> Rotation of the most displaced vector in the finite-difference Hessian product [rad]
+    logical,parameter,private :: eig_debug = .false. !> Report every Lanczos step (development aid)
+    integer,parameter,private :: eig_minit = 3       !> Fewest Lanczos steps before the convergence test is trusted, warm start
+    integer,parameter,private :: eig_minit_moved = 10 !> The same after a push off a saddle, when the start vector is mostly random
 
     contains
 
@@ -112,12 +123,14 @@ module EnergyMinimizer
     real,intent(in) :: tol, thres_value, conv_tol
     integer,intent(in) :: useCVODE, callback_display
 
-    real,dimension(:),allocatable :: H, m_prev, g, g_prev, tq, tq_prev, m_best
+    real,dimension(:),allocatable :: H, m_prev, g, g_prev, tq, tq_prev, m_best, u, w
     real,dimension(:),allocatable :: t_out_fb
     real,dimension(:,:),allocatable :: y_fb
     real,dimension(n_hist) :: E_hist
     real,dimension(4) :: E4
-    real :: E, E_best, tq_max, tq_rel, tq_best, tau, E_stop
+    real :: E, E_best, tq_max, tq_rel, tq_best, tau, E_stop, lambda, umax
+    integer :: n_eig
+    logical :: eig_ok
     integer :: k, i_round, i_sc, n_iter_total, status, nt, n_display, k_cap
     logical :: converged, stalled
     character*(256) :: prog_str
@@ -138,7 +151,7 @@ module EnergyMinimizer
         call descend()
         n_iter_total = n_iter_total + k
 
-        if ( converged .and. settings%saddle_check .ne. 0 ) then
+        if ( converged .and. settings%saddle_check .eq. 1 ) then
             !A vanishing torque also marks a saddle point, and a symmetric starting state - the
             !canonical vortex of standard problem 3, or a magnetization exactly antiparallel to the
             !field in a hysteresis loop - sits on one. Steepest descent then converges onto it
@@ -178,6 +191,64 @@ module EnergyMinimizer
                     exit
                 endif
             end do
+        endif
+
+        if ( converged .and. settings%saddle_check .eq. 2 ) then
+            !The rigorous version of the check above: the lowest eigenvalue of the energy Hessian in
+            !the tangent space, from Lanczos on finite-difference Hessian products (one field
+            !evaluation each). Positive means minimum. Negative means saddle, and the eigenvector is
+            !the direction of steepest descent out of it, so the state is pushed along it and
+            !relaxed again, then checked again.
+            allocate( u(3*n), w(n) )
+            if ( allocated(settings%weights) ) then
+                w = settings%weights * ( real(n) / sum(settings%weights) )
+            else
+                w = 1.0
+            endif
+            do i_sc = 1, n_saddle_max
+                if ( i_sc .eq. 1 .and. allocated(settings%eig_start) ) then
+                    u = settings%eig_start
+                else if ( i_sc .eq. 1 ) then
+                    u = 0.0
+                endif
+                !The finite differences need the gradient at exactly this state, so it is evaluated
+                !afresh rather than taken from the descent (one field evaluation).
+                call heff( m, H )
+                call torqueAndGradient( m, H, n, tq, g, tq_max )
+                !u enters as the start vector (the eigenvector of the previous check or field, or zero
+                !for a random one) and leaves as the eigenvector
+                !Between neighbouring fields the handed-over eigenvector is close and a small random
+                !admixture with a few steps suffices; after a push off a saddle the state has moved and
+                !the search starts from an equal mix with more steps.
+                if ( i_sc .eq. 1 ) then
+                    call lowestEigenpair( heff, m, g, n, w, settings%H_scale, settings%eig_tol, settings%eig_maxiter, &
+                                          eig_minit, 0.1, lambda, u, n_eig, eig_ok, callback )
+                else
+                    call lowestEigenpair( heff, m, g, n, w, settings%H_scale, settings%eig_tol, settings%eig_maxiter, &
+                                          eig_minit_moved, 1.0, lambda, u, n_eig, eig_ok, callback )
+                endif
+                result%eig_vec = u
+                result%n_eig = result%n_eig + n_eig
+                result%eig_min = lambda / settings%H_scale
+                if ( .not. eig_ok ) then
+                    write(prog_str,'(A,I4,A,ES10.3)') 'Minimizer: Hessian eigenvalue not converged in ', n_eig, ' steps, lambda/H ', lambda / settings%H_scale
+                    call callback( trim(prog_str), -1 )
+                endif
+                if ( lambda .ge. -1.0e-2 * settings%eig_tol * settings%H_scale ) exit
+                write(prog_str,'(A,ES10.3,A)') 'Minimizer: saddle, lowest Hessian eigenvalue ', lambda / settings%H_scale, ' H_scale, descending'
+                call callback( trim(prog_str), -1 )
+                !Push along the eigenvector so that the most displaced vector rotates by saddle_pert
+                umax = sqrt( maxval( u(1:n)**2 + u(n+1:2*n)**2 + u(2*n+1:3*n)**2 ) )
+                m = m + ( settings%saddle_pert / max( umax, tiny(1.0) ) ) * u
+                call normalizeVectors( m, n )
+                k_cap = settings%maxiter
+                E_stop = -huge(1.0)
+                call startState()
+                call descend()
+                n_iter_total = n_iter_total + k
+                if ( .not. converged ) exit
+            end do
+            deallocate( u, w )
         endif
 
         if ( converged ) then
@@ -306,6 +377,261 @@ module EnergyMinimizer
     end subroutine descend
 
     end subroutine MagTense_Minimize
+
+    !>-----------------------------------------
+    !> Renormalizes every vector of m to unit length
+    !>-----------------------------------------
+    subroutine normalizeVectors( m, n )
+    real,dimension(:),intent(inout) :: m
+    integer,intent(in) :: n
+    real,dimension(:),allocatable :: nrm
+    allocate( nrm(n) )
+    nrm = sqrt( m(1:n)**2 + m(n+1:2*n)**2 + m(2*n+1:3*n)**2 )
+    m(1:n)       = m(1:n) / nrm
+    m(n+1:2*n)   = m(n+1:2*n) / nrm
+    m(2*n+1:3*n) = m(2*n+1:3*n) / nrm
+    deallocate( nrm )
+    end subroutine normalizeVectors
+
+    !>-----------------------------------------
+    !> Removes from every v_i its component along the unit vector m_i
+    !>-----------------------------------------
+    subroutine projectTangent( m, v, n )
+    real,dimension(:),intent(in) :: m
+    real,dimension(:),intent(inout) :: v
+    integer,intent(in) :: n
+    real,dimension(:),allocatable :: c
+    allocate( c(n) )
+    c = m(1:n) * v(1:n) + m(n+1:2*n) * v(n+1:2*n) + m(2*n+1:3*n) * v(2*n+1:3*n)
+    v(1:n)       = v(1:n)       - c * m(1:n)
+    v(n+1:2*n)   = v(n+1:2*n)   - c * m(n+1:2*n)
+    v(2*n+1:3*n) = v(2*n+1:3*n) - c * m(2*n+1:3*n)
+    deallocate( c )
+    end subroutine projectTangent
+
+    !>-----------------------------------------
+    !> Hessian-vector product in field units at the state m, for a tangent displacement v,
+    !>     (K v)_i = -P_i (A v)_i + (m_i . H_i) v_i,
+    !> i.e. the linearised negative field plus the curvature of the sphere, obtained from one field
+    !> evaluation as the one-sided difference of the gradient g = m x (m x H),
+    !>     K v = P [ g(m + eps v) - g(m) ] / eps,
+    !> with eps chosen so that the most displaced vector rotates by eig_step. The difference also
+    !> covers a nonlinear (cubic) anisotropy, which a product with the field operator would not.
+    !> g0 is the gradient at m, which the caller already has.
+    !>-----------------------------------------
+    subroutine hessianProduct( heff, m, g0, v, n, Kv )
+    procedure(heff_fct) :: heff
+    real,dimension(:),intent(in) :: m, g0, v
+    integer,intent(in) :: n
+    real,dimension(:),intent(out) :: Kv
+    real,dimension(:),allocatable :: m1, H1, tq1, g1
+    real :: eps, vmax, tqmax
+
+    vmax = sqrt( maxval( v(1:n)**2 + v(n+1:2*n)**2 + v(2*n+1:3*n)**2 ) )
+    if ( vmax .le. tiny(1.0) ) then
+        Kv = 0.0
+        return
+    endif
+    allocate( m1(3*n), H1(3*n), tq1(3*n), g1(3*n) )
+    eps = eig_step / vmax
+    m1 = m + eps * v
+    call normalizeVectors( m1, n )
+    call heff( m1, H1 )
+    call torqueAndGradient( m1, H1, n, tq1, g1, tqmax )
+    Kv = ( g1 - g0 ) / eps
+    call projectTangent( m, Kv, n )
+    deallocate( m1, H1, tq1, g1 )
+    end subroutine hessianProduct
+
+    !>-----------------------------------------
+    !> Lowest eigenpair of the energy Hessian at the state m, restricted to the tangent space, by
+    !> the Lanczos iteration with the matrix-free products of hessianProduct. K is self-adjoint in
+    !> the inner product weighted with w_i = Ms_i V_i (mean 1), so the Lanczos vectors are
+    !> orthonormalised in that product, with full reorthogonalisation (V is 3n x maxit). The
+    !> eigenvalues are those of the energy Hessian divided by mu0 Ms_i V_i, in field units, and
+    !> have the same signs: lambda > 0 means minimum, lambda < 0 saddle, with u the direction of
+    !> steepest descent out of it. Converged when the residual beta_j |y_j| falls below
+    !> eig_tol * H_scale or the Krylov space is exhausted; ok is false when maxit steps did not
+    !> get there (lambda and u are then the best available Ritz pair).
+    !>-----------------------------------------
+    subroutine lowestEigenpair( heff, m, g0, n, w, H_scale, eig_tol, maxit, minit, admix, lambda, u, n_iter, ok, callback )
+    procedure(heff_fct) :: heff
+    real,dimension(:),intent(in) :: m, g0, w
+    integer,intent(in) :: n, maxit, minit   !> minit: fewest steps before the convergence test is trusted
+    real,intent(in) :: H_scale, eig_tol, admix   !> admix: weight of a random vector added to the (unit) start vector
+    real,intent(out) :: lambda
+    real,dimension(:),intent(inout) :: u   !> in: start vector (zero for random), out: eigenvector
+    integer,intent(out) :: n_iter
+    logical,intent(out) :: ok
+    procedure(callback_fct), pointer :: callback
+    character*(256) :: prog_str
+
+    real,dimension(:,:),allocatable :: V, T, Z
+    real,dimension(:),allocatable :: r, Kv, ev, alpha, beta
+    real :: nrm, resid, c, lambda_prev
+    integer :: j, i, jmin
+
+    allocate( V(3*n, maxit), r(3*n), Kv(3*n), alpha(maxit), beta(maxit) )
+    alpha = 0.0
+    beta = 0.0
+    ok = .false.
+    lambda = 0.0
+    n_iter = 0
+
+    !Start vector: the one handed over, projected onto the tangent space and normalised, plus a
+    !random tangent vector of weight admix so that every mode is represented - Lanczos only finds
+    !the lowest eigenvalue if the start vector has a component along its eigenvector, and the
+    !eigenvector of a neighbouring state need not have one when the state has changed much.
+    r = u
+    call projectTangent( m, r, n )
+    nrm = sqrt( wdot( r, r ) )
+    if ( nrm .gt. 1.0e-3 ) then
+        r = r / nrm
+    else
+        r = 0.0
+    endif
+    call random_number( Kv )
+    Kv = 2.0 * Kv - 1.0
+    call projectTangent( m, Kv, n )
+    nrm = sqrt( wdot( Kv, Kv ) )
+    if ( nrm .gt. tiny(1.0) ) r = r + max( admix, merge( 1.0, 0.0, sum(r**2) .eq. 0.0 ) ) * Kv / nrm
+    nrm = sqrt( wdot( r, r ) )
+    u = 0.0
+    lambda_prev = huge(1.0)
+    if ( nrm .le. tiny(1.0) ) then
+        deallocate( V, r, Kv, alpha, beta )
+        return
+    endif
+    V(:,1) = r / nrm
+
+    do j = 1, maxit
+        call hessianProduct( heff, m, g0, V(:,j), n, Kv )
+        alpha(j) = wdot( V(:,j), Kv )
+        r = Kv - alpha(j) * V(:,j)
+        if ( j .gt. 1 ) r = r - beta(j-1) * V(:,j-1)
+        do i = 1, j
+            c = wdot( V(:,i), r )
+            r = r - c * V(:,i)
+        end do
+        call projectTangent( m, r, n )
+        beta(j) = sqrt( wdot( r, r ) )
+
+        !Lowest eigenpair of the tridiagonal T_j
+        allocate( T(j,j), Z(j,j), ev(j) )
+        T = 0.0
+        do i = 1, j
+            T(i,i) = alpha(i)
+            if ( i .lt. j ) then
+                T(i,i+1) = beta(i)
+                T(i+1,i) = beta(i)
+            endif
+        end do
+        call jacobiEigen( T, j, ev, Z )
+        jmin = minloc( ev, 1 )
+        lambda = ev(jmin)
+        resid = beta(j) * abs( Z(j,jmin) )
+        n_iter = j
+        if ( eig_debug ) then
+            write(prog_str,'(A,I4,A,ES12.4,A,ES12.4,A,ES12.4)') 'Lanczos ', j, ' lambda/H ', lambda / H_scale, ' resid/H ', resid / H_scale, ' beta/H ', beta(j) / H_scale
+            call callback( trim(prog_str), -1 )
+        endif
+        !Bauer-Fike: the true eigenvalue lies within resid of the Ritz value, so this bounds the
+        !relative error of lambda by eig_tol, with an absolute floor near lambda = 0. The Krylov
+        !space is exhausted when beta vanishes (a single vector has only two tangent directions).
+        !At least minit steps, and the lowest Ritz value must have stopped falling (it decreases
+        !monotonically with j), so that a start vector that happens to be an eigenvector of a
+        !higher mode is not accepted on its own residual.
+        if ( ( j .ge. minit .and. resid .lt. eig_tol * max( abs(lambda), 1.0e-2 * H_scale ) .and. &
+               lambda_prev - lambda .lt. eig_tol * max( abs(lambda), 1.0e-2 * H_scale ) ) .or. &
+             beta(j) .le. 1.0e-12 * max( H_scale, abs(lambda) ) ) ok = .true.
+        lambda_prev = lambda
+        if ( ok .or. j .eq. maxit ) then
+            !Ritz vector of the lowest eigenvalue
+            u = 0.0
+            do i = 1, j
+                u = u + Z(i,jmin) * V(:,i)
+            end do
+            call projectTangent( m, u, n )
+            deallocate( T, Z, ev )
+            exit
+        endif
+        deallocate( T, Z, ev )
+        V(:,j+1) = r / beta(j)
+    end do
+    deallocate( V, r, Kv, alpha, beta )
+
+    contains
+
+        !> Inner product weighted per vector with w
+        real function wdot( a, b )
+        real,dimension(:),intent(in) :: a, b
+        wdot = sum( w * ( a(1:n) * b(1:n) + a(n+1:2*n) * b(n+1:2*n) + a(2*n+1:3*n) * b(2*n+1:3*n) ) )
+        end function wdot
+
+    end subroutine lowestEigenpair
+
+    !>-----------------------------------------
+    !> Eigenvalues ev and eigenvectors (the columns of Z) of the symmetric matrix A by cyclic Jacobi
+    !> rotations. A is destroyed. Meant for the small Lanczos tridiagonal, not for large matrices.
+    !>-----------------------------------------
+    subroutine jacobiEigen( A, n, ev, Z )
+    integer,intent(in) :: n
+    real,dimension(n,n),intent(inout) :: A
+    real,dimension(n),intent(out) :: ev
+    real,dimension(n,n),intent(out) :: Z
+    integer :: sweep, p, q, k
+    real :: off, diag, theta, t, c, s, tau, apq, app, aqq, akp, akq, zkp, zkq
+
+    Z = 0.0
+    do k = 1, n
+        Z(k,k) = 1.0
+    end do
+    do sweep = 1, 100
+        off = 0.0
+        diag = 0.0
+        do p = 1, n
+            diag = diag + A(p,p)**2
+            do q = p+1, n
+                off = off + A(p,q)**2
+            end do
+        end do
+        if ( off .le. 1.0e-30 * max( diag, tiny(1.0) ) ) exit
+        do p = 1, n-1
+            do q = p+1, n
+                apq = A(p,q)
+                if ( abs(apq) .le. tiny(1.0) ) cycle
+                theta = ( A(q,q) - A(p,p) ) / ( 2.0 * apq )
+                t = sign( 1.0, theta ) / ( abs(theta) + sqrt( theta**2 + 1.0 ) )
+                c = 1.0 / sqrt( t**2 + 1.0 )
+                s = t * c
+                tau = s / ( 1.0 + c )
+                app = A(p,p)
+                aqq = A(q,q)
+                A(p,p) = app - t * apq
+                A(q,q) = aqq + t * apq
+                A(p,q) = 0.0
+                A(q,p) = 0.0
+                do k = 1, n
+                    if ( k .ne. p .and. k .ne. q ) then
+                        akp = A(k,p)
+                        akq = A(k,q)
+                        A(k,p) = akp - s * ( akq + tau * akp )
+                        A(k,q) = akq + s * ( akp - tau * akq )
+                        A(p,k) = A(k,p)
+                        A(q,k) = A(k,q)
+                    endif
+                    zkp = Z(k,p)
+                    zkq = Z(k,q)
+                    Z(k,p) = zkp - s * ( zkq + tau * zkp )
+                    Z(k,q) = zkq + s * ( zkp - tau * zkq )
+                end do
+            end do
+        end do
+    end do
+    do k = 1, n
+        ev(k) = A(k,k)
+    end do
+    end subroutine jacobiEigen
 
     !>-----------------------------------------
     !> Rotates every vector by a random angle of the order of pert [rad] and renormalizes. Uses the

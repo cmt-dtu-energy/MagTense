@@ -219,7 +219,7 @@ constructor arguments are plain attributes and are listed there as well.
         min_maxiter: int = 10000,
         min_maxrot: float = 0.3,
         min_fallback: bool = True,
-        min_saddle_check: bool = True,
+        min_saddle_check: bool | int = True,
         min_predictor: bool = False,
     ) -> None
 

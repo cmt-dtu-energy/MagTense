@@ -173,7 +173,7 @@ include "mkl_dfti.f90"
         integer  :: min_maxiter = 10000                   !> Maximum number of minimizer iterations per applied field
         real(DP) :: min_maxrot = 0.3_DP                   !> Largest rotation of any cell in one iteration [rad]
         integer  :: min_fallback = 1                      !> 1: fall back to LL time integration if the minimizer stalls, 0: give up
-        integer  :: min_saddle_check = 1                  !> 1: nudge a converged state and relax again to make sure it is a minimum, 0: accept it as it is
+        integer  :: min_saddle_check = 1                  !> 0: accept a converged state as it is, 1: nudge it and relax again, 2: lowest Hessian eigenvalue by Lanczos (rigorous, and reported in min_eig)
         integer  :: min_predictor = 0                     !> 1: start each applied field from the secant extrapolation of the two previous equilibria, 0: from the previous equilibrium
         real(DP),dimension(:,:),allocatable :: alpha      !> A time dependent damping parameter, i.e. as a function of time. Size (nt,1).
         
@@ -317,6 +317,7 @@ include "mkl_dfti.f90"
         integer,dimension(:),allocatable :: min_iter        !> Minimizer iterations at each applied field (nt_Hext), 0 for the LL solver
         real(DP),dimension(:),allocatable :: min_torque     !> Final max_i |m_i x H_i| / max(Ms) at each applied field (nt_Hext)
         integer,dimension(:),allocatable :: min_status      !> -1 LL time integration, 0 minimizer converged, 1 converged after LL fallback, 2 not converged
+        real(DP),dimension(:),allocatable :: min_eig        !> Lowest Hessian eigenvalue of the returned state / max(Ms) at each applied field (min_saddle_check = 2), NaN otherwise
         
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         

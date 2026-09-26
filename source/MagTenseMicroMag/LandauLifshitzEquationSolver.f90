@@ -36,6 +36,7 @@
 #endif
 
     use trace_mod
+    use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
     implicit none          
 
     !>Module variables
@@ -53,11 +54,12 @@
     real(DP),dimension(3) :: pred_H1 = 0.0_DP, pred_H2 = 0.0_DP !>Applied fields of pred_m1 and pred_m2 [A/m]
     integer :: pred_n = 0                                       !>Filled history slots (0, 1 or 2)
     real(DP) :: pred_tau = 0.0_DP                               !>Last minimizer step length, the warm start of the next field (0: none)
+    real(DP),dimension(:),allocatable :: pred_u                 !>Lowest Hessian eigenvector of the previous field, the Lanczos start vector of the next
     real(DP),parameter :: pred_ratio_max = 2.0_DP               !>Largest field-step ratio the extrapolation is taken at
     real(DP),parameter :: pred_dm_max = 0.5_DP                  !>Largest per-cell displacement |dm| the extrapolation is taken at
 
     private :: gb_solution,gb_problem,crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2,gb_cellVol,n_feval_count
-    private :: pred_m1,pred_m2,pred_H1,pred_H2,pred_n,pred_tau,pred_ratio_max,pred_dm_max
+    private :: pred_m1,pred_m2,pred_H1,pred_H2,pred_n,pred_tau,pred_u,pred_ratio_max,pred_dm_max
 
     contains
     
@@ -394,12 +396,13 @@
     !Energies and relaxation diagnostics, one entry per applied field. min_status = -1 marks a field
     !relaxed by the Landau-Lifshitz time integration; the minimizer overwrites it.
     allocate( gb_solution%E_out(nt,nt_Hext,4), gb_solution%n_feval(nt_Hext), gb_solution%min_iter(nt_Hext), &
-              gb_solution%min_torque(nt_Hext), gb_solution%min_status(nt_Hext) )
+              gb_solution%min_torque(nt_Hext), gb_solution%min_status(nt_Hext), gb_solution%min_eig(nt_Hext) )
     gb_solution%E_out = 0.
     gb_solution%n_feval = 0
     gb_solution%min_iter = 0
     gb_solution%min_torque = 0.
     gb_solution%min_status = -1
+    gb_solution%min_eig = ieee_value( 1.0_DP, ieee_quiet_nan )
     !Allocate the arrays for the different fields
     !Only if these are to be returned are they saved at every time step
     if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
@@ -757,6 +760,7 @@
     subroutine predictorReset()
         pred_n = 0
         pred_tau = 0.0_DP
+        if ( allocated(pred_u) ) deallocate( pred_u )
     end subroutine predictorReset
 
     !> Records the converged equilibrium m at the applied field H (status 0 or 1); anything else
@@ -1145,6 +1149,14 @@
     settings%maxrot = gb_problem%min_maxrot
     settings%fallback = gb_problem%min_fallback
     settings%saddle_check = gb_problem%min_saddle_check
+    !The eigenvalue check needs the weight of every cell in the energy, Ms_i V_i, to make the
+    !Hessian self-adjoint in its inner product
+    if ( gb_problem%min_saddle_check .eq. 2 ) then
+        settings%weights = gb_problem%Ms * gb_cellVol
+        !The soft mode changes little between neighbouring fields, so the eigenvector of the
+        !previous field is the Lanczos start vector (a random one otherwise)
+        if ( allocated(pred_u) ) settings%eig_start = pred_u
+    endif
     settings%H_scale = Ms_max
     settings%E_scale = 0.5_DP * mu0 * Ms_max**2 * sum( gb_cellVol )
     settings%display_every = max( 1, gb_problem%setTimeDisplay ) * 10
@@ -1167,6 +1179,14 @@
     gb_solution%min_iter(i_field) = gb_solution%min_iter(i_field) + result%n_iter
     gb_solution%min_torque(i_field) = result%torque
     gb_solution%min_status(i_field) = result%status
+    if ( gb_problem%min_saddle_check .eq. 2 ) then
+        gb_solution%min_eig(i_field) = result%eig_min
+        if ( result%status .le. 1 .and. allocated(result%eig_vec) ) then
+            pred_u = result%eig_vec
+        else if ( allocated(pred_u) ) then
+            deallocate( pred_u )
+        endif
+    endif
     if ( result%status .le. 1 ) then
         pred_tau = result%tau_last
     else
@@ -3263,7 +3283,23 @@ end subroutine updateDemagfieldFMM
                 descr%diag = SPARSE_DIAG_NON_UNIT
                 stat = mkl_sparse_copy ( d2dz2%A, descr, A )
             else
-                !no exchange terms
+                !No exchange terms: a single cell along every direction, i.e. a macrospin. The rest of
+                !the code (and the deallocation below) expects an exchange operator, so build one
+                !with an explicit zero on every diagonal. This used to fall through with d2dz2
+                !unallocated and die in the deallocate.
+                call displayGUIMessage( 'No exchange terms (single cell)' )
+                allocate(d2dz2%values(ntot),d2dz2%cols(ntot),d2dz2%rows_start(ntot),d2dz2%rows_end(ntot))
+                do i = 1, ntot
+                    d2dz2%values(i) = 0.0_DP
+                    d2dz2%cols(i) = i
+                    d2dz2%rows_start(i) = i
+                    d2dz2%rows_end(i) = i + 1
+                end do
+                stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, ntot, ntot, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
+                descr%type = SPARSE_MATRIX_TYPE_GENERAL
+                descr%mode = SPARSE_FILL_MODE_FULL
+                descr%diag = SPARSE_DIAG_NON_UNIT
+                stat = mkl_sparse_copy ( d2dz2%A, descr, A )
             endif
             deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
             stat = mkl_sparse_destroy (d2dz2%A)

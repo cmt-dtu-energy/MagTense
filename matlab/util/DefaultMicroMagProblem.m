@@ -241,12 +241,15 @@ properties
     %min_maxrot: largest rotation of any cell in one iteration [rad]. min_fallback: 1 to
     %fall back to the Landau-Lifshitz time integration when the minimizer stalls, 0 to
     %give up. min_saddle: 1 to nudge a converged state and relax again, so that a saddle
-    %point (which a symmetric starting state sits on) is not mistaken for a minimum, 0 to
-    %accept the state as it is. min_pred: 1 to start the minimizer at each applied field
+    %point (which a symmetric starting state sits on) is not mistaken for a minimum, 2 to
+    %compute the lowest eigenvalue of the energy Hessian instead (returned as min_eig,
+    %negative means saddle, in which case the state is pushed along the eigenvector and
+    %relaxed again), 0 to accept the state as it is. min_pred: 1 to start the minimizer at each applied field
     %from the secant extrapolation of the two previous equilibria and with the step length
     %the previous field ended with (free, skipped across a switching event), 0 to start
     %from the previous equilibrium. The solution struct
-    %returns E (energies), n_feval, min_iter, min_torque and min_status, see the TechManual.
+    %returns E (energies), n_feval, min_iter, min_torque, min_status and min_eig, see the
+    %TechManual.
     min_tol
     min_maxiter
     min_maxrot

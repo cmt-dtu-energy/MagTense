@@ -109,9 +109,13 @@ class MicromagProblem:
         min_maxrot: Largest rotation of any cell in one minimizer iteration [rad].
         min_fallback: If True, a minimizer that stalls or hits min_maxiter falls back to the
             Landau-Lifshitz time integration over the requested time window and restarts.
-        min_saddle_check: If True (default), a converged state is nudged by a small random
+        min_saddle_check: 1 or True (default): a converged state is nudged by a small random
             rotation and relaxed again, so that a saddle point - which a symmetric starting
             state such as the canonical vortex sits on - is not mistaken for a minimum.
+            2: the lowest eigenvalue of the energy Hessian is computed instead (Lanczos with
+            matrix-free products, one field evaluation each); a negative value marks a saddle
+            and the state is pushed along the eigenvector and relaxed again. The eigenvalue is
+            returned in min_eig. 0 or False: the converged state is accepted as it is.
         min_predictor: If True, the minimizer at each applied field starts from the secant
             extrapolation of the two previous equilibria instead of from the previous one, and
             takes its first step with the step length the previous field ended with. Costs
@@ -124,6 +128,8 @@ class MicromagProblem:
         n_feval: (nt_h_ext,) number of effective-field evaluations spent relaxing at each field.
         min_iter: (nt_h_ext,) minimizer iterations at each field (0 for the LL solver).
         min_torque: (nt_h_ext,) final max_i |m_i x H_i| / max(Ms) at each field.
+        min_eig: (nt_h_ext,) lowest Hessian eigenvalue of the returned state divided by max(Ms),
+            when min_saddle_check = 2 (positive: minimum), NaN otherwise.
         min_status: (nt_h_ext,) -1 LL time integration, 0 minimizer converged, 1 converged after
             an LL fallback, 2 not converged.
     """
@@ -196,7 +202,7 @@ class MicromagProblem:
             min_maxiter: int = 10000,
             min_maxrot: float = 0.3,
             min_fallback: bool = True,
-            min_saddle_check: bool = True,
+            min_saddle_check: bool | int = True,
             min_predictor: bool = False,
     ) -> None:
         ntot = np.prod(res)
@@ -337,7 +343,9 @@ class MicromagProblem:
         self.min_maxiter = int(min_maxiter)
         self.min_maxrot = float(min_maxrot)
         self.min_fallback = int(bool(min_fallback))
-        self.min_saddle_check = int(bool(min_saddle_check))
+        self.min_saddle_check = int(min_saddle_check)
+        if self.min_saddle_check not in (0, 1, 2):
+            raise ValueError("min_saddle_check must be 0 (off), 1 (nudge) or 2 (Hessian eigenvalue)")
         self.min_predictor = int(bool(min_predictor))
 
         # Energies and relaxation diagnostics of the last run, see the class docstring
@@ -346,6 +354,7 @@ class MicromagProblem:
         self.min_iter = None
         self.min_torque = None
         self.min_status = None
+        self.min_eig = None
 
         self.usedemag = int(usedemag)
         self.useavgn = int(useavgn)
@@ -806,13 +815,14 @@ class MicromagProblem:
         return self._solver
 
     def _store_diagnostics(self, result: list, n_accepted: int | None = None) -> None:
-        """Pop the five trailing diagnostics off a Fortran result list onto the problem.
+        """Pop the six trailing diagnostics off a Fortran result list onto the problem.
 
-        The Fortran entry point returns E_out, n_feval, min_iter, min_torque and min_status after
+        The Fortran entry point returns E_out, n_feval, min_iter, min_torque, min_status and min_eig after
         the historical outputs. They are kept off the returned list so that its layout, which
         callers index by position, does not change. For an adaptive run only the accepted field
         steps are kept.
         """
+        min_eig = np.asarray(result.pop())
         min_status = np.asarray(result.pop())
         min_torque = np.asarray(result.pop())
         min_iter = np.asarray(result.pop())
@@ -824,11 +834,13 @@ class MicromagProblem:
             min_iter = min_iter[:n_accepted]
             min_torque = min_torque[:n_accepted]
             min_status = min_status[:n_accepted]
+            min_eig = min_eig[:n_accepted]
         self.E_out = E_out
         self.n_feval = n_feval
         self.min_iter = min_iter
         self.min_torque = min_torque
         self.min_status = min_status
+        self.min_eig = min_eig
 
     @property
     def hysteresis_solver(self) -> int:

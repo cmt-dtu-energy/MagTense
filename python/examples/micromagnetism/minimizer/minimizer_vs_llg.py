@@ -106,14 +106,14 @@ def single_grain(solver: str, cuda: bool, n: int = 5, tilt_deg: float = 3.0, pre
         n_fallback=int(np.sum(problem.min_status == 1)),
         n_fail=int(np.sum(problem.min_status == 2)),
         E_total=problem.E_out[-1, :n_acc, :].sum(axis=1),
-        H_T=MU0 * H, m=m,
+        H_T=MU0 * H, m=m, eig=np.asarray(problem.min_eig[:n_acc]),
     )
 
 
 # ----------------------------------------------------------------------------------------------
 # 2. Standard problem 3 at one cube size
 # ----------------------------------------------------------------------------------------------
-def std_problem_3(solver: str, cuda: bool, res: int = 10, L_lex: float = 8.5) -> dict:
+def std_problem_3(solver: str, cuda: bool, res: int = 10, L_lex: float = 8.5, saddle_check: int = 1) -> dict:
     A0 = 1.74532925199e-10
     Ms = 1e6
     K0 = 0.1 * 0.5 * MU0 * Ms**2
@@ -130,6 +130,7 @@ def std_problem_3(solver: str, cuda: bool, res: int = 10, L_lex: float = 8.5) ->
             alpha=1e3, gamma=0.0,
             cuda=cuda,
             usereturnhall=False,
+            min_saddle_check=saddle_check,
         )
         problem.u_ea[:, 2] = 1
         quiet(problem)
@@ -164,7 +165,7 @@ def std_problem_3(solver: str, cuda: bool, res: int = 10, L_lex: float = 8.5) ->
         out[state] = dict(
             E_red=E, E_tot=E.sum(), n_feval=int(problem.n_feval.sum()), wall=wall,
             iters=int(problem.min_iter.sum()), status=int(problem.min_status[0]),
-            torque=float(problem.min_torque[0]),
+            torque=float(problem.min_torque[0]), eig=float(problem.min_eig[0]),
         )
     return out
 

@@ -687,7 +687,7 @@ end subroutine getHFromTilesFMM
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useFMM, &
         log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, timer_enabled, useDemag, rng_seed, &
         n_phase, phase_id, A_int, &
-        E_out, n_feval, min_iter, min_torque, min_status )
+        E_out, n_feval, min_iter, min_torque, min_status, min_eig )
 
         !nt_Hext is the number of rows in the Hext array; nt_Hext_out is the third extent of the
         !returned M and H arrays. There used to be a third, n_Hext, which was accepted and declared
@@ -746,7 +746,7 @@ end subroutine getHFromTilesFMM
         !> after an LL fallback, 2 not converged)
         real(8),dimension(nt,nt_Hext_out,4),intent(out) :: E_out
         integer(4),dimension(nt_Hext_out),intent(out) :: n_feval, min_iter, min_status
-        real(8),dimension(nt_Hext_out),intent(out) :: min_torque
+        real(8),dimension(nt_Hext_out),intent(out) :: min_torque, min_eig
         integer :: n_copy
 		
 		integer,intent(out) :: n_tot_Exch
@@ -853,12 +853,14 @@ end subroutine getHFromTilesFMM
         min_iter = 0
         min_torque = 0.
         min_status = 0
+        min_eig = 0.
         n_copy = min( size(solution%n_feval), nt_Hext_out )
         E_out(:,1:n_copy,:) = solution%E_out(:,1:n_copy,:)
         n_feval(1:n_copy) = solution%n_feval(1:n_copy)
         min_iter(1:n_copy) = solution%min_iter(1:n_copy)
         min_torque(1:n_copy) = solution%min_torque(1:n_copy)
         min_status(1:n_copy) = solution%min_status(1:n_copy)
+        min_eig(1:n_copy) = solution%min_eig(1:n_copy)
 
 
         t_out = solution%t_out
@@ -933,6 +935,7 @@ end subroutine getHFromTilesFMM
         min_iter = 0
         min_torque = 0.
         min_status = 0
+        min_eig = 0.
 #endif
 
 
