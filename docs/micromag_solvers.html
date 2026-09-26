@@ -127,21 +127,27 @@ time-varying applied field. The field is linearly interpolated from the
 tabulated values at the requested time.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Explicit</span></code></p></td>
-<td><p>1</p></td>
+<td><p>3</p></td>
 <td><p>Treats every row of the applied-field table as a separate, <em>constant</em>
 field and relaxes the magnetization to equilibrium for each of them in
 turn, starting from the state reached at the previous field. This is the
-quasi-static mode used for hysteresis loops.</p></td>
+quasi-static mode used for hysteresis loops. The equilibrium is found
+with the <a class="reference internal" href="#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a>. The minimizer cannot include the
+thermal field, so a finite temperature in any cell is an error, raised
+just before the Fortran call with a message pointing to <code class="docutils literal notranslate"><span class="pre">ExplicitLL</span></code>.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Minimizer</span></code></p></td>
-<td><p>3</p></td>
-<td><p>Reads the applied-field table exactly as <code class="docutils literal notranslate"><span class="pre">Explicit</span></code> does, one constant
-field per row, but finds the equilibrium at each field with the
-<a class="reference internal" href="#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a> instead of integrating the Landau-Lifshitz
-equation in time. <code class="docutils literal notranslate"><span class="pre">Implicit</span></code> is accepted as the old name of this slot.</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ExplicitLL</span></code></p></td>
+<td><p>1</p></td>
+<td><p>Reads the applied-field table as <code class="docutils literal notranslate"><span class="pre">Explicit</span></code> does, but finds the
+equilibrium at each field by integrating the Landau-Lifshitz equation in
+time. This is what <code class="docutils literal notranslate"><span class="pre">Explicit</span></code> did before the minimizer became its
+default, and the choice for thermal runs. Python
+<code class="docutils literal notranslate"><span class="pre">solver=&quot;explicit_ll&quot;</span></code>.</p></td>
 </tr>
 </tbody>
 </table>
+<p>The names <code class="docutils literal notranslate"><span class="pre">Minimizer</span></code> and <code class="docutils literal notranslate"><span class="pre">Implicit</span></code> are no longer accepted; use
+<code class="docutils literal notranslate"><span class="pre">Explicit</span></code>.</p>
 <p><code class="docutils literal notranslate"><span class="pre">ProblemMod</span></code> (Python <code class="docutils literal notranslate"><span class="pre">prob_mode</span></code>) selects <code class="docutils literal notranslate"><span class="pre">new</span></code> (1) or <code class="docutils literal notranslate"><span class="pre">old</span></code> (2). Use
 <code class="docutils literal notranslate"><span class="pre">new</span></code>, which is the default; <code class="docutils literal notranslate"><span class="pre">old</span></code> skips the allocation of the solution
 arrays and only makes sense for continuing a solution inside the same process.</p>
@@ -173,11 +179,12 @@ uniformly spaced times between 0 and <code class="docutils literal notranslate">
 </pre></div>
 </div>
 <p>The field function must return an <code class="docutils literal notranslate"><span class="pre">(nt_h_ext,</span> <span class="pre">3)</span></code> array.</p>
-<p>For the <strong>explicit</strong> solver the same table is read differently: the time column
-is ignored and each row is one constant field to relax at. <code class="docutils literal notranslate"><span class="pre">nt_h_ext</span></code> is
-therefore the number of points on the hysteresis curve, and <code class="docutils literal notranslate"><span class="pre">t_end</span></code>/<code class="docutils literal notranslate"><span class="pre">nt</span></code>
-only control how long each relaxation is integrated and how densely the hysteresis curve is
-sampled.</p>
+<p>For the <strong>explicit</strong> solvers (<code class="docutils literal notranslate"><span class="pre">Explicit</span></code> and <code class="docutils literal notranslate"><span class="pre">ExplicitLL</span></code>)
+the same table is read differently: the time column is ignored and each row is
+one constant field to relax at. <code class="docutils literal notranslate"><span class="pre">nt_h_ext</span></code> is therefore the number of points
+on the hysteresis curve, and <code class="docutils literal notranslate"><span class="pre">t_end</span></code>/<code class="docutils literal notranslate"><span class="pre">nt</span></code> only control how long each
+relaxation is integrated (for the minimizer, only when it falls back to the
+time integration) and how densely the hysteresis curve is sampled.</p>
 <p><code class="docutils literal notranslate"><span class="pre">setTimeDis</span></code> (Python <code class="docutils literal notranslate"><span class="pre">setTimeDis</span></code>, default 10) controls how often the
 solver reports progress: a message is printed every <code class="docutils literal notranslate"><span class="pre">setTimeDis</span></code>’th
 integration step.</p>
@@ -246,7 +253,7 @@ matters for the thermal field because it is redrawn once per grid time, see
 specifically want to add integration times.</p>
 <section id="energy-minimizer">
 <h3>Energy minimizer<a class="headerlink" href="#energy-minimizer" title="Link to this heading"></a></h3>
-<p>With <code class="docutils literal notranslate"><span class="pre">solver</span> <span class="pre">=</span> <span class="pre">Minimizer</span></code> (Python <code class="docutils literal notranslate"><span class="pre">solver=&quot;minimizer&quot;</span></code>) the equilibrium at
+<p>With <code class="docutils literal notranslate"><span class="pre">solver</span> <span class="pre">=</span> <span class="pre">Explicit</span></code> (Python <code class="docutils literal notranslate"><span class="pre">solver=&quot;explicit&quot;</span></code>) the equilibrium at
 each constant applied field is found by minimizing the energy directly rather
 than by integrating the Landau-Lifshitz equation with a large damping. The
 method is steepest descent on the unit sphere with Barzilai-Borwein step
@@ -284,14 +291,31 @@ through a switching event, where the state sits near a saddle point.</p>
 starting state sits on one: the canonical vortex of standard problem 3, or a
 magnetization exactly antiparallel to the applied field. Steepest descent
 converges onto such a point, whereas the time integration only leaves it
-through rounding noise, slowly. With <code class="docutils literal notranslate"><span class="pre">min_saddle_check</span></code> set, which is the
-default, a converged state is therefore nudged by a random tilt of about half
+through rounding noise, slowly. With <code class="docutils literal notranslate"><span class="pre">min_saddle_check</span> <span class="pre">=</span> <span class="pre">1</span></code>, a converged
+state is therefore nudged by a random tilt of about half
 a degree, common to all cells with a smaller independent part per cell, and
 relaxed again for up to a hundred iterations. A minimum keeps the energy above
 the unperturbed value throughout and is returned unperturbed; a saddle lets the
 energy fall below it, at which point the descent continues to the lower
 minimum, which is then checked in the same way, up to three times. The check
 costs up to a hundred field evaluations per applied field.</p>
+<p>With <code class="docutils literal notranslate"><span class="pre">min_saddle_check</span> <span class="pre">=</span> <span class="pre">2</span></code>, the default, the question is answered rigorously
+instead: the
+lowest eigenvalue of the energy Hessian in the tangent space of the converged
+state is computed by the Lanczos iteration, each step costing one field
+evaluation, since the Hessian applied to a tangent displacement is the
+finite difference of the torque along it (the energy is quadratic in the
+magnetization, up to the anisotropy). The eigenvalue is returned in
+<code class="docutils literal notranslate"><span class="pre">min_eig</span></code> in units of the largest saturation magnetization: positive means a
+minimum, negative a saddle, in which case the state is pushed along the
+eigenvector, which is the direction of steepest descent out of the saddle,
+and relaxed again. Near a switching event the eigenvalue goes to zero, so it
+also tells how close a state is to switching. Along a field sweep the
+eigenvector of the previous field starts the iteration, which then converges
+in a handful of steps; a cold start takes a few tens. On a single-grain loop
+the check costs less than the random nudge, and it finds saddles that the
+nudge misses, such as the plain flower state of standard problem 3 near the
+flower-vortex transition, which relaxes to the lower twisted flower.</p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 18.0%" />
@@ -323,9 +347,18 @@ costs up to a hundred field evaluations per applied field.</p>
 up and report it (0).</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_saddle_check</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">2</span></code></p></td>
 <td><p>Nudge a converged state and relax again to make sure it is a minimum
-(1) or accept it as it is (0). Matlab: <code class="docutils literal notranslate"><span class="pre">min_saddle</span></code>.</p></td>
+(1), compute the lowest eigenvalue of the energy Hessian instead (2, see
+below) or accept the state as it is (0). Matlab: <code class="docutils literal notranslate"><span class="pre">min_saddle</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_predictor</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Start the minimizer at each applied field from the secant extrapolation
+of the two previous equilibria (1) instead of from the previous one (0),
+with the first step taken at the step length the previous field ended
+with. Costs no field evaluation; the extrapolation is skipped across a
+switching event. Matlab: <code class="docutils literal notranslate"><span class="pre">min_pred</span></code>.</p></td>
 </tr>
 </tbody>
 </table>
@@ -470,8 +503,9 @@ loop, as in the standard problem 2 example:</p>
 <span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTime</span><span class="p">(</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">40e-9</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
 </pre></div>
 </div>
-<p>Either the <code class="docutils literal notranslate"><span class="pre">Explicit</span></code> solver or the <code class="docutils literal notranslate"><span class="pre">Minimizer</span></code> can be used for the
-relaxation at each field; see <a class="reference internal" href="#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a> for the trade-off.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Explicit</span></code> relaxes at each field with the energy minimizer. Use
+<code class="docutils literal notranslate"><span class="pre">ExplicitLL</span></code> to integrate the Landau-Lifshitz equation instead; see
+<a class="reference internal" href="#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a> for the trade-off.</p>
 <p>In Python the dedicated method <code class="docutils literal notranslate"><span class="pre">run_hysteresis</span></code> takes the field table
 directly as an <code class="docutils literal notranslate"><span class="pre">(n,4)</span></code> array, and requires <code class="docutils literal notranslate"><span class="pre">hysteresis_solver='static'</span></code>,
 which is the default:</p>
@@ -492,11 +526,20 @@ step length itself, based on how much the volume-averaged magnetization moved.</
 <p>The whole accept/reject loop runs inside Fortran in a single call. It is
 available from Python through <code class="docutils literal notranslate"><span class="pre">run_hysteresis_adaptive</span></code> and requires
 <code class="docutils literal notranslate"><span class="pre">hysteresis_solver='adaptive'</span></code> together with <code class="docutils literal notranslate"><span class="pre">solver='explicit'</span></code> or
-<code class="docutils literal notranslate"><span class="pre">solver='minimizer'</span></code>. In Matlab
+<code class="docutils literal notranslate"><span class="pre">solver='explicit_ll'</span></code>. In Matlab
 the same parameters exist on the problem object (<code class="docutils literal notranslate"><span class="pre">adaptiveHext</span></code>,
 <code class="docutils literal notranslate"><span class="pre">maxHextSteps</span></code>, <code class="docutils literal notranslate"><span class="pre">H_start</span></code>, <code class="docutils literal notranslate"><span class="pre">H_end</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_initial</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_min</span></code>,
 <code class="docutils literal notranslate"><span class="pre">dH_max</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_grow</span></code>, <code class="docutils literal notranslate"><span class="pre">dH_shrink</span></code>, <code class="docutils literal notranslate"><span class="pre">dM_min</span></code>, <code class="docutils literal notranslate"><span class="pre">dM_target</span></code>,
 <code class="docutils literal notranslate"><span class="pre">dM_reject</span></code>, <code class="docutils literal notranslate"><span class="pre">switch_refdH</span></code>, <code class="docutils literal notranslate"><span class="pre">use_sw_ref</span></code>).</p>
+<p>The sweep first relaxes the starting state <code class="docutils literal notranslate"><span class="pre">m0</span></code> at <code class="docutils literal notranslate"><span class="pre">H_start</span></code> and stores
+the result as the first field state, so every entry of the output, including
+the first, is an equilibrium (and the first entry of <code class="docutils literal notranslate"><span class="pre">n_feval</span></code>,
+<code class="docutils literal notranslate"><span class="pre">min_iter</span></code>, <code class="docutils literal notranslate"><span class="pre">min_torque</span></code>, <code class="docutils literal notranslate"><span class="pre">min_status</span></code> and <code class="docutils literal notranslate"><span class="pre">min_eig</span></code> describes that relaxation).
+Every step is measured against the last accepted state, and measuring the
+first one against an <code class="docutils literal notranslate"><span class="pre">m0</span></code> far from equilibrium - for example <code class="docutils literal notranslate"><span class="pre">m0</span></code> along a
+field well away from the easy axis and below the anisotropy field - would make
+it look like a switch. There is therefore no need to relax <code class="docutils literal notranslate"><span class="pre">m0</span></code> in a
+separate solve before the sweep.</p>
 <p>The step metric is the length of the change of the cell-averaged reduced
 magnetization vector across the trial field step,</p>
 <div class="math notranslate nohighlight">
@@ -515,6 +558,21 @@ multiplied by <code class="docutils literal notranslate"><span class="pre">dH_gr
 magnetization <em>along the field direction</em> changes sign is rejected whenever
 <code class="docutils literal notranslate"><span class="pre">dH</span></code> exceeds <code class="docutils literal notranslate"><span class="pre">switch_refdH</span></code>. This forces fine sampling right at the
 switching field, which is what a coercivity calculation needs.</p></li>
+<li><p>Recovery from the floor: once <code class="docutils literal notranslate"><span class="pre">dH</span></code> has been driven down to <code class="docutils literal notranslate"><span class="pre">dH_min</span></code>
+(by rejections or by the <code class="docutils literal notranslate"><span class="pre">dM_target</span></code> rule, e.g. around a fast change of
+the magnetization) or to <code class="docutils literal notranslate"><span class="pre">switch_refdH</span></code> by the switch refinement, <code class="docutils literal notranslate"><span class="pre">dH</span></code>
+also grows by <code class="docutils literal notranslate"><span class="pre">dH_grow</span></code> after every accepted step with
+<span class="math notranslate nohighlight">\(\mathrm{d}M \le\)</span> <code class="docutils literal notranslate"><span class="pre">dM_target</span></code>, not only below <code class="docutils literal notranslate"><span class="pre">dM_min</span></code>. After a
+switch refinement this waits until the step across the sign change has
+been accepted. The first step above <code class="docutils literal notranslate"><span class="pre">dM_target</span></code> after <code class="docutils literal notranslate"><span class="pre">dH</span></code> has grown
+ends the recovery and divides <code class="docutils literal notranslate"><span class="pre">dH</span></code> by <code class="docutils literal notranslate"><span class="pre">dH_grow</span></code>, back to the last step
+length that stayed within <code class="docutils literal notranslate"><span class="pre">dM_target</span></code>, and the rules above take over
+again. Without it, a
+smooth stretch that follows would give a <span class="math notranslate nohighlight">\(\mathrm{d}M\)</span> between
+<code class="docutils literal notranslate"><span class="pre">dM_min</span></code> and <code class="docutils literal notranslate"><span class="pre">dM_target</span></code> at the floor and keep the rest of the sweep
+there: in a hard-axis loop that is about a thousand steps of <code class="docutils literal notranslate"><span class="pre">dH_min</span></code>.
+Until <code class="docutils literal notranslate"><span class="pre">dH</span></code> first reaches its floor the step control is exactly the rules
+above.</p></li>
 </ul>
 <p>At <code class="docutils literal notranslate"><span class="pre">dH_min</span></code> a large change is accepted rather than looping forever, and the
 solver says so in its progress output. Too many rejected steps in total aborts
@@ -561,11 +619,11 @@ the run.</p>
 <td><p>Above this change the step is rejected and retried.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dH_grow</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1.5</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.25</span></code></p></td>
 <td><p>Growth factor, must be larger than 1.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dH_shrink</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0.75</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.5</span></code></p></td>
 <td><p>Shrink factor, must be between 0 and 1.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">switch_refine_dH</span></code></p></td>
