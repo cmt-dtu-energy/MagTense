@@ -193,14 +193,32 @@ A vanishing torque is also what a saddle point looks like, and a symmetric
 starting state sits on one: the canonical vortex of standard problem 3, or a
 magnetization exactly antiparallel to the applied field. Steepest descent
 converges onto such a point, whereas the time integration only leaves it
-through rounding noise, slowly. With ``min_saddle_check`` set, which is the
-default, a converged state is therefore nudged by a random tilt of about half
+through rounding noise, slowly. With ``min_saddle_check = 1``, a converged
+state is therefore nudged by a random tilt of about half
 a degree, common to all cells with a smaller independent part per cell, and
 relaxed again for up to a hundred iterations. A minimum keeps the energy above
 the unperturbed value throughout and is returned unperturbed; a saddle lets the
 energy fall below it, at which point the descent continues to the lower
 minimum, which is then checked in the same way, up to three times. The check
 costs up to a hundred field evaluations per applied field.
+
+With ``min_saddle_check = 2``, the default, the question is answered rigorously
+instead: the
+lowest eigenvalue of the energy Hessian in the tangent space of the converged
+state is computed by the Lanczos iteration, each step costing one field
+evaluation, since the Hessian applied to a tangent displacement is the
+finite difference of the torque along it (the energy is quadratic in the
+magnetization, up to the anisotropy). The eigenvalue is returned in
+``min_eig`` in units of the largest saturation magnetization: positive means a
+minimum, negative a saddle, in which case the state is pushed along the
+eigenvector, which is the direction of steepest descent out of the saddle,
+and relaxed again. Near a switching event the eigenvalue goes to zero, so it
+also tells how close a state is to switching. Along a field sweep the
+eigenvector of the previous field starts the iteration, which then converges
+in a handful of steps; a cold start takes a few tens. On a single-grain loop
+the check costs less than the random nudge, and it finds saddles that the
+nudge misses, such as the plain flower state of standard problem 3 near the
+flower-vortex transition, which relaxes to the lower twisted flower.
 
 .. list-table::
    :widths: 18 12 70
@@ -223,9 +241,17 @@ costs up to a hundred field evaluations per applied field.
      - Fall back to the time integration when the minimizer stalls (1) or give
        up and report it (0).
    * - ``min_saddle_check``
-     - ``1``
+     - ``2``
      - Nudge a converged state and relax again to make sure it is a minimum
-       (1) or accept it as it is (0). Matlab: ``min_saddle``.
+       (1), compute the lowest eigenvalue of the energy Hessian instead (2, see
+       below) or accept the state as it is (0). Matlab: ``min_saddle``.
+   * - ``min_predictor``
+     - ``1``
+     - Start the minimizer at each applied field from the secant extrapolation
+       of the two previous equilibria (1) instead of from the previous one (0),
+       with the first step taken at the step length the previous field ended
+       with. Costs no field evaluation; the extrapolation is skipped across a
+       switching event. Matlab: ``min_pred``.
 
 The minimizer works with every grid type, with CUDA and with FMM, because it
 calls the same field routines as the time integration. It cannot be combined
@@ -387,7 +413,7 @@ the same parameters exist on the problem object (``adaptiveHext``,
 The sweep first relaxes the starting state ``m0`` at ``H_start`` and stores
 the result as the first field state, so every entry of the output, including
 the first, is an equilibrium (and the first entry of ``n_feval``,
-``min_iter``, ``min_torque`` and ``min_status`` describes that relaxation).
+``min_iter``, ``min_torque``, ``min_status`` and ``min_eig`` describes that relaxation).
 Every step is measured against the last accepted state, and measuring the
 first one against an ``m0`` far from equilibrium - for example ``m0`` along a
 field well away from the easy axis and below the anisotropy field - would make

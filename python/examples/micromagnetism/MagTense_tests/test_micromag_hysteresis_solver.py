@@ -42,9 +42,9 @@ def _problem(hysteresis_solver: str = "static") -> MicromagProblem:
 def _fortran_result(n_fields: int, n_accepted: int) -> list:
     """Build a recognizable result in the unified f2py output order.
 
-    ``RunMicroMagSimulation`` returns 19 values. Index 7 is the accepted-field
+    ``RunMicroMagSimulation`` returns 20 values. Index 7 is the accepted-field
     count, indices 8-13 contain the exchange-matrix data that historically started
-    at index 7 for static simulations, and indices 14-18 are the energies and the
+    at index 7 for static simulations, and indices 14-19 are the energies and the
     relaxation diagnostics, which the wrapper moves onto the problem object.
     """
     field_shape = (2, 1, n_fields, 3)
@@ -68,6 +68,7 @@ def _fortran_result(n_fields: int, n_accepted: int) -> list:
         np.arange(n_fields) + 200,                # minimizer iterations
         np.full(n_fields, 1e-6),                  # final torque
         np.full(n_fields, -1),                    # status
+        np.full(n_fields, 0.5),                   # lowest Hessian eigenvalue
     ]
 
 
@@ -102,7 +103,8 @@ class HysteresisSolverTests(unittest.TestCase):
         self.assertEqual(captured["min_maxiter"], 10000)
         self.assertEqual(captured["min_maxrot"], 0.3)
         self.assertEqual(captured["min_fallback"], 1)
-        self.assertEqual(captured["min_saddle_check"], 1)
+        self.assertEqual(captured["min_saddle_check"], 2)
+        self.assertEqual(captured["min_predictor"], 1)
         np.testing.assert_array_equal(captured["hext"], h_ext)
         self.assertEqual(captured["nt_hext_out"], 3)
         self.assertEqual(captured["maxhextsteps"], 0)
@@ -190,18 +192,23 @@ class HysteresisSolverTests(unittest.TestCase):
         self.assertEqual(problem.E_out.shape, (2, 2, 4))
         np.testing.assert_array_equal(problem.n_feval, [100, 101])
         np.testing.assert_array_equal(problem.min_torque, [1e-6, 1e-6])
+        np.testing.assert_array_equal(problem.min_eig, [0.5, 0.5])
 
     def test_minimizer_settings_are_stored(self) -> None:
         """The minimizer settings land on the problem as given."""
         problem = MicromagProblem(
             res=[1, 1, 1], solver="explicit", min_tol=2e-6, min_maxiter=50,
-            min_maxrot=0.1, min_fallback=False, min_saddle_check=False,
+            min_maxrot=0.1, min_fallback=False, min_saddle_check=False, min_predictor=True,
         )
         self.assertEqual(problem.min_tol, 2e-6)
         self.assertEqual(problem.min_maxiter, 50)
         self.assertEqual(problem.min_maxrot, 0.1)
         self.assertEqual(problem.min_fallback, 0)
         self.assertEqual(problem.min_saddle_check, 0)
+        self.assertEqual(problem.min_predictor, 1)
+        self.assertEqual(MicromagProblem(res=[1, 1, 1], min_saddle_check=2).min_saddle_check, 2)
+        with self.assertRaises(ValueError):
+            MicromagProblem(res=[1, 1, 1], min_saddle_check=3)
 
     def test_explicit_uses_the_minimizer(self) -> None:
         """'explicit' relaxes with the minimizer, 'explicit_ll' with the LL integration."""

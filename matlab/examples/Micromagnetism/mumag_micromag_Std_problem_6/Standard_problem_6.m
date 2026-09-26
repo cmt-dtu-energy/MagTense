@@ -267,6 +267,12 @@ if options.use_minimizer
     H = mu0*squeeze(solution.H_ext(end,1,:,dim));
     disp(['   Minimizer: ' num2str(sum(solution.n_feval)) ' field evaluations, ' num2str(sum(solution.min_iter)) ...
           ' iterations, ' num2str(sum(solution.min_status == 2)) ' fields not converged'])
+    if isfield(solution, 'min_eig') && any(isfinite(solution.min_eig))
+        %--- Lowest Hessian eigenvalue of every equilibrium (min_saddle = 2), relative to max(Ms):
+        %--- positive is a minimum, and it approaches zero towards a depinning event
+        disp(['   Lowest Hessian eigenvalue / Ms over the fields: min ' num2str(min(solution.min_eig), '%.4f') ...
+              ', max ' num2str(max(solution.min_eig), '%.4f')])
+    end
 else
     H = mu0*solution.H_ext(:,1,1,dim);
     disp(['   LL time ramp: ' num2str(sum(solution.n_feval)) ' field evaluations'])

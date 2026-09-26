@@ -682,12 +682,12 @@ end subroutine getHFromTilesFMM
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
         n_macro, shiftVec, macroShape, sampleShape, exchPBC, hysteresis_solver, &
         H_start, H_end, dH_initial, dH_min, dH_max, maxHextSteps, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH, use_switch_refine, &
-        min_tol, min_maxiter, min_maxrot, min_fallback, min_saddle_check, &
+        min_tol, min_maxiter, min_maxrot, min_fallback, min_saddle_check, min_predictor, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, n_Hext_accepted, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useFMM, &
         log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, timer_enabled, useDemag, rng_seed, &
         n_phase, phase_id, A_int, &
-        E_out, n_feval, min_iter, min_torque, min_status )
+        E_out, n_feval, min_iter, min_torque, min_status, min_eig )
 
         !nt_Hext is the number of rows in the Hext array; nt_Hext_out is the third extent of the
         !returned M and H arrays. There used to be a third, n_Hext, which was accepted and declared
@@ -703,7 +703,7 @@ end subroutine getHFromTilesFMM
         integer(4),intent(in) :: hysteresis_solver, maxHextSteps, use_switch_refine
         !> Energy minimizer settings (solver = 3), see MicroMagProblem
         real(8),intent(in) :: min_tol, min_maxrot
-        integer(4),intent(in) :: min_maxiter, min_fallback, min_saddle_check
+        integer(4),intent(in) :: min_maxiter, min_fallback, min_saddle_check, min_predictor
         real(8),dimension(ntot,3),intent(in) :: grid_pts
         integer(4),dimension(4,ntot),intent(in) :: grid_ele
         real(8),dimension(grid_nnod,3),intent(in) :: grid_nod
@@ -746,7 +746,7 @@ end subroutine getHFromTilesFMM
         !> after an LL fallback, 2 not converged)
         real(8),dimension(nt,nt_Hext_out,4),intent(out) :: E_out
         integer(4),dimension(nt_Hext_out),intent(out) :: n_feval, min_iter, min_status
-        real(8),dimension(nt_Hext_out),intent(out) :: min_torque
+        real(8),dimension(nt_Hext_out),intent(out) :: min_torque, min_eig
         integer :: n_copy
 		
 		integer,intent(out) :: n_tot_Exch
@@ -841,6 +841,7 @@ end subroutine getHFromTilesFMM
         problem%min_maxrot = min_maxrot
         problem%min_fallback = min_fallback
         problem%min_saddle_check = min_saddle_check
+        problem%min_predictor = min_predictor
 
         call SolveLandauLifshitzEquation( problem, solution )
 
@@ -852,12 +853,14 @@ end subroutine getHFromTilesFMM
         min_iter = 0
         min_torque = 0.
         min_status = 0
+        min_eig = 0.
         n_copy = min( size(solution%n_feval), nt_Hext_out )
         E_out(:,1:n_copy,:) = solution%E_out(:,1:n_copy,:)
         n_feval(1:n_copy) = solution%n_feval(1:n_copy)
         min_iter(1:n_copy) = solution%min_iter(1:n_copy)
         min_torque(1:n_copy) = solution%min_torque(1:n_copy)
         min_status(1:n_copy) = solution%min_status(1:n_copy)
+        min_eig(1:n_copy) = solution%min_eig(1:n_copy)
 
 
         t_out = solution%t_out
@@ -932,6 +935,7 @@ end subroutine getHFromTilesFMM
         min_iter = 0
         min_torque = 0.
         min_status = 0
+        min_eig = 0.
 #endif
 
 
