@@ -79,9 +79,11 @@
           call getFieldFromTetrahedronTile( tile(1), H, pts, n_ele, N, .false. )
       else if (tile(1)%tileType .eq. tileTypeSphere ) then          
           call getFieldFromSphereTile( tile(1), H, pts, n_ele, N, .false. )
-      else if (tile(1)%tileType .eq. tileTypeSpheroid ) then          
+      else if (tile(1)%tileType .eq. tileTypeSpheroid ) then
           call getFieldFromSpheroidTile( tile(1), H, pts, n_ele, N, .false. )
-      endif
+      else if (tile(1)%tileType .eq. tileTypeUniformField ) then
+          call getFieldFromUniformFieldTile( tile(1), H, pts, n_ele, N, .false. )
+endif
       
       
       !::Load the result back to Matlab

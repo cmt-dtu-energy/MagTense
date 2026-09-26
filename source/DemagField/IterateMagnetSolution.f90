@@ -48,9 +48,10 @@
         real(8),dimension(:,:),allocatable :: H,H_old
         real(8),dimension(:),allocatable :: Hnorm,Hnorm_old,err_val,Mnorm,Mnorm_old
         type(NStoreArr),dimension(:),allocatable :: Nstore
-        real(8),dimension(3) :: pts    
+        real(8),dimension(3) :: pts
+        real(8),dimension(3) :: mur
         real(8) :: H_par,H_trans_1,H_trans_2,err,lambda,tmp
-        real(8),dimension(4) :: maxRelDiffArr
+real(8),dimension(4) :: maxRelDiffArr
         real(8),dimension(3,3) :: rotMat,rotMatInv
         logical :: lCh
         character*(100) :: prog_str 
@@ -226,12 +227,25 @@
                             tiles(i)%excludeFromSummation = .true.
                         endif
                         
-                        call getFieldFromTiles( tiles, H(i,:), pts, n, 1, Nstore(i)%N)     !< Get the field in the i'th tile from all tiles           
-                    
-                        
+                        call getFieldFromTiles( tiles, H(i,:), pts, n, 1, Nstore(i)%N)     !< Get the field in the i'th tile from all tiles
+
+                        !>For a soft tile the summation above has left the tile's own field out, so H(i,:) is the field
+                        !>of the other tiles, and the internal field follows from H = H_others + N M(H) with the tile's
+                        !>own material law and its own tensor Nstore(i)%N(i,1,:,:). The state-function tile uses the
+                        !>curve itself here; it used to be linearized with mu_r_ea, which made its magnetization
+                        !>depend on a parameter that has no meaning for it.
+                        if ( tiles(i)%magnetType .eq. magnetTypeSoftConstPerm ) then
+                            mur(1) = tiles(i)%mu_r_ea
+                            mur(2) = tiles(i)%mu_r_oa
+                            mur(3) = tiles(i)%mu_r_oa
+                            call selfConsistentFieldConstMur( H(i,:), Nstore(i)%N(i,1,:,:), mur )
+                        else if ( tiles(i)%magnetType .eq. MagnetTypeSoft ) then
+                            call selfConsistentFieldStateFunction( H(i,:), Nstore(i)%N(i,1,:,:), stateFunction(tiles(i)%stateFunctionIndex) )
+                        endif
+
                         !! When lambda == 1 then the new solution dominates. As lambda is decreased, the step towards the new solution is dampened
                         H(i,:) = H_old(i,:) + lambda * ( H(i,:) - H_old(i,:) )
-                        
+
                         !>Set the flag back to false such that the tile is included in the next round of summation
                         if ( tiles(i)%magnetType .eq. magnetTypeSoftConstPerm .OR. tiles(i)%magnetType .eq. MagnetTypeSoft ) then
                             tiles(i)%excludeFromSummation = .false.
@@ -299,6 +313,106 @@
         deallocate(H,H_old,Hnorm,Hnorm_old,Nstore,err_val,Mnorm,Mnorm_old)
     end subroutine IterateMagnetization
     
+
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !<
+    !! Self-consistent internal field of a soft tile with a constant permeability, from the field of the
+    !! other tiles and the tile's own demagnetization tensor (moved unchanged from getFieldFromTiles).
+    !! B = mu0 mur H = mu0 (H + M) => M = (mur-1) H, and H = Happ + N M with Happ the field of the other
+    !! tiles. The internal field is taken parallel to Happ, H = Hnorm * Happ_un, and Hnorm is the
+    !! least-squares solution of the vector equation, which is exact when N Happ_un is parallel to
+    !! Happ_un (sphere, cube) and a small approximation otherwise. Note that N is negative by the sign
+    !! convention of the demagnetization tensor.
+    !!@param H in: the field of the other tiles at the tile; out: the internal field
+    !!@param N the tile's own demagnetization tensor at the point
+    !!@param mur the relative permeability, per component (easy axis, other, other)
+    subroutine selfConsistentFieldConstMur( H, N, mur )
+        real(8),dimension(3),intent(inout) :: H
+        real(8),dimension(3,3),intent(in) :: N
+        real(8),dimension(3),intent(in) :: mur
+        real(8) :: Happ_nrm, Hnorm
+        real(8),dimension(3) :: Happ_un, NHapp, v1, v2
+
+        Happ_nrm = sqrt( sum( H**2 ) )
+        if ( Happ_nrm .eq. 0. ) return
+
+        Happ_un = H / Happ_nrm
+        NHapp = matmul( N, Happ_un )
+        !0 = (Happ_nrm - Hnorm) Happ_un + Hnorm (mur-1) N Happ_un, solved in the least-squares sense for Hnorm
+        v1 = (mur - 1.) * NHapp - Happ_un
+        v2 = Happ_un
+        Hnorm = -Happ_nrm * dot_product( v1, v2 ) / sum( v1**2 )
+        H = Happ_un * Hnorm
+    end subroutine selfConsistentFieldConstMur
+
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !<
+    !! Self-consistent internal field of a soft tile with a state function M(H), from the field of the
+    !! other tiles and the tile's own demagnetization tensor. Same equation and same ansatz as for the
+    !! constant permeability, H = Hnorm * Happ_un with Happ the field of the other tiles, but the
+    !! magnetization comes from the curve, M = M(Hnorm), so the residual
+    !!     K(Hnorm) = (Happ_nrm - Hnorm) Happ_un + M(Hnorm) N Happ_un
+    !! is no longer linear in Hnorm and its norm is minimized numerically, by a golden-section search on
+    !! [0, Happ_nrm]. For a curve that is a straight line this reproduces selfConsistentFieldConstMur
+    !! exactly, and for any curve the internal field lies between zero and the field of the other tiles,
+    !! because the tensor is negative. The permeability of the tile plays no role here.
+    !! The curve is read at the first temperature, as getM_SoftMagnet does.
+    !!@param H in: the field of the other tiles at the tile; out: the internal field
+    !!@param N the tile's own demagnetization tensor at the point
+    !!@param stf the state function of the tile
+    subroutine selfConsistentFieldStateFunction( H, N, stf )
+        real(8),dimension(3),intent(inout) :: H
+        real(8),dimension(3,3),intent(in) :: N
+        type(MagStateFunction),intent(in) :: stf
+        real(8),parameter :: gr = 0.6180339887498949d0
+        integer,parameter :: k_max = 200
+        real(8) :: Happ_nrm, a, b, c, d, fc, fd
+        real(8),dimension(3) :: Happ_un, NHapp
+        integer :: k
+
+        Happ_nrm = sqrt( sum( H**2 ) )
+        if ( Happ_nrm .eq. 0. ) return
+
+        Happ_un = H / Happ_nrm
+        NHapp = matmul( N, Happ_un )
+
+        a = 0.
+        b = Happ_nrm
+        c = b - gr * ( b - a )
+        d = a + gr * ( b - a )
+        fc = residual( c )
+        fd = residual( d )
+        do k = 1, k_max
+            if ( fc .lt. fd ) then
+                b = d
+                d = c
+                fd = fc
+                c = b - gr * ( b - a )
+                fc = residual( c )
+            else
+                a = c
+                c = d
+                fc = fd
+                d = a + gr * ( b - a )
+                fd = residual( d )
+            endif
+            if ( b - a .lt. 1d-14 * Happ_nrm ) exit
+        enddo
+        H = Happ_un * 0.5 * ( a + b )
+
+    contains
+
+        !> |K(Hnorm)|^2 with M(Hnorm) from the curve
+        function residual( Hnorm ) result( r )
+            real(8),intent(in) :: Hnorm
+            real(8) :: r, Mnorm
+            real(8),dimension(3) :: K
+            call spline_b_val( stf%nH, stf%H, stf%M(1,:), Hnorm, Mnorm )
+            K = ( Happ_nrm - Hnorm ) * Happ_un + Mnorm * NHapp
+            r = sum( K**2 )
+        end function residual
+
+    end subroutine selfConsistentFieldStateFunction
 
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !<

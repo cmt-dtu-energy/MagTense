@@ -174,8 +174,18 @@ methods
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Sphere' );
              case {'Spheroid','spheroid'}
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Spheroid' );
+            case {'Avgprism','avgprism'}
+                %A prism for which getHFromTiles_mex returns the field averaged over an
+                %observation volume around each point, given as its fifth argument
+                obj.tileType = MagTenseTilesUtil.getMagTileType( 'Avgprism' );
             case {'Planarcoil','planarcoil'}
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Planarcoil' );
+            case {'Uniformfield','uniformfield'}
+                %Not a geometry: a uniform applied field that is the same at every point. Set
+                %tile.M to the field H_app in A/m. It magnetizes the other tiles in the
+                %iteration and is included in the field at the evaluation points.
+                obj.tileType = MagTenseTilesUtil.getMagTileType( 'Uniformfield' );
+                obj.inclIter = int32(0);
         end
     end
 
@@ -195,8 +205,12 @@ methods
                 res = 'Sphere';
             case MagTenseTilesUtil.getMagTileType( 'Spheroid' )
                 res = 'Spheroid';
+            case MagTenseTilesUtil.getMagTileType( 'Avgprism' )
+                res = 'Avgprism';
             case MagTenseTilesUtil.getMagTileType( 'Planarcoil' )
                 res = 'Planarcoil';
+            case MagTenseTilesUtil.getMagTileType( 'Uniformfield' )
+                res = 'Uniformfield';
         end
     end
 

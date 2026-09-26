@@ -14,7 +14,7 @@
     <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/documentation_options.js?v=7f41d439"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
@@ -117,8 +117,8 @@ grid with <code class="docutils literal notranslate"><span class="pre">nx*ny*nz<
 <code class="docutils literal notranslate"><span class="pre">set...</span></code> helper methods map human-readable names onto the integer flags that
 Fortran expects. Finally the object is converted to a plain struct and passed
 to the MEX-file:</p>
-<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="nb">addpath</span><span class="p">(</span><span class="s">'MagTense/matlab/MEX_files'</span><span class="p">);</span>
-<span class="nb">addpath</span><span class="p">(</span><span class="s">'MagTense/matlab/util'</span><span class="p">);</span>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="nb">addpath</span><span class="p">(</span><span class="s">&#39;MagTense/matlab/MEX_files&#39;</span><span class="p">);</span>
+<span class="nb">addpath</span><span class="p">(</span><span class="s">&#39;MagTense/matlab/util&#39;</span><span class="p">);</span>
 
 <span class="n">mu0</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">4</span><span class="o">*</span><span class="nb">pi</span><span class="o">*</span><span class="mf">1e-7</span><span class="p">;</span>
 <span class="n">resolution</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="mi">36</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">1</span><span class="p">];</span>
@@ -127,10 +127,9 @@ to the MEX-file:</p>
 <span class="n">problem</span><span class="p">.</span><span class="n">grid_L</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="mf">500e-9</span><span class="p">,</span><span class="mf">125e-9</span><span class="p">,</span><span class="mf">3e-9</span><span class="p">];</span><span class="w">              </span><span class="c">% m</span>
 
 <span class="c">% Solver and hardware options</span>
-<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagSolver</span><span class="p">(</span><span class="w"> </span><span class="s">'Dynamic'</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagSolver</span><span class="p">(</span><span class="w"> </span><span class="s">&#39;Dynamic&#39;</span><span class="w"> </span><span class="p">);</span>
 <span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setUseCuda</span><span class="p">(</span><span class="w"> </span><span class="nb">true</span><span class="w"> </span><span class="p">);</span>
 <span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setUseCVODE</span><span class="p">(</span><span class="w"> </span><span class="nb">false</span><span class="w"> </span><span class="p">);</span>
-<span class="n">problem</span><span class="p">.</span><span class="n">nThreads</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">int32</span><span class="p">(</span><span class="mi">8</span><span class="p">);</span>
 
 <span class="c">% Material parameters</span>
 <span class="n">problem</span><span class="p">.</span><span class="n">A0</span><span class="w">    </span><span class="p">=</span><span class="w"> </span><span class="mf">1.3e-11</span><span class="p">;</span><span class="w">                            </span><span class="c">% J/m</span>
@@ -147,7 +146,7 @@ to the MEX-file:</p>
 <span class="c">% Output times and the applied field as a function of time</span>
 <span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTime</span><span class="p">(</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">200</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
 <span class="n">HystDir</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">1</span><span class="o">/</span><span class="n">mu0</span><span class="o">*</span><span class="p">[</span><span class="o">-</span><span class="mf">24.6</span><span class="p">,</span><span class="mf">4.3</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span><span class="o">/</span><span class="mi">1000</span><span class="p">;</span>
-<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">&gt;-</span><span class="mi">1</span><span class="p">)</span><span class="o">'.*</span><span class="n">HystDir</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">2000</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">&gt;-</span><span class="mi">1</span><span class="p">)</span><span class="o">&#39;.*</span><span class="n">HystDir</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">2000</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
 
 <span class="c">% Solve</span>
 <span class="n">solution</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">struct</span><span class="p">();</span>
@@ -186,8 +185,8 @@ run method rather than being stored on the problem:</p>
 <span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span>
     <span class="n">res</span><span class="o">=</span><span class="n">res</span><span class="p">,</span>
     <span class="n">grid_L</span><span class="o">=</span><span class="p">[</span><span class="mf">500e-9</span><span class="p">,</span> <span class="mf">125e-9</span><span class="p">,</span> <span class="mf">3e-9</span><span class="p">],</span>
-    <span class="n">grid_type</span><span class="o">=</span><span class="s2">"uniform"</span><span class="p">,</span>
-    <span class="n">solver</span><span class="o">=</span><span class="s2">"dynamic"</span><span class="p">,</span>
+    <span class="n">grid_type</span><span class="o">=</span><span class="s2">&quot;uniform&quot;</span><span class="p">,</span>
+    <span class="n">solver</span><span class="o">=</span><span class="s2">&quot;dynamic&quot;</span><span class="p">,</span>
     <span class="n">m0</span><span class="o">=</span><span class="mi">1</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
     <span class="n">A0</span><span class="o">=</span><span class="mf">1.3e-11</span><span class="p">,</span>
     <span class="n">Ms</span><span class="o">=</span><span class="mf">8e5</span><span class="p">,</span>

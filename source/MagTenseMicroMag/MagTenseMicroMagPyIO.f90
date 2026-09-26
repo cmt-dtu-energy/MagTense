@@ -9,11 +9,11 @@ contains
 
 
 subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-    gamma, alpha, temperature, MaxT0, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+    gamma, alpha, temperature, nt_Hext, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
     N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
     conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-    exch_cols, grid_abc, usePrecision, nThreadsMatlab, N_ave, &
-	CV, useReturnHall, useAvgN, demigstp, exch_weigh, exch_meth, exch_intpn, &
+    exch_cols, grid_abc, N_ave, &
+	CV, useReturnHall, useAvgN, exch_weigh, exch_meth, exch_intpn, &
 	n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
     passExch, exch_ncols, crysaxis, k0_arr, k1, k2, n_phase, phase_id, A_int, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
     useDemag, rng_seed)
@@ -41,9 +41,9 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     real(8),dimension(exch_nval),intent(in) :: exch_val
     integer(4),dimension(exch_nval),intent(in) :: exch_rows, exch_cols
     real(8),dimension(nt_conv),intent(in) :: t_conv
-    integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr, usePrecision, nThreadsMatlab
-    integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, useAvgN, useDemag, demigstp, exch_meth, exch_intpn, passExch
-    real(8),intent(in) :: gamma, alpha, MaxT0, tol, thres, conv_tol, dem_thres
+    integer(4),intent(in) :: ProblemMode, solver, useCuda, dem_appr
+    integer(4),intent(in) :: N_ret, N_load, setTimeDis, useCVODE, useReturnHall, useAvgN, useDemag, exch_meth, exch_intpn, passExch
+    real(8),intent(in) :: gamma, alpha, tol, thres, conv_tol, dem_thres
 	real(8),dimension(ntot),intent(in) :: A0, Ms, K0, K1, K2, temperature
 	real(8),dimension(ntot,6,3),intent(in) :: K0_arr
 	real(8),dimension(ntot,3,3),intent(in):: crysaxis
@@ -168,7 +168,6 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     problem%alpha0 = alpha
     allocate( problem%temperature(ntot) )
     problem%temperature = temperature
-    problem%MaxT0 = MaxT0
     
     !Applied field as a function of time evaluated at the timesteps specified in nt_Hext
     !problem%Hext(:,1) is the time grid while problem%Hext(:,2:4) are the x-,y- and z-components of the applied field
@@ -270,13 +269,6 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     problem%t_conv = t_conv
     problem%conv_tol = conv_tol
 
-    if ( usePrecision .eq. 1 ) then
-        problem%usePrecision = usePrecisionTrue
-    else
-        problem%usePrecision = usePrecisionFalse
-    endif
-    
-    problem%nThreadsMatlab = nThreadsMatlab
     problem%N_ave = N_ave
 	
 	problem%CV = sngl(CV)
@@ -293,7 +285,6 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 		problem%useAvgN = useAvgNFalse
 	endif
 	
-	problem%demag_ignore_steps = demigstp
 	problem%exch_weight = exch_weigh
 	problem%exch_method = exch_meth
 	problem%exch_interpn = exch_intpn

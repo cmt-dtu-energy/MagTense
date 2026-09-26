@@ -2,7 +2,7 @@ function checks = macrogeometry_PBC_test(options)
 %MACROGEOMETRY_PBC_TEST
 % Test if periodic boundary conditions as modeled by the macrogeometry method are implemented
 % correctly in the MagTense micromagnetics solver. This is the MATLAB counterpart of
-% python/examples/micromagnetism/macrogeometry_PBC_test.py and uses the same geometry, the same
+% python/examples/micromagnetism/MagTense_tests/macrogeometry_PBC_test.py and uses the same geometry, the same
 % material parameters and the same acceptance limits.
 %
 % SHORT EXPLANATION : If the plotted polar angle is constant at the critical point, the code works.

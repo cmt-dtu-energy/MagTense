@@ -14,7 +14,7 @@
     <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/documentation_options.js?v=7f41d439"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
@@ -116,12 +116,6 @@ The memory requirement is therefore approximately
 Matlab interface prints an estimate when the problem struct is created. The
 saturation magnetization is folded into the tensor when it is built, so a
 spatially varying <span class="math notranslate nohighlight">\(M_s\)</span> costs nothing extra.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The parameter <code class="docutils literal notranslate"><span class="pre">usePres</span></code> (Python <code class="docutils literal notranslate"><span class="pre">precision</span></code>) is accepted but has no
-effect - the demagnetization tensor is always kept in single precision,
-while everything else is double precision.</p>
-</div>
 <section id="switching-the-demagnetization-off">
 <h2>Switching the demagnetization off<a class="headerlink" href="#switching-the-demagnetization-off" title="Link to this heading"></a></h2>
 <p>Setting <code class="docutils literal notranslate"><span class="pre">useDemag</span></code> (Matlab <code class="docutils literal notranslate"><span class="pre">setUseDemag</span></code>, Python <code class="docutils literal notranslate"><span class="pre">usedemag</span></code>) to False removes the
@@ -243,8 +237,6 @@ and therefore means “do not return and do not load”.</p>
 <section id="parallelism-and-hardware">
 <h2>Parallelism and hardware<a class="headerlink" href="#parallelism-and-hardware" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">nThreads</span></code> (Python <code class="docutils literal notranslate"><span class="pre">n_threads</span></code>) is the number of OpenMP threads used when
-building the demagnetization tensor.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">useCuda</span></code> (Matlab <code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code>, Python <code class="docutils literal notranslate"><span class="pre">cuda</span></code>) evaluates the
 tensor-vector product on an NVIDIA GPU at every time step. The Python
 interface checks for <code class="docutils literal notranslate"><span class="pre">nvidia-smi</span></code> and falls back to the CPU with a warning
@@ -254,13 +246,6 @@ MEX-file.</p></li>
 evaluation and is described in <a class="reference internal" href="demag_fmm.html#demag-field-fmm"><span class="std std-ref">Demag field - FMM</span></a>. It is off by
 default and requires a build with <code class="docutils literal notranslate"><span class="pre">USE_FMM3D=1</span></code>.</p></li>
 </ul>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The parameter <code class="docutils literal notranslate"><span class="pre">demigstp</span></code> (<code class="docutils literal notranslate"><span class="pre">demag_ignore_steps</span></code>), intended to recompute
-the demagnetization tensor only every n’th step of a hysteresis
-calculation, is accepted by both interfaces but is not acted on by the
-current solver.</p>
-</div>
 </section>
 </section>
 

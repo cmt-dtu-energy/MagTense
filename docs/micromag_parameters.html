@@ -14,7 +14,7 @@
     <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/documentation_options.js?v=7f41d439"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
@@ -245,12 +245,7 @@ only.</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
 <td><p>Tabulated time-dependent damping. Matlab: <code class="docutils literal notranslate"><span class="pre">setAlpha</span></code>.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MaxT0</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">max_T0</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">2</span></code></p></td>
-<td><p>Legacy, not used by the current solver.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">m0</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">m0</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">m0</span></code></p></td>
 <td><p>random</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">(ntot,3)</span></code> initial reduced magnetization. Normalised on input.</p></td>
@@ -279,8 +274,8 @@ only.</p></td>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">solver</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">solver</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">Dynamic</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">Explicit</span></code> (1), <code class="docutils literal notranslate"><span class="pre">Dynamic</span></code> (2), <code class="docutils literal notranslate"><span class="pre">Implicit</span></code> (3, not implemented).
-Matlab: <code class="docutils literal notranslate"><span class="pre">setMicroMagSolver</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Explicit</span></code> (1), <code class="docutils literal notranslate"><span class="pre">Dynamic</span></code> (2), <code class="docutils literal notranslate"><span class="pre">Minimizer</span></code> (3; the old name
+<code class="docutils literal notranslate"><span class="pre">Implicit</span></code> is no longer accepted). Matlab: <code class="docutils literal notranslate"><span class="pre">setMicroMagSolver</span></code>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ProblemMod</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">prob_mode</span></code></p></td>
@@ -315,6 +310,40 @@ Matlab: <code class="docutils literal notranslate"><span class="pre">setMicroMag
 <td><p><code class="docutils literal notranslate"><span class="pre">0</span></code>, <code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
 <td><p>Convergence-check times. Matlab:
 <code class="docutils literal notranslate"><span class="pre">setConvergenceCheckTime</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_tol</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">min_tol</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-5</span></code></p></td>
+<td><p>Minimizer convergence criterion on the largest relative torque, see
+<a class="reference internal" href="micromag_solvers.html#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_maxiter</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">min_maxiter</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">10000</span></code></p></td>
+<td><p>Minimizer iteration cap per applied field.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_maxrot</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">min_maxrot</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.3</span></code></p></td>
+<td><p>Largest rotation of a cell per minimizer iteration [rad].</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_fallback</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">min_fallback</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Fall back to the time integration when the minimizer stalls.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_saddle</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">min_saddle_check</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">2</span></code></p></td>
+<td><p>1: nudge a converged state and relax again, so that a saddle point is not
+mistaken for a minimum. 2: compute the lowest eigenvalue of the energy
+Hessian instead (returned as <code class="docutils literal notranslate"><span class="pre">min_eig</span></code>). 0: accept the state.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_pred</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">min_predictor</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Start each applied field from the secant extrapolation of the two
+previous equilibria instead of from the previous one.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">conv_tol</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">conv_tol</span></code></p></td>
@@ -384,15 +413,13 @@ Matlab: <code class="docutils literal notranslate"><span class="pre">setMicroMag
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dH_grow</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">dH_grow</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1.25</span></code> / <code class="docutils literal notranslate"><span class="pre">1.5</span></code></p></td>
-<td><p>Growth factor. The Matlab default is 1.25, the Python method default is
-1.5.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.25</span></code></p></td>
+<td><p>Growth factor.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dH_shrink</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">dH_shrink</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0.5</span></code> / <code class="docutils literal notranslate"><span class="pre">0.75</span></code></p></td>
-<td><p>Shrink factor. The Matlab default is 0.5, the Python method default is
-0.75.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.5</span></code></p></td>
+<td><p>Shrink factor.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dM_min</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">dM_min</span></code></p></td>
@@ -545,21 +572,6 @@ field.</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">filename</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code>, <code class="docutils literal notranslate"><span class="pre">'t'</span></code></p></td>
 <td><p>Load a stored demagnetization tensor. Matlab: <code class="docutils literal notranslate"><span class="pre">setLoadNFilename</span></code>.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nThreads</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">n_threads</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
-<td><p>OpenMP threads used when building the tensor.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">usePres</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">precision</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
-<td><p>Accepted but not used; the tensor is always single precision.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">demigstp</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">demigstp</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
-<td><p>Accepted but not used by the current solver.</p></td>
 </tr>
 </tbody>
 </table>
@@ -757,12 +769,17 @@ the clock.</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
 <td><p>Enable the execution trace. Significant performance cost.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">flush_each</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">timer_ena</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">timer_enabled</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
+<td><p>Write the timing log file. Off by default.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">flush_each</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">flush_each</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
 <td><p>Flush the trace file after every entry.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">trace_verb</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">trace_verb</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">trace_verbose</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
 <td><p>Only log trace events with at least this verbosity.</p></td>

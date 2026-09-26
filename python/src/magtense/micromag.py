@@ -58,10 +58,16 @@ class MicromagProblem:
         grid_nod: xyz coordinates of the nodes of a tetrahedral mesh, one node per row
         grid_ele: the four corner nodes of each tetrahedron, 1-based, shape (4, ntot)
         prob_mode:
-        solver: Options are 'explicit', 'dynamic' and 'implicit'.
-            If solver = 'dynamic', a single time-varying magnetic field is constructed
-            If solver = 'explicit', the equilibrium configuration is computed at several constant fields
-            solver = 'implicit' has not been implemented.
+        solver: Options are 'dynamic', 'explicit' and 'explicit_ll'.
+            If solver = 'dynamic', a single time-varying magnetic field is constructed and the
+            Landau-Lifshitz equation is integrated in time.
+            If solver = 'explicit', the equilibrium configuration is computed at several constant
+            fields, each found by the energy minimizer (steepest descent on the sphere with
+            Barzilai-Borwein steps). The minimizer has no notion of a stochastic field, so a
+            finite temperature T in any cell is an error; use 'explicit_ll' for thermal runs.
+            If solver = 'explicit_ll', the equilibrium at each constant field is found by
+            integrating the Landau-Lifshitz equation in time, which was the behaviour of
+            'explicit' before the minimizer became the default.
             See documentation under run_simulation for details.
         hysteresis_solver: External-field stepping mode. Options are 'static'
             and 'adaptive'. The default 'static' mode preserves the predefined
@@ -76,7 +82,6 @@ class MicromagProblem:
         alpha: Dampening constant [m/(A*s)]. Product of Gilbert damping and precession parameter.
         T: Temperature [K] ('temp' in fortran part)
         gamma: Gyromagnetic factor [m/(A*s)].
-        max_T0:
         nt_conv:
         conv_tol: The convergence tolerance, which is the maximum change in
                   magnetization between two timesteps.
@@ -91,8 +96,6 @@ class MicromagProblem:
         filename:
         cuda: Optional GPU support via CUDA.
         cvode:
-        precision: Precision for the demag tensor. Only SP is supported.
-        n_threads: Number of threads used by OpenMP for building the demag tensor.
         N_ave:
         t_alpha:
         alpha_fct:
@@ -100,6 +103,35 @@ class MicromagProblem:
         shiftVec: How far to shift domain copies along x, y and z when constructing the macrogeometry
         macroShape: Sidelengths of a prism representing the shape of the macrogeometry.
         sampleShape: Sidelengths of a prism representing the sample shape.
+        min_tol: Minimizer convergence criterion: the largest torque max_i |m_i x H_i| over the
+            cells, divided by max(Ms), must fall below this.
+        min_maxiter: Maximum number of minimizer iterations per applied field.
+        min_maxrot: Largest rotation of any cell in one minimizer iteration [rad].
+        min_fallback: If True, a minimizer that stalls or hits min_maxiter falls back to the
+            Landau-Lifshitz time integration over the requested time window and restarts.
+        min_saddle_check: 1 or True: a converged state is nudged by a small random
+            rotation and relaxed again, so that a saddle point - which a symmetric starting
+            state such as the canonical vortex sits on - is not mistaken for a minimum.
+            2 (default): the lowest eigenvalue of the energy Hessian is computed instead (Lanczos with
+            matrix-free products, one field evaluation each); a negative value marks a saddle
+            and the state is pushed along the eigenvector and relaxed again. The eigenvalue is
+            returned in min_eig. 0 or False: the converged state is accepted as it is.
+        min_predictor: If True (default), the minimizer at each applied field starts from the secant
+            extrapolation of the two previous equilibria instead of from the previous one, and
+            takes its first step with the step length the previous field ended with. Costs
+            nothing; the extrapolation is skipped automatically across a switching event.
+
+    After a run the following diagnostics are available as attributes:
+        E_out: (nt, nt_h_ext, 4) energies [J] in the order exchange, external, demagnetization,
+            anisotropy. Filled at every output time when usereturnhall is set, otherwise only at
+            the last output time (the other entries are zero).
+        n_feval: (nt_h_ext,) number of effective-field evaluations spent relaxing at each field.
+        min_iter: (nt_h_ext,) minimizer iterations at each field (0 for the LL solver).
+        min_torque: (nt_h_ext,) final max_i |m_i x H_i| / max(Ms) at each field.
+        min_eig: (nt_h_ext,) lowest Hessian eigenvalue of the returned state divided by max(Ms),
+            when min_saddle_check = 2 (positive: minimum), NaN otherwise.
+        min_status: (nt_h_ext,) -1 LL time integration, 0 minimizer converged, 1 converged after
+            an LL fallback, 2 not converged.
     """
 
     def __init__(
@@ -121,7 +153,6 @@ class MicromagProblem:
             CrysAxis: np.ndarray | None = None,
             alpha: float = 4.42e3,
             gamma: float = 2.21e5,
-            max_T0: float = 2.0,
             nt_conv: int = 1,
             conv_tol: float = 1e-4,
             tol: float = 1e-4,
@@ -144,7 +175,6 @@ class MicromagProblem:
             exch_meth: str | None = "directlaplacianneumann",
             exch_weigh: float = 8,
             exch_presize: int = 12,
-            demigstp: int = 0,
             passexch: int = 0,
             filename: str = "t",
             cuda: bool = False,
@@ -156,8 +186,6 @@ class MicromagProblem:
             # Set it to True to have run_simulation return H_exc/H_ext/H_dem/H_ani; leaving it
             # off also avoids allocating four more (nt, ntot, nt_h_ext, 3) arrays.
             usereturnhall: bool = False,
-            precision: bool = False,
-            n_threads: int = 1,
             N_ave: tuple[int] = (1, 1, 1),
             t_alpha: np.ndarray = np.zeros(1),  # noqa: B008
             alpha_fct=lambda t: np.atleast_2d(t).T * 0,
@@ -170,6 +198,12 @@ class MicromagProblem:
             rng_seed: int = 0,
             phase_id: np.ndarray | None = None,
             A_int: np.ndarray | None = None,
+            min_tol: float = 1e-5,
+            min_maxiter: int = 10000,
+            min_maxrot: float = 0.3,
+            min_fallback: bool = True,
+            min_saddle_check: bool | int = 2,
+            min_predictor: bool = True,
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -182,7 +216,6 @@ class MicromagProblem:
         self.exch_meth = exch_meth
         self.exch_weigh = exch_weigh
         self.passexch = passexch
-        self.demigstp = demigstp
         self.usereturnhall = usereturnhall
         self.useavgn = useavgn
         self.exch_presize = exch_presize
@@ -190,7 +223,6 @@ class MicromagProblem:
         self.nt_conv = nt_conv
 
         self.usereturnhall = usereturnhall
-        self.demigstp = demigstp
         self.usereturnhall = usereturnhall
         self.exch_presize = exch_presize
 
@@ -262,7 +294,6 @@ class MicromagProblem:
 
         self.alpha_mm = alpha
         self.gamma = gamma
-        self.max_T0 = max_T0
 
         self.t_conv = np.zeros(shape=(nt_conv), dtype=np.float64, order="F")
         self.conv_tol = np.array(
@@ -306,11 +337,28 @@ class MicromagProblem:
             self.cuda = int(cuda)
 
         self.cvode = int(cvode)
+
+        # Energy minimizer settings, used when solver = 'explicit'
+        self.min_tol = float(min_tol)
+        self.min_maxiter = int(min_maxiter)
+        self.min_maxrot = float(min_maxrot)
+        self.min_fallback = int(bool(min_fallback))
+        self.min_saddle_check = int(min_saddle_check)
+        if self.min_saddle_check not in (0, 1, 2):
+            raise ValueError("min_saddle_check must be 0 (off), 1 (nudge) or 2 (Hessian eigenvalue)")
+        self.min_predictor = int(bool(min_predictor))
+
+        # Energies and relaxation diagnostics of the last run, see the class docstring
+        self.E_out = None
+        self.n_feval = None
+        self.min_iter = None
+        self.min_torque = None
+        self.min_status = None
+        self.min_eig = None
+
         self.usedemag = int(usedemag)
         self.useavgn = int(useavgn)
         self.usereturnhall = int(usereturnhall)
-        self.precision = int(precision)
-        self.n_threads = n_threads
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")
 
 
@@ -338,6 +386,7 @@ class MicromagProblem:
         self.window_enabled = 1
         self.window_interval = 30.0
         self.trace_enabled = 0
+        self.timer_enabled = 0   # 1 writes the timing log file; off by default like the trace
         self.flush_each = 1
         self.trace_verbose = 1
         #-----------------------------------------------
@@ -536,7 +585,7 @@ class MicromagProblem:
             self._T = val + np.zeros(self.ntot, dtype=np.float64, order="F")
 
         else:
-            assert np.asarray(val).shape == self.ntot
+            assert np.asarray(val).shape == (self.ntot,)
             self._T = np.asarray(val, dtype=np.float64, order="F")
 
     @property
@@ -742,7 +791,56 @@ class MicromagProblem:
 
     @solver.setter
     def solver(self, val: str | None = None) -> None:
-        self._solver = {None: -1, "explicit": 1, "dynamic": 2, "implicit": 3}[val]
+        # 'explicit' is the constant-field problem and relaxes with the minimizer (slot 3);
+        # 'explicit_ll' keeps the Landau-Lifshitz time integration (slot 1).
+        solvers = {None: -1, "explicit": 3, "explicit_ll": 1, "dynamic": 2}
+        if val not in solvers:
+            msg = (
+                f"Unknown solver type {val!r}. Use 'explicit', 'explicit_ll' or 'dynamic'."
+            )
+            raise ValueError(msg)
+        self._solver = solvers[val]
+
+    def _run_solver(self) -> int:
+        """The solver slot handed to Fortran, after checking it suits the temperature.
+
+        Checked at run time because T may be set after the solver.
+        """
+        if self._solver == 3 and np.any(np.asarray(self.T) > 0):
+            raise ValueError(
+                "solver='explicit' uses the energy minimizer, which cannot include the thermal "
+                "field, but the temperature T is above zero. Use solver='explicit_ll' to relax "
+                "by integrating the Landau-Lifshitz equation instead."
+            )
+        return self._solver
+
+    def _store_diagnostics(self, result: list, n_accepted: int | None = None) -> None:
+        """Pop the six trailing diagnostics off a Fortran result list onto the problem.
+
+        The Fortran entry point returns E_out, n_feval, min_iter, min_torque, min_status and min_eig after
+        the historical outputs. They are kept off the returned list so that its layout, which
+        callers index by position, does not change. For an adaptive run only the accepted field
+        steps are kept.
+        """
+        min_eig = np.asarray(result.pop())
+        min_status = np.asarray(result.pop())
+        min_torque = np.asarray(result.pop())
+        min_iter = np.asarray(result.pop())
+        n_feval = np.asarray(result.pop())
+        E_out = np.asarray(result.pop())
+        if n_accepted is not None:
+            E_out = E_out[:, :n_accepted, :]
+            n_feval = n_feval[:n_accepted]
+            min_iter = min_iter[:n_accepted]
+            min_torque = min_torque[:n_accepted]
+            min_status = min_status[:n_accepted]
+            min_eig = min_eig[:n_accepted]
+        self.E_out = E_out
+        self.n_feval = n_feval
+        self.min_iter = min_iter
+        self.min_torque = min_torque
+        self.min_status = min_status
+        self.min_eig = min_eig
 
     @property
     def hysteresis_solver(self) -> int:
@@ -852,8 +950,10 @@ class MicromagProblem:
                       Evaluation times are uniformly distributed from t=0 to t=t_end
                       If solver = "dynamic", a single time-varying magnetic field is constructed
                        by linear interpolation of the evaluation points.
-                      If solver = "explicit", then each of the nt_h_ext field evaluations are treated
-                       as a distinct, constant field and the equilibrium solution is computed for each field
+                      If solver = "explicit" or "explicit_ll", then each of the nt_h_ext field
+                       evaluations are treated as a distinct, constant field and the equilibrium
+                       solution is computed for each field, by the energy minimizer ("explicit")
+                       or by integrating the Landau-Lifshitz equation ("explicit_ll")
 
         Outputs:
             A list containing the simulation results.
@@ -881,8 +981,8 @@ class MicromagProblem:
         else:
             nt_h_ext_out = nt_h_ext 
 
-        if self.solver not in (1, 2):
-            print("Only 'dynamic' and 'explicit' solvers are implemented")
+        if self.solver not in (1, 2, 3):
+            raise ValueError("solver must be 'explicit', 'explicit_ll' or 'dynamic'")
 
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
             ntot=self.ntot,
@@ -891,7 +991,7 @@ class MicromagProblem:
             grid_l=self.grid_L,
             u_ea=self.u_ea,
             problemmode=self.prob_mode,
-            solver=self.solver,
+            solver=self._run_solver(),
             a0=self.A0,
             ms=self.Ms,
             k0=self.K0,
@@ -902,7 +1002,6 @@ class MicromagProblem:
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
             temperature=self.T,
-            maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             nt_hext_out = nt_h_ext_out,
             hext=h_ext,
@@ -936,13 +1035,10 @@ class MicromagProblem:
             exch_rows=self.exch_rows,
             exch_cols=self.exch_cols,
             grid_abc=self.grid_abc,
-            useprecision=self.precision,
-            nthreadsmatlab=self.n_threads,
             n_ave=self.N_ave,
             cv=self.cv,
             usereturnhall=self.usereturnhall,
             useavgn=self.useavgn,
-            demigstp=self.demigstp,
             exch_weigh=self.exch_weigh,
             exch_meth=self.exch_meth,
             exch_intpn=self.exch_intpn,
@@ -968,6 +1064,12 @@ class MicromagProblem:
             dh_shrink=0.0,
             switch_refine_dh=0.0,
             use_switch_refine=0,
+            min_tol=self.min_tol,
+            min_maxiter=self.min_maxiter,
+            min_maxrot=self.min_maxrot,
+            min_fallback=self.min_fallback,
+            min_saddle_check=self.min_saddle_check,
+            min_predictor=self.min_predictor,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
@@ -984,6 +1086,7 @@ class MicromagProblem:
             window_enabled=self.window_enabled,
             window_interval=self.window_interval,
             trace_enabled=self.trace_enabled,
+            timer_enabled=self.timer_enabled,
             flush_each=self.flush_each,
             trace_verbose=self.trace_verbose,
             rng_seed=self.rng_seed,
@@ -993,6 +1096,7 @@ class MicromagProblem:
         )
 
         result = list(result)
+        self._store_diagnostics(result)
         result.pop(7)  # n_Hext_accepted is only public for adaptive hysteresis.
         n_tot_Exch = result[7]
         result[8] = result[8][:n_tot_Exch]  # ExchMat_r
@@ -1040,8 +1144,8 @@ class MicromagProblem:
         nt_h_ext = H_ext.shape[0]
         nt_h_ext_out = nt_h_ext
 
-        if self.solver not in (1, 2):
-            print("Only 'dynamic' and 'explicit' solvers are implemented")
+        if self.solver not in (1, 2, 3):
+            raise ValueError("solver must be 'explicit', 'explicit_ll' or 'dynamic'")
 
 
         result = magtensesource.fortrantopythonio.runmicromagsimulation(
@@ -1051,7 +1155,7 @@ class MicromagProblem:
             grid_l=self.grid_L,
             u_ea=self.u_ea,
             problemmode=self.prob_mode,
-            solver=self.solver,
+            solver=self._run_solver(),
             a0=self.A0,
             ms=self.Ms,
             k0=self.K0,
@@ -1062,7 +1166,6 @@ class MicromagProblem:
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
             temperature=self.T,
-            maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             nt_hext_out = nt_h_ext_out,
             hext=H_ext,
@@ -1096,13 +1199,10 @@ class MicromagProblem:
             exch_rows=self.exch_rows,
             exch_cols=self.exch_cols,
             grid_abc=self.grid_abc,
-            useprecision=self.precision,
-            nthreadsmatlab=self.n_threads,
             n_ave=self.N_ave,
             cv=self.cv,
             usereturnhall=self.usereturnhall,
             useavgn=self.useavgn,
-            demigstp=self.demigstp,
             exch_weigh=self.exch_weigh,
             exch_meth=self.exch_meth,
             exch_intpn=self.exch_intpn,
@@ -1128,6 +1228,12 @@ class MicromagProblem:
             dh_shrink=0.0,
             switch_refine_dh=0.0,
             use_switch_refine=0,
+            min_tol=self.min_tol,
+            min_maxiter=self.min_maxiter,
+            min_maxrot=self.min_maxrot,
+            min_fallback=self.min_fallback,
+            min_saddle_check=self.min_saddle_check,
+            min_predictor=self.min_predictor,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
@@ -1144,6 +1250,7 @@ class MicromagProblem:
             window_enabled=self.window_enabled,
             window_interval=self.window_interval,
             trace_enabled=self.trace_enabled,
+            timer_enabled=self.timer_enabled,
             flush_each=self.flush_each,
             trace_verbose=self.trace_verbose,
             rng_seed=self.rng_seed,
@@ -1153,6 +1260,7 @@ class MicromagProblem:
         )
 
         result = list(result)
+        self._store_diagnostics(result)
         result.pop(7)  # n_Hext_accepted is only public for adaptive hysteresis.
         n_tot_Exch = result[7]
         result[8] = result[8][:n_tot_Exch]  # ExchMat_r
@@ -1172,8 +1280,8 @@ class MicromagProblem:
             dM_min: float = 1e-3,
             dM_target: float = 1e-2,
             dM_reject: float = 5e-2,
-            dH_grow: float = 1.5,
-            dH_shrink: float = 0.75,
+            dH_grow: float = 1.25,
+            dH_shrink: float = 0.5,
             switch_refine_dH: float | None = None,
     ) -> list[np.ndarray | int]:
         """
@@ -1182,14 +1290,18 @@ class MicromagProblem:
         The adaptive accept/reject loop is executed by the Fortran backend in a
         single call. Output arrays are preallocated to ``max_steps`` in Fortran
         and sliced here to include only accepted field steps.
+
+        The first field state is ``m0`` relaxed at ``H_start``, so it is an
+        equilibrium like every later one and the first step is measured
+        against it; ``m0`` does not need to be relaxed beforehand.
         """
 
         if self.hysteresis_solver != 2:
             raise ValueError(
                 "run_hysteresis_adaptive requires hysteresis_solver='adaptive'"
             )
-        if self.solver != 1:
-            raise ValueError("Adaptive hysteresis requires the explicit solver")
+        if self.solver not in (1, 3):
+            raise ValueError("Adaptive hysteresis requires solver='explicit' or 'explicit_ll'")
 
         H_start = np.asarray(H_start, dtype=np.float64)
         H_end = np.asarray(H_end, dtype=np.float64)
@@ -1229,7 +1341,7 @@ class MicromagProblem:
             grid_l=self.grid_L,
             u_ea=self.u_ea,
             problemmode=self.prob_mode,
-            solver=self.solver,
+            solver=self._run_solver(),
             a0=self.A0,
             ms=self.Ms,
             k0=self.K0,
@@ -1240,7 +1352,6 @@ class MicromagProblem:
             gamma=self.gamma,
             alpha_mm=self.alpha_mm,
             temperature=self.T,
-            maxt0=self.max_T0,
             nt_hext=nt_h_ext,
             nt_hext_out=nt_h_ext_out,
             hext=h_ext,
@@ -1274,13 +1385,10 @@ class MicromagProblem:
             exch_rows=self.exch_rows,
             exch_cols=self.exch_cols,
             grid_abc=self.grid_abc,
-            useprecision=self.precision,
-            nthreadsmatlab=self.n_threads,
             n_ave=self.N_ave,
             cv=self.cv,
             usereturnhall=self.usereturnhall,
             useavgn=self.useavgn,
-            demigstp=self.demigstp,
             exch_weigh=self.exch_weigh,
             exch_meth=self.exch_meth,
             exch_intpn=self.exch_intpn,
@@ -1306,6 +1414,12 @@ class MicromagProblem:
             dh_shrink=float(dH_shrink),
             switch_refine_dh=switch_refine_value,
             use_switch_refine=int(use_switch_refine),
+            min_tol=self.min_tol,
+            min_maxiter=self.min_maxiter,
+            min_maxrot=self.min_maxrot,
+            min_fallback=self.min_fallback,
+            min_saddle_check=self.min_saddle_check,
+            min_predictor=self.min_predictor,
             dummy_run=self.dummy_run,
             fmm_cells_per_node=self.fmm_cells_per_node,
             eps_fmm=self.fmm_eps,
@@ -1322,6 +1436,7 @@ class MicromagProblem:
             window_enabled=self.window_enabled,
             window_interval=self.window_interval,
             trace_enabled=self.trace_enabled,
+            timer_enabled=self.timer_enabled,
             flush_each=self.flush_each,
             trace_verbose=self.trace_verbose,
             rng_seed=self.rng_seed,
@@ -1332,6 +1447,7 @@ class MicromagProblem:
 
         result = list(result)
         n_accepted = int(result[7])
+        self._store_diagnostics(result, n_accepted)
         n_tot_Exch = result[8]
 
         fixed_order_result = result[0:7] + result[8:14] + [n_accepted]

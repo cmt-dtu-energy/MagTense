@@ -60,7 +60,7 @@ On Windows there are two compilation options for building the Fortran objective 
   -Next step is building the MEX-files. Start up Matlab and then build the MEX-files specifying where the intel compilers are as options:
   ```
   cd('MagTense/matlab');
-  buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',true,'USE_FMM',true,'VS_STUDIO',false,'USE_RELEASE',true)
+  buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',true,'USE_FMM3D',true,'VS_STUDIO',false,'USE_RELEASE',true)
   ```
   
 ### Compilation with Visual Studio
@@ -71,6 +71,6 @@ For compiling MagTense with Visual Studio, we provide a VS project file for Wind
 Once the objective files have been build, start up Matlab, and first setup the MEX-compiler using `mex -setup FORTRAN` and then run 
 ```
 cd('MagTense/matlab');
-buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',true,'USE_FMM',true,'VS_STUDIO',true,'USE_RELEASE',true)
+buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',true,'USE_FMM3D',true,'VS_STUDIO',true,'USE_RELEASE',true)
 ```
 to build the MEX-files.

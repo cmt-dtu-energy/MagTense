@@ -5,6 +5,7 @@
 !include 'mkl_vml.f90'
     module LandauLifshitzSolution
     use ODE_Solvers
+    use EnergyMinimizer
     use integrationDataTypes
     use MKL_SPBLAS
     use MKL_DFTI
@@ -35,6 +36,7 @@
 #endif
 
     use trace_mod
+    use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
     implicit none          
 
     !>Module variables
@@ -44,9 +46,21 @@
     real(DP),dimension(:),allocatable :: crossX,crossY,crossZ   !>Cross product terms
     real(DP),dimension(:),allocatable :: HeffX,HeffY,HeffZ      !>Effective fields
     real(DP),dimension(:),allocatable :: HeffX2,HeffY2,HeffZ2      !>Effective fields
-    
-    private :: gb_solution,gb_problem,crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2
-    
+    real(DP),dimension(:),allocatable :: gb_cellVol             !>Cell volumes [m^3], filled on first use by computeEnergies
+    integer :: n_feval_count = 0                                !>Effective-field evaluations since the last reset (see relaxAtField)
+    !>History of the secant predictor (min_predictor): the two most recent converged equilibria and
+    !>the applied fields they were found at. pred_n counts how many of the two slots are filled.
+    real(DP),dimension(:),allocatable :: pred_m1, pred_m2      !>Last and second-last converged equilibrium
+    real(DP),dimension(3) :: pred_H1 = 0.0_DP, pred_H2 = 0.0_DP !>Applied fields of pred_m1 and pred_m2 [A/m]
+    integer :: pred_n = 0                                       !>Filled history slots (0, 1 or 2)
+    real(DP) :: pred_tau = 0.0_DP                               !>Last minimizer step length, the warm start of the next field (0: none)
+    real(DP),dimension(:),allocatable :: pred_u                 !>Lowest Hessian eigenvector of the previous field, the Lanczos start vector of the next
+    real(DP),parameter :: pred_ratio_max = 2.0_DP               !>Largest field-step ratio the extrapolation is taken at
+    real(DP),parameter :: pred_dm_max = 0.5_DP                  !>Largest per-cell displacement |dm| the extrapolation is taken at
+
+    private :: gb_solution,gb_problem,crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2,gb_cellVol,n_feval_count
+    private :: pred_m1,pred_m2,pred_H1,pred_H2,pred_n,pred_tau,pred_u,pred_ratio_max,pred_dm_max
+
     contains
     
     !>-----------------------------------------
@@ -85,7 +99,7 @@
     call system_clock(count_max=cm)
     rate = REAL(cr)
     
-    write(prog_str,'(A37, A8, A12)') 'MagTense version 2.3.0, compiled on: ', __TIME__, __DATE__ 
+    write(prog_str,'(A37, A8, A12)') 'MagTense version 3.0.1, compiled on: ', __TIME__, __DATE__ 
     call displayGUIMessage( trim(prog_str) ) 
     
     !Save internal representation of the problem and the solution
@@ -280,8 +294,18 @@
         gb_problem%includeThermal = .false.
     end if
         
-    if ( gb_problem%solver .eq. MicroMagSolverExplicit ) then
-        !Go through several different applied fields and find the equilibrium solution for each of them
+    !The minimizer has no notion of a stochastic field: it looks for a stationary point of the energy,
+    !which a thermal run never reaches.
+    if ( gb_problem%includeThermal .and. gb_problem%solver .eq. MicroMagSolverMinimizer ) then
+        call displayGUIMessage( 'MagTense: the energy minimizer (''Explicit'') cannot be combined with a finite ' // &
+                                'temperature - use ''ExplicitLL'' (Python solver=''explicit_ll'')' )
+        error stop 'SolveLandauLifshitzEquation: minimizer with thermal field'
+    endif
+
+    if ( gb_problem%solver .eq. MicroMagSolverExplicit .or. gb_problem%solver .eq. MicroMagSolverMinimizer ) then
+        !Go through several different applied fields and find the equilibrium solution for each of them.
+        !The minimizer reads the field table exactly as the explicit solver does - one constant field
+        !per row - and differs only in how the equilibrium at each of them is found.
         nt_Hext = size(gb_problem%Hext, 1)          !The no. of applied fields to consider
         if (gb_problem%adaptiveHext) then
             ! Allocate one extra slot for the initial starting field and state
@@ -369,6 +393,16 @@
     !the slots it accepts and leaves the tail of M_out untouched.
     M_out = 0.
     gb_solution%M_out = 0.
+    !Energies and relaxation diagnostics, one entry per applied field. min_status = -1 marks a field
+    !relaxed by the Landau-Lifshitz time integration; the minimizer overwrites it.
+    allocate( gb_solution%E_out(nt,nt_Hext,4), gb_solution%n_feval(nt_Hext), gb_solution%min_iter(nt_Hext), &
+              gb_solution%min_torque(nt_Hext), gb_solution%min_status(nt_Hext), gb_solution%min_eig(nt_Hext) )
+    gb_solution%E_out = 0.
+    gb_solution%n_feval = 0
+    gb_solution%min_iter = 0
+    gb_solution%min_torque = 0.
+    gb_solution%min_status = -1
+    gb_solution%min_eig = ieee_value( 1.0_DP, ieee_quiet_nan )
     !Allocate the arrays for the different fields
     !Only if these are to be returned are they saved at every time step
     if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
@@ -427,12 +461,16 @@
           deallocate(gb_solution%u1, gb_solution%u2, gb_solution%u3, gb_solution%u4, gb_solution%u5, gb_solution%u6)
       endif
       
-      !clean-up
-      stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
+      !clean-up. The descriptor only exists for the FFT demag approximations
+      if ( associated(gb_problem%desc_hndl_FFT_M_H) ) stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
   end if
 
+    !The cell volumes are cached by computeEnergies for the grid of this solve; the next solve in the
+    !same process may use another grid
+    if ( allocated(gb_cellVol) ) deallocate( gb_cellVol )
+
     #if USE_CUDA
-      if ( gb_problem%useCuda .eqv. useCudaTrue ) then
+      if ( gb_problem%useCuda .eq. useCudaTrue ) then
           call cudaDestroy()
       endif
     #endif
@@ -454,25 +492,29 @@
     integer :: i
     character*(100) :: prog_str
 
+      call predictorReset()
       do i=1,nt_Hext
           !Applied field
           gb_solution%HextInd = i
+          !Secant predictor: extrapolate the two previous equilibria to this field (no-op unless enabled)
+          call predictorStart( gb_problem%Hext(i,2:4), gb_problem%m0, ntot )
 
-          if (gb_problem%solver .eq. MicroMagSolverExplicit) then
+          if (gb_problem%solver .eq. MicroMagSolverExplicit .or. gb_problem%solver .eq. MicroMagSolverMinimizer) then
               write(prog_str,'(A20, I5, A8, I5, A6, F6.2, A7)') 'External Field nr.: ', i, ' out of ', nt_Hext, ' i.e. ', real(i)/real(nt_Hext)*100,'% done'
               call displayGUIMessage( trim(prog_str) )
           endif
 
-          ! This is where the LLG is actually integrated (short description by F. Durhuus)
-          ! fct is a pointer to the dmdt_fct function which returns time derivatives of the normalised magnetic moments
+          ! This is where the equilibrium at the current field is found, either by integrating the LLG
+          ! equation in time or by the energy minimizer - see relaxAtField.
+          ! For the time integration: fct is a pointer to the dmdt_fct function which returns time derivatives of the normalised magnetic moments
           ! With m0 as initial condition, integrate from t(1) to t(nt) with effective field updated at each time coordinate t, then store result in t_out and M_out.
           ! t_conv is time coordinates where convergence is tested when computing equilibrium structure (explicit solver rather than dynamic). Also included in t_out.
           ! When thermal noise is included (includeThermal = .true.) the magnetisation is normalised each timestep to prevent thermal drift
-          call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i), gb_problem%includeThermal, fct_thermal, cb_fct, &
-                  gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
+          call relaxAtField( fct, fct_thermal, cb_fct, M_out(:,:,i), ntot, nt, i )
 
           !The initial state of the next solution is the previous solution result
           gb_problem%m0 = M_out(:,nt,i)
+          call predictorRecord( gb_problem%Hext(i,2:4), M_out(:,nt,i), gb_solution%min_status(i), ntot )
 
           !Store the solution
           gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
@@ -491,11 +533,12 @@
     procedure(callback_fct),pointer :: cb_fct
     real(DP),dimension(:,:,:),intent(inout) :: M_out
     integer,intent(in) :: ntot, nt, n_reject_max
-    integer :: i_acc, i_trial, n_reject, n_reject_total, ti
+    integer :: i_acc, i_trial, n_reject, n_reject_total
     real(DP) :: H_delta(3), H_dir(3), H_current(3), H_trial(3), H_remaining(3)
     real(DP) :: H_distance, remaining_distance, dH, dH_initial, dH_step, dH_initial_T, dH_T, dH_step_T, dM, m_parallel_before, m_parallel_trial
     real(DP),dimension(:),allocatable :: m_before, m_accepted, m_trial
-    logical :: reject_step, reached_end
+    logical :: reject_step, reached_end, sign_change, switch_reject
+    logical :: recover_armed, recover_grown, refine_pending
     character*(256) :: prog_str
 
       if (gb_problem%maxHextSteps <= 0) then
@@ -525,23 +568,36 @@
       allocate(m_before(3*ntot), m_accepted(3*ntot), m_trial(3*ntot))
       m_accepted = gb_problem%m0
 
-    ! Save the starting field and magnetisation state (store at first time index)
-    i_acc = 1
-    gb_solution%HextInd = i_acc
-    gb_problem%Hext(i_acc,1) = 0.0_DP
-    gb_problem%Hext(i_acc,2:4) = H_current
-    ! Store the initial condition for all time indices so the returned
-    ! `gb_solution%M_out` contains a valid time-series for the initial field.
-    do ti = 1, size(gb_problem%t)
-        gb_solution%M_out(ti,:,i_acc,1) = m_accepted(1:ntot)
-        gb_solution%M_out(ti,:,i_acc,2) = m_accepted(ntot+1:2*ntot)
-        gb_solution%M_out(ti,:,i_acc,3) = m_accepted(2*ntot+1:3*ntot)
-    end do
-    call StoreHeffComponents ( gb_problem, gb_solution )
+      ! Relax the starting state at H_start and store it in the first slot. Every trial step's dM is
+      ! measured against the last accepted state, so that state has to be an equilibrium: an m0 far
+      ! from equilibrium at H_start (e.g. m0 along a field well away from the easy axis, below the
+      ! anisotropy field) makes the first step look like a switch, is rejected down to dH_min and
+      ! leaves the rest of the sweep there. Relaxing an m0 that is already an equilibrium is cheap.
+      i_acc = 1
+      gb_solution%HextInd = i_acc
+      gb_problem%Hext(i_acc,1) = 0.0_DP
+      gb_problem%Hext(i_acc,2:4) = H_current
+      gb_problem%m0 = m_accepted
+      write(prog_str,'(A,3F10.6)') 'Relaxing at H_start, mu0 H [T] = ', mu0*H_current(1), mu0*H_current(2), mu0*H_current(3)
+      call displayGUIMessage( trim(prog_str) )
 
-    n_reject = 0
+      call predictorReset()
+      call relaxAtField( fct, fct_thermal, cb_fct, M_out(:,:,i_acc), ntot, nt, i_acc )
+
+      m_accepted = M_out(:,nt,i_acc)
+      gb_problem%m0 = m_accepted
+      call predictorRecord( H_current, m_accepted, gb_solution%min_status(i_acc), ntot )
+      gb_solution%M_out(:,:,i_acc,1) =  transpose( M_out(1:ntot,:,i_acc) )
+      gb_solution%M_out(:,:,i_acc,2) =  transpose( M_out((ntot+1):2*ntot,:,i_acc) )
+      gb_solution%M_out(:,:,i_acc,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i_acc)  )
+      call StoreHeffComponents ( gb_problem, gb_solution )
+
+      n_reject = 0
       n_reject_total = 0
       reached_end = .false.
+      recover_armed = .false.
+      recover_grown = .false.
+      refine_pending = .false.
 
       do while (.not. reached_end .and. i_acc < gb_problem%maxHextSteps + 1)
           remaining_distance = dot_product(gb_problem%H_end - H_current, H_dir)
@@ -557,6 +613,9 @@
 
           m_before = m_accepted
           gb_problem%m0 = m_before
+          !Secant predictor from the accepted history (a rejected trial leaves the history alone,
+          !so the retry with a smaller dH gets a proportionally smaller extrapolation)
+          call predictorStart( H_trial, gb_problem%m0, ntot )
           gb_solution%HextInd = i_trial
           gb_problem%Hext(i_trial,1) = 0.0_DP
           gb_problem%Hext(i_trial,2:4) = H_trial
@@ -570,18 +629,22 @@
               call displayGUIMessage( trim(prog_str) )
           endif
 
-          call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out(:,:,i_trial), gb_problem%includeThermal, fct_thermal, cb_fct, &
-                  gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
+          call relaxAtField( fct, fct_thermal, cb_fct, M_out(:,:,i_trial), ntot, nt, i_trial )
 
           m_trial = M_out(:,nt,i_trial)
           dM = adaptiveStepMetric(m_before, m_trial, ntot)
 
           m_parallel_before = meanMagnetisationAlongField(m_before, ntot, H_dir)
           m_parallel_trial = meanMagnetisationAlongField(m_trial, ntot, H_dir)
+          sign_change = m_parallel_before * m_parallel_trial < 0.0_DP
           reject_step = .false.
+          switch_reject = .false.
           if (dM > gb_problem%dM_reject .and. dH > gb_problem%dH_min) reject_step = .true.
           if (gb_problem%use_switch_refine) then
-              if (m_parallel_before * m_parallel_trial < 0.0_DP .and. dH > gb_problem%switch_refine_dH .and. dH > gb_problem%dH_min) reject_step = .true.
+              if (sign_change .and. dH > gb_problem%switch_refine_dH .and. dH > gb_problem%dH_min) then
+                  reject_step = .true.
+                  switch_reject = .true.
+              endif
           endif
 
           if (reject_step) then
@@ -589,6 +652,14 @@
                   reject_step = .false.
               else
                   dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+                  !dH is being driven to its floor, so arm the recovery (see the step control below).
+                  !Across a sign change the floor is switch_refine_dH, and the recovery waits until
+                  !the step across the sign change has been accepted
+                  if (switch_reject) refine_pending = .true.
+                  if (switch_reject .or. dH <= gb_problem%dH_min) then
+                      recover_armed = .true.
+                      recover_grown = .false.
+                  endif
                   dH_T = mu0 * dH
                   write(prog_str,'(A27,F10.6,A4)') '   Retrying with lower dH = ', dH_T, ' T'
                   call displayGUIMessage( trim(prog_str) )
@@ -615,6 +686,7 @@
           H_current = H_trial
           m_accepted = m_trial
           gb_problem%m0 = m_accepted
+          call predictorRecord( H_current, m_accepted, gb_solution%min_status(i_trial), ntot )
           gb_solution%HextInd = i_acc
           gb_problem%Hext(i_acc,1) = 0.0_DP
           gb_problem%Hext(i_acc,2:4) = H_current
@@ -628,14 +700,36 @@
           H_remaining = gb_problem%H_end - H_current
           reached_end = sqrt(sum(H_remaining**2)) <= max(1.0e-10_DP * H_distance, 1.0e-9_DP)
 
+          !Step control for the next step: grow below dM_min, shrink above dM_target. On its own this
+          !band can leave dH at its floor for the rest of the sweep once something has driven it there
+          !(the switch refinement, or the shrinking around a large, fast change): in a smooth region a
+          !step that small gives a dM between dM_min and dM_target, so dH never grows again. In a
+          !hard-axis loop that is ~1000 steps of dH_min. So when dH reaches its floor the recovery is
+          !armed, and while it is armed dH also grows whenever dM <= dM_target. The first step above
+          !dM_target after it has grown disarms it and sets dH back by one dH_grow, to the last
+          !step length that was within dM_target, and the band takes over from there. Until dH
+          !reaches its floor the step control is exactly the band.
+          if (sign_change) refine_pending = .false.
           if (dM < gb_problem%dM_min) then
               dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
+              if (recover_armed) recover_grown = .true.
           else if (dM > gb_problem%dM_target) then
-              dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+              if (recover_armed .and. recover_grown) then
+                  !The recovery has overshot: go back to the previous step length, which was within
+                  !dM_target, rather than shrinking by dH_shrink below it
+                  recover_armed = .false.
+                  dH = max(dH / gb_problem%dH_grow, gb_problem%dH_min)
+              else
+                  dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+              endif
+              if (dH <= gb_problem%dH_min) then
+                  recover_armed = .true.
+                  recover_grown = .false.
+              endif
+          else if (recover_armed .and. .not. refine_pending) then
+              dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
+              recover_grown = .true.
           endif
-
-          
-          
       enddo
 
       gb_problem%nHextAccepted = i_acc
@@ -644,6 +738,97 @@
       endif
       deallocate(m_before, m_accepted, m_trial)
     end subroutine SolveAdaptiveHextLoop
+
+    !>-----------------------------------------
+    !> @author Rasmus Bjoerk, rabj@dtu.dk, DTU, 2026
+    !> @brief
+    !> Secant predictor for the applied-field stepping (problem%min_predictor). The equilibrium
+    !> changes smoothly with the applied field between switching events, so the start state of
+    !> the next field is extrapolated from the two previous equilibria,
+    !>     m_start = normalize( m1 + r (m1 - m2) ),   r = (H - H1).(H1 - H2) / |H1 - H2|^2,
+    !> which is exact for a linear dependence and costs no field evaluation. The first step of
+    !> the minimizer is then taken with the step length the previous field ended with, since a
+    !> fixed first rotation overshoots a start that is already close (see minimizeAtField). The ratio r takes
+    !> care of non-uniform (adaptive) steps and of a reversal of the sweep direction. The
+    !> extrapolation is skipped, and the previous equilibrium used as before, when the history
+    !> holds fewer than two converged states, when |r| exceeds pred_ratio_max, or when a cell
+    !> would be displaced by more than pred_dm_max - the last two mean that the previous step
+    !> was a switching event, which must not be extrapolated. Only the minimizer uses it; the
+    !> history is reset at the start of every field loop and whenever a relaxation did not
+    !> converge.
+    !>-----------------------------------------
+    subroutine predictorReset()
+        pred_n = 0
+        pred_tau = 0.0_DP
+        if ( allocated(pred_u) ) deallocate( pred_u )
+    end subroutine predictorReset
+
+    !> Records the converged equilibrium m at the applied field H (status 0 or 1); anything else
+    !> empties the history.
+    subroutine predictorRecord( H, m, status, ntot )
+    real(DP),dimension(3),intent(in) :: H
+    real(DP),dimension(:),intent(in) :: m
+    integer,intent(in) :: status, ntot
+        if ( gb_problem%min_predictor .eq. 0 .or. gb_problem%solver .ne. MicroMagSolverMinimizer ) return
+        if ( status .lt. 0 .or. status .gt. 1 ) then
+            pred_n = 0
+            return
+        endif
+        if ( .not. allocated(pred_m1) ) allocate( pred_m1(3*ntot), pred_m2(3*ntot) )
+        if ( size(pred_m1) .ne. 3*ntot ) then
+            deallocate( pred_m1, pred_m2 )
+            allocate( pred_m1(3*ntot), pred_m2(3*ntot) )
+            pred_n = 0
+        endif
+        if ( pred_n .ge. 1 ) then
+            pred_m2 = pred_m1
+            pred_H2 = pred_H1
+        endif
+        pred_m1 = m
+        pred_H1 = H
+        pred_n = min( pred_n + 1, 2 )
+    end subroutine predictorRecord
+
+    !> Overwrites m0 with the extrapolated start state for the applied field H when the history
+    !> allows it, and leaves it alone otherwise.
+    subroutine predictorStart( H, m0, ntot )
+    real(DP),dimension(3),intent(in) :: H
+    real(DP),dimension(:),intent(inout) :: m0
+    integer,intent(in) :: ntot
+    real(DP) :: dH2, r, dm_max, nrm
+    integer :: i
+    character*(256) :: prog_str
+        if ( gb_problem%min_predictor .eq. 0 .or. gb_problem%solver .ne. MicroMagSolverMinimizer ) return
+        if ( pred_n .lt. 2 ) return
+        dH2 = sum( (pred_H1 - pred_H2)**2 )
+        if ( dH2 .le. tiny(1.0_DP) ) return
+        r = dot_product( H - pred_H1, pred_H1 - pred_H2 ) / dH2
+        if ( abs(r) .gt. pred_ratio_max ) return
+        dm_max = 0.0_DP
+        do i = 1, ntot
+            dm_max = max( dm_max, (pred_m1(i) - pred_m2(i))**2 + (pred_m1(ntot+i) - pred_m2(ntot+i))**2 &
+                                  + (pred_m1(2*ntot+i) - pred_m2(2*ntot+i))**2 )
+        enddo
+        dm_max = abs(r) * sqrt( dm_max )
+        if ( dm_max .gt. pred_dm_max ) then
+            write(prog_str,'(A,F6.3,A)') 'Predictor skipped: largest cell displacement ', dm_max, ' (switching)'
+            call displayGUIMessage( trim(prog_str) )
+            return
+        endif
+        m0 = pred_m1 + r * ( pred_m1 - pred_m2 )
+        do i = 1, ntot
+            nrm = sqrt( m0(i)**2 + m0(ntot+i)**2 + m0(2*ntot+i)**2 )
+            if ( nrm .gt. tiny(1.0_DP) ) then
+                m0(i) = m0(i) / nrm
+                m0(ntot+i) = m0(ntot+i) / nrm
+                m0(2*ntot+i) = m0(2*ntot+i) / nrm
+            else
+                m0(i) = pred_m1(i)
+                m0(ntot+i) = pred_m1(ntot+i)
+                m0(2*ntot+i) = pred_m1(2*ntot+i)
+            endif
+        enddo
+    end subroutine predictorStart
 
     real(DP) function adaptiveStepMetric(m_before, m_trial, ntot) result(dM_rms)
     real(DP),dimension(:),intent(in) :: m_before, m_trial
@@ -685,18 +870,70 @@
 
         !---- locals ----
         integer :: ntot
-        real(DP) :: mx_mean, my_mean, mz_mean, volume_total
-        integer :: i
-        integer, save :: itimer = 0, itimer_wait = 0
+        integer, save :: itimer = 0
         call trace%begin( "dmdt_fct", itimer=itimer, verbose=1 )
         !------------------------------------------
         ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
 
+        !--------------- effective field at m: fills gb_solution%Mx.. and HeffX/Y/Z ------------------
+        call computeHeff( t, m )
+        !-------------------------------------------------------------
+        !--------------- calculate precession term: m x Heff -------------
+        crossX = 1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
+        crossY = 1.0_DP * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
+        crossZ = 1.0_DP * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
+        !-------------------------------------------------------------
+        !--------------- calculate damping term: m x (m x Heff) -------------
+        HeffX2 = gb_solution%My * crossZ - gb_solution%Mz * crossY
+        HeffY2 = gb_solution%Mz * crossX - gb_solution%Mx * crossZ
+        HeffZ2 = gb_solution%Mx * crossY - gb_solution%My * crossX
+        !-------------------------------------------------------------
+        !--------------- assemble dm/dt -------------------------------------
+        dmdt(1:ntot)               = -gb_problem%gamma * crossX - alpha(t,gb_problem) * HeffX2
+        dmdt(ntot+1:2*ntot)        = -gb_problem%gamma * crossY - alpha(t,gb_problem) * HeffY2
+        dmdt(2*ntot+1:3*ntot)      = -gb_problem%gamma * crossZ - alpha(t,gb_problem) * HeffZ2
+        !---------------------------------------------------------------------
+        call trace%end("dmdt_fct", itimer=itimer, verbose=1 )
+    end subroutine dmdt_fct
+
+    !>-----------------------------------------
+    !> Allocates the module work arrays for the effective field and the cross products once per solve.
+    !> They are deallocated at the end of SolveLandauLifshitzEquation.
+    !>-----------------------------------------
+    subroutine ensureWorkArrays( ntot )
+        integer,intent(in) :: ntot
         if ( .not. allocated(crossX) ) then
             allocate( crossX(ntot), crossY(ntot), crossZ(ntot) )
             allocate( HeffX(ntot), HeffY(ntot), HeffZ(ntot) )
             allocate( HeffX2(ntot), HeffY2(ntot), HeffZ2(ntot) )
         endif
+    end subroutine ensureWorkArrays
+
+    !>-----------------------------------------
+    !> @author Rasmus Bjoerk, rabj@dtu.dk, DTU, 2026
+    !> @brief
+    !> Evaluates the effective field at the magnetization m (mx = m(1:ntot), my = m(ntot+1:2*ntot),
+    !> mz = m(2*ntot+1:3*ntot)) and time t. Loads m into gb_solution%Mx/My/Mz, updates every field term
+    !> (exchange, applied, anisotropy, demagnetization; the thermal field is whatever the last draw left
+    !> in HtX/HtY/HtZ) and sums them into the module arrays HeffX/HeffY/HeffZ.
+    !> Every field evaluation in the code goes through here - the Landau-Lifshitz right-hand side, the
+    !> energy minimizer and the post-processing of the returned fields - and n_feval_count counts the
+    !> calls, which is what makes the cost of the two relaxation methods comparable.
+    !> @param[in] t the time, only used by the dynamic solver to interpolate the applied field
+    !> @param[in] m the magnetization, size 3*ntot
+    !>-----------------------------------------
+    subroutine computeHeff( t, m )
+        real(DP),intent(in)              :: t
+        real(DP),dimension(:),intent(in) :: m
+
+        integer :: ntot
+        integer, save :: itimer = 0, itimer_wait = 0
+        call trace%begin( "computeHeff", itimer=itimer, verbose=1 )
+        !------------------------------------------
+        ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+
+        call ensureWorkArrays( ntot )
+        n_feval_count = n_feval_count + 1
 
         !------------- Update magnetisation (load from m)-------------
         gb_solution%Mx = m(1:ntot)
@@ -745,23 +982,229 @@
         HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY + gb_solution%HtY
         HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ + gb_solution%HtZ
         !-------------------------------------------------------------
-        !--------------- calculate precession term: m x Heff -------------
-        crossX = 1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
-        crossY = 1.0_DP * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
-        crossZ = 1.0_DP * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
-        !-------------------------------------------------------------
-        !--------------- calculate damping term: m x (m x Heff) -------------
-        HeffX2 = gb_solution%My * crossZ - gb_solution%Mz * crossY
-        HeffY2 = gb_solution%Mz * crossX - gb_solution%Mx * crossZ
-        HeffZ2 = gb_solution%Mx * crossY - gb_solution%My * crossX
-        !-------------------------------------------------------------
-        !--------------- assemble dm/dt -------------------------------------
-        dmdt(1:ntot)               = -gb_problem%gamma * crossX - alpha(t,gb_problem) * HeffX2
-        dmdt(ntot+1:2*ntot)        = -gb_problem%gamma * crossY - alpha(t,gb_problem) * HeffY2
-        dmdt(2*ntot+1:3*ntot)      = -gb_problem%gamma * crossZ - alpha(t,gb_problem) * HeffZ2
-        !---------------------------------------------------------------------
-        call trace%end("dmdt_fct", itimer=itimer, verbose=1 )
-    end subroutine dmdt_fct
+        call trace%end("computeHeff", itimer=itimer, verbose=1 )
+    end subroutine computeHeff
+
+    !>-----------------------------------------
+    !> @author Rasmus Bjoerk, rabj@dtu.dk, DTU, 2026
+    !> @brief
+    !> Finds the equilibrium magnetization at the applied field with index i_field, starting from
+    !> gb_problem%m0, and stores it in M_out_i (3*ntot, nt) in the layout of the ODE driver: the first
+    !> column is the starting state and the last column the final state. The method is chosen by the
+    !> solver type - the energy minimizer for MicroMagSolverMinimizer and the Landau-Lifshitz time
+    !> integration otherwise - and the number of effective-field evaluations spent is accumulated in
+    !> gb_solution%n_feval(i_field), so that the two can be compared on the same problem.
+    !>-----------------------------------------
+    subroutine relaxAtField( fct, fct_thermal, cb_fct, M_out_i, ntot, nt, i_field )
+    procedure(dydt_fct), pointer :: fct
+    procedure(no_argument_fct), pointer :: fct_thermal
+    procedure(callback_fct),pointer :: cb_fct
+    real(DP),dimension(:,:),intent(inout) :: M_out_i
+    integer,intent(in) :: ntot, nt, i_field
+    integer, save :: itimer = 0
+
+    call trace%begin( "relaxAtField", itimer=itimer, verbose=1 )
+    n_feval_count = 0
+
+    if ( gb_problem%solver .eq. MicroMagSolverMinimizer ) then
+        call minimizeAtField( fct, fct_thermal, cb_fct, M_out_i, ntot, nt, i_field )
+    else
+        call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out_i, gb_problem%includeThermal, fct_thermal, cb_fct, &
+                gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
+    endif
+
+    !Accumulated rather than assigned: the adaptive hysteresis loop retries a rejected field step under
+    !the same index, and the cost of reaching an accepted state includes those retries.
+    gb_solution%n_feval(i_field) = gb_solution%n_feval(i_field) + n_feval_count
+
+    call trace%end( "relaxAtField", itimer=itimer, verbose=1 )
+    end subroutine relaxAtField
+
+    !>-----------------------------------------
+    !> @author Rasmus Bjoerk, rabj@dtu.dk, DTU, 2026
+    !> @brief
+    !> Evaluates the energy terms for the magnetization and the field components currently held in
+    !> solution, i.e. right after a call to computeHeff. All four are in J:
+    !>   E(1) exchange       -1/2 mu0 sum_i Ms_i V_i m_i . H_exc,i
+    !>   E(2) external       -    mu0 sum_i Ms_i V_i m_i . H_ext,i
+    !>   E(3) demagnetization -1/2 mu0 sum_i Ms_i V_i m_i . H_dem,i
+    !>   E(4) anisotropy     the energy density integrated over the cells.
+    !> The anisotropy term is evaluated from the polynomial rather than from m . H_ani, because the cubic
+    !> and general expansions are not single-degree homogeneous polynomials, for which the half-m.H
+    !> shortcut does not hold. For the uniaxial term the constant K0 is included, so that E(4) is
+    !> K0 V sin^2(theta) >= 0 as in the standard texts; the general expansion carries no such constant
+    !> and is exactly the polynomial documented for K0_arr, plus the cubic K1 and K2 terms.
+    !>-----------------------------------------
+    subroutine computeEnergies( problem, solution, E )
+    type(MicroMagProblem),intent(in) :: problem
+    type(MicroMagSolution),intent(in) :: solution
+    real(DP),dimension(4),intent(out) :: E
+    integer :: ntot
+    real(DP),dimension(:),allocatable :: w, mdotu, mx, my, mz, e_an
+    integer, save :: itimer = 0
+
+    call trace%begin( "computeEnergies", itimer=itimer, verbose=1 )
+    ntot = problem%grid%nx * problem%grid%ny * problem%grid%nz
+
+    if ( .not. allocated(gb_cellVol) ) then
+        allocate( gb_cellVol(ntot) )
+        call cellVolumes( problem, solution, gb_cellVol )
+    endif
+
+    allocate( w(ntot) )
+    w = mu0 * problem%Ms * gb_cellVol
+
+    E(1) = -0.5_DP * sum( w * ( solution%Mx * solution%HjX + solution%My * solution%HjY + solution%Mz * solution%HjZ ) )
+    E(2) = -          sum( w * ( solution%Mx * solution%HhX + solution%My * solution%HhY + solution%Mz * solution%HhZ ) )
+    E(3) = -0.5_DP * sum( w * ( solution%Mx * real(solution%HmX,DP) + solution%My * real(solution%HmY,DP) + solution%Mz * real(solution%HmZ,DP) ) )
+
+    if ( any(problem%K0 .ne. 0) ) then
+        !Uniaxial: K0 (1 - (u.m)^2) per unit volume
+        allocate( mdotu(ntot) )
+        mdotu = problem%u_ea(:,1) * solution%Mx + problem%u_ea(:,2) * solution%My + problem%u_ea(:,3) * solution%Mz
+        E(4) = sum( gb_cellVol * problem%K0 * ( 1.0_DP - mdotu**2 ) )
+        deallocate( mdotu )
+    else if ( allocated(problem%Kfact_arr) ) then
+        !General expansion in the local crystal frame. Kfact_arr is K0_arr/(mu0 Ms) with the cubic K1, K2
+        !folded in (see ComputeAnisotropyTerm3D), so w * Kfact_arr is the coefficient in J.
+        allocate( mx(ntot), my(ntot), mz(ntot), e_an(ntot) )
+        mx = problem%CrystalAxis(:,1,1)*solution%Mx + problem%CrystalAxis(:,1,2)*solution%My + problem%CrystalAxis(:,1,3)*solution%Mz
+        my = problem%CrystalAxis(:,2,1)*solution%Mx + problem%CrystalAxis(:,2,2)*solution%My + problem%CrystalAxis(:,2,3)*solution%Mz
+        mz = problem%CrystalAxis(:,3,1)*solution%Mx + problem%CrystalAxis(:,3,2)*solution%My + problem%CrystalAxis(:,3,3)*solution%Mz
+        e_an = -( problem%Kfact_arr(:,1,1)*mx**2 + problem%Kfact_arr(:,1,2)*my**2 + problem%Kfact_arr(:,1,3)*mz**2 &
+                + problem%Kfact_arr(:,2,1)*mx**4 + problem%Kfact_arr(:,2,2)*my**4 + problem%Kfact_arr(:,2,3)*mz**4 &
+                + problem%Kfact_arr(:,3,1)*my**2*mz**2 + problem%Kfact_arr(:,3,2)*mz**2*mx**2 + problem%Kfact_arr(:,3,3)*mx**2*my**2 &
+                + problem%Kfact_arr(:,4,1)*mx**6 + problem%Kfact_arr(:,4,2)*my**6 + problem%Kfact_arr(:,4,3)*mz**6 &
+                + problem%Kfact_arr(:,5,1)*mx**4*(my**2 + mz**2) + problem%Kfact_arr(:,5,2)*my**4*(mz**2 + mx**2) &
+                + problem%Kfact_arr(:,5,3)*mz**4*(mx**2 + my**2) &
+                + problem%Kfact_arr(:,6,1)*mx**2*my**2*mz**2 )
+        E(4) = sum( w * e_an )
+        deallocate( mx, my, mz, e_an )
+    else
+        E(4) = 0.0_DP
+    endif
+
+    deallocate( w )
+    call trace%end( "computeEnergies", itimer=itimer, verbose=1 )
+    end subroutine computeEnergies
+
+    !>-----------------------------------------
+    !> Callbacks handed to the generic EnergyMinimizer module: the effective field at a state, and
+    !> the energy terms of the state the field was last evaluated at. Both read the module state of
+    !> the current problem, which is why they live here and not in the minimizer.
+    !>-----------------------------------------
+    subroutine minimizerHeff( m, H )
+    real(DP),dimension(:),intent(in) :: m
+    real(DP),dimension(:),intent(out) :: H
+    integer :: ntot
+    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
+    call computeHeff( 0.0_DP, m )
+    H(1:ntot)          = HeffX
+    H(ntot+1:2*ntot)   = HeffY
+    H(2*ntot+1:3*ntot) = HeffZ
+    end subroutine minimizerHeff
+
+    subroutine minimizerEnergy( E )
+    real(DP),dimension(4),intent(out) :: E
+    call computeEnergies( gb_problem, gb_solution, E )
+    end subroutine minimizerEnergy
+
+    !>-----------------------------------------
+    !> @author Rasmus Bjoerk, rabj@dtu.dk, DTU, 2026
+    !> @brief
+    !> Relaxes the magnetization to an energy minimum at the applied field gb_problem%Hext(i_field,:),
+    !> starting from gb_problem%m0, with the Barzilai-Borwein minimizer in EnergyMinimizer.f90. This
+    !> routine only translates between the problem struct and the generic minimizer: it sets the
+    !> tolerances and the field and energy scales, hands over the field and energy callbacks and the
+    !> ODE settings the fallback needs, and stores the result in the layout of the ODE driver:
+    !> M_out_i(:,1) is the starting state and every later column holds the final state, and
+    !> gb_solution%t_out holds the requested output times.
+    !>-----------------------------------------
+    subroutine minimizeAtField( fct, fct_thermal, cb_fct, M_out_i, ntot, nt, i_field )
+    procedure(dydt_fct), pointer :: fct
+    procedure(no_argument_fct), pointer :: fct_thermal
+    procedure(callback_fct),pointer :: cb_fct
+    real(DP),dimension(:,:),intent(inout) :: M_out_i
+    integer,intent(in) :: ntot, nt, i_field
+
+    type(MinimizerSettings) :: settings
+    type(MinimizerResult) :: result
+    real(DP),dimension(:),allocatable :: m
+    real(DP) :: Ms_max
+    integer :: j
+    character*(256) :: prog_str
+    integer, save :: itimer = 0
+
+    call trace%begin( "minimizeAtField", itimer=itimer, verbose=1 )
+
+    !The cell volumes set the energy scale of the watchdog; computeEnergies caches them as well
+    if ( .not. allocated(gb_cellVol) ) then
+        allocate( gb_cellVol(ntot) )
+        call cellVolumes( gb_problem, gb_solution, gb_cellVol )
+    endif
+    Ms_max = maxval( gb_problem%Ms )
+
+    settings%tol = gb_problem%min_tol
+    settings%maxiter = gb_problem%min_maxiter
+    settings%maxrot = gb_problem%min_maxrot
+    settings%fallback = gb_problem%min_fallback
+    settings%saddle_check = gb_problem%min_saddle_check
+    !The eigenvalue check needs the weight of every cell in the energy, Ms_i V_i, to make the
+    !Hessian self-adjoint in its inner product
+    if ( gb_problem%min_saddle_check .eq. 2 ) then
+        settings%weights = gb_problem%Ms * gb_cellVol
+        !The soft mode changes little between neighbouring fields, so the eigenvector of the
+        !previous field is the Lanczos start vector (a random one otherwise)
+        if ( allocated(pred_u) ) settings%eig_start = pred_u
+    endif
+    settings%H_scale = Ms_max
+    settings%E_scale = 0.5_DP * mu0 * Ms_max**2 * sum( gb_cellVol )
+    settings%display_every = max( 1, gb_problem%setTimeDisplay ) * 10
+    !With the predictor on, the first step also starts from the step length the previous field
+    !ended with (a curvature estimate), see predictorStart
+    if ( gb_problem%min_predictor .ne. 0 ) settings%tau_init = pred_tau
+
+    allocate( m(3*ntot) )
+    call MagTense_Minimize( minimizerHeff, minimizerEnergy, gb_problem%m0, m, ntot, settings, result, cb_fct, &
+            fct, fct_thermal, gb_problem%t, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, &
+            gb_problem%t_conv, gb_problem%conv_tol, gb_problem%setTimeDisplay )
+
+    !Output in the layout of the ODE driver
+    M_out_i(:,1) = gb_problem%m0
+    do j = 2, nt
+        M_out_i(:,j) = m
+    end do
+    gb_solution%t_out = gb_problem%t
+
+    gb_solution%min_iter(i_field) = gb_solution%min_iter(i_field) + result%n_iter
+    gb_solution%min_torque(i_field) = result%torque
+    gb_solution%min_status(i_field) = result%status
+    if ( gb_problem%min_saddle_check .eq. 2 ) then
+        gb_solution%min_eig(i_field) = result%eig_min
+        if ( result%status .le. 1 .and. allocated(result%eig_vec) ) then
+            pred_u = result%eig_vec
+        else if ( allocated(pred_u) ) then
+            deallocate( pred_u )
+        endif
+    endif
+    if ( result%status .le. 1 ) then
+        pred_tau = result%tau_last
+    else
+        pred_tau = 0.0_DP
+    endif
+
+    !Only the failure is reported; a converged relaxation stays quiet. The report used to sit
+    !after the if with the converged message commented out, so on convergence an
+    !uninitialised buffer went to displayGUIMessage. Python printed the garbage silently,
+    !but in the MEX mxCreateString asserts on non-UTF-8 input and takes MATLAB down.
+    if ( result%status .gt. 1 ) then
+        write(prog_str,'(A,I7,A,I7,A,ES9.2)') 'Minimizer NOT converged: iter ', result%n_iter, ' feval ', n_feval_count, ' torque/Ms ', result%torque
+        call displayGUIMessage( trim(prog_str) )
+    endif
+
+    deallocate( m )
+    call trace%end( "minimizeAtField", itimer=itimer, verbose=1 )
+    end subroutine minimizeAtField
 
     
     !>--------------------------
@@ -799,53 +1242,43 @@
     subroutine StoreHeffComponents ( problem, solution )
     type(MicroMagProblem),intent(in) :: problem
     type(MicroMagSolution),intent(inout) :: solution
-    integer :: i,j,nt
+    integer :: i,j,nt,ntot,j_start
+    real(DP),dimension(:),allocatable :: m
+    real(DP),dimension(4) :: E4
     integer, save :: itimer = 0
 
-    !This routine exists only to fill the returned H_exc/H_ext/H_dem/H_ani arrays, so there is
-    !nothing to do when the caller has not asked for them.
-    !Note that this is NOT the field update the solver runs on - that is dmdt_fct, which the
-    !integrator calls at every right-hand-side evaluation. This routine runs after MagTense_ODE has
-    !returned and recomputes the field terms at the nt output times from the stored solution,
-    !because the integrator's last right-hand-side evaluation is at an internal step rather than at
-    !the requested output state. The recomputed terms land in solution%HjX/HhX/HkX/HmX, which
-    !dmdt_fct overwrites from scratch on its next call and which nothing outside this file reads,
-    !so with useReturnHall off the whole loop below has no consumer.
-    !The test lives here rather than at the call sites so that a new call site cannot reintroduce
-    !the redundant work by forgetting it.
-    if ( problem%useReturnHall .ne. useReturnHallTrue ) return
-
+    !This routine fills the returned energies E_out and, when asked for, the H_exc/H_ext/H_dem/H_ani
+    !arrays. Note that this is NOT the field update the solver runs on - that is computeHeff, which the
+    !integrator calls through dmdt_fct at every right-hand-side evaluation. This routine runs after the
+    !relaxation has returned and recomputes the field terms at the output times from the stored
+    !solution, because the integrator's last right-hand-side evaluation is at an internal step rather
+    !than at the requested output state.
+    !The energies at the last output time are always stored, which costs one field evaluation per
+    !applied field; the energies and the fields at every output time only when they were asked for.
     call trace%begin( "StoreHeffComponents", itimer=itimer, verbose=1 )
 
     i = gb_solution%HextInd
-    nt = size( gb_problem%t ) 
-    
-    do j=1,nt
-        !Calculate the effective field for the values where the magnetization is known
-        gb_solution%Mx = gb_solution%M_out(j,:,i,1)
-        gb_solution%My = gb_solution%M_out(j,:,i,2)
-        gb_solution%Mz = gb_solution%M_out(j,:,i,3)
-    
-        !Exchange term    
-        call updateExchangeTerms( gb_problem, gb_solution )
-        !External field
-        call updateExternalField( gb_problem, gb_solution, gb_solution%t_out(j) )
-        !Anisotropy term
-        call updateAnisotropy(  gb_problem, gb_solution )
-        !Demag. field
-#if USE_FMM3D
-        if ( gb_problem%use_fmm)  then
-          call updateDemagfieldFMM( gb_problem, gb_solution )
-        else
-           call updateDemagfield( gb_problem, gb_solution )
-        end if
-#else
-        call updateDemagfield( gb_problem, gb_solution )
-#endif
+    nt = size( gb_problem%t )
+    ntot = size( gb_solution%M_out, 2 )
+    if ( problem%useReturnHall .eq. useReturnHallTrue ) then
+        j_start = 1
+    else
+        j_start = nt
+    endif
+    allocate( m(3*ntot) )
 
-    
+    do j=j_start,nt
+        !Calculate the effective field for the values where the magnetization is known
+        m(1:ntot)          = gb_solution%M_out(j,:,i,1)
+        m(ntot+1:2*ntot)   = gb_solution%M_out(j,:,i,2)
+        m(2*ntot+1:3*ntot) = gb_solution%M_out(j,:,i,3)
+        call computeHeff( gb_solution%t_out(j), m )
+
+        call computeEnergies( gb_problem, gb_solution, E4 )
+        gb_solution%E_out(j,i,:) = E4
+
         if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
-            !Store the components of the effective field
+!Store the components of the effective field
             gb_solution%H_exc(j,:,i,1) = gb_solution%HjX
             gb_solution%H_exc(j,:,i,2) = gb_solution%HjY
             gb_solution%H_exc(j,:,i,3) = gb_solution%HjZ
@@ -863,10 +1296,11 @@
             gb_solution%H_ani(j,:,i,3) = gb_solution%HkZ
         endif
     end do
-    
+    deallocate( m )
+
     call trace%end( "StoreHeffComponents", itimer=itimer, verbose=1 )
     end subroutine StoreHeffComponents
-    
+
     
     
     !>-----------------------------------------
@@ -1015,14 +1449,14 @@
 
     call trace%begin( "updateExternalField", itimer=itimer, verbose=1 )
     
-    if ( problem%solver .eq. MicroMagSolverExplicit ) then
+    if ( problem%solver .eq. MicroMagSolverExplicit .or. problem%solver .eq. MicroMagSolverMinimizer ) then
          !Assume the field to be constant in time (we are finding the equilibrium solution at a given applied field)
         solution%HhX = problem%Hext(solution%HextInd,2)
         solution%HhY = problem%Hext(solution%HextInd,3)
         solution%HhZ = problem%Hext(solution%HextInd,4)
 
     elseif ( problem%solver .eq. MicroMagSolverDynamic ) then
-        
+
         !Interpolate to get the applied field at time t
         call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,2), t, size(problem%Hext(:,1)), HextX )
         call interp1_MagTense( problem%Hext(:,1), problem%Hext(:,3), t, size(problem%Hext(:,1)), HextY )
@@ -1031,11 +1465,9 @@
         solution%HhX = HextX
         solution%HhY = HextY
         solution%HhZ = HextZ
-        
-    elseif ( problem%solver .eq. MicroMagSolverImplicit ) then
-        !not implemented yet
+
     endif
-    
+
     call trace%end( "updateExternalField", itimer=itimer, verbose=1 )
 
     end subroutine updateExternalField
@@ -1812,8 +2244,6 @@ end subroutine updateDemagfieldFMM
 
         !CALL SYSTEM_CLOCK(c1)
  
-        !call mkl_set_num_threads(problem%nThreadsMatlab)
-        !call omp_set_num_threads(problem%nThreadsMatlab)
         !call omp_set_num_threads(1)               
         if ( problem%grid%gridType .eq. gridTypeUniform ) then
             
@@ -2853,7 +3283,23 @@ end subroutine updateDemagfieldFMM
                 descr%diag = SPARSE_DIAG_NON_UNIT
                 stat = mkl_sparse_copy ( d2dz2%A, descr, A )
             else
-                !no exchange terms
+                !No exchange terms: a single cell along every direction, i.e. a macrospin. The rest of
+                !the code (and the deallocation below) expects an exchange operator, so build one
+                !with an explicit zero on every diagonal. This used to fall through with d2dz2
+                !unallocated and die in the deallocate.
+                call displayGUIMessage( 'No exchange terms (single cell)' )
+                allocate(d2dz2%values(ntot),d2dz2%cols(ntot),d2dz2%rows_start(ntot),d2dz2%rows_end(ntot))
+                do i = 1, ntot
+                    d2dz2%values(i) = 0.0_DP
+                    d2dz2%cols(i) = i
+                    d2dz2%rows_start(i) = i
+                    d2dz2%rows_end(i) = i + 1
+                end do
+                stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, ntot, ntot, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
+                descr%type = SPARSE_MATRIX_TYPE_GENERAL
+                descr%mode = SPARSE_FILL_MODE_FULL
+                descr%diag = SPARSE_DIAG_NON_UNIT
+                stat = mkl_sparse_copy ( d2dz2%A, descr, A )
             endif
             deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
             stat = mkl_sparse_destroy (d2dz2%A)
@@ -3049,23 +3495,30 @@ subroutine add_near_field(problem, solution)
 
 
 #if USE_CUDA
-    allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) )
-    hx_tmp = 0.0_SP
-    hy_tmp = 0.0_SP
-    hz_tmp = 0.0_SP
+    !The GPU holds the near-field matrices only when the solver was asked to use CUDA
+    !(cudaInit_sparse is called on problem%useCuda, not on the build flag), so a CUDA build
+    !with useCuda off must take the MKL path below like any other build.
+    if ( problem%useCuda .eq. useCudaTrue ) then
+        allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) )
+        hx_tmp = 0.0_SP
+        hy_tmp = 0.0_SP
+        hz_tmp = 0.0_SP
 
-    pref = sngl(1.0)
-    call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
+        pref = sngl(1.0)
+        call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
 
-    !$omp critical (solution_update)
-    solution%HmX = solution%HmX + hx_tmp 
-    solution%HmY = solution%HmY + hy_tmp 
-    solution%HmZ = solution%HmZ + hz_tmp 
-    !$omp end critical (solution_update)
+        !$omp critical (solution_update)
+        solution%HmX = solution%HmX + hx_tmp 
+        solution%HmY = solution%HmY + hy_tmp 
+        solution%HmZ = solution%HmZ + hz_tmp 
+        !$omp end critical (solution_update)
 
-    deallocate(hx_tmp, hy_tmp, hz_tmp)
+        deallocate(hx_tmp, hy_tmp, hz_tmp)
 
-#else
+        call trace%end( "add_near_field", itimer=itimer, verbose=2 )
+        return
+    endif
+#endif
     allocate(temp(ntot))
 
     alpha = 1.0_SP
@@ -3106,7 +3559,6 @@ subroutine add_near_field(problem, solution)
     solution%HmZ = solution%HmZ + temp
     !$omp end critical (solution_update)
     deallocate(temp)
-#endif
 
     call trace%end( "add_near_field", itimer=itimer, verbose=2 )
 end subroutine add_near_field

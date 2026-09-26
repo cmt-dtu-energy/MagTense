@@ -185,7 +185,6 @@ constructor arguments are plain attributes and are listed there as well.
         K0_arr=None, CrysAxis=None,
         alpha: float = 4.42e3,
         gamma: float = 2.21e5,
-        max_T0: float = 2.0,
         nt_conv: int = 1,
         conv_tol: float = 1e-4,
         tol: float = 1e-4,
@@ -201,7 +200,6 @@ constructor arguments are plain attributes and are listed there as well.
         exch_meth: str | None = "directlaplacianneumann",
         exch_weigh: float = 8,
         exch_presize: int = 12,
-        demigstp: int = 0,
         passexch: int = 0,
         filename: str = "t",
         cuda: bool = False,
@@ -209,8 +207,6 @@ constructor arguments are plain attributes and are listed there as well.
         usedemag: bool = True,
         useavgn: bool = True,
         usereturnhall: bool = False,
-        precision: bool = False,
-        n_threads: int = 1,
         N_ave: tuple[int] = (1, 1, 1),
         t_alpha: np.ndarray = np.zeros(1),
         alpha_fct=lambda t: np.atleast_2d(t).T * 0,
@@ -218,6 +214,13 @@ constructor arguments are plain attributes and are listed there as well.
         shiftVec=np.zeros(3), n_macro=np.zeros(3),
         hysteresis_solver: str = "static",
         rng_seed: int = 0,
+        phase_id=None, A_int=None,
+        min_tol: float = 1e-5,
+        min_maxiter: int = 10000,
+        min_maxrot: float = 0.3,
+        min_fallback: bool = True,
+        min_saddle_check: bool | int = 2,
+        min_predictor: bool = True,
     ) -> None
 
 ----------------------------------------
@@ -233,10 +236,11 @@ Micromagnetic run methods
         nt_h_ext: int
     ) -> list
 
-A single solve, used for both the ``dynamic`` and the ``explicit`` solver.
-``fct_h_ext`` is evaluated on ``nt_h_ext`` uniformly spaced times between 0 and
-``t_end`` and must return an ``(nt_h_ext, 3)`` array. The returned list is
-described in :ref:`Micromagnetic output`.
+A single solve, used for the ``dynamic``, the ``explicit`` and the
+``minimizer`` solver. ``fct_h_ext`` is evaluated on ``nt_h_ext`` uniformly
+spaced times between 0 and ``t_end`` and must return an ``(nt_h_ext, 3)``
+array. The returned list is described in :ref:`Micromagnetic output`, and the
+energies and relaxation diagnostics land on the problem object.
 
 ::
 
@@ -257,13 +261,14 @@ A predefined sequence of applied fields, given as an ``(n,4)`` array of
         dM_min: float = 1e-3,
         dM_target: float = 1e-2,
         dM_reject: float = 5e-2,
-        dH_grow: float = 1.5,
-        dH_shrink: float = 0.75,
+        dH_grow: float = 1.25,
+        dH_shrink: float = 0.5,
         switch_refine_dH: float | None = None,
     ) -> list
 
 A field sweep in which the solver picks the field steps itself. Requires
-``hysteresis_solver="adaptive"`` and ``solver="explicit"``. See
+``hysteresis_solver="adaptive"`` and ``solver="explicit"`` (the energy
+minimizer) or ``"explicit_ll"`` (Landau-Lifshitz time integration). See
 :ref:`Adaptive hysteresis`.
 
 ========================================

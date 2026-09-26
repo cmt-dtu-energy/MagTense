@@ -45,7 +45,18 @@ jobs:
 
     - name: Linux - Select FMM3D make.inc
       if: ${{ runner.os == 'Linux' }}
-      run: cp external/FMM3D/make.inc.linux external/FMM3D/make.inc
+      # make.inc.linux builds with -march=native, which ties libfmm3d.so to the
+      # CPU of whichever hosted VM ran this leg. A leg that lands on an AVX-512
+      # host ships a wheel that dies with SIGILL on machines without AVX-512
+      # (as the self-hosted CUDA runner does), so pin a portable baseline.
+      run: |
+        cp external/FMM3D/make.inc.linux external/FMM3D/make.inc
+        sed -i 's/-march=native/-march=x86-64-v3/g' external/FMM3D/make.inc
+        if grep -n 'march=native' external/FMM3D/make.inc; then
+          echo "::error::-march=native is still set in external/FMM3D/make.inc"
+          exit 1
+        fi
+        grep -n '^FFLAGS' external/FMM3D/make.inc
 
     - name: Win - Select FMM3D make.inc
       if: ${{ runner.os == 'Windows' }}
@@ -235,7 +246,7 @@ jobs:
         python -m pip install pytest
         python -m pytest python/examples/magnetostatics/test_magtense.py
 
-    # python/examples/micromagnetism/testMagTenseFunctions.py is the combined micromagnetic
+    # python/util/testMagTenseFunctions.py is the combined micromagnetic
     # suite and the counterpart of matlab/util/testMagTenseFunctions. It runs the validation
     # examples, compares every measure with the limit that belongs to it, and exits non zero
     # when one of them is over its limit, so this step fails on a numerical regression and not
@@ -248,20 +259,20 @@ jobs:
       if: ${{ !(matrix.os == 'ubuntu-latest' && matrix.py-version.id == '3.13' && matrix.mt-punit.name == 'cpu') }}
       run: |
         python -m pip install matplotlib scipy
-        python python/examples/micromagnetism/testMagTenseFunctions.py --skip std_problem_6
+        python python/util/testMagTenseFunctions.py --skip std_problem_6
 
     - name: Run the whole combined micromagnetic test suite
       if: ${{ matrix.os == 'ubuntu-latest' && matrix.py-version.id == '3.13' && matrix.mt-punit.name == 'cpu' }}
       run: |
         python -m pip install matplotlib scipy
-        python python/examples/micromagnetism/testMagTenseFunctions.py
+        python python/util/testMagTenseFunctions.py
 
     - name: Upload the overview of the test suite
       if: ${{ always() && matrix.os == 'ubuntu-latest' && matrix.py-version.id == '3.13' && matrix.mt-punit.name == 'cpu' }}
       uses: actions/upload-artifact@v4
       with:
         name: test-suite-py${{ matrix.py-version.name }}-${{ matrix.mt-punit.name }}-${{ runner.os }}
-        path: python/examples/micromagnetism/testMagTenseFunctions_overview.png
+        path: python/util/results/testMagTenseFunctions_overview.png
         if-no-files-found: ignore
 
 
@@ -479,7 +490,7 @@ jobs:
       if: ${{ matrix.fmm_runner.os_name == 'linux' }}
       run: |
         "$PYTHON_EXE" -m pip install matplotlib scipy
-        "$PYTHON_EXE" python/examples/micromagnetism/testMagTenseFunctions.py --cuda --skip std_problem_6
+        "$PYTHON_EXE" python/util/testMagTenseFunctions.py --cuda --skip std_problem_6
 
     - name: Install pip-wheel and pytest (Windows)
       if: ${{ matrix.fmm_runner.os_name == 'windows' }}
@@ -527,7 +538,7 @@ jobs:
         $ErrorActionPreference = "Stop"
 
         & $env:PYTHON_EXE -m pip install matplotlib scipy
-        & $env:PYTHON_EXE python/examples/micromagnetism/testMagTenseFunctions.py --cuda --skip std_problem_6
+        & $env:PYTHON_EXE python/util/testMagTenseFunctions.py --cuda --skip std_problem_6
 
 
   cache-conda-win:

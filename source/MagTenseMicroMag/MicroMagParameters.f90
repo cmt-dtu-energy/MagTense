@@ -99,9 +99,9 @@ include "mkl_dfti.f90"
         integer, allocatable  :: AllFaces(:,:)                                   !> K x 3 node indices of each face. Only filled for a tetrahedral mesh
         logical  :: exchPBC(3) = .false.         !> Periodic boundary conditions along x, y and z for the exchange coupling
         real(dp) :: Lper(3) = 0.                 !> Period, i.e. the extent of the mesh, along x, y and z. Only used when exchPBC is set
-        integer :: Exch_mat_nr                   !> Number of rows in the exchange coupling matrix
-        integer :: Exch_mat_nc                   !> Number of columns in the exchange coupling matrix
-        integer :: Exch_mat_ntot                 !> Number of elements in the exchange coupling matrix
+        integer :: Exch_mat_nr = 0                   !> Number of rows in the exchange coupling matrix
+        integer :: Exch_mat_nc = 0                   !> Number of columns in the exchange coupling matrix
+        integer :: Exch_mat_ntot = 0                 !> Number of elements in the exchange coupling matrix
         integer, allocatable  :: Exch_mat_r(:)   !> Row indices for the exchange coupling matrix
         integer, allocatable  :: Exch_mat_c(:)   !> Column indices for the exchange coupling matrix
         real(dp), allocatable :: Exch_mat_v(:)   !> Values for the exchange coupling matrix
@@ -138,7 +138,7 @@ include "mkl_dfti.f90"
         integer  :: exch_method                           !> Determines what type of exchange operator method to use
         integer  :: exch_interpn                          !> Determines what type of exchange interpolation method to use
     
-        real(DP) :: gamma,alpha0,MaxT0                    !> User defined coefficients determining part of the problem.
+        real(DP) :: gamma,alpha0                          !> User defined coefficients determining part of the problem.
         real(DP) :: tol,thres_value                       !> User defined coefficients for the ODE solver
         real(DP),dimension(:),allocatable :: Jfact,Kfact
         real(SP),dimension(:),allocatable :: Mfact
@@ -166,6 +166,15 @@ include "mkl_dfti.f90"
         real(DP) :: dM_reject = 5.0e-2_DP                 !> Magnetisation-change threshold for rejecting adaptive field steps.
         real(DP) :: switch_refine_dH = 0.0_DP             !> Maximum accepted step across magnetisation sign changes [A/m].
         logical :: use_switch_refine = .false.            !> Enable adaptive sign-change refinement.
+
+        !> Settings for the energy minimizer (solver = MicroMagSolverMinimizer). The minimizer replaces
+        !> the Landau-Lifshitz time integration when relaxing to equilibrium at a constant applied field.
+        real(DP) :: min_tol = 1.0e-5_DP                   !> Convergence criterion: max_i |m_i x H_eff,i| / max(Ms) must fall below this
+        integer  :: min_maxiter = 10000                   !> Maximum number of minimizer iterations per applied field
+        real(DP) :: min_maxrot = 0.3_DP                   !> Largest rotation of any cell in one iteration [rad]
+        integer  :: min_fallback = 1                      !> 1: fall back to LL time integration if the minimizer stalls, 0: give up
+        integer  :: min_saddle_check = 2                  !> 0: accept a converged state as it is, 1: nudge it and relax again, 2: lowest Hessian eigenvalue by Lanczos (rigorous, and reported in min_eig)
+        integer  :: min_predictor = 1                     !> 1: start each applied field from the secant extrapolation of the two previous equilibria, 0: from the previous equilibrium
         real(DP),dimension(:,:),allocatable :: alpha      !> A time dependent damping parameter, i.e. as a function of time. Size (nt,1).
         
         real(DP),dimension(:),allocatable :: t              !> Time array for the desired output times
@@ -178,20 +187,17 @@ include "mkl_dfti.f90"
         
         real(SP) :: demag_threshold                        !> Used for specifying whether the demag tensors should be converted to sparse matrices by defining values below this value to be zero
         real(SP) :: CV                                   !> The coefficient of variation (CV), i.e. the ratio of the standard deviation to the mean, which can be used to add an error to the demag field
-        integer :: demag_ignore_steps                    !> Only compute the demag tensor every demag_ignore_steps'th-step in a calculation using the hysteresis-model. Otherwise the parameter is ignore (i.e. in the dynamic solver)
         
         integer :: setTimeDisplay                               !> Determines how often the timestep is shown in Matlab
         integer :: useCuda                                      !> Defines whether to attempt using CUDA or not
         integer :: useCVODE                                     !> Defines whether to attempt using CVODE or not
         integer :: useDemag                                     !> Defines whether to include the demagnetization field in the calculations or not
-        integer :: usePrecision                                 !> Defines whether to use single (false) or double precision (true)
         integer :: useReturnHall                                !> Defines whether to return all the specific H-fields (exchange, demag) �(true) or not (false)
         integer :: useAvgN                                      !> Defines wether to use volume avergared demag tensor for the prism (True) or not (False)
         integer :: passExch                                     !> Defines whether the exchange matrix is passed from Matlab/Python (true) or calculated localled (false).
         integer :: demag_approximation                          !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         integer :: demagTensorReturnState                       !> Flag describing how or if the demag tensor should be returned
         integer :: demagTensorLoadState                         !> Flag describing how or if to load the demag tensor (from disk e.g.)
-        integer :: nThreadsMatlab                               !> Number of threads to use in the OpenMP demag tensor allocation
         integer,dimension(3) :: N_ave                           !> Number of points to average the demag tensor in in the recieving tile, N_ave(1) = N_x etc
         character*256 :: demagTensorFileOut, demagTensorFileIn  !> Filename (including path) for output (input) of demag tensor if it is to be returned as a file (demagTensorReturnState >2 and the value is equal to the length of the file including path)
         
@@ -233,7 +239,7 @@ include "mkl_dfti.f90"
         integer,dimension(:,:,:),allocatable :: phase_map   !> phase_id mapped onto a uniform grid
         real(DP),dimension(:,:),allocatable :: A_int        !> Interface exchange per pair of phases [J/m]
         
-        type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H       !> Handle for the FFT MKL stuff
+        type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H => null()      !> Handle for the FFT MKL stuff
 
 
 
@@ -267,6 +273,7 @@ include "mkl_dfti.f90"
         integer :: window_ena
         real(DP) :: window_int
         integer :: trace_ena
+        integer :: timer_ena = 0                                !> 1 writes the timing log file, 0 (default) does not
         integer :: flush_each
         integer :: trace_verb
         character*256 :: log_dir
@@ -300,6 +307,17 @@ include "mkl_dfti.f90"
         real(DP),dimension(:,:,:,:),allocatable :: H_ani    !> The anisotropy field at each of these times (nt,ntot,nt_Hext,3)
         
         real(DP),dimension(:,:),allocatable :: pts          !> n,3 array with the points (x,y,z) of the centers of the tiles
+
+        !> Energies and relaxation diagnostics. The last index of E_out is the term:
+        !> 1 exchange, 2 external (Zeeman), 3 demagnetization, 4 anisotropy, all in J.
+        !> E_out is filled at every output time when useReturnHall is set and otherwise
+        !> only at the last output time (the remaining entries stay zero).
+        real(DP),dimension(:,:,:),allocatable :: E_out      !> Energies (nt,nt_Hext,4) [J]
+        integer,dimension(:),allocatable :: n_feval         !> Effective-field evaluations spent relaxing at each applied field (nt_Hext)
+        integer,dimension(:),allocatable :: min_iter        !> Minimizer iterations at each applied field (nt_Hext), 0 for the LL solver
+        real(DP),dimension(:),allocatable :: min_torque     !> Final max_i |m_i x H_i| / max(Ms) at each applied field (nt_Hext)
+        integer,dimension(:),allocatable :: min_status      !> -1 LL time integration, 0 minimizer converged, 1 converged after LL fallback, 2 not converged
+        real(DP),dimension(:),allocatable :: min_eig        !> Lowest Hessian eigenvalue of the returned state / max(Ms) at each applied field (min_saddle_check = 2), NaN otherwise
         
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         
@@ -316,7 +334,7 @@ include "mkl_dfti.f90"
     
     integer,parameter :: gridTypeUniform=1,gridTypeTetrahedron=2,gridTypeUnstructuredPrisms=3
     integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
-    integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverImplicit=3
+    integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverMinimizer=3
     integer,parameter :: MicroMagExchMethodDirectLaplacianNeumann=1,MicroMagExchMethodGGNeumann=2
     integer,parameter :: MicroMagExchInterpnExtended=1,MicroMagExchInterpnCompact=2
     integer,parameter :: useCudaTrue=1,useCudaFalse=0
@@ -325,7 +343,6 @@ include "mkl_dfti.f90"
     !!@todo Do NOT have useCVODETrue/-False variables both here and in IntegrationDataTypes.
     integer,parameter :: useCVODETrue=1,useCVODEFalse=0
     integer,parameter :: passExchTrue=1,passExchFalse=0
-    integer,parameter :: usePrecisionTrue=1,usePrecisionFalse=0
     integer,parameter :: useReturnHallTrue=1,useReturnHallFalse=0
     integer,parameter :: useFMMTrue=1,useFMMFalse=0
     integer,parameter :: useDemagTrue=1,useDemagFalse=0

@@ -14,7 +14,7 @@
     <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/documentation_options.js?v=7f41d439"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
@@ -101,7 +101,66 @@
 <h1>Micromagnetic examples and validation<a class="headerlink" href="#micromagnetic-examples-and-validation" title="Link to this heading"></a></h1>
 <p>The examples below ship with MagTense and are the recommended starting point.
 The Matlab and the Python versions of each test are written to mirror each
-other, so the same physics is checked from both interfaces.</p>
+other, so the same physics is checked from both interfaces. The standard
+problems take the same options in both languages, with the same defaults:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 30.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Matlab option</p></th>
+<th class="head"><p>Python argument</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_CUDA</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">cuda</span></code></p></td>
+<td><p>Use CUDA for the calculations (default true)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">use_CVODE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">cvode</span></code></p></td>
+<td><p>Use CVODE for the time integration (default false)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ShowTheResult</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">plotting</span></code>, <code class="docutils literal notranslate"><span class="pre">figpath</span></code></p></td>
+<td><p>Show the result, or in Python save it to <code class="docutils literal notranslate"><span class="pre">figpath</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">use_minimizer</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">use_minimizer</span></code></p></td>
+<td><p>Relax with the <a class="reference internal" href="micromag_solvers.html#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a> instead of the time integration</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_adaptive</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">use_adaptive</span></code></p></td>
+<td><p>Problem 2: adaptive field stepping instead of the fixed table</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mesh_type</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mesh_type</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">'uniform'</span></code>, <code class="docutils literal notranslate"><span class="pre">'unstructuredPrisms'</span></code> or, in problem 3, <code class="docutils literal notranslate"><span class="pre">'tetrahedron'</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">mesh_file</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mesh_file</span></code></p></td>
+<td><p>The text file with the unstructured Cartesian mesh</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mesh_res_param</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">mesh_res_param</span></code></p></td>
+<td><p>Problem 3: tetrahedra per edge length</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_AvgN</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">use_avgn</span></code></p></td>
+<td><p>Problem 4: the averaged prism tensor for the demag field</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cart_dir</span></code>, <code class="docutils literal notranslate"><span class="pre">TwoDsim</span></code>, <code class="docutils literal notranslate"><span class="pre">TwoDsize</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">cart_dir</span></code>, <code class="docutils literal notranslate"><span class="pre">two_d_sim</span></code>, <code class="docutils literal notranslate"><span class="pre">two_d_size</span></code></p></td>
+<td><p>Problem 6: the axis of the sample and the 2D strip</p></td>
+</tr>
+</tbody>
+</table>
+<p>The unstructured Cartesian meshes are text files, one prism per row with its
+centre and its side lengths, and both languages read the same files from
+<code class="docutils literal notranslate"><span class="pre">documentation/examples_mumag_validation</span></code>.</p>
 <section id="mumag-standard-problems">
 <h2>muMag standard problems<a class="headerlink" href="#mumag-standard-problems" title="Link to this heading"></a></h2>
 <table class="docutils align-default">
@@ -119,12 +178,10 @@ other, so the same physics is checked from both interfaces.</p>
 <tbody>
 <tr class="row-even"><td><p>Standard problem 2</p></td>
 <td><p><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_2/Standard_problem_2.m">Standard_problem_2.m</a></p></td>
-<td><p>-</p></td>
+<td><p><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/mumag_micromag_Std_problem_2/std_problem_2.py">std_problem_2.py</a></p></td>
 </tr>
 <tr class="row-odd"><td><p>Standard problem 3</p></td>
-<td><p><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_3/Standard_problem_3.m">Standard_problem_3.m</a>,
-<code class="docutils literal notranslate"><span class="pre">Standard_problem_3_unstructured_cart.m</span></code>,
-<code class="docutils literal notranslate"><span class="pre">Standard_problem_3_tetra.m</span></code></p></td>
+<td><p><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/examples/Micromagnetism/mumag_micromag_Std_problem_3/Standard_problem_3.m">Standard_problem_3.m</a></p></td>
 <td><p><a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/mumag_micromag_Std_problem_3/std_problem_3.py">std_problem_3.py</a></p></td>
 </tr>
 <tr class="row-even"><td><p>Standard problem 4</p></td>
@@ -144,20 +201,48 @@ bar, computed with the <strong>explicit</strong> solver and swept over the width
 bar in units of the exchange length. This is the example to copy for a
 hysteresis calculation.</p></li>
 <li><p><strong>Standard problem 3</strong> - the flower/vortex energy crossover of a cube as a
-function of its size in units of the exchange length. It is run on a uniform
-grid, on an unstructured Cartesian mesh and on a tetrahedral mesh, so it is
-also the example to copy for either kind of unstructured mesh.
-<code class="docutils literal notranslate"><span class="pre">Standard_problem_3_tetra.m</span></code> is the shortest illustration of a tetrahedral
-problem: it meshes the cube with <code class="docutils literal notranslate"><span class="pre">CreateTetraMesh</span></code>, hands the mesh over with
-a single call to <code class="docutils literal notranslate"><span class="pre">setMicroMagGridTetrahedron</span></code>, and lets MagTense do the rest.</p></li>
+function of its size in units of the exchange length. The <code class="docutils literal notranslate"><span class="pre">mesh_type</span></code>
+option runs it on a uniform grid (<code class="docutils literal notranslate"><span class="pre">'uniform'</span></code>, the default), on an
+unstructured Cartesian mesh read from a text file
+(<code class="docutils literal notranslate"><span class="pre">'unstructuredPrisms'</span></code>) or on a tetrahedral mesh (<code class="docutils literal notranslate"><span class="pre">'tetrahedron'</span></code>), so
+it is also the example to copy for either kind of unstructured mesh. The
+tetrahedral branch is the shortest illustration of a tetrahedral problem: it
+meshes the cube with <code class="docutils literal notranslate"><span class="pre">CreateTetraMesh</span></code> (Matlab, PDE Toolbox) or
+<code class="docutils literal notranslate"><span class="pre">magtense.utils.create_tetra_mesh</span></code> (Python), hands the mesh over with a
+single call to <code class="docutils literal notranslate"><span class="pre">setMicroMagGridTetrahedron</span></code> or the <code class="docutils literal notranslate"><span class="pre">grid_nod</span></code> and
+<code class="docutils literal notranslate"><span class="pre">grid_ele</span></code> arguments of <code class="docutils literal notranslate"><span class="pre">MicromagProblem</span></code>, and lets MagTense do the rest.</p></li>
 <li><p><strong>Standard problem 4</strong> - the switching dynamics of a thin film under a
 reversed field, compared against the published mean solutions. It is a
 two-stage calculation: first an s-state is relaxed, then that state is used
-as the initial condition for the <strong>dynamic</strong> run.</p></li>
+as the initial condition for the <strong>dynamic</strong> run. With
+<code class="docutils literal notranslate"><span class="pre">mesh_type</span> <span class="pre">=</span> <span class="pre">'unstructuredPrisms'</span></code> it runs on an unstructured Cartesian
+mesh, and the exchange operator MagTense builds in the first stage is handed
+to the second, so the mesh is analysed only once.</p></li>
 <li><p><strong>Standard problem 6</strong> - domain-wall pinning at a phase boundary, which is
 the test of the spatially varying <span class="math notranslate nohighlight">\(A_0\)</span>, <span class="math notranslate nohighlight">\(K_0\)</span> and <span class="math notranslate nohighlight">\(M_s\)</span>
-and of the modified exchange stencil.</p></li>
+and of the modified exchange stencil. <code class="docutils literal notranslate"><span class="pre">cart_dir</span></code> orients the sample along
+x, y or z, which must not change the result, and <code class="docutils literal notranslate"><span class="pre">mesh_type</span></code> runs the same
+chain of cells as unstructured prisms.</p></li>
 </ul>
+<p>Standard problems 2, 3 and 6 take a <code class="docutils literal notranslate"><span class="pre">use_minimizer</span></code> switch in both languages
+(<code class="docutils literal notranslate"><span class="pre">options.use_minimizer</span></code> in Matlab, the <code class="docutils literal notranslate"><span class="pre">use_minimizer</span></code> argument in Python).
+With it set, the equilibrium at each field is found by the
+<a class="reference internal" href="micromag_solvers.html#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a> instead of the Landau-Lifshitz time integration, and
+the scripts print the number of effective-field evaluations spent either way,
+which is the cost to compare. Problem 3 reads its energies from the <code class="docutils literal notranslate"><span class="pre">E</span></code>
+output of the solver in both cases. In problem 6 the switch replaces the time
+ramp of the applied field by the same field values visited as constant
+fields, so the depinning field it reports is the static one, which is what the
+analytical values of the reference paper are; the ramp gives a rate-dependent
+one. Problem 2 additionally takes <code class="docutils literal notranslate"><span class="pre">use_adaptive</span></code>, which replaces the fixed
+table of 40 fields by the <a class="reference internal" href="micromag_solvers.html#adaptive-hysteresis"><span class="std std-ref">Adaptive hysteresis</span></a> stepping, refining the
+field step to 0.0005 T across the coercive field.</p>
+<p>The Python script
+<a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/minimizer/minimizer_vs_llg.py">minimizer_vs_llg.py</a>
+runs the single-grain hysteresis loop and standard problem 3 with both the
+Landau-Lifshitz relaxation and the <a class="reference internal" href="micromag_solvers.html#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a>, and prints the
+switching fields, the energies and the number of field evaluations each method
+needed.</p>
 </section>
 <section id="feature-tests">
 <h2>Feature tests<a class="headerlink" href="#feature-tests" title="Link to this heading"></a></h2>
@@ -214,16 +299,21 @@ comparison against a fixed-step loop.</p></li>
 <section id="running-the-test-suites">
 <h2>Running the test suites<a class="headerlink" href="#running-the-test-suites" title="Link to this heading"></a></h2>
 <p>Both interfaces ship a runner that executes the examples, turns each of them
-into a set of pass/fail checks and prints a summary table.</p>
+into a set of pass/fail checks and prints a summary table. The two run the
+same tests - the magnetostatic field of every tile type against FEM, and the
+micromagnetic tests and standard problems - under the same names, with the
+same checks and limits.</p>
 <p>In Matlab, from <code class="docutils literal notranslate"><span class="pre">matlab/util</span></code>:</p>
 <div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">testMagTenseFunctions</span>
 </pre></div>
 </div>
 <p>The tests to run can be restricted with the environment variables
 <code class="docutils literal notranslate"><span class="pre">MAGTENSE_TESTS</span></code> and <code class="docutils literal notranslate"><span class="pre">MAGTENSE_SKIP</span></code>, and the CUDA and CVODE variants are
-selected with <code class="docutils literal notranslate"><span class="pre">MAGTENSE_TEST_CUDA</span></code> and <code class="docutils literal notranslate"><span class="pre">MAGTENSE_TEST_CVODE</span></code>. Standard
-problem 6 alone accounts for most of the running time.</p>
-<p>In Python, from <code class="docutils literal notranslate"><span class="pre">python/examples/micromagnetism</span></code>:</p>
+selected with <code class="docutils literal notranslate"><span class="pre">MAGTENSE_TEST_CUDA</span></code> and <code class="docutils literal notranslate"><span class="pre">MAGTENSE_TEST_CVODE</span></code>.
+<code class="docutils literal notranslate"><span class="pre">MAGTENSE_INCLUDE_SLOW=1</span></code> adds standard problem 3 by time integration,
+which is very slow. Standard problem 6 accounts for most of the running time
+of the rest.</p>
+<p>In Python, from <code class="docutils literal notranslate"><span class="pre">python/util</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>testMagTenseFunctions.py
 </pre></div>
 </div>
@@ -238,8 +328,9 @@ problem 6 alone accounts for most of the running time.</p>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">--include-slow</span></code> adds standard problem 3, which is very slow. Each example
 lives in its own directory and is run from there, so the figures and timer logs
-it produces land beside it, and the overview figure of the suite is written next
-to <code class="docutils literal notranslate"><span class="pre">testMagTenseFunctions.py</span></code>. There are in addition <code class="docutils literal notranslate"><span class="pre">pytest</span></code> suites in
+it produces land beside it, and the overview figure of the suite is written to
+<code class="docutils literal notranslate"><span class="pre">python/util/results</span></code>, as the Matlab suite writes to <code class="docutils literal notranslate"><span class="pre">matlab/util/results</span></code>.
+There are in addition <code class="docutils literal notranslate"><span class="pre">pytest</span></code> suites in
 <code class="docutils literal notranslate"><span class="pre">python/examples/magnetostatics</span></code> and
 <code class="docutils literal notranslate"><span class="pre">python/examples/micromagnetism/MagTense_tests</span></code>.</p>
 </section>

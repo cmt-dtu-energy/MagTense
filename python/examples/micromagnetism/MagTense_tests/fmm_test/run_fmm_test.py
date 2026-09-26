@@ -156,6 +156,7 @@ def fmm_test_main(
         
         prob = fmm_test_setup(
             **common_setup,
+            use_fmm=1,
             allow_fmm_short_circuit=0,
             nlmax=nl,
             fmm_nterms=nt_fmm,
@@ -170,6 +171,16 @@ def fmm_test_main(
             fct_h_ext=h_ext_fct, nt_h_ext=prob.nt
         )
         results[config_label] = {"Mout": res[1], "Hdem": res[5]}
+
+        # A bit-identical result means FMM never engaged and the run fell back to the
+        # direct tensor, so every metric would be 0 and the test would pass while
+        # testing nothing. Same guard as the MATLAB run_fmm_test.m.
+        if np.max(np.abs(res[5] - res_cuda[5])) == 0:
+            raise RuntimeError(
+                f"{config_label} produced results bit-identical to the direct "
+                "reference, so FMM did not run. Check that the library was built "
+                "with USE_FMM3D=1."
+            )
     #----------------------------------------------------------------
 
 

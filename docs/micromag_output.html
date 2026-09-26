@@ -14,9 +14,10 @@
     <link rel="shortcut icon" href="_static/MagTense_logo.ico"/>
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/documentation_options.js?v=7f41d439"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="author" title="About these documents" href="about.html" />
     <link rel="index" title="Index" href="genindex.html" />
@@ -155,12 +156,49 @@ arrays.</p></td>
 <td><p>Number of accepted applied-field steps. Only meaningful for
 <a class="reference internal" href="micromag_solvers.html#adaptive-hysteresis"><span class="std std-ref">Adaptive hysteresis</span></a>.</p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">E</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(nt,</span> <span class="pre">nt_Hext,</span> <span class="pre">4)</span></code></p></td>
+<td><p>Energies in J in the order exchange, external (Zeeman),
+demagnetization, anisotropy. Always filled at the last output time; at
+the other output times only when <code class="docutils literal notranslate"><span class="pre">ReturnHall</span></code> is set (the entries are
+zero otherwise).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">n_feval</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(nt_Hext)</span></code></p></td>
+<td><p>Number of effective-field evaluations spent relaxing at each applied
+field. This is the cost measure that scales with the problem size, and
+the one to compare between the time integration and the minimizer.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_iter</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(nt_Hext)</span></code></p></td>
+<td><p>Minimizer iterations at each applied field, 0 for the time integration.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_torque</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(nt_Hext)</span></code></p></td>
+<td><p>Final largest relative torque <span class="math notranslate nohighlight">\(\max_i |\mathbf{m}_i \times
+\mathbf{H}_i| / \max(M_s)\)</span>, minimizer only.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">min_status</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(nt_Hext)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">-1</span></code> relaxed by the time integration, <code class="docutils literal notranslate"><span class="pre">0</span></code> minimizer converged,
+<code class="docutils literal notranslate"><span class="pre">1</span></code> converged after a fallback to the time integration, <code class="docutils literal notranslate"><span class="pre">2</span></code> not
+converged.</p></td>
+</tr>
 </tbody>
 </table>
 <p><code class="docutils literal notranslate"><span class="pre">ReturnHall</span></code> (Python <code class="docutils literal notranslate"><span class="pre">usereturnhall</span></code>) is off by default. Turning it on
 costs four additional <code class="docutils literal notranslate"><span class="pre">(nt,</span> <span class="pre">ntot,</span> <span class="pre">nt_Hext,</span> <span class="pre">3)</span></code> arrays, which for a large
 problem is substantial, so leave it off unless the individual field terms are
 actually needed.</p>
+<p>The energies are evaluated in Fortran from the same fields the solver ran on.
+The exchange, external and demagnetization terms are <span class="math notranslate nohighlight">\(-\tfrac{1}{2}\mu_0
+\sum_i M_{s,i} V_i\, \mathbf{m}_i\cdot\mathbf{H}_i\)</span> (without the one half for
+the external field). The anisotropy term is the energy density integrated over
+the cells: <span class="math notranslate nohighlight">\(K_0 (1 - (\mathbf{u}\cdot\mathbf{m})^2)\)</span> for the uniaxial
+case, so that it is non-negative, and the polynomial documented in
+<a class="reference internal" href="micromag_material.html#magnetocrystalline-anisotropy"><span class="std std-ref">Magnetocrystalline anisotropy</span></a> plus the cubic <span class="math notranslate nohighlight">\(K_1\)</span>, <span class="math notranslate nohighlight">\(K_2\)</span>
+terms otherwise. Dividing by <span class="math notranslate nohighlight">\(\tfrac{1}{2}\mu_0 M_s^2 V\)</span> gives the
+reduced energies used by the mumag standard problems.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>The four <code class="docutils literal notranslate"><span class="pre">H_*</span></code> arrays are <strong>not</strong> the fields the integrator ran on. They
@@ -239,6 +277,18 @@ the energy terms.</p>
 <p><code class="docutils literal notranslate"><span class="pre">run_hysteresis_adaptive</span></code> returns the same twelve entries followed by one
 extra element, the number of accepted field steps, and the arrays with an
 applied-field dimension are already sliced to that number.</p>
+<p>The energies and the relaxation diagnostics are not part of the list, so that
+its layout does not change; after any of the three run methods they are
+attributes of the problem object, with the meaning given in the Matlab table
+above:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="o">.</span><span class="n">E_out</span>       <span class="c1"># (nt, nt_h_ext, 4): exchange, external, demag, anisotropy [J]</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">n_feval</span>     <span class="c1"># (nt_h_ext,) effective-field evaluations per applied field</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">min_iter</span>    <span class="c1"># (nt_h_ext,) minimizer iterations</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">min_torque</span>  <span class="c1"># (nt_h_ext,) final largest relative torque</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">min_status</span>  <span class="c1"># (nt_h_ext,) -1 LL, 0 converged, 1 after fallback, 2 failed</span>
+</pre></div>
+</div>
+<p>For an adaptive run they are sliced to the accepted field steps.</p>
 <p>A typical unpacking is</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">t_out</span><span class="p">,</span> <span class="n">M_out</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">run_simulation</span><span class="p">(</span>
     <span class="n">t_end</span><span class="o">=</span><span class="mf">1e-9</span><span class="p">,</span> <span class="n">nt</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">fct_h_ext</span><span class="o">=</span><span class="n">h_ext_fct</span><span class="p">,</span> <span class="n">nt_h_ext</span><span class="o">=</span><span class="mi">2000</span>
