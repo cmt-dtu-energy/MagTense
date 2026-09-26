@@ -163,14 +163,14 @@ The mesh is specified through</p>
 is what the solver uses, not a rectangular subdivision:</p>
 <div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">resolution</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="nb">length</span><span class="p">(</span><span class="nb">mesh</span><span class="p">.</span><span class="n">pos_out</span><span class="p">)</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="mi">1</span><span class="p">];</span>
 <span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">DefaultMicroMagProblem</span><span class="p">(</span><span class="w"> </span><span class="n">resolution</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span><span class="w"> </span><span class="n">resolution</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span><span class="w"> </span><span class="n">resolution</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
-<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagGridType</span><span class="p">(</span><span class="s">&#39;unstructuredPrisms&#39;</span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagGridType</span><span class="p">(</span><span class="s">'unstructuredPrisms'</span><span class="p">);</span>
 <span class="n">problem</span><span class="p">.</span><span class="n">grid_pts</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">mesh</span><span class="p">.</span><span class="n">pos_out</span><span class="p">;</span>
 <span class="n">problem</span><span class="p">.</span><span class="n">grid_abc</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">mesh</span><span class="p">.</span><span class="n">dims_out</span><span class="p">;</span>
 </pre></div>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span>
     <span class="n">res</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">grid_pts</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
-    <span class="n">grid_type</span><span class="o">=</span><span class="s2">&quot;unstructuredPrisms&quot;</span><span class="p">,</span>
+    <span class="n">grid_type</span><span class="o">=</span><span class="s2">"unstructuredPrisms"</span><span class="p">,</span>
     <span class="n">grid_pts</span><span class="o">=</span><span class="n">grid_pts</span><span class="p">,</span>
     <span class="n">grid_abc</span><span class="o">=</span><span class="n">grid_abc</span><span class="p">,</span>
 <span class="p">)</span>
