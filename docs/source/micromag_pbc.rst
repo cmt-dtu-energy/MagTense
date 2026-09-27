@@ -1,9 +1,9 @@
 Periodic boundaries and macrogeometry
 ========================================
 
-Micromagnetic simulations are generally limited to sub-mm magnetic domains, 
-but real samples tend to be macroscopic. MagTense offers three separate methods for bridging
-this gap in length scale, and they can be combined:
+A micromagnetic simulation resolves a domain of sub-mm size, while real
+samples are macroscopic. MagTense bridges this gap in length scale with three
+separate methods, which can be combined:
 
 #. a **macrogeometry** that repeats the simulated domain when the
    demagnetization tensor is built;
@@ -39,11 +39,10 @@ effect is included when the demagnetization tensor is built: for every copy the
 tensor is evaluated with the evaluation points shifted by the copy offset, and
 the contributions are summed. The magnetization of every copy is by
 construction identical to that of the simulated domain, so the cost is one
-extra tensor evaluation per copy and no extra memory.
-Note that, since the material properties and magnetisation distribution is copy-pasted,
-the macrogeometry method assumes the simulated domain is representative of the 
-whole bulk sample, and that the simulated domain is large enough to contain all 
-features of interest, e.g. long domain walls. 
+extra tensor evaluation per copy and no extra memory. Since every copy
+carries the same material properties and magnetisation, the simulated domain
+represents the bulk sample, and it is chosen large enough to contain the
+features of interest, e.g. long domain walls.
 
 .. list-table::
    :widths: 22 22 56
@@ -93,11 +92,11 @@ which is exactly how a periodic array of separated particles is modelled.
 Sample shape correction
 ----------------------------------------
 
-Even with the macrogeometry method, it can be difficult to represent a macroscopic sample,
-especially for 3D structures, as opposed to wires and thin-films. The shape
-correction adds the difference between the demagnetization field of the **real
-sample** and that of the **macrogeometry**, both approximated by rectangular
-prisms centred on the mesh:
+The macrogeometry represents wires and thin films directly. For a
+three-dimensional sample the shape correction goes one step further and adds
+the difference between the demagnetization field of the **real sample** and
+that of the **macrogeometry**, both approximated by rectangular prisms centred
+on the mesh:
 
 .. math::
 
@@ -131,9 +130,8 @@ larger than the simulation domain, :math:`\mathrm{N}_\mathrm{sample}` is spatial
        metres. Default ``[1 1 1]``.
 
 Leaving both at their defaults makes the two tensors identical, so the
-correction vanishes. A zero side length in ``macroShape`` disables the
-correction and prints ``MagTense: macroShape has a zero side length -
-disabling the shape correction``.
+correction vanishes; a zero side length in ``macroShape`` switches it off
+explicitly.
 
 The evaluation points are shifted into a frame centred on the bounding box of
 the mesh before the two tensors are evaluated, so an externally supplied mesh
@@ -142,8 +140,8 @@ uniform grid, which is centred on the origin.
 
 .. note::
    The correction is applied on both the dense and the FMM demagnetization
-   paths. It cannot be used with a tetrahedral mesh, since the occupied volume
-   fraction cannot be determined there.
+   paths, for the uniform and the unstructured prism grids, where the occupied
+   volume fraction follows from the cell sizes.
 
 ----------------------------------------
 Periodic exchange boundaries
@@ -180,18 +178,14 @@ How it is realised depends on the grid:
   :ref:`Periodic boundaries on a tetrahedral mesh` below. The period is taken as
   the extent of the mesh along that direction, as for the prisms.
 * An exchange matrix **passed in from outside** carries its own boundary
-  conditions, so ``exchPBC`` does not apply to it.
+  conditions, periodic or otherwise.
 
-Two constraints apply:
-
-* A periodic direction needs at least **three** cells. With exactly two, the
-  wrap-around neighbour and the ordinary neighbour of a boundary cell are the
-  same cell, which is not a valid sparse row, and the solver stops with
-  ``MagTense: periodic exchange requires at least three cells along a periodic
-  direction``. A single cell along a direction is fine - the direction is
-  simply dropped, which is the correct periodic answer for one cell.
-* For an unstructured mesh the extent along a periodic direction must be larger
-  than twice the largest cell size along that direction.
+The mesh has to be thick enough along a periodic direction for the wrap-around
+neighbour of a boundary cell to be distinct from its ordinary neighbour: at
+least three cells on a uniform grid, and on an unstructured mesh an extent
+larger than twice the largest cell size along that direction. The solver
+checks both. A single cell along a direction is simply dropped from the
+operator, which is the correct periodic answer for one cell.
 
 The ``periodic_exchange_test`` example verifies that exchange-coupled moments
 across a periodic boundary end up identical, on a uniform grid, on an
@@ -238,12 +232,10 @@ so they collapse to a single node rather than to a set of pairs.
 Non-periodic mesh: mortar coupling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Most meshes are *not* periodic. A mesh generated without asking for periodicity
-triangulates the two boundary planes independently, so the triangles do not
-match and no node pairing exists. Matlab's own ``generateMesh``, used by
-``CreateTetraMesh``, cannot produce a periodic mesh at all.
-
-In that case the boundary faces are **mortar coupled**. Every boundary triangle
+A mesh generated without asking for periodicity, such as one from Matlab's
+``generateMesh`` used by ``CreateTetraMesh``, triangulates the two boundary
+planes independently, so the triangles do not match one for one. MagTense
+handles such a mesh as well: the boundary faces are **mortar coupled**. Every boundary triangle
 on one plane is clipped against the triangles it overlaps on the other, and each
 intersection polygon becomes a *sub-face* shared by the two elements on either
 side, carrying its own area and centroid. A triangle that straddles three
@@ -261,66 +253,52 @@ exact.**
 
 The interpolation stencil is where the two mechanisms differ. A sub-face has no
 nodes of its own, so its stencil is taken as the union of the stencils of its
-two parent triangles. That is a superset of what a matching face would give, and
-it needs no geometric search or tolerance, but it is not the same stencil. The
-consequence is that the operator is **less accurate on a mortar coupled plane
-than in the interior of the mesh**: it stays conservative, but the local
-truncation error there is larger. For a problem in which the periodic plane is
-meant to be invisible this is worth being aware of, and worth measuring - for
-instance by comparing a domain wall energy with the wall on the plane against
-the same wall in the interior.
+two parent triangles, a superset of what a matching face would give, which
+needs no geometric search or tolerance. The operator stays conservative, with
+a somewhat larger local truncation error on the coupled plane than in the
+interior of the mesh. A periodic mesh gives full accuracy on the plane, and
+the difference can be measured directly, for instance by comparing the energy
+of a domain wall on the plane with that of the same wall in the interior.
 
-Because it is a fallback rather than a free choice, it is announced as a
-warning::
+The analysis reports which mechanism it used along each direction. For mortar
+coupling it names the direction, suggests meshing periodically for full
+accuracy, and reports the number of sub-faces together with the check that
+the tiling is exact::
 
-    *** MagTense WARNING: the mesh is not periodic ***
-    Periodic boundary conditions were requested along x, but the mesh
-    does not match across it: the two planes hold 16 and 34 nodes,
-    and only 16 of them could be paired up.
-    Falling back to MORTAR COUPLING of the boundary faces.
-    The exchange operator stays conservative, but it is less
-    accurate on that plane than in the interior of the mesh.
-    For full accuracy, mesh the geometry periodically along x:
-    gmsh 'Periodic Surface', or a COMSOL 'Copy Face' operation.
-    **************************************************
     Mortar coupling: 72 boundary faces split into 54 sub-faces
     Mortar coupling: worst relative area mismatch   2.84E-15
 
-The last line is the check that the tiling really is exact: the summed sub-face
-area of every parent triangle is compared with the area of that triangle, and
-the worst relative mismatch is reported. It is a rounding level number for a
-mesh that can be coupled at all.
+The last line compares the summed sub-face area of every parent triangle with
+the area of that triangle and reports the worst relative mismatch, a rounding
+level number for a mesh that can be coupled.
 
 Mixing the two
 ~~~~~~~~~~~~~~
 
 The choice is made per direction, so a mesh that is periodic along one direction
-and not along another uses the exact path where it can and falls back only where
-it must. A single run can report::
+and not along another uses node identification where it can and mortar coupling
+where it must. A single run can report::
 
-    *** MagTense WARNING: the mesh is not periodic ***
-    ... (mortar coupling along x)
+    Periodic boundary conditions were requested along x, but the mesh
+    does not match across it: the two planes hold 16 and 34 nodes,
+    and only 16 of them could be paired up.
+    Falling back to MORTAR COUPLING of the boundary faces.
+    ...
     Periodic exchange along y: mesh is periodic, 20 node pairs merged
     Periodic exchange along z: mesh is periodic, 20 node pairs merged
+    Mortar coupling: 72 boundary faces split into 54 sub-faces
 
-A partial merge along one direction never happens: the node pairing is only
-applied when *every* node on the plane has a partner, since half a merged
-boundary would be worse than either mechanism on its own.
+The node pairing is applied when *every* node on the plane has a partner, so
+each direction is handled by one mechanism throughout.
 
-When it cannot be done at all
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What the geometry has to satisfy
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Mortar coupling repairs a mesh that does not match. It cannot repair a
-*geometry* that does not match. If the two boundary planes do not cover the same
-cross section - the sample is wider at one end than the other, say - then part
-of a boundary face has nothing on the opposite plane to be coupled to, the
-summed sub-face area falls short of the parent area, and the analysis stops
-with::
-
-    MagTense: worst relative area mismatch on a periodic plane: ...
-    MagTense: the two boundary planes do not cover the same cross section
-    MagTense: the geometry, not just the mesh, has to be periodic
-
-Together with the thickness requirement listed above - the extent along a
-periodic direction has to exceed twice the largest element extent along it -
-these are the conditions a tetrahedral mesh has to meet to be made periodic.
+Mortar coupling matches up two differently meshed planes; the *geometry*
+itself has to be periodic, i.e. the two boundary planes cover the same cross
+section. The analysis verifies this through the area check above: where part
+of a boundary face has nothing on the opposite plane to couple to, the summed
+sub-face area falls short of the parent area, and the analysis stops and says
+that the geometry, not just the mesh, has to be periodic. Together with the
+thickness requirement listed above, this is what a tetrahedral mesh has to
+satisfy to be made periodic.

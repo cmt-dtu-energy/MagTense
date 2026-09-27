@@ -12,7 +12,8 @@ The micromagnetic framework solves the Landau-Lifshitz equation using that same
 analytical demagnetization tensor. It supports uniform, unstructured-prism and
 tetrahedral meshes, spatially varying material parameters, general
 magnetocrystalline anisotropy, thermal fluctuations, periodic boundary
-conditions and adaptive hysteresis calculations.
+conditions, an energy minimizer for quasi-static problems and adaptive
+hysteresis calculations.
 
 MagTense uses Intel MKL, and can optionally be built with CUDA for GPU
 acceleration, with CVODE as the time integrator and with FMM3D for an

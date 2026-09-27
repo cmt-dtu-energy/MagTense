@@ -311,8 +311,7 @@ same checks and limits.</p>
 <code class="docutils literal notranslate"><span class="pre">MAGTENSE_TESTS</span></code> and <code class="docutils literal notranslate"><span class="pre">MAGTENSE_SKIP</span></code>, and the CUDA and CVODE variants are
 selected with <code class="docutils literal notranslate"><span class="pre">MAGTENSE_TEST_CUDA</span></code> and <code class="docutils literal notranslate"><span class="pre">MAGTENSE_TEST_CVODE</span></code>.
 <code class="docutils literal notranslate"><span class="pre">MAGTENSE_INCLUDE_SLOW=1</span></code> adds standard problem 3 by time integration,
-which is very slow. Standard problem 6 accounts for most of the running time
-of the rest.</p>
+which takes considerably longer than the rest of the suite.</p>
 <p>In Python, from <code class="docutils literal notranslate"><span class="pre">python/util</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>testMagTenseFunctions.py
 </pre></div>
@@ -326,7 +325,7 @@ of the rest.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>testMagTenseFunctions.py<span class="w"> </span>--skip<span class="w"> </span>std_problem_6
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">--include-slow</span></code> adds standard problem 3, which is very slow. Each example
+<p><code class="docutils literal notranslate"><span class="pre">--include-slow</span></code> adds standard problem 3 by time integration. Each example
 lives in its own directory and is run from there, so the figures and timer logs
 it produces land beside it, and the overview figure of the suite is written to
 <code class="docutils literal notranslate"><span class="pre">python/util/results</span></code>, as the Matlab suite writes to <code class="docutils literal notranslate"><span class="pre">matlab/util/results</span></code>.

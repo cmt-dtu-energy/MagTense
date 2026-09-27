@@ -207,18 +207,14 @@ they share three nodes, and the face they share is the one opposite the node
 that they do not.</p>
 <p>Periodic exchange boundaries are requested through <code class="docutils literal notranslate"><span class="pre">exchPBC</span></code>. They are linked
 either by identifying the nodes on the two boundary planes, when the mesh is
-periodic along that direction, or by mortar coupling the boundary faces when it
-is not, with the choice made per direction and a warning printed when the
-fallback is used. See <a class="reference internal" href="micromag_pbc.html#periodic-boundaries-on-a-tetrahedral-mesh"><span class="std std-ref">Periodic boundaries on a tetrahedral mesh</span></a> for what
-each mechanism does and what the fallback costs.</p>
-<p>The demagnetization tensor is computed from the analytical tetrahedron tensor.
-Note the following limitations of this grid type:</p>
-<ul class="simple">
-<li><p>Averaging of the demagnetization tensor over the receiving cell (<code class="docutils literal notranslate"><span class="pre">N_ave</span></code>)
-is not supported and a warning is printed if it is requested.</p></li>
-<li><p>The shape correction is disabled, because a tetrahedral mesh carries no
-per-element size array from which the occupied volume fraction can be found.</p></li>
-</ul>
+periodic along that direction, or by mortar coupling the boundary faces
+otherwise, with the choice made per direction and reported by the analysis.
+See <a class="reference internal" href="micromag_pbc.html#periodic-boundaries-on-a-tetrahedral-mesh"><span class="std std-ref">Periodic boundaries on a tetrahedral mesh</span></a> for what each mechanism
+does.</p>
+<p>The demagnetization tensor is the analytical tetrahedron tensor, evaluated at
+the element centres. The sub-cell averaging <code class="docutils literal notranslate"><span class="pre">N_ave</span></code> and the
+<a class="reference internal" href="micromag_pbc.html#sample-shape-correction"><span class="std std-ref">Sample shape correction</span></a> are features of the prism grids, whose
+per-cell sizes they are built from.</p>
 </section>
 <section id="passing-an-externally-computed-exchange-matrix">
 <h2>Passing an externally computed exchange matrix<a class="headerlink" href="#passing-an-externally-computed-exchange-matrix" title="Link to this heading"></a></h2>

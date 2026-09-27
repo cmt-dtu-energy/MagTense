@@ -155,19 +155,18 @@ to the MEX-file:</p>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">struct(problem)</span></code> call performs a final consistency check before the data
 is handed to Fortran: scalar values of <code class="docutils literal notranslate"><span class="pre">Ms</span></code>, <code class="docutils literal notranslate"><span class="pre">A0</span></code>, <code class="docutils literal notranslate"><span class="pre">K0</span></code>, <code class="docutils literal notranslate"><span class="pre">K1</span></code> and
-<code class="docutils literal notranslate"><span class="pre">K2</span></code> are expanded to one value per cell, and <code class="docutils literal notranslate"><span class="pre">m0</span></code> is normalised if it is
-not of unit length (a warning is issued). It also prints an estimate of the
-memory needed by the demagnetization tensor.</p>
+<code class="docutils literal notranslate"><span class="pre">K2</span></code> are expanded to one value per cell, and <code class="docutils literal notranslate"><span class="pre">m0</span></code> is normalised to unit
+length. It also prints an estimate of the memory needed by the demagnetization
+tensor.</p>
 <p><code class="docutils literal notranslate"><span class="pre">problem.MagTenseLandauLifshitzSolver_mex</span></code> is a function handle that
 <code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code> sets, pointing either at <code class="docutils literal notranslate"><span class="pre">MagTenseLandauLifshitzSolver_mex</span></code> or
 at <code class="docutils literal notranslate"><span class="pre">MagTenseLandauLifshitzSolverNoCUDA_mex</span></code>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The constructor sets <code class="docutils literal notranslate"><span class="pre">useCuda</span></code> to 0 but does not populate that function
-handle, so <code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code> has to be called at least once - with <code class="docutils literal notranslate"><span class="pre">false</span></code>
-for a CPU run - before the solver can be invoked through
-<code class="docutils literal notranslate"><span class="pre">problem.MagTenseLandauLifshitzSolver_mex</span></code>. Alternatively, call the
-MEX-file directly by name.</p>
+<p><code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code> is what selects the MEX-file, so call it once - with
+<code class="docutils literal notranslate"><span class="pre">false</span></code> for a CPU run - before invoking the solver through
+<code class="docutils literal notranslate"><span class="pre">problem.MagTenseLandauLifshitzSolver_mex</span></code>. The MEX-file can also be
+called directly by name.</p>
 </div>
 </section>
 <section id="python-problem-setup">
@@ -210,8 +209,7 @@ run method rather than being stored on the problem:</p>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">m0</span></code> accepts a scalar (all components set to that value), an <code class="docutils literal notranslate"><span class="pre">(ntot,3)</span></code>
 array, or <code class="docutils literal notranslate"><span class="pre">None</span></code>, in which case a random unit vector is drawn for every cell.
-As in Matlab, <code class="docutils literal notranslate"><span class="pre">m0</span></code> is normalised on assignment and a warning is issued if it
-was not already of unit length.</p>
+As in Matlab, <code class="docutils literal notranslate"><span class="pre">m0</span></code> is normalised to unit length on assignment.</p>
 <p>The three run methods are</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">run_simulation(t_end,</span> <span class="pre">nt,</span> <span class="pre">fct_h_ext,</span> <span class="pre">nt_h_ext)</span></code> - a single solve, used for

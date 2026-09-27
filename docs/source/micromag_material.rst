@@ -82,17 +82,13 @@ and :math:`M_s`,
 Magnetocrystalline anisotropy
 ========================================
 
-MagTense offers three ways of specifying the anisotropy. They are **mutually
-exclusive in the following sense**: the uniaxial constant ``K0`` cannot be
-combined with ``K1``, ``K2`` or ``K0_arr``. Doing so aborts the solve with
-
-::
-
-    MagTense: the uniaxial anisotropy K0 cannot be combined with K1, K2 or K0_arr
-    MagTense: express the uniaxial term through K0_arr(:,1,:) instead, or set K0 to zero
-
-``K1``/``K2`` and ``K0_arr`` *are* compatible - they are expressed in the same
-rotated frame and are summed.
+MagTense offers three ways of specifying the anisotropy. The cubic constants
+``K1``/``K2`` and the general expansion ``K0_arr`` are expressed in the same
+rotated crystal frame and are summed, so they can be given together. The
+uniaxial constant ``K0`` is its own path with its own easy axis; a uniaxial
+term that is to be combined with the cubic or the general expansion is written
+into ``K0_arr(:,1,:)`` instead, as shown under :ref:`General anisotropy`, and
+the solver points this out if ``K0`` is set together with the others.
 
 ----------------------------------------
 Uniaxial anisotropy
@@ -108,7 +104,7 @@ field is then
         \left( \mathbf{u}_\mathrm{ea}\cdot\mathbf{m} \right) \mathbf{u}_\mathrm{ea},
 
 i.e. a positive :math:`K_0` makes :math:`\mathbf{u}_\mathrm{ea}` an easy axis.
-This path does not use ``CrysAxis``.
+The easy axis is given directly in the global coordinate system, per cell.
 
 ----------------------------------------
 Cubic anisotropy
@@ -222,4 +218,4 @@ values in ``alphat``. In Matlab this table is filled by
     problem = problem.setAlpha( @(t) alpha_of_t(t), t_alpha );
 
 and in Python through the ``t_alpha`` and ``alpha_fct`` constructor arguments.
-If ``alpha`` is non-zero it is used as a constant and the table is ignored.
+A non-zero ``alpha`` is used as a constant damping.
