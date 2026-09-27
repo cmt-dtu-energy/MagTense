@@ -137,8 +137,8 @@ used</p></li>
 <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/releases">MEX-files</a>, which are
 provided for both Windows and Linux. Add the folder holding the MEX-files and
 the <code class="docutils literal notranslate"><span class="pre">matlab/util</span></code> folder to the Matlab path:</p>
-<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="nb">addpath</span><span class="p">(</span><span class="s">&#39;MagTense/matlab/MEX_files&#39;</span><span class="p">);</span>
-<span class="nb">addpath</span><span class="p">(</span><span class="s">&#39;MagTense/matlab/util&#39;</span><span class="p">);</span>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="nb">addpath</span><span class="p">(</span><span class="s">'MagTense/matlab/MEX_files'</span><span class="p">);</span>
+<span class="nb">addpath</span><span class="p">(</span><span class="s">'MagTense/matlab/util'</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>The MEX-files are</p>
@@ -232,7 +232,7 @@ commit.</p></li>
 produced from Matlab itself with
 <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/matlab/buildMagTenseMEX.m">buildMagTenseMEX.m</a>:</p>
 <div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="nb">mex</span><span class="w"> </span><span class="o">-</span><span class="nb">setup</span><span class="w"> </span><span class="n">FORTRAN</span>
-<span class="n">buildMagTenseMEX</span><span class="p">(</span><span class="s">&#39;USE_RELEASE&#39;</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="s">&#39;USE_CUDA&#39;</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="s">&#39;USE_CVODE&#39;</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">)</span>
+<span class="n">buildMagTenseMEX</span><span class="p">(</span><span class="s">'USE_RELEASE'</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="s">'USE_CUDA'</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="s">'USE_CVODE'</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
