@@ -117,17 +117,15 @@ components are selected with make flags:
    * - ``USE_MATLAB=1``
      - Compile the Fortran objects needed by the Matlab MEX-files.
 
-A typical Linux build of the Python module with everything enabled is
+An example Linux build of the Python module is
 
 .. code-block:: bash
 
-    conda env create -n magtense-env -f python/.build/env-313-linux.yml
-    conda activate magtense-env
-    make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0
-    python -m pip install -e ./python
+    make python-interface USE_CUDA=1 USE_CVODE=1 PY_VERSION=314 USE_FMM3D=0
 
-The environment files come in one variant per Python version and platform,
-``env-312``, ``env-313`` and ``env-314`` times ``-linux`` and ``-win``.
+This will automatically download the latest version of Miniconda,
+create a dedicated environment, install the required dependencies, and build the
+Fortran core. The Python library `magtense` will be installed in the `magtense-env` conda environment.
 
 The full, up-to-date build instructions - including the Conda environment
 files, the CVODE and CUDA prerequisites, the Windows toolchain and the
