@@ -8,11 +8,12 @@
 % table in the command window and as a colour coded overview figure, so that a single
 % failure does not hide the state of everything else.
 %
-% This is the counterpart of python/examples/micromagnetism/testMagTenseFunctions.py. The
-% micromagnetic tests in examples/Micromagnetism/MagTense_tests mirror the python ones one
-% for one, with the same geometries and the same acceptance limits. Beyond those, the
-% magnetostatic validations and the standard problem 6 direction and mesh variants only
-% exist here, while standard problem 3 only exists in the python suite.
+% This is the counterpart of python/util/testMagTenseFunctions.py. The two suites run the
+% same tests, under the same names, in the same order, with the same checks and the same
+% limits; every python example is a port of its MATLAB counterpart, and the magnetostatic
+% validations give the same errors to three significant figures. Standard problem 3 by time
+% integration is slow and only runs when MAGTENSE_INCLUDE_SLOW is 1 or MAGTENSE_TESTS names it,
+% as with --include-slow and --tests in python.
 %
 % Every test returns a struct array of checks with the fields 'check', 'value', 'limit'
 % and 'passed', where a check passes when value < limit.
@@ -62,6 +63,18 @@ tests = {
         @() validationChecks(fullfile(magnetostatics_dir, 'Validation_field_prism'), ...
                              'MagTense_Validation_prism', field_error_limit), ...
         'Field of a rectangular prism vs FEM'
+    'magnetostatics_circpiece', ...
+        @() validationChecks(fullfile(magnetostatics_dir, 'Validation_field_circpiece'), ...
+                             'MagTense_Validation_circpiece', field_error_limit), ...
+        'Field of a circular piece vs FEM'
+    'magnetostatics_circpiece_inverted', ...
+        @() validationChecks(fullfile(magnetostatics_dir, 'Validation_field_circpiece_inverted'), ...
+                             'MagTense_Validation_circpiece_inverted', field_error_limit), ...
+        'Field of an inverted circular piece vs FEM'
+    'magnetostatics_avgprism', ...
+        @() validationChecks(fullfile(magnetostatics_dir, 'Validation_field_avgprism'), ...
+                             'MagTense_Validation_avgprism', field_error_limit), ...
+        'Field of a prism averaged over observation volumes vs FEM, x and y components'
     'magnetostatics_sphere', ...
         @() validationChecks(fullfile(magnetostatics_dir, 'Validation_field_sphere'), ...
                              'MagTense_Validation_sphere', field_error_limit), ...
@@ -90,6 +103,10 @@ tests = {
         @() micromagTestChecks(fullfile(micromagnetism_dir, 'MagTense_tests'), ...
                                'temperature_test', cuda_args), ...
         'Thermal fluctuations against the analytical angular diffusion'
+    'dipole_field_test', ...
+        @() micromagTestChecks(fullfile(micromagnetism_dir, 'MagTense_tests'), ...
+                               'dipole_field_test', cuda_args), ...
+        'Far field of a magnetised cube against the analytical point dipole'
     'std_problem_4', ...
         @() stdProblem4Checks(fullfile(micromagnetism_dir, 'mumag_micromag_Std_problem_4'), ...
                               [cuda_args, cvode_args]), ...
@@ -102,6 +119,10 @@ tests = {
         @() stdProblem6Checks(fullfile(micromagnetism_dir, 'mumag_micromag_Std_problem_6'), ...
                               [cuda_args, cvode_args, {'use_minimizer', true}], true), ...
         'mumag standard problem 6 relaxed with the energy minimizer at each field, akj and k along x'
+    'std_problem_3', ...
+        @() stdProblem3Checks(fullfile(micromagnetism_dir, 'mumag_micromag_Std_problem_3'), ...
+                              [cuda_args, cvode_args, {'use_minimizer', false}]), ...
+        'mumag standard problem 3 by LL time integration, single domain limit (slow, tens of minutes)'
     'std_problem_3_minimizer', ...
         @() stdProblem3Checks(fullfile(micromagnetism_dir, 'mumag_micromag_Std_problem_3'), ...
                               [cuda_args, cvode_args, {'use_minimizer', true}]), ...
@@ -110,13 +131,19 @@ tests = {
 
 %% Run them
 
-tests = selectTests(tests, getenv('MAGTENSE_TESTS'), getenv('MAGTENSE_SKIP'));
+% Slow tests only run when MAGTENSE_INCLUDE_SLOW is 1 or when MAGTENSE_TESTS names them, as with
+% --include-slow and --tests in the python suite
+slow_tests = {'std_problem_3'};
+include_slow = environmentFlag('include_slow', 'MAGTENSE_INCLUDE_SLOW');
+include_slow = ~isempty(include_slow) && include_slow{2};
+
+[tests, skipped] = selectTests(tests, getenv('MAGTENSE_TESTS'), getenv('MAGTENSE_SKIP'), slow_tests, include_slow);
 records = runAllTests(tests);
 
 %% Report
 
-printResultTable(records)
-plotResultOverview(records, figure_path, save_figure, results_dir)
+printResultTable(records, skipped)
+plotResultOverview(records, skipped, figure_path, save_figure, results_dir)
 
 failed = [records([records.status] ~= "PASS").name];
 if ~isempty(failed)
@@ -151,9 +178,10 @@ function args = environmentFlag(name, variable)
     end
 end
 
-function tests = selectTests(tests, selection, skipped)
+function [tests, notRun] = selectTests(tests, selection, skipped, slow_tests, include_slow)
     % Keep the tests named in a comma separated list and drop the ones named in another, in the
-    % order they are listed above. Both lists are normally empty, which runs everything
+    % order they are listed above. Both lists are normally empty, which runs everything but the
+    % slow tests. A slow test runs when include_slow is set or when the first list names it
 
     names = string(tests(:, 1));
     keep = true(size(names));
@@ -161,12 +189,17 @@ function tests = selectTests(tests, selection, skipped)
     wanted = testNames(selection, names, 'MAGTENSE_TESTS');
     if ~isempty(wanted)
         keep = keep & ismember(names, wanted);
+    elseif ~include_slow
+        keep = keep & ~ismember(names, string(slow_tests));
     end
 
     dropped = testNames(skipped, names, 'MAGTENSE_SKIP');
     if ~isempty(dropped)
         keep = keep & ~ismember(names, dropped);
     end
+
+    % Reported as skipped, as in the python suite
+    notRun = names(~keep);
 
     if all(keep)
         return
@@ -272,8 +305,9 @@ function checks = micromagTestChecks(exampleDir, functionName, solverArgs)
 end
 
 function checks = stdProblem4Checks(exampleDir, solverArgs)
-    % Standard problem 4, first NIST field. The limit of 100 % is loose because <My>
-    % and <Mz> average close to zero, so the relative measure has a small denominator.
+    % Standard problem 4, both NIST fields, as in the python suite. The limit of 100 % is
+    % loose because <My> and <Mz> average close to zero, so the relative measure has a small
+    % denominator.
 
     if nargin < 2
         solverArgs = {};
@@ -282,19 +316,16 @@ function checks = stdProblem4Checks(exampleDir, solverArgs)
     oldDir = cd(exampleDir);
     cleanupObj = onCleanup(@() cd(oldDir));
 
-    if isempty(solverArgs)
-        [~, ~, ~, ~, ~, ~, relativeError] = Standard_problem_4(1);
-    else
-        % The resolution has to be spelled out, since the options can only follow the
-        % positional arguments. [36 9 1] is the default of Standard_problem_4
-        [~, ~, ~, ~, ~, ~, relativeError] = Standard_problem_4(1, [36 9 1], solverArgs{:});
-    end
-
     componentNames = {'<Mx>', '<My>', '<Mz>'};
     checks = emptyChecks();
-    for i = 1:numel(relativeError)
-        checks(end + 1) = makeCheck(sprintf('field 1: %s vs mumag', componentNames{i}), ...
-                                    relativeError(i), 100); %#ok<AGROW>
+    for field = 1:2
+        % The resolution has to be spelled out, since the options can only follow the
+        % positional arguments. [36 9 1] is the default of Standard_problem_4
+        [~, ~, ~, ~, ~, ~, relativeError] = Standard_problem_4(field, [36 9 1], solverArgs{:});
+        for i = 1:numel(relativeError)
+            checks(end + 1) = makeCheck(sprintf('field %d: %s vs mumag', field, componentNames{i}), ...
+                                        relativeError(i), 100); %#ok<AGROW>
+        end
     end
 end
 
@@ -328,8 +359,17 @@ function checks = stdProblem3Checks(exampleDir, solverArgs)
         fprintf('Single domain limit: L = %.3f l_ex (accepted value %.2f)\n', L_cross, singleDomainLimit);
     end
 
+    % Named after how the states were relaxed, as in the python suite. Standard_problem_3
+    % uses the minimizer unless told otherwise
+    minimizerIndex = find(strcmp(solverArgs(1:2:end), 'use_minimizer'), 1, 'last');
+    if isempty(minimizerIndex) || solverArgs{2*minimizerIndex}
+        label = 'single domain limit L/l_ex (minimizer)';
+    else
+        label = 'single domain limit L/l_ex (LL)';
+    end
+
     checks = emptyChecks();
-    checks(end + 1) = makeCheck('single domain limit L/l_ex', relativeErrorPercent(L_cross, singleDomainLimit), 5);
+    checks(end + 1) = makeCheck(label, relativeErrorPercent(L_cross, singleDomainLimit), 5);
 end
 
 function checks = stdProblem6Checks(exampleDir, solverArgs, reduced)
@@ -415,7 +455,7 @@ end
 %  Reporting
 %  ----------------------------------------------------------------------------------
 
-function rows = buildRows(records)
+function rows = buildRows(records, skipped)
     % Flatten the records into one row per check, as a table with string columns
 
     name = strings(0, 1);
@@ -466,6 +506,15 @@ function rows = buildRows(records)
         end
     end
 
+    for i = 1:numel(skipped)
+        name(end + 1, 1) = skipped(i); %#ok<AGROW>
+        check(end + 1, 1) = "not run"; %#ok<AGROW>
+        value(end + 1, 1) = "-"; %#ok<AGROW>
+        limit(end + 1, 1) = "-"; %#ok<AGROW>
+        status(end + 1, 1) = "SKIPPED"; %#ok<AGROW>
+        margin(end + 1, 1) = NaN; %#ok<AGROW>
+    end
+
     rows = table(name, check, value, limit, status, margin);
 end
 
@@ -484,10 +533,10 @@ function text = formatNumber(value)
     end
 end
 
-function printResultTable(records)
+function printResultTable(records, skipped)
     % Print the overview as plain text in the command window
 
-    rows = buildRows(records);
+    rows = buildRows(records, skipped);
     header = ["Test", "Check", "Value", "Limit", "Status"];
     columns = {rows.name, rows.check, rows.value, rows.limit, rows.status};
 
@@ -513,7 +562,8 @@ function printResultTable(records)
     fprintf('%s\n', repmat('-', 1, ruleWidth));
 
     [nPass, nFail, nError, totalTime] = summarise(records);
-    fprintf('%d passed, %d failed, %d errored, in %.0f s\n', nPass, nFail, nError, totalTime);
+    fprintf('%d passed, %d failed, %d errored, %d skipped, in %.0f s\n', nPass, nFail, nError, ...
+            numel(skipped), totalTime);
 end
 
 function [nPass, nFail, nError, totalTime] = summarise(records)
@@ -524,15 +574,16 @@ function [nPass, nFail, nError, totalTime] = summarise(records)
     totalTime = sum([records.elapsed]);
 end
 
-function plotResultOverview(records, figurePath, saveFigure, resultsDir)
+function plotResultOverview(records, skipped, figurePath, saveFigure, resultsDir)
     % Colour coded table of every check, with the margin to its limit beside it
 
-    rows = buildRows(records);
+    rows = buildRows(records, skipped);
     nRows = height(rows);
 
     colours = struct('PASS', [0.788 0.906 0.788], ...
                      'FAIL', [0.949 0.722 0.710], ...
-                     'ERROR', [0.949 0.722 0.710]);
+                     'ERROR', [0.949 0.722 0.710], ...
+                     'SKIPPED', [0.878 0.878 0.878]);
 
     figureHeight = min(1400, 120 + 26 * (nRows + 1));
     fig = figure('Color', 'w', 'Position', [80 60 1500 figureHeight], ...
@@ -576,7 +627,7 @@ function plotResultOverview(records, figurePath, saveFigure, resultsDir)
     hold(axBar, 'on')
     for r = 1:nRows
         if isnan(rows.margin(r))
-            continue                                 % Errored, there is nothing to draw
+            continue                                 % Errored or skipped, nothing to draw
         end
         % Bars outside the plotted range are pulled just inside it to stay visible.
         % The table holds the exact numbers.
@@ -609,7 +660,8 @@ function plotResultOverview(records, figurePath, saveFigure, resultsDir)
     end
     annotation(fig, 'textbox', [0 0.915 1 0.075], 'String', ...
         {sprintf('MagTense MATLAB test suite - %s', verdict), ...
-         sprintf('%d passed, %d failed, %d errored, %.0f s', nPass, nFail, nError, totalTime)}, ...
+         sprintf('%d passed, %d failed, %d errored, %d skipped, %.0f s', nPass, nFail, nError, ...
+                 numel(skipped), totalTime)}, ...
         'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
         'FontSize', 13, 'FontWeight', 'bold', 'Color', titleColour, ...
         'EdgeColor', 'none');

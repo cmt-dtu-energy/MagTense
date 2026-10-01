@@ -2,7 +2,7 @@ import os
 import sys
 from pathlib import Path
 
-import importlib_resources
+import importlib.resources as importlib_resources   # stdlib since 3.9; the backport package is not needed
 import numpy as np
 
 # Windows only
@@ -448,7 +448,7 @@ class Tiles:
 
     @M_rem.setter
     def M_rem(self, val) -> None:
-        if not hasattr(self, "_M_rem "):
+        if not hasattr(self, "_M_rem"):
             self._M_rem = np.zeros(shape=(self.n), dtype=np.float64, order="F")
 
         if val is None:

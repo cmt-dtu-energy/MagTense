@@ -46,7 +46,8 @@ def quiet(problem: MicromagProblem) -> None:
 # ----------------------------------------------------------------------------------------------
 # 1. Single grain hysteresis with adaptive field stepping
 # ----------------------------------------------------------------------------------------------
-def single_grain(solver: str, cuda: bool, n: int = 5, tilt_deg: float = 3.0) -> dict:
+def single_grain(solver: str, cuda: bool, n: int = 5, tilt_deg: float = 3.0, predictor: bool = False,
+                 saddle_check: bool = True) -> dict:
     Bs, K0, A0 = 2.4, 1.0e6, 7.0e-12
     Ms = Bs / MU0
     L = 10.0e-9
@@ -63,6 +64,8 @@ def single_grain(solver: str, cuda: bool, n: int = 5, tilt_deg: float = 3.0) -> 
         alpha=4000.0, gamma=0.0,
         cuda=cuda,
         usereturnhall=True,
+        min_predictor=predictor,
+        min_saddle_check=saddle_check,
     )
     problem.u_ea[:, :] = [0.0, 0.0, 1.0]
     # Two output times and a convergence check at the second one, so the LL relaxation can stop
@@ -103,14 +106,14 @@ def single_grain(solver: str, cuda: bool, n: int = 5, tilt_deg: float = 3.0) -> 
         n_fallback=int(np.sum(problem.min_status == 1)),
         n_fail=int(np.sum(problem.min_status == 2)),
         E_total=problem.E_out[-1, :n_acc, :].sum(axis=1),
-        H_T=MU0 * H, m=m,
+        H_T=MU0 * H, m=m, eig=np.asarray(problem.min_eig[:n_acc]),
     )
 
 
 # ----------------------------------------------------------------------------------------------
 # 2. Standard problem 3 at one cube size
 # ----------------------------------------------------------------------------------------------
-def std_problem_3(solver: str, cuda: bool, res: int = 10, L_lex: float = 8.5) -> dict:
+def std_problem_3(solver: str, cuda: bool, res: int = 10, L_lex: float = 8.5, saddle_check: int = 1) -> dict:
     A0 = 1.74532925199e-10
     Ms = 1e6
     K0 = 0.1 * 0.5 * MU0 * Ms**2
@@ -127,6 +130,7 @@ def std_problem_3(solver: str, cuda: bool, res: int = 10, L_lex: float = 8.5) ->
             alpha=1e3, gamma=0.0,
             cuda=cuda,
             usereturnhall=False,
+            min_saddle_check=saddle_check,
         )
         problem.u_ea[:, 2] = 1
         quiet(problem)
@@ -161,7 +165,7 @@ def std_problem_3(solver: str, cuda: bool, res: int = 10, L_lex: float = 8.5) ->
         out[state] = dict(
             E_red=E, E_tot=E.sum(), n_feval=int(problem.n_feval.sum()), wall=wall,
             iters=int(problem.min_iter.sum()), status=int(problem.min_status[0]),
-            torque=float(problem.min_torque[0]),
+            torque=float(problem.min_torque[0]), eig=float(problem.min_eig[0]),
         )
     return out
 
@@ -179,7 +183,7 @@ def main() -> None:
     print("1. Single-grain hysteresis, adaptive field stepping")
     print("=" * 90)
     rows = []
-    for solver in ("explicit", "minimizer"):
+    for solver in ("explicit_ll", "explicit"):
         r = single_grain(solver, args.cuda, n=args.ngrain)
         rows.append(r)
         print(
@@ -201,7 +205,7 @@ def main() -> None:
     print(f"2. Standard problem 3, {res3}^3 cells, L = 8.5 l_ex")
     print("=" * 90)
     res = {}
-    for solver in ("explicit", "minimizer"):
+    for solver in ("explicit_ll", "explicit"):
         res[solver] = std_problem_3(solver, args.cuda, res=res3)
         for state in ("flower", "vortex"):
             r = res[solver][state]
@@ -212,8 +216,8 @@ def main() -> None:
                 f"iters {r['iters']}, status {r['status']}, torque {r['torque']:.1e}"
             )
     for state in ("flower", "vortex"):
-        dE = res["minimizer"][state]["E_tot"] - res["explicit"][state]["E_tot"]
-        ratio = res["explicit"][state]["n_feval"] / max(res["minimizer"][state]["n_feval"], 1)
+        dE = res["explicit"][state]["E_tot"] - res["explicit_ll"][state]["E_tot"]
+        ratio = res["explicit_ll"][state]["n_feval"] / max(res["explicit"][state]["n_feval"], 1)
         print(f"   {state:>7s}: E_min - E_LL = {dE:+.2e} (reduced units), field-evaluation ratio LL / minimizer: {ratio:.1f}")
 
 

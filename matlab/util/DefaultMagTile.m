@@ -174,6 +174,10 @@ methods
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Sphere' );
              case {'Spheroid','spheroid'}
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Spheroid' );
+            case {'Avgprism','avgprism'}
+                %A prism for which getHFromTiles_mex returns the field averaged over an
+                %observation volume around each point, given as its fifth argument
+                obj.tileType = MagTenseTilesUtil.getMagTileType( 'Avgprism' );
             case {'Planarcoil','planarcoil'}
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Planarcoil' );
             case {'Uniformfield','uniformfield'}
@@ -201,6 +205,8 @@ methods
                 res = 'Sphere';
             case MagTenseTilesUtil.getMagTileType( 'Spheroid' )
                 res = 'Spheroid';
+            case MagTenseTilesUtil.getMagTileType( 'Avgprism' )
+                res = 'Avgprism';
             case MagTenseTilesUtil.getMagTileType( 'Planarcoil' )
                 res = 'Planarcoil';
             case MagTenseTilesUtil.getMagTileType( 'Uniformfield' )

@@ -219,7 +219,8 @@ constructor arguments are plain attributes and are listed there as well.
         min_maxiter: int = 10000,
         min_maxrot: float = 0.3,
         min_fallback: bool = True,
-        min_saddle_check: bool = True,
+        min_saddle_check: bool | int = 2,
+        min_predictor: bool = True,
     ) -> None
 
 ----------------------------------------
@@ -266,7 +267,8 @@ A predefined sequence of applied fields, given as an ``(n,4)`` array of
     ) -> list
 
 A field sweep in which the solver picks the field steps itself. Requires
-``hysteresis_solver="adaptive"`` and ``solver="explicit"``. See
+``hysteresis_solver="adaptive"`` and ``solver="explicit"`` (the energy
+minimizer) or ``"explicit_ll"`` (Landau-Lifshitz time integration). See
 :ref:`Adaptive hysteresis`.
 
 ========================================

@@ -95,7 +95,7 @@ def soft_sphere_state_function(radius: float = 0.01, H_app_T: float = 0.1, verbo
     M = tiles.M[0]
 
     # The state function M(H) that iterate_magnetization used, from the package data
-    import importlib_resources
+    import importlib.resources as importlib_resources
 
     ref = importlib_resources.files("magtense") / "mat/Fe_mur_20_Ms_2_1.csv"
     with importlib_resources.as_file(ref) as path:

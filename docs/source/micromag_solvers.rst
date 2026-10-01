@@ -21,17 +21,24 @@ The solver is selected with ``setMicroMagSolver`` in Matlab and with the
        time-varying applied field. The field is linearly interpolated from the
        tabulated values at the requested time.
    * - ``Explicit``
-     - 1
+     - 3
      - Treats every row of the applied-field table as a separate, *constant*
        field and relaxes the magnetization to equilibrium for each of them in
        turn, starting from the state reached at the previous field. This is the
-       quasi-static mode used for hysteresis loops.
-   * - ``Minimizer``
-     - 3
-     - Reads the applied-field table exactly as ``Explicit`` does, one constant
-       field per row, but finds the equilibrium at each field with the
-       :ref:`Energy minimizer` instead of integrating the Landau-Lifshitz
-       equation in time. ``Implicit`` is accepted as the old name of this slot.
+       quasi-static mode used for hysteresis loops. The equilibrium is found
+       with the :ref:`Energy minimizer`. The minimizer cannot include the
+       thermal field, so a finite temperature in any cell is an error, raised
+       just before the Fortran call with a message pointing to ``ExplicitLL``.
+   * - ``ExplicitLL``
+     - 1
+     - Reads the applied-field table as ``Explicit`` does, but finds the
+       equilibrium at each field by integrating the Landau-Lifshitz equation in
+       time. This is what ``Explicit`` did before the minimizer became its
+       default, and the choice for thermal runs. Python
+       ``solver="explicit_ll"``.
+
+The names ``Minimizer`` and ``Implicit`` are no longer accepted; use
+``Explicit``.
 
 ``ProblemMod`` (Python ``prob_mode``) selects ``new`` (1) or ``old`` (2). Use
 ``new``, which is the default; ``old`` skips the allocation of the solution
@@ -72,11 +79,12 @@ uniformly spaced times between 0 and ``t_end``:
 
 The field function must return an ``(nt_h_ext, 3)`` array.
 
-For the **explicit** solver the same table is read differently: the time column
-is ignored and each row is one constant field to relax at. ``nt_h_ext`` is
-therefore the number of points on the hysteresis curve, and ``t_end``/``nt``
-only control how long each relaxation is integrated and how densely the hysteresis curve is
-sampled.
+For the **explicit** solvers (``Explicit`` and ``ExplicitLL``)
+the same table is read differently: the time column is ignored and each row is
+one constant field to relax at. ``nt_h_ext`` is therefore the number of points
+on the hysteresis curve, and ``t_end``/``nt`` only control how long each
+relaxation is integrated (for the minimizer, only when it falls back to the
+time integration) and how densely the hysteresis curve is sampled.
 
 ``setTimeDis`` (Python ``setTimeDis``, default 10) controls how often the
 solver reports progress: a message is printed every ``setTimeDis``'th
@@ -142,7 +150,7 @@ specifically want to add integration times.
 Energy minimizer
 ========================================
 
-With ``solver = Minimizer`` (Python ``solver="minimizer"``) the equilibrium at
+With ``solver = Explicit`` (Python ``solver="explicit"``) the equilibrium at
 each constant applied field is found by minimizing the energy directly rather
 than by integrating the Landau-Lifshitz equation with a large damping. The
 method is steepest descent on the unit sphere with Barzilai-Borwein step
@@ -185,14 +193,32 @@ A vanishing torque is also what a saddle point looks like, and a symmetric
 starting state sits on one: the canonical vortex of standard problem 3, or a
 magnetization exactly antiparallel to the applied field. Steepest descent
 converges onto such a point, whereas the time integration only leaves it
-through rounding noise, slowly. With ``min_saddle_check`` set, which is the
-default, a converged state is therefore nudged by a random tilt of about half
+through rounding noise, slowly. With ``min_saddle_check = 1``, a converged
+state is therefore nudged by a random tilt of about half
 a degree, common to all cells with a smaller independent part per cell, and
 relaxed again for up to a hundred iterations. A minimum keeps the energy above
 the unperturbed value throughout and is returned unperturbed; a saddle lets the
 energy fall below it, at which point the descent continues to the lower
 minimum, which is then checked in the same way, up to three times. The check
 costs up to a hundred field evaluations per applied field.
+
+With ``min_saddle_check = 2``, the default, the question is answered rigorously
+instead: the
+lowest eigenvalue of the energy Hessian in the tangent space of the converged
+state is computed by the Lanczos iteration, each step costing one field
+evaluation, since the Hessian applied to a tangent displacement is the
+finite difference of the torque along it (the energy is quadratic in the
+magnetization, up to the anisotropy). The eigenvalue is returned in
+``min_eig`` in units of the largest saturation magnetization: positive means a
+minimum, negative a saddle, in which case the state is pushed along the
+eigenvector, which is the direction of steepest descent out of the saddle,
+and relaxed again. Near a switching event the eigenvalue goes to zero, so it
+also tells how close a state is to switching. Along a field sweep the
+eigenvector of the previous field starts the iteration, which then converges
+in a handful of steps; a cold start takes a few tens. On a single-grain loop
+the check costs less than the random nudge, and it finds saddles that the
+nudge misses, such as the plain flower state of standard problem 3 near the
+flower-vortex transition, which relaxes to the lower twisted flower.
 
 .. list-table::
    :widths: 18 12 70
@@ -215,9 +241,17 @@ costs up to a hundred field evaluations per applied field.
      - Fall back to the time integration when the minimizer stalls (1) or give
        up and report it (0).
    * - ``min_saddle_check``
-     - ``1``
+     - ``2``
      - Nudge a converged state and relax again to make sure it is a minimum
-       (1) or accept it as it is (0). Matlab: ``min_saddle``.
+       (1), compute the lowest eigenvalue of the energy Hessian instead (2, see
+       below) or accept the state as it is (0). Matlab: ``min_saddle``.
+   * - ``min_predictor``
+     - ``1``
+     - Start the minimizer at each applied field from the secant extrapolation
+       of the two previous equilibria (1) instead of from the previous one (0),
+       with the first step taken at the step length the previous field ended
+       with. Costs no field evaluation; the extrapolation is skipped across a
+       switching event. Matlab: ``min_pred``.
 
 The minimizer works with every grid type, with CUDA and with FMM, because it
 calls the same field routines as the time integration. It cannot be combined
@@ -343,8 +377,9 @@ loop, as in the standard problem 2 example:
     problem = problem.setHext( @(t) HystDir.*t', linspace(MaxH,-MaxH,40) );
     problem = problem.setTime( linspace(0,40e-9,2) );
 
-Either the ``Explicit`` solver or the ``Minimizer`` can be used for the
-relaxation at each field; see :ref:`Energy minimizer` for the trade-off.
+``Explicit`` relaxes at each field with the energy minimizer. Use
+``ExplicitLL`` to integrate the Landau-Lifshitz equation instead; see
+:ref:`Energy minimizer` for the trade-off.
 
 In Python the dedicated method ``run_hysteresis`` takes the field table
 directly as an ``(n,4)`` array, and requires ``hysteresis_solver='static'``,
@@ -369,11 +404,21 @@ step length itself, based on how much the volume-averaged magnetization moved.
 The whole accept/reject loop runs inside Fortran in a single call. It is
 available from Python through ``run_hysteresis_adaptive`` and requires
 ``hysteresis_solver='adaptive'`` together with ``solver='explicit'`` or
-``solver='minimizer'``. In Matlab
+``solver='explicit_ll'``. In Matlab
 the same parameters exist on the problem object (``adaptiveHext``,
 ``maxHextSteps``, ``H_start``, ``H_end``, ``dH_initial``, ``dH_min``,
 ``dH_max``, ``dH_grow``, ``dH_shrink``, ``dM_min``, ``dM_target``,
 ``dM_reject``, ``switch_refdH``, ``use_sw_ref``).
+
+The sweep first relaxes the starting state ``m0`` at ``H_start`` and stores
+the result as the first field state, so every entry of the output, including
+the first, is an equilibrium (and the first entry of ``n_feval``,
+``min_iter``, ``min_torque``, ``min_status`` and ``min_eig`` describes that relaxation).
+Every step is measured against the last accepted state, and measuring the
+first one against an ``m0`` far from equilibrium - for example ``m0`` along a
+field well away from the easy axis and below the anisotropy field - would make
+it look like a switch. There is therefore no need to relax ``m0`` in a
+separate solve before the sweep.
 
 The step metric is the length of the change of the cell-averaged reduced
 magnetization vector across the trial field step,
@@ -396,6 +441,21 @@ The step-control logic is then
   magnetization *along the field direction* changes sign is rejected whenever
   ``dH`` exceeds ``switch_refdH``. This forces fine sampling right at the
   switching field, which is what a coercivity calculation needs.
+* Recovery from the floor: once ``dH`` has been driven down to ``dH_min``
+  (by rejections or by the ``dM_target`` rule, e.g. around a fast change of
+  the magnetization) or to ``switch_refdH`` by the switch refinement, ``dH``
+  also grows by ``dH_grow`` after every accepted step with
+  :math:`\mathrm{d}M \le` ``dM_target``, not only below ``dM_min``. After a
+  switch refinement this waits until the step across the sign change has
+  been accepted. The first step above ``dM_target`` after ``dH`` has grown
+  ends the recovery and divides ``dH`` by ``dH_grow``, back to the last step
+  length that stayed within ``dM_target``, and the rules above take over
+  again. Without it, a
+  smooth stretch that follows would give a :math:`\mathrm{d}M` between
+  ``dM_min`` and ``dM_target`` at the floor and keep the rest of the sweep
+  there: in a hard-axis loop that is about a thousand steps of ``dH_min``.
+  Until ``dH`` first reaches its floor the step control is exactly the rules
+  above.
 
 At ``dH_min`` a large change is accepted rather than looping forever, and the
 solver says so in its progress output. Too many rejected steps in total aborts

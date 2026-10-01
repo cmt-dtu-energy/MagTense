@@ -64,7 +64,7 @@ The irregular mesh
 ------------------
 Both unstructured tests above use a regular lattice of identical cubes, which is the easy case
 for the mesh analysis. They are therefore repeated on an irregular mesh of Voronoi grains of the
-kind used in python/experiments/Grain_perf, where the cells differ in size and a face at one end
+kind used in python/util/grain_generator.py, where the cells differ in size and a face at one end
 of the domain is linked to several smaller faces at the other end. Method 1 does not carry over,
 since its spacer pattern is built for a 6 X 6 X 6 grid, but its idea does: a slab of cells one
 base cell thick is left out of the mesh, so that what remains falls into two halves which touch
@@ -136,7 +136,7 @@ GRID_TYPES = ('uniform', 'unstructuredPrisms')
 GRID_LABELS = {'uniform': 'uniform grid', 'unstructuredPrisms': 'unstructured mesh'}
 
 # The irregular mesh. A base grid that is refined once wherever a grain boundary passes through a
-# cell, which is the mesh type used in python/experiments/Grain_perf. Two sizes are needed: the
+# cell, which is the mesh type used in python/util/grain_generator.py. Two sizes are needed: the
 # sectioned simulation wants a few cells on either side of the gap, while the supercell
 # reference replicates the mesh 27 times and has to stay small enough to assemble quickly.
 GRAIN_LABEL = 'grain mesh'
@@ -332,7 +332,7 @@ def build_grain_mesh(res_base, a_base, n_grains=GRAIN_COUNT, n_refine=GRAIN_REFI
     A base grid of res_base**3 cubes is refined recursively: a cell is split into eight whenever
     it is close enough to the boundary between two grains that the boundary can pass through it.
     The grains are the Voronoi cells of a set of random points, so the result is the mesh type
-    used in python/experiments/Grain_perf, reproduced here without the grain bookkeeping and
+    used in python/util/grain_generator.py, reproduced here without the grain bookkeeping and
     without any dependency beyond numpy. The mesh is centered on the origin and is deterministic
     for a given seed.
     """
@@ -1234,15 +1234,16 @@ def run_test(res=(6, 6, 6), a=a_operator, pbc=(1, 1, 1), cuda=False, cvode=False
                                                            cuda=cuda)
             checks.append(check)
 
-    tetra_results = None
-    if tetra:
-        tetra_results = tetra_analysis(pbc, cuda=cuda, cvode=cvode)
-        checks.extend(tetra_results['checks'])
-
+    # Grain mesh first, then tetrahedra: the order of the MATLAB test
     grain_results = None
     if grains:
         grain_results = grain_analysis(pbc, cuda=cuda, cvode=cvode)
         checks.extend(grain_results['checks'])
+
+    tetra_results = None
+    if tetra:
+        tetra_results = tetra_analysis(pbc, cuda=cuda, cvode=cvode)
+        checks.extend(tetra_results['checks'])
 
     if plotting:
         plot_results(deviations, operators, res, a, pbc, supercells, grain_results)

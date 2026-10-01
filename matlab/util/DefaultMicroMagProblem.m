@@ -48,7 +48,7 @@ properties
     u_ea
     %new or old problem
     ProblemMod
-    %solver type ('Explicit', 'Dynamic' or 'Minimizer')
+    %solver type ('Dynamic', 'Explicit' or 'ExplicitLL'), see setMicroMagSolver
     solver
 
     %Exchange term constant
@@ -235,20 +235,27 @@ properties
     %value seeds from the clock, which is what independent Monte-Carlo runs need.
     rng_seed
 
-    %Energy minimizer settings, used when the solver is 'Minimizer' (setMicroMagSolver).
+    %Energy minimizer settings, used when the solver is 'Explicit' (setMicroMagSolver).
     %min_tol: convergence criterion, the largest torque max_i |m_i x H_i| over the cells
     %divided by max(Ms) must fall below it. min_maxiter: iteration cap per applied field.
     %min_maxrot: largest rotation of any cell in one iteration [rad]. min_fallback: 1 to
     %fall back to the Landau-Lifshitz time integration when the minimizer stalls, 0 to
     %give up. min_saddle: 1 to nudge a converged state and relax again, so that a saddle
-    %point (which a symmetric starting state sits on) is not mistaken for a minimum, 0 to
-    %accept the state as it is. The solution struct returns E (energies), n_feval,
-    %min_iter, min_torque and min_status, see the TechManual.
+    %point (which a symmetric starting state sits on) is not mistaken for a minimum, 2 to
+    %compute the lowest eigenvalue of the energy Hessian instead (returned as min_eig,
+    %negative means saddle, in which case the state is pushed along the eigenvector and
+    %relaxed again), 0 to accept the state as it is. min_pred: 1 to start the minimizer at each applied field
+    %from the secant extrapolation of the two previous equilibria and with the step length
+    %the previous field ended with (free, skipped across a switching event), 0 to start
+    %from the previous equilibrium. The solution struct
+    %returns E (energies), n_feval, min_iter, min_torque, min_status and min_eig, see the
+    %TechManual.
     min_tol
     min_maxiter
     min_maxrot
     min_fallback
     min_saddle
+    min_pred
 
     %Optional exchange stiffness at the interface between two materials. phase_id gives
     %the material index (1..n_phase) of every tile and A_int is a symmetric
@@ -367,7 +374,7 @@ methods
         obj.u_ea = zeros( obj.ntot, 3 );
         %new or old problem
         obj = obj.setMicroMagProblemMode( 'new' );
-        %solver type ('Explicit', 'Dynamic' or 'Minimizer')
+        %solver type ('Dynamic', 'Explicit' or 'ExplicitLL')
         obj = obj.setMicroMagSolver( 'Dynamic' );
 
         obj.exch_weigh = 8.0;
@@ -525,7 +532,8 @@ methods
         obj.min_maxiter = int32(10000);
         obj.min_maxrot = 0.3;
         obj.min_fallback = int32(1);
-        obj.min_saddle = int32(1);
+        obj.min_saddle = int32(2);
+        obj.min_pred = int32(1);
 
         %One material, i.e. the harmonic mean everywhere, which is the previous behaviour.
         obj.n_phase = int32(1);
@@ -548,16 +556,11 @@ methods
     function obj = setddHext( obj, fct, t_ddHext )
         obj.nt_ddHext = int32(length(t_ddHext));
         
-        obj.ddHext = zeros( obj.nt_Hext, 4 );
+        obj.ddHext = zeros( obj.nt_ddHext, 4 );
         obj.ddHext(:,1) = t_ddHext;
         obj.ddHext(:,2:4) = fct( t_ddHext );
     end
         
-    function obj = setHextTime( obj, nt )
-        obj.nt_Hext = int32( nt );
-        obj.t_Hext  = linspace( obj.t(1), obj.t(end), obj.nt_Hext );
-    end
-    
     function obj = setTime( obj, t )
         obj.t  = t;
         obj.nt = int32(length(t));
@@ -786,17 +789,22 @@ methods
     function obj = setMicroMagSolver( obj, type_var  )
     %the following maps from naming to internal (fortran) representation of the solver type
         
+    %'Dynamic': one time-varying applied field, the LL equation integrated in time.
+    %'Explicit': the equilibrium at each of a list of constant fields, found by the energy
+    %   minimizer. The minimizer cannot include the thermal field, so a finite temperature
+    %   in any cell is an error (checked in struct(), just before the Fortran call).
+    %'ExplicitLL': the equilibrium at each constant field found by integrating the LL
+    %   equation over the time window, which is what 'Explicit' did before the minimizer
+    %   became its default. Use it for thermal runs.
         switch type_var
             case 'Explicit'
+                obj.solver = int32(3);
+            case 'ExplicitLL'
                 obj.solver = int32(1);
             case 'Dynamic'
                 obj.solver = int32(2);
-            case 'Minimizer'
-                %Energy minimizer: reads the field table like 'Explicit' but relaxes to
-                %equilibrium by steepest descent instead of integrating the LL equation
-                obj.solver = int32(3);
             otherwise
-                error('Unknown solver type ''%s''. Use ''Explicit'', ''Dynamic'' or ''Minimizer''.', type_var);
+                error('Unknown solver type ''%s''. Use ''Explicit'', ''ExplicitLL'' or ''Dynamic''.', type_var);
         end
             
     end
@@ -867,6 +875,12 @@ methods
                 warning('Initial array not normalized -- Normalizing')
                 obj.m0(~zerorow,:) = obj.m0(~zerorow,:)./mnorm(~zerorow);
             end
+        end
+        if obj.solver == 3 && any(obj.temperature(:) > 0)
+            error(['The ''Explicit'' solver uses the energy minimizer, which cannot include ' ...
+                   'the thermal field, but the temperature is above zero. Use ' ...
+                   'setMicroMagSolver(''ExplicitLL'') to relax by integrating the ' ...
+                   'Landau-Lifshitz equation instead.']);
         end
         if (obj.useDemag)
            disp(['The demag tensor will require around ' num2str(((3*numel(obj.m0)*(3*numel(obj.m0) + 1)/2))*4/(2^30)) ' Gb'])

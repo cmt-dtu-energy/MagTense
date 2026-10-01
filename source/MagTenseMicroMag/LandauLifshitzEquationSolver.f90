@@ -36,6 +36,7 @@
 #endif
 
     use trace_mod
+    use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
     implicit none          
 
     !>Module variables
@@ -47,8 +48,18 @@
     real(DP),dimension(:),allocatable :: HeffX2,HeffY2,HeffZ2      !>Effective fields
     real(DP),dimension(:),allocatable :: gb_cellVol             !>Cell volumes [m^3], filled on first use by computeEnergies
     integer :: n_feval_count = 0                                !>Effective-field evaluations since the last reset (see relaxAtField)
+    !>History of the secant predictor (min_predictor): the two most recent converged equilibria and
+    !>the applied fields they were found at. pred_n counts how many of the two slots are filled.
+    real(DP),dimension(:),allocatable :: pred_m1, pred_m2      !>Last and second-last converged equilibrium
+    real(DP),dimension(3) :: pred_H1 = 0.0_DP, pred_H2 = 0.0_DP !>Applied fields of pred_m1 and pred_m2 [A/m]
+    integer :: pred_n = 0                                       !>Filled history slots (0, 1 or 2)
+    real(DP) :: pred_tau = 0.0_DP                               !>Last minimizer step length, the warm start of the next field (0: none)
+    real(DP),dimension(:),allocatable :: pred_u                 !>Lowest Hessian eigenvector of the previous field, the Lanczos start vector of the next
+    real(DP),parameter :: pred_ratio_max = 2.0_DP               !>Largest field-step ratio the extrapolation is taken at
+    real(DP),parameter :: pred_dm_max = 0.5_DP                  !>Largest per-cell displacement |dm| the extrapolation is taken at
 
     private :: gb_solution,gb_problem,crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2,gb_cellVol,n_feval_count
+    private :: pred_m1,pred_m2,pred_H1,pred_H2,pred_n,pred_tau,pred_u,pred_ratio_max,pred_dm_max
 
     contains
     
@@ -88,7 +99,7 @@
     call system_clock(count_max=cm)
     rate = REAL(cr)
     
-    write(prog_str,'(A37, A8, A12)') 'MagTense version 3.0.0, compiled on: ', __TIME__, __DATE__ 
+    write(prog_str,'(A37, A8, A12)') 'MagTense version 3.0.1, compiled on: ', __TIME__, __DATE__ 
     call displayGUIMessage( trim(prog_str) ) 
     
     !Save internal representation of the problem and the solution
@@ -286,7 +297,8 @@
     !The minimizer has no notion of a stochastic field: it looks for a stationary point of the energy,
     !which a thermal run never reaches.
     if ( gb_problem%includeThermal .and. gb_problem%solver .eq. MicroMagSolverMinimizer ) then
-        call displayGUIMessage( 'MagTense: the energy minimizer cannot be combined with a finite temperature - use the explicit solver' )
+        call displayGUIMessage( 'MagTense: the energy minimizer (''Explicit'') cannot be combined with a finite ' // &
+                                'temperature - use ''ExplicitLL'' (Python solver=''explicit_ll'')' )
         error stop 'SolveLandauLifshitzEquation: minimizer with thermal field'
     endif
 
@@ -384,12 +396,13 @@
     !Energies and relaxation diagnostics, one entry per applied field. min_status = -1 marks a field
     !relaxed by the Landau-Lifshitz time integration; the minimizer overwrites it.
     allocate( gb_solution%E_out(nt,nt_Hext,4), gb_solution%n_feval(nt_Hext), gb_solution%min_iter(nt_Hext), &
-              gb_solution%min_torque(nt_Hext), gb_solution%min_status(nt_Hext) )
+              gb_solution%min_torque(nt_Hext), gb_solution%min_status(nt_Hext), gb_solution%min_eig(nt_Hext) )
     gb_solution%E_out = 0.
     gb_solution%n_feval = 0
     gb_solution%min_iter = 0
     gb_solution%min_torque = 0.
     gb_solution%min_status = -1
+    gb_solution%min_eig = ieee_value( 1.0_DP, ieee_quiet_nan )
     !Allocate the arrays for the different fields
     !Only if these are to be returned are they saved at every time step
     if (gb_problem%useReturnHall .eq. useReturnHallTrue) then
@@ -479,9 +492,12 @@
     integer :: i
     character*(100) :: prog_str
 
+      call predictorReset()
       do i=1,nt_Hext
           !Applied field
           gb_solution%HextInd = i
+          !Secant predictor: extrapolate the two previous equilibria to this field (no-op unless enabled)
+          call predictorStart( gb_problem%Hext(i,2:4), gb_problem%m0, ntot )
 
           if (gb_problem%solver .eq. MicroMagSolverExplicit .or. gb_problem%solver .eq. MicroMagSolverMinimizer) then
               write(prog_str,'(A20, I5, A8, I5, A6, F6.2, A7)') 'External Field nr.: ', i, ' out of ', nt_Hext, ' i.e. ', real(i)/real(nt_Hext)*100,'% done'
@@ -498,6 +514,7 @@
 
           !The initial state of the next solution is the previous solution result
           gb_problem%m0 = M_out(:,nt,i)
+          call predictorRecord( gb_problem%Hext(i,2:4), M_out(:,nt,i), gb_solution%min_status(i), ntot )
 
           !Store the solution
           gb_solution%M_out(:,:,i,1) =  transpose( M_out(1:ntot,:,i) )
@@ -516,11 +533,12 @@
     procedure(callback_fct),pointer :: cb_fct
     real(DP),dimension(:,:,:),intent(inout) :: M_out
     integer,intent(in) :: ntot, nt, n_reject_max
-    integer :: i_acc, i_trial, n_reject, n_reject_total, ti
+    integer :: i_acc, i_trial, n_reject, n_reject_total
     real(DP) :: H_delta(3), H_dir(3), H_current(3), H_trial(3), H_remaining(3)
     real(DP) :: H_distance, remaining_distance, dH, dH_initial, dH_step, dH_initial_T, dH_T, dH_step_T, dM, m_parallel_before, m_parallel_trial
     real(DP),dimension(:),allocatable :: m_before, m_accepted, m_trial
-    logical :: reject_step, reached_end
+    logical :: reject_step, reached_end, sign_change, switch_reject
+    logical :: recover_armed, recover_grown, refine_pending
     character*(256) :: prog_str
 
       if (gb_problem%maxHextSteps <= 0) then
@@ -550,23 +568,36 @@
       allocate(m_before(3*ntot), m_accepted(3*ntot), m_trial(3*ntot))
       m_accepted = gb_problem%m0
 
-    ! Save the starting field and magnetisation state (store at first time index)
-    i_acc = 1
-    gb_solution%HextInd = i_acc
-    gb_problem%Hext(i_acc,1) = 0.0_DP
-    gb_problem%Hext(i_acc,2:4) = H_current
-    ! Store the initial condition for all time indices so the returned
-    ! `gb_solution%M_out` contains a valid time-series for the initial field.
-    do ti = 1, size(gb_problem%t)
-        gb_solution%M_out(ti,:,i_acc,1) = m_accepted(1:ntot)
-        gb_solution%M_out(ti,:,i_acc,2) = m_accepted(ntot+1:2*ntot)
-        gb_solution%M_out(ti,:,i_acc,3) = m_accepted(2*ntot+1:3*ntot)
-    end do
-    call StoreHeffComponents ( gb_problem, gb_solution )
+      ! Relax the starting state at H_start and store it in the first slot. Every trial step's dM is
+      ! measured against the last accepted state, so that state has to be an equilibrium: an m0 far
+      ! from equilibrium at H_start (e.g. m0 along a field well away from the easy axis, below the
+      ! anisotropy field) makes the first step look like a switch, is rejected down to dH_min and
+      ! leaves the rest of the sweep there. Relaxing an m0 that is already an equilibrium is cheap.
+      i_acc = 1
+      gb_solution%HextInd = i_acc
+      gb_problem%Hext(i_acc,1) = 0.0_DP
+      gb_problem%Hext(i_acc,2:4) = H_current
+      gb_problem%m0 = m_accepted
+      write(prog_str,'(A,3F10.6)') 'Relaxing at H_start, mu0 H [T] = ', mu0*H_current(1), mu0*H_current(2), mu0*H_current(3)
+      call displayGUIMessage( trim(prog_str) )
 
-    n_reject = 0
+      call predictorReset()
+      call relaxAtField( fct, fct_thermal, cb_fct, M_out(:,:,i_acc), ntot, nt, i_acc )
+
+      m_accepted = M_out(:,nt,i_acc)
+      gb_problem%m0 = m_accepted
+      call predictorRecord( H_current, m_accepted, gb_solution%min_status(i_acc), ntot )
+      gb_solution%M_out(:,:,i_acc,1) =  transpose( M_out(1:ntot,:,i_acc) )
+      gb_solution%M_out(:,:,i_acc,2) =  transpose( M_out((ntot+1):2*ntot,:,i_acc) )
+      gb_solution%M_out(:,:,i_acc,3) =  transpose( M_out((2*ntot+1):3*ntot,:,i_acc)  )
+      call StoreHeffComponents ( gb_problem, gb_solution )
+
+      n_reject = 0
       n_reject_total = 0
       reached_end = .false.
+      recover_armed = .false.
+      recover_grown = .false.
+      refine_pending = .false.
 
       do while (.not. reached_end .and. i_acc < gb_problem%maxHextSteps + 1)
           remaining_distance = dot_product(gb_problem%H_end - H_current, H_dir)
@@ -582,6 +613,9 @@
 
           m_before = m_accepted
           gb_problem%m0 = m_before
+          !Secant predictor from the accepted history (a rejected trial leaves the history alone,
+          !so the retry with a smaller dH gets a proportionally smaller extrapolation)
+          call predictorStart( H_trial, gb_problem%m0, ntot )
           gb_solution%HextInd = i_trial
           gb_problem%Hext(i_trial,1) = 0.0_DP
           gb_problem%Hext(i_trial,2:4) = H_trial
@@ -602,10 +636,15 @@
 
           m_parallel_before = meanMagnetisationAlongField(m_before, ntot, H_dir)
           m_parallel_trial = meanMagnetisationAlongField(m_trial, ntot, H_dir)
+          sign_change = m_parallel_before * m_parallel_trial < 0.0_DP
           reject_step = .false.
+          switch_reject = .false.
           if (dM > gb_problem%dM_reject .and. dH > gb_problem%dH_min) reject_step = .true.
           if (gb_problem%use_switch_refine) then
-              if (m_parallel_before * m_parallel_trial < 0.0_DP .and. dH > gb_problem%switch_refine_dH .and. dH > gb_problem%dH_min) reject_step = .true.
+              if (sign_change .and. dH > gb_problem%switch_refine_dH .and. dH > gb_problem%dH_min) then
+                  reject_step = .true.
+                  switch_reject = .true.
+              endif
           endif
 
           if (reject_step) then
@@ -613,6 +652,14 @@
                   reject_step = .false.
               else
                   dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+                  !dH is being driven to its floor, so arm the recovery (see the step control below).
+                  !Across a sign change the floor is switch_refine_dH, and the recovery waits until
+                  !the step across the sign change has been accepted
+                  if (switch_reject) refine_pending = .true.
+                  if (switch_reject .or. dH <= gb_problem%dH_min) then
+                      recover_armed = .true.
+                      recover_grown = .false.
+                  endif
                   dH_T = mu0 * dH
                   write(prog_str,'(A27,F10.6,A4)') '   Retrying with lower dH = ', dH_T, ' T'
                   call displayGUIMessage( trim(prog_str) )
@@ -639,6 +686,7 @@
           H_current = H_trial
           m_accepted = m_trial
           gb_problem%m0 = m_accepted
+          call predictorRecord( H_current, m_accepted, gb_solution%min_status(i_trial), ntot )
           gb_solution%HextInd = i_acc
           gb_problem%Hext(i_acc,1) = 0.0_DP
           gb_problem%Hext(i_acc,2:4) = H_current
@@ -652,14 +700,36 @@
           H_remaining = gb_problem%H_end - H_current
           reached_end = sqrt(sum(H_remaining**2)) <= max(1.0e-10_DP * H_distance, 1.0e-9_DP)
 
+          !Step control for the next step: grow below dM_min, shrink above dM_target. On its own this
+          !band can leave dH at its floor for the rest of the sweep once something has driven it there
+          !(the switch refinement, or the shrinking around a large, fast change): in a smooth region a
+          !step that small gives a dM between dM_min and dM_target, so dH never grows again. In a
+          !hard-axis loop that is ~1000 steps of dH_min. So when dH reaches its floor the recovery is
+          !armed, and while it is armed dH also grows whenever dM <= dM_target. The first step above
+          !dM_target after it has grown disarms it and sets dH back by one dH_grow, to the last
+          !step length that was within dM_target, and the band takes over from there. Until dH
+          !reaches its floor the step control is exactly the band.
+          if (sign_change) refine_pending = .false.
           if (dM < gb_problem%dM_min) then
               dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
+              if (recover_armed) recover_grown = .true.
           else if (dM > gb_problem%dM_target) then
-              dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+              if (recover_armed .and. recover_grown) then
+                  !The recovery has overshot: go back to the previous step length, which was within
+                  !dM_target, rather than shrinking by dH_shrink below it
+                  recover_armed = .false.
+                  dH = max(dH / gb_problem%dH_grow, gb_problem%dH_min)
+              else
+                  dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+              endif
+              if (dH <= gb_problem%dH_min) then
+                  recover_armed = .true.
+                  recover_grown = .false.
+              endif
+          else if (recover_armed .and. .not. refine_pending) then
+              dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
+              recover_grown = .true.
           endif
-
-          
-          
       enddo
 
       gb_problem%nHextAccepted = i_acc
@@ -668,6 +738,97 @@
       endif
       deallocate(m_before, m_accepted, m_trial)
     end subroutine SolveAdaptiveHextLoop
+
+    !>-----------------------------------------
+    !> @author Rasmus Bjoerk, rabj@dtu.dk, DTU, 2026
+    !> @brief
+    !> Secant predictor for the applied-field stepping (problem%min_predictor). The equilibrium
+    !> changes smoothly with the applied field between switching events, so the start state of
+    !> the next field is extrapolated from the two previous equilibria,
+    !>     m_start = normalize( m1 + r (m1 - m2) ),   r = (H - H1).(H1 - H2) / |H1 - H2|^2,
+    !> which is exact for a linear dependence and costs no field evaluation. The first step of
+    !> the minimizer is then taken with the step length the previous field ended with, since a
+    !> fixed first rotation overshoots a start that is already close (see minimizeAtField). The ratio r takes
+    !> care of non-uniform (adaptive) steps and of a reversal of the sweep direction. The
+    !> extrapolation is skipped, and the previous equilibrium used as before, when the history
+    !> holds fewer than two converged states, when |r| exceeds pred_ratio_max, or when a cell
+    !> would be displaced by more than pred_dm_max - the last two mean that the previous step
+    !> was a switching event, which must not be extrapolated. Only the minimizer uses it; the
+    !> history is reset at the start of every field loop and whenever a relaxation did not
+    !> converge.
+    !>-----------------------------------------
+    subroutine predictorReset()
+        pred_n = 0
+        pred_tau = 0.0_DP
+        if ( allocated(pred_u) ) deallocate( pred_u )
+    end subroutine predictorReset
+
+    !> Records the converged equilibrium m at the applied field H (status 0 or 1); anything else
+    !> empties the history.
+    subroutine predictorRecord( H, m, status, ntot )
+    real(DP),dimension(3),intent(in) :: H
+    real(DP),dimension(:),intent(in) :: m
+    integer,intent(in) :: status, ntot
+        if ( gb_problem%min_predictor .eq. 0 .or. gb_problem%solver .ne. MicroMagSolverMinimizer ) return
+        if ( status .lt. 0 .or. status .gt. 1 ) then
+            pred_n = 0
+            return
+        endif
+        if ( .not. allocated(pred_m1) ) allocate( pred_m1(3*ntot), pred_m2(3*ntot) )
+        if ( size(pred_m1) .ne. 3*ntot ) then
+            deallocate( pred_m1, pred_m2 )
+            allocate( pred_m1(3*ntot), pred_m2(3*ntot) )
+            pred_n = 0
+        endif
+        if ( pred_n .ge. 1 ) then
+            pred_m2 = pred_m1
+            pred_H2 = pred_H1
+        endif
+        pred_m1 = m
+        pred_H1 = H
+        pred_n = min( pred_n + 1, 2 )
+    end subroutine predictorRecord
+
+    !> Overwrites m0 with the extrapolated start state for the applied field H when the history
+    !> allows it, and leaves it alone otherwise.
+    subroutine predictorStart( H, m0, ntot )
+    real(DP),dimension(3),intent(in) :: H
+    real(DP),dimension(:),intent(inout) :: m0
+    integer,intent(in) :: ntot
+    real(DP) :: dH2, r, dm_max, nrm
+    integer :: i
+    character*(256) :: prog_str
+        if ( gb_problem%min_predictor .eq. 0 .or. gb_problem%solver .ne. MicroMagSolverMinimizer ) return
+        if ( pred_n .lt. 2 ) return
+        dH2 = sum( (pred_H1 - pred_H2)**2 )
+        if ( dH2 .le. tiny(1.0_DP) ) return
+        r = dot_product( H - pred_H1, pred_H1 - pred_H2 ) / dH2
+        if ( abs(r) .gt. pred_ratio_max ) return
+        dm_max = 0.0_DP
+        do i = 1, ntot
+            dm_max = max( dm_max, (pred_m1(i) - pred_m2(i))**2 + (pred_m1(ntot+i) - pred_m2(ntot+i))**2 &
+                                  + (pred_m1(2*ntot+i) - pred_m2(2*ntot+i))**2 )
+        enddo
+        dm_max = abs(r) * sqrt( dm_max )
+        if ( dm_max .gt. pred_dm_max ) then
+            write(prog_str,'(A,F6.3,A)') 'Predictor skipped: largest cell displacement ', dm_max, ' (switching)'
+            call displayGUIMessage( trim(prog_str) )
+            return
+        endif
+        m0 = pred_m1 + r * ( pred_m1 - pred_m2 )
+        do i = 1, ntot
+            nrm = sqrt( m0(i)**2 + m0(ntot+i)**2 + m0(2*ntot+i)**2 )
+            if ( nrm .gt. tiny(1.0_DP) ) then
+                m0(i) = m0(i) / nrm
+                m0(ntot+i) = m0(ntot+i) / nrm
+                m0(2*ntot+i) = m0(2*ntot+i) / nrm
+            else
+                m0(i) = pred_m1(i)
+                m0(ntot+i) = pred_m1(ntot+i)
+                m0(2*ntot+i) = pred_m1(2*ntot+i)
+            endif
+        enddo
+    end subroutine predictorStart
 
     real(DP) function adaptiveStepMetric(m_before, m_trial, ntot) result(dM_rms)
     real(DP),dimension(:),intent(in) :: m_before, m_trial
@@ -988,9 +1149,20 @@
     settings%maxrot = gb_problem%min_maxrot
     settings%fallback = gb_problem%min_fallback
     settings%saddle_check = gb_problem%min_saddle_check
+    !The eigenvalue check needs the weight of every cell in the energy, Ms_i V_i, to make the
+    !Hessian self-adjoint in its inner product
+    if ( gb_problem%min_saddle_check .eq. 2 ) then
+        settings%weights = gb_problem%Ms * gb_cellVol
+        !The soft mode changes little between neighbouring fields, so the eigenvector of the
+        !previous field is the Lanczos start vector (a random one otherwise)
+        if ( allocated(pred_u) ) settings%eig_start = pred_u
+    endif
     settings%H_scale = Ms_max
     settings%E_scale = 0.5_DP * mu0 * Ms_max**2 * sum( gb_cellVol )
     settings%display_every = max( 1, gb_problem%setTimeDisplay ) * 10
+    !With the predictor on, the first step also starts from the step length the previous field
+    !ended with (a curvature estimate), see predictorStart
+    if ( gb_problem%min_predictor .ne. 0 ) settings%tau_init = pred_tau
 
     allocate( m(3*ntot) )
     call MagTense_Minimize( minimizerHeff, minimizerEnergy, gb_problem%m0, m, ntot, settings, result, cb_fct, &
@@ -1007,6 +1179,19 @@
     gb_solution%min_iter(i_field) = gb_solution%min_iter(i_field) + result%n_iter
     gb_solution%min_torque(i_field) = result%torque
     gb_solution%min_status(i_field) = result%status
+    if ( gb_problem%min_saddle_check .eq. 2 ) then
+        gb_solution%min_eig(i_field) = result%eig_min
+        if ( result%status .le. 1 .and. allocated(result%eig_vec) ) then
+            pred_u = result%eig_vec
+        else if ( allocated(pred_u) ) then
+            deallocate( pred_u )
+        endif
+    endif
+    if ( result%status .le. 1 ) then
+        pred_tau = result%tau_last
+    else
+        pred_tau = 0.0_DP
+    endif
 
     !Only the failure is reported; a converged relaxation stays quiet. The report used to sit
     !after the if with the converged message commented out, so on convergence an
@@ -3098,7 +3283,23 @@ end subroutine updateDemagfieldFMM
                 descr%diag = SPARSE_DIAG_NON_UNIT
                 stat = mkl_sparse_copy ( d2dz2%A, descr, A )
             else
-                !no exchange terms
+                !No exchange terms: a single cell along every direction, i.e. a macrospin. The rest of
+                !the code (and the deallocation below) expects an exchange operator, so build one
+                !with an explicit zero on every diagonal. This used to fall through with d2dz2
+                !unallocated and die in the deallocate.
+                call displayGUIMessage( 'No exchange terms (single cell)' )
+                allocate(d2dz2%values(ntot),d2dz2%cols(ntot),d2dz2%rows_start(ntot),d2dz2%rows_end(ntot))
+                do i = 1, ntot
+                    d2dz2%values(i) = 0.0_DP
+                    d2dz2%cols(i) = i
+                    d2dz2%rows_start(i) = i
+                    d2dz2%rows_end(i) = i + 1
+                end do
+                stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, ntot, ntot, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
+                descr%type = SPARSE_MATRIX_TYPE_GENERAL
+                descr%mode = SPARSE_FILL_MODE_FULL
+                descr%diag = SPARSE_DIAG_NON_UNIT
+                stat = mkl_sparse_copy ( d2dz2%A, descr, A )
             endif
             deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
             stat = mkl_sparse_destroy (d2dz2%A)
