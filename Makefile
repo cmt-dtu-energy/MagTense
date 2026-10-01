@@ -605,7 +605,7 @@ print-%:
 
 info:
 	@echo Using Fortran compiler: $(FC)
-	@echo Conda installation: $(CONDA_DIR) \($(CONDA_BIN)\)
+	@echo "Conda installation: $(CONDA_DIR) ($(CONDA_BIN))"
 	@echo Conda environment: $(ENV_NAME)
 	@echo Python interpreter: $(PYTHON)
 	@echo Fortran flags: $(FFLAGS)
