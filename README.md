@@ -55,7 +55,7 @@ For the higher-level interfaces, the instructions depend on which one you want t
 
 For customizing and developing MagTense to use with the Python interface, check out the [python/README.md](python/README.md) file.
 
-On **Windows**, the quickest way to set up a full development environment (Fortran core + Python interface) is the automated installer: download `install-magtense.bat` and `install-magtense.ps1` from [Releases](https://github.com/cmt-dtu-energy/MagTense/releases) and double-click the `.bat`. It provisions the entire toolchain through conda — no separate Visual Studio or Intel oneAPI install needed. See [python/README.md](python/README.md#windows) for details.
+On **Windows**, the quickest way to set up a full development environment (Fortran core + Python interface) is the automated installer: download `install-magtense.bat` and `install-magtense.ps1` from [Releases](https://github.com/cmt-dtu-energy/MagTense/releases) and double-click the `.bat`. It provisions the entire toolchain through conda — no separate Visual Studio or Intel oneAPI install needed. The CPU build is fully validated; GPU (CUDA) support on Windows is still being revalidated after a recent core merge — see [python/README.md](python/README.md#windows) for current status and for how to rebuild after making changes.
 
 
 

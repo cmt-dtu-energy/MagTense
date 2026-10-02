@@ -132,12 +132,53 @@ CPU-only build. You can force a choice or pick the Python version, e.g. from a t
 .\install-magtense.bat -Compute cpu -PyVersion 313
 ```
 
+> **CPU vs. GPU on Windows.** The CPU path (`-Compute cpu`, or auto-detection falling
+> back to it on a machine with no NVIDIA GPU) is validated end to end: environment,
+> Fortran core, Python interface, tests. The GPU path (`-Compute gpu`) is **still being
+> revalidated** after a large merge of core Fortran changes landed on this branch, and
+> compiling the CUDA plugin on Windows currently hits an unresolved error (NVIDIA's own
+> `cuda_bf16.hpp` header, not MagTense code). If you don't specifically need CUDA
+> acceleration, or aren't actively helping test it, use `-Compute cpu`. We'll update this
+> section as the GPU path gets re-validated.
+
 The installer is idempotent — if a step fails you can fix the cause and re-run it;
 completed steps (conda, the environment, an already-built CVODE) are detected and skipped.
-A log of each run is written to `%USERPROFILE%\.magtense\`.
+A log of each run is written to `%USERPROFILE%\.magtense\`. If you are re-running it after
+a previous attempt, remove any existing environment first so your current flags (e.g.
+switching from GPU to CPU) actually take effect: `conda env remove -n magtense-env -y`.
+The installer reuses an existing `magtense-env` by name rather than recreating it.
 
 Once installed, open the "MagTense Dev Shell" from the Start Menu (a PowerShell with
 `magtense-env` already activated) and try the example scripts in [python/examples/](./examples/).
+
+### Rebuilding after changes (Windows)
+
+Once the environment is set up — by the installer above, or manually as described
+below — iterating on the Fortran core or the Python interface does not need the
+installer again. Stay inside the "MagTense Dev Shell" (or any shell with `magtense-env`
+activated and `ifx`/`icx` on `PATH`) and:
+
+- **Editing Python files** under `python/src/magtense/` needs no rebuild at all. The
+  package is installed editable (`pip install -e`), so the change takes effect on the
+  next `import magtense`.
+- **Editing the Fortran core** (anything under `source/`) or the f2py bridge
+  (`python/FortranToPythonIO.f90`) needs a rebuild:
+
+  ```powershell
+  make python-interface-win USE_CUDA=0   # or USE_CUDA=1 for GPU
+  ```
+
+  Use the **same `USE_CUDA`/`USE_CVODE`/`USE_MATLAB`/`USE_FMM3D` flags as the original
+  build**. Each source subdirectory under `source/` tracks its own file timestamps, so
+  only what actually changed gets recompiled; the link step always reruns, and
+  `pip install -e` re-registers the rebuilt extension in the environment.
+- **Switching `USE_CUDA` or any other `USE_*` flag** on the same checkout (e.g. moving
+  from a CPU build to a GPU build) needs `make clean` first. `check-flags` compares the
+  flags used to build the core against the ones you are linking with, and refuses to
+  link on a mismatch rather than silently mixing objects built with different flags.
+
+Then re-run `make pytest`, or the scripts in [python/examples/](./examples/), to check
+the change.
 
 <details>
 <summary><b>Manual installation (advanced / fallback)</b></summary>
