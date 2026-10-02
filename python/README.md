@@ -132,14 +132,12 @@ CPU-only build. You can force a choice or pick the Python version, e.g. from a t
 .\install-magtense.bat -Compute cpu -PyVersion 313
 ```
 
-> **CPU vs. GPU on Windows.** The CPU path (`-Compute cpu`, or auto-detection falling
-> back to it on a machine with no NVIDIA GPU) is validated end to end: environment,
-> Fortran core, Python interface, tests. The GPU path (`-Compute gpu`) is **still being
-> revalidated** after a large merge of core Fortran changes landed on this branch, and
-> compiling the CUDA plugin on Windows currently hits an unresolved error (NVIDIA's own
-> `cuda_bf16.hpp` header, not MagTense code). If you don't specifically need CUDA
-> acceleration, or aren't actively helping test it, use `-Compute cpu`. We'll update this
-> section as the GPU path gets re-validated.
+> **CPU vs. GPU on Windows.** Both paths are validated end to end: environment, Fortran
+> core (plus the CUDA plugin for `-Compute gpu`), Python interface, tests, and the
+> CUDA-accelerated numerics suite. If you hit a `cuda_bf16.hpp` compile error from `nvcc`,
+> that has only been reproduced on a machine with no NVIDIA GPU/driver visible to Windows
+> (check with `Get-CimInstance Win32_VideoController`) — it is not a known issue on
+> actual GPU hardware.
 
 The installer is idempotent — if a step fails you can fix the cause and re-run it;
 completed steps (conda, the environment, an already-built CVODE) are detected and skipped.
