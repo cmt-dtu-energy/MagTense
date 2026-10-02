@@ -53,7 +53,10 @@ dependencies:
   - vc14_runtime=14.44.35208=h818238b_31
   - vcomp14=14.44.35208=h818238b_31
   - vs2015_runtime=14.44.35208=h38c0c73_31
-  - vs2017_win-64=19.16.27032.1=hb4161e2_3
+  # Do not add vs2017_win-64 back - see env-314-win.yml's note beside the
+  # CUDA block. ifx_win-64/dpcpp_win-64 need only vs_win-64 (-> vs2022_win-64);
+  # vs2017_win-64 drops an activate.d script that exits 1 without a VS2017/v141
+  # install, which kills env creation.
   - vs2022_win-64=19.44.35207=ha74f236_31
   - vs_win-64=2022.14=ha74f236_31
   - vswhere=3.1.7=h40126e0_1
