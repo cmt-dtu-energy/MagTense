@@ -593,6 +593,13 @@ test:
 
 ${PYTHON_MODN_ALL}: check-config check-flags $(if $(filter 1,${USE_CDFMM}),check-cdfmm)
 	${CP_LIB}
+	# f2py's meson backend keeps the FFLAGS/LDFLAGS it saw when the build
+	# directory was first configured and only warns ("Directory already
+	# configured") when they change, so a later build with another
+	# CDFMM_ROOT or FMM3D_LIB would silently keep the old rpath. Start from a
+	# fresh build directory; only FortranToPythonIO.f90 and the wrappers are
+	# compiled here, the libraries are already built.
+	rm -rf ${PYTHON_LIBPATH}/build
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
 		python -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} \
