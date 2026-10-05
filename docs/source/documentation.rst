@@ -261,8 +261,8 @@ A predefined sequence of applied fields, given as an ``(n,4)`` array of
         dM_min: float = 1e-3,
         dM_target: float = 1e-2,
         dM_reject: float = 5e-2,
-        dH_grow: float = 1.25,
-        dH_shrink: float = 0.5,
+        dH_grow: float = 2.0,
+        dH_shrink: float = 0.25,
         switch_refine_dH: float | None = None,
     ) -> list
 

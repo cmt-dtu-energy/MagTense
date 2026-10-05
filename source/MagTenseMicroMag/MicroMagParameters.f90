@@ -159,20 +159,13 @@ include "mkl_dfti.f90"
         real(DP) :: dH_initial = 0.0_DP                   !> Initial adaptive field-step length [A/m].
         real(DP) :: dH_min = 0.0_DP                       !> Minimum adaptive field-step length [A/m].
         real(DP) :: dH_max = 0.0_DP                       !> Maximum adaptive field-step length [A/m].
-        real(DP) :: dH_grow = 1.25_DP                     !> Factor for increasing adaptive field-step length.
-        real(DP) :: dH_shrink = 0.5_DP                    !> Factor for decreasing adaptive field-step length.
-        real(DP) :: dM_min = 1.0e-3_DP                    !> Magnetisation-change threshold for growing adaptive field steps.
-        real(DP) :: dM_target = 1.0e-2_DP                 !> Magnetisation-change threshold for shrinking adaptive field steps.
+        real(DP) :: dH_grow = 2.0_DP                      !> Largest factor the adaptive field step may grow by per step.
+        real(DP) :: dH_shrink = 0.25_DP                   !> Smallest factor the adaptive field step may shrink by per step.
+        real(DP) :: dM_min = 1.0e-3_DP                    !> Unused by the step controller; kept for interface compatibility.
+        real(DP) :: dM_target = 1.0e-2_DP                 !> Change of the mean magnetisation per step the adaptive field step aims for.
         real(DP) :: dM_reject = 5.0e-2_DP                 !> Magnetisation-change threshold for rejecting adaptive field steps.
         real(DP) :: switch_refine_dH = 0.0_DP             !> Maximum accepted step across magnetisation sign changes [A/m].
         logical :: use_switch_refine = .false.            !> Enable adaptive sign-change refinement.
-        !> Step controller of the adaptive hysteresis loop. 1: the original band (grow below dM_min,
-        !> shrink above dM_target, recovery from the floor). 2: target tracking - the step is scaled
-        !> by (dM_target/dM) clamped to [dH_shrink, dH_grow], a relaxation that did not converge is
-        !> retried with half the step, the rejected trial of a switch is kept as a bracket, and an
-        !> instability indicator (lowest Hessian eigenvalue of the minimizer, or the relaxation cost
-        !> of the time integration) caps the step before a switching field.
-        integer :: adaptive_controller = 1
 
         !> Settings for the energy minimizer (solver = MicroMagSolverMinimizer). The minimizer replaces
         !> the Landau-Lifshitz time integration when relaxing to equilibrium at a constant applied field.

@@ -579,6 +579,32 @@
     end subroutine SolveFixedHextLoop
 
     subroutine SolveAdaptiveHextLoop(fct, fct_thermal, cb_fct, M_out, ntot, nt, n_reject_max)
+    !>-----------------------------------------
+    !> Adaptive stepping of the applied field from H_start to H_end. Every trial step is a full
+    !> relaxation from the last accepted equilibrium; the change of the cell-averaged magnetisation
+    !> dM = |<m>_trial - <m>_accepted| decides whether the trial is accepted and how long the next
+    !> step is (target tracking):
+    !>
+    !>   - reject and bisect towards the accepted state when dM > dM_reject, when the mean
+    !>     magnetisation along the sweep changes sign and the step is above switch_refine_dH, or when
+    !>     the minimizer did not converge (status 2); nothing is rejected once dH is at dH_min, so a
+    !>     switching event is resolved to dH_min and accepted there;
+    !>   - the rejected trial of a switching event is kept as a bracket: the step never passes the
+    !>     field that is known to have switched, the refinement ends as soon as the bracket is dH_min
+    !>     wide, and the step length from before the switch is restored right after it;
+    !>   - after an acceptance the step is scaled by 0.9 dM_target / dM, clamped per step to
+    !>     [dH_shrink, dH_grow], floored at dH_min and capped at dH_max;
+    !>   - an approaching instability shortens the step before dM shows it: for the minimizer the
+    !>     lowest Hessian eigenvalue (min_saddle_check = 2), once it has fallen below half its maximum
+    !>     on the current branch, is extrapolated as lambda^2 linear in the field (the saddle-node law)
+    !>     and the step is capped at 0.9 of the predicted distance; for the time integration a 3x jump
+    !>     of the field evaluations of a relaxation halves the next step;
+    !>   - a time integration that ran out of its window (min_status -2) is accepted and flagged, not
+    !>     retried: the slow relaxation is a property of the field, not of the step, and a retry costs
+    !>     another full window (tested: it doubled the cost and left more fields unconverged).
+    !>
+    !> dM_min is not used by this controller and is kept only for interface compatibility.
+    !>-----------------------------------------
     procedure(dydt_fct), pointer :: fct
     procedure(no_argument_fct), pointer :: fct_thermal
     procedure(callback_fct),pointer :: cb_fct
@@ -588,10 +614,7 @@
     real(DP) :: H_delta(3), H_dir(3), H_current(3), H_trial(3), H_remaining(3)
     real(DP) :: H_distance, remaining_distance, dH, dH_initial, dH_step, dH_initial_T, dH_T, dH_step_T, dM, m_parallel_before, m_parallel_trial
     real(DP),dimension(:),allocatable :: m_before, m_accepted, m_trial
-    logical :: reject_step, reached_end, sign_change, switch_reject
-    logical :: recover_armed, recover_grown, refine_pending
-    !Target-tracking controller (gb_problem%adaptive_controller == 2), see the step control below
-    logical :: use_target, nonconv_reject, trial_converged, switched
+    logical :: reject_step, reached_end, sign_change, switch_reject, nonconv_reject, trial_converged, switched
     real(DP) :: bracket_dH, dH_pre_switch, factor, lam_prev, lam_acc, lam_max, s_prev, s_acc, slope, d_sw, nfev_prev
     integer :: n_rej_dM, n_rej_sign, n_rej_conv, n_floor_accept, n_unconverged_acc
     real(DP), parameter :: ctrl_safety = 0.9_DP       !>Aim slightly below dM_target
@@ -599,6 +622,7 @@
     real(DP), parameter :: ind_fraction = 0.9_DP      !>Fraction of the predicted distance to the instability the step may take
     real(DP), parameter :: ind_gate = 0.5_DP          !>The eigenvalue must have fallen to this fraction of its branch maximum first
     real(DP), parameter :: ll_cost_ratio = 3.0_DP     !>Relaxation-cost jump that halves the step for the time integration
+    real(DP), parameter :: bracket_void = 0.25_DP     !>A bracket narrower than this fraction of dH_min is dropped
     character*(256) :: prog_str
 
       if (gb_problem%maxHextSteps <= 0) then
@@ -612,6 +636,10 @@
       if (gb_problem%dH_min > gb_problem%dH_max) then
           call displayGUIMessage('Adaptive hysteresis requires dH_min <= dH_max')
           error stop 'Adaptive hysteresis requires dH_min <= dH_max'
+      endif
+      if (gb_problem%dH_grow <= 1.0_DP .or. gb_problem%dH_shrink <= 0.0_DP .or. gb_problem%dH_shrink >= 1.0_DP) then
+          call displayGUIMessage('Adaptive hysteresis requires dH_grow > 1 and 0 < dH_shrink < 1 (per-step limits of the step change)')
+          error stop 'Adaptive hysteresis requires dH_grow > 1 and 0 < dH_shrink < 1'
       endif
 
       H_delta = gb_problem%H_end - gb_problem%H_start
@@ -655,10 +683,6 @@
       n_reject = 0
       n_reject_total = 0
       reached_end = .false.
-      recover_armed = .false.
-      recover_grown = .false.
-      refine_pending = .false.
-      use_target = (gb_problem%adaptive_controller == 2)
       bracket_dH = -1.0_DP
       dH_pre_switch = -1.0_DP
       lam_prev = -1.0_DP
@@ -670,7 +694,6 @@
       n_rej_conv = 0
       n_floor_accept = 0
       n_unconverged_acc = 0
-      if (use_target) call displayGUIMessage('Adaptive hysteresis: target-tracking step controller')
 
       do while (.not. reached_end .and. i_acc < gb_problem%maxHextSteps + 1)
           remaining_distance = dot_product(gb_problem%H_end - H_current, H_dir)
@@ -680,8 +703,8 @@
           !Inside the bracket of a switching event the step never passes the field that is known to
           !have switched; once the bracket is dH_min wide (or narrower) the trial lands on it and is
           !accepted there, which ends the refinement without a further rejected relaxation.
-          if (use_target .and. bracket_dH > 0.0_DP) then
-              if (bracket_dH < 0.25_DP * gb_problem%dH_min) then
+          if (bracket_dH > 0.0_DP) then
+              if (bracket_dH < bracket_void * gb_problem%dH_min) then
                   !The trial that defined the bracket switched, but the states accepted since then did
                   !not, and the bracket has shrunk below anything the sweep can resolve: the switch was a
                   !path effect of the larger step. Drop the bracket rather than step by a sliver.
@@ -724,10 +747,12 @@
           m_parallel_before = meanMagnetisationAlongField(m_before, ntot, H_dir)
           m_parallel_trial = meanMagnetisationAlongField(m_trial, ntot, H_dir)
           sign_change = m_parallel_before * m_parallel_trial < 0.0_DP
+          trial_converged = (gb_solution%min_status(i_trial) /= 2 .and. gb_solution%min_status(i_trial) /= -2)
+
+          !----- accept or reject the trial -----
           reject_step = .false.
           switch_reject = .false.
           nonconv_reject = .false.
-          trial_converged = (gb_solution%min_status(i_trial) /= 2 .and. gb_solution%min_status(i_trial) /= -2)
           if (dM > gb_problem%dM_reject .and. dH > gb_problem%dH_min) reject_step = .true.
           if (gb_problem%use_switch_refine) then
               if (sign_change .and. dH > gb_problem%switch_refine_dH .and. dH > gb_problem%dH_min) then
@@ -735,12 +760,7 @@
                   switch_reject = .true.
               endif
           endif
-          !A minimizer that did not reach equilibrium (status 2) is retried with a smaller step while there
-          !is room. A time integration that ran out of its window (status -2) is not retried: the slow
-          !relaxation is a property of the field, not of the step, and a retry costs another full window
-          !(tested: it doubled the cost and left more fields unconverged); it is flagged and the cost
-          !indicator below shrinks the following step instead
-          if (use_target .and. gb_solution%min_status(i_trial) == 2 .and. .not. reject_step .and. dH > gb_problem%dH_min) then
+          if (gb_solution%min_status(i_trial) == 2 .and. .not. reject_step .and. dH > gb_problem%dH_min) then
               reject_step = .true.
               nonconv_reject = .true.
           endif
@@ -749,34 +769,22 @@
               if (n_reject > 0 .and. dH <= gb_problem%dH_min) then
                   reject_step = .false.
               else
-                  if (use_target) then
-                      if (nonconv_reject) then
-                          n_rej_conv = n_rej_conv + 1
-                          call displayGUIMessage('   Relaxation did not converge; retrying with a smaller field step')
-                      else
-                          !The trial switched: keep it as the far end of the bracket and remember the
-                          !step length to return to once the switch has been accepted
-                          if (bracket_dH < 0.0_DP) dH_pre_switch = dH
-                          bracket_dH = dH_step
-                          if (switch_reject) then
-                              n_rej_sign = n_rej_sign + 1
-                          else
-                              n_rej_dM = n_rej_dM + 1
-                          endif
-                      endif
-                      !Bisect towards the accepted state
-                      dH = max(0.5_DP * dH, gb_problem%dH_min)
+                  if (nonconv_reject) then
+                      n_rej_conv = n_rej_conv + 1
+                      call displayGUIMessage('   Relaxation did not converge; retrying with a smaller field step')
                   else
-                      dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+                      !The trial switched: keep it as the far end of the bracket and remember the step
+                      !length to return to once the switch has been accepted
+                      if (bracket_dH < 0.0_DP) dH_pre_switch = dH
+                      bracket_dH = dH_step
+                      if (switch_reject) then
+                          n_rej_sign = n_rej_sign + 1
+                      else
+                          n_rej_dM = n_rej_dM + 1
+                      endif
                   endif
-                  !dH is being driven to its floor, so arm the recovery (see the step control below).
-                  !Across a sign change the floor is switch_refine_dH, and the recovery waits until
-                  !the step across the sign change has been accepted
-                  if (switch_reject) refine_pending = .true.
-                  if (switch_reject .or. dH <= gb_problem%dH_min) then
-                      recover_armed = .true.
-                      recover_grown = .false.
-                  endif
+                  !Bisect towards the accepted state
+                  dH = max(0.5_DP * dH, gb_problem%dH_min)
                   dH_T = mu0 * dH
                   write(prog_str,'(A27,F10.6,A4)') '   Retrying with lower dH = ', dH_T, ' T'
                   call displayGUIMessage( trim(prog_str) )
@@ -794,13 +802,14 @@
               cycle
           endif
 
+          !----- accept -----
           if (dM > gb_problem%dM_reject .and. dH <= gb_problem%dH_min) then
               call displayGUIMessage('Adaptive hysteresis accepting a large magnetisation change at dH_min')
               n_floor_accept = n_floor_accept + 1
           endif
           if (.not. trial_converged) then
               n_unconverged_acc = n_unconverged_acc + 1
-              if (use_target) call displayGUIMessage('Adaptive hysteresis accepting a field whose relaxation did not converge')
+              call displayGUIMessage('Adaptive hysteresis accepting a field whose relaxation did not converge')
           endif
           nfev_prev = real(gb_solution%n_feval(i_acc), DP)
 
@@ -823,109 +832,76 @@
           H_remaining = gb_problem%H_end - H_current
           reached_end = sqrt(sum(H_remaining**2)) <= max(1.0e-10_DP * H_distance, 1.0e-9_DP)
 
-          !Step control for the next step: grow below dM_min, shrink above dM_target. On its own this
-          !band can leave dH at its floor for the rest of the sweep once something has driven it there
-          !(the switch refinement, or the shrinking around a large, fast change): in a smooth region a
-          !step that small gives a dM between dM_min and dM_target, so dH never grows again. In a
-          !hard-axis loop that is ~1000 steps of dH_min. So when dH reaches its floor the recovery is
-          !armed, and while it is armed dH also grows whenever dM <= dM_target. The first step above
-          !dM_target after it has grown disarms it and sets dH back by one dH_grow, to the last
-          !step length that was within dM_target, and the band takes over from there. Until dH
-          !reaches its floor the step control is exactly the band.
-          if (use_target) then
-              !Target tracking. A switching event (dM above dM_reject, accepted at the floor, or the
-              !trial that landed on the bracket end) restores the pre-switch step; otherwise the step
-              !is scaled towards dM_target, clamped to [dH_shrink, dH_grow] per step, floored at dH_min
-              !and capped at dH_max.
-              switched = (dM > gb_problem%dM_reject) .or. sign_change
-              s_acc = dot_product(H_current - gb_problem%H_start, H_dir)
-              if (switched) then
-                  if (dH_pre_switch > 0.0_DP) then
-                      dH = min(max(dH_pre_switch, gb_problem%dH_min), gb_problem%dH_max)
-                  else
-                      dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
-                  endif
-                  bracket_dH = -1.0_DP
-                  dH_pre_switch = -1.0_DP
-                  lam_prev = -1.0_DP
-                  lam_max = -1.0_DP
+          !----- step control for the next trial -----
+          !A switching event (dM above dM_reject accepted at the floor, or the trial that landed on
+          !the bracket end) restores the pre-switch step; otherwise the step is scaled towards
+          !dM_target, clamped to [dH_shrink, dH_grow] per step, floored at dH_min and capped at dH_max.
+          switched = (dM > gb_problem%dM_reject) .or. sign_change
+          s_acc = dot_product(H_current - gb_problem%H_start, H_dir)
+          if (switched) then
+              if (dH_pre_switch > 0.0_DP) then
+                  dH = min(max(dH_pre_switch, gb_problem%dH_min), gb_problem%dH_max)
               else
-                  if (bracket_dH > 0.0_DP) then
-                      bracket_dH = bracket_dH - dH_step
-                      !Landed on (or past) the far end without switching: the bracket is void
-                      if (bracket_dH <= 0.25_DP * gb_problem%dH_min) then
-                          bracket_dH = -1.0_DP
-                          dH_pre_switch = -1.0_DP
-                      endif
+                  dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
+              endif
+              bracket_dH = -1.0_DP
+              dH_pre_switch = -1.0_DP
+              lam_prev = -1.0_DP
+              lam_max = -1.0_DP
+          else
+              if (bracket_dH > 0.0_DP) then
+                  bracket_dH = bracket_dH - dH_step
+                  !Landed on (or past) the far end without switching: the bracket is void
+                  if (bracket_dH <= bracket_void * gb_problem%dH_min) then
+                      bracket_dH = -1.0_DP
+                      dH_pre_switch = -1.0_DP
                   endif
-                  if (dM > 0.0_DP) then
-                      factor = (ctrl_safety * gb_problem%dM_target / dM)**ctrl_exponent
-                  else
-                      factor = gb_problem%dH_grow
-                  endif
-                  factor = min(max(factor, gb_problem%dH_shrink), gb_problem%dH_grow)
-                  !Time integration: a jump in the relaxation cost means the state is approaching an
-                  !instability (critical slowing down) before the mean magnetisation shows it
-                  if (gb_problem%solver .ne. MicroMagSolverMinimizer .and. nfev_prev > 0.0_DP) then
-                      if (real(gb_solution%n_feval(i_acc), DP) > ll_cost_ratio * nfev_prev) factor = min(factor, 0.5_DP)
-                  endif
-                  dH = min(max(dH * factor, gb_problem%dH_min), gb_problem%dH_max)
-                  !Minimizer: the lowest Hessian eigenvalue goes to zero at the switching field as
-                  !sqrt(H_sw - H), so lambda^2 extrapolated linearly from the last two accepted states on
-                  !this branch predicts the distance to the instability; keep the step inside it
-                  lam_acc = gb_solution%min_eig(i_acc)
-                  if (gb_problem%solver .eq. MicroMagSolverMinimizer .and. gb_solution%min_status(i_acc) == 0 .and. &
-                      ieee_is_finite(lam_acc)) then
-                      lam_max = max(lam_max, lam_acc)
-                      !Far from the instability the eigenvalue decays roughly exponentially with the field
-                      !and the linear extrapolation of lambda^2 predicts the switch far too early; only once
-                      !it has fallen well below its maximum on this branch is the sqrt law a fair model
-                      if (lam_acc > 0.0_DP .and. lam_prev > 0.0_DP .and. s_acc > s_prev .and. lam_acc < ind_gate * lam_max) then
-                          slope = (lam_prev**2 - lam_acc**2) / (s_acc - s_prev)
-                          if (slope > 0.0_DP) then
-                              d_sw = lam_acc**2 / slope
-                              if (ind_fraction * d_sw < dH) then
-                                  dH = max(ind_fraction * d_sw, gb_problem%dH_min)
-                                  write(prog_str,'(A,F10.6,A,F10.6,A)') '   Instability predicted ', mu0*d_sw, ' T ahead; dH capped to ', mu0*dH, ' T'
-                                  call displayGUIMessage( trim(prog_str) )
-                              endif
+              endif
+              if (dM > 0.0_DP) then
+                  factor = (ctrl_safety * gb_problem%dM_target / dM)**ctrl_exponent
+              else
+                  factor = gb_problem%dH_grow
+              endif
+              factor = min(max(factor, gb_problem%dH_shrink), gb_problem%dH_grow)
+              !Time integration: a jump in the relaxation cost means the state is approaching an
+              !instability (critical slowing down) before the mean magnetisation shows it
+              if (gb_problem%solver .ne. MicroMagSolverMinimizer .and. nfev_prev > 0.0_DP) then
+                  if (real(gb_solution%n_feval(i_acc), DP) > ll_cost_ratio * nfev_prev) factor = min(factor, 0.5_DP)
+              endif
+              dH = min(max(dH * factor, gb_problem%dH_min), gb_problem%dH_max)
+              !Minimizer: the lowest Hessian eigenvalue goes to zero at the switching field as
+              !sqrt(H_sw - H), so lambda^2 extrapolated linearly from the last two accepted states on
+              !this branch predicts the distance to the instability; keep the step inside it
+              lam_acc = gb_solution%min_eig(i_acc)
+              if (gb_problem%solver .eq. MicroMagSolverMinimizer .and. gb_solution%min_status(i_acc) == 0 .and. &
+                  ieee_is_finite(lam_acc)) then
+                  lam_max = max(lam_max, lam_acc)
+                  !Far from the instability the eigenvalue decays roughly exponentially with the field
+                  !and the linear extrapolation of lambda^2 predicts the switch far too early; only once
+                  !it has fallen well below its maximum on this branch is the sqrt law a fair model
+                  if (lam_acc > 0.0_DP .and. lam_prev > 0.0_DP .and. s_acc > s_prev .and. lam_acc < ind_gate * lam_max) then
+                      slope = (lam_prev**2 - lam_acc**2) / (s_acc - s_prev)
+                      if (slope > 0.0_DP) then
+                          d_sw = lam_acc**2 / slope
+                          if (ind_fraction * d_sw < dH) then
+                              dH = max(ind_fraction * d_sw, gb_problem%dH_min)
+                              write(prog_str,'(A,F10.6,A,F10.6,A)') '   Instability predicted ', mu0*d_sw, ' T ahead; dH capped to ', mu0*dH, ' T'
+                              call displayGUIMessage( trim(prog_str) )
                           endif
                       endif
-                      lam_prev = merge(lam_acc, -1.0_DP, lam_acc > 0.0_DP)
-                  else
-                      lam_prev = -1.0_DP
-                      lam_max = -1.0_DP
                   endif
-              endif
-              s_prev = s_acc
-          else
-          if (sign_change) refine_pending = .false.
-          if (dM < gb_problem%dM_min) then
-              dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
-              if (recover_armed) recover_grown = .true.
-          else if (dM > gb_problem%dM_target) then
-              if (recover_armed .and. recover_grown) then
-                  !The recovery has overshot: go back to the previous step length, which was within
-                  !dM_target, rather than shrinking by dH_shrink below it
-                  recover_armed = .false.
-                  dH = max(dH / gb_problem%dH_grow, gb_problem%dH_min)
+                  lam_prev = merge(lam_acc, -1.0_DP, lam_acc > 0.0_DP)
               else
-                  dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+                  lam_prev = -1.0_DP
+                  lam_max = -1.0_DP
               endif
-              if (dH <= gb_problem%dH_min) then
-                  recover_armed = .true.
-                  recover_grown = .false.
-              endif
-          else if (recover_armed .and. .not. refine_pending) then
-              dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
-              recover_grown = .true.
           endif
-          endif
+          s_prev = s_acc
       enddo
 
       gb_problem%nHextAccepted = i_acc
       write(prog_str,'(A,I5,A,I4,A,I4,A,I4,A,I4,A,I4)') 'Adaptive hysteresis summary: accepted ', i_acc, &
-          ', rejected (dM) ', merge(n_rej_dM, n_reject_total, use_target), ', rejected (sign change) ', n_rej_sign, &
+          ', rejected (dM) ', n_rej_dM, ', rejected (sign change) ', n_rej_sign, &
           ', rejected (not converged) ', n_rej_conv, ', switches accepted at dH_min ', n_floor_accept, &
           ', accepted without convergence ', n_unconverged_acc
       call displayGUIMessage( trim(prog_str) )

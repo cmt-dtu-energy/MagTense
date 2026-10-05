@@ -1098,7 +1098,6 @@ class MicromagProblem:
             dh_shrink=0.0,
             switch_refine_dh=0.0,
             use_switch_refine=0,
-            adaptive_controller=1,
             min_tol=self.min_tol,
             min_maxiter=self.min_maxiter,
             min_maxrot=self.min_maxrot,
@@ -1268,7 +1267,6 @@ class MicromagProblem:
             dh_shrink=0.0,
             switch_refine_dh=0.0,
             use_switch_refine=0,
-            adaptive_controller=1,
             min_tol=self.min_tol,
             min_maxiter=self.min_maxiter,
             min_maxrot=self.min_maxrot,
@@ -1326,30 +1324,27 @@ class MicromagProblem:
             dM_min: float = 1e-3,
             dM_target: float = 1e-2,
             dM_reject: float = 5e-2,
-            dH_grow: float = 1.25,
-            dH_shrink: float = 0.5,
+            dH_grow: float = 2.0,
+            dH_shrink: float = 0.25,
             switch_refine_dH: float | None = None,
-            controller: str = "target",
     ) -> list[np.ndarray | int]:
         """
         Run a micromagnetic hysteresis simulation with adaptive external-field steps.
 
-        ``controller`` selects how the step is adapted after each accepted field:
-
-        - ``"band"``: the original rule. Grow by ``dH_grow`` when the change of the mean
-          magnetisation ``dM`` is below ``dM_min``, shrink by ``dH_shrink`` above ``dM_target``,
-          otherwise keep the step; reject and halve a step with ``dM > dM_reject`` or across a sign
-          change of the mean magnetisation (``switch_refine_dH``).
-        - ``"target"`` (default): the step is multiplied by ``0.9 dM_target / dM``, clamped to
-          ``[dH_shrink, dH_grow]``, so it heads for ``dM_target`` directly (``dM_min`` is unused;
-          sensible clamps are ``dH_shrink`` 0.2-0.5 and ``dH_grow`` 2-3). In addition a relaxation
-          that did not converge (LL window exhausted, or minimizer status 2) is retried with half the
-          step while the step is above ``dH_min``; the rejected trial of a switching event is kept as
-          a bracket, so the refinement ends as soon as the bracket is ``dH_min`` wide and the step
-          returns to its pre-switch length right after the switch; and the step is capped ahead of a
-          predicted switching field, from the lowest Hessian eigenvalue of the minimizer
-          (``min_saddle_check = 2``, assuming eigenvalue^2 linear in the field near the instability)
-          or, for the time integration, when the relaxation cost jumps by more than 3x.
+        Step control: every trial field is a full relaxation from the last accepted state and
+        ``dM``, the change of the cell-averaged magnetisation vector, decides. A trial is redone
+        with half the step when ``dM > dM_reject``, when the mean magnetisation along the sweep
+        changes sign and the step is above ``switch_refine_dH``, or when the minimizer did not
+        converge; nothing is redone once the step is at ``dH_min``, so a switching event is
+        resolved to ``dH_min``. The rejected trial of a switch is kept as a bracket (the step never
+        passes the field known to have switched, and the pre-switch step is restored right after
+        the switch). After an accepted step the step is scaled by ``0.9 dM_target / dM``, clamped
+        per step to ``[dH_shrink, dH_grow]`` (so these are per-step limits, not fixed factors),
+        floored at ``dH_min`` and capped at ``dH_max``. An approaching instability shortens the
+        step early: for the minimizer from the lowest Hessian eigenvalue (``min_saddle_check = 2``),
+        for the time integration when the relaxation cost jumps by more than 3x. ``dM_min`` is
+        accepted for compatibility and unused. A time integration that ran out of its window is
+        accepted and reported with ``min_status = -2``.
 
         The adaptive accept/reject loop is executed by the Fortran backend in a
         single call. Output arrays are preallocated to ``max_steps`` in Fortran
@@ -1364,10 +1359,6 @@ class MicromagProblem:
             raise ValueError(
                 "run_hysteresis_adaptive requires hysteresis_solver='adaptive'"
             )
-        controllers = {"band": 1, "target": 2}
-        if controller not in controllers:
-            raise ValueError("controller must be 'band' or 'target'")
-        controller_id = controllers[controller]
         if self.solver not in (1, 3):
             raise ValueError("Adaptive hysteresis requires solver='explicit' or 'explicit_ll'")
 
@@ -1482,7 +1473,6 @@ class MicromagProblem:
             dh_shrink=float(dH_shrink),
             switch_refine_dh=switch_refine_value,
             use_switch_refine=int(use_switch_refine),
-            adaptive_controller=controller_id,
             min_tol=self.min_tol,
             min_maxiter=self.min_maxiter,
             min_maxrot=self.min_maxrot,

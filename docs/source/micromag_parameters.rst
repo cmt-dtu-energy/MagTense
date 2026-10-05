@@ -248,20 +248,20 @@ Adaptive hysteresis parameters
      - Smallest and largest allowed field step [A/m].
    * - ``dH_grow``
      - ``dH_grow``
-     - ``1.25``
-     - Growth factor.
+     - ``2.0``
+     - Largest per-step growth of the adaptive field step.
    * - ``dH_shrink``
      - ``dH_shrink``
-     - ``0.5``
-     - Shrink factor.
+     - ``0.25``
+     - Smallest per-step shrink of the adaptive field step.
    * - ``dM_min``
      - ``dM_min``
      - ``1e-3``
-     - Grow the step below this magnetization change.
+     - Unused by the step controller, kept for compatibility.
    * - ``dM_target``
      - ``dM_target``
      - ``1e-2``
-     - Shrink the step above this magnetization change.
+     - Magnetization change per step the adaptive field step aims for.
    * - ``dM_reject``
      - ``dM_reject``
      - ``5e-2``

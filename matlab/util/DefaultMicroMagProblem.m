@@ -516,8 +516,11 @@ methods
         obj.dH_initial = 1e3;
         obj.dH_min = 1e1;
         obj.dH_max = 1e5;
-        obj.dH_grow = 1.25;
-        obj.dH_shrink = 0.5;
+        %dH_grow and dH_shrink are the per-step limits of the step change: after an accepted
+        %field the step is scaled by 0.9*dM_target/dM and clamped to [dH_shrink, dH_grow].
+        %dM_min is unused by the step controller and kept for compatibility.
+        obj.dH_grow = 2.0;
+        obj.dH_shrink = 0.25;
         obj.dM_min = 1e-3;
         obj.dM_target = 1e-2;
         obj.dM_reject = 5e-2;

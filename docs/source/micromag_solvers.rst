@@ -428,34 +428,45 @@ magnetization vector across the trial field step,
     \mathrm{d}M = \left| \langle\mathbf{m}\rangle_\mathrm{trial}
                        - \langle\mathbf{m}\rangle_\mathrm{before} \right| .
 
-The step-control logic is then
+The accept/reject rule is
 
 * :math:`\mathrm{d}M >` ``dM_reject`` and :math:`\mathrm{d}H >` ``dH_min``:
-  the step is **rejected**, ``dH`` is multiplied by ``dH_shrink`` (never below
-  ``dH_min``) and the step is retried from the same state.
-* :math:`\mathrm{d}M >` ``dM_target``: the step is accepted but ``dH`` is
-  reduced for the next step.
-* :math:`\mathrm{d}M <` ``dM_min``: the step is accepted and ``dH`` is
-  multiplied by ``dH_grow`` for the next step, capped at ``dH_max``.
+  the step is **rejected**, ``dH`` is halved (never below ``dH_min``) and the
+  step is retried from the same state. The rejected trial is kept as the far
+  end of a *bracket*: later steps never pass the field that is known to have
+  switched, and once the bracket is ``dH_min`` wide the trial lands on it and
+  is accepted there, which ends the refinement. Right after the switch the
+  step length from before it is restored.
 * Optionally, if ``use_sw_ref`` is set, a step across which the mean
   magnetization *along the field direction* changes sign is rejected whenever
-  ``dH`` exceeds ``switch_refdH``. This forces fine sampling right at the
-  switching field, which is what a coercivity calculation needs.
-* Recovery from the floor: once ``dH`` has been driven down to ``dH_min``
-  (by rejections or by the ``dM_target`` rule, e.g. around a fast change of
-  the magnetization) or to ``switch_refdH`` by the switch refinement, ``dH``
-  also grows by ``dH_grow`` after every accepted step with
-  :math:`\mathrm{d}M \le` ``dM_target``, not only below ``dM_min``. After a
-  switch refinement this waits until the step across the sign change has
-  been accepted. The first step above ``dM_target`` after ``dH`` has grown
-  ends the recovery and divides ``dH`` by ``dH_grow``, back to the last step
-  length that stayed within ``dM_target``, and the rules above take over
-  again. Without it, a
-  smooth stretch that follows would give a :math:`\mathrm{d}M` between
-  ``dM_min`` and ``dM_target`` at the floor and keep the rest of the sweep
-  there: in a hard-axis loop that is about a thousand steps of ``dH_min``.
-  Until ``dH`` first reaches its floor the step control is exactly the rules
-  above.
+  ``dH`` exceeds ``switch_refdH``, with the same bracketing. This forces fine
+  sampling right at the switching field, which is what a coercivity
+  calculation needs.
+* A minimizer relaxation that did not converge (``min_status = 2``) is
+  rejected and retried with half the step while ``dH > dH_min``. A time
+  integration that ran out of its window (``min_status = -2``) is accepted and
+  flagged, not retried: the slow relaxation is a property of the field, not of
+  the step, and a retry costs another full window.
+
+After an accepted step the next step length is set by target tracking,
+
+.. math::
+
+    \mathrm{d}H \leftarrow \mathrm{d}H \cdot
+    \mathrm{clamp}\left(\frac{0.9\,\mathtt{dM\_target}}{\mathrm{d}M},\;
+    \mathtt{dH\_shrink},\; \mathtt{dH\_grow}\right),
+
+floored at ``dH_min`` and capped at ``dH_max``. ``dH_grow`` and ``dH_shrink``
+are therefore the per-step limits of the step change (defaults 2 and 0.25),
+not fixed growth and shrink factors; ``dM_min`` is accepted for compatibility
+and unused. Two indicators shorten the step before the magnetization change
+shows an approaching instability: for the minimizer, once the lowest Hessian
+eigenvalue (``min_saddle_check = 2``) has fallen below half its maximum on the
+current branch, :math:`\lambda^2` is extrapolated linearly to zero (the
+saddle-node law :math:`\lambda \propto \sqrt{H_\mathrm{sw} - H}`) and the
+step is capped at 0.9 of the predicted distance; for the time integration a
+3x jump in the number of field evaluations of a relaxation halves the next
+step.
 
 At ``dH_min`` a large change is accepted rather than looping forever, and the
 solver says so in its progress output. Too many rejected steps in total aborts
@@ -482,19 +493,19 @@ the run.
      - Maximum number of accepted field states, excluding the initial one.
    * - ``dM_min``
      - ``1e-3``
-     - Below this change the step is grown.
+     - Unused by the step controller, accepted for compatibility.
    * - ``dM_target``
      - ``1e-2``
-     - Above this change the step is shrunk.
+     - Change of the mean magnetization per step the step length aims for.
    * - ``dM_reject``
      - ``5e-2``
      - Above this change the step is rejected and retried.
    * - ``dH_grow``
-     - ``1.25``
-     - Growth factor, must be larger than 1.
+     - ``2.0``
+     - Largest factor the step may grow by per accepted step, must be larger than 1.
    * - ``dH_shrink``
-     - ``0.5``
-     - Shrink factor, must be between 0 and 1.
+     - ``0.25``
+     - Smallest factor the step may shrink by per accepted step, must be between 0 and 1.
    * - ``switch_refine_dH``
      - ``None``
      - When given, the largest step accepted across a sign change of the mean
