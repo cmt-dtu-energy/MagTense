@@ -84,11 +84,21 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 - Compile with the dip-fmm micromagnetic demagnetisation backend
 
   Place or clone dip-fmm at `dip-fmm/` in the MagTense repository. The build
-  below uses dip-fmm's `release` preset, with CUDA and oneMKL enabled, installs
-  its shared C API under `dip-fmm/local`, and links the MagTense Python
-  extension against it. Override `CDFMM_DIR`, `CDFMM_ROOT`, or
-  `CDFMM_CUDA_ARCHITECTURES` when a different checkout, installation, or GPU
-  architecture list is required.
+  below uses dip-fmm's `release` preset, with oneMKL enabled and CUDA
+  following `USE_CUDA`, installs its shared C API under `dip-fmm/local`, and
+  links the MagTense Python extension against it. Override `CDFMM_DIR`,
+  `CDFMM_ROOT`, `CDFMM_BUILD_DIR`, or `CDFMM_CUDA_ARCHITECTURES` when a
+  different checkout, installation, build directory, or GPU architecture list
+  is required (`CDFMM_CUDA_ARCHITECTURES=native` targets only the local GPU).
+
+  dip-fmm is built with the conda environment's own `gcc`, `g++`, and `nvcc`
+  (override with `CDFMM_C_COMPILER`, `CDFMM_CXX_COMPILER`, and
+  `CDFMM_CUDA_COMPILER`). Its CUDA sources require the CUDA 13.3 toolchain
+  from `python/.build/env-313-linux.yml`; an environment that still carries
+  CUDA 12.x fails inside dip-fmm's `src/backend/cuda` sources. The default
+  architecture list includes `sm_120` (RTX 50 series). The highest expansion
+  order with procedural point kernels is `CDFMM_PROCEDURAL_MAX_ORDER` (10 by
+  default; higher orders use precomputed operators).
 
   On workstations where CUDA is provided as an environment module:
 

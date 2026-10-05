@@ -25,7 +25,21 @@ CVODE_ROOT ?= ${MKFILE_PATH}/cvode
 CDFMM_DIR ?= dip-fmm
 CDFMM_ROOT ?= $(abspath $(CDFMM_DIR)/local)
 CDFMM_BUILD_DIR ?= $(abspath $(CDFMM_DIR)/build-release)
-CDFMM_CUDA_ARCHITECTURES ?= 75;80;86;89;90
+# dip-fmm's CUDA sources are written against the CUDA 13.3 toolchain that
+# python/.build/env-*-linux.yml installs; nvcc 12.x does not compile them.
+# sm_120 is the consumer Blackwell generation (RTX 50 series) and needs
+# nvcc >= 12.8. Pass CDFMM_CUDA_ARCHITECTURES=native for a quicker build
+# that only targets the GPU in the build machine.
+CDFMM_CUDA_ARCHITECTURES ?= 75;80;86;89;90;120
+# Highest expansion order dip-fmm compiles its procedural point kernels for
+# (1-20). Orders above this fall back to precomputed operators.
+CDFMM_PROCEDURAL_MAX_ORDER ?= 10
+# Toolchain used for the dip-fmm build. The defaults are the conda
+# environment's compilers so that dip-fmm, the MagTense CUDA kernels and the
+# Python extension all link against the same CUDA runtime and C++ library.
+CDFMM_C_COMPILER ?= $(if $(wildcard ${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-gcc),${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-gcc,gcc)
+CDFMM_CXX_COMPILER ?= $(if $(wildcard ${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++),${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++,g++)
+CDFMM_CUDA_COMPILER ?= $(if $(wildcard ${CONDA_PREFIX}/bin/nvcc),${CONDA_PREFIX}/bin/nvcc,nvcc)
 CUDA_HOST_COMPILER ?= ${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++
 
 #=======================================================================
@@ -427,11 +441,11 @@ endif
 .PHONY: all clean clean_cdfmm cdfmm
 
 clean_cdfmm:
-	@echo "Removing bundled dip-fmm release build: ${MKFILE_PATH}/dip-fmm/build-release"
-	cmake -E remove_directory "${MKFILE_PATH}/dip-fmm/build-release"
-	@echo "Removing bundled dip-fmm local installation: ${MKFILE_PATH}/dip-fmm/local"
-	cmake -E remove_directory "${MKFILE_PATH}/dip-fmm/local"
-	@echo "Preserved dip-fmm caches under ${MKFILE_PATH}/dip-fmm/caches"
+	@echo "Removing dip-fmm release build: ${CDFMM_BUILD_DIR}"
+	cmake -E remove_directory "${CDFMM_BUILD_DIR}"
+	@echo "Removing dip-fmm local installation: ${CDFMM_ROOT}"
+	cmake -E remove_directory "${CDFMM_ROOT}"
+	@echo "Preserved dip-fmm caches under $(abspath ${CDFMM_DIR})/caches"
 
 cdfmm:
 ifeq ($(USE_CDFMM),1)
@@ -442,12 +456,13 @@ else
 	cd "${CDFMM_DIR}" && CPATH= CPLUS_INCLUDE_PATH= cmake --preset release \
 		-B "${CDFMM_BUILD_DIR}" \
 		-DCMAKE_INSTALL_PREFIX="${CDFMM_ROOT}" \
-		-DCMAKE_C_COMPILER="${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-gcc" \
-		-DCMAKE_CXX_COMPILER="${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++" \
-		-DCMAKE_CUDA_COMPILER="${CONDA_PREFIX}/bin/nvcc" \
-		-DCMAKE_CUDA_HOST_COMPILER="${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++" \
+		-DCMAKE_C_COMPILER="${CDFMM_C_COMPILER}" \
+		-DCMAKE_CXX_COMPILER="${CDFMM_CXX_COMPILER}" \
+		-DCMAKE_CUDA_COMPILER="${CDFMM_CUDA_COMPILER}" \
+		-DCMAKE_CUDA_HOST_COMPILER="${CDFMM_CXX_COMPILER}" \
 		-DCMAKE_CUDA_ARCHITECTURES="${CDFMM_CUDA_ARCHITECTURES}" \
-		-DCDFMM_ENABLE_CUDA=ON \
+		-DCDFMM_ENABLE_CUDA=$(if $(filter 1,${USE_CUDA}),ON,OFF) \
+		-DCDFMM_PROCEDURAL_MAX_ORDER="${CDFMM_PROCEDURAL_MAX_ORDER}" \
 		-DCDFMM_ENABLE_MKL=ON \
 		-DMKL_DIR="${CONDA_PREFIX}/lib/cmake/mkl" \
 		-DMKL_INTERFACE=lp64 \
@@ -555,6 +570,8 @@ info:
 	@echo FMM3D enabled: $(USE_FMM3D)
 	@echo dip-fmm enabled: $(USE_CDFMM)
 	@echo dip-fmm root: $(CDFMM_ROOT)
+	@echo dip-fmm CUDA architectures: $(CDFMM_CUDA_ARCHITECTURES)
+	@echo dip-fmm CUDA compiler: $(CDFMM_CUDA_COMPILER)
 	@echo MATLAB enabled: $(USE_MATLAB)
 	@echo MATLAB include: $(MATLAB_INCLUDE)
 	@echo CVODE root: $(CVODE_ROOT)
