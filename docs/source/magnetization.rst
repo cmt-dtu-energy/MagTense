@@ -25,6 +25,20 @@ The third option describes a softmagnet with a constant permeability
 :math:`\mu \equiv \mu_0 ( 1 + \chi_m)` and therefore a linear relationship
 for the magnetization with the H-field: :math:`M = \chi_m H`
 
+For both kinds of soft tile the iteration solves the tile's own self-consistency
+at every step: the internal field is :math:`\mathbf{H} = \mathbf{H}_\mathrm{others} +
+N\,\mathbf{M}(\mathbf{H})`, with :math:`\mathbf{H}_\mathrm{others}` the field of all
+other tiles (and of an :ref:`Applied field`), :math:`N` the tile's own
+demagnetization tensor at its centre and :math:`\mathbf{M}(\mathbf{H})` the tile's
+material law. The internal field is taken parallel to
+:math:`\mathbf{H}_\mathrm{others}`, which is exact for spheres and cubes and a
+small approximation for elongated tiles. For a constant permeability this is a
+closed form; for a state function the magnitude is found numerically on the
+curve itself. The permeabilities :math:`\mu_{r\_ea}` and :math:`\mu_{r\_oa}` are
+therefore used by hard tiles and constant-permeability tiles only, and are
+ignored by a state-function tile, whose material is fully described by its
+curve.
+
 ==============================================
 Easy axis and other axes
 ==============================================

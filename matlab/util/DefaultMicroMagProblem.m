@@ -48,7 +48,7 @@ properties
     u_ea
     %new or old problem
     ProblemMod
-    %solver type ('Explicit', 'Implicit' or 'Dynamic')
+    %solver type ('Dynamic', 'Explicit' or 'ExplicitLL'), see setMicroMagSolver
     solver
 
     %Exchange term constant
@@ -92,8 +92,6 @@ properties
 
     %
     alpha
-
-    MaxT0
 
     %Sets how often timestep is displayed from Fortran
     setTimeDis
@@ -167,10 +165,6 @@ properties
     %magnetization between two timesteps
     conv_tol = 1e-4;
     
-    %defines how often to calculate the demagnetization tensor in
-    %hysteresis problems. Zero is every step
-    demigstp = int32(0) ;
-    
     %defines whether to use an External Mesh or not
     ExternalMesh = 0 ; 
     
@@ -185,9 +179,6 @@ properties
    
     % function handle for external field
     HextFct = [] ;
-
-    %The number of threads used by OpenMP for building the demag tensor
-    nThreads = int32(1);
 
     %FMM parameters
     fmm_cells
@@ -214,6 +205,8 @@ properties
     window_ena
     window_int
     trace_ena
+    %Write the timing log file (1) or not (0, default). Same idea as trace_ena.
+    timer_ena
     flush_each
     trace_verb
     N_log_dir
@@ -241,6 +234,41 @@ properties
     %that value, so runs are reproducible but differ from each other. A negative
     %value seeds from the clock, which is what independent Monte-Carlo runs need.
     rng_seed
+
+    %Energy minimizer settings, used when the solver is 'Explicit' (setMicroMagSolver).
+    %min_tol: convergence criterion, the largest torque max_i |m_i x H_i| over the cells
+    %divided by max(Ms) must fall below it. min_maxiter: iteration cap per applied field.
+    %min_maxrot: largest rotation of any cell in one iteration [rad]. min_fallback: 1 to
+    %fall back to the Landau-Lifshitz time integration when the minimizer stalls, 0 to
+    %give up. min_saddle: 1 to nudge a converged state and relax again, so that a saddle
+    %point (which a symmetric starting state sits on) is not mistaken for a minimum, 2 to
+    %compute the lowest eigenvalue of the energy Hessian instead (returned as min_eig,
+    %negative means saddle, in which case the state is pushed along the eigenvector and
+    %relaxed again), 0 to accept the state as it is. min_pred: 1 to start the minimizer at each applied field
+    %from the secant extrapolation of the two previous equilibria and with the step length
+    %the previous field ended with (free, skipped across a switching event), 0 to start
+    %from the previous equilibrium. The solution struct
+    %returns E (energies), n_feval, min_iter, min_torque, min_status and min_eig, see the
+    %TechManual.
+    min_tol
+    min_maxiter
+    min_maxrot
+    min_fallback
+    min_saddle
+    min_pred
+
+    %Optional exchange stiffness at the interface between two materials. phase_id gives
+    %the material index (1..n_phase) of every tile and A_int is a symmetric
+    %n_phase-by-n_phase table of interface exchange values in J/m. A negative entry means
+    %'use the harmonic mean of the two tiles', which is the default everywhere, so a table
+    %can override only the pairs of interest. Entries on the diagonal are never used, as
+    %two tiles of the same material always use the harmonic mean.
+    %A tile with A0 = 0 is not magnetic, so a face touching one stays uncoupled whatever
+    %the table says, which is what the harmonic mean does by itself.
+    %n_phase = 1 disables the feature.
+    n_phase
+    phase_id
+    A_int
 end
 
 properties (SetAccess=private,GetAccess=public)
@@ -290,10 +318,6 @@ properties (SetAccess=private,GetAccess=public)
     %defines if the demagnetization field is calculated or not
     useDemag
 
-    %defines what precision is used for the demag tensor. Right now only
-    %single is supported. All other varibales are double.
-    usePres
-    
     %defines whether to save the result or not
     SaveTheResult
     
@@ -350,7 +374,7 @@ methods
         obj.u_ea = zeros( obj.ntot, 3 );
         %new or old problem
         obj = obj.setMicroMagProblemMode( 'new' );
-        %solver type ('Explicit', 'Implicit' or 'Dynamic')
+        %solver type ('Dynamic', 'Explicit' or 'ExplicitLL')
         obj = obj.setMicroMagSolver( 'Dynamic' );
 
         obj.exch_weigh = 8.0;
@@ -379,12 +403,6 @@ methods
         %
         obj.alpha = 4.42e3;
 
-        %if set to zero then the alpha parameter remains constant.
-        %if MaxT0 > 0 then alpha = alpha0 * 10^( 7 * min(t,MaxT0)/MaxT0 )
-        %thus scaling with the solution time. This is used in the explicit
-        %solver for tuning into the correct time scale of the problem
-        obj.MaxT0 = 2;
-        
         %solution times
         obj.nt = int32(1000);
         obj.t = linspace(0,1,obj.nt);
@@ -428,8 +446,6 @@ methods
         obj.useCVODE = int32(0);
 		%set use Demag to default
         obj.useDemag = int32(1);
-        %set use CVODE to default
-        obj.usePres = int32(0);
         %set the demag approximation to the default, i.e. use no
         %approximation
         obj = obj.setMicroMagDemagApproximation('none');
@@ -459,7 +475,6 @@ methods
         obj.ShowTheResult = int32(1);
 
         obj.DirectoryFilename = '';
-        obj.demigstp = int32(0) ;
         obj.ExternalMesh = int32(0) ;
         obj.MeshType = '' ;
         obj.ExternalMeshFileName = '' ;
@@ -489,6 +504,7 @@ methods
         obj.window_ena = int32(1);
         obj.window_int = 30.0;
         obj.trace_ena = int32(0);
+        obj.timer_ena = int32(0);
         obj.flush_each = int32(1);
         obj.trace_verb = int32(1);
 
@@ -511,6 +527,19 @@ methods
         %Thermal-field RNG seed. Default 0 preserves the previous behaviour.
         obj.rng_seed = int32(0);
 
+        %Energy minimizer defaults
+        obj.min_tol = 1e-5;
+        obj.min_maxiter = int32(10000);
+        obj.min_maxrot = 0.3;
+        obj.min_fallback = int32(1);
+        obj.min_saddle = int32(2);
+        obj.min_pred = int32(1);
+
+        %One material, i.e. the harmonic mean everywhere, which is the previous behaviour.
+        obj.n_phase = int32(1);
+        obj.phase_id = ones(obj.ntot,1);
+        obj.A_int = -1;
+
     end
     
     %%Calculates the applied field as a function of time on the time grid
@@ -527,16 +556,11 @@ methods
     function obj = setddHext( obj, fct, t_ddHext )
         obj.nt_ddHext = int32(length(t_ddHext));
         
-        obj.ddHext = zeros( obj.nt_Hext, 4 );
+        obj.ddHext = zeros( obj.nt_ddHext, 4 );
         obj.ddHext(:,1) = t_ddHext;
         obj.ddHext(:,2:4) = fct( t_ddHext );
     end
         
-    function obj = setHextTime( obj, nt )
-        obj.nt_Hext = int32( nt );
-        obj.t_Hext  = linspace( obj.t(1), obj.t(end), obj.nt_Hext );
-    end
-    
     function obj = setTime( obj, t )
         obj.t  = t;
         obj.nt = int32(length(t));
@@ -691,27 +715,96 @@ methods
 
     function obj = setMicroMagGridType( obj, type_var )
     % maps the grid type from name to internal int value
-        
+
         switch type_var
-            case 'uniform' 
+            case 'uniform'
                 obj.grid_type = int32(1);
-            case 'tetrahedron' 
+            case 'tetrahedron'
                 obj.grid_type = int32(2);
-            case 'unstructuredPrisms' 
+            case 'unstructuredPrisms'
                 obj.grid_type = int32(3);
+        end
+    end
+
+    function obj = setMicroMagGridTetrahedron( obj, nodes, elements )
+    % Set up a tetrahedral grid from a mesh, i.e. its nodes and its connectivity
+    %
+    % This is the tetrahedral counterpart of setting grid_pts and grid_abc for a grid of
+    % unstructured prisms: the mesh is all that has to be given, and MagTense analyses it and
+    % builds the exchange operator itself. Do not call setExchangeMatrixSparse or
+    % setExchangeMatrixCOO afterwards - those switch on passExch, which tells MagTense that the
+    % exchange operator is supplied from the outside and makes it skip the mesh analysis.
+    %
+    % nodes is 3 x M, or M x 3, holding the coordinates of the mesh nodes.
+    % elements is 4 x N, or N x 4, holding the four corner nodes of each tetrahedron, 1-based.
+    % A mesh from the PDE Toolbox is passed straight through as
+    %   problem = problem.setMicroMagGridTetrahedron(model.Mesh.Nodes, model.Mesh.Elements);
+    % including a quadratic one, of which only the corner nodes are used.
+    %
+    % The element centres are computed here, so that grid_pts cannot fall out of step with the
+    % mesh it is supposed to describe.
+
+        % Both arrays are accepted either way round, since getting them transposed is a silent
+        % error rather than a loud one: only the orientation that cannot be told apart is
+        % rejected
+        if size(nodes,1) ~= 3 && size(nodes,2) == 3
+            nodes = nodes';
+        end
+        if size(nodes,1) ~= 3
+            error('DefaultMicroMagProblem:nodeShape', ...
+                  'nodes has to be 3 x M or M x 3, but it is %d x %d', size(nodes,1), size(nodes,2));
+        end
+        if size(elements,1) ~= 4 && size(elements,2) == 4
+            elements = elements';
+        end
+        if size(elements,1) < 4
+            error('DefaultMicroMagProblem:elementShape', ...
+                  'elements has to be 4 x N or N x 4, but it is %d x %d', ...
+                  size(elements,1), size(elements,2));
+        end
+        elements = elements(1:4,:);   % A quadratic mesh is used as its linear counterpart
+
+        if min(elements(:)) < 1 || max(elements(:)) > size(nodes,2)
+            error('DefaultMicroMagProblem:connectivityRange', ...
+                  'the connectivity refers to nodes outside the node array, and has to be 1-based');
+        end
+        if size(elements,2) ~= obj.ntot
+            error('DefaultMicroMagProblem:elementCount', ...
+                  'the mesh has %d elements but the problem was created for %d tiles', ...
+                  size(elements,2), obj.ntot);
+        end
+
+        obj = obj.setMicroMagGridType('tetrahedron');
+        obj.grid_nod  = double(nodes);
+        obj.grid_ele  = int32(elements);
+        obj.grid_nnod = int32(size(nodes,2));
+
+        % The centre of each tetrahedron, which is the point MagTense places the tile at
+        obj.grid_pts = squeeze(mean(reshape(nodes(:, elements(:))', [4, size(elements,2), 3]), 1));
+        if size(elements,2) == 1
+            obj.grid_pts = obj.grid_pts(:)';
         end
     end
 
     function obj = setMicroMagSolver( obj, type_var  )
     %the following maps from naming to internal (fortran) representation of the solver type
         
+    %'Dynamic': one time-varying applied field, the LL equation integrated in time.
+    %'Explicit': the equilibrium at each of a list of constant fields, found by the energy
+    %   minimizer. The minimizer cannot include the thermal field, so a finite temperature
+    %   in any cell is an error (checked in struct(), just before the Fortran call).
+    %'ExplicitLL': the equilibrium at each constant field found by integrating the LL
+    %   equation over the time window, which is what 'Explicit' did before the minimizer
+    %   became its default. Use it for thermal runs.
         switch type_var
             case 'Explicit'
+                obj.solver = int32(3);
+            case 'ExplicitLL'
                 obj.solver = int32(1);
             case 'Dynamic'
                 obj.solver = int32(2);
-            case 'Implicit'
-                obj.solver = int32(3);
+            otherwise
+                error('Unknown solver type ''%s''. Use ''Explicit'', ''ExplicitLL'' or ''Dynamic''.', type_var);
         end
             
     end
@@ -782,6 +875,12 @@ methods
                 warning('Initial array not normalized -- Normalizing')
                 obj.m0(~zerorow,:) = obj.m0(~zerorow,:)./mnorm(~zerorow);
             end
+        end
+        if obj.solver == 3 && any(obj.temperature(:) > 0)
+            error(['The ''Explicit'' solver uses the energy minimizer, which cannot include ' ...
+                   'the thermal field, but the temperature is above zero. Use ' ...
+                   'setMicroMagSolver(''ExplicitLL'') to relax by integrating the ' ...
+                   'Landau-Lifshitz equation instead.']);
         end
         if (obj.useDemag)
            disp(['The demag tensor will require around ' num2str(((3*numel(obj.m0)*(3*numel(obj.m0) + 1)/2))*4/(2^30)) ' Gb'])

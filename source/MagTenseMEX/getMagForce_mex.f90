@@ -32,6 +32,7 @@
       mwSize,dimension(3) :: dims
       mwIndex :: i
       mwSize sizevars
+      mwSize ndim               !>Rank of the returned array; must be mwSize
       
 !     Check for proper number of arguments. 
       if( nrhs .ne. 3 ) then
@@ -74,7 +75,8 @@
       
       !Return the force vector
       sx = 3
-      plhs(1) = mxCreateNumericArray( 2, dims, classid, ComplexFlag )
+      ndim = 2
+      plhs(1) = mxCreateNumericArray( ndim, dims, classid, ComplexFlag )
       call mxCopyReal8ToPtr( Fout, mxGetPr( plhs(1) ), sx )
       
       if ( nrhs .ge. 2 ) then
@@ -82,7 +84,8 @@
           dims(1) = 18
           dims(2) = 2
           classid = mxClassIDFromClassName('int32')
-          plhs(2) = mxCreateNumericArray( 2, dims, classid, ComplexFlag )
+          ndim = 2
+          plhs(2) = mxCreateNumericArray( ndim, dims, classid, ComplexFlag )
           sx = 36
           call mxCopyReal8ToPtr( ier, mxGetPr( plhs(2) ), sx )
       endif
@@ -92,7 +95,8 @@
           dims(1) = 18
           dims(2) = 2
           classid = mxClassIDFromClassName('int32')
-          plhs(3) = mxCreateNumericArray( 2, dims, classid, ComplexFlag )
+          ndim = 2
+          plhs(3) = mxCreateNumericArray( ndim, dims, classid, ComplexFlag )
           sx = 36
           call mxCopyReal8ToPtr( neval, mxGetPr( plhs(3) ), sx )
       endif

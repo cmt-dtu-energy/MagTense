@@ -55,7 +55,7 @@
       
       !---------------------- initiaize auxiliary modules ----------------------------- 
       call initAux(auxInit, problem%log_dir, problem%timer_log, problem%trace_log, problem%window_ena, &
-          problem%window_int, problem%trace_ena, problem%flush_each, problem%trace_verb)
+          problem%window_int, problem%trace_ena, problem%flush_each, problem%trace_verb, problem%timer_ena)
       !---------------------------------------------------------------------------------
       
       !Call the ODE solver

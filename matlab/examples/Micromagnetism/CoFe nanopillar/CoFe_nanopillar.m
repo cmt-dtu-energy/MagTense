@@ -75,8 +75,6 @@ problem = problem.setMicroMagSolver( 'Explicit' );
 problem.grid_pts = pos_out;
 problem.grid_abc = dims_out;
 
-problem.nThreads = int32(8);
-
 %% Save the physical parameters in the problem structure
 
 problem.alpha = alpha;

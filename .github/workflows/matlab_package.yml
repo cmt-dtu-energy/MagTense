@@ -17,11 +17,11 @@ jobs:
       matrix:
         CVODE-compile: [CVODE,noCVODE]
         CUDA-compile: [CUDA,noCUDA]
-    # CUDA 12.8's nvcc only supports host compilers up to VS 2022, but
     # windows-latest and windows-2025 both moved to VS 2026 in June 2026 and no
     # longer carry VS 2022 at all. windows-2022 is GitHub's supported fallback.
-    # Lifting this pin requires a CUDA version that accepts a newer host
-    # compiler, which means re-pinning cuda-* in python/.build/env-*-win.yml.
+    # Two things have to accept the host MSVC before this pin can be lifted:
+    # oneAPI, which at 2025 predates VS 2026, and the pinned CUDA toolkit's
+    # nvcc - pinned in python/.build/env-*-win.yml, currently CUDA 13.3.
     runs-on: [windows-2022]
     needs: [build-cvode]
     env:
@@ -147,7 +147,7 @@ jobs:
           CVODE: ${{ matrix.CVODE-compile == 'noCVODE' && '0' || '1' }}
         uses: matlab-actions/run-command@v2
         with:
-          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_RELEASE',true,'USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'USE_FMM3D',true,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib');
+          command: setenv('ONEAPI_ROOT',"C:\Users\runneradmin\miniconda3\envs\magtense-env\Library"); mex -setup FORTRAN; cd('D:/a/MagTense/MagTense/matlab'); USE_CUDA = str2num(getenv('CUDA')); USE_CVODE = str2num(getenv('CVODE'));  buildMagTenseMEX('USE_RELEASE',true,'USE_CUDA',USE_CUDA,'USE_CVODE',USE_CVODE,'USE_FMM3D',true,'mkl_include','C:\Users\runneradmin\miniconda3\envs\magtense-env\opt\compiler\include\intel64','mkl_lib','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib','cuda_root','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\lib\x64','mkl_lp64','C:\Users\runneradmin\miniconda3\envs\magtense-env\Library\include\intel64\lp64','cvode_include','D:\a\MagTense\MagTense\cvode\fortran','cvode_lib','D:\a\MagTense\MagTense\cvode\lib');
        
       - name: Check created MEX-files
         shell: bash -el {0}

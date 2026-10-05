@@ -13,7 +13,7 @@ CDFMM_ROOT =
 #       List all source files required for the project
 #=======================================================================
 
-LIBSRC_SOURCES = fmm3d_tree_mod MicroMagParameters fmm_nbor_tensor_mod util_micromag DemagAuxFunctions FortranCuda ComputeDifferentialOperatorsFromMesh UnstructuredMeshAnalysis
+LIBSRC_SOURCES = fmm3d_tree_mod MicroMagParameters fmm_nbor_tensor_mod util_micromag DemagAuxFunctions FortranCuda ComputeDifferentialOperatorsFromMesh UnstructuredMeshAnalysis TetrahedralMeshAnalysis
 
 ifeq (${USE_CDFMM},1)
     CDFMM_FORTRAN_SOURCE = ${CDFMM_ROOT}/share/cdfmm/fortran/cdfmm_fortran.f90

@@ -11,7 +11,7 @@ FFLAGS =
 #       List all source files required for the project
 #=======================================================================
 LIBSRC_SOURCES = IOgeneral IntegrationDataTypes quadpack \
-	SpecialFunctions NumericalIntegrals RKSuitef90 ODE_Solvers util
+	SpecialFunctions NumericalIntegrals RKSuitef90 ODE_Solvers EnergyMinimizer util
 
 LIBSRC_OBJECTS = $(addsuffix .o, ${LIBSRC_SOURCES})
 

@@ -1,21 +1,21 @@
-function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error] = Standard_problem_4( mumag_field, resolution, options )
-%STANDARD_PROBLEM_4 
+function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error,GridInfo] = Standard_problem_4( mumag_field, resolution, options )
+%STANDARD_PROBLEM_4
 %A function script to setup and simulate mumag standard problem 4
 %
 %Syntax:
 %------
 %   Standard_problem_4()
-%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( mumag_field, resolution, options)
+%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error,GridInfo] = Standard_problem_4( mumag_field, resolution, options)
 %
 %Description of syntax:
 %------
-%   Standard_problem_4() 
+%   Standard_problem_4()
 %       Uses the default parameters to solve mumag problem 4 and displays the results on screen
 %
 %   Standard_problem_4( mumag_field, resolution, options)
 %       Takes 1 or 2 input argument which specifies the applied field and the resolution of the problem. Additional options can also be specified
 %
-%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym] = Standard_problem_4( mumag_field, resolution, options)
+%   [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_dym,solution_dym,rel_int_error,GridInfo] = Standard_problem_4( mumag_field, resolution, options)
 %       As above but also returns the computation times, the problem setup file and the solution for both the initial and dynamical part of the problem
 %
 %Input arguments:
@@ -24,12 +24,27 @@ function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_d
 %       Determines if the first or second applied field specified in the mumag problem description is used (Default value is 1)
 %
 %   resolution : Array of size 1x3 (Default value is [36,9,1])
-%       The resolution of the prismal mesh used to solve the problem
+%       The resolution of the uniform grid used to solve the problem. Ignored for the unstructured mesh
 %
 %Options:
 %-------
+%   mesh_type : Either 'uniform' or 'unstructuredPrisms' - Default is 'uniform'
+%       The type of mesh to run on. 'uniform' is a regular grid of resolution(1) x resolution(2) x resolution(3) cells.
+%       'unstructuredPrisms' is a grid of unstructured Cartesian prisms read from the text file mesh_file (one row per
+%       prism: centre [x,y,z] and side lengths [a,b,c] in metres). The exchange operator that MagTense builds from the
+%       mesh in the first stage is handed to the second stage with setExchangeMatrixCOO, so the mesh is analysed only once.
+%
+%   mesh_file : Path to a text file
+%       The unstructured Cartesian mesh, used with mesh_type = 'unstructuredPrisms'.
+%
 %   use_CUDA : Interpreted as a logical - Default is true
 %       Determines if CUDA is used for the computation.
+%
+%   use_CVODE : Interpreted as a logical - Default is false
+%       Determines if CVODE is used for the numerical time evolution.
+%
+%   use_AvgN : Interpreted as a logical - Default is true
+%       Use the averaged prism tensor for the demag field.
 %
 %   ShowTheResult : Interpreted as a logical - Default is true
 %       Determines if the results are plotted or not.
@@ -44,30 +59,38 @@ function [elapsedTime_part1,elapsedTime_part2,problem_ini,solution_ini,problem_d
 %
 %   problem_ini : Struct
 %      A struct containing the MagTense problem setup for the initial part of the mumag standard problem 4
-% 
+%
 %   solution_ini : Struct
 %      A struct containing the MagTense solution for the initial part of the mumag standard problem 4
 %
 %   problem_dym : Struct
 %      A struct containing the MagTense problem setup for the dynamic part of the mumag standard problem 4
-% 
+%
 %   solution_dym : Struct
 %      A struct containing the MagTense solution for the dynamic part of the mumag standard problem 4
 %
-%   int_error : Array
-%      A double array containing the integrated error (the difference between the curves) between the NIST published solutions and the MagTense computed solution. The array is the three components of the average magnetization.
+%   rel_int_error : Array
+%      The integrated difference between the NIST published solutions and the MagTense computed solution, relative to the
+%      integral of the published solution and in percent, for the three components of the average magnetization.
+%
+%   GridInfo : Struct
+%      The information on the mesh that MagTense built, including the cell volumes and the exchange matrix. Only filled
+%      for the unstructured mesh.
 %
 %Detailed description:
 %-------
-%   The script setups up and runs the mumag standard problem 4 for a prismal mesh.
+%   The script setups up and runs the mumag standard problem 4 on a uniform grid or on an unstructured prism mesh.
 %
-%Version: 1.0.2
+%Version: 1.1.0
 %Author:  Rasmus Bjørk
-%Date:    2026.05.11
+%Date:    2026.09.22
 
 arguments
     mumag_field (1,1) {mustBeInteger}                = 1            %--- Use either field 1 or field 2 from the mumag example
-    resolution (1,3) {mustBeInteger}                = [36,9,1];     %--- [nx,ny,nz] of the grid
+    resolution (1,3) {mustBeInteger}                = [36,9,1];     %--- [nx,ny,nz] of the uniform grid (ignored for the unstructured mesh)
+    options.mesh_type {mustBeMember(options.mesh_type,{'uniform','unstructuredPrisms'})} = 'uniform' %--- The type of mesh to run on
+    options.mesh_file (1,:) char                    = '../../../../documentation/examples_mumag_validation/Validation_standard_problem_4/Std_prob_4_unstructured_mesh_grains_6_res_80_20_ref_2.txt' %--- The unstructured Cartesian mesh
+    % options.mesh_file (1,:) char                    = '../../../../documentation/examples_mumag_validation/Validation_standard_problem_4/Std_prob_4_unstructured_mesh_grains_6_res_100_25_ref_3.txt' %--- The finer unstructured Cartesian mesh
     options.use_CUDA {mustBeNumericOrLogical}       = true          %--- Use CUDA for the calculations
     options.ShowTheResult {mustBeNumericOrLogical}  = true          %--- Show the result
     options.use_CVODE {mustBeNumericOrLogical}      = false;        %--- Use CVODE for the numerical time evolution
@@ -82,12 +105,29 @@ addpath('../../../util');
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% ------------------------------------------------------------------- MAGTENSE ---------------------------------------------------------
 %% --------------------------------------------------------------------------------------------------------------------------------------
-%% Setup the problem for the initial configuration
-% Construct a default problem, with a grid with size (nx,ny,nz)
-problem_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));    
-problem_ini.grid_L = [500e-9,125e-9,3e-9]; %m
-problem_ini.nThreads = int32(8);
+%% Setup the mesh
+switch options.mesh_type
+    case 'uniform'
+        % Construct a default problem, with a grid with size (nx,ny,nz)
+        problem_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
 
+    case 'unstructuredPrisms'
+        [data] = load(options.mesh_file);
+        pos_out  = data(:,1:3);
+        dims_out = data(:,4:6);
+
+        resolution = [length(pos_out) 1 1];
+        disp(['Prisms N_grid = ' num2str(prod(resolution))])
+        problem_ini = DefaultMicroMagProblem(resolution(1),resolution(2),resolution(3));
+        problem_ini = problem_ini.setMicroMagGridType('unstructuredPrisms');
+
+        %--- Information on the grid
+        problem_ini.grid_pts    = pos_out;
+        problem_ini.grid_abc    = dims_out;
+end
+problem_ini.grid_L = [500e-9,125e-9,3e-9]; %m
+
+%% Setup the problem for the initial configuration
 % Set specific flags on options
 problem_ini = problem_ini.setMicroMagDemagApproximation('none');
 problem_ini = problem_ini.setUseCuda( options.use_CUDA );
@@ -99,13 +139,13 @@ problem_ini.alpha = 4.42e3;
 problem_ini.gamma = 0;
 problem_ini.Ms = 8e5*ones(prod(resolution),1);
 problem_ini.K0 = 0*zeros(prod(resolution),1);
-problem_ini.A0 = 1.3e-11;
+problem_ini.A0 = 1.3e-11*ones(prod(resolution),1);
 
 % Initial magnetization
 problem_ini.m0(:,1) = 1/sqrt(3);
 problem_ini.m0(:,2) = 1/sqrt(3);
 problem_ini.m0(:,3) = 1/sqrt(3);
-  
+
 % Time points at which to return the solution
 problem_ini = problem_ini.setTime( linspace(0,100e-9,200) );
 problem_ini.setTimeDis = int32(100);
@@ -121,20 +161,36 @@ solution_ini = struct();
 prob_struct = struct(problem_ini);
 
 tic
-solution_ini = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
-
+if strcmp(options.mesh_type,'uniform')
+    solution_ini = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
+    GridInfo = struct();
+    tile_volumes = [];   % all tiles have the same volume, so computeMagneticMomentGeneralMesh takes the plain mean
+else
+    %--- The second output is the GridInfo that MagTense built from the mesh. Its Volumes are what
+    %--- the magnetic moment has to be weighted by, and its exchange matrix is reused below
+    [solution_ini, GridInfo] = problem_ini.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_ini );
+    tile_volumes = GridInfo.Volumes;
+end
 elapsedTime_part1 = toc
+
 if (options.ShowTheResult)
-    figure; 
-    M_end = squeeze(solution_ini.M(end,:,:)); 
-    quiver(solution_ini.pts(:,1),solution_ini.pts(:,2),M_end(:,1),M_end(:,2)); 
-    axis equal; 
+    figure;
+    M_end = squeeze(solution_ini.M(end,:,:));
+    quiver(solution_ini.pts(:,1),solution_ini.pts(:,2),M_end(:,1),M_end(:,2));
+    axis equal;
     title('Starting state of dynamical simulation')
 end
 
 %% Setup problem for the time-dependent solver'
 % Use the initial problem to setup the dynamical part of the simulations
 problem_dym = problem_ini;
+
+% Pass the exchange matrix MagTense built from the unstructured mesh on to the dynamic problem,
+% so the mesh is analysed only once
+if strcmp(options.mesh_type,'unstructuredPrisms')
+    problem_dym = problem_dym.setExchangeMatrixCOO( GridInfo.ExchMat_nr, GridInfo.ExchMat_nc ...
+                                        , GridInfo.ExchMat_r, GridInfo.ExchMat_c, GridInfo.ExchMat_v );
+end
 
 % Calculate to 1 ns and save the results in 200 steps
 problem_dym = problem_dym.setTime( linspace(0,1e-9,200) );
@@ -167,8 +223,7 @@ tic
 solution_dym = problem_dym.MagTenseLandauLifshitzSolver_mex( prob_struct, solution_dym );
 elapsedTime_part2 = toc
 
-[Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution_dym.M);
-
+[Mx,My,Mz,mx,my,mz] = computeMagneticMomentGeneralMesh(solution_dym.M,tile_volumes);
 
 %% --------------------------------------------------------------------------------------------------------------------------------------
 %% --------------------------------------------------------------------  mumag ----------------------------------------------------------
@@ -186,17 +241,21 @@ rel_int_error(3) = calculate_relative_integral_error(t,M_mumag(:,5),solution_dym
 %% ---------------------------------------------------------------  Plot the results ----------------------------------------------------
 %% --------------------------------------------------------------------------------------------------------------------------------------
 if (options.ShowTheResult)
+    if strcmp(options.mesh_type,'unstructuredPrisms')
+        cartesianUnstructuredMeshPlot(pos_out,dims_out,GridInfo);
+    end
+
     figure1= figure('PaperType','A4','Visible','on','PaperPositionMode', 'auto'); fig1 = axes('Parent',figure1,'Layer','top','FontSize',16); hold on; grid on; box on
 
     %--- Plot the MagTense magnetization
-    plot(fig1,solution_dym.t,Mx,'rx'); 
-    plot(fig1,solution_dym.t,My,'gx'); 
-    plot(fig1,solution_dym.t,Mz,'bx'); 
+    plot(fig1,solution_dym.t,Mx,'rx');
+    plot(fig1,solution_dym.t,My,'gx');
+    plot(fig1,solution_dym.t,Mz,'bx');
 
     %--- Plot the mumag solutions
     colours = [[1 0 0];[0 1 0];[0 0 1]];
     weak_colours = colours + ~colours*0.75;
-    fill_ts=[t,fliplr(t)];  
+    fill_ts=[t,fliplr(t)];
     for j=1:3
         std_errors(1:2,:)=[M_mumag(:,(j-1)*2+1)+M_mumag(:,j*2), M_mumag(:,(j-1)*2+1)-M_mumag(:,j*2)]';
         interval = [std_errors(1,:),fliplr(std_errors(2,:))];
@@ -208,7 +267,8 @@ if (options.ShowTheResult)
     ylabel(fig1,'<M_i>/M_s')
     xlabel(fig1,'Time [ns]')
     xlim(fig1,[0 1e-9])
-    figure(figure1)   
+    title(fig1,['Standard problem 4, Field ' num2str(mumag_field) ', mesh: ' options.mesh_type])
+    figure(figure1)
 end
 
 end

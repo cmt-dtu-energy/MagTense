@@ -316,7 +316,7 @@ CONTAINS
 !> window_enabled : enable periodic window dumps
 !> window_interval: seconds between window dumps
 !=============================================================================
-  subroutine log_init(log_dir, filename, unit, flush_each, window_enabled, window_interval)
+  subroutine log_init(log_dir, filename, unit, flush_each, window_enabled, window_interval, enabled)
     !DEC$ ATTRIBUTES ALIAS:"log_init_" :: log_init
     character(len=*), intent(in), optional :: log_dir
     character(len=*), intent(in), optional :: filename
@@ -324,6 +324,8 @@ CONTAINS
     logical,          intent(in), optional :: flush_each
     logical,          intent(in), optional :: window_enabled
     real(8),          intent(in), optional :: window_interval
+    logical,          intent(in), optional :: enabled
+    logical :: log_on
     character(len=256) :: dir
     character(len=256) :: full_fn
     character(len=256) :: fn
@@ -345,12 +347,17 @@ CONTAINS
 
     timer%window_interval = 30.0d0
     if (present(window_interval)) timer%window_interval = window_interval
+    !The timing log is opt-in, like the trace log. Without it no log directory is created,
+    !nothing is opened and the periodic window dumps and the final report stay silent; the
+    !in-memory begin/end accounting that the trace module relies on is unaffected.
+    log_on = .false.
+    if (present(enabled)) log_on = enabled
 
     dir = "logs"
     if (present(log_dir)) dir = log_dir
 
     !---------------------------- Ensure log dir --------------------------------
-    call ensure_dir_exists(trim(dir))
+    if (log_on) call ensure_dir_exists(trim(dir))
     !---------------------------------------------------------------------------
 
     full_fn = trim(dir)//"/"//trim(fn)
@@ -363,25 +370,22 @@ CONTAINS
 
     !----------------------- Open timing log (fresh) ---------------------------
     call log_lock%lock()
-
       inquire(unit=timer%log_unit, opened=log_unit_open)
       if (log_unit_open) close(timer%log_unit)
-
-      open(timer%log_unit, file=trim(full_fn), status="replace", action="write")
-      timer%log_enabled = .true.
-
-      win_snap_initialized = .false.
-      if (allocated(win_prev_calls)) deallocate(win_prev_calls)
-      if (allocated(win_prev_total)) deallocate(win_prev_total)
-      allocate(win_prev_calls(timer%capacity), win_prev_total(timer%capacity))
-      win_prev_calls = 0_8
-      win_prev_total = 0.0d0
-
-      write(timer%log_unit,'(a)') "============================================================"
-      write(timer%log_unit,'(a)') "TIMING LOG START"
-      write(timer%log_unit,'(a)') "============================================================"
-      if (timer%log_flush_each) flush(timer%log_unit)
-
+      timer%log_enabled = log_on
+      if (log_on) then
+        open(timer%log_unit, file=trim(full_fn), status="replace", action="write")
+        win_snap_initialized = .false.
+        if (allocated(win_prev_calls)) deallocate(win_prev_calls)
+        if (allocated(win_prev_total)) deallocate(win_prev_total)
+        allocate(win_prev_calls(timer%capacity), win_prev_total(timer%capacity))
+        win_prev_calls = 0_8
+        win_prev_total = 0.0d0
+        write(timer%log_unit,'(a)') "============================================================"
+        write(timer%log_unit,'(a)') "TIMING LOG START"
+        write(timer%log_unit,'(a)') "============================================================"
+        if (timer%log_flush_each) flush(timer%log_unit)
+      end if
     call log_lock%unlock()
     !---------------------------------------------------------------------------
 

@@ -62,7 +62,11 @@ module TileNComponents
       end subroutine N_tensor_subroutine
     end interface
     
-    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeSphere=6,tileTypeSpheroid=7,tileTypeAvgPrism=8,tileTypePlanarCoil=101
+    !Tile types below 100 are geometries with a magnetization of their own. Types from 100 up are field
+    !sources that the iteration never updates: the planar coil, and the uniform applied field, which is
+    !not a geometry at all but stands for an external field that is the same everywhere (see
+    !getFieldFromUniformFieldTile).
+    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeSphere=6,tileTypeSpheroid=7,tileTypeAvgPrism=8,tileTypePlanarCoil=101,tileTypeUniformField=102
     integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2,magnetTypeSoftConstPerm=3
     integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     

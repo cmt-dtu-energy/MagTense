@@ -61,7 +61,7 @@ jobs:
       with:
         activate-environment: magtense-env
         miniforge-version: latest
-        channels: conda-forge,nvidia/label/cuda-12.6.3,https://software.repos.intel.com/python/conda/
+        channels: conda-forge,nvidia/label/cuda-13.3.1,https://software.repos.intel.com/python/conda/
         auto-activate-base: false
 
     - name: Install minimal packages in bash

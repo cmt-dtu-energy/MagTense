@@ -28,6 +28,7 @@ def fmm_test_setup(
                 t_end: float = 40e-9,
                 nt: int = 10,
                 dummy_run: int = 0,
+                use_fmm: int = 0,
                 nlmax: int = 2,
                 allow_fmm_short_circuit: int = 0,
                 fmm_min_n: int = 20000,
@@ -148,6 +149,9 @@ def fmm_test_setup(
 
 
 
+        # use_fmm defaults to 0 in MicromagProblem, and without it every knob below is
+        # ignored and the run is the direct calculation.
+        problem.use_fmm = use_fmm
         problem.fmm_cells_per_node = 10
         problem.fmm_eps = 1e-4
         problem.ifunif = 1
@@ -161,6 +165,7 @@ def fmm_test_setup(
 
         problem.log_dir = "timer_logs"
         problem.timer_log_file = timer_log_file
+        problem.timer_enabled = 1   # the test reads these logs back
         problem.trace_log_file = trace_log_file
         problem.window_enabled = 1
         problem.window_interval = 5.0

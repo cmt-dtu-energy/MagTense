@@ -1,0 +1,635 @@
+"""Combined test suite for the python version of MagTense.
+
+This is the python counterpart of matlab/util/testMagTenseFunctions.m, and lives in
+python/util just as that one lives in matlab/util. It runs the validation examples in
+python/examples/magnetostatics and python/examples/micromagnetism, collects the
+numerical measure each of them produces, compares it with the acceptance limit that
+belongs to it, and prints a table plus a figure showing which tests passed. Each example
+is run from its own directory, so whatever it writes lands beside it. The overview
+figure is written to results/ next to this file, as the MATLAB suite does.
+
+Coverage compared with the MATLAB suite
+---------------------------------------
+The two suites run the same tests, under the same names, in the same order, with the
+same checks and the same limits. Every example is a port of its MATLAB counterpart
+with the same geometry and evaluation points, and the magnetostatic validations give
+the same errors to three significant figures. Standard problem 3 by time integration
+is marked slow in both: it runs here with --include-slow and in MATLAB with
+MAGTENSE_INCLUDE_SLOW=1, or in either when it is asked for by name.
+
+Magnetostatics     : the field of each tile type (cylindrical slice, prism, circular
+                     piece, inverted circular piece, averaged prism, sphere, spheroid,
+                     tetrahedron) against FEM, from
+                     python/examples/magnetostatics/Validation_field_*.
+Micromagnetism     : macrogeometry periodic boundary conditions, periodic exchange on
+                     both the uniform grid and the unstructured mesh, shape correction,
+                     thermal fluctuations, the point dipole far field of a magnetised
+                     cube, standard problem 4, standard problem 6 by time integration
+                     and with the energy minimizer, and standard problem 3 by time
+                     integration and with the energy minimizer.
+
+How a test reports its result
+-----------------------------
+Every example exposes a function that returns a list of checks. A check is a dict
+
+    {'check': str, 'value': float, 'limit': float, 'passed': bool}
+
+and passes when value < limit. Metrics that are naturally two sided, such as the ratio
+between a simulated and an analytical diffusion constant, are converted to that form by
+the example itself.
+
+Usage
+-----
+    python testMagTenseFunctions.py                 # everything except the slow tests
+    python testMagTenseFunctions.py --include-slow  # add standard problem 3 (very slow)
+    python testMagTenseFunctions.py --list          # show the available tests
+    python testMagTenseFunctions.py --tests temperature_test,std_problem_4
+    python testMagTenseFunctions.py --skip std_problem_6   # all but the slowest one
+"""
+
+import argparse
+import importlib
+import os
+import sys
+import time
+import traceback
+from contextlib import contextmanager
+from pathlib import Path
+
+import matplotlib as mpl
+
+# The suite writes figures rather than showing them, so no interactive backend is
+# needed. This has to happen before the examples are imported, since they create
+# figures at call time.
+mpl.use(os.environ.get("MPLBACKEND", "Agg"))
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Every example has its own directory, the same as in
+# matlab/examples/Micromagnetism, and writes what it produces beside itself.
+UTIL_DIR = Path(__file__).resolve().parent
+EXAMPLE_ROOT = UTIL_DIR.parent / "examples" / "micromagnetism"
+MAGSTAT_ROOT = UTIL_DIR.parent / "examples" / "magnetostatics"
+RESULTS_DIR = UTIL_DIR / "results"
+TESTS_DIR = EXAMPLE_ROOT / "MagTense_tests"
+STD3_DIR = EXAMPLE_ROOT / "mumag_micromag_Std_problem_3"
+STD4_DIR = EXAMPLE_ROOT / "mumag_micromag_Std_problem_4"
+STD6_DIR = EXAMPLE_ROOT / "mumag_micromag_Std_problem_6"
+
+
+@contextmanager
+def example_dir(directory: Path):
+    """Import from and run inside one example directory.
+
+    The examples name their timer logs with a bare relative filename, so the
+    directory the interpreter runs in decides where those land. The MATLAB suite
+    solves this by entering each example folder before calling it, and this does
+    the same, which also keeps the figures next to the example that made them.
+    """
+    entry = str(directory)
+    added = entry not in sys.path
+    if added:
+        sys.path.insert(0, entry)
+    previous = Path.cwd()
+    os.chdir(directory)
+    try:
+        yield directory
+    finally:
+        os.chdir(previous)
+        if added:
+            sys.path.remove(entry)
+
+# Passed on to the examples that accept it. The examples that do not take a cuda
+# argument set it themselves; MicromagProblem falls back to the CPU when no GPU is
+# present anyway.
+USE_CUDA = False
+
+# The integrated field errors are in percent, so 5 means the MagTense and the FEM curve
+# enclose an area of 5 % of the area under the FEM curve. The same as in MATLAB.
+FIELD_ERROR_LIMIT = 5.0
+
+# Single domain limit of the muMag standard problem 3, in units of the exchange length
+STD3_SINGLE_DOMAIN_LIMIT = 8.47
+
+
+#%% Wrappers turning each example into a list of checks
+
+
+def _validation_checks(directory: str, function: str) -> list[dict]:
+    """Run one magnetostatic validation from its own directory.
+
+    They all return the relative integrated error against FEM in percent, one value per
+    field component or evaluation line, and are named the way the MATLAB suite names
+    them.
+    """
+    with example_dir(MAGSTAT_ROOT / directory):
+        module = importlib.import_module(function)
+        errors = getattr(module, function)(show_plot=False)
+    labels = ['Hx', 'Hy', 'Hz']
+    return [
+        {
+            'check': 'rel. integrated error, '
+                     + (labels[i] if i < len(labels) else f'component {i + 1}'),
+            'value': float(error),
+            'limit': FIELD_ERROR_LIMIT,
+            'passed': error < FIELD_ERROR_LIMIT,
+        }
+        for i, error in enumerate(errors)
+    ]
+
+
+def _macrogeometry_PBC_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import macrogeometry_PBC_test as mod
+        return mod.run_test()
+
+
+def _periodic_exchange_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import periodic_exchange_test as mod
+        return mod.run_test(cuda=USE_CUDA)
+
+
+def _shape_correction_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import shape_correction_test as mod
+        return mod.run_test()
+
+
+def _temperature_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import temperature_test as mod
+        return mod.run_test()
+
+
+def _dipole_field_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import dipole_field_test as mod
+        return mod.run_test()
+
+
+def _std_problem_4() -> list[dict]:
+    """Compare both NIST fields of standard problem 4 with the published mean solutions.
+
+    The limit of 100 % is the one used by the MATLAB suite. It is loose because <My> and
+    <Mz> average close to zero, so the relative measure has a small denominator.
+    """
+    with example_dir(STD4_DIR):
+        from std_problem_4 import std_prob_4
+
+        checks = []
+        for field in (1, 2):
+            _, rel_int_error = std_prob_4(
+                mumag_field=field,
+                cuda=USE_CUDA,
+                cvode=False,
+                mesh_type="uniform",
+                plotting=True,
+                figpath=STD4_DIR,
+            )
+            checks.extend(
+                {
+                    'check': f'field {field}: <M{component}> vs mumag',
+                    'value': error,
+                    'limit': 100.0,
+                    'passed': error < 100.0,
+                }
+                for component, error in zip("xyz", rel_int_error, strict=True)
+            )
+        return checks
+
+
+def _std_problem_6(use_minimizer: bool = False, reduced: bool = False) -> list[dict]:
+    """Compare the depinning field of standard problem 6 with the analytical values.
+
+    The parameter variations, the runs along y and z, the run on the unstructured mesh and the
+    5 % limit are the same as in the MATLAB suite. With use_minimizer the field values are
+    visited as constant fields and relaxed with the energy minimizer instead of integrating
+    along the time ramp; reduced runs only the 'akj' and 'k' variations along x, which is
+    what the minimizer variant of the suite does to keep its running time down.
+    """
+    with example_dir(STD6_DIR):
+        from std_problem_6 import THEORETICAL_PINNING_FIELDS, std_prob_6
+
+        def check(name: str, settings: str, **kwargs) -> dict:
+            theory = THEORETICAL_PINNING_FIELDS[settings]
+            switching_field = std_prob_6(
+                settings=settings,
+                x_steps=80,
+                field_steps=201,
+                cuda=USE_CUDA,
+                cvode=False,
+                plotting=True,
+                figpath=STD6_DIR,
+                use_minimizer=use_minimizer,
+                **kwargs,
+            )
+            if switching_field is None:
+                # No switching at all is a failure whatever the limit is
+                error = float('inf')
+                print(f'{name}: no switching observed (theory {theory:.3f} T)')
+            else:
+                error = abs(switching_field - theory) / theory * 100
+                print(f'{name}: switching field = {switching_field:.4f} T '
+                      f'(theory {theory:.3f} T, error {error:.1f} %)')
+            return {'check': name, 'value': error, 'limit': 5.0, 'passed': error < 5.0}
+
+        checks = []
+        if reduced:
+            for settings in ("akj", "k"):
+                checks.append(check(f'depinning field, variation "{settings}"', settings))
+            return checks
+        # Parameter variations, all along x
+        for settings in ("akj", "ak", "aj", "a", "kj", "k"):
+            checks.append(check(f'depinning field, variation "{settings}"', settings))
+        # The same problem rotated onto each axis. The result must not depend on the
+        # orientation, so this tests that the physics is implemented correctly in all three
+        # directions
+        for cart_dir in ("x", "y", "z"):
+            checks.append(check(f'depinning field along {cart_dir}', "akj", cart_dir=cart_dir))
+        # Unstructured mesh, which only works in the x direction
+        checks.append(check('depinning field, unstructured mesh', "akj", mesh_type="unstructuredPrisms"))
+        return checks
+
+
+def _std_problem_3(use_minimizer: bool = True) -> list[dict]:
+    """Locate the single domain limit of standard problem 3, compare with the reference.
+
+    The flower and the vortex state swap their role as the ground state at L = 8.47
+    exchange lengths. The crossing of the two total energies is found by linear
+    interpolation, so the simulated cube sizes have to bracket it. Each state is relaxed
+    either with the energy minimizer or by integrating the Landau-Lifshitz equation in time.
+    """
+    L_loop = np.linspace(8, 9, 6)
+    with example_dir(STD3_DIR):
+        from std_problem_3 import std_prob_3
+
+        L_loop, E_arr = std_prob_3(
+            L_loop=L_loop,
+            cuda=USE_CUDA,
+            cvode=False,
+            use_minimizer=use_minimizer,
+            plotting=True,
+            figpath=STD3_DIR,
+        )
+
+    E_flower = np.sum(E_arr[:, :, 0], axis=0)
+    E_vortex = np.sum(E_arr[:, :, 1], axis=0)
+    # Negative while the flower state is the ground state
+    difference = E_flower - E_vortex
+
+    if difference[0] >= 0 or difference[-1] <= 0:
+        print("The simulated cube sizes do not bracket the crossing: E_flower - "
+              f"E_vortex goes from {difference[0]:.3e} to {difference[-1]:.3e}")
+        error = float('inf')
+        L_cross = float('nan')
+    else:
+        L_cross = float(np.interp(0.0, difference, L_loop))
+        error = abs(L_cross - STD3_SINGLE_DOMAIN_LIMIT) / STD3_SINGLE_DOMAIN_LIMIT * 100
+        print(f"Single domain limit: L = {L_cross:.3f} l_ex "
+              f"(accepted value {STD3_SINGLE_DOMAIN_LIMIT}, error {error:.1f} %)")
+
+    return [{
+        'check': 'single domain limit L/l_ex' + (' (minimizer)' if use_minimizer else ' (LL)'),
+        'value': error,
+        'limit': 5.0,
+        'passed': error < 5.0,
+    }]
+
+
+#%% Registry
+
+# name -> (function, slow, one line description)
+TESTS = {
+    'magnetostatics_cylindrical_slice_1': (
+        lambda: _validation_checks('Validation_field_cylindrical_slice', 'validation_cylindrical_slice_example_1'), False,
+        'Field of a cylindrical slice vs FEM, example 1',
+    ),
+    'magnetostatics_cylindrical_slice_2': (
+        lambda: _validation_checks('Validation_field_cylindrical_slice', 'validation_cylindrical_slice_example_2'), False,
+        'Field of a cylindrical slice vs FEM, example 2',
+    ),
+    'magnetostatics_prism': (
+        lambda: _validation_checks('Validation_field_prism', 'validation_prism'), False,
+        'Field of a rectangular prism vs FEM',
+    ),
+    'magnetostatics_circpiece': (
+        lambda: _validation_checks('Validation_field_circpiece', 'validation_circpiece'), False,
+        'Field of a circular piece vs FEM',
+    ),
+    'magnetostatics_circpiece_inverted': (
+        lambda: _validation_checks('Validation_field_circpiece_inverted', 'validation_circpiece_inverted'), False,
+        'Field of an inverted circular piece vs FEM',
+    ),
+    'magnetostatics_avgprism': (
+        lambda: _validation_checks('Validation_field_avgprism', 'validation_avgprism'), False,
+        'Field of a prism averaged over observation volumes vs FEM, x and y components',
+    ),
+    'magnetostatics_sphere': (
+        lambda: _validation_checks('Validation_field_sphere', 'validation_sphere'), False,
+        'Field of a sphere vs FEM',
+    ),
+    'magnetostatics_spheroid': (
+        lambda: _validation_checks('Validation_field_spheroid', 'validation_spheroid'), False,
+        'Field of a spheroid vs FEM',
+    ),
+    'magnetostatics_tetrahedron': (
+        lambda: _validation_checks('Validation_field_tetrahedron', 'validation_tetrahedron'), False,
+        'Field of a tetrahedron vs FEM',
+    ),
+    'macrogeometry_PBC_test': (
+        _macrogeometry_PBC_test, False,
+        'Periodic boundaries by the macrogeometry method, along x, y and z',
+    ),
+    'periodic_exchange_test': (
+        _periodic_exchange_test, False,
+        'Periodic exchange coupling, uniform grid, unstructured mesh and grain mesh',
+    ),
+    'shape_correction_test': (
+        _shape_correction_test, False,
+        'Shape correction field of the sample geometry',
+    ),
+    'temperature_test': (
+        _temperature_test, False,
+        'Thermal fluctuations against the analytical angular diffusion',
+    ),
+    'dipole_field_test': (
+        _dipole_field_test, False,
+        'Far field of a magnetised cube against the analytical point dipole',
+    ),
+    'std_problem_4': (
+        _std_problem_4, False,
+        'muMag standard problem 4 against the published mean solutions',
+    ),
+    'std_problem_6': (
+        _std_problem_6, False,
+        'muMag standard problem 6, domain wall depinning fields',
+    ),
+    'std_problem_6_minimizer': (
+        lambda: _std_problem_6(use_minimizer=True, reduced=True), False,
+        'muMag standard problem 6 relaxed with the energy minimizer at each field, akj and k along x',
+    ),
+    'std_problem_3': (
+        lambda: _std_problem_3(use_minimizer=False), True,
+        'muMag standard problem 3 by LL time integration, single domain limit (slow, tens of minutes)',
+    ),
+    'std_problem_3_minimizer': (
+        lambda: _std_problem_3(use_minimizer=True), False,
+        'muMag standard problem 3 relaxed with the energy minimizer, single domain limit',
+    ),
+}
+
+
+#%% Running and reporting
+
+
+def run_tests(names: list[str]) -> list[dict]:
+    """Run the named tests and return one record per test."""
+    records = []
+    for i, name in enumerate(names, start=1):
+        function = TESTS[name][0]
+        print(f"\n{'=' * 78}\n[{i}/{len(names)}] {name}\n{'=' * 78}")
+        start = time.time()
+        try:
+            checks = function()
+            status = 'PASS' if all(c['passed'] for c in checks) else 'FAIL'
+            error = None
+        except Exception:
+            # A broken example must not stop the rest of the suite
+            checks = []
+            status = 'ERROR'
+            error = traceback.format_exc()
+            print(error)
+        elapsed = time.time() - start
+        print(f"--> {name}: {status} in {elapsed:.1f} s")
+        records.append({'name': name, 'checks': checks, 'status': status,
+                        'elapsed': elapsed, 'error': error})
+    return records
+
+
+def print_table(records: list[dict], skipped: list[str]) -> None:
+    """Print the overview as plain text."""
+    rows = _table_rows(records, skipped)
+    widths = [max(len(str(row[c])) for row in [_HEADER, *rows])
+              for c in range(len(_HEADER))]
+
+    print(f"\n{'=' * (sum(widths) + 3 * len(widths))}")
+    print("OVERVIEW")
+    print('=' * (sum(widths) + 3 * len(widths)))
+    print('   '.join(str(h).ljust(w) for h, w in zip(_HEADER, widths, strict=True)))
+    print('-' * (sum(widths) + 3 * len(widths)))
+    for row in rows:
+        print('   '.join(str(c).ljust(w) for c, w in zip(row, widths, strict=True)))
+    print('-' * (sum(widths) + 3 * len(widths)))
+
+    n_pass = sum(r['status'] == 'PASS' for r in records)
+    n_fail = sum(r['status'] == 'FAIL' for r in records)
+    n_error = sum(r['status'] == 'ERROR' for r in records)
+    total_time = sum(r['elapsed'] for r in records)
+    print(f"{n_pass} passed, {n_fail} failed, {n_error} errored, "
+          f"{len(skipped)} skipped, in {total_time:.0f} s")
+
+
+_HEADER = ('Test', 'Check', 'Value', 'Limit', 'Status')
+
+
+def _fmt(value: float) -> str:
+    if np.isnan(value):
+        return 'nan'
+    if np.isinf(value):
+        return 'inf'
+    if value == 0:
+        return '0'
+    return f'{value:.3g}' if 1e-3 <= abs(value) < 1e4 else f'{value:.2e}'
+
+
+def _table_rows(records: list[dict], skipped: list[str]) -> list[tuple]:
+    """Flatten the records into table rows, one per check."""
+    rows = []
+    for record in records:
+        label = f"{record['name']} [{record['elapsed']:.0f} s]"
+        if record['status'] == 'ERROR':
+            first_line = record['error'].strip().splitlines()[-1]
+            rows.append((label, f'raised: {first_line[:60]}', '-', '-', 'ERROR'))
+            continue
+        rows.extend(
+            (
+                label if j == 0 else '',
+                check['check'],
+                _fmt(check['value']),
+                _fmt(check['limit']),
+                'PASS' if check['passed'] else 'FAIL',
+            )
+            for j, check in enumerate(record['checks'])
+        )
+        if not record['checks']:
+            rows.append((label, 'no checks returned', '-', '-', 'ERROR'))
+    rows.extend((name, 'not run', '-', '-', 'SKIPPED') for name in skipped)
+    return rows
+
+
+_STATUS_COLOURS = {
+    'PASS': '#c9e7c9',
+    'FAIL': '#f2b8b5',
+    'ERROR': '#f2b8b5',
+    'SKIPPED': '#e0e0e0',
+}
+
+
+def plot_overview(records: list[dict], skipped: list[str], figure_path: Path) -> None:
+    """Save a figure with the result table and the margin of every check."""
+    rows = _table_rows(records, skipped)
+    n_rows = len(rows)
+
+    fig = plt.figure(figsize=(15, 1.6 + 0.30 * (n_rows + 1)))
+    grid = fig.add_gridspec(1, 2, width_ratios=[2.6, 1.0], wspace=0.04,
+                            left=0.01, right=0.98, top=0.90, bottom=0.06)
+    ax_table = fig.add_subplot(grid[0, 0])
+    ax_bar = fig.add_subplot(grid[0, 1])
+
+    # ── Table ────────────────────────────────────────────────────────────────
+    ax_table.axis('off')
+    table = ax_table.table(
+        cellText=[[str(c) for c in row] for row in rows],
+        colLabels=_HEADER,
+        colWidths=[0.30, 0.42, 0.10, 0.10, 0.08],
+        cellLoc='left',
+        loc='upper left',
+        bbox=[0, 0, 1, 1],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+    for (row, _col), cell in table.get_celld().items():
+        cell.set_linewidth(0.4)
+        if row == 0:
+            cell.set_facecolor('#404040')
+            cell.set_text_props(color='white', fontweight='bold')
+        else:
+            cell.set_facecolor(_STATUS_COLOURS.get(rows[row - 1][4], 'white'))
+
+    # ── Margin bar chart, aligned row by row with the table ──────────────────
+    # A bar is the measured value divided by its limit, so anything left of 1 passed.
+    # The rows are laid out so bar i sits at the vertical centre of table row i.
+    bar_min, bar_max = 1e-10, 1e4
+    for i, row in enumerate(rows):
+        status = row[4]
+        if status in ('SKIPPED', 'ERROR'):
+            continue
+        value, limit = float(row[2]), float(row[3])
+        margin = value / limit if limit > 0 else np.inf
+        # A bar is drawn from the left edge of the axis, so margins outside the plotted
+        # range are pulled just inside it to stay visible. The table has the exact
+        # numbers.
+        margin = min(max(margin, 3 * bar_min), 0.8 * bar_max)
+        ax_bar.barh(i + 1.5, margin, height=0.6,
+                    color='forestgreen' if status == 'PASS' else 'firebrick')
+
+    ax_bar.axvline(1.0, color='black', linestyle='--', linewidth=1.2)
+    ax_bar.set_xscale('log')
+    ax_bar.set_xlim(bar_min, bar_max)
+    ax_bar.set_ylim(n_rows + 1, 0)
+    ax_bar.set_yticks([])
+    ax_bar.set_xlabel('measured value / acceptance limit', fontsize=9)
+    ax_bar.tick_params(axis='x', labelsize=8)
+    ax_bar.grid(axis='x', linestyle=':', alpha=0.5)
+    ax_bar.text(1.0, 0.4, ' limit', fontsize=8, va='center')
+
+    n_pass = sum(r['status'] == 'PASS' for r in records)
+    n_fail = sum(r['status'] == 'FAIL' for r in records)
+    n_error = sum(r['status'] == 'ERROR' for r in records)
+    total_time = sum(r['elapsed'] for r in records)
+    all_good = n_fail == 0 and n_error == 0
+    overall = 'ALL TESTS PASSED' if all_good else 'SOME TESTS FAILED'
+    fig.suptitle(
+        f"MagTense micromagnetism test suite - {overall}\n"
+        f"{n_pass} passed, {n_fail} failed, {n_error} errored, "
+        f"{len(skipped)} skipped, {total_time:.0f} s",
+        fontsize=13, fontweight='bold',
+        color='darkgreen' if (n_fail == 0 and n_error == 0) else 'darkred',
+    )
+
+    figure_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(figure_path, dpi=200, bbox_inches='tight')
+    plt.close(fig)
+    print(f"\nSaved overview figure to {figure_path}")
+
+
+#%% Command line
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--list', action='store_true',
+                        help="List the available tests and exit")
+    parser.add_argument('--tests', type=str, default=None,
+                        help="Comma separated subset of tests to run "
+                             "(default: all but the slow ones)")
+    parser.add_argument('--skip', type=str, default=None,
+                        help="Comma separated tests to leave out. Used by the workflow, "
+                             "where standard problem 6 is most of the running time")
+    parser.add_argument('--include-slow', action='store_true',
+                        help="Also run the tests marked slow")
+    parser.add_argument('--cuda', action='store_true',
+                        help="Ask the examples that support it to use the GPU")
+    parser.add_argument('--no-figure', action='store_true',
+                        help="Print the overview table but do not save the figure")
+    args = parser.parse_args()
+
+    if args.list:
+        print(f"{'Test':38s} {'Slow':5s} Description")
+        for name, (_, slow, description) in TESTS.items():
+            print(f"{name:38s} {'yes' if slow else 'no':5s} {description}")
+        return 0
+
+    # A module level switch is the simplest way to reach the wrappers
+    global USE_CUDA
+    USE_CUDA = args.cuda
+
+    if args.tests is not None:
+        requested = [name.strip() for name in args.tests.split(',') if name.strip()]
+        unknown = [name for name in requested if name not in TESTS]
+        if unknown:
+            print(f"Unknown test(s): {', '.join(unknown)}. "
+                  "Use --list to see the available ones.")
+            return 2
+        # Every test that is not run is reported as skipped, as in the MATLAB suite
+        selected = [name for name in TESTS if name in requested]
+        skipped = [name for name in TESTS if name not in selected]
+    else:
+        selected = [name for name, (_, slow, _) in TESTS.items()
+                    if args.include_slow or not slow]
+        skipped = [name for name in TESTS if name not in selected]
+
+    if args.skip is not None:
+        dropped = [name.strip() for name in args.skip.split(',') if name.strip()]
+        unknown = [name for name in dropped if name not in TESTS]
+        if unknown:
+            print(f"Unknown test(s) in --skip: {', '.join(unknown)}. "
+                  "Use --list to see the available ones.")
+            return 2
+        selected = [name for name in selected if name not in dropped]
+        skipped = [name for name in TESTS if name not in selected]
+
+    print(f"Running {len(selected)} test(s): {', '.join(selected)}")
+    if skipped:
+        print(f"Skipping {len(skipped)} test(s): {', '.join(skipped)}")
+
+    records = run_tests(selected)
+    print_table(records, skipped)
+
+    if not args.no_figure:
+        plot_overview(records, skipped,
+                      RESULTS_DIR / 'testMagTenseFunctions_overview.png')
+
+    failed = [r['name'] for r in records if r['status'] != 'PASS']
+    if failed:
+        print(f"\nFAILED: {', '.join(failed)}")
+        return 1
+    print("\nAll selected tests passed")
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

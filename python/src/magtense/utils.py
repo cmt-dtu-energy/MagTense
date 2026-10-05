@@ -768,6 +768,9 @@ def create_plot(
                 # TODO plot_ellipsoid()
                 pass
 
+            elif tiles.tile_type[i] == 102:
+                # A uniform applied-field source has no geometry to draw
+                continue
             else:
                 value_err = f"Tile type {tiles.tile_type[i]} not supported!"
                 raise ValueError(value_err)
@@ -1101,3 +1104,66 @@ def plot_Halbach(
     plt.title(r"2D slice of long cylinders @ $z=0$")
     plt.grid(True)
     plt.show()
+
+
+# The six tetrahedra a cube is cut into along its main diagonal (Kuhn subdivision). The corner
+# numbering is x fastest, then y, then z, and the indices are 0-based.
+_KUHN_TETRAHEDRA = np.array(
+    [[1, 2, 4, 8], [1, 2, 6, 8], [1, 3, 4, 8], [1, 3, 7, 8], [1, 5, 6, 8], [1, 5, 7, 8]]
+) - 1
+
+
+def create_tetra_mesh(
+    L: list[float] | np.ndarray, h_max: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """A tetrahedral mesh of a box centred on the origin, the Python counterpart of CreateTetraMesh.m.
+
+    The box of side lengths L is cut into cubes of edge at most h_max, and each cube into six
+    tetrahedra. It is a regular mesh rather than the unstructured one the Matlab PDE Toolbox
+    produces, but it is a valid tetrahedral mesh of the same box with the same cell size, and it
+    needs nothing beyond numpy.
+
+    Args:
+        L: side lengths of the box along x, y and z [m].
+        h_max: the largest edge length of the cubes the box is cut into [m].
+
+    Returns:
+        nodes: (M, 3) node coordinates, one node per row.
+        elements: (N, 4) connectivity, the four corner nodes of each tetrahedron, 1-based.
+        pts: (N, 3) element centres.
+
+    The three arrays are what MicromagProblem wants for a tetrahedral grid::
+
+        nodes, elements, pts = create_tetra_mesh(L, h_max)
+        problem = MicromagProblem(res=(len(pts), 1, 1), grid_type="tetrahedron",
+                                  grid_nod=nodes, grid_ele=elements.T, grid_pts=pts)
+    """
+    L = np.asarray(L, dtype=np.float64)
+    n = np.maximum(1, np.ceil(L / h_max)).astype(int)
+    nx, ny, nz = n
+
+    ii, jj, kk = np.meshgrid(np.arange(nx + 1), np.arange(ny + 1), np.arange(nz + 1), indexing="ij")
+    nodes = np.stack([ii.ravel(), jj.ravel(), kk.ravel()], axis=1) * (L / n) - L / 2
+    node_id = np.arange(nodes.shape[0]).reshape((nx + 1, ny + 1, nz + 1))
+
+    elements = []
+    for ic in range(nx):
+        for jc in range(ny):
+            for kc in range(nz):
+                corners = np.array(
+                    [node_id[ic + i, jc + j, kc + k] for k in (0, 1) for j in (0, 1) for i in (0, 1)]
+                )
+                elements.extend(corners[_KUHN_TETRAHEDRA])
+    elements = np.array(elements)
+    pts = nodes[elements, :].mean(axis=1)
+
+    return nodes, elements + 1, pts
+
+
+def tetra_volumes(nodes: np.ndarray, elements: np.ndarray) -> np.ndarray:
+    """The volumes of the tetrahedra given by the nodes and the 1-based (N, 4) connectivity."""
+    corners = nodes[np.asarray(elements, dtype=np.int64) - 1, :]  # (N, 4, 3)
+    a = corners[:, 1] - corners[:, 0]
+    b = corners[:, 2] - corners[:, 0]
+    c = corners[:, 3] - corners[:, 0]
+    return np.abs(np.einsum("ij,ij->i", a, np.cross(b, c))) / 6.0

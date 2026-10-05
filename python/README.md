@@ -7,6 +7,9 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
 - New Conda environment from [env-313-linux.yml](./.build/env-313-linux.yml)
 
+  Environment files exist for Python 3.12, 3.13 and 3.14 (`env-312`, `env-313`,
+  `env-314`); pick the one matching the Python version you want to build for.
+
   ```bash
   conda env create -n magtense-env -f python/.build/env-313-linux.yml
   conda activate magtense-env
@@ -23,7 +26,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
   conda config --env --add channels conda-forge
   conda install -y python=3.13
   python3 -m pip install numpy meson ninja charset-normalizer build
-  conda config --env --add channels nvidia/label/cuda-12.9.1
+  conda config --env --add channels nvidia/label/cuda-13.3.1
   conda install -y cuda-nvcc libcusparse-dev libcublas-dev cuda-cudart-dev libnvjitlink-dev
   conda config --env --add channels https://software.repos.intel.com/python/conda/
   conda install -y mkl mkl-devel mkl-static "dpcpp_linux-64" "ifx_linux-64"
@@ -140,10 +143,10 @@ After this compile as above but with `USE_FMM3D=1`
   - Download of MagTense and [FMM3D](https://github.com/Ximtecs/FMM3D). Unzip the latter in `external\FMM3D`
 
 
-- Conda environment `magtense-env` is created from `env-313-win.yml` in a `Powershell` as
+- Conda environment `magtense-env` is created from `env-314-win.yml` in a `Powershell` as
 
   ```bash
-  conda env create -f python/.build/env-313-win.yml
+  conda env create -f python/.build/env-314-win.yml
   conda activate magtense-env
   ```
   All commands below, except for CVODE compilation, takes place in the `magtense-env` environment

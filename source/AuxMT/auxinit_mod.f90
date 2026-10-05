@@ -13,6 +13,7 @@ MODULE auxInit_mod
 
     logical :: window_enabled = .true.                   ! enable periodic timer windows
     logical :: trace_enabled  = .false.                  ! enable trace logging
+    logical :: timer_enabled  = .false.                  ! enable the timing log file
     logical :: flush_each     = .true.                   ! flush log output after each write
 
     real(8) :: window_interval = 30.0d0                  ! seconds between timer windows
@@ -39,15 +40,17 @@ CONTAINS
 !> trace_enabled   : optional integer flag for trace logging
 !> flush_each      : optional integer flag for flushing after each write
 !> trace_verbose   : optional trace verbosity level
+!> timer_enabled   : optional integer flag for the timing log file (off by default)
 !=============================================================================
   subroutine initAux(self, log_dir, timer_log_file, trace_log_file, window_enabled, &
-      window_interval, trace_enabled, flush_each, trace_verbose)
+      window_interval, trace_enabled, flush_each, trace_verbose, timer_enabled)
     !DEC$ ATTRIBUTES ALIAS:"initaux_" :: initAux
     type(auxInit_t), intent(inout) :: self
     character(len=*), intent(in), optional :: log_dir, timer_log_file, trace_log_file
     integer, intent(in), optional :: window_enabled, trace_enabled, flush_each
     real(8), intent(in), optional :: window_interval
     integer, intent(in), optional :: trace_verbose
+    integer, intent(in), optional :: timer_enabled
 
     !---------------------- Store the requested input parameters ---------------
     if (present(log_dir)) self%log_dir = log_dir
@@ -58,6 +61,7 @@ CONTAINS
     if (present(flush_each)) self%flush_each = merge(.true., .false., flush_each /= 0)
     if (present(window_interval)) self%window_interval = window_interval
     if (present(trace_verbose)) self%trace_verbose = trace_verbose
+    if (present(timer_enabled)) self%timer_enabled = merge(.true., .false., timer_enabled /= 0)
     !---------------------------------------------------------------------------
 
     !---------------------- Initialise auxiliary modules -----------------------
@@ -65,7 +69,7 @@ CONTAINS
     if (self%trace_enabled) call omp%info()
     call timer%log_init(trim(self%log_dir), trim(self%timer_log_file), &
       flush_each=self%flush_each, window_enabled=self%window_enabled, &
-      window_interval=self%window_interval)
+      window_interval=self%window_interval, enabled=self%timer_enabled)
     call trace%trace_init(trim(self%log_dir), trim(self%trace_log_file), &
       enabled=self%trace_enabled, unit=97, flush_each=self%flush_each, &
       verbose=self%trace_verbose)

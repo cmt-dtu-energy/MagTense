@@ -16,7 +16,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--cu_version",
         type=str,
-        default="cpu,cu12",
+        default="cpu,cu13",
         help="Cuda / cpu versions (comma-separated)",
     )
     parser.add_argument(
@@ -42,7 +42,7 @@ def main(
     build_tag: dict | None = None,
 ) -> None:
     if build_tag is None:
-        build_tag = {"cpu": 0, "cu12": 1, "cu12-fmm": 3}
+        build_tag = {"cpu": 0, "cu13": 1, "cu13-fmm": 3}
     py_folder = Path(__file__).parent.parent
     lib_folder = py_folder / "src" / "magtense" / "lib"
 
@@ -91,12 +91,11 @@ def main(
                 rpath_entries = ["$ORIGIN/../../../../../lib/"]
                 if cuda.endswith("-fmm"):
                     rpath_entries.insert(0, "$ORIGIN")
-                if cuda.startswith("cu12"):
-                    rpath_entries += [
-                        "$ORIGIN/../../nvidia/cublas/lib/",
-                        "$ORIGIN/../../nvidia/cuda_runtime/lib/",
-                        "$ORIGIN/../../nvidia/cusparse/lib/",
-                    ]
+                if cuda.startswith("cu13"):
+                    # One shared directory, not the per-library
+                    # nvidia/<name>/lib/ layout the cu12 wheels used: every
+                    # CUDA 13 wheel unpacks into nvidia/cu13/lib/.
+                    rpath_entries.append("$ORIGIN/../../nvidia/cu13/lib/")
                 subprocess.run(
                     [
                         "patchelf",
@@ -107,24 +106,21 @@ def main(
                     ],
                     check=False,
                 )
-            subprocess.run(
-                [
-                    "cp",
-                    f"{py_folder}/.build/requirements-py{py[0]}.txt",
-                    f"{py_folder}/requirements.txt",
-                ],
-                check=False,
-            )
+            # Done in-process rather than through cp and sed: the sed call was
+            # passed "'/^nvidia-/d'" with the shell quotes still around the
+            # expression, so sed rejected it, check=False swallowed the error,
+            # and every cpu wheel kept the nvidia- pins - roughly a gigabyte of
+            # CUDA runtime wheels pulled in by a build that cannot use them.
+            requirements = (
+                py_folder / ".build" / f"requirements-py{py[0]}.txt"
+            ).read_text()
             if cuda == "cpu":
-                subprocess.run(
-                    [
-                        "sed",
-                        "-i",
-                        "'/^nvidia-/d'",
-                        f"{py_folder}/requirements.txt",
-                    ],
-                    check=False,
+                requirements = "".join(
+                    line
+                    for line in requirements.splitlines(keepends=True)
+                    if not line.startswith("nvidia-")
                 )
+            (py_folder / "requirements.txt").write_text(requirements)
             subprocess.run(
                 ["python", "-m", "build", "--wheel"],
                 cwd=py_folder,

@@ -11,7 +11,13 @@ arguments
     options.mkl_include   = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include"';
     options.mkl_lp64      = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include\mkl\intel64\lp64"';
     options.mkl_lib       = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\lib"';
-    options.cuda_root     = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\lib\x64"';
+    %--- CUDA 13 keeps the import libraries in lib\x64, as the standalone
+    %--- toolkit always has. A Conda environment puts them in
+    %--- <env>\Library\lib\x64 instead, so pass that as cuda_root when linking
+    %--- against the Conda toolkit rather than a standalone installation - up
+    %--- to CUDA 12 they sat directly in <env>\Library\lib and were picked up
+    %--- from the mkl_lib search path by accident.
+    options.cuda_root     = '"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\lib\x64"';
     options.cvode_include = '"C:\Program Files (x86)\sundials-7.2.1\fortran"';
     options.cvode_lib     = '"C:\Program Files (x86)\sundials-7.2.1\lib"';
 

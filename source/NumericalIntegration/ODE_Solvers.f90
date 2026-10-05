@@ -89,7 +89,8 @@ module ODE_Solvers
             allocate( MTy_out(neq), MTf_vec(neq) )
 
             !call solver...
-            call MagTense_CVODEsuite( int(neq, kind=c_long), neq, real(t, kind=c_double), int(nt, kind=c_long), nt, real(y0, kind=c_double), t_out, y_out, real(tol, kind=c_double), callback, int(callback_display, kind=c_long) )
+            call MagTense_CVODEsuite( int(neq, kind=c_long), neq, real(t, kind=c_double), int(nt, kind=c_long), nt, real(y0, kind=c_double), t_out, y_out, real(tol, kind=c_double), callback, int(callback_display, kind=c_long), &
+                                      nt_conv, t_conv, conv_tol, includeThermal )
 
             !clean-up
             deallocate(MTy_out, MTf_vec)
@@ -157,6 +158,7 @@ module ODE_Solvers
         integer :: i, k                             !>Counter variable
         character*(100) :: prog_str                 !>Variable holding the output string
         logical :: includeThermal                   !>Whether to normalise result and update thermal field after each timestep
+        logical :: converged                        !>Whether the convergence test has been passed
         !integer,parameter :: n_write=100
         !Perform allocations. 
         allocate(thres(neq))
@@ -185,6 +187,7 @@ module ODE_Solvers
 
         !Calculate the magnetization to use for the first convergence calculation
         y_last = ystart
+        converged = .false.
         
         !Concertinate the t_out and t_conv arrays
         t_comb(1:size(t)) = t
@@ -273,29 +276,42 @@ module ODE_Solvers
                 call callback( prog_str, -1 )
             endif
             
-            !Check if the time which the solution is returned is part of the array that checks for converge or if it part of the times where the simulation is to be saved
-            !ind = findloc(t_conv,t_comb_unique(i))
-            !if (maxval(ind) .gt. 0) then !If the time is part of the converge array, we check for converge
-            !    conv_error = maxval(abs(y_step-y_last))
-            !    if (conv_error < conv_tol) then
-            !        !Save the current state before exiting
-            !        y_out(:,k) = y_step
-            !        yderiv_out(:,k) = yderiv_step
-            !        t_out(k) = t_step
-            !        exit
-            !    endif
-            !    !Save the new magnetization to use for the next converge calculation
-            !    y_last = y_step
-            !endif
-            
-            !Check if we should save the result in the array to be returned
-            !ind = findloc(t,t_comb_unique(i))
-            !if (maxval(ind) .gt. 0) then !If the time is part of the save array
+            !Convergence test at the requested convergence times. y_last is the state at the previous
+            !convergence time (the initial state before the first one), and the integration stops once the
+            !largest change of any component between two convergence times is below conv_tol. This is what
+            !makes a relaxation to equilibrium stop when it is done instead of running to the last output
+            !time. It is skipped for a thermal run, where the noise never settles.
+            if ( .not. includeThermal .and. conv_tol .gt. 0. ) then
+                if ( any( t_conv .eq. t_comb_unique(i) ) ) then
+                    conv_error = maxval(abs(y_step - y_last))
+                    y_last = y_step
+                    if ( conv_error .lt. conv_tol ) converged = .true.
+                endif
+            endif
+
+            !Save the result at the requested output times only. The combined time array also holds the
+            !convergence times, and writing at those as well would run past the end of y_out whenever
+            !t_conv adds times that are not in t.
+            if ( any( t .eq. t_comb_unique(i) ) ) then
                 y_out(:,k) = y_step
                 yderiv_out(:,k) = yderiv_step
                 t_out(k) = t_step
                 k = k+1
-            !endif
+            endif
+
+            if ( converged ) then
+                !Hold the converged state at the remaining output times, so that the last column - which
+                !the callers read as the final state - is always filled
+                do while ( k .le. nt )
+                    y_out(:,k) = y_step
+                    yderiv_out(:,k) = yderiv_step
+                    t_out(k) = t(k)
+                    k = k + 1
+                enddo
+                write(prog_str,'(A,ES9.2,A,F8.2,A)') 'Converged (max change ', conv_error, ') at t = ', t_step*1e9, ' ns, stopping'
+                call callback( trim(prog_str), -1 )
+                exit
+            endif
         enddo
         !Clean up
         deallocate(thres)
@@ -316,7 +332,8 @@ module ODE_Solvers
     !> @param[inout] t_out output array with the times at which y_i are found
     !> @param[inout] y_out output array with the y_i values
     !---------------------------------------------------------------------------
-    subroutine MagTense_CVODEsuite( neq, neq_f, t, nt, nt_f, ystart, t_inout, y_out, rtol, callback, callback_display )
+    subroutine MagTense_CVODEsuite( neq, neq_f, t, nt, nt_f, ystart, t_inout, y_out, rtol, callback, callback_display, &
+                                    nt_conv, t_conv, conv_tol, includeThermal )
 	use, intrinsic :: iso_c_binding
     
     use fsundials_core_mod           ! Fortran interface to data types and constants
@@ -362,6 +379,13 @@ module ODE_Solvers
     real(c_double), dimension(neq), intent(in) :: ystart
     real(c_double), dimension(neq) :: y_cur, y_norm
     real(c_double) :: max_norm_dev
+    integer, intent(in) :: nt_conv                        ! number of convergence-check times
+    real, dimension(nt_conv), intent(in) :: t_conv        ! times at which the convergence test is made (must be output times)
+    real, intent(in) :: conv_tol                          ! convergence criterion on the largest change between two checks
+    logical, intent(in) :: includeThermal                 ! a thermal run never converges, so the test is skipped
+    real, dimension(neq_f) :: y_last                      ! state at the previous convergence check
+    real :: conv_error                                    ! largest change since the previous check
+    integer(c_long) :: k_fill                             ! counter for holding the converged state
 
     !======= Internals ============
     ! create the SUNDIALS context
@@ -476,6 +500,7 @@ module ODE_Solvers
     t_out(1) = t(1)
     t_inout(1) = real(t(1))
     y_out(:, 1) = real(y_cur)
+    y_last = real(y_cur)
 
     do outstep = 2, nt
 	    ! call CVode
@@ -541,6 +566,25 @@ module ODE_Solvers
             endif
         endif
         y_out(:, outstep) = real(y_cur)
+
+        ! Convergence test at the requested convergence times, as in the RKSuite driver. CVODE only
+        ! steps to the output times, so a convergence time that is not also an output time is never
+        ! visited.
+        if ( .not. includeThermal .and. conv_tol .gt. 0. ) then
+            if ( any( t_conv .eq. real(t(outstep)) ) ) then
+                conv_error = maxval(abs(real(y_cur) - y_last))
+                y_last = real(y_cur)
+                if ( conv_error .lt. conv_tol ) then
+                    do k_fill = outstep+1, nt
+                        y_out(:, k_fill) = real(y_cur)
+                        t_inout(k_fill) = real(t(k_fill))
+                    enddo
+                    write(err_str,'(A,ES9.2,A,F8.2,A)') 'Converged (max change ', conv_error, ') at t = ', real(t(outstep))*1e9, ' ns, stopping'
+                    call callback( trim(err_str), -1 )
+                    exit
+                endif
+            endif
+        endif
     enddo
 
     ! diagnostics output

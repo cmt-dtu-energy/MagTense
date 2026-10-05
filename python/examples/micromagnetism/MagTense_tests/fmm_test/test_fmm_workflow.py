@@ -11,12 +11,12 @@ def _is_fmm3d_wheel() -> bool:
     return (
         os.environ.get("MAGTENSE_USE_FMM3D", "").strip().lower()
         in {"1", "true", "yes", "on"}
-        and os.environ.get("MAGTENSE_WHEEL_VARIANT") == "cu12-fmm"
+        and os.environ.get("MAGTENSE_WHEEL_VARIANT") == "cu13-fmm"
     )
 
 
 def _has_nvidia_gpu() -> bool:
-    # This test validates the cu12-fmm wheel by comparing FMM output against a
+    # This test validates the cu13-fmm wheel by comparing FMM output against a
     # CUDA baseline, so a CUDA runtime package alone is not enough.
     nvidia_smi = shutil.which("nvidia-smi")
     if not nvidia_smi:
@@ -71,14 +71,14 @@ def _print_failure_diagnostics(
 
 @pytest.mark.skipif(
     not _is_fmm3d_wheel(),
-    reason="FMM3D quick test requires the cu12-fmm MagTense wheel.",
+    reason="FMM3D quick test requires the cu13-fmm MagTense wheel.",
 )
 @pytest.mark.skipif(
     os.environ.get("GITHUB_ACTIONS") == "true" and not _has_nvidia_gpu(),
     reason="FMM3D quick test compares against CUDA and requires an NVIDIA GPU.",
 )
 def test_fmm_quick_workflow() -> None:
-    # Smoke-test the installed cu12-fmm wheel through the grain workflow:
+    # Smoke-test the installed cu13-fmm wheel through the grain workflow:
     # generate exchange/demag setup, run the CUDA reference, run quick FMM
     # variants, and validate the FMM fields against the CUDA result.
     test_dir = Path(__file__).parent

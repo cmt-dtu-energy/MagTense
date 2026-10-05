@@ -6,6 +6,11 @@ if (~issparse(GridInfo.TheSigns))
     GridInfo.TheSigns = sparse(GridInfo.TheSigns(:,1),GridInfo.TheSigns(:,2),single(GridInfo.TheSigns(:,3)));
 end
 
+if ~exist('iIn','var')
+    iIn = cell(1);
+    iIn{1} = 1:length(dims);
+end
+
 if ~exist('hF','var')
     hF = figure('position',[0 0 600 600],'Color',[1 1 1]);
     ppsz = .2.*[20,19] ;
