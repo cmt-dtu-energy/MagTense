@@ -138,8 +138,10 @@ class MicromagProblem:
         min_torque: (nt_h_ext,) final max_i |m_i x H_i| / max(Ms) at each field.
         min_eig: (nt_h_ext,) lowest Hessian eigenvalue of the returned state divided by max(Ms),
             when min_saddle_check = 2 (positive: minimum), NaN otherwise.
-        min_status: (nt_h_ext,) -1 LL time integration, 0 minimizer converged, 1 converged after
-            an LL fallback, 2 not converged.
+        min_status: (nt_h_ext,) -1 LL time integration that passed its convergence check (or had
+            none configured), -2 LL time integration that ran to the end of its time window without
+            passing the check, 0 minimizer converged, 1 converged after an LL fallback, 2 not
+            converged.
     """
 
     def __init__(
@@ -1096,6 +1098,7 @@ class MicromagProblem:
             dh_shrink=0.0,
             switch_refine_dh=0.0,
             use_switch_refine=0,
+            adaptive_controller=1,
             min_tol=self.min_tol,
             min_maxiter=self.min_maxiter,
             min_maxrot=self.min_maxrot,
@@ -1265,6 +1268,7 @@ class MicromagProblem:
             dh_shrink=0.0,
             switch_refine_dh=0.0,
             use_switch_refine=0,
+            adaptive_controller=1,
             min_tol=self.min_tol,
             min_maxiter=self.min_maxiter,
             min_maxrot=self.min_maxrot,
@@ -1325,9 +1329,27 @@ class MicromagProblem:
             dH_grow: float = 1.25,
             dH_shrink: float = 0.5,
             switch_refine_dH: float | None = None,
+            controller: str = "target",
     ) -> list[np.ndarray | int]:
         """
         Run a micromagnetic hysteresis simulation with adaptive external-field steps.
+
+        ``controller`` selects how the step is adapted after each accepted field:
+
+        - ``"band"``: the original rule. Grow by ``dH_grow`` when the change of the mean
+          magnetisation ``dM`` is below ``dM_min``, shrink by ``dH_shrink`` above ``dM_target``,
+          otherwise keep the step; reject and halve a step with ``dM > dM_reject`` or across a sign
+          change of the mean magnetisation (``switch_refine_dH``).
+        - ``"target"`` (default): the step is multiplied by ``0.9 dM_target / dM``, clamped to
+          ``[dH_shrink, dH_grow]``, so it heads for ``dM_target`` directly (``dM_min`` is unused;
+          sensible clamps are ``dH_shrink`` 0.2-0.5 and ``dH_grow`` 2-3). In addition a relaxation
+          that did not converge (LL window exhausted, or minimizer status 2) is retried with half the
+          step while the step is above ``dH_min``; the rejected trial of a switching event is kept as
+          a bracket, so the refinement ends as soon as the bracket is ``dH_min`` wide and the step
+          returns to its pre-switch length right after the switch; and the step is capped ahead of a
+          predicted switching field, from the lowest Hessian eigenvalue of the minimizer
+          (``min_saddle_check = 2``, assuming eigenvalue^2 linear in the field near the instability)
+          or, for the time integration, when the relaxation cost jumps by more than 3x.
 
         The adaptive accept/reject loop is executed by the Fortran backend in a
         single call. Output arrays are preallocated to ``max_steps`` in Fortran
@@ -1342,6 +1364,10 @@ class MicromagProblem:
             raise ValueError(
                 "run_hysteresis_adaptive requires hysteresis_solver='adaptive'"
             )
+        controllers = {"band": 1, "target": 2}
+        if controller not in controllers:
+            raise ValueError("controller must be 'band' or 'target'")
+        controller_id = controllers[controller]
         if self.solver not in (1, 3):
             raise ValueError("Adaptive hysteresis requires solver='explicit' or 'explicit_ll'")
 
@@ -1456,6 +1482,7 @@ class MicromagProblem:
             dh_shrink=float(dH_shrink),
             switch_refine_dh=switch_refine_value,
             use_switch_refine=int(use_switch_refine),
+            adaptive_controller=controller_id,
             min_tol=self.min_tol,
             min_maxiter=self.min_maxiter,
             min_maxrot=self.min_maxrot,

@@ -166,6 +166,13 @@ include "mkl_dfti.f90"
         real(DP) :: dM_reject = 5.0e-2_DP                 !> Magnetisation-change threshold for rejecting adaptive field steps.
         real(DP) :: switch_refine_dH = 0.0_DP             !> Maximum accepted step across magnetisation sign changes [A/m].
         logical :: use_switch_refine = .false.            !> Enable adaptive sign-change refinement.
+        !> Step controller of the adaptive hysteresis loop. 1: the original band (grow below dM_min,
+        !> shrink above dM_target, recovery from the floor). 2: target tracking - the step is scaled
+        !> by (dM_target/dM) clamped to [dH_shrink, dH_grow], a relaxation that did not converge is
+        !> retried with half the step, the rejected trial of a switch is kept as a bracket, and an
+        !> instability indicator (lowest Hessian eigenvalue of the minimizer, or the relaxation cost
+        !> of the time integration) caps the step before a switching field.
+        integer :: adaptive_controller = 1
 
         !> Settings for the energy minimizer (solver = MicroMagSolverMinimizer). The minimizer replaces
         !> the Landau-Lifshitz time integration when relaxing to equilibrium at a constant applied field.

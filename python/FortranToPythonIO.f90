@@ -711,6 +711,7 @@ end subroutine getHFromTilesFMM
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
         n_macro, shiftVec, macroShape, sampleShape, exchPBC, hysteresis_solver, &
         H_start, H_end, dH_initial, dH_min, dH_max, maxHextSteps, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH, use_switch_refine, &
+        adaptive_controller, &
         min_tol, min_maxiter, min_maxrot, min_fallback, min_saddle_check, min_predictor, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, n_Hext_accepted, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useFMM, &
@@ -731,6 +732,7 @@ end subroutine getHFromTilesFMM
         real(8),dimension(3),intent(in) :: H_start, H_end
         real(8),intent(in) :: dH_initial, dH_min, dH_max, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH
         integer(4),intent(in) :: hysteresis_solver, maxHextSteps, use_switch_refine
+        integer(4),intent(in) :: adaptive_controller                !> 1 band controller, 2 target-tracking controller
         !> Energy minimizer settings (solver = 3), see MicroMagProblem
         real(8),intent(in) :: min_tol, min_maxrot
         integer(4),intent(in) :: min_maxiter, min_fallback, min_saddle_check, min_predictor
@@ -866,6 +868,10 @@ end subroutine getHFromTilesFMM
             problem%dM_reject = dM_reject
             problem%switch_refine_dH = switch_refine_dH
             problem%use_switch_refine = (use_switch_refine /= 0)
+            if (adaptive_controller /= 1 .and. adaptive_controller /= 2) then
+                error stop 'adaptive_controller must be 1 (band) or 2 (target tracking)'
+            end if
+            problem%adaptive_controller = adaptive_controller
         else if (hysteresis_solver .eq. 1) then
             problem%adaptiveHext = .false.
         else
