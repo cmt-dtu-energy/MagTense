@@ -4,6 +4,7 @@ module TileNComponents
     use TileRectangularPrismTensor
     use TileRectangularPrismAvgTensor
     use TileCircPieceTensor
+    use TileCylinderTensor
     use TilePlanarCoilTensor
     use TileTriangle
 
@@ -103,6 +104,12 @@ module TileNComponents
                 enddo
             enddo
         enddo
+        !::A full cylinder is evaluated at its centre, on the axis, like the other closed geometries (the
+        !::single point above would otherwise sit at half the radius). IterateMagnetization rotates it.
+        if ( isFullCylinder( cylTile ) .AND. n .eq. 1 ) then
+            r(1) = 0.
+            z(1) = cylTile%z0
+        endif
         cyltile%h_ave_pts(:,1) = r * cos( theta ) + cyltile%offset(1)
         cyltile%h_ave_pts(:,2) = r * sin( theta ) + cyltile%offset(2)
         cyltile%h_ave_pts(:,3) = z + cyltile%offset(3)
@@ -110,7 +117,53 @@ module TileNComponents
         deallocate(r,theta,z)            
         
     end subroutine setupEvaluationPoints
-    
+
+    !::True for a cylindrical tile (tileTypeCylPiece) that spans the full circle, dtheta = 2 pi: a full
+    !::cylinder of radius r0 + dr/2 and height dz when its inner radius r0 - dr/2 is zero, otherwise a ring.
+    !::Such a tile is evaluated with the closed-form tensor of TileCylinderTensor (getN_fullCylinder)
+    !::instead of the cylinder-piece integrals, and it returns H directly rather than B/mu0 (see
+    !::getFieldFromCylTile and SubtractMFromCylindricalTiles).
+    function isFullCircleCyl( tile ) result( res )
+    type(MagTile),intent(in) :: tile
+    logical :: res
+
+        res = tile%tileType .eq. tileTypeCylPiece .AND. abs( tile%dtheta - 2 * pi ) .lt. 1e-10
+
+    end function isFullCircleCyl
+
+    !::True for a full cylinder: a cylindrical tile that spans the full circle (isFullCircleCyl) with inner
+    !::radius zero. Its centre, on the axis, is the point at which the iteration evaluates its field.
+    function isFullCylinder( tile ) result( res )
+    type(MagTile),intent(in) :: tile
+    logical :: res
+
+        res = isFullCircleCyl( tile ) .AND. abs( tile%r0 - tile%dr / 2 ) .le. 1e-10 * abs( tile%dr )
+
+    end function isFullCylinder
+
+    !::The demagnetization tensor of a cylindrical tile that spans the full circle (see isFullCircleCyl) at
+    !::the point pos, given in the tile's own frame (relative to its offset and rotated with it): the closed
+    !::form of Caciagli et al. (2018) implemented in TileCylinderTensor, with the axis along the local z-axis
+    !::through z0. A ring is the difference between the full cylinders of its outer and inner radius, which
+    !::have the same uniform magnetization, so its tensor is the difference of their tensors.
+    subroutine getN_fullCylinder( tile, pos, N, Obs_size )
+    type(MagTile),intent(in) :: tile
+    real,intent(in),dimension(3) :: pos
+    real,intent(inout),dimension(3,3) :: N
+    real,intent(in),dimension(3), optional :: Obs_size  ! declared to match N_tensor_subroutine, not used
+    real,dimension(3,3) :: N_inner
+    real :: r_inner
+
+        call getN_cylinder( tile%r0 + tile%dr / 2, tile%dz / 2, pos(1), pos(2), pos(3) - tile%z0, N )
+
+        r_inner = tile%r0 - tile%dr / 2
+        if ( r_inner .gt. 1e-10 * abs( tile%dr ) ) then
+            call getN_cylinder( r_inner, tile%dz / 2, pos(1), pos(2), pos(3) - tile%z0, N_inner )
+            N = N - N_inner
+        endif
+
+    end subroutine getN_fullCylinder
+
     subroutine  getN_CylPiece( cylP, x, N , Obs_size)
     type(MagTile),intent(in) :: cylP
     real,intent(in) :: x

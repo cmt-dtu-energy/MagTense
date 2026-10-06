@@ -316,6 +316,10 @@ TESTS = {
         lambda: _validation_checks('Validation_field_cylindrical_slice', 'validation_cylindrical_slice_example_2'), False,
         'Field of a cylindrical slice vs FEM, example 2',
     ),
+    'magnetostatics_cylinder': (
+        lambda: _validation_checks('Validation_field_cylinder', 'validation_cylinder'), False,
+        'Field of a full cylinder vs FEM',
+    ),
     'magnetostatics_prism': (
         lambda: _validation_checks('Validation_field_prism', 'validation_prism'), False,
         'Field of a rectangular prism vs FEM',
