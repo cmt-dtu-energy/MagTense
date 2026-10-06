@@ -15,9 +15,9 @@ separate methods, which can be combined:
 The periodic demgnetization field is verified against an analytical result from 
 Durhuus *et al.*, "Exact demagnetisation field for periodic
 one-dimensional array of rectangular prisms" (see :ref:`Publications`). The
-implementation is validated by the ``macrogeometry_PBC_test`` and
-``shape_correction_test`` examples that ship with MagTense in both Matlab and
-Python.
+implementation is validated by the ``macrogeometry_PBC_test``,
+``macrogeometry_supercell_test`` and ``shape_correction_test`` examples that
+ship with MagTense in both Matlab and Python.
 
 That average magnetisation is enough to fully account for shape effects is proven 
 in Durhuus *et al.*, "Including sample shape in micromagnetics with 3D periodic 
@@ -82,6 +82,16 @@ Note that ``shiftVec`` is the *spacing between copies*, not the size of the
 domain: setting it larger than the domain leaves a gap between the copies,
 which is exactly how a periodic array of separated particles is modelled.
 
+For a gapless periodic medium, set ``shiftVec`` equal to ``grid_L`` along
+every periodic direction, i.e. :math:`n_x \Delta x` for :math:`n_x` cells of
+size :math:`\Delta x`. Do not use the distance between the centres of the two
+end cells, :math:`(n_x-1)\Delta x`. The copies would then overlap by one layer
+of cells, and for a small domain the field would be wrong by up to 100 %.
+MagTense stops with an error when ``shiftVec`` is smaller than ``grid_L`` along
+a direction with copies. The ``macrogeometry_supercell_test`` example checks the
+gapless case: a periodic domain has to give exactly the field of an explicitly
+replicated domain.
+
 .. note::
    Some analytical benchmarks for the periodic field are derived for the
    demagnetization tensor evaluated at the cell centres rather than averaged
@@ -136,7 +146,10 @@ explicitly.
 The evaluation points are shifted into a frame centred on the bounding box of
 the mesh before the two tensors are evaluated, so an externally supplied mesh
 that runs from 0 to L is handled the same way as the internally generated
-uniform grid, which is centred on the origin.
+uniform grid, which is centred on the origin. For an unstructured prism mesh
+the bounding box is spanned by the outer faces of the cells, taken from
+``grid_abc``. This holds even when the mesh is refined at one end, so the end
+cells differ in size.
 
 .. note::
    The correction is applied on both the dense and the FMM demagnetization

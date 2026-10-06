@@ -145,6 +145,12 @@ def _macrogeometry_PBC_test() -> list[dict]:
         return mod.run_test()
 
 
+def _macrogeometry_supercell_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import macrogeometry_supercell_test as mod
+        return mod.run_test()
+
+
 def _periodic_exchange_test() -> list[dict]:
     with example_dir(TESTS_DIR):
         import periodic_exchange_test as mod
@@ -341,6 +347,10 @@ TESTS = {
     'macrogeometry_PBC_test': (
         _macrogeometry_PBC_test, False,
         'Periodic boundaries by the macrogeometry method, along x, y and z',
+    ),
+    'macrogeometry_supercell_test': (
+        _macrogeometry_supercell_test, False,
+        'Gapless macrogeometry against an explicitly replicated supercell',
     ),
     'periodic_exchange_test': (
         _periodic_exchange_test, False,

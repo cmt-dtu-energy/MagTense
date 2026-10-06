@@ -3,6 +3,13 @@ Test if the shape correction field is implemented correctly in the Magtense micr
 
 The system is a uniform grid of micromagnetic tiles forming a rectangular prism.
 
+A second check uses an unstructured prism mesh running from 0 to L whose first layer of cells is
+refined, so the cells at the two ends differ in size. The macrogeometry prism of the shape
+correction has to be centred on the outer faces of that mesh. For a uniform magnetisation the
+field of the cells and that of the macrogeometry prism then cancel exactly, and what is left is
+the field of the sample. Centring it on the midpoint of the end-cell centres instead shifts it by
+a/8 and leaves a field error of about 20 %.
+
 Running the file executes the test and saves a figure. ``run_test()`` returns the same result as a
 list of checks, which is the contract the combined suite in testMagTenseFunctions.py expects.
 """
@@ -110,6 +117,82 @@ K = -Ksh
 # u_pv = np.tile(np.array([0, 0, 1]), [Ntiles, 1])
 u_pv = np.tile(np.array([1, 0, 0]), [Ntiles, 1])
 
+#%% Unstructured mesh with unequal end cells
+
+# The shape correction places the macrogeometry prism on the centre of the simulated domain. On an
+# unstructured mesh that centre has to be taken from the outer faces of the cells: the centres of
+# the end cells only give it when the cells at the two ends have the same size. This mesh is a
+# 4 x 2 x 2 block of 1 nm cubes running from 0 to L, whose first layer along x is refined into
+# cells of half the size, so the centres of the end cells are a/4 and a/2 from the two faces.
+mesh_base = (4, 2, 2)           # Base cells along x, y and z
+mesh_grid_L = np.array(mesh_base) * a
+# For a uniform magnetisation the field of the cells and the macrogeometry prism cancel exactly,
+# by superposition, wherever the prism sits on the domain. What is left is the field of the sample,
+# so it has to be uniform to the single precision the tensor is stored in.
+mesh_field_tol = 1e-5
+
+
+def refined_end_mesh() -> tuple[np.ndarray, np.ndarray]:
+    """Cell centres and side lengths of the mesh with a refined first layer along x."""
+    pts, abc = [], []
+    for k in range(mesh_base[2]):
+        for j in range(mesh_base[1]):
+            for i in range(mesh_base[0]):
+                corner = np.array([i, j, k]) * a
+                if i == 0:
+                    for sub in np.ndindex(2, 2, 2):
+                        pts.append(corner + (np.array(sub) + 0.5) * a / 2)
+                        abc.append(np.full(3, a / 2))
+                else:
+                    pts.append(corner + 0.5 * a)
+                    abc.append(np.full(3, a))
+    return np.array(pts), np.array(abc)
+
+
+def sample_demag_tensor() -> np.ndarray:
+    """Demagnetisation tensor at the centre of the sample prism, which has b = c."""
+    Nxx_s = 2/np.pi * np.arctan(bSample**2 / (aSample * np.sqrt(aSample**2 + 2*bSample**2)))
+    Nyy_s = (1 - Nxx_s) / 2
+    return np.diag([Nxx_s, Nyy_s, Nyy_s])
+
+
+def run_mesh_check() -> float:
+    """Relative deviation of the demagnetisation field from that of the sample, on the mesh."""
+    pts, abc = refined_end_mesh()
+    ntot = len(pts)
+    problem = MicromagProblem(
+        res=(ntot, 1, 1),
+        grid_type='unstructuredPrisms',
+        grid_pts=pts,
+        grid_abc=abc,
+        grid_L=list(mesh_grid_L),
+        A0=Aex * np.ones((ntot, 1)),
+        Ms=Ms * np.ones((ntot, 1)),
+        K0=0,
+        alpha=eta,
+        gamma=0,
+        m0=np.tile(m0_v, [ntot, 1]),
+        macroShape=mesh_grid_L,
+        sampleShape=sampleShape,
+        cuda=cuda,
+        cvode=cvode,
+        # The shape correction is evaluated at the cell centres, so the cells have to be as well
+        # for the field of the cells and of the macrogeometry prism to cancel
+        useavgn=False,
+        usereturnhall=True,
+        solver='dynamic',
+        exch_presize=64,
+    )
+    problem.use_fmm = 0
+    # Only the field of the initial state is needed
+    result = problem.run_simulation(
+        t_end=1e-15, nt=2, fct_h_ext=fct_h_ext, nt_h_ext=2,
+    )
+    H_dem = np.asarray(result[5][0, :, 0, :])
+    H_sample = -Ms * sample_demag_tensor() @ m0_v
+    return float(np.abs(H_dem - H_sample).max() / np.abs(H_sample).max())
+
+
 #%% Magtense computation
 
 def run_test(plotting: bool = True) -> list[dict]:
@@ -205,6 +288,11 @@ def run_test(plotting: bool = True) -> list[dict]:
         plt.close(fig)
         print(f"Saved figure to {figure_path}")
 
+    mesh_deviation = run_mesh_check()
+    verdict = 'is the sample field' if mesh_deviation < mesh_field_tol else 'is NOT the sample field'
+    print(f'Unstructured mesh with unequal end cells: the field {verdict}, '
+          f'max deviation = {mesh_deviation:.3e}')
+
     return [
         {
             'check': 'magnetisation stays uniform',
@@ -217,6 +305,12 @@ def run_test(plotting: bool = True) -> list[dict]:
             'value': drift,
             'limit': drift_tol,
             'passed': drift < drift_tol,
+        },
+        {
+            'check': 'unstructured mesh, unequal end cells: field is the sample field',
+            'value': mesh_deviation,
+            'limit': mesh_field_tol,
+            'passed': mesh_deviation < mesh_field_tol,
         },
     ]
 
