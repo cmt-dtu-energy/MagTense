@@ -348,7 +348,7 @@ module TileNComponents
             call int_ddx_sin_dtheta_dz( dat, int_ddx_sin_dtheta_dz_val )            
             
             !xy-plane (Mz) (UP,positive)
-            call int_ddx_dx_dy( dat, int_ddx_dx_dy_val1, int_ddx_dx_dy_val2 )            
+            call int_ddxy_dx_dy( dat, int_ddx_dx_dy_val1, int_ddx_dx_dy_val2, int_ddy_dx_dy_val1, int_ddy_dx_dy_val2 )
             
             
             !y-component of the field
@@ -363,8 +363,7 @@ module TileNComponents
             call int_ddy_sin_dtheta_dz( dat, int_ddy_sin_dtheta_dz_val )
             
             
-            !xy-plane (Mz) (UP,positive, DOWN negative)
-            call int_ddy_dx_dy( dat, int_ddy_dx_dy_val1, int_ddy_dx_dy_val2 )
+            !xy-plane (Mz): evaluated together with the x-component above
                         
             !z-component of the field
             !yz-plane (Mx)
@@ -551,7 +550,7 @@ module TileNComponents
             int_ddx_sin_dtheta_dz_val = -int_ddx_sin_dtheta_dz_val
             
             !xy-plane (Mz) (UP,positive)
-            call int_ddx_dx_dy_inv( dat, int_ddx_dx_dy_val1, int_ddx_dx_dy_val2 )            
+            call int_ddxy_dx_dy_inv( dat, int_ddx_dx_dy_val1, int_ddx_dx_dy_val2, int_ddy_dx_dy_val1, int_ddy_dx_dy_val2 )
             
             
             !y-component of the field
@@ -568,8 +567,7 @@ module TileNComponents
             int_ddy_sin_dtheta_dz_val = -int_ddy_sin_dtheta_dz_val
             
             
-            !xy-plane (Mz) (UP,positive, DOWN negative)
-            call int_ddy_dx_dy_inv( dat, int_ddy_dx_dy_val1, int_ddy_dx_dy_val2 )
+            !xy-plane (Mz): evaluated together with the x-component above
                         
             !z-component of the field
             !yz-plane (Mx)
