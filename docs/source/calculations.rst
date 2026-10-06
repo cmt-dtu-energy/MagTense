@@ -74,10 +74,10 @@ Applied field
 
 An external field that is the same at every point, such as the field of a
 large electromagnet or a Helmholtz coil, is entered as a tile of type 102.
-This tile is **not a geometry**. It has no size, position or orientation; it
-is a field source, and its ``M`` vector holds the applied field
-:math:`\mathbf{H}_\mathrm{app}` in A/m. Like the planar coil it is never
-updated by the iteration. It acts in two places:
+This tile is a pure field source: it needs no size, position or orientation,
+and its ``M`` vector holds the applied field
+:math:`\mathbf{H}_\mathrm{app}` in A/m. Like the planar coil it keeps its
+value throughout the iteration. It acts in two places:
 
 * it is part of the field that magnetizes every other tile in the iteration,
   which is what lets a soft magnet alone in space acquire a magnetization, and
@@ -89,14 +89,13 @@ updated by the iteration. It acts in two places:
 The value is an H field. The source is by definition outside all tiles, where
 :math:`\mathbf{B}/\mu_0` and :math:`\mathbf{H}` coincide, so a field known as
 :math:`\mathbf{B}` in tesla is divided by :math:`\mu_0` before it is entered.
-A field evaluated inside a magnetized body is not an applied field: for the
+The field inside a magnetized body is handled by the tiles themselves: for the
 cylindrical tile MagTense computes :math:`\mathbf{B}/\mu_0` inside the tile
-and subtracts :math:`\mathbf{M}` to get :math:`\mathbf{H}` there, and that
-correction belongs to the tile's own field, not to this one. The field of other
-MagTense tiles is not entered this way either: put those tiles in the same
-problem, with ``includeInIteration`` set to zero if they are permanent magnets
-whose magnetization should stay fixed, and the iteration uses their field
-directly, correction included.
+and subtracts :math:`\mathbf{M}` to get :math:`\mathbf{H}` there, as part of
+the tile's own field. The field of other MagTense tiles enters the problem
+directly: put those tiles in the same problem, with ``includeInIteration`` set
+to zero if they are permanent magnets whose magnetization should stay fixed,
+and the iteration uses their field, correction included.
 
 In Python the source is appended with ``tiles.add_uniform_field(H_app)``, in
 Matlab with ``tile.setMagTileType('Uniformfield')`` and ``tile.M = H_app``, and
@@ -107,9 +106,6 @@ the standard check: its magnetization is
 `soft_sphere_in_uniform_field.py <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/magnetostatics/Example_005_soft_sphere_in_uniform_field/soft_sphere_in_uniform_field.py>`_
 and its Matlab counterpart
 ``Example_005_soft_sphere_in_uniform_field`` reproduce it.
-
-A field that differs from tile to tile cannot be entered this way; that is a
-separate, per-tile applied field, which is not available yet.
 
 ========================================
 H-field

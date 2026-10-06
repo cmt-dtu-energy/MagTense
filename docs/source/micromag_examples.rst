@@ -187,8 +187,7 @@ The tests to run can be restricted with the environment variables
 ``MAGTENSE_TESTS`` and ``MAGTENSE_SKIP``, and the CUDA and CVODE variants are
 selected with ``MAGTENSE_TEST_CUDA`` and ``MAGTENSE_TEST_CVODE``.
 ``MAGTENSE_INCLUDE_SLOW=1`` adds standard problem 3 by time integration,
-which is very slow. Standard problem 6 accounts for most of the running time
-of the rest.
+which takes considerably longer than the rest of the suite.
 
 In Python, from ``python/util``:
 
@@ -208,7 +207,7 @@ In Python, from ``python/util``:
 
     python testMagTenseFunctions.py --skip std_problem_6
 
-``--include-slow`` adds standard problem 3, which is very slow. Each example
+``--include-slow`` adds standard problem 3 by time integration. Each example
 lives in its own directory and is run from there, so the figures and timer logs
 it produces land beside it, and the overview figure of the suite is written to
 ``python/util/results``, as the Matlab suite writes to ``matlab/util/results``.

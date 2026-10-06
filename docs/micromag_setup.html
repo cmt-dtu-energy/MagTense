@@ -117,8 +117,8 @@ grid with <code class="docutils literal notranslate"><span class="pre">nx*ny*nz<
 <code class="docutils literal notranslate"><span class="pre">set...</span></code> helper methods map human-readable names onto the integer flags that
 Fortran expects. Finally the object is converted to a plain struct and passed
 to the MEX-file:</p>
-<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="nb">addpath</span><span class="p">(</span><span class="s">&#39;MagTense/matlab/MEX_files&#39;</span><span class="p">);</span>
-<span class="nb">addpath</span><span class="p">(</span><span class="s">&#39;MagTense/matlab/util&#39;</span><span class="p">);</span>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="nb">addpath</span><span class="p">(</span><span class="s">'MagTense/matlab/MEX_files'</span><span class="p">);</span>
+<span class="nb">addpath</span><span class="p">(</span><span class="s">'MagTense/matlab/util'</span><span class="p">);</span>
 
 <span class="n">mu0</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">4</span><span class="o">*</span><span class="nb">pi</span><span class="o">*</span><span class="mf">1e-7</span><span class="p">;</span>
 <span class="n">resolution</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="mi">36</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">1</span><span class="p">];</span>
@@ -127,7 +127,7 @@ to the MEX-file:</p>
 <span class="n">problem</span><span class="p">.</span><span class="n">grid_L</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="mf">500e-9</span><span class="p">,</span><span class="mf">125e-9</span><span class="p">,</span><span class="mf">3e-9</span><span class="p">];</span><span class="w">              </span><span class="c">% m</span>
 
 <span class="c">% Solver and hardware options</span>
-<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagSolver</span><span class="p">(</span><span class="w"> </span><span class="s">&#39;Dynamic&#39;</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagSolver</span><span class="p">(</span><span class="w"> </span><span class="s">'Dynamic'</span><span class="w"> </span><span class="p">);</span>
 <span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setUseCuda</span><span class="p">(</span><span class="w"> </span><span class="nb">true</span><span class="w"> </span><span class="p">);</span>
 <span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setUseCVODE</span><span class="p">(</span><span class="w"> </span><span class="nb">false</span><span class="w"> </span><span class="p">);</span>
 
@@ -146,7 +146,7 @@ to the MEX-file:</p>
 <span class="c">% Output times and the applied field as a function of time</span>
 <span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTime</span><span class="p">(</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">200</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
 <span class="n">HystDir</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">1</span><span class="o">/</span><span class="n">mu0</span><span class="o">*</span><span class="p">[</span><span class="o">-</span><span class="mf">24.6</span><span class="p">,</span><span class="mf">4.3</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span><span class="o">/</span><span class="mi">1000</span><span class="p">;</span>
-<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">&gt;-</span><span class="mi">1</span><span class="p">)</span><span class="o">&#39;.*</span><span class="n">HystDir</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">2000</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">&gt;-</span><span class="mi">1</span><span class="p">)</span><span class="o">'.*</span><span class="n">HystDir</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">2000</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
 
 <span class="c">% Solve</span>
 <span class="n">solution</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">struct</span><span class="p">();</span>
@@ -155,19 +155,18 @@ to the MEX-file:</p>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">struct(problem)</span></code> call performs a final consistency check before the data
 is handed to Fortran: scalar values of <code class="docutils literal notranslate"><span class="pre">Ms</span></code>, <code class="docutils literal notranslate"><span class="pre">A0</span></code>, <code class="docutils literal notranslate"><span class="pre">K0</span></code>, <code class="docutils literal notranslate"><span class="pre">K1</span></code> and
-<code class="docutils literal notranslate"><span class="pre">K2</span></code> are expanded to one value per cell, and <code class="docutils literal notranslate"><span class="pre">m0</span></code> is normalised if it is
-not of unit length (a warning is issued). It also prints an estimate of the
-memory needed by the demagnetization tensor.</p>
+<code class="docutils literal notranslate"><span class="pre">K2</span></code> are expanded to one value per cell, and <code class="docutils literal notranslate"><span class="pre">m0</span></code> is normalised to unit
+length. It also prints an estimate of the memory needed by the demagnetization
+tensor.</p>
 <p><code class="docutils literal notranslate"><span class="pre">problem.MagTenseLandauLifshitzSolver_mex</span></code> is a function handle that
 <code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code> sets, pointing either at <code class="docutils literal notranslate"><span class="pre">MagTenseLandauLifshitzSolver_mex</span></code> or
 at <code class="docutils literal notranslate"><span class="pre">MagTenseLandauLifshitzSolverNoCUDA_mex</span></code>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The constructor sets <code class="docutils literal notranslate"><span class="pre">useCuda</span></code> to 0 but does not populate that function
-handle, so <code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code> has to be called at least once - with <code class="docutils literal notranslate"><span class="pre">false</span></code>
-for a CPU run - before the solver can be invoked through
-<code class="docutils literal notranslate"><span class="pre">problem.MagTenseLandauLifshitzSolver_mex</span></code>. Alternatively, call the
-MEX-file directly by name.</p>
+<p><code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code> is what selects the MEX-file, so call it once - with
+<code class="docutils literal notranslate"><span class="pre">false</span></code> for a CPU run - before invoking the solver through
+<code class="docutils literal notranslate"><span class="pre">problem.MagTenseLandauLifshitzSolver_mex</span></code>. The MEX-file can also be
+called directly by name.</p>
 </div>
 </section>
 <section id="python-problem-setup">
@@ -185,8 +184,8 @@ run method rather than being stored on the problem:</p>
 <span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span>
     <span class="n">res</span><span class="o">=</span><span class="n">res</span><span class="p">,</span>
     <span class="n">grid_L</span><span class="o">=</span><span class="p">[</span><span class="mf">500e-9</span><span class="p">,</span> <span class="mf">125e-9</span><span class="p">,</span> <span class="mf">3e-9</span><span class="p">],</span>
-    <span class="n">grid_type</span><span class="o">=</span><span class="s2">&quot;uniform&quot;</span><span class="p">,</span>
-    <span class="n">solver</span><span class="o">=</span><span class="s2">&quot;dynamic&quot;</span><span class="p">,</span>
+    <span class="n">grid_type</span><span class="o">=</span><span class="s2">"uniform"</span><span class="p">,</span>
+    <span class="n">solver</span><span class="o">=</span><span class="s2">"dynamic"</span><span class="p">,</span>
     <span class="n">m0</span><span class="o">=</span><span class="mi">1</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
     <span class="n">A0</span><span class="o">=</span><span class="mf">1.3e-11</span><span class="p">,</span>
     <span class="n">Ms</span><span class="o">=</span><span class="mf">8e5</span><span class="p">,</span>
@@ -210,8 +209,7 @@ run method rather than being stored on the problem:</p>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">m0</span></code> accepts a scalar (all components set to that value), an <code class="docutils literal notranslate"><span class="pre">(ntot,3)</span></code>
 array, or <code class="docutils literal notranslate"><span class="pre">None</span></code>, in which case a random unit vector is drawn for every cell.
-As in Matlab, <code class="docutils literal notranslate"><span class="pre">m0</span></code> is normalised on assignment and a warning is issued if it
-was not already of unit length.</p>
+As in Matlab, <code class="docutils literal notranslate"><span class="pre">m0</span></code> is normalised to unit length on assignment.</p>
 <p>The three run methods are</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">run_simulation(t_end,</span> <span class="pre">nt,</span> <span class="pre">fct_h_ext,</span> <span class="pre">nt_h_ext)</span></code> - a single solve, used for

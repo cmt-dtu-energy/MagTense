@@ -3,19 +3,18 @@ Demag field - FMM
 
 Calculating the demagnetization (stray) field is typically the most
 computationally demanding part of a micromagnetic simulation. MagTense's
-default approach - the fully analytical demagnetization tensor - is exact, but
-its :math:`O(N^2)` memory and work scaling becomes prohibitive for very large
-systems.
+default approach - the fully analytical demagnetization tensor - is exact, with
+memory and work that scale as :math:`O(N^2)` in the number of cells.
 
-To address this, MagTense includes an implementation of the **Fast Multipole
-Method (FMM)**, which reduces the computational complexity to :math:`O(N)`.
+For very large systems MagTense includes an implementation of the **Fast
+Multipole Method (FMM)**, which reduces the computational complexity to
+:math:`O(N)` while keeping the analytical tensor for all near-field
+interactions.
 
 .. note::
-   The FMM path is **off by default**. It has to be enabled explicitly with
-   ``use_fmm``, and it is ignored altogether unless the library was built with
-   ``USE_FMM3D=1``. Opting in explicitly means that a problem does not silently
-   change its demagnetization path when the library is rebuilt with FMM
-   support.
+   The FMM path is selected explicitly with ``use_fmm``, in a library built
+   with ``USE_FMM3D=1``, so a problem keeps its demagnetization path when the
+   library is rebuilt.
 
 Implementation and attribution
 ------------------------------
@@ -41,8 +40,8 @@ modules:
     make USE_FMM3D=1
 
 On Linux, ``$(MagTense)/external/FMM3D/local`` must be on ``LD_LIBRARY_PATH``
-when building. Without ``USE_FMM3D=1`` the FMM source is not compiled at all
-and the ``use_fmm`` flag has no effect.
+when building. ``USE_FMM3D=1`` is what compiles the FMM source and activates
+the ``use_fmm`` flag.
 
 Optimization: persistent tree structure
 ---------------------------------------
@@ -54,16 +53,16 @@ solver. By reusing the tree, the cost of re-partitioning space at every time
 step is eliminated.
 
 .. note::
-   The current implementation requires a fully grown tree, so **ifunif** must
-   always be set to **1**.
+   MagTense uses a fully grown (uniform) tree, **ifunif = 1**, which is what
+   lets the cached tree be reused unchanged from call to call.
 
 Near-field evaluation and neighbour tensors
 -------------------------------------------
 
 In standard FMM implementations, near-field interactions are handled by a
-direct point-to-point (P2P) evaluation. In MagTense this standard P2P
-evaluation is **disabled**, and the high-precision analytical demagnetization
-tensors are used for all near-field interactions instead:
+direct point-to-point (P2P) evaluation. MagTense replaces this by the
+high-precision analytical demagnetization tensors for all near-field
+interactions:
 
 1. **Neighbour identification:** based on *List 1* from the FMM tree creation,
    MagTense identifies neighbour pairs, i.e. cells within the same or adjacent
@@ -108,7 +107,7 @@ FMM input variables
    * - ``ifunif``
      - ``ifunif``
      - int
-     - Tree type. Must be **1** (uniform tree).
+     - Tree type. MagTense uses the uniform tree, **1**.
    * - ``nlmin``
      - ``nlmin``
      - int
@@ -116,8 +115,8 @@ FMM input variables
    * - ``nlmax``
      - ``nlmax``
      - int
-     - Maximum level of the octree hierarchy. For the required uniform tree,
-       this parameter controls the tree depth. Default 5.
+     - Maximum level of the octree hierarchy, which for the uniform tree is
+       its depth. Default 5.
    * - ``allow_fmm_short_circuit``
      - ``fmm_short``
      - int
@@ -135,12 +134,10 @@ demag tensor`` and continues with the dense tensor. The test is made before the
 octree is built, so a small or effectively one-dimensional geometry never
 reaches the tree construction.
 
-.. warning::
-   The FMM implementation is currently configured for rectangular-prism cells,
-   corresponding to the MagTense grid types ``gridTypeUniform`` and
-   ``gridTypeUnstructuredPrisms``. Cell dimensions may be supplied either
-   through the uniform-grid dimensions ``dx``, ``dy``, and ``dz``, or through
-   the per-cell ``grid_abc`` dimensions for unstructured prism grids.
+The FMM path works with rectangular-prism cells, i.e. the ``uniform`` and
+``unstructuredPrisms`` grid types, taking the cell dimensions from the
+uniform-grid spacings ``dx``, ``dy`` and ``dz`` or from the per-cell
+``grid_abc`` of an unstructured prism grid.
 
 FMM Python example
 ------------------

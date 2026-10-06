@@ -31,8 +31,8 @@ Tile Types
 * 8 = avgPrism, i.e. a prism whose demagnetization tensor is averaged over the
   volume of the receiving tile rather than evaluated at its centre
 * 101 = planar coil
-* 102 = uniform applied field. **Not a geometry**: a field source that adds
-  the same field everywhere, see :ref:`Applied field`.
+* 102 = uniform applied field, a field source that adds the same field
+  everywhere, see :ref:`Applied field`.
 
 The tile types are defined as parameters in
 `TileNComponents.f90 <https://github.com/cmt-dtu-energy/MagTense/blob/master/source/TileDemagTensor/TileNComponents.f90>`_.
@@ -238,8 +238,9 @@ A flat coil (tile type 101) in the xy-plane, centred on the tile's offset and
 made of 100 concentric circular loops evenly spaced from the inner radius
 :math:`a` to the outer radius :math:`b`, the first two entries of the tile size.
 The magnetization vector holds the current in each loop in ampere, and has to be
-the same in all three entries, :math:`\mathbf{M} = (I, I, I)`. The coil is not
-rotated and does not take part in the magnetization iteration.
+the same in all three entries, :math:`\mathbf{M} = (I, I, I)`. The coil is a
+fixed field source: it lies in the xy-plane and its current stays constant
+throughout the magnetization iteration.
 
 The field is compared with the Biot-Savart law for the same loops in `Matlab
 <https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Magnetostatics/Example_006_planar_coil>`__ and

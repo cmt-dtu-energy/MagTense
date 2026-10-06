@@ -154,8 +154,8 @@ change.
         nlmin=0, nlmax=2, ifunif=1, do_target=0, do_FI=1, n_pts=-1
     ) -> np.ndarray
 
-FMM-backed H-field. This is a test version that uses a single dipole per tile
-and requires a build with ``USE_FMM3D=1``.
+FMM-backed H-field, an experimental path that represents each tile by a single
+dipole. Needs a build with ``USE_FMM3D=1``.
 
 ::
 

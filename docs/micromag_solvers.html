@@ -132,9 +132,8 @@ tabulated values at the requested time.</p></td>
 field and relaxes the magnetization to equilibrium for each of them in
 turn, starting from the state reached at the previous field. This is the
 quasi-static mode used for hysteresis loops. The equilibrium is found
-with the <a class="reference internal" href="#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a>. The minimizer cannot include the
-thermal field, so a finite temperature in any cell is an error, raised
-just before the Fortran call with a message pointing to <code class="docutils literal notranslate"><span class="pre">ExplicitLL</span></code>.</p></td>
+with the <a class="reference internal" href="#energy-minimizer"><span class="std std-ref">Energy minimizer</span></a>. Thermal runs use <code class="docutils literal notranslate"><span class="pre">ExplicitLL</span></code>,
+which the interface points to if a temperature is set.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ExplicitLL</span></code></p></td>
 <td><p>1</p></td>
@@ -146,8 +145,7 @@ default, and the choice for thermal runs. Python
 </tr>
 </tbody>
 </table>
-<p>The names <code class="docutils literal notranslate"><span class="pre">Minimizer</span></code> and <code class="docutils literal notranslate"><span class="pre">Implicit</span></code> are no longer accepted; use
-<code class="docutils literal notranslate"><span class="pre">Explicit</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Explicit</span></code> replaces the earlier names <code class="docutils literal notranslate"><span class="pre">Minimizer</span></code> and <code class="docutils literal notranslate"><span class="pre">Implicit</span></code>.</p>
 <p><code class="docutils literal notranslate"><span class="pre">ProblemMod</span></code> (Python <code class="docutils literal notranslate"><span class="pre">prob_mode</span></code>) selects <code class="docutils literal notranslate"><span class="pre">new</span></code> (1) or <code class="docutils literal notranslate"><span class="pre">old</span></code> (2). Use
 <code class="docutils literal notranslate"><span class="pre">new</span></code>, which is the default; <code class="docutils literal notranslate"><span class="pre">old</span></code> skips the allocation of the solution
 arrays and only makes sense for continuing a solution inside the same process.</p>
@@ -164,7 +162,7 @@ returned;</p></li>
 <p>In Matlab both are set through helper methods:</p>
 <div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTime</span><span class="p">(</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">200</span><span class="p">)</span><span class="w"> </span><span class="p">);</span><span class="w">          </span><span class="c">% output times</span>
 <span class="n">HystDir</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">1</span><span class="o">/</span><span class="n">mu0</span><span class="o">*</span><span class="p">[</span><span class="o">-</span><span class="mf">24.6</span><span class="p">,</span><span class="mf">4.3</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span><span class="o">/</span><span class="mi">1000</span><span class="p">;</span><span class="w">                         </span><span class="c">% A/m</span>
-<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">&gt;-</span><span class="mi">1</span><span class="p">)</span><span class="o">&#39;.*</span><span class="n">HystDir</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">2000</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">&gt;-</span><span class="mi">1</span><span class="p">)</span><span class="o">'.*</span><span class="n">HystDir</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">1e-9</span><span class="p">,</span><span class="mi">2000</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">setHext(fct,</span> <span class="pre">t_Hext)</span></code> evaluates the function handle on the given time array
@@ -180,8 +178,8 @@ uniformly spaced times between 0 and <code class="docutils literal notranslate">
 </div>
 <p>The field function must return an <code class="docutils literal notranslate"><span class="pre">(nt_h_ext,</span> <span class="pre">3)</span></code> array.</p>
 <p>For the <strong>explicit</strong> solvers (<code class="docutils literal notranslate"><span class="pre">Explicit</span></code> and <code class="docutils literal notranslate"><span class="pre">ExplicitLL</span></code>)
-the same table is read differently: the time column is ignored and each row is
-one constant field to relax at. <code class="docutils literal notranslate"><span class="pre">nt_h_ext</span></code> is therefore the number of points
+the same table is read differently: each row is one constant field to relax
+at, and the time column is unused. <code class="docutils literal notranslate"><span class="pre">nt_h_ext</span></code> is therefore the number of points
 on the hysteresis curve, and <code class="docutils literal notranslate"><span class="pre">t_end</span></code>/<code class="docutils literal notranslate"><span class="pre">nt</span></code> only control how long each
 relaxation is integrated (for the minimizer, only when it falls back to the
 time integration) and how densely the hysteresis curve is sampled.</p>
@@ -244,13 +242,13 @@ a subset of them) and choose <code class="docutils literal notranslate"><span cl
 <span class="n">problem</span><span class="o">.</span><span class="n">conv_tol</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mf">1e-6</span><span class="p">,</span> <span class="n">nt</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>The test is skipped in a thermal run, where the noise never settles. Both the
-RKSuite and the CVODE driver apply it; CVODE only steps to the output times, so
-a convergence time that is not also an output time is never visited there. The
-times in <code class="docutils literal notranslate"><span class="pre">t_conv</span></code> <em>are</em> merged into the RKSuite integration grid, which
+<p>In a thermal run the noise never settles, so the test is left out there. Both
+the RKSuite and the CVODE driver apply it; CVODE steps to the output times, so
+the convergence times are visited there when they are output times as well.
+The times in <code class="docutils literal notranslate"><span class="pre">t_conv</span></code> <em>are</em> merged into the RKSuite integration grid, which
 matters for the thermal field because it is redrawn once per grid time, see
-<a class="reference internal" href="micromag_thermal.html#thermal-fluctuations"><span class="std std-ref">Thermal fluctuations</span></a>. Keep <code class="docutils literal notranslate"><span class="pre">t_conv</span></code> a subset of <code class="docutils literal notranslate"><span class="pre">t</span></code> unless you
-specifically want to add integration times.</p>
+<a class="reference internal" href="micromag_thermal.html#thermal-fluctuations"><span class="std std-ref">Thermal fluctuations</span></a>. Keeping <code class="docutils literal notranslate"><span class="pre">t_conv</span></code> a subset of <code class="docutils literal notranslate"><span class="pre">t</span></code> therefore
+serves both integrators.</p>
 <section id="energy-minimizer">
 <h3>Energy minimizer<a class="headerlink" href="#energy-minimizer" title="Link to this heading"></a></h3>
 <p>With <code class="docutils literal notranslate"><span class="pre">solver</span> <span class="pre">=</span> <span class="pre">Explicit</span></code> (Python <code class="docutils literal notranslate"><span class="pre">solver=&quot;explicit&quot;</span></code>) the equilibrium at
@@ -363,10 +361,9 @@ switching event. Matlab: <code class="docutils literal notranslate"><span class=
 </tbody>
 </table>
 <p>The minimizer works with every grid type, with CUDA and with FMM, because it
-calls the same field routines as the time integration. It cannot be combined
-with a finite temperature, since a stochastic field has no stationary point;
-the solve stops with a message. The thermal, <code class="docutils literal notranslate"><span class="pre">dynamic</span></code> and time-dependent
-<code class="docutils literal notranslate"><span class="pre">alpha</span></code> settings are ignored by it.</p>
+calls the same field routines as the time integration. A finite-temperature
+run has no stationary state to converge to, so it uses the time integration
+through <code class="docutils literal notranslate"><span class="pre">ExplicitLL</span></code>; the damping settings play no role in the minimizer.</p>
 <p>The output has the layout of the time integration: the first output time holds
 the starting state and every later one the converged state. In addition every
 run, with either method, returns the energies and a few diagnostics per applied
@@ -419,9 +416,9 @@ with the minimizer</p></td>
 saddle check; without it the flower state takes 39 evaluations and the vortex
 156. The energies agree to six digits in the vortex case and the minimizer
 finds a marginally lower flower energy than the time integration did in its
-10 ns window. On the grain the 1 ns time integration is not relaxed near the
-switching field and overshoots the Stoner-Wohlfarth value by ten percent; the
-minimizer lands within one field step of it. The script
+10 ns window. On the grain the minimizer lands within one field step of the
+Stoner-Wohlfarth value, where the 1 ns time integration is still relaxing
+near the switching field and overshoots it by ten percent. The script
 <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/minimizer/minimizer_vs_llg.py">minimizer_vs_llg.py</a>
 reproduces these numbers.</p>
 <p>Standard problem 6 shows the same picture on a domain wall pinned at a phase
@@ -486,7 +483,7 @@ fewer field evaluations:</p>
 </tbody>
 </table>
 <p>The time integration remains the method of choice for dynamics, for thermal
-runs, and as a robust reference when the minimizer reports a failure.</p>
+runs, and as an independent reference for the minimizer.</p>
 </section>
 <section id="hysteresis-simulations">
 <h3>Hysteresis simulations<a class="headerlink" href="#hysteresis-simulations" title="Link to this heading"></a></h3>
@@ -497,9 +494,9 @@ found at each of them, starting from the previous equilibrium state. Setting
 cheaper when only the equilibrium state matters.</p>
 <p>In Matlab this is just the explicit solver with a field table that walks the
 loop, as in the standard problem 2 example:</p>
-<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagSolver</span><span class="p">(</span><span class="w"> </span><span class="s">&#39;Explicit&#39;</span><span class="w"> </span><span class="p">);</span>
+<div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagSolver</span><span class="p">(</span><span class="w"> </span><span class="s">'Explicit'</span><span class="w"> </span><span class="p">);</span>
 <span class="n">HystDir</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">1</span><span class="o">/</span><span class="n">mu0</span><span class="o">*</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">]</span><span class="o">/</span><span class="nb">sqrt</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span>
-<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="n">HystDir</span><span class="o">.*</span><span class="n">t</span><span class="o">&#39;</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="n">MaxH</span><span class="p">,</span><span class="o">-</span><span class="n">MaxH</span><span class="p">,</span><span class="mi">40</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setHext</span><span class="p">(</span><span class="w"> </span><span class="p">@(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="n">HystDir</span><span class="o">.*</span><span class="n">t</span><span class="o">'</span><span class="p">,</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="n">MaxH</span><span class="p">,</span><span class="o">-</span><span class="n">MaxH</span><span class="p">,</span><span class="mi">40</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
 <span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setTime</span><span class="p">(</span><span class="w"> </span><span class="nb">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mf">40e-9</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
 </pre></div>
 </div>
@@ -509,7 +506,7 @@ loop, as in the standard problem 2 example:</p>
 <p>In Python the dedicated method <code class="docutils literal notranslate"><span class="pre">run_hysteresis</span></code> takes the field table
 directly as an <code class="docutils literal notranslate"><span class="pre">(n,4)</span></code> array, and requires <code class="docutils literal notranslate"><span class="pre">hysteresis_solver='static'</span></code>,
 which is the default:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span><span class="n">res</span><span class="o">=</span><span class="n">res</span><span class="p">,</span> <span class="n">solver</span><span class="o">=</span><span class="s1">&#39;explicit&#39;</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span><span class="n">res</span><span class="o">=</span><span class="n">res</span><span class="p">,</span> <span class="n">solver</span><span class="o">=</span><span class="s1">'explicit'</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
 <span class="n">H_ext</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">40</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 <span class="n">H_ext</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">max_H</span><span class="p">,</span> <span class="o">-</span><span class="n">max_H</span><span class="p">,</span> <span class="mi">40</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">hyst_dir</span>
 <span class="n">result</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">run_hysteresis</span><span class="p">(</span><span class="n">H_ext</span><span class="p">)</span>
@@ -574,9 +571,9 @@ there: in a hard-axis loop that is about a thousand steps of <code class="docuti
 Until <code class="docutils literal notranslate"><span class="pre">dH</span></code> first reaches its floor the step control is exactly the rules
 above.</p></li>
 </ul>
-<p>At <code class="docutils literal notranslate"><span class="pre">dH_min</span></code> a large change is accepted rather than looping forever, and the
-solver says so in its progress output. Too many rejected steps in total aborts
-the run.</p>
+<p>At <code class="docutils literal notranslate"><span class="pre">dH_min</span></code> a large change is accepted and noted in the progress output, so
+the sweep always advances, and a cap on the total number of rejected steps
+bounds the run time.</p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 22.0%" />
@@ -640,8 +637,8 @@ list. A minimal, self-contained example is
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span>
     <span class="n">res</span><span class="o">=</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span>
     <span class="n">grid_L</span><span class="o">=</span><span class="p">[</span><span class="mf">10e-9</span><span class="p">,</span> <span class="mf">10e-9</span><span class="p">,</span> <span class="mf">10e-9</span><span class="p">],</span>
-    <span class="n">solver</span><span class="o">=</span><span class="s2">&quot;explicit&quot;</span><span class="p">,</span>
-    <span class="n">hysteresis_solver</span><span class="o">=</span><span class="s2">&quot;adaptive&quot;</span><span class="p">,</span>
+    <span class="n">solver</span><span class="o">=</span><span class="s2">"explicit"</span><span class="p">,</span>
+    <span class="n">hysteresis_solver</span><span class="o">=</span><span class="s2">"adaptive"</span><span class="p">,</span>
     <span class="n">Ms</span><span class="o">=</span><span class="mf">2.4</span> <span class="o">/</span> <span class="n">mu0</span><span class="p">,</span> <span class="n">K0</span><span class="o">=</span><span class="mf">1e6</span><span class="p">,</span> <span class="n">A0</span><span class="o">=</span><span class="mf">7e-12</span><span class="p">,</span>
     <span class="n">alpha</span><span class="o">=</span><span class="mf">4000.0</span><span class="p">,</span> <span class="n">gamma</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
     <span class="n">usereturnhall</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>

@@ -26,9 +26,8 @@ The solver is selected with ``setMicroMagSolver`` in Matlab and with the
        field and relaxes the magnetization to equilibrium for each of them in
        turn, starting from the state reached at the previous field. This is the
        quasi-static mode used for hysteresis loops. The equilibrium is found
-       with the :ref:`Energy minimizer`. The minimizer cannot include the
-       thermal field, so a finite temperature in any cell is an error, raised
-       just before the Fortran call with a message pointing to ``ExplicitLL``.
+       with the :ref:`Energy minimizer`. Thermal runs use ``ExplicitLL``,
+       which the interface points to if a temperature is set.
    * - ``ExplicitLL``
      - 1
      - Reads the applied-field table as ``Explicit`` does, but finds the
@@ -37,8 +36,7 @@ The solver is selected with ``setMicroMagSolver`` in Matlab and with the
        default, and the choice for thermal runs. Python
        ``solver="explicit_ll"``.
 
-The names ``Minimizer`` and ``Implicit`` are no longer accepted; use
-``Explicit``.
+``Explicit`` replaces the earlier names ``Minimizer`` and ``Implicit``.
 
 ``ProblemMod`` (Python ``prob_mode``) selects ``new`` (1) or ``old`` (2). Use
 ``new``, which is the default; ``old`` skips the allocation of the solution
@@ -80,8 +78,8 @@ uniformly spaced times between 0 and ``t_end``:
 The field function must return an ``(nt_h_ext, 3)`` array.
 
 For the **explicit** solvers (``Explicit`` and ``ExplicitLL``)
-the same table is read differently: the time column is ignored and each row is
-one constant field to relax at. ``nt_h_ext`` is therefore the number of points
+the same table is read differently: each row is one constant field to relax
+at, and the time column is unused. ``nt_h_ext`` is therefore the number of points
 on the hysteresis curve, and ``t_end``/``nt`` only control how long each
 relaxation is integrated (for the minimizer, only when it falls back to the
 time integration) and how densely the hysteresis curve is sampled.
@@ -138,13 +136,13 @@ a subset of them) and choose ``conv_tol``; in Python this is
     problem.nt_conv = nt
     problem.conv_tol = np.repeat(1e-6, nt)
 
-The test is skipped in a thermal run, where the noise never settles. Both the
-RKSuite and the CVODE driver apply it; CVODE only steps to the output times, so
-a convergence time that is not also an output time is never visited there. The
-times in ``t_conv`` *are* merged into the RKSuite integration grid, which
+In a thermal run the noise never settles, so the test is left out there. Both
+the RKSuite and the CVODE driver apply it; CVODE steps to the output times, so
+the convergence times are visited there when they are output times as well.
+The times in ``t_conv`` *are* merged into the RKSuite integration grid, which
 matters for the thermal field because it is redrawn once per grid time, see
-:ref:`Thermal fluctuations`. Keep ``t_conv`` a subset of ``t`` unless you
-specifically want to add integration times.
+:ref:`Thermal fluctuations`. Keeping ``t_conv`` a subset of ``t`` therefore
+serves both integrators.
 
 ========================================
 Energy minimizer
@@ -254,10 +252,9 @@ flower-vortex transition, which relaxes to the lower twisted flower.
        switching event. Matlab: ``min_pred``.
 
 The minimizer works with every grid type, with CUDA and with FMM, because it
-calls the same field routines as the time integration. It cannot be combined
-with a finite temperature, since a stochastic field has no stationary point;
-the solve stops with a message. The thermal, ``dynamic`` and time-dependent
-``alpha`` settings are ignored by it.
+calls the same field routines as the time integration. A finite-temperature
+run has no stationary state to converge to, so it uses the time integration
+through ``ExplicitLL``; the damping settings play no role in the minimizer.
 
 The output has the layout of the time integration: the first output time holds
 the starting state and every later one the converged state. In addition every
@@ -301,9 +298,9 @@ Roughly a hundred of the minimizer's evaluations per applied field go into the
 saddle check; without it the flower state takes 39 evaluations and the vortex
 156. The energies agree to six digits in the vortex case and the minimizer
 finds a marginally lower flower energy than the time integration did in its
-10 ns window. On the grain the 1 ns time integration is not relaxed near the
-switching field and overshoots the Stoner-Wohlfarth value by ten percent; the
-minimizer lands within one field step of it. The script
+10 ns window. On the grain the minimizer lands within one field step of the
+Stoner-Wohlfarth value, where the 1 ns time integration is still relaxing
+near the switching field and overshoots it by ten percent. The script
 `minimizer_vs_llg.py <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/minimizer/minimizer_vs_llg.py>`_
 reproduces these numbers.
 
@@ -355,7 +352,7 @@ fewer field evaluations:
      - 2 848 863 / 13 982
 
 The time integration remains the method of choice for dynamics, for thermal
-runs, and as a robust reference when the minimizer reports a failure.
+runs, and as an independent reference for the minimizer.
 
 ========================================
 Hysteresis simulations
@@ -457,9 +454,9 @@ The step-control logic is then
   Until ``dH`` first reaches its floor the step control is exactly the rules
   above.
 
-At ``dH_min`` a large change is accepted rather than looping forever, and the
-solver says so in its progress output. Too many rejected steps in total aborts
-the run.
+At ``dH_min`` a large change is accepted and noted in the progress output, so
+the sweep always advances, and a cap on the total number of rejected steps
+bounds the run time.
 
 .. list-table::
    :widths: 22 18 60
