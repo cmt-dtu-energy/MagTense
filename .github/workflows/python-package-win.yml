@@ -214,3 +214,154 @@ jobs:
         name: test-suite-py${{ matrix.py-version.version }}-cpu-Windows
         path: python/util/results/testMagTenseFunctions_overview.png
         if-no-files-found: ignore
+
+
+  # test-wheel above proves the cu13 wheel builds, links and imports - this
+  # job is the only one that proves CUDA actually executes on a device. Runs
+  # on the persistent self-hosted GPU box python-package-conda.yml already
+  # uses for the same purpose (see its "test-wheel-fmm-cuda" job, which this
+  # mirrors minus the FMM3D-specific steps - this branch doesn't build an
+  # fmm variant).
+  test-wheel-cuda:
+    runs-on: [self-hosted, Windows, CUDA]
+    needs: build-wheel
+    strategy:
+      fail-fast: false
+      matrix:
+        py-version:
+          - { version: "312", semver: "3.12" }
+          - { version: "313", semver: "3.13" }
+          - { version: "314", semver: "3.14" }
+
+    steps:
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/util/
+          python/examples/
+          documentation/examples_FEM_validation/
+          documentation/examples_mumag_validation/
+
+    - name: Download cu13 wheel artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version.version }}-cu13-Windows
+
+    - name: Diagnose Windows self-hosted runner identity
+      shell: cmd /C CALL {0}
+      run: |
+        echo RUNNER_NAME=%RUNNER_NAME%
+        whoami
+        dir C:\Users\github_runner\miniconda3\condabin\conda.bat || echo Conda path is not accessible from this runner process.
+
+    # This runner keeps its own conda install and per-version test envs
+    # between runs rather than using actions/setup-python, mirroring
+    # python-package-conda.yml's proven bootstrap for this exact machine.
+    - name: Bootstrap existing Miniconda Python
+      shell: cmd /C CALL {0}
+      run: |
+        set CONDA_ROOT=C:\Users\github_runner\miniconda3
+        set CONDA_BAT=C:\Users\github_runner\miniconda3\condabin\conda.bat
+
+        if not exist "%CONDA_BAT%" (
+          echo Expected Conda at "%CONDA_BAT%", but it was not found or is not accessible.
+          exit /b 1
+        )
+
+        call "%CONDA_BAT%" activate base
+        if errorlevel 1 (
+          echo Failed to activate Conda base environment.
+          exit /b 1
+        )
+
+        set ENV_NAME=magtense-test-py${{ matrix.py-version.version }}
+        set WANTED=${{ matrix.py-version.semver }}
+
+        call conda env list | findstr /C:"%ENV_NAME%" >nul
+        if errorlevel 1 (
+          echo Creating Conda environment %ENV_NAME%
+          call conda create -y -n %ENV_NAME% python=%WANTED% pip
+          if errorlevel 1 (
+            echo Failed to create Conda environment %ENV_NAME%.
+            exit /b 1
+          )
+        )
+
+        call conda activate %ENV_NAME%
+        if errorlevel 1 (
+          echo Failed to activate Conda environment %ENV_NAME%.
+          exit /b 1
+        )
+
+        python -c "import sys; raise SystemExit(0 if f'{sys.version_info.major}.{sys.version_info.minor}' == '%WANTED%' else 1)"
+        if errorlevel 1 (
+          echo Environment %ENV_NAME% does not have Python %WANTED%; updating it.
+          call conda install -y -n %ENV_NAME% python=%WANTED% pip
+          if errorlevel 1 (
+            echo Failed to update Conda environment %ENV_NAME% to Python %WANTED%.
+            exit /b 1
+          )
+          call conda activate %ENV_NAME%
+          if errorlevel 1 (
+            echo Failed to reactivate Conda environment %ENV_NAME%.
+            exit /b 1
+          )
+        )
+
+        for /f "delims=" %%i in ('python -c "import sys; print(sys.executable)"') do set PYTHON_EXE=%%i
+
+        echo Selected Python: %PYTHON_EXE%
+        python --version
+
+        echo CONDA=%CONDA_ROOT%>> "%GITHUB_ENV%"
+        echo MAGTENSE_CONDA_ENV=%ENV_NAME%>> "%GITHUB_ENV%"
+        echo PYTHON_EXE=%PYTHON_EXE%>> "%GITHUB_ENV%"
+
+        echo %CONDA_ROOT%\envs\%ENV_NAME%>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Scripts>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Library\mingw-w64\bin>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Library\usr\bin>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Library\bin>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\condabin>> "%GITHUB_PATH%"
+
+    # The self-hosted runner has a Restricted execution policy and a user
+    # profile.ps1, neither of which the built-in "powershell" shell copes
+    # with, so invoke it explicitly - same reasoning as python-package-conda.yml.
+    - name: Show CUDA device info
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      run: |
+        $ErrorActionPreference = "Stop"
+        & $env:PYTHON_EXE -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
+        & nvidia-smi
+
+    # This is a persistent self-hosted runner and the wheel version does not
+    # change between builds, so a plain install would be a no-op and silently
+    # leave the previous wheel in place. Uninstall first rather than
+    # --force-reinstall, which would also redownload the CUDA dependency wheels.
+    - name: Install pip-wheel and confirm the CUDA extension imports
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      run: |
+        $ErrorActionPreference = "Stop"
+
+        & $env:PYTHON_EXE -m pip uninstall -y magtense
+
+        Get-ChildItem "$env:GITHUB_WORKSPACE\*.whl" | ForEach-Object {
+          & $env:PYTHON_EXE -m pip install $_.FullName
+        }
+
+        & $env:PYTHON_EXE -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
+
+    # The one step that actually proves CUDA executes on this device, not just
+    # that the wheel imports. --skip std_problem_6 on every leg here (not just
+    # a designated one) since this is a shared, limited physical runner, not a
+    # disposable GitHub-hosted VM - keep its load light.
+    - name: Run the combined micromagnetic test suite with CUDA
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      env:
+        PYTHONUTF8: 1
+      run: |
+        $ErrorActionPreference = "Stop"
+
+        & $env:PYTHON_EXE -m pip install matplotlib scipy
+        & $env:PYTHON_EXE python/util/testMagTenseFunctions.py --cuda --skip std_problem_6
