@@ -128,8 +128,8 @@ For each tile an individual local coordinate system is created.</p>
 <li><p>8 = avgPrism, i.e. a prism whose demagnetization tensor is averaged over the
 volume of the receiving tile rather than evaluated at its centre</p></li>
 <li><p>101 = planar coil</p></li>
-<li><p>102 = uniform applied field. <strong>Not a geometry</strong>: a field source that adds
-the same field everywhere, see <a class="reference internal" href="calculations.html#applied-field"><span class="std std-ref">Applied field</span></a>.</p></li>
+<li><p>102 = uniform applied field, a field source that adds the same field
+everywhere, see <a class="reference internal" href="calculations.html#applied-field"><span class="std std-ref">Applied field</span></a>.</p></li>
 </ul>
 <p>The tile types are defined as parameters in
 <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/source/TileDemagTensor/TileNComponents.f90">TileNComponents.f90</a>.
@@ -179,6 +179,16 @@ and <span class="math notranslate nohighlight">\(dz\)</span>, respectively.</spa
 <p>Examples of how to compute the magnetic field from such a tile, compared with a
 FEM simulation, are given in <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Magnetostatics/Validation_field_cylindrical_slice">Matlab</a>
 and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/magnetostatics/Validation_field_cylindrical_slice">python</a>.</p>
+<p>A cylindrical tile that spans the full circle, <span class="math notranslate nohighlight">\(d\theta = 2\pi\)</span>, is a full
+cylinder of radius <span class="math notranslate nohighlight">\(r_0 + dr/2\)</span> and height <span class="math notranslate nohighlight">\(dz\)</span> when its inner radius
+<span class="math notranslate nohighlight">\(r_0 - dr/2\)</span> is zero, and a ring otherwise. Such a tile is evaluated with the
+closed-form field of a uniformly magnetized cylinder (Caciagli et al., J. Magn. Magn.
+Mater. 456 (2018) 423) instead of the integrals of the cylindrical piece, so it is
+also defined on the axis, is much faster, and follows the rotation angles of the
+tile like the other tile types. A ring is the difference of the full cylinders of its
+outer and inner radius. An example comparing the field of a full cylinder with a FEM
+simulation is given in <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Magnetostatics/Validation_field_cylinder">Matlab</a>
+and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/magnetostatics/Validation_field_cylinder">python</a>.</p>
 </section>
 <section id="prism">
 <h2>Prism<a class="headerlink" href="#prism" title="Link to this heading"></a></h2>
@@ -306,8 +316,9 @@ and <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTen
 made of 100 concentric circular loops evenly spaced from the inner radius
 <span class="math notranslate nohighlight">\(a\)</span> to the outer radius <span class="math notranslate nohighlight">\(b\)</span>, the first two entries of the tile size.
 The magnetization vector holds the current in each loop in ampere, and has to be
-the same in all three entries, <span class="math notranslate nohighlight">\(\mathbf{M} = (I, I, I)\)</span>. The coil is not
-rotated and does not take part in the magnetization iteration.</p>
+the same in all three entries, <span class="math notranslate nohighlight">\(\mathbf{M} = (I, I, I)\)</span>. The coil is a
+fixed field source: it lies in the xy-plane and its current stays constant
+throughout the magnetization iteration.</p>
 <p>The field is compared with the Biot-Savart law for the same loops in <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Magnetostatics/Example_006_planar_coil">Matlab</a> and
 <a class="reference external" href="https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/magnetostatics/Example_006_planar_coil/planar_coil.py">python</a>.</p>
 </section>

@@ -100,7 +100,10 @@ class MicromagProblem:
         t_alpha:
         alpha_fct:
         n_macro: How many copies of the simulated domain to have along x, y and z to represent the macrogeometry
-        shiftVec: How far to shift domain copies along x, y and z when constructing the macrogeometry
+        shiftVec: How far to shift domain copies along x, y and z when constructing the macrogeometry,
+            i.e. the period. Equal to grid_L for a gapless periodic medium (the full length n*dx, not
+            the (n-1)*dx between the centres of the end cells); larger for separated particles.
+            A value smaller than grid_L along a direction with copies is rejected.
         macroShape: Sidelengths of a prism representing the shape of the macrogeometry.
         sampleShape: Sidelengths of a prism representing the sample shape.
         min_tol: Minimizer convergence criterion: the largest torque max_i |m_i x H_i| over the

@@ -2082,6 +2082,9 @@ end subroutine updateDemagfieldFMM
     call trace%begin( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     
     if ( problem%useDemag .eq. useDemagTrue ) then
+        !Refuse a macrogeometry whose copies overlap before any tensor is built
+        call checkMacrogeometrySpacing( problem )
+
         !Demagnetization tensor matrix
 #if USE_FMM3D
         !------------- build neighbour demag tensor -------------------------------------------------------------------
@@ -2113,6 +2116,50 @@ end subroutine updateDemagfieldFMM
     
     call trace%end( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     end subroutine initializeInteractionMatrices
+
+
+    !>-----------------------------------------
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2026
+    !> @brief
+    !> Stops on a macrogeometry whose copies overlap. Neighbouring copies of the simulated domain are
+    !> shifted by shiftVec, so along a direction with copies shiftVec is the period and has to be at
+    !> least the size of the domain. Equal to grid_L the copies tile space without gaps, larger than
+    !> grid_L they model an array of separated particles. A smaller shift puts magnetic material on
+    !> top of itself, which is never what was meant and silently corrupts the demagnetisation field.
+    !> The usual cause is measuring the period between the centres of the two end cells, (n-1)*dx,
+    !> rather than between the outer faces of the domain, n*dx.
+    !> The copies are only built on the uniform grid, so that is the only grid type checked.
+    !> @param[in] problem the struct containing the problem
+    !---------------------------------------------------------------------------
+    subroutine checkMacrogeometrySpacing( problem )
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure
+
+    real(DP),dimension(3) :: L                          !> Size of the simulated domain
+    integer :: idim                                     !> Loop counter over the three directions
+    character(len=1),dimension(3),parameter :: axisName = [ 'x', 'y', 'z' ]
+    character*(100) :: prog_str
+
+    if ( problem%grid%gridType .ne. gridTypeUniform ) return
+
+    L = [ problem%grid%Lx, problem%grid%Ly, problem%grid%Lz ]
+    do idim = 1, 3
+        !The relative tolerance accepts a shiftVec that equals grid_L up to round-off, as it does
+        !when the two are computed in different ways on the calling side
+        if ( problem%macrogrid%n_macro(idim) .gt. 0 .and. &
+             problem%macrogrid%shiftVec(idim) .lt. L(idim) * ( 1.0_DP - 1.0e-9_DP ) ) then
+            call displayGUIMessage( 'MagTense: the periodic copies of the macrogeometry overlap' )
+            write(prog_str,'(A,A,A,ES11.4,A,ES11.4,A)') 'MagTense: shiftVec(', axisName(idim), ') = ', &
+                problem%macrogrid%shiftVec(idim), ' m < grid_L = ', L(idim), ' m'
+            call displayGUIMessage( trim(prog_str) )
+            call displayGUIMessage( 'MagTense: shiftVec is the period, the full length of the domain,' )
+            call displayGUIMessage( 'MagTense: not the distance between the centres of the end cells.' )
+            call displayGUIMessage( 'MagTense: use shiftVec = grid_L for a gapless periodic medium,' )
+            call displayGUIMessage( 'MagTense: or larger than grid_L for separated particles.' )
+            error stop 'checkMacrogeometrySpacing: the macrogeometry copies overlap'
+        endif
+    end do
+
+    end subroutine checkMacrogeometrySpacing
     
     
     !>-----------------------------------------
@@ -2585,8 +2632,18 @@ end subroutine updateDemagfieldFMM
     ! mesh, which commonly runs from 0 to L. Shift the evaluation points into a frame centred on
     ! the bounding box of the mesh so that the correction is evaluated at the right offsets in
     ! either case. For a grid that is already centred this shift is zero and nothing changes.
+    ! The bounding box is spanned by the outer faces of the cells, not by their centres: the
+    ! midpoint of the centres is off by a quarter of the difference in size of the two end cells,
+    ! which on a mesh refined at one end puts the macrogeometry prism off the domain it stands for.
+    ! The side lengths in abc give the faces of a prism mesh. The uniform grid has equal end cells,
+    ! so its centres are exact, and a tetrahedral mesh has the shape correction disabled below.
     do idim = 1, 3
-        sampleCentre(idim) = 0.5_DP * ( minval(pts(:,idim)) + maxval(pts(:,idim)) )
+        if ( allocated(problem%grid%abc) ) then
+            sampleCentre(idim) = 0.5_DP * ( minval( pts(:,idim) - 0.5_DP * problem%grid%abc(:,idim) ) &
+                                          + maxval( pts(:,idim) + 0.5_DP * problem%grid%abc(:,idim) ) )
+        else
+            sampleCentre(idim) = 0.5_DP * ( minval(pts(:,idim)) + maxval(pts(:,idim)) )
+        endif
         pts(:,idim) = pts(:,idim) - sampleCentre(idim)
     end do
 
