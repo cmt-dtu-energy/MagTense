@@ -1,37 +1,10 @@
-import os
-import sys
-from pathlib import Path
-
 import importlib.resources as importlib_resources   # stdlib since 3.9; the backport package is not needed
 import numpy as np
 
-# Windows only
-if hasattr(os, "add_dll_directory"):
-    # First entry is the installed layout
-    # (<prefix>/Lib/site-packages/magtense/../../../Library/bin), the second the
-    # active environment prefix, which is what applies when running from source.
-    dll_paths = [
-        Path(__file__).parent / ".." / ".." / ".." / "Library" / "bin",
-        Path(sys.prefix) / "Library" / "bin",
-    ]
-
-    # The CUDA wheels changed layout between the two major versions: cu12 gave
-    # every library its own nvidia/<name>/bin, cu13 puts them all together in
-    # nvidia/cu13/bin/x86_64. Offer both so either generation of wheel resolves.
-    nvidia_path = Path(__file__).parent / ".." / "nvidia"
-    dll_paths.append(nvidia_path / "cu13" / "bin" / "x86_64")
-    dll_paths += [
-        nvidia_path / lib / "bin"
-        for lib in ["cublas", "cuda_runtime", "cusparse", "nvjitlink"]
-    ]
-
-    for dll_path in dll_paths:
-        if Path.is_dir(dll_path):
-            os.add_dll_directory(dll_path)
-            # libifcoremd.dll resolves its own dependency on libmmd.dll through
-            # PATH, which add_dll_directory does not cover.
-            os.environ["PATH"] = f"{dll_path.resolve()}{os.pathsep}{os.environ['PATH']}"
-
+# The Windows DLL-directory setup this used to do here lives in magtense/__init__.py
+# now - it has to run before ANY submodule of magtense touches the compiled
+# extension, including a bare `from magtense.lib import magtensesource`, not just
+# when this particular module happens to be the one imported first.
 from magtense.lib import magtensesource
 
 
