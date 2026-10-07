@@ -45,13 +45,13 @@ Trace and timing variables
    * - ``timer_enabled``
      - ``timer_ena``
      - ``0``
-     - Write the timing log file. Off by default; without it no log directory is
-       created and the periodic windows are not written.
+     - Write the timing log file. Off by default; when on, the log directory
+       is created and the periodic windows are written to it.
    * - ``trace_enabled``
      - ``trace_ena``
      - int
-     - **1** to enable the execution trace. **Warning: significant performance
-       cost.** Default 0.
+     - **1** to enable the execution trace, which is detailed and
+       correspondingly costly, so it is meant for profiling runs. Default 0.
    * - ``flush_each``
      - ``flush_each``
      - int
@@ -64,10 +64,9 @@ Trace and timing variables
        Default 1.
 
 .. note::
-   The log directory is created if it does not exist, on both Windows and
-   Unix-like systems. If the creation fails, the module writes
-   ``TRACE: failed to create log directory`` to standard error and the run
-   continues.
+   The log directory is created as needed, on both Windows and Unix-like
+   systems, and a directory that could not be created is reported on standard
+   error without interrupting the run.
 
 Timing & Windowing
 ------------------

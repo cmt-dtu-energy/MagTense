@@ -165,14 +165,14 @@ def std_prob_6(
         Ms_arr[soft] = Ms_soft
 
     # ── Problem setup ─────────────────────────────────────────────────────
-    # The time ramp below is integrated by the dynamic solver. With the minimizer the same field
-    # table is read as a sequence of constant fields and the equilibrium at each is found by the
-    # energy minimizer, which gives the static depinning field - the quantity the analytical
-    # values above are - rather than the rate-dependent one of the ramp.
+    # The time ramp below is integrated by the dynamic solver. With the minimizer ("explicit") the
+    # same field table is read as a sequence of constant fields and the equilibrium at each is
+    # found by the energy minimizer, which gives the static depinning field - the quantity the
+    # analytical values above are - rather than the rate-dependent one of the ramp.
     problem = MicromagProblem(
         res=res,
         grid_L=grid_L,
-        solver="minimizer" if use_minimizer else "dynamic",
+        solver="explicit" if use_minimizer else "dynamic",
         alpha=alpha,
         gamma=gamma,
         Ms=Ms_arr,

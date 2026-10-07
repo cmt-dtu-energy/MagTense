@@ -13,8 +13,10 @@ The tensor is symmetric, so it is stored as the six components
 :math:`K_{xx}, K_{xy}, K_{xz}, K_{yy}, K_{yz}, K_{zz}`, each a dense
 :math:`n_\mathrm{tot} \times n_\mathrm{tot}` matrix in **single precision**.
 The memory requirement is therefore approximately
-:math:`24\,n_\mathrm{tot}^2` bytes, which is what limits the problem size; the
-Matlab interface prints an estimate when the problem struct is created. The
+:math:`24\,n_\mathrm{tot}^2` bytes, which sets the problem size the dense
+tensor handles; the Matlab interface prints an estimate when the problem
+struct is created, and the :ref:`Fast Multipole Method <Demag field - FMM>`
+lifts the scaling to :math:`O(N)` for larger problems. The
 saturation magnetization is folded into the tensor when it is built, so a
 spatially varying :math:`M_s` costs nothing extra.
 
@@ -32,9 +34,8 @@ Cell-averaged versus point-evaluated tensor
 
 ``useAvgN`` (Python ``useavgn``, default **on**) selects the *volume-averaged*
 prism tensor, i.e. the tensor averaged over the receiving cell rather than
-evaluated at its centre. This is the more accurate choice for a uniform mesh
-and is the default, but it is only implemented for the rectangular prism tile
-(tile_type = 8).
+evaluated at its centre. This is the more accurate choice for a prism mesh
+and is the default; it uses the averaged prism tile (tile_type = 8).
 
 Some analytical benchmarks are formulated for the tensor evaluated at
 the cell centre, and for those ``useAvgN`` must be switched off. This includes the
@@ -43,8 +44,7 @@ macrogeometry and shape-correction tests.
 For the ``unstructuredPrisms`` grid the tensor may additionally be averaged
 numerically over the receiving cell using ``N_ave = [nx, ny, nz]``, which
 evaluates the tensor on an ``nx*ny*nz`` sub-grid inside each receiving prism
-and averages. The default ``[1 1 1]`` means no averaging. This is not supported
-for tetrahedral meshes.
+and averages. The default ``[1 1 1]`` means no averaging.
 
 ----------------------------------------
 Approximating the tensor
@@ -74,19 +74,10 @@ and with ``demag_approx`` in Python, and the associated cut-off is
      - As above, but ``dem_thres`` is interpreted as the *fraction* of tensor
        elements to discard. The cut-off value is found by bisection. A value
        :math:`\geq 1` zeroes the demagnetization field entirely.
-   * - ``fft_thres``
-     - 3
-     - Threshold applied in Fourier space. **Stale, do not use.**
-   * - ``fft_threshold_fraction``
-     - 5
-     - Fractional threshold applied in Fourier space. **Stale, do not use.**
 
-.. warning::
-   The two Fourier-space approximations are not maintained. The solver prints a
-   loud warning if they are selected: the transformed field is never mapped
-   back onto the demagnetization field and the tensor is not corrected for a
-   spatially varying :math:`M_s`, so the result is wrong. Use ``none``,
-   ``threshold`` or ``threshold_fraction``.
+The values 3 (``fft_thres``) and 5 (``fft_threshold_fraction``) select
+earlier Fourier-space variants of the threshold that are superseded by the
+three options above; the solver says so if they are selected.
 
 -----------------------------------------
 Adding noise to the demagnetization field
@@ -114,7 +105,7 @@ it can be written to disk and read back:
      - Description
    * - ``N_ret``, ``N_file_out``
      - ``N_ret``, ``N_file_out``
-     - ``1`` does not return the tensor, ``2`` returns it in memory, and a
+     - ``1`` keeps the tensor internal, ``2`` returns it in memory, and a
        value ``> 2`` writes it to the file named by ``N_file_out``. The value
        is the length of that filename.
    * - ``N_load``, ``N_file_in``
@@ -125,7 +116,7 @@ it can be written to disk and read back:
 The Matlab helpers ``setReturnNFilename`` and ``setLoadNFilename`` set the
 filename and the matching length in one call. In Python the ``filename``
 constructor argument sets all four fields; its default ``"t"`` has length one
-and therefore means "do not return and do not load".
+and therefore selects the default of computing the tensor internally.
 
 ----------------------------------------
 Parallelism and hardware
@@ -133,9 +124,9 @@ Parallelism and hardware
 
 * ``useCuda`` (Matlab ``setUseCuda``, Python ``cuda``) evaluates the
   tensor-vector product on an NVIDIA GPU at every time step. The Python
-  interface checks for ``nvidia-smi`` and falls back to the CPU with a warning
-  if no GPU is present. In Matlab, ``setUseCuda`` also picks the matching
-  MEX-file.
+  interface checks for ``nvidia-smi`` and runs on the CPU instead, with a
+  note, when no GPU is present. In Matlab, ``setUseCuda`` also picks the
+  matching MEX-file.
 * The **Fast Multipole Method** replaces the dense tensor by an :math:`O(N)`
-  evaluation and is described in :ref:`Demag field - FMM`. It is off by
-  default and requires a build with ``USE_FMM3D=1``.
+  evaluation and is described in :ref:`Demag field - FMM`. It is selected
+  with ``use_fmm`` in a build with ``USE_FMM3D=1``.

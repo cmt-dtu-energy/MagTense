@@ -6,8 +6,8 @@ interface. Neither interface requires building anything from source: prebuilt
 MEX-files are attached to every release, and the Python interface is available
 as a wheel on PyPI.
 
-MagTense is tested on Linux and on Windows 11. macOS is not supported at the
-moment.
+MagTense runs on Linux and on Windows 11, where every commit is built and
+tested.
 
 ==============================================
 Python
@@ -97,9 +97,9 @@ Examples are in
 Building from source
 ==============================================
 
-Building is only necessary in order to modify the Fortran core, or to enable an
-optional component that the prebuilt binaries do not carry. The optional
-components are selected with make flags:
+Building from source is for modifying the Fortran core, or for choosing a
+different set of optional components than the prebuilt binaries ship with. The
+optional components are selected with make flags:
 
 .. list-table::
    :widths: 24 76

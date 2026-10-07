@@ -126,10 +126,10 @@ for i = 1:length(L_loop)
     problem = problem.setUseCVODE( options.use_CVODE );
     %--- The equilibrium is found either by integrating the LL equation in time at zero field over
     %--- the window set with setTime (the default 'Dynamic' solver of this example) or by the
-    %--- energy minimizer ('Minimizer'), which ignores the time window and stops when the largest
+    %--- energy minimizer ('Explicit'), which ignores the time window and stops when the largest
     %--- torque is below problem.min_tol. The energies come back in solution.E in both cases.
     if options.use_minimizer
-        problem = problem.setMicroMagSolver( 'Minimizer' );
+        problem = problem.setMicroMagSolver( 'Explicit' );
     end
     problem.ReturnHall = int32(1);
 

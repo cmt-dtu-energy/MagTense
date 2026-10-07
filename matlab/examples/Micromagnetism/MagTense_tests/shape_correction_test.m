@@ -2,7 +2,7 @@ function checks = shape_correction_test(options)
 %SHAPE_CORRECTION_TEST
 % Test if the shape correction field is implemented correctly in the MagTense micromagnetics
 % solver. This is the MATLAB counterpart of
-% python/examples/micromagnetism/shape_correction_test.py and uses the same geometry, the same
+% python/examples/micromagnetism/MagTense_tests/shape_correction_test.py and uses the same geometry, the same
 % material parameters and the same acceptance limits.
 %
 % The system is a uniform grid of micromagnetic tiles forming a rectangular prism. The
@@ -10,6 +10,13 @@ function checks = shape_correction_test(options)
 % demagnetisation field of the sample is uniform across the domain. The uniaxial anisotropy is
 % set to cancel that field exactly, which means the magnetisation should neither rotate nor
 % break up: the polar angle stays where it starts and the magnetisation stays uniform.
+%
+% A second check uses an unstructured prism mesh running from 0 to L whose first layer of cells
+% is refined, so the cells at the two ends differ in size. The macrogeometry prism of the shape
+% correction has to be centred on the outer faces of that mesh. For a uniform magnetisation the
+% field of the cells and that of the macrogeometry prism then cancel exactly, and what is left is
+% the field of the sample. Centring it on the midpoint of the end-cell centres instead shifts it
+% by a/8 and leaves a field error of about 20 %.
 %
 % Returns a struct array of checks with the fields 'check', 'value', 'limit' and 'passed',
 % where a check passes when value < limit. That is the contract used by testMagTenseFunctions.m.
@@ -47,6 +54,9 @@ nTimesteps = round(t_end/t_step) + 1;    % Include both time endpoints
 uniformity_tol = 1e-4;
 % How far the mean polar angle may drift over the simulation to count as passed [rad]
 drift_tol = 1e-5;
+% How far the field on the mesh with unequal end cells may deviate from that of the sample,
+% relative to it. Single precision, in which the tensor is stored, sets the floor.
+mesh_field_tol = 1e-5;
 
 % Material properties
 Ms = 0.1/mu0;                   % Saturation magnetisation [A/m]
@@ -129,11 +139,23 @@ else
     fprintf('Mean polar angle DRIFTS: max change = %.3e rad\n', drift);
 end
 
+%% The unstructured mesh with unequal end cells
+mesh_deviation = mesh_check(a, Ms, Aex, eta, m0_v/norm(m0_v), sampleShape, Nxx, options.use_CUDA);
+if mesh_deviation < mesh_field_tol
+    verdict = 'is the sample field';
+else
+    verdict = 'is NOT the sample field';
+end
+fprintf('Unstructured mesh with unequal end cells: the field %s, max deviation = %.3e\n', ...
+        verdict, mesh_deviation);
+
 checks = struct('check', {'magnetisation stays uniform', ...
-                          'mean polar angle does not drift'}, ...
-                'value', {uniformity, drift}, ...
-                'limit', {uniformity_tol, drift_tol}, ...
-                'passed', {uniformity < uniformity_tol, drift < drift_tol});
+                          'mean polar angle does not drift', ...
+                          'unstructured mesh, unequal end cells: field is the sample field'}, ...
+                'value', {uniformity, drift, mesh_deviation}, ...
+                'limit', {uniformity_tol, drift_tol, mesh_field_tol}, ...
+                'passed', {uniformity < uniformity_tol, drift < drift_tol, ...
+                           mesh_deviation < mesh_field_tol});
 
 %% Plot the result
 if options.ShowTheResult
@@ -172,4 +194,77 @@ if nargout == 0
     end
     clear checks
 end
+end
+
+
+function deviation = mesh_check(a, Ms, Aex, eta, m0_v, sampleShape, Nxx, use_CUDA)
+% Relative deviation of the demagnetisation field from that of the sample, on a mesh whose end
+% cells differ in size.
+%
+% The mesh is a 4 x 2 x 2 block of cubes of side a running from 0 to L, whose first layer along x
+% is refined into cells of half the size, so the centres of the end cells are a/4 and a/2 from the
+% two faces. For a uniform magnetisation the field of the cells and of the macrogeometry prism
+% cancel exactly, by superposition, wherever the prism sits on the domain, provided it sits on the
+% domain. What is left is the field of the sample, which is uniform across the nanometre domain.
+
+base = [4 2 2];
+grid_L = base*a;
+pts = zeros(0,3);
+abc = zeros(0,3);
+for k = 0:base(3)-1
+    for j = 0:base(2)-1
+        for i = 0:base(1)-1
+            corner = [i j k]*a;
+            if i == 0
+                [sx, sy, sz] = ndgrid(0:1, 0:1, 0:1);
+                sub = [sx(:) sy(:) sz(:)];
+                pts = [pts; corner + (sub + 0.5)*a/2]; %#ok<AGROW>
+                abc = [abc; repmat(a/2*[1 1 1], 8, 1)]; %#ok<AGROW>
+            else
+                pts = [pts; corner + 0.5*a]; %#ok<AGROW>
+                abc = [abc; a*[1 1 1]]; %#ok<AGROW>
+            end
+        end
+    end
+end
+ntot = size(pts,1);
+
+problem = DefaultMicroMagProblem(ntot, 1, 1);
+problem = problem.setMicroMagGridType('unstructuredPrisms');
+problem.grid_pts = pts;
+problem.grid_abc = abc;
+problem.grid_L = grid_L;
+problem = problem.setUseCuda(use_CUDA);
+problem = problem.setUseCVODE(false);
+problem = problem.setUseDemag(true);
+problem = problem.setMicroMagSolver('Dynamic');
+% The shape correction is evaluated at the cell centres, so the cells have to be as well for the
+% field of the cells and of the macrogeometry prism to cancel
+problem.useAvgN = int32(0);
+problem.use_fmm = int32(0);
+problem.ReturnHall = int32(1);
+
+problem.gamma = 0;
+problem.alpha = eta;
+problem.Ms = Ms*ones(ntot,1);
+problem.A0 = Aex*ones(ntot,1);
+problem.K0 = zeros(ntot,1);
+problem.m0 = repmat(m0_v, ntot, 1);
+problem.macroShape = grid_L;
+problem.sampleShape = sampleShape;
+
+% Only the field of the initial state is needed
+HextFct = @(t) (t>=0)' * [0, 0, 0];
+problem = problem.setHext( HextFct, linspace(0, 1e-15, 2) );
+problem = problem.setTime( linspace(0, 1e-15, 2) );
+
+solution = struct();
+prob_struct = struct(problem);
+solution = problem.MagTenseLandauLifshitzSolver_mex( prob_struct, solution );
+
+H_dem = reshape(solution.H_dem(1,:,1,:), ntot, 3);
+% The sample prism has b = c, so its tensor at the centre is diagonal with Nyy = Nzz
+Nyy = (1 - Nxx)/2;
+H_sample = -Ms * (diag([Nxx Nyy Nyy]) * m0_v(:))';
+deviation = max(abs(H_dem - H_sample), [], 'all') / max(abs(H_sample));
 end

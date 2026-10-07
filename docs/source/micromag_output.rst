@@ -70,15 +70,14 @@ The solution struct contains
        \mathbf{H}_i| / \max(M_s)`, minimizer only.
    * - ``min_status``
      - ``(nt_Hext)``
-     - ``-1`` relaxed by the time integration (or, in an adaptive run, the
-       unrelaxed starting state in the first slot), ``0`` minimizer converged,
+     - ``-1`` relaxed by the time integration, ``0`` minimizer converged,
        ``1`` converged after a fallback to the time integration, ``2`` not
        converged.
 
 ``ReturnHall`` (Python ``usereturnhall``) is off by default. Turning it on
-costs four additional ``(nt, ntot, nt_Hext, 3)`` arrays, which for a large
-problem is substantial, so leave it off unless the individual field terms are
-actually needed.
+returns the four individual field terms as additional
+``(nt, ntot, nt_Hext, 3)`` arrays, which is worth keeping in mind for the
+memory of a large problem.
 
 The energies are evaluated in Fortran from the same fields the solver ran on.
 The exchange, external and demagnetization terms are :math:`-\tfrac{1}{2}\mu_0
@@ -91,10 +90,10 @@ terms otherwise. Dividing by :math:`\tfrac{1}{2}\mu_0 M_s^2 V` gives the
 reduced energies used by the mumag standard problems.
 
 .. note::
-   The four ``H_*`` arrays are **not** the fields the integrator ran on. They
-   are recomputed from the stored solution at the ``nt`` output times after the
-   integration has finished, because the integrator's last right-hand-side
-   evaluation is at an internal step rather than at the requested output state.
+   The four ``H_*`` arrays are evaluated from the stored solution at the
+   ``nt`` output times after the integration has finished, so they belong
+   exactly to the returned magnetization states rather than to an internal
+   step of the integrator.
 
 The optional ``GridInfo`` output carries the analysed mesh - face normals,
 face areas, cell volumes, cell and face centres, the interpolation index
@@ -155,10 +154,9 @@ Python result list
 extra element, the number of accepted field steps, and the arrays with an
 applied-field dimension are already sliced to that number.
 
-The energies and the relaxation diagnostics are not part of the list, so that
-its layout does not change; after any of the three run methods they are
-attributes of the problem object, with the meaning given in the Matlab table
-above:
+The energies and the relaxation diagnostics are attributes of the problem
+object after any of the three run methods, which keeps the layout of the list
+unchanged. Their meaning is given in the Matlab table above:
 
 .. code-block:: python
 

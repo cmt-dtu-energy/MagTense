@@ -154,8 +154,8 @@ change.
         nlmin=0, nlmax=2, ifunif=1, do_target=0, do_FI=1, n_pts=-1
     ) -> np.ndarray
 
-FMM-backed H-field. This is a test version that uses a single dipole per tile
-and requires a build with ``USE_FMM3D=1``.
+FMM-backed H-field, an experimental path that represents each tile by a single
+dipole. Needs a build with ``USE_FMM3D=1``.
 
 ::
 
@@ -219,7 +219,8 @@ constructor arguments are plain attributes and are listed there as well.
         min_maxiter: int = 10000,
         min_maxrot: float = 0.3,
         min_fallback: bool = True,
-        min_saddle_check: bool = True,
+        min_saddle_check: bool | int = 2,
+        min_predictor: bool = True,
     ) -> None
 
 ----------------------------------------
@@ -266,7 +267,8 @@ A predefined sequence of applied fields, given as an ``(n,4)`` array of
     ) -> list
 
 A field sweep in which the solver picks the field steps itself. Requires
-``hysteresis_solver="adaptive"`` and ``solver="explicit"``. See
+``hysteresis_solver="adaptive"`` and ``solver="explicit"`` (the energy
+minimizer) or ``"explicit_ll"`` (Landau-Lifshitz time integration). See
 :ref:`Adaptive hysteresis`.
 
 ========================================

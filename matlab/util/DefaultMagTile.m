@@ -161,6 +161,9 @@ methods
     function obj = setMagTileType( obj, type_var )
         switch ( type_var )
             case {'Cylinder','cylinder'}
+                %A cylindrical piece (r0, theta0, z0, dr, dtheta, dz). With dtheta = 2*pi it
+                %is a full cylinder, or a ring when the inner radius r0 - dr/2 is not zero,
+                %and is then evaluated in closed form
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Cylinder' );
             case {'Prism','prism'}
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Prism' );
@@ -174,6 +177,10 @@ methods
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Sphere' );
              case {'Spheroid','spheroid'}
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Spheroid' );
+            case {'Avgprism','avgprism'}
+                %A prism for which getHFromTiles_mex returns the field averaged over an
+                %observation volume around each point, given as its fifth argument
+                obj.tileType = MagTenseTilesUtil.getMagTileType( 'Avgprism' );
             case {'Planarcoil','planarcoil'}
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Planarcoil' );
             case {'Uniformfield','uniformfield'}
@@ -201,6 +208,8 @@ methods
                 res = 'Sphere';
             case MagTenseTilesUtil.getMagTileType( 'Spheroid' )
                 res = 'Spheroid';
+            case MagTenseTilesUtil.getMagTileType( 'Avgprism' )
+                res = 'Avgprism';
             case MagTenseTilesUtil.getMagTileType( 'Planarcoil' )
                 res = 'Planarcoil';
             case MagTenseTilesUtil.getMagTileType( 'Uniformfield' )

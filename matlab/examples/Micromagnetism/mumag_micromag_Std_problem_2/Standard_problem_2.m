@@ -39,12 +39,12 @@ problem.m0(:) = 1/sqrt(3);
 problem = problem.setSolverType( 'UseExplicitSolver' );
 %--- The field table below is a list of constant fields either way; the choice is how the
 %--- equilibrium at each of them is found: by integrating the LL equation over the time window set
-%--- with setTime ('Explicit'), or by the Barzilai-Borwein energy minimizer ('Minimizer'), which
+%--- with setTime ('ExplicitLL'), or by the Barzilai-Borwein energy minimizer ('Explicit'), which
 %--- ignores the time window and stops when the largest torque is below problem.min_tol.
 if options.use_minimizer
-    problem = problem.setMicroMagSolver( 'Minimizer' );
-else
     problem = problem.setMicroMagSolver( 'Explicit' );
+else
+    problem = problem.setMicroMagSolver( 'ExplicitLL' );
 end
 
 problem = problem.setHext( HextFct, linspace(MaxH,-MaxH,40) );

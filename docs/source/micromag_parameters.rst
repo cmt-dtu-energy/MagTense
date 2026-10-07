@@ -137,8 +137,8 @@ Solver, time and applied field
    * - ``solver``
      - ``solver``
      - ``Dynamic``
-     - ``Explicit`` (1), ``Dynamic`` (2), ``Minimizer`` (3, ``Implicit`` is
-       its old name). Matlab: ``setMicroMagSolver``.
+     - ``ExplicitLL`` (1), ``Dynamic`` (2) or ``Explicit`` (3), see
+       :ref:`Solver type`. Matlab: ``setMicroMagSolver``.
    * - ``ProblemMod``
      - ``prob_mode``
      - ``new``
@@ -186,9 +186,15 @@ Solver, time and applied field
      - Fall back to the time integration when the minimizer stalls.
    * - ``min_saddle``
      - ``min_saddle_check``
+     - ``2``
+     - 1: nudge a converged state and relax again, so that a saddle point is not
+       mistaken for a minimum. 2: compute the lowest eigenvalue of the energy
+       Hessian instead (returned as ``min_eig``). 0: accept the state.
+   * - ``min_pred``
+     - ``min_predictor``
      - ``1``
-     - Nudge a converged state and relax again, so that a saddle point is not
-       mistaken for a minimum.
+     - Start each applied field from the secant extrapolation of the two
+       previous equilibria instead of from the previous one.
    * - ``conv_tol``
      - ``conv_tol``
      - ``1e-4``
@@ -347,8 +353,8 @@ Demagnetization
    * - ``dem_appr``
      - ``demag_approx``
      - ``none``
-     - ``none`` (1), ``threshold`` (2), ``fft_thres`` (3),
-       ``threshold_fraction`` (4), ``fft_threshold_fraction`` (5). Matlab:
+     - ``none`` (1), ``threshold`` (2) or ``threshold_fraction`` (4); 3 and 5
+       are earlier Fourier-space variants. Matlab:
        ``setMicroMagDemagApproximation``.
    * - ``dem_thres``
      - ``dem_thres``
@@ -457,7 +463,8 @@ FMM demagnetization
    * - ``ifunif``
      - ``ifunif``
      - ``1``
-     - Tree type. Must be 1 (uniform tree).
+     - Tree type; MagTense uses the uniform tree (1), whose depth ``nlmax``
+       sets.
    * - ``nlmin``, ``nlmax``
      - ``nlmin``, ``nlmax``
      - ``1``, ``5``
@@ -538,8 +545,8 @@ See :ref:`Micromagnetic output` and
 Matlab-only convenience fields
 ----------------------------------------
 
-The following fields exist on the Matlab problem object but are not passed to
-Fortran. They are used by the example scripts to steer plotting and saving:
+The following fields on the Matlab problem object are used by the example
+scripts to steer plotting and saving, and stay on the Matlab side:
 
 ``SaveTheResult``, ``ShowTheResult``, ``SolverType``, ``DirectoryFilename``,
 ``SimulationName``, ``FileName``, ``HextFct``, ``FFTdims``, ``ExternalMesh``,
