@@ -35,8 +35,8 @@ contains
 #if USE_CDFMM
         type(cdfmm_options_t) :: options
         real(c_double) :: cell_size(3)
-        real(c_double), dimension(:), allocatable :: hx, hy, hz
-        real(c_double) :: root_centre(3)
+        real(c_double), dimension(:), allocatable :: hx, hy, hz, xs, ys, zs
+        real(c_double) :: root_centre(3), origin(3), unit
         integer(c_int) :: cdfmm_ierr
         integer :: ntot
         logical :: uniform_cells
@@ -121,27 +121,54 @@ contains
                 hy = real(problem%grid%abc(:, 2), c_double)
                 hz = real(problem%grid%abc(:, 3), c_double)
             end if
+            ! dip-fmm builds one exact near-field operator per class of pairs whose
+            ! displacement and sizes agree bit for bit. Mesh coordinates in metres are not
+            ! exactly representable (2.5e-9 m), so equal pairs of an octree mesh would all
+            ! differ in their last bits and every pair would be built separately (290 s
+            ! instead of 15 s for 324k tiles). The plan therefore gets the geometry in
+            ! units of the smallest tile edge, measured from the lower corner of the root
+            ! (or of the tiles), snapped to 2^-20 of that unit: a dyadic mesh becomes exact
+            ! and nothing moves by more than 5e-7 of a tile. The field is unchanged, since
+            ! the moments use the volumes in the same unit (m / r^3 is scale invariant).
+            unit = minval(min(hx, min(hy, hz)))
+            if (.not. (unit > 0.0_c_double)) then
+                ierr = 1
+                message = 'dip-fmm needs positive tile sizes'
+                deallocate(cell_volume, hx, hy, hz)
+                return
+            end if
+            if (problem%cdfmm_tree == 1 .and. problem%cdfmm_root(4) > 0.0_DP) then
+                origin = real(problem%cdfmm_root(1:3) - problem%cdfmm_root(4), c_double)
+            else
+                origin = [minval(problem%grid%pts(:, 1) - 0.5_c_double * hx), &
+                          minval(problem%grid%pts(:, 2) - 0.5_c_double * hy), &
+                          minval(problem%grid%pts(:, 3) - 0.5_c_double * hz)]
+            end if
+            allocate(xs(ntot), ys(ntot), zs(ntot))
+            xs = snap((problem%grid%pts(:, 1) - origin(1)) / unit)
+            ys = snap((problem%grid%pts(:, 2) - origin(2)) / unit)
+            zs = snap((problem%grid%pts(:, 3) - origin(3)) / unit)
+            hx = snap(hx / unit)
+            hy = snap(hy / unit)
+            hz = snap(hz / unit)
             cell_volume = hx * hy * hz
             if (problem%cdfmm_tree == 1) then
                 if (problem%cdfmm_root(4) > 0.0_DP) then
-                    root_centre = real(problem%cdfmm_root(1:3), c_double)
+                    root_centre = snap((real(problem%cdfmm_root(1:3), c_double) - origin) / unit)
                     call cdfmm_create_adaptive_variable_cuboids( &
-                        dip_fmm_plan, problem%grid%pts(:, 1), problem%grid%pts(:, 2), &
-                        problem%grid%pts(:, 3), hx, hy, hz, problem%cdfmm_capacity, &
+                        dip_fmm_plan, xs, ys, zs, hx, hy, hz, problem%cdfmm_capacity, &
                         problem%cdfmm_max_depth, options, cdfmm_ierr, root_centre, &
-                        real(problem%cdfmm_root(4), c_double))
+                        snap(real(problem%cdfmm_root(4), c_double) / unit))
                 else
                     call cdfmm_create_adaptive_variable_cuboids( &
-                        dip_fmm_plan, problem%grid%pts(:, 1), problem%grid%pts(:, 2), &
-                        problem%grid%pts(:, 3), hx, hy, hz, problem%cdfmm_capacity, &
+                        dip_fmm_plan, xs, ys, zs, hx, hy, hz, problem%cdfmm_capacity, &
                         problem%cdfmm_max_depth, options, cdfmm_ierr)
                 end if
             else
                 call cdfmm_create_variable_cuboids( &
-                    dip_fmm_plan, problem%grid%pts(:, 1), problem%grid%pts(:, 2), &
-                    problem%grid%pts(:, 3), hx, hy, hz, options, cdfmm_ierr)
+                    dip_fmm_plan, xs, ys, zs, hx, hy, hz, options, cdfmm_ierr)
             end if
-            deallocate(hx, hy, hz)
+            deallocate(hx, hy, hz, xs, ys, zs)
         end if
         if (cdfmm_ierr /= CDFMM_SUCCESS) then
             ierr = int(cdfmm_ierr)
@@ -223,5 +250,15 @@ contains
     logical function dipFmmIsActive()
         dipFmmIsActive = dip_fmm_active
     end function dipFmmIsActive
+
+#if USE_CDFMM
+    !> Round to the nearest multiple of 2^-20 (exact in double for |x| < 2^32).
+    elemental function snap(x) result(y)
+        real(c_double), intent(in) :: x
+        real(c_double) :: y
+        real(c_double), parameter :: grid = 1048576.0_c_double
+        y = anint(x * grid) / grid
+    end function snap
+#endif
 
 end module DipFmmDemag
