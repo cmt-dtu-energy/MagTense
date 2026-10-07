@@ -104,13 +104,24 @@ class MicromagProblem:
         macroShape: Sidelengths of a prism representing the shape of the macrogeometry.
         sampleShape: Sidelengths of a prism representing the sample shape.
         use_cdfmm: Use dip-fmm instead of the regular dense demagnetisation
-            calculation. Currently supported for uniform cuboid grids only.
+            calculation. Supported for uniform grids and for grids of axis-aligned
+            prisms ('unstructuredPrisms', e.g. octree-refined meshes), where every
+            tile passes its own grid_abc side lengths.
             Backend selection follows MagTense: CUDA requires both a
             CUDA-enabled build and ``cuda=True``; otherwise dip-fmm prefers
             oneMKL and falls back to portable CPU execution.
         cdfmm_order: Expansion order used by dip-fmm.
-        cdfmm_depth: Fixed octree depth used by dip-fmm.
+        cdfmm_depth: Fixed octree depth used by dip-fmm's uniform tree.
         cdfmm_basis: Expansion basis, either ``"spherical"`` or ``"cartesian"``.
+        cdfmm_tree: ``"uniform"`` (fixed depth ``cdfmm_depth``) or ``"adaptive"`` (a box is
+            split while it holds more than ``cdfmm_capacity`` tiles, at most
+            ``cdfmm_max_depth`` levels). On a graded mesh the uniform tree must be shallow
+            enough that its leaves contain the largest tile; dip-fmm warns otherwise.
+        cdfmm_capacity: Adaptive tree: maximum number of tiles per leaf before a split.
+        cdfmm_max_depth: Adaptive tree: deepest level, 0 to 8.
+        cdfmm_root: Adaptive tree: root cube as (centre x, y, z, half-width) [m]. ``None``
+            uses the exact bounding cube of the cells (right for a mesh refined inside a cube). Fix it so that the tile grid is dyadic in the
+            root (e.g. a 640 nm cube for 20 nm base tiles), otherwise tiles can straddle leaves.
         min_tol: Minimizer convergence criterion: the largest torque max_i |m_i x H_i| over the
             cells, divided by max(Ms), must fall below this.
         min_maxiter: Maximum number of minimizer iterations per applied field.
@@ -210,6 +221,10 @@ class MicromagProblem:
             cdfmm_order: int = 6,
             cdfmm_depth: int = 4,
             cdfmm_basis: str | int = "spherical",
+            cdfmm_tree: str = "uniform",
+            cdfmm_capacity: int = 32,
+            cdfmm_max_depth: int = 5,
+            cdfmm_root: list | np.ndarray | None = None,
             phase_id: np.ndarray | None = None,
             A_int: np.ndarray | None = None,
             min_tol: float = 1e-5,
@@ -393,15 +408,25 @@ class MicromagProblem:
         self.use_fmm = 0
         #--------------------------------------------------
 
-        # dip-fmm is independent of the legacy FMM3D backend above. Its current
-        # MagTense adapter supports uniform cuboids and FP32 field arrays.
+        # dip-fmm is independent of the legacy FMM3D backend above. Its MagTense adapter
+        # supports uniform cuboids and axis-aligned prisms of any size, with FP32 field arrays.
         basis_values = {"spherical": 0, "cartesian": 1}
         if isinstance(cdfmm_basis, str):
             if cdfmm_basis not in basis_values:
                 raise ValueError(f"Unknown dip-fmm basis: {cdfmm_basis}")
             cdfmm_basis = basis_values[cdfmm_basis]
-        if use_cdfmm and self.grid_type != 1:
-            raise ValueError("dip-fmm currently requires grid_type='uniform'")
+        if use_cdfmm and self.grid_type not in (1, 3):
+            raise ValueError("dip-fmm requires grid_type='uniform' or 'unstructuredPrisms'")
+        tree_values = {"uniform": 0, "adaptive": 1}
+        if cdfmm_tree not in tree_values:
+            raise ValueError("cdfmm_tree must be 'uniform' or 'adaptive'")
+        if int(cdfmm_capacity) < 1 or not (0 <= int(cdfmm_max_depth) <= 8):
+            raise ValueError("cdfmm_capacity must be positive and cdfmm_max_depth in 0..8")
+        if cdfmm_root is None:
+            cdfmm_root = [0.0, 0.0, 0.0, -1.0]
+        cdfmm_root = np.asarray(cdfmm_root, dtype=np.float64).ravel()
+        if cdfmm_root.size != 4:
+            raise ValueError("cdfmm_root must be (centre x, y, z, half-width)")
         if cdfmm_order < 1 or cdfmm_depth < 1:
             raise ValueError("cdfmm_order and cdfmm_depth must be positive")
         if int(cdfmm_basis) not in basis_values.values():
@@ -412,6 +437,13 @@ class MicromagProblem:
         self.cdfmm_depth = int(cdfmm_depth)
         self.cdfmm_basis = int(cdfmm_basis)
         self.cdfmm_precision = 0  # MagTense stores the demag field in FP32.
+        self.cdfmm_tree = tree_values[cdfmm_tree]
+        self.cdfmm_capacity = int(cdfmm_capacity)
+        self.cdfmm_max_depth = int(cdfmm_max_depth)
+        self.cdfmm_root = np.asfortranarray(cdfmm_root)
+        #: Applied field (x, y, z) [A/m] of every field step of the last run: the accepted
+        #: steps of an adaptive run. Filled whether or not usereturnhall is set.
+        self.H_ext_applied = None
 
         #---------- timer and trace parameters ----------
         self.log_dir = "logs"
@@ -848,14 +880,50 @@ class MicromagProblem:
             )
         return self._solver
 
-    def _store_diagnostics(self, result: list, n_accepted: int | None = None) -> None:
-        """Pop the six trailing diagnostics off a Fortran result list onto the problem.
+    def _resolved_cdfmm_root(self) -> np.ndarray:
+        """Root cube (centre x, y, z, half-width) handed to dip-fmm's adaptive tree.
 
-        The Fortran entry point returns E_out, n_feval, min_iter, min_torque, min_status and min_eig after
-        the historical outputs. They are kept off the returned list so that its layout, which
+        An explicit ``cdfmm_root`` is used as given. Otherwise the root is the exact bounding cube
+        of the cells: ``grid_L`` centred on the origin for a uniform grid, the extents of
+        ``grid_pts`` +- ``grid_abc``/2 for a prism grid. An octree mesh built in a cube therefore
+        stays on the dyadic grid of the root, so its tiles fit their leaves; any padding would
+        shift the leaf faces off that grid.
+        """
+        root = np.asarray(self.cdfmm_root, dtype=np.float64)
+        if root[3] > 0 or self.cdfmm_tree != 1:
+            return np.asfortranarray(root)
+        if self.grid_type == 3:
+            pts = np.asarray(self.grid_pts, dtype=np.float64)
+            half_size = 0.5 * np.asarray(self.grid_abc, dtype=np.float64)
+            low = (pts - half_size).min(axis=0)
+            high = (pts + half_size).max(axis=0)
+        else:
+            low = -0.5 * np.asarray(self.grid_L, dtype=np.float64)
+            high = 0.5 * np.asarray(self.grid_L, dtype=np.float64)
+        centre = 0.5 * (low + high)
+        return np.asfortranarray(np.concatenate([centre, [0.5 * float(np.max(high - low))]]))
+
+    def _field_output_extents(self, nt: int, nt_h_ext_out: int) -> dict:
+        """Extents of the four returned field arrays (H_exc, H_ext, H_dem, H_ani).
+
+        Full size only with usereturnhall; otherwise (1, 1, 1), so that a large mesh does not
+        allocate 4 x nt x ntot x nt_h_ext_out x 3 doubles of zeros. The applied fields of
+        every step are always available as ``H_ext_applied``.
+        """
+        if self.usereturnhall:
+            return {"nt_h": int(nt), "ntot_h": int(self.ntot), "nt_hext_h": int(nt_h_ext_out)}
+        return {"nt_h": 1, "ntot_h": 1, "nt_hext_h": 1}
+
+    def _store_diagnostics(self, result: list, n_accepted: int | None = None) -> None:
+        """Pop the seven trailing outputs off a Fortran result list onto the problem.
+
+        The Fortran entry point returns E_out, n_feval, min_iter, min_torque, min_status, min_eig and
+        the applied fields of every step after the historical outputs. They are kept off the returned list so that its layout, which
         callers index by position, does not change. For an adaptive run only the accepted field
         steps are kept.
         """
+        H_ext_applied = np.asarray(result.pop())
+        self.H_ext_applied = H_ext_applied[:n_accepted] if n_accepted is not None else H_ext_applied
         min_eig = np.asarray(result.pop())
         min_status = np.asarray(result.pop())
         min_torque = np.asarray(result.pop())
@@ -1038,6 +1106,7 @@ class MicromagProblem:
             temperature=self.T,
             nt_hext=nt_h_ext,
             nt_hext_out = nt_h_ext_out,
+            **self._field_output_extents(nt, nt_h_ext_out),
             hext=h_ext,
             nt=nt,
             t=np.linspace(0, t_end, nt),
@@ -1119,6 +1188,10 @@ class MicromagProblem:
             cdfmm_depth=self.cdfmm_depth,
             cdfmm_basis=self.cdfmm_basis,
             cdfmm_precision=self.cdfmm_precision,
+            cdfmm_tree=self.cdfmm_tree,
+            cdfmm_capacity=self.cdfmm_capacity,
+            cdfmm_max_depth=self.cdfmm_max_depth,
+            cdfmm_root=self._resolved_cdfmm_root(),
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,
@@ -1207,6 +1280,7 @@ class MicromagProblem:
             temperature=self.T,
             nt_hext=nt_h_ext,
             nt_hext_out = nt_h_ext_out,
+            **self._field_output_extents(self.nt, nt_h_ext_out),
             hext=H_ext,
             nt=self.nt,
             t=self.t,
@@ -1288,6 +1362,10 @@ class MicromagProblem:
             cdfmm_depth=self.cdfmm_depth,
             cdfmm_basis=self.cdfmm_basis,
             cdfmm_precision=self.cdfmm_precision,
+            cdfmm_tree=self.cdfmm_tree,
+            cdfmm_capacity=self.cdfmm_capacity,
+            cdfmm_max_depth=self.cdfmm_max_depth,
+            cdfmm_root=self._resolved_cdfmm_root(),
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,
@@ -1413,6 +1491,7 @@ class MicromagProblem:
             temperature=self.T,
             nt_hext=nt_h_ext,
             nt_hext_out=nt_h_ext_out,
+            **self._field_output_extents(self.nt, nt_h_ext_out),
             hext=h_ext,
             nt=self.nt,
             t=self.t,
@@ -1494,6 +1573,10 @@ class MicromagProblem:
             cdfmm_depth=self.cdfmm_depth,
             cdfmm_basis=self.cdfmm_basis,
             cdfmm_precision=self.cdfmm_precision,
+            cdfmm_tree=self.cdfmm_tree,
+            cdfmm_capacity=self.cdfmm_capacity,
+            cdfmm_max_depth=self.cdfmm_max_depth,
+            cdfmm_root=self._resolved_cdfmm_root(),
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,

@@ -2314,6 +2314,11 @@ end subroutine updateDemagfieldFMM
             call initialiseDipFmm(problem, cdfmm_ierr, cdfmm_message)
             if (cdfmm_ierr /= 0) then
                 call displayGUIMessage('dip-fmm plan creation failed: '//trim(cdfmm_message))
+                ! The dense tensor holds 6 x ntot^2 entries: a fallback for a large mesh
+                ! would exhaust the memory instead of reporting the dip-fmm error.
+                if (size(problem%grid%pts, dim=1) > 50000) then
+                    error stop 'dip-fmm plan creation failed and the mesh is too large for the dense demag fallback'
+                end if
                 call displayGUIMessage('Falling back to the regular demag calculation')
                 problem%use_cdfmm = .false.
                 call ComputeDemagfieldTensor(problem)

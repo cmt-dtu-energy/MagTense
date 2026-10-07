@@ -263,6 +263,19 @@ include "mkl_dfti.f90"
         integer :: cdfmm_depth = 4
         integer :: cdfmm_basis = 0       !> 0 spherical, 1 Cartesian
         integer :: cdfmm_precision = 0   !> 0 FP32; MagTense demag arrays are FP32
+        ! Octree support. On a uniform grid every cell has the same size; on an
+        ! unstructuredPrisms grid each tile passes its own grid%abc (full side
+        ! lengths). cdfmm_tree selects the fixed-depth uniform tree of cdfmm_depth (0)
+        ! or the capacity-driven adaptive tree (1), which splits a box while it holds
+        ! more than cdfmm_capacity tiles and is shallower than cdfmm_max_depth.
+        ! cdfmm_root = (centre x, y, z, half-width) fixes the adaptive root cube; a
+        ! half-width <= 0 lets dip-fmm enclose the tiles itself. Keep tiles on the
+        ! dyadic grid of the root, or a tile can protrude from its leaf (dip-fmm then
+        ! prints a containment warning).
+        integer :: cdfmm_tree = 0          !> 0 uniform tree, 1 adaptive tree
+        integer :: cdfmm_capacity = 32     !> adaptive: maximum tiles per leaf before a split
+        integer :: cdfmm_max_depth = 5     !> adaptive: deepest level (0..8)
+        real(DP), dimension(4) :: cdfmm_root = [0.0_DP, 0.0_DP, 0.0_DP, -1.0_DP]
 
         integer, dimension(:,:), pointer :: nbr_idx(:,:) => null()    !> Neighbour indices for each target cell
         integer, dimension(:), pointer :: n_nbors(:) => null()

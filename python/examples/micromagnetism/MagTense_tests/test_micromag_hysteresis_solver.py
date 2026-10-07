@@ -11,8 +11,9 @@ The suite verifies four public contracts:
 * Both Python hysteresis methods call the same ``runmicromagsimulation`` symbol.
 * Static callers retain the historical 13-item result layout.
 * Adaptive callers receive only accepted field steps plus the accepted count.
-* The energies and relaxation diagnostics that Fortran returns after the historical
-  outputs land on the problem object, sliced to the accepted steps for adaptive runs.
+* The energies, relaxation diagnostics and applied fields that Fortran returns after the
+  historical outputs land on the problem object, sliced to the accepted steps for adaptive runs.
+* Without usereturnhall the four field outputs are requested at (1, 1, 1) extent.
 """
 
 import unittest
@@ -42,10 +43,11 @@ def _problem(hysteresis_solver: str = "static") -> MicromagProblem:
 def _fortran_result(n_fields: int, n_accepted: int) -> list:
     """Build a recognizable result in the unified f2py output order.
 
-    ``RunMicroMagSimulation`` returns 20 values. Index 7 is the accepted-field
+    ``RunMicroMagSimulation`` returns 21 values. Index 7 is the accepted-field
     count, indices 8-13 contain the exchange-matrix data that historically started
-    at index 7 for static simulations, and indices 14-19 are the energies and the
-    relaxation diagnostics, which the wrapper moves onto the problem object.
+    at index 7 for static simulations, and indices 14-20 are the energies, the
+    relaxation diagnostics and the applied fields, which the wrapper moves onto the
+    problem object.
     """
     field_shape = (2, 1, n_fields, 3)
     return [
@@ -69,6 +71,7 @@ def _fortran_result(n_fields: int, n_accepted: int) -> list:
         np.full(n_fields, 1e-6),                  # final torque
         np.full(n_fields, -1),                    # status
         np.full(n_fields, 0.5),                   # lowest Hessian eigenvalue
+        np.arange(3 * n_fields, dtype=float).reshape(n_fields, 3),  # applied fields
     ]
 
 
@@ -127,6 +130,13 @@ class HysteresisSolverTests(unittest.TestCase):
         np.testing.assert_array_equal(problem.n_feval, [100, 101, 102])
         np.testing.assert_array_equal(problem.min_iter, [200, 201, 202])
         np.testing.assert_array_equal(problem.min_status, [-1, -1, -1])
+        np.testing.assert_array_equal(problem.H_ext_applied, np.arange(9.0).reshape(3, 3))
+
+        # usereturnhall is off: the four field outputs are not allocated at full size
+        self.assertEqual((captured["nt_h"], captured["ntot_h"], captured["nt_hext_h"]), (1, 1, 1))
+        # dip-fmm settings travel with every call; the uniform tree is the default
+        self.assertEqual(captured["cdfmm_tree"], 0)
+        self.assertEqual(captured["cdfmm_root"].shape, (4,))
 
     def test_adaptive_hysteresis_uses_unified_fortran_entry_point(self) -> None:
         """Adaptive mode forwards controls and slices all field-dependent data."""
@@ -193,6 +203,7 @@ class HysteresisSolverTests(unittest.TestCase):
         np.testing.assert_array_equal(problem.n_feval, [100, 101])
         np.testing.assert_array_equal(problem.min_torque, [1e-6, 1e-6])
         np.testing.assert_array_equal(problem.min_eig, [0.5, 0.5])
+        np.testing.assert_array_equal(problem.H_ext_applied, np.arange(6.0).reshape(2, 3))
 
     def test_minimizer_settings_are_stored(self) -> None:
         """The minimizer settings land on the problem as given."""

@@ -704,10 +704,10 @@ end subroutine getHFromTilesFMM
 
 
     subroutine RunMicroMagSimulation( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMode, solver, A0, Ms, K0, &
-        K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, temperature, nt_Hext, nt_Hext_out, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
+        K1, K2, K0_arr, CrysAxis, gamma, alpha_mm, temperature, nt_Hext, nt_Hext_out, nt_h, ntot_h, nt_Hext_h, Hext, nt, t, m0, dem_thres, useCuda, dem_appr, N_ret, N_file_out, &
         N_load, N_file_in, setTimeDis, nt_alpha, alphat, tol, thres, useCVODE, nt_conv, t_conv, &
         conv_tol, grid_pts, grid_ele, grid_nod, grid_nnod, exch_nval, exch_nrow, exch_val, exch_rows, &
-        exch_cols, grid_abc, N_ave, CV, useReturnHall, useAvgN, & 
+        exch_cols, grid_abc, N_ave, CV, useReturnHall, useAvgN, &
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
         n_macro, shiftVec, macroShape, sampleShape, exchPBC, hysteresis_solver, &
         H_start, H_end, dH_initial, dH_min, dH_max, maxHextSteps, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH, use_switch_refine, &
@@ -715,9 +715,10 @@ end subroutine getHFromTilesFMM
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, n_Hext_accepted, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useFMM, &
         useCDFMM, cdfmm_order, cdfmm_depth, cdfmm_basis, cdfmm_precision, &
+        cdfmm_tree, cdfmm_capacity, cdfmm_max_depth, cdfmm_root, &
         log_dir,timer_log_file, trace_log_file, window_enabled, window_interval, trace_enabled, flush_each, trace_verbose, timer_enabled, useDemag, rng_seed, &
         n_phase, phase_id, A_int, &
-        E_out, n_feval, min_iter, min_torque, min_status, min_eig )
+        E_out, n_feval, min_iter, min_torque, min_status, min_eig, Hext_acc )
 
         !nt_Hext is the number of rows in the Hext array; nt_Hext_out is the third extent of the
         !returned M and H arrays. There used to be a third, n_Hext, which was accepted and declared
@@ -726,6 +727,12 @@ end subroutine getHFromTilesFMM
         !a parameter that looks meaningful from the Python side.
         integer(4), intent(in) :: ntot, nt_conv, grid_type, nt_Hext, nt_alpha, nt, grid_nnod, exch_nval, exch_nrow, exch_ncols, exch_presize
         integer(4), intent(in) :: nt_Hext_out
+        !> Extents of the four returned field arrays H_exc, H_ext, H_dem and H_ani: (nt, ntot,
+        !> nt_Hext_out) when useReturnHall is set, (1, 1, 1) otherwise. f2py allocates intent(out)
+        !> arrays whatever the caller wants back, and at full size the four fields cost
+        !> 4 x 2 x 3 x 8 = 192 bytes per cell per applied field - 115 GB for a million cells and
+        !> 150 accepted fields - for arrays that are only zeros without useReturnHall.
+        integer(4), intent(in) :: nt_h, ntot_h, nt_Hext_h
         integer(4),dimension(3),intent(in) :: grid_n, N_ave
         real(8),dimension(3),intent(in) :: grid_L
         real(8),dimension(3),intent(in) :: H_start, H_end
@@ -767,8 +774,11 @@ end subroutine getHFromTilesFMM
         real(8),dimension(nt),intent(in) :: t
         real(8),dimension(nt),intent(out) :: t_out
         real(8),dimension(nt,ntot,nt_Hext_out,3),intent(out) :: M_mm
-        real(8),dimension(nt,ntot,nt_Hext_out,3),intent(out) :: H_exc, H_ext, H_dem, H_ani
+        real(8),dimension(nt_h,ntot_h,nt_Hext_h,3),intent(out) :: H_exc, H_ext, H_dem, H_ani
         integer(4),intent(out) :: n_Hext_accepted
+        !> The applied field (x, y, z) of every field step [A/m]: the accepted steps of an adaptive
+        !> run, the given table of a static run. Available without useReturnHall.
+        real(8),dimension(nt_Hext_out,3),intent(out) :: Hext_acc
         real(8),dimension(ntot,3),intent(out) :: pts
         !> Energies (exchange, external, demag, anisotropy) [J] at the output times and applied fields,
         !> and the relaxation diagnostics per applied field: field evaluations spent, minimizer
@@ -798,6 +808,11 @@ end subroutine getHFromTilesFMM
         integer(4), intent(in) :: useCDFMM
         integer(4), intent(in) :: cdfmm_order, cdfmm_depth, cdfmm_basis
         integer(4), intent(in) :: cdfmm_precision
+        !> dip-fmm tree: 0 uniform (depth cdfmm_depth), 1 adaptive (cdfmm_capacity tiles per leaf,
+        !> at most cdfmm_max_depth levels, root cube cdfmm_root = centre x,y,z and half-width;
+        !> half-width <= 0 lets dip-fmm enclose the tiles)
+        integer(4), intent(in) :: cdfmm_tree, cdfmm_capacity, cdfmm_max_depth
+        real(8),dimension(4),intent(in) :: cdfmm_root
         !> Seed for the stochastic thermal field: 0 keeps the compiler default sequence (identical
         !> on every run), a positive value seeds deterministically, a negative value seeds from the
         !> clock so that repeated runs are independent Monte-Carlo samples.
@@ -849,6 +864,11 @@ end subroutine getHFromTilesFMM
             passExch, exch_ncols, CrysAxis, K0_arr, K1, K2, n_phase, phase_id, A_int, problem, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
             use_cdfmm, cdfmm_order, cdfmm_depth, cdfmm_basis, cdfmm_precision, &
             useDemag, rng_seed)
+
+        problem%cdfmm_tree = cdfmm_tree
+        problem%cdfmm_capacity = cdfmm_capacity
+        problem%cdfmm_max_depth = cdfmm_max_depth
+        problem%cdfmm_root = cdfmm_root
 
         if (hysteresis_solver .eq. 2) then
             problem%adaptiveHext = .true.
@@ -908,7 +928,9 @@ end subroutine getHFromTilesFMM
         !into these full-size intent(out) arrays is a non-conforming array assignment, and it left
         !the caller holding uninitialised memory - values of order 1e+60 and 1e-227 were coming
         !back. Return explicit zeros in that case instead.
-        if ( useReturnHall .eq. 1 ) then
+        !The caller sizes the four field outputs (1,1,1,3) when it does not want them back; copy
+        !only when both sides have the full size.
+        if ( useReturnHall .eq. 1 .and. size(H_exc) .eq. size(solution%H_exc) ) then
             H_exc = solution%H_exc
             H_ext = solution%H_ext
             H_dem = solution%H_dem
@@ -920,6 +942,11 @@ end subroutine getHFromTilesFMM
             H_ani = 0.
         endif
 		n_Hext_accepted = problem%nHextAccepted
+        !The applied field of every step: SolveAdaptiveHextLoop records the accepted fields in
+        !problem%Hext(:,2:4); a static run keeps the given table there.
+        Hext_acc = 0.
+        n_copy = min( size(problem%Hext, 1), nt_Hext_out )
+        Hext_acc(1:n_copy,:) = problem%Hext(1:n_copy,2:4)
         !The exchange matrix in COO form only exists when the solver built the exchange operator
         !itself. With passExch the matrix comes from the caller and these arrays stay unallocated,
         !so return an empty matrix instead of reading them (the bounds-checked build stops here).
@@ -966,6 +993,7 @@ end subroutine getHFromTilesFMM
         H_dem(:,:,:,:) = 0.
         H_ani(:,:,:,:) = 0.
         n_Hext_accepted = 0
+        Hext_acc = 0.
         E_out = 0.
         n_feval = 0
         min_iter = 0
