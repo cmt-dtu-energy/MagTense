@@ -164,6 +164,7 @@ include "mkl_dfti.f90"
         real(DP) :: dM_min = 1.0e-3_DP                    !> Unused by the step controller; kept for interface compatibility.
         real(DP) :: dM_target = 1.0e-2_DP                 !> Change of the mean magnetisation per step the adaptive field step aims for.
         real(DP) :: dM_reject = 5.0e-2_DP                 !> Magnetisation-change threshold for rejecting adaptive field steps.
+        real(DP) :: dM_abort = 1.5_DP                     !> Minimizer short-circuit of an adaptive trial above dH_min: abandon it once its mean has moved by dM_abort * dM_reject (0: off).
         real(DP) :: switch_refine_dH = 0.0_DP             !> Maximum accepted step across magnetisation sign changes [A/m].
         logical :: use_switch_refine = .false.            !> Enable adaptive sign-change refinement.
 

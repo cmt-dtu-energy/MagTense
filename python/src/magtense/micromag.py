@@ -1163,6 +1163,7 @@ class MicromagProblem:
             dm_min=0.0,
             dm_target=0.0,
             dm_reject=0.0,
+            dm_abort=0.0,
             dh_grow=0.0,
             dh_shrink=0.0,
             switch_refine_dh=0.0,
@@ -1337,6 +1338,7 @@ class MicromagProblem:
             dm_min=0.0,
             dm_target=0.0,
             dm_reject=0.0,
+            dm_abort=0.0,
             dh_grow=0.0,
             dh_shrink=0.0,
             switch_refine_dh=0.0,
@@ -1405,12 +1407,16 @@ class MicromagProblem:
             dH_grow: float = 2.0,
             dH_shrink: float = 0.25,
             switch_refine_dH: float | None = None,
+            dM_abort: float = 1.5,
     ) -> list[np.ndarray | int]:
         """
         Run a micromagnetic hysteresis simulation with adaptive external-field steps.
 
         Step control: every trial field is a full relaxation from the last accepted state and
-        ``dM``, the change of the cell-averaged magnetisation vector, decides. A trial is redone
+        ``dM``, the change of the mean magnetisation vector, decides. The mean is weighted by the
+        moment of every cell, ``<m> = sum_i Ms_i V_i m_i / sum_i Ms_i V_i``, so that on a refined
+        mesh the many small tiles and a soft phase of low ``Ms`` count by their moment, not by
+        their number; on a uniform grid of one material it is the plain average. A trial is redone
         with half the step when ``dM > dM_reject``, when the mean magnetisation along the sweep
         changes sign and the step is above ``switch_refine_dH``, or when the minimizer did not
         converge; nothing is redone once the step is at ``dH_min``, so a switching event is
@@ -1423,6 +1429,13 @@ class MicromagProblem:
         for the time integration when the relaxation cost jumps by more than 3x. ``dM_min`` is
         accepted for compatibility and unused. A time integration that ran out of its window is
         accepted and reported with ``min_status = -2``.
+
+        Short-circuit (minimizer only): a trial above ``dH_min`` is abandoned as soon as its mean
+        has moved by ``dM_abort * dM_reject`` - checked every 10 minimizer iterations and around
+        the LL fallback - and rejected like a ``dM`` rejection, instead of being relaxed to the end
+        (or through the fallback) first. ``dM_abort`` must be 0 (off) or at least 1; above 1 the
+        margin covers a descent whose mean overshoots and comes back. At ``dH_min`` nothing is
+        rejected, so a switching event is still relaxed in full there.
 
         The adaptive accept/reject loop is executed by the Fortran backend in a
         single call. Output arrays are preallocated to ``max_steps`` in Fortran
@@ -1456,6 +1469,8 @@ class MicromagProblem:
             raise ValueError("dH_grow must be larger than 1")
         if not (0.0 < dH_shrink < 1.0):
             raise ValueError("dH_shrink must be between 0 and 1")
+        if dM_abort != 0.0 and not dM_abort >= 1.0:
+            raise ValueError("dM_abort must be 0 (off) or at least 1")
 
         # The Fortran loop records the starting field in slot 1 and then one slot per accepted
         # step, so it needs max_steps + 1 slots. Sizing these to max_steps overran problem%Hext
@@ -1548,6 +1563,7 @@ class MicromagProblem:
             dm_min=float(dM_min),
             dm_target=float(dM_target),
             dm_reject=float(dM_reject),
+            dm_abort=float(dM_abort),
             dh_grow=float(dH_grow),
             dh_shrink=float(dH_shrink),
             switch_refine_dh=switch_refine_value,

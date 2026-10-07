@@ -710,7 +710,7 @@ end subroutine getHFromTilesFMM
         exch_cols, grid_abc, N_ave, CV, useReturnHall, useAvgN, &
 		exch_weigh, exch_meth, exch_intpn, passExch, exch_ncols, exch_presize, &
         n_macro, shiftVec, macroShape, sampleShape, exchPBC, hysteresis_solver, &
-        H_start, H_end, dH_initial, dH_min, dH_max, maxHextSteps, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH, use_switch_refine, &
+        H_start, H_end, dH_initial, dH_min, dH_max, maxHextSteps, dM_min, dM_target, dM_reject, dM_abort, dH_grow, dH_shrink, switch_refine_dH, use_switch_refine, &
         min_tol, min_maxiter, min_maxrot, min_fallback, min_saddle_check, min_predictor, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, n_Hext_accepted, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, useFMM, &
@@ -736,7 +736,7 @@ end subroutine getHFromTilesFMM
         integer(4),dimension(3),intent(in) :: grid_n, N_ave
         real(8),dimension(3),intent(in) :: grid_L
         real(8),dimension(3),intent(in) :: H_start, H_end
-        real(8),intent(in) :: dH_initial, dH_min, dH_max, dM_min, dM_target, dM_reject, dH_grow, dH_shrink, switch_refine_dH
+        real(8),intent(in) :: dH_initial, dH_min, dH_max, dM_min, dM_target, dM_reject, dM_abort, dH_grow, dH_shrink, switch_refine_dH
         integer(4),intent(in) :: hysteresis_solver, maxHextSteps, use_switch_refine
         !> Energy minimizer settings (solver = 3), see MicroMagProblem
         real(8),intent(in) :: min_tol, min_maxrot
@@ -884,6 +884,7 @@ end subroutine getHFromTilesFMM
             problem%dM_min = dM_min
             problem%dM_target = dM_target
             problem%dM_reject = dM_reject
+            problem%dM_abort = dM_abort
             problem%switch_refine_dH = switch_refine_dH
             problem%use_switch_refine = (use_switch_refine /= 0)
         else if (hysteresis_solver .eq. 1) then

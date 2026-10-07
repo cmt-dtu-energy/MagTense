@@ -112,6 +112,7 @@ class HysteresisSolverTests(unittest.TestCase):
         self.assertEqual(captured["nt_hext_out"], 3)
         self.assertEqual(captured["maxhextsteps"], 0)
         self.assertEqual(captured["use_switch_refine"], 0)
+        self.assertEqual(captured["dm_abort"], 0.0)
         np.testing.assert_array_equal(captured["h_start"], np.zeros(3))
         np.testing.assert_array_equal(captured["h_end"], np.zeros(3))
 
@@ -187,6 +188,8 @@ class HysteresisSolverTests(unittest.TestCase):
         self.assertEqual(captured["dh_shrink"], 0.6)
         self.assertEqual(captured["switch_refine_dh"], 0.15)
         self.assertEqual(captured["use_switch_refine"], 1)
+        # The minimizer short-circuit is on by default at 1.5 x dM_reject
+        self.assertEqual(captured["dm_abort"], 1.5)
 
         # Fortran allocates four field slots, but reports that only two were
         # accepted. Every field-dependent output must therefore be sliced to 2.
@@ -338,6 +341,8 @@ class HysteresisSolverTests(unittest.TestCase):
             ({"dH_grow": 1.0}, "larger than 1"),
             ({"dH_shrink": 1.0}, "between 0 and 1"),
             ({"switch_refine_dH": 0.0}, "must be positive"),
+            ({"dM_abort": 0.5}, "dM_abort must be 0"),
+            ({"dM_abort": -1.0}, "dM_abort must be 0"),
         )
         for overrides, message in invalid_cases:
             with self.subTest(overrides=overrides):

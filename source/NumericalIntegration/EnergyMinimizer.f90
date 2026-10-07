@@ -23,6 +23,12 @@
 !> set) and the minimizer is restarted from its result - this is what carries a hysteresis loop
 !> through a switching event, where the state sits near a saddle.
 !>
+!> A caller that will reject a state whose mean has moved too far (the adaptive hysteresis loop) can
+!> set abort_dM: the weighted mean of m is then compared with abort_ref every abort_every iterations,
+!> and before and after the ODE fallback, and the relaxation is abandoned (status 3) as soon as it
+!> has moved further than abort_dM, instead of being run to convergence or through the fallback only
+!> to be rejected afterwards.
+!>
 !> A vanishing torque is also what a saddle point looks like, and a symmetric starting state sits on
 !> one. When saddle_check is set, a converged state is therefore nudged by a small random rotation of
 !> every vector and relaxed again; a minimum takes the nudge back and is returned unperturbed, a
@@ -66,13 +72,16 @@ module EnergyMinimizer
         integer :: eig_maxiter = 60   !> saddle_check 2: cap on the Lanczos steps per check (one field evaluation each)
         real,dimension(:),allocatable :: weights !> saddle_check 2: weight of every vector in the energy, Ms_i V_i; uniform when not allocated
         real,dimension(:),allocatable :: eig_start !> saddle_check 2: Lanczos start vector (3n), e.g. the eigenvector of a similar state; random when not allocated
+        real :: abort_dM = 0.0        !> Short-circuit: abandon the relaxation once |<m> - abort_ref| exceeds this (0: off)
+        real,dimension(3) :: abort_ref = 0.0 !> Short-circuit: the reference mean, e.g. that of the last accepted state
+        real,dimension(:),allocatable :: abort_w !> Short-circuit: weight of every vector in the mean (n, summing to 1); uniform when not allocated
     end type MinimizerSettings
 
     !> What the minimizer reports back
     type MinimizerResult
         integer :: n_iter = 0         !> Iterations over all rounds
         real :: torque = 0.0          !> Final max_i |m_i x H_i| / H_scale
-        integer :: status = 2         !> 0 converged, 1 converged after an ODE fallback, 2 not converged
+        integer :: status = 2         !> 0 converged, 1 converged after an ODE fallback, 2 not converged, 3 abandoned by the short-circuit (abort_dM)
         real :: tau_last = 0.0        !> Step length of the last iteration, a curvature estimate the next call can start from (tau_init)
         real :: eig_min = 0.0         !> saddle_check 2: lowest Hessian eigenvalue of the returned state, relative to H_scale
         integer :: n_eig = 0          !> saddle_check 2: Lanczos steps spent over all checks
@@ -90,6 +99,8 @@ module EnergyMinimizer
     logical,parameter,private :: eig_debug = .false. !> Report every Lanczos step (development aid)
     integer,parameter,private :: eig_minit = 3       !> Fewest Lanczos steps before the convergence test is trusted, warm start
     integer,parameter,private :: eig_minit_moved = 10 !> The same after a push off a saddle, when the start vector is mostly random
+    integer,parameter,private :: abort_every = 10    !> Short-circuit: the mean is checked every this many iterations ...
+    integer,parameter,private :: abort_minit = 20    !> ... from this iteration on (the first steps of a descent are the largest)
 
     contains
 
@@ -132,7 +143,8 @@ module EnergyMinimizer
     integer :: n_eig
     logical :: eig_ok
     integer :: k, i_round, i_sc, n_iter_total, status, nt, n_display, k_cap
-    logical :: converged, stalled
+    logical :: converged, stalled, aborted
+    real :: dM_moved
     character*(256) :: prog_str
 
     allocate( H(3*n), m_prev(3*n), g(3*n), g_prev(3*n), tq(3*n), tq_prev(3*n), m_best(3*n) )
@@ -142,6 +154,8 @@ module EnergyMinimizer
     status = 2
     n_iter_total = 0
     tq_rel = 0.0
+    aborted = .false.
+    dM_moved = 0.0
 
     do i_round = 1, n_round_max
 
@@ -150,6 +164,7 @@ module EnergyMinimizer
         call startState()
         call descend()
         n_iter_total = n_iter_total + k
+        if ( aborted ) exit
 
         if ( converged .and. settings%saddle_check .eq. 1 ) then
             !A vanishing torque also marks a saddle point, and a symmetric starting state - the
@@ -172,6 +187,7 @@ module EnergyMinimizer
                 call startState()
                 call descend()
                 n_iter_total = n_iter_total + k
+                if ( aborted ) exit
                 if ( E .lt. E_stop ) then
                     write(prog_str,'(A,ES10.3,A,I4,A)') 'Minimizer: saddle check lowered the energy by ', E_best - E, ' J after ', k, ' iterations, continuing'
                     call callback( trim(prog_str), -1 )
@@ -181,7 +197,7 @@ module EnergyMinimizer
                     call startState()
                     call descend()
                     n_iter_total = n_iter_total + k
-                    if ( .not. converged ) exit
+                    if ( aborted .or. .not. converged ) exit
                 else
                     !Back to the unperturbed minimum, whichever way the trial descent ended
                     m = m_best
@@ -246,10 +262,11 @@ module EnergyMinimizer
                 call startState()
                 call descend()
                 n_iter_total = n_iter_total + k
-                if ( .not. converged ) exit
+                if ( aborted .or. .not. converged ) exit
             end do
             deallocate( u, w )
         endif
+        if ( aborted ) exit
 
         if ( converged ) then
             if ( i_round .eq. 1 ) then
@@ -268,6 +285,8 @@ module EnergyMinimizer
         call callback( trim(prog_str), -1 )
 
         if ( settings%fallback .eq. 0 .or. i_round .eq. n_round_max ) exit
+        !A state that has already moved too far is not worth a time integration
+        if ( abortCheck() ) exit
 
         !Fall back to the ODE integration over the requested time window from the current state,
         !then try the minimizer again from where it ends up
@@ -278,7 +297,15 @@ module EnergyMinimizer
                 callback_display, tol, thres_value, useCVODE, t_conv, conv_tol )
         m = y_fb(:,nt)
         deallocate( t_out_fb, y_fb )
+        if ( abortCheck() ) exit
     end do
+
+    if ( aborted ) then
+        status = 3
+        write(prog_str,'(A,ES9.2,A,ES9.2,A,I7,A)') 'Minimizer short-circuit: mean moved by ', dM_moved, &
+            ' (limit ', settings%abort_dM, ') after ', n_iter_total, ' iterations; relaxation abandoned'
+        call callback( trim(prog_str), -1 )
+    endif
 
     result%n_iter = result%n_iter + n_iter_total
     result%torque = tq_rel
@@ -351,6 +378,9 @@ module EnergyMinimizer
                 converged = .true.
                 exit
             endif
+            if ( k .ge. abort_minit .and. mod(k, abort_every) .eq. 0 ) then
+                if ( abortCheck() ) exit
+            endif
 
             !Barzilai-Borwein step for the next iteration, alternating between the two rules
             ss = sum( (m - m_prev)**2 )
@@ -375,6 +405,26 @@ module EnergyMinimizer
             !endif
         end do
     end subroutine descend
+
+    !> Short-circuit test: has the weighted mean of the current m moved further than abort_dM from
+    !> abort_ref? Sets aborted (and dM_moved) and returns it; always false when abort_dM is 0.
+    logical function abortCheck()
+        real,dimension(3) :: mean
+        abortCheck = .false.
+        if ( settings%abort_dM .le. 0.0 ) return
+        if ( allocated(settings%abort_w) ) then
+            mean(1) = sum( settings%abort_w * m(1:n) )
+            mean(2) = sum( settings%abort_w * m(n+1:2*n) )
+            mean(3) = sum( settings%abort_w * m(2*n+1:3*n) )
+        else
+            mean(1) = sum( m(1:n) ) / real(n)
+            mean(2) = sum( m(n+1:2*n) ) / real(n)
+            mean(3) = sum( m(2*n+1:3*n) ) / real(n)
+        endif
+        dM_moved = sqrt( sum( (mean - settings%abort_ref)**2 ) )
+        aborted = dM_moved .gt. settings%abort_dM
+        abortCheck = aborted
+    end function abortCheck
 
     end subroutine MagTense_Minimize
 

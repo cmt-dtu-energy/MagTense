@@ -61,9 +61,16 @@
     real(DP),dimension(:),allocatable :: pred_u                 !>Lowest Hessian eigenvector of the previous field, the Lanczos start vector of the next
     real(DP),parameter :: pred_ratio_max = 2.0_DP               !>Largest field-step ratio the extrapolation is taken at
     real(DP),parameter :: pred_dm_max = 0.5_DP                  !>Largest per-cell displacement |dm| the extrapolation is taken at
+    !>Adaptive field loop: the weight Ms_i V_i / sum(Ms V) of every cell in the mean magnetisation that
+    !>dM and the sign-change test are measured on, and the minimizer short-circuit of the current
+    !>trial (limit 0: off) with the weighted mean of the last accepted state as its reference
+    real(DP),dimension(:),allocatable :: gb_metric_w
+    real(DP) :: gb_abort_dM = 0.0_DP
+    real(DP),dimension(3) :: gb_abort_ref = 0.0_DP
 
     private :: gb_solution,gb_problem,crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2,gb_cellVol,n_feval_count
     private :: pred_m1,pred_m2,pred_H1,pred_H2,pred_n,pred_tau,pred_u,pred_ratio_max,pred_dm_max
+    private :: gb_metric_w,gb_abort_dM,gb_abort_ref
 
     contains
     
@@ -519,6 +526,8 @@
     !The cell volumes are cached by computeEnergies for the grid of this solve; the next solve in the
     !same process may use another grid
     if ( allocated(gb_cellVol) ) deallocate( gb_cellVol )
+    if ( allocated(gb_metric_w) ) deallocate( gb_metric_w )
+    gb_abort_dM = 0.0_DP
 
     #if USE_CUDA
       if ( gb_problem%useCuda .eq. useCudaTrue ) then
@@ -581,10 +590,13 @@
     subroutine SolveAdaptiveHextLoop(fct, fct_thermal, cb_fct, M_out, ntot, nt, n_reject_max)
     !>-----------------------------------------
     !> Adaptive stepping of the applied field from H_start to H_end. Every trial step is a full
-    !> relaxation from the last accepted equilibrium; the change of the cell-averaged magnetisation
-    !> dM = |<m>_trial - <m>_accepted| decides whether the trial is accepted and how long the next
-    !> step is (target tracking):
+    !> relaxation from the last accepted equilibrium; the change of the moment-weighted mean
+    !> magnetisation dM = |<m>_trial - <m>_accepted|, <m> = sum_i Ms_i V_i m_i / sum_i Ms_i V_i,
+    !> decides whether the trial is accepted and how long the next step is (target tracking):
     !>
+    !>   - the minimizer abandons a trial above dH_min as soon as its mean has moved by
+    !>     dM_abort x dM_reject (short-circuit, status 3), and the trial is rejected like a dM
+    !>     rejection, without relaxing it to the end or through the LL fallback first;
     !>   - reject and bisect towards the accepted state when dM > dM_reject, when the mean
     !>     magnetisation along the sweep changes sign and the step is above switch_refine_dH, or when
     !>     the minimizer did not converge (status 2); nothing is rejected once dH is at dH_min, so a
@@ -614,9 +626,9 @@
     real(DP) :: H_delta(3), H_dir(3), H_current(3), H_trial(3), H_remaining(3)
     real(DP) :: H_distance, remaining_distance, dH, dH_initial, dH_step, dH_initial_T, dH_T, dH_step_T, dM, m_parallel_before, m_parallel_trial
     real(DP),dimension(:),allocatable :: m_before, m_accepted, m_trial
-    logical :: reject_step, reached_end, sign_change, switch_reject, nonconv_reject, trial_converged, switched
+    logical :: reject_step, reached_end, sign_change, switch_reject, nonconv_reject, trial_converged, switched, short_circuit
     real(DP) :: bracket_dH, dH_pre_switch, factor, lam_prev, lam_acc, lam_max, s_prev, s_acc, slope, d_sw, nfev_prev
-    integer :: n_rej_dM, n_rej_sign, n_rej_conv, n_floor_accept, n_unconverged_acc
+    integer :: n_rej_dM, n_rej_sign, n_rej_conv, n_floor_accept, n_unconverged_acc, n_rej_abort
     real(DP), parameter :: ctrl_safety = 0.9_DP       !>Aim slightly below dM_target
     real(DP), parameter :: ctrl_exponent = 1.0_DP     !>dM is about linear in dH between switching events
     real(DP), parameter :: ind_fraction = 0.9_DP      !>Fraction of the predicted distance to the instability the step may take
@@ -655,6 +667,8 @@
       dH = dH_initial
       allocate(m_before(3*ntot), m_accepted(3*ntot), m_trial(3*ntot))
       m_accepted = gb_problem%m0
+      call setMetricWeights( ntot )
+      gb_abort_dM = 0.0_DP
 
       ! Relax the starting state at H_start and store it in the first slot. Every trial step's dM is
       ! measured against the last accepted state, so that state has to be an equilibrium: an m0 far
@@ -690,6 +704,7 @@
       s_prev = 0.0_DP
       nfev_prev = real(gb_solution%n_feval(i_acc), DP)
       n_rej_dM = 0
+      n_rej_abort = 0
       n_rej_sign = 0
       n_rej_conv = 0
       n_floor_accept = 0
@@ -739,7 +754,19 @@
               call displayGUIMessage( trim(prog_str) )
           endif
 
+          !Short-circuit: a trial that can still be rejected (dH above the floor) is abandoned by the
+          !minimizer as soon as its mean has moved by dM_abort x dM_reject, before it is relaxed to the
+          !end or through the LL fallback. At dH_min nothing is rejected, so it relaxes in full there.
+          if (gb_problem%solver .eq. MicroMagSolverMinimizer .and. gb_problem%dM_abort > 0.0_DP .and. &
+              dH > gb_problem%dH_min) then
+              gb_abort_dM = gb_problem%dM_abort * gb_problem%dM_reject
+              gb_abort_ref = weightedMeanMagnetisation(m_before, ntot)
+          else
+              gb_abort_dM = 0.0_DP
+          endif
+
           call relaxAtField( fct, fct_thermal, cb_fct, M_out(:,:,i_trial), ntot, nt, i_trial )
+          gb_abort_dM = 0.0_DP
 
           m_trial = M_out(:,nt,i_trial)
           dM = adaptiveStepMetric(m_before, m_trial, ntot)
@@ -747,13 +774,17 @@
           m_parallel_before = meanMagnetisationAlongField(m_before, ntot, H_dir)
           m_parallel_trial = meanMagnetisationAlongField(m_trial, ntot, H_dir)
           sign_change = m_parallel_before * m_parallel_trial < 0.0_DP
-          trial_converged = (gb_solution%min_status(i_trial) /= 2 .and. gb_solution%min_status(i_trial) /= -2)
+          short_circuit = (gb_solution%min_status(i_trial) == 3)
+          trial_converged = (gb_solution%min_status(i_trial) /= 2 .and. gb_solution%min_status(i_trial) /= -2 &
+                             .and. .not. short_circuit)
 
           !----- accept or reject the trial -----
           reject_step = .false.
           switch_reject = .false.
           nonconv_reject = .false.
           if (dM > gb_problem%dM_reject .and. dH > gb_problem%dH_min) reject_step = .true.
+          !An abandoned trial is a large change by construction (it is only armed above dH_min)
+          if (short_circuit) reject_step = .true.
           if (gb_problem%use_switch_refine) then
               if (sign_change .and. dH > gb_problem%switch_refine_dH .and. dH > gb_problem%dH_min) then
                   reject_step = .true.
@@ -777,7 +808,9 @@
                       !length to return to once the switch has been accepted
                       if (bracket_dH < 0.0_DP) dH_pre_switch = dH
                       bracket_dH = dH_step
-                      if (switch_reject) then
+                      if (short_circuit) then
+                          n_rej_abort = n_rej_abort + 1
+                      else if (switch_reject) then
                           n_rej_sign = n_rej_sign + 1
                       else
                           n_rej_dM = n_rej_dM + 1
@@ -900,8 +933,9 @@
       enddo
 
       gb_problem%nHextAccepted = i_acc
-      write(prog_str,'(A,I5,A,I4,A,I4,A,I4,A,I4,A,I4)') 'Adaptive hysteresis summary: accepted ', i_acc, &
-          ', rejected (dM) ', n_rej_dM, ', rejected (sign change) ', n_rej_sign, &
+      gb_abort_dM = 0.0_DP
+      write(prog_str,'(A,I5,A,I4,A,I4,A,I4,A,I4,A,I4,A,I4)') 'Adaptive hysteresis summary: accepted ', i_acc, &
+          ', rejected (dM) ', n_rej_dM, ', rejected (short-circuit) ', n_rej_abort, ', rejected (sign change) ', n_rej_sign, &
           ', rejected (not converged) ', n_rej_conv, ', switches accepted at dH_min ', n_floor_accept, &
           ', accepted without convergence ', n_unconverged_acc
       call displayGUIMessage( trim(prog_str) )
@@ -1002,28 +1036,51 @@
         enddo
     end subroutine predictorStart
 
+    !> The magnetic moment per unit total moment of every cell, Ms_i V_i / sum_j Ms_j V_j, the weight
+    !> of the cell in the mean magnetisation the adaptive loop works with. A plain average over the
+    !> cells would weigh a cell by its count: on a refined (octree) mesh the small tiles of the
+    !> refined regions would dominate, and a soft phase of low Ms would count as much as the
+    !> material that carries the moment. On a uniform grid of one material both are the same.
+    subroutine setMetricWeights( ntot )
+    integer,intent(in) :: ntot
+    real(DP) :: total
+      if ( .not. allocated(gb_cellVol) ) then
+          allocate( gb_cellVol(ntot) )
+          call cellVolumes( gb_problem, gb_solution, gb_cellVol )
+      endif
+      if ( allocated(gb_metric_w) ) deallocate( gb_metric_w )
+      allocate( gb_metric_w(ntot) )
+      gb_metric_w = abs(gb_problem%Ms) * gb_cellVol
+      total = sum( gb_metric_w )
+      if ( total > 0.0_DP ) then
+          gb_metric_w = gb_metric_w / total
+      else
+          gb_metric_w = 1.0_DP / real(ntot, DP)
+      endif
+    end subroutine setMetricWeights
+
+    !> Moment-weighted mean magnetisation <m> = sum_i w_i m_i (see setMetricWeights)
+    function weightedMeanMagnetisation(m, ntot) result(M_mean)
+    real(DP),dimension(:),intent(in) :: m
+    integer,intent(in) :: ntot
+    real(DP) :: M_mean(3)
+      M_mean(1) = sum(gb_metric_w * m(1:ntot))
+      M_mean(2) = sum(gb_metric_w * m(ntot+1:2*ntot))
+      M_mean(3) = sum(gb_metric_w * m(2*ntot+1:3*ntot))
+    end function weightedMeanMagnetisation
+
+    !> dM = |<m>_trial - <m>_before| with the moment-weighted mean
     real(DP) function adaptiveStepMetric(m_before, m_trial, ntot) result(dM_rms)
     real(DP),dimension(:),intent(in) :: m_before, m_trial
     integer,intent(in) :: ntot
-    real(DP) :: M_sum_before(3), M_sum_trial(3)
-      M_sum_before(1) = sum(m_before(1:ntot)) / real(ntot, DP)
-      M_sum_before(2) = sum(m_before(ntot+1:2*ntot)) / real(ntot, DP)
-      M_sum_before(3) = sum(m_before(2*ntot+1:3*ntot)) / real(ntot, DP)
-      M_sum_trial(1)  = sum(m_trial(1:ntot)) / real(ntot, DP)
-      M_sum_trial(2)  = sum(m_trial(ntot+1:2*ntot)) / real(ntot, DP)
-      M_sum_trial(3)  = sum(m_trial(2*ntot+1:3*ntot)) / real(ntot, DP)
-      dM_rms = sqrt(sum((M_sum_trial - M_sum_before)**2))
+      dM_rms = sqrt(sum((weightedMeanMagnetisation(m_trial, ntot) - weightedMeanMagnetisation(m_before, ntot))**2))
     end function adaptiveStepMetric
 
     real(DP) function meanMagnetisationAlongField(m, ntot, H_dir) result(M_parallel)
     real(DP),dimension(:),intent(in) :: m
     integer,intent(in) :: ntot
     real(DP),dimension(3),intent(in) :: H_dir
-    real(DP) :: M_mean(3)
-      M_mean(1) = sum(m(1:ntot)) / real(ntot, DP)
-      M_mean(2) = sum(m(ntot+1:2*ntot)) / real(ntot, DP)
-      M_mean(3) = sum(m(2*ntot+1:3*ntot)) / real(ntot, DP)
-      M_parallel = dot_product(M_mean, H_dir)
+      M_parallel = dot_product(weightedMeanMagnetisation(m, ntot), H_dir)
     end function meanMagnetisationAlongField
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
@@ -1351,6 +1408,12 @@
     !With the predictor on, the first step also starts from the step length the previous field
     !ended with (a curvature estimate), see predictorStart
     if ( gb_problem%min_predictor .ne. 0 ) settings%tau_init = pred_tau
+    !Short-circuit of the adaptive field loop (set there per trial; 0 everywhere else)
+    if ( gb_abort_dM > 0.0_DP .and. allocated(gb_metric_w) ) then
+        settings%abort_dM = gb_abort_dM
+        settings%abort_ref = gb_abort_ref
+        settings%abort_w = gb_metric_w
+    endif
 
     allocate( m(3*ntot) )
     call MagTense_Minimize( minimizerHeff, minimizerEnergy, gb_problem%m0, m, ntot, settings, result, cb_fct, &
@@ -1367,17 +1430,19 @@
     gb_solution%min_iter(i_field) = gb_solution%min_iter(i_field) + result%n_iter
     gb_solution%min_torque(i_field) = result%torque
     gb_solution%min_status(i_field) = result%status
+    !An abandoned trial (status 3) is retried closer to the accepted state, whose warm start (the
+    !eigenvector and step length of the last accepted field) is kept for it
     if ( gb_problem%min_saddle_check .eq. 2 ) then
         gb_solution%min_eig(i_field) = result%eig_min
         if ( result%status .le. 1 .and. allocated(result%eig_vec) ) then
             pred_u = result%eig_vec
-        else if ( allocated(pred_u) ) then
+        else if ( result%status .ne. 3 .and. allocated(pred_u) ) then
             deallocate( pred_u )
         endif
     endif
     if ( result%status .le. 1 ) then
         pred_tau = result%tau_last
-    else
+    else if ( result%status .ne. 3 ) then
         pred_tau = 0.0_DP
     endif
 
@@ -1385,7 +1450,7 @@
     !after the if with the converged message commented out, so on convergence an
     !uninitialised buffer went to displayGUIMessage. Python printed the garbage silently,
     !but in the MEX mxCreateString asserts on non-UTF-8 input and takes MATLAB down.
-    if ( result%status .gt. 1 ) then
+    if ( result%status .eq. 2 ) then
         write(prog_str,'(A,I7,A,I7,A,ES9.2)') 'Minimizer NOT converged: iter ', result%n_iter, ' feval ', n_feval_count, ' torque/Ms ', result%torque
         call displayGUIMessage( trim(prog_str) )
     endif
