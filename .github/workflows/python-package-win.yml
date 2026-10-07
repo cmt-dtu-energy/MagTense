@@ -242,6 +242,7 @@ jobs:
           python/examples/
           documentation/examples_FEM_validation/
           documentation/examples_mumag_validation/
+          .github/scripts/
 
     - name: Download cu13 wheel artifact
       uses: actions/download-artifact@v4
@@ -351,6 +352,18 @@ jobs:
         }
 
         & $env:PYTHON_EXE -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
+
+    # Only runs if the import above failed. See the script itself for what it
+    # checks and why - kept as a real file rather than inlined here because a
+    # PowerShell here-string's closing '@ must sit at column 0, which conflicts
+    # with YAML block-scalar indentation rules once the script is long enough
+    # to matter.
+    - name: Diagnose DLL load failure
+      if: failure()
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      run: |
+        $ErrorActionPreference = "Continue"
+        & $env:PYTHON_EXE .github/scripts/diagnose_windows_dll.py
 
     # The one step that actually proves CUDA executes on this device, not just
     # that the wheel imports. --skip std_problem_6 on every leg here (not just
