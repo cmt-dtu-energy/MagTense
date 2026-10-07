@@ -36,7 +36,6 @@ matplotlib
 notebook
 h5py
 tqdm
-importlib_resources
 ipympl
 pycairo
 nvidia-cuda-runtime-cu12

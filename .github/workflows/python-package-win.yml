@@ -186,7 +186,7 @@ jobs:
         python -m pytest python/examples/magnetostatics/test_magtense.py \
                           python/examples/micromagnetism/MagTense_tests
 
-    # python/examples/micromagnetism/testMagTenseFunctions.py is the combined micromagnetic
+    # python/util/testMagTenseFunctions.py is the combined micromagnetic
     # suite. It runs the validation examples, compares every measure with the limit that
     # belongs to it, and exits non zero when one of them is over its limit, so this step
     # fails on a numerical regression and not only on a crash. matplotlib and scipy are not
@@ -199,18 +199,18 @@ jobs:
       if: ${{ !(matrix.py-version.semver == '3.13' && matrix.variant.name == 'cpu') }}
       run: |
         python -m pip install matplotlib scipy
-        python python/examples/micromagnetism/testMagTenseFunctions.py --skip std_problem_6
+        python python/util/testMagTenseFunctions.py --skip std_problem_6
 
     - name: Run the whole combined micromagnetic test suite
       if: ${{ matrix.py-version.semver == '3.13' && matrix.variant.name == 'cpu' }}
       run: |
         python -m pip install matplotlib scipy
-        python python/examples/micromagnetism/testMagTenseFunctions.py
+        python python/util/testMagTenseFunctions.py
 
     - name: Upload the overview of the test suite
       if: ${{ always() && matrix.py-version.semver == '3.13' && matrix.variant.name == 'cpu' }}
       uses: actions/upload-artifact@v4
       with:
         name: test-suite-py${{ matrix.py-version.version }}-cpu-Windows
-        path: python/examples/micromagnetism/testMagTenseFunctions_overview.png
+        path: python/util/results/testMagTenseFunctions_overview.png
         if-no-files-found: ignore
