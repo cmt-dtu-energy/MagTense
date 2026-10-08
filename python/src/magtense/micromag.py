@@ -119,9 +119,19 @@ class MicromagProblem:
             enough that its leaves contain the largest tile; dip-fmm warns otherwise.
         cdfmm_capacity: Adaptive tree: maximum number of tiles per leaf before a split.
         cdfmm_max_depth: Adaptive tree: deepest level, 0 to 8.
-        cdfmm_root: Adaptive tree: root cube as (centre x, y, z, half-width) [m]. ``None``
-            uses the exact bounding cube of the cells (right for a mesh refined inside a cube). Fix it so that the tile grid is dyadic in the
-            root (e.g. a 640 nm cube for 20 nm base tiles), otherwise tiles can straddle leaves.
+        cdfmm_root: Root cube as (centre x, y, z, half-width) [m]. ``None`` lets MagTense choose
+            it (see ``cdfmm_align``). A given root is used as it is, for either tree.
+        cdfmm_align: With ``cdfmm_root=None``, choose a root on which every leaf holds whole
+            cells, so that no cell sticks out of its leaf box (a cell that does breaks the
+            far-field assumption and costs accuracy; dip-fmm warns about it). The root is
+            anchored at the lower corner of the cells; its unit is the smallest common
+            multiple of the cell (or finest tile) side lengths, so cells that are not cubes
+            are aligned along every axis (a warning is given if the sides have no common
+            multiple). Uniform tree: the leaf at ``cdfmm_depth`` is ceil(extent / 2**depth)
+            units, e.g. 3 cells of an 80-cell grid at depth 5. Adaptive tree: the root is a
+            power of two times the unit. ``False`` keeps the previous behaviour: the bounding
+            box of a uniform grid (dip-fmm's original uniform-cuboid plan) and the bounding
+            cube of the tiles for the adaptive tree.
         min_tol: Minimizer convergence criterion: the largest torque max_i |m_i x H_i| over the
             cells, divided by max(Ms), must fall below this.
         min_maxiter: Maximum number of minimizer iterations per applied field.
@@ -225,6 +235,7 @@ class MicromagProblem:
             cdfmm_capacity: int = 32,
             cdfmm_max_depth: int = 5,
             cdfmm_root: list | np.ndarray | None = None,
+            cdfmm_align: bool = True,
             phase_id: np.ndarray | None = None,
             A_int: np.ndarray | None = None,
             min_tol: float = 1e-5,
@@ -441,6 +452,7 @@ class MicromagProblem:
         self.cdfmm_capacity = int(cdfmm_capacity)
         self.cdfmm_max_depth = int(cdfmm_max_depth)
         self.cdfmm_root = np.asfortranarray(cdfmm_root)
+        self.cdfmm_align = bool(cdfmm_align)
         #: Applied field (x, y, z) [A/m] of every field step of the last run: the accepted
         #: steps of an adaptive run. Filled whether or not usereturnhall is set.
         self.H_ext_applied = None
@@ -880,26 +892,62 @@ class MicromagProblem:
             )
         return self._solver
 
-    def _resolved_cdfmm_root(self) -> np.ndarray:
-        """Root cube (centre x, y, z, half-width) handed to dip-fmm's adaptive tree.
-
-        An explicit ``cdfmm_root`` is used as given. Otherwise the root is the exact bounding cube
-        of the cells: ``grid_L`` centred on the origin for a uniform grid, the extents of
-        ``grid_pts`` +- ``grid_abc``/2 for a prism grid. An octree mesh built in a cube therefore
-        stays on the dyadic grid of the root, so its tiles fit their leaves; any padding would
-        shift the leaf faces off that grid.
-        """
-        root = np.asarray(self.cdfmm_root, dtype=np.float64)
-        if root[3] > 0 or self.cdfmm_tree != 1:
-            return np.asfortranarray(root)
+    def _cell_extent(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Lower corner, upper corner and cell (finest tile) side lengths of the grid [m]."""
         if self.grid_type == 3:
             pts = np.asarray(self.grid_pts, dtype=np.float64)
-            half_size = 0.5 * np.asarray(self.grid_abc, dtype=np.float64)
-            low = (pts - half_size).min(axis=0)
-            high = (pts + half_size).max(axis=0)
+            abc = np.asarray(self.grid_abc, dtype=np.float64)
+            return (pts - 0.5 * abc).min(axis=0), (pts + 0.5 * abc).max(axis=0), abc.min(axis=0)
+        L = np.asarray(self.grid_L, dtype=np.float64)
+        n = np.asarray(self.grid_n, dtype=np.float64)
+        return -0.5 * L, 0.5 * L, L / n
+
+    @staticmethod
+    def _common_unit(h: np.ndarray) -> tuple[float, bool]:
+        """Smallest length that is a whole multiple of every side length in h (up to 64 of the
+        largest), and whether one was found; otherwise the largest side."""
+        hmax = float(np.max(h))
+        for k in range(1, 65):
+            u = k * hmax
+            q = u / h
+            if np.all(np.abs(q - np.rint(q)) < 1e-6 * q):
+                return u, True
+        return hmax, False
+
+    def aligned_cdfmm_root(self, tree: str | None = None, depth: int | None = None) -> np.ndarray:
+        """The aligned root (centre x, y, z, half-width) [m] described under ``cdfmm_align``."""
+        tree = tree or {0: "uniform", 1: "adaptive"}[self.cdfmm_tree]
+        depth = self.cdfmm_depth if depth is None else int(depth)
+        low, high, h = self._cell_extent()
+        unit, ok = self._common_unit(h)
+        if not ok:
+            import warnings
+            warnings.warn(f"cell sides {h} have no common multiple: the dip-fmm root cannot align "
+                          "the leaves with the cells along every axis", stacklevel=2)
+        extent = float(np.max(high - low))
+        n_units = extent / unit
+        if tree == "uniform":
+            side = unit * np.ceil(n_units / 2**depth - 1e-9) * 2**depth
         else:
-            low = -0.5 * np.asarray(self.grid_L, dtype=np.float64)
-            high = 0.5 * np.asarray(self.grid_L, dtype=np.float64)
+            side = unit * 2 ** int(np.ceil(np.log2(max(n_units, 1.0)) - 1e-9))
+        centre = low + 0.5 * side
+        return np.asfortranarray(np.concatenate([centre, [0.5 * side]]))
+
+    def _resolved_cdfmm_root(self) -> np.ndarray:
+        """Root cube (centre x, y, z, half-width) handed to dip-fmm; half-width <= 0 means none.
+
+        An explicit ``cdfmm_root`` is used as given. Otherwise, with ``cdfmm_align``, the aligned
+        root of ``aligned_cdfmm_root``; without it, the bounding cube of the cells for the
+        adaptive tree and none for the uniform tree (dip-fmm then encloses the cells itself).
+        """
+        root = np.asarray(self.cdfmm_root, dtype=np.float64)
+        if root[3] > 0:
+            return np.asfortranarray(root)
+        if self.cdfmm_align:
+            return self.aligned_cdfmm_root()
+        if self.cdfmm_tree != 1:
+            return np.asfortranarray(root)
+        low, high, _ = self._cell_extent()
         centre = 0.5 * (low + high)
         return np.asfortranarray(np.concatenate([centre, [0.5 * float(np.max(high - low))]]))
 

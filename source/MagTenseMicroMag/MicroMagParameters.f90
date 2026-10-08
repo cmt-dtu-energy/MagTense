@@ -269,10 +269,13 @@ include "mkl_dfti.f90"
         ! lengths). cdfmm_tree selects the fixed-depth uniform tree of cdfmm_depth (0)
         ! or the capacity-driven adaptive tree (1), which splits a box while it holds
         ! more than cdfmm_capacity tiles and is shallower than cdfmm_max_depth.
-        ! cdfmm_root = (centre x, y, z, half-width) fixes the adaptive root cube; a
-        ! half-width <= 0 lets dip-fmm enclose the tiles itself. Keep tiles on the
-        ! dyadic grid of the root, or a tile can protrude from its leaf (dip-fmm then
-        ! prints a containment warning).
+        ! cdfmm_root = (centre x, y, z, half-width) fixes the root cube of either tree; a
+        ! half-width <= 0 lets dip-fmm enclose the tiles itself (for the uniform tree on a
+        ! uniform grid: the original uniform-cuboid plan on the bounding box). With a root,
+        ! the uniform tree is built as every occupied box split to cdfmm_depth. Keep the
+        ! tiles on the grid of the root's leaves, or a tile can protrude from its leaf
+        ! (dip-fmm then prints a containment warning); the Python layer chooses such an
+        ! aligned root by default (MicromagProblem.cdfmm_align).
         integer :: cdfmm_tree = 0          !> 0 uniform tree, 1 adaptive tree
         integer :: cdfmm_capacity = 32     !> adaptive: maximum tiles per leaf before a split
         integer :: cdfmm_max_depth = 5     !> adaptive: deepest level (0..8)

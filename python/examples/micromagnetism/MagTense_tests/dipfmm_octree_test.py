@@ -86,6 +86,14 @@ def uniform_problem(m0, cuda=False, **dipfmm) -> MicromagProblem:
     return p
 
 
+def grid_problem(res, m0, cuda=False, **dipfmm) -> MicromagProblem:
+    """A uniform grid of the 32 nm cube with res cells (any shape) and a random magnetisation."""
+    p = MicromagProblem(res=list(res), grid_L=[L, L, L], grid_type="uniform", m0=m0, Ms=MS, A0=A_EX, K0=0.0,
+                        alpha=4000.0, gamma=0.0, solver="dynamic", cuda=cuda, usereturnhall=True, **dipfmm)
+    p.window_enabled = 0
+    return p
+
+
 def rel_l2(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.linalg.norm(a - b) / np.linalg.norm(b))
 
@@ -128,6 +136,41 @@ def run_test(cpu_only: bool = False) -> list[dict]:
         ada_u = demag_field(uniform_problem(m0u, cuda=cuda, use_cdfmm=True, cdfmm_order=6, cdfmm_tree="adaptive",
                                             cdfmm_root=[0.0, 0.0, 0.0, 0.5 * L]))
         checks.append(check(f"uniform {tag}: dip-fmm adaptive tree vs dense", rel_l2(ada_u, dense_u), 2e-3))
+
+    # the original uniform-cuboid plan (bounding-box root) is still reachable
+    for cuda in backends:
+        tag = "cuda" if cuda else "cpu"
+        leg = demag_field(uniform_problem(m0u, cuda=cuda, use_cdfmm=True, cdfmm_order=6, cdfmm_depth=2, cdfmm_align=False))
+        checks.append(check(f"uniform {tag}: original uniform plan (cdfmm_align=False) vs dense", rel_l2(leg, dense_u), 2e-3))
+
+    # aligned roots: a 10^3 grid at depth 2 has 2.5 cells per leaf on its bounding box, so half the
+    # cells stick out of their leaves; the aligned root (3-cell leaves) keeps them inside
+    m10 = random_m0(1000, seed=13)
+    dense10 = demag_field(grid_problem([10, 10, 10], m10))
+    for cuda in backends:
+        tag = "cuda" if cuda else "cpu"
+        al = demag_field(grid_problem([10, 10, 10], m10, cuda=cuda, use_cdfmm=True, cdfmm_order=6, cdfmm_depth=2))
+        un = demag_field(grid_problem([10, 10, 10], m10, cuda=cuda, use_cdfmm=True, cdfmm_order=6, cdfmm_depth=2,
+                                      cdfmm_align=False))
+        e_al, e_un = rel_l2(al, dense10), rel_l2(un, dense10)
+        print(f"  10^3 grid, depth 2 ({tag}): aligned {e_al:.3e}, bounding-box root {e_un:.3e}")
+        checks.append(check(f"10^3 {tag}: uniform tree on the aligned root (3 cells per leaf) vs dense", e_al, 2e-3))
+        checks.append(check(f"10^3 {tag}: aligned root is more accurate than the bounding box (ratio)", e_al / e_un, 1.0))
+    # cells that are not cubes: 10 x 10 x 5 cells of 3.2 x 3.2 x 6.4 nm; the root unit is 6.4 nm
+    m_aniso = random_m0(500, seed=17)
+    dense_an = demag_field(grid_problem([10, 10, 5], m_aniso))
+    an = demag_field(grid_problem([10, 10, 5], m_aniso, use_cdfmm=True, cdfmm_order=6, cdfmm_depth=2))
+    checks.append(check("10x10x5 non-cubic cells: aligned uniform tree vs dense", rel_l2(an, dense_an), 2e-3))
+    pa = grid_problem([10, 10, 5], m_aniso, use_cdfmm=True, cdfmm_depth=2)
+    leaf = 2 * pa.aligned_cdfmm_root()[3] / 4
+    checks.append(check("10x10x5: aligned leaf holds whole cells along x and z (0 = yes)",
+                        0.0 if abs(leaf / 3.2e-9 - round(leaf / 3.2e-9)) < 1e-9 and abs(leaf / 6.4e-9 - round(leaf / 6.4e-9)) < 1e-9 else 1.0, 0.5))
+    # the root sizes of the 80^3 production grid (2.5 nm cells)
+    p80 = MicromagProblem(res=[80, 80, 80], grid_L=[200e-9] * 3, use_cdfmm=True, cdfmm_depth=5)
+    side_u = 2 * p80.aligned_cdfmm_root("uniform", 5)[3]
+    side_a = 2 * p80.aligned_cdfmm_root("adaptive")[3]
+    checks.append(check("80^3: aligned uniform root at depth 5 is 240 nm (|side - 240 nm| [nm])", abs(side_u - 240e-9) * 1e9, 1e-6))
+    checks.append(check("80^3: aligned adaptive root is 320 nm (|side - 320 nm| [nm])", abs(side_a - 320e-9) * 1e9, 1e-6))
 
     # outputs without usereturnhall: small field arrays, applied fields still returned
     p = octree_problem(pts, abc, m0, returnhall=False, use_cdfmm=True, cdfmm_order=6, cdfmm_depth=2)

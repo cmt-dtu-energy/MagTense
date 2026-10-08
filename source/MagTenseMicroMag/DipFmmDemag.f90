@@ -23,11 +23,12 @@ contains
 
     !> Construct the fixed-geometry cuboid plan and persistent moment buffers.
     !>
-    !> Uniform grid with the uniform tree: one common cell size (the original path).
-    !> Otherwise every cell passes its own full side lengths: grid%abc on an
-    !> unstructuredPrisms (octree) grid, or the common size repeated on a uniform grid
-    !> evaluated with the adaptive tree. problem%cdfmm_tree selects the fixed-depth
-    !> uniform tree (0) or dip-fmm's capacity-driven adaptive tree (1).
+    !> Uniform grid with the uniform tree and no root: one common cell size on the bounding
+    !> box (the original path). Otherwise every cell passes its own full side lengths:
+    !> grid%abc on an unstructuredPrisms (octree) grid, or the common size repeated on a
+    !> uniform grid. problem%cdfmm_tree selects the fixed-depth uniform tree (0) or dip-fmm's
+    !> capacity-driven adaptive tree (1); with problem%cdfmm_root the uniform tree is every
+    !> occupied box of that root split down to cdfmm_depth (adaptive builder, capacity 1).
     subroutine initialiseDipFmm(problem, ierr, message)
         type(MicroMagProblem), intent(in) :: problem
         integer, intent(out) :: ierr
@@ -101,8 +102,9 @@ contains
 #endif
 
         allocate(cell_volume(ntot))
-        if (uniform_cells .and. problem%cdfmm_tree == 0) then
-            ! The original path: one common cuboid size on the fixed-depth tree.
+        if (uniform_cells .and. problem%cdfmm_tree == 0 .and. .not. (problem%cdfmm_root(4) > 0.0_DP)) then
+            ! The original path: one common cuboid size on the fixed-depth tree, whose root
+            ! dip-fmm takes as the bounding box of the cells.
             cell_volume = cell_size(1) * cell_size(2) * cell_size(3)
             call cdfmm_create_uniform_cuboids( &
                 dip_fmm_plan, &
@@ -137,7 +139,7 @@ contains
                 deallocate(cell_volume, hx, hy, hz)
                 return
             end if
-            if (problem%cdfmm_tree == 1 .and. problem%cdfmm_root(4) > 0.0_DP) then
+            if (problem%cdfmm_root(4) > 0.0_DP) then
                 origin = real(problem%cdfmm_root(1:3) - problem%cdfmm_root(4), c_double)
             else
                 origin = [minval(problem%grid%pts(:, 1) - 0.5_c_double * hx), &
@@ -152,7 +154,16 @@ contains
             hy = snap(hy / unit)
             hz = snap(hz / unit)
             cell_volume = hx * hy * hz
-            if (problem%cdfmm_tree == 1) then
+            if (problem%cdfmm_tree == 0 .and. problem%cdfmm_root(4) > 0.0_DP) then
+                ! Uniform tree on a given (aligned) root: the adaptive builder with capacity 1
+                ! splits every occupied box down to cdfmm_depth, i.e. the uniform tree of that
+                ! depth on this root, with the empty boxes left out. Its leaves hold whole cells
+                ! when the root is aligned, which the bounding box of the cells does not ensure.
+                root_centre = snap((real(problem%cdfmm_root(1:3), c_double) - origin) / unit)
+                call cdfmm_create_adaptive_variable_cuboids( &
+                    dip_fmm_plan, xs, ys, zs, hx, hy, hz, 1, problem%cdfmm_depth, options, cdfmm_ierr, &
+                    root_centre, snap(real(problem%cdfmm_root(4), c_double) / unit))
+            else if (problem%cdfmm_tree == 1) then
                 if (problem%cdfmm_root(4) > 0.0_DP) then
                     root_centre = snap((real(problem%cdfmm_root(1:3), c_double) - origin) / unit)
                     call cdfmm_create_adaptive_variable_cuboids( &
