@@ -175,6 +175,12 @@ def _dipole_field_test() -> list[dict]:
         return mod.run_test()
 
 
+def _no_exchange_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import no_exchange_test as mod
+        return mod.run_test(cuda=USE_CUDA)
+
+
 def _std_problem_4() -> list[dict]:
     """Compare both NIST fields of standard problem 4 with the published mean solutions.
 
@@ -371,6 +377,10 @@ TESTS = {
     'dipole_field_test': (
         _dipole_field_test, False,
         'Far field of a magnetised cube against the analytical point dipole',
+    ),
+    'no_exchange_test': (
+        _no_exchange_test, False,
+        'No exchange (A0 = 0 everywhere) on the uniform grid, unstructured and tetrahedral mesh',
     ),
     'std_problem_4': (
         _std_problem_4, False,

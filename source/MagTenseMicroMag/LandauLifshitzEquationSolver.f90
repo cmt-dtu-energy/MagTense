@@ -1398,7 +1398,11 @@
     type(MATRIX_DESCR) :: descr
     real(DP) :: alpha, beta
     real(DP), dimension(:), allocatable :: temp
-    integer, save :: itimer = 0 
+    integer, save :: itimer = 0
+
+    !Without exchange the operator is identically zero, so the field stays at the zeros that
+    !initializeSolution put there and the three sparse products are skipped
+    if ( .not. problem%useExchange ) return
 
     call trace%begin( "updateExchangeTerms", itimer=itimer, verbose=1 )
     
@@ -2721,7 +2725,20 @@ end subroutine updateDemagfieldFMM
 
     if ( problem%passExch .eq. passExchTrue) return ! Skip this if the exchange has already been passed from outside
 
-    allocate( A0_normalized(size(problem%A0)) )  
+    !With A0 = 0 in every tile there is no exchange at all, and the operator is identically zero.
+    !It has to be caught here: the normalisation below is then 0/0, which is NaN inside the
+    !python and MATLAB extensions (where /fpe:0 does not trap), and on an unstructured mesh the
+    !NaN zeroes every interpolation weight, all sparse matrices come out empty and the solver
+    !segfaults. The uniform grid survived only because it never reads A0_normalized.
+    if ( .not. any( problem%A0 .gt. 0.0_DP ) ) then
+        call displayGUIMessage( 'No exchange terms (A0 = 0 in every tile)' )
+        call ComputeZeroExchangeOperator( grid%nx * grid%ny * grid%nz, A )
+        call create_COO_values_from_CSR( A, solution%gridinfo )
+        problem%useExchange = .false.
+        return
+    endif
+
+    allocate( A0_normalized(size(problem%A0)) )
     A0_normalized = problem%A0 / ( maxval(problem%A0) )   ! Normalized by the largest exchange factor
 
     !The interface values have to be scaled exactly as A0 is, since they replace a harmonic
@@ -3339,27 +3356,16 @@ end subroutine updateDemagfieldFMM
                 descr%mode = SPARSE_FILL_MODE_FULL
                 descr%diag = SPARSE_DIAG_NON_UNIT
                 stat = mkl_sparse_copy ( d2dz2%A, descr, A )
+                deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
+                stat = mkl_sparse_destroy (d2dz2%A)
             else
                 !No exchange terms: a single cell along every direction, i.e. a macrospin. The rest of
-                !the code (and the deallocation below) expects an exchange operator, so build one
-                !with an explicit zero on every diagonal. This used to fall through with d2dz2
-                !unallocated and die in the deallocate.
+                !the code expects an exchange operator, so build one with an explicit zero on every
+                !diagonal. This used to fall through with d2dz2 unallocated and die in the deallocate.
                 call displayGUIMessage( 'No exchange terms (single cell)' )
-                allocate(d2dz2%values(ntot),d2dz2%cols(ntot),d2dz2%rows_start(ntot),d2dz2%rows_end(ntot))
-                do i = 1, ntot
-                    d2dz2%values(i) = 0.0_DP
-                    d2dz2%cols(i) = i
-                    d2dz2%rows_start(i) = i
-                    d2dz2%rows_end(i) = i + 1
-                end do
-                stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, ntot, ntot, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
-                descr%type = SPARSE_MATRIX_TYPE_GENERAL
-                descr%mode = SPARSE_FILL_MODE_FULL
-                descr%diag = SPARSE_DIAG_NON_UNIT
-                stat = mkl_sparse_copy ( d2dz2%A, descr, A )
+                call ComputeZeroExchangeOperator( ntot, A )
+                problem%useExchange = .false.
             endif
-            deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
-            stat = mkl_sparse_destroy (d2dz2%A)
         endif
     endif
     
@@ -3437,7 +3443,44 @@ end subroutine updateDemagfieldFMM
     endif
 
     end function exchCoeff
-       
+
+
+    !>-----------------------------------------
+    !> @brief
+    !> An exchange operator that is identically zero, for a problem without exchange: A0 = 0
+    !> in every tile, or a uniform grid of one cell in total (a macrospin). A problem where
+    !> only some tiles have A0 = 0 still has exchange between the others and does not come
+    !> here. It is stored with an explicit zero on
+    !> every diagonal rather than as an empty matrix, which keeps every row of the CSR arrays
+    !> non-empty and gives the returned GridInfo a well-formed operator of the right size.
+    !> @param[in] ntot the number of tiles
+    !> @param[inout] A the returned sparse matrix
+    !---------------------------------------------------------------------------
+    subroutine ComputeZeroExchangeOperator( ntot, A )
+    integer,intent(in) :: ntot                         !> Number of tiles
+    type(sparse_matrix_t),intent(inout) :: A           !> The returned zero operator
+    type(MagTenseSparse_d) :: Z                        !> Holds the CSR arrays until A owns a copy
+    type(matrix_descr) :: descr
+    integer :: i, stat
+
+    allocate(Z%values(ntot),Z%cols(ntot),Z%rows_start(ntot),Z%rows_end(ntot))
+    do i = 1, ntot
+        Z%values(i) = 0.0_DP
+        Z%cols(i) = i
+        Z%rows_start(i) = i
+        Z%rows_end(i) = i + 1
+    end do
+    !mkl_sparse_d_create_csr only references the arrays, so A is made as a copy before they go
+    stat = mkl_sparse_d_create_csr ( Z%A, SPARSE_INDEX_BASE_ONE, ntot, ntot, Z%rows_start, Z%rows_end, Z%cols, Z%values)
+    descr%type = SPARSE_MATRIX_TYPE_GENERAL
+    descr%mode = SPARSE_FILL_MODE_FULL
+    descr%diag = SPARSE_DIAG_NON_UNIT
+    stat = mkl_sparse_copy ( Z%A, descr, A )
+    stat = mkl_sparse_destroy ( Z%A )
+    deallocate(Z%values,Z%cols,Z%rows_start,Z%rows_end)
+
+    end subroutine ComputeZeroExchangeOperator
+
     !>-----------------------------------------
     !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
     !> @brief
