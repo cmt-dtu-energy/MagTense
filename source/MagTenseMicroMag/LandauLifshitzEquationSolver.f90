@@ -1842,6 +1842,9 @@ subroutine updateDemagfieldDipFmm(problem, solution)
   type(MicroMagSolution), intent(inout) :: solution
   integer :: ierr
   character(len=512) :: message
+  integer, save :: itimer = 0
+
+  call trace%begin( "updateDemagfieldDipFmm", itimer=itimer, verbose=1 )
 
   call evaluateDipFmm(problem, solution, ierr, message)
   if (ierr /= 0) then
@@ -1856,6 +1859,7 @@ subroutine updateDemagfieldDipFmm(problem, solution)
       problem%useCuda = useCudaFalse
       call ComputeDemagfieldTensor(problem)
       call updateDemagfield(problem, solution)
+      call trace%end( "updateDemagfieldDipFmm", itimer=itimer, verbose=1 )
       return
   end if
 
@@ -1866,6 +1870,8 @@ subroutine updateDemagfieldDipFmm(problem, solution)
       solution%HmY = solution%HmY + solution%HmY*problem%CV*sqrt(-2d0*log(solution%u3))*cos(2d0*pi*solution%u4)
       solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
   end if
+
+  call trace%end( "updateDemagfieldDipFmm", itimer=itimer, verbose=1 )
 end subroutine updateDemagfieldDipFmm
 #endif
 
