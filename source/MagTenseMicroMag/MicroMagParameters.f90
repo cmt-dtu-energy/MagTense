@@ -4,9 +4,6 @@ include "mkl_dfti.f90"
     module MicroMagParameters
     use MKL_SPBLAS
     Use MKL_DFTI
-#if USE_FMM3D    
-    use fmm3d_tree_mod
-#endif    
 
     INTEGER, PARAMETER :: SP = SELECTED_REAL_KIND(6, 37)
     INTEGER, PARAMETER :: DP = SELECTED_REAL_KIND(15, 307)
@@ -242,21 +239,6 @@ include "mkl_dfti.f90"
         
         type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H => null()      !> Handle for the FFT MKL stuff
 
-
-
-
-
-        !--------------- demag tensor neighbour stuff ---------------
-        integer :: fmm_cells_per_node
-        real(DP) :: fmm_eps 
-        integer :: fmm_nterms = -1  ! if positive, this is the number of expansions. If negative, the expansion number is computed inside the FMM tree build based on the value of fmm_eps. 
-        integer :: ifunif = 1 
-        integer :: nlmin = 0
-        integer :: nlmax = 5
-        logical :: use_fmm = .true.
-        integer :: allow_fmm_short_circuit = 0
-        integer :: fmm_min_n = 20000    !> Minimum number of cells to use FMM
-
         ! dip-fmm uses an independent persistent cuboid FMM plan. These integer
         ! values match the public constants in cdfmm_fortran.
         logical :: use_cdfmm = .false.
@@ -281,19 +263,7 @@ include "mkl_dfti.f90"
         integer :: cdfmm_max_depth = 5     !> adaptive: deepest level (0..8)
         real(DP), dimension(4) :: cdfmm_root = [0.0_DP, 0.0_DP, 0.0_DP, -1.0_DP]
 
-        integer, dimension(:,:), pointer :: nbr_idx(:,:) => null()    !> Neighbour indices for each target cell
-        integer, dimension(:), pointer :: n_nbors(:) => null()
-        real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:) => null()
-        real(SP),dimension(:,:,:,:), pointer:: diffTens(:,:,:,:) => null()
-
-        type(MagTenseSparse), dimension(6) :: K_fmm_s
-        logical :: K_fmm_built = .false.
-        type(matrix_descr) :: K_fmm_descr_s
-
-        real(SP),dimension(:,:), contiguous, pointer :: Kxx_fmm,Kxy_fmm,Kxz_fmm  !> Demag field tensor split out into the nine symmetric components
-        real(SP),dimension(:,:), contiguous, pointer :: Kyy_fmm,Kyz_fmm      !> Demag field tensor split out into the nine symmetric components
-        real(SP),dimension(:,:), contiguous, pointer :: Kzz_fmm          !> Demag field tensor split out into the nine symmetric components
-        integer :: dummy_run = 0    !> Flag to indicate whether the demag tensor neighbour test setup has been done
+        integer :: dummy_run = 0    !> 1 sets the problem up (demag tensor or dip-fmm plan) and returns without solving
         
         integer :: window_ena
         real(DP) :: window_int
@@ -347,9 +317,6 @@ include "mkl_dfti.f90"
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
-#if USE_FMM3D
-        class(FMM3DTree), pointer :: fmm_tree => null()    !> FMM tree for computing the demag field using FMM
-#endif
     end type MicroMagSolution
     
     
@@ -369,7 +336,6 @@ include "mkl_dfti.f90"
     integer,parameter :: useCVODETrue=1,useCVODEFalse=0
     integer,parameter :: passExchTrue=1,passExchFalse=0
     integer,parameter :: useReturnHallTrue=1,useReturnHallFalse=0
-    integer,parameter :: useFMMTrue=1,useFMMFalse=0
     integer,parameter :: useDemagTrue=1,useDemagFalse=0
     integer, parameter :: useAvgNTrue=1, useAvgNFalse=0
 

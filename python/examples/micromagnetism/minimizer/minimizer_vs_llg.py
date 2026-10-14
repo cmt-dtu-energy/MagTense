@@ -35,7 +35,6 @@ MU0 = 4.0 * np.pi * 1.0e-7
 
 
 def quiet(problem: MicromagProblem) -> None:
-    problem.use_fmm = 0
     problem.log_dir = str(Path(tempfile.gettempdir()) / "magtense_minimizer_vs_llg")
     Path(problem.log_dir).mkdir(parents=True, exist_ok=True)
     problem.window_enabled = 0

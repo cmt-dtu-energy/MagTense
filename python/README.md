@@ -78,7 +78,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 - Compile Fortran source files
 
   ```bash
-  LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0
+  LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
   ```
 
 - Compile with the dip-fmm micromagnetic demagnetisation backend
@@ -105,7 +105,7 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
   ```bash
   module load cuda
   LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LIBRARY_PATH" \
-    make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 USE_CDFMM=1
+    make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_CDFMM=1
   ```
 
   Remove the bundled dip-fmm release build and local installation without
@@ -135,11 +135,6 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
     python python/examples/micromagnetism/FMM/fmm_vs_regular.py
   ```
 
-- Compiling with FMM3D backend
-
-To compile with FMM3D `$(MagTense-Folder)/external/FMM3D/local` must be in the `LD_Library_PATH` (replace MagTense-Folder with the actual path to the MagTense destiation).
-After this compile as above but with `USE_FMM3D=1`
-
 ## Windows
 
 - Requiments
@@ -150,7 +145,7 @@ After this compile as above but with `USE_FMM3D=1`
 
   - Installation of Miniconda or Anaconda
 
-  - Download of MagTense and [FMM3D](https://github.com/Ximtecs/FMM3D). Unzip the latter in `external\FMM3D`
+  - Download of MagTense
 
 
 - Conda environment `magtense-env` is created from `env-314-win.yml` in a `Powershell` as
@@ -190,9 +185,8 @@ After this compile as above but with `USE_FMM3D=1`
   - Open a `x64 Native Tools Command Prompt for VS 2022` and run:
 
     ```bash
-    make fmm3d USE_FMM3D=1
-    make auxmt magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=1 CVODE_ROOT="cvode-7.4.0/install"
-	make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=1 CVODE_ROOT="cvode-7.4.0/install"
+    make auxmt magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 CVODE_ROOT="cvode-7.4.0/install"
+	make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 CVODE_ROOT="cvode-7.4.0/install"
     ```
 
 - Install local editable magtense package

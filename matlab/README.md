@@ -53,24 +53,24 @@ On Windows there are two compilation options for building the Fortran objective 
   - Open a `x64 Native Tools Command Prompt for VS 2022` and run:
 
     ```bash
-    make auxmt magnetostatic micromagnetism forceintegrator USE_CUDA=1 USE_CVODE=1 USE_MATLAB=1 USE_FMM3D=1 CVODE_ROOT="sundials-7.4.0/install" MATLAB_INCLUDE="C:/Program Files/MATLAB/R2024b/extern/include"
+    make auxmt magnetostatic micromagnetism forceintegrator USE_CUDA=1 USE_CVODE=1 USE_MATLAB=1 CVODE_ROOT="sundials-7.4.0/install" MATLAB_INCLUDE="C:/Program Files/MATLAB/R2024b/extern/include"
     ```
 
 - Building the MEX-files
   -Next step is building the MEX-files. Start up Matlab and then build the MEX-files specifying where the intel compilers are as options:
   ```
   cd('MagTense/matlab');
-  buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',true,'USE_FMM3D',true,'VS_STUDIO',false,'USE_RELEASE',true)
+  buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',true,'VS_STUDIO',false,'USE_RELEASE',true)
   ```
   
 ### Compilation with Visual Studio
 
-For compiling MagTense with Visual Studio, we provide a VS project file for Windows, [MagTense.sln](../MagTense.sln). The Visual Studio environment has configuration for Release, Debug as well as for configurations included NO_CUDA, NO_CVODE and NO_FMM. Remember to set the correct paths to Matlab and CUDA in `properties` in each project in Visual Studio. An installation of Intel oneAPI is necessary to compile using Visual Studio.
+For compiling MagTense with Visual Studio, we provide a VS project file for Windows, [MagTense.sln](../MagTense.sln). The Visual Studio environment has configuration for Release, Debug as well as for configurations included NO_CUDA and NO_CVODE. The `_no_FMM` configurations are left over from the removed FMM3D backend and now build the same as their counterparts without the suffix; `buildMagTenseMEX` uses the latter. Remember to set the correct paths to Matlab and CUDA in `properties` in each project in Visual Studio. An installation of Intel oneAPI is necessary to compile using Visual Studio.
 
 #### Building the MEX-files
 Once the objective files have been build, start up Matlab, and first setup the MEX-compiler using `mex -setup FORTRAN` and then run 
 ```
 cd('MagTense/matlab');
-buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',true,'USE_FMM3D',true,'VS_STUDIO',true,'USE_RELEASE',true)
+buildMagTenseMEX('USE_CUDA',true,'USE_CVODE',true,'VS_STUDIO',true,'USE_RELEASE',true)
 ```
 to build the MEX-files.

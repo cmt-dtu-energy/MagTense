@@ -408,25 +408,11 @@ class MicromagProblem:
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")
 
 
-        #--------- default FMM parameters -----------------
+        # 1 sets the problem up (demag tensor or dip-fmm plan) and returns without solving
         self.dummy_run = 0
-        self.fmm_cells_per_node = 100
-        self.fmm_eps = 1e-4
-        self.ifunif = 1
-        self.nlmin = 1
-        self.nlmax = 5
-        self.allow_fmm_short_circuit = 1
-        self.fmm_min_n = 20000
-        self.fmm_nterms = -1
-        # Off by default: the FMM demag path only pays off for large problems, and it is
-        # ignored altogether unless the library is built with USE_FMM3D=1. Opting in
-        # explicitly means a problem does not silently change its demag path when the
-        # library is rebuilt with FMM enabled. Set `problem.use_fmm = 1` to use it.
-        self.use_fmm = 0
-        #--------------------------------------------------
 
-        # dip-fmm is independent of the legacy FMM3D backend above. Its MagTense adapter
-        # supports uniform cuboids and axis-aligned prisms of any size, with FP32 field arrays.
+        # dip-fmm demag backend. Its MagTense adapter supports uniform cuboids and
+        # axis-aligned prisms of any size, with FP32 field arrays.
         basis_values = {"spherical": 0, "cartesian": 1}
         if isinstance(cdfmm_basis, str):
             if cdfmm_basis not in basis_values:
@@ -1236,15 +1222,6 @@ class MicromagProblem:
             min_saddle_check=self.min_saddle_check,
             min_predictor=self.min_predictor,
             dummy_run=self.dummy_run,
-            fmm_cells_per_node=self.fmm_cells_per_node,
-            eps_fmm=self.fmm_eps,
-            ifunif=self.ifunif,
-            nlmin=self.nlmin,
-            nlmax=self.nlmax,
-            allow_fmm_short_circuit=self.allow_fmm_short_circuit,
-            fmm_min_n=self.fmm_min_n,
-            fmm_nterms=self.fmm_nterms,
-            usefmm=self.use_fmm,
             usecdfmm=self.use_cdfmm,
             cdfmm_order=self.cdfmm_order,
             cdfmm_depth=self.cdfmm_depth,
@@ -1411,15 +1388,6 @@ class MicromagProblem:
             min_saddle_check=self.min_saddle_check,
             min_predictor=self.min_predictor,
             dummy_run=self.dummy_run,
-            fmm_cells_per_node=self.fmm_cells_per_node,
-            eps_fmm=self.fmm_eps,
-            ifunif=self.ifunif,
-            nlmin=self.nlmin,
-            nlmax=self.nlmax,
-            allow_fmm_short_circuit=self.allow_fmm_short_circuit,
-            fmm_min_n=self.fmm_min_n,
-            fmm_nterms=self.fmm_nterms,
-            usefmm=self.use_fmm,
             usecdfmm=self.use_cdfmm,
             cdfmm_order=self.cdfmm_order,
             cdfmm_depth=self.cdfmm_depth,
@@ -1636,15 +1604,6 @@ class MicromagProblem:
             min_saddle_check=self.min_saddle_check,
             min_predictor=self.min_predictor,
             dummy_run=self.dummy_run,
-            fmm_cells_per_node=self.fmm_cells_per_node,
-            eps_fmm=self.fmm_eps,
-            ifunif=self.ifunif,
-            nlmin=self.nlmin,
-            nlmax=self.nlmax,
-            allow_fmm_short_circuit=self.allow_fmm_short_circuit,
-            fmm_min_n=self.fmm_min_n,
-            fmm_nterms=self.fmm_nterms,
-            usefmm=self.use_fmm,
             usecdfmm=self.use_cdfmm,
             cdfmm_order=self.cdfmm_order,
             cdfmm_depth=self.cdfmm_depth,

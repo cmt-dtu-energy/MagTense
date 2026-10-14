@@ -6,7 +6,6 @@ USE_CVODE = 0
 USE_MICROMAG = 1
 USE_MATLAB = 0
 MATLAB_INCLUDE ?=
-USE_FMM3D ?= 0
 USE_CDFMM ?= 0
 
 # /usr/local/MATLAB/<version>/extern/include (Linux)
@@ -77,52 +76,18 @@ ifeq ($(OS),Windows_NT)
 endif
 
 #=======================================================================
-#                    FMM3D integration (upstream Makefile)
+#                    Optional FMM library
 #=======================================================================
-FMM3D_DEBUG ?= 0
-# Submodule location
-FMM3D_DIR      ?= external/FMM3D
-
-# Absolute paths to headers and static archive
-FMM3D_ROOT     := $(abspath $(FMM3D_DIR))
-FMM3D_LIB      := $(FMM3D_ROOT)/local
-
-# The upstream makefile has no record of what it last built with, and 'clean'
-# deliberately leaves the submodule alone so an ordinary rebuild does not pay
-# for FMM3D again. Object files from a different compiler therefore survive a
-# toolchain change and are silently reused, and the mismatch surfaces only when
-# the shared library is linked: constant-pool symbols named __xmm@<hex>, which
-# the Intel compilers emit, make ld read the @ as a symbol version and fail with
-#   ld: libfmm3d.so: version node not found for symbol __xmm@4022dcdf...
-#   ld: failed to set dynamic section sizes: bad value
-# Record the toolchain FMM3D was built with and clean the submodule when it
-# changes. The stamp lives in the MagTense tree, next to ${BUILD_FLAGS_FILE},
-# so that it does not show up as untracked content inside the submodule.
-FMM3D_STAMP := $(MKFILE_PATH)/.fmm3d_toolchain
-FMM3D_TOOLCHAIN = FC=$(FC) DEBUG=$(FMM3D_DEBUG) `$(FC) --version 2>/dev/null | head -1`
-
-.PHONY: fmm3d
-fmm3d:
+# The FMM3D backend (external/FMM3D, USE_FMM3D) has been removed; dip-fmm
+# (USE_CDFMM=1) is the FMM demag backend. Fail loudly rather than silently
+# building without FMM when an old command line still asks for it.
 ifeq ($(USE_FMM3D),1)
-	@echo "==> FMM3D: building via upstream makefile (install)"
-	@if [ ! -f "$(FMM3D_STAMP)" ] || [ "`cat "$(FMM3D_STAMP)"`" != "$(FMM3D_TOOLCHAIN)" ]; then \
-		echo "==> FMM3D: toolchain changed since the last build, cleaning it first"; \
-		cd "$(FMM3D_DIR)" && $(MAKE) clean; \
-	fi
-	@cd "$(FMM3D_DIR)" && \
-	  $(MAKE) install PREFIX=$(abspath $(FMM3D_DIR)/local) DO_DEBUG=$(FMM3D_DEBUG) FAST_KER=OFF
-	@echo "$(FMM3D_TOOLCHAIN)" > "$(FMM3D_STAMP)"
-else
-	@echo "USE_FMM3D=0 -> skipping FMM3D build"
+$(error USE_FMM3D=1: the FMM3D backend has been removed. Use USE_CDFMM=1 for the dip-fmm backend)
 endif
 
-# Make high-level targets depend on optional FMM libraries only when enabled.
+# Make high-level targets depend on the optional FMM library only when enabled.
 ALL_DEPS :=
 PY_DEPS :=
-ifeq ($(USE_FMM3D),1)
-ALL_DEPS += fmm3d
-PY_DEPS  += fmm3d
-endif
 ifeq ($(USE_CDFMM),1)
 ALL_DEPS += cdfmm
 PY_DEPS  += cdfmm
@@ -149,20 +114,20 @@ ifeq (${FC}, ifx)
 		FFLAGS = /O3 /fpp /real-size:64 /Qopenmp /assume:nocc_omp /fpe:0 \
 			/heap-arrays:1024 /traceback \
 			/fp:source /nologo /DUSE_CVODE=${USE_CVODE} /DUSE_MATLAB=${USE_MATLAB} \
-			/DUSE_CUDA=${USE_CUDA} /DUSE_MICROMAG=${USE_MICROMAG} /DUSE_FMM3D=${USE_FMM3D} \
+			/DUSE_CUDA=${USE_CUDA} /DUSE_MICROMAG=${USE_MICROMAG} \
 			/DUSE_CDFMM=${USE_CDFMM}
 	else
 		FFLAGS = -O3 -fpp -real-size 64 -qopenmp -assume nocc_omp -fpe0 \
 			-heap-arrays 1024 -traceback \
 			-fp-model=source -fpic -nologo -DUSE_CVODE=${USE_CVODE} \
 			-DUSE_MATLAB=${USE_MATLAB} -DUSE_CUDA=${USE_CUDA} \
-			-DUSE_MICROMAG=${USE_MICROMAG} -DUSE_FMM3D=${USE_FMM3D} \
+			-DUSE_MICROMAG=${USE_MICROMAG} \
 			-DUSE_CDFMM=${USE_CDFMM}
 
 	endif
 else ifeq (${FC}, gfortran)
 	FFLAGS = -O3 -fdefault-real-8 -fopenmp -ffree-line-length-512 -cpp -fPIC \
-		-DUSE_MICROMAG=0 -DUSE_CVODE=${USE_CVODE} -DUSE_FMM3D=${USE_FMM3D} \
+		-DUSE_MICROMAG=0 -DUSE_CVODE=${USE_CVODE} \
 		-DUSE_CDFMM=${USE_CDFMM}
 
 endif
@@ -196,11 +161,7 @@ ifeq ($(OS),Windows_NT)
 		
 	AUXMT_PATH_ROOT     := $(abspath $(AUXMT_PATH))
 	
-	ifeq ($(USE_FMM3D),0)	
-		LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib'
-	else
-		LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib /LIBPATH:${FMM3D_LIB}'
-	endif
+	LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib'
 	
 	LIB_SUFFIX = .lib
 	PY_MOD_SUFFIX = .pyd
@@ -278,25 +239,6 @@ else
 
 
 endif
-#===================== FMM3D Integration ===========================
-ifeq ($(USE_FMM3D),0)
-  FMM3D =
-else
-  ifeq ($(OS),Windows_NT)
-    # 1. Use the standard linker flag (-lfmm3d looks for fmm3d.lib)
-    FMM3D = -L"${FMM3D_LIB}" -lfmm3d
-    
-    # 2. Use 'cp' (since your shell is sh) and RENAME the file during copy
-    # This creates fmm3d.lib in your root so the linker finds it easily
-    CP_LIB += && cp "${FMM3D_LIB}/libfmm3d.lib" ./fmm3d.lib
-  else
-    FMM3D = -L${FMM3D_LIB} -lfmm3d
-    LDFLAGS = "-Wl,-z,noexecstack -Wl,-rpath,${FMM3D_LIB}"
-    CP_LIB += && cp ${FMM3D_LIB}/libfmm3d${LIB_SUFFIX} .
-  endif
-endif
-#===================================================================
-
 #===================== dip-fmm Integration ==========================
 ifeq ($(USE_CDFMM),0)
   CDFMM =
@@ -305,11 +247,7 @@ else
     CDFMM = -L"${CDFMM_ROOT}/lib" -lcdfmm_c
   else
     CDFMM = -L${CDFMM_ROOT}/lib -lcdfmm_c
-    ifeq ($(USE_FMM3D),1)
-      LDFLAGS = "-Wl,-z,noexecstack -Wl,-rpath,${FMM3D_LIB} -Wl,-rpath,${CDFMM_ROOT}/lib"
-    else
-      LDFLAGS = "-Wl,-z,noexecstack -Wl,-rpath,${CDFMM_ROOT}/lib"
-    endif
+    LDFLAGS = "-Wl,-z,noexecstack -Wl,-rpath,${CDFMM_ROOT}/lib"
   endif
 endif
 #===================================================================
@@ -362,16 +300,16 @@ PYTHON_MODN_ALL = _${PYTHON_MODN}${PY_MOD_SUFFIX}
 # static libraries and the python extension have to be built with the same set.
 # Make cannot tell that a flag changed - the sources are unmodified, so nothing
 # is recompiled - and a mismatch therefore surfaces only as a wall of unresolved
-# symbols when the extension is linked. Building the libraries with USE_FMM3D=1
-# and then linking with USE_FMM3D=0 leaves every FMM3D symbol undefined, and the
-# reverse leaves the FMM3D entry points out of the extension.
+# symbols when the extension is linked. Building the libraries with USE_CDFMM=1
+# and then linking with USE_CDFMM=0 leaves every dip-fmm symbol undefined, and
+# the reverse leaves the dip-fmm adapter out of the extension.
 #
 # The settings are therefore recorded when the libraries are built and compared
 # before the extension is linked, so that a mismatch is reported in terms of the
 # flags that caused it.
 #=======================================================================
 BUILD_FLAGS_FILE := .build_flags
-BUILD_FLAGS := USE_CUDA=${USE_CUDA} USE_CVODE=${USE_CVODE} USE_MATLAB=${USE_MATLAB} USE_MICROMAG=${USE_MICROMAG} USE_FMM3D=${USE_FMM3D} USE_CDFMM=${USE_CDFMM}
+BUILD_FLAGS := USE_CUDA=${USE_CUDA} USE_CVODE=${USE_CVODE} USE_MATLAB=${USE_MATLAB} USE_MICROMAG=${USE_MICROMAG} USE_CDFMM=${USE_CDFMM}
 
 # Written by the library targets once they have succeeded
 RECORD_FLAGS = @echo "${BUILD_FLAGS}" > ${BUILD_FLAGS_FILE}
@@ -516,7 +454,6 @@ clean:
 	rm -f ${BUILD_FLAGS_FILE}
 
 clean_full:
-	cd ${FMM3D_DIR} && ${MAKE} clean
 	cd ${AUXMT_PATH} && ${MAKE} clean
 	cd ${NUM_INT_PATH} && ${MAKE} clean
 	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} clean
@@ -528,7 +465,6 @@ clean_full:
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
 	rm -rf ${PYTHON_LIBPATH}/build
 	rm -f ${BUILD_FLAGS_FILE}
-	rm -f ${FMM3D_STAMP}
 
 auxmt: check-config
 	cd ${AUXMT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
@@ -567,7 +503,6 @@ info:
 	@echo CUDA enabled: $(USE_CUDA)
 	@echo CVODE enabled: $(USE_CVODE)
 	@echo Micromagnetics enabled: $(USE_MICROMAG)
-	@echo FMM3D enabled: $(USE_FMM3D)
 	@echo dip-fmm enabled: $(USE_CDFMM)
 	@echo dip-fmm root: $(CDFMM_ROOT)
 	@echo dip-fmm CUDA architectures: $(CDFMM_CUDA_ARCHITECTURES)
@@ -596,12 +531,12 @@ ${PYTHON_MODN_ALL}: check-config check-flags $(if $(filter 1,${USE_CDFMM}),check
 	# f2py's meson backend keeps the FFLAGS/LDFLAGS it saw when the build
 	# directory was first configured and only warns ("Directory already
 	# configured") when they change, so a later build with another
-	# CDFMM_ROOT or FMM3D_LIB would silently keep the old rpath. Start from a
+	# CDFMM_ROOT would silently keep the old rpath. Start from a
 	# fresh build directory; only FortranToPythonIO.f90 and the wrappers are
 	# compiled here, the libraries are already built.
 	rm -rf ${PYTHON_LIBPATH}/build
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
 		python -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} \
-		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${FMM3D} ${CDFMM}
+		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${CDFMM}
 	cp *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/

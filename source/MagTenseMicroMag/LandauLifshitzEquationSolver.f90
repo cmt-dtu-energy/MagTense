@@ -31,10 +31,6 @@
     use TetrahedralMeshAnalysis
     use DifferentialOperators
 
-#if USE_FMM3D
-    use fmm3d_tree_mod
-    use fmm_nbor_tensor_mod
-#endif
 #if USE_CDFMM
     use DipFmmDemag
 #endif
@@ -209,27 +205,6 @@
 #endif
             call displayGUIMessage( 'Copying to CUDA' ) 
 #if USE_CUDA
-#if USE_FMM3D 
-            !------------- if use_fmm then copy sparse nbr_corr tensor else copy normal demag tensor --------------
-            if ( gb_problem%use_fmm) then
-              call displayGUIMessage( 'copying nbr_corr for FMM nbor correction')  
-              call cudaInit_sparse( gb_problem%K_fmm_s )    
-            !----------------------------------------------------------------------------------------------
-            !------------ else copy the normal demag tensor ------------------------------------------------
-            else 
-              !Initialize the Cuda arrays and load the demag tensors into the GPU memory
-              if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
-                  !If the matrices are sparse
-                call displayGUIMessage( 'Initializing sparse matrices on CUDA' )
-                  call cudaInit_sparse( gb_problem%K_s )            
-              else
-                  !if the matrices are dense 
-                call displayGUIMessage( 'Initializing dense matrices on CUDA' )
-                  call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
-              endif
-            end if
-            !----------------------------------------------------------------------------------------------
-#else
             !Initialize the Cuda arrays and load the demag tensors into the GPU memory
             if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
                 !If the matrices are sparse
@@ -246,8 +221,7 @@
             !     used for comparing GPU vs. CPU tensor
             !call cudaDumpDemagDense("CUDA_dense_K_matrices.bin")
             !=================================================================================
-        endif
-#endif
+            endif
 #else
             call displayGUIMessage( 'MagTense not compiled with CUDA - exiting!' )
             stop
@@ -1193,24 +1167,13 @@
           call updateDemagfieldDipFmm(gb_problem, gb_solution)
         else
 #endif
-#if USE_FMM3D
-        !-------------------- if use_fmm then use FMM otherwise shortcircuit to normal demag field --------------
-        if ( gb_problem%use_fmm)  then
-          call updateDemagfieldFMM( gb_problem, gb_solution )
-        else
-           call updateDemagfield( gb_problem, gb_solution )
-        end if
-        !--------------------------------------------------------------------------------------------------------------
-#else
-         call updateDemagfield( gb_problem, gb_solution )
-#endif
+        call updateDemagfield( gb_problem, gb_solution )
 #if USE_CDFMM
         endif
 #endif
         !-------------------------------------------------------------
         !------------------ wait for all task to finish before calculating the effective field and the dm/dt ----------------
         call trace%begin( "dmdt_fct_taskwait", itimer=itimer_wait, verbose=1 )
-        !NOTE:      Not needed when running FMM, since it already contains a taskwait
         !$omp taskwait
         call trace%end( "dmdt_fct_taskwait", itimer=itimer_wait, verbose=1 )
         !--------------------------------------------------------------------------------------------------------------------
@@ -1907,6 +1870,9 @@ subroutine updateDemagfieldDipFmm(problem, solution)
   type(MicroMagSolution), intent(inout) :: solution
   integer :: ierr
   character(len=512) :: message
+  integer, save :: itimer = 0
+
+  call trace%begin( "updateDemagfieldDipFmm", itimer=itimer, verbose=1 )
 
   call evaluateDipFmm(problem, solution, ierr, message)
   if (ierr /= 0) then
@@ -1921,6 +1887,7 @@ subroutine updateDemagfieldDipFmm(problem, solution)
       problem%useCuda = useCudaFalse
       call ComputeDemagfieldTensor(problem)
       call updateDemagfield(problem, solution)
+      call trace%end( "updateDemagfieldDipFmm", itimer=itimer, verbose=1 )
       return
   end if
 
@@ -1931,180 +1898,10 @@ subroutine updateDemagfieldDipFmm(problem, solution)
       solution%HmY = solution%HmY + solution%HmY*problem%CV*sqrt(-2d0*log(solution%u3))*cos(2d0*pi*solution%u4)
       solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
   end if
+
+  call trace%end( "updateDemagfieldDipFmm", itimer=itimer, verbose=1 )
 end subroutine updateDemagfieldDipFmm
 #endif
-
-
-subroutine updateDemagfieldFMM(problem, solution)
-  implicit none
-  !------------------ Arguments ------------------
-  type(MicroMagProblem),  intent(inout) :: problem
-  type(MicroMagSolution), intent(inout) :: solution
-
-#if USE_FMM3D
-  !------------------ Timing ---------------------
-  !------------------ Locals ---------------------
-  integer :: ntot, i
-  real(DP) :: fourpi
-  integer :: nd, ier
-  double precision , contiguous, pointer :: source(:,:), dipvec(:,:,:)
-  double precision , contiguous, pointer :: grad(:,:,:)
-  double precision :: vol_i
-  double precision :: mx, my, mz
-  double precision :: eps_fmm
-
-  class(FMM3DTree), pointer :: fmm_tree
-  logical :: built_tree
-  integer, save :: itimer = 0, itimer_wait = 0 
-  !------------------------------------------------
-    
-  if ( problem%useDemag .eq. useDemagFalse ) then
-        solution%HmX(:) = 0.
-        solution%HmY(:) = 0.
-        solution%HmZ(:) = 0.
-        return
-  endif
-  
-  call trace%begin( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
-
-  fourpi  = 12.566370614359172D0
-  ntot = size(problem%grid%pts, dim=1)
-  ier = 0
-
-  !----------- cast Mx,My,Mz to single precision -----------
-  solution%Mx_s = real(solution%Mx, SP)
-  solution%My_s = real(solution%My, SP)
-  solution%Mz_s = real(solution%Mz, SP)
-  !--------------------------------------------------------------
-
-
-  !-------------- reset field ---------------------------------------------
-solution%HmX = 0.0_SP
-solution%HmY = 0.0_SP
-solution%HmZ = 0.0_SP
-  !-------------------------------------------------------------------------
-
-    !------------- add correction from neighbouring tiles ---------------------
-    !$omp task untied default(shared)
-    call add_near_field(problem, solution)
-    !$omp end task
-    !-------------------------------------------------------------------------
-
-
-  !------------------ Allocate FMM work arrays ------------------
-    built_tree = .false.
-    if (.not. associated(solution%fmm_tree)) then
-        allocate(solution%fmm_tree)
-        built_tree = .true.
-        allocate(source(3, ntot))
-    end if
-    fmm_tree => solution%fmm_tree
-
-  allocate(dipvec(1, 3, ntot))
-  allocate(grad(1, 3, ntot))
-  grad(:,:,:) = 0.0_DP 
-  !------------------------------------------------------------
-  !------------------ Pack sources and dipoles ------------------
-    if (built_tree) then
-        do i = 1, ntot
-            !------------------ positions -> FMM (3, N) ------------------
-            source(1,i) = real(problem%grid%pts(i,1), DP)
-            source(2,i) = real(problem%grid%pts(i,2), DP)
-            source(3,i) = real(problem%grid%pts(i,3), DP)
-            !------------------------------------------------------------
-        end do
-    end if
-  do i = 1, ntot
-    !------------- get cell volume ------------------------------
-    ! TODO - implement non-uniform and non-cubic grids here
-    if (problem%grid%gridType /= gridTypeUniform) then
-      vol_i = real(problem%grid%abc(i,1), DP) * &
-              real(problem%grid%abc(i,2), DP) * &
-              real(problem%grid%abc(i,3), DP)
-    else
-    vol_i = real(problem%grid%dx, DP) * &
-            real(problem%grid%dy, DP) * &
-            real(problem%grid%dz, DP)
-    end if
-    !------------------------------------------------------------
-    !--------- conert to dipole moment m = M * ΔV --------------
-    mx = solution%Mx(i) * vol_i * problem%Ms(i)
-    my = solution%My(i) * vol_i * problem%Ms(i)
-    mz = solution%Mz(i) * vol_i * problem%Ms(i)
-    !------------------------------------------------------------
-    !-------------- pack dipole vector ---------------------------
-    dipvec(1,1,i) = mx 
-    dipvec(1,2,i) = my
-    dipvec(1,3,i) = mz
-    !------------------------------------------------------------ 
-  end do
-    !--------------------------------------------------------------
-   !------------------ Call FMM (sources->sources) ------------------
-   nd = 1
-   fmm_tree%nterms_in = problem%fmm_nterms
-   !Only build on the call that allocated the source array. build_tree returns immediately once
-   !is_built is set, but reaching it on a later call meant passing a local pointer whose
-   !association status is undefined, since source is only allocated in the branch above.
-   if (built_tree) then
-       call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif, problem%nlmin, problem%nlmax)
-   end if
-   !------- only run if number of boxes > 9 -----------
-   !--- NOTE - if nboxes <= 9 then we have all-to-all and the is no need for FMM ---
-   if (fmm_tree%nboxes > 9) then
-       call fmm_tree%make_and_eval(dipvec, grad)
-   end if
-   !--------------------------------------------------
-
-  if (ier /= 0) then
-    write(*,*) 'FMM3D returned error code in updateDemagfieldFMM: ier =', ier
-    stop " FMM3D error"
-  end if
-  !-----------------------------------------------------------------
-  !------------------ Map grad -> H (and to single) ----------------
-  ! include factor 4pi to match Magtense units
-   if (fmm_tree%nboxes > 9) then 
-      !$omp critical (solution_update)
-        solution%HmX = solution%HmX - real( grad(1,1,:) / fourpi, SP )
-        solution%HmY = solution%HmY - real( grad(1,2,:) / fourpi, SP )
-        solution%HmZ = solution%HmZ - real( grad(1,3,:) / fourpi, SP ) 
-      !$omp end critical (solution_update)
-  end if
-  !-----------------------------------------------------------------
-
-  !------------------- Wait for near-field task to complete ------------------
-  call trace%begin( "updateDemagfieldFMM_taskwait", itimer=itimer_wait, verbose=1 )
-  !$omp taskwait
-  call trace%end( "updateDemagfieldFMM_taskwait", itimer=itimer_wait, verbose=1 )
-  !---------------------------------------------------------------------------
-
-  !------------------ Shape correction ----------------------------
-  ! Applied after the taskwait so the near-field contribution is already in HmX/HmY/HmZ, and
-  ! through the same routine the non-FMM path uses so the two demag paths agree.
-  call applyShapeCorrection( problem, solution )
-  !----------------------------------------------------------------
-
-    !------------------ Cleanup -------------------------------------
-  ! The source array is owned by the tree from build_tree onwards - fmm_tree%source points at it
-  ! for as long as the tree lives - so fmm_tree%dealloc releases it. It must not be released here:
-  ! doing so left that component dangling for every later call while keep_tree was set.
-  if (.not. fmm_tree%keep_tree) then
-      call fmm_tree%dealloc()
-      deallocate( fmm_tree )
-      nullify(solution%fmm_tree)
-  end if
-  deallocate(dipvec, grad)
-    !--------------------------------------------------------------
-  !------------------ Optional field noise (CV) --------------------
-  if (problem%CV > 0) then
-      solution%HmX = solution%HmX + solution%HmX*problem%CV*sqrt(-2d0*log(solution%u1))*cos(2d0*pi*solution%u2)
-      solution%HmY = solution%HmY + solution%HmY*problem%CV*sqrt(-2d0*log(solution%u3))*cos(2d0*pi*solution%u4)
-      solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
-  end if
-    call trace%end( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
-#endif
-
-end subroutine updateDemagfieldFMM
-
 
 
     !>-----------------------------------------
@@ -2325,9 +2122,8 @@ end subroutine updateDemagfieldFMM
     !> @author Frederik L. Durhuus, fladu@dtu.dk, DTU, 2025
     !> @brief
     !> Adds the macrogeometry/sample shape correction onto the demagnetisation field.
-    !> Factored out of updateDemagfield so that the FMM demag path applies exactly the same
-    !> correction - it previously had no equivalent block, so setting use_fmm silently discarded
-    !> macroShape and sampleShape while still accepting them as inputs.
+    !> Factored out of updateDemagfield so that the dip-fmm demag path applies exactly the same
+    !> correction.
     !> @param[in] problem, the struct containing the problem
     !> @param[inout] solution, struct containing the current solution
     !>-----------------------------------------
@@ -2390,21 +2186,7 @@ end subroutine updateDemagfieldFMM
             end if
         else
 #endif
-#if USE_FMM3D
-        !------------- build neighbour demag tensor -------------------------------------------------------------------
-        if (problem%use_fmm) then
-            call BuildNeighbourDemagTensor( problem )
-        end if
-        
-        !---------- if BuildNeighbourDemagTensor sets use_fmm to false then compute the demag tensor normally -----
-        if (.not. problem%use_fmm) then
-           call ComputeDemagfieldTensor( problem )
-        end if
-            !-----------------------------------------------------------------------------------------------------------
-        !---------------------------------------------------------------------------------------------------------------
-#else
         call ComputeDemagfieldTensor( problem )
-#endif
 #if USE_CDFMM
         endif
 #endif
@@ -3837,109 +3619,4 @@ end subroutine updateDemagfieldFMM
     
     end subroutine ComputeAnisotropyTerm3D
 
-    
-
-
-    !================== Helper functions for FMM correction =========================================
-!>======================================================================
-!> Add demagnitization field from nearfield 
-!> uses K_nbrcorr, which depending on the setup contains either
-!>      1. The correction tensors (Nnbr - Kdip*V) stored in sparse format
-!>      2. The demagnetization tensor Nnbr stored in sparse format
-!> adds computed field to the existing solution%H
-!>======================================================================
-subroutine add_near_field(problem, solution)
-  implicit none
-  type(MicroMagProblem),  intent(in)    :: problem
-  type(MicroMagSolution), intent(inout) :: solution
-
-  !-----------------------------------------------------------------------------
-  real(SP), contiguous, pointer :: hx_tmp(:), hy_tmp(:), hz_tmp(:), temp(:)
-  integer :: ntot
-  real(SP) :: pref
-  integer :: stat
-  real(SP) :: alpha, beta
-  integer, save :: itimer = 0
-  call trace%begin( "add_near_field", itimer=itimer, verbose=2 )
-
-
-  ntot = size(problem%grid%pts, dim=1)
-
-
-#if USE_CUDA
-    !The GPU holds the near-field matrices only when the solver was asked to use CUDA
-    !(cudaInit_sparse is called on problem%useCuda, not on the build flag), so a CUDA build
-    !with useCuda off must take the MKL path below like any other build.
-    if ( problem%useCuda .eq. useCudaTrue ) then
-        allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) )
-        hx_tmp = 0.0_SP
-        hy_tmp = 0.0_SP
-        hz_tmp = 0.0_SP
-
-        pref = sngl(1.0)
-        call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
-
-        !$omp critical (solution_update)
-        solution%HmX = solution%HmX + hx_tmp 
-        solution%HmY = solution%HmY + hy_tmp 
-        solution%HmZ = solution%HmZ + hz_tmp 
-        !$omp end critical (solution_update)
-
-        deallocate(hx_tmp, hy_tmp, hz_tmp)
-
-        call trace%end( "add_near_field", itimer=itimer, verbose=2 )
-        return
-    endif
-#endif
-    allocate(temp(ntot))
-
-    alpha = 1.0_SP
-    ! ---------------- Hx correction = xx*Mx + xy*My + xz*Mz ----------------
-    beta = 0.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(1)%A, problem%K_fmm_descr_s, solution%Mx_s , beta, temp)
-    beta = 1.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(2)%A, problem%K_fmm_descr_s, solution%My_s, beta, temp)
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(3)%A, problem%K_fmm_descr_s, solution%Mz_s, beta, temp)
-
-    !--- Accumulated with '+', matching the CUDA branch above. That branch
-    !    calls cu_MVMult_GetH_sparse, which computes alpha*(K.M) with
-    !    alpha = pref = 1 and applies no negation of its own, so both paths
-    !    have to add K.M. This used to subtract, which put a systematic error
-    !    of order 10x the field norm on every non-CUDA FMM run - independent
-    !    of fmm_nterms, since it is not an expansion-order effect.
-    !$omp critical (solution_update)
-    solution%HmX = solution%HmX + temp
-    !$omp end critical (solution_update)
-    ! ---------------- Hy correction = xy*Mx + yy*My + yz*Mz ----------------
-    beta = 0.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(2)%A, problem%K_fmm_descr_s, solution%Mx_s , beta, temp)
-    beta = 1.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(4)%A, problem%K_fmm_descr_s, solution%My_s, beta, temp)
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(5)%A, problem%K_fmm_descr_s, solution%Mz_s, beta, temp)
-
-    !$omp critical (solution_update)
-    solution%HmY = solution%HmY + temp
-    !$omp end critical (solution_update)
-    ! ---------------- Hz correction = xz*Mx + yz*My + zz*Mz ----------------
-    beta = 0.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(3)%A, problem%K_fmm_descr_s, solution%Mx_s , beta, temp)
-    beta = 1.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(5)%A, problem%K_fmm_descr_s, solution%My_s, beta, temp)
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(6)%A, problem%K_fmm_descr_s, solution%Mz_s, beta, temp)
-
-    !$omp critical (solution_update)
-    solution%HmZ = solution%HmZ + temp
-    !$omp end critical (solution_update)
-    deallocate(temp)
-
-    call trace%end( "add_near_field", itimer=itimer, verbose=2 )
-end subroutine add_near_field
-
-        !------------------------------------------------------------------------------------------------
-    !============================================================================================================
-
-
-
-
-    
 end module LandauLifshitzSolution

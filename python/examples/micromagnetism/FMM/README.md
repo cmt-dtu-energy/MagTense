@@ -11,7 +11,7 @@ Build the Python extension from the repository root first:
 ```bash
 module load cuda
 LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LIBRARY_PATH" \
-  make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0 USE_CDFMM=1
+  make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_CDFMM=1
 ```
 
 Prepare all 160 persistent plans without running time evolution:

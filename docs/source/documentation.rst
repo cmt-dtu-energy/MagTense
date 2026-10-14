@@ -149,16 +149,6 @@ change.
 
 ::
 
-    get_H_field_fmm(
-        tiles, pts, eps=1e-6, nterms_in=10, cells_per_node=10,
-        nlmin=0, nlmax=2, ifunif=1, do_target=0, do_FI=1, n_pts=-1
-    ) -> np.ndarray
-
-FMM-backed H-field. This is a test version that uses a single dipole per tile
-and requires a build with ``USE_FMM3D=1``.
-
-::
-
     get_rotmat(rot: np.ndarray) -> np.ndarray
 
 Rotation matrix corresponding to the three rotation angles of a tile.

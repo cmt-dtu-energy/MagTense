@@ -10,9 +10,7 @@ __pycache__/
 .Python
 build/
 # Per-variant wrapper directories the wheel build fills in (cpu_libs, cu13_libs,
-# cu13-fmm_libs, ...). Globbed so the next CUDA major bump does not have to rename
-# these lines - cu13-fmm_libs/ was missed when cu12 became cu13 and showed up as
-# untracked, libfmm3d.dll and all.
+# ...). Globbed so the next CUDA major bump does not have to rename these lines.
 *_libs/
 develop-eggs/
 dist/
