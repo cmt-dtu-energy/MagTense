@@ -183,10 +183,6 @@ def create_problem(config: DemoConfig, hysteresis_solver: str) -> MicromagProble
     problem.t_conv = problem.t.copy()
     problem.nt_conv = len(problem.t_conv)
     problem.exch_presize = problem.ntot * 28
-    problem.use_fmm = 0
-    problem.ifunif = 1
-    problem.nlmin = 1
-    problem.nlmax = 5
 
     # Solver log files are placed outside the repository so repeatedly running
     # this educational example does not dirty the working tree.

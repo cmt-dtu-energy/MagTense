@@ -180,16 +180,6 @@ properties
     % function handle for external field
     HextFct = [] ;
 
-    %FMM parameters
-    fmm_cells
-    fmm_eps
-    ifunif
-    nlmin
-    nlmax
-    use_fmm
-    fmm_short
-    fmm_min_n
-
     temperature
     n_macro
     shiftVec
@@ -197,7 +187,6 @@ properties
     sampleShape
     exchPBC
     dummy_run
-    fmm_nterms
 
     log_dir char = '';
     timer_log char = '';
@@ -480,15 +469,6 @@ methods
         obj.ExternalMeshFileName = '' ;
         obj.DemagTensorFileName = 0 ;
 
-        obj.fmm_cells = int32(100);
-        obj.fmm_eps = 1e-4;
-        obj.ifunif = int32(1);
-        obj.nlmin = int32(1);
-        obj.nlmax = int32(5);
-        obj.use_fmm = int32(0);
-        obj.fmm_short = int32(1);
-        obj.fmm_min_n = int32(20000);
-
         obj.temperature	 = zeros(obj.ntot,1);
         obj.n_macro	= int32([0 0 0]);
         obj.shiftVec = ([0 0 0]);
@@ -496,7 +476,6 @@ methods
         obj.sampleShape = [1 1 1];
         obj.exchPBC	= int32([0 0 0]);
         obj.dummy_run = 0;
-        obj.fmm_nterms = -1;
 
         obj = obj.setLogDirFilename( 'logs' );
         obj = obj.setTimerLogFilename( 'timing.log' );

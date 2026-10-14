@@ -444,38 +444,23 @@ FMM demagnetization
      - Python
      - Default
      - Description
-   * - ``use_fmm``
-     - ``use_fmm``
-     - ``0``
-     - Enable the FMM demagnetization path. Requires ``USE_FMM3D=1``.
-   * - ``fmm_cells``
-     - ``fmm_cells_per_node``
-     - ``100``
-     - Maximum cells in a leaf node before splitting.
-   * - ``fmm_eps``
-     - ``fmm_eps``
-     - ``1e-4``
-     - Requested FMM accuracy, which sets the plane-wave expansion order.
-   * - ``fmm_nterms``
-     - ``fmm_nterms``
-     - ``-1``
-     - Multipole expansion order. Negative means derive it from ``fmm_eps``.
-   * - ``ifunif``
-     - ``ifunif``
-     - ``1``
-     - Tree type. Must be 1 (uniform tree).
-   * - ``nlmin``, ``nlmax``
-     - ``nlmin``, ``nlmax``
-     - ``1``, ``5``
-     - Minimum and maximum level of the octree.
-   * - ``fmm_short``
-     - ``allow_fmm_short_circuit``
-     - ``1``
-     - Allow falling back to the direct calculation for small problems.
-   * - ``fmm_min_n``
-     - ``fmm_min_n``
-     - ``20000``
-     - Cell-count threshold above which FMM is used.
+   * - -
+     - ``use_cdfmm``
+     - ``False``
+     - Use dip-fmm instead of the dense demagnetization tensor. Requires
+       ``USE_CDFMM=1`` and a uniform grid; not available from Matlab.
+   * - -
+     - ``cdfmm_order``
+     - ``6``
+     - Expansion order.
+   * - -
+     - ``cdfmm_depth``
+     - ``4``
+     - Fixed octree depth.
+   * - -
+     - ``cdfmm_basis``
+     - ``"spherical"``
+     - Expansion basis, ``"spherical"`` or ``"cartesian"``.
 
 See :ref:`Demag field - FMM`.
 

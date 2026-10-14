@@ -15,7 +15,7 @@ magnetocrystalline anisotropy, thermal fluctuations, periodic boundary
 conditions and adaptive hysteresis calculations.
 
 MagTense uses Intel MKL, and can optionally be built with CUDA for GPU
-acceleration, with CVODE as the time integrator and with FMM3D for an
+acceleration, with CVODE as the time integrator and with dip-fmm for an
 :math:`O(N)` demagnetization field.
 
 | Github: `http://github.com/cmt-dtu-energy/MagTense <http://github.com/cmt-dtu-energy/MagTense>`_

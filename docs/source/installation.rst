@@ -112,8 +112,8 @@ components are selected with make flags:
    * - ``USE_CVODE=1``
      - The CVODE time integrator from SUNDIALS, see
        :ref:`ODE solver settings`.
-   * - ``USE_FMM3D=1``
-     - The FMM demagnetization path, see :ref:`Demag field - FMM`.
+   * - ``USE_CDFMM=1``
+     - The dip-fmm demagnetization path (Linux), see :ref:`Demag field - FMM`.
    * - ``USE_MATLAB=1``
      - Compile the Fortran objects needed by the Matlab MEX-files.
 
@@ -123,7 +123,7 @@ A typical Linux build of the Python module with everything enabled is
 
     conda env create -n magtense-env -f python/.build/env-313-linux.yml
     conda activate magtense-env
-    make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0
+    make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
     python -m pip install -e ./python
 
 The environment files come in one variant per Python version and platform,

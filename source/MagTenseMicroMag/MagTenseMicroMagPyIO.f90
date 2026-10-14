@@ -15,7 +15,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     exch_cols, grid_abc, N_ave, &
 	CV, useReturnHall, useAvgN, exch_weigh, exch_meth, exch_intpn, &
 	n_macro, shiftVec, macroShape, sampleShape, exchPBC, &
-    passExch, exch_ncols, crysaxis, k0_arr, k1, k2, n_phase, phase_id, A_int, problem , dummy_run, fmm_cells_per_node, eps_fmm, ifunif, nlmin, nlmax, allow_fmm_short_circuit, fmm_min_n, fmm_nterms, use_fmm, &
+    passExch, exch_ncols, crysaxis, k0_arr, k1, k2, n_phase, phase_id, A_int, problem , dummy_run, &
     use_cdfmm, cdfmm_order, cdfmm_depth, cdfmm_basis, cdfmm_precision, &
     useDemag, rng_seed)
     !DEC$ ATTRIBUTES ALIAS:"loadmicromagproblem_" :: loadMicroMagProblem
@@ -60,15 +60,6 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     type(MicroMagProblem),intent(inout) :: problem
 
     integer, intent(in) :: dummy_run
-    integer(4), intent(in) :: fmm_cells_per_node
-    real(8), intent(in) :: eps_fmm
-    integer(4), intent(in) :: ifunif
-    integer(4), intent(in) :: nlmin
-    integer(4), intent(in) :: nlmax
-    integer(4), intent(in) :: allow_fmm_short_circuit
-    integer(4), intent(in) :: fmm_min_n
-    integer(4), intent(in) :: fmm_nterms
-    logical, intent(in) :: use_fmm
     logical, intent(in) :: use_cdfmm
     integer(4), intent(in) :: cdfmm_order, cdfmm_depth, cdfmm_basis
     integer(4), intent(in) :: cdfmm_precision
@@ -79,15 +70,6 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     call trace%begin("loadMicroMagProblem", itimer=itimer, verbose=1)
 
     problem%dummy_run = dummy_run
-    problem%fmm_cells_per_node = fmm_cells_per_node
-    problem%fmm_eps = eps_fmm
-    problem%ifunif = ifunif
-    problem%nlmin = nlmin
-    problem%nlmax = nlmax
-    problem%allow_fmm_short_circuit = allow_fmm_short_circuit
-    problem%fmm_min_n = fmm_min_n
-    problem%fmm_nterms = fmm_nterms
-    problem%use_fmm = use_fmm
     problem%use_cdfmm = use_cdfmm
     problem%cdfmm_order = cdfmm_order
     problem%cdfmm_depth = cdfmm_depth
