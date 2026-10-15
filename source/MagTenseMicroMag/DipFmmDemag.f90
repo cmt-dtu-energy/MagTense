@@ -37,10 +37,11 @@ contains
         type(cdfmm_options_t) :: options
         real(c_double) :: cell_size(3)
         real(c_double), dimension(:), allocatable :: hx, hy, hz, xs, ys, zs
-        real(c_double) :: root_centre(3), origin(3), unit
+        real(c_double), dimension(:,:), allocatable :: vertices
+        real(c_double) :: root_centre(3), origin(3), unit, corner(3, 4), centroid(3)
         integer(c_int) :: cdfmm_ierr
-        integer :: ntot
-        logical :: uniform_cells
+        integer :: ntot, i, k
+        logical :: uniform_cells, tetrahedra
 #endif
 
         call destroyDipFmm()
@@ -60,9 +61,23 @@ contains
         end if
 
         ntot = size(problem%grid%pts, dim=1)
+        tetrahedra = .false.
         select case (problem%grid%gridType)
         case (gridTypeUniform)
             uniform_cells = .true.
+        case (gridTypeTetrahedron)
+            uniform_cells = .false.
+            tetrahedra = .true.
+            if (.not. (allocated(problem%grid%nodes) .and. allocated(problem%grid%elements))) then
+                ierr = 1
+                message = 'dip-fmm on a tetrahedron grid needs grid%nodes and grid%elements'
+                return
+            end if
+            if (size(problem%grid%elements, dim=1) < 4 .or. size(problem%grid%elements, dim=2) /= ntot) then
+                ierr = 1
+                message = 'grid%elements must hold the four corner nodes of every tetrahedron'
+                return
+            end if
         case (gridTypeUnstructuredPrisms)
             uniform_cells = .false.
             if (.not. allocated(problem%grid%abc)) then
@@ -77,7 +92,7 @@ contains
             end if
         case default
             ierr = 1
-            message = 'dip-fmm supports uniform and unstructuredPrisms MagTense grids'
+            message = 'dip-fmm supports uniform, unstructuredPrisms and tetrahedron MagTense grids'
             return
         end select
         cell_size = [real(problem%grid%dx, c_double), &
@@ -102,7 +117,67 @@ contains
 #endif
 
         allocate(cell_volume(ntot))
-        if (uniform_cells .and. problem%cdfmm_tree == 0 .and. .not. (problem%cdfmm_root(4) > 0.0_DP)) then
+        if (tetrahedra) then
+            ! Exact tetrahedra: each element is passed as its centroid plus the offsets of
+            ! its four corners. As for the prisms below, the geometry is given in a mesh unit
+            ! (here the edge of the cube of mean element volume) measured from the lower
+            ! corner of the nodes (or of the root), and the moments use the volumes in the
+            ! same unit, so the field is unchanged. Irregular tetrahedra have no exactly
+            ! equal pairs, so nothing is snapped.
+            allocate(xs(ntot), ys(ntot), zs(ntot), vertices(12, ntot))
+            do i = 1, ntot
+                do k = 1, 4
+                    corner(:, k) = real(problem%grid%nodes(:, problem%grid%elements(k, i)), c_double)
+                end do
+                centroid = 0.25_c_double * sum(corner, dim=2)
+                xs(i) = centroid(1)
+                ys(i) = centroid(2)
+                zs(i) = centroid(3)
+                do k = 1, 4
+                    vertices(3 * k - 2:3 * k, i) = corner(:, k) - centroid
+                end do
+                cell_volume(i) = abs(dot_product(corner(:, 4) - corner(:, 1), &
+                    cross3(corner(:, 2) - corner(:, 1), corner(:, 3) - corner(:, 1)))) / 6.0_c_double
+            end do
+            unit = (sum(cell_volume) / real(ntot, c_double))**(1.0_c_double / 3.0_c_double)
+            if (.not. (minval(cell_volume) > 0.0_c_double)) then
+                ierr = 1
+                message = 'dip-fmm needs tetrahedra of positive volume'
+                deallocate(cell_volume, xs, ys, zs, vertices)
+                return
+            end if
+            if (problem%cdfmm_root(4) > 0.0_DP) then
+                origin = real(problem%cdfmm_root(1:3) - problem%cdfmm_root(4), c_double)
+            else
+                origin = real(minval(problem%grid%nodes(1:3, :), dim=2), c_double)
+            end if
+            xs = (xs - origin(1)) / unit
+            ys = (ys - origin(2)) / unit
+            zs = (zs - origin(3)) / unit
+            vertices = vertices / unit
+            cell_volume = cell_volume / unit**3
+            if (problem%cdfmm_root(4) > 0.0_DP) then
+                root_centre = (real(problem%cdfmm_root(1:3), c_double) - origin) / unit
+                if (problem%cdfmm_tree == 1) then
+                    call cdfmm_create_adaptive_tetrahedra( &
+                        dip_fmm_plan, xs, ys, zs, vertices, problem%cdfmm_capacity, &
+                        problem%cdfmm_max_depth, options, cdfmm_ierr, root_centre, &
+                        real(problem%cdfmm_root(4), c_double) / unit)
+                else
+                    ! Uniform tree of cdfmm_depth on the given root (capacity 1), as for prisms.
+                    call cdfmm_create_adaptive_tetrahedra( &
+                        dip_fmm_plan, xs, ys, zs, vertices, 1, problem%cdfmm_depth, options, &
+                        cdfmm_ierr, root_centre, real(problem%cdfmm_root(4), c_double) / unit)
+                end if
+            else if (problem%cdfmm_tree == 1) then
+                call cdfmm_create_adaptive_tetrahedra( &
+                    dip_fmm_plan, xs, ys, zs, vertices, problem%cdfmm_capacity, &
+                    problem%cdfmm_max_depth, options, cdfmm_ierr)
+            else
+                call cdfmm_create_tetrahedra(dip_fmm_plan, xs, ys, zs, vertices, options, cdfmm_ierr)
+            end if
+            deallocate(xs, ys, zs, vertices)
+        else if (uniform_cells .and. problem%cdfmm_tree == 0 .and. .not. (problem%cdfmm_root(4) > 0.0_DP)) then
             ! The original path: one common cuboid size on the fixed-depth tree, whose root
             ! dip-fmm takes as the bounding box of the cells.
             cell_volume = cell_size(1) * cell_size(2) * cell_size(3)
@@ -270,6 +345,12 @@ contains
         real(c_double), parameter :: grid = 1048576.0_c_double
         y = anint(x * grid) / grid
     end function snap
+
+    pure function cross3(a, b) result(c)
+        real(c_double), intent(in) :: a(3), b(3)
+        real(c_double) :: c(3)
+        c = [a(2) * b(3) - a(3) * b(2), a(3) * b(1) - a(1) * b(3), a(1) * b(2) - a(2) * b(1)]
+    end function cross3
 #endif
 
 end module DipFmmDemag

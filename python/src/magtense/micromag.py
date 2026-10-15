@@ -411,15 +411,15 @@ class MicromagProblem:
         # 1 sets the problem up (demag tensor or dip-fmm plan) and returns without solving
         self.dummy_run = 0
 
-        # dip-fmm demag backend. Its MagTense adapter supports uniform cuboids and
-        # axis-aligned prisms of any size, with FP32 field arrays.
+        # dip-fmm demag backend. Its MagTense adapter supports uniform cuboids,
+        # axis-aligned prisms of any size and tetrahedra, with FP32 field arrays.
         basis_values = {"spherical": 0, "cartesian": 1}
         if isinstance(cdfmm_basis, str):
             if cdfmm_basis not in basis_values:
                 raise ValueError(f"Unknown dip-fmm basis: {cdfmm_basis}")
             cdfmm_basis = basis_values[cdfmm_basis]
-        if use_cdfmm and self.grid_type not in (1, 3):
-            raise ValueError("dip-fmm requires grid_type='uniform' or 'unstructuredPrisms'")
+        if use_cdfmm and self.grid_type not in (1, 2, 3):
+            raise ValueError("dip-fmm requires grid_type='uniform', 'unstructuredPrisms' or 'tetrahedron'")
         tree_values = {"uniform": 0, "adaptive": 1, "uniform_strict": 1}
         if cdfmm_tree not in tree_values:
             raise ValueError("cdfmm_tree must be 'uniform', 'adaptive' or 'uniform_strict'")
@@ -941,6 +941,9 @@ class MicromagProblem:
         """
         root = np.asarray(self.cdfmm_root, dtype=np.float64)
         if root[3] > 0:
+            return np.asfortranarray(root)
+        if self.grid_type == 2:
+            # Tetrahedra have no lattice to align with: dip-fmm encloses every vertex itself.
             return np.asfortranarray(root)
         if self.cdfmm_align:
             return self.aligned_cdfmm_root()
