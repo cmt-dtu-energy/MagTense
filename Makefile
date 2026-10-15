@@ -36,6 +36,19 @@ CDFMM_PROCEDURAL_MAX_ORDER ?= 10
 # Toolchain used for the dip-fmm build. The defaults are the conda
 # environment's compilers so that dip-fmm, the MagTense CUDA kernels and the
 # Python extension all link against the same CUDA runtime and C++ library.
+# dip-fmm's internal OpenMP (CDFMM_OPENMP=1, the default when the environment
+# has Intel's libiomp5). MagTense runs on Intel's OpenMP runtime (ifx, MKL
+# intel_thread), so dip-fmm is compiled with -fopenmp but linked against that
+# same libiomp5 (which implements GCC's GOMP_* entry points) instead of libgomp:
+# one runtime per process, never libgomp next to libiomp5. Plan construction
+# (serial set-up) then uses all threads, which matters for tetrahedra (no exact
+# pair reuse: 100 nm ellipsoid, 11.7k elements, depth 4: 96 s on 8 cores instead
+# of tens of minutes on one); CPU evaluation in the minimizer also ran 2-3x
+# faster on 8 cores with identical energies. Nested regions stay serial
+# (OMP_MAX_ACTIVE_LEVELS=1). CDFMM_OPENMP=0 restores the previous single-threaded
+# dip-fmm.
+CDFMM_IOMP5 ?= ${CONDA_PREFIX}/lib/libiomp5.so
+CDFMM_OPENMP ?= $(if $(wildcard ${CDFMM_IOMP5}),1,0)
 CDFMM_C_COMPILER ?= $(if $(wildcard ${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-gcc),${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-gcc,gcc)
 CDFMM_CXX_COMPILER ?= $(if $(wildcard ${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++),${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++,g++)
 CDFMM_CUDA_COMPILER ?= $(if $(wildcard ${CONDA_PREFIX}/bin/nvcc),${CONDA_PREFIX}/bin/nvcc,nvcc)
@@ -391,6 +404,7 @@ ifeq ($(OS),Windows_NT)
 	@echo "ERROR: automatic dip-fmm builds are currently implemented for Linux only."
 	@exit 1
 else
+	@echo "dip-fmm OpenMP: CDFMM_OPENMP=${CDFMM_OPENMP}$(if $(filter 1,${CDFMM_OPENMP}), (linked to ${CDFMM_IOMP5}), (no libiomp5 at ${CDFMM_IOMP5}: single-threaded dip-fmm))"
 	cd "${CDFMM_DIR}" && CPATH= CPLUS_INCLUDE_PATH= cmake --preset release \
 		-B "${CDFMM_BUILD_DIR}" \
 		-DCMAKE_INSTALL_PREFIX="${CDFMM_ROOT}" \
@@ -405,7 +419,7 @@ else
 		-DMKL_DIR="${CONDA_PREFIX}/lib/cmake/mkl" \
 		-DMKL_INTERFACE=lp64 \
 		-DMKL_THREADING=intel_thread \
-		-DCDFMM_ENABLE_OPENMP=OFF \
+		$(if $(filter 1,${CDFMM_OPENMP}),-DCDFMM_ENABLE_OPENMP=ON -DOpenMP_CXX_FLAGS=-fopenmp -DOpenMP_CXX_LIB_NAMES=iomp5 -DOpenMP_iomp5_LIBRARY="${CDFMM_IOMP5}",-DCDFMM_ENABLE_OPENMP=OFF) \
 		-DCDFMM_INSTALL_PYTHON_TO_ENV=OFF \
 		-DCDFMM_BUILD_PYTHON=OFF \
 		-DCDFMM_BUILD_FORTRAN_INTERFACE=OFF \
