@@ -151,6 +151,12 @@ def _periodic_exchange_test() -> list[dict]:
         return mod.run_test(cuda=USE_CUDA)
 
 
+def _tetra_exchange_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import tetra_exchange_test as mod
+        return mod.run_test(cuda=USE_CUDA)
+
+
 def _shape_correction_test() -> list[dict]:
     with example_dir(TESTS_DIR):
         import shape_correction_test as mod
@@ -345,6 +351,10 @@ TESTS = {
     'periodic_exchange_test': (
         _periodic_exchange_test, False,
         'Periodic exchange coupling, uniform grid, unstructured mesh and grain mesh',
+    ),
+    'tetra_exchange_test': (
+        _tetra_exchange_test, False,
+        'Exchange operator on Kuhn and jittered tetrahedral meshes vs an analytical helix',
     ),
     'shape_correction_test': (
         _shape_correction_test, False,

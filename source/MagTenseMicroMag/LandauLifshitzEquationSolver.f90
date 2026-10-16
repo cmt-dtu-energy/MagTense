@@ -2857,7 +2857,11 @@ end subroutine updateDemagfieldDipFmm
             !own boundary conditions and has already returned above.
             call displayGUIMessage( 'Using periodic exchange boundary conditions' )
         endif
-        call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, phase_local, A_int_normalized, problem%A_exch)
+        !A tetrahedral mesh needs the full quadratic face fit: its faces are not axis aligned, and
+        !the linear fit with dropped gradient components is not consistent there. Prism grids keep
+        !the original fit, which is exact on their axis aligned faces.
+        call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, phase_local, A_int_normalized, problem%A_exch, &
+            quadFit = ( problem%grid%gridType .eq. gridTypeTetrahedron ))
     endif
 
     

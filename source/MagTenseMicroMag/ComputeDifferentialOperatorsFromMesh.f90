@@ -93,10 +93,22 @@ module DifferentialOperators
     !> Jfact_local is an n-vector containing the exchange interaction strength at each tile.
     !> 
     !> OUTPUT ARGUMENTS:
-    !>  
+    !>
     !> Aexch_matrix - The sparse CSR matrix of the exchange coupling
+    !>
+    !> quadFit (optional, default .false.) selects, for 3D Direct Laplacian, a full quadratic
+    !> least squares fit of Phi around each face centre (value, gradient and the six second order
+    !> terms), with all three gradient components kept whatever the face normal. The default fit
+    !> is linear and drops the gradient components along which the face normal vanishes, which is
+    !> exact on the axis aligned faces of a prism grid but not on a tetrahedral mesh: there a face
+    !> with e.g. a z normal and a stencil spread out in x lets the x variation of Phi leak into the
+    !> fitted z gradient, and the operator is not even exact for a linear Phi. The quadratic fit is
+    !> exact for quadratic Phi on any stencil that determines it, so the face gradients are second
+    !> order and the Laplacian converges. It is solved by SVD (dgelsd), so a thin stencil (a film
+    !> one element thick) gives the minimum norm fit rather than a singular system.
     !---------------------------------------------------------------------------
-    subroutine computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, interpn, weight, method, Jfact_local, phase_local, A_int_local, Aexch_matrix)
+    subroutine computeDifferentialOperatorsFromMesh_DirectLap(GridInfo, interpn, weight, method, Jfact_local, phase_local, A_int_local, Aexch_matrix, quadFit)
+        logical, intent(in), optional :: quadFit
         type(MicroMagGridInfo), intent(inout) :: GridInfo
         integer, intent(in) :: interpn
         integer, intent(in) :: method
@@ -142,13 +154,23 @@ module DifferentialOperators
         integer, save :: itimer=0
         !>------------------------------------------------------------------------------
         integer, dimension(:), allocatable :: sorted_indices
-        integer :: u 
+        integer :: u
+        logical :: useQuad
+        real(dp), dimension(:), allocatable :: dn
+        real(dp), dimension(:,:), allocatable :: gcoef
 
         call trace%begin( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
         eps_criteria = 1.0e-12
         const = 1.
-        
+        useQuad = .false.
+        if ( present(quadFit) ) useQuad = quadFit
+        !The quadratic fit replaces only the face gradient of the Direct Laplacian, and it needs the
+        !extended (vertex) stencil: the compact stencil has two cells per face, too few for ten
+        !coefficients. Green-Gauss interpolates face values and keeps its own fit.
+        useQuad = useQuad .and. method .eq. MicroMagExchMethodDirectLaplacianNeumann &
+                          .and. interpn .eq. MicroMagExchInterpnExtended
+
         NX = GridInfo%fNormX
         NY = GridInfo%fNormY
         NZ = GridInfo%fNormZ
@@ -537,9 +559,13 @@ module DifferentialOperators
                 endif        ! This check is only necessary for edge faces.
                 
                 allocate(extra(size(dxk,1),3))                       ! mirror reflection on face plane
-                extra(:,1) = dxk - 2 * nns(1) * (dxk * nns(1))
-                extra(:,2) = dyk - 2 * nns(2) * (dyk * nns(2))
-                extra(:,3) = dzk - 2 * nns(3) * (dzk * nns(3))
+                ! d - 2 n (d.n). Reflecting each component on its own, d_i - 2 n_i (d_i n_i), is
+                ! the same thing only for an axis aligned face, which is all a prism grid has; an
+                ! oblique boundary face of a tetrahedral mesh needs the full projection.
+                dn = dxk * nns(1) + dyk * nns(2) + dzk * nns(3)
+                extra(:,1) = dxk - 2 * nns(1) * dn
+                extra(:,2) = dyk - 2 * nns(2) * dn
+                extra(:,3) = dzk - 2 * nns(3) * dn
                 dxk2 = [dxk, extra(:,1)]                             ! Virtual x-distances appended to the real ones
                 dyk2 = [dyk, extra(:,2)]
                 dzk2 = [dzk, extra(:,3)]
@@ -558,7 +584,28 @@ module DifferentialOperators
             end if
             
             e(:) = 1
-            
+
+            if ( useQuad .and. dims == 3 ) then
+                ! Full quadratic fit, all three gradient components kept (see quadFit above).
+                call quadraticFaceGradient( dxk2, dyk2, dzk2, Wk2, gcoef, info )
+                if ( info .ne. 0 ) then
+                    n_singular = n_singular + 1
+                    deallocate(ind,e)
+                    cycle
+                endif
+                if (edgeFace(kk)) then
+                    vx(ind) = (gcoef(1,1:lind) + gcoef(1,lind+1:2*lind)) / scale
+                    vy(ind) = (gcoef(2,1:lind) + gcoef(2,lind+1:2*lind)) / scale
+                    vz(ind) = (gcoef(3,1:lind) + gcoef(3,lind+1:2*lind)) / scale
+                else
+                    vx(ind) = gcoef(1,:) / scale
+                    vy(ind) = gcoef(2,:) / scale
+                    vz(ind) = gcoef(3,:) / scale
+                endif
+                deallocate(ind,e,gcoef)
+                cycle
+            endif
+
             allocate(Gkl1(size(e,1),4))
             Gkl1(:,1) = e
             Gkl1(:,2) = dxk2
@@ -764,6 +811,65 @@ module DifferentialOperators
         call trace%end( "computeDifferentialOperatorsFromMesh_DirectLap", itimer=itimer )
         
     end subroutine computeDifferentialOperatorsFromMesh_DirectLap
+
+
+    !>-----------------------------------------
+    !> @brief
+    !> Weighted quadratic least squares fit of Phi around a face centre, returning the rows that
+    !> map the stencil values to the fitted gradient at the face centre.
+    !>
+    !> Phi(d) ~ c0 + g.d + (second order terms in d) is fitted to the stencil values with weights w,
+    !> where d = (x,y,z) are the (scaled) offsets of the stencil points from the face centre. The fit
+    !> is c = pinv(sqrt(W) G) sqrt(W) phi, so the gradient rows are rows 2-4 of
+    !> pinv(sqrt(W) G) sqrt(W). It is computed by SVD (dgelsd), which returns the minimum norm fit
+    !> when the stencil does not determine all ten coefficients.
+    !>
+    !> @param[in] x,y,z offsets of the stencil points from the face centre
+    !> @param[in] w least squares weights
+    !> @param[out] gcoef 3 x size(x): gradient components = gcoef * phi(stencil)
+    !> @param[out] info 0 on success, the dgelsd status otherwise
+    !---------------------------------------------------------------------------
+    subroutine quadraticFaceGradient( x, y, z, w, gcoef, info )
+        real(dp), dimension(:), intent(in) :: x, y, z, w
+        real(dp), dimension(:,:), allocatable, intent(out) :: gcoef
+        integer, intent(out) :: info
+
+        integer, parameter :: nc = 10
+        real(dp), parameter :: rcond = 1.0e-10_dp
+        real(dp), dimension(:,:), allocatable :: A, B
+        real(dp), dimension(:), allocatable :: sw, S, work
+        integer, dimension(:), allocatable :: iwork
+        real(dp) :: wq(1)
+        integer :: iwq(1), m, ldb, rank, lwork, i
+
+        m = size(x)
+        ldb = max(m, nc)
+        allocate(sw(m), A(m,nc), B(ldb,m), S(min(m,nc)))
+        sw = sqrt(w)
+        A(:,1) = sw
+        A(:,2) = sw * x
+        A(:,3) = sw * y
+        A(:,4) = sw * z
+        A(:,5) = sw * x * x
+        A(:,6) = sw * y * y
+        A(:,7) = sw * z * z
+        A(:,8) = sw * x * y
+        A(:,9) = sw * x * z
+        A(:,10) = sw * y * z
+        B = 0.0_dp
+        do i = 1, m
+            B(i,i) = sw(i)
+        enddo
+
+        call dgelsd( m, nc, m, A, m, B, ldb, S, rcond, rank, wq, -1, iwq, info )
+        lwork = int(wq(1))
+        allocate(work(lwork), iwork(max(1,iwq(1))))
+        call dgelsd( m, nc, m, A, m, B, ldb, S, rcond, rank, work, lwork, iwork, info )
+
+        allocate(gcoef(3,m))
+        gcoef = B(2:4,1:m)
+
+    end subroutine quadraticFaceGradient
 
 
     subroutine passDifferentialOperators(problem)
