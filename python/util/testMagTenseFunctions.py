@@ -157,6 +157,12 @@ def _tetra_exchange_test() -> list[dict]:
         return mod.run_test(cuda=USE_CUDA)
 
 
+def _unstructured_exchange_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import unstructured_exchange_test as mod
+        return mod.run_test(cuda=USE_CUDA)
+
+
 def _shape_correction_test() -> list[dict]:
     with example_dir(TESTS_DIR):
         import shape_correction_test as mod
@@ -355,6 +361,10 @@ TESTS = {
     'tetra_exchange_test': (
         _tetra_exchange_test, False,
         'Exchange operator on Kuhn and jittered tetrahedral meshes vs an analytical helix',
+    ),
+    'unstructured_exchange_test': (
+        _unstructured_exchange_test, False,
+        'Cell Hessian exchange on irregular tetrahedra and prisms: free surfaces, exchPBC, curved boundary',
     ),
     'shape_correction_test': (
         _shape_correction_test, False,

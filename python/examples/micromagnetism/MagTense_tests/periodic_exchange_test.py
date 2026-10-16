@@ -1050,15 +1050,19 @@ def operator_analysis(res, a, pbc, grid_type, cuda=False):
     results = analyse(A_pbc, res, a, pbc, f"{label}, periodic")
     analyse(A_free, res, a, [0, 0, 0], f"{label}, free boundaries")
 
-    # The rows of the tiles that do not touch a periodic boundary must be untouched by the
-    # linking. Reported rather than tested, since it is a property of the implementation
+    # The rows of the tiles that do not see a periodic boundary must be untouched by the
+    # linking. Reported rather than tested, since it is a property of the implementation. On
+    # the uniform grid that is every tile not on a boundary; the cell Hessian operator of the
+    # unstructured grids also imposes the free surfaces of its stencil neighbours, so there it
+    # is the tiles at least two layers in.
     nx, ny, nz = res
     idx = np.arange(nx * ny * nz)
     ijk = np.stack([idx % nx, (idx // nx) % ny, idx // (nx * ny)], axis=1)
+    depth = 1 if grid_type == "uniform" else 2
     interior = np.ones(len(idx), dtype=bool)
     for direction in range(3):
         if pbc[direction]:
-            interior &= (ijk[:, direction] > 0) & (ijk[:, direction] < res[direction] - 1)
+            interior &= (ijk[:, direction] >= depth) & (ijk[:, direction] < res[direction] - depth)
     if interior.any():
         difference = np.abs(A_pbc[interior] - A_free[interior]).max() / np.abs(A_pbc).max()
         status = "pass" if difference < 1e-12 else "FAIL"

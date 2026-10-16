@@ -93,6 +93,16 @@ class MicromagProblem:
         demag_approx:
         exch_nval: Number of values in the exchange operator matrix.
         exch_nrow: Number of rows in the exchange operator matrix.
+        exch_meth: Exchange operator of an unstructured grid ('tetrahedron', 'unstructuredPrisms').
+            'cellhessian' (the default there) fits a quadratic around every cell centroid over
+            its neighbours (cells sharing a node, or touching prisms) and takes the trace of the
+            fitted Hessian; free surfaces are imposed in the fit, periodic coupling only along
+            exchPBC. It is consistent on irregular, graded and refined meshes. The previous
+            face-based 'directlaplacianneumann' and 'ggneumann' remain selectable; they are only
+            consistent on regular axis-aligned grids. A uniform grid always uses its own
+            finite-difference stencil. exch_weigh applies to 'directlaplacianneumann' only.
+            The cell Hessian stencils hold ~15-150 cells, so exch_presize must be raised (e.g.
+            to 256) when the exchange matrix is to be returned.
         filename:
         cuda: Optional GPU support via CUDA.
         cvode:
@@ -209,7 +219,7 @@ class MicromagProblem:
             exch_nrow: int = 1,
             exch_ncols: int = 1,
             exch_intpn: str | None = "extended",
-            exch_meth: str | None = "directlaplacianneumann",
+            exch_meth: str | None = None,
             exch_weigh: float = 8,
             exch_presize: int = 12,
             passexch: int = 0,
@@ -259,6 +269,12 @@ class MicromagProblem:
         self.exch_nrow = exch_nrow
         self.exch_ncols = exch_ncols
         self.exch_intpn = exch_intpn
+        # The cell Hessian operator is the default on unstructured grids (tetrahedra and prisms):
+        # the face-based Direct Laplacian is only consistent on regular axis-aligned grids. A
+        # uniform grid uses its own finite-difference stencil whatever exch_meth says.
+        if exch_meth is None:
+            exch_meth = "cellhessian" if grid_type in ("tetrahedron", "unstructuredPrisms") \
+                else "directlaplacianneumann"
         self.exch_meth = exch_meth
         self.exch_weigh = exch_weigh
         self.passexch = passexch
@@ -851,6 +867,7 @@ class MicromagProblem:
             None: -1,
             "directlaplacianneumann": 1,
             "ggneumann": 2,
+            "cellhessian": 3,
         }[val]
 
     @property

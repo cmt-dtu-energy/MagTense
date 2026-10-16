@@ -30,6 +30,7 @@
     use UnstructuredMeshAnalysis
     use TetrahedralMeshAnalysis
     use DifferentialOperators
+    use CellHessianExchange
 
 #if USE_CDFMM
     use DipFmmDemag
@@ -2857,11 +2858,18 @@ end subroutine updateDemagfieldDipFmm
             !own boundary conditions and has already returned above.
             call displayGUIMessage( 'Using periodic exchange boundary conditions' )
         endif
-        !A tetrahedral mesh needs the full quadratic face fit: its faces are not axis aligned, and
-        !the linear fit with dropped gradient components is not consistent there. Prism grids keep
-        !the original fit, which is exact on their axis aligned faces.
-        call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, phase_local, A_int_normalized, problem%A_exch, &
-            quadFit = ( problem%grid%gridType .eq. gridTypeTetrahedron ))
+        if ( problem%exch_method .eq. MicroMagExchMethodCellHessian ) then
+            !Cell-centred Hessian operator: consistent on irregular tetrahedra and on graded and
+            !refined prism grids, free surfaces imposed in the fit, periodic only along exchPBC.
+            call computeExchangeCellHessian( problem%grid, problem%macrogrid%exchPBC .ne. 0, A0_normalized, &
+                                             phase_local, A_int_normalized, solution%gridinfo, problem%A_exch )
+        else
+            !A tetrahedral mesh needs the full quadratic face fit: its faces are not axis aligned, and
+            !the linear fit with dropped gradient components is not consistent there. Prism grids keep
+            !the original fit, which is exact on their axis aligned faces.
+            call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, phase_local, A_int_normalized, problem%A_exch, &
+                quadFit = ( problem%grid%gridType .eq. gridTypeTetrahedron ))
+        endif
     endif
 
     
