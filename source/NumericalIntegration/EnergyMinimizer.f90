@@ -97,6 +97,11 @@ module EnergyMinimizer
     real,parameter,private :: E_rise_rel = 1.0e-6    !> Allowed energy rise per step, relative to E_scale
     real,parameter,private :: eig_step = 1.0e-4      !> Rotation of the most displaced vector in the finite-difference Hessian product [rad]
     logical,parameter,private :: eig_debug = .false. !> Report every Lanczos step (development aid)
+    !> Entries per task of the loops over the state. The minimizer runs on the master thread of the
+    !> solver's parallel region, so these loops are split into blocks, each an OpenMP task for the
+    !> other threads of the team (serial outside a parallel region). Explicit tasks rather than
+    !> taskloops, which ifx 2025.2 miscompiles; sums are formed per block and added in block order.
+    integer,parameter,private :: par_grain = 16384
     integer,parameter,private :: eig_minit = 3       !> Fewest Lanczos steps before the convergence test is trusted, warm start
     integer,parameter,private :: eig_minit_moved = 10 !> The same after a push off a saddle, when the start vector is mostly random
     integer,parameter,private :: abort_every = 10    !> Short-circuit: the mean is checked every this many iterations ...
@@ -344,9 +349,7 @@ module EnergyMinimizer
 
         do while ( .not. converged .and. k .lt. k_cap )
             k = k + 1
-            m_prev = m
-            g_prev = g
-            tq_prev = tq
+            call copyState( m, g, tq, m_prev, g_prev, tq_prev )
 
             !Trial step, halved until the energy watchdog is satisfied
             n_shrink = 0
@@ -383,9 +386,7 @@ module EnergyMinimizer
             endif
 
             !Barzilai-Borwein step for the next iteration, alternating between the two rules
-            ss = sum( (m - m_prev)**2 )
-            sy = sum( (m - m_prev) * (g - g_prev) )
-            yy = sum( (g - g_prev)**2 )
+            call stepProducts( m, m_prev, g, g_prev, ss, sy, yy )
             if ( sy .gt. 0.0 .and. yy .gt. 0.0 ) then
                 if ( mod(k,2) .eq. 0 ) then
                     tau = ss / sy
@@ -720,16 +721,34 @@ module EnergyMinimizer
     integer,intent(in) :: n
     real,dimension(:),intent(out) :: tq, g
     real,intent(out) :: tq_max
+    integer :: i, c, nb, lo, hi
+    real :: tx, ty, tz
+    real,dimension(:),allocatable :: t2max
 
-    tq(1:n)       = m(n+1:2*n) * H(2*n+1:3*n) - m(2*n+1:3*n) * H(n+1:2*n)
-    tq(n+1:2*n)   = m(2*n+1:3*n) * H(1:n) - m(1:n) * H(2*n+1:3*n)
-    tq(2*n+1:3*n) = m(1:n) * H(n+1:2*n) - m(n+1:2*n) * H(1:n)
-
-    g(1:n)       = m(n+1:2*n) * tq(2*n+1:3*n) - m(2*n+1:3*n) * tq(n+1:2*n)
-    g(n+1:2*n)   = m(2*n+1:3*n) * tq(1:n) - m(1:n) * tq(2*n+1:3*n)
-    g(2*n+1:3*n) = m(1:n) * tq(n+1:2*n) - m(n+1:2*n) * tq(1:n)
-
-    tq_max = sqrt( maxval( tq(1:n)**2 + tq(n+1:2*n)**2 + tq(2*n+1:3*n)**2 ) )
+    nb = nBlocks( n )
+    allocate( t2max(nb) )
+    do c = 1, nb
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(c, lo, hi) private(i, tx, ty, tz)
+        t2max(c) = 0.0
+        do i = lo, hi
+            tx = m(n+i) * H(2*n+i) - m(2*n+i) * H(n+i)
+            ty = m(2*n+i) * H(i) - m(i) * H(2*n+i)
+            tz = m(i) * H(n+i) - m(n+i) * H(i)
+            tq(i) = tx
+            tq(n+i) = ty
+            tq(2*n+i) = tz
+            g(i)     = m(n+i) * tz - m(2*n+i) * ty
+            g(n+i)   = m(2*n+i) * tx - m(i) * tz
+            g(2*n+i) = m(i) * ty - m(n+i) * tx
+            t2max(c) = max( t2max(c), tx**2 + ty**2 + tz**2 )
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    tq_max = sqrt( maxval( t2max ) )
+    deallocate( t2max )
     end subroutine torqueAndGradient
 
     !>-----------------------------------------
@@ -743,15 +762,85 @@ module EnergyMinimizer
     real,intent(in) :: tau
     integer,intent(in) :: n
     real,dimension(:),intent(out) :: m1
-    real,dimension(:),allocatable :: q, denom
+    integer :: i, c, lo, hi
+    real :: q, denom
 
-    allocate( q(n), denom(n) )
-    q = 0.25 * tau**2 * ( tq(1:n)**2 + tq(n+1:2*n)**2 + tq(2*n+1:3*n)**2 )
-    denom = 1.0 / ( 1.0 + q )
-    m1(1:n)       = ( (1.0 - q) * m0(1:n)       - tau * g(1:n) )       * denom
-    m1(n+1:2*n)   = ( (1.0 - q) * m0(n+1:2*n)   - tau * g(n+1:2*n) )   * denom
-    m1(2*n+1:3*n) = ( (1.0 - q) * m0(2*n+1:3*n) - tau * g(2*n+1:3*n) ) * denom
-    deallocate( q, denom )
+    do c = 1, nBlocks( n )
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i, q, denom)
+        do i = lo, hi
+            q = 0.25 * tau**2 * ( tq(i)**2 + tq(n+i)**2 + tq(2*n+i)**2 )
+            denom = 1.0 / ( 1.0 + q )
+            m1(i)     = ( (1.0 - q) * m0(i)     - tau * g(i) )     * denom
+            m1(n+i)   = ( (1.0 - q) * m0(n+i)   - tau * g(n+i) )   * denom
+            m1(2*n+i) = ( (1.0 - q) * m0(2*n+i) - tau * g(2*n+i) ) * denom
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
     end subroutine cayleyUpdate
+
+    !>-----------------------------------------
+    !> dst = src for the three (3n) iterates of a descent step at once
+    !>-----------------------------------------
+    subroutine copyState( m, g, tq, m_prev, g_prev, tq_prev )
+    real,dimension(:),intent(in) :: m, g, tq
+    real,dimension(:),intent(out) :: m_prev, g_prev, tq_prev
+    integer :: i, c, lo, hi
+
+    do c = 1, nBlocks( size(m) )
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, size(m) )
+        !$omp task default(shared) firstprivate(lo, hi) private(i)
+        do i = lo, hi
+            m_prev(i) = m(i)
+            g_prev(i) = g(i)
+            tq_prev(i) = tq(i)
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine copyState
+
+    !>-----------------------------------------
+    !> The inner products of the Barzilai-Borwein step lengths, ss = |s|^2, sy = s.y and yy = |y|^2
+    !> with s = m - m_prev and y = g - g_prev, in one pass
+    !>-----------------------------------------
+    subroutine stepProducts( m, m_prev, g, g_prev, ss, sy, yy )
+    real,dimension(:),intent(in) :: m, m_prev, g, g_prev
+    real,intent(out) :: ss, sy, yy
+    integer :: i, c, nb, lo, hi
+    real :: s, y
+    real,dimension(:,:),allocatable :: part
+
+    nb = nBlocks( size(m) )
+    allocate( part(3,nb) )
+    do c = 1, nb
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, size(m) )
+        !$omp task default(shared) firstprivate(c, lo, hi) private(i, s, y)
+        part(:,c) = 0.0
+        do i = lo, hi
+            s = m(i) - m_prev(i)
+            y = g(i) - g_prev(i)
+            part(1,c) = part(1,c) + s * s
+            part(2,c) = part(2,c) + s * y
+            part(3,c) = part(3,c) + y * y
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    ss = sum( part(1,:) )
+    sy = sum( part(2,:) )
+    yy = sum( part(3,:) )
+    deallocate( part )
+    end subroutine stepProducts
+
+    !> Number of blocks of par_grain entries that n entries are split into
+    pure integer function nBlocks( n )
+    integer,intent(in) :: n
+    nBlocks = max( 1, (n + par_grain - 1) / par_grain )
+    end function nBlocks
 
 end module EnergyMinimizer
