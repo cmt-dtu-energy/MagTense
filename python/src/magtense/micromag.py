@@ -103,6 +103,15 @@ class MicromagProblem:
             finite-difference stencil. exch_weigh applies to 'directlaplacianneumann' only.
             The cell Hessian stencils hold ~15-150 cells, so exch_presize must be raised (e.g.
             to 256) when the exchange matrix is to be returned.
+            'sushi' is the symmetric, energy-based operator (SUSHI-g): the matrix is -V^-1 K with
+            K symmetric positive semidefinite, so the exchange field is exactly -dE/dm, the
+            exchange energy is conserved without damping and decreases with damping, and on a
+            uniform prism grid it is the standard 7-point Laplacian. Its solution error is
+            second order and below that of 'cellhessian' on all meshes tested; its pointwise
+            residual does not converge on irregular meshes (as for finite volumes in general).
+            Free surfaces are natural (homogeneous Neumann), periodic only along exchPBC; every
+            cell uses its own A (interface exchange values are not used). ~30-60 entries per
+            row on tetrahedra, ~10-60 on prisms.
         filename:
         cuda: Optional GPU support via CUDA.
         cvode:
@@ -868,6 +877,7 @@ class MicromagProblem:
             "directlaplacianneumann": 1,
             "ggneumann": 2,
             "cellhessian": 3,
+            "sushi": 4,
         }[val]
 
     @property

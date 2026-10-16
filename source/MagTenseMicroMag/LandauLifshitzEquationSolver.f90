@@ -2863,6 +2863,12 @@ end subroutine updateDemagfieldDipFmm
             !refined prism grids, free surfaces imposed in the fit, periodic only along exchPBC.
             call computeExchangeCellHessian( problem%grid, problem%macrogrid%exchPBC .ne. 0, A0_normalized, &
                                              phase_local, A_int_normalized, solution%gridinfo, problem%A_exch )
+        elseif ( problem%exch_method .eq. MicroMagExchMethodSushi ) then
+            !Symmetric, energy based operator (SUSHI-g): the field is exactly -dE/dm, so the exchange
+            !energy is conserved without damping and decreases with damping; free surfaces natural,
+            !periodic only along exchPBC.
+            call computeExchangeSushi( problem%grid, problem%macrogrid%exchPBC .ne. 0, A0_normalized, &
+                                       phase_local, A_int_normalized, solution%gridinfo, problem%A_exch )
         else
             !A tetrahedral mesh needs the full quadratic face fit: its faces are not axis aligned, and
             !the linear fit with dropped gradient components is not consistent there. Prism grids keep

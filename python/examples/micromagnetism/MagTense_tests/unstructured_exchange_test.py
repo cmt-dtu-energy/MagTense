@@ -12,7 +12,8 @@ the cells at the boundary included:
             a curved boundary; the mesh is the Delaunay tetrahedralisation of points in the cylinder
 
 Meshes (n = 5 and 10 cells per edge): Kuhn tetrahedra, Kuhn tetrahedra with the interior nodes
-moved by up to 0.35 h (slivers), Delaunay tetrahedra of random points; uniform prisms, prisms with
+moved by up to 0.35 h (slivers; a few of them invert, which the cell Hessian fit tolerates),
+Delaunay tetrahedra of random points; uniform prisms, prisms with
 random widths 0.4-1.6 h (graded), and an octree-like refinement with hanging faces.
 
 Checks: the error over all cells is below the limit at n = 10 and decreases from n = 5 to n = 10
