@@ -53,7 +53,7 @@
 !> exact (R = 0, g = grad u) for affine u. Interior face values are interpolated from cell values,
 !> exact for affine fields and well conditioned (two-point when the face point lies between the
 !> centroids, else the face neighbours of both cells, else their vertex neighbours; least squares
-!> weights V_j |d_j|^-4, so that small cells carry small weights); free-surface
+!> weights V_j^(1/2) |d_j|^-4, so that small cells carry small weights); free-surface
 !> face values are eliminated by minimising E_K, which is the natural homogeneous Neumann
 !> condition. stab = sqrt(3) for prisms, where the operator is then identical to the 7-point
 !> Laplacian with mirror Neumann boundaries on uniform grids, and 1 for tetrahedra. Every cell's
@@ -1343,7 +1343,7 @@ module CellHessianExchange
 
     !>-----------------------------------------
     !> Minimum-norm weights beta (sum beta_j phi_j = phi(0) for affine phi) from the points Y
-    !> (relative to the target point), weights (v_j / mean v) |y|^-4 after scaling by the rms
+    !> (relative to the target point), weights (v_j / mean v)^(1/2) |y|^-4 after scaling by the rms
     !> distance. The volume factor keeps small cells (slivers) from entering the face values of
     !> their neighbours with O(1) weights, which would make L = -V^-1 K very stiff.
     !---------------------------------------------------------------------------
@@ -1359,7 +1359,7 @@ module CellHessianExchange
         M4 = 0._dp
         do j = 1, n
             y3 = Y(:,j) / sc
-            w = ( v(j) / vm ) / ( sum( y3**2 ) + 1.e-6_dp )**2
+            w = sqrt( v(j) / vm ) / ( sum( y3**2 ) + 1.e-6_dp )**2
             g = [ 1._dp, y3 ]
             do a = 1, 4
                 M4(:,a) = M4(:,a) + w * g * g(a)
@@ -1370,7 +1370,7 @@ module CellHessianExchange
         s = 0._dp
         do j = 1, n
             y3 = Y(:,j) / sc
-            w = ( v(j) / vm ) / ( sum( y3**2 ) + 1.e-6_dp )**2
+            w = sqrt( v(j) / vm ) / ( sum( y3**2 ) + 1.e-6_dp )**2
             beta(j) = w * ( c(1) + dot_product( y3, c(2:4) ) )
             s = s + beta(j) * y3
         enddo
