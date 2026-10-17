@@ -64,10 +64,12 @@
     real(DP),dimension(:),allocatable :: gb_metric_w
     real(DP) :: gb_abort_dM = 0.0_DP
     real(DP),dimension(3) :: gb_abort_ref = 0.0_DP
+    logical :: gb_exch_gpu = .false.                            !>The exchange field is computed on the GPU (see initExchangeGpu)
+    integer,parameter :: par_grain = 16384                      !>Cells per task of the taskloops over the cells (see computeHeff)
 
     private :: gb_solution,gb_problem,crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2,gb_cellVol,n_feval_count
     private :: pred_m1,pred_m2,pred_H1,pred_H2,pred_n,pred_tau,pred_u,pred_ratio_max,pred_dm_max
-    private :: gb_metric_w,gb_abort_dM,gb_abort_ref
+    private :: gb_metric_w,gb_abort_dM,gb_abort_ref,gb_exch_gpu,par_grain
 
     contains
     
@@ -508,7 +510,9 @@
       if ( gb_problem%useCuda .eq. useCudaTrue ) then
           call cudaDestroy()
       endif
+      if ( gb_exch_gpu ) call cudaExchangeDestroy()
     #endif
+    gb_exch_gpu = .false.
     !Return the correct state
     sol = gb_solution
     prob = gb_problem    
@@ -1082,20 +1086,9 @@
         !--------------- effective field at m: fills gb_solution%Mx.. and HeffX/Y/Z ------------------
         call computeHeff( t, m )
         !-------------------------------------------------------------
-        !--------------- calculate precession term: m x Heff -------------
-        crossX = 1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
-        crossY = 1.0_DP * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
-        crossZ = 1.0_DP * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
-        !-------------------------------------------------------------
-        !--------------- calculate damping term: m x (m x Heff) -------------
-        HeffX2 = gb_solution%My * crossZ - gb_solution%Mz * crossY
-        HeffY2 = gb_solution%Mz * crossX - gb_solution%Mx * crossZ
-        HeffZ2 = gb_solution%Mx * crossY - gb_solution%My * crossX
-        !-------------------------------------------------------------
-        !--------------- assemble dm/dt -------------------------------------
-        dmdt(1:ntot)               = -gb_problem%gamma * crossX - alpha(t,gb_problem) * HeffX2
-        dmdt(ntot+1:2*ntot)        = -gb_problem%gamma * crossY - alpha(t,gb_problem) * HeffY2
-        dmdt(2*ntot+1:3*ntot)      = -gb_problem%gamma * crossZ - alpha(t,gb_problem) * HeffZ2
+        !--------------- precession m x Heff, damping m x (m x Heff), dm/dt -------------
+        call llRhs( gb_solution%Mx, gb_solution%My, gb_solution%Mz, HeffX, HeffY, HeffZ, gb_problem%gamma, &
+                    alpha( t, gb_problem ), crossX, crossY, crossZ, HeffX2, HeffY2, HeffZ2, dmdt )
         !---------------------------------------------------------------------
         call trace%end("dmdt_fct", itimer=itimer, verbose=1 )
     end subroutine dmdt_fct
@@ -1140,9 +1133,8 @@
         n_feval_count = n_feval_count + 1
 
         !------------- Update magnetisation (load from m)-------------
-        gb_solution%Mx = m(1:ntot)
-        gb_solution%My = m(ntot+1:2*ntot)
-        gb_solution%Mz = m(2*ntot+1:3*ntot)
+        !The loops over the cells here and in the callers are taskloops (see splitState)
+        call splitState( m, gb_solution%Mx, gb_solution%My, gb_solution%Mz )
         !-------------------------------------------------------------
 
         !------------ add exchange term -----------------------------
@@ -1179,9 +1171,9 @@
         call trace%end( "dmdt_fct_taskwait", itimer=itimer_wait, verbose=1 )
         !--------------------------------------------------------------------------------------------------------------------
         !--------------- combine to get effective field, Heff -------------
-        HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX + gb_solution%HtX
-        HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY + gb_solution%HtY
-        HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ + gb_solution%HtZ
+        call sumFieldTerms( gb_solution%HhX, gb_solution%HjX, gb_solution%HmX, gb_solution%HkX, gb_solution%HtX, HeffX )
+        call sumFieldTerms( gb_solution%HhY, gb_solution%HjY, gb_solution%HmY, gb_solution%HkY, gb_solution%HtY, HeffY )
+        call sumFieldTerms( gb_solution%HhZ, gb_solution%HjZ, gb_solution%HmZ, gb_solution%HkZ, gb_solution%HtZ, HeffZ )
         !-------------------------------------------------------------
         call trace%end("computeHeff", itimer=itimer, verbose=1 )
     end subroutine computeHeff
@@ -1249,7 +1241,8 @@
     type(MicroMagSolution),intent(in) :: solution
     real(DP),dimension(4),intent(out) :: E
     integer :: ntot
-    real(DP),dimension(:),allocatable :: w, mdotu, mx, my, mz, e_an
+    real(DP),dimension(:),allocatable :: mx, my, mz, e_an
+    real(DP) :: e1, e2, e3
     integer, save :: itimer = 0
 
     call trace%begin( "computeEnergies", itimer=itimer, verbose=1 )
@@ -1260,19 +1253,18 @@
         call cellVolumes( problem, solution, gb_cellVol )
     endif
 
-    allocate( w(ntot) )
-    w = mu0 * problem%Ms * gb_cellVol
-
-    E(1) = -0.5_DP * sum( w * ( solution%Mx * solution%HjX + solution%My * solution%HjY + solution%Mz * solution%HjZ ) )
-    E(2) = -          sum( w * ( solution%Mx * solution%HhX + solution%My * solution%HhY + solution%Mz * solution%HhZ ) )
-    E(3) = -0.5_DP * sum( w * ( solution%Mx * real(solution%HmX,DP) + solution%My * real(solution%HmY,DP) + solution%Mz * real(solution%HmZ,DP) ) )
+    !One pass over the cells for the three field energies and the uniaxial anisotropy (taskloop, see
+    !computeHeff); the weight of cell i is w = mu0 Ms_i V_i
+    call fieldEnergySums( problem%Ms, gb_cellVol, solution%Mx, solution%My, solution%Mz, &
+                          solution%HjX, solution%HjY, solution%HjZ, solution%HhX, solution%HhY, solution%HhZ, &
+                          solution%HmX, solution%HmY, solution%HmZ, e1, e2, e3 )
+    E(1) = -0.5_DP * e1
+    E(2) = -e2
+    E(3) = -0.5_DP * e3
 
     if ( any(problem%K0 .ne. 0) ) then
         !Uniaxial: K0 (1 - (u.m)^2) per unit volume
-        allocate( mdotu(ntot) )
-        mdotu = problem%u_ea(:,1) * solution%Mx + problem%u_ea(:,2) * solution%My + problem%u_ea(:,3) * solution%Mz
-        E(4) = sum( gb_cellVol * problem%K0 * ( 1.0_DP - mdotu**2 ) )
-        deallocate( mdotu )
+        E(4) = uniaxialEnergySum( gb_cellVol, problem%K0, problem%u_ea, solution%Mx, solution%My, solution%Mz )
     else if ( allocated(problem%Kfact_arr) ) then
         !General expansion in the local crystal frame. Kfact_arr is K0_arr/(mu0 Ms) with the cubic K1, K2
         !folded in (see ComputeAnisotropyTerm3D), so w * Kfact_arr is the coefficient in J.
@@ -1287,13 +1279,12 @@
                 + problem%Kfact_arr(:,5,1)*mx**4*(my**2 + mz**2) + problem%Kfact_arr(:,5,2)*my**4*(mz**2 + mx**2) &
                 + problem%Kfact_arr(:,5,3)*mz**4*(mx**2 + my**2) &
                 + problem%Kfact_arr(:,6,1)*mx**2*my**2*mz**2 )
-        E(4) = sum( w * e_an )
+        E(4) = sum( mu0 * problem%Ms * gb_cellVol * e_an )
         deallocate( mx, my, mz, e_an )
     else
         E(4) = 0.0_DP
     endif
 
-    deallocate( w )
     call trace%end( "computeEnergies", itimer=itimer, verbose=1 )
     end subroutine computeEnergies
 
@@ -1305,12 +1296,8 @@
     subroutine minimizerHeff( m, H )
     real(DP),dimension(:),intent(in) :: m
     real(DP),dimension(:),intent(out) :: H
-    integer :: ntot
-    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     call computeHeff( 0.0_DP, m )
-    H(1:ntot)          = HeffX
-    H(ntot+1:2*ntot)   = HeffY
-    H(2*ntot+1:3*ntot) = HeffZ
+    call joinState( HeffX, HeffY, HeffZ, H )
     end subroutine minimizerHeff
 
     subroutine minimizerEnergy( E )
@@ -1618,7 +1605,20 @@
     integer, save :: itimer = 0 
 
     call trace%begin( "updateExchangeTerms", itimer=itimer, verbose=1 )
-    
+
+#if USE_CUDA
+    if ( gb_exch_gpu ) then
+        call cudaExchangeApply( solution%Mx, solution%My, solution%Mz, solution%HjX, solution%HjY, solution%HjZ, stat )
+        if ( stat .eq. 0 ) then
+            call trace%end( "updateExchangeTerms", itimer=itimer, verbose=1 )
+            return
+        endif
+        call displayGUIMessage( 'Exchange field on the GPU failed - continuing on the CPU' )
+        call cudaExchangeDestroy()
+        gb_exch_gpu = .false.
+    endif
+#endif
+
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
@@ -1646,6 +1646,252 @@
 
     call trace%end( "updateExchangeTerms", itimer=itimer, verbose=1 )
     end subroutine updateExchangeTerms
+
+    !>-----------------------------------------
+    !> Loops over the cells of the per-evaluation work. computeHeff, the minimizer and the
+    !> Landau-Lifshitz right-hand side run on the master thread of the parallel region in
+    !> SolveLandauLifshitzEquation, so these loops are split into blocks of par_grain cells, each an
+    !> OpenMP task for the other threads of the team (outside a parallel region the tasks run at
+    !> once, serially). Explicit tasks rather than taskloops: ifx 2025.2 stops with internal compiler
+    !> errors on several of these as taskloops, and one that compiled crashed at run time. Sums are
+    !> formed per block and added in block order, so they do not depend on the number of threads.
+    !>-----------------------------------------
+
+    !> x = m(1:n), y = m(n+1:2n), z = m(2n+1:3n)
+    subroutine splitState( m, x, y, z )
+    real(DP),dimension(:),intent(in) :: m
+    real(DP),dimension(:),intent(inout) :: x, y, z
+    integer :: i, n, c, lo, hi
+    n = size(x)
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i)
+        do i = lo, hi
+            x(i) = m(i)
+            y(i) = m(n+i)
+            z(i) = m(2*n+i)
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine splitState
+
+    !> m = [x; y; z]
+    subroutine joinState( x, y, z, m )
+    real(DP),dimension(:),intent(in) :: x, y, z
+    real(DP),dimension(:),intent(inout) :: m
+    integer :: i, n, c, lo, hi
+    n = size(x)
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i)
+        do i = lo, hi
+            m(i) = x(i)
+            m(n+i) = y(i)
+            m(2*n+i) = z(i)
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine joinState
+
+    !> One component of the effective field: H = H_ext + H_exc + H_dem + H_ani + H_th
+    subroutine sumFieldTerms( Hh, Hj, Hm, Hk, Ht, H )
+    real(DP),dimension(:),intent(in) :: Hh, Hj, Hk, Ht
+    real(SP),dimension(:),intent(in) :: Hm
+    real(DP),dimension(:),intent(inout) :: H
+    integer :: i, n, c, lo, hi
+    n = size(H)
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i)
+        do i = lo, hi
+            H(i) = Hh(i) + Hj(i) + Hm(i) + Hk(i) + Ht(i)
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine sumFieldTerms
+
+    !> The Landau-Lifshitz right-hand side dm/dt = -gamma m x H - alpha m x (m x H), keeping the
+    !> precession c = m x H and the damping term d = m x (m x H) in the module work arrays
+    subroutine llRhs( mx, my, mz, hx, hy, hz, gam, alp, cx, cy, cz, dx, dy, dz, dmdt )
+    real(DP),dimension(:),intent(in) :: mx, my, mz, hx, hy, hz
+    real(DP),intent(in) :: gam, alp
+    real(DP),dimension(:),intent(inout) :: cx, cy, cz, dx, dy, dz, dmdt
+    integer :: i, n, c, lo, hi
+    n = size(mx)
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i)
+        do i = lo, hi
+            cx(i) = my(i) * hz(i) - mz(i) * hy(i)
+            cy(i) = mz(i) * hx(i) - mx(i) * hz(i)
+            cz(i) = mx(i) * hy(i) - my(i) * hx(i)
+            dx(i) = my(i) * cz(i) - mz(i) * cy(i)
+            dy(i) = mz(i) * cx(i) - mx(i) * cz(i)
+            dz(i) = mx(i) * cy(i) - my(i) * cx(i)
+            dmdt(i)     = -gam * cx(i) - alp * dx(i)
+            dmdt(n+i)   = -gam * cy(i) - alp * dy(i)
+            dmdt(2*n+i) = -gam * cz(i) - alp * dz(i)
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine llRhs
+
+    !> The sums sum_i w_i m_i . H_i, w_i = mu0 Ms_i V_i, of the exchange (e1), external (e2) and
+    !> demagnetization (e3) fields, in one pass
+    subroutine fieldEnergySums( Ms, V, mx, my, mz, hjx, hjy, hjz, hhx, hhy, hhz, hmx, hmy, hmz, e1, e2, e3 )
+    real(DP),dimension(:),intent(in) :: Ms, V, mx, my, mz, hjx, hjy, hjz, hhx, hhy, hhz
+    real(SP),dimension(:),intent(in) :: hmx, hmy, hmz
+    real(DP),intent(out) :: e1, e2, e3
+    real(DP),dimension(:,:),allocatable :: part
+    integer :: i, n, c, lo, hi
+    real(DP) :: w
+    n = size(mx)
+    allocate( part(3,cellBlocks(n)) )
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(c, lo, hi) private(i, w)
+        part(:,c) = 0.0_DP
+        do i = lo, hi
+            w = mu0 * Ms(i) * V(i)
+            part(1,c) = part(1,c) + w * ( mx(i) * hjx(i) + my(i) * hjy(i) + mz(i) * hjz(i) )
+            part(2,c) = part(2,c) + w * ( mx(i) * hhx(i) + my(i) * hhy(i) + mz(i) * hhz(i) )
+            part(3,c) = part(3,c) + w * ( mx(i) * real(hmx(i),DP) + my(i) * real(hmy(i),DP) + mz(i) * real(hmz(i),DP) )
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    e1 = sum( part(1,:) )
+    e2 = sum( part(2,:) )
+    e3 = sum( part(3,:) )
+    deallocate( part )
+    end subroutine fieldEnergySums
+
+    !> The uniaxial anisotropy energy sum_i V_i K0_i (1 - (u_i . m_i)^2)
+    function uniaxialEnergySum( V, K0, u, mx, my, mz ) result( e4 )
+    real(DP),dimension(:),intent(in) :: V, K0, mx, my, mz
+    real(DP),dimension(:,:),intent(in) :: u
+    real(DP) :: e4, mdotu
+    real(DP),dimension(:),allocatable :: part
+    integer :: i, n, c, lo, hi
+    n = size(mx)
+    allocate( part(cellBlocks(n)) )
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(c, lo, hi) private(i, mdotu)
+        part(c) = 0.0_DP
+        do i = lo, hi
+            mdotu = u(i,1) * mx(i) + u(i,2) * my(i) + u(i,3) * mz(i)
+            part(c) = part(c) + V(i) * K0(i) * ( 1.0_DP - mdotu**2 )
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    e4 = sum( part )
+    deallocate( part )
+    end function uniaxialEnergySum
+
+    !> Uniaxial anisotropy field H_k = 2 Kfact A m, A the symmetric 3x3 matrix u u^T of every cell
+    subroutine uniaxialAnisotropyField( Kf, Axx, Axy, Axz, Ayy, Ayz, Azz, mx, my, mz, hx, hy, hz )
+    real(DP),dimension(:),intent(in) :: Kf, Axx, Axy, Axz, Ayy, Ayz, Azz, mx, my, mz
+    real(DP),dimension(:),intent(inout) :: hx, hy, hz
+    integer :: i, n, c, lo, hi
+    n = size(mx)
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i)
+        do i = lo, hi
+            hx(i) = 2. * Kf(i) * ( Axx(i) * mx(i) + Axy(i) * my(i) + Axz(i) * mz(i) )
+            hy(i) = 2. * Kf(i) * ( Axy(i) * mx(i) + Ayy(i) * my(i) + Ayz(i) * mz(i) )
+            hz(i) = 2. * Kf(i) * ( Axz(i) * mx(i) + Ayz(i) * my(i) + Azz(i) * mz(i) )
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine uniaxialAnisotropyField
+
+    !> General anisotropy field from the expansion in the local crystal frame (see updateAnisotropy):
+    !> m is rotated into the frame of cell i, the field evaluated there and rotated back
+    subroutine generalAnisotropyField( CA, Kf, mx, my, mz, hx, hy, hz )
+    real(DP),dimension(:,:,:),intent(in) :: CA, Kf
+    real(DP),dimension(:),intent(in) :: mx, my, mz
+    real(DP),dimension(:),intent(inout) :: hx, hy, hz
+    real(DP) :: x, y, z, x2, y2, z2, hxr, hyr, hzr
+    integer :: i, n, c, lo, hi
+    n = size(mx)
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i, x, y, z, x2, y2, z2, hxr, hyr, hzr)
+        do i = lo, hi
+            x = CA(i,1,1)*mx(i) + CA(i,1,2)*my(i) + CA(i,1,3)*mz(i)
+            y = CA(i,2,1)*mx(i) + CA(i,2,2)*my(i) + CA(i,2,3)*mz(i)
+            z = CA(i,3,1)*mx(i) + CA(i,3,2)*my(i) + CA(i,3,3)*mz(i)
+            x2 = x**2
+            y2 = y**2
+            z2 = z**2
+            hxr = -2*x*( Kf(i,1,1) + 2*Kf(i,2,1)*x2 + Kf(i,3,3)*y2 + Kf(i,3,2)*z2 + 3*Kf(i,4,1)*x2**2 + Kf(i,5,2)*y2**2 &
+                       + Kf(i,5,3)*z2**2 + 2*Kf(i,5,1)*x2*y2 + 2*Kf(i,5,1)*x2*z2 + Kf(i,6,1)*y2*z2 )
+            hyr = -2*y*( Kf(i,1,2) + 2*Kf(i,2,2)*y2 + Kf(i,3,3)*x2 + Kf(i,3,1)*z2 + 3*Kf(i,4,2)*y2**2 + Kf(i,5,1)*x2**2 &
+                       + Kf(i,5,3)*z2**2 + 2*Kf(i,5,2)*x2*y2 + 2*Kf(i,5,2)*y2*z2 + Kf(i,6,1)*x2*z2 )
+            hzr = -2*z*( Kf(i,1,3) + 2*Kf(i,2,3)*z2 + Kf(i,3,2)*x2 + Kf(i,3,1)*y2 + 3*Kf(i,4,3)*z2**2 + Kf(i,5,1)*x2**2 &
+                       + Kf(i,5,2)*y2**2 + 2*Kf(i,5,3)*x2*z2 + 2*Kf(i,5,3)*y2*z2 + Kf(i,6,1)*x2*y2 )
+            hx(i) = - CA(i,1,1)*hxr - CA(i,2,1)*hyr - CA(i,3,1)*hzr
+            hy(i) = - CA(i,1,2)*hxr - CA(i,2,2)*hyr - CA(i,3,2)*hzr
+            hz(i) = - CA(i,1,3)*hxr - CA(i,2,3)*hyr - CA(i,3,3)*hzr
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine generalAnisotropyField
+
+    !> Number of blocks of par_grain cells that n cells are split into
+    pure integer function cellBlocks( n )
+    integer,intent(in) :: n
+    cellBlocks = max( 1, (n + par_grain - 1) / par_grain )
+    end function cellBlocks
+
+    !>-----------------------------------------
+    !> @brief
+    !> Moves the exchange operator to the GPU in a CUDA run, so that updateExchangeTerms computes
+    !> the exchange field there (in FP64, as on the CPU) instead of with three sequential MKL
+    !> products. The CPU stays in use when MagTense is built without CUDA, when useCuda is off,
+    !> when MAGTENSE_EXCHANGE_GPU=0 and when the upload fails.
+    !> @param[in] problem, the struct containing the current problem, with A_exch and Jfact set
+    !>-----------------------------------------
+    subroutine initExchangeGpu( problem )
+    type(MicroMagProblem),intent(in) :: problem
+    integer :: status, nnz
+    character(len=100) :: prog_str
+
+    gb_exch_gpu = .false.
+#if USE_CUDA
+    if ( problem%useCuda .ne. useCudaTrue ) return
+    call cudaExchangeInit( problem%A_exch, 2.0_DP * problem%Jfact, status, nnz )
+    gb_exch_gpu = ( status .eq. 0 )
+    select case ( status )
+    case ( 0 )
+        write(prog_str,'(A,I0,A,F6.2,A)') 'Exchange field on the GPU (', nnz, ' non-zeros, ', &
+            real(nnz,DP) / size(problem%Jfact), ' per row)'
+        call displayGUIMessage( trim(prog_str) )
+    case ( 1 )
+        call displayGUIMessage( 'Exchange field on the CPU (MAGTENSE_EXCHANGE_GPU=0)' )
+    case default
+        write(prog_str,'(A,I3,A)') 'Exchange field on the CPU (GPU initialization failed, status ', status, ')'
+        call displayGUIMessage( trim(prog_str) )
+    end select
+#endif
+    end subroutine initExchangeGpu
 
     
     !>-----------------------------------------
@@ -1702,8 +1948,7 @@
     
     !real :: prefact                                    !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
-    real(DP),dimension(:),allocatable   :: Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot
-    integer, save :: itimer = 0, itimer1 = 0, itimer2 = 0
+    integer, save :: itimer = 0, itimer2 = 0
 
     call trace%begin( "updateAnisotropy", itimer=itimer, verbose=1 )
     
@@ -1742,31 +1987,17 @@
     !                      [0 0 0]
     !                      [Kfact2 0 0]
     
+    !Both branches loop over blocks of cells as child tasks of the task computeHeff runs this in
+    !(see splitState)
     if (any(problem%K0 .ne. 0)) then
-        solution%Hkx = 2. * problem%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-        solution%Hky = 2. * problem%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-        solution%Hkz = 2. * problem%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
-    else 
-        call trace%begin( "updateAnisotropy_alloc", itimer=itimer1, verbose=2 )
-        allocate(Mx_rot(size(solution%Mx)), My_rot(size(solution%My)), Mz_rot(size(solution%Mz)))
-        allocate(Hkx_rot(size(Mx_rot)), Hky_rot(size(My_rot)), Hkz_rot(size(Mz_rot)))
-        call trace%end( "updateAnisotropy_alloc", itimer=itimer1, verbose=2 )
+        call uniaxialAnisotropyField( problem%Kfact, problem%Axx, problem%Axy, problem%Axz, problem%Ayy, problem%Ayz, &
+            problem%Azz, solution%Mx, solution%My, solution%Mz, solution%Hkx, solution%Hky, solution%Hkz )
+    else
         call trace%begin( "updateAnisotropy_calc", itimer=itimer2, verbose=2 )
-        Mx_rot = problem%CrystalAxis(:,1,1)*solution%Mx(:) + problem%CrystalAxis(:,1,2)*solution%My(:) + problem%CrystalAxis(:,1,3)*solution%Mz(:)
-        My_rot = problem%CrystalAxis(:,2,1)*solution%Mx(:) + problem%CrystalAxis(:,2,2)*solution%My(:) + problem%CrystalAxis(:,2,3)*solution%Mz(:)
-        Mz_rot = problem%CrystalAxis(:,3,1)*solution%Mx(:) + problem%CrystalAxis(:,3,2)*solution%My(:) + problem%CrystalAxis(:,3,3)*solution%Mz(:)
-        
-        Hkx_rot = -2*Mx_rot(:)*(problem%Kfact_arr(:,1,1) + 2*problem%Kfact_arr(:,2,1)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,3)*My_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*My_rot(:)**2*Mz_rot(:)**2 )
-        Hky_rot = -2*My_rot(:)*(problem%Kfact_arr(:,1,2) + 2*problem%Kfact_arr(:,2,2)*My_rot(:)**2 + problem%Kfact_arr(:,3,3)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,2)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,2)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*Mz_rot(:)**2 )
-        Hkz_rot = -2*Mz_rot(:)*(problem%Kfact_arr(:,1,3) + 2*problem%Kfact_arr(:,2,3)*Mz_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*My_rot(:)**2 + 3*problem%Kfact_arr(:,4,3)*Mz_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + 2*problem%Kfact_arr(:,5,3)*Mx_rot(:)**2*Mz_rot(:)**2 + 2*problem%Kfact_arr(:,5,3)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*My_rot(:)**2 )
+        call generalAnisotropyField( problem%CrystalAxis, problem%Kfact_arr, solution%Mx, solution%My, solution%Mz, &
+            solution%Hkx, solution%Hky, solution%Hkz )
         call trace%end( "updateAnisotropy_calc", itimer=itimer2, verbose=2 )
-
-        solution%Hkx(:) = - problem%CrystalAxis(:,1,1)*Hkx_rot(:) - problem%CrystalAxis(:,2,1)*Hky_rot(:) - problem%CrystalAxis(:,3,1)*Hkz_rot(:)
-        solution%Hky(:) = - problem%CrystalAxis(:,1,2)*Hkx_rot(:) - problem%CrystalAxis(:,2,2)*Hky_rot(:) - problem%CrystalAxis(:,3,2)*Hkz_rot(:)
-        solution%Hkz(:) = - problem%CrystalAxis(:,1,3)*Hkx_rot(:) - problem%CrystalAxis(:,2,3)*Hky_rot(:) - problem%CrystalAxis(:,3,3)*Hkz_rot(:)
-        
-        deallocate(Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot)
-    end if 
+    end if
     call trace%end( "updateAnisotropy", itimer=itimer, verbose=1 )
 
     end subroutine updateAnisotropy    
@@ -2202,8 +2433,9 @@ end subroutine updateDemagfieldDipFmm
     
     !Exhange term matrix
     call ComputeExchangeTerm3D( problem%grid, problem%A_exch, problem, solution )
-    
-    
+    call initExchangeGpu( problem )
+
+
     call trace%end( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     end subroutine initializeInteractionMatrices
     

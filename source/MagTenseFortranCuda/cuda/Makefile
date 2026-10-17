@@ -7,12 +7,21 @@ CUDA_HOST_COMPILER ?=
 #       List all source files required for the project
 #=======================================================================
 CUDA_SOURCE = MagTenseCudaBlas
+CUDA_EXCH_SOURCE = MagTenseCudaExchange
 CUDA_WRAP_SOURCE = MagTenseCudaBlasICLWrapper
 #=======================================================================
 #                 Relevant suffixes
 #=======================================================================
 CUDA_FILE = $(CUDA_SOURCE).cu
+CUDA_EXCH_FILE = $(CUDA_EXCH_SOURCE).cu
 CUDA_WRAP_FILE = $(CUDA_WRAP_SOURCE).cxx
+
+# MagTenseCudaExchange.cu has its own kernel, so it is compiled to machine code for each of these
+# architectures (the list dip-fmm uses) plus PTX for the newest. PTX alone is not enough: a driver
+# older than the toolkit refuses to JIT it ("PTX was compiled with an unsupported toolchain").
+CUDA_ARCHITECTURES ?= 75 80 86 89 90 120
+CUDA_GENCODE = $(foreach a,$(CUDA_ARCHITECTURES),-gencode arch=compute_$(a),code=sm_$(a)) \
+	-gencode arch=compute_$(lastword $(CUDA_ARCHITECTURES)),code=compute_$(lastword $(CUDA_ARCHITECTURES))
 
 ifeq ($(OS),Windows_NT)
     OBJ_SUFFIX = .obj
@@ -48,6 +57,7 @@ else
 endif
 
 CUDA_OBJECT = $(CUDA_SOURCE)$(OBJ_SUFFIX)
+CUDA_EXCH_OBJECT = $(CUDA_EXCH_SOURCE)$(OBJ_SUFFIX)
 CUDA_WRAP   = $(CUDA_WRAP_SOURCE)$(OBJ_SUFFIX)
 
 STATIC_LIB = libCuda$(LIB_SUFFIX)
@@ -61,15 +71,18 @@ all: cuda $(STATIC_LIB)
 
 wrap: $(STATIC_LIB)
 
-cuda: $(CUDA_OBJECT)
+cuda: $(CUDA_OBJECT) $(CUDA_EXCH_OBJECT)
 
 $(CUDA_OBJECT): $(CUDA_FILE)
 	$(NVCC) $(CUFLAGS) -c $(CUDA_FILE) -o $(CUDA_OBJECT)
 
+$(CUDA_EXCH_OBJECT): $(CUDA_EXCH_FILE)
+	$(NVCC) $(CUFLAGS) $(CUDA_GENCODE) -c $(CUDA_EXCH_FILE) -o $(CUDA_EXCH_OBJECT)
+
 $(CUDA_WRAP): $(CUDA_WRAP_FILE)
 	$(CPP) $(CPPFLAGS) $(CPPFLAGS_OUT)$@ -c $(CUDA_WRAP_FILE)
 
-$(STATIC_LIB): $(CUDA_OBJECT) $(CUDA_WRAP)
+$(STATIC_LIB): $(CUDA_OBJECT) $(CUDA_EXCH_OBJECT) $(CUDA_WRAP)
 	$(LIBTOOL)
 
 clean:
