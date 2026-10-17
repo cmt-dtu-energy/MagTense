@@ -23,7 +23,10 @@
 !>
 !> with n^t and n^s the OUTWARD face normals of target and source. The sixteen
 !> scalar face-pair integrals are evaluated in closed form by
-!> TileTriangleTriangle; there is no numerical quadrature anywhere in this path.
+!> TileTriangleTriangle for touching, self and near pairs. Pairs separated by
+!> at least 1.5 summed circumradii are instead averaged by a collapsed Gauss
+!> rule of the analytical point field over the target (see gaussFactor), where
+!> the closed form loses its accuracy through cancellation.
 !>
 !> NOTE ON NORMALISATION. The equivalent routine in dip-fmm maps the TOTAL
 !> SOURCE MOMENT m = V_s M to the field and therefore carries the prefactor
@@ -33,12 +36,28 @@
 !---------------------------------------------------------------------------
 module TileTetrahedronPairTensor
     use TileTriangleTriangle
+    use TileTriangle, only : getN_Triangle
     use, intrinsic :: ieee_arithmetic
     implicit none
 
     private
 
     real(ttReal),parameter :: fourPi = 12.566370614359172953850573533118_ttReal
+
+    !> Separation, in units of the summed circumradii, from which the pair is
+    !> averaged by a collapsed Gauss rule of the exact point field of the
+    !> source over the target instead of formed from the analytical face-pair
+    !> integrals. The analytical reduction cancels catastrophically for
+    !> separated pairs: on random irregular tetrahedra its error grows from
+    !> 3e-11 at 1.5 to 2e-8 at eight, and for parallel faces with non-aligned
+    !> edges (the top and bottom faces of a tetrahedral film mesh) it lost all
+    !> digits by ten. Below 1.5 the source's singularity is too close for a
+    !> fixed rule. Values and rule orders are dip-fmm's (tetrahedron_detail.hpp):
+    !> 7 points per direction from 1.5, 6 from 2 and 5 from 4, each with a worst
+    !> relative error of about 2e-10 in its range.
+    real(ttReal),parameter :: gaussFactor = 1.5_ttReal
+    real(ttReal),parameter :: gaussSixFactor = 2.0_ttReal
+    real(ttReal),parameter :: gaussFiveFactor = 4.0_ttReal
 
     !> The four triangular faces of a tetrahedron, as vertex triples. Face k is
     !> the face opposite vertex k, so the vertex used to orient the outward
@@ -82,8 +101,8 @@ module TileTetrahedronPairTensor
     real(ttReal),dimension(3,4) :: normalS, normalT
     real(ttReal),dimension(3,3) :: acc
     real(ttReal),dimension(3) :: shift
-    real(ttReal) :: volS, volT, integral, prefactor, avg
-    integer :: a, b, i, j, status
+    real(ttReal) :: volS, volT, integral, prefactor, avg, dr
+    integer :: a, b, i, j, status, q
     logical :: ok
 
         N = 0._ttReal
@@ -108,6 +127,31 @@ module TileTetrahedronPairTensor
         call tetrahedron_pair_volume( vt, volT, ok )
         if ( .not. ok ) then
             if ( present(ierr) ) ierr = tetPairBadTarget
+            return
+        endif
+
+        !Separated pairs: Gauss rule of the analytical point field (see
+        !gaussFactor). The source centroid is the origin here.
+        dr = norm2( sum( vt, dim=2 ) / 4._ttReal ) &
+           / ( tetrahedron_circumradius( vs ) + tetrahedron_circumradius( vt ) )
+        if ( dr .ge. gaussFactor .and. .not. tetrahedra_share_vertex( vs, vt ) ) then
+            q = 7
+            if ( dr .ge. gaussSixFactor ) q = 6
+            if ( dr .ge. gaussFiveFactor ) q = 5
+            call gauss_pair_tensor( vs, vt, q, N )
+            if ( .not. all( ieee_is_finite( N ) ) ) then
+                N = 0._ttReal
+                if ( present(ierr) ) ierr = tetPairNotFinite
+                return
+            endif
+            do i = 1, 3
+                do j = i+1, 3
+                    avg = 0.5_ttReal * ( N(i,j) + N(j,i) )
+                    N(i,j) = avg
+                    N(j,i) = avg
+                enddo
+            enddo
+            if ( present(ierr) ) ierr = tetPairOk
             return
         endif
 
@@ -264,5 +308,129 @@ module TileTetrahedronPairTensor
         ok = .true.
 
     end subroutine tetrahedron_faces
+
+
+    !> Circumradius of a non-degenerate tetrahedron.
+    function tetrahedron_circumradius( vert ) result( radius )
+    real(ttReal),dimension(3,4),intent(in) :: vert
+    real(ttReal) :: radius
+    real(ttReal),dimension(3) :: u, v, w, centre
+        u = vert(:,2) - vert(:,1)
+        v = vert(:,3) - vert(:,1)
+        w = vert(:,4) - vert(:,1)
+        centre = ( dot_product( u, u ) * cross_product( v, w ) + dot_product( v, v ) * cross_product( w, u ) &
+                 + dot_product( w, w ) * cross_product( u, v ) ) / ( 2._ttReal * dot_product( u, cross_product( v, w ) ) )
+        radius = norm2( centre )
+    end function tetrahedron_circumradius
+
+
+    function cross_product( a, b ) result( c )
+    real(ttReal),dimension(3),intent(in) :: a, b
+    real(ttReal),dimension(3) :: c
+        c(1) = a(2)*b(3) - a(3)*b(2)
+        c(2) = a(3)*b(1) - a(1)*b(3)
+        c(3) = a(1)*b(2) - a(2)*b(1)
+    end function cross_product
+
+
+    !> .true. if the two tetrahedra have a vertex in common (to round-off of the
+    !> element size): their point field is singular on the target, so such a
+    !> pair is never averaged by quadrature.
+    function tetrahedra_share_vertex( vs, vt ) result( shared )
+    real(ttReal),dimension(3,4),intent(in) :: vs, vt
+    logical :: shared
+    real(ttReal) :: scaleVal
+    integer :: i, j
+        scaleVal = 0._ttReal
+        do i = 1, 4
+            do j = i+1, 4
+                scaleVal = max( scaleVal, norm2( vs(:,i) - vs(:,j) ), norm2( vt(:,i) - vt(:,j) ) )
+            enddo
+        enddo
+        shared = .false.
+        do i = 1, 4
+            do j = 1, 4
+                if ( norm2( vs(:,i) - vt(:,j) ) .le. 1.0e-10_ttReal * scaleVal ) shared = .true.
+            enddo
+        enddo
+    end function tetrahedra_share_vertex
+
+
+    !> Gauss-Legendre nodes and weights on [0,1] (Newton iteration on the
+    !> Legendre recurrence; the weights sum to one).
+    subroutine gauss_legendre01( q, x, w )
+    integer,intent(in) :: q
+    real(ttReal),dimension(q),intent(out) :: x, w
+    real(ttReal),parameter :: pi = 3.14159265358979323846264338327950288_ttReal
+    real(ttReal) :: z, z1, p1, p2, p3, pp
+    integer :: i, j, it
+        do i = 1, q
+            z = cos( pi * ( real( i, ttReal ) - 0.25_ttReal ) / ( real( q, ttReal ) + 0.5_ttReal ) )
+            do it = 1, 100
+                p1 = 1._ttReal
+                p2 = 0._ttReal
+                do j = 1, q
+                    p3 = p2
+                    p2 = p1
+                    p1 = ( real( 2*j-1, ttReal ) * z * p2 - real( j-1, ttReal ) * p3 ) / real( j, ttReal )
+                enddo
+                pp = real( q, ttReal ) * ( z * p1 - p2 ) / ( z*z - 1._ttReal )
+                z1 = z
+                z = z1 - p1 / pp
+                if ( abs( z - z1 ) .le. 4._ttReal * epsilon( z ) ) exit
+            enddo
+            x(i) = 0.5_ttReal * ( 1._ttReal - z )
+            w(i) = 1._ttReal / ( ( 1._ttReal - z*z ) * pp*pp )
+        enddo
+    end subroutine gauss_legendre01
+
+
+    !---------------------------------------------------------------------------
+    !> @brief Target average of the analytical point tensor of the source by a
+    !> collapsed (Duffy) Gauss rule of q points per direction, q**3 in all.
+    !>
+    !> The point tensor is MagTense's getN_tensor_tetrahedron (four oriented
+    !> triangular faces, TileTriangle), with the same sign convention as the
+    !> analytical pair tensor.
+    !---------------------------------------------------------------------------
+    subroutine gauss_pair_tensor( vs, vt, q, N )
+    real(ttReal),dimension(3,4),intent(in) :: vs, vt
+    integer,intent(in) :: q
+    real(ttReal),dimension(3,3),intent(out) :: N
+
+    real(ttReal),dimension(q) :: x, w
+    real(ttReal),dimension(4) :: lam
+    real(ttReal) :: r, s, t, wt, wsum
+    real,dimension(3,4) :: vsDefault
+    real,dimension(3) :: pt
+    real,dimension(3,3) :: nTri, pMat
+    integer :: a, b, c, f
+
+        call gauss_legendre01( q, x, w )
+        vsDefault = real( vs, kind( 1.0 ) )
+        N = 0._ttReal
+        wsum = 0._ttReal
+        do a = 1, q
+            r = x(a)
+            do b = 1, q
+                s = x(b)
+                do c = 1, q
+                    t = x(c)
+                    wt = 6._ttReal * r*r * s * w(a) * w(b) * w(c)
+                    lam = [ 1._ttReal - r, r * ( 1._ttReal - s ), r * s * ( 1._ttReal - t ), r * s * t ]
+                    pt = real( matmul( vt, lam ), kind( 1.0 ) )
+                    do f = 1, 4
+                        nTri = 0.
+                        pMat = 0.
+                        call getN_Triangle( cshift( vsDefault, f-1, 2 ), pt, nTri, pMat )
+                        N = N + wt * real( nTri, ttReal )
+                    enddo
+                    wsum = wsum + wt
+                enddo
+            enddo
+        enddo
+        N = N / wsum
+
+    end subroutine gauss_pair_tensor
 
 end module TileTetrahedronPairTensor

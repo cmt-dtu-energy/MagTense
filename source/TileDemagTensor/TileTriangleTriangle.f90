@@ -48,6 +48,29 @@ module TileTriangleTriangle
     !> of the four heights are identically zero.
     real(ttReal),parameter :: i0Zero2 = 1.0e-28_ttReal
 
+    !> Precision of the I0 primitive. Its branches subtract nearly equal
+    !> logarithms and arctangents, so it is evaluated in quadruple precision,
+    !> as dip-fmm does in long double (src/geometry/primitives/tetrahedron.cpp).
+    integer,parameter :: i0Real = selected_real_kind(30)
+    real(i0Real),parameter :: i0Z2 = 1.0e-28_i0Real
+
+    !> The Gram-Schmidt rank tolerance stays at 256 eps (relative, squared).
+    !> dip-fmm's coarser kRelativeRank = 1e-4 was tried: it removed the largest
+    !> errors on touching pairs with parallel faces but added O(1e-3..1) errors
+    !> on other touching and near pairs (validation of 17 Oct 2026 in the
+    !> FMM-article repository, tet-tet-article/data/T5_pair_robustness.csv).
+
+    !> Heights below this fraction of the vector scale are zero (dip-fmm's
+    !> kRelativeResidual). A nearly shared vertex leaves heights of a few ulps,
+    !> for which the one-dimensional closed forms combine logarithms of the
+    !> height that cancel only approximately.
+    real(ttReal),parameter :: relResidual = 1.0e-10_ttReal
+
+    !> Face pairs whose normals differ by less than this are projected onto a
+    !> common plane and evaluated by the parallel branch, where the general
+    !> branch's error grows like eps / angle**3 (dip-fmm's kNearParallel).
+    real(ttReal),parameter :: nearParallel = 1.0e-3_ttReal
+
     public :: triangle_triangle_laplace_integral
 
     contains
@@ -151,16 +174,18 @@ module TileTriangleTriangle
     !> parallel branch carries the (constant) separation of the two planes as
     !> the height h4 of the reduction.
     !---------------------------------------------------------------------------
-    subroutine triangle_triangle_core( first, second, val, ok )
+    recursive subroutine triangle_triangle_core( first, second, val, ok )
     real(ttReal),dimension(3,3),intent(in) :: first, second
     real(ttReal),intent(out) :: val
     logical,intent(inout) :: ok
 
-    real(ttReal),dimension(3) :: a1, a2, a3, a4, e4, e4x, crossA, crossB, nA, nB, proj
+    real(ttReal),dimension(3) :: a1, a2, a3, a4, e4, e4x, crossA, crossB, nA, nB, proj, nMean
     real(ttReal),dimension(3,4) :: basis
     real(ttReal),dimension(4) :: coeff
+    real(ttReal),dimension(3,3) :: projA, projB
     real(ttReal) :: twiceAreaA, twiceAreaB, residual, parallelMeasure, h4, reduced
     real(ttReal) :: s0, s1, s2, s3, i31, i32, i33, i34, i35, i36
+    integer :: k
 
         val = 0._ttReal
 
@@ -194,6 +219,26 @@ module TileTriangleTriangle
         nA = crossA / twiceAreaA
         nB = crossB / twiceAreaB
         parallelMeasure = min( norm2( nA + nB ), norm2( nA - nB ) )
+
+        !Nearly parallel faces (coplanar faces of a mesh after rounding, or
+        !genuinely almost parallel ones): project both triangles onto planes
+        !normal to their mean normal, each through its own centroid, and let the
+        !parallel branch evaluate them. That costs O(angle) and is symmetric in
+        !the two triangles; the general branch cancels like eps / angle**3 here.
+        if ( parallelMeasure .gt. zeroTol .and. parallelMeasure .le. nearParallel ) then
+            if ( dot_product( nA, nB ) .ge. 0._ttReal ) then
+                nMean = nA + nB
+            else
+                nMean = nA - nB
+            endif
+            nMean = nMean / norm2( nMean )
+            do k = 1, 3
+                projA(:,k) = first(:,k) - dot_product( first(:,k) - sum( first, dim=2 ) / 3._ttReal, nMean ) * nMean
+                projB(:,k) = second(:,k) - dot_product( second(:,k) - sum( second, dim=2 ) / 3._ttReal, nMean ) * nMean
+            enddo
+            call triangle_triangle_core( projA, projB, val, ok )
+            return
+        endif
 
         if ( parallelMeasure .gt. zeroTol ) then
             !The two triangle planes intersect: the reduction closes in the
@@ -301,7 +346,7 @@ module TileTriangleTriangle
         enddo
 
         residual = norm2( val - projected )
-        residTol = 256._ttReal * epsilon(1._ttReal) * max( 1._ttReal, vecScale )
+        residTol = relResidual * max( 1._ttReal, vecScale )
         if ( residual .le. residTol ) residual = 0._ttReal
 
     end subroutine expand_gram_schmidt
@@ -469,10 +514,10 @@ module TileTriangleTriangle
 
     !> Helper for the I0 case analysis, the reference Phi2 function.
     function i0_phi2( h, h1, p, hh, rad ) result( phi2 )
-    real(ttReal),intent(in) :: h, h1, p, hh, rad
-    real(ttReal) :: phi2
-        if ( h1 * p .eq. 0._ttReal ) then
-            phi2 = 1._ttReal / ( hh + h * rad )
+    real(i0Real),intent(in) :: h, h1, p, hh, rad
+    real(i0Real) :: phi2
+        if ( h1 * p .eq. 0._i0Real ) then
+            phi2 = 1._i0Real / ( hh + h * rad )
         else
             phi2 = atan( ( h1 * p ) / ( hh + h * rad ) ) / ( h1 * p )
         endif
@@ -499,13 +544,13 @@ module TileTriangleTriangle
     real(ttReal),intent(out) :: ans
     logical,intent(inout) :: ok
 
-    real(ttReal),dimension(4) :: h
+    real(i0Real),dimension(4) :: h
     integer,dimension(4) :: ord
     integer :: i, j, key
-    real(ttReal) :: h1, h2, h3, h4, pAbs, hh, hh1, rad, rad1, rad2, hNorm
-    real(ttReal) :: phi1, phi2, phi3, phi4, q, lg
+    real(i0Real) :: h1, h2, h3, h4, pAbs, hh, hh1, rad, rad1, rad2, hNorm
+    real(i0Real) :: phi1, phi2, phi3, phi4, q, lg
 
-        ans = 0._ttReal
+        ans = 0._i0Real
         h = hIn
 
         !Stable ascending index sort of the four heights, then zero the two
@@ -524,8 +569,8 @@ module TileTriangleTriangle
             enddo
             ord(j+1) = key
         enddo
-        h(ord(1)) = 0._ttReal
-        h(ord(2)) = 0._ttReal
+        h(ord(1)) = 0._i0Real
+        h(ord(2)) = 0._i0Real
 
         h1 = h(1)
         h2 = h(2)
@@ -537,19 +582,19 @@ module TileTriangleTriangle
 
         !Only reachable through a vanishing edge in a degenerate triangle; the
         !valid reductions drop such a term before they reach I0.
-        if ( pAbs .eq. 0._ttReal .and. hh .eq. 0._ttReal ) return
+        if ( pAbs .eq. 0._i0Real .and. hh .eq. 0._i0Real ) return
 
         rad = sqrt( pAbs*pAbs + hh )
 
         !The complete zero-height branch of the reference reduction, not merely
         !an alternative way of evaluating Phi1.
-        if ( hh .lt. i0Zero2 * pAbs * pAbs ) then
-            ans = log( pAbs ) / ( 6._ttReal * pAbs )
+        if ( hh .lt. i0Z2 * pAbs * pAbs ) then
+            ans = log( pAbs ) / ( 6._i0Real * pAbs )
             return
         endif
 
-        if ( pAbs .eq. 0._ttReal ) then
-            phi1 = 1._ttReal / sqrt( hh )
+        if ( pAbs .eq. 0._i0Real ) then
+            phi1 = 1._i0Real / sqrt( hh )
         else
             !asinh(p/sqrt(hh))/p is the logarithm of the reference I0 written in
             !a form that stays well behaved as p -> 0.
@@ -558,67 +603,67 @@ module TileTriangleTriangle
 
         hh1 = hh - h1*h1
 
-        if ( h1*h1 + h2*h2 + h4*h4 .lt. i0Zero2 * hh ) then
+        if ( h1*h1 + h2*h2 + h4*h4 .lt. i0Z2 * hh ) then
             !Rank-deficient reductions can leave h3 as the only non-zero height.
             !The reference case-4 expression is 0/0 at h1 = 0; this is its
             !analytical h1 -> 0 limit.
             q = hypot( pAbs, h3 )
             lg = asinh( pAbs / h3 )
-            ans = ( lg * ( 2._ttReal*q*q - 3._ttReal*h3*h3 ) / ( 2._ttReal * pAbs**3 ) &
-                  + ( 4._ttReal*h3 - 3._ttReal*q ) / ( 2._ttReal * pAbs*pAbs ) ) / 6._ttReal
+            ans = ( lg * ( 2._i0Real*q*q - 3._i0Real*h3*h3 ) / ( 2._i0Real * pAbs**3 ) &
+                  + ( 4._i0Real*h3 - 3._i0Real*q ) / ( 2._i0Real * pAbs*pAbs ) ) / 6._i0Real
 
-        elseif ( h1*h1 + h2*h2 + h3*h3 .lt. i0Zero2 * hh ) then
+        elseif ( h1*h1 + h2*h2 + h3*h3 .lt. i0Z2 * hh ) then
             !Likewise the h1 -> 0 limit of the reference case-6 expression, for
             !h4 being the only non-zero height.
             q = hypot( pAbs, h4 )
             lg = asinh( pAbs / h4 )
-            ans = ( lg * ( 2._ttReal*q*q - 5._ttReal*h4*h4 ) / ( 2._ttReal * pAbs**3 ) &
-                  + 3._ttReal * ( 2._ttReal*h4 - q ) / ( 2._ttReal * pAbs*pAbs ) &
-                  - ( q + 2._ttReal*h4 ) / ( 3._ttReal * ( q + h4 )**2 ) ) / 6._ttReal
+            ans = ( lg * ( 2._i0Real*q*q - 5._i0Real*h4*h4 ) / ( 2._i0Real * pAbs**3 ) &
+                  + 3._i0Real * ( 2._i0Real*h4 - q ) / ( 2._i0Real * pAbs*pAbs ) &
+                  - ( q + 2._i0Real*h4 ) / ( 3._i0Real * ( q + h4 )**2 ) ) / 6._i0Real
 
-        elseif ( hh1 .lt. i0Zero2 * hh ) then
-            ans = phi1 / 6._ttReal
+        elseif ( hh1 .lt. i0Z2 * hh ) then
+            ans = phi1 / 6._i0Real
 
-        elseif ( h3*h3 + h4*h4 .lt. i0Zero2 * hh ) then
-            ans = ( phi1 - h2 * i0_phi2( h2, h1, pAbs, hh, rad ) ) / 6._ttReal
+        elseif ( h3*h3 + h4*h4 .lt. i0Z2 * hh ) then
+            ans = ( phi1 - h2 * i0_phi2( h2, h1, pAbs, hh, rad ) ) / 6._i0Real
 
         else
             rad1 = sqrt( pAbs*pAbs + h1*h1 )
 
-            if ( h2*h2 + h4*h4 .lt. i0Zero2 * hh ) then
+            if ( h2*h2 + h4*h4 .lt. i0Z2 * hh ) then
                 phi2 = i0_phi2( h3, h1, pAbs, hh, rad )
-                phi3 = 0.5_ttReal * hh1 / rad1 * log( ( rad1 + rad )**2 / hh1 )
-                ans = ( ( h1*h1 - h3*h3 ) * phi1 - 2._ttReal*h1*h1*h3 * phi2 + phi3 ) &
-                    / ( 6._ttReal * h1*h1 )
+                phi3 = 0.5_i0Real * hh1 / rad1 * log( ( rad1 + rad )**2 / hh1 )
+                ans = ( ( h1*h1 - h3*h3 ) * phi1 - 2._i0Real*h1*h1*h3 * phi2 + phi3 ) &
+                    / ( 6._i0Real * h1*h1 )
 
-            elseif ( h2*h2 + h3*h3 .lt. i0Zero2 * hh ) then
+            elseif ( h2*h2 + h3*h3 .lt. i0Z2 * hh ) then
                 phi2 = i0_phi2( h4, h1, pAbs, hh, rad )
-                phi3 = 0.5_ttReal / rad1 * log( ( rad1 + rad )**2 / hh1 )
-                ans = ( ( h1*h1 - 3._ttReal*h4*h4 ) * phi1 &
-                      - h4 * ( 3._ttReal*h1*h1 - h4*h4 ) * phi2 &
-                      + 3._ttReal*h4*h4 * phi3 - h4*h4 / ( rad + h4 ) ) &
-                    / ( 6._ttReal * h1*h1 )
+                phi3 = 0.5_i0Real / rad1 * log( ( rad1 + rad )**2 / hh1 )
+                ans = ( ( h1*h1 - 3._i0Real*h4*h4 ) * phi1 &
+                      - h4 * ( 3._i0Real*h1*h1 - h4*h4 ) * phi2 &
+                      + 3._i0Real*h4*h4 * phi3 - h4*h4 / ( rad + h4 ) ) &
+                    / ( 6._i0Real * h1*h1 )
 
-            elseif ( h1*h1 + h4*h4 .lt. i0Zero2 * hh ) then
+            elseif ( h1*h1 + h4*h4 .lt. i0Z2 * hh ) then
                 hNorm = sqrt( hh )
                 rad2 = sqrt( pAbs*pAbs + h2*h2 )
                 phi4 = h3*h3 / ( h2 * pAbs*pAbs ) &
                      * ( ( rad2 / h2 ) * log( ( rad2 + rad ) / h3 ) - log( ( h2 + hNorm ) / h3 ) )
-                ans = ( hh / ( h2*h2 ) * phi1 - 1._ttReal / ( rad + hNorm ) - phi4 ) / 6._ttReal
+                ans = ( hh / ( h2*h2 ) * phi1 - 1._i0Real / ( rad + hNorm ) - phi4 ) / 6._i0Real
 
-            elseif ( h1*h1 + h3*h3 .lt. i0Zero2 * hh ) then
+            elseif ( h1*h1 + h3*h3 .lt. i0Z2 * hh ) then
                 hNorm = sqrt( hh )
                 rad2 = sqrt( pAbs*pAbs + h2*h2 )
                 phi2 = atan( h2 * pAbs / ( hh + h4 * rad ) ) / pAbs
                 phi4 = h4*h4 / ( h2 * pAbs*pAbs ) &
                      * ( ( rad2 / h2 ) * log( ( rad2 + rad ) / h4 ) - log( ( h2 + hNorm ) / h4 ) )
-                ans = ( ( 1._ttReal + 3._ttReal*h4*h4 / ( h2*h2 ) ) * phi1 &
-                      - 2._ttReal * ( h4 / h2 )**3 * phi2 - 3._ttReal * phi4 &
-                      + ( 2._ttReal*h4*h4 - h2*h2 ) / ( h2*h2 * ( rad + hNorm ) ) ) / 6._ttReal
+                ans = ( ( 1._i0Real + 3._i0Real*h4*h4 / ( h2*h2 ) ) * phi1 &
+                      - 2._i0Real * ( h4 / h2 )**3 * phi2 - 3._i0Real * phi4 &
+                      + ( 2._i0Real*h4*h4 - h2*h2 ) / ( h2*h2 * ( rad + hNorm ) ) ) / 6._i0Real
 
             else
                 ok = .false.
-                ans = ieee_value( 1._ttReal, ieee_quiet_nan )
+                ans = ieee_value( 1._i0Real, ieee_quiet_nan )
             endif
         endif
 
