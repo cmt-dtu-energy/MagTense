@@ -26,8 +26,11 @@
 !> e.g. the top and bottom faces of a tetrahedral film mesh (validation of
 !> 19 Oct 2026 against an independent Sauter-Schwab quadrature, FMM-article
 !> repository, tet-tet-article/data/REPORT.md "A1"). Therefore:
-!>   - the reduction is evaluated in quadruple precision (kind wq), with
-!>     tolerances chosen for it (see the parameters below);
+!>   - a geometric screen leaves well-conditioned face pairs to the former
+!>     double-precision reduction (module TileTriangleTriangleDouble); all
+!>     others are reduced in quadruple precision (TileTriangleTriangleQuad)
+!>     with tolerances chosen for it. Both modules include the same reduction
+!>     source, TileTriangleTriangleReduction.inc;
 !>   - a Gram-Schmidt rank decision close to the rank tolerance, where neither
 !>     dropping nor keeping the direction is reliable, flags the face pair,
 !>     which is then integrated numerically instead (Sauter-Schwab quadrature
@@ -43,8 +46,64 @@
 !> depend on whether the build promotes the default real kind (ifx -real-size
 !> 64, gfortran -fdefault-real-8).
 !---------------------------------------------------------------------------
+!---------------------------------------------------------------------------
+!> @brief The triangle-pair reduction in quadruple precision, for face pairs
+!> the geometric screen of triangle_triangle_laplace_integral does not clear.
+!> Tolerances chosen for this precision (FMM-article tet-tet-tests, REPORT
+!> "A1"): coefficient drop 1e-22, height snap 1e-12, I0 zero test 1e-24, rank
+!> 1e-23 (squared, relative); a rank decision with a squared relative norm in
+!> [1e-26, 1e-20) sets the guard; face pairs within 1e-8 of parallel are
+!> projected onto parallel planes.
+!---------------------------------------------------------------------------
+module TileTriangleTriangleQuad
+    use, intrinsic :: ieee_arithmetic
+    implicit none
+    private
+    integer,parameter :: dp = selected_real_kind(15, 307)
+    integer,parameter :: wk = selected_real_kind(33, 4931)
+    integer,parameter :: wi = wk
+    real(wk),parameter :: zeroTol = 1.0e-22_wk
+    real(wi),parameter :: i0Z2 = 1.0e-24_wi
+    real(wk),parameter :: relResidual = 1.0e-12_wk
+    real(wk),parameter :: rankRel2 = 1.0e-23_wk
+    real(wk),parameter :: guardLow = 1.0e-26_wk
+    real(wk),parameter :: guardHigh = 1.0e-20_wk
+    real(wk),parameter :: nearParallel = 1.0e-8_wk
+    public :: reduce_triangle_pair
+    contains
+    include 'TileTriangleTriangleReduction.inc'
+end module TileTriangleTriangleQuad
+
+
+!---------------------------------------------------------------------------
+!> @brief The triangle-pair reduction in double precision with the former
+!> double-precision tolerances (I0 in quadruple precision), for the
+!> well-conditioned face pairs the geometric screen clears; the guard is off.
+!---------------------------------------------------------------------------
+module TileTriangleTriangleDouble
+    use, intrinsic :: ieee_arithmetic
+    implicit none
+    private
+    integer,parameter :: dp = selected_real_kind(15, 307)
+    integer,parameter :: wk = dp
+    integer,parameter :: wi = selected_real_kind(33, 4931)
+    real(wk),parameter :: zeroTol = 1.0e-14_wk
+    real(wi),parameter :: i0Z2 = 1.0e-28_wi
+    real(wk),parameter :: relResidual = 1.0e-10_wk
+    real(wk),parameter :: rankRel2 = 256._wk * epsilon( 1._wk )
+    real(wk),parameter :: guardLow = 0._wk
+    real(wk),parameter :: guardHigh = 0._wk
+    real(wk),parameter :: nearParallel = 1.0e-3_wk
+    public :: reduce_triangle_pair
+    contains
+    include 'TileTriangleTriangleReduction.inc'
+end module TileTriangleTriangleDouble
+
+
 module TileTriangleTriangle
     use, intrinsic :: ieee_arithmetic
+    use TileTriangleTriangleQuad, only : reduce_quad => reduce_triangle_pair
+    use TileTriangleTriangleDouble, only : reduce_double => reduce_triangle_pair
     implicit none
 
     private
@@ -52,44 +111,17 @@ module TileTriangleTriangle
     !> Precision of the interface and of the quadratures.
     integer,parameter,public :: ttReal = selected_real_kind(15, 307)
 
-    !> Working precision of the analytical reduction (quadruple). Its cost is
-    !> about twice that of the double-precision reduction (ifx, 19 Oct 2026).
-    integer,parameter :: wq = selected_real_kind(33, 4931)
-
-    !> Relative threshold below which an expansion coefficient is treated as
-    !> exactly zero and its term is dropped from the reduction. Dropping the
-    !> term is what keeps the reduction finite for touching triangles. The
-    !> double-precision value 1e-14 dropped real terms of nearly degenerate pairs
-    !> (errors up to 7e-8); 1e-22 is still far above quadruple round-off.
-    real(wq),parameter :: zeroTol = 1.0e-22_wq
-
-    !> Squared relative threshold used by the I0 case selection to decide which
-    !> of the four heights are identically zero.
-    real(wq),parameter :: i0Z2 = 1.0e-24_wq
-
-    !> Heights below this fraction of the vector scale are zero. A nearly shared
-    !> vertex of double-precision input leaves heights of a few double ulps,
-    !> which must be snapped; the I0 forms lose about eps/h**2, which this keeps
-    !> below 1e-10 in quadruple precision.
-    real(wq),parameter :: relResidual = 1.0e-12_wq
-
-    !> Gram-Schmidt rank tolerance, squared and relative to the largest basis
-    !> vector. Mesh geometry produces nearly dependent directions at every
-    !> scale; directions down to 1e-23 must be kept and those below it dropped
-    !> on the validation set (a decade either way fails on some pairs).
-    real(wq),parameter :: rankRel2 = 1.0e-23_wq
-
-    !> A rank decision with a squared relative norm in this band is unreliable:
-    !> the face pair is then integrated numerically (about 2 % of the touching
-    !> face pairs of an unstructured film mesh).
-    real(wq),parameter :: guardLow = 1.0e-26_wq
-    real(wq),parameter :: guardHigh = 1.0e-20_wq
-
-    !> Face pairs whose normals differ by less than this are projected onto a
-    !> common plane and evaluated by the parallel branch. The projection costs
-    !> about 0.1 x angle, the general branch's round-off grows like
-    !> eps / angle**3; both are below 1e-9 here in quadruple precision.
-    real(wq),parameter :: nearParallel = 1.0e-8_wq
+    !> The geometric screen: a face pair whose smallest non-exact measure of
+    !> near-degeneracy (angle between the normals, between an edge and the other
+    !> plane, between two edges, height of a vertex over the other plane;
+    !> measures below screenExact are exact degeneracies) is at least screenBand
+    !> is reduced in double precision (TileTriangleTriangleDouble), all others in
+    !> quadruple precision with the guard (TileTriangleTriangleQuad). On the
+    !> 440-pair validation set the double-precision reduction is accurate to
+    !> 3.6e-11 on every face pair it clears (26 % are not cleared); a band of
+    !> 1e-3 would have let 2.8e-9 through.
+    real(ttReal),parameter :: screenBand = 1.0e-2_ttReal
+    real(ttReal),parameter :: screenExact = 1.0e-13_ttReal
 
     !> Separated triangles (see separatedVertexTol) whose normals differ by
     !> more than round-off but less than this are integrated by Gauss
@@ -149,8 +181,8 @@ module TileTriangleTriangle
     logical,intent(out) :: ok
     integer,intent(out),optional :: method
 
-    real(wq),dimension(3,3) :: first, second, normA, normB
-    real(wq) :: scaleA, scaleB, scaleVal, invScale, valQ
+    real(ttReal),dimension(3,3) :: first, second
+    real(ttReal) :: scaleA, scaleB, valR
     real(ttReal),dimension(3) :: nA, nB
     real(ttReal) :: pm, edge, closest
     integer :: i, j, nShared
@@ -194,37 +226,27 @@ module TileTriangleTriangle
             return
         endif
 
-        first = real( triA, wq )
-        second = real( triB, wq )
-
-        scaleA = triangle_scale( first )
-        scaleB = triangle_scale( second )
-
-        !The core is symmetric in its two triangles. Put the larger one first,
-        !which is the ordering the reference reduction is written for, and do so
-        !before the common origin is chosen so the normalisation stays one-pass.
+        !The reduction is symmetric in its two triangles. Put the larger one
+        !first, which is the ordering the reference reduction is written for.
+        scaleA = triangle_scale_dp( triA )
+        scaleB = triangle_scale_dp( triB )
         if ( scaleA .lt. scaleB ) then
-            normA = first
-            first = second
-            second = normA
-            scaleVal = scaleA
-            scaleA = scaleB
-            scaleB = scaleVal
+            first = triB
+            second = triA
+        else
+            first = triA
+            second = triB
         endif
 
-        scaleVal = max( scaleA, scaleB )
-        invScale = 1._wq / scaleVal
+        if ( smallest_degeneracy( triA, triB, nA, nB, pm, edge ) .ge. screenBand ) then
+            !Well-conditioned: the double-precision reduction.
+            call reduce_double( first, second, edge, valR, ok, guard )
+            val = valR
+            if ( .not. ieee_is_finite( val ) ) ok = .false.
+            return
+        endif
 
-        !Translate to the first vertex of the first triangle and rescale to unit
-        !size. Both operations are exact up to rounding and the integral scales
-        !as length**3, so this only improves the conditioning of the reduction.
-        do i = 1, 3
-            normA(:,i) = ( first(:,i)  - first(:,1) ) * invScale
-            normB(:,i) = ( second(:,i) - first(:,1) ) * invScale
-        enddo
-
-        guard = .false.
-        call triangle_triangle_core( normA, normB, valQ, ok, guard )
+        call reduce_quad( first, second, edge, valR, ok, guard )
 
         if ( guard .and. nShared .gt. 0 ) then
             !An unreliable rank decision: integrate numerically instead.
@@ -239,7 +261,7 @@ module TileTriangleTriangle
             !A guarded pair that is neither touching nor separated (nearly
             !touching without a common vertex) keeps the closed form: no
             !fallback here resolves its gap.
-            val = real( scaleVal**3 * valQ, ttReal )
+            val = valR
         endif
 
         if ( .not. ieee_is_finite( val ) ) ok = .false.
@@ -247,14 +269,47 @@ module TileTriangleTriangle
     end subroutine triangle_triangle_laplace_integral
 
 
-    !> Largest edge length of a triangle, used as its characteristic size.
-    function triangle_scale( tri ) result( s )
-    real(wq),dimension(3,3),intent(in) :: tri
-    real(wq) :: s
-        s = max( norm2( tri(:,2) - tri(:,1) ), &
-                 norm2( tri(:,3) - tri(:,2) ), &
-                 norm2( tri(:,1) - tri(:,3) ) )
-    end function triangle_scale
+    !---------------------------------------------------------------------------
+    !> @brief The smallest measure of near-degeneracy of a triangle pair that is
+    !> not an exact degeneracy (see screenBand); huge() if all are exact.
+    !---------------------------------------------------------------------------
+    function smallest_degeneracy( triA, triB, nA, nB, pm, edge ) result( smallest )
+    real(ttReal),dimension(3,3),intent(in) :: triA, triB
+    real(ttReal),dimension(3),intent(in) :: nA, nB
+    real(ttReal),intent(in) :: pm, edge
+    real(ttReal) :: smallest
+    real(ttReal),dimension(3,3) :: eA, eB
+    integer :: i, j
+
+        smallest = huge( 1._ttReal )
+        call consider( pm )
+        do i = 1, 3
+            eA(:,i) = triA(:,modulo(i,3)+1) - triA(:,i)
+            eA(:,i) = eA(:,i) / norm2( eA(:,i) )
+            eB(:,i) = triB(:,modulo(i,3)+1) - triB(:,i)
+            eB(:,i) = eB(:,i) / norm2( eB(:,i) )
+        enddo
+        do i = 1, 3
+            !An edge nearly parallel to the other triangle's plane.
+            call consider( abs( dot_product( nA, eB(:,i) ) ) )
+            call consider( abs( dot_product( nB, eA(:,i) ) ) )
+            !A vertex nearly in the other triangle's plane.
+            call consider( abs( dot_product( nA, triB(:,i) - triA(:,1) ) ) / edge )
+            call consider( abs( dot_product( nB, triA(:,i) - triB(:,1) ) ) / edge )
+            do j = 1, 3
+                !Two nearly parallel edges.
+                call consider( norm2( cross_dp( eA(:,i), eB(:,j) ) ) )
+            enddo
+        enddo
+
+    contains
+
+        subroutine consider( measure )
+        real(ttReal),intent(in) :: measure
+            if ( measure .ge. screenExact ) smallest = min( smallest, measure )
+        end subroutine consider
+
+    end function smallest_degeneracy
 
 
     function triangle_scale_dp( tri ) result( s )
@@ -266,13 +321,6 @@ module TileTriangleTriangle
     end function triangle_scale_dp
 
 
-    function cross3( a, b ) result( c )
-    real(wq),dimension(3),intent(in) :: a, b
-    real(wq),dimension(3) :: c
-        c(1) = a(2)*b(3) - a(3)*b(2)
-        c(2) = a(3)*b(1) - a(1)*b(3)
-        c(3) = a(1)*b(2) - a(2)*b(1)
-    end function cross3
 
 
     function cross_dp( a, b ) result( c )
@@ -284,515 +332,20 @@ module TileTriangleTriangle
     end function cross_dp
 
 
-    !---------------------------------------------------------------------------
-    !> @brief The reduction itself, for two triangles of order-unity size.
-    !>
-    !> a1, a2 span the first triangle and a3, a4 the second one; e4 is the
-    !> offset between their first vertices. The non-parallel branch reduces the
-    !> four-dimensional integral with a vanishing out-of-plane height, while the
-    !> parallel branch carries the (constant) separation of the two planes as
-    !> the height h4 of the reduction. guard is set when a rank decision of the
-    !> reduction is unreliable (see guardLow).
-    !---------------------------------------------------------------------------
-    recursive subroutine triangle_triangle_core( first, second, val, ok, guard )
-    real(wq),dimension(3,3),intent(in) :: first, second
-    real(wq),intent(out) :: val
-    logical,intent(inout) :: ok, guard
 
-    real(wq),dimension(3) :: a1, a2, a3, a4, e4, e4x, crossA, crossB, nA, nB, proj, nMean
-    real(wq),dimension(3,4) :: basis
-    real(wq),dimension(4) :: coeff
-    real(wq),dimension(3,3) :: projA, projB
-    real(wq) :: twiceAreaA, twiceAreaB, residual, parallelMeasure, h4, reduced
-    real(wq) :: s0, s1, s2, s3, i31, i32, i33, i34, i35, i36
-    integer :: k
 
-        val = 0._wq
 
-        a1 = first(:,2)  - first(:,1)
-        a2 = first(:,3)  - first(:,1)
-        a3 = second(:,1) - second(:,2)
-        a4 = second(:,1) - second(:,3)
-        e4 = first(:,1)  - second(:,1)
 
-        crossA = cross3( a1, a2 )
-        crossB = cross3( a3, a4 )
-        twiceAreaA = norm2( crossA )
-        twiceAreaB = norm2( crossB )
 
-        if ( .not. ( twiceAreaA .gt. 0._wq ) .or. .not. ( twiceAreaB .gt. 0._wq ) ) then
-            ok = .false.
-            return
-        endif
 
-        basis(:,1) = a1
-        basis(:,2) = a2
-        basis(:,3) = a3
-        basis(:,4) = a4
-        call expand_gram_schmidt( basis, 4, e4, coeff, proj, residual, guard )
-        s0 = coeff(1)
-        s1 = coeff(2)
-        s2 = coeff(3)
-        s3 = coeff(4)
-        e4x = proj
 
-        nA = crossA / twiceAreaA
-        nB = crossB / twiceAreaB
-        parallelMeasure = min( norm2( nA + nB ), norm2( nA - nB ) )
 
-        !Nearly parallel faces (coplanar faces of a mesh after rounding, or
-        !genuinely almost parallel ones): project both triangles onto planes
-        !normal to their mean normal, each through its own centroid, and let the
-        !parallel branch evaluate them. That costs O(angle) and is symmetric in
-        !the two triangles; the general branch cancels like eps / angle**3 here.
-        if ( parallelMeasure .gt. zeroTol .and. parallelMeasure .le. nearParallel ) then
-            if ( dot_product( nA, nB ) .ge. 0._wq ) then
-                nMean = nA + nB
-            else
-                nMean = nA - nB
-            endif
-            nMean = nMean / norm2( nMean )
-            do k = 1, 3
-                projA(:,k) = first(:,k) - dot_product( first(:,k) - sum( first, dim=2 ) / 3._wq, nMean ) * nMean
-                projB(:,k) = second(:,k) - dot_product( second(:,k) - sum( second, dim=2 ) / 3._wq, nMean ) * nMean
-            enddo
-            call triangle_triangle_core( projA, projB, val, ok, guard )
-            return
-        endif
 
-        if ( parallelMeasure .gt. zeroTol ) then
-            !The two triangle planes intersect: the reduction closes in the
-            !plane of each triangle and there is no out-of-plane height.
-            h4 = 0._wq
-            call triangle_i3( a1, a2, a3,       e4,      h4, i31, ok, guard )
-            call triangle_i3( a1, a2, a4,       e4,      h4, i32, ok, guard )
-            call triangle_i3( a1, a2, a4 - a3,  e4 + a3, h4, i33, ok, guard )
-            call triangle_i3( a3, a4, a1,       e4,      h4, i34, ok, guard )
-            call triangle_i3( a3, a4, a2,       e4,      h4, i35, ok, guard )
-            call triangle_i3( a3, a4, a2 - a1,  e4 + a1, h4, i36, ok, guard )
-            reduced = ( 1._wq + s2 + s3 ) * i33 - s3 * i31 - s2 * i32 &
-                    + ( 1._wq + s0 + s1 ) * i36 - s1 * i34 - s0 * i35
-        else
-            !Parallel planes: the component of e4 normal to the common plane is
-            !the residual of the expansion and enters the reduction as a
-            !constant height. The projection of e4 into the plane is the only
-            !in-plane offset the reduction needs.
-            h4 = residual
-            call triangle_i3( a1, a2, a4 - a3,  e4x + a3, h4, i33, ok, guard )
-            call triangle_i3( a3, a4, a1,       e4x,      h4, i34, ok, guard )
-            call triangle_i3( a3, a4, a2,       e4x,      h4, i35, ok, guard )
-            call triangle_i3( a3, a4, a2 - a1,  e4x + a1, h4, i36, ok, guard )
-            reduced = i33 + ( 1._wq + s0 + s1 ) * i36 - s1 * i34 - s0 * i35
-        endif
 
-        val = 4._wq * ( 0.5_wq * twiceAreaA ) * ( 0.5_wq * twiceAreaB ) * reduced
 
-    end subroutine triangle_triangle_core
 
 
-    !---------------------------------------------------------------------------
-    !> @brief Small Gram-Schmidt expansion with explicit triangular back
-    !> substitution.
-    !>
-    !> This mirrors the reference expan_GrammSchmidt routine. Keeping the back
-    !> substitution explicit matters: I1/I2/I3 need the coefficients of val in
-    !> the ORIGINAL (generally non-orthogonal) vectors, not the coefficients in
-    !> the orthogonalised basis. A rank-deficient direction is detected with a
-    !> scale-aware tolerance, zeroed, and skipped by the back substitution, so
-    !> a degenerate configuration reduces rather than divides by zero.
-    !>
-    !> @param[out] coeff expansion coefficients of val in vectors(:,1:n)
-    !> @param[out] projected the part of val spanned by vectors(:,1:n)
-    !> @param[out] residual the norm of the unspanned remainder of val
-    !> @param[inout] guard set if a rank decision falls in the guard band
-    !---------------------------------------------------------------------------
-    subroutine expand_gram_schmidt( vectors, n, val, coeff, projected, residual, guard )
-    real(wq),dimension(3,4),intent(in) :: vectors
-    integer,intent(in) :: n
-    real(wq),dimension(3),intent(in) :: val
-    real(wq),dimension(4),intent(out) :: coeff
-    real(wq),dimension(3),intent(out) :: projected
-    real(wq),intent(out) :: residual
-    logical,intent(inout) :: guard
 
-    real(wq),dimension(3,4) :: ortho
-    real(wq),dimension(4) :: onorm2, residProj
-    real(wq),dimension(4,4) :: cmat
-    real(wq) :: vecScale, basisScale2, rankTol, residTol, nrm2, len, ratio
-    integer :: i, col, row
-
-        ortho = 0._wq
-        onorm2 = 0._wq
-        cmat = 0._wq
-        coeff = 0._wq
-        residProj = 0._wq
-
-        vecScale = norm2( val )
-        basisScale2 = 0._wq
-        do i = 1, n
-            len = norm2( vectors(:,i) )
-            vecScale = max( vecScale, len )
-            basisScale2 = max( basisScale2, len*len )
-        enddo
-        basisScale2 = max( tiny(1._wq), basisScale2 )
-        rankTol = rankRel2 * basisScale2
-
-        do col = 1, n
-            ortho(:,col) = vectors(:,col)
-            do row = 1, col-1
-                cmat(row,col) = dot_product( ortho(:,row), vectors(:,col) ) / onorm2(row)
-                ortho(:,col) = ortho(:,col) - cmat(row,col) * ortho(:,row)
-            enddo
-            nrm2 = dot_product( ortho(:,col), ortho(:,col) )
-            ratio = nrm2 / basisScale2
-            if ( ratio .ge. guardLow .and. ratio .lt. guardHigh ) guard = .true.
-            if ( .not. ( nrm2 .gt. rankTol ) ) then
-                ortho(:,col) = 0._wq
-                onorm2(col) = 1._wq
-                cmat(col,col) = 0._wq
-            else
-                onorm2(col) = nrm2
-                cmat(col,col) = dot_product( ortho(:,col), vectors(:,col) ) / nrm2
-            endif
-        enddo
-
-        do col = n, 1, -1
-            if ( cmat(col,col) .eq. 0._wq ) cycle
-            coeff(col) = ( dot_product( val, ortho(:,col) ) - residProj(col) ) &
-                       / ( cmat(col,col) * onorm2(col) )
-            do row = 1, col-1
-                residProj(row) = residProj(row) + coeff(col) * cmat(row,col) * onorm2(row)
-            enddo
-        enddo
-
-        projected = 0._wq
-        do col = 1, n
-            projected = projected + coeff(col) * vectors(:,col)
-        enddo
-
-        residual = norm2( val - projected )
-        residTol = relResidual * max( 1._wq, vecScale )
-        if ( residual .le. residTol ) residual = 0._wq
-
-    end subroutine expand_gram_schmidt
-
-
-    !---------------------------------------------------------------------------
-    !> @brief Third-level reduction. Reduces the pair integral to five
-    !> second-level integrals over the edges spanned by first, second, third.
-    !---------------------------------------------------------------------------
-    subroutine triangle_i3( first, second, third, offset, h4, res, ok, guard )
-    real(wq),dimension(3),intent(in) :: first, second, third, offset
-    real(wq),intent(in) :: h4
-    real(wq),intent(out) :: res
-    logical,intent(inout) :: ok, guard
-
-    real(wq),dimension(3,4) :: basis
-    real(wq),dimension(4) :: coeff
-    real(wq),dimension(3) :: proj
-    real(wq) :: residual, s0, s1, s2, term
-
-        res = 0._wq
-        basis = 0._wq
-        basis(:,1) = first
-        basis(:,2) = second
-        basis(:,3) = third
-        call expand_gram_schmidt( basis, 3, offset, coeff, proj, residual, guard )
-        s0 = coeff(1)
-        s1 = coeff(2)
-        s2 = coeff(3)
-
-        if ( abs( 1._wq + s0 + s1 ) .gt. zeroTol ) then
-            call triangle_i2s( first - second, third, proj + second, residual, h4, term, ok, guard )
-            res = res + ( 1._wq + s0 + s1 ) * term
-        endif
-        if ( abs( s0 ) .gt. zeroTol ) then
-            call triangle_i2s( second, third, proj, residual, h4, term, ok, guard )
-            res = res - s0 * term
-        endif
-        if ( abs( s1 ) .gt. zeroTol ) then
-            call triangle_i2s( first, third, proj, residual, h4, term, ok, guard )
-            res = res - s1 * term
-        endif
-        if ( abs( 1._wq + s2 ) .gt. zeroTol ) then
-            call triangle_i2t( first, second, proj + third, residual, h4, term, ok, guard )
-            res = res + ( 1._wq + s2 ) * term
-        endif
-        if ( abs( s2 ) .gt. zeroTol ) then
-            call triangle_i2t( first, second, proj, residual, h4, term, ok, guard )
-            res = res - s2 * term
-        endif
-
-    end subroutine triangle_i3
-
-
-    !> Second-level reduction over a parallelogram-type pair of directions.
-    subroutine triangle_i2s( first, second, offset, h3, h4, res, ok, guard )
-    real(wq),dimension(3),intent(in) :: first, second, offset
-    real(wq),intent(in) :: h3, h4
-    real(wq),intent(out) :: res
-    logical,intent(inout) :: ok, guard
-
-    real(wq),dimension(3,4) :: basis
-    real(wq),dimension(4) :: coeff
-    real(wq),dimension(3) :: proj
-    real(wq) :: residual, s0, s1, term
-
-        res = 0._wq
-        basis = 0._wq
-        basis(:,1) = first
-        basis(:,2) = second
-        call expand_gram_schmidt( basis, 2, offset, coeff, proj, residual, guard )
-        s0 = coeff(1)
-        s1 = coeff(2)
-
-        if ( abs( 1._wq + s0 ) .gt. zeroTol ) then
-            call triangle_i1( second, proj + first, residual, h3, h4, term, ok, guard )
-            res = res + ( 1._wq + s0 ) * term
-        endif
-        if ( abs( s0 ) .gt. zeroTol ) then
-            call triangle_i1( second, proj, residual, h3, h4, term, ok, guard )
-            res = res - s0 * term
-        endif
-        if ( abs( 1._wq + s1 ) .gt. zeroTol ) then
-            call triangle_i1( first, proj + second, residual, h3, h4, term, ok, guard )
-            res = res + ( 1._wq + s1 ) * term
-        endif
-        if ( abs( s1 ) .gt. zeroTol ) then
-            call triangle_i1( first, proj, residual, h3, h4, term, ok, guard )
-            res = res - s1 * term
-        endif
-
-    end subroutine triangle_i2s
-
-
-    !> Second-level reduction over a triangular-type pair of directions.
-    subroutine triangle_i2t( first, second, offset, h3, h4, res, ok, guard )
-    real(wq),dimension(3),intent(in) :: first, second, offset
-    real(wq),intent(in) :: h3, h4
-    real(wq),intent(out) :: res
-    logical,intent(inout) :: ok, guard
-
-    real(wq),dimension(3,4) :: basis
-    real(wq),dimension(4) :: coeff
-    real(wq),dimension(3) :: proj
-    real(wq) :: residual, s0, s1, term
-
-        res = 0._wq
-        basis = 0._wq
-        basis(:,1) = first
-        basis(:,2) = second
-        call expand_gram_schmidt( basis, 2, offset, coeff, proj, residual, guard )
-        s0 = coeff(1)
-        s1 = coeff(2)
-
-        if ( abs( s0 ) .gt. zeroTol ) then
-            call triangle_i1( second, proj, residual, h3, h4, term, ok, guard )
-            res = res - s0 * term
-        endif
-        if ( abs( s1 ) .gt. zeroTol ) then
-            call triangle_i1( first, proj, residual, h3, h4, term, ok, guard )
-            res = res - s1 * term
-        endif
-        if ( abs( 1._wq + s0 + s1 ) .gt. zeroTol ) then
-            call triangle_i1( first - second, proj + second, residual, h3, h4, term, ok, guard )
-            res = res + ( 1._wq + s0 + s1 ) * term
-        endif
-
-    end subroutine triangle_i2t
-
-
-    !> First-level reduction along a single edge direction.
-    subroutine triangle_i1( vec, offset, h2, h3, h4, res, ok, guard )
-    real(wq),dimension(3),intent(in) :: vec, offset
-    real(wq),intent(in) :: h2, h3, h4
-    real(wq),intent(out) :: res
-    logical,intent(inout) :: ok, guard
-
-    real(wq),dimension(3,4) :: basis
-    real(wq),dimension(4) :: coeff
-    real(wq),dimension(3) :: proj
-    real(wq) :: residual, len, c, term
-
-        res = 0._wq
-        len = norm2( vec )
-        !A vanishing edge contributes nothing; returning here is what keeps the
-        !degenerate reductions out of the I0 primitive.
-        if ( .not. ( len .gt. 0._wq ) ) return
-
-        basis = 0._wq
-        basis(:,1) = vec
-        call expand_gram_schmidt( basis, 1, offset, coeff, proj, residual, guard )
-        c = coeff(1)
-
-        if ( abs( 1._wq + c ) .gt. zeroTol ) then
-            call triangle_i0( abs( 1._wq + c ) * len, [ residual, h2, h3, h4 ], term, ok )
-            res = res + ( 1._wq + c ) * term
-        endif
-        if ( abs( c ) .gt. zeroTol ) then
-            call triangle_i0( abs( c ) * len, [ residual, h2, h3, h4 ], term, ok )
-            res = res - c * term
-        endif
-
-    end subroutine triangle_i1
-
-
-    !> Helper for the I0 case analysis, the reference Phi2 function.
-    function i0_phi2( h, h1, p, hh, rad ) result( phi2 )
-    real(wq),intent(in) :: h, h1, p, hh, rad
-    real(wq) :: phi2
-        if ( h1 * p .eq. 0._wq ) then
-            phi2 = 1._wq / ( hh + h * rad )
-        else
-            phi2 = atan( ( h1 * p ) / ( hh + h * rad ) ) / ( h1 * p )
-        endif
-    end function i0_phi2
-
-
-    !---------------------------------------------------------------------------
-    !> @brief The closed-form primitive at the bottom of the reduction.
-    !>
-    !> @param[in] p the (signed) reduced edge length; only its modulus is used
-    !> @param[in] hIn the four reduction heights. At most two of them are
-    !>            non-zero for a valid reduction, so the two smallest are set
-    !>            to zero before the case analysis, exactly as in the reference.
-    !>
-    !> The branches are the reference I0 cases, plus the analytical h1 -> 0
-    !> limits of the two cases whose reference expressions are 0/0 there. The
-    !> final branch is the reference's prohibited case: reaching it means the
-    !> preceding reduction lost its expected rank, so it is reported through ok
-    !> rather than being given an ad-hoc value that would hide the error.
-    !---------------------------------------------------------------------------
-    subroutine triangle_i0( p, hIn, ans, ok )
-    real(wq),intent(in) :: p
-    real(wq),dimension(4),intent(in) :: hIn
-    real(wq),intent(out) :: ans
-    logical,intent(inout) :: ok
-
-    real(wq),dimension(4) :: h
-    integer,dimension(4) :: ord
-    integer :: i, j, key
-    real(wq) :: h1, h2, h3, h4, pAbs, hh, hh1, rad, rad1, rad2, hNorm
-    real(wq) :: phi1, phi2, phi3, phi4, q, lg
-
-        ans = 0._wq
-        h = hIn
-
-        !Stable ascending index sort of the four heights, then zero the two
-        !smallest ones. Ties are broken by index so the result is deterministic.
-        ord = [ 1, 2, 3, 4 ]
-        do i = 2, 4
-            key = ord(i)
-            j = i - 1
-            do while ( j .ge. 1 )
-                if ( h(ord(j)) .gt. h(key) ) then
-                    ord(j+1) = ord(j)
-                    j = j - 1
-                else
-                    exit
-                endif
-            enddo
-            ord(j+1) = key
-        enddo
-        h(ord(1)) = 0._wq
-        h(ord(2)) = 0._wq
-
-        h1 = h(1)
-        h2 = h(2)
-        h3 = h(3)
-        h4 = h(4)
-
-        pAbs = abs( p )
-        hh = h1*h1 + h2*h2 + h3*h3 + h4*h4
-
-        !Only reachable through a vanishing edge in a degenerate triangle; the
-        !valid reductions drop such a term before they reach I0.
-        if ( pAbs .eq. 0._wq .and. hh .eq. 0._wq ) return
-
-        rad = sqrt( pAbs*pAbs + hh )
-
-        !The complete zero-height branch of the reference reduction, not merely
-        !an alternative way of evaluating Phi1.
-        if ( hh .lt. i0Z2 * pAbs * pAbs ) then
-            ans = log( pAbs ) / ( 6._wq * pAbs )
-            return
-        endif
-
-        if ( pAbs .eq. 0._wq ) then
-            phi1 = 1._wq / sqrt( hh )
-        else
-            !asinh(p/sqrt(hh))/p is the logarithm of the reference I0 written in
-            !a form that stays well behaved as p -> 0.
-            phi1 = asinh( pAbs / sqrt( hh ) ) / pAbs
-        endif
-
-        hh1 = hh - h1*h1
-
-        if ( h1*h1 + h2*h2 + h4*h4 .lt. i0Z2 * hh ) then
-            !Rank-deficient reductions can leave h3 as the only non-zero height.
-            !The reference case-4 expression is 0/0 at h1 = 0; this is its
-            !analytical h1 -> 0 limit.
-            q = hypot( pAbs, h3 )
-            lg = asinh( pAbs / h3 )
-            ans = ( lg * ( 2._wq*q*q - 3._wq*h3*h3 ) / ( 2._wq * pAbs**3 ) &
-                  + ( 4._wq*h3 - 3._wq*q ) / ( 2._wq * pAbs*pAbs ) ) / 6._wq
-
-        elseif ( h1*h1 + h2*h2 + h3*h3 .lt. i0Z2 * hh ) then
-            !Likewise the h1 -> 0 limit of the reference case-6 expression, for
-            !h4 being the only non-zero height.
-            q = hypot( pAbs, h4 )
-            lg = asinh( pAbs / h4 )
-            ans = ( lg * ( 2._wq*q*q - 5._wq*h4*h4 ) / ( 2._wq * pAbs**3 ) &
-                  + 3._wq * ( 2._wq*h4 - q ) / ( 2._wq * pAbs*pAbs ) &
-                  - ( q + 2._wq*h4 ) / ( 3._wq * ( q + h4 )**2 ) ) / 6._wq
-
-        elseif ( hh1 .lt. i0Z2 * hh ) then
-            ans = phi1 / 6._wq
-
-        elseif ( h3*h3 + h4*h4 .lt. i0Z2 * hh ) then
-            ans = ( phi1 - h2 * i0_phi2( h2, h1, pAbs, hh, rad ) ) / 6._wq
-
-        else
-            rad1 = sqrt( pAbs*pAbs + h1*h1 )
-
-            if ( h2*h2 + h4*h4 .lt. i0Z2 * hh ) then
-                phi2 = i0_phi2( h3, h1, pAbs, hh, rad )
-                phi3 = 0.5_wq * hh1 / rad1 * log( ( rad1 + rad )**2 / hh1 )
-                ans = ( ( h1*h1 - h3*h3 ) * phi1 - 2._wq*h1*h1*h3 * phi2 + phi3 ) &
-                    / ( 6._wq * h1*h1 )
-
-            elseif ( h2*h2 + h3*h3 .lt. i0Z2 * hh ) then
-                phi2 = i0_phi2( h4, h1, pAbs, hh, rad )
-                phi3 = 0.5_wq / rad1 * log( ( rad1 + rad )**2 / hh1 )
-                ans = ( ( h1*h1 - 3._wq*h4*h4 ) * phi1 &
-                      - h4 * ( 3._wq*h1*h1 - h4*h4 ) * phi2 &
-                      + 3._wq*h4*h4 * phi3 - h4*h4 / ( rad + h4 ) ) &
-                    / ( 6._wq * h1*h1 )
-
-            elseif ( h1*h1 + h4*h4 .lt. i0Z2 * hh ) then
-                hNorm = sqrt( hh )
-                rad2 = sqrt( pAbs*pAbs + h2*h2 )
-                phi4 = h3*h3 / ( h2 * pAbs*pAbs ) &
-                     * ( ( rad2 / h2 ) * log( ( rad2 + rad ) / h3 ) - log( ( h2 + hNorm ) / h3 ) )
-                ans = ( hh / ( h2*h2 ) * phi1 - 1._wq / ( rad + hNorm ) - phi4 ) / 6._wq
-
-            elseif ( h1*h1 + h3*h3 .lt. i0Z2 * hh ) then
-                hNorm = sqrt( hh )
-                rad2 = sqrt( pAbs*pAbs + h2*h2 )
-                phi2 = atan( h2 * pAbs / ( hh + h4 * rad ) ) / pAbs
-                phi4 = h4*h4 / ( h2 * pAbs*pAbs ) &
-                     * ( ( rad2 / h2 ) * log( ( rad2 + rad ) / h4 ) - log( ( h2 + hNorm ) / h4 ) )
-                ans = ( ( 1._wq + 3._wq*h4*h4 / ( h2*h2 ) ) * phi1 &
-                      - 2._wq * ( h4 / h2 )**3 * phi2 - 3._wq * phi4 &
-                      + ( 2._wq*h4*h4 - h2*h2 ) / ( h2*h2 * ( rad + hNorm ) ) ) / 6._wq
-
-            else
-                ok = .false.
-                ans = ieee_value( 1._wq, ieee_quiet_nan )
-            endif
-        endif
-
-    end subroutine triangle_i0
 
 
     !> Gauss-Legendre nodes and weights on [0,1] (Newton iteration on the
