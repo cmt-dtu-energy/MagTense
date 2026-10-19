@@ -6,6 +6,8 @@ module TileNComponents
     use TileCircPieceTensor
     use TilePlanarCoilTensor
     use TileTriangle
+    use TileTriangleTriangle, only : ttReal
+    use TileTetrahedronPairTensor, only : getN_tetrahedron_point
 
     implicit none
     
@@ -1060,16 +1062,12 @@ module TileNComponents
          real,dimension(3,3),intent(inout) :: N
          real,intent(in),dimension(3), optional :: Obs_size
          
-         real,dimension(3,3) :: N_tmp,P
-         integer :: i
-         
-         N(:,:) = 0.
-         
-         !Loop through all the four triangular faces
-         do i=1,4
-            call getN_Triangle( cshift( tile%vert, (i-1), 2 ), r, N_tmp, P )
-            N = N + N_tmp
-         enddo
+         real(ttReal),dimension(3,3) :: N_pt
+
+         !Face-charge form of the point tensor (TileTetrahedronPairTensor); the sum
+         !of getN_Triangle over the four faces lost up to 1e-3 at large distance.
+         call getN_tetrahedron_point( real( tile%vert, ttReal ), real( r, ttReal ), N_pt )
+         N = real( N_pt, kind( N ) )
          
          
       end subroutine getN_tensor_tetrahedron

@@ -79,6 +79,7 @@ module TileTetrahedronPairTensor
 
     public :: getN_tensor_tetrahedron_tetrahedron
     public :: tetrahedron_pair_volume
+    public :: getN_tetrahedron_point
 
     contains
 
@@ -428,6 +429,42 @@ module TileTetrahedronPairTensor
         N = N / wsum
 
     end subroutine gauss_pair_tensor
+
+
+    !---------------------------------------------------------------------------
+    !> @brief Field tensor of a uniformly magnetised tetrahedron (vertices vert)
+    !> at the point x, in the face-charge form of tet_point_tensor, with
+    !> coordinates taken relative to the centroid as in the pair tensor.
+    !>
+    !> This is the kernel of the centre-sampled tetrahedron tensor
+    !> (getN_tensor_tetrahedron), which summed getN_Triangle over the faces
+    !> before; getN_Triangle's differences of atanh and atan terms lose up to
+    !> 1e-3 relative accuracy at twenty element sizes.
+    !---------------------------------------------------------------------------
+    subroutine getN_tetrahedron_point( vert, x, N )
+    real(ttReal),dimension(3,4),intent(in) :: vert
+    real(ttReal),dimension(3),intent(in) :: x
+    real(ttReal),dimension(3,3),intent(out) :: N
+
+    real(ttReal),dimension(3,4) :: vs
+    real(ttReal),dimension(3,3,4) :: faces
+    real(ttReal),dimension(3,4) :: normals
+    real(ttReal),dimension(3) :: shift
+    logical :: ok
+    integer :: i
+
+        shift = sum( vert, dim=2 ) / 4._ttReal
+        do i = 1, 4
+            vs(:,i) = vert(:,i) - shift
+        enddo
+        call tetrahedron_faces( vs, faces, normals, ok )
+        if ( .not. ok ) then
+            N = ieee_value( 1._ttReal, ieee_quiet_nan )
+            return
+        endif
+        call tet_point_tensor( faces, normals, x - shift, N )
+
+    end subroutine getN_tetrahedron_point
 
 
     !---------------------------------------------------------------------------
