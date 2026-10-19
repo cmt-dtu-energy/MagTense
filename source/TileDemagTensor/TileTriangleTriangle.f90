@@ -91,12 +91,23 @@ module TileTriangleTriangle
     !> eps / angle**3; both are below 1e-9 here in quadruple precision.
     real(wq),parameter :: nearParallel = 1.0e-8_wq
 
-    !> Triangles without a common vertex whose normals differ by more than
-    !> round-off but less than this are integrated by Gauss quadrature.
+    !> Separated triangles (see separatedVertexTol) whose normals differ by
+    !> more than round-off but less than this are integrated by Gauss
+    !> quadrature.
     real(ttReal),parameter :: parallelQuadrature = 1.0e-2_ttReal
 
-    !> Vertices closer than this fraction of the larger edge are common.
-    real(ttReal),parameter :: sharedVertexTol = 1.0e-10_ttReal
+    !> Vertices closer than this fraction of the larger edge are common. It is
+    !> loose on purpose: rounded mesh coordinates (dip-fmm's canonical grid
+    !> moves shared vertices by up to ~1e-9 of the root) leave common vertices
+    !> slightly apart, and the Sauter-Schwab maps tolerate such a mismatch.
+    real(ttReal),parameter :: sharedVertexTol = 1.0e-6_ttReal
+
+    !> Triangles count as separated, and may be integrated by Gauss
+    !> quadrature, only when every vertex pair is further apart than this
+    !> fraction of the larger edge: a nearly touching pair needs more
+    !> splitting than maxSplitDepth and stays with the closed form, whose
+    !> near-parallel projection and height snapping exist for that case.
+    real(ttReal),parameter :: separatedVertexTol = 1.0e-3_ttReal
 
     !> Gauss quadrature of separated triangles: q x q collapsed Gauss points per
     !> triangle, the larger triangle split into four until the gap between the
@@ -141,9 +152,9 @@ module TileTriangleTriangle
     real(wq),dimension(3,3) :: first, second, normA, normB
     real(wq) :: scaleA, scaleB, scaleVal, invScale, valQ
     real(ttReal),dimension(3) :: nA, nB
-    real(ttReal) :: pm, edge
+    real(ttReal) :: pm, edge, closest
     integer :: i, j, nShared
-    logical :: guard
+    logical :: guard, separated
 
         val = 0._ttReal
         ok = .true.
@@ -166,14 +177,17 @@ module TileTriangleTriangle
 
         edge = max( triangle_scale_dp( triA ), triangle_scale_dp( triB ) )
         nShared = 0
+        closest = huge( 1._ttReal )
         do i = 1, 3
             do j = 1, 3
+                closest = min( closest, norm2( triA(:,i) - triB(:,j) ) )
                 if ( norm2( triA(:,i) - triB(:,j) ) .le. sharedVertexTol * edge ) nShared = nShared + 1
             enddo
         enddo
+        separated = closest .gt. separatedVertexTol * edge
 
         !Separated, nearly parallel triangles: Gauss quadrature (see the header).
-        if ( nShared .eq. 0 .and. pm .gt. 1.0e-14_ttReal .and. pm .lt. parallelQuadrature ) then
+        if ( separated .and. pm .gt. 1.0e-14_ttReal .and. pm .lt. parallelQuadrature ) then
             val = triangle_triangle_regular( triA, triB, 0 )
             if ( present(method) ) method = ttGaussParallel
             if ( .not. ieee_is_finite( val ) ) ok = .false.
@@ -212,16 +226,19 @@ module TileTriangleTriangle
         guard = .false.
         call triangle_triangle_core( normA, normB, valQ, ok, guard )
 
-        if ( guard ) then
+        if ( guard .and. nShared .gt. 0 ) then
             !An unreliable rank decision: integrate numerically instead.
             ok = .true.
-            if ( nShared .gt. 0 ) then
-                val = triangle_triangle_sauter_schwab( triA, triB, edge )
-            else
-                val = triangle_triangle_regular( triA, triB, 0 )
-            endif
+            val = triangle_triangle_sauter_schwab( triA, triB, edge )
+            if ( present(method) ) method = ttGuardQuadrature
+        elseif ( guard .and. separated ) then
+            ok = .true.
+            val = triangle_triangle_regular( triA, triB, 0 )
             if ( present(method) ) method = ttGuardQuadrature
         else
+            !A guarded pair that is neither touching nor separated (nearly
+            !touching without a common vertex) keeps the closed form: no
+            !fallback here resolves its gap.
             val = real( scaleVal**3 * valQ, ttReal )
         endif
 
