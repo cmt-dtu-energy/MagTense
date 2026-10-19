@@ -25,7 +25,7 @@
 !> scalar face-pair integrals are evaluated by TileTriangleTriangle (closed
 !> form in quadruple precision, with numerical fallbacks for nearly degenerate
 !> face pairs) for touching, self and near pairs. Pairs separated by at least
-!> 1.5 summed circumradii are instead averaged by a collapsed Gauss rule of the
+!> 1.5 summed vertex radii are instead averaged by a collapsed Gauss rule of the
 !> analytical point field over the target (see gaussFactor), where the closed
 !> form loses its accuracy through cancellation.
 !>
@@ -44,7 +44,8 @@ module TileTetrahedronPairTensor
 
     real(ttReal),parameter :: fourPi = 12.566370614359172953850573533118_ttReal
 
-    !> Separation, in units of the summed circumradii, from which the pair is
+    !> Separation, in units of the summed vertex radii (largest distance of a
+    !> vertex from the centroid, as in dip-fmm), from which the pair is
     !> averaged by a collapsed Gauss rule of the exact point field of the
     !> source over the target instead of formed from the analytical face-pair
     !> integrals. The analytical reduction cancels catastrophically for
@@ -54,7 +55,12 @@ module TileTetrahedronPairTensor
     !> digits by ten. Below 1.5 the source's singularity is too close for a
     !> fixed rule. Values and rule orders are dip-fmm's (tetrahedron_detail.hpp):
     !> 7 points per direction from 1.5, 6 from 2 and 5 from 4, each with a worst
-    !> relative error of about 2e-10 in its range.
+    !> relative error of about 2e-10 in its range. The rule order is taken from
+    !> the smaller of this separation and the one in summed circumradii, which
+    !> never lowers it below the order the circumradius alone would give. The
+    !> circumradius must not decide the branch: it overstates the size of a
+    !> sliver, whose separated pairs then stayed on the analytical branch, where
+    !> their sixteen face-pair terms cancel by up to five digits (6.6e-8).
     real(ttReal),parameter :: gaussFactor = 1.5_ttReal
     real(ttReal),parameter :: gaussSixFactor = 2.0_ttReal
     real(ttReal),parameter :: gaussFiveFactor = 4.0_ttReal
@@ -101,7 +107,7 @@ module TileTetrahedronPairTensor
     real(ttReal),dimension(3,4) :: normalS, normalT
     real(ttReal),dimension(3,3) :: acc
     real(ttReal),dimension(3) :: shift
-    real(ttReal) :: volS, volT, integral, prefactor, avg, dr
+    real(ttReal) :: volS, volT, integral, prefactor, avg, dr, drOrder, dist
     integer :: a, b, i, j, status, q
     logical :: ok
 
@@ -132,12 +138,13 @@ module TileTetrahedronPairTensor
 
         !Separated pairs: Gauss rule of the analytical point field (see
         !gaussFactor). The source centroid is the origin here.
-        dr = norm2( sum( vt, dim=2 ) / 4._ttReal ) &
-           / ( tetrahedron_circumradius( vs ) + tetrahedron_circumradius( vt ) )
+        dist = norm2( sum( vt, dim=2 ) / 4._ttReal )
+        dr = dist / ( tetrahedron_vertex_radius( vs ) + tetrahedron_vertex_radius( vt ) )
         if ( dr .ge. gaussFactor .and. .not. tetrahedra_share_vertex( vs, vt ) ) then
+            drOrder = min( dr, dist / ( tetrahedron_circumradius( vs ) + tetrahedron_circumradius( vt ) ) )
             q = 7
-            if ( dr .ge. gaussSixFactor ) q = 6
-            if ( dr .ge. gaussFiveFactor ) q = 5
+            if ( drOrder .ge. gaussSixFactor ) q = 6
+            if ( drOrder .ge. gaussFiveFactor ) q = 5
             call gauss_pair_tensor( vs, vt, q, N )
             if ( .not. all( ieee_is_finite( N ) ) ) then
                 N = 0._ttReal
@@ -308,6 +315,20 @@ module TileTetrahedronPairTensor
         ok = .true.
 
     end subroutine tetrahedron_faces
+
+
+    !> Largest distance of a vertex from the centroid.
+    function tetrahedron_vertex_radius( vert ) result( radius )
+    real(ttReal),dimension(3,4),intent(in) :: vert
+    real(ttReal) :: radius
+    real(ttReal),dimension(3) :: c
+    integer :: i
+        c = sum( vert, dim=2 ) / 4._ttReal
+        radius = 0._ttReal
+        do i = 1, 4
+            radius = max( radius, norm2( vert(:,i) - c ) )
+        enddo
+    end function tetrahedron_vertex_radius
 
 
     !> Circumradius of a non-degenerate tetrahedron.
