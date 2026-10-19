@@ -9,10 +9,9 @@
 !> I3 -> I2s/I2t -> I1 -> I0 of
 !>
 !>   N. A. Gumerov, S. Kaneko and R. Duraiswami,
-!>   "Recursive computation of the multipole expansions of layer potential
-!>    integrals over simplices for efficient fast multipole accelerated
-!>    boundary elements",
-!>   SIAM J. Sci. Comput. 46 (2024), DOI 10.1137/23M1547688,
+!>   "Analytical Galerkin boundary integrals of Laplace kernel layer
+!>    potentials in R^3",
+!>   SIAM J. Sci. Comput. 46(2) (2024) A974-A997, DOI 10.1137/23M1547688,
 !>
 !> following the same reduction used by the (MIT licensed) reference
 !> implementation GalerkinLaplaceTriGS.m and by its C++ port in the dip-fmm
