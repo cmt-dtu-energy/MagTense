@@ -22,11 +22,12 @@
 !>     I_ab = \int_{S^t_a} \int_{S^s_b} 1/|r_t - r_s| dS_s dS_t
 !>
 !> with n^t and n^s the OUTWARD face normals of target and source. The sixteen
-!> scalar face-pair integrals are evaluated in closed form by
-!> TileTriangleTriangle for touching, self and near pairs. Pairs separated by
-!> at least 1.5 summed circumradii are instead averaged by a collapsed Gauss
-!> rule of the analytical point field over the target (see gaussFactor), where
-!> the closed form loses its accuracy through cancellation.
+!> scalar face-pair integrals are evaluated by TileTriangleTriangle (closed
+!> form in quadruple precision, with numerical fallbacks for nearly degenerate
+!> face pairs) for touching, self and near pairs. Pairs separated by at least
+!> 1.5 summed circumradii are instead averaged by a collapsed Gauss rule of the
+!> analytical point field over the target (see gaussFactor), where the closed
+!> form loses its accuracy through cancellation.
 !>
 !> NOTE ON NORMALISATION. The equivalent routine in dip-fmm maps the TOTAL
 !> SOURCE MOMENT m = V_s M to the field and therefore carries the prefactor
@@ -36,7 +37,6 @@
 !---------------------------------------------------------------------------
 module TileTetrahedronPairTensor
     use TileTriangleTriangle
-    use TileTriangle, only : getN_Triangle
     use, intrinsic :: ieee_arithmetic
     implicit none
 
@@ -356,42 +356,15 @@ module TileTetrahedronPairTensor
     end function tetrahedra_share_vertex
 
 
-    !> Gauss-Legendre nodes and weights on [0,1] (Newton iteration on the
-    !> Legendre recurrence; the weights sum to one).
-    subroutine gauss_legendre01( q, x, w )
-    integer,intent(in) :: q
-    real(ttReal),dimension(q),intent(out) :: x, w
-    real(ttReal),parameter :: pi = 3.14159265358979323846264338327950288_ttReal
-    real(ttReal) :: z, z1, p1, p2, p3, pp
-    integer :: i, j, it
-        do i = 1, q
-            z = cos( pi * ( real( i, ttReal ) - 0.25_ttReal ) / ( real( q, ttReal ) + 0.5_ttReal ) )
-            do it = 1, 100
-                p1 = 1._ttReal
-                p2 = 0._ttReal
-                do j = 1, q
-                    p3 = p2
-                    p2 = p1
-                    p1 = ( real( 2*j-1, ttReal ) * z * p2 - real( j-1, ttReal ) * p3 ) / real( j, ttReal )
-                enddo
-                pp = real( q, ttReal ) * ( z * p1 - p2 ) / ( z*z - 1._ttReal )
-                z1 = z
-                z = z1 - p1 / pp
-                if ( abs( z - z1 ) .le. 4._ttReal * epsilon( z ) ) exit
-            enddo
-            x(i) = 0.5_ttReal * ( 1._ttReal - z )
-            w(i) = 1._ttReal / ( ( 1._ttReal - z*z ) * pp*pp )
-        enddo
-    end subroutine gauss_legendre01
-
-
     !---------------------------------------------------------------------------
     !> @brief Target average of the analytical point tensor of the source by a
     !> collapsed (Duffy) Gauss rule of q points per direction, q**3 in all.
     !>
-    !> The point tensor is MagTense's getN_tensor_tetrahedron (four oriented
-    !> triangular faces, TileTriangle), with the same sign convention as the
-    !> analytical pair tensor.
+    !> The point tensor is tet_point_tensor, with the same sign convention as
+    !> the analytical pair tensor. MagTense's getN_Triangle is not used here: its
+    !> differences of atanh and atan terms lose up to 1e-3 relative accuracy at
+    !> twenty element sizes (validation of 19 Oct 2026, FMM-article repository,
+    !> tet-tet-article/data/REPORT.md "A1").
     !---------------------------------------------------------------------------
     subroutine gauss_pair_tensor( vs, vt, q, N )
     real(ttReal),dimension(3,4),intent(in) :: vs, vt
@@ -400,15 +373,21 @@ module TileTetrahedronPairTensor
 
     real(ttReal),dimension(q) :: x, w
     real(ttReal),dimension(4) :: lam
+    real(ttReal),dimension(3,3,4) :: faces
+    real(ttReal),dimension(3,4) :: normals
+    real(ttReal),dimension(3,3) :: nPt
+    real(ttReal),dimension(3) :: pt
     real(ttReal) :: r, s, t, wt, wsum
-    real,dimension(3,4) :: vsDefault
-    real,dimension(3) :: pt
-    real,dimension(3,3) :: nTri, pMat
-    integer :: a, b, c, f
+    integer :: a, b, c
+    logical :: ok
 
-        call gauss_legendre01( q, x, w )
-        vsDefault = real( vs, kind( 1.0 ) )
         N = 0._ttReal
+        call tetrahedron_faces( vs, faces, normals, ok )
+        if ( .not. ok ) then
+            N = ieee_value( 1._ttReal, ieee_quiet_nan )
+            return
+        endif
+        call gauss_legendre01( q, x, w )
         wsum = 0._ttReal
         do a = 1, q
             r = x(a)
@@ -418,13 +397,9 @@ module TileTetrahedronPairTensor
                     t = x(c)
                     wt = 6._ttReal * r*r * s * w(a) * w(b) * w(c)
                     lam = [ 1._ttReal - r, r * ( 1._ttReal - s ), r * s * ( 1._ttReal - t ), r * s * t ]
-                    pt = real( matmul( vt, lam ), kind( 1.0 ) )
-                    do f = 1, 4
-                        nTri = 0.
-                        pMat = 0.
-                        call getN_Triangle( cshift( vsDefault, f-1, 2 ), pt, nTri, pMat )
-                        N = N + wt * real( nTri, ttReal )
-                    enddo
+                    pt = matmul( vt, lam )
+                    call tet_point_tensor( faces, normals, pt, nPt )
+                    N = N + wt * nPt
                     wsum = wsum + wt
                 enddo
             enddo
@@ -432,5 +407,68 @@ module TileTetrahedronPairTensor
         N = N / wsum
 
     end subroutine gauss_pair_tensor
+
+
+    !---------------------------------------------------------------------------
+    !> @brief Field tensor of a uniformly magnetised tetrahedron at a point
+    !> outside it, H = N M, in the face-charge form
+    !>
+    !>     N = 1/(4 pi) sum_f ( Omega_f n_f + sum_e L_e m_e ) n_f^T ,
+    !>
+    !> Omega_f the solid angle of face f signed with its outward normal n_f
+    !> (Van Oosterom-Strackee), m_e the outward in-plane normal of edge e and
+    !> L_e = ln( (R1+R2+l)/(R1+R2-l) ). Both are evaluated without cancellation:
+    !> L_e as 2 atanh(l/(R1+R2)) away from the edge, and with R1+R2-l formed as
+    !> ((R1+R2)**2 - l**2)/(R1+R2+l) near it.
+    !---------------------------------------------------------------------------
+    subroutine tet_point_tensor( faces, normals, x, N )
+    real(ttReal),dimension(3,3,4),intent(in) :: faces
+    real(ttReal),dimension(3,4),intent(in) :: normals
+    real(ttReal),dimension(3),intent(in) :: x
+    real(ttReal),dimension(3,3),intent(out) :: N
+
+    real(ttReal),dimension(3,3) :: p
+    real(ttReal),dimension(3) :: nrm, a, b, c, vec, e, m, tmp, rr
+    real(ttReal) :: det, den, le, ssum, lg
+    integer :: f, i, j, k
+
+        N = 0._ttReal
+        do f = 1, 4
+            p = faces(:,:,f)
+            nrm = normals(:,f)
+            !Vertices counter-clockwise about the outward normal.
+            if ( dot_product( cross_product( p(:,2) - p(:,1), p(:,3) - p(:,1) ), nrm ) .lt. 0._ttReal ) then
+                tmp = p(:,2)
+                p(:,2) = p(:,3)
+                p(:,3) = tmp
+            endif
+            a = p(:,1) - x
+            b = p(:,2) - x
+            c = p(:,3) - x
+            rr = [ norm2( a ), norm2( b ), norm2( c ) ]
+            det = dot_product( a, cross_product( p(:,2) - p(:,1), p(:,3) - p(:,1) ) )
+            den = rr(1) * rr(2) * rr(3) + dot_product( a, b ) * rr(3) &
+                + dot_product( a, c ) * rr(2) + dot_product( b, c ) * rr(1)
+            vec = -2._ttReal * atan2( det, den ) * nrm
+            do i = 1, 3
+                j = modulo( i, 3 ) + 1
+                e = p(:,j) - p(:,i)
+                le = norm2( e )
+                m = cross_product( e, nrm ) / le
+                ssum = rr(i) + rr(j)
+                if ( le .lt. 0.5_ttReal * ssum ) then
+                    lg = 2._ttReal * atanh( le / ssum )
+                else
+                    lg = log( ( ssum + le ) / ( ( ssum*ssum - le*le ) / ( ssum + le ) ) )
+                endif
+                vec = vec + lg * m
+            enddo
+            do k = 1, 3
+                N(:,k) = N(:,k) + vec * nrm(k)
+            enddo
+        enddo
+        N = N / fourPi
+
+    end subroutine tet_point_tensor
 
 end module TileTetrahedronPairTensor
