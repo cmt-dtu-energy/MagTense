@@ -3051,7 +3051,8 @@ end subroutine updateDemagfieldDipFmm
     real(DP),dimension(:),allocatable :: A0_normalized  !> Normalized A0 for uneven anisotropy
     real(DP),dimension(:,:),allocatable :: A_int_normalized  !> Interface exchange, same scaling
     integer,dimension(:),allocatable :: phase_local     !> Material index of each tile
-        
+    integer :: dlLinLen, dlLinStat                      !> Length and status of MAGTENSE_DL_LINEAR
+
 
     if ( problem%passExch .eq. passExchTrue) return ! Skip this if the exchange has already been passed from outside
 
@@ -3106,11 +3107,14 @@ end subroutine updateDemagfieldDipFmm
             call computeExchangeSushi( problem%grid, problem%macrogrid%exchPBC .ne. 0, A0_normalized, &
                                        phase_local, A_int_normalized, solution%gridinfo, problem%A_exch )
         else
-            !A tetrahedral mesh needs the full quadratic face fit: its faces are not axis aligned, and
-            !the linear fit with dropped gradient components is not consistent there. Prism grids keep
-            !the original fit, which is exact on their axis aligned faces.
+            !Tetrahedral meshes use a quadratic face fit by default; prism grids use the linear fit of
+            !Poulsen et al. 2022 with all gradient components, which is exact for linear fields on
+            !uniform, graded and locally refined grids. Setting the environment variable
+            !MAGTENSE_DL_LINEAR (to anything) selects that linear fit on tetrahedra too, i.e. the
+            !method as published, for comparison.
+            call get_environment_variable( 'MAGTENSE_DL_LINEAR', length=dlLinLen, status=dlLinStat )
             call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, phase_local, A_int_normalized, problem%A_exch, &
-                quadFit = ( problem%grid%gridType .eq. gridTypeTetrahedron ))
+                quadFit = ( problem%grid%gridType .eq. gridTypeTetrahedron ) .and. .not. ( dlLinStat .eq. 0 .and. dlLinLen .gt. 0 ))
         endif
     endif
 
