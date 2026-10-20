@@ -165,6 +165,9 @@ module TileTriangleTriangle
     !> 1 separated near-parallel Gauss, 2 FP64 (screened) closed form, 3 quadruple
     !> closed form, 4 guard -> Sauter-Schwab, 5 guard -> split Gauss, 6 guard kept.
     integer(8),public :: ttPathCount(6) = 0
+    !> Counting is off unless tet_pair_stats_reset finds MAGTENSE_TETPAIR_STATS set,
+    !> so production runs pay neither the atomics nor their contention.
+    logical,public :: ttStatsOn = .false.
 
     contains
 
@@ -227,8 +230,10 @@ module TileTriangleTriangle
         if ( separated .and. pm .gt. 1.0e-14_ttReal .and. pm .lt. parallelQuadrature ) then
             val = triangle_triangle_regular( triA, triB, 0 )
             if ( present(method) ) method = ttGaussParallel
-            !$omp atomic
-            ttPathCount(1) = ttPathCount(1) + 1
+            if ( ttStatsOn ) then
+                !$omp atomic
+                ttPathCount(1) = ttPathCount(1) + 1
+            endif
             if ( .not. ieee_is_finite( val ) ) ok = .false.
             return
         endif
@@ -249,8 +254,10 @@ module TileTriangleTriangle
             !Well-conditioned: the double-precision reduction.
             call reduce_double( first, second, edge, valR, ok, guard )
             val = valR
-            !$omp atomic
-            ttPathCount(2) = ttPathCount(2) + 1
+            if ( ttStatsOn ) then
+                !$omp atomic
+                ttPathCount(2) = ttPathCount(2) + 1
+            endif
             if ( .not. ieee_is_finite( val ) ) ok = .false.
             return
         endif
@@ -262,25 +269,33 @@ module TileTriangleTriangle
             ok = .true.
             val = triangle_triangle_sauter_schwab( triA, triB, edge )
             if ( present(method) ) method = ttGuardQuadrature
-            !$omp atomic
-            ttPathCount(4) = ttPathCount(4) + 1
+            if ( ttStatsOn ) then
+                !$omp atomic
+                ttPathCount(4) = ttPathCount(4) + 1
+            endif
         elseif ( guard .and. separated ) then
             ok = .true.
             val = triangle_triangle_regular( triA, triB, 0 )
             if ( present(method) ) method = ttGuardQuadrature
-            !$omp atomic
-            ttPathCount(5) = ttPathCount(5) + 1
+            if ( ttStatsOn ) then
+                !$omp atomic
+                ttPathCount(5) = ttPathCount(5) + 1
+            endif
         else
             !A guarded pair that is neither touching nor separated (nearly
             !touching without a common vertex) keeps the closed form: no
             !fallback here resolves its gap.
             val = valR
             if ( guard ) then
-                !$omp atomic
-                ttPathCount(6) = ttPathCount(6) + 1
+                if ( ttStatsOn ) then
+                    !$omp atomic
+                    ttPathCount(6) = ttPathCount(6) + 1
+                endif
             else
-                !$omp atomic
-                ttPathCount(3) = ttPathCount(3) + 1
+                if ( ttStatsOn ) then
+                    !$omp atomic
+                    ttPathCount(3) = ttPathCount(3) + 1
+                endif
             endif
         endif
 

@@ -121,7 +121,8 @@ module TileTetrahedronPairTensor
 
         N = 0._ttReal
         status = tetPairOk
-        tStart = omp_get_wtime()
+        tStart = 0.d0
+        if ( ttStatsOn ) tStart = omp_get_wtime()
 
         !Work relative to the source centroid. This is an exact translation of
         !the geometry and keeps all coordinates of the order of the element size
@@ -155,10 +156,12 @@ module TileTetrahedronPairTensor
             if ( drOrder .ge. gaussSixFactor ) q = 6
             if ( drOrder .ge. gaussFiveFactor ) q = 5
             call gauss_pair_tensor( vs, vt, q, N )
-            !$omp atomic
-            tetPairCount(2) = tetPairCount(2) + 1
-            !$omp atomic
-            tetPairTime(2) = tetPairTime(2) + ( omp_get_wtime() - tStart )
+            if ( ttStatsOn ) then
+                !$omp atomic
+                tetPairCount(2) = tetPairCount(2) + 1
+                !$omp atomic
+                tetPairTime(2) = tetPairTime(2) + ( omp_get_wtime() - tStart )
+            endif
             if ( .not. all( ieee_is_finite( N ) ) ) then
                 N = 0._ttReal
                 if ( present(ierr) ) ierr = tetPairNotFinite
@@ -209,10 +212,12 @@ module TileTetrahedronPairTensor
         !TARGET volume only. No division by the source volume.
         prefactor = -1._ttReal / ( fourPi * volT )
         N = prefactor * acc
-        !$omp atomic
-        tetPairCount(1) = tetPairCount(1) + 1
-        !$omp atomic
-        tetPairTime(1) = tetPairTime(1) + ( omp_get_wtime() - tStart )
+        if ( ttStatsOn ) then
+            !$omp atomic
+            tetPairCount(1) = tetPairCount(1) + 1
+            !$omp atomic
+            tetPairTime(1) = tetPairTime(1) + ( omp_get_wtime() - tStart )
+        endif
 
         if ( .not. all( ieee_is_finite( N ) ) ) then
             N = 0._ttReal
@@ -334,8 +339,12 @@ module TileTetrahedronPairTensor
     end subroutine tetrahedron_faces
 
 
-    !> Measurement only: zero the path and branch counters.
+    !> Measurement only: zero the path and branch counters and switch counting
+    !> on if the environment variable MAGTENSE_TETPAIR_STATS names a file.
     subroutine tet_pair_stats_reset()
+    integer :: n, stat
+        call get_environment_variable( 'MAGTENSE_TETPAIR_STATS', length=n, status=stat )
+        ttStatsOn = stat .eq. 0 .and. n .gt. 0
         ttPathCount = 0
         tetPairCount = 0
         tetPairTime = 0.d0
