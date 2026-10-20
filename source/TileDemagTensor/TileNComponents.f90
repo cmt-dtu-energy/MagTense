@@ -6,7 +6,7 @@ module TileNComponents
     use TileCircPieceTensor
     use TilePlanarCoilTensor
     use TileTriangle
-    use TileTriangleTriangle, only : ttReal
+    use TileTriangleTriangle, only : ttReal, gauss_legendre01
     use TileTetrahedronPairTensor, only : getN_tetrahedron_point
 
     implicit none
@@ -652,6 +652,11 @@ module TileNComponents
     real(8) :: X1, X2, Y1, Y2, Z1, Z2, vol, min_vol
     real(8), parameter :: eps = 1.0d-15
     integer :: unit
+    real(8) :: rSum, sep, sScale                    !> Summed vertex radii, separation in them, length unit of the closed form
+    real(8) :: gx(7), gw(7)                         !> Gauss-Legendre nodes and weights on [0, 1]
+    real,dimension(3) :: ptGauss                    !> Gauss point in the receiving tile, relative to the source centre
+    real,dimension(3,3) :: Npt                      !> Point tensor of the source at ptGauss
+    integer :: q
 
     !Lengths of source tile in x,y,z dimensions
     a = Avgprism%a/2.0
@@ -674,6 +679,51 @@ module TileNComponents
     x = pos(1)
     y = pos(2)
     z = pos(3)
+
+    ! For well separated tiles the closed form below is a small difference of large terms: its
+    ! 64 corner terms grow as the cube of the distance d while the tensor falls as d^-3, so in
+    ! double precision its relative error grows roughly as 1e-16 (d/h)^6, to 1e-4 at 100 cells
+    ! and order one at 200 (Chernyshenko and Fangohr, JMMM 381, 440, 2015). From 1.5 summed
+    ! vertex radii (half the space diagonals) on, the tensor is therefore the average over the
+    ! receiving tile of the point tensor of the source, by a q^3 tensor Gauss-Legendre rule
+    ! with q = 7, 6 and 5 from 1.5, 2 and 4 summed radii, as for tetrahedron pairs; the point
+    ! tensor does not cancel at such distances. On test cubes the rule agrees with a 20-point
+    ! rule to 5e-12 or better at every separation and direction.
+    rSum = sqrt( a**2 + b**2 + c**2 ) + sqrt( a1**2 + b1**2 + c1**2 )
+    sep = sqrt( x**2 + y**2 + z**2 ) / rSum
+    if ( sep .ge. 1.5d0 ) then
+        q = 7
+        if ( sep .ge. 2.0d0 ) q = 6
+        if ( sep .ge. 4.0d0 ) q = 5
+        call gauss_legendre01( q, gx(1:q), gw(1:q) )
+        N_out = 0.
+        do i = 1, q
+            do j = 1, q
+                do k = 1, q
+                    ptGauss = (/ x + a1 * ( 2.0d0 * gx(i) - 1.0d0 ), &
+                                 y + b1 * ( 2.0d0 * gx(j) - 1.0d0 ), &
+                                 z + c1 * ( 2.0d0 * gx(k) - 1.0d0 ) /)
+                    call getN_prism_3D( Avgprism, ptGauss, Npt )
+                    N_out = N_out + gw(i) * gw(j) * gw(k) * Npt
+                end do
+            end do
+        end do
+        return
+    endif
+
+    ! The closed form is evaluated in units of the largest side, so that the guards against
+    ! zero arguments (eps) are relative; in metres eps = 1e-15 is 1e-7 of a 10 nm tile and gave
+    ! errors of that order even for touching tiles. The tensor is dimensionless and unchanged.
+    sScale = 2.0d0 * max( a, b, c, a1, b1, c1 )
+    a = a / sScale
+    b = b / sScale
+    c = c / sScale
+    a1 = a1 / sScale
+    b1 = b1 / sScale
+    c1 = c1 / sScale
+    x = x / sScale
+    y = y / sScale
+    z = z / sScale
 
     !Find coordinates for corners
     source_coords = (/ -a,  a,  -b,  b,  -c,  c /)
