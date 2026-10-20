@@ -157,6 +157,12 @@ def _tetra_exchange_test() -> list[dict]:
         return mod.run_test(cuda=USE_CUDA)
 
 
+def _avgprism_farfield_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import avgprism_farfield_test as mod
+        return mod.run_test(cuda=USE_CUDA)
+
+
 def _prism_directlaplacian_test() -> list[dict]:
     with example_dir(TESTS_DIR):
         import prism_directlaplacian_test as mod
@@ -369,6 +375,10 @@ TESTS = {
     'periodic_exchange_test': (
         _periodic_exchange_test, False,
         'Periodic exchange coupling, uniform grid, unstructured mesh and grain mesh',
+    ),
+    'avgprism_farfield_test': (
+        _avgprism_farfield_test, False,
+        'Volume-averaged prism-prism tensor from touching to 200 cells apart against a Gauss reference',
     ),
     'prism_directlaplacian_test': (
         _prism_directlaplacian_test, False,
