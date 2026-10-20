@@ -9,8 +9,9 @@ point tensor of the source over the receiving tile beyond.
 Two 5 nm cubes are placed from touching to 200 cells apart along x (where coordinate differences vanish
 exactly) and along a generic direction. The reference is a 16-point-per-axis Gauss average of the point
 tensor (tile type 2), which agrees with a 12-point rule to 2e-10 or better here. Check: the largest
-relative Frobenius difference is below 1e-9 (the previous closed form reached 2.5 at 200 cells along x
-and 7.7e-7 for touching cubes).
+relative Frobenius difference is below 5e-9 (the previous closed form reached 2.5 at 200 cells along x
+and 7.7e-7 for touching cubes). The limit is set by the point tensor itself, whose own corner sum cancels
+as roughly 1e-16 (d/h)^3, about 1e-9 at 200 cells, for every Gauss order and for the reference alike.
 
 Usage:
     python avgprism_farfield_test.py
@@ -63,7 +64,7 @@ def run_test(cuda: bool = False) -> list[dict]:
             err = np.linalg.norm(averaged(c) - ref) / np.linalg.norm(ref)
             print(f"{name}, {d:5.0f} cells: {err:.2e}")
             worst = max(worst, err)
-        checks.append(check(f"cubes {name}, 1-200 cells: largest relative difference", worst, 1e-9))
+        checks.append(check(f"cubes {name}, 1-200 cells: largest relative difference", worst, 5e-9))
     return checks
 
 

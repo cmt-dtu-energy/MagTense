@@ -686,15 +686,20 @@ module TileNComponents
     ! and order one at 200 (Chernyshenko and Fangohr, JMMM 381, 440, 2015). From 1.5 summed
     ! vertex radii (half the space diagonals) on, the tensor is therefore the average over the
     ! receiving tile of the point tensor of the source, by a q^3 tensor Gauss-Legendre rule
-    ! with q = 7, 6 and 5 from 1.5, 2 and 4 summed radii, as for tetrahedron pairs; the point
-    ! tensor does not cancel at such distances. On test cubes the rule agrees with a 20-point
-    ! rule to 5e-12 or better at every separation and direction.
+    ! with q = 7, 6 and 5 from 1.5, 2 and 4 summed radii, as for tetrahedron pairs, and q = 4
+    ! and 3 from 8 and 16 summed radii, where they are as accurate and keep the cost of the
+    ! many distant pairs of a large mesh at that of the closed form; the point tensor does not
+    ! cancel at such distances. On test cubes the rule agrees with a 12- or 20-point rule to
+    ! 2e-11 or better at every separation and direction (q = 1 or 2 would leave the fourth-
+    ! order term, 1e-6 at 12 summed radii).
     rSum = sqrt( a**2 + b**2 + c**2 ) + sqrt( a1**2 + b1**2 + c1**2 )
     sep = sqrt( x**2 + y**2 + z**2 ) / rSum
     if ( sep .ge. 1.5d0 ) then
         q = 7
         if ( sep .ge. 2.0d0 ) q = 6
         if ( sep .ge. 4.0d0 ) q = 5
+        if ( sep .ge. 8.0d0 ) q = 4
+        if ( sep .ge. 16.0d0 ) q = 3
         call gauss_legendre01( q, gx(1:q), gw(1:q) )
         N_out = 0.
         do i = 1, q
