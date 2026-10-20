@@ -2534,6 +2534,7 @@ end subroutine updateDemagfieldDipFmm
     real(DP),dimension(3,3) :: N_tet                              !> Exact tetrahedron-tetrahedron averaged demag tensor
     integer :: ierr_tet                                           !> Status of the exact tetrahedron-tetrahedron tensor
     integer :: n_tet_pair_err                                     !> Number of element pairs the exact tensor could not evaluate
+    real(8) :: tet_stats_t0                                       !> Assembly start (tet-pair-stats measurement)
     character(200) :: tet_err_str
     real :: rate
     !integer :: c1,c2,cr,cm
@@ -2694,6 +2695,8 @@ end subroutine updateDemagfieldDipFmm
                 !from inside the parallel region, so failures are counted here
                 !and reported once the loop has finished.
                 n_tet_pair_err = 0
+                call tet_pair_stats_reset()
+                tet_stats_t0 = omp_get_wtime()
 
                 !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, i, j, indx_ele, indx_ele_tgt, vert_src, vert_tgt, N_tet, ierr_tet) REDUCTION(+:n_tet_pair_err)
                 do i=1,nx
@@ -2725,6 +2728,7 @@ end subroutine updateDemagfieldDipFmm
                     enddo
                 enddo
                 !$OMP END PARALLEL DO
+                call tet_pair_stats_report( omp_get_wtime() - tet_stats_t0 )
 
                 if ( n_tet_pair_err .gt. 0 ) then
                     write(tet_err_str,'(A,I0,A)') 'Exact tetrahedron-tetrahedron demag tensor failed for ', &

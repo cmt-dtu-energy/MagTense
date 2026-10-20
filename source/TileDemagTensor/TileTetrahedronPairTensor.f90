@@ -38,9 +38,16 @@
 module TileTetrahedronPairTensor
     use TileTriangleTriangle
     use, intrinsic :: ieee_arithmetic
+    use omp_lib, only : omp_get_wtime
     implicit none
 
     private
+
+    !> Measurement only (branch tet-pair-stats): pairs and summed thread time per
+    !> branch, 1 analytical (face pairs), 2 Gauss rule; see tet_pair_stats_report.
+    integer(8),public :: tetPairCount(2) = 0
+    real(8),public :: tetPairTime(2) = 0.d0
+    public :: tet_pair_stats_reset, tet_pair_stats_report
 
     real(ttReal),parameter :: fourPi = 12.566370614359172953850573533118_ttReal
 
@@ -111,9 +118,12 @@ module TileTetrahedronPairTensor
     real(ttReal) :: volS, volT, integral, prefactor, avg, dr, drOrder, dist
     integer :: a, b, i, j, status, q
     logical :: ok
+    real(8) :: tStart
 
         N = 0._ttReal
         status = tetPairOk
+        tStart = 0.d0
+        if ( ttStatsOn ) tStart = omp_get_wtime()
 
         !Work relative to the source centroid. This is an exact translation of
         !the geometry and keeps all coordinates of the order of the element size
@@ -147,6 +157,12 @@ module TileTetrahedronPairTensor
             if ( drOrder .ge. gaussSixFactor ) q = 6
             if ( drOrder .ge. gaussFiveFactor ) q = 5
             call gauss_pair_tensor( vs, vt, q, N )
+            if ( ttStatsOn ) then
+                !$omp atomic
+                tetPairCount(2) = tetPairCount(2) + 1
+                !$omp atomic
+                tetPairTime(2) = tetPairTime(2) + ( omp_get_wtime() - tStart )
+            endif
             if ( .not. all( ieee_is_finite( N ) ) ) then
                 N = 0._ttReal
                 if ( present(ierr) ) ierr = tetPairNotFinite
@@ -197,6 +213,12 @@ module TileTetrahedronPairTensor
         !TARGET volume only. No division by the source volume.
         prefactor = -1._ttReal / ( fourPi * volT )
         N = prefactor * acc
+        if ( ttStatsOn ) then
+            !$omp atomic
+            tetPairCount(1) = tetPairCount(1) + 1
+            !$omp atomic
+            tetPairTime(1) = tetPairTime(1) + ( omp_get_wtime() - tStart )
+        endif
 
         if ( .not. all( ieee_is_finite( N ) ) ) then
             N = 0._ttReal
@@ -316,6 +338,35 @@ module TileTetrahedronPairTensor
         ok = .true.
 
     end subroutine tetrahedron_faces
+
+
+    !> Measurement only: zero the path and branch counters and switch counting
+    !> on if the environment variable MAGTENSE_TETPAIR_STATS names a file.
+    subroutine tet_pair_stats_reset()
+    integer :: n, stat
+        call get_environment_variable( 'MAGTENSE_TETPAIR_STATS', length=n, status=stat )
+        ttStatsOn = stat .eq. 0 .and. n .gt. 0
+        ttPathCount = 0
+        tetPairCount = 0
+        tetPairTime = 0.d0
+    end subroutine tet_pair_stats_reset
+
+
+    !> Measurement only: append the counters to the file named by the
+    !> environment variable MAGTENSE_TETPAIR_STATS (nothing if it is unset).
+    subroutine tet_pair_stats_report( wall )
+    real(8),intent(in) :: wall
+    character(len=1024) :: fname
+    integer :: n, u, stat
+        call get_environment_variable( 'MAGTENSE_TETPAIR_STATS', fname, n, stat )
+        if ( stat .ne. 0 .or. n .eq. 0 ) return
+        open( newunit=u, file=fname(1:n), position='append', action='write' )
+        write(u,'(A,6(1X,I0))') 'face_pairs gauss_parallel fp64_screen quad_closed guard_sauter_schwab guard_gauss guard_kept', ttPathCount
+        write(u,'(A,2(1X,I0))') 'pairs analytical gauss', tetPairCount
+        write(u,'(A,2(1X,ES12.5))') 'thread_seconds analytical gauss', tetPairTime
+        write(u,'(A,1X,ES12.5)') 'wall_seconds assembly', wall
+        close( u )
+    end subroutine tet_pair_stats_report
 
 
     !> Largest distance of a vertex from the centroid.
