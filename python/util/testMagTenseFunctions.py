@@ -157,6 +157,12 @@ def _tetra_exchange_test() -> list[dict]:
         return mod.run_test(cuda=USE_CUDA)
 
 
+def _prism_directlaplacian_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import prism_directlaplacian_test as mod
+        return mod.run_test(cuda=USE_CUDA)
+
+
 def _unstructured_exchange_test() -> list[dict]:
     with example_dir(TESTS_DIR):
         import unstructured_exchange_test as mod
@@ -363,6 +369,10 @@ TESTS = {
     'periodic_exchange_test': (
         _periodic_exchange_test, False,
         'Periodic exchange coupling, uniform grid, unstructured mesh and grain mesh',
+    ),
+    'prism_directlaplacian_test': (
+        _prism_directlaplacian_test, False,
+        'Direct Laplacian exchange on uniform, graded and grain prism meshes: exact for linear fields',
     ),
     'tetra_exchange_test': (
         _tetra_exchange_test, False,

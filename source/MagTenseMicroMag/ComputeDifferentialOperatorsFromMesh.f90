@@ -633,19 +633,21 @@ module DifferentialOperators
                 Hk(i,:) = Wk2(:)*Gkl1_T(i,:)                !  least squares vector. See [1] or [2].
             enddo
                 
+            ! The least squares system keeps every gradient component of the problem's
+            ! dimensionality, as in Eqs. (16)-(21) of Poulsen et al. 2022; only the components the
+            ! face sum needs are used afterwards. Fitting with the components along the face normal
+            ! alone (the previous mask) left the tangential variation of phi to be absorbed by the
+            ! normal gradient. On a uniform grid the stencil is symmetric and that variation cancels,
+            ! but at a hanging face or on a graded mesh it does not, and the operator was then not
+            ! exact even for a linear phi.
             allocate(mask_int2log(size(nns)+1))
             mask_int2log(1) = .true.
             do i = 2, size(mask_int2log)
-                if (abs(nns(i-1)) > eps_criteria) then
-                    mask_int2log(i) = .true.
-                else
-                    mask_int2log(i) = .false.
-                endif
+                mask_int2log(i) = ( i - 1 .le. dims )
             enddo
-            
-            ! Pick out only the components used in the face-sum.
-            ! This means e.g. only x gradient of phi if dims==1 and/or the norm
-            ! of the face is in the x-direction.
+
+            ! The reduced system: the face value and the gradient components of the dims
+            ! dimensions, in the order x, y, z.
             allocate(GkRed(count(mask_int2log),count(mask_int2log)))
             allocate(HkRed(count(mask_int2log),size(Hk,2)))
             k_i = 1
@@ -698,32 +700,19 @@ module DifferentialOperators
                 cycle
             endif
             
+            ! Rows of the solution: 1 the face value, 2..dims+1 the x, y, z gradient components.
+            ! A component is stored only where the face normal has it, which is all the face sum
+            ! uses; a virtual (mirror) node adds its weight to the real node it mirrors.
             if (edgeFace(kk)) then
                 vw(ind) = Wktmp(1,1:lind)+Wktmp(1,lind+1:size(Wktmp,2))                 ! Interpolated face values
-                if (abs(nns(1)) > eps_criteria) then                                    ! Interpolated x-components of face gradients
-                    vx(ind)=(Wktmp(2,1:lind)+Wktmp(2,lind+1:size(Wktmp,2)))/scale       ! rescaled
-                    if (abs(nns(2)) > eps_criteria) then                                ! Interpolated y-components of face gradients
-                        vy(ind) = (Wktmp(3,1:lind)+Wktmp(3,lind+1:size(Wktmp,2)))/scale ! rescaled
-                    endif
-                elseif (abs(nns(2)) > eps_criteria) then                                ! Interpolated y-components of face gradients
-                    vy(ind)=(Wktmp(2,1:lind)+Wktmp(2,lind+1:size(Wktmp,2)))/scale       ! rescaled
-                endif
-                if (abs(nns(3)) > eps_criteria) then                                    ! Interpolated z-components of face gradients
-                    vz(ind)=(Wktmp(size(Wktmp,1),1:lind)+Wktmp(size(Wktmp,1),lind+1:size(Wktmp,2)))/scale ! rescaled
-                endif
+                if (abs(nns(1)) > eps_criteria) vx(ind) = (Wktmp(2,1:lind)+Wktmp(2,lind+1:size(Wktmp,2)))/scale
+                if (dims > 1 .and. abs(nns(2)) > eps_criteria) vy(ind) = (Wktmp(3,1:lind)+Wktmp(3,lind+1:size(Wktmp,2)))/scale
+                if (dims > 2 .and. abs(nns(3)) > eps_criteria) vz(ind) = (Wktmp(4,1:lind)+Wktmp(4,lind+1:size(Wktmp,2)))/scale
             else                                            ! NOT an edge face. No mirror tricks necessary.
                 vw(ind) = Wktmp(1,:);                       ! Interpolated face values
-                if (abs(nns(1)) > eps_criteria) then        ! Interpolated x-components of face gradients
-                    vx(ind)=Wktmp(2,:)/scale                ! rescaled
-                    if (abs(nns(2)) > eps_criteria) then    ! Interpolated y-components of face gradients
-                        vy(ind) = Wktmp(3,:)/scale          ! rescaled
-                    endif
-                elseif (abs(nns(2)) > eps_criteria) then    ! Interpolated y-components of face gradients
-                    vy(ind)=Wktmp(2,:)/scale                ! rescaled
-                endif
-                if (abs(nns(3)) > eps_criteria) then        ! Interpolated z-components of face gradients
-                    vz(ind)=Wktmp(size(Wktmp,1),:)/scale    ! rescaled
-                endif
+                if (abs(nns(1)) > eps_criteria) vx(ind) = Wktmp(2,:)/scale
+                if (dims > 1 .and. abs(nns(2)) > eps_criteria) vy(ind) = Wktmp(3,:)/scale
+                if (dims > 2 .and. abs(nns(3)) > eps_criteria) vz(ind) = Wktmp(4,:)/scale
             endif
                 
             deallocate(ind,e,Gkl1,Gkl1_temp,Hk,Gk,mask_int2log,GkRed,HkRed,Wktmp)        
