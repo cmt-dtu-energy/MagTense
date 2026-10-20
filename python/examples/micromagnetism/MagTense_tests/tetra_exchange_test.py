@@ -3,7 +3,7 @@
 A helix m = (cos kx, sin kx, 0) has the exact exchange field H_exc = -(2A/(mu0 Ms)) k^2 m, and it
 satisfies the Neumann condition on the faces normal to y and z. MagTense builds the exchange
 operator of a tetrahedral mesh itself (mesh analysis plus the Direct Laplacian with a quadratic
-face fit); the field it returns at t = 0 is compared with the exact one on the elements at least
+face fit, selected explicitly since the default for tetrahedra is now 'cellhessian'); the field it returns at t = 0 is compared with the exact one on the elements at least
 10 nm from the two x ends of a 50 nm cube.
 
 Meshes: the Kuhn mesh of magtense.utils.create_tetra_mesh (six tetrahedra per cube) and the same
@@ -51,7 +51,8 @@ def helix_error(nodes: np.ndarray, elements: np.ndarray, cuda: bool = False) -> 
     p = MicromagProblem(res=(len(pts), 1, 1), grid_L=[L, L, L], grid_type="tetrahedron",
                         grid_nod=nodes, grid_ele=elements.T, grid_pts=pts, m0=m0, Ms=MS, A0=A_EX,
                         K0=0.0, alpha=4000.0, gamma=0.0, solver="dynamic", cuda=cuda,
-                        usedemag=False, usereturnhall=True, exch_presize=256)
+                        usedemag=False, usereturnhall=True, exch_presize=256,
+                        exch_meth="directlaplacianneumann")
     p.window_enabled = 0
     res = p.run_simulation(t_end=1e-13, nt=2, fct_h_ext=lambda t: np.zeros((len(t), 3)), nt_h_ext=2)
     H = np.asarray(res[3])[0, :, 0, :]
