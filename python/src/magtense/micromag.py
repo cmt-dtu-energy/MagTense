@@ -141,8 +141,12 @@ class MicromagProblem:
             its large tiles get leaves of their own size. ``"uniform_strict"`` splits every
             occupied box down to ``cdfmm_depth`` (adaptive builder, capacity 0), so large tiles
             sit in depth-``cdfmm_depth`` leaves by their centre; it needs a dip-fmm that
-            accepts capacity 0.
-        cdfmm_capacity: Adaptive tree: maximum number of tiles per leaf before a split.
+            accepts capacity 0. ``"adaptive_target"`` is the adaptive tree with dip-fmm's target
+            split rule: ``cdfmm_capacity`` is the occupancy to aim for, and a box above it is split
+            only if its octants are, weighted by their tile counts, closer to it (|ln(n/target)|);
+            it needs a dip-fmm with the ``_split`` adaptive entry points.
+        cdfmm_capacity: Adaptive tree: maximum number of tiles per leaf before a split
+            (``"adaptive_target"``: the target number of tiles per leaf).
         cdfmm_max_depth: Adaptive tree: deepest level, 0 to 8.
         cdfmm_root: Root cube as (centre x, y, z, half-width) [m]. ``None`` lets MagTense choose
             it (see ``cdfmm_align``). A given root is used as it is, for either tree.
@@ -445,9 +449,9 @@ class MicromagProblem:
             cdfmm_basis = basis_values[cdfmm_basis]
         if use_cdfmm and self.grid_type not in (1, 2, 3):
             raise ValueError("dip-fmm requires grid_type='uniform', 'unstructuredPrisms' or 'tetrahedron'")
-        tree_values = {"uniform": 0, "adaptive": 1, "uniform_strict": 1}
+        tree_values = {"uniform": 0, "adaptive": 1, "uniform_strict": 1, "adaptive_target": 2}
         if cdfmm_tree not in tree_values:
-            raise ValueError("cdfmm_tree must be 'uniform', 'adaptive' or 'uniform_strict'")
+            raise ValueError("cdfmm_tree must be 'uniform', 'adaptive', 'adaptive_target' or 'uniform_strict'")
         self.cdfmm_strict = cdfmm_tree == "uniform_strict"
         if self.cdfmm_strict:
             # the adaptive builder with capacity 0 splits every occupied box to max_depth
@@ -942,7 +946,7 @@ class MicromagProblem:
     def aligned_cdfmm_root(self, tree: str | None = None, depth: int | None = None) -> np.ndarray:
         """The aligned root (centre x, y, z, half-width) [m] described under ``cdfmm_align``."""
         tree = tree or ("uniform" if getattr(self, "cdfmm_strict", False)
-                        else {0: "uniform", 1: "adaptive"}[self.cdfmm_tree])
+                        else {0: "uniform", 1: "adaptive", 2: "adaptive"}[self.cdfmm_tree])
         depth = self.cdfmm_depth if depth is None else int(depth)
         low, high, h = self._cell_extent()
         unit, ok = self._common_unit(h)
@@ -974,7 +978,7 @@ class MicromagProblem:
             return np.asfortranarray(root)
         if self.cdfmm_align:
             return self.aligned_cdfmm_root()
-        if self.cdfmm_tree != 1 or getattr(self, "cdfmm_strict", False):
+        if self.cdfmm_tree not in (1, 2) or getattr(self, "cdfmm_strict", False):
             return np.asfortranarray(root)
         low, high, _ = self._cell_extent()
         centre = 0.5 * (low + high)

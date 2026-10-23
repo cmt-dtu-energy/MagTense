@@ -26,9 +26,11 @@ contains
     !> Uniform grid with the uniform tree and no root: one common cell size on the bounding
     !> box (the original path). Otherwise every cell passes its own full side lengths:
     !> grid%abc on an unstructuredPrisms (octree) grid, or the common size repeated on a
-    !> uniform grid. problem%cdfmm_tree selects the fixed-depth uniform tree (0) or dip-fmm's
-    !> capacity-driven adaptive tree (1); with problem%cdfmm_root the uniform tree is every
-    !> occupied box of that root split down to cdfmm_depth (adaptive builder, capacity 1).
+    !> uniform grid. problem%cdfmm_tree selects the fixed-depth uniform tree (0), dip-fmm's
+    !> capacity-driven adaptive tree (1) or the adaptive tree with its target split rule (2,
+    !> cdfmm_capacity is then the occupancy to aim for); with problem%cdfmm_root the uniform
+    !> tree is every occupied box of that root split down to cdfmm_depth (adaptive builder,
+    !> capacity 1).
     subroutine initialiseDipFmm(problem, ierr, message)
         type(MicroMagProblem), intent(in) :: problem
         integer, intent(out) :: ierr
@@ -40,7 +42,7 @@ contains
         real(c_double), dimension(:,:), allocatable :: vertices
         real(c_double) :: root_centre(3), origin(3), unit, corner(3, 4), centroid(3)
         integer(c_int) :: cdfmm_ierr
-        integer :: ntot, i, k
+        integer :: ntot, i, k, split_rule
         logical :: uniform_cells, tetrahedra
 #endif
 
@@ -54,11 +56,13 @@ contains
             message = 'MagTense demag arrays are FP32; cdfmm_precision must be FLOAT32 (0)'
             return
         end if
-        if (problem%cdfmm_tree /= 0 .and. problem%cdfmm_tree /= 1) then
+        if (problem%cdfmm_tree < 0 .or. problem%cdfmm_tree > 2) then
             ierr = 1
-            message = 'cdfmm_tree must be 0 (uniform tree) or 1 (adaptive tree)'
+            message = 'cdfmm_tree must be 0 (uniform tree), 1 (adaptive tree) or 2 (adaptive, target rule)'
             return
         end if
+        split_rule = CDFMM_ADAPTIVE_SPLIT_CAPACITY
+        if (problem%cdfmm_tree == 2) split_rule = CDFMM_ADAPTIVE_SPLIT_TARGET
 
         ntot = size(problem%grid%pts, dim=1)
         tetrahedra = .false.
@@ -158,21 +162,21 @@ contains
             cell_volume = cell_volume / unit**3
             if (problem%cdfmm_root(4) > 0.0_DP) then
                 root_centre = (real(problem%cdfmm_root(1:3), c_double) - origin) / unit
-                if (problem%cdfmm_tree == 1) then
+                if (problem%cdfmm_tree >= 1) then
                     call cdfmm_create_adaptive_tetrahedra( &
                         dip_fmm_plan, xs, ys, zs, vertices, problem%cdfmm_capacity, &
                         problem%cdfmm_max_depth, options, cdfmm_ierr, root_centre, &
-                        real(problem%cdfmm_root(4), c_double) / unit)
+                        real(problem%cdfmm_root(4), c_double) / unit, split_rule)
                 else
                     ! Uniform tree of cdfmm_depth on the given root (capacity 1), as for prisms.
                     call cdfmm_create_adaptive_tetrahedra( &
                         dip_fmm_plan, xs, ys, zs, vertices, 1, problem%cdfmm_depth, options, &
                         cdfmm_ierr, root_centre, real(problem%cdfmm_root(4), c_double) / unit)
                 end if
-            else if (problem%cdfmm_tree == 1) then
+            else if (problem%cdfmm_tree >= 1) then
                 call cdfmm_create_adaptive_tetrahedra( &
                     dip_fmm_plan, xs, ys, zs, vertices, problem%cdfmm_capacity, &
-                    problem%cdfmm_max_depth, options, cdfmm_ierr)
+                    problem%cdfmm_max_depth, options, cdfmm_ierr, split_rule=split_rule)
             else
                 call cdfmm_create_tetrahedra(dip_fmm_plan, xs, ys, zs, vertices, options, cdfmm_ierr)
             end if
@@ -238,17 +242,17 @@ contains
                 call cdfmm_create_adaptive_variable_cuboids( &
                     dip_fmm_plan, xs, ys, zs, hx, hy, hz, 1, problem%cdfmm_depth, options, cdfmm_ierr, &
                     root_centre, snap(real(problem%cdfmm_root(4), c_double) / unit))
-            else if (problem%cdfmm_tree == 1) then
+            else if (problem%cdfmm_tree >= 1) then
                 if (problem%cdfmm_root(4) > 0.0_DP) then
                     root_centre = snap((real(problem%cdfmm_root(1:3), c_double) - origin) / unit)
                     call cdfmm_create_adaptive_variable_cuboids( &
                         dip_fmm_plan, xs, ys, zs, hx, hy, hz, problem%cdfmm_capacity, &
                         problem%cdfmm_max_depth, options, cdfmm_ierr, root_centre, &
-                        snap(real(problem%cdfmm_root(4), c_double) / unit))
+                        snap(real(problem%cdfmm_root(4), c_double) / unit), split_rule)
                 else
                     call cdfmm_create_adaptive_variable_cuboids( &
                         dip_fmm_plan, xs, ys, zs, hx, hy, hz, problem%cdfmm_capacity, &
-                        problem%cdfmm_max_depth, options, cdfmm_ierr)
+                        problem%cdfmm_max_depth, options, cdfmm_ierr, split_rule=split_rule)
                 end if
             else
                 call cdfmm_create_variable_cuboids( &

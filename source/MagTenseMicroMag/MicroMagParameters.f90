@@ -258,7 +258,7 @@ include "mkl_dfti.f90"
         ! tiles on the grid of the root's leaves, or a tile can protrude from its leaf
         ! (dip-fmm then prints a containment warning); the Python layer chooses such an
         ! aligned root by default (MicromagProblem.cdfmm_align).
-        integer :: cdfmm_tree = 0          !> 0 uniform tree, 1 adaptive tree
+        integer :: cdfmm_tree = 0          !> 0 uniform tree, 1 adaptive tree, 2 adaptive tree with the target split rule
         integer :: cdfmm_capacity = 32     !> adaptive: maximum tiles per leaf before a split
         integer :: cdfmm_max_depth = 5     !> adaptive: deepest level (0..8)
         real(DP), dimension(4) :: cdfmm_root = [0.0_DP, 0.0_DP, 0.0_DP, -1.0_DP]
