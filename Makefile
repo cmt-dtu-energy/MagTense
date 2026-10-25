@@ -658,7 +658,15 @@ endif
 # Rule that installs Miniconda only if no conda was found - see the detection
 # of CONDA_DIR/CONDA_BIN at the top of this file. The marker file records that
 # the installation is ours, which is what allows rm-conda to remove it.
+# On Windows this is a no-op: install/windows/install-magtense.ps1 installs its
+# own Miniforge, and the Windows checklist's Phase 1 creates magtense-env
+# directly with "conda env create -f ...yml" rather than through this target -
+# the POSIX recipe below (curl | bash, Linux-only installer URL) can't run
+# under PowerShell and was never meant to on this platform.
 install-miniconda:
+ifeq ($(OS),Windows_NT)
+	@echo "Windows: conda install is handled by install/windows/install-magtense.ps1 (or already done manually); skipping."
+else
 	@if [ -x "$(CONDA_BIN)" ]; then \
 			echo "Conda already installed at $(CONDA_DIR) (using $(CONDA_BIN))."; \
 	else \
@@ -668,6 +676,7 @@ install-miniconda:
 			touch $(CONDA_MARKER); \
 			echo "Miniconda installed at $(CONDA_DIR)."; \
 	fi
+endif
 
 # Anaconda's default channels (repo.anaconda.com/pkgs/main and /pkgs/r) require
 # their Terms of Service to be accepted before conda will solve against them.
@@ -694,6 +703,9 @@ define accept-conda-tos-now
 endef
 
 accept-conda-tos: install-miniconda
+ifeq ($(OS),Windows_NT)
+	@echo "Windows: the Anaconda Terms of Service gate below is POSIX-only and does not apply to the conda-forge/Intel channels the Windows envs use; skipping."
+else
 	@if [ -f "$(CONDA_TOS_MARKER)" ]; then \
 		:; \
 	elif ! $(CONDA_BIN) tos --help >/dev/null 2>&1; then \
@@ -733,6 +745,7 @@ accept-conda-tos: install-miniconda
 		done; \
 		exit 1; \
 	fi
+endif
 
 # Removes only an installation this Makefile created. CONDA_DIR is detected and
 # can therefore point at a system-wide or shared conda, which must never be
