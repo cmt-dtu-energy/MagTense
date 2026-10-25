@@ -195,6 +195,7 @@ include "mkl_dfti.f90"
         integer :: useReturnHall                                !> Defines whether to return all the specific H-fields (exchange, demag) �(true) or not (false)
         integer :: useAvgN                                      !> Defines wether to use volume avergared demag tensor for the prism (True) or not (False)
         integer :: passExch                                     !> Defines whether the exchange matrix is passed from Matlab/Python (true) or calculated localled (false).
+        logical :: useExchange = .true.                         !> Not an input: set to false when the exchange operator is identically zero (A0 = 0 in every tile, or a uniform grid of one cell in total, i.e. a macrospin), so that the exchange field is not evaluated
         integer :: demag_approximation                          !> Flag for how to approximate the demagnetization tensor as specified in the parameters below
         integer :: demagTensorReturnState                       !> Flag describing how or if the demag tensor should be returned
         integer :: demagTensorLoadState                         !> Flag describing how or if to load the demag tensor (from disk e.g.)
