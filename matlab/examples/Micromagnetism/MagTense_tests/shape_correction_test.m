@@ -247,13 +247,7 @@ problem.ReturnHall = int32(1);
 problem.gamma = 0;
 problem.alpha = eta;
 problem.Ms = Ms*ones(ntot,1);
-% This check only verifies the geometry of the demagnetisation field (K0 = 0 below too, so
-% there is no anisotropy either): exchange contributes nothing to what is being tested, but on
-% the refined half-size end cells it made the dynamics genuinely stiff - RKSuite (an explicit
-% solver) failed outright on Windows ifx, converging only by a hair's breadth elsewhere. A0 = 0
-% removes that stiffness entirely; this is the same "no exchange" case the Aexch=0 guard in
-% LandauLifshitzEquationSolver.f90 now handles. See the matching fix in shape_correction_test.py.
-problem.A0 = zeros(ntot,1);
+problem.A0 = Aex*ones(ntot,1);
 problem.K0 = zeros(ntot,1);
 problem.m0 = repmat(m0_v, ntot, 1);
 problem.macroShape = grid_L;

@@ -166,13 +166,7 @@ def run_mesh_check() -> float:
         grid_pts=pts,
         grid_abc=abc,
         grid_L=list(mesh_grid_L),
-        # This check only verifies the geometry of the demagnetisation field (K0 = 0 below too,
-        # so there is no anisotropy either): exchange contributes nothing to what is being
-        # tested, but on the refined half-size end cells it made the dynamics genuinely stiff -
-        # RKSuite (an explicit solver) failed outright on Windows ifx, converging only by a
-        # hair's breadth elsewhere. A0 = 0 removes that stiffness entirely; this is the same
-        # "no exchange" case the Aexch=0 guard in LandauLifshitzEquationSolver.f90 now handles.
-        A0=0,
+        A0=Aex * np.ones((ntot, 1)),
         Ms=Ms * np.ones((ntot, 1)),
         K0=0,
         alpha=eta,
