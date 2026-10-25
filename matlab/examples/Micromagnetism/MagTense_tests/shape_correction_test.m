@@ -253,10 +253,15 @@ problem.m0 = repmat(m0_v, ntot, 1);
 problem.macroShape = grid_L;
 problem.sampleShape = sampleShape;
 
-% Only the field of the initial state is needed
+% Only the field of the initial state is needed. The end time just has to stay far below any
+% real dynamical timescale - 1e-15 s left RKSuite's adaptive stepping only a few multiples of
+% double-precision epsilon (~2.2e-16) to work with, which an ifx build on Windows failed to
+% resolve (STEP_INTEGRATE hard failure) even though the same mesh/exchange settings integrate
+% fine elsewhere (see the matching fix in shape_correction_test.py). 1e-13 s keeps the same
+% "effectively t=0" intent with three more orders of magnitude of floating-point headroom.
 HextFct = @(t) (t>=0)' * [0, 0, 0];
-problem = problem.setHext( HextFct, linspace(0, 1e-15, 2) );
-problem = problem.setTime( linspace(0, 1e-15, 2) );
+problem = problem.setHext( HextFct, linspace(0, 1e-13, 2) );
+problem = problem.setTime( linspace(0, 1e-13, 2) );
 
 solution = struct();
 prob_struct = struct(problem);

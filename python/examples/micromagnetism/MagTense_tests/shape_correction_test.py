@@ -184,9 +184,14 @@ def run_mesh_check() -> float:
         exch_presize=64,
     )
     problem.use_fmm = 0
-    # Only the field of the initial state is needed
+    # Only the field of the initial state is needed. t_end just has to stay far below any real
+    # dynamical timescale (t_step above is 5e-11 s) - 1e-15 s left RKSuite's adaptive stepping
+    # only a few multiples of double-precision epsilon (~2.2e-16) to work with, which an ifx
+    # build on Windows failed to resolve (STEP_INTEGRATE hard failure) even though the same
+    # mesh/exchange settings integrate fine elsewhere. 1e-13 s keeps the same "effectively t=0"
+    # intent with three more orders of magnitude of floating-point headroom.
     result = problem.run_simulation(
-        t_end=1e-15, nt=2, fct_h_ext=fct_h_ext, nt_h_ext=2,
+        t_end=1e-13, nt=2, fct_h_ext=fct_h_ext, nt_h_ext=2,
     )
     H_dem = np.asarray(result[5][0, :, 0, :])
     H_sample = -Ms * sample_demag_tensor() @ m0_v
