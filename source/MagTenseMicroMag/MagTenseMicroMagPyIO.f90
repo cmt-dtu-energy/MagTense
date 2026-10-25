@@ -159,6 +159,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 
     problem%ProblemMode = ProblemMode
     problem%solver = solver
+    allocate( problem%A0(ntot) )
     problem%A0 = A0
     allocate( problem%Ms(ntot) )
     problem%Ms = Ms
@@ -171,6 +172,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     
     !Applied field as a function of time evaluated at the timesteps specified in nt_Hext
     !problem%Hext(:,1) is the time grid while problem%Hext(:,2:4) are the x-,y- and z-components of the applied field
+    allocate( problem%Hext(nt_Hext,4) )
     problem%Hext = Hext
     allocate( problem%t(nt) )
     problem%t = t
@@ -222,6 +224,7 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
     
     !alpha as a function of time evaluated at the timesteps
     !problem%alpha(:,1) is the time grid while problem%alpha(:,2) are the alpha values
+    allocate( problem%alpha(nt_alpha,2) )
     problem%alpha = alphat
     
     problem%tol = tol
@@ -293,9 +296,13 @@ subroutine loadMicroMagProblem( ntot, grid_n, grid_L, grid_type, u_ea, ProblemMo
 	!                             [v1_x v2_x v3_x]
 	!problem%CrystalAxis(i,:,:) = [v1_y v2_y v3_y]
 	!                             [v1_z v2_z v3_z]
+	allocate( problem%CrystalAxis(ntot,3,3) )
 	problem%CrystalAxis =  crysaxis
+    allocate( problem%K0_arr(ntot,6,3) )
     problem%K0_arr = k0_arr
-    problem%K1 = k1	
+    allocate( problem%K1(ntot) )
+    problem%K1 = k1
+    allocate( problem%K2(ntot) )
     problem%K2 = k2
 
     !----------------- Interface exchange between two materials -----------------------
