@@ -166,7 +166,13 @@ def run_mesh_check() -> float:
         grid_pts=pts,
         grid_abc=abc,
         grid_L=list(mesh_grid_L),
-        A0=Aex * np.ones((ntot, 1)),
+        # This check only verifies the geometry of the demagnetisation field (K0 = 0 below too,
+        # so there is no anisotropy either): exchange contributes nothing to what is being
+        # tested, but on the refined half-size end cells it made the dynamics genuinely stiff -
+        # RKSuite (an explicit solver) failed outright on Windows ifx, converging only by a
+        # hair's breadth elsewhere. A0 = 0 removes that stiffness entirely; this is the same
+        # "no exchange" case the Aexch=0 guard in LandauLifshitzEquationSolver.f90 now handles.
+        A0=0,
         Ms=Ms * np.ones((ntot, 1)),
         K0=0,
         alpha=eta,
@@ -184,14 +190,9 @@ def run_mesh_check() -> float:
         exch_presize=64,
     )
     problem.use_fmm = 0
-    # Only the field of the initial state is needed. t_end just has to stay far below any real
-    # dynamical timescale (t_step above is 5e-11 s) - 1e-15 s left RKSuite's adaptive stepping
-    # only a few multiples of double-precision epsilon (~2.2e-16) to work with, which an ifx
-    # build on Windows failed to resolve (STEP_INTEGRATE hard failure) even though the same
-    # mesh/exchange settings integrate fine elsewhere. 1e-13 s keeps the same "effectively t=0"
-    # intent with three more orders of magnitude of floating-point headroom.
+    # Only the field of the initial state is needed
     result = problem.run_simulation(
-        t_end=1e-13, nt=2, fct_h_ext=fct_h_ext, nt_h_ext=2,
+        t_end=1e-15, nt=2, fct_h_ext=fct_h_ext, nt_h_ext=2,
     )
     H_dem = np.asarray(result[5][0, :, 0, :])
     H_sample = -Ms * sample_demag_tensor() @ m0_v

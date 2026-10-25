@@ -247,21 +247,22 @@ problem.ReturnHall = int32(1);
 problem.gamma = 0;
 problem.alpha = eta;
 problem.Ms = Ms*ones(ntot,1);
-problem.A0 = Aex*ones(ntot,1);
+% This check only verifies the geometry of the demagnetisation field (K0 = 0 below too, so
+% there is no anisotropy either): exchange contributes nothing to what is being tested, but on
+% the refined half-size end cells it made the dynamics genuinely stiff - RKSuite (an explicit
+% solver) failed outright on Windows ifx, converging only by a hair's breadth elsewhere. A0 = 0
+% removes that stiffness entirely; this is the same "no exchange" case the Aexch=0 guard in
+% LandauLifshitzEquationSolver.f90 now handles. See the matching fix in shape_correction_test.py.
+problem.A0 = zeros(ntot,1);
 problem.K0 = zeros(ntot,1);
 problem.m0 = repmat(m0_v, ntot, 1);
 problem.macroShape = grid_L;
 problem.sampleShape = sampleShape;
 
-% Only the field of the initial state is needed. The end time just has to stay far below any
-% real dynamical timescale - 1e-15 s left RKSuite's adaptive stepping only a few multiples of
-% double-precision epsilon (~2.2e-16) to work with, which an ifx build on Windows failed to
-% resolve (STEP_INTEGRATE hard failure) even though the same mesh/exchange settings integrate
-% fine elsewhere (see the matching fix in shape_correction_test.py). 1e-13 s keeps the same
-% "effectively t=0" intent with three more orders of magnitude of floating-point headroom.
+% Only the field of the initial state is needed
 HextFct = @(t) (t>=0)' * [0, 0, 0];
-problem = problem.setHext( HextFct, linspace(0, 1e-13, 2) );
-problem = problem.setTime( linspace(0, 1e-13, 2) );
+problem = problem.setHext( HextFct, linspace(0, 1e-15, 2) );
+problem = problem.setTime( linspace(0, 1e-15, 2) );
 
 solution = struct();
 prob_struct = struct(problem);
