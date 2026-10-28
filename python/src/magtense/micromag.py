@@ -178,6 +178,13 @@ class MicromagProblem:
             extrapolation of the two previous equilibria instead of from the previous one, and
             takes its first step with the step length the previous field ended with. Costs
             nothing; the extrapolation is skipped automatically across a switching event.
+        min_stall_window: Stall exit of the minimizer (0, default: off). A descent whose best
+            torque has not fallen by 10 % in this many iterations is stuck: its best state is
+            accepted if its torque is within min_stall_mult * min_tol (min_status 4), and it goes
+            to the fallback at once otherwise, instead of running on to min_maxiter.
+        min_stall_mult: Band of the stall exit, as a multiple of min_tol (default 2).
+        min_stall_dH_factor: Adaptive hysteresis: after a field accepted while stuck (min_status
+            4), the next field step is at most this factor times the one just taken (default 0.5).
 
     After a run the following diagnostics are available as attributes:
         E_out: (nt, nt_h_ext, 4) energies [J] in the order exchange, external, demagnetization,
@@ -273,6 +280,9 @@ class MicromagProblem:
             min_fallback: bool = True,
             min_saddle_check: bool | int = 2,
             min_predictor: bool = True,
+            min_stall_window: int = 0,
+            min_stall_mult: float = 2.0,
+            min_stall_dH_factor: float = 0.5,
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -422,6 +432,15 @@ class MicromagProblem:
         if self.min_saddle_check not in (0, 1, 2):
             raise ValueError("min_saddle_check must be 0 (off), 1 (nudge) or 2 (Hessian eigenvalue)")
         self.min_predictor = int(bool(min_predictor))
+        self.min_stall_window = int(min_stall_window)
+        if self.min_stall_window < 0:
+            raise ValueError("min_stall_window must be >= 0 (0: stall exit off)")
+        self.min_stall_mult = float(min_stall_mult)
+        if self.min_stall_mult < 1.0:
+            raise ValueError("min_stall_mult must be >= 1 (a multiple of min_tol)")
+        self.min_stall_dH_factor = float(min_stall_dH_factor)
+        if not 0.0 < self.min_stall_dH_factor <= 1.0:
+            raise ValueError("min_stall_dH_factor must be in (0, 1]")
 
         # Energies and relaxation diagnostics of the last run, see the class docstring
         self.E_out = None
@@ -1255,6 +1274,9 @@ class MicromagProblem:
             min_fallback=self.min_fallback,
             min_saddle_check=self.min_saddle_check,
             min_predictor=self.min_predictor,
+            min_stall_window=self.min_stall_window,
+            min_stall_mult=self.min_stall_mult,
+            min_stall_dh_factor=self.min_stall_dH_factor,
             dummy_run=self.dummy_run,
             usecdfmm=self.use_cdfmm,
             cdfmm_order=self.cdfmm_order,
@@ -1421,6 +1443,9 @@ class MicromagProblem:
             min_fallback=self.min_fallback,
             min_saddle_check=self.min_saddle_check,
             min_predictor=self.min_predictor,
+            min_stall_window=self.min_stall_window,
+            min_stall_mult=self.min_stall_mult,
+            min_stall_dh_factor=self.min_stall_dH_factor,
             dummy_run=self.dummy_run,
             usecdfmm=self.use_cdfmm,
             cdfmm_order=self.cdfmm_order,
@@ -1637,6 +1662,9 @@ class MicromagProblem:
             min_fallback=self.min_fallback,
             min_saddle_check=self.min_saddle_check,
             min_predictor=self.min_predictor,
+            min_stall_window=self.min_stall_window,
+            min_stall_mult=self.min_stall_mult,
+            min_stall_dh_factor=self.min_stall_dH_factor,
             dummy_run=self.dummy_run,
             usecdfmm=self.use_cdfmm,
             cdfmm_order=self.cdfmm_order,

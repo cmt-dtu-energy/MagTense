@@ -29,6 +29,12 @@
 !> has moved further than abort_dM, instead of being run to convergence or through the fallback only
 !> to be rejected afterwards.
 !>
+!> With stall_window set, a descent whose best torque has not fallen by stall_gain over stall_window
+!> iterations is stuck: within stall_mult * tol its best state is accepted (status 4, so the caller can
+!> shorten its next field step), above that band it goes to the fallback at once instead of running on
+!> to the iteration cap. Near a switching field, or on meshes with very stiff small cells, the torque
+!> can stagnate just above tol for tens of thousands of iterations.
+!>
 !> A vanishing torque is also what a saddle point looks like, and a symmetric starting state sits on
 !> one. When saddle_check is set, a converged state is therefore nudged by a small random rotation of
 !> every vector and relaxed again; a minimum takes the nudge back and is returned unperturbed, a
@@ -72,6 +78,8 @@ module EnergyMinimizer
         integer :: eig_maxiter = 60   !> saddle_check 2: cap on the Lanczos steps per check (one field evaluation each)
         real,dimension(:),allocatable :: weights !> saddle_check 2: weight of every vector in the energy, Ms_i V_i; uniform when not allocated
         real,dimension(:),allocatable :: eig_start !> saddle_check 2: Lanczos start vector (3n), e.g. the eigenvector of a similar state; random when not allocated
+        integer :: stall_window = 0   !> Stall exit: iterations without a stall_gain improvement of the best torque after which a descent is stuck (0: off)
+        real :: stall_mult = 2.0      !> Stall exit: a stuck descent whose best torque is within stall_mult * tol is accepted (status 4)
         real :: abort_dM = 0.0        !> Short-circuit: abandon the relaxation once |<m> - abort_ref| exceeds this (0: off)
         real,dimension(3) :: abort_ref = 0.0 !> Short-circuit: the reference mean, e.g. that of the last accepted state
         real,dimension(:),allocatable :: abort_w !> Short-circuit: weight of every vector in the mean (n, summing to 1); uniform when not allocated
@@ -81,7 +89,7 @@ module EnergyMinimizer
     type MinimizerResult
         integer :: n_iter = 0         !> Iterations over all rounds
         real :: torque = 0.0          !> Final max_i |m_i x H_i| / H_scale
-        integer :: status = 2         !> 0 converged, 1 converged after an ODE fallback, 2 not converged, 3 abandoned by the short-circuit (abort_dM)
+        integer :: status = 2         !> 0 converged, 1 converged after an ODE fallback, 2 not converged, 3 abandoned by the short-circuit (abort_dM), 4 accepted while stuck within stall_mult * tol
         real :: tau_last = 0.0        !> Step length of the last iteration, a curvature estimate the next call can start from (tau_init)
         real :: eig_min = 0.0         !> saddle_check 2: lowest Hessian eigenvalue of the returned state, relative to H_scale
         integer :: n_eig = 0          !> saddle_check 2: Lanczos steps spent over all checks
@@ -106,6 +114,7 @@ module EnergyMinimizer
     integer,parameter,private :: eig_minit_moved = 10 !> The same after a push off a saddle, when the start vector is mostly random
     integer,parameter,private :: abort_every = 10    !> Short-circuit: the mean is checked every this many iterations ...
     integer,parameter,private :: abort_minit = 20    !> ... from this iteration on (the first steps of a descent are the largest)
+    real,parameter,private :: stall_gain = 0.9       !> Stall exit: progress means the best torque fell below this fraction of its value at the last progress
 
     contains
 
@@ -139,20 +148,23 @@ module EnergyMinimizer
     real,intent(in) :: tol, thres_value, conv_tol
     integer,intent(in) :: useCVODE, callback_display
 
-    real,dimension(:),allocatable :: H, m_prev, g, g_prev, tq, tq_prev, m_best, u, w
+    real,dimension(:),allocatable :: H, m_prev, g, g_prev, tq, tq_prev, m_best, u, w, m_stall
     real,dimension(:),allocatable :: t_out_fb
     real,dimension(:,:),allocatable :: y_fb
     real,dimension(n_hist) :: E_hist
     real,dimension(4) :: E4
     real :: E, E_best, tq_max, tq_rel, tq_best, tau, E_stop, lambda, umax
+    real :: tq_stall, E_stall, tq_progress   !> stall exit: best torque of the descent, its energy, and the best at the last progress
     integer :: n_eig
     logical :: eig_ok
-    integer :: k, i_round, i_sc, n_iter_total, status, nt, n_display, k_cap
-    logical :: converged, stalled, aborted
+    integer :: k, i_round, i_sc, n_iter_total, status, nt, n_display, k_cap, k_progress
+    logical :: converged, stalled, aborted, stall_accepted, stall_best
     real :: dM_moved
     character*(256) :: prog_str
 
     allocate( H(3*n), m_prev(3*n), g(3*n), g_prev(3*n), tq(3*n), tq_prev(3*n), m_best(3*n) )
+    if ( settings%stall_window .gt. 0 ) allocate( m_stall(3*n) )
+    stall_accepted = .false.
     n_display = max( 1, settings%display_every )
 
     m = m0
@@ -186,6 +198,7 @@ module EnergyMinimizer
                 m_best = m
                 E_best = E
                 tq_best = tq_rel
+                stall_best = stall_accepted
                 call perturb( m, n, settings%saddle_pert )
                 k_cap = n_saddle_iter
                 E_stop = E_best - E_rise_rel * settings%E_scale
@@ -208,6 +221,7 @@ module EnergyMinimizer
                     m = m_best
                     E = E_best
                     tq_rel = tq_best
+                    stall_accepted = stall_best
                     converged = .true.
                     exit
                 endif
@@ -274,7 +288,9 @@ module EnergyMinimizer
         if ( aborted ) exit
 
         if ( converged ) then
-            if ( i_round .eq. 1 ) then
+            if ( stall_accepted ) then
+                status = 4
+            else if ( i_round .eq. 1 ) then
                 status = 0
             else
                 status = 1
@@ -318,6 +334,7 @@ module EnergyMinimizer
     result%tau_last = tau
 
     deallocate( H, m_prev, g, g_prev, tq, tq_prev, m_best )
+    if ( allocated(m_stall) ) deallocate( m_stall )
 
     contains
 
@@ -331,6 +348,14 @@ module EnergyMinimizer
         tq_rel = tq_max / settings%H_scale
         converged = tq_rel .lt. settings%tol
         stalled = .false.
+        stall_accepted = .false.
+        if ( settings%stall_window .gt. 0 ) then
+            tq_stall = tq_rel
+            tq_progress = tq_rel
+            E_stall = E
+            m_stall = m
+            k_progress = 0
+        endif
         !The first step: rot_init on the most-torqued vector, unless the caller hands over the step
         !length of a previous, similar minimization - a start close to the minimum (the secant
         !predictor) has a torque far smaller than the curvature, and a fixed rotation overshoots it
@@ -383,6 +408,39 @@ module EnergyMinimizer
             endif
             if ( k .ge. abort_minit .and. mod(k, abort_every) .eq. 0 ) then
                 if ( abortCheck() ) exit
+            endif
+
+            !Stall exit: keep the best state of the descent; when its torque has not fallen by
+            !stall_gain for stall_window iterations the descent is stuck - accept the best state if
+            !it is within stall_mult * tol, otherwise leave for the fallback now rather than at the cap
+            if ( settings%stall_window .gt. 0 ) then
+                if ( tq_rel .lt. tq_stall ) then
+                    tq_stall = tq_rel
+                    E_stall = E
+                    m_stall = m
+                endif
+                if ( tq_stall .lt. stall_gain * tq_progress ) then
+                    tq_progress = tq_stall
+                    k_progress = k
+                endif
+                if ( k - k_progress .ge. settings%stall_window ) then
+                    if ( tq_stall .le. settings%stall_mult * settings%tol ) then
+                        write(prog_str,'(A,I7,A,ES9.2,A,F5.2,A)') 'Minimizer stuck after iter ', k, &
+                            '; best state accepted, torque ', tq_stall, ' (', tq_stall / settings%tol, ' tol)'
+                        call callback( trim(prog_str), -1 )
+                        m = m_stall
+                        E = E_stall
+                        tq_rel = tq_stall
+                        converged = .true.
+                        stall_accepted = .true.
+                    else
+                        write(prog_str,'(A,I7,A,ES9.2,A,F7.2,A)') 'Minimizer stuck after iter ', k, &
+                            ', best torque ', tq_stall, ' (', tq_stall / settings%tol, ' tol): falling back early'
+                        call callback( trim(prog_str), -1 )
+                        stalled = .true.
+                    endif
+                    exit
+                endif
             endif
 
             !Barzilai-Borwein step for the next iteration, alternating between the two rules

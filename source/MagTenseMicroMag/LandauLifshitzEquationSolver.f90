@@ -590,6 +590,8 @@
     !>     on the current branch, is extrapolated as lambda^2 linear in the field (the saddle-node law)
     !>     and the step is capped at 0.9 of the predicted distance; for the time integration a 3x jump
     !>     of the field evaluations of a relaxation halves the next step;
+    !>   - a field the minimizer accepted while stuck within min_stall_mult * min_tol (min_status 4)
+    !>     counts as converged, and the next step is capped at min_stall_dH_factor times the last one;
     !>   - a time integration that ran out of its window (min_status -2) is accepted and flagged, not
     !>     retried: the slow relaxation is a property of the field, not of the step, and a retry costs
     !>     another full window (tested: it doubled the cost and left more fields unconverged).
@@ -607,7 +609,7 @@
     real(DP),dimension(:),allocatable :: m_before, m_accepted, m_trial
     logical :: reject_step, reached_end, sign_change, switch_reject, nonconv_reject, trial_converged, switched, short_circuit
     real(DP) :: bracket_dH, dH_pre_switch, factor, lam_prev, lam_acc, lam_max, s_prev, s_acc, slope, d_sw, nfev_prev
-    integer :: n_rej_dM, n_rej_sign, n_rej_conv, n_floor_accept, n_unconverged_acc, n_rej_abort
+    integer :: n_rej_dM, n_rej_sign, n_rej_conv, n_floor_accept, n_unconverged_acc, n_rej_abort, n_stall_acc
     real(DP), parameter :: ctrl_safety = 0.9_DP       !>Aim slightly below dM_target
     real(DP), parameter :: ctrl_exponent = 1.0_DP     !>dM is about linear in dH between switching events
     real(DP), parameter :: ind_fraction = 0.9_DP      !>Fraction of the predicted distance to the instability the step may take
@@ -688,6 +690,7 @@
       n_rej_conv = 0
       n_floor_accept = 0
       n_unconverged_acc = 0
+      n_stall_acc = 0
 
       do while (.not. reached_end .and. i_acc < gb_problem%maxHextSteps + 1)
           remaining_distance = dot_product(gb_problem%H_end - H_current, H_dir)
@@ -908,15 +911,25 @@
                   lam_max = -1.0_DP
               endif
           endif
+          !A field accepted while the minimizer was stuck (status 4) is a hint that the next step is
+          !too long for it: cap the next step at min_stall_dH_factor times the one just taken
+          if (gb_problem%solver .eq. MicroMagSolverMinimizer .and. gb_solution%min_status(i_acc) == 4) then
+              n_stall_acc = n_stall_acc + 1
+              if (gb_problem%min_stall_dH_factor * dH_step < dH) then
+                  dH = max(gb_problem%min_stall_dH_factor * dH_step, gb_problem%dH_min)
+                  write(prog_str,'(A,F10.6,A)') '   Minimizer was stuck at this field; next dH capped to ', mu0*dH, ' T'
+                  call displayGUIMessage( trim(prog_str) )
+              endif
+          endif
           s_prev = s_acc
       enddo
 
       gb_problem%nHextAccepted = i_acc
       gb_abort_dM = 0.0_DP
-      write(prog_str,'(A,I5,A,I4,A,I4,A,I4,A,I4,A,I4,A,I4)') 'Adaptive hysteresis summary: accepted ', i_acc, &
+      write(prog_str,'(A,I5,A,I4,A,I4,A,I4,A,I4,A,I4,A,I4,A,I4)') 'Adaptive hysteresis summary: accepted ', i_acc, &
           ', rejected (dM) ', n_rej_dM, ', rejected (short-circuit) ', n_rej_abort, ', rejected (sign change) ', n_rej_sign, &
           ', rejected (not converged) ', n_rej_conv, ', switches accepted at dH_min ', n_floor_accept, &
-          ', accepted without convergence ', n_unconverged_acc
+          ', accepted without convergence ', n_unconverged_acc, ', accepted while stuck ', n_stall_acc
       call displayGUIMessage( trim(prog_str) )
       if (.not. reached_end) then
           call displayGUIMessage('Adaptive hysteresis reached maxHextSteps before H_end')
@@ -948,14 +961,14 @@
         if ( allocated(pred_u) ) deallocate( pred_u )
     end subroutine predictorReset
 
-    !> Records the converged equilibrium m at the applied field H (status 0 or 1); anything else
-    !> empties the history.
+    !> Records the converged equilibrium m at the applied field H (status 0, 1 or 4, the last
+    !> accepted within the stall band); anything else empties the history.
     subroutine predictorRecord( H, m, status, ntot )
     real(DP),dimension(3),intent(in) :: H
     real(DP),dimension(:),intent(in) :: m
     integer,intent(in) :: status, ntot
         if ( gb_problem%min_predictor .eq. 0 .or. gb_problem%solver .ne. MicroMagSolverMinimizer ) return
-        if ( status .lt. 0 .or. status .gt. 1 ) then
+        if ( status .lt. 0 .or. ( status .gt. 1 .and. status .ne. 4 ) ) then
             pred_n = 0
             return
         endif
@@ -1345,6 +1358,8 @@
     settings%maxrot = gb_problem%min_maxrot
     settings%fallback = gb_problem%min_fallback
     settings%saddle_check = gb_problem%min_saddle_check
+    settings%stall_window = gb_problem%min_stall_window
+    settings%stall_mult = gb_problem%min_stall_mult
     !The eigenvalue check needs the weight of every cell in the energy, Ms_i V_i, to make the
     !Hessian self-adjoint in its inner product
     if ( gb_problem%min_saddle_check .eq. 2 ) then
@@ -1382,16 +1397,17 @@
     gb_solution%min_torque(i_field) = result%torque
     gb_solution%min_status(i_field) = result%status
     !An abandoned trial (status 3) is retried closer to the accepted state, whose warm start (the
-    !eigenvector and step length of the last accepted field) is kept for it
+    !eigenvector and step length of the last accepted field) is kept for it. A state accepted while
+    !stuck within the stall band (status 4) is a usable equilibrium and warm-starts the next field.
     if ( gb_problem%min_saddle_check .eq. 2 ) then
         gb_solution%min_eig(i_field) = result%eig_min
-        if ( result%status .le. 1 .and. allocated(result%eig_vec) ) then
+        if ( ( result%status .le. 1 .or. result%status .eq. 4 ) .and. allocated(result%eig_vec) ) then
             pred_u = result%eig_vec
         else if ( result%status .ne. 3 .and. allocated(pred_u) ) then
             deallocate( pred_u )
         endif
     endif
-    if ( result%status .le. 1 ) then
+    if ( result%status .le. 1 .or. result%status .eq. 4 ) then
         pred_tau = result%tau_last
     else if ( result%status .ne. 3 ) then
         pred_tau = 0.0_DP
