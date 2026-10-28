@@ -179,9 +179,9 @@ class MicromagProblem:
             takes its first step with the step length the previous field ended with. Costs
             nothing; the extrapolation is skipped automatically across a switching event.
         min_stall_window: Stall exit of the minimizer (0, default: off). A descent whose best
-            torque has not fallen by 10 % in this many iterations is stuck: its best state is
-            accepted if its torque is within min_stall_mult * min_tol (min_status 4), and it goes
-            to the fallback at once otherwise, instead of running on to min_maxiter.
+            torque is within min_stall_mult * min_tol but has not fallen by 10 % in this many
+            iterations is stuck there: its best state is accepted (min_status 4) instead of
+            running on to min_maxiter and the fallback. Above the band nothing changes.
         min_stall_mult: Band of the stall exit, as a multiple of min_tol (default 2).
         min_stall_dH_factor: Adaptive hysteresis: after a field accepted while stuck (min_status
             4), the next field step is at most this factor times the one just taken (default 0.5).

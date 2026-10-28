@@ -29,11 +29,11 @@
 !> has moved further than abort_dM, instead of being run to convergence or through the fallback only
 !> to be rejected afterwards.
 !>
-!> With stall_window set, a descent whose best torque has not fallen by stall_gain over stall_window
-!> iterations is stuck: within stall_mult * tol its best state is accepted (status 4, so the caller can
-!> shorten its next field step), above that band it goes to the fallback at once instead of running on
-!> to the iteration cap. Near a switching field, or on meshes with very stiff small cells, the torque
-!> can stagnate just above tol for tens of thousands of iterations.
+!> With stall_window set, a descent whose best torque is within stall_mult * tol but has not fallen by
+!> stall_gain over stall_window iterations is stuck there, and its best state is accepted (status 4, so
+!> the caller can shorten its next field step) instead of running on to the iteration cap and the
+!> fallback. Near a switching field, or on meshes with very stiff small cells, the torque can stagnate
+!> just above tol for tens of thousands of iterations. Above the band nothing changes.
 !>
 !> A vanishing torque is also what a saddle point looks like, and a symmetric starting state sits on
 !> one. When saddle_check is set, a converged state is therefore nudged by a small random rotation of
@@ -410,35 +410,30 @@ module EnergyMinimizer
                 if ( abortCheck() ) exit
             endif
 
-            !Stall exit: keep the best state of the descent; when its torque has not fallen by
-            !stall_gain for stall_window iterations the descent is stuck - accept the best state if
-            !it is within stall_mult * tol, otherwise leave for the fallback now rather than at the cap
+            !Stall exit: keep the best state of the descent. Only once that is within stall_mult * tol
+            !does the stall clock run (far from the tolerance the largest torque can plateau for
+            !thousands of iterations while the energy still falls, and the descent then converges
+            !normally); when the best torque has not fallen by stall_gain for stall_window iterations
+            !inside the band, the descent is stuck there and its best state is accepted.
             if ( settings%stall_window .gt. 0 ) then
                 if ( tq_rel .lt. tq_stall ) then
                     tq_stall = tq_rel
                     E_stall = E
                     m_stall = m
                 endif
-                if ( tq_stall .lt. stall_gain * tq_progress ) then
+                if ( tq_stall .gt. settings%stall_mult * settings%tol .or. tq_stall .lt. stall_gain * tq_progress ) then
                     tq_progress = tq_stall
                     k_progress = k
                 endif
                 if ( k - k_progress .ge. settings%stall_window ) then
-                    if ( tq_stall .le. settings%stall_mult * settings%tol ) then
-                        write(prog_str,'(A,I7,A,ES9.2,A,F5.2,A)') 'Minimizer stuck after iter ', k, &
-                            '; best state accepted, torque ', tq_stall, ' (', tq_stall / settings%tol, ' tol)'
-                        call callback( trim(prog_str), -1 )
-                        m = m_stall
-                        E = E_stall
-                        tq_rel = tq_stall
-                        converged = .true.
-                        stall_accepted = .true.
-                    else
-                        write(prog_str,'(A,I7,A,ES9.2,A,F7.2,A)') 'Minimizer stuck after iter ', k, &
-                            ', best torque ', tq_stall, ' (', tq_stall / settings%tol, ' tol): falling back early'
-                        call callback( trim(prog_str), -1 )
-                        stalled = .true.
-                    endif
+                    write(prog_str,'(A,I7,A,ES9.2,A,F5.2,A)') 'Minimizer stuck after iter ', k, &
+                        '; best state accepted, torque ', tq_stall, ' (', tq_stall / settings%tol, ' tol)'
+                    call callback( trim(prog_str), -1 )
+                    m = m_stall
+                    E = E_stall
+                    tq_rel = tq_stall
+                    converged = .true.
+                    stall_accepted = .true.
                     exit
                 endif
             endif
