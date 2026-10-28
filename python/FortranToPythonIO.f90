@@ -516,7 +516,7 @@ module FortranToPythonIO
         n_macro, shiftVec, macroShape, sampleShape, exchPBC, hysteresis_solver, &
         H_start, H_end, dH_initial, dH_min, dH_max, maxHextSteps, dM_min, dM_target, dM_reject, dM_abort, dH_grow, dH_shrink, switch_refine_dH, use_switch_refine, &
         min_tol, min_maxiter, min_maxrot, min_fallback, min_saddle_check, min_predictor, &
-        min_stall_window, min_stall_mult, min_stall_dH_factor, &
+        min_stall_window, min_stall_mult, min_stall_dH_factor, min_precond, &
         t_out, M_mm, pts, H_exc, H_ext, H_dem, H_ani, n_Hext_accepted, &
 		n_tot_Exch, ExchMat_r, ExchMat_c, ExchMat_v, ExchMat_nr, ExchMat_nc, dummy_run, &
         useCDFMM, cdfmm_order, cdfmm_depth, cdfmm_basis, cdfmm_precision, &
@@ -547,7 +547,7 @@ module FortranToPythonIO
         real(8),intent(in) :: min_tol, min_maxrot
         integer(4),intent(in) :: min_maxiter, min_fallback, min_saddle_check, min_predictor
         !> Stall exit of the minimizer and the field-step cap after a field accepted while stuck
-        integer(4),intent(in) :: min_stall_window
+        integer(4),intent(in) :: min_stall_window, min_precond
         real(8),intent(in) :: min_stall_mult, min_stall_dH_factor
         real(8),dimension(ntot,3),intent(in) :: grid_pts
         integer(4),dimension(4,ntot),intent(in) :: grid_ele
@@ -699,6 +699,7 @@ module FortranToPythonIO
         problem%min_stall_window = min_stall_window
         problem%min_stall_mult = min_stall_mult
         problem%min_stall_dH_factor = min_stall_dH_factor
+        problem%min_precond = min_precond
 
         call SolveLandauLifshitzEquation( problem, solution )
 

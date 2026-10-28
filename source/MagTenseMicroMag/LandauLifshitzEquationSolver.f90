@@ -66,10 +66,11 @@
     real(DP),dimension(3) :: gb_abort_ref = 0.0_DP
     logical :: gb_exch_gpu = .false.                            !>The exchange field is computed on the GPU (see initExchangeGpu)
     integer,parameter :: par_grain = 16384                      !>Cells per task of the taskloops over the cells (see computeHeff)
+    real(DP),dimension(:),allocatable :: gb_exch_diag           !>Diagonal of the exchange operator A_exch, read once for the minimizer's preconditioner
 
     private :: gb_solution,gb_problem,crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2,gb_cellVol,n_feval_count
     private :: pred_m1,pred_m2,pred_H1,pred_H2,pred_n,pred_tau,pred_u,pred_ratio_max,pred_dm_max
-    private :: gb_metric_w,gb_abort_dM,gb_abort_ref,gb_exch_gpu,par_grain
+    private :: gb_metric_w,gb_abort_dM,gb_abort_ref,gb_exch_gpu,par_grain,gb_exch_diag
 
     contains
     
@@ -1319,6 +1320,65 @@
     end subroutine minimizerEnergy
 
     !>-----------------------------------------
+    !> Diagonal preconditioner of the minimizer at the applied field with index i_field: pc_i =
+    !> min(d) / d_i with d_i a bound on the curvature of cell i in field units - its own exchange
+    !> coupling 2 Jfact_i |A_ii|, the anisotropy 2 |Kfact_i|, the applied field and the self
+    !> demagnetisation Ms_i. The scale of pc is immaterial (the step lengths absorb it); what matters
+    !> is that a stiff cell takes a proportionally smaller step than a soft one.
+    !>-----------------------------------------
+    subroutine minimizerPrecond( ntot, i_field, pc )
+    integer,intent(in) :: ntot, i_field
+    real(DP),dimension(:),allocatable,intent(inout) :: pc
+    real(DP),dimension(:),allocatable :: d
+    logical :: ok
+
+    if ( .not. allocated(gb_exch_diag) ) then
+        allocate( gb_exch_diag(ntot) )
+        call exchangeDiagonal( gb_problem%A_exch, gb_exch_diag, ok )
+        if ( .not. ok ) then
+            gb_exch_diag = 0.0_DP
+            call displayGUIMessage( 'Minimizer preconditioner: the exchange operator could not be read; anisotropy and field terms only' )
+        endif
+    endif
+    allocate( d(ntot) )
+    d = 2.0_DP * gb_problem%Jfact * abs( gb_exch_diag ) + 2.0_DP * abs( gb_problem%Kfact ) &
+        + sqrt( sum( gb_problem%Hext(i_field,2:4)**2 ) ) + gb_problem%Ms
+    pc = minval( d ) / d
+    deallocate( d )
+    end subroutine minimizerPrecond
+
+    !>-----------------------------------------
+    !> The diagonal of the sparse operator A (MKL handle), from its exported CSR, as in cudaExchangeInit.
+    !> ok is false when the export fails or A does not have size(d) rows.
+    !>-----------------------------------------
+    subroutine exchangeDiagonal( A, d, ok )
+    use, intrinsic :: iso_c_binding, only : c_ptr, c_f_pointer
+    type(sparse_matrix_t),intent(in) :: A
+    real(DP),dimension(:),intent(out) :: d
+    logical,intent(out) :: ok
+    integer :: stat, indexing, nrows, ncols, base, i, j
+    type(c_ptr) :: rs_c, re_c, ci_c, v_c
+    integer,pointer :: rs(:), re(:), ci(:)
+    real(DP),pointer :: v(:)
+
+    d = 0.0_DP
+    ok = .false.
+    stat = mkl_sparse_d_export_csr( A, indexing, nrows, ncols, rs_c, re_c, ci_c, v_c )
+    if ( stat .ne. SPARSE_STATUS_SUCCESS .or. nrows .ne. size(d) ) return
+    base = merge( 1, 0, indexing .eq. SPARSE_INDEX_BASE_ONE )
+    call c_f_pointer( rs_c, rs, [nrows] )
+    call c_f_pointer( re_c, re, [nrows] )
+    call c_f_pointer( ci_c, ci, [maxval(re) - base] )
+    call c_f_pointer( v_c, v, [maxval(re) - base] )
+    do i = 1, nrows
+        do j = rs(i) - base + 1, re(i) - base
+            if ( ci(j) - base + 1 .eq. i ) d(i) = d(i) + v(j)
+        enddo
+    enddo
+    ok = .true.
+    end subroutine exchangeDiagonal
+
+    !>-----------------------------------------
     !> @author Rasmus Bjoerk, rabj@dtu.dk, DTU, 2026
     !> @brief
     !> Relaxes the magnetization to an energy minimum at the applied field gb_problem%Hext(i_field,:),
@@ -1360,6 +1420,7 @@
     settings%saddle_check = gb_problem%min_saddle_check
     settings%stall_window = gb_problem%min_stall_window
     settings%stall_mult = gb_problem%min_stall_mult
+    if ( gb_problem%min_precond .ne. 0 ) call minimizerPrecond( ntot, i_field, settings%precond )
     !The eigenvalue check needs the weight of every cell in the energy, Ms_i V_i, to make the
     !Hessian self-adjoint in its inner product
     if ( gb_problem%min_saddle_check .eq. 2 ) then

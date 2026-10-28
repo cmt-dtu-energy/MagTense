@@ -185,6 +185,10 @@ class MicromagProblem:
         min_stall_mult: Band of the stall exit, as a multiple of min_tol (default 2).
         min_stall_dH_factor: Adaptive hysteresis: after a field accepted while stuck (min_status
             4), the next field step is at most this factor times the one just taken (default 0.5).
+        min_precond: If True, the minimizer's steps are preconditioned per cell (Jacobi): each cell
+            steps in proportion to the inverse of its own curvature (exchange diagonal, anisotropy,
+            applied field, Ms), so that a few stiff small cells no longer set the step of all
+            others. Default False (plain Barzilai-Borwein steps).
 
     After a run the following diagnostics are available as attributes:
         E_out: (nt, nt_h_ext, 4) energies [J] in the order exchange, external, demagnetization,
@@ -283,6 +287,7 @@ class MicromagProblem:
             min_stall_window: int = 0,
             min_stall_mult: float = 2.0,
             min_stall_dH_factor: float = 0.5,
+            min_precond: bool = False,
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -441,6 +446,7 @@ class MicromagProblem:
         self.min_stall_dH_factor = float(min_stall_dH_factor)
         if not 0.0 < self.min_stall_dH_factor <= 1.0:
             raise ValueError("min_stall_dH_factor must be in (0, 1]")
+        self.min_precond = int(bool(min_precond))
 
         # Energies and relaxation diagnostics of the last run, see the class docstring
         self.E_out = None
@@ -1277,6 +1283,7 @@ class MicromagProblem:
             min_stall_window=self.min_stall_window,
             min_stall_mult=self.min_stall_mult,
             min_stall_dh_factor=self.min_stall_dH_factor,
+            min_precond=self.min_precond,
             dummy_run=self.dummy_run,
             usecdfmm=self.use_cdfmm,
             cdfmm_order=self.cdfmm_order,
@@ -1446,6 +1453,7 @@ class MicromagProblem:
             min_stall_window=self.min_stall_window,
             min_stall_mult=self.min_stall_mult,
             min_stall_dh_factor=self.min_stall_dH_factor,
+            min_precond=self.min_precond,
             dummy_run=self.dummy_run,
             usecdfmm=self.use_cdfmm,
             cdfmm_order=self.cdfmm_order,
@@ -1665,6 +1673,7 @@ class MicromagProblem:
             min_stall_window=self.min_stall_window,
             min_stall_mult=self.min_stall_mult,
             min_stall_dh_factor=self.min_stall_dH_factor,
+            min_precond=self.min_precond,
             dummy_run=self.dummy_run,
             usecdfmm=self.use_cdfmm,
             cdfmm_order=self.cdfmm_order,
