@@ -1321,10 +1321,12 @@
 
     !>-----------------------------------------
     !> Diagonal preconditioner of the minimizer at the applied field with index i_field: pc_i =
-    !> min(d) / d_i with d_i a bound on the curvature of cell i in field units - its own exchange
-    !> coupling 2 Jfact_i |A_ii|, the anisotropy 2 |Kfact_i|, the applied field and the self
-    !> demagnetisation Ms_i. The scale of pc is immaterial (the step lengths absorb it); what matters
-    !> is that a stiff cell takes a proportionally smaller step than a soft one.
+    !> sqrt( min(d) / d_i ) with d_i a bound on the curvature of cell i in field units - its own
+    !> exchange coupling 2 Jfact_i |A_ii|, the anisotropy 2 |Kfact_i|, the applied field and the self
+    !> demagnetisation Ms_i. The scale of pc is immaterial (the step lengths absorb it). The square
+    !> root: the full Jacobi scaling min(d)/d stalls once the nonlocal demagnetisation field is
+    !> included (10k-tetrahedron grain mesh, dip-fmm: torque stuck at 3e-4 at +1 T), while its square
+    !> root converges with 8x fewer iterations than plain steps over +1..-4 T (tools/precond_bb_test.py).
     !>-----------------------------------------
     subroutine minimizerPrecond( ntot, i_field, pc )
     integer,intent(in) :: ntot, i_field
@@ -1343,7 +1345,7 @@
     allocate( d(ntot) )
     d = 2.0_DP * gb_problem%Jfact * abs( gb_exch_diag ) + 2.0_DP * abs( gb_problem%Kfact ) &
         + sqrt( sum( gb_problem%Hext(i_field,2:4)**2 ) ) + gb_problem%Ms
-    pc = minval( d ) / d
+    pc = sqrt( minval( d ) / d )
     deallocate( d )
     end subroutine minimizerPrecond
 

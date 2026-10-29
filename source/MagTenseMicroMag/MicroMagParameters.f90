@@ -173,7 +173,7 @@ include "mkl_dfti.f90"
         integer  :: min_fallback = 1                      !> 1: fall back to LL time integration if the minimizer stalls, 0: give up
         integer  :: min_saddle_check = 2                  !> 0: accept a converged state as it is, 1: nudge it and relax again, 2: lowest Hessian eigenvalue by Lanczos (rigorous, and reported in min_eig)
         integer  :: min_predictor = 1                     !> 1: start each applied field from the secant extrapolation of the two previous equilibria, 0: from the previous equilibrium
-        integer  :: min_precond = 0                       !> 1: diagonal (Jacobi) preconditioner of the minimizer's steps, each cell scaled by its own curvature (exchange diagonal, anisotropy, field, Ms); 0: plain steps
+        integer  :: min_precond = 0                       !> 1: diagonal preconditioner of the minimizer's steps, each cell scaled by the inverse square root of its own curvature (exchange diagonal, anisotropy, field, Ms); 0: plain steps
         integer  :: min_stall_window = 0                 !> Stall exit: a descent within min_stall_mult * min_tol whose best torque has not fallen by 10 % in this many iterations is stuck (0: off)
         real(DP) :: min_stall_mult = 2.0_DP               !> Stall exit: the band, as a multiple of min_tol, in which a stuck descent's best state is accepted (status 4)
         real(DP) :: min_stall_dH_factor = 0.5_DP          !> Adaptive loop: the field step after a field accepted while stuck (status 4) is at most this factor times the last one
