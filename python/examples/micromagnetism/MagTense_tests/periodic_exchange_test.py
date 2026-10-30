@@ -95,6 +95,13 @@ The plane wave test of method 2 does not carry over. Six tetrahedra share every 
 repeating unit of the lattice holds six elements and a plain plane wave is no longer an
 eigenvector: Bloch's theorem gives six bands rather than one.
 
+Two cells along a periodic direction
+------------------------------------
+With two cells along a periodic direction a tile has the same cell as its neighbour on both
+sides, which the uniform grid does not support. Such a problem has to be refused with an error
+stop, which takes the interpreter with it, so it is run in a subprocess, followed by a valid
+problem in this process.
+
 NOTE: the Fortran library has to be rebuilt for the unstructured part of this test to run.
 
 Running the file executes the test and saves three figures: one of the measures, one of the
@@ -113,6 +120,10 @@ Usage:
 # General modules
 import argparse
 import itertools
+import os
+import subprocess
+import sys
+import textwrap
 from pathlib import Path
 
 import numpy as np
@@ -1068,6 +1079,44 @@ def operator_analysis(res, a, pbc, grid_type, cuda=False):
     return A_pbc, A_free, results
 
 
+#%% Two cells along a periodic direction
+
+# The script run in a subprocess for the two cell check. MagTense has to stop on the problem
+# rather than build an exchange operator, and stopping takes the whole interpreter with it.
+TWO_CELL_SCRIPT = textwrap.dedent('''
+    import numpy as np
+    from magtense.micromag import MicromagProblem
+    a = {a}
+    problem = MicromagProblem(res=[2, 3, 3], grid_L=[2 * a, 3 * a, 3 * a], grid_type='uniform',
+                              m0=1 / np.sqrt(3), A0=1.3e-11, Ms=8e5, K0=0, gamma=0, alpha=4.42e3,
+                              exchPBC=np.array([1, 0, 0], dtype=np.int32), usedemag=0,
+                              cuda={cuda}, cvode=False, solver='dynamic')
+    problem.run_simulation(t_end=1e-12, nt=2, fct_h_ext=lambda t: np.zeros((len(t), 3)),
+                           nt_h_ext=2)
+    print('TWO CELLS NOT REFUSED')
+''')
+
+
+def two_cell_refusal(a, cuda=False):
+    """Check that two cells along a periodic direction are refused, and that MagTense still
+    works afterwards. Returns whether it was refused, the largest relative row sum of a valid
+    periodic operator assembled afterwards, and the output of the subprocess."""
+    env = dict(os.environ)
+    env['PYTHONPATH'] = os.pathsep.join(p for p in sys.path if p)
+    proc = subprocess.run([sys.executable, '-c', TWO_CELL_SCRIPT.format(a=a, cuda=cuda)],
+                          capture_output=True, text=True, env=env, timeout=600)
+    output = proc.stdout + proc.stderr
+    # The message of the guard in ComputeExchangeTerm3D_Uniform, so that the subprocess failing
+    # for any other reason is not taken for a refusal
+    refused = proc.returncode != 0 and 'too few cells along a periodic direction' in output \
+        and 'TWO CELLS NOT REFUSED' not in output
+
+    A_after = exchange_matrix([3, 3, 3], a, [1, 0, 0], 'uniform', cuda=cuda)
+    row_sum_after = np.abs(A_after.sum(axis=1)).max() / np.abs(A_after).max()
+
+    return refused, row_sum_after, output
+
+
 #%% The irregular mesh
 
 def grain_analysis(pbc, cuda=False, cvode=False):
@@ -1233,6 +1282,26 @@ def run_test(res=(6, 6, 6), a=a_operator, pbc=(1, 1, 1), cuda=False, cvode=False
             supercells[grid_type], check = supercell_check(pts, abc, grid_L, pbc, label,
                                                            cuda=cuda)
             checks.append(check)
+
+    print("\nTwo cells along a periodic direction on the uniform grid")
+    refused, row_sum_after, output = two_cell_refusal(a, cuda=cuda)
+    print(f"  2 x 3 x 3 cells, exchPBC = [1 0 0] : {'pass' if refused else 'FAIL'}")
+    if not refused:
+        print(output[-2000:])
+    print(f"  3 x 3 x 3 cells afterwards          : max |row sum| {row_sum_after:.3e} "
+          f"[{'pass' if row_sum_after < ROW_SUM_TOL else 'FAIL'}]")
+    checks.append({
+        'check': 'uniform grid: two cells along a periodic direction are refused',
+        'value': float(not refused),
+        'limit': 0.5,
+        'passed': refused,
+    })
+    checks.append({
+        'check': 'uniform grid: a solve after the refusal still works',
+        'value': row_sum_after,
+        'limit': ROW_SUM_TOL,
+        'passed': row_sum_after < ROW_SUM_TOL,
+    })
 
     # Grain mesh first, then tetrahedra: the order of the MATLAB test
     grain_results = None

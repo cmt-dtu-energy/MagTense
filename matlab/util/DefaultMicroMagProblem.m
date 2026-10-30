@@ -237,7 +237,8 @@ properties
 
     %Energy minimizer settings, used when the solver is 'Explicit' (setMicroMagSolver).
     %min_tol: convergence criterion, the largest torque max_i |m_i x H_i| over the cells
-    %divided by max(Ms) must fall below it. min_maxiter: iteration cap per applied field.
+    %divided by max(Ms) must fall below it. min_maxiter: iteration cap of one descent,
+    %extended up to four times while the energy is still falling.
     %min_maxrot: largest rotation of any cell in one iteration [rad]. min_fallback: 1 to
     %fall back to the Landau-Lifshitz time integration when the minimizer stalls, 0 to
     %give up. min_saddle: 1 to nudge a converged state and relax again, so that a saddle

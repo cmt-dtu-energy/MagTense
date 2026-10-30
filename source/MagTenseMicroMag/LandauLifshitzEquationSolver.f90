@@ -105,7 +105,12 @@
     !Save internal representation of the problem and the solution
     gb_solution = sol
     gb_problem = prob
-    
+
+    !A solve stopped by abortMagTense returns to MATLAB without reaching the deallocations at the
+    !end of this routine, so release any module work arrays it left behind before starting
+    if ( allocated(crossX) ) deallocate( crossX, crossY, crossZ, HeffX, HeffY, HeffZ, HeffX2, HeffY2, HeffZ2 )
+    if ( allocated(gb_cellVol) ) deallocate( gb_cellVol )
+
     !Calculate the local scaled coefficients for the LLG equation
     !"J" : exchange term
     if (( gb_problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
@@ -230,7 +235,7 @@
 #endif
 #else
             call displayGUIMessage( 'MagTense not compiled with CUDA - exiting!' )
-            stop
+            call abortMagTense( 'MagTense not compiled with CUDA' )
 #endif
         endif
     endif
@@ -299,7 +304,7 @@
     if ( gb_problem%includeThermal .and. gb_problem%solver .eq. MicroMagSolverMinimizer ) then
         call displayGUIMessage( 'MagTense: the energy minimizer (''Explicit'') cannot be combined with a finite ' // &
                                 'temperature - use ''ExplicitLL'' (Python solver=''explicit_ll'')' )
-        error stop 'SolveLandauLifshitzEquation: minimizer with thermal field'
+        call abortMagTense( 'SolveLandauLifshitzEquation: minimizer with thermal field' )
     endif
 
     if ( gb_problem%solver .eq. MicroMagSolverExplicit .or. gb_problem%solver .eq. MicroMagSolverMinimizer ) then
@@ -429,6 +434,8 @@
     else 
 
         !CALL SYSTEM_CLOCK(c1)
+    if (gb_problem%adaptiveHext) call checkAdaptiveHextInput()
+
     !$omp parallel default(shared)
     !$omp master
         
@@ -527,6 +534,28 @@
       gb_problem%nHextAccepted = nt_Hext
     end subroutine SolveFixedHextLoop
 
+    !>-----------------------------------------
+    !> Checks the input of the adaptive hysteresis loop. Called before the parallel region of the
+    !> field loop, since abortMagTense must not be called from inside a parallel region.
+    !>-----------------------------------------
+    subroutine checkAdaptiveHextInput()
+
+      if (gb_problem%maxHextSteps <= 0) then
+          call abortMagTense( 'Adaptive hysteresis requires maxHextSteps > 0' )
+      endif
+      if (gb_problem%dH_initial <= 0.0_DP .or. gb_problem%dH_min <= 0.0_DP .or. gb_problem%dH_max <= 0.0_DP) then
+          call abortMagTense( 'Adaptive hysteresis requires positive dH_initial, dH_min and dH_max' )
+      endif
+      if (gb_problem%dH_min > gb_problem%dH_max) then
+          call abortMagTense( 'Adaptive hysteresis requires dH_min <= dH_max' )
+      endif
+      if (sqrt(sum((gb_problem%H_end - gb_problem%H_start)**2)) <= tiny(1.0_DP)) then
+          call abortMagTense( 'Adaptive hysteresis requires H_start and H_end to differ' )
+      endif
+
+    end subroutine checkAdaptiveHextInput
+
+
     subroutine SolveAdaptiveHextLoop(fct, fct_thermal, cb_fct, M_out, ntot, nt, n_reject_max)
     procedure(dydt_fct), pointer :: fct
     procedure(no_argument_fct), pointer :: fct_thermal
@@ -541,25 +570,9 @@
     logical :: recover_armed, recover_grown, refine_pending
     character*(256) :: prog_str
 
-      if (gb_problem%maxHextSteps <= 0) then
-          call displayGUIMessage('Adaptive hysteresis requires maxHextSteps > 0')
-          error stop 'Adaptive hysteresis requires maxHextSteps > 0'
-      endif
-      if (gb_problem%dH_initial <= 0.0_DP .or. gb_problem%dH_min <= 0.0_DP .or. gb_problem%dH_max <= 0.0_DP) then
-          call displayGUIMessage('Adaptive hysteresis requires positive dH_initial, dH_min and dH_max')
-          error stop 'Adaptive hysteresis requires positive dH_initial, dH_min and dH_max'
-      endif
-      if (gb_problem%dH_min > gb_problem%dH_max) then
-          call displayGUIMessage('Adaptive hysteresis requires dH_min <= dH_max')
-          error stop 'Adaptive hysteresis requires dH_min <= dH_max'
-      endif
-
+      !The input was validated by checkAdaptiveHextInput before the parallel region was entered
       H_delta = gb_problem%H_end - gb_problem%H_start
       H_distance = sqrt(sum(H_delta**2))
-      if (H_distance <= tiny(1.0_DP)) then
-          call displayGUIMessage('Adaptive hysteresis requires H_start and H_end to differ')
-          error stop 'Adaptive hysteresis requires H_start and H_end to differ'
-      endif
 
       H_dir = H_delta / H_distance
       H_current = gb_problem%H_start
@@ -2159,7 +2172,7 @@ end subroutine updateDemagfieldFMM
             call displayGUIMessage( 'MagTense: not the distance between the centres of the end cells.' )
             call displayGUIMessage( 'MagTense: use shiftVec = grid_L for a gapless periodic medium,' )
             call displayGUIMessage( 'MagTense: or larger than grid_L for separated particles.' )
-            error stop 'checkMacrogeometrySpacing: the macrogeometry copies overlap'
+            call abortMagTense( 'checkMacrogeometrySpacing: the macrogeometry copies overlap' )
         endif
     end do
 
@@ -2839,7 +2852,7 @@ end subroutine updateDemagfieldFMM
     if ( ( PBCx .and. nx .eq. 2 ) .or. ( PBCy .and. ny .eq. 2 ) .or. ( PBCz .and. nz .eq. 2 ) ) then
         call displayGUIMessage( 'MagTense: periodic exchange requires at least three cells along a periodic direction' )
         call displayGUIMessage( 'MagTense: with two cells a tile becomes its own neighbour through the periodic image' )
-        error stop 'ComputeExchangeTerm3D_Uniform: too few cells along a periodic direction'
+        call abortMagTense( 'ComputeExchangeTerm3D_Uniform: too few cells along a periodic direction' )
     endif
 
 
@@ -3511,7 +3524,7 @@ end subroutine updateDemagfieldFMM
          ( any(problem%K1 .ne. 0) .or. any(problem%K2 .ne. 0) .or. any(problem%K0_arr .ne. 0) ) ) then
         call displayGUIMessage( 'MagTense: the uniaxial anisotropy K0 cannot be combined with K1, K2 or K0_arr' )
         call displayGUIMessage( 'MagTense: express the uniaxial term through K0_arr(:,1,:) instead, or set K0 to zero' )
-        error stop 'ComputeAnisotropyTerm3D: K0 cannot be combined with K1, K2 or K0_arr'
+        call abortMagTense( 'ComputeAnisotropyTerm3D: K0 cannot be combined with K1, K2 or K0_arr' )
     endif
 
     if (any(problem%K0 .ne. 0)) then !Uniaxial anisotropy

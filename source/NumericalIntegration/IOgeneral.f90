@@ -46,6 +46,28 @@ module IO_GENERAL
 
     end subroutine displayGUIProgressMessage
 
+
+    !>----------------------------------------
+    !> Rasmus Bjørk, rabj@dtu.dk, October 2026
+    !> Stops the calculation because of an error in the input or an unsupported option.
+    !> Inside a MEX file an error stop terminates the whole MATLAB process, and the message
+    !> printed just before it is lost with the command window. There the message is raised as
+    !> a MATLAB error instead, which unwinds the MEX call and returns to the MATLAB prompt.
+    !> Elsewhere (python, stand-alone) it is an error stop.
+    !> Must not be called from inside an OpenMP parallel region, as the MATLAB error can only
+    !> be raised from the thread that MATLAB called the MEX file on.
+    !> @params[in] mess The error message
+    !>----------------------------------------
+    subroutine abortMagTense( mess )
+        character(*),intent(in) :: mess
+
+#if USE_MATLAB
+        call mexErrMsgIdAndTxt( 'MagTense:abort', mess )
+#endif
+        error stop mess
+
+    end subroutine abortMagTense
+
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !---------------------------------------------------------------- Message Matlab interface ---------------------------------------------------------------------------------
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------

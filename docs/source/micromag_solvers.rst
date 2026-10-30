@@ -181,11 +181,39 @@ in check:
   than a small fraction of the energy scale; if it would, the step is halved
   and retried.
 
-If the iteration cap ``min_maxiter`` is hit, or the watchdog stalls, and
-``min_fallback`` is set, the Landau-Lifshitz time integration is run once over
-the requested time window from the current state and the minimizer is
-restarted from where it ends up. This is what carries a hysteresis loop
-through a switching event, where the state sits near a saddle point.
+A descent that reaches the iteration cap ``min_maxiter`` while its energy is
+still falling is given another ``min_maxiter`` iterations, up to four times.
+Falling means that at least 1 % of the last quarter of ``min_maxiter``
+iterations, and at least three, set a new lowest energy of the descent. That
+test needs no energy scale: a descent sets new lows steadily however slowly it
+moves, whereas energies that only scatter by the noise of the field evaluation
+set a new low less than once in that quarter. Right after a switching field
+the state leaves a saddle along a soft mode, and steepest descent then
+converges slowly but steadily: in the hard-soft bilayer example at 0.25 nm
+cells, the soft-layer nucleation field takes 10 000 to 14 000 iterations, with
+the step length pinned near the stability limit of the stiffest exchange mode,
+and 5 % of them set a new low. The torque is no measure of that progress, as it
+first grows while the state speeds up along the soft mode, and the non-monotone
+iteration makes it jump by two orders of magnitude from one iteration to the
+next. If the cap is hit without that progress, or
+the watchdog stalls, and ``min_fallback`` is set, the Landau-Lifshitz time
+integration is run once over the requested time window from the current state
+and the minimizer is restarted from where it ends up. This is what carries a
+hysteresis loop through a switching event, where the state sits near a saddle
+point. The fallback is expensive on a fine grid, because the explicit time step
+is limited by the exchange stiffness, which grows as one over the cell size
+squared. In the bilayer example the fallback took 750 000 field evaluations at
+each nucleation field, 85 % of the whole loop, where finishing the descent
+takes about 15 000.
+
+The demagnetization field is evaluated in single precision on both the CPU and
+the CUDA path. The difference between the two is below
+:math:`4 \cdot 10^{-7} \max(M_s)`, and so is the torque floor this sets, two
+orders of magnitude below the default ``min_tol``. The two paths therefore
+converge in the same way, and a converged CPU state has the same torque when
+evaluated on the GPU. A run that stalls on one path but not on the other has
+followed a different, equally valid trajectory near a switching field, where
+the descent is slow on both paths.
 
 A vanishing torque is also what a saddle point looks like, and a symmetric
 starting state sits on one: the canonical vortex of standard problem 3, or a
@@ -213,7 +241,19 @@ eigenvector, which is the direction of steepest descent out of the saddle,
 and relaxed again. Near a switching event the eigenvalue goes to zero, so it
 also tells how close a state is to switching. Along a field sweep the
 eigenvector of the previous field starts the iteration, which then converges
-in a handful of steps; a cold start takes a few tens. On a single-grain loop
+in a handful of steps; a cold start takes a few tens. The iteration stops at 60
+steps. The number of steps it needs grows as the square root of the ratio of
+the largest eigenvalue, which is set by the exchange stiffness, to the gap
+above the lowest. So it scales as one over the cell size, not with the number
+of cells. The hard-soft bilayer example needs 15 to 40 steps at 1 nm cells
+(largest eigenvalue 56 :math:`\max(M_s)`) and 55 to 150 at 0.25 nm cells
+(810 :math:`\max(M_s)`). In the second case the message "Hessian eigenvalue not
+converged in 60 steps" is reported at most fields. The returned ``min_eig`` is
+then the lowest Ritz value, which is an upper bound on the lowest eigenvalue: a
+negative value always proves a saddle. With a warm start it is accurate to about
+:math:`10^{-5} \max(M_s)` in that example. The exception is the state reached
+at the nucleation field itself, where it is :math:`2 \cdot 10^{-3} \max(M_s)`
+too high. On a single-grain loop
 the check costs less than the random nudge, and it finds saddles that the
 nudge misses, such as the plain flower state of standard problem 3 near the
 flower-vortex transition, which relaxes to the lower twisted flower.
@@ -230,7 +270,8 @@ flower-vortex transition, which relaxes to the lower twisted flower.
      - Convergence criterion on the largest relative torque.
    * - ``min_maxiter``
      - ``10000``
-     - Maximum number of iterations per applied field.
+     - Iteration cap of one descent, extended up to four times while the
+       energy is still falling.
    * - ``min_maxrot``
      - ``0.3``
      - Largest rotation of any cell in one iteration [rad].

@@ -108,10 +108,12 @@ class MicromagProblem:
         sampleShape: Sidelengths of a prism representing the sample shape.
         min_tol: Minimizer convergence criterion: the largest torque max_i |m_i x H_i| over the
             cells, divided by max(Ms), must fall below this.
-        min_maxiter: Maximum number of minimizer iterations per applied field.
+        min_maxiter: Iteration cap of one minimizer descent, extended up to four times while
+            the energy is still falling.
         min_maxrot: Largest rotation of any cell in one minimizer iteration [rad].
-        min_fallback: If True, a minimizer that stalls or hits min_maxiter falls back to the
-            Landau-Lifshitz time integration over the requested time window and restarts.
+        min_fallback: If True, a minimizer that stalls, or hits min_maxiter without progress,
+            falls back to the Landau-Lifshitz time integration over the requested time window
+            and restarts.
         min_saddle_check: 1 or True: a converged state is nudged by a small random
             rotation and relaxed again, so that a saddle point - which a symmetric starting
             state such as the canonical vortex sits on - is not mistaken for a minimum.

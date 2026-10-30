@@ -182,7 +182,7 @@
 
                 if ( minval(problem%phase_id) .lt. 1 .or. maxval(problem%phase_id) .gt. problem%n_phase ) then
                     call displayGUIMessage( 'MagTense: phase_id must be between 1 and n_phase' )
-                    error stop 'loadMicroMagProblem: phase_id out of range'
+                    call abortMagTense( 'loadMicroMagProblem: phase_id out of range' )
                 endif
 
                 !A MATLAB matrix arrives in column-major order, which is also how the
@@ -202,7 +202,7 @@
                 !the two cells is asked, which is not a physical operator.
                 if ( maxval(abs(problem%A_int - transpose(problem%A_int))) .gt. 0.0_DP ) then
                     call displayGUIMessage( 'MagTense: the interface exchange table must be symmetric' )
-                    error stop 'loadMicroMagProblem: A_int is not symmetric'
+                    call abortMagTense( 'loadMicroMagProblem: A_int is not symmetric' )
                 endif
             endif
         endif

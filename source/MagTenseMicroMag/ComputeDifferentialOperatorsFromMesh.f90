@@ -168,7 +168,7 @@ module DifferentialOperators
         Aexch_local = Jfact_local
         
         if (method == MicroMagExchMethodGGNeumann .and. ((maxval(Aexch_local)-minval(Aexch_local))/maxval(Aexch_local)) > 1e-6) then
-            error stop 'Green-Gauss method not available for heterogeneous exchange stiffness'
+            call abortMagTense( 'Green-Gauss method not available for heterogeneous exchange stiffness' )
         end if
 
         ! Determine dimensionality

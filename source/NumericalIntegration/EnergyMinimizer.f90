@@ -18,10 +18,13 @@
 !> Convergence is declared when max_i |m_i x H_i| / H_scale < tol. Two safeguards keep the
 !> non-monotone Barzilai-Borwein iteration in check: no vector rotates by more than maxrot in one
 !> iteration, and an energy watchdog halves the step when the energy would rise above the largest
-!> of the last n_hist iterates (Grippo-Lampariello-Lucidi style). If the iteration cap is hit, or the
-!> watchdog stalls, the caller's ODE integration is run once from the current state (when fallback is
-!> set) and the minimizer is restarted from its result - this is what carries a hysteresis loop
-!> through a switching event, where the state sits near a saddle.
+!> of the last n_hist iterates (Grippo-Lampariello-Lucidi style). A descent that reaches the
+!> iteration cap while its energy is still falling is given another maxiter iterations, up to
+!> n_extend_max times: next to a switching field the soft mode makes the descent slow but steady, and
+!> on a fine grid the ODE integration costs far more than finishing it. If the iteration cap is hit
+!> without that progress, or the watchdog stalls, the caller's ODE integration is run once from the
+!> current state (when fallback is set) and the minimizer is restarted from its result - this is what
+!> carries a hysteresis loop through a switching event, where the state sits near a saddle.
 !>
 !> A vanishing torque is also what a saddle point looks like, and a symmetric starting state sits on
 !> one. When saddle_check is set, a converged state is therefore nudged by a small random rotation of
@@ -82,6 +85,8 @@ module EnergyMinimizer
     integer,parameter,private :: n_hist = 10         !> Window of the non-monotone energy watchdog
     integer,parameter,private :: n_shrink_max = 30   !> Consecutive step halvings before the iteration is declared stalled
     integer,parameter,private :: n_round_max = 3     !> Minimizer rounds: the first plus up to two restarts after a fallback
+    integer,parameter,private :: n_extend_max = 4    !> Extensions of a descent by maxiter iterations while its energy is still falling
+    real,parameter,private :: extend_lows = 0.01     !> Still falling: this fraction of the last quarter of maxiter iterations, and at least 3, set a new lowest energy
     integer,parameter,private :: n_saddle_max = 3    !> Saddle checks per round before the state is accepted as it is
     integer,parameter,private :: n_saddle_iter = 100 !> Iterations a perturbed state gets to fall below the unperturbed energy
     real,parameter,private :: rot_init = 1.0e-3      !> Rotation of the most-torqued vector in the first step [rad]
@@ -148,7 +153,7 @@ module EnergyMinimizer
         k_cap = settings%maxiter
         E_stop = -huge(1.0)
         call startState()
-        call descend()
+        call descend( .true. )
         n_iter_total = n_iter_total + k
 
         if ( converged .and. settings%saddle_check .eq. 1 ) then
@@ -170,7 +175,7 @@ module EnergyMinimizer
                 k_cap = n_saddle_iter
                 E_stop = E_best - E_rise_rel * settings%E_scale
                 call startState()
-                call descend()
+                call descend( .false. )
                 n_iter_total = n_iter_total + k
                 if ( E .lt. E_stop ) then
                     write(prog_str,'(A,ES10.3,A,I4,A)') 'Minimizer: saddle check lowered the energy by ', E_best - E, ' J after ', k, ' iterations, continuing'
@@ -179,7 +184,7 @@ module EnergyMinimizer
                     k_cap = settings%maxiter
                     E_stop = -huge(1.0)
                     call startState()
-                    call descend()
+                    call descend( .true. )
                     n_iter_total = n_iter_total + k
                     if ( .not. converged ) exit
                 else
@@ -244,7 +249,7 @@ module EnergyMinimizer
                 k_cap = settings%maxiter
                 E_stop = -huge(1.0)
                 call startState()
-                call descend()
+                call descend( .true. )
                 n_iter_total = n_iter_total + k
                 if ( .not. converged ) exit
             end do
@@ -310,11 +315,26 @@ module EnergyMinimizer
         k = 0
     end subroutine startState
 
-    !> The Barzilai-Borwein descent from the current state until converged, stalled or capped
-    subroutine descend()
-        real :: E_ref, tau_cap, ss, sy, yy
-        integer :: n_shrink
+    !> The Barzilai-Borwein descent from the current state until converged, stalled or capped.
+    !> With extend set, a descent that reaches the cap with its energy still falling gets another
+    !> maxiter iterations, up to n_extend_max times. Falling means that a fraction extend_lows of
+    !> the last quarter of maxiter iterations, and at least three, set a new lowest energy of the
+    !> descent. This needs no energy scale: a descent sets new lows steadily however slowly it
+    !> moves (5 % of the iterations next to the nucleation field of the hard-soft bilayer example),
+    !> while energies that only scatter by the noise of the field evaluation set a new low about
+    !> ln(N) times in N iterations, less than one in the last quarter. The energy and not the torque
+    !> is the measure, because a state leaving a saddle first speeds up along the soft mode, so the
+    !> torque grows before it falls, and the non-monotone iteration makes it jump by orders of
+    !> magnitude.
+    subroutine descend( extend )
+        logical,intent(in) :: extend
+        real :: E_ref, tau_cap, ss, sy, yy, E_low
+        integer :: n_shrink, n_ext, w, n_low
 
+        n_ext = 0
+        w = max( 1, settings%maxiter / 4 )
+        E_low = E
+        n_low = 0
         do while ( .not. converged .and. k .lt. k_cap )
             k = k + 1
             m_prev = m
@@ -350,6 +370,22 @@ module EnergyMinimizer
             if ( tq_rel .lt. settings%tol ) then
                 converged = .true.
                 exit
+            endif
+
+            if ( extend ) then
+                if ( E .lt. E_low ) then
+                    E_low = E
+                    if ( k .gt. k_cap - w ) n_low = n_low + 1
+                endif
+                if ( k .eq. k_cap ) then
+                    if ( n_ext .lt. n_extend_max .and. n_low .ge. max( 3.0, extend_lows * w ) ) then
+                        n_ext = n_ext + 1
+                        k_cap = k_cap + settings%maxiter
+                        write(prog_str,'(A,ES9.2,A)') 'Minimizer at the iteration cap, torque ', tq_rel, ', energy falling, continuing'
+                        call callback( trim(prog_str), -1 )
+                    endif
+                    n_low = 0
+                endif
             endif
 
             !Barzilai-Borwein step for the next iteration, alternating between the two rules

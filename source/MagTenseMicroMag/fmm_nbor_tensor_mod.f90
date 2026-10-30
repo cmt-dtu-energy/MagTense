@@ -115,12 +115,12 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
   call trace%begin( "BuildNeighbourList_FromTree", itimer=itimer, verbose=1 )
 
   ! --- basic sanity ---
-  if (.not. tree%is_built) stop "BuildNeighbourList_FromTree: tree not built"
-  if (.not. associated(tree%laddr))  stop "BuildNeighbourList_FromTree: tree%laddr not associated"
-  if (.not. associated(tree%isrcse)) stop "BuildNeighbourList_FromTree: tree%isrcse not associated"
-  if (.not. associated(tree%isrc))   stop "BuildNeighbourList_FromTree: tree%isrc not associated"
-  if (.not. associated(tree%nlist1)) stop "BuildNeighbourList_FromTree: tree%nlist1 not associated"
-  if (.not. associated(tree%list1))  stop "BuildNeighbourList_FromTree: tree%list1 not associated"
+  if (.not. tree%is_built) call abortMagTense( "BuildNeighbourList_FromTree: tree not built" )
+  if (.not. associated(tree%laddr))  call abortMagTense( "BuildNeighbourList_FromTree: tree%laddr not associated" )
+  if (.not. associated(tree%isrcse)) call abortMagTense( "BuildNeighbourList_FromTree: tree%isrcse not associated" )
+  if (.not. associated(tree%isrc))   call abortMagTense( "BuildNeighbourList_FromTree: tree%isrc not associated" )
+  if (.not. associated(tree%nlist1)) call abortMagTense( "BuildNeighbourList_FromTree: tree%nlist1 not associated" )
+  if (.not. associated(tree%list1))  call abortMagTense( "BuildNeighbourList_FromTree: tree%list1 not associated" )
 
   ntot = tree%nsource   ! should match size(problem%grid%pts,1) in your usage
 
@@ -197,7 +197,7 @@ subroutine BuildNeighbourList_FromTree(problem, tree)
             if (cnt <= nneigh_max) then
               problem%nbr_idx(t_idx, cnt) = j_idx
             else
-              stop "BuildNeighbourList_FromTree: cnt exceeded nneigh_max (unexpected)"
+              call abortMagTense( "BuildNeighbourList_FromTree: cnt exceeded nneigh_max (unexpected)" )
             end if
           end do
         end do
@@ -364,7 +364,7 @@ subroutine BuildNeighbourDemagTensor(problem)
   elseif (problem%grid%gridType .eq. gridTypeUnstructuredPrisms) then
       size_cell(:,:) = problem%grid%abc(:,:)
   else
-      error stop "BuildNeighbourDemagTensor: unsupported grid type"
+      call abortMagTense( "BuildNeighbourDemagTensor: unsupported grid type" )
   end if
 
   do d = 1, 3
@@ -391,7 +391,7 @@ subroutine BuildNeighbourDemagTensor(problem)
 
   fmm_tree%nterms_in = problem%fmm_nterms
   call fmm_tree%build_tree(sources, problem%fmm_eps, problem%fmm_cells_per_node, ier, problem%ifunif, problem%nlmin, problem%nlmax)
-  if (ier /= 0) stop "BuildNeighbourDemagTensor: fmm_tree%build_tree failed"
+  if (ier /= 0) call abortMagTense( "BuildNeighbourDemagTensor: fmm_tree%build_tree failed" )
 
   call BuildNeighbourList_FromTree(problem, fmm_tree)
 
@@ -411,7 +411,7 @@ subroutine BuildNeighbourDemagTensor(problem)
 
   ! If no neighbours at all - error 
   if (nneigh_max <= 0) then
-    error stop "BuildNeighbourDemagTensor: no neighbours found in FMM tree lists - check tree construction and parameters"
+    call abortMagTense( "BuildNeighbourDemagTensor: no neighbours found in FMM tree lists - check tree construction and parameters" )
   end if
 
   !---------------------------------------
@@ -650,9 +650,9 @@ subroutine build_fmm_sparse_nborTensor(problem)
   call system_clock(count_rate=clk_rate)
 
   ! Guards
-  if (.not. associated(problem%nbr_idx))   stop "build_fmm_sparse_nborTensor: nbr_idx not associated"
-  if (.not. associated(problem%n_nbors))  stop "build_fmm_sparse_nborTensor: n_nbors not associated"
-  if (.not. associated(problem%diffTens)) stop "build_fmm_sparse_nborTensor: diffTens not associated"
+  if (.not. associated(problem%nbr_idx))   call abortMagTense( "build_fmm_sparse_nborTensor: nbr_idx not associated" )
+  if (.not. associated(problem%n_nbors))  call abortMagTense( "build_fmm_sparse_nborTensor: n_nbors not associated" )
+  if (.not. associated(problem%diffTens)) call abortMagTense( "build_fmm_sparse_nborTensor: diffTens not associated" )
 
   call displayGUIMessage(" Starting FMM sparse nbor build (opt)")
 
@@ -728,7 +728,7 @@ subroutine build_fmm_sparse_nborTensor(problem)
     pos = pos + row_nnz(t)
   end do
 
-  if (pos /= nnz_total + 1) stop "build_fmm_sparse_nborTensor: nnz mismatch"
+  if (pos /= nnz_total + 1) call abortMagTense( "build_fmm_sparse_nborTensor: nnz mismatch" )
 
   call system_clock(clk_end)
   t_sec = real(clk_end - clk_start, SP) / real(clk_rate, SP)
@@ -788,7 +788,7 @@ subroutine build_fmm_sparse_nborTensor(problem)
                                    ntot, ntot, &
                                    problem%K_fmm_s(idx)%rows_start, problem%K_fmm_s(idx)%rows_end, &
                                    problem%K_fmm_s(idx)%cols, problem%K_fmm_s(idx)%values )
-    if (stat /= SPARSE_STATUS_SUCCESS) stop "build_fmm_sparse_nborTensort: mkl_sparse_s_create_csr failed"
+    if (stat /= SPARSE_STATUS_SUCCESS) call abortMagTense( "build_fmm_sparse_nborTensort: mkl_sparse_s_create_csr failed" )
   end do
 
   call system_clock(clk_end)

@@ -21,8 +21,8 @@ function checks = macrogeometry_supercell_test(options)
 % chain of separated particles, where shiftVec is much larger than the domain. A shift that is off
 % by a cell - for instance the distance between the centres of the two end cells, (n - 1)*dx,
 % rather than the full length n*dx - makes the copies overlap by one cell layer. MagTense rejects
-% such a shiftVec outright, so the last check runs that case in a separate MATLAB process and
-% requires it to stop with a message rather than to return a field.
+% such a shiftVec outright, so the last check runs that case and requires it to raise a MATLAB
+% error with the identifier MagTense:abort rather than to return a field.
 %
 % The domain has a different cell size along x, y and z and a random magnetisation, so a mix-up
 % between directions or a misplaced copy anywhere shows up. Both the point demagnetisation tensor
@@ -242,48 +242,22 @@ end
 
 
 function [rejected, output] = overlapping_copies_rejected(res, cellSize)
-% Run a domain whose copies overlap by one cell layer in a separate MATLAB process.
+% Run a domain whose copies overlap by one cell layer and report whether MagTense refused it.
 %
 % The shift is the distance between the centres of the two end cells instead of the full length
-% of the domain. MagTense has to stop on that rather than return a field, and stopping takes the
-% whole process with it, hence the separate process.
+% of the domain. MagTense has to stop on that with a MATLAB error rather than return a field.
 
-here = fileparts(mfilename('fullpath'));
-mexDir = fullfile(here, '..', '..', '..', 'MEX_files');
-utilDir = fullfile(here, '..', '..', '..', 'util');
-
-script = strjoin({
-    sprintf('addpath(''%s''); addpath(''%s'');', mexDir, utilDir)
-    sprintf('res = [%d %d %d]; cellSize = [%.17g %.17g %.17g];', res, cellSize)
-    'problem = DefaultMicroMagProblem(res(1), res(2), res(3));'
-    'problem.grid_L = res .* cellSize;'
-    'problem = problem.setUseCuda(false); problem = problem.setUseCVODE(false);'
-    'problem = problem.setUseDemag(true); problem = problem.setMicroMagSolver(''Dynamic'');'
-    'problem.useAvgN = int32(0); problem.use_fmm = int32(0);'
-    'problem.gamma = 0; problem.alpha = 1e3; problem.Ms = 8e5*ones(prod(res),1);'
-    'problem.A0 = 1e-20; problem.K0 = zeros(prod(res),1); problem.m0 = repmat([1 0 0], prod(res), 1);'
-    'problem.n_macro = int32([2 0 0]); problem.shiftVec = [(res(1)-1)*cellSize(1) 0 0];'
-    'problem = problem.setHext(@(t) (t>=0)'' * [0 0 0], linspace(0, 1e-15, 2));'
-    'problem = problem.setTime(linspace(0, 1e-15, 2));'
-    'solution = problem.MagTenseLandauLifshitzSolver_mex(struct(problem), struct());'
-    'disp(''OVERLAP NOT DETECTED'')'
-    }, ' ');
-
-scriptFile = [tempname '.m'];
-[scriptDir, scriptName] = fileparts(scriptFile);
-% A function or script name has to start with a letter
-scriptName = ['mtcheck_' regexprep(scriptName, '[^A-Za-z0-9_]', '_')];
-scriptFile = fullfile(scriptDir, [scriptName '.m']);
-fid = fopen(scriptFile, 'w');
-fprintf(fid, '%s\n', script);
-fclose(fid);
-cleanup = onCleanup(@() delete(scriptFile));
-
-matlabExe = fullfile(matlabroot, 'bin', 'matlab');
-command = sprintf('"%s" -batch "cd(''%s''); %s"', matlabExe, scriptDir, scriptName);
-[status, output] = system(command);
-% The message of the error stop in checkMacrogeometrySpacing, so that the child failing for any
-% other reason - a missing licence, a path problem - is not taken for a rejection
-rejected = status ~= 0 && contains(output, 'the macrogeometry copies overlap') ...
-           && ~contains(output, 'OVERLAP NOT DETECTED');
+ntot = prod(res);
+m0 = repmat([1 0 0], ntot, 1);
+output = 'OVERLAP NOT DETECTED';
+try
+    demag_field(res, res .* cellSize, m0, 8e5, 0, false, [2 0 0], [(res(1)-1)*cellSize(1) 0 0]);
+    rejected = false;
+catch err
+    output = sprintf('%s: %s', err.identifier, err.message);
+    % The message of the guard in checkMacrogeometrySpacing, so that the solve failing for any
+    % other reason is not taken for a rejection
+    rejected = strcmp(err.identifier, 'MagTense:abort') && ...
+               contains(err.message, 'the macrogeometry copies overlap');
+end
 end

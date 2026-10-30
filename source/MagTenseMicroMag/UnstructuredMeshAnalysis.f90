@@ -178,7 +178,7 @@ module UnstructuredMeshAnalysis
         if ( PBC(i) .and. ( Lper(i) .lt. (2.0 * maxval(dimscopy(:,i)) + 1e-9) ) ) then
             call displayGUIMessage( 'MagTense: too few elements along a periodic direction' )
             call displayGUIMessage( 'MagTense: at least three elements are required for periodic exchange boundary conditions' )
-            error stop 'CartesianUnstructuredMeshAnalysis: too few elements along a periodic direction'
+            call abortMagTense( 'CartesianUnstructuredMeshAnalysis: too few elements along a periodic direction' )
         endif
     end do
 
@@ -1055,7 +1055,7 @@ module UnstructuredMeshAnalysis
         call displayGUIMessage( 'MagTense: out of memory in CartesianUnstructuredMeshAnalysis' )
         call displayGUIMessage( 'MagTense: failed to allocate '//trim(arrayname) )
         call displayGUIMessage( 'MagTense: reduce the number of mesh elements or free memory and retry' )
-        error stop 'CartesianUnstructuredMeshAnalysis: allocation failure'
+        call abortMagTense( 'CartesianUnstructuredMeshAnalysis: allocation failure' )
     endif
 
     end subroutine checkAllocation
