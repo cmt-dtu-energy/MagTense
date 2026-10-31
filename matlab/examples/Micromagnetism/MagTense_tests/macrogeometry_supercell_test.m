@@ -127,7 +127,7 @@ for c = 1:size(cases,1)
 end
 
 %% Overlapping copies have to be rejected
-[rejected, output] = overlapping_copies_rejected(res, cellSize);
+[rejected, output] = overlapping_copies_rejected(res, cellSize, options.use_CUDA);
 if rejected
     fprintf('  shiftVec = (n - 1)*dx, copies overlapping by one cell: rejected\n');
 else
@@ -241,17 +241,18 @@ H = reshape(solution.H_dem(1,:,1,:), ntot, 3);
 end
 
 
-function [rejected, output] = overlapping_copies_rejected(res, cellSize)
+function [rejected, output] = overlapping_copies_rejected(res, cellSize, use_CUDA)
 % Run a domain whose copies overlap by one cell layer and report whether MagTense refused it.
 %
 % The shift is the distance between the centres of the two end cells instead of the full length
 % of the domain. MagTense has to stop on that with a MATLAB error rather than return a field.
+% use_CUDA has to follow the rest of the test: a CUDA build ships only the CUDA MEX file.
 
 ntot = prod(res);
 m0 = repmat([1 0 0], ntot, 1);
 output = 'OVERLAP NOT DETECTED';
 try
-    demag_field(res, res .* cellSize, m0, 8e5, 0, false, [2 0 0], [(res(1)-1)*cellSize(1) 0 0]);
+    demag_field(res, res .* cellSize, m0, 8e5, 0, use_CUDA, [2 0 0], [(res(1)-1)*cellSize(1) 0 0]);
     rejected = false;
 catch err
     output = sprintf('%s: %s', err.identifier, err.message);
