@@ -9,6 +9,7 @@ dependencies:
   - _openmp_mutex=4.5=2_gnu
   - bzip2=1.0.8=h0ad9c76_10
   - ca-certificates=2026.7.22=h4c7d964_0
+  - cmake
   - compiler_shared=2025.2.1=intel_1000
   - cuda-cccl_win-64=13.3.3.4.1=hc667259_0
   - cuda-crt-dev_win-64=13.3.73=0
@@ -104,3 +105,4 @@ dependencies:
       - numpy==2.3.2
       - packaging==25.0
       - pyproject-hooks==1.2.0
+      - pytest

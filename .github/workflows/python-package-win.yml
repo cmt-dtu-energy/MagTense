@@ -1,0 +1,380 @@
+name: Python pip-wheel via make python-interface-win (Windows)
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_call:
+    inputs:
+      tag:
+        required: false
+        type: string
+  push:
+    branches:
+      - fabio-makefile-win
+  workflow_dispatch:
+
+jobs:
+  build-cvode:
+    name: cvode
+    uses: ./.github/workflows/cmake-sundials-cvode.yml
+
+  build-wheel:
+    runs-on: windows-2022
+    needs: [build-cvode]
+    strategy:
+      # The legs are independent wheels, and a transient conda/anaconda.org
+      # failure on one of them should not cancel the others.
+      fail-fast: false
+      matrix:
+        variant:
+          - { name: cpu, cuda: 0, env_suffix: "-cpu", build_tag: 0 }
+          - { name: cu13, cuda: 1, env_suffix: "", build_tag: 1 }
+        py-version:
+          - { version: "312", semver: "3.12" }
+          - { version: "313", semver: "3.13" }
+          - { version: "314", semver: "3.14" }
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Fetch tags
+      if: "${{ inputs.tag == '' }}"
+      run: git fetch --tags origin
+
+    - name: Get latest release tag
+      id: previoustag
+      if: "${{ inputs.tag == '' }}"
+      uses: WyriHaximus/github-action-get-previous-tag@v1
+      with:
+        fallback: 1.0.0
+
+    # icx-cl/ifx link against the MSVC CRT and Windows SDK, but neither
+    # oneAPI's own setvars nor the conda env's vs2022_win-64 package reliably
+    # pick up the toolset on the GitHub-hosted windows-2022 image, leaving LIB
+    # without kernel32.lib etc. - see the same note in cmake-sundials-cvode.yml.
+    # Set the MSVC env explicitly rather than relying on conda alone.
+    - name: Setup msvc-dev-cmd
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: amd64
+
+    - name: Setup Miniforge
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-version: latest
+        activate-environment: magtense-env
+        environment-file: python/.build/env-${{ matrix.py-version.version }}-win${{ matrix.variant.env_suffix }}.yml
+        use-mamba: true
+
+    - name: Download cvode (sundials)
+      uses: actions/download-artifact@v4
+      with:
+        name: cvode-Windows
+        path: ${{ github.workspace }}/cvode/
+
+    # msvc-dev-cmd puts the real MSVC link.exe on PATH, which the conda env's
+    # own copy (from its msys2/binutils-flavoured packages) would otherwise
+    # shadow depending on PATH order, producing confusing link errors.
+    - name: Win - Delete link.exe
+      run: rm '${{ env.CONDA }}'/envs/magtense-env/Library/usr/bin/link.exe
+
+    # python-interface-win's underlying `python` target already chains the CUDA
+    # plugin build as a prerequisite when USE_CUDA=1 (no separate step needed -
+    # this mirrors install-magtense.ps1 exactly, which also calls only this one
+    # command for both CPU and GPU builds).
+    #
+    # -NoExit was masking the script's exit code in an earlier workflow, so a
+    # failed make still passed this step and produced a wheel with no
+    # extension module in it. $LASTEXITCODE has to be checked explicitly: a
+    # non-zero exit from a native command does not trip $ErrorActionPreference.
+    - name: Build Python interface via make python-interface-win
+      shell: pwsh -ExecutionPolicy Bypass -File {0}
+      working-directory: ${{ github.workspace }}
+      run: |
+        $ErrorActionPreference = "Stop"
+        make python-interface-win USE_CUDA=${{ matrix.variant.cuda }}
+        if ($LASTEXITCODE -ne 0) { throw "make python-interface-win failed (exit $LASTEXITCODE)" }
+
+    # dist_pypi.py expects the compiled extension staged at
+    # python/<cu_version>_libs/magtensesource.cp<py>-win_amd64.pyd. The
+    # properly-named module (not the bare f2py output at the repo root) lands
+    # in python/src/magtense/lib/ after python-interface-win's editable install.
+    - name: Stage .pyd for dist_pypi.py
+      working-directory: ${{ github.workspace }}
+      run: |
+        mkdir -p python/${{ matrix.variant.name }}_libs
+        cp python/src/magtense/lib/magtensesource.cp${{ matrix.py-version.version }}-win_amd64.pyd python/${{ matrix.variant.name }}_libs/
+
+    - name: Build pip-wheel
+      if: "${{ inputs.tag == '' }}"
+      working-directory: ${{ github.workspace }}/python/
+      run: |
+        sed -i 's/1.0.0/${{ steps.previoustag.outputs.tag }}/' src/magtense/__init__.py
+        python .build/dist_pypi.py --py_version ${{ matrix.py-version.version }} --cu_version ${{ matrix.variant.name }} --platform win --pkg_version ${{ steps.previoustag.outputs.tag }}
+
+    - name: Deployment - Build pip-wheel
+      if: "${{ inputs.tag != '' }}"
+      working-directory: ${{ github.workspace }}/python/
+      run: |
+        sed -i 's/1.0.0/${{ inputs.tag }}/' src/magtense/__init__.py
+        python .build/dist_pypi.py --py_version ${{ matrix.py-version.version }} --cu_version ${{ matrix.variant.name }} --platform win --pkg_version ${{ inputs.tag }}
+
+    - name: Archive pip-wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version.version }}-${{ matrix.variant.name }}-Windows
+        path: ${{ github.workspace }}/python/dist/magtense-*-${{ matrix.variant.build_tag }}-py${{ matrix.py-version.version }}-none-win_amd64.whl
+
+
+  test-wheel:
+    runs-on: windows-2022
+    needs: build-wheel
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - { name: cpu }
+          - { name: cu13 }
+        py-version:
+          - { version: "312", semver: "3.12" }
+          - { version: "313", semver: "3.13" }
+          - { version: "314", semver: "3.14" }
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/util/
+          python/examples/
+          documentation/examples_FEM_validation/
+          documentation/examples_mumag_validation/
+
+    - name: Download wheel artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version.version }}-${{ matrix.variant.name }}-Windows
+
+    - name: Setup python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.py-version.semver }}
+
+    # This runner has no NVIDIA GPU, so cu13 here only proves the wheel builds,
+    # links, and imports correctly on CPU - not that the CUDA path executes
+    # correctly on a device. That was validated by hand on real GPU hardware;
+    # see python/README.md. A self-hosted [Windows, CUDA] runner exists in
+    # python-package-conda.yml for actually exercising CUDA, if this workflow
+    # grows a GPU-hardware leg later.
+    - name: Install pip-wheel and run pytest
+      env:
+        MAGTENSE_USE_FMM3D: 0
+        MAGTENSE_WHEEL_VARIANT: ${{ matrix.variant.name }}
+      run: |
+        python -m pip install '${{ github.workspace }}'/*.whl
+        python -m pip install pytest
+        python -m pytest python/examples/magnetostatics/test_magtense.py \
+                          python/examples/micromagnetism/MagTense_tests
+
+    # python/util/testMagTenseFunctions.py is the combined micromagnetic
+    # suite. It runs the validation examples, compares every measure with the limit that
+    # belongs to it, and exits non zero when one of them is over its limit, so this step
+    # fails on a numerical regression and not only on a crash. matplotlib and scipy are not
+    # dependencies of the wheel, but the examples need them. No --cuda flag here - this
+    # runner has no GPU, so both variants run the CPU solver path.
+    #
+    # Standard problem 6 is about seventy percent of the running time of the suite, so it is
+    # left out on most of the matrix and the whole suite runs on one designated leg.
+    - name: Run the combined micromagnetic test suite
+      if: ${{ !(matrix.py-version.semver == '3.13' && matrix.variant.name == 'cpu') }}
+      run: |
+        python -m pip install matplotlib scipy
+        python python/util/testMagTenseFunctions.py --skip std_problem_6
+
+    - name: Run the whole combined micromagnetic test suite
+      if: ${{ matrix.py-version.semver == '3.13' && matrix.variant.name == 'cpu' }}
+      run: |
+        python -m pip install matplotlib scipy
+        python python/util/testMagTenseFunctions.py
+
+    - name: Upload the overview of the test suite
+      if: ${{ always() && matrix.py-version.semver == '3.13' && matrix.variant.name == 'cpu' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-suite-py${{ matrix.py-version.version }}-cpu-Windows
+        path: python/util/results/testMagTenseFunctions_overview.png
+        if-no-files-found: ignore
+
+
+  # test-wheel above proves the cu13 wheel builds, links and imports - this
+  # job is the only one that proves CUDA actually executes on a device. Runs
+  # on the persistent self-hosted GPU box python-package-conda.yml already
+  # uses for the same purpose (see its "test-wheel-fmm-cuda" job, which this
+  # mirrors minus the FMM3D-specific steps - this branch doesn't build an
+  # fmm variant).
+  test-wheel-cuda:
+    runs-on: [self-hosted, Windows, CUDA]
+    needs: build-wheel
+    strategy:
+      fail-fast: false
+      matrix:
+        py-version:
+          - { version: "312", semver: "3.12" }
+          - { version: "313", semver: "3.13" }
+          - { version: "314", semver: "3.14" }
+
+    steps:
+    - name: Checkout test scripts
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          python/util/
+          python/examples/
+          documentation/examples_FEM_validation/
+          documentation/examples_mumag_validation/
+          .github/scripts/
+
+    - name: Download cu13 wheel artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: pip-wheel-py${{ matrix.py-version.version }}-cu13-Windows
+
+    - name: Diagnose Windows self-hosted runner identity
+      shell: cmd /C CALL {0}
+      run: |
+        echo RUNNER_NAME=%RUNNER_NAME%
+        whoami
+        dir C:\Users\github_runner\miniconda3\condabin\conda.bat || echo Conda path is not accessible from this runner process.
+
+    # This runner keeps its own conda install and per-version test envs
+    # between runs rather than using actions/setup-python, mirroring
+    # python-package-conda.yml's proven bootstrap for this exact machine.
+    - name: Bootstrap existing Miniconda Python
+      shell: cmd /C CALL {0}
+      run: |
+        set CONDA_ROOT=C:\Users\github_runner\miniconda3
+        set CONDA_BAT=C:\Users\github_runner\miniconda3\condabin\conda.bat
+
+        if not exist "%CONDA_BAT%" (
+          echo Expected Conda at "%CONDA_BAT%", but it was not found or is not accessible.
+          exit /b 1
+        )
+
+        call "%CONDA_BAT%" activate base
+        if errorlevel 1 (
+          echo Failed to activate Conda base environment.
+          exit /b 1
+        )
+
+        set ENV_NAME=magtense-test-py${{ matrix.py-version.version }}
+        set WANTED=${{ matrix.py-version.semver }}
+
+        call conda env list | findstr /C:"%ENV_NAME%" >nul
+        if errorlevel 1 (
+          echo Creating Conda environment %ENV_NAME%
+          call conda create -y -n %ENV_NAME% python=%WANTED% pip
+          if errorlevel 1 (
+            echo Failed to create Conda environment %ENV_NAME%.
+            exit /b 1
+          )
+        )
+
+        call conda activate %ENV_NAME%
+        if errorlevel 1 (
+          echo Failed to activate Conda environment %ENV_NAME%.
+          exit /b 1
+        )
+
+        python -c "import sys; raise SystemExit(0 if f'{sys.version_info.major}.{sys.version_info.minor}' == '%WANTED%' else 1)"
+        if errorlevel 1 (
+          echo Environment %ENV_NAME% does not have Python %WANTED%; updating it.
+          call conda install -y -n %ENV_NAME% python=%WANTED% pip
+          if errorlevel 1 (
+            echo Failed to update Conda environment %ENV_NAME% to Python %WANTED%.
+            exit /b 1
+          )
+          call conda activate %ENV_NAME%
+          if errorlevel 1 (
+            echo Failed to reactivate Conda environment %ENV_NAME%.
+            exit /b 1
+          )
+        )
+
+        for /f "delims=" %%i in ('python -c "import sys; print(sys.executable)"') do set PYTHON_EXE=%%i
+
+        echo Selected Python: %PYTHON_EXE%
+        python --version
+
+        echo CONDA=%CONDA_ROOT%>> "%GITHUB_ENV%"
+        echo MAGTENSE_CONDA_ENV=%ENV_NAME%>> "%GITHUB_ENV%"
+        echo PYTHON_EXE=%PYTHON_EXE%>> "%GITHUB_ENV%"
+
+        echo %CONDA_ROOT%\envs\%ENV_NAME%>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Scripts>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Library\mingw-w64\bin>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Library\usr\bin>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\envs\%ENV_NAME%\Library\bin>> "%GITHUB_PATH%"
+        echo %CONDA_ROOT%\condabin>> "%GITHUB_PATH%"
+
+    # The self-hosted runner has a Restricted execution policy and a user
+    # profile.ps1, neither of which the built-in "powershell" shell copes
+    # with, so invoke it explicitly - same reasoning as python-package-conda.yml.
+    - name: Show CUDA device info
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      run: |
+        $ErrorActionPreference = "Stop"
+        & $env:PYTHON_EXE -c "import shutil; print('nvidia-smi:', shutil.which('nvidia-smi'))"
+        & nvidia-smi
+
+    # This is a persistent self-hosted runner and the wheel version does not
+    # change between builds, so a plain install would be a no-op and silently
+    # leave the previous wheel in place. Uninstall first rather than
+    # --force-reinstall, which would also redownload the CUDA dependency wheels.
+    - name: Install pip-wheel and confirm the CUDA extension imports
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      run: |
+        $ErrorActionPreference = "Stop"
+
+        & $env:PYTHON_EXE -m pip uninstall -y magtense
+
+        Get-ChildItem "$env:GITHUB_WORKSPACE\*.whl" | ForEach-Object {
+          & $env:PYTHON_EXE -m pip install $_.FullName
+        }
+
+        & $env:PYTHON_EXE -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
+
+    # Only runs if the import above failed. See the script itself for what it
+    # checks and why - kept as a real file rather than inlined here because a
+    # PowerShell here-string's closing '@ must sit at column 0, which conflicts
+    # with YAML block-scalar indentation rules once the script is long enough
+    # to matter.
+    - name: Diagnose DLL load failure
+      if: failure()
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      run: |
+        $ErrorActionPreference = "Continue"
+        & $env:PYTHON_EXE .github/scripts/diagnose_windows_dll.py
+
+    # The one step that actually proves CUDA executes on this device, not just
+    # that the wheel imports. --skip std_problem_6 on every leg here (not just
+    # a designated one) since this is a shared, limited physical runner, not a
+    # disposable GitHub-hosted VM - keep its load light.
+    - name: Run the combined micromagnetic test suite with CUDA
+      shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+      env:
+        PYTHONUTF8: 1
+      run: |
+        $ErrorActionPreference = "Stop"
+
+        & $env:PYTHON_EXE -m pip install matplotlib scipy
+        & $env:PYTHON_EXE python/util/testMagTenseFunctions.py --cuda --skip std_problem_6
