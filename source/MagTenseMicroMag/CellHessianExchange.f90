@@ -57,7 +57,9 @@
 !> face values are eliminated by minimising E_K, which is the natural homogeneous Neumann
 !> condition. stab = sqrt(3) for prisms, where the operator is then identical to the 7-point
 !> Laplacian with mirror Neumann boundaries on uniform grids, and 1 for tetrahedra. Every cell's
-!> energy carries its own A_K; interface exchange values are not used by this operator.
+!> energy carries its own A_K; interface exchange values are not used by this operator. The value
+!> at a face between cells of different A is SUSHI's hybrid unknown, eliminated by minimising
+!> A_K E_K + A_L E_L (interfaceWeights): on box grids this is the harmonic coupling of the two cells.
 !---------------------------------------------------------------------------
 module CellHessianExchange
     use MKL_SPBLAS
@@ -828,10 +830,10 @@ module CellHessianExchange
     integer, allocatable :: nbPtr(:), nbIdx(:), bfOwner(:), fK(:), fL(:), fnPtr(:), fnIdx(:)
     integer, allocatable :: cfPtr(:), cfIdx(:), uPtr(:), uIdx(:), rowPtr(:), colIdx(:)
     integer, allocatable :: cooR(:), cooC(:), fKind(:), fOk(:), nU(:), tmpU(:)
-    type(faceStencil), allocatable :: fs(:)
-    logical, allocatable :: live(:)
+    type(faceStencil), allocatable :: fs(:), fsI(:)
+    logical, allocatable :: live(:), isIfc(:)
     real(dp) :: per(3), lo(3), hi(3), stab, p(3,4)
-    integer :: N, i, f, nF, nbf, nBad, nNeg, k, nnz, nInt
+    integer :: N, i, f, nF, nbf, nBad, nNeg, k, nnz, nInt, nIfc
     character(len=256) :: msg
 
         if ( grid%gridType .eq. gridTypeTetrahedron ) then
@@ -897,6 +899,29 @@ module CellHessianExchange
         enddo
         !$OMP END PARALLEL DO
 
+        !--- faces between cells of different exchange stiffness: SUSHI's elimination of the face value
+        allocate( isIfc(nF) )
+        isIfc = .false.
+        do f = 1, nF
+            if ( fL(f) .eq. 0 ) cycle
+            isIfc(f) = abs( A0n(fK(f)) - A0n(fL(f)) ) .gt. 1.e-12_dp * max( A0n(fK(f)), A0n(fL(f)) )
+        enddo
+        nIfc = count( isIfc )
+        if ( nIfc .gt. 0 ) then
+            allocate( fsI(nF) )
+            !$OMP PARALLEL DO SCHEDULE(dynamic,64) DEFAULT(shared) PRIVATE(f)
+            do f = 1, nF
+                if ( .not. isIfc(f) ) cycle
+                call interfaceWeights( f, cen, vol, A0n, stab, cfPtr, cfIdx, fK, fL, fA, fX, fN, fD, fs, fsI(f) )
+            enddo
+            !$OMP END PARALLEL DO
+            do f = 1, nF
+                if ( .not. isIfc(f) ) cycle
+                call move_alloc( fsI(f)%idx, fs(f)%idx )
+                call move_alloc( fsI(f)%w, fs(f)%w )
+            enddo
+        endif
+
         !--- the cells each cell's energy couples (its own and those of its face interpolations)
         allocate( nU(N), uPtr(N+1) )
         nU = 0
@@ -955,6 +980,11 @@ module CellHessianExchange
             write(msg,'(A,I0,A,I0,A)') 'Symmetric exchange: ', count( fOk .eq. 0 ), &
                 ' face interpolations not affine exact, ', nNeg, &
                 ' cell faces with the centroid on or behind the face (inverted cells?)'
+            call displayGUIMessage( trim(msg) )
+        endif
+        if ( nIfc .gt. 0 ) then
+            write(msg,'(A,I0,A)') 'Symmetric exchange: ', nIfc, ' faces between cells of different A, ' // &
+                'face values from minimising A_K E_K + A_L E_L'
             call displayGUIMessage( trim(msg) )
         endif
         if ( size(Aint,1) .gt. 1 ) then
@@ -1511,22 +1541,21 @@ module CellHessianExchange
     !>   boundary face values (free surfaces) are eliminated by minimising the energy (Schur
     !>   complement), interior face values are their interpolations u_s = sum_j beta_j u_j
     !---------------------------------------------------------------------------
-    subroutine cellMatrix( i, cen, vol, A0n, stab, cfPtr, cfIdx, fK, fL, fA, fX, fN, fD, fs, U, &
-                           rowPtr, colIdx, vals, nNeg )
-    integer, intent(in) :: i, cfPtr(:), cfIdx(:), fK(:), fL(:), U(:), rowPtr(:), colIdx(:)
-    real(dp), intent(in) :: cen(:,:), vol(:), A0n(:), stab, fA(:), fX(:,:), fN(:,:), fD(:,:)
-    type(faceStencil), intent(in) :: fs(:)
-    real(dp), intent(inout) :: vals(:)
+    subroutine cellLocal( i, cen, vol, stab, cfPtr, cfIdx, fK, fL, fA, fX, fN, fD, Sc, keep, nk, nNeg )
+    integer, intent(in) :: i, cfPtr(:), cfIdx(:), fK(:), fL(:)
+    real(dp), intent(in) :: cen(:,:), vol(:), stab, fA(:), fX(:,:), fN(:,:), fD(:,:)
+    real(dp), allocatable, intent(out) :: Sc(:,:)
+    integer, allocatable, intent(out) :: keep(:)
+    integer, intent(out) :: nk
     integer, intent(inout) :: nNeg
 
-    integer :: nf, a, b, k, f, sf, nk, nbd, im, nU, ir, row, col, pos
-    integer, allocatable :: keep(:), bnd(:)
+    integer :: nf, a, b, f, sf, nbd
+    integer, allocatable :: bnd(:)
     real(dp), allocatable :: G(:,:), S(:,:), rr(:,:), nn(:,:), ar(:), dd(:), Rv(:), Bm(:,:)
-    real(dp), allocatable :: Sc(:,:), Sbb(:,:), Skb(:,:), P(:,:), Mm(:,:)
-    real(dp) :: hK, deff, v
+    real(dp), allocatable :: Sbb(:,:), Skb(:,:)
+    real(dp) :: hK, deff
 
         nf = cfPtr(i+1) - cfPtr(i)
-        nU = size(U)
         allocate( G(3,0:nf), S(0:nf,0:nf), rr(3,nf), nn(3,nf), ar(nf), dd(nf), Rv(0:nf), Bm(3,0:nf) )
         allocate( keep(nf+1), bnd(nf) )
         nk = 1
@@ -1582,6 +1611,28 @@ module CellHessianExchange
             call symPinv( Sbb, nbd, 1.e-12_dp )
             Sc = Sc - matmul( Skb, matmul( Sbb, transpose(Skb) ) )
         endif
+    end subroutine cellLocal
+
+
+    !>-----------------------------------------
+    !> Energy matrix of cell i, A_i P^T Sc P, added into the CSR values; Sc from cellLocal, the kept
+    !> face values replaced by their interpolations u_s = sum_j beta_j u_j
+    !---------------------------------------------------------------------------
+    subroutine cellMatrix( i, cen, vol, A0n, stab, cfPtr, cfIdx, fK, fL, fA, fX, fN, fD, fs, U, &
+                           rowPtr, colIdx, vals, nNeg )
+    integer, intent(in) :: i, cfPtr(:), cfIdx(:), fK(:), fL(:), U(:), rowPtr(:), colIdx(:)
+    real(dp), intent(in) :: cen(:,:), vol(:), A0n(:), stab, fA(:), fX(:,:), fN(:,:), fD(:,:)
+    type(faceStencil), intent(in) :: fs(:)
+    real(dp), intent(inout) :: vals(:)
+    integer, intent(inout) :: nNeg
+
+    integer :: a, b, k, f, nk, im, nU, ir, row, col, pos
+    integer, allocatable :: keep(:)
+    real(dp), allocatable :: Sc(:,:), P(:,:), Mm(:,:)
+    real(dp) :: v
+
+        nU = size(U)
+        call cellLocal( i, cen, vol, stab, cfPtr, cfIdx, fK, fL, fA, fX, fN, fD, Sc, keep, nk, nNeg )
 
         !kept unknowns in terms of cell values
         allocate( P(nk,nU), Mm(nU,nU) )
@@ -1633,6 +1684,80 @@ module CellHessianExchange
         end function findCol
 
     end subroutine cellMatrix
+
+
+    !>-----------------------------------------
+    !> Value at an interface face f between cells K and L of different exchange stiffness: the
+    !> minimiser of A_K E_K + A_L E_L over u_f, with the other face values of K and L at their
+    !> interpolations (cellLocal, free surfaces condensed). This is SUSHI's treatment of a
+    !> discontinuous coefficient (the face value is a hybrid unknown eliminated by minimising the
+    !> energy), done face by face; it is exact (the harmonic coupling of the two cells on box grids)
+    !> when K and L have no other interface face. The weights sum to one, since a constant field
+    !> minimises both energies. Result: the stencil of f replaced by the union of K, L and the
+    !> stencils of their other interior faces.
+    !---------------------------------------------------------------------------
+    subroutine interfaceWeights( f, cen, vol, A0n, stab, cfPtr, cfIdx, fK, fL, fA, fX, fN, fD, fs, st )
+    integer, intent(in) :: f, cfPtr(:), cfIdx(:), fK(:), fL(:)
+    real(dp), intent(in) :: cen(:,:), vol(:), A0n(:), stab, fA(:), fX(:,:), fN(:,:), fD(:,:)
+    type(faceStencil), intent(in) :: fs(:)
+    type(faceStencil), intent(out) :: st
+
+    integer :: e, c, nk, ir, irs, a, g, im, k, nU, nNegLoc, cap
+    integer, allocatable :: keep(:), U(:)
+    real(dp), allocatable :: Sc(:,:), P(:,:), num(:)
+    real(dp) :: den, Ac
+
+        !the cells the result can involve: K, L and the stencils of their other interior faces
+        cap = 2
+        do e = 1, 2
+            c = merge( fK(f), fL(f), e .eq. 1 )
+            do k = cfPtr(c), cfPtr(c+1) - 1
+                g = abs( cfIdx(k) )
+                if ( g .ne. f .and. fL(g) .gt. 0 ) cap = cap + size( fs(g)%idx )
+            enddo
+        enddo
+        allocate( U(cap), num(cap) )
+        nU = 2
+        U(1) = fK(f)
+        U(2) = fL(f)
+        num = 0._dp
+        den = 0._dp
+        nNegLoc = 0
+        do e = 1, 2
+            c = merge( fK(f), fL(f), e .eq. 1 )
+            Ac = A0n(c)
+            call cellLocal( c, cen, vol, stab, cfPtr, cfIdx, fK, fL, fA, fX, fN, fD, Sc, keep, nk, nNegLoc )
+            !P: kept local unknowns of c in terms of cells, the row of f left zero
+            allocate( P(nk,cap) )
+            P = 0._dp
+            P(1, merge( 1, 2, e .eq. 1 )) = 1._dp
+            irs = 0
+            do ir = 2, nk
+                a = keep(ir)
+                g = abs( cfIdx(cfPtr(c)+a-1) )
+                if ( g .eq. f ) then
+                    irs = ir
+                    cycle
+                endif
+                do im = 1, size( fs(g)%idx )
+                    do k = 1, nU
+                        if ( U(k) .eq. fs(g)%idx(im) ) exit
+                    enddo
+                    if ( k .gt. nU ) then
+                        nU = nU + 1
+                        U(nU) = fs(g)%idx(im)
+                    endif
+                    P(ir,k) = P(ir,k) + fs(g)%w(im)
+                enddo
+            enddo
+            num(1:nU) = num(1:nU) + Ac * matmul( Sc(irs,:), P(:,1:nU) )
+            den = den + Ac * Sc(irs,irs)
+            deallocate( P, Sc, keep )
+        enddo
+        allocate( st%idx(nU), st%w(nU) )
+        st%idx = U(1:nU)
+        st%w = -num(1:nU) / den
+    end subroutine interfaceWeights
 
 
     !>-----------------------------------------
