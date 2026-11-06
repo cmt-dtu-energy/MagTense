@@ -13,7 +13,12 @@ CDFMM_ROOT =
 #       List all source files required for the project
 #=======================================================================
 
-LIBSRC_SOURCES = MicroMagParameters util_micromag DemagAuxFunctions FortranCuda ComputeDifferentialOperatorsFromMesh CellHessianExchange UnstructuredMeshAnalysis TetrahedralMeshAnalysis
+# Exchange: one module per operator, ExchangeOperator is the entry point of the solver. The order
+# is the compile order (modules before their users).
+LIBSRC_SOURCES = MicroMagParameters util_micromag DemagAuxFunctions FortranCuda \
+	UnstructuredMeshAnalysis TetrahedralMeshAnalysis \
+	ExchangeMeshTopology ExchangeDirectLaplacian ExchangeCellHessian ExchangeSushi ExchangeUniform \
+	ExchangeOperator
 
 ifeq (${USE_CDFMM},1)
     CDFMM_FORTRAN_SOURCE = ${CDFMM_ROOT}/share/cdfmm/fortran/cdfmm_fortran.f90
