@@ -26,9 +26,8 @@ The solver is selected with ``setMicroMagSolver`` in Matlab and with the
        field and relaxes the magnetization to equilibrium for each of them in
        turn, starting from the state reached at the previous field. This is the
        quasi-static mode used for hysteresis loops. The equilibrium is found
-       with the :ref:`Energy minimizer`. The minimizer cannot include the
-       thermal field, so a finite temperature in any cell is an error, raised
-       just before the Fortran call with a message pointing to ``ExplicitLL``.
+       with the :ref:`Energy minimizer`. Thermal runs use ``ExplicitLL``,
+       which the interface points to if a temperature is set.
    * - ``ExplicitLL``
      - 1
      - Reads the applied-field table as ``Explicit`` does, but finds the
@@ -37,8 +36,7 @@ The solver is selected with ``setMicroMagSolver`` in Matlab and with the
        default, and the choice for thermal runs. Python
        ``solver="explicit_ll"``.
 
-The names ``Minimizer`` and ``Implicit`` are no longer accepted; use
-``Explicit``.
+``Explicit`` replaces the earlier names ``Minimizer`` and ``Implicit``.
 
 ``ProblemMod`` (Python ``prob_mode``) selects ``new`` (1) or ``old`` (2). Use
 ``new``, which is the default; ``old`` skips the allocation of the solution
@@ -80,8 +78,8 @@ uniformly spaced times between 0 and ``t_end``:
 The field function must return an ``(nt_h_ext, 3)`` array.
 
 For the **explicit** solvers (``Explicit`` and ``ExplicitLL``)
-the same table is read differently: the time column is ignored and each row is
-one constant field to relax at. ``nt_h_ext`` is therefore the number of points
+the same table is read differently: each row is one constant field to relax
+at, and the time column is unused. ``nt_h_ext`` is therefore the number of points
 on the hysteresis curve, and ``t_end``/``nt`` only control how long each
 relaxation is integrated (for the minimizer, only when it falls back to the
 time integration) and how densely the hysteresis curve is sampled.
@@ -138,13 +136,13 @@ a subset of them) and choose ``conv_tol``; in Python this is
     problem.nt_conv = nt
     problem.conv_tol = np.repeat(1e-6, nt)
 
-The test is skipped in a thermal run, where the noise never settles. Both the
-RKSuite and the CVODE driver apply it; CVODE only steps to the output times, so
-a convergence time that is not also an output time is never visited there. The
-times in ``t_conv`` *are* merged into the RKSuite integration grid, which
+In a thermal run the noise never settles, so the test is left out there. Both
+the RKSuite and the CVODE driver apply it; CVODE steps to the output times, so
+the convergence times are visited there when they are output times as well.
+The times in ``t_conv`` *are* merged into the RKSuite integration grid, which
 matters for the thermal field because it is redrawn once per grid time, see
-:ref:`Thermal fluctuations`. Keep ``t_conv`` a subset of ``t`` unless you
-specifically want to add integration times.
+:ref:`Thermal fluctuations`. Keeping ``t_conv`` a subset of ``t`` therefore
+serves both integrators.
 
 ========================================
 Energy minimizer
@@ -183,11 +181,39 @@ in check:
   than a small fraction of the energy scale; if it would, the step is halved
   and retried.
 
-If the iteration cap ``min_maxiter`` is hit, or the watchdog stalls, and
-``min_fallback`` is set, the Landau-Lifshitz time integration is run once over
-the requested time window from the current state and the minimizer is
-restarted from where it ends up. This is what carries a hysteresis loop
-through a switching event, where the state sits near a saddle point.
+A descent that reaches the iteration cap ``min_maxiter`` while its energy is
+still falling is given another ``min_maxiter`` iterations, up to four times.
+Falling means that at least 1 % of the last quarter of ``min_maxiter``
+iterations, and at least three, set a new lowest energy of the descent. That
+test needs no energy scale: a descent sets new lows steadily however slowly it
+moves, whereas energies that only scatter by the noise of the field evaluation
+set a new low less than once in that quarter. Right after a switching field
+the state leaves a saddle along a soft mode, and steepest descent then
+converges slowly but steadily: in the hard-soft bilayer example at 0.25 nm
+cells, the soft-layer nucleation field takes 10 000 to 14 000 iterations, with
+the step length pinned near the stability limit of the stiffest exchange mode,
+and 5 % of them set a new low. The torque is no measure of that progress, as it
+first grows while the state speeds up along the soft mode, and the non-monotone
+iteration makes it jump by two orders of magnitude from one iteration to the
+next. If the cap is hit without that progress, or
+the watchdog stalls, and ``min_fallback`` is set, the Landau-Lifshitz time
+integration is run once over the requested time window from the current state
+and the minimizer is restarted from where it ends up. This is what carries a
+hysteresis loop through a switching event, where the state sits near a saddle
+point. The fallback is expensive on a fine grid, because the explicit time step
+is limited by the exchange stiffness, which grows as one over the cell size
+squared. In the bilayer example the fallback took 750 000 field evaluations at
+each nucleation field, 85 % of the whole loop, where finishing the descent
+takes about 15 000.
+
+The demagnetization field is evaluated in single precision on both the CPU and
+the CUDA path. The difference between the two is below
+:math:`4 \cdot 10^{-7} \max(M_s)`, and so is the torque floor this sets, two
+orders of magnitude below the default ``min_tol``. The two paths therefore
+converge in the same way, and a converged CPU state has the same torque when
+evaluated on the GPU. A run that stalls on one path but not on the other has
+followed a different, equally valid trajectory near a switching field, where
+the descent is slow on both paths.
 
 A vanishing torque is also what a saddle point looks like, and a symmetric
 starting state sits on one: the canonical vortex of standard problem 3, or a
@@ -215,7 +241,19 @@ eigenvector, which is the direction of steepest descent out of the saddle,
 and relaxed again. Near a switching event the eigenvalue goes to zero, so it
 also tells how close a state is to switching. Along a field sweep the
 eigenvector of the previous field starts the iteration, which then converges
-in a handful of steps; a cold start takes a few tens. On a single-grain loop
+in a handful of steps; a cold start takes a few tens. The iteration stops at 60
+steps. The number of steps it needs grows as the square root of the ratio of
+the largest eigenvalue, which is set by the exchange stiffness, to the gap
+above the lowest. So it scales as one over the cell size, not with the number
+of cells. The hard-soft bilayer example needs 15 to 40 steps at 1 nm cells
+(largest eigenvalue 56 :math:`\max(M_s)`) and 55 to 150 at 0.25 nm cells
+(810 :math:`\max(M_s)`). In the second case the message "Hessian eigenvalue not
+converged in 60 steps" is reported at most fields. The returned ``min_eig`` is
+then the lowest Ritz value, which is an upper bound on the lowest eigenvalue: a
+negative value always proves a saddle. With a warm start it is accurate to about
+:math:`10^{-5} \max(M_s)` in that example. The exception is the state reached
+at the nucleation field itself, where it is :math:`2 \cdot 10^{-3} \max(M_s)`
+too high. On a single-grain loop
 the check costs less than the random nudge, and it finds saddles that the
 nudge misses, such as the plain flower state of standard problem 3 near the
 flower-vortex transition, which relaxes to the lower twisted flower.
@@ -232,7 +270,8 @@ flower-vortex transition, which relaxes to the lower twisted flower.
      - Convergence criterion on the largest relative torque.
    * - ``min_maxiter``
      - ``10000``
-     - Maximum number of iterations per applied field.
+     - Iteration cap of one descent, extended up to four times while the
+       energy is still falling.
    * - ``min_maxrot``
      - ``0.3``
      - Largest rotation of any cell in one iteration [rad].
@@ -254,10 +293,9 @@ flower-vortex transition, which relaxes to the lower twisted flower.
        switching event. Matlab: ``min_pred``.
 
 The minimizer works with every grid type, with CUDA and with FMM, because it
-calls the same field routines as the time integration. It cannot be combined
-with a finite temperature, since a stochastic field has no stationary point;
-the solve stops with a message. The thermal, ``dynamic`` and time-dependent
-``alpha`` settings are ignored by it.
+calls the same field routines as the time integration. A finite-temperature
+run has no stationary state to converge to, so it uses the time integration
+through ``ExplicitLL``; the damping settings play no role in the minimizer.
 
 The output has the layout of the time integration: the first output time holds
 the starting state and every later one the converged state. In addition every
@@ -301,9 +339,9 @@ Roughly a hundred of the minimizer's evaluations per applied field go into the
 saddle check; without it the flower state takes 39 evaluations and the vortex
 156. The energies agree to six digits in the vortex case and the minimizer
 finds a marginally lower flower energy than the time integration did in its
-10 ns window. On the grain the 1 ns time integration is not relaxed near the
-switching field and overshoots the Stoner-Wohlfarth value by ten percent; the
-minimizer lands within one field step of it. The script
+10 ns window. On the grain the minimizer lands within one field step of the
+Stoner-Wohlfarth value, where the 1 ns time integration is still relaxing
+near the switching field and overshoots it by ten percent. The script
 `minimizer_vs_llg.py <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/micromagnetism/minimizer/minimizer_vs_llg.py>`_
 reproduces these numbers.
 
@@ -355,7 +393,7 @@ fewer field evaluations:
      - 2 848 863 / 13 982
 
 The time integration remains the method of choice for dynamics, for thermal
-runs, and as a robust reference when the minimizer reports a failure.
+runs, and as an independent reference for the minimizer.
 
 ========================================
 Hysteresis simulations
@@ -468,9 +506,9 @@ step is capped at 0.9 of the predicted distance; for the time integration a
 3x jump in the number of field evaluations of a relaxation halves the next
 step.
 
-At ``dH_min`` a large change is accepted rather than looping forever, and the
-solver says so in its progress output. Too many rejected steps in total aborts
-the run.
+At ``dH_min`` a large change is accepted and noted in the progress output, so
+the sweep always advances, and a cap on the total number of rejected steps
+bounds the run time.
 
 .. list-table::
    :widths: 22 18 60

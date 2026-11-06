@@ -73,7 +73,7 @@ module UTIL_MICROMAG
         vol = problem%grid%abc(:,1) * problem%grid%abc(:,2) * problem%grid%abc(:,3)
     else
         call displayGUIMessage( 'MagTense: cannot determine the cell volumes for this grid type' )
-        error stop 'cellVolumes: unknown grid'
+        call abortMagTense( 'cellVolumes: unknown grid' )
     endif
     end subroutine cellVolumes
 

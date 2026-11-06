@@ -34,10 +34,9 @@ material law. The internal field is taken parallel to
 :math:`\mathbf{H}_\mathrm{others}`, which is exact for spheres and cubes and a
 small approximation for elongated tiles. For a constant permeability this is a
 closed form; for a state function the magnitude is found numerically on the
-curve itself. The permeabilities :math:`\mu_{r\_ea}` and :math:`\mu_{r\_oa}` are
-therefore used by hard tiles and constant-permeability tiles only, and are
-ignored by a state-function tile, whose material is fully described by its
-curve.
+curve itself. The permeabilities :math:`\mu_{r\_ea}` and :math:`\mu_{r\_oa}`
+therefore describe hard tiles and constant-permeability tiles, while a
+state-function tile is fully described by its curve.
 
 ==============================================
 Easy axis and other axes

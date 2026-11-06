@@ -118,7 +118,12 @@
     !Save internal representation of the problem and the solution
     gb_solution = sol
     gb_problem = prob
-    
+
+    !A solve stopped by abortMagTense returns to MATLAB without reaching the deallocations at the
+    !end of this routine, so release any module work arrays it left behind before starting
+    if ( allocated(crossX) ) deallocate( crossX, crossY, crossZ, HeffX, HeffY, HeffZ, HeffX2, HeffY2, HeffZ2 )
+    if ( allocated(gb_cellVol) ) deallocate( gb_cellVol )
+
     !Calculate the local scaled coefficients for the LLG equation
     !"J" : exchange term
     if (( gb_problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
@@ -228,7 +233,7 @@
             endif
 #else
             call displayGUIMessage( 'MagTense not compiled with CUDA - exiting!' )
-            stop
+            call abortMagTense( 'MagTense not compiled with CUDA' )
 #endif
 #if USE_CDFMM
           endif
@@ -300,7 +305,7 @@
     if ( gb_problem%includeThermal .and. gb_problem%solver .eq. MicroMagSolverMinimizer ) then
         call displayGUIMessage( 'MagTense: the energy minimizer (''Explicit'') cannot be combined with a finite ' // &
                                 'temperature - use ''ExplicitLL'' (Python solver=''explicit_ll'')' )
-        error stop 'SolveLandauLifshitzEquation: minimizer with thermal field'
+        call abortMagTense( 'SolveLandauLifshitzEquation: minimizer with thermal field' )
     endif
 
     if ( gb_problem%solver .eq. MicroMagSolverExplicit .or. gb_problem%solver .eq. MicroMagSolverMinimizer ) then
@@ -438,6 +443,9 @@
        eval_end = eval_start
     else 
 
+        !CALL SYSTEM_CLOCK(c1)
+    if (gb_problem%adaptiveHext) call checkAdaptiveHextInput()
+
     !$omp parallel default(shared)
     !$omp master
         
@@ -567,6 +575,31 @@
       gb_problem%nHextAccepted = nt_Hext
     end subroutine SolveFixedHextLoop
 
+    !>-----------------------------------------
+    !> Checks the input of the adaptive hysteresis loop. Called before the parallel region of the
+    !> field loop, since abortMagTense must not be called from inside a parallel region.
+    !>-----------------------------------------
+    subroutine checkAdaptiveHextInput()
+
+      if (gb_problem%maxHextSteps <= 0) then
+          call abortMagTense( 'Adaptive hysteresis requires maxHextSteps > 0' )
+      endif
+      if (gb_problem%dH_initial <= 0.0_DP .or. gb_problem%dH_min <= 0.0_DP .or. gb_problem%dH_max <= 0.0_DP) then
+          call abortMagTense( 'Adaptive hysteresis requires positive dH_initial, dH_min and dH_max' )
+      endif
+      if (gb_problem%dH_min > gb_problem%dH_max) then
+          call abortMagTense( 'Adaptive hysteresis requires dH_min <= dH_max' )
+      endif
+      if (gb_problem%dH_grow <= 1.0_DP .or. gb_problem%dH_shrink <= 0.0_DP .or. gb_problem%dH_shrink >= 1.0_DP) then
+          call abortMagTense( 'Adaptive hysteresis requires dH_grow > 1 and 0 < dH_shrink < 1 (per-step limits of the step change)' )
+      endif
+      if (sqrt(sum((gb_problem%H_end - gb_problem%H_start)**2)) <= tiny(1.0_DP)) then
+          call abortMagTense( 'Adaptive hysteresis requires H_start and H_end to differ' )
+      endif
+
+    end subroutine checkAdaptiveHextInput
+
+
     subroutine SolveAdaptiveHextLoop(fct, fct_thermal, cb_fct, M_out, ntot, nt, n_reject_max)
     !>-----------------------------------------
     !> Adaptive stepping of the applied field from H_start to H_end. Every trial step is a full
@@ -619,29 +652,9 @@
     real(DP), parameter :: bracket_void = 0.25_DP     !>A bracket narrower than this fraction of dH_min is dropped
     character*(256) :: prog_str
 
-      if (gb_problem%maxHextSteps <= 0) then
-          call displayGUIMessage('Adaptive hysteresis requires maxHextSteps > 0')
-          error stop 'Adaptive hysteresis requires maxHextSteps > 0'
-      endif
-      if (gb_problem%dH_initial <= 0.0_DP .or. gb_problem%dH_min <= 0.0_DP .or. gb_problem%dH_max <= 0.0_DP) then
-          call displayGUIMessage('Adaptive hysteresis requires positive dH_initial, dH_min and dH_max')
-          error stop 'Adaptive hysteresis requires positive dH_initial, dH_min and dH_max'
-      endif
-      if (gb_problem%dH_min > gb_problem%dH_max) then
-          call displayGUIMessage('Adaptive hysteresis requires dH_min <= dH_max')
-          error stop 'Adaptive hysteresis requires dH_min <= dH_max'
-      endif
-      if (gb_problem%dH_grow <= 1.0_DP .or. gb_problem%dH_shrink <= 0.0_DP .or. gb_problem%dH_shrink >= 1.0_DP) then
-          call displayGUIMessage('Adaptive hysteresis requires dH_grow > 1 and 0 < dH_shrink < 1 (per-step limits of the step change)')
-          error stop 'Adaptive hysteresis requires dH_grow > 1 and 0 < dH_shrink < 1'
-      endif
-
+      !The input was validated by checkAdaptiveHextInput before the parallel region was entered
       H_delta = gb_problem%H_end - gb_problem%H_start
       H_distance = sqrt(sum(H_delta**2))
-      if (H_distance <= tiny(1.0_DP)) then
-          call displayGUIMessage('Adaptive hysteresis requires H_start and H_end to differ')
-          error stop 'Adaptive hysteresis requires H_start and H_end to differ'
-      endif
 
       H_dir = H_delta / H_distance
       H_current = gb_problem%H_start
@@ -1681,7 +1694,11 @@
     type(MATRIX_DESCR) :: descr
     real(DP) :: alpha, beta
     real(DP), dimension(:), allocatable :: temp
-    integer, save :: itimer = 0 
+    integer, save :: itimer = 0
+
+    !Without exchange the operator is identically zero, so the field stays at the zeros that
+    !initializeSolution put there and the three sparse products are skipped
+    if ( .not. problem%useExchange ) return
 
     call trace%begin( "updateExchangeTerms", itimer=itimer, verbose=1 )
 
@@ -2480,6 +2497,9 @@ end subroutine updateDemagfieldDipFmm
     call trace%begin( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     
     if ( problem%useDemag .eq. useDemagTrue ) then
+        !Refuse a macrogeometry whose copies overlap before any tensor is built
+        call checkMacrogeometrySpacing( problem )
+
         !Demagnetization tensor matrix
 #if USE_CDFMM
         if (problem%use_cdfmm) then
@@ -2517,6 +2537,50 @@ end subroutine updateDemagfieldDipFmm
 
     call trace%end( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     end subroutine initializeInteractionMatrices
+
+
+    !>-----------------------------------------
+    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2026
+    !> @brief
+    !> Stops on a macrogeometry whose copies overlap. Neighbouring copies of the simulated domain are
+    !> shifted by shiftVec, so along a direction with copies shiftVec is the period and has to be at
+    !> least the size of the domain. Equal to grid_L the copies tile space without gaps, larger than
+    !> grid_L they model an array of separated particles. A smaller shift puts magnetic material on
+    !> top of itself, which is never what was meant and silently corrupts the demagnetisation field.
+    !> The usual cause is measuring the period between the centres of the two end cells, (n-1)*dx,
+    !> rather than between the outer faces of the domain, n*dx.
+    !> The copies are only built on the uniform grid, so that is the only grid type checked.
+    !> @param[in] problem the struct containing the problem
+    !---------------------------------------------------------------------------
+    subroutine checkMacrogeometrySpacing( problem )
+    type(MicroMagProblem),intent(in) :: problem         !> Problem data structure
+
+    real(DP),dimension(3) :: L                          !> Size of the simulated domain
+    integer :: idim                                     !> Loop counter over the three directions
+    character(len=1),dimension(3),parameter :: axisName = [ 'x', 'y', 'z' ]
+    character*(100) :: prog_str
+
+    if ( problem%grid%gridType .ne. gridTypeUniform ) return
+
+    L = [ problem%grid%Lx, problem%grid%Ly, problem%grid%Lz ]
+    do idim = 1, 3
+        !The relative tolerance accepts a shiftVec that equals grid_L up to round-off, as it does
+        !when the two are computed in different ways on the calling side
+        if ( problem%macrogrid%n_macro(idim) .gt. 0 .and. &
+             problem%macrogrid%shiftVec(idim) .lt. L(idim) * ( 1.0_DP - 1.0e-9_DP ) ) then
+            call displayGUIMessage( 'MagTense: the periodic copies of the macrogeometry overlap' )
+            write(prog_str,'(A,A,A,ES11.4,A,ES11.4,A)') 'MagTense: shiftVec(', axisName(idim), ') = ', &
+                problem%macrogrid%shiftVec(idim), ' m < grid_L = ', L(idim), ' m'
+            call displayGUIMessage( trim(prog_str) )
+            call displayGUIMessage( 'MagTense: shiftVec is the period, the full length of the domain,' )
+            call displayGUIMessage( 'MagTense: not the distance between the centres of the end cells.' )
+            call displayGUIMessage( 'MagTense: use shiftVec = grid_L for a gapless periodic medium,' )
+            call displayGUIMessage( 'MagTense: or larger than grid_L for separated particles.' )
+            call abortMagTense( 'checkMacrogeometrySpacing: the macrogeometry copies overlap' )
+        endif
+    end do
+
+    end subroutine checkMacrogeometrySpacing
     
     
     !>-----------------------------------------
@@ -3055,8 +3119,18 @@ end subroutine updateDemagfieldDipFmm
     ! mesh, which commonly runs from 0 to L. Shift the evaluation points into a frame centred on
     ! the bounding box of the mesh so that the correction is evaluated at the right offsets in
     ! either case. For a grid that is already centred this shift is zero and nothing changes.
+    ! The bounding box is spanned by the outer faces of the cells, not by their centres: the
+    ! midpoint of the centres is off by a quarter of the difference in size of the two end cells,
+    ! which on a mesh refined at one end puts the macrogeometry prism off the domain it stands for.
+    ! The side lengths in abc give the faces of a prism mesh. The uniform grid has equal end cells,
+    ! so its centres are exact, and a tetrahedral mesh has the shape correction disabled below.
     do idim = 1, 3
-        sampleCentre(idim) = 0.5_DP * ( minval(pts(:,idim)) + maxval(pts(:,idim)) )
+        if ( allocated(problem%grid%abc) ) then
+            sampleCentre(idim) = 0.5_DP * ( minval( pts(:,idim) - 0.5_DP * problem%grid%abc(:,idim) ) &
+                                          + maxval( pts(:,idim) + 0.5_DP * problem%grid%abc(:,idim) ) )
+        else
+            sampleCentre(idim) = 0.5_DP * ( minval(pts(:,idim)) + maxval(pts(:,idim)) )
+        endif
         pts(:,idim) = pts(:,idim) - sampleCentre(idim)
     end do
 
@@ -3135,7 +3209,20 @@ end subroutine updateDemagfieldDipFmm
 
     if ( problem%passExch .eq. passExchTrue) return ! Skip this if the exchange has already been passed from outside
 
-    allocate( A0_normalized(size(problem%A0)) )  
+    !With A0 = 0 in every tile there is no exchange at all, and the operator is identically zero.
+    !It has to be caught here: the normalisation below is then 0/0, which is NaN inside the
+    !python and MATLAB extensions (where /fpe:0 does not trap), and on an unstructured mesh the
+    !NaN zeroes every interpolation weight, all sparse matrices come out empty and the solver
+    !segfaults. The uniform grid survived only because it never reads A0_normalized.
+    if ( .not. any( problem%A0 .gt. 0.0_DP ) ) then
+        call displayGUIMessage( 'No exchange terms (A0 = 0 in every tile)' )
+        call ComputeZeroExchangeOperator( grid%nx * grid%ny * grid%nz, A )
+        call create_COO_values_from_CSR( A, solution%gridinfo )
+        problem%useExchange = .false.
+        return
+    endif
+
+    allocate( A0_normalized(size(problem%A0)) )
     A0_normalized = problem%A0 / ( maxval(problem%A0) )   ! Normalized by the largest exchange factor
 
     !The interface values have to be scaled exactly as A0 is, since they replace a harmonic
@@ -3256,7 +3343,7 @@ end subroutine updateDemagfieldDipFmm
     if ( ( PBCx .and. nx .eq. 2 ) .or. ( PBCy .and. ny .eq. 2 ) .or. ( PBCz .and. nz .eq. 2 ) ) then
         call displayGUIMessage( 'MagTense: periodic exchange requires at least three cells along a periodic direction' )
         call displayGUIMessage( 'MagTense: with two cells a tile becomes its own neighbour through the periodic image' )
-        error stop 'ComputeExchangeTerm3D_Uniform: too few cells along a periodic direction'
+        call abortMagTense( 'ComputeExchangeTerm3D_Uniform: too few cells along a periodic direction' )
     endif
 
 
@@ -3773,27 +3860,16 @@ end subroutine updateDemagfieldDipFmm
                 descr%mode = SPARSE_FILL_MODE_FULL
                 descr%diag = SPARSE_DIAG_NON_UNIT
                 stat = mkl_sparse_copy ( d2dz2%A, descr, A )
+                deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
+                stat = mkl_sparse_destroy (d2dz2%A)
             else
                 !No exchange terms: a single cell along every direction, i.e. a macrospin. The rest of
-                !the code (and the deallocation below) expects an exchange operator, so build one
-                !with an explicit zero on every diagonal. This used to fall through with d2dz2
-                !unallocated and die in the deallocate.
+                !the code expects an exchange operator, so build one with an explicit zero on every
+                !diagonal. This used to fall through with d2dz2 unallocated and die in the deallocate.
                 call displayGUIMessage( 'No exchange terms (single cell)' )
-                allocate(d2dz2%values(ntot),d2dz2%cols(ntot),d2dz2%rows_start(ntot),d2dz2%rows_end(ntot))
-                do i = 1, ntot
-                    d2dz2%values(i) = 0.0_DP
-                    d2dz2%cols(i) = i
-                    d2dz2%rows_start(i) = i
-                    d2dz2%rows_end(i) = i + 1
-                end do
-                stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, ntot, ntot, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
-                descr%type = SPARSE_MATRIX_TYPE_GENERAL
-                descr%mode = SPARSE_FILL_MODE_FULL
-                descr%diag = SPARSE_DIAG_NON_UNIT
-                stat = mkl_sparse_copy ( d2dz2%A, descr, A )
+                call ComputeZeroExchangeOperator( ntot, A )
+                problem%useExchange = .false.
             endif
-            deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
-            stat = mkl_sparse_destroy (d2dz2%A)
         endif
     endif
     
@@ -3871,7 +3947,44 @@ end subroutine updateDemagfieldDipFmm
     endif
 
     end function exchCoeff
-       
+
+
+    !>-----------------------------------------
+    !> @brief
+    !> An exchange operator that is identically zero, for a problem without exchange: A0 = 0
+    !> in every tile, or a uniform grid of one cell in total (a macrospin). A problem where
+    !> only some tiles have A0 = 0 still has exchange between the others and does not come
+    !> here. It is stored with an explicit zero on
+    !> every diagonal rather than as an empty matrix, which keeps every row of the CSR arrays
+    !> non-empty and gives the returned GridInfo a well-formed operator of the right size.
+    !> @param[in] ntot the number of tiles
+    !> @param[inout] A the returned sparse matrix
+    !---------------------------------------------------------------------------
+    subroutine ComputeZeroExchangeOperator( ntot, A )
+    integer,intent(in) :: ntot                         !> Number of tiles
+    type(sparse_matrix_t),intent(inout) :: A           !> The returned zero operator
+    type(MagTenseSparse_d) :: Z                        !> Holds the CSR arrays until A owns a copy
+    type(matrix_descr) :: descr
+    integer :: i, stat
+
+    allocate(Z%values(ntot),Z%cols(ntot),Z%rows_start(ntot),Z%rows_end(ntot))
+    do i = 1, ntot
+        Z%values(i) = 0.0_DP
+        Z%cols(i) = i
+        Z%rows_start(i) = i
+        Z%rows_end(i) = i + 1
+    end do
+    !mkl_sparse_d_create_csr only references the arrays, so A is made as a copy before they go
+    stat = mkl_sparse_d_create_csr ( Z%A, SPARSE_INDEX_BASE_ONE, ntot, ntot, Z%rows_start, Z%rows_end, Z%cols, Z%values)
+    descr%type = SPARSE_MATRIX_TYPE_GENERAL
+    descr%mode = SPARSE_FILL_MODE_FULL
+    descr%diag = SPARSE_DIAG_NON_UNIT
+    stat = mkl_sparse_copy ( Z%A, descr, A )
+    stat = mkl_sparse_destroy ( Z%A )
+    deallocate(Z%values,Z%cols,Z%rows_start,Z%rows_end)
+
+    end subroutine ComputeZeroExchangeOperator
+
     !>-----------------------------------------
     !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
     !> @brief
@@ -3902,7 +4015,7 @@ end subroutine updateDemagfieldDipFmm
          ( any(problem%K1 .ne. 0) .or. any(problem%K2 .ne. 0) .or. any(problem%K0_arr .ne. 0) ) ) then
         call displayGUIMessage( 'MagTense: the uniaxial anisotropy K0 cannot be combined with K1, K2 or K0_arr' )
         call displayGUIMessage( 'MagTense: express the uniaxial term through K0_arr(:,1,:) instead, or set K0 to zero' )
-        error stop 'ComputeAnisotropyTerm3D: K0 cannot be combined with K1, K2 or K0_arr'
+        call abortMagTense( 'ComputeAnisotropyTerm3D: K0 cannot be combined with K1, K2 or K0_arr' )
     endif
 
     if (any(problem%K0 .ne. 0)) then !Uniaxial anisotropy

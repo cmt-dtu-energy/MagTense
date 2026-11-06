@@ -142,11 +142,21 @@ real(8),dimension(4) :: maxRelDiffArr
                 if ( tiles(i)%includeInIteration .ne. 0 ) then
                     !! Consider the different possible tiles
                     select case (tiles(i)%tileType )
-                    case (tileTypeCylPiece)                
-                        !! Find the contribution to the internal field of the i'th tile from all tiles           
-                        pts(1) = cos(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(1)
-                        pts(2) = sin(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(2)
-                        pts(3) = tiles(i)%z0 + tiles(i)%offset(3)
+                    case (tileTypeCylPiece)
+                        !! Find the contribution to the internal field of the i'th tile from all tiles
+                        if ( isFullCylinder( tiles(i) ) ) then
+                            !! A full cylinder is evaluated at its centre, on the axis, rotated with the tile like the circ piece
+                            pts(1) = 0.
+                            pts(2) = 0.
+                            pts(3) = tiles(i)%z0
+                            call getRotationMatrices( tiles(i), rotMat, rotMatInv)
+                            pts = matmul( rotMatInv, pts ) + tiles(i)%offset
+                            if ( tiles(i)%n_ave(1) * tiles(i)%n_ave(2) * tiles(i)%n_ave(3) .eq. 1 ) tiles(i)%H_ave_pts(1,:) = pts
+                        else
+                            pts(1) = cos(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(1)
+                            pts(2) = sin(tiles(i)%theta0) * tiles(i)%r0 + tiles(i)%offset(2)
+                            pts(3) = tiles(i)%z0 + tiles(i)%offset(3)
+                        endif
                         if ( tiles(i)%fieldEvaluation == fieldEvaluationCentre ) then
                             !! Do nothing as the field is already know at the tile centers
                     

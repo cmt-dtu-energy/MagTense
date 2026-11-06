@@ -433,7 +433,22 @@
         integer(4) :: i
         logical,intent(in),optional :: useStoredN
         real(8) :: x_nan_val
-        
+        procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
+
+        !::A tile that spans the full circle is a full cylinder (inner radius zero) or a ring. Its tensor is
+        !::the closed form of Caciagli et al. (2018) in TileCylinderTensor, evaluated through the generic
+        !::routine like the other closed geometries, so it is defined on the axis, follows rotAngles and
+        !::exploitSymmetry, and returns H directly (no M to subtract afterwards).
+        if ( isFullCircleCyl( cylTile ) ) then
+            N_tensor => getN_fullCylinder
+            if ( cylTile%exploitSymmetry .eq. 1 ) then
+                call getFieldFromTile_symm( cylTile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+            else
+                call getFieldFromTile( cylTile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+            endif
+            return
+        endif
+
         x_nan_val = 0.
         x_nan_val = 0./x_nan_val
 
@@ -557,8 +572,9 @@
               
         !::loop over each tile
         do i=1,n_tiles
-            if ( tiles(i)%tileType .eq. tileTypeCylPiece ) then
-            
+            !::A full cylinder or ring (isFullCircleCyl) already returns H, so nothing is subtracted for it
+            if ( tiles(i)%tileType .eq. tileTypeCylPiece .AND. .NOT. isFullCircleCyl( tiles(i) ) ) then
+
                 !::Include the offset between the global coordinate system and the tile's coordinate system
                 !::the pts array is always in global coordinates
                 pts_local(:,1) = pts(:,1) - tiles(i)%offset(1)

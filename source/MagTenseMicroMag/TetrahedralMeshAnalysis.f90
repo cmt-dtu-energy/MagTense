@@ -101,16 +101,16 @@ module TetrahedralMeshAnalysis
 
     if ( N .lt. 1 ) then
         call displayGUIMessage( 'MagTense: the tetrahedral mesh holds no elements' )
-        error stop 'TetrahedralUnstructuredMeshAnalysis: empty mesh'
+        call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: empty mesh' )
     endif
     if ( size(elements,1) .lt. 4 ) then
         call displayGUIMessage( 'MagTense: the element connectivity needs at least four rows' )
-        error stop 'TetrahedralUnstructuredMeshAnalysis: malformed connectivity'
+        call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: malformed connectivity' )
     endif
     if ( (minval(elements(1:4,:)) .lt. 1) .or. (maxval(elements(1:4,:)) .gt. M) ) then
         call displayGUIMessage( 'MagTense: the element connectivity refers to a node outside the node array' )
         call displayGUIMessage( 'MagTense: the connectivity has to be 1-based' )
-        error stop 'TetrahedralUnstructuredMeshAnalysis: node index out of range'
+        call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: node index out of range' )
     endif
 
     PBC = ( exchPBC .ne. 0 )
@@ -138,7 +138,7 @@ module TetrahedralMeshAnalysis
 
     if ( any( Volumes .le. 0.0_dp ) ) then
         call displayGUIMessage( 'MagTense: the mesh contains a tetrahedron of zero volume' )
-        error stop 'TetrahedralUnstructuredMeshAnalysis: degenerate element'
+        call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: degenerate element' )
     endif
 
     !------------------------------------------------------------------------------------------
@@ -200,7 +200,7 @@ module TetrahedralMeshAnalysis
             if ( PBC(i) .and. ( Lper(i) .lt. (2.0_dp * maxSpan(i) + 1.0e-9_dp * Lper(i)) ) ) then
                 call displayGUIMessage( 'MagTense: too few elements along a periodic direction' )
                 call displayGUIMessage( 'MagTense: at least three elements are required for periodic exchange boundary conditions' )
-                error stop 'TetrahedralUnstructuredMeshAnalysis: too few elements along a periodic direction'
+                call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: too few elements along a periodic direction' )
             endif
         end do
 
@@ -226,7 +226,7 @@ module TetrahedralMeshAnalysis
                 if ( elemC(p,j) .eq. elemC(q,j) ) then
                     call displayGUIMessage( 'MagTense: an element touches its own periodic image' )
                     call displayGUIMessage( 'MagTense: the mesh is too thin along a periodic direction' )
-                    error stop 'TetrahedralUnstructuredMeshAnalysis: element touches its own image'
+                    call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: element touches its own image' )
                 endif
             end do
         end do
@@ -292,7 +292,7 @@ module TetrahedralMeshAnalysis
             if ( cnt .eq. 4 ) then
                 if ( outElem(t) .ne. j ) then
                     call displayGUIMessage( 'MagTense: two elements of the mesh share all four nodes' )
-                    error stop 'TetrahedralUnstructuredMeshAnalysis: duplicate element'
+                    call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: duplicate element' )
                 endif
                 cycle
             endif
@@ -307,13 +307,13 @@ module TetrahedralMeshAnalysis
             if ( nNb(j) .ge. 4 ) then
                 call displayGUIMessage( 'MagTense: an element has more than four face neighbours' )
                 call displayGUIMessage( 'MagTense: the mesh is not conforming - hanging nodes are not supported' )
-                error stop 'TetrahedralUnstructuredMeshAnalysis: non-conforming mesh'
+                call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: non-conforming mesh' )
             endif
             do s = 1, nNb(j)
                 if ( nbLoc(s,j) .eq. loc ) then
                     call displayGUIMessage( 'MagTense: two elements claim the same face of a third element' )
                     call displayGUIMessage( 'MagTense: the mesh is not conforming - hanging nodes are not supported' )
-                    error stop 'TetrahedralUnstructuredMeshAnalysis: non-conforming mesh'
+                    call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: non-conforming mesh' )
                 endif
             end do
 
@@ -512,7 +512,7 @@ module TetrahedralMeshAnalysis
 
     if ( totf .ne. K ) then
         call displayGUIMessage( 'MagTense: internal error - the face count does not match' )
-        error stop 'TetrahedralUnstructuredMeshAnalysis: face count mismatch'
+        call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: face count mismatch' )
     endif
 
     !------------------------------------------------------------------------------------------
@@ -1062,7 +1062,7 @@ module TetrahedralMeshAnalysis
             parentArea(i) = abs(triArea2D(triA))
             if ( parentArea(i) .le. 0.0_dp ) then
                 call displayGUIMessage( 'MagTense: a boundary triangle on a periodic plane has zero area' )
-                error stop 'TetrahedralUnstructuredMeshAnalysis: degenerate boundary face'
+                call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: degenerate boundary face' )
             endif
             if ( mpSide(i) .eq. 1 ) then
                 nA = nA + 1
@@ -1075,7 +1075,7 @@ module TetrahedralMeshAnalysis
 
         if ( (nA .eq. 0) .or. (nB .eq. 0) ) then
             call displayGUIMessage( 'MagTense: a periodic boundary plane carries no faces' )
-            error stop 'TetrahedralUnstructuredMeshAnalysis: empty periodic boundary plane'
+            call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: empty periodic boundary plane' )
         endif
 
         !--- a two dimensional lookup grid over the low-plane triangles ------------------------
@@ -1222,7 +1222,7 @@ module TetrahedralMeshAnalysis
         call displayGUIMessage( trim(prog_str) )
         call displayGUIMessage( 'MagTense: the two boundary planes do not cover the same cross section' )
         call displayGUIMessage( 'MagTense: the geometry, not just the mesh, has to be periodic' )
-        error stop 'TetrahedralUnstructuredMeshAnalysis: non-periodic geometry'
+        call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: non-periodic geometry' )
     endif
 
     write(prog_str,'(A,I0,A,I0,A)') 'Mortar coupling: ', nMP, ' boundary faces split into ', &
@@ -1532,7 +1532,7 @@ module TetrahedralMeshAnalysis
         call displayGUIMessage( 'MagTense: out of memory in TetrahedralUnstructuredMeshAnalysis' )
         call displayGUIMessage( 'MagTense: failed to allocate '//trim(arrayname) )
         call displayGUIMessage( 'MagTense: reduce the number of mesh elements or free memory and retry' )
-        error stop 'TetrahedralUnstructuredMeshAnalysis: allocation failure'
+        call abortMagTense( 'TetrahedralUnstructuredMeshAnalysis: allocation failure' )
     endif
 
     end subroutine checkAllocationTet

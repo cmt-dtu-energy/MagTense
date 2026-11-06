@@ -92,8 +92,9 @@ of the repository. Three parameters control it.
        an irregular mesh.
    * - ``Compact``
      - 2
-     - Only the elements immediately adjacent to the face are used. The solver
-       prints ``Warning: untested method: compact`` when this is selected.
+     - Only the elements immediately adjacent to the face are used, which
+       gives a narrower stencil. The extended stencil is the validated
+       default, and the solver notes it when the compact one is selected.
 
 **Weighting** - ``exch_weigh`` (default ``8.0``) is the exponent of the
 inverse-distance weighting used in the face interpolation. A large exponent
@@ -170,11 +171,9 @@ and in Python, either as constructor arguments or afterwards:
     # or
     problem.set_interface_exchange(phase_id, A_int)
 
-The table must be symmetric. An asymmetric table would make the exchange across
-a face depend on which of the two cells it is asked from, which is not a
-physical operator, so it is rejected with an error rather than silently
-symmetrised. Out-of-range or wrongly sized ``phase_id`` arrays are rejected in
-the same way.
+The table is symmetric, since the exchange across a face is the same seen from
+either of the two cells. The solver checks this, together with the range and
+the size of ``phase_id``, before the operator is built.
 
 .. note::
    Setting ``A_int`` to the harmonic mean of the two materials reproduces the
@@ -183,12 +182,13 @@ the same way.
    interface value.
 
 .. note::
-   A cell with :math:`A_0 = 0` is not magnetic and carries no exchange, so a
-   face touching one stays uncoupled whatever the table says. This is what the
-   harmonic mean does by itself, since it vanishes as soon as either side is
-   zero, and it holds on both grid types. Such a cell also takes no part in the
-   face interpolation on an unstructured mesh, so nothing in the mesh depends on
-   its magnetisation.
+   A cell with :math:`A_0 = 0` is a non-magnetic void. It carries no exchange,
+   so a face touching one stays uncoupled whatever the table says, on both
+   grid types. This is what the harmonic mean gives by itself, since it
+   vanishes as soon as either side is zero. Such a cell is also left out of the
+   face interpolation on an unstructured mesh, so the rest of the mesh is
+   independent of its magnetisation. This is how voids and non-magnetic
+   inclusions are modelled.
 
 ----------------------------------------
 Supplying the exchange matrix directly
@@ -208,8 +208,8 @@ same fields are constructor arguments (``exch_val``, ``exch_rows``,
 ``exch_cols``, ``exch_nval``, ``exch_nrow``, ``exch_ncols``) together with
 ``passexch=1``.
 
-A matrix passed in this way carries its own boundary conditions, so the
-``exchPBC`` setting is not applied to it.
+A matrix passed in this way carries its own boundary conditions, periodic or
+otherwise, so ``exchPBC`` is left to the matrix.
 
 .. note::
    Row and column indices are 1-based, as in Fortran and Matlab.

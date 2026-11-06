@@ -64,11 +64,9 @@ mind:
   larger, more strongly averaged volume.
 
 .. note::
-   The thermal field requires the **dynamic** solver. The explicit solver
-   computes equilibrium states at a sequence of constant applied fields and has
-   no time axis for the fluctuations to live on. The prefactor is still
-   allocated for all solver types, so no error is raised, but a thermal run
-   with the explicit solver is not meaningful.
+   The thermal field lives on the time axis of the integration. It is used
+   with the ``Dynamic`` solver and with ``ExplicitLL``, which relaxes at each
+   constant applied field by time integration; see :ref:`Solver type`.
 
 ----------------------------------------
 Reproducible random numbers
@@ -85,10 +83,9 @@ are:
    * - Value
      - Behaviour
    * - ``0`` (default)
-     - The compiler default sequence is used. It is identical in every process
-       and keeps advancing between solves within one process, so runs are
-       neither reproducible nor independent. This preserves the behaviour of
-       earlier MagTense versions.
+     - The compiler default sequence is used, as in earlier MagTense versions.
+       It is the same in every process and keeps advancing between solves
+       within one process.
    * - ``> 0``
      - The generator is seeded deterministically from this value. The same
        seed reproduces a run exactly; different seeds give independent runs.
@@ -98,9 +95,8 @@ are:
        on every run. This is what independent Monte-Carlo samples need.
 
 .. note::
-   The seed is applied inside Fortran. Seeding NumPy in a Python script has no
-   effect on the thermal field - only on quantities that Python itself draws,
-   such as a randomly initialised ``m0``.
+   The seed is applied inside Fortran. Quantities that Python draws itself,
+   such as a randomly initialised ``m0``, follow NumPy's own seed.
 
 ----------------------------------------
 Validation

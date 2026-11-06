@@ -83,6 +83,12 @@ function checks = periodic_exchange_test(options)
 % all carry over; the plane wave test does not, since six tetrahedra share every cube and a plain
 % plane wave is then no longer an eigenvector.
 %
+% Two cells along a periodic direction
+% ------------------------------------
+% With two cells along a periodic direction a tile has the same cell as its neighbour on both
+% sides, which the uniform grid does not support. Such a problem has to be refused with a MATLAB
+% error that leaves the session usable, which is checked by running a valid problem right after.
+%
 % Returns a struct array of checks with the fields 'check', 'value', 'limit' and 'passed',
 % where a check passes when value < limit. That is the contract used by testMagTenseFunctions.m.
 
@@ -300,6 +306,30 @@ for g = 1:numel(gridTypes)
             'passed', supercells(g) < SUPERCELL_TOL); %#ok<AGROW>
     end
 end
+
+%% Two cells along a periodic direction
+% With two cells the ordinary and the wrap-around neighbour of a tile are the same cell, which
+% the uniform grid refuses. The refusal has to arrive as a MATLAB error that can be caught, not
+% end the MATLAB process, and the next solve in the same session has to work as before.
+fprintf('\nTwo cells along a periodic direction on the uniform grid\n');
+caught = 'no error';
+try
+    exchange_matrix([2 3 3], op_a, [1 0 0], 'uniform', options.use_CUDA);
+    refused = false;
+catch err
+    caught = sprintf('%s: %s', err.identifier, err.message);
+    refused = strcmp(err.identifier, 'MagTense:abort') && ...
+              contains(err.message, 'too few cells along a periodic direction');
+end
+A_after = exchange_matrix([3 3 3], op_a, [1 0 0], 'uniform', options.use_CUDA);
+row_sum_after = max(abs(sum(A_after, 2))) / max(abs(A_after(:)));
+fprintf('  2 x 3 x 3 cells, exchPBC = [1 0 0] : %s (%s)\n', passFail(refused), caught);
+fprintf('  3 x 3 x 3 cells afterwards          : max |row sum| %.3e [%s]\n', ...
+        row_sum_after, passFail(row_sum_after < ROW_SUM_TOL));
+checks(end+1) = struct('check', 'uniform grid: two cells along a periodic direction are refused', ...
+    'value', double(~refused), 'limit', 0.5, 'passed', refused);
+checks(end+1) = struct('check', 'uniform grid: a solve after the refusal still works', ...
+    'value', row_sum_after, 'limit', ROW_SUM_TOL, 'passed', row_sum_after < ROW_SUM_TOL);
 
 %% The irregular mesh of grains
 % Method 1 with a gap through the mesh instead of the sections, and methods 2 and 3 on a smaller

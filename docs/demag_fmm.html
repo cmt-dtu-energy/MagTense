@@ -90,18 +90,17 @@
 <h1>Demag field - FMM<a class="headerlink" href="#demag-field-fmm" title="Link to this heading"></a></h1>
 <p>Calculating the demagnetization (stray) field is typically the most
 computationally demanding part of a micromagnetic simulation. MagTense’s
-default approach - the fully analytical demagnetization tensor - is exact, but
-its <span class="math notranslate nohighlight">\(O(N^2)\)</span> memory and work scaling becomes prohibitive for very large
-systems.</p>
-<p>To address this, MagTense includes an implementation of the <strong>Fast Multipole
-Method (FMM)</strong>, which reduces the computational complexity to <span class="math notranslate nohighlight">\(O(N)\)</span>.</p>
+default approach - the fully analytical demagnetization tensor - is exact, with
+memory and work that scale as <span class="math notranslate nohighlight">\(O(N^2)\)</span> in the number of cells.</p>
+<p>For very large systems MagTense includes an implementation of the <strong>Fast
+Multipole Method (FMM)</strong>, which reduces the computational complexity to
+<span class="math notranslate nohighlight">\(O(N)\)</span> while keeping the analytical tensor for all near-field
+interactions.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The FMM path is <strong>off by default</strong>. It has to be enabled explicitly with
-<code class="docutils literal notranslate"><span class="pre">use_fmm</span></code>, and it is ignored altogether unless the library was built with
-<code class="docutils literal notranslate"><span class="pre">USE_FMM3D=1</span></code>. Opting in explicitly means that a problem does not silently
-change its demagnetization path when the library is rebuilt with FMM
-support.</p>
+<p>The FMM path is selected explicitly with <code class="docutils literal notranslate"><span class="pre">use_fmm</span></code>, in a library built
+with <code class="docutils literal notranslate"><span class="pre">USE_FMM3D=1</span></code>, so a problem keeps its demagnetization path when the
+library is rebuilt.</p>
 </div>
 <section id="implementation-and-attribution">
 <h2>Implementation and attribution<a class="headerlink" href="#implementation-and-attribution" title="Link to this heading"></a></h2>
@@ -123,8 +122,8 @@ modules:</p>
 </pre></div>
 </div>
 <p>On Linux, <code class="docutils literal notranslate"><span class="pre">$(MagTense)/external/FMM3D/local</span></code> must be on <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code>
-when building. Without <code class="docutils literal notranslate"><span class="pre">USE_FMM3D=1</span></code> the FMM source is not compiled at all
-and the <code class="docutils literal notranslate"><span class="pre">use_fmm</span></code> flag has no effect.</p>
+when building. <code class="docutils literal notranslate"><span class="pre">USE_FMM3D=1</span></code> is what compiles the FMM source and activates
+the <code class="docutils literal notranslate"><span class="pre">use_fmm</span></code> flag.</p>
 </section>
 <section id="optimization-persistent-tree-structure">
 <h2>Optimization: persistent tree structure<a class="headerlink" href="#optimization-persistent-tree-structure" title="Link to this heading"></a></h2>
@@ -135,16 +134,16 @@ solver. By reusing the tree, the cost of re-partitioning space at every time
 step is eliminated.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The current implementation requires a fully grown tree, so <strong>ifunif</strong> must
-always be set to <strong>1</strong>.</p>
+<p>MagTense uses a fully grown (uniform) tree, <strong>ifunif = 1</strong>, which is what
+lets the cached tree be reused unchanged from call to call.</p>
 </div>
 </section>
 <section id="near-field-evaluation-and-neighbour-tensors">
 <h2>Near-field evaluation and neighbour tensors<a class="headerlink" href="#near-field-evaluation-and-neighbour-tensors" title="Link to this heading"></a></h2>
 <p>In standard FMM implementations, near-field interactions are handled by a
-direct point-to-point (P2P) evaluation. In MagTense this standard P2P
-evaluation is <strong>disabled</strong>, and the high-precision analytical demagnetization
-tensors are used for all near-field interactions instead:</p>
+direct point-to-point (P2P) evaluation. MagTense replaces this by the
+high-precision analytical demagnetization tensors for all near-field
+interactions:</p>
 <ol class="arabic simple">
 <li><p><strong>Neighbour identification:</strong> based on <em>List 1</em> from the FMM tree creation,
 MagTense identifies neighbour pairs, i.e. cells within the same or adjacent
@@ -198,7 +197,7 @@ order from <code class="docutils literal notranslate"><span class="pre">fmm_eps<
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ifunif</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">ifunif</span></code></p></td>
 <td><p>int</p></td>
-<td><p>Tree type. Must be <strong>1</strong> (uniform tree).</p></td>
+<td><p>Tree type. MagTense uses the uniform tree, <strong>1</strong>.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nlmin</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">nlmin</span></code></p></td>
@@ -208,8 +207,8 @@ order from <code class="docutils literal notranslate"><span class="pre">fmm_eps<
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nlmax</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">nlmax</span></code></p></td>
 <td><p>int</p></td>
-<td><p>Maximum level of the octree hierarchy. For the required uniform tree,
-this parameter controls the tree depth. Default 5.</p></td>
+<td><p>Maximum level of the octree hierarchy, which for the uniform tree is
+its depth. Default 5.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">allow_fmm_short_circuit</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">fmm_short</span></code></p></td>
@@ -230,14 +229,10 @@ allowed. Default 20000.</p></td>
 <span class="pre">demag</span> <span class="pre">tensor</span></code> and continues with the dense tensor. The test is made before the
 octree is built, so a small or effectively one-dimensional geometry never
 reaches the tree construction.</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>The FMM implementation is currently configured for rectangular-prism cells,
-corresponding to the MagTense grid types <code class="docutils literal notranslate"><span class="pre">gridTypeUniform</span></code> and
-<code class="docutils literal notranslate"><span class="pre">gridTypeUnstructuredPrisms</span></code>. Cell dimensions may be supplied either
-through the uniform-grid dimensions <code class="docutils literal notranslate"><span class="pre">dx</span></code>, <code class="docutils literal notranslate"><span class="pre">dy</span></code>, and <code class="docutils literal notranslate"><span class="pre">dz</span></code>, or through
-the per-cell <code class="docutils literal notranslate"><span class="pre">grid_abc</span></code> dimensions for unstructured prism grids.</p>
-</div>
+<p>The FMM path works with rectangular-prism cells, i.e. the <code class="docutils literal notranslate"><span class="pre">uniform</span></code> and
+<code class="docutils literal notranslate"><span class="pre">unstructuredPrisms</span></code> grid types, taking the cell dimensions from the
+uniform-grid spacings <code class="docutils literal notranslate"><span class="pre">dx</span></code>, <code class="docutils literal notranslate"><span class="pre">dy</span></code> and <code class="docutils literal notranslate"><span class="pre">dz</span></code> or from the per-cell
+<code class="docutils literal notranslate"><span class="pre">grid_abc</span></code> of an unstructured prism grid.</p>
 </section>
 <section id="fmm-python-example">
 <h2>FMM Python example<a class="headerlink" href="#fmm-python-example" title="Link to this heading"></a></h2>

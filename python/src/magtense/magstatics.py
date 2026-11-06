@@ -85,7 +85,9 @@ class Tiles:
         mu_r_ea: Relative permeability in easy axis.
         mu_r_oa: Relative permeability in other axis.
         M_rem: Remanent magnetization.
-        tile_type: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
+        tile_type: 1 = cylinder (a cylindrical piece; with dtheta = 2 pi a full cylinder, or a
+                   ring when the inner radius r0 - dr/2 is not zero, evaluated in closed form),
+                   2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
                    5 = tetrahedron, 6 = sphere, 7 = spheroid, 8 = avg prism, 10 = ellipsoid,
                    101 = planar coil, 102 = uniform applied field (not a geometry, see
                    add_uniform_field)

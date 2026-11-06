@@ -333,7 +333,7 @@ end subroutine
       
       FUNCTION rf(x,y,z)
       REAL rf,x,y,z,ERRTOL,TINY,BIG,THIRD,C1,C2,C3,C4
-      PARAMETER (ERRTOL=.08,TINY=1.e-308,BIG=1.E308,THIRD=1./3.,C1=1./24.,C2=.1,C3=3./44.,C4=1./14.)
+      PARAMETER (ERRTOL=.0025,TINY=1.e-308,BIG=1.E308,THIRD=1./3.,C1=1./24.,C2=.1,C3=3./44.,C4=1./14.)
       REAL alamb,ave,delx,dely,delz,e2,e3,sqrtx,sqrty,sqrtz,xt,yt,zt
       if(min(x,y,z).lt.0..or.min(x+y,x+z,y+z).lt.TINY.or.max(x,y,z).gt.BIG)pause 'invalid arguments in rf'
       xt=x
@@ -360,7 +360,7 @@ end subroutine
 
       FUNCTION rj(x,y,z,p)
       REAL rj,p,x,y,z,ERRTOL,TINY,BIG,C1,C2,C3,C4,C5,C6,C7,C8
-      PARAMETER (ERRTOL=.05,TINY=2.5e-13,BIG=9.E11,C1=3./14.,C2=1./3.,C3=3./22.,C4=3./26.,C5=.75*C3,C6=1.5*C4,C7=.5*C2,C8=C3+C3)
+      PARAMETER (ERRTOL=.0015,TINY=1.e-100,BIG=1.E60,C1=3./14.,C2=1./3.,C3=3./22.,C4=3./26.,C5=.75*C3,C6=1.5*C4,C7=.5*C2,C8=C3+C3)
 !     USES rc,rf
       REAL a,alamb,alpha,ave,b,beta,delp,delx,dely,delz,ea,eb,ec,ed,ee,fac,pt,rcx,rho,sqrtx,sqrty,sqrtz,sum,tau,xt,yt,zt
       if(min(x,y,z).lt.0..or.min(x+y,x+z,y+z,abs(p)).lt.TINY.or.max(x,y,z,abs(p)).gt.BIG)pause 'invalid arguments in rj'
@@ -413,7 +413,7 @@ end subroutine
 
       FUNCTION rc(x,y)
       REAL rc,x,y,ERRTOL,TINY,SQRTNY,BIG,TNBG,COMP1,COMP2,THIRD,C1,C2,C3,C4
-      PARAMETER (ERRTOL=.04,TINY=1.69e-38,SQRTNY=1.3e-19,BIG=3.E37,TNBG=TINY*BIG,COMP1=2.236/SQRTNY,COMP2=TNBG*TNBG/25.,THIRD=1./3.,C1=.3,C2=1./7.,C3=.375,C4=9./22.)
+      PARAMETER (ERRTOL=.0012,TINY=1.e-250,SQRTNY=1.e-125,BIG=1.E250,TNBG=TINY*BIG,COMP1=2.236/SQRTNY,COMP2=TNBG*TNBG/25.,THIRD=1./3.,C1=.3,C2=1./7.,C3=.375,C4=9./22.)
       REAL alamb,ave,s,w,xt,yt
       if(x.lt.0..or.y.eq.0..or.(x+abs(y)).lt.TINY.or.(x+abs(y)).gt.BIG.or.(y.lt.-COMP1.and.x.gt.0..and.x.lt.COMP2))pause 'invalid arguments in rc'
       if(y.gt.0.)then
@@ -438,7 +438,7 @@ end subroutine
       
       FUNCTION rd(x,y,z)
       REAL rd,x,y,z,ERRTOL,TINY,BIG,C1,C2,C3,C4,C5,C6
-      PARAMETER (ERRTOL=.05,TINY=1.e-25,BIG=4.5E21,C1=3./14.,C2=1./6.,C3=9./22.,C4=3./26.,C5=.25*C3,C6=1.5*C4)
+      PARAMETER (ERRTOL=.0015,TINY=1.e-25,BIG=4.5E21,C1=3./14.,C2=1./6.,C3=9./22.,C4=3./26.,C5=.25*C3,C6=1.5*C4)
       REAL alamb,ave,delx,dely,delz,ea,eb,ec,ed,ee,fac,sqrtx,sqrty,sqrtz,sum,xt,yt,zt
       if(min(x,y).lt.0..or.min(x+y,z).lt.TINY.or.max(x,y,z).gt.BIG)pause 'invalid arguments in rd'
       xt=x

@@ -195,15 +195,13 @@ and <span class="math notranslate nohighlight">\(M_s\)</span>,</p>
 \[l_\mathrm{ex} = \sqrt{\frac{A_0}{\tfrac{1}{2}\mu_0 M_s^2}} .\]</div>
 <section id="magnetocrystalline-anisotropy">
 <h2>Magnetocrystalline anisotropy<a class="headerlink" href="#magnetocrystalline-anisotropy" title="Link to this heading"></a></h2>
-<p>MagTense offers three ways of specifying the anisotropy. They are <strong>mutually
-exclusive in the following sense</strong>: the uniaxial constant <code class="docutils literal notranslate"><span class="pre">K0</span></code> cannot be
-combined with <code class="docutils literal notranslate"><span class="pre">K1</span></code>, <code class="docutils literal notranslate"><span class="pre">K2</span></code> or <code class="docutils literal notranslate"><span class="pre">K0_arr</span></code>. Doing so aborts the solve with</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">MagTense</span><span class="p">:</span> <span class="n">the</span> <span class="n">uniaxial</span> <span class="n">anisotropy</span> <span class="n">K0</span> <span class="n">cannot</span> <span class="n">be</span> <span class="n">combined</span> <span class="k">with</span> <span class="n">K1</span><span class="p">,</span> <span class="n">K2</span> <span class="ow">or</span> <span class="n">K0_arr</span>
-<span class="n">MagTense</span><span class="p">:</span> <span class="n">express</span> <span class="n">the</span> <span class="n">uniaxial</span> <span class="n">term</span> <span class="n">through</span> <span class="n">K0_arr</span><span class="p">(:,</span><span class="mi">1</span><span class="p">,:)</span> <span class="n">instead</span><span class="p">,</span> <span class="ow">or</span> <span class="nb">set</span> <span class="n">K0</span> <span class="n">to</span> <span class="n">zero</span>
-</pre></div>
-</div>
-<p><code class="docutils literal notranslate"><span class="pre">K1</span></code>/<code class="docutils literal notranslate"><span class="pre">K2</span></code> and <code class="docutils literal notranslate"><span class="pre">K0_arr</span></code> <em>are</em> compatible - they are expressed in the same
-rotated frame and are summed.</p>
+<p>MagTense offers three ways of specifying the anisotropy. The cubic constants
+<code class="docutils literal notranslate"><span class="pre">K1</span></code>/<code class="docutils literal notranslate"><span class="pre">K2</span></code> and the general expansion <code class="docutils literal notranslate"><span class="pre">K0_arr</span></code> are expressed in the same
+rotated crystal frame and are summed, so they can be given together. The
+uniaxial constant <code class="docutils literal notranslate"><span class="pre">K0</span></code> is its own path with its own easy axis; a uniaxial
+term that is to be combined with the cubic or the general expansion is written
+into <code class="docutils literal notranslate"><span class="pre">K0_arr(:,1,:)</span></code> instead, as shown under <a class="reference internal" href="#general-anisotropy"><span class="std std-ref">General anisotropy</span></a>, and
+the solver points this out if <code class="docutils literal notranslate"><span class="pre">K0</span></code> is set together with the others.</p>
 <section id="uniaxial-anisotropy">
 <h3>Uniaxial anisotropy<a class="headerlink" href="#uniaxial-anisotropy" title="Link to this heading"></a></h3>
 <p>Specify a local anisotropy constant <code class="docutils literal notranslate"><span class="pre">K0(i)</span></code> at every grid point together with
@@ -213,7 +211,7 @@ field is then</p>
 \[\mathbf{H}_\mathrm{ani} = \frac{2 K_0}{\mu_0 M_s}
     \left( \mathbf{u}_\mathrm{ea}\cdot\mathbf{m} \right) \mathbf{u}_\mathrm{ea},\]</div>
 <p>i.e. a positive <span class="math notranslate nohighlight">\(K_0\)</span> makes <span class="math notranslate nohighlight">\(\mathbf{u}_\mathrm{ea}\)</span> an easy axis.
-This path does not use <code class="docutils literal notranslate"><span class="pre">CrysAxis</span></code>.</p>
+The easy axis is given directly in the global coordinate system, per cell.</p>
 </section>
 <section id="cubic-anisotropy">
 <h3>Cubic anisotropy<a class="headerlink" href="#cubic-anisotropy" title="Link to this heading"></a></h3>
@@ -305,7 +303,7 @@ values in <code class="docutils literal notranslate"><span class="pre">alphat</s
 </pre></div>
 </div>
 <p>and in Python through the <code class="docutils literal notranslate"><span class="pre">t_alpha</span></code> and <code class="docutils literal notranslate"><span class="pre">alpha_fct</span></code> constructor arguments.
-If <code class="docutils literal notranslate"><span class="pre">alpha</span></code> is non-zero it is used as a constant and the table is ignored.</p>
+A non-zero <code class="docutils literal notranslate"><span class="pre">alpha</span></code> is used as a constant damping.</p>
 </section>
 </section>
 

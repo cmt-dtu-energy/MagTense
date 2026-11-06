@@ -17,6 +17,7 @@ FIELD_ERROR_LIMIT = 5
 VALIDATIONS = [
     ("Validation_field_cylindrical_slice", "validation_cylindrical_slice_example_1"),
     ("Validation_field_cylindrical_slice", "validation_cylindrical_slice_example_2"),
+    ("Validation_field_cylinder", "validation_cylinder"),
     ("Validation_field_prism", "validation_prism"),
     ("Validation_field_circpiece", "validation_circpiece"),
     ("Validation_field_circpiece_inverted", "validation_circpiece_inverted"),

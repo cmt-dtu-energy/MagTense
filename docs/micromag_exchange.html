@@ -190,8 +190,9 @@ an irregular mesh.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">Compact</span></code></p></td>
 <td><p>2</p></td>
-<td><p>Only the elements immediately adjacent to the face are used. The solver
-prints <code class="docutils literal notranslate"><span class="pre">Warning:</span> <span class="pre">untested</span> <span class="pre">method:</span> <span class="pre">compact</span></code> when this is selected.</p></td>
+<td><p>Only the elements immediately adjacent to the face are used, which
+gives a narrower stencil. The extended stencil is the validated
+default, and the solver notes it when the compact one is selected.</p></td>
 </tr>
 </tbody>
 </table>
@@ -268,11 +269,9 @@ override only the pairs of interest and leave the rest at the default.</p>
 <span class="n">problem</span><span class="o">.</span><span class="n">set_interface_exchange</span><span class="p">(</span><span class="n">phase_id</span><span class="p">,</span> <span class="n">A_int</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>The table must be symmetric. An asymmetric table would make the exchange across
-a face depend on which of the two cells it is asked from, which is not a
-physical operator, so it is rejected with an error rather than silently
-symmetrised. Out-of-range or wrongly sized <code class="docutils literal notranslate"><span class="pre">phase_id</span></code> arrays are rejected in
-the same way.</p>
+<p>The table is symmetric, since the exchange across a face is the same seen from
+either of the two cells. The solver checks this, together with the range and
+the size of <code class="docutils literal notranslate"><span class="pre">phase_id</span></code>, before the operator is built.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Setting <code class="docutils literal notranslate"><span class="pre">A_int</span></code> to the harmonic mean of the two materials reproduces the
@@ -282,12 +281,13 @@ interface value.</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>A cell with <span class="math notranslate nohighlight">\(A_0 = 0\)</span> is not magnetic and carries no exchange, so a
-face touching one stays uncoupled whatever the table says. This is what the
-harmonic mean does by itself, since it vanishes as soon as either side is
-zero, and it holds on both grid types. Such a cell also takes no part in the
-face interpolation on an unstructured mesh, so nothing in the mesh depends on
-its magnetisation.</p>
+<p>A cell with <span class="math notranslate nohighlight">\(A_0 = 0\)</span> is a non-magnetic void. It carries no exchange,
+so a face touching one stays uncoupled whatever the table says, on both
+grid types. This is what the harmonic mean gives by itself, since it
+vanishes as soon as either side is zero. Such a cell is also left out of the
+face interpolation on an unstructured mesh, so the rest of the mesh is
+independent of its magnetisation. This is how voids and non-magnetic
+inclusions are modelled.</p>
 </div>
 </section>
 <section id="supplying-the-exchange-matrix-directly">
@@ -303,8 +303,8 @@ format. In Matlab:</p>
 same fields are constructor arguments (<code class="docutils literal notranslate"><span class="pre">exch_val</span></code>, <code class="docutils literal notranslate"><span class="pre">exch_rows</span></code>,
 <code class="docutils literal notranslate"><span class="pre">exch_cols</span></code>, <code class="docutils literal notranslate"><span class="pre">exch_nval</span></code>, <code class="docutils literal notranslate"><span class="pre">exch_nrow</span></code>, <code class="docutils literal notranslate"><span class="pre">exch_ncols</span></code>) together with
 <code class="docutils literal notranslate"><span class="pre">passexch=1</span></code>.</p>
-<p>A matrix passed in this way carries its own boundary conditions, so the
-<code class="docutils literal notranslate"><span class="pre">exchPBC</span></code> setting is not applied to it.</p>
+<p>A matrix passed in this way carries its own boundary conditions, periodic or
+otherwise, so <code class="docutils literal notranslate"><span class="pre">exchPBC</span></code> is left to the matrix.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Row and column indices are 1-based, as in Fortran and Matlab.</p>
