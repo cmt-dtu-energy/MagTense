@@ -90,6 +90,8 @@ module FortranToPythonIO
                 call getFieldFromSphereTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case ( tileTypeSpheroid )
                 call getFieldFromSpheroidTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
+            case ( tileTypeCone )
+                call getFieldFromConeTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case ( tileTypeCircPiece )
                 call getFieldFromCircPieceTile( tiles(i), H, pts, n_pts, N(i,:,:,:), .false. )
             case ( tileTypeCircPieceInverted )
@@ -213,6 +215,12 @@ module FortranToPythonIO
                     call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
                 else
                     call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts )
+                endif
+            case ( tileTypeCone )
+                if ( useStoredN .eqv. .true. ) then
+                    call getFieldFromConeTile( tiles(i), H_tmp, pts, n_pts, N(i,:,:,:), useStoredN )
+                else
+                    call getFieldFromConeTile( tiles(i), H_tmp, pts, n_pts )
                 endif
             case ( tileTypeCircPiece )
                 if ( useStoredN .eqv. .true. ) then
@@ -378,6 +386,8 @@ subroutine getHFromTilesFMM( centerPos, dev_center, tile_size, vertices, Mag, u_
         vol_i = real(tile_size(i,1), DP) * &
                 real(tile_size(i,2), DP) * &
                 real(tile_size(i,3), DP)
+        !A cone has the radius of its base in tile_size(i,1) and its height in tile_size(i,3), volume pi a**2 c/3
+        if ( tileType(i) .eq. tileTypeCone ) vol_i = fourpi / 12 * real(tile_size(i,1), DP)**2 * real(tile_size(i,3), DP)
         !A uniform applied-field source carries no moment; its field is added after the FMM pass
         if ( tileType(i) .eq. tileTypeUniformField ) vol_i = 0.0d0
 
@@ -643,6 +653,8 @@ end subroutine getHFromTilesFMM
                     call getFieldFromSphereTile( tiles(i), H_tmp, pts, n_pts )
                 case (tileTypeSpheroid)
                     call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_pts )
+                case (tileTypeCone)
+                    call getFieldFromConeTile( tiles(i), H_tmp, pts, n_pts )
                 case (tileTypeCircPiece )
                     call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_pts )
                 case (tileTypeCircPieceInverted )

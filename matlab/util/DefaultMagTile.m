@@ -181,6 +181,14 @@ methods
                 %A prism for which getHFromTiles_mex returns the field averaged over an
                 %observation volume around each point, given as its fifth argument
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Avgprism' );
+            case {'Cone','cone'}
+                %A right circular cone standing on its base, evaluated in closed form.
+                %abc = [base radius, 0, height]. The second entry is reserved for the top
+                %radius of a truncated cone and must be zero. In the tile's own frame the
+                %base is centred at the origin in the plane z = 0 and the apex is at
+                %[0,0,height]. The tile is rotated by rotAngles and then moved to offset,
+                %so offset is the centre of the base
+                obj.tileType = MagTenseTilesUtil.getMagTileType( 'Cone' );
             case {'Planarcoil','planarcoil'}
                 obj.tileType = MagTenseTilesUtil.getMagTileType( 'Planarcoil' );
             case {'Uniformfield','uniformfield'}
@@ -210,6 +218,8 @@ methods
                 res = 'Spheroid';
             case MagTenseTilesUtil.getMagTileType( 'Avgprism' )
                 res = 'Avgprism';
+            case MagTenseTilesUtil.getMagTileType( 'Cone' )
+                res = 'Cone';
             case MagTenseTilesUtil.getMagTileType( 'Planarcoil' )
                 res = 'Planarcoil';
             case MagTenseTilesUtil.getMagTileType( 'Uniformfield' )
