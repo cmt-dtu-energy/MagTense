@@ -3,9 +3,8 @@ Demag field - FMM
 
 Calculating the demagnetization (stray) field is typically the most
 computationally demanding part of a micromagnetic simulation. MagTense's
-default approach - the fully analytical demagnetization tensor - is exact, but
-its :math:`O(N^2)` memory and work scaling becomes prohibitive for very large
-systems.
+default approach - the fully analytical demagnetization tensor - is exact, with
+memory and work that scale as :math:`O(N^2)` in the number of cells.
 
 For such systems MagTense can evaluate the demagnetization field with the
 **Fast Multipole Method (FMM)** through the dip-fmm library, which reduces the

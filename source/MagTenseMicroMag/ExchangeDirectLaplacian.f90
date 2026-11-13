@@ -1,4 +1,4 @@
-module DifferentialOperators
+module ExchangeDirectLaplacian
   use MKL_SPBLAS
   use BLAS95
   use LAPACK95
@@ -190,7 +190,7 @@ module DifferentialOperators
         Aexch_local = Jfact_local
         
         if (method == MicroMagExchMethodGGNeumann .and. ((maxval(Aexch_local)-minval(Aexch_local))/maxval(Aexch_local)) > 1e-6) then
-            error stop 'Green-Gauss method not available for heterogeneous exchange stiffness'
+            call abortMagTense( 'Green-Gauss method not available for heterogeneous exchange stiffness' )
         end if
 
         ! Determine dimensionality
@@ -861,18 +861,6 @@ module DifferentialOperators
     end subroutine quadraticFaceGradient
 
 
-    subroutine passDifferentialOperators(problem)
-        implicit none
-        type(MicroMagProblem),intent(inout) :: problem     !> The problem data structure
-        real(dp) :: eps_criteria
-    
-        eps_criteria = 1.0e-12
-        call displayGUIMessage( 'Creating Exchange matrix start' )
-        call create_CSR_matrix(problem%grid%A_exch_load%rows, problem%grid%A_exch_load%cols, problem%grid%A_exch_load%values, problem%grid%A_exch_load%nrows, problem%grid%A_exch_load%ncols, eps_criteria, problem%A_exch)
-        call displayGUIMessage( 'Creating Exchange matrix end' )
-    
-    end subroutine passDifferentialOperators
-
     
     
 
@@ -918,4 +906,4 @@ module DifferentialOperators
     !    enddo
     !    close(21)
     
-end module DifferentialOperators
+end module ExchangeDirectLaplacian

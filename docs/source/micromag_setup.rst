@@ -64,20 +64,19 @@ to the MEX-file:
 
 The ``struct(problem)`` call performs a final consistency check before the data
 is handed to Fortran: scalar values of ``Ms``, ``A0``, ``K0``, ``K1`` and
-``K2`` are expanded to one value per cell, and ``m0`` is normalised if it is
-not of unit length (a warning is issued). It also prints an estimate of the
-memory needed by the demagnetization tensor.
+``K2`` are expanded to one value per cell, and ``m0`` is normalised to unit
+length. It also prints an estimate of the memory needed by the demagnetization
+tensor.
 
 ``problem.MagTenseLandauLifshitzSolver_mex`` is a function handle that
 ``setUseCuda`` sets, pointing either at ``MagTenseLandauLifshitzSolver_mex`` or
 at ``MagTenseLandauLifshitzSolverNoCUDA_mex``.
 
 .. note::
-   The constructor sets ``useCuda`` to 0 but does not populate that function
-   handle, so ``setUseCuda`` has to be called at least once - with ``false``
-   for a CPU run - before the solver can be invoked through
-   ``problem.MagTenseLandauLifshitzSolver_mex``. Alternatively, call the
-   MEX-file directly by name.
+   ``setUseCuda`` is what selects the MEX-file, so call it once - with
+   ``false`` for a CPU run - before invoking the solver through
+   ``problem.MagTenseLandauLifshitzSolver_mex``. The MEX-file can also be
+   called directly by name.
 
 ----------------------------------------
 Python problem setup
@@ -123,8 +122,7 @@ run method rather than being stored on the problem:
 
 ``m0`` accepts a scalar (all components set to that value), an ``(ntot,3)``
 array, or ``None``, in which case a random unit vector is drawn for every cell.
-As in Matlab, ``m0`` is normalised on assignment and a warning is issued if it
-was not already of unit length.
+As in Matlab, ``m0`` is normalised to unit length on assignment.
 
 The three run methods are
 

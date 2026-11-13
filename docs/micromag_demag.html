@@ -112,8 +112,10 @@ for various geometries, Journal of Magnetism and Magnetic Materials, 587,
 <span class="math notranslate nohighlight">\(K_{xx}, K_{xy}, K_{xz}, K_{yy}, K_{yz}, K_{zz}\)</span>, each a dense
 <span class="math notranslate nohighlight">\(n_\mathrm{tot} \times n_\mathrm{tot}\)</span> matrix in <strong>single precision</strong>.
 The memory requirement is therefore approximately
-<span class="math notranslate nohighlight">\(24\,n_\mathrm{tot}^2\)</span> bytes, which is what limits the problem size; the
-Matlab interface prints an estimate when the problem struct is created. The
+<span class="math notranslate nohighlight">\(24\,n_\mathrm{tot}^2\)</span> bytes, which sets the problem size the dense
+tensor handles; the Matlab interface prints an estimate when the problem
+struct is created, and the <a class="reference internal" href="demag_fmm.html#demag-field-fmm"><span class="std std-ref">Fast Multipole Method</span></a>
+lifts the scaling to <span class="math notranslate nohighlight">\(O(N)\)</span> for larger problems. The
 saturation magnetization is folded into the tensor when it is built, so a
 spatially varying <span class="math notranslate nohighlight">\(M_s\)</span> costs nothing extra.</p>
 <section id="switching-the-demagnetization-off">
@@ -126,17 +128,15 @@ altogether.</p>
 <h2>Cell-averaged versus point-evaluated tensor<a class="headerlink" href="#cell-averaged-versus-point-evaluated-tensor" title="Link to this heading"></a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">useAvgN</span></code> (Python <code class="docutils literal notranslate"><span class="pre">useavgn</span></code>, default <strong>on</strong>) selects the <em>volume-averaged</em>
 prism tensor, i.e. the tensor averaged over the receiving cell rather than
-evaluated at its centre. This is the more accurate choice for a uniform mesh
-and is the default, but it is only implemented for the rectangular prism tile
-(tile_type = 8).</p>
+evaluated at its centre. This is the more accurate choice for a prism mesh
+and is the default; it uses the averaged prism tile (tile_type = 8).</p>
 <p>Some analytical benchmarks are formulated for the tensor evaluated at
 the cell centre, and for those <code class="docutils literal notranslate"><span class="pre">useAvgN</span></code> must be switched off. This includes the
 macrogeometry and shape-correction tests.</p>
 <p>For the <code class="docutils literal notranslate"><span class="pre">unstructuredPrisms</span></code> grid the tensor may additionally be averaged
 numerically over the receiving cell using <code class="docutils literal notranslate"><span class="pre">N_ave</span> <span class="pre">=</span> <span class="pre">[nx,</span> <span class="pre">ny,</span> <span class="pre">nz]</span></code>, which
 evaluates the tensor on an <code class="docutils literal notranslate"><span class="pre">nx*ny*nz</span></code> sub-grid inside each receiving prism
-and averages. The default <code class="docutils literal notranslate"><span class="pre">[1</span> <span class="pre">1</span> <span class="pre">1]</span></code> means no averaging. This is not supported
-for tetrahedral meshes.</p>
+and averages. The default <code class="docutils literal notranslate"><span class="pre">[1</span> <span class="pre">1</span> <span class="pre">1]</span></code> means no averaging.</p>
 </section>
 <section id="approximating-the-tensor">
 <h2>Approximating the tensor<a class="headerlink" href="#approximating-the-tensor" title="Link to this heading"></a></h2>
@@ -172,24 +172,11 @@ six matrices are converted to MKL sparse matrices.</p></td>
 elements to discard. The cut-off value is found by bisection. A value
 <span class="math notranslate nohighlight">\(\geq 1\)</span> zeroes the demagnetization field entirely.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fft_thres</span></code></p></td>
-<td><p>3</p></td>
-<td><p>Threshold applied in Fourier space. <strong>Stale, do not use.</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fft_threshold_fraction</span></code></p></td>
-<td><p>5</p></td>
-<td><p>Fractional threshold applied in Fourier space. <strong>Stale, do not use.</strong></p></td>
-</tr>
 </tbody>
 </table>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>The two Fourier-space approximations are not maintained. The solver prints a
-loud warning if they are selected: the transformed field is never mapped
-back onto the demagnetization field and the tensor is not corrected for a
-spatially varying <span class="math notranslate nohighlight">\(M_s\)</span>, so the result is wrong. Use <code class="docutils literal notranslate"><span class="pre">none</span></code>,
-<code class="docutils literal notranslate"><span class="pre">threshold</span></code> or <code class="docutils literal notranslate"><span class="pre">threshold_fraction</span></code>.</p>
-</div>
+<p>The values 3 (<code class="docutils literal notranslate"><span class="pre">fft_thres</span></code>) and 5 (<code class="docutils literal notranslate"><span class="pre">fft_threshold_fraction</span></code>) select
+earlier Fourier-space variants of the threshold that are superseded by the
+three options above; the solver says so if they are selected.</p>
 </section>
 <section id="adding-noise-to-the-demagnetization-field">
 <h2>Adding noise to the demagnetization field<a class="headerlink" href="#adding-noise-to-the-demagnetization-field" title="Link to this heading"></a></h2>
@@ -218,7 +205,7 @@ it can be written to disk and read back:</p>
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">N_ret</span></code>, <code class="docutils literal notranslate"><span class="pre">N_file_out</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">N_ret</span></code>, <code class="docutils literal notranslate"><span class="pre">N_file_out</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code> does not return the tensor, <code class="docutils literal notranslate"><span class="pre">2</span></code> returns it in memory, and a
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code> keeps the tensor internal, <code class="docutils literal notranslate"><span class="pre">2</span></code> returns it in memory, and a
 value <code class="docutils literal notranslate"><span class="pre">&gt;</span> <span class="pre">2</span></code> writes it to the file named by <code class="docutils literal notranslate"><span class="pre">N_file_out</span></code>. The value
 is the length of that filename.</p></td>
 </tr>
@@ -232,19 +219,19 @@ computing it.</p></td>
 <p>The Matlab helpers <code class="docutils literal notranslate"><span class="pre">setReturnNFilename</span></code> and <code class="docutils literal notranslate"><span class="pre">setLoadNFilename</span></code> set the
 filename and the matching length in one call. In Python the <code class="docutils literal notranslate"><span class="pre">filename</span></code>
 constructor argument sets all four fields; its default <code class="docutils literal notranslate"><span class="pre">&quot;t&quot;</span></code> has length one
-and therefore means “do not return and do not load”.</p>
+and therefore selects the default of computing the tensor internally.</p>
 </section>
 <section id="parallelism-and-hardware">
 <h2>Parallelism and hardware<a class="headerlink" href="#parallelism-and-hardware" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">useCuda</span></code> (Matlab <code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code>, Python <code class="docutils literal notranslate"><span class="pre">cuda</span></code>) evaluates the
 tensor-vector product on an NVIDIA GPU at every time step. The Python
-interface checks for <code class="docutils literal notranslate"><span class="pre">nvidia-smi</span></code> and falls back to the CPU with a warning
-if no GPU is present. In Matlab, <code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code> also picks the matching
-MEX-file.</p></li>
+interface checks for <code class="docutils literal notranslate"><span class="pre">nvidia-smi</span></code> and runs on the CPU instead, with a
+note, when no GPU is present. In Matlab, <code class="docutils literal notranslate"><span class="pre">setUseCuda</span></code> also picks the
+matching MEX-file.</p></li>
 <li><p>The <strong>Fast Multipole Method</strong> replaces the dense tensor by an <span class="math notranslate nohighlight">\(O(N)\)</span>
-evaluation and is described in <a class="reference internal" href="demag_fmm.html#demag-field-fmm"><span class="std std-ref">Demag field - FMM</span></a>. It is off by
-default and requires a build with <code class="docutils literal notranslate"><span class="pre">USE_FMM3D=1</span></code>.</p></li>
+evaluation and is described in <a class="reference internal" href="demag_fmm.html#demag-field-fmm"><span class="std std-ref">Demag field - FMM</span></a>. It is selected
+with <code class="docutils literal notranslate"><span class="pre">use_fmm</span></code> in a build with <code class="docutils literal notranslate"><span class="pre">USE_FMM3D=1</span></code>.</p></li>
 </ul>
 </section>
 </section>

@@ -203,8 +203,12 @@
 		<Filter Name="Header Files" Filter="fi;fd;h;inc"/>
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe"/>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
-			<File RelativePath=".\CellHessianExchange.f90"/>
-			<File RelativePath=".\ComputeDifferentialOperatorsFromMesh.f90"/>
+			<File RelativePath=".\ExchangeCellHessian.f90"/>
+			<File RelativePath=".\ExchangeDirectLaplacian.f90"/>
+			<File RelativePath=".\ExchangeMeshTopology.f90"/>
+			<File RelativePath=".\ExchangeOperator.f90"/>
+			<File RelativePath=".\ExchangeSushi.f90"/>
+			<File RelativePath=".\ExchangeUniform.f90"/>
 			<File RelativePath=".\DemagAuxFunctions.f90"/>
 			<File RelativePath=".\FortranCuda.f90">
 			</File>

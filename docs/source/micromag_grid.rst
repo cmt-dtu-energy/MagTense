@@ -120,18 +120,15 @@ that they do not.
 
 Periodic exchange boundaries are requested through ``exchPBC``. They are linked
 either by identifying the nodes on the two boundary planes, when the mesh is
-periodic along that direction, or by mortar coupling the boundary faces when it
-is not, with the choice made per direction and a warning printed when the
-fallback is used. See :ref:`Periodic boundaries on a tetrahedral mesh` for what
-each mechanism does and what the fallback costs.
+periodic along that direction, or by mortar coupling the boundary faces
+otherwise, with the choice made per direction and reported by the analysis.
+See :ref:`Periodic boundaries on a tetrahedral mesh` for what each mechanism
+does.
 
-The demagnetization tensor is computed from the analytical tetrahedron tensor.
-Note the following limitations of this grid type:
-
-* Averaging of the demagnetization tensor over the receiving cell (``N_ave``)
-  is not supported and a warning is printed if it is requested.
-* The shape correction is disabled, because a tetrahedral mesh carries no
-  per-element size array from which the occupied volume fraction can be found.
+The demagnetization tensor is the analytical tetrahedron tensor, evaluated at
+the element centres. The sub-cell averaging ``N_ave`` and the
+:ref:`Sample shape correction` are features of the prism grids, whose
+per-cell sizes they are built from.
 
 ----------------------------------------------
 Passing an externally computed exchange matrix

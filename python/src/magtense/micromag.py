@@ -119,7 +119,10 @@ class MicromagProblem:
         t_alpha:
         alpha_fct:
         n_macro: How many copies of the simulated domain to have along x, y and z to represent the macrogeometry
-        shiftVec: How far to shift domain copies along x, y and z when constructing the macrogeometry
+        shiftVec: How far to shift domain copies along x, y and z when constructing the macrogeometry,
+            i.e. the period. Equal to grid_L for a gapless periodic medium (the full length n*dx, not
+            the (n-1)*dx between the centres of the end cells); larger for separated particles.
+            A value smaller than grid_L along a direction with copies is rejected.
         macroShape: Sidelengths of a prism representing the shape of the macrogeometry.
         sampleShape: Sidelengths of a prism representing the sample shape.
         use_cdfmm: Use dip-fmm instead of the regular dense demagnetisation
@@ -163,10 +166,12 @@ class MicromagProblem:
             cube of the tiles for the adaptive tree.
         min_tol: Minimizer convergence criterion: the largest torque max_i |m_i x H_i| over the
             cells, divided by max(Ms), must fall below this.
-        min_maxiter: Maximum number of minimizer iterations per applied field.
+        min_maxiter: Iteration cap of one minimizer descent, extended up to four times while
+            the energy is still falling.
         min_maxrot: Largest rotation of any cell in one minimizer iteration [rad].
-        min_fallback: If True, a minimizer that stalls or hits min_maxiter falls back to the
-            Landau-Lifshitz time integration over the requested time window and restarts.
+        min_fallback: If True, a minimizer that stalls, or hits min_maxiter without progress,
+            falls back to the Landau-Lifshitz time integration over the requested time window
+            and restarts.
         min_saddle_check: 1 or True: a converged state is nudged by a small random
             rotation and relaxed again, so that a saddle point - which a symmetric starting
             state such as the canonical vortex sits on - is not mistaken for a minimum.

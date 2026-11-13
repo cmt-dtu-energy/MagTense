@@ -145,6 +145,12 @@ def _macrogeometry_PBC_test() -> list[dict]:
         return mod.run_test()
 
 
+def _macrogeometry_supercell_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import macrogeometry_supercell_test as mod
+        return mod.run_test()
+
+
 def _periodic_exchange_test() -> list[dict]:
     with example_dir(TESTS_DIR):
         import periodic_exchange_test as mod
@@ -197,6 +203,12 @@ def _dipole_field_test() -> list[dict]:
     with example_dir(TESTS_DIR):
         import dipole_field_test as mod
         return mod.run_test()
+
+
+def _no_exchange_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import no_exchange_test as mod
+        return mod.run_test(cuda=USE_CUDA)
 
 
 def _std_problem_4() -> list[dict]:
@@ -340,6 +352,10 @@ TESTS = {
         lambda: _validation_checks('Validation_field_cylindrical_slice', 'validation_cylindrical_slice_example_2'), False,
         'Field of a cylindrical slice vs FEM, example 2',
     ),
+    'magnetostatics_cylinder': (
+        lambda: _validation_checks('Validation_field_cylinder', 'validation_cylinder'), False,
+        'Field of a full cylinder vs FEM',
+    ),
     'magnetostatics_prism': (
         lambda: _validation_checks('Validation_field_prism', 'validation_prism'), False,
         'Field of a rectangular prism vs FEM',
@@ -371,6 +387,10 @@ TESTS = {
     'macrogeometry_PBC_test': (
         _macrogeometry_PBC_test, False,
         'Periodic boundaries by the macrogeometry method, along x, y and z',
+    ),
+    'macrogeometry_supercell_test': (
+        _macrogeometry_supercell_test, False,
+        'Gapless macrogeometry against an explicitly replicated supercell',
     ),
     'periodic_exchange_test': (
         _periodic_exchange_test, False,
@@ -407,6 +427,10 @@ TESTS = {
     'dipole_field_test': (
         _dipole_field_test, False,
         'Far field of a magnetised cube against the analytical point dipole',
+    ),
+    'no_exchange_test': (
+        _no_exchange_test, False,
+        'No exchange (A0 = 0 everywhere) on the uniform grid, unstructured and tetrahedral mesh',
     ),
     'std_problem_4': (
         _std_problem_4, False,

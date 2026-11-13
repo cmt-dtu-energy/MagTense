@@ -144,14 +144,24 @@ against an analytical result rather than against a reference simulation.
        whole setup is rotated so that the axis of periodicity becomes x, y and
        z in turn, which validates all three directions. Two further spacings
        act as controls. See :ref:`Macrogeometry`.
+   * - ``macrogeometry_supercell_test``
+     - The gapless macrogeometry, with ``shiftVec`` equal to ``grid_L``. The
+       demagnetization field of a periodic domain has to match, cell by cell,
+       that of the central block of an explicitly replicated supercell. This
+       is checked along x, y and z separately and along all three at once,
+       for both the point and the cell-averaged tensor. The test also checks
+       that a ``shiftVec`` which makes the copies overlap is rejected. See
+       :ref:`Macrogeometry`.
    * - ``periodic_exchange_test``
      - Periodic exchange coupling, on a uniform grid, on an unstructured mesh
        and on a grain mesh. Exchange-coupled moments across the periodic
        boundary must end up identical. See
        :ref:`Periodic exchange boundaries`.
    * - ``shape_correction_test``
-     - Both the shape anisotropy (shape-dependent demagnetisation) and the magnetocrystalline anisotropy give uniaxial anisotropy energies. The shape correction field rewrites the shape anisotropy so it precisely cancels the magnetocrystalline contribution. Consequently, in a successful test the magnetization stays put. See
-       :ref:`Sample shape correction`.
+     - Both the shape anisotropy (shape-dependent demagnetisation) and the magnetocrystalline anisotropy give uniaxial anisotropy energies. The shape correction field rewrites the shape anisotropy so it precisely cancels the magnetocrystalline contribution. Consequently, in a successful test the magnetization stays put. A second
+       check uses an unstructured mesh refined at one end. For a uniform
+       magnetization, the corrected field there must equal the field of the
+       sample exactly. See :ref:`Sample shape correction`.
    * - ``temperature_test``
      - Thermal fluctuations against the analytical angular diffusion of
        non-interacting moments. See :ref:`Thermal fluctuations`.
@@ -187,8 +197,7 @@ The tests to run can be restricted with the environment variables
 ``MAGTENSE_TESTS`` and ``MAGTENSE_SKIP``, and the CUDA and CVODE variants are
 selected with ``MAGTENSE_TEST_CUDA`` and ``MAGTENSE_TEST_CVODE``.
 ``MAGTENSE_INCLUDE_SLOW=1`` adds standard problem 3 by time integration,
-which is very slow. Standard problem 6 accounts for most of the running time
-of the rest.
+which takes considerably longer than the rest of the suite.
 
 In Python, from ``python/util``:
 
@@ -208,7 +217,7 @@ In Python, from ``python/util``:
 
     python testMagTenseFunctions.py --skip std_problem_6
 
-``--include-slow`` adds standard problem 3, which is very slow. Each example
+``--include-slow`` adds standard problem 3 by time integration. Each example
 lives in its own directory and is run from there, so the figures and timer logs
 it produces land beside it, and the overview figure of the suite is written to
 ``python/util/results``, as the Matlab suite writes to ``matlab/util/results``.

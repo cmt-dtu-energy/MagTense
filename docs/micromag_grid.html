@@ -163,14 +163,14 @@ The mesh is specified through</p>
 is what the solver uses, not a rectangular subdivision:</p>
 <div class="highlight-matlab notranslate"><div class="highlight"><pre><span></span><span class="n">resolution</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="nb">length</span><span class="p">(</span><span class="nb">mesh</span><span class="p">.</span><span class="n">pos_out</span><span class="p">)</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="mi">1</span><span class="p">];</span>
 <span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">DefaultMicroMagProblem</span><span class="p">(</span><span class="w"> </span><span class="n">resolution</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span><span class="w"> </span><span class="n">resolution</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span><span class="w"> </span><span class="n">resolution</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
-<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagGridType</span><span class="p">(</span><span class="s">&#39;unstructuredPrisms&#39;</span><span class="p">);</span>
+<span class="n">problem</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">problem</span><span class="p">.</span><span class="n">setMicroMagGridType</span><span class="p">(</span><span class="s">'unstructuredPrisms'</span><span class="p">);</span>
 <span class="n">problem</span><span class="p">.</span><span class="n">grid_pts</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">mesh</span><span class="p">.</span><span class="n">pos_out</span><span class="p">;</span>
 <span class="n">problem</span><span class="p">.</span><span class="n">grid_abc</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="nb">mesh</span><span class="p">.</span><span class="n">dims_out</span><span class="p">;</span>
 </pre></div>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">problem</span> <span class="o">=</span> <span class="n">MicromagProblem</span><span class="p">(</span>
     <span class="n">res</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">grid_pts</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
-    <span class="n">grid_type</span><span class="o">=</span><span class="s2">&quot;unstructuredPrisms&quot;</span><span class="p">,</span>
+    <span class="n">grid_type</span><span class="o">=</span><span class="s2">"unstructuredPrisms"</span><span class="p">,</span>
     <span class="n">grid_pts</span><span class="o">=</span><span class="n">grid_pts</span><span class="p">,</span>
     <span class="n">grid_abc</span><span class="o">=</span><span class="n">grid_abc</span><span class="p">,</span>
 <span class="p">)</span>
@@ -207,18 +207,14 @@ they share three nodes, and the face they share is the one opposite the node
 that they do not.</p>
 <p>Periodic exchange boundaries are requested through <code class="docutils literal notranslate"><span class="pre">exchPBC</span></code>. They are linked
 either by identifying the nodes on the two boundary planes, when the mesh is
-periodic along that direction, or by mortar coupling the boundary faces when it
-is not, with the choice made per direction and a warning printed when the
-fallback is used. See <a class="reference internal" href="micromag_pbc.html#periodic-boundaries-on-a-tetrahedral-mesh"><span class="std std-ref">Periodic boundaries on a tetrahedral mesh</span></a> for what
-each mechanism does and what the fallback costs.</p>
-<p>The demagnetization tensor is computed from the analytical tetrahedron tensor.
-Note the following limitations of this grid type:</p>
-<ul class="simple">
-<li><p>Averaging of the demagnetization tensor over the receiving cell (<code class="docutils literal notranslate"><span class="pre">N_ave</span></code>)
-is not supported and a warning is printed if it is requested.</p></li>
-<li><p>The shape correction is disabled, because a tetrahedral mesh carries no
-per-element size array from which the occupied volume fraction can be found.</p></li>
-</ul>
+periodic along that direction, or by mortar coupling the boundary faces
+otherwise, with the choice made per direction and reported by the analysis.
+See <a class="reference internal" href="micromag_pbc.html#periodic-boundaries-on-a-tetrahedral-mesh"><span class="std std-ref">Periodic boundaries on a tetrahedral mesh</span></a> for what each mechanism
+does.</p>
+<p>The demagnetization tensor is the analytical tetrahedron tensor, evaluated at
+the element centres. The sub-cell averaging <code class="docutils literal notranslate"><span class="pre">N_ave</span></code> and the
+<a class="reference internal" href="micromag_pbc.html#sample-shape-correction"><span class="std std-ref">Sample shape correction</span></a> are features of the prism grids, whose
+per-cell sizes they are built from.</p>
 </section>
 <section id="passing-an-externally-computed-exchange-matrix">
 <h2>Passing an externally computed exchange matrix<a class="headerlink" href="#passing-an-externally-computed-exchange-matrix" title="Link to this heading"></a></h2>

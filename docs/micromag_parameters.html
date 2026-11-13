@@ -274,8 +274,8 @@ only.</p></td>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">solver</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">solver</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">Dynamic</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">Explicit</span></code> (1), <code class="docutils literal notranslate"><span class="pre">Dynamic</span></code> (2), <code class="docutils literal notranslate"><span class="pre">Minimizer</span></code> (3; the old name
-<code class="docutils literal notranslate"><span class="pre">Implicit</span></code> is no longer accepted). Matlab: <code class="docutils literal notranslate"><span class="pre">setMicroMagSolver</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ExplicitLL</span></code> (1), <code class="docutils literal notranslate"><span class="pre">Dynamic</span></code> (2) or <code class="docutils literal notranslate"><span class="pre">Explicit</span></code> (3), see
+<a class="reference internal" href="micromag_solvers.html#solver-type"><span class="std std-ref">Solver type</span></a>. Matlab: <code class="docutils literal notranslate"><span class="pre">setMicroMagSolver</span></code>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ProblemMod</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">prob_mode</span></code></p></td>
@@ -547,8 +547,8 @@ centre.</p></td>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dem_appr</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">demag_approx</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">none</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">none</span></code> (1), <code class="docutils literal notranslate"><span class="pre">threshold</span></code> (2), <code class="docutils literal notranslate"><span class="pre">fft_thres</span></code> (3),
-<code class="docutils literal notranslate"><span class="pre">threshold_fraction</span></code> (4), <code class="docutils literal notranslate"><span class="pre">fft_threshold_fraction</span></code> (5). Matlab:
+<td><p><code class="docutils literal notranslate"><span class="pre">none</span></code> (1), <code class="docutils literal notranslate"><span class="pre">threshold</span></code> (2) or <code class="docutils literal notranslate"><span class="pre">threshold_fraction</span></code> (4); 3 and 5
+are earlier Fourier-space variants. Matlab:
 <code class="docutils literal notranslate"><span class="pre">setMicroMagDemagApproximation</span></code>.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dem_thres</span></code></p></td>
@@ -690,7 +690,8 @@ the clock.</p></td>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ifunif</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">ifunif</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
-<td><p>Tree type. Must be 1 (uniform tree).</p></td>
+<td><p>Tree type; MagTense uses the uniform tree (1), whose depth <code class="docutils literal notranslate"><span class="pre">nlmax</span></code>
+sets.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nlmin</span></code>, <code class="docutils literal notranslate"><span class="pre">nlmax</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">nlmin</span></code>, <code class="docutils literal notranslate"><span class="pre">nlmax</span></code></p></td>
@@ -791,8 +792,8 @@ the clock.</p></td>
 </section>
 <section id="matlab-only-convenience-fields">
 <h2>Matlab-only convenience fields<a class="headerlink" href="#matlab-only-convenience-fields" title="Link to this heading"></a></h2>
-<p>The following fields exist on the Matlab problem object but are not passed to
-Fortran. They are used by the example scripts to steer plotting and saving:</p>
+<p>The following fields on the Matlab problem object are used by the example
+scripts to steer plotting and saving, and stay on the Matlab side:</p>
 <p><code class="docutils literal notranslate"><span class="pre">SaveTheResult</span></code>, <code class="docutils literal notranslate"><span class="pre">ShowTheResult</span></code>, <code class="docutils literal notranslate"><span class="pre">SolverType</span></code>, <code class="docutils literal notranslate"><span class="pre">DirectoryFilename</span></code>,
 <code class="docutils literal notranslate"><span class="pre">SimulationName</span></code>, <code class="docutils literal notranslate"><span class="pre">FileName</span></code>, <code class="docutils literal notranslate"><span class="pre">HextFct</span></code>, <code class="docutils literal notranslate"><span class="pre">FFTdims</span></code>, <code class="docutils literal notranslate"><span class="pre">ExternalMesh</span></code>,
 <code class="docutils literal notranslate"><span class="pre">MeshType</span></code>, <code class="docutils literal notranslate"><span class="pre">ExternalMeshFileName</span></code>, <code class="docutils literal notranslate"><span class="pre">DemagTensorFileName</span></code> and

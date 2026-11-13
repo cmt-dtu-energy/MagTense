@@ -137,8 +137,8 @@ Solver, time and applied field
    * - ``solver``
      - ``solver``
      - ``Dynamic``
-     - ``Explicit`` (1), ``Dynamic`` (2), ``Minimizer`` (3; the old name
-       ``Implicit`` is no longer accepted). Matlab: ``setMicroMagSolver``.
+     - ``ExplicitLL`` (1), ``Dynamic`` (2) or ``Explicit`` (3), see
+       :ref:`Solver type`. Matlab: ``setMicroMagSolver``.
    * - ``ProblemMod``
      - ``prob_mode``
      - ``new``
@@ -353,8 +353,8 @@ Demagnetization
    * - ``dem_appr``
      - ``demag_approx``
      - ``none``
-     - ``none`` (1), ``threshold`` (2), ``fft_thres`` (3),
-       ``threshold_fraction`` (4), ``fft_threshold_fraction`` (5). Matlab:
+     - ``none`` (1), ``threshold`` (2) or ``threshold_fraction`` (4); 3 and 5
+       are earlier Fourier-space variants. Matlab:
        ``setMicroMagDemagApproximation``.
    * - ``dem_thres``
      - ``dem_thres``
@@ -532,8 +532,8 @@ See :ref:`Micromagnetic output` and
 Matlab-only convenience fields
 ----------------------------------------
 
-The following fields exist on the Matlab problem object but are not passed to
-Fortran. They are used by the example scripts to steer plotting and saving:
+The following fields on the Matlab problem object are used by the example
+scripts to steer plotting and saving, and stay on the Matlab side:
 
 ``SaveTheResult``, ``ShowTheResult``, ``SolverType``, ``DirectoryFilename``,
 ``SimulationName``, ``FileName``, ``HextFct``, ``FFTdims``, ``ExternalMesh``,
