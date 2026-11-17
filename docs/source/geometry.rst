@@ -30,6 +30,7 @@ Tile Types
 * 7 = spheroid
 * 8 = avgPrism, i.e. a prism whose demagnetization tensor is averaged over the
   volume of the receiving tile rather than evaluated at its centre
+* 9 = cone
 * 101 = planar coil
 * 102 = uniform applied field, a field source that adds the same field
   everywhere, see :ref:`Applied field`.
@@ -224,6 +225,40 @@ Examples of how to compute the magnetic field from such a tile, compared with a
 FEM simulation, are given in `Matlab
 <https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Magnetostatics/Validation_field_spheroid>`__
 and `python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/magnetostatics/Validation_field_spheroid/validation_spheroid.py>`__.
+
+
+========================================
+Cone
+========================================
+.. figure:: ./fig/cone.png
+    :width: 400px
+    :alt: Cone
+
+    A right circular cone that stands on its base is defined by its base
+    radius :math:`a` and its height :math:`c`.
+    The centre of the base is at :math:`(x_{off}, y_{off}, z_{off})` in the
+    global coordinate system, and the apex lies at the distance :math:`c` from
+    it along the local z-axis.
+
+The second entry of the tile size, :math:`b`, is reserved for the top radius of a
+truncated cone and must be zero. The rotation angles turn the cone about the
+centre of its base, so a cone with its apex pointing in the negative z-direction
+has the rotation angles :math:`(\pi, 0, 0)`.
+
+The field is evaluated with the closed-form demagnetization tensor of a
+homogeneously magnetized cone (R. Bjørk, "The magnetic field of a homogeneously
+magnetized cone"), which holds at every point inside and outside the cone,
+including the axis. Its elements are elementary functions and complete elliptic
+integrals, apart from one function that is found by a one-dimensional numerical
+integration. On the rim of the base and at the apex the field diverges
+logarithmically, and a large but finite value is returned there. On the surface
+of the cone, where the field is discontinuous, the value is the limit from
+outside.
+
+An example of how to compute the magnetic field from such a tile, compared with a
+FEM simulation, is given in `Matlab
+<https://github.com/cmt-dtu-energy/MagTense/tree/master/matlab/examples/Magnetostatics/Validation_field_cone>`__
+and `python <https://github.com/cmt-dtu-energy/MagTense/blob/master/python/examples/magnetostatics/Validation_field_cone/validation_cone.py>`__.
 
 
 ----------------------------------------

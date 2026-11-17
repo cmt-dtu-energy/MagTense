@@ -25,6 +25,9 @@ classdef MagTenseTilesUtil
                 case 'Avgprism'
                     %A prism whose field is averaged over an observation volume at each point
                     type = int32( 8 );
+                case 'Cone'
+                    %A right circular cone standing on its base, evaluated in closed form
+                    type = int32( 9 );
                 case 'Planarcoil'
                     type = int32( 101 );
                 case 'Uniformfield'

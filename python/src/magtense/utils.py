@@ -203,6 +203,52 @@ def plot_spheroid(ax, size, offset, rotation, M, color) -> None:
     )
 
 
+def plot_cone(ax, size, offset, rotation, M, color) -> None:
+    # size = (base radius, 0, height). In the tile's own frame the base is centred
+    # at the origin in the plane z = 0 and the apex is at (0, 0, height)
+    r_base = size[0]
+    height = size[2]
+    psi = np.linspace(0, 2 * np.pi, 50)
+    frac = np.linspace(0, 1, 2)
+
+    R = get_rotmat(rotation)
+
+    # Lateral surface: straight lines from the rim (frac = 0) to the apex (frac = 1)
+    x = np.outer(1 - frac, r_base * np.cos(psi))
+    y = np.outer(1 - frac, r_base * np.sin(psi))
+    z = np.outer(frac, height * np.ones_like(psi))
+
+    # Add rotation and offset to cone
+    pts = np.stack((x, y, z), axis=-1) @ R.T + np.asarray(offset)
+
+    # Plot lateral surface
+    ax.plot_surface(
+        pts[..., 0], pts[..., 1], pts[..., 2], color=color, alpha=0.25, linewidth=0
+    )
+
+    # Plot base and rim
+    rim = pts[0]
+    ax.add_collection3d(
+        Poly3DCollection([rim], facecolors=color, alpha=0.25, linewidths=0)
+    )
+    ax.plot(rim[:, 0], rim[:, 1], rim[:, 2], color=color, alpha=0.75, linewidth=1)
+
+    # Plot vector of magnetization in the centroid of the cone
+    centroid = R @ np.array([0, 0, height / 4]) + np.asarray(offset)
+    ax.quiver(
+        centroid[0],
+        centroid[1],
+        centroid[2],
+        M[0],
+        M[1],
+        M[2],
+        color=color,
+        length=np.linalg.norm(size) / 4,
+        pivot="middle",
+        normalize=True,
+    )
+
+
 def plot_tetrahedron(axes, vertices, M, color) -> None:
     ax = axes
     vert = np.transpose(vertices)
@@ -685,7 +731,8 @@ def create_plot(
     Creates a plot with the iterated tiles and the calculated magnetic field H at the
     evaluation points as quiver plot. Additionally, an optional grid can be displayed.
     Tile types: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
-                5 = tetrahedron, 6 = sphere, 7 = spheroid, 10 = ellipsoid
+                5 = tetrahedron, 6 = sphere, 7 = spheroid, 8 = avg prism, 9 = cone,
+                10 = ellipsoid
     """
     ax = plt.figure().add_subplot(projection="3d")
 
@@ -756,6 +803,16 @@ def create_plot(
             
             elif tiles.tile_type[i] == 8:
                 plot_cube(
+                    ax,
+                    tiles.size[i],
+                    tiles.offset[i],
+                    tiles.rot[i],
+                    tiles.M[i],
+                    tiles.color[i],
+                )
+
+            elif tiles.tile_type[i] == 9:
+                plot_cone(
                     ax,
                     tiles.size[i],
                     tiles.offset[i],

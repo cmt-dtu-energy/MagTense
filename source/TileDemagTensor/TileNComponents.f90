@@ -5,6 +5,7 @@ module TileNComponents
     use TileRectangularPrismAvgTensor
     use TileCircPieceTensor
     use TileCylinderTensor
+    use TileConeTensor
     use TilePlanarCoilTensor
     use TileTriangle
 
@@ -67,7 +68,7 @@ module TileNComponents
     !sources that the iteration never updates: the planar coil, and the uniform applied field, which is
     !not a geometry at all but stands for an external field that is the same everywhere (see
     !getFieldFromUniformFieldTile).
-    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeSphere=6,tileTypeSpheroid=7,tileTypeAvgPrism=8,tileTypePlanarCoil=101,tileTypeUniformField=102
+    integer,parameter :: tileTypeCylPiece=1,tileTypePrism=2,tileTypeCircPiece=3,tileTypeCircPieceInverted=4,tileTypeTetrahedron=5,tileTypeSphere=6,tileTypeSpheroid=7,tileTypeAvgPrism=8,tileTypeCone=9,tileTypePlanarCoil=101,tileTypeUniformField=102
     integer,parameter :: magnetTypeHard=1,magnetTypeSoft=2,magnetTypeSoftConstPerm=3
     integer,parameter :: fieldEvaluationCentre=1,fieldEvaluationAverage=2
     
@@ -163,6 +164,21 @@ module TileNComponents
         endif
 
     end subroutine getN_fullCylinder
+
+    !::The demagnetization tensor of a cone tile (tileTypeCone) at the point pos, given in the tile's own frame
+    !::(relative to its offset and rotated with it): the closed form of TileConeTensor. The offset of the tile
+    !::is the centre of the base, a is the radius of the base and c the height, with the axis of the cone along
+    !::the local z-axis and the apex at (0,0,c). b is reserved for the top radius of a truncated cone and is
+    !::not used.
+    subroutine getN_cone_3D( tile, pos, N, Obs_size )
+    type(MagTile),intent(in) :: tile
+    real,intent(in),dimension(3) :: pos
+    real,intent(inout),dimension(3,3) :: N
+    real,intent(in),dimension(3), optional :: Obs_size  ! declared to match N_tensor_subroutine, not used
+
+        call getN_cone( tile%a, tile%c, pos(1), pos(2), pos(3), N )
+
+    end subroutine getN_cone_3D
 
     subroutine  getN_CylPiece( cylP, x, N , Obs_size)
     type(MagTile),intent(in) :: cylP

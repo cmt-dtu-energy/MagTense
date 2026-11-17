@@ -290,7 +290,7 @@ Plots the tiles together with the calculated H-field at the evaluation points
 as a quiver plot, and optionally a grid.
 
 **Tile types**: 1 = cylinder, 2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
-5 = tetrahedron, 6 = sphere, 7 = spheroid, 8 = avg_prism, 10 = ellipsoid
+5 = tetrahedron, 6 = sphere, 7 = spheroid, 8 = avg_prism, 9 = cone, 10 = ellipsoid
 
 ::
 
@@ -320,5 +320,5 @@ Plots the components of a field on a regular grid as images.
 Further helpers in ``magtense.utils`` include ``plot_M_avg_seq``,
 ``plot_field``, ``plot_grid``, ``plot_Halbach``, ``load_COMSOL`` and
 ``validation``, as well as the individual tile plotting routines
-``plot_cube``, ``plot_sphere``, ``plot_spheroid``, ``plot_tetrahedron``,
-``plot_cylindrical`` and ``plot_circpiece``.
+``plot_cube``, ``plot_sphere``, ``plot_spheroid``, ``plot_cone``,
+``plot_tetrahedron``, ``plot_cylindrical`` and ``plot_circpiece``.

@@ -326,6 +326,10 @@ TESTS = {
         lambda: _validation_checks('Validation_field_cylinder', 'validation_cylinder'), False,
         'Field of a full cylinder vs FEM',
     ),
+    'magnetostatics_cone': (
+        lambda: _validation_checks('Validation_field_cone', 'validation_cone'), False,
+        'Field of a cone vs FEM',
+    ),
     'magnetostatics_prism': (
         lambda: _validation_checks('Validation_field_prism', 'validation_prism'), False,
         'Field of a rectangular prism vs FEM',

@@ -88,7 +88,12 @@ class Tiles:
         tile_type: 1 = cylinder (a cylindrical piece; with dtheta = 2 pi a full cylinder, or a
                    ring when the inner radius r0 - dr/2 is not zero, evaluated in closed form),
                    2 = prism, 3 = circ_piece, 4 = circ_piece_inv,
-                   5 = tetrahedron, 6 = sphere, 7 = spheroid, 8 = avg prism, 10 = ellipsoid,
+                   5 = tetrahedron, 6 = sphere, 7 = spheroid, 8 = avg prism, 9 = cone (a right
+                   circular cone standing on its base, evaluated in closed form; size =
+                   base radius, 0, height, where the second entry is reserved for the
+                   top radius of a truncated cone and must be zero; offset is the centre
+                   of the base and the axis points along the rotated z-axis),
+                   10 = ellipsoid,
                    101 = planar coil, 102 = uniform applied field (not a geometry, see
                    add_uniform_field)
         offset: Offset of global coordinates.

@@ -181,8 +181,17 @@ real(8),dimension(4) :: maxRelDiffArr
             
                     case(tileTypeSpheroid)
                         !! No rotation is needed
-                        pts = tiles(i)%offset 
-                        
+                        pts = tiles(i)%offset
+
+                    case(tileTypeCone)
+                        !! The offset of a cone is the centre of its base. The field is evaluated at the centroid,
+                        !! which lies on the axis a quarter of the height c above the base, rotated with the tile
+                        pts(1) = 0.
+                        pts(2) = 0.
+                        pts(3) = tiles(i)%c / 4
+                        call getRotationMatrices( tiles(i), rotMat, rotMatInv)
+                        pts = matmul( rotMatInv, pts ) + tiles(i)%offset
+
                     case(tileTypeCircPiece)
                         !! Find the center point of the circ piece
                         !! First find the center point of the piece in the reference frame of the piece itself

@@ -28,6 +28,8 @@ classdef MagTenseTilesPlot
                         MagTenseTilesPlot.plotCircPieceInv( tiles(i) );
                     case MagTenseTilesUtil.getMagTileType('Tetrahedron')
                         MagTenseTilesPlot.plotTetrahedron(tiles(i));
+                    case MagTenseTilesUtil.getMagTileType( 'Cone' )
+                        MagTenseTilesPlot.plotCone( tiles(i) );
                 end
             end
             
@@ -51,6 +53,11 @@ classdef MagTenseTilesPlot
                     case (MagTenseTilesUtil.getMagTileType( 'Prism' ) )
                         p0 = [0,0,0];
                         dl = mean(tiles(i).abc);
+                    case (MagTenseTilesUtil.getMagTileType( 'Cone' ) )
+                        %the centroid, a quarter of the height above the base, rotated as the tile
+                        R = MagTenseTilesPlot.getRotationMatrices( tiles(i).rotAngles );
+                        p0 = ( R{1} * R{2} * R{3} * [0; 0; tiles(i).abc(3)/4] )';
+                        dl = tiles(i).abc(3)/4;
                     
                 end
                 p0 = p0 + tiles(i).offset;
@@ -358,6 +365,45 @@ classdef MagTenseTilesPlot
             P.P4 = Pin;
             P.P5 = Plow;
             P.P6 = Phigh;
+        end
+       
+        %%
+        %Plots a cone tile: a right circular cone standing on its base. In the tile's own
+        %frame the base (radius abc(1)) is centred at the origin in the plane z = 0 and
+        %the apex is at [0,0,abc(3)]. The tile is rotated by rotAngles and moved to offset
+        function [P] = plotCone( cone )
+            thg = hgtransform;
+            col = cone.color;
+            Rb = cone.abc(1);
+            h = cone.abc(3);
+            
+            nPhi = 60;
+            phi = linspace( 0, 2*pi, nPhi+1 );
+            xb = Rb * cos(phi);
+            yb = Rb * sin(phi);
+            
+            %%plot the base
+            Pbase = patch( xb, yb, zeros(1,nPhi+1), col, 'parent', thg );
+            
+            %%plot the lateral surface as triangles from the rim to the apex
+            ver = [ xb(1:nPhi)', yb(1:nPhi)', zeros(nPhi,1); 0, 0, h ];
+            fac = [ (1:nPhi)', [2:nPhi,1]', (nPhi+1)*ones(nPhi,1) ];
+            Plat = patch( 'Faces', fac, 'Vertices', ver, 'FaceColor', col, 'EdgeColor', 'none', 'parent', thg );
+            
+            P = struct();
+            P.P1 = Pbase;
+            P.P2 = Plat;
+            
+            Rx = makehgtform('xrotate',cone.rotAngles(1));
+            Ry = makehgtform('yrotate',cone.rotAngles(2));
+            Rz = makehgtform('zrotate',cone.rotAngles(3));
+            
+            %after rotation, translate to the offset
+            T2 = makehgtform('translate', cone.offset);
+            
+            %The order of rotation is about the z-axis first, then y and finally x,
+            %and the translation comes last, as in the field calculation
+            thg.Matrix = T2 * Rx * Ry * Rz;
         end
        
         %%

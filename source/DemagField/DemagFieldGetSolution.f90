@@ -120,6 +120,12 @@
                 else
                     call getFieldFromSpheroidTile( tiles(i), H_tmp, pts, n_ele )
                 endif
+            case (tileTypeCone)
+                if ( present(Nout) ) then
+                    call getFieldFromConeTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
+                else
+                    call getFieldFromConeTile( tiles(i), H_tmp, pts, n_ele )
+                endif
             case (tileTypeCircPiece )
                  if ( present(Nout) ) then
                     call getFieldFromCircPieceTile( tiles(i), H_tmp, pts, n_ele, Nout(i,:,:,:), useStoredN )
@@ -382,8 +388,36 @@
             call getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )       
         endif
     
-    end subroutine getFieldFromSpheroidTile   
-    
+    end subroutine getFieldFromSpheroidTile
+
+    !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    !>
+    !!Returns the magnetic field from a cone. The offset of the tile is the centre of the base, a is the
+    !!radius of the base and c the height, with the apex on the local z-axis at the height c above the base.
+    !!The tensor is the closed form of TileConeTensor.
+    !!
+    subroutine getFieldFromConeTile( tile, H, pts, n_ele, N_out, useStoredN )
+        !DEC$ ATTRIBUTES ALIAS:"getfieldfromconetile_" :: getFieldFromConeTile
+        type(MagTile),intent(in) :: tile
+        real(8),dimension(n_ele,3),intent(inout) :: H
+        real(8),dimension(n_ele,3) :: pts
+        integer(4),intent(in) :: n_ele
+        real(8),dimension(n_ele,3,3),intent(inout),optional :: N_out
+        logical,intent(in),optional :: useStoredN
+
+        procedure (N_tensor_subroutine), pointer :: N_tensor => null ()
+
+        N_tensor => getN_cone_3D
+
+        !! Check to see if we should use symmetry
+        if ( tile%exploitSymmetry .eq. 1 ) then
+            call getFieldFromTile_symm( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+        else
+            call getFieldFromTile( tile, H, pts, n_ele, N_tensor, N_out, useStoredN )
+        endif
+
+    end subroutine getFieldFromConeTile
+
     
     !--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     !>
