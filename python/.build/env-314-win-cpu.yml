@@ -1,0 +1,77 @@
+name: magtense-env
+channels:
+  - defaults
+  - https://software.repos.intel.com/python/conda
+  - https://software.repos.intel.com/python/conda/
+  - conda-forge
+  - https://repo.anaconda.com/pkgs/main
+  - https://repo.anaconda.com/pkgs/r
+  - https://repo.anaconda.com/pkgs/msys2
+dependencies:
+  - _openmp_mutex=4.5=20_gnu
+  - bzip2=1.0.8=h0ad9c76_9
+  - ca-certificates=2026.2.25=h4c7d964_0
+  - cmake
+  - compiler_shared=2025.3.2=intel_833
+  - dpcpp-cpp-rt=2025.3.2=intel_833
+  - dpcpp_impl_win-64=2025.3.2=intel_833
+  - dpcpp_win-64=2025.3.2=intel_833
+  - git=2.53.0=h57928b3_0
+  - ifx_impl_win-64=2025.3.2=intel_833
+  - ifx_win-64=2025.3.2=intel_833
+  - intel-cmplr-lib-rt=2025.3.2=intel_833
+  - intel-cmplr-lib-ur=2025.3.2=intel_833
+  - intel-cmplr-lic-rt=2025.3.2=intel_833
+  - intel-fortran-rt=2025.3.2=intel_833
+  - intel-opencl-rt=2025.3.2=intel_833
+  - intel-openmp=2025.3.2=intel_833
+  - intel-sycl-rt=2025.3.2=intel_833
+  - libexpat=2.7.4=hac47afa_0
+  - libffi=3.5.2=h3d046cb_0
+  - libgcc=15.2.0=h8ee18e1_18
+  - libgomp=15.2.0=h8ee18e1_18
+  - liblzma=5.8.2=hfd05255_0
+  - libmpdec=4.0.0=hfd05255_1
+  - libsqlite=3.52.0=hf5d6505_0
+  - libwinpthread=12.0.0.r4.gg4f2fc60ca=h57928b3_10
+  - libzlib=1.3.2=hfd05255_2
+  - make=4.4.1=h0e40799_2
+  - ninja
+  - mkl=2025.3.1=intel_9
+  - mkl-devel=2025.3.1=intel_9
+  - mkl-include=2025.3.1=intel_9
+  - mkl-static=2025.3.1=intel_9
+  - ocloc=2025.3.7=intel_6
+  - onemkl-license=2025.3.1=intel_9
+  - openssl=3.6.1=hf411b9b_1
+  - pip=26.0.1=pyh145f28c_0
+  - python=3.14.3=h4b44e0e_101_cp314
+  - python_abi=3.14=8_cp314
+  - tbb=2022.3.1=vc14_intel_401
+  - tbb-devel=2022.3.1=vc14_intel_401
+  - tcm=1.4.1=intel_444
+  - tk=8.6.13=h6ed50ae_3
+  - tzdata=2025c=hc9c84f9_1
+  - ucrt=10.0.26100.0=h57928b3_0
+  - umf=1.0.3=intel_18
+  - vc=14.3=h41ae7f8_34
+  - vc14_runtime=14.44.35208=h818238b_34
+  - vcomp14=14.44.35208=h818238b_34
+  - vs2015_runtime=14.44.35208=h38c0c73_34
+  # Do not add vs2017_win-64 back - see env-314-win.yml's note beside the
+  # CUDA block. ifx_win-64/dpcpp_win-64 need only vs_win-64 (-> vs2022_win-64);
+  # vs2017_win-64 drops an activate.d script that exits 1 without a VS2017/v141
+  # install, which kills env creation.
+  - vs2022_win-64=19.44.35207=ha74f236_34
+  - vs_win-64=2022.14=ha74f236_34
+  - vswhere=3.1.7=h40126e0_1
+  - zstd=1.5.7=h534d264_6
+  - pip:
+      - build==1.4.0
+      - charset-normalizer==3.4.6
+      - colorama==0.4.6
+      - meson==1.10.2
+      - numpy==2.4.3
+      - packaging==26.0
+      - pyproject-hooks==1.2.0
+      - pytest

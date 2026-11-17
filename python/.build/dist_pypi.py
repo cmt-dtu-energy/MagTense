@@ -115,6 +115,13 @@ def main(
                 py_folder / ".build" / f"requirements-py{py[0]}.txt"
             ).read_text()
             if cuda == "cpu":
+                # The CUDA wheels are the only ones that need the nvidia-*
+                # runtime libraries, so drop them from the cpu variant. Done in
+                # Python rather than by shelling out to sed: the argument list
+                # form passes the expression through literally, so the quotes
+                # that used to wrap it were part of the script and sed rejected
+                # it every time - silently, because check=False. The cpu wheels
+                # therefore shipped the nvidia-* dependencies.
                 requirements = "".join(
                     line
                     for line in requirements.splitlines(keepends=True)
