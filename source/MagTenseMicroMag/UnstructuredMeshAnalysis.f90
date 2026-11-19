@@ -74,6 +74,7 @@ module UnstructuredMeshAnalysis
     integer :: TheJ(3, 2), ThePM(2), TheEE(3, 3), TheNot(3, 2)
     integer, allocatable :: Aindex(:), Bindex(:), indexItContainsTrue(:,:), indexItContainsTrue_temp(:,:)
     real(dp), allocatable :: dimscopy(:,:)
+    real(dp), allocatable :: xxMinTmp(:), xxMaxTmp(:)     !> Rounded lower and upper bounds of the elements along one axis
     logical, allocatable :: SamePosAlongDim(:)
     logical, allocatable :: UAcontainsUB(:), VAcontainsVB(:), UBcontainsUA(:), VBcontainsVA(:)
     logical, allocatable :: AcontainsB(:), BcontainsA(:)
@@ -138,26 +139,30 @@ module UnstructuredMeshAnalysis
     Volumes = dims(:,1) * dims(:,2) * dims(:,3)
     
     ! Rescaling
-    DimsScales = minval(dims, dim=1) / 2.0_dp
-    
+    ! All faces are compared exactly on an integer lattice. Rounding the element centres to half
+    ! the smallest element only works when every centre is a multiple of that length (uniform and
+    ! octree meshes); on a graded mesh the rounded faces of two neighbours no longer coincide, no
+    ! neighbours are found and the exchange operator is silently zero. The lattice is therefore
+    ! 2^20 times finer, and the two bounds of each element are rounded instead of its centre, so
+    ! neighbours, which compute their common bound from the same coordinates, share it exactly.
+    ! For uniform and octree meshes every bound is a lattice point and nothing changes but the scale.
+    DimsScales = minval(dims, dim=1) / 2.0_dp / 2.0_dp**20
+
     allocate(Xel(Nel), Yel(Nel), Zel(Nel), stat=alloc_stat)
     call checkAllocation( alloc_stat, 'Xel/Yel/Zel' )
-
-    Xel = anint(pos(:,1) / DimsScales(1))
-    Yel = anint(pos(:,2) / DimsScales(2))
-    Zel = anint(pos(:,3) / DimsScales(3))
-    
-   
-    
     allocate(XXel(Nel,3), stat=alloc_stat)
     call checkAllocation( alloc_stat, 'XXel' )
-    XXel = reshape([Xel, Yel, Zel], [Nel, 3])
-
     allocate(dimscopy(Nel, 3), stat=alloc_stat)
     call checkAllocation( alloc_stat, 'dimscopy' )
     do i = 1, 3
-        dimscopy(:,i) = dims(:,i) / DimsScales(i)
+        xxMinTmp = anint( (pos(:,i) - 0.5_dp * dims(:,i)) / DimsScales(i) )
+        xxMaxTmp = anint( (pos(:,i) + 0.5_dp * dims(:,i)) / DimsScales(i) )
+        XXel(:,i) = 0.5_dp * ( xxMinTmp + xxMaxTmp )
+        dimscopy(:,i) = xxMaxTmp - xxMinTmp
     end do
+    Xel = XXel(:,1)
+    Yel = XXel(:,2)
+    Zel = XXel(:,3)
 
     ! Periodic boundary conditions for the exchange interaction.
     ! The bounding box of the mesh defines the period along each of the three directions. Note that

@@ -79,10 +79,6 @@ problem.nt = len(problem.t)
 problem.t_conv = problem.t.copy()
 problem.nt_conv = len(problem.t_conv)
 problem.exch_presize = problem.ntot * 28
-problem.use_fmm = 0
-problem.ifunif = 1
-problem.nlmin = 1
-problem.nlmax = 5
 problem.log_dir = str(Path(tempfile.gettempdir()) / "magtense_adaptive_hysteresis")
 Path(problem.log_dir).mkdir(parents=True, exist_ok=True)
 problem.window_enabled = 0

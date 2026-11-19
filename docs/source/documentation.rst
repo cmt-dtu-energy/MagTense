@@ -149,16 +149,6 @@ change.
 
 ::
 
-    get_H_field_fmm(
-        tiles, pts, eps=1e-6, nterms_in=10, cells_per_node=10,
-        nlmin=0, nlmax=2, ifunif=1, do_target=0, do_FI=1, n_pts=-1
-    ) -> np.ndarray
-
-FMM-backed H-field, an experimental path that represents each tile by a single
-dipole. Needs a build with ``USE_FMM3D=1``.
-
-::
-
     get_rotmat(rot: np.ndarray) -> np.ndarray
 
 Rotation matrix corresponding to the three rotation angles of a tile.
@@ -261,8 +251,8 @@ A predefined sequence of applied fields, given as an ``(n,4)`` array of
         dM_min: float = 1e-3,
         dM_target: float = 1e-2,
         dM_reject: float = 5e-2,
-        dH_grow: float = 1.25,
-        dH_shrink: float = 0.5,
+        dH_grow: float = 2.0,
+        dH_shrink: float = 0.25,
         switch_refine_dH: float | None = None,
     ) -> list
 

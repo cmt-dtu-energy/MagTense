@@ -14,6 +14,9 @@ module ODE_Solvers
     procedure(dydt_fct), pointer :: MTdmdt  !>Input function pointer for the function to be integrated
     real, allocatable, dimension(:) :: MTy_out, MTf_vec
     private MTdmdt, MTy_out, MTf_vec
+    !>Whether the most recent MagTense_ODE call stopped because its convergence test passed. The
+    !>hysteresis loops read it to tell a relaxed state from one that only ran out of time window.
+    logical, public, save :: ode_last_converged = .false.
 
     contains
     
@@ -57,6 +60,7 @@ module ODE_Solvers
         real, allocatable, dimension(:,:) :: yderiv_out         !>The derivative of y_i wrt t at each time step
     
         !find the no. of equations and the no. of requested timesteps
+        ode_last_converged = .false.
         neq = size(y0)
         nt = size(t)
         nt_conv = size(t_conv)
@@ -310,6 +314,7 @@ module ODE_Solvers
                 enddo
                 write(prog_str,'(A,ES9.2,A,F8.2,A)') 'Converged (max change ', conv_error, ') at t = ', t_step*1e9, ' ns, stopping'
                 call callback( trim(prog_str), -1 )
+                ode_last_converged = .true.
                 exit
             endif
         enddo
@@ -581,6 +586,7 @@ module ODE_Solvers
                     enddo
                     write(err_str,'(A,ES9.2,A,F8.2,A)') 'Converged (max change ', conv_error, ') at t = ', real(t(outstep))*1e9, ' ns, stopping'
                     call callback( trim(err_str), -1 )
+                    ode_last_converged = .true.
                     exit
                 endif
             endif

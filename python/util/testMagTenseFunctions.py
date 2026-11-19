@@ -157,6 +157,36 @@ def _periodic_exchange_test() -> list[dict]:
         return mod.run_test(cuda=USE_CUDA)
 
 
+def _tetra_exchange_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import tetra_exchange_test as mod
+        return mod.run_test(cuda=USE_CUDA)
+
+
+def _avgprism_farfield_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import avgprism_farfield_test as mod
+        return mod.run_test(cuda=USE_CUDA)
+
+
+def _prism_directlaplacian_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import prism_directlaplacian_test as mod
+        return mod.run_test(cuda=USE_CUDA)
+
+
+def _unstructured_exchange_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import unstructured_exchange_test as mod
+        return mod.run_test(cuda=USE_CUDA)
+
+
+def _symmetric_exchange_test() -> list[dict]:
+    with example_dir(TESTS_DIR):
+        import symmetric_exchange_test as mod
+        return mod.run_test(cuda=USE_CUDA)
+
+
 def _shape_correction_test() -> list[dict]:
     with example_dir(TESTS_DIR):
         import shape_correction_test as mod
@@ -369,6 +399,26 @@ TESTS = {
     'periodic_exchange_test': (
         _periodic_exchange_test, False,
         'Periodic exchange coupling, uniform grid, unstructured mesh and grain mesh',
+    ),
+    'avgprism_farfield_test': (
+        _avgprism_farfield_test, False,
+        'Volume-averaged prism-prism tensor from touching to 200 cells apart against a Gauss reference',
+    ),
+    'prism_directlaplacian_test': (
+        _prism_directlaplacian_test, False,
+        'Direct Laplacian exchange on uniform, graded and grain prism meshes: exact for linear fields',
+    ),
+    'tetra_exchange_test': (
+        _tetra_exchange_test, False,
+        'Exchange operator on Kuhn and jittered tetrahedral meshes vs an analytical helix',
+    ),
+    'unstructured_exchange_test': (
+        _unstructured_exchange_test, False,
+        'Cell Hessian exchange on irregular tetrahedra and prisms: free surfaces, exchPBC, curved boundary',
+    ),
+    'symmetric_exchange_test': (
+        _symmetric_exchange_test, False,
+        'Symmetric (SUSHI-g) exchange: symmetry, energy conservation/decay, FD on regular grids, convergence',
     ),
     'shape_correction_test': (
         _shape_correction_test, False,

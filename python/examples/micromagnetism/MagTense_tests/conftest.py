@@ -4,4 +4,3 @@
 # collection time pulls in magtense for no benefit, so keep them out. The real
 # pytest suites here are all named test_*.py and are unaffected.
 collect_ignore_glob = ["*_test.py"]
-collect_ignore = ["fmm_test/run_fmm_test.py"]

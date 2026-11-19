@@ -209,8 +209,6 @@ problem = problem.setUseCVODE(false);
 problem = problem.setUseDemag(true);
 problem = problem.setMicroMagSolver('Dynamic');
 problem.useAvgN = int32(useAvg);
-% An octree is pointless for grids this small, and the FMM path ignores the macrogeometry
-problem.use_fmm = int32(0);
 problem.ReturnHall = int32(1);
 
 problem.gamma = 0;

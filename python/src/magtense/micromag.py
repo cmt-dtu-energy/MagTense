@@ -93,6 +93,25 @@ class MicromagProblem:
         demag_approx:
         exch_nval: Number of values in the exchange operator matrix.
         exch_nrow: Number of rows in the exchange operator matrix.
+        exch_meth: Exchange operator of an unstructured grid ('tetrahedron', 'unstructuredPrisms').
+            'cellhessian' (the default there) fits a quadratic around every cell centroid over
+            its neighbours (cells sharing a node, or touching prisms) and takes the trace of the
+            fitted Hessian; free surfaces are imposed in the fit, periodic coupling only along
+            exchPBC. It is consistent on irregular, graded and refined meshes. The previous
+            face-based 'directlaplacianneumann' and 'ggneumann' remain selectable; they are only
+            consistent on regular axis-aligned grids. A uniform grid always uses its own
+            finite-difference stencil. exch_weigh applies to 'directlaplacianneumann' only.
+            The cell Hessian stencils hold ~15-150 cells, so exch_presize must be raised (e.g.
+            to 256) when the exchange matrix is to be returned.
+            'sushi' is the symmetric, energy-based operator (SUSHI-g): the matrix is -V^-1 K with
+            K symmetric positive semidefinite, so the exchange field is exactly -dE/dm, the
+            exchange energy is conserved without damping and decreases with damping, and on a
+            uniform prism grid it is the standard 7-point Laplacian. Its solution error is
+            second order and below that of 'cellhessian' on all meshes tested; its pointwise
+            residual does not converge on irregular meshes (as for finite volumes in general).
+            Free surfaces are natural (homogeneous Neumann), periodic only along exchPBC; every
+            cell uses its own A (interface exchange values are not used). ~30-60 entries per
+            row on tetrahedra, ~10-60 on prisms.
         filename:
         cuda: Optional GPU support via CUDA.
         cvode:
@@ -106,6 +125,45 @@ class MicromagProblem:
             A value smaller than grid_L along a direction with copies is rejected.
         macroShape: Sidelengths of a prism representing the shape of the macrogeometry.
         sampleShape: Sidelengths of a prism representing the sample shape.
+        use_cdfmm: Use dip-fmm instead of the regular dense demagnetisation
+            calculation. Supported for uniform grids and for grids of axis-aligned
+            prisms ('unstructuredPrisms', e.g. octree-refined meshes), where every
+            tile passes its own grid_abc side lengths.
+            Backend selection follows MagTense: CUDA requires both a
+            CUDA-enabled build and ``cuda=True``; otherwise dip-fmm prefers
+            oneMKL and falls back to portable CPU execution.
+        cdfmm_order: Expansion order used by dip-fmm.
+        cdfmm_depth: Fixed octree depth used by dip-fmm's uniform tree.
+        cdfmm_basis: Expansion basis, either ``"spherical"`` or ``"cartesian"``.
+        cdfmm_tree: ``"uniform"`` (fixed depth ``cdfmm_depth``) or ``"adaptive"`` (a box is
+            split while it holds more than ``cdfmm_capacity`` tiles, at most
+            ``cdfmm_max_depth`` levels). On a graded mesh the uniform tree must be shallow
+            enough that its leaves contain the largest tile; dip-fmm warns otherwise.
+            With a root (given or aligned) ``"uniform"`` is built by the adaptive builder with
+            capacity 1, so a box holding a single tile is not split further: on a graded mesh
+            its large tiles get leaves of their own size. ``"uniform_strict"`` splits every
+            occupied box down to ``cdfmm_depth`` (adaptive builder, capacity 0), so large tiles
+            sit in depth-``cdfmm_depth`` leaves by their centre; it needs a dip-fmm that
+            accepts capacity 0. ``"adaptive_target"`` is the adaptive tree with dip-fmm's target
+            split rule: ``cdfmm_capacity`` is the occupancy to aim for, and a box above it is split
+            only if its octants are, weighted by their tile counts, closer to it (|ln(n/target)|);
+            it needs a dip-fmm with the ``_split`` adaptive entry points.
+        cdfmm_capacity: Adaptive tree: maximum number of tiles per leaf before a split
+            (``"adaptive_target"``: the target number of tiles per leaf).
+        cdfmm_max_depth: Adaptive tree: deepest level, 0 to 8.
+        cdfmm_root: Root cube as (centre x, y, z, half-width) [m]. ``None`` lets MagTense choose
+            it (see ``cdfmm_align``). A given root is used as it is, for either tree.
+        cdfmm_align: With ``cdfmm_root=None``, choose a root on which every leaf holds whole
+            cells, so that no cell sticks out of its leaf box (a cell that does breaks the
+            far-field assumption and costs accuracy; dip-fmm warns about it). The root is
+            anchored at the lower corner of the cells; its unit is the smallest common
+            multiple of the cell (or finest tile) side lengths, so cells that are not cubes
+            are aligned along every axis (a warning is given if the sides have no common
+            multiple). Uniform tree: the leaf at ``cdfmm_depth`` is ceil(extent / 2**depth)
+            units, e.g. 3 cells of an 80-cell grid at depth 5. Adaptive tree: the root is a
+            power of two times the unit. ``False`` keeps the previous behaviour: the bounding
+            box of a uniform grid (dip-fmm's original uniform-cuboid plan) and the bounding
+            cube of the tiles for the adaptive tree.
         min_tol: Minimizer convergence criterion: the largest torque max_i |m_i x H_i| over the
             cells, divided by max(Ms), must fall below this.
         min_maxiter: Iteration cap of one minimizer descent, extended up to four times while
@@ -125,6 +183,18 @@ class MicromagProblem:
             extrapolation of the two previous equilibria instead of from the previous one, and
             takes its first step with the step length the previous field ended with. Costs
             nothing; the extrapolation is skipped automatically across a switching event.
+        min_stall_window: Stall exit of the minimizer (0, default: off). A descent whose best
+            torque is within min_stall_mult * min_tol but has not fallen by 10 % in this many
+            iterations is stuck there: its best state is accepted (min_status 4) instead of
+            running on to min_maxiter and the fallback. Above the band nothing changes.
+        min_stall_mult: Band of the stall exit, as a multiple of min_tol (default 2).
+        min_stall_dH_factor: Adaptive hysteresis: after a field accepted while stuck (min_status
+            4), the next field step is at most this factor times the one just taken (default 0.5).
+        min_precond: If True, the minimizer's steps are preconditioned per cell: each cell steps
+            in proportion to the inverse square root of its own curvature (exchange diagonal,
+            anisotropy, applied field, Ms), so that a few stiff small cells no longer set the
+            step of all others (the full inverse stalls with the demagnetisation field). Default
+            False (plain Barzilai-Borwein steps).
 
     After a run the following diagnostics are available as attributes:
         E_out: (nt, nt_h_ext, 4) energies [J] in the order exchange, external, demagnetization,
@@ -135,8 +205,10 @@ class MicromagProblem:
         min_torque: (nt_h_ext,) final max_i |m_i x H_i| / max(Ms) at each field.
         min_eig: (nt_h_ext,) lowest Hessian eigenvalue of the returned state divided by max(Ms),
             when min_saddle_check = 2 (positive: minimum), NaN otherwise.
-        min_status: (nt_h_ext,) -1 LL time integration, 0 minimizer converged, 1 converged after
-            an LL fallback, 2 not converged.
+        min_status: (nt_h_ext,) -1 LL time integration that passed its convergence check (or had
+            none configured), -2 LL time integration that ran to the end of its time window without
+            passing the check, 0 minimizer converged, 1 converged after an LL fallback, 2 not
+            converged.
     """
 
     def __init__(
@@ -177,7 +249,7 @@ class MicromagProblem:
             exch_nrow: int = 1,
             exch_ncols: int = 1,
             exch_intpn: str | None = "extended",
-            exch_meth: str | None = "directlaplacianneumann",
+            exch_meth: str | None = None,
             exch_weigh: float = 8,
             exch_presize: int = 12,
             passexch: int = 0,
@@ -201,6 +273,15 @@ class MicromagProblem:
             n_macro: list | np.ndarray | None = np.zeros(3),
             hysteresis_solver: str = "static",
             rng_seed: int = 0,
+            use_cdfmm: bool = False,
+            cdfmm_order: int = 6,
+            cdfmm_depth: int = 4,
+            cdfmm_basis: str | int = "spherical",
+            cdfmm_tree: str = "uniform",
+            cdfmm_capacity: int = 32,
+            cdfmm_max_depth: int = 5,
+            cdfmm_root: list | np.ndarray | None = None,
+            cdfmm_align: bool = True,
             phase_id: np.ndarray | None = None,
             A_int: np.ndarray | None = None,
             min_tol: float = 1e-5,
@@ -209,6 +290,10 @@ class MicromagProblem:
             min_fallback: bool = True,
             min_saddle_check: bool | int = 2,
             min_predictor: bool = True,
+            min_stall_window: int = 0,
+            min_stall_mult: float = 2.0,
+            min_stall_dH_factor: float = 0.5,
+            min_precond: bool = False,
     ) -> None:
         ntot = np.prod(res)
         self.ntot = ntot
@@ -218,6 +303,12 @@ class MicromagProblem:
         self.exch_nrow = exch_nrow
         self.exch_ncols = exch_ncols
         self.exch_intpn = exch_intpn
+        # The cell Hessian operator is the default on unstructured grids (tetrahedra and prisms):
+        # the face-based Direct Laplacian is only consistent on regular axis-aligned grids. A
+        # uniform grid uses its own finite-difference stencil whatever exch_meth says.
+        if exch_meth is None:
+            exch_meth = "cellhessian" if grid_type in ("tetrahedron", "unstructuredPrisms") \
+                else "directlaplacianneumann"
         self.exch_meth = exch_meth
         self.exch_weigh = exch_weigh
         self.passexch = passexch
@@ -352,6 +443,16 @@ class MicromagProblem:
         if self.min_saddle_check not in (0, 1, 2):
             raise ValueError("min_saddle_check must be 0 (off), 1 (nudge) or 2 (Hessian eigenvalue)")
         self.min_predictor = int(bool(min_predictor))
+        self.min_stall_window = int(min_stall_window)
+        if self.min_stall_window < 0:
+            raise ValueError("min_stall_window must be >= 0 (0: stall exit off)")
+        self.min_stall_mult = float(min_stall_mult)
+        if self.min_stall_mult < 1.0:
+            raise ValueError("min_stall_mult must be >= 1 (a multiple of min_tol)")
+        self.min_stall_dH_factor = float(min_stall_dH_factor)
+        if not 0.0 < self.min_stall_dH_factor <= 1.0:
+            raise ValueError("min_stall_dH_factor must be in (0, 1]")
+        self.min_precond = int(bool(min_precond))
 
         # Energies and relaxation diagnostics of the last run, see the class docstring
         self.E_out = None
@@ -367,22 +468,52 @@ class MicromagProblem:
         self.N_ave = np.array(N_ave, dtype=np.int32, order="F")
 
 
-        #--------- default FMM parameters -----------------
+        # 1 sets the problem up (demag tensor or dip-fmm plan) and returns without solving
         self.dummy_run = 0
-        self.fmm_cells_per_node = 100
-        self.fmm_eps = 1e-4
-        self.ifunif = 1
-        self.nlmin = 1
-        self.nlmax = 5
-        self.allow_fmm_short_circuit = 1
-        self.fmm_min_n = 20000
-        self.fmm_nterms = -1
-        # Off by default: the FMM demag path only pays off for large problems, and it is
-        # ignored altogether unless the library is built with USE_FMM3D=1. Opting in
-        # explicitly means a problem does not silently change its demag path when the
-        # library is rebuilt with FMM enabled. Set `problem.use_fmm = 1` to use it.
-        self.use_fmm = 0
-        #--------------------------------------------------
+
+        # dip-fmm demag backend. Its MagTense adapter supports uniform cuboids,
+        # axis-aligned prisms of any size and tetrahedra, with FP32 field arrays.
+        basis_values = {"spherical": 0, "cartesian": 1}
+        if isinstance(cdfmm_basis, str):
+            if cdfmm_basis not in basis_values:
+                raise ValueError(f"Unknown dip-fmm basis: {cdfmm_basis}")
+            cdfmm_basis = basis_values[cdfmm_basis]
+        if use_cdfmm and self.grid_type not in (1, 2, 3):
+            raise ValueError("dip-fmm requires grid_type='uniform', 'unstructuredPrisms' or 'tetrahedron'")
+        tree_values = {"uniform": 0, "adaptive": 1, "uniform_strict": 1, "adaptive_target": 2}
+        if cdfmm_tree not in tree_values:
+            raise ValueError("cdfmm_tree must be 'uniform', 'adaptive', 'adaptive_target' or 'uniform_strict'")
+        self.cdfmm_strict = cdfmm_tree == "uniform_strict"
+        if self.cdfmm_strict:
+            # the adaptive builder with capacity 0 splits every occupied box to max_depth
+            if not (1 <= int(cdfmm_depth) <= 8):
+                raise ValueError("uniform_strict: cdfmm_depth must be in 1..8")
+            cdfmm_capacity, cdfmm_max_depth = 0, int(cdfmm_depth)
+        elif int(cdfmm_capacity) < 1 or not (0 <= int(cdfmm_max_depth) <= 8):
+            raise ValueError("cdfmm_capacity must be positive and cdfmm_max_depth in 0..8")
+        if cdfmm_root is None:
+            cdfmm_root = [0.0, 0.0, 0.0, -1.0]
+        cdfmm_root = np.asarray(cdfmm_root, dtype=np.float64).ravel()
+        if cdfmm_root.size != 4:
+            raise ValueError("cdfmm_root must be (centre x, y, z, half-width)")
+        if cdfmm_order < 1 or cdfmm_depth < 1:
+            raise ValueError("cdfmm_order and cdfmm_depth must be positive")
+        if int(cdfmm_basis) not in basis_values.values():
+            raise ValueError("cdfmm_basis must be 0 (spherical) or 1 (cartesian)")
+
+        self.use_cdfmm = int(use_cdfmm)
+        self.cdfmm_order = int(cdfmm_order)
+        self.cdfmm_depth = int(cdfmm_depth)
+        self.cdfmm_basis = int(cdfmm_basis)
+        self.cdfmm_precision = 0  # MagTense stores the demag field in FP32.
+        self.cdfmm_tree = tree_values[cdfmm_tree]
+        self.cdfmm_capacity = int(cdfmm_capacity)
+        self.cdfmm_max_depth = int(cdfmm_max_depth)
+        self.cdfmm_root = np.asfortranarray(cdfmm_root)
+        self.cdfmm_align = bool(cdfmm_align)
+        #: Applied field (x, y, z) [A/m] of every field step of the last run: the accepted
+        #: steps of an adaptive run. Filled whether or not usereturnhall is set.
+        self.H_ext_applied = None
 
         #---------- timer and trace parameters ----------
         self.log_dir = "logs"
@@ -780,6 +911,8 @@ class MicromagProblem:
             None: -1,
             "directlaplacianneumann": 1,
             "ggneumann": 2,
+            "cellhessian": 3,
+            "sushi": 4,
         }[val]
 
     @property
@@ -819,14 +952,90 @@ class MicromagProblem:
             )
         return self._solver
 
-    def _store_diagnostics(self, result: list, n_accepted: int | None = None) -> None:
-        """Pop the six trailing diagnostics off a Fortran result list onto the problem.
+    def _cell_extent(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Lower corner, upper corner and cell (finest tile) side lengths of the grid [m]."""
+        if self.grid_type == 3:
+            pts = np.asarray(self.grid_pts, dtype=np.float64)
+            abc = np.asarray(self.grid_abc, dtype=np.float64)
+            return (pts - 0.5 * abc).min(axis=0), (pts + 0.5 * abc).max(axis=0), abc.min(axis=0)
+        L = np.asarray(self.grid_L, dtype=np.float64)
+        n = np.asarray(self.grid_n, dtype=np.float64)
+        return -0.5 * L, 0.5 * L, L / n
 
-        The Fortran entry point returns E_out, n_feval, min_iter, min_torque, min_status and min_eig after
-        the historical outputs. They are kept off the returned list so that its layout, which
+    @staticmethod
+    def _common_unit(h: np.ndarray) -> tuple[float, bool]:
+        """Smallest length that is a whole multiple of every side length in h (up to 64 of the
+        largest), and whether one was found; otherwise the largest side."""
+        hmax = float(np.max(h))
+        for k in range(1, 65):
+            u = k * hmax
+            q = u / h
+            if np.all(np.abs(q - np.rint(q)) < 1e-6 * q):
+                return u, True
+        return hmax, False
+
+    def aligned_cdfmm_root(self, tree: str | None = None, depth: int | None = None) -> np.ndarray:
+        """The aligned root (centre x, y, z, half-width) [m] described under ``cdfmm_align``."""
+        tree = tree or ("uniform" if getattr(self, "cdfmm_strict", False)
+                        else {0: "uniform", 1: "adaptive", 2: "adaptive"}[self.cdfmm_tree])
+        depth = self.cdfmm_depth if depth is None else int(depth)
+        low, high, h = self._cell_extent()
+        unit, ok = self._common_unit(h)
+        if not ok:
+            import warnings
+            warnings.warn(f"cell sides {h} have no common multiple: the dip-fmm root cannot align "
+                          "the leaves with the cells along every axis", stacklevel=2)
+        extent = float(np.max(high - low))
+        n_units = extent / unit
+        if tree == "uniform":
+            side = unit * np.ceil(n_units / 2**depth - 1e-9) * 2**depth
+        else:
+            side = unit * 2 ** int(np.ceil(np.log2(max(n_units, 1.0)) - 1e-9))
+        centre = low + 0.5 * side
+        return np.asfortranarray(np.concatenate([centre, [0.5 * side]]))
+
+    def _resolved_cdfmm_root(self) -> np.ndarray:
+        """Root cube (centre x, y, z, half-width) handed to dip-fmm; half-width <= 0 means none.
+
+        An explicit ``cdfmm_root`` is used as given. Otherwise, with ``cdfmm_align``, the aligned
+        root of ``aligned_cdfmm_root``; without it, the bounding cube of the cells for the
+        adaptive tree and none for the uniform tree (dip-fmm then encloses the cells itself).
+        """
+        root = np.asarray(self.cdfmm_root, dtype=np.float64)
+        if root[3] > 0:
+            return np.asfortranarray(root)
+        if self.grid_type == 2:
+            # Tetrahedra have no lattice to align with: dip-fmm encloses every vertex itself.
+            return np.asfortranarray(root)
+        if self.cdfmm_align:
+            return self.aligned_cdfmm_root()
+        if self.cdfmm_tree not in (1, 2) or getattr(self, "cdfmm_strict", False):
+            return np.asfortranarray(root)
+        low, high, _ = self._cell_extent()
+        centre = 0.5 * (low + high)
+        return np.asfortranarray(np.concatenate([centre, [0.5 * float(np.max(high - low))]]))
+
+    def _field_output_extents(self, nt: int, nt_h_ext_out: int) -> dict:
+        """Extents of the four returned field arrays (H_exc, H_ext, H_dem, H_ani).
+
+        Full size only with usereturnhall; otherwise (1, 1, 1), so that a large mesh does not
+        allocate 4 x nt x ntot x nt_h_ext_out x 3 doubles of zeros. The applied fields of
+        every step are always available as ``H_ext_applied``.
+        """
+        if self.usereturnhall:
+            return {"nt_h": int(nt), "ntot_h": int(self.ntot), "nt_hext_h": int(nt_h_ext_out)}
+        return {"nt_h": 1, "ntot_h": 1, "nt_hext_h": 1}
+
+    def _store_diagnostics(self, result: list, n_accepted: int | None = None) -> None:
+        """Pop the seven trailing outputs off a Fortran result list onto the problem.
+
+        The Fortran entry point returns E_out, n_feval, min_iter, min_torque, min_status, min_eig and
+        the applied fields of every step after the historical outputs. They are kept off the returned list so that its layout, which
         callers index by position, does not change. For an adaptive run only the accepted field
         steps are kept.
         """
+        H_ext_applied = np.asarray(result.pop())
+        self.H_ext_applied = H_ext_applied[:n_accepted] if n_accepted is not None else H_ext_applied
         min_eig = np.asarray(result.pop())
         min_status = np.asarray(result.pop())
         min_torque = np.asarray(result.pop())
@@ -1009,6 +1218,7 @@ class MicromagProblem:
             temperature=self.T,
             nt_hext=nt_h_ext,
             nt_hext_out = nt_h_ext_out,
+            **self._field_output_extents(nt, nt_h_ext_out),
             hext=h_ext,
             nt=nt,
             t=np.linspace(0, t_end, nt),
@@ -1065,6 +1275,7 @@ class MicromagProblem:
             dm_min=0.0,
             dm_target=0.0,
             dm_reject=0.0,
+            dm_abort=0.0,
             dh_grow=0.0,
             dh_shrink=0.0,
             switch_refine_dh=0.0,
@@ -1075,16 +1286,20 @@ class MicromagProblem:
             min_fallback=self.min_fallback,
             min_saddle_check=self.min_saddle_check,
             min_predictor=self.min_predictor,
+            min_stall_window=self.min_stall_window,
+            min_stall_mult=self.min_stall_mult,
+            min_stall_dh_factor=self.min_stall_dH_factor,
+            min_precond=self.min_precond,
             dummy_run=self.dummy_run,
-            fmm_cells_per_node=self.fmm_cells_per_node,
-            eps_fmm=self.fmm_eps,
-            ifunif=self.ifunif,
-            nlmin=self.nlmin,
-            nlmax=self.nlmax,
-            allow_fmm_short_circuit=self.allow_fmm_short_circuit,
-            fmm_min_n=self.fmm_min_n,
-            fmm_nterms=self.fmm_nterms,
-            usefmm=self.use_fmm,
+            usecdfmm=self.use_cdfmm,
+            cdfmm_order=self.cdfmm_order,
+            cdfmm_depth=self.cdfmm_depth,
+            cdfmm_basis=self.cdfmm_basis,
+            cdfmm_precision=self.cdfmm_precision,
+            cdfmm_tree=self.cdfmm_tree,
+            cdfmm_capacity=self.cdfmm_capacity,
+            cdfmm_max_depth=self.cdfmm_max_depth,
+            cdfmm_root=self._resolved_cdfmm_root(),
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,
@@ -1173,6 +1388,7 @@ class MicromagProblem:
             temperature=self.T,
             nt_hext=nt_h_ext,
             nt_hext_out = nt_h_ext_out,
+            **self._field_output_extents(self.nt, nt_h_ext_out),
             hext=H_ext,
             nt=self.nt,
             t=self.t,
@@ -1229,6 +1445,7 @@ class MicromagProblem:
             dm_min=0.0,
             dm_target=0.0,
             dm_reject=0.0,
+            dm_abort=0.0,
             dh_grow=0.0,
             dh_shrink=0.0,
             switch_refine_dh=0.0,
@@ -1239,16 +1456,20 @@ class MicromagProblem:
             min_fallback=self.min_fallback,
             min_saddle_check=self.min_saddle_check,
             min_predictor=self.min_predictor,
+            min_stall_window=self.min_stall_window,
+            min_stall_mult=self.min_stall_mult,
+            min_stall_dh_factor=self.min_stall_dH_factor,
+            min_precond=self.min_precond,
             dummy_run=self.dummy_run,
-            fmm_cells_per_node=self.fmm_cells_per_node,
-            eps_fmm=self.fmm_eps,
-            ifunif=self.ifunif,
-            nlmin=self.nlmin,
-            nlmax=self.nlmax,
-            allow_fmm_short_circuit=self.allow_fmm_short_circuit,
-            fmm_min_n=self.fmm_min_n,
-            fmm_nterms=self.fmm_nterms,
-            usefmm=self.use_fmm,
+            usecdfmm=self.use_cdfmm,
+            cdfmm_order=self.cdfmm_order,
+            cdfmm_depth=self.cdfmm_depth,
+            cdfmm_basis=self.cdfmm_basis,
+            cdfmm_precision=self.cdfmm_precision,
+            cdfmm_tree=self.cdfmm_tree,
+            cdfmm_capacity=self.cdfmm_capacity,
+            cdfmm_max_depth=self.cdfmm_max_depth,
+            cdfmm_root=self._resolved_cdfmm_root(),
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,
@@ -1285,12 +1506,38 @@ class MicromagProblem:
             dM_min: float = 1e-3,
             dM_target: float = 1e-2,
             dM_reject: float = 5e-2,
-            dH_grow: float = 1.25,
-            dH_shrink: float = 0.5,
+            dH_grow: float = 2.0,
+            dH_shrink: float = 0.25,
             switch_refine_dH: float | None = None,
+            dM_abort: float = 1.5,
     ) -> list[np.ndarray | int]:
         """
         Run a micromagnetic hysteresis simulation with adaptive external-field steps.
+
+        Step control: every trial field is a full relaxation from the last accepted state and
+        ``dM``, the change of the mean magnetisation vector, decides. The mean is weighted by the
+        moment of every cell, ``<m> = sum_i Ms_i V_i m_i / sum_i Ms_i V_i``, so that on a refined
+        mesh the many small tiles and a soft phase of low ``Ms`` count by their moment, not by
+        their number; on a uniform grid of one material it is the plain average. A trial is redone
+        with half the step when ``dM > dM_reject``, when the mean magnetisation along the sweep
+        changes sign and the step is above ``switch_refine_dH``, or when the minimizer did not
+        converge; nothing is redone once the step is at ``dH_min``, so a switching event is
+        resolved to ``dH_min``. The rejected trial of a switch is kept as a bracket (the step never
+        passes the field known to have switched, and the pre-switch step is restored right after
+        the switch). After an accepted step the step is scaled by ``0.9 dM_target / dM``, clamped
+        per step to ``[dH_shrink, dH_grow]`` (so these are per-step limits, not fixed factors),
+        floored at ``dH_min`` and capped at ``dH_max``. An approaching instability shortens the
+        step early: for the minimizer from the lowest Hessian eigenvalue (``min_saddle_check = 2``),
+        for the time integration when the relaxation cost jumps by more than 3x. ``dM_min`` is
+        accepted for compatibility and unused. A time integration that ran out of its window is
+        accepted and reported with ``min_status = -2``.
+
+        Short-circuit (minimizer only): a trial above ``dH_min`` is abandoned as soon as its mean
+        has moved by ``dM_abort * dM_reject`` - checked every 10 minimizer iterations and around
+        the LL fallback - and rejected like a ``dM`` rejection, instead of being relaxed to the end
+        (or through the fallback) first. ``dM_abort`` must be 0 (off) or at least 1; above 1 the
+        margin covers a descent whose mean overshoots and comes back. At ``dH_min`` nothing is
+        rejected, so a switching event is still relaxed in full there.
 
         The adaptive accept/reject loop is executed by the Fortran backend in a
         single call. Output arrays are preallocated to ``max_steps`` in Fortran
@@ -1324,6 +1571,8 @@ class MicromagProblem:
             raise ValueError("dH_grow must be larger than 1")
         if not (0.0 < dH_shrink < 1.0):
             raise ValueError("dH_shrink must be between 0 and 1")
+        if dM_abort != 0.0 and not dM_abort >= 1.0:
+            raise ValueError("dM_abort must be 0 (off) or at least 1")
 
         # The Fortran loop records the starting field in slot 1 and then one slot per accepted
         # step, so it needs max_steps + 1 slots. Sizing these to max_steps overran problem%Hext
@@ -1359,6 +1608,7 @@ class MicromagProblem:
             temperature=self.T,
             nt_hext=nt_h_ext,
             nt_hext_out=nt_h_ext_out,
+            **self._field_output_extents(self.nt, nt_h_ext_out),
             hext=h_ext,
             nt=self.nt,
             t=self.t,
@@ -1415,6 +1665,7 @@ class MicromagProblem:
             dm_min=float(dM_min),
             dm_target=float(dM_target),
             dm_reject=float(dM_reject),
+            dm_abort=float(dM_abort),
             dh_grow=float(dH_grow),
             dh_shrink=float(dH_shrink),
             switch_refine_dh=switch_refine_value,
@@ -1425,16 +1676,20 @@ class MicromagProblem:
             min_fallback=self.min_fallback,
             min_saddle_check=self.min_saddle_check,
             min_predictor=self.min_predictor,
+            min_stall_window=self.min_stall_window,
+            min_stall_mult=self.min_stall_mult,
+            min_stall_dh_factor=self.min_stall_dH_factor,
+            min_precond=self.min_precond,
             dummy_run=self.dummy_run,
-            fmm_cells_per_node=self.fmm_cells_per_node,
-            eps_fmm=self.fmm_eps,
-            ifunif=self.ifunif,
-            nlmin=self.nlmin,
-            nlmax=self.nlmax,
-            allow_fmm_short_circuit=self.allow_fmm_short_circuit,
-            fmm_min_n=self.fmm_min_n,
-            fmm_nterms=self.fmm_nterms,
-            usefmm=self.use_fmm,
+            usecdfmm=self.use_cdfmm,
+            cdfmm_order=self.cdfmm_order,
+            cdfmm_depth=self.cdfmm_depth,
+            cdfmm_basis=self.cdfmm_basis,
+            cdfmm_precision=self.cdfmm_precision,
+            cdfmm_tree=self.cdfmm_tree,
+            cdfmm_capacity=self.cdfmm_capacity,
+            cdfmm_max_depth=self.cdfmm_max_depth,
+            cdfmm_root=self._resolved_cdfmm_root(),
             log_dir=self.log_dir,
             timer_log_file=self.timer_log_file,
             trace_log_file=self.trace_log_file,

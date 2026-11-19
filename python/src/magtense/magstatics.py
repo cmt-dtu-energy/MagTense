@@ -1069,6 +1069,57 @@ def get_demag_tensor(tiles: Tiles, pts: np.ndarray,obs_size: np.ndarray = None) 
     return demag_tensor
 
 
+def get_demag_tensor_tetrahedron_pair(
+    source_vertices: np.ndarray, target_vertices: np.ndarray
+) -> np.ndarray:
+    """
+    Analytically exact, target-volume-averaged demagnetization tensor between
+    two tetrahedra.
+
+    The returned tensor N satisfies ``<H>_{V_target} = N @ M``, i.e. it maps the
+    uniform magnetization of the source tetrahedron to the demagnetizing field
+    averaged over the volume of the receiving tetrahedron. It is the
+    finite-target counterpart of the tetrahedron-source to point-target tensor
+    obtained from :func:`get_demag_tensor` with ``tile_type=5``.
+
+    The tensor is evaluated in closed form from sixteen analytical
+    triangle-pair Laplace integrals over the outward-oriented faces of the two
+    tetrahedra; no numerical quadrature is involved. The result does not depend
+    on the orientation or on the permutation of the supplied vertices.
+
+    Args:
+        source_vertices: (4, 3) array with the four vertices of the source
+            tetrahedron as rows, in absolute coordinates.
+        target_vertices: (4, 3) array with the four vertices of the receiving
+            tetrahedron as rows, in the same coordinate system.
+
+    Returns:
+        (3, 3) demagnetization tensor.
+
+    Raises:
+        ValueError: If either tetrahedron is degenerate or the analytical
+            evaluation did not produce a finite result.
+    """
+    src = np.asarray(source_vertices, dtype=np.float64)
+    tgt = np.asarray(target_vertices, dtype=np.float64)
+
+    if src.shape != (4, 3) or tgt.shape != (4, 3):
+        raise ValueError("Both tetrahedra have to be given as (4, 3) vertex arrays")
+
+    demag_tensor, ierr = magtensesource.fortrantopythonio.getntensortetrahedronpair(
+        source_vertices=np.asfortranarray(src.T),
+        target_vertices=np.asfortranarray(tgt.T),
+    )
+
+    if ierr != 0:
+        raise ValueError(
+            "Exact tetrahedron-tetrahedron demagnetization tensor failed "
+            f"with status {int(ierr)}"
+        )
+
+    return np.asarray(demag_tensor, dtype=np.float64)
+
+
 def get_H_field(
     tiles: Tiles, pts: np.ndarray, demag_tensor: np.ndarray | None = None
 ) -> np.ndarray:
@@ -1121,64 +1172,3 @@ def get_H_field(
     )
 
     return H_out
-
-
-def get_H_field_fmm(
-    tiles, pts, eps=1e-6,
-    nterms_in=10, cells_per_node=10, nlmin=0, nlmax=2, ifunif=1,
-    do_target=0, do_FI=1, n_pts=-1
-
-) -> np.ndarray:
-    """
-    FMM-backed H-field, test version.
-    Mirrors get_H_field(...) but calls the Fortran FMM routine.
-
-    Notes:
-      - Currently uses a single dipole per tile (centre + moment).
-      - 'demag_tensor' is ignored here (no tensor reuse in this FMM path).
-      - 'eps' controls FMM accuracy.
-    """
-
-    if n_pts > 0:
-        n_pts_in = np.int32(n_pts)
-    else:
-        n_pts_in = np.int32(len(pts))
-
-    H_out = magtensesource.fortrantopythonio.gethfromtilesfmm(
-        centerpos=tiles.center_pos,
-        dev_center=tiles.dev_center,
-        tile_size=tiles.size,
-        vertices=tiles.vertices,
-        mag=tiles.M,
-        u_ea=tiles.u_ea,
-        u_oa1=tiles.u_oa1,
-        u_oa2=tiles.u_oa2,
-        mu_r_ea=tiles.mu_r_ea,
-        mu_r_oa=tiles.mu_r_oa,
-        mrem=tiles.M_rem,
-        tiletype=tiles.tile_type,
-        offset=tiles.offset,
-        rotangles=tiles.rot,
-        color=tiles.color,
-        magnettype=tiles.magnet_type,
-        statefunctionindex=tiles.stfcn_index,
-        includeiniteration=tiles.incl_it,
-        exploitsymmetry=tiles.use_sym,
-        symmetryops=tiles.sym_op,
-        mrel=tiles.M_rel,
-        pts=pts,
-        n_tiles=np.int32(tiles.n),
-        n_pts=n_pts_in,
-        fmm_eps=np.float64(eps),     # FMM precision
-        fmm_nterms_in=np.int32(nterms_in),
-        fmm_cells_per_node=np.int32(cells_per_node),
-        fmm_nlmin=np.int32(nlmin),
-        fmm_nlmax=np.int32(nlmax),
-        fmm_ifunif=np.int32(ifunif),
-        do_target=np.int32(do_target),
-        do_fi=np.int32(do_FI)
-    )
-    return H_out
-
-
-

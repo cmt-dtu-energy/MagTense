@@ -42,7 +42,7 @@ def main(
     build_tag: dict | None = None,
 ) -> None:
     if build_tag is None:
-        build_tag = {"cpu": 0, "cu13": 1, "cu13-fmm": 3}
+        build_tag = {"cpu": 0, "cu13": 1}
     py_folder = Path(__file__).parent.parent
     lib_folder = py_folder / "src" / "magtense" / "lib"
 
@@ -69,28 +69,8 @@ def main(
                     "The compile step did not produce it."
                 )
             subprocess.run(["cp", str(ext_module), lib_folder], check=True)
-            if cuda.endswith("-fmm") and platform == "linux":
-                subprocess.run(
-                    [
-                        "cp",
-                        f"{py_folder}/{cuda}_libs/libfmm3d.so",
-                        lib_folder,
-                    ],
-                    check=False,
-                )
-            if cuda.endswith("-fmm") and platform == "win":
-                subprocess.run(
-                    [
-                        "cp",
-                        f"{py_folder}/{cuda}_libs/libfmm3d.dll",
-                        lib_folder,
-                    ],
-                    check=False,
-                )
             if platform == "linux":
                 rpath_entries = ["$ORIGIN/../../../../../lib/"]
-                if cuda.endswith("-fmm"):
-                    rpath_entries.insert(0, "$ORIGIN")
                 if cuda.startswith("cu13"):
                     # One shared directory, not the per-library
                     # nvidia/<name>/lib/ layout the cu12 wheels used: every
@@ -147,16 +127,6 @@ def main(
                 ["rm", f"{lib_folder}/magtensesource.{py_lib}-{arch}.{suffix}"],
                 check=False,
             )
-            if cuda.endswith("-fmm") and platform == "linux":
-                subprocess.run(
-                    ["rm", f"{lib_folder}/libfmm3d.so"],
-                    check=False,
-                )
-            if cuda.endswith("-fmm") and platform == "win":
-                subprocess.run(
-                    ["rm", f"{lib_folder}/libfmm3d.dll"],
-                    check=False,
-                )
             if Path(py_folder / "src" / "magtense.egg-info").is_dir():
                 subprocess.run(
                     [

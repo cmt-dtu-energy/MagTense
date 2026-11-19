@@ -8,6 +8,8 @@ module TileNComponents
     use TileConeTensor
     use TilePlanarCoilTensor
     use TileTriangle
+    use TileTriangleTriangle, only : ttReal, gauss_legendre01
+    use TileTetrahedronPairTensor, only : getN_tetrahedron_point
 
     implicit none
     
@@ -717,6 +719,11 @@ module TileNComponents
     real(8) :: X1, X2, Y1, Y2, Z1, Z2, vol, min_vol
     real(8), parameter :: eps = 1.0d-15
     integer :: unit
+    real(8) :: rSum, sep, sScale                    !> Summed vertex radii, separation in them, length unit of the closed form
+    real(8) :: gx(7), gw(7)                         !> Gauss-Legendre nodes and weights on [0, 1]
+    real,dimension(3) :: ptGauss                    !> Gauss point in the receiving tile, relative to the source centre
+    real,dimension(3,3) :: Npt                      !> Point tensor of the source at ptGauss
+    integer :: q
 
     !Lengths of source tile in x,y,z dimensions
     a = Avgprism%a/2.0
@@ -739,6 +746,56 @@ module TileNComponents
     x = pos(1)
     y = pos(2)
     z = pos(3)
+
+    ! For well separated tiles the closed form below is a small difference of large terms: its
+    ! 64 corner terms grow as the cube of the distance d while the tensor falls as d^-3, so in
+    ! double precision its relative error grows roughly as 1e-16 (d/h)^6, to 1e-4 at 100 cells
+    ! and order one at 200 (Chernyshenko and Fangohr, JMMM 381, 440, 2015). From 1.5 summed
+    ! vertex radii (half the space diagonals) on, the tensor is therefore the average over the
+    ! receiving tile of the point tensor of the source, by a q^3 tensor Gauss-Legendre rule
+    ! with q = 7, 6 and 5 from 1.5, 2 and 4 summed radii, as for tetrahedron pairs, and q = 4
+    ! and 3 from 8 and 16 summed radii, where they are as accurate and keep the cost of the
+    ! many distant pairs of a large mesh at that of the closed form; the point tensor does not
+    ! cancel at such distances. On test cubes the rule agrees with a 12- or 20-point rule to
+    ! 2e-11 or better at every separation and direction (q = 1 or 2 would leave the fourth-
+    ! order term, 1e-6 at 12 summed radii).
+    rSum = sqrt( a**2 + b**2 + c**2 ) + sqrt( a1**2 + b1**2 + c1**2 )
+    sep = sqrt( x**2 + y**2 + z**2 ) / rSum
+    if ( sep .ge. 1.5d0 ) then
+        q = 7
+        if ( sep .ge. 2.0d0 ) q = 6
+        if ( sep .ge. 4.0d0 ) q = 5
+        if ( sep .ge. 8.0d0 ) q = 4
+        if ( sep .ge. 16.0d0 ) q = 3
+        call gauss_legendre01( q, gx(1:q), gw(1:q) )
+        N_out = 0.
+        do i = 1, q
+            do j = 1, q
+                do k = 1, q
+                    ptGauss = (/ x + a1 * ( 2.0d0 * gx(i) - 1.0d0 ), &
+                                 y + b1 * ( 2.0d0 * gx(j) - 1.0d0 ), &
+                                 z + c1 * ( 2.0d0 * gx(k) - 1.0d0 ) /)
+                    call getN_prism_3D( Avgprism, ptGauss, Npt )
+                    N_out = N_out + gw(i) * gw(j) * gw(k) * Npt
+                end do
+            end do
+        end do
+        return
+    endif
+
+    ! The closed form is evaluated in units of the largest side, so that the guards against
+    ! zero arguments (eps) are relative; in metres eps = 1e-15 is 1e-7 of a 10 nm tile and gave
+    ! errors of that order even for touching tiles. The tensor is dimensionless and unchanged.
+    sScale = 2.0d0 * max( a, b, c, a1, b1, c1 )
+    a = a / sScale
+    b = b / sScale
+    c = c / sScale
+    a1 = a1 / sScale
+    b1 = b1 / sScale
+    c1 = c1 / sScale
+    x = x / sScale
+    y = y / sScale
+    z = z / sScale
 
     !Find coordinates for corners
     source_coords = (/ -a,  a,  -b,  b,  -c,  c /)
@@ -1127,16 +1184,12 @@ module TileNComponents
          real,dimension(3,3),intent(inout) :: N
          real,intent(in),dimension(3), optional :: Obs_size
          
-         real,dimension(3,3) :: N_tmp,P
-         integer :: i
-         
-         N(:,:) = 0.
-         
-         !Loop through all the four triangular faces
-         do i=1,4
-            call getN_Triangle( cshift( tile%vert, (i-1), 2 ), r, N_tmp, P )
-            N = N + N_tmp
-         enddo
+         real(ttReal),dimension(3,3) :: N_pt
+
+         !Face-charge form of the point tensor (TileTetrahedronPairTensor); the sum
+         !of getN_Triangle over the four faces lost up to 1e-3 at large distance.
+         call getN_tetrahedron_point( real( tile%vert, ttReal ), real( r, ttReal ), N_pt )
+         N = real( N_pt, kind( N ) )
          
          
       end subroutine getN_tensor_tetrahedron

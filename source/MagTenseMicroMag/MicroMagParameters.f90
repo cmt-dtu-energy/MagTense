@@ -4,9 +4,6 @@ include "mkl_dfti.f90"
     module MicroMagParameters
     use MKL_SPBLAS
     Use MKL_DFTI
-#if USE_FMM3D    
-    use fmm3d_tree_mod
-#endif    
 
     INTEGER, PARAMETER :: SP = SELECTED_REAL_KIND(6, 37)
     INTEGER, PARAMETER :: DP = SELECTED_REAL_KIND(15, 307)
@@ -159,11 +156,12 @@ include "mkl_dfti.f90"
         real(DP) :: dH_initial = 0.0_DP                   !> Initial adaptive field-step length [A/m].
         real(DP) :: dH_min = 0.0_DP                       !> Minimum adaptive field-step length [A/m].
         real(DP) :: dH_max = 0.0_DP                       !> Maximum adaptive field-step length [A/m].
-        real(DP) :: dH_grow = 1.25_DP                     !> Factor for increasing adaptive field-step length.
-        real(DP) :: dH_shrink = 0.5_DP                    !> Factor for decreasing adaptive field-step length.
-        real(DP) :: dM_min = 1.0e-3_DP                    !> Magnetisation-change threshold for growing adaptive field steps.
-        real(DP) :: dM_target = 1.0e-2_DP                 !> Magnetisation-change threshold for shrinking adaptive field steps.
+        real(DP) :: dH_grow = 2.0_DP                      !> Largest factor the adaptive field step may grow by per step.
+        real(DP) :: dH_shrink = 0.25_DP                   !> Smallest factor the adaptive field step may shrink by per step.
+        real(DP) :: dM_min = 1.0e-3_DP                    !> Unused by the step controller; kept for interface compatibility.
+        real(DP) :: dM_target = 1.0e-2_DP                 !> Change of the mean magnetisation per step the adaptive field step aims for.
         real(DP) :: dM_reject = 5.0e-2_DP                 !> Magnetisation-change threshold for rejecting adaptive field steps.
+        real(DP) :: dM_abort = 1.5_DP                     !> Minimizer short-circuit of an adaptive trial above dH_min: abandon it once its mean has moved by dM_abort * dM_reject (0: off).
         real(DP) :: switch_refine_dH = 0.0_DP             !> Maximum accepted step across magnetisation sign changes [A/m].
         logical :: use_switch_refine = .false.            !> Enable adaptive sign-change refinement.
 
@@ -175,6 +173,10 @@ include "mkl_dfti.f90"
         integer  :: min_fallback = 1                      !> 1: fall back to LL time integration if the minimizer stalls, 0: give up
         integer  :: min_saddle_check = 2                  !> 0: accept a converged state as it is, 1: nudge it and relax again, 2: lowest Hessian eigenvalue by Lanczos (rigorous, and reported in min_eig)
         integer  :: min_predictor = 1                     !> 1: start each applied field from the secant extrapolation of the two previous equilibria, 0: from the previous equilibrium
+        integer  :: min_precond = 0                       !> 1: diagonal preconditioner of the minimizer's steps, each cell scaled by the inverse square root of its own curvature (exchange diagonal, anisotropy, field, Ms); 0: plain steps
+        integer  :: min_stall_window = 0                 !> Stall exit: a descent within min_stall_mult * min_tol whose best torque has not fallen by 10 % in this many iterations is stuck (0: off)
+        real(DP) :: min_stall_mult = 2.0_DP               !> Stall exit: the band, as a multiple of min_tol, in which a stuck descent's best state is accepted (status 4)
+        real(DP) :: min_stall_dH_factor = 0.5_DP          !> Adaptive loop: the field step after a field accepted while stuck (status 4) is at most this factor times the last one
         real(DP),dimension(:,:),allocatable :: alpha      !> A time dependent damping parameter, i.e. as a function of time. Size (nt,1).
         
         real(DP),dimension(:),allocatable :: t              !> Time array for the desired output times
@@ -242,34 +244,31 @@ include "mkl_dfti.f90"
         
         type(DFTI_DESCRIPTOR), POINTER :: desc_hndl_FFT_M_H => null()      !> Handle for the FFT MKL stuff
 
+        ! dip-fmm uses an independent persistent cuboid FMM plan. These integer
+        ! values match the public constants in cdfmm_fortran.
+        logical :: use_cdfmm = .false.
+        integer :: cdfmm_order = 6
+        integer :: cdfmm_depth = 4
+        integer :: cdfmm_basis = 0       !> 0 spherical, 1 Cartesian
+        integer :: cdfmm_precision = 0   !> 0 FP32; MagTense demag arrays are FP32
+        ! Octree support. On a uniform grid every cell has the same size; on an
+        ! unstructuredPrisms grid each tile passes its own grid%abc (full side
+        ! lengths). cdfmm_tree selects the fixed-depth uniform tree of cdfmm_depth (0)
+        ! or the capacity-driven adaptive tree (1), which splits a box while it holds
+        ! more than cdfmm_capacity tiles and is shallower than cdfmm_max_depth.
+        ! cdfmm_root = (centre x, y, z, half-width) fixes the root cube of either tree; a
+        ! half-width <= 0 lets dip-fmm enclose the tiles itself (for the uniform tree on a
+        ! uniform grid: the original uniform-cuboid plan on the bounding box). With a root,
+        ! the uniform tree is built as every occupied box split to cdfmm_depth. Keep the
+        ! tiles on the grid of the root's leaves, or a tile can protrude from its leaf
+        ! (dip-fmm then prints a containment warning); the Python layer chooses such an
+        ! aligned root by default (MicromagProblem.cdfmm_align).
+        integer :: cdfmm_tree = 0          !> 0 uniform tree, 1 adaptive tree, 2 adaptive tree with the target split rule
+        integer :: cdfmm_capacity = 32     !> adaptive: maximum tiles per leaf before a split
+        integer :: cdfmm_max_depth = 5     !> adaptive: deepest level (0..8)
+        real(DP), dimension(4) :: cdfmm_root = [0.0_DP, 0.0_DP, 0.0_DP, -1.0_DP]
 
-
-
-
-        !--------------- demag tensor neighbour stuff ---------------
-        integer :: fmm_cells_per_node
-        real(DP) :: fmm_eps 
-        integer :: fmm_nterms = -1  ! if positive, this is the number of expansions. If negative, the expansion number is computed inside the FMM tree build based on the value of fmm_eps. 
-        integer :: ifunif = 1 
-        integer :: nlmin = 0
-        integer :: nlmax = 5
-        logical :: use_fmm = .true.
-        integer :: allow_fmm_short_circuit = 0
-        integer :: fmm_min_n = 20000    !> Minimum number of cells to use FMM
-
-        integer, dimension(:,:), pointer :: nbr_idx(:,:) => null()    !> Neighbour indices for each target cell
-        integer, dimension(:), pointer :: n_nbors(:) => null()
-        real(SP),dimension(:,:,:,:), pointer:: Nnbr(:,:,:,:) => null()
-        real(SP),dimension(:,:,:,:), pointer:: diffTens(:,:,:,:) => null()
-
-        type(MagTenseSparse), dimension(6) :: K_fmm_s
-        logical :: K_fmm_built = .false.
-        type(matrix_descr) :: K_fmm_descr_s
-
-        real(SP),dimension(:,:), contiguous, pointer :: Kxx_fmm,Kxy_fmm,Kxz_fmm  !> Demag field tensor split out into the nine symmetric components
-        real(SP),dimension(:,:), contiguous, pointer :: Kyy_fmm,Kyz_fmm      !> Demag field tensor split out into the nine symmetric components
-        real(SP),dimension(:,:), contiguous, pointer :: Kzz_fmm          !> Demag field tensor split out into the nine symmetric components
-        integer :: dummy_run = 0    !> Flag to indicate whether the demag tensor neighbour test setup has been done
+        integer :: dummy_run = 0    !> 1 sets the problem up (demag tensor or dip-fmm plan) and returns without solving
         
         integer :: window_ena
         real(DP) :: window_int
@@ -323,9 +322,6 @@ include "mkl_dfti.f90"
         real(SP),dimension(:),allocatable :: u1,u2,u3,u4,u5,u6  !> Random vectors to add noise to the demagnetization field
         
         integer :: HextInd                              !> Index specifying which external field in the input array we have reached in the explicit method
-#if USE_FMM3D
-        class(FMM3DTree), pointer :: fmm_tree => null()    !> FMM tree for computing the demag field using FMM
-#endif
     end type MicroMagSolution
     
     
@@ -336,7 +332,7 @@ include "mkl_dfti.f90"
     integer,parameter :: gridTypeUniform=1,gridTypeTetrahedron=2,gridTypeUnstructuredPrisms=3
     integer,parameter :: ProblemModeNew=1,ProblemModeContinued=2
     integer,parameter :: MicroMagSolverExplicit=1,MicroMagSolverDynamic=2,MicroMagSolverMinimizer=3
-    integer,parameter :: MicroMagExchMethodDirectLaplacianNeumann=1,MicroMagExchMethodGGNeumann=2
+    integer,parameter :: MicroMagExchMethodDirectLaplacianNeumann=1,MicroMagExchMethodGGNeumann=2,MicroMagExchMethodCellHessian=3,MicroMagExchMethodSushi=4
     integer,parameter :: MicroMagExchInterpnExtended=1,MicroMagExchInterpnCompact=2
     integer,parameter :: useCudaTrue=1,useCudaFalse=0
     integer,parameter :: DemagApproximationNothing=1,DemagApproximationThreshold=2,DemagApproximationFFTThreshold=3,DemagApproximationThresholdFraction=4,DemagApproximationFFTThresholdFraction=5
@@ -345,8 +341,7 @@ include "mkl_dfti.f90"
     integer,parameter :: useCVODETrue=1,useCVODEFalse=0
     integer,parameter :: passExchTrue=1,passExchFalse=0
     integer,parameter :: useReturnHallTrue=1,useReturnHallFalse=0
-    integer,parameter :: useFMMTrue=1,useFMMFalse=0
     integer,parameter :: useDemagTrue=1,useDemagFalse=0
     integer, parameter :: useAvgNTrue=1, useAvgNFalse=0
-    
-end module MicroMagParameters    
+
+end module MicroMagParameters

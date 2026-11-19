@@ -78,13 +78,63 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 - Compile Fortran source files
 
   ```bash
-  LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=0
+  LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0
   ```
 
-- Compiling with FMM3D backend
+- Compile with the dip-fmm micromagnetic demagnetisation backend
 
-To compile with FMM3D `$(MagTense-Folder)/external/FMM3D/local` must be in the `LD_Library_PATH` (replace MagTense-Folder with the actual path to the MagTense destiation).
-After this compile as above but with `USE_FMM3D=1`
+  Place or clone dip-fmm at `dip-fmm/` in the MagTense repository or next to
+  it (the Visual Studio project and `buildMagTenseMEX` expect the latter). The build
+  below uses dip-fmm's `release` preset, with oneMKL enabled and CUDA
+  following `USE_CUDA`, installs its shared C API under `dip-fmm/local`, and
+  links the MagTense Python extension against it. Override `CDFMM_DIR`,
+  `CDFMM_ROOT`, `CDFMM_BUILD_DIR`, or `CDFMM_CUDA_ARCHITECTURES` when a
+  different checkout, installation, build directory, or GPU architecture list
+  is required (`CDFMM_CUDA_ARCHITECTURES=native` targets only the local GPU).
+
+  dip-fmm is built with the conda environment's own `gcc`, `g++`, and `nvcc`
+  (override with `CDFMM_C_COMPILER`, `CDFMM_CXX_COMPILER`, and
+  `CDFMM_CUDA_COMPILER`). Its CUDA sources require the CUDA 13.3 toolchain
+  from `python/.build/env-313-linux.yml`; an environment that still carries
+  CUDA 12.x fails inside dip-fmm's `src/backend/cuda` sources. The default
+  architecture list includes `sm_120` (RTX 50 series). The highest expansion
+  order with procedural point kernels is `CDFMM_PROCEDURAL_MAX_ORDER` (10 by
+  default; higher orders use precomputed operators).
+
+  On workstations where CUDA is provided as an environment module:
+
+  ```bash
+  module load cuda
+  LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LIBRARY_PATH" \
+    make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_CDFMM=1
+  ```
+
+  Remove the bundled dip-fmm release build and local installation without
+  deleting its persistent caches:
+
+  ```bash
+  make clean_cdfmm
+  ```
+
+  The readable comparison example and its notebook are under
+  [`examples/micromagnetism/FMM`](./examples/micromagnetism/FMM). The default
+  sets the normal MagTense `cuda` input to true. When MagTense was compiled
+  with `USE_CUDA=1`, this also selects dip-fmm's CUDA-full backend:
+
+  ```bash
+  LD_LIBRARY_PATH="$PWD/dip-fmm/local/lib:$CONDA_PREFIX/lib:$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LIBRARY_PATH" \
+    python python/examples/micromagnetism/FMM/fmm_vs_regular.py
+  ```
+
+  For a CPU-only integration smoke test, set the normal MagTense `cuda` input
+  to false. dip-fmm then prefers oneMKL and falls back to its portable CPU
+  implementation when oneMKL is unavailable:
+
+  ```bash
+  MAGTENSE_USE_CUDA=0 \
+  LD_LIBRARY_PATH="$PWD/dip-fmm/local/lib:$CONDA_PREFIX/lib:$LD_LIBRARY_PATH" \
+    python python/examples/micromagnetism/FMM/fmm_vs_regular.py
+  ```
 
 ## Windows
 
@@ -96,7 +146,7 @@ After this compile as above but with `USE_FMM3D=1`
 
   - Installation of Miniconda or Anaconda
 
-  - Download of MagTense and [FMM3D](https://github.com/Ximtecs/FMM3D). Unzip the latter in `external\FMM3D`
+  - Download of MagTense
 
 
 - Conda environment `magtense-env` is created from `env-314-win.yml` in a `Powershell` as
@@ -136,10 +186,29 @@ After this compile as above but with `USE_FMM3D=1`
   - Open a `x64 Native Tools Command Prompt for VS 2022` and run:
 
     ```bash
-    make fmm3d USE_FMM3D=1
-    make auxmt magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=1 CVODE_ROOT="cvode-7.4.0/install"
-	make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_FMM3D=1 CVODE_ROOT="cvode-7.4.0/install"
+    make auxmt magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 CVODE_ROOT="cvode-7.4.0/install"
+	make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 CVODE_ROOT="cvode-7.4.0/install"
     ```
+
+- *Optional* dip-fmm micromagnetic demagnetisation backend
+
+  Clone dip-fmm (the branch with the adaptive-tree and tetrahedron C API,
+  currently `develop/v0.3`, including its Windows port) to `dip-fmm/` in the
+  MagTense repository, or point `CDFMM_DIR` at a checkout elsewhere. In a
+  shell with the conda environment activated first and `vcvars64.bat` called
+  second, add `USE_CDFMM=1` to the full build:
+
+    ```bash
+    make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0 USE_CDFMM=1 CDFMM_DIR=D:/path/to/dip-fmm
+    ```
+
+  dip-fmm is built with the environment's `icx` (and `nvcc` with MSVC as host
+  compiler when `USE_CUDA=1`), installed under `<CDFMM_DIR>/local`, and
+  `cdfmm_c.dll` is copied next to the Python extension in
+  `python/src/magtense/lib`. Do not put `<env>\Library\bin` in front of the
+  MSVC directories on `PATH`: make's shell maps it onto the directory holding
+  the msys `link.exe`, and the final link then fails with
+  `link: unknown option -- d`.
 
 - Install local editable magtense package
   To install the compiled MagTense package locally, so that simulations can be run, do

@@ -26,6 +26,23 @@
 !> current state (when fallback is set) and the minimizer is restarted from its result - this is what
 !> carries a hysteresis loop through a switching event, where the state sits near a saddle.
 !>
+!> A caller that will reject a state whose mean has moved too far (the adaptive hysteresis loop) can
+!> set abort_dM: the weighted mean of m is then compared with abort_ref every abort_every iterations,
+!> and before and after the ODE fallback, and the relaxation is abandoned (status 3) as soon as it
+!> has moved further than abort_dM, instead of being run to convergence or through the fallback only
+!> to be rejected afterwards.
+!>
+!> With a diagonal preconditioner (precond, one factor per vector, e.g. a typical curvature over the
+!> vector's own), vector i steps tau * precond(i) and the Barzilai-Borwein lengths are taken in that
+!> metric, so that a few very stiff vectors (small cells with a large exchange coupling) no longer set
+!> the step of all others. The convergence test is unchanged.
+!>
+!> With stall_window set, a descent whose best torque is within stall_mult * tol but has not fallen by
+!> stall_gain over stall_window iterations is stuck there, and its best state is accepted (status 4, so
+!> the caller can shorten its next field step) instead of running on to the iteration cap and the
+!> fallback. Near a switching field, or on meshes with very stiff small cells, the torque can stagnate
+!> just above tol for tens of thousands of iterations. Above the band nothing changes.
+!>
 !> A vanishing torque is also what a saddle point looks like, and a symmetric starting state sits on
 !> one. When saddle_check is set, a converged state is therefore nudged by a small random rotation of
 !> every vector and relaxed again; a minimum takes the nudge back and is returned unperturbed, a
@@ -69,13 +86,19 @@ module EnergyMinimizer
         integer :: eig_maxiter = 60   !> saddle_check 2: cap on the Lanczos steps per check (one field evaluation each)
         real,dimension(:),allocatable :: weights !> saddle_check 2: weight of every vector in the energy, Ms_i V_i; uniform when not allocated
         real,dimension(:),allocatable :: eig_start !> saddle_check 2: Lanczos start vector (3n), e.g. the eigenvector of a similar state; random when not allocated
+        real,dimension(:),allocatable :: precond !> Diagonal preconditioner: vector i steps tau * precond(i) (n), e.g. a typical over its own curvature; plain BB when not allocated
+        integer :: stall_window = 0   !> Stall exit: iterations without a stall_gain improvement of the best torque after which a descent is stuck (0: off)
+        real :: stall_mult = 2.0      !> Stall exit: a stuck descent whose best torque is within stall_mult * tol is accepted (status 4)
+        real :: abort_dM = 0.0        !> Short-circuit: abandon the relaxation once |<m> - abort_ref| exceeds this (0: off)
+        real,dimension(3) :: abort_ref = 0.0 !> Short-circuit: the reference mean, e.g. that of the last accepted state
+        real,dimension(:),allocatable :: abort_w !> Short-circuit: weight of every vector in the mean (n, summing to 1); uniform when not allocated
     end type MinimizerSettings
 
     !> What the minimizer reports back
     type MinimizerResult
         integer :: n_iter = 0         !> Iterations over all rounds
         real :: torque = 0.0          !> Final max_i |m_i x H_i| / H_scale
-        integer :: status = 2         !> 0 converged, 1 converged after an ODE fallback, 2 not converged
+        integer :: status = 2         !> 0 converged, 1 converged after an ODE fallback, 2 not converged, 3 abandoned by the short-circuit (abort_dM), 4 accepted while stuck within stall_mult * tol
         real :: tau_last = 0.0        !> Step length of the last iteration, a curvature estimate the next call can start from (tau_init)
         real :: eig_min = 0.0         !> saddle_check 2: lowest Hessian eigenvalue of the returned state, relative to H_scale
         integer :: n_eig = 0          !> saddle_check 2: Lanczos steps spent over all checks
@@ -93,8 +116,16 @@ module EnergyMinimizer
     real,parameter,private :: E_rise_rel = 1.0e-6    !> Allowed energy rise per step, relative to E_scale
     real,parameter,private :: eig_step = 1.0e-4      !> Rotation of the most displaced vector in the finite-difference Hessian product [rad]
     logical,parameter,private :: eig_debug = .false. !> Report every Lanczos step (development aid)
+    !> Entries per task of the loops over the state. The minimizer runs on the master thread of the
+    !> solver's parallel region, so these loops are split into blocks, each an OpenMP task for the
+    !> other threads of the team (serial outside a parallel region). Explicit tasks rather than
+    !> taskloops, which ifx 2025.2 miscompiles; sums are formed per block and added in block order.
+    integer,parameter,private :: par_grain = 16384
     integer,parameter,private :: eig_minit = 3       !> Fewest Lanczos steps before the convergence test is trusted, warm start
     integer,parameter,private :: eig_minit_moved = 10 !> The same after a push off a saddle, when the start vector is mostly random
+    integer,parameter,private :: abort_every = 10    !> Short-circuit: the mean is checked every this many iterations ...
+    integer,parameter,private :: abort_minit = 20    !> ... from this iteration on (the first steps of a descent are the largest)
+    real,parameter,private :: stall_gain = 0.9       !> Stall exit: progress means the best torque fell below this fraction of its value at the last progress
 
     contains
 
@@ -128,25 +159,32 @@ module EnergyMinimizer
     real,intent(in) :: tol, thres_value, conv_tol
     integer,intent(in) :: useCVODE, callback_display
 
-    real,dimension(:),allocatable :: H, m_prev, g, g_prev, tq, tq_prev, m_best, u, w
+    real,dimension(:),allocatable :: H, m_prev, g, g_prev, tq, tq_prev, m_best, u, w, m_stall
     real,dimension(:),allocatable :: t_out_fb
     real,dimension(:,:),allocatable :: y_fb
     real,dimension(n_hist) :: E_hist
     real,dimension(4) :: E4
     real :: E, E_best, tq_max, tq_rel, tq_best, tau, E_stop, lambda, umax
+    real :: tq_stall, E_stall, tq_progress   !> stall exit: best torque of the descent, its energy, and the best at the last progress
+    real :: tqc_max                          !> largest preconditioned torque c_i |tq_i| (the plain one without a preconditioner)
     integer :: n_eig
     logical :: eig_ok
-    integer :: k, i_round, i_sc, n_iter_total, status, nt, n_display, k_cap
-    logical :: converged, stalled
+    integer :: k, i_round, i_sc, n_iter_total, status, nt, n_display, k_cap, k_progress
+    logical :: converged, stalled, aborted, stall_accepted, stall_best
+    real :: dM_moved
     character*(256) :: prog_str
 
     allocate( H(3*n), m_prev(3*n), g(3*n), g_prev(3*n), tq(3*n), tq_prev(3*n), m_best(3*n) )
+    if ( settings%stall_window .gt. 0 ) allocate( m_stall(3*n) )
+    stall_accepted = .false.
     n_display = max( 1, settings%display_every )
 
     m = m0
     status = 2
     n_iter_total = 0
     tq_rel = 0.0
+    aborted = .false.
+    dM_moved = 0.0
 
     do i_round = 1, n_round_max
 
@@ -155,6 +193,7 @@ module EnergyMinimizer
         call startState()
         call descend( .true. )
         n_iter_total = n_iter_total + k
+        if ( aborted ) exit
 
         if ( converged .and. settings%saddle_check .eq. 1 ) then
             !A vanishing torque also marks a saddle point, and a symmetric starting state - the
@@ -171,12 +210,14 @@ module EnergyMinimizer
                 m_best = m
                 E_best = E
                 tq_best = tq_rel
+                stall_best = stall_accepted
                 call perturb( m, n, settings%saddle_pert )
                 k_cap = n_saddle_iter
                 E_stop = E_best - E_rise_rel * settings%E_scale
                 call startState()
                 call descend( .false. )
                 n_iter_total = n_iter_total + k
+                if ( aborted ) exit
                 if ( E .lt. E_stop ) then
                     write(prog_str,'(A,ES10.3,A,I4,A)') 'Minimizer: saddle check lowered the energy by ', E_best - E, ' J after ', k, ' iterations, continuing'
                     call callback( trim(prog_str), -1 )
@@ -186,12 +227,13 @@ module EnergyMinimizer
                     call startState()
                     call descend( .true. )
                     n_iter_total = n_iter_total + k
-                    if ( .not. converged ) exit
+                    if ( aborted .or. .not. converged ) exit
                 else
                     !Back to the unperturbed minimum, whichever way the trial descent ended
                     m = m_best
                     E = E_best
                     tq_rel = tq_best
+                    stall_accepted = stall_best
                     converged = .true.
                     exit
                 endif
@@ -251,13 +293,16 @@ module EnergyMinimizer
                 call startState()
                 call descend( .true. )
                 n_iter_total = n_iter_total + k
-                if ( .not. converged ) exit
+                if ( aborted .or. .not. converged ) exit
             end do
             deallocate( u, w )
         endif
+        if ( aborted ) exit
 
         if ( converged ) then
-            if ( i_round .eq. 1 ) then
+            if ( stall_accepted ) then
+                status = 4
+            else if ( i_round .eq. 1 ) then
                 status = 0
             else
                 status = 1
@@ -273,6 +318,8 @@ module EnergyMinimizer
         call callback( trim(prog_str), -1 )
 
         if ( settings%fallback .eq. 0 .or. i_round .eq. n_round_max ) exit
+        !A state that has already moved too far is not worth a time integration
+        if ( abortCheck() ) exit
 
         !Fall back to the ODE integration over the requested time window from the current state,
         !then try the minimizer again from where it ends up
@@ -283,7 +330,15 @@ module EnergyMinimizer
                 callback_display, tol, thres_value, useCVODE, t_conv, conv_tol )
         m = y_fb(:,nt)
         deallocate( t_out_fb, y_fb )
+        if ( abortCheck() ) exit
     end do
+
+    if ( aborted ) then
+        status = 3
+        write(prog_str,'(A,ES9.2,A,ES9.2,A,I7,A)') 'Minimizer short-circuit: mean moved by ', dM_moved, &
+            ' (limit ', settings%abort_dM, ') after ', n_iter_total, ' iterations; relaxation abandoned'
+        call callback( trim(prog_str), -1 )
+    endif
 
     result%n_iter = result%n_iter + n_iter_total
     result%torque = tq_rel
@@ -291,6 +346,7 @@ module EnergyMinimizer
     result%tau_last = tau
 
     deallocate( H, m_prev, g, g_prev, tq, tq_prev, m_best )
+    if ( allocated(m_stall) ) deallocate( m_stall )
 
     contains
 
@@ -304,13 +360,23 @@ module EnergyMinimizer
         tq_rel = tq_max / settings%H_scale
         converged = tq_rel .lt. settings%tol
         stalled = .false.
+        stall_accepted = .false.
+        if ( settings%stall_window .gt. 0 ) then
+            tq_stall = tq_rel
+            tq_progress = tq_rel
+            E_stall = E
+            m_stall = m
+            k_progress = 0
+        endif
         !The first step: rot_init on the most-torqued vector, unless the caller hands over the step
         !length of a previous, similar minimization - a start close to the minimum (the secant
         !predictor) has a torque far smaller than the curvature, and a fixed rotation overshoots it
+        !With the preconditioner, vector i rotates by tau c_i |tq_i|, so the bounds use max c_i |tq_i|
+        tqc_max = stepTorqueMax( tq, n, settings%precond )
         if ( settings%tau_init .gt. 0.0 ) then
-            tau = min( settings%tau_init, settings%maxrot / max( tq_max, tiny(1.0) ) )
+            tau = min( settings%tau_init, settings%maxrot / max( tqc_max, tiny(1.0) ) )
         else
-            tau = rot_init / max( tq_max, tiny(1.0) )
+            tau = rot_init / max( tqc_max, tiny(1.0) )
         endif
         k = 0
     end subroutine startState
@@ -329,22 +395,20 @@ module EnergyMinimizer
     subroutine descend( extend )
         logical,intent(in) :: extend
         real :: E_ref, tau_cap, ss, sy, yy, E_low
-        integer :: n_shrink, n_ext, w, n_low
+        integer :: n_shrink, n_ext, w_ext, n_low
 
         n_ext = 0
-        w = max( 1, settings%maxiter / 4 )
+        w_ext = max( 1, settings%maxiter / 4 )
         E_low = E
         n_low = 0
         do while ( .not. converged .and. k .lt. k_cap )
             k = k + 1
-            m_prev = m
-            g_prev = g
-            tq_prev = tq
+            call copyState( m, g, tq, m_prev, g_prev, tq_prev )
 
             !Trial step, halved until the energy watchdog is satisfied
             n_shrink = 0
             do
-                call cayleyUpdate( m_prev, tq_prev, g_prev, tau, n, m )
+                call cayleyUpdate( m_prev, tq_prev, g_prev, tau, n, m, settings%precond )
                 call heff( m, H )
                 call energy( E4 )
                 E = sum( E4 )
@@ -371,14 +435,17 @@ module EnergyMinimizer
                 converged = .true.
                 exit
             endif
+            if ( k .ge. abort_minit .and. mod(k, abort_every) .eq. 0 ) then
+                if ( abortCheck() ) exit
+            endif
 
             if ( extend ) then
                 if ( E .lt. E_low ) then
                     E_low = E
-                    if ( k .gt. k_cap - w ) n_low = n_low + 1
+                    if ( k .gt. k_cap - w_ext ) n_low = n_low + 1
                 endif
                 if ( k .eq. k_cap ) then
-                    if ( n_ext .lt. n_extend_max .and. n_low .ge. max( 3.0, extend_lows * w ) ) then
+                    if ( n_ext .lt. n_extend_max .and. n_low .ge. max( 3.0, extend_lows * w_ext ) ) then
                         n_ext = n_ext + 1
                         k_cap = k_cap + settings%maxiter
                         write(prog_str,'(A,ES9.2,A)') 'Minimizer at the iteration cap, torque ', tq_rel, ', energy falling, continuing'
@@ -388,10 +455,37 @@ module EnergyMinimizer
                 endif
             endif
 
-            !Barzilai-Borwein step for the next iteration, alternating between the two rules
-            ss = sum( (m - m_prev)**2 )
-            sy = sum( (m - m_prev) * (g - g_prev) )
-            yy = sum( (g - g_prev)**2 )
+            !Stall exit: keep the best state of the descent. Only once that is within stall_mult * tol
+            !does the stall clock run (far from the tolerance the largest torque can plateau for
+            !thousands of iterations while the energy still falls, and the descent then converges
+            !normally); when the best torque has not fallen by stall_gain for stall_window iterations
+            !inside the band, the descent is stuck there and its best state is accepted.
+            if ( settings%stall_window .gt. 0 ) then
+                if ( tq_rel .lt. tq_stall ) then
+                    tq_stall = tq_rel
+                    E_stall = E
+                    m_stall = m
+                endif
+                if ( tq_stall .gt. settings%stall_mult * settings%tol .or. tq_stall .lt. stall_gain * tq_progress ) then
+                    tq_progress = tq_stall
+                    k_progress = k
+                endif
+                if ( k - k_progress .ge. settings%stall_window ) then
+                    write(prog_str,'(A,I7,A,ES9.2,A,F5.2,A)') 'Minimizer stuck after iter ', k, &
+                        '; best state accepted, torque ', tq_stall, ' (', tq_stall / settings%tol, ' tol)'
+                    call callback( trim(prog_str), -1 )
+                    m = m_stall
+                    E = E_stall
+                    tq_rel = tq_stall
+                    converged = .true.
+                    stall_accepted = .true.
+                    exit
+                endif
+            endif
+
+            !Barzilai-Borwein step for the next iteration, alternating between the two rules (in the
+            !metric of the preconditioner when there is one: ss = s.C^-1 s, yy = y.C y)
+            call stepProducts( m, m_prev, g, g_prev, ss, sy, yy, settings%precond )
             if ( sy .gt. 0.0 .and. yy .gt. 0.0 ) then
                 if ( mod(k,2) .eq. 0 ) then
                     tau = ss / sy
@@ -402,7 +496,7 @@ module EnergyMinimizer
                 !Negative curvature along the step: grow the step and let the cap and the watchdog bound it
                 tau = 2.0 * tau
             endif
-            tau_cap = settings%maxrot / max( tq_max, tiny(1.0) )
+            tau_cap = settings%maxrot / max( stepTorqueMax( tq, n, settings%precond ), tiny(1.0) )
             tau = min( tau, tau_cap )
 
             !if ( mod(k, n_display) .eq. 0 ) then
@@ -411,6 +505,26 @@ module EnergyMinimizer
             !endif
         end do
     end subroutine descend
+
+    !> Short-circuit test: has the weighted mean of the current m moved further than abort_dM from
+    !> abort_ref? Sets aborted (and dM_moved) and returns it; always false when abort_dM is 0.
+    logical function abortCheck()
+        real,dimension(3) :: mean
+        abortCheck = .false.
+        if ( settings%abort_dM .le. 0.0 ) return
+        if ( allocated(settings%abort_w) ) then
+            mean(1) = sum( settings%abort_w * m(1:n) )
+            mean(2) = sum( settings%abort_w * m(n+1:2*n) )
+            mean(3) = sum( settings%abort_w * m(2*n+1:3*n) )
+        else
+            mean(1) = sum( m(1:n) ) / real(n)
+            mean(2) = sum( m(n+1:2*n) ) / real(n)
+            mean(3) = sum( m(2*n+1:3*n) ) / real(n)
+        endif
+        dM_moved = sqrt( sum( (mean - settings%abort_ref)**2 ) )
+        aborted = dM_moved .gt. settings%abort_dM
+        abortCheck = aborted
+    end function abortCheck
 
     end subroutine MagTense_Minimize
 
@@ -706,16 +820,34 @@ module EnergyMinimizer
     integer,intent(in) :: n
     real,dimension(:),intent(out) :: tq, g
     real,intent(out) :: tq_max
+    integer :: i, c, nb, lo, hi
+    real :: tx, ty, tz
+    real,dimension(:),allocatable :: t2max
 
-    tq(1:n)       = m(n+1:2*n) * H(2*n+1:3*n) - m(2*n+1:3*n) * H(n+1:2*n)
-    tq(n+1:2*n)   = m(2*n+1:3*n) * H(1:n) - m(1:n) * H(2*n+1:3*n)
-    tq(2*n+1:3*n) = m(1:n) * H(n+1:2*n) - m(n+1:2*n) * H(1:n)
-
-    g(1:n)       = m(n+1:2*n) * tq(2*n+1:3*n) - m(2*n+1:3*n) * tq(n+1:2*n)
-    g(n+1:2*n)   = m(2*n+1:3*n) * tq(1:n) - m(1:n) * tq(2*n+1:3*n)
-    g(2*n+1:3*n) = m(1:n) * tq(n+1:2*n) - m(n+1:2*n) * tq(1:n)
-
-    tq_max = sqrt( maxval( tq(1:n)**2 + tq(n+1:2*n)**2 + tq(2*n+1:3*n)**2 ) )
+    nb = nBlocks( n )
+    allocate( t2max(nb) )
+    do c = 1, nb
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(c, lo, hi) private(i, tx, ty, tz)
+        t2max(c) = 0.0
+        do i = lo, hi
+            tx = m(n+i) * H(2*n+i) - m(2*n+i) * H(n+i)
+            ty = m(2*n+i) * H(i) - m(i) * H(2*n+i)
+            tz = m(i) * H(n+i) - m(n+i) * H(i)
+            tq(i) = tx
+            tq(n+i) = ty
+            tq(2*n+i) = tz
+            g(i)     = m(n+i) * tz - m(2*n+i) * ty
+            g(n+i)   = m(2*n+i) * tx - m(i) * tz
+            g(2*n+i) = m(i) * ty - m(n+i) * tx
+            t2max(c) = max( t2max(c), tx**2 + ty**2 + tz**2 )
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    tq_max = sqrt( maxval( t2max ) )
+    deallocate( t2max )
     end subroutine torqueAndGradient
 
     !>-----------------------------------------
@@ -723,21 +855,119 @@ module EnergyMinimizer
     !>     m1 = ( (1 - tau^2 |tq|^2 / 4) m0 - tau g ) / (1 + tau^2 |tq|^2 / 4),   tq = m0 x H,  g = m0 x tq,
     !> which is the exact solution of the midpoint rule m1 = m0 - (tau/2) (m0 + m1) x tq. Every vector is
     !> rotated about its own torque axis by the angle 2 atan(tau |tq|/2), so |m1| = |m0| to rounding.
+    !> With the diagonal preconditioner pc (n), vector i takes the step tau * pc(i) instead.
     !>-----------------------------------------
-    subroutine cayleyUpdate( m0, tq, g, tau, n, m1 )
+    subroutine cayleyUpdate( m0, tq, g, tau, n, m1, pc )
     real,dimension(:),intent(in) :: m0, tq, g
     real,intent(in) :: tau
     integer,intent(in) :: n
     real,dimension(:),intent(out) :: m1
-    real,dimension(:),allocatable :: q, denom
+    real,dimension(:),intent(in),optional :: pc
+    integer :: i, c, lo, hi
+    real :: q, denom, ti
+    logical :: has_pc
 
-    allocate( q(n), denom(n) )
-    q = 0.25 * tau**2 * ( tq(1:n)**2 + tq(n+1:2*n)**2 + tq(2*n+1:3*n)**2 )
-    denom = 1.0 / ( 1.0 + q )
-    m1(1:n)       = ( (1.0 - q) * m0(1:n)       - tau * g(1:n) )       * denom
-    m1(n+1:2*n)   = ( (1.0 - q) * m0(n+1:2*n)   - tau * g(n+1:2*n) )   * denom
-    m1(2*n+1:3*n) = ( (1.0 - q) * m0(2*n+1:3*n) - tau * g(2*n+1:3*n) ) * denom
-    deallocate( q, denom )
+    has_pc = present( pc )
+    do c = 1, nBlocks( n )
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i, q, denom, ti)
+        do i = lo, hi
+            ti = tau
+            if ( has_pc ) ti = tau * pc(i)
+            q = 0.25 * ti**2 * ( tq(i)**2 + tq(n+i)**2 + tq(2*n+i)**2 )
+            denom = 1.0 / ( 1.0 + q )
+            m1(i)     = ( (1.0 - q) * m0(i)     - ti * g(i) )     * denom
+            m1(n+i)   = ( (1.0 - q) * m0(n+i)   - ti * g(n+i) )   * denom
+            m1(2*n+i) = ( (1.0 - q) * m0(2*n+i) - ti * g(2*n+i) ) * denom
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
     end subroutine cayleyUpdate
+
+    !>-----------------------------------------
+    !> The largest rotation rate of a step: max_i pc(i) |tq_i| with the preconditioner pc, the
+    !> largest torque max_i |tq_i| without it
+    !>-----------------------------------------
+    real function stepTorqueMax( tq, n, pc )
+    real,dimension(:),intent(in) :: tq
+    integer,intent(in) :: n
+    real,dimension(:),intent(in),optional :: pc
+    if ( present(pc) ) then
+        stepTorqueMax = sqrt( maxval( pc**2 * ( tq(1:n)**2 + tq(n+1:2*n)**2 + tq(2*n+1:3*n)**2 ) ) )
+    else
+        stepTorqueMax = sqrt( maxval( tq(1:n)**2 + tq(n+1:2*n)**2 + tq(2*n+1:3*n)**2 ) )
+    endif
+    end function stepTorqueMax
+
+    !>-----------------------------------------
+    !> dst = src for the three (3n) iterates of a descent step at once
+    !>-----------------------------------------
+    subroutine copyState( m, g, tq, m_prev, g_prev, tq_prev )
+    real,dimension(:),intent(in) :: m, g, tq
+    real,dimension(:),intent(out) :: m_prev, g_prev, tq_prev
+    integer :: i, c, lo, hi
+
+    do c = 1, nBlocks( size(m) )
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, size(m) )
+        !$omp task default(shared) firstprivate(lo, hi) private(i)
+        do i = lo, hi
+            m_prev(i) = m(i)
+            g_prev(i) = g(i)
+            tq_prev(i) = tq(i)
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine copyState
+
+    !>-----------------------------------------
+    !> The inner products of the Barzilai-Borwein step lengths, ss = |s|^2, sy = s.y and yy = |y|^2
+    !> with s = m - m_prev and y = g - g_prev, in one pass. With the diagonal preconditioner pc (n, one
+    !> entry per vector of the 3n layout) they are taken in its metric: ss = s.C^-1 s, yy = y.C y.
+    !>-----------------------------------------
+    subroutine stepProducts( m, m_prev, g, g_prev, ss, sy, yy, pc )
+    real,dimension(:),intent(in) :: m, m_prev, g, g_prev
+    real,intent(out) :: ss, sy, yy
+    real,dimension(:),intent(in),optional :: pc
+    integer :: i, c, nb, lo, hi, nv
+    real :: s, y, w
+    real,dimension(:,:),allocatable :: part
+    logical :: has_pc
+
+    has_pc = present( pc )
+    nv = size(m) / 3
+    nb = nBlocks( size(m) )
+    allocate( part(3,nb) )
+    do c = 1, nb
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, size(m) )
+        !$omp task default(shared) firstprivate(c, lo, hi) private(i, s, y, w)
+        part(:,c) = 0.0
+        do i = lo, hi
+            s = m(i) - m_prev(i)
+            y = g(i) - g_prev(i)
+            w = 1.0
+            if ( has_pc ) w = pc( mod(i-1, nv) + 1 )
+            part(1,c) = part(1,c) + s * s / w
+            part(2,c) = part(2,c) + s * y
+            part(3,c) = part(3,c) + y * y * w
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    ss = sum( part(1,:) )
+    sy = sum( part(2,:) )
+    yy = sum( part(3,:) )
+    deallocate( part )
+    end subroutine stepProducts
+
+    !> Number of blocks of par_grain entries that n entries are split into
+    pure integer function nBlocks( n )
+    integer,intent(in) :: n
+    nBlocks = max( 1, (n + par_grain - 1) / par_grain )
+    end function nBlocks
 
 end module EnergyMinimizer

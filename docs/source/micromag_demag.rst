@@ -128,5 +128,5 @@ Parallelism and hardware
   note, when no GPU is present. In Matlab, ``setUseCuda`` also picks the
   matching MEX-file.
 * The **Fast Multipole Method** replaces the dense tensor by an :math:`O(N)`
-  evaluation and is described in :ref:`Demag field - FMM`. It is selected
-  with ``use_fmm`` in a build with ``USE_FMM3D=1``.
+  evaluation and is described in :ref:`Demag field - FMM`. It is off by
+  default and requires a build with ``USE_CDFMM=1``.

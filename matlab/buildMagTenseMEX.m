@@ -5,7 +5,14 @@ arguments
     options.USE_RELEASE {mustBeNumericOrLogical} = true;
     options.USE_CUDA {mustBeNumericOrLogical}    = true;
     options.USE_CVODE {mustBeNumericOrLogical}   = true;
-    options.USE_FMM3D {mustBeNumericOrLogical}   = false;
+    %--- The FMM demagnetization backend, dip-fmm. The libraries have to be built
+    %--- with it too: by the root Makefile, which also builds and installs
+    %--- dip-fmm, or by a Visual Studio configuration without "_no_FMM". See
+    %--- 'Demag field - FMM' in the TechManual.
+    options.USE_FMM {mustBeNumericOrLogical}     = false;
+    %--- Install folder of dip-fmm (the one holding lib and bin). The default
+    %--- is that of a dip-fmm checkout next to the MagTense repository.
+    options.fmm_root      = '../../dip-fmm/local';
 
     %--- Set the right include paths on Windows or allow the user to set them manually
     options.mkl_include   = '"C:\Program Files (x86)\Intel\oneAPI\mkl\latest\include"';
@@ -21,9 +28,6 @@ arguments
     options.cvode_include = '"C:\Program Files (x86)\sundials-7.2.1\fortran"';
     options.cvode_lib     = '"C:\Program Files (x86)\sundials-7.2.1\lib"';
 
-    %--- The static FMM3D archive produced by 'make fmm3d USE_FMM3D=1'
-    options.fmm3d_lib     = '../external/FMM3D/lib-static';
-
     options.VS_STUDIO {mustBeNumericOrLogical} = false;
 end
 
@@ -31,9 +35,8 @@ end
 USE_RELEASE   = options.USE_RELEASE;
 USE_CUDA      = options.USE_CUDA;
 USE_CVODE     = options.USE_CVODE;
-USE_FMM3D     = options.USE_FMM3D;
+USE_FMM       = options.USE_FMM;
 VS_STUDIO     = options.VS_STUDIO;
-fmm3d_lib     = options.fmm3d_lib;
 
 pause_time = 1; %Time to wait between making and moving the generated files
 mex_root                    = '../source/MagTenseMEX/';
@@ -74,7 +77,9 @@ else
             pre_str = ['/home/' user '/miniconda3/envs/magtense-env'];
         end
     else
-        if isempty(strfind(pre_str,'magtense-env'))
+        %--- CONDA_PREFIX is the environment itself when one is active, whatever its
+        %--- name; only a base installation needs the default environment appended
+        if isempty(strfind(pre_str,'magtense-env')) && ~isfile([pre_str '/bin/ifx'])
             pre_str = [pre_str '/envs/magtense-env'];
         end
     end
@@ -106,13 +111,13 @@ if (USE_CUDA)
     if (ispc)
         CUDA = ['-L' cuda_root ' -lcublas -lcudart -lcuda -lcusparse'];
         % if (VS_STUDIO)
-            OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.obj ' FortranCuda_path '/MagTenseCudaBlas.obj" '];
+            OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.obj ' FortranCuda_path '/MagTenseCudaBlas.obj ' FortranCuda_path '/MagTenseCudaExchange.obj" '];
         % else
             % OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.o ' FortranCuda_path '/MagTenseCudaBlas.o" '];
         % end
     else
         CUDA = ['-Wl,-Bdynamic ' '-L' cuda_root ' -lcublas -lcudart -lcusparse'];
-        OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.o ' FortranCuda_path '/MagTenseCudaBlas.o" '];
+        OBJS = ['OBJS="$OBJS ' FortranCuda_path '/MagTenseCudaBlasICLWrapper.o ' FortranCuda_path '/MagTenseCudaBlas.o ' FortranCuda_path '/MagTenseCudaExchange.o" '];
     end
     BUILD_MagTenseMicroMag = BUILD;
 else
@@ -142,22 +147,22 @@ else
     end
 end
 
-if (USE_FMM3D)
-    if (ispc)
-        %--- mex maps -lfoo to foo.lib and the archive is named libfmm3d.lib
-        FMM3D = ['-L' fmm3d_lib ' -llibfmm3d'];
-        fmm3d_file = fullfile(fmm3d_lib, 'libfmm3d.lib');
-    else
-        FMM3D = ['-L' fmm3d_lib ' -lfmm3d'];
-        fmm3d_file = fullfile(fmm3d_lib, 'libfmm3d.a');
+if (USE_FMM)
+    %--- The absolute path: on Linux it also becomes the run path of the MEX files
+    fmm_dir = dir(fullfile(char(options.fmm_root), 'lib'));
+    if (isempty(fmm_dir))
+        error('buildMagTenseMEX:fmmRoot', ...
+              'USE_FMM is set, but there is no dip-fmm installation (lib folder) under %s', ...
+              char(options.fmm_root));
     end
-
-    if (~isfile(fmm3d_file))
-        error(['FMM3D library not found: ' fmm3d_file '. Build it with ' ...
-            '''make fmm3d USE_FMM3D=1'' before building the MEX files.'])
+    fmm_lib = fmm_dir(1).folder;
+    if (ispc)
+        FMM = [' -L"' fmm_lib '" -lcdfmm_c'];
+    else
+        FMM = ['-L' fmm_lib ' -lcdfmm_c -Wl,-rpath,' fmm_lib];
     end
 else
-    FMM3D = '';
+    FMM = '';
     if (VS_STUDIO)
         BUILD_MagTenseMicroMag = [BUILD_MagTenseMicroMag '_no_FMM'];
     end
@@ -225,24 +230,15 @@ else
         LIBS = [LIBS(1:(end-1)) ' ' CVODE ''''];
         CVODE = '';
     end
-    if (USE_FMM3D)
-        LIBS = [LIBS(1:(end-1)) ' ' FMM3D ''''];
-        FMM3D = '';
+    if (USE_FMM)
+        LIBS = [LIBS(1:(end-1)) ' ' FMM ''''];
+        FMM = '';
     end
     INCLUDE = [INCLUDE CVODE_include '"'];
     FFLAGS = ['FFLAGS="-O3 -fpp -real-size 64 -fpe0 -fp-model=source -fPIC -nologo -diag-disable 10006"'];
 end
 
 LINKFLAGS = ' LINKFLAGS="$LINKFLAGS /DEFAULTLIB:msvcrt.lib"';
-
-%--- FMM3D is built with /MD, so the static runtime pulled in by /libs:static
-%--- has to be kept out of the link - see LDFLAGS in the root Makefile
-if (ispc && USE_FMM3D)
-    LINKFLAGS = [LINKFLAGS(1:(end-1)) ' /NODEFAULTLIB:libcmt.lib"'];
-    if (~USE_RELEASE)
-        LINKFLAGS = [LINKFLAGS(1:(end-1)) ' /NODEFAULTLIB:libcmtd.lib"'];
-    end
-end
 
 %%------------------------------------------------------------------
 %%--------------- Build the MEX files ------------------------------
@@ -260,7 +256,7 @@ for i = 1:length(names)
         source = [mex_root names(i) '_mex.f90'];
         orig_name = names(i);
     end
-    mex_str = ['mex' DEBUG DEFINES FFLAGS INCLUDE OBJS LIBS MKL CUDA CVODE FMM3D LINKFLAGS join(source, '')];
+    mex_str = ['mex' DEBUG DEFINES FFLAGS INCLUDE OBJS LIBS MKL CUDA CVODE FMM LINKFLAGS join(source, '')];
 
     disp(join(mex_str, ' '))
     eval_MEX(join(mex_str, ' '))
@@ -272,6 +268,11 @@ for i = 1:length(names)
         pause(pause_time)
         movefile(join([orig_name '_mex.mex' mex_suffix '64.pdb'], ''), join(['MEX_files/' names(i) '_mex.mex' mex_suffix '64.pdb'], ''));
     end
+end
+
+%--- Windows has no run path: the MEX files find cdfmm_c.dll because it sits next to them
+if (USE_FMM && ispc)
+    copyfile(fullfile(fileparts(fmm_lib), 'bin', 'cdfmm_c.dll'), 'MEX_files/');
 end
 
 end

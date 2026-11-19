@@ -6,7 +6,7 @@ USE_CVODE = 0
 USE_MICROMAG = 1
 USE_MATLAB = 0
 MATLAB_INCLUDE ?=
-USE_FMM3D ?= 0
+USE_CDFMM ?= 0
 
 # /usr/local/MATLAB/<version>/extern/include (Linux)
 # "C:\Program Files\MATLAB\<version>\extern\include" (Win)
@@ -18,6 +18,83 @@ MKFILE_PATH := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 # environment and the command line to override it, e.g.
 #   make ... USE_CVODE=1 CVODE_ROOT="C:/Program Files (x86)/sundials-7.2.1"
 CVODE_ROOT ?= ${MKFILE_PATH}/cvode
+
+# dip-fmm is a shared C ABI library. Its native Fortran convenience module is
+# compiled again by MagTense with the same compiler and flags as the solver.
+# The checkout is dip-fmm/ inside the MagTense repository when there is one,
+# otherwise dip-fmm/ next to the repository, which is also where the Visual
+# Studio project and buildMagTenseMEX look by default.
+CDFMM_DIR ?= $(if $(wildcard dip-fmm/CMakeLists.txt),dip-fmm,../dip-fmm)
+CDFMM_ROOT ?= $(abspath $(CDFMM_DIR)/local)
+CDFMM_BUILD_DIR ?= $(abspath $(CDFMM_DIR)/build-release)
+# dip-fmm's CUDA sources are written against the CUDA 13.3 toolchain that
+# python/.build/env-*-linux.yml installs; nvcc 12.x does not compile them.
+# sm_120 is the consumer Blackwell generation (RTX 50 series) and needs
+# nvcc >= 12.8. Pass CDFMM_CUDA_ARCHITECTURES=native for a quicker build
+# that only targets the GPU in the build machine.
+CDFMM_CUDA_ARCHITECTURES ?= 75;80;86;89;90;120
+# dip-fmm's CUDA backend follows USE_CUDA. It is selected at run time, so a
+# dip-fmm built with it also serves a MagTense built with USE_CUDA=0; the two
+# MATLAB solver MEX files (CUDA and NoCUDA) share one dip-fmm that way, with
+# CDFMM_ENABLE_CUDA=ON given to the USE_CUDA=0 library build.
+CDFMM_ENABLE_CUDA ?= $(if $(filter 1,${USE_CUDA}),ON,OFF)
+# Highest expansion order dip-fmm compiles its procedural point kernels for
+# (1-20). Orders above this fall back to precomputed operators.
+CDFMM_PROCEDURAL_MAX_ORDER ?= 10
+# Toolchain used for the dip-fmm build. The defaults are the conda
+# environment's compilers so that dip-fmm, the MagTense CUDA kernels and the
+# Python extension all link against the same CUDA runtime and C++ library.
+# dip-fmm's internal OpenMP (CDFMM_OPENMP=1, the default when the environment
+# has Intel's libiomp5). MagTense runs on Intel's OpenMP runtime (ifx, MKL
+# intel_thread), so dip-fmm is compiled with -fopenmp but linked against that
+# same libiomp5 (which implements GCC's GOMP_* entry points) instead of libgomp:
+# one runtime per process, never libgomp next to libiomp5. Plan construction
+# (serial set-up) then uses all threads, which matters for tetrahedra (no exact
+# pair reuse: 100 nm ellipsoid, 11.7k elements, depth 4: 96 s on 8 cores instead
+# of tens of minutes on one); CPU evaluation in the minimizer also ran 2-3x
+# faster on 8 cores with identical energies. Nested regions stay serial
+# (OMP_MAX_ACTIVE_LEVELS=1). CDFMM_OPENMP=0 restores the previous single-threaded
+# dip-fmm.
+#
+# On Windows the C++ compiler is the environment's icx: it has the MSVC ABI, so
+# its objects link with the CUDA ones (nvcc there uses cl from the developer
+# shell as its host compiler), and its OpenMP runtime is libiomp5md, the one
+# ifx and MKL intel_thread already bring into the process. Nothing has to be
+# redirected, so CDFMM_OPENMP defaults to 1.
+#
+# CDFMM_MKL_LINK: how dip-fmm links oneMKL. "dynamic" shares the environment's
+# MKL with the Python extension. A MATLAB build (USE_MATLAB=1) needs "static",
+# i.e. MKL inside the dip-fmm library itself, as the MEX files do it:
+#  - Linux: MATLAB has its own MKL with 64-bit integers in the process, and a
+#    dynamically linked sgemm of dip-fmm (32-bit integers) binds to that one.
+#    Nothing crashes: oneMKL prints "Parameter 8 was incorrect on entry to
+#    SGEMM" for every call and the far field is silently missing (a 20 % error
+#    on the CPU, whatever the expansion order). The library is therefore also
+#    linked with --exclude-libs,ALL, which keeps the MKL symbols out of its
+#    dynamic symbol table so that its own calls cannot be bound elsewhere.
+#  - Windows: MATLAB is not started from the conda environment, so
+#    mkl_intel_thread.2.dll and friends are not on its PATH.
+CDFMM_MKL_LINK ?= $(if $(filter 1,${USE_MATLAB}),static,dynamic)
+comma := ,
+ifeq ($(OS),Windows_NT)
+CDFMM_OPENMP ?= 1
+CDFMM_C_COMPILER ?= $(subst \,/,${CONDA_PREFIX})/Library/bin/icx.exe
+CDFMM_CXX_COMPILER ?= $(CDFMM_C_COMPILER)
+CDFMM_CUDA_COMPILER ?= $(subst \,/,${CONDA_PREFIX})/Library/bin/nvcc.exe
+else
+CDFMM_IOMP5 ?= ${CONDA_PREFIX}/lib/libiomp5.so
+CDFMM_OPENMP ?= $(if $(wildcard ${CDFMM_IOMP5}),1,0)
+CDFMM_C_COMPILER ?= $(if $(wildcard ${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-gcc),${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-gcc,gcc)
+CDFMM_CXX_COMPILER ?= $(if $(wildcard ${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++),${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++,g++)
+CDFMM_CUDA_COMPILER ?= $(if $(wildcard ${CONDA_PREFIX}/bin/nvcc),${CONDA_PREFIX}/bin/nvcc,nvcc)
+# MATLAB loads its own libstdc++ before any other (R2024b: up to
+# GLIBCXX_3.4.30), and a libcdfmm_c.so compiled by the environment's g++ 13
+# does not load against it: "version `GLIBCXX_3.4.31' not found", reported as
+# an invalid MEX file. The interface of the library is plain C, so for a MATLAB
+# build (USE_MATLAB=1) the C++ runtime is linked into it statically.
+CDFMM_SHARED_LINKER_FLAGS ?= $(if $(filter 1,${USE_MATLAB}),-static-libstdc++ -static-libgcc -Wl$(comma)--exclude-libs$(comma)ALL,)
+endif
+CUDA_HOST_COMPILER ?= ${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-g++
 
 #=======================================================================
 #                    Recursive make on Windows
@@ -51,55 +128,26 @@ ifeq ($(OS),Windows_NT)
 		override MATLAB_INCLUDE := $(call short_path,$(MATLAB_INCLUDE))
 	endif
 	override CVODE_ROOT := $(call short_path,$(CVODE_ROOT))
+	# cdfmm_fortran.f90 is compiled straight out of CDFMM_ROOT by such a recipe.
+	override CDFMM_ROOT := $(call short_path,$(CDFMM_ROOT))
 endif
 
 #=======================================================================
-#                    FMM3D integration (upstream Makefile)
+#                    Optional FMM library
 #=======================================================================
-FMM3D_DEBUG ?= 0
-# Submodule location
-FMM3D_DIR      ?= external/FMM3D
-
-# Absolute paths to headers and static archive
-FMM3D_ROOT     := $(abspath $(FMM3D_DIR))
-FMM3D_LIB      := $(FMM3D_ROOT)/local
-
-# The upstream makefile has no record of what it last built with, and 'clean'
-# deliberately leaves the submodule alone so an ordinary rebuild does not pay
-# for FMM3D again. Object files from a different compiler therefore survive a
-# toolchain change and are silently reused, and the mismatch surfaces only when
-# the shared library is linked: constant-pool symbols named __xmm@<hex>, which
-# the Intel compilers emit, make ld read the @ as a symbol version and fail with
-#   ld: libfmm3d.so: version node not found for symbol __xmm@4022dcdf...
-#   ld: failed to set dynamic section sizes: bad value
-# Record the toolchain FMM3D was built with and clean the submodule when it
-# changes. The stamp lives in the MagTense tree, next to ${BUILD_FLAGS_FILE},
-# so that it does not show up as untracked content inside the submodule.
-FMM3D_STAMP := $(MKFILE_PATH)/.fmm3d_toolchain
-FMM3D_TOOLCHAIN = FC=$(FC) DEBUG=$(FMM3D_DEBUG) `$(FC) --version 2>/dev/null | head -1`
-
-.PHONY: fmm3d
-fmm3d:
+# The FMM3D backend (external/FMM3D, USE_FMM3D) has been removed; dip-fmm
+# (USE_CDFMM=1) is the FMM demag backend. Fail loudly rather than silently
+# building without FMM when an old command line still asks for it.
 ifeq ($(USE_FMM3D),1)
-	@echo "==> FMM3D: building via upstream makefile (install)"
-	@if [ ! -f "$(FMM3D_STAMP)" ] || [ "`cat "$(FMM3D_STAMP)"`" != "$(FMM3D_TOOLCHAIN)" ]; then \
-		echo "==> FMM3D: toolchain changed since the last build, cleaning it first"; \
-		cd "$(FMM3D_DIR)" && $(MAKE) clean; \
-	fi
-	@cd "$(FMM3D_DIR)" && \
-	  $(MAKE) install PREFIX=$(abspath $(FMM3D_DIR)/local) DO_DEBUG=$(FMM3D_DEBUG) FAST_KER=OFF
-	@echo "$(FMM3D_TOOLCHAIN)" > "$(FMM3D_STAMP)"
-else
-	@echo "USE_FMM3D=0 -> skipping FMM3D build"
+$(error USE_FMM3D=1: the FMM3D backend has been removed. Use USE_CDFMM=1 for the dip-fmm backend)
 endif
 
-# Make high-level targets depend on FMM only when enabled
-ifeq ($(USE_FMM3D),1)
-ALL_DEPS := fmm3d
-PY_DEPS  := fmm3d
-else
+# Make high-level targets depend on the optional FMM library only when enabled.
 ALL_DEPS :=
-PY_DEPS  :=
+PY_DEPS :=
+ifeq ($(USE_CDFMM),1)
+ALL_DEPS += cdfmm
+PY_DEPS  += cdfmm
 endif
 #=======================================================================
 
@@ -123,18 +171,21 @@ ifeq (${FC}, ifx)
 		FFLAGS = /O3 /fpp /real-size:64 /Qopenmp /assume:nocc_omp /fpe:0 \
 			/heap-arrays:1024 /traceback \
 			/fp:source /nologo /DUSE_CVODE=${USE_CVODE} /DUSE_MATLAB=${USE_MATLAB} \
-			/DUSE_CUDA=${USE_CUDA} /DUSE_MICROMAG=${USE_MICROMAG} /DUSE_FMM3D=${USE_FMM3D}
+			/DUSE_CUDA=${USE_CUDA} /DUSE_MICROMAG=${USE_MICROMAG} \
+			/DUSE_CDFMM=${USE_CDFMM}
 	else
 		FFLAGS = -O3 -fpp -real-size 64 -qopenmp -assume nocc_omp -fpe0 \
 			-heap-arrays 1024 -traceback \
 			-fp-model=source -fpic -nologo -DUSE_CVODE=${USE_CVODE} \
 			-DUSE_MATLAB=${USE_MATLAB} -DUSE_CUDA=${USE_CUDA} \
-			-DUSE_MICROMAG=${USE_MICROMAG} -DUSE_FMM3D=${USE_FMM3D}
+			-DUSE_MICROMAG=${USE_MICROMAG} \
+			-DUSE_CDFMM=${USE_CDFMM}
 
 	endif
 else ifeq (${FC}, gfortran)
 	FFLAGS = -O3 -fdefault-real-8 -fopenmp -ffree-line-length-512 -cpp -fPIC \
-		-DUSE_MICROMAG=0 -DUSE_CVODE=${USE_CVODE} -DUSE_FMM3D=${USE_FMM3D}
+		-DUSE_MICROMAG=0 -DUSE_CVODE=${USE_CVODE} \
+		-DUSE_CDFMM=${USE_CDFMM}
 
 endif
 
@@ -167,11 +218,7 @@ ifeq ($(OS),Windows_NT)
 		
 	AUXMT_PATH_ROOT     := $(abspath $(AUXMT_PATH))
 	
-	ifeq ($(USE_FMM3D),0)	
-		LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib'
-	else
-		LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib /LIBPATH:${FMM3D_LIB}'
-	endif
+	LDFLAGS = '/DEFAULTLIB:msvcrt.lib /NODEFAULTLIB:libcmt.lib /LIBPATH:${CONDA_PATH}/Library/lib'
 	
 	LIB_SUFFIX = .lib
 	PY_MOD_SUFFIX = .pyd
@@ -249,21 +296,18 @@ else
 
 
 endif
-#===================== FMM3D Integration ===========================
-ifeq ($(USE_FMM3D),0)
-  FMM3D =
+#===================== dip-fmm Integration ==========================
+ifeq ($(USE_CDFMM),0)
+  CDFMM =
 else
   ifeq ($(OS),Windows_NT)
-    # 1. Use the standard linker flag (-lfmm3d looks for fmm3d.lib)
-    FMM3D = -L"${FMM3D_LIB}" -lfmm3d
-    
-    # 2. Use 'cp' (since your shell is sh) and RENAME the file during copy
-    # This creates fmm3d.lib in your root so the linker finds it easily
-    CP_LIB += && cp "${FMM3D_LIB}/libfmm3d.lib" ./fmm3d.lib
+    CDFMM = -L"${CDFMM_ROOT}/lib" -lcdfmm_c
+    # Windows has no rpath: the extension finds cdfmm_c.dll because it sits in
+    # the same directory, which is searched for an extension's dependencies.
+    CP_CDFMM_DLL = cp "${CDFMM_ROOT}/bin/cdfmm_c.dll" ${PYTHON_LIBPATH}/
   else
-    FMM3D = -L${FMM3D_LIB} -lfmm3d
-    LDFLAGS = "-Wl,-z,noexecstack -Wl,-rpath,${FMM3D_LIB}"
-    CP_LIB += && cp ${FMM3D_LIB}/libfmm3d${LIB_SUFFIX} .
+    CDFMM = -L${CDFMM_ROOT}/lib -lcdfmm_c
+    LDFLAGS = "-Wl,-z,noexecstack -Wl,-rpath,${CDFMM_ROOT}/lib"
   endif
 endif
 #===================================================================
@@ -316,16 +360,16 @@ PYTHON_MODN_ALL = _${PYTHON_MODN}${PY_MOD_SUFFIX}
 # static libraries and the python extension have to be built with the same set.
 # Make cannot tell that a flag changed - the sources are unmodified, so nothing
 # is recompiled - and a mismatch therefore surfaces only as a wall of unresolved
-# symbols when the extension is linked. Building the libraries with USE_FMM3D=1
-# and then linking with USE_FMM3D=0 leaves every FMM3D symbol undefined, and the
-# reverse leaves the FMM3D entry points out of the extension.
+# symbols when the extension is linked. Building the libraries with USE_CDFMM=1
+# and then linking with USE_CDFMM=0 leaves every dip-fmm symbol undefined, and
+# the reverse leaves the dip-fmm adapter out of the extension.
 #
 # The settings are therefore recorded when the libraries are built and compared
 # before the extension is linked, so that a mismatch is reported in terms of the
 # flags that caused it.
 #=======================================================================
 BUILD_FLAGS_FILE := .build_flags
-BUILD_FLAGS := USE_CUDA=${USE_CUDA} USE_CVODE=${USE_CVODE} USE_MATLAB=${USE_MATLAB} USE_MICROMAG=${USE_MICROMAG} USE_FMM3D=${USE_FMM3D}
+BUILD_FLAGS := USE_CUDA=${USE_CUDA} USE_CVODE=${USE_CVODE} USE_MATLAB=${USE_MATLAB} USE_MICROMAG=${USE_MICROMAG} USE_CDFMM=${USE_CDFMM}
 
 # Written by the library targets once they have succeeded
 RECORD_FLAGS = @echo "${BUILD_FLAGS}" > ${BUILD_FLAGS_FILE}
@@ -389,11 +433,113 @@ ifeq ($(USE_MATLAB),1)
 		exit 1; \
 	fi
 endif
-
 #=======================================================================
 #							Targets
 #=======================================================================
-.PHONY: all clean
+.PHONY: all clean clean_cdfmm cdfmm
+
+clean_cdfmm:
+	@echo "Removing dip-fmm release build: ${CDFMM_BUILD_DIR}"
+	cmake -E remove_directory "${CDFMM_BUILD_DIR}"
+	@echo "Removing dip-fmm local installation: ${CDFMM_ROOT}"
+	cmake -E remove_directory "${CDFMM_ROOT}"
+	@echo "Preserved dip-fmm caches under $(abspath ${CDFMM_DIR})/caches"
+
+cdfmm:
+ifeq ($(USE_CDFMM),1)
+ifeq ($(OS),Windows_NT)
+	# Run from the same shell as the rest of the build: conda environment
+	# activated, then vcvars64. dip-fmm's presets name g++, so the options are
+	# spelled out instead. The environment is cleared of what the conda
+	# activation scripts export for other purposes: CC/CXX=cl.exe and a Visual
+	# Studio generator (vs2022), and a CUDA_PATH that points at the standalone
+	# toolkit installed last rather than at the environment's own.
+	# icx defaults to fast floating-point; -fp:precise gives the IEEE
+	# semantics of the g++ build, which dip-fmm's double-double kernels need
+	# (the dash spelling keeps msys from rewriting /fp:precise into a path).
+	# MKLConfig.cmake sees icx and also wants oneMKL's SYCL libraries, which a
+	# static link then requires although the environment has none; a value
+	# outside its list (MKL_SYCL_LINK=none) is its way of leaving them out.
+	@echo "dip-fmm OpenMP: CDFMM_OPENMP=${CDFMM_OPENMP}"
+	cd "${CDFMM_DIR}" && CC= CXX= CMAKE_GENERATOR= CMAKE_GENERATOR_PLATFORM= CMAKE_GENERATOR_TOOLSET= \
+		NVCC_PREPEND_FLAGS= CUDA_PATH="${CONDA_PATH}/Library" cmake -S . -G Ninja \
+		-B "${CDFMM_BUILD_DIR}" \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX="${CDFMM_ROOT}" \
+		-DCMAKE_C_COMPILER="${CDFMM_C_COMPILER}" \
+		-DCMAKE_CXX_COMPILER="${CDFMM_CXX_COMPILER}" \
+		-DCMAKE_CUDA_COMPILER="${CDFMM_CUDA_COMPILER}" \
+		-DCMAKE_CUDA_ARCHITECTURES="${CDFMM_CUDA_ARCHITECTURES}" \
+		-DCUDAToolkit_ROOT="${CONDA_PATH}/Library" \
+		-DCDFMM_ENABLE_CUDA=${CDFMM_ENABLE_CUDA} \
+		-DCDFMM_PROCEDURAL_MAX_ORDER="${CDFMM_PROCEDURAL_MAX_ORDER}" \
+		-DCDFMM_EXTRA_COMPILE_OPTIONS=-fp:precise \
+		-DCDFMM_ENABLE_MKL=ON \
+		-DMKL_DIR="${CONDA_PATH}/Library/lib/cmake/mkl" \
+		-DMKL_INTERFACE=lp64 \
+		-DMKL_THREADING=intel_thread \
+		-DMKL_LINK=${CDFMM_MKL_LINK} \
+		-DMKL_SYCL_LINK=none \
+		-DCDFMM_ENABLE_OPENMP=$(if $(filter 1,${CDFMM_OPENMP}),ON,OFF) \
+		-DCDFMM_INSTALL_PYTHON_TO_ENV=OFF \
+		-DCDFMM_BUILD_PYTHON=OFF \
+		-DCDFMM_BUILD_FORTRAN_INTERFACE=OFF \
+		-DCDFMM_BUILD_TESTS=OFF \
+		-DCDFMM_BUILD_EXAMPLES=OFF \
+		-DCDFMM_BUILD_BENCHMARKS=OFF
+	cmake --build "${CDFMM_BUILD_DIR}" --parallel
+	cmake --install "${CDFMM_BUILD_DIR}"
+else
+	@echo "dip-fmm OpenMP: CDFMM_OPENMP=${CDFMM_OPENMP}$(if $(filter 1,${CDFMM_OPENMP}), (linked to ${CDFMM_IOMP5}), (no libiomp5 at ${CDFMM_IOMP5}: single-threaded dip-fmm))"
+	cd "${CDFMM_DIR}" && CPATH= CPLUS_INCLUDE_PATH= cmake --preset release \
+		-B "${CDFMM_BUILD_DIR}" \
+		-DCMAKE_INSTALL_PREFIX="${CDFMM_ROOT}" \
+		-DCMAKE_C_COMPILER="${CDFMM_C_COMPILER}" \
+		-DCMAKE_CXX_COMPILER="${CDFMM_CXX_COMPILER}" \
+		-DCMAKE_CUDA_COMPILER="${CDFMM_CUDA_COMPILER}" \
+		-DCMAKE_CUDA_HOST_COMPILER="${CDFMM_CXX_COMPILER}" \
+		-DCMAKE_CUDA_ARCHITECTURES="${CDFMM_CUDA_ARCHITECTURES}" \
+		-DCDFMM_ENABLE_CUDA=${CDFMM_ENABLE_CUDA} \
+		-DCDFMM_PROCEDURAL_MAX_ORDER="${CDFMM_PROCEDURAL_MAX_ORDER}" \
+		-DCMAKE_SHARED_LINKER_FLAGS="${CDFMM_SHARED_LINKER_FLAGS}" \
+		-DCDFMM_ENABLE_MKL=ON \
+		-DMKL_DIR="${CONDA_PREFIX}/lib/cmake/mkl" \
+		-DMKL_INTERFACE=lp64 \
+		-DMKL_THREADING=intel_thread \
+		-DMKL_LINK=${CDFMM_MKL_LINK} \
+		$(if $(filter 1,${CDFMM_OPENMP}),-DCDFMM_ENABLE_OPENMP=ON -DOpenMP_CXX_FLAGS=-fopenmp -DOpenMP_CXX_LIB_NAMES=iomp5 -DOpenMP_iomp5_LIBRARY="${CDFMM_IOMP5}",-DCDFMM_ENABLE_OPENMP=OFF) \
+		-DCDFMM_INSTALL_PYTHON_TO_ENV=OFF \
+		-DCDFMM_BUILD_PYTHON=OFF \
+		-DCDFMM_BUILD_FORTRAN_INTERFACE=OFF \
+		-DCDFMM_BUILD_TESTS=OFF \
+		-DCDFMM_BUILD_EXAMPLES=OFF \
+		-DCDFMM_BUILD_BENCHMARKS=OFF
+	CPATH= CPLUS_INCLUDE_PATH= cmake --build "${CDFMM_BUILD_DIR}" --parallel
+	cmake --install "${CDFMM_BUILD_DIR}"
+endif
+else
+	@echo "USE_CDFMM=0 -> skipping dip-fmm build"
+endif
+
+.PHONY: check-cdfmm
+check-cdfmm: $(if $(filter 1,${USE_CDFMM}),cdfmm)
+ifeq ($(USE_CDFMM),1)
+ifeq ($(OS),Windows_NT)
+	@if [ ! -f "${CDFMM_ROOT}/lib/cdfmm_c.lib" ] || [ ! -f "${CDFMM_ROOT}/bin/cdfmm_c.dll" ]; then \
+		echo "ERROR: USE_CDFMM=1 but lib/cdfmm_c.lib or bin/cdfmm_c.dll is missing under ${CDFMM_ROOT}."; \
+		exit 1; \
+	fi
+else
+	@if [ ! -f "${CDFMM_ROOT}/lib/libcdfmm_c.so" ]; then \
+		echo "ERROR: USE_CDFMM=1 but libcdfmm_c.so is missing under ${CDFMM_ROOT}/lib."; \
+		exit 1; \
+	fi
+endif
+	@if [ ! -f "${CDFMM_ROOT}/share/cdfmm/fortran/cdfmm_fortran.f90" ]; then \
+		echo "ERROR: the installed dip-fmm Fortran wrapper is missing under ${CDFMM_ROOT}/share."; \
+		exit 1; \
+	fi
+endif
 
 all: $(ALL_DEPS) ${AUXMT} magnetostatic ${MICROMAG} ${COMPILE_CUDA} ${FORCEINTEGRATOR} 
 
@@ -413,11 +559,11 @@ clean:
 	cd $(STANDALONE_PATH) && ${MAKE} clean
 	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
+	rm -f ${PYTHON_LIBPATH}/cdfmm_c.dll
 	rm -rf ${PYTHON_LIBPATH}/build
 	rm -f ${BUILD_FLAGS_FILE}
 
 clean_full:
-	cd ${FMM3D_DIR} && ${MAKE} clean
 	cd ${AUXMT_PATH} && ${MAKE} clean
 	cd ${NUM_INT_PATH} && ${MAKE} clean
 	cd ${TILE_DEMAG_TENSOR_PATH} && ${MAKE} clean
@@ -427,9 +573,9 @@ clean_full:
 	cd $(STANDALONE_PATH) && ${MAKE} clean
 	cd $(FORCEINTEGRATOR_PATH) && ${MAKE} clean
 	rm -f *${LIB_SUFFIX} *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/*${LIB_SUFFIX} ${PYTHON_LIBPATH}/*${PY_MOD_SUFFIX}
+	rm -f ${PYTHON_LIBPATH}/cdfmm_c.dll
 	rm -rf ${PYTHON_LIBPATH}/build
 	rm -f ${BUILD_FLAGS_FILE}
-	rm -f ${FMM3D_STAMP}
 
 auxmt: check-config
 	cd ${AUXMT_PATH} && ${MAKE} FC=${FC} FFLAGS="${FFLAGS}" USE_CVODE=${USE_CVODE} CVODE_ROOT="${CVODE_ROOT}" USE_MATLAB=${USE_MATLAB} MATLAB_INCLUDE="${MATLAB_INCLUDE}"
@@ -445,12 +591,12 @@ magnetostatic: check-config
 	cd ${DEMAG_FIELD_PATH}  && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
 	${RECORD_FLAGS}
 
-micromagnetism: check-config
-	cd ${MICROMAG_PATH} && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
+micromagnetism: check-config $(if $(filter 1,${USE_CDFMM}),check-cdfmm)
+	cd ${MICROMAG_PATH} && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' USE_CVODE=$(USE_CVODE) CVODE_ROOT="$(CVODE_ROOT)" USE_MATLAB=$(USE_MATLAB) MATLAB_INCLUDE="$(MATLAB_INCLUDE)" USE_CDFMM=$(USE_CDFMM) CDFMM_ROOT="$(CDFMM_ROOT)"
 	${RECORD_FLAGS}
 
 cuda:
-	cd ${FORTRAN_CUDA_PATH} && $(MAKE) CPP=$(CPP)
+	cd ${FORTRAN_CUDA_PATH} && CPATH= CPLUS_INCLUDE_PATH= $(MAKE) CPP=$(CPP) CUDA_HOST_COMPILER="$(CUDA_HOST_COMPILER)"
 
 forceintegrator: check-config
 	cd $(FORCEINTEGRATOR_PATH) && $(MAKE) FC=$(FC) FFLAGS='${FFLAGS}' MATLAB_INCLUDE="$(MATLAB_INCLUDE)"
@@ -468,7 +614,10 @@ info:
 	@echo CUDA enabled: $(USE_CUDA)
 	@echo CVODE enabled: $(USE_CVODE)
 	@echo Micromagnetics enabled: $(USE_MICROMAG)
-	@echo FMM3D enabled: $(USE_FMM3D)
+	@echo dip-fmm enabled: $(USE_CDFMM)
+	@echo dip-fmm root: $(CDFMM_ROOT)
+	@echo dip-fmm CUDA architectures: $(CDFMM_CUDA_ARCHITECTURES)
+	@echo dip-fmm CUDA compiler: $(CDFMM_CUDA_COMPILER)
 	@echo MATLAB enabled: $(USE_MATLAB)
 	@echo MATLAB include: $(MATLAB_INCLUDE)
 	@echo CVODE root: $(CVODE_ROOT)
@@ -488,10 +637,18 @@ test:
 
 
 
-${PYTHON_MODN_ALL}: check-config check-flags
+${PYTHON_MODN_ALL}: check-config check-flags $(if $(filter 1,${USE_CDFMM}),check-cdfmm)
 	${CP_LIB}
+	# f2py's meson backend keeps the FFLAGS/LDFLAGS it saw when the build
+	# directory was first configured and only warns ("Directory already
+	# configured") when they change, so a later build with another
+	# CDFMM_ROOT would silently keep the old rpath. Start from a
+	# fresh build directory; only FortranToPythonIO.f90 and the wrappers are
+	# compiled here, the libraries are already built.
+	rm -rf ${PYTHON_LIBPATH}/build
 	FC=${FC} FFLAGS=${EXTRA_FFLAGS} LDFLAGS=${LDFLAGS} \
 		python -m numpy.f2py -c -m ${PYTHON_MODN} \
 		--build-dir ${PYTHON_LIBPATH}/build -I${OPT} -I${INCLUDE_OBJ} \
-		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${FMM3D}
+		-L${MKFILE_PATH} ${LIB_OPT} python/FortranToPythonIO.f90 ${MKL} ${CUDA} ${CVODE} ${CDFMM}
 	cp *${PY_MOD_SUFFIX} ${PYTHON_LIBPATH}/
+	${CP_CDFMM_DLL}

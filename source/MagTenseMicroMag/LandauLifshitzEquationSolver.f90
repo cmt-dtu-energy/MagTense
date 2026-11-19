@@ -21,22 +21,20 @@
     use UTIL_MICROMAG
     use DemagAuxFunctions
     use DemagFieldGetSolution
+    use TileTetrahedronPairTensor
     use FortranCuda
     !use, intrinsic :: omp_lib
     use omp_lib
     use IO_GENERAL
     use iso_fortran_env
-    use UnstructuredMeshAnalysis
-    use TetrahedralMeshAnalysis
-    use DifferentialOperators
+    use ExchangeOperator
 
-#if USE_FMM3D
-    use fmm3d_tree_mod
-    use fmm_nbor_tensor_mod
+#if USE_CDFMM
+    use DipFmmDemag
 #endif
 
     use trace_mod
-    use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
+    use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan, ieee_is_finite
     implicit none          
 
     !>Module variables
@@ -57,9 +55,19 @@
     real(DP),dimension(:),allocatable :: pred_u                 !>Lowest Hessian eigenvector of the previous field, the Lanczos start vector of the next
     real(DP),parameter :: pred_ratio_max = 2.0_DP               !>Largest field-step ratio the extrapolation is taken at
     real(DP),parameter :: pred_dm_max = 0.5_DP                  !>Largest per-cell displacement |dm| the extrapolation is taken at
+    !>Adaptive field loop: the weight Ms_i V_i / sum(Ms V) of every cell in the mean magnetisation that
+    !>dM and the sign-change test are measured on, and the minimizer short-circuit of the current
+    !>trial (limit 0: off) with the weighted mean of the last accepted state as its reference
+    real(DP),dimension(:),allocatable :: gb_metric_w
+    real(DP) :: gb_abort_dM = 0.0_DP
+    real(DP),dimension(3) :: gb_abort_ref = 0.0_DP
+    logical :: gb_exch_gpu = .false.                            !>The exchange field is computed on the GPU (see initExchangeGpu)
+    integer,parameter :: par_grain = 16384                      !>Cells per task of the taskloops over the cells (see computeHeff)
+    real(DP),dimension(:),allocatable :: gb_exch_diag           !>Diagonal of the exchange operator A_exch, read once for the minimizer's preconditioner
 
     private :: gb_solution,gb_problem,crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2,gb_cellVol,n_feval_count
     private :: pred_m1,pred_m2,pred_H1,pred_H2,pred_n,pred_tau,pred_u,pred_ratio_max,pred_dm_max
+    private :: gb_metric_w,gb_abort_dM,gb_abort_ref,gb_exch_gpu,par_grain,gb_exch_diag
 
     contains
     
@@ -88,16 +96,18 @@
     logical :: is_dup_t                                  !> Whether a convergence time coincides with a requested output time
     integer,dimension(:),allocatable :: seed_arr         !> Seed array for the stochastic thermal field
     integer :: seed_n, seed_clock                        !> Size of the seed array and a clock value to seed it from
-    character*(100) :: prog_str 
-    real :: rate
-    integer :: c1,c2,cr,cm 
+    character*(100) :: prog_str
+    integer(int64) :: full_start, eval_start, eval_end, clock_rate
+    real(DP) :: full_seconds, evaluation_seconds, initialization_seconds
+    real(DP) :: evaluation_initialization_ratio
     integer, save :: itimer = 0
     call trace%begin( "SolveLandauLifshitzEquation", itimer=itimer, verbose=1 )
-    
-    ! First initialize the system_clock
-    call system_clock(count_rate=cr)
-    call system_clock(count_max=cm)
-    rate = REAL(cr)
+    call system_clock(count=full_start, count_rate=clock_rate)
+#if USE_CDFMM
+    ! A previous solve may have returned through a non-standard path. Begin from
+    ! a known state before constructing this solve's fixed-geometry plan.
+    call destroyDipFmm()
+#endif
     
     write(prog_str,'(A37, A8, A12)') 'MagTense version 3.0.1, compiled on: ', __TIME__, __DATE__ 
     call displayGUIMessage( trim(prog_str) ) 
@@ -130,22 +140,7 @@
     allocate( gb_solution%pts(ntot,3) )
     
     !Analyze the mesh, if needed
-    if (( gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) .or. &
-        ( gb_problem%grid%gridType .eq. gridTypeTetrahedron )) then
-        if ( gb_problem%passExch .eq. passExchTrue) then
-            call displayGUIMessage( 'Passing exchange matrix' )
-            call passDifferentialOperators(gb_problem)
-        elseif ( gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
-            call CartesianUnstructuredMeshAnalysis(gb_problem%grid%pts, gb_problem%grid%abc, gb_solution%gridinfo, &
-                gb_problem%macrogrid%exchPBC)
-        else
-            !A tetrahedral mesh is given by its nodes and connectivity rather than by positions
-            !and sizes, so it has its own analysis. It fills the same GridInfo, which means the
-            !exchange operator below is built in exactly the same way as for the prisms.
-            call TetrahedralUnstructuredMeshAnalysis(gb_problem%grid%nodes, gb_problem%grid%elements, &
-                gb_solution%gridinfo, gb_problem%macrogrid%exchPBC)
-        endif
-    endif
+    call prepareExchangeMesh( gb_problem, gb_solution )
 
     if (( gb_problem%grid%gridType .eq. gridTypeTetrahedron ) .or. (gb_problem%grid%gridType .eq. gridTypeUnstructuredPrisms)) then
         do i=1,gb_problem%grid%nx
@@ -192,29 +187,15 @@
     if ( gb_problem%useDemag .eq. useDemagTrue ) then
         !Copy the demag tensor to CUDA
         if ( gb_problem%useCuda .eq. useCudaTrue ) then
+#if USE_CDFMM
+          if (gb_problem%use_cdfmm) then
+            ! dip-fmm owns its CUDA buffers and handles. The legacy dense/sparse
+            ! MagTense CUDA matrices are intentionally not initialised.
+            call displayGUIMessage( 'dip-fmm owns the CUDA demag state' )
+          else
+#endif
             call displayGUIMessage( 'Copying to CUDA' ) 
 #if USE_CUDA
-#if USE_FMM3D 
-            !------------- if use_fmm then copy sparse nbr_corr tensor else copy normal demag tensor --------------
-            if ( gb_problem%use_fmm) then
-              call displayGUIMessage( 'copying nbr_corr for FMM nbor correction')  
-              call cudaInit_sparse( gb_problem%K_fmm_s )    
-            !----------------------------------------------------------------------------------------------
-            !------------ else copy the normal demag tensor ------------------------------------------------
-            else 
-              !Initialize the Cuda arrays and load the demag tensors into the GPU memory
-              if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
-                  !If the matrices are sparse
-                call displayGUIMessage( 'Initializing sparse matrices on CUDA' )
-                  call cudaInit_sparse( gb_problem%K_s )            
-              else
-                  !if the matrices are dense 
-                call displayGUIMessage( 'Initializing dense matrices on CUDA' )
-                  call cudaInit_s( gb_problem%Kxx, gb_problem%Kxy, gb_problem%Kxz, gb_problem%Kyy, gb_problem%Kyz, gb_problem%Kzz )
-              endif
-            end if
-            !----------------------------------------------------------------------------------------------
-#else
             !Initialize the Cuda arrays and load the demag tensors into the GPU memory
             if ( ( gb_problem%demag_approximation .eq. DemagApproximationThreshold ) .or. ( gb_problem%demag_approximation .eq. DemagApproximationThresholdFraction ) ) then
                 !If the matrices are sparse
@@ -231,11 +212,13 @@
             !     used for comparing GPU vs. CPU tensor
             !call cudaDumpDemagDense("CUDA_dense_K_matrices.bin")
             !=================================================================================
-        endif
-#endif
+            endif
 #else
             call displayGUIMessage( 'MagTense not compiled with CUDA - exiting!' )
             call abortMagTense( 'MagTense not compiled with CUDA' )
+#endif
+#if USE_CDFMM
+          endif
 #endif
         endif
     endif
@@ -428,9 +411,18 @@
         gb_solution%H_ani(:,:,:,:) = 0
     endif
 
+    ! Everything before this boundary is one-time solver initialization. The
+    ! timed evaluation phase contains the actual ODE solve and all effective
+    ! field evaluations, but excludes construction of the dense tensor/FMM plan.
+    call system_clock(count=eval_start)
+    initialization_seconds = real(eval_start - full_start, DP) / real(clock_rate, DP)
+    write(prog_str,'(A,F12.6,A)') 'Initialization took: ', initialization_seconds, ' seconds'
+    call displayGUIMessage(trim(prog_str))
+
     !loop over the range of applied fields
     if ( gb_problem%dummy_run .eq. 1) then
        call displayGUIMessage( 'Performing dummy run - skipping time evolution ' )
+       eval_end = eval_start
     else 
 
         !CALL SYSTEM_CLOCK(c1)
@@ -453,15 +445,20 @@
           nt_Hext = gb_problem%nHextAccepted
       endif
 
-      
-        !CALL SYSTEM_CLOCK(c2)
-        !call displayGUIMessage( 'Time simulation time integration:' )
-        !write (prog_str,'(f10.3)') (c2 - c1)/rate
-        !call displayGUIMessage( prog_str )
+      call system_clock(count=eval_end)
 
 
       !clean up
-      deallocate(crossX,crossY,crossZ,HeffX,HeffY,HeffZ,HeffX2,HeffY2,HeffZ2, M_out)
+      if (allocated(crossX)) deallocate(crossX)
+      if (allocated(crossY)) deallocate(crossY)
+      if (allocated(crossZ)) deallocate(crossZ)
+      if (allocated(HeffX)) deallocate(HeffX)
+      if (allocated(HeffY)) deallocate(HeffY)
+      if (allocated(HeffZ)) deallocate(HeffZ)
+      if (allocated(HeffX2)) deallocate(HeffX2)
+      if (allocated(HeffY2)) deallocate(HeffY2)
+      if (allocated(HeffZ2)) deallocate(HeffZ2)
+      if (allocated(M_out)) deallocate(M_out)
       
       !clean up
       if (gb_problem%CV > 0) then
@@ -472,15 +469,41 @@
       if ( associated(gb_problem%desc_hndl_FFT_M_H) ) stat = DftiFreeDescriptor(gb_problem%desc_hndl_FFT_M_H)
   end if
 
+    evaluation_seconds = real(eval_end - eval_start, DP) / real(clock_rate, DP)
+    full_seconds = initialization_seconds + evaluation_seconds
+    if (initialization_seconds > tiny(1.0_DP)) then
+        evaluation_initialization_ratio = evaluation_seconds / initialization_seconds
+    else
+        evaluation_initialization_ratio = 0.0_DP
+    end if
+
+    call displayGUIMessage('Finished simulation:')
+    write(prog_str,'(A,F12.6,A)') 'Full time: ', full_seconds, ' seconds'
+    call displayGUIMessage(trim(prog_str))
+    write(prog_str,'(A,F12.6,A)') 'Evaluation time: ', evaluation_seconds, ' seconds'
+    call displayGUIMessage(trim(prog_str))
+    write(prog_str,'(A,F12.6,A)') 'Initialization time: ', initialization_seconds, ' seconds'
+    call displayGUIMessage(trim(prog_str))
+    write(prog_str,'(A,F12.6)') 'Eval/init ratio: ', evaluation_initialization_ratio
+    call displayGUIMessage(trim(prog_str))
+
+#if USE_CDFMM
+    call destroyDipFmm()
+#endif
+
     !The cell volumes are cached by computeEnergies for the grid of this solve; the next solve in the
     !same process may use another grid
     if ( allocated(gb_cellVol) ) deallocate( gb_cellVol )
+    if ( allocated(gb_metric_w) ) deallocate( gb_metric_w )
+    gb_abort_dM = 0.0_DP
 
     #if USE_CUDA
       if ( gb_problem%useCuda .eq. useCudaTrue ) then
           call cudaDestroy()
       endif
+      if ( gb_exch_gpu ) call cudaExchangeDestroy()
     #endif
+    gb_exch_gpu = .false.
     !Return the correct state
     sol = gb_solution
     prob = gb_problem    
@@ -549,6 +572,9 @@
       if (gb_problem%dH_min > gb_problem%dH_max) then
           call abortMagTense( 'Adaptive hysteresis requires dH_min <= dH_max' )
       endif
+      if (gb_problem%dH_grow <= 1.0_DP .or. gb_problem%dH_shrink <= 0.0_DP .or. gb_problem%dH_shrink >= 1.0_DP) then
+          call abortMagTense( 'Adaptive hysteresis requires dH_grow > 1 and 0 < dH_shrink < 1 (per-step limits of the step change)' )
+      endif
       if (sqrt(sum((gb_problem%H_end - gb_problem%H_start)**2)) <= tiny(1.0_DP)) then
           call abortMagTense( 'Adaptive hysteresis requires H_start and H_end to differ' )
       endif
@@ -557,6 +583,37 @@
 
 
     subroutine SolveAdaptiveHextLoop(fct, fct_thermal, cb_fct, M_out, ntot, nt, n_reject_max)
+    !>-----------------------------------------
+    !> Adaptive stepping of the applied field from H_start to H_end. Every trial step is a full
+    !> relaxation from the last accepted equilibrium; the change of the moment-weighted mean
+    !> magnetisation dM = |<m>_trial - <m>_accepted|, <m> = sum_i Ms_i V_i m_i / sum_i Ms_i V_i,
+    !> decides whether the trial is accepted and how long the next step is (target tracking):
+    !>
+    !>   - the minimizer abandons a trial above dH_min as soon as its mean has moved by
+    !>     dM_abort x dM_reject (short-circuit, status 3), and the trial is rejected like a dM
+    !>     rejection, without relaxing it to the end or through the LL fallback first;
+    !>   - reject and bisect towards the accepted state when dM > dM_reject, when the mean
+    !>     magnetisation along the sweep changes sign and the step is above switch_refine_dH, or when
+    !>     the minimizer did not converge (status 2); nothing is rejected once dH is at dH_min, so a
+    !>     switching event is resolved to dH_min and accepted there;
+    !>   - the rejected trial of a switching event is kept as a bracket: the step never passes the
+    !>     field that is known to have switched, the refinement ends as soon as the bracket is dH_min
+    !>     wide, and the step length from before the switch is restored right after it;
+    !>   - after an acceptance the step is scaled by 0.9 dM_target / dM, clamped per step to
+    !>     [dH_shrink, dH_grow], floored at dH_min and capped at dH_max;
+    !>   - an approaching instability shortens the step before dM shows it: for the minimizer the
+    !>     lowest Hessian eigenvalue (min_saddle_check = 2), once it has fallen below half its maximum
+    !>     on the current branch, is extrapolated as lambda^2 linear in the field (the saddle-node law)
+    !>     and the step is capped at 0.9 of the predicted distance; for the time integration a 3x jump
+    !>     of the field evaluations of a relaxation halves the next step;
+    !>   - a field the minimizer accepted while stuck within min_stall_mult * min_tol (min_status 4)
+    !>     counts as converged, and the next step is capped at min_stall_dH_factor times the last one;
+    !>   - a time integration that ran out of its window (min_status -2) is accepted and flagged, not
+    !>     retried: the slow relaxation is a property of the field, not of the step, and a retry costs
+    !>     another full window (tested: it doubled the cost and left more fields unconverged).
+    !>
+    !> dM_min is not used by this controller and is kept only for interface compatibility.
+    !>-----------------------------------------
     procedure(dydt_fct), pointer :: fct
     procedure(no_argument_fct), pointer :: fct_thermal
     procedure(callback_fct),pointer :: cb_fct
@@ -566,8 +623,15 @@
     real(DP) :: H_delta(3), H_dir(3), H_current(3), H_trial(3), H_remaining(3)
     real(DP) :: H_distance, remaining_distance, dH, dH_initial, dH_step, dH_initial_T, dH_T, dH_step_T, dM, m_parallel_before, m_parallel_trial
     real(DP),dimension(:),allocatable :: m_before, m_accepted, m_trial
-    logical :: reject_step, reached_end, sign_change, switch_reject
-    logical :: recover_armed, recover_grown, refine_pending
+    logical :: reject_step, reached_end, sign_change, switch_reject, nonconv_reject, trial_converged, switched, short_circuit
+    real(DP) :: bracket_dH, dH_pre_switch, factor, lam_prev, lam_acc, lam_max, s_prev, s_acc, slope, d_sw, nfev_prev
+    integer :: n_rej_dM, n_rej_sign, n_rej_conv, n_floor_accept, n_unconverged_acc, n_rej_abort, n_stall_acc
+    real(DP), parameter :: ctrl_safety = 0.9_DP       !>Aim slightly below dM_target
+    real(DP), parameter :: ctrl_exponent = 1.0_DP     !>dM is about linear in dH between switching events
+    real(DP), parameter :: ind_fraction = 0.9_DP      !>Fraction of the predicted distance to the instability the step may take
+    real(DP), parameter :: ind_gate = 0.5_DP          !>The eigenvalue must have fallen to this fraction of its branch maximum first
+    real(DP), parameter :: ll_cost_ratio = 3.0_DP     !>Relaxation-cost jump that halves the step for the time integration
+    real(DP), parameter :: bracket_void = 0.25_DP     !>A bracket narrower than this fraction of dH_min is dropped
     character*(256) :: prog_str
 
       !The input was validated by checkAdaptiveHextInput before the parallel region was entered
@@ -580,6 +644,8 @@
       dH = dH_initial
       allocate(m_before(3*ntot), m_accepted(3*ntot), m_trial(3*ntot))
       m_accepted = gb_problem%m0
+      call setMetricWeights( ntot )
+      gb_abort_dM = 0.0_DP
 
       ! Relax the starting state at H_start and store it in the first slot. Every trial step's dM is
       ! measured against the last accepted state, so that state has to be an equilibrium: an m0 far
@@ -608,15 +674,39 @@
       n_reject = 0
       n_reject_total = 0
       reached_end = .false.
-      recover_armed = .false.
-      recover_grown = .false.
-      refine_pending = .false.
+      bracket_dH = -1.0_DP
+      dH_pre_switch = -1.0_DP
+      lam_prev = -1.0_DP
+      lam_max = -1.0_DP
+      s_prev = 0.0_DP
+      nfev_prev = real(gb_solution%n_feval(i_acc), DP)
+      n_rej_dM = 0
+      n_rej_abort = 0
+      n_rej_sign = 0
+      n_rej_conv = 0
+      n_floor_accept = 0
+      n_unconverged_acc = 0
+      n_stall_acc = 0
 
       do while (.not. reached_end .and. i_acc < gb_problem%maxHextSteps + 1)
           remaining_distance = dot_product(gb_problem%H_end - H_current, H_dir)
           if (remaining_distance <= max(1.0e-12_DP * H_distance, tiny(1.0_DP))) exit
 
           i_trial = i_acc + 1
+          !Inside the bracket of a switching event the step never passes the field that is known to
+          !have switched; once the bracket is dH_min wide (or narrower) the trial lands on it and is
+          !accepted there, which ends the refinement without a further rejected relaxation.
+          if (bracket_dH > 0.0_DP) then
+              if (bracket_dH < bracket_void * gb_problem%dH_min) then
+                  !The trial that defined the bracket switched, but the states accepted since then did
+                  !not, and the bracket has shrunk below anything the sweep can resolve: the switch was a
+                  !path effect of the larger step. Drop the bracket rather than step by a sliver.
+                  bracket_dH = -1.0_DP
+                  dH_pre_switch = -1.0_DP
+              else
+                  dH = min(dH, bracket_dH)
+              endif
+          endif
           H_trial = H_current + min(dH, remaining_distance) * H_dir
           if (remaining_distance <= dH) H_trial = gb_problem%H_end
           dH_step = sqrt(sum((H_trial - H_current)**2))
@@ -642,7 +732,19 @@
               call displayGUIMessage( trim(prog_str) )
           endif
 
+          !Short-circuit: a trial that can still be rejected (dH above the floor) is abandoned by the
+          !minimizer as soon as its mean has moved by dM_abort x dM_reject, before it is relaxed to the
+          !end or through the LL fallback. At dH_min nothing is rejected, so it relaxes in full there.
+          if (gb_problem%solver .eq. MicroMagSolverMinimizer .and. gb_problem%dM_abort > 0.0_DP .and. &
+              dH > gb_problem%dH_min) then
+              gb_abort_dM = gb_problem%dM_abort * gb_problem%dM_reject
+              gb_abort_ref = weightedMeanMagnetisation(m_before, ntot)
+          else
+              gb_abort_dM = 0.0_DP
+          endif
+
           call relaxAtField( fct, fct_thermal, cb_fct, M_out(:,:,i_trial), ntot, nt, i_trial )
+          gb_abort_dM = 0.0_DP
 
           m_trial = M_out(:,nt,i_trial)
           dM = adaptiveStepMetric(m_before, m_trial, ntot)
@@ -650,29 +752,50 @@
           m_parallel_before = meanMagnetisationAlongField(m_before, ntot, H_dir)
           m_parallel_trial = meanMagnetisationAlongField(m_trial, ntot, H_dir)
           sign_change = m_parallel_before * m_parallel_trial < 0.0_DP
+          short_circuit = (gb_solution%min_status(i_trial) == 3)
+          trial_converged = (gb_solution%min_status(i_trial) /= 2 .and. gb_solution%min_status(i_trial) /= -2 &
+                             .and. .not. short_circuit)
+
+          !----- accept or reject the trial -----
           reject_step = .false.
           switch_reject = .false.
+          nonconv_reject = .false.
           if (dM > gb_problem%dM_reject .and. dH > gb_problem%dH_min) reject_step = .true.
+          !An abandoned trial is a large change by construction (it is only armed above dH_min)
+          if (short_circuit) reject_step = .true.
           if (gb_problem%use_switch_refine) then
               if (sign_change .and. dH > gb_problem%switch_refine_dH .and. dH > gb_problem%dH_min) then
                   reject_step = .true.
                   switch_reject = .true.
               endif
           endif
+          if (gb_solution%min_status(i_trial) == 2 .and. .not. reject_step .and. dH > gb_problem%dH_min) then
+              reject_step = .true.
+              nonconv_reject = .true.
+          endif
 
           if (reject_step) then
               if (n_reject > 0 .and. dH <= gb_problem%dH_min) then
                   reject_step = .false.
               else
-                  dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
-                  !dH is being driven to its floor, so arm the recovery (see the step control below).
-                  !Across a sign change the floor is switch_refine_dH, and the recovery waits until
-                  !the step across the sign change has been accepted
-                  if (switch_reject) refine_pending = .true.
-                  if (switch_reject .or. dH <= gb_problem%dH_min) then
-                      recover_armed = .true.
-                      recover_grown = .false.
+                  if (nonconv_reject) then
+                      n_rej_conv = n_rej_conv + 1
+                      call displayGUIMessage('   Relaxation did not converge; retrying with a smaller field step')
+                  else
+                      !The trial switched: keep it as the far end of the bracket and remember the step
+                      !length to return to once the switch has been accepted
+                      if (bracket_dH < 0.0_DP) dH_pre_switch = dH
+                      bracket_dH = dH_step
+                      if (short_circuit) then
+                          n_rej_abort = n_rej_abort + 1
+                      else if (switch_reject) then
+                          n_rej_sign = n_rej_sign + 1
+                      else
+                          n_rej_dM = n_rej_dM + 1
+                      endif
                   endif
+                  !Bisect towards the accepted state
+                  dH = max(0.5_DP * dH, gb_problem%dH_min)
                   dH_T = mu0 * dH
                   write(prog_str,'(A27,F10.6,A4)') '   Retrying with lower dH = ', dH_T, ' T'
                   call displayGUIMessage( trim(prog_str) )
@@ -690,9 +813,16 @@
               cycle
           endif
 
+          !----- accept -----
           if (dM > gb_problem%dM_reject .and. dH <= gb_problem%dH_min) then
               call displayGUIMessage('Adaptive hysteresis accepting a large magnetisation change at dH_min')
+              n_floor_accept = n_floor_accept + 1
           endif
+          if (.not. trial_converged) then
+              n_unconverged_acc = n_unconverged_acc + 1
+              call displayGUIMessage('Adaptive hysteresis accepting a field whose relaxation did not converge')
+          endif
+          nfev_prev = real(gb_solution%n_feval(i_acc), DP)
 
           i_acc = i_trial
           n_reject = 0
@@ -713,39 +843,90 @@
           H_remaining = gb_problem%H_end - H_current
           reached_end = sqrt(sum(H_remaining**2)) <= max(1.0e-10_DP * H_distance, 1.0e-9_DP)
 
-          !Step control for the next step: grow below dM_min, shrink above dM_target. On its own this
-          !band can leave dH at its floor for the rest of the sweep once something has driven it there
-          !(the switch refinement, or the shrinking around a large, fast change): in a smooth region a
-          !step that small gives a dM between dM_min and dM_target, so dH never grows again. In a
-          !hard-axis loop that is ~1000 steps of dH_min. So when dH reaches its floor the recovery is
-          !armed, and while it is armed dH also grows whenever dM <= dM_target. The first step above
-          !dM_target after it has grown disarms it and sets dH back by one dH_grow, to the last
-          !step length that was within dM_target, and the band takes over from there. Until dH
-          !reaches its floor the step control is exactly the band.
-          if (sign_change) refine_pending = .false.
-          if (dM < gb_problem%dM_min) then
-              dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
-              if (recover_armed) recover_grown = .true.
-          else if (dM > gb_problem%dM_target) then
-              if (recover_armed .and. recover_grown) then
-                  !The recovery has overshot: go back to the previous step length, which was within
-                  !dM_target, rather than shrinking by dH_shrink below it
-                  recover_armed = .false.
-                  dH = max(dH / gb_problem%dH_grow, gb_problem%dH_min)
+          !----- step control for the next trial -----
+          !A switching event (dM above dM_reject accepted at the floor, or the trial that landed on
+          !the bracket end) restores the pre-switch step; otherwise the step is scaled towards
+          !dM_target, clamped to [dH_shrink, dH_grow] per step, floored at dH_min and capped at dH_max.
+          switched = (dM > gb_problem%dM_reject) .or. sign_change
+          s_acc = dot_product(H_current - gb_problem%H_start, H_dir)
+          if (switched) then
+              if (dH_pre_switch > 0.0_DP) then
+                  dH = min(max(dH_pre_switch, gb_problem%dH_min), gb_problem%dH_max)
               else
-                  dH = max(dH * gb_problem%dH_shrink, gb_problem%dH_min)
+                  dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
               endif
-              if (dH <= gb_problem%dH_min) then
-                  recover_armed = .true.
-                  recover_grown = .false.
+              bracket_dH = -1.0_DP
+              dH_pre_switch = -1.0_DP
+              lam_prev = -1.0_DP
+              lam_max = -1.0_DP
+          else
+              if (bracket_dH > 0.0_DP) then
+                  bracket_dH = bracket_dH - dH_step
+                  !Landed on (or past) the far end without switching: the bracket is void
+                  if (bracket_dH <= bracket_void * gb_problem%dH_min) then
+                      bracket_dH = -1.0_DP
+                      dH_pre_switch = -1.0_DP
+                  endif
               endif
-          else if (recover_armed .and. .not. refine_pending) then
-              dH = min(dH * gb_problem%dH_grow, gb_problem%dH_max)
-              recover_grown = .true.
+              if (dM > 0.0_DP) then
+                  factor = (ctrl_safety * gb_problem%dM_target / dM)**ctrl_exponent
+              else
+                  factor = gb_problem%dH_grow
+              endif
+              factor = min(max(factor, gb_problem%dH_shrink), gb_problem%dH_grow)
+              !Time integration: a jump in the relaxation cost means the state is approaching an
+              !instability (critical slowing down) before the mean magnetisation shows it
+              if (gb_problem%solver .ne. MicroMagSolverMinimizer .and. nfev_prev > 0.0_DP) then
+                  if (real(gb_solution%n_feval(i_acc), DP) > ll_cost_ratio * nfev_prev) factor = min(factor, 0.5_DP)
+              endif
+              dH = min(max(dH * factor, gb_problem%dH_min), gb_problem%dH_max)
+              !Minimizer: the lowest Hessian eigenvalue goes to zero at the switching field as
+              !sqrt(H_sw - H), so lambda^2 extrapolated linearly from the last two accepted states on
+              !this branch predicts the distance to the instability; keep the step inside it
+              lam_acc = gb_solution%min_eig(i_acc)
+              if (gb_problem%solver .eq. MicroMagSolverMinimizer .and. gb_solution%min_status(i_acc) == 0 .and. &
+                  ieee_is_finite(lam_acc)) then
+                  lam_max = max(lam_max, lam_acc)
+                  !Far from the instability the eigenvalue decays roughly exponentially with the field
+                  !and the linear extrapolation of lambda^2 predicts the switch far too early; only once
+                  !it has fallen well below its maximum on this branch is the sqrt law a fair model
+                  if (lam_acc > 0.0_DP .and. lam_prev > 0.0_DP .and. s_acc > s_prev .and. lam_acc < ind_gate * lam_max) then
+                      slope = (lam_prev**2 - lam_acc**2) / (s_acc - s_prev)
+                      if (slope > 0.0_DP) then
+                          d_sw = lam_acc**2 / slope
+                          if (ind_fraction * d_sw < dH) then
+                              dH = max(ind_fraction * d_sw, gb_problem%dH_min)
+                              write(prog_str,'(A,F10.6,A,F10.6,A)') '   Instability predicted ', mu0*d_sw, ' T ahead; dH capped to ', mu0*dH, ' T'
+                              call displayGUIMessage( trim(prog_str) )
+                          endif
+                      endif
+                  endif
+                  lam_prev = merge(lam_acc, -1.0_DP, lam_acc > 0.0_DP)
+              else
+                  lam_prev = -1.0_DP
+                  lam_max = -1.0_DP
+              endif
           endif
+          !A field accepted while the minimizer was stuck (status 4) is a hint that the next step is
+          !too long for it: cap the next step at min_stall_dH_factor times the one just taken
+          if (gb_problem%solver .eq. MicroMagSolverMinimizer .and. gb_solution%min_status(i_acc) == 4) then
+              n_stall_acc = n_stall_acc + 1
+              if (gb_problem%min_stall_dH_factor * dH_step < dH) then
+                  dH = max(gb_problem%min_stall_dH_factor * dH_step, gb_problem%dH_min)
+                  write(prog_str,'(A,F10.6,A)') '   Minimizer was stuck at this field; next dH capped to ', mu0*dH, ' T'
+                  call displayGUIMessage( trim(prog_str) )
+              endif
+          endif
+          s_prev = s_acc
       enddo
 
       gb_problem%nHextAccepted = i_acc
+      gb_abort_dM = 0.0_DP
+      write(prog_str,'(A,I5,A,I4,A,I4,A,I4,A,I4,A,I4,A,I4,A,I4)') 'Adaptive hysteresis summary: accepted ', i_acc, &
+          ', rejected (dM) ', n_rej_dM, ', rejected (short-circuit) ', n_rej_abort, ', rejected (sign change) ', n_rej_sign, &
+          ', rejected (not converged) ', n_rej_conv, ', switches accepted at dH_min ', n_floor_accept, &
+          ', accepted without convergence ', n_unconverged_acc, ', accepted while stuck ', n_stall_acc
+      call displayGUIMessage( trim(prog_str) )
       if (.not. reached_end) then
           call displayGUIMessage('Adaptive hysteresis reached maxHextSteps before H_end')
       endif
@@ -776,14 +957,14 @@
         if ( allocated(pred_u) ) deallocate( pred_u )
     end subroutine predictorReset
 
-    !> Records the converged equilibrium m at the applied field H (status 0 or 1); anything else
-    !> empties the history.
+    !> Records the converged equilibrium m at the applied field H (status 0, 1 or 4, the last
+    !> accepted within the stall band); anything else empties the history.
     subroutine predictorRecord( H, m, status, ntot )
     real(DP),dimension(3),intent(in) :: H
     real(DP),dimension(:),intent(in) :: m
     integer,intent(in) :: status, ntot
         if ( gb_problem%min_predictor .eq. 0 .or. gb_problem%solver .ne. MicroMagSolverMinimizer ) return
-        if ( status .lt. 0 .or. status .gt. 1 ) then
+        if ( status .lt. 0 .or. ( status .gt. 1 .and. status .ne. 4 ) ) then
             pred_n = 0
             return
         endif
@@ -843,28 +1024,51 @@
         enddo
     end subroutine predictorStart
 
+    !> The magnetic moment per unit total moment of every cell, Ms_i V_i / sum_j Ms_j V_j, the weight
+    !> of the cell in the mean magnetisation the adaptive loop works with. A plain average over the
+    !> cells would weigh a cell by its count: on a refined (octree) mesh the small tiles of the
+    !> refined regions would dominate, and a soft phase of low Ms would count as much as the
+    !> material that carries the moment. On a uniform grid of one material both are the same.
+    subroutine setMetricWeights( ntot )
+    integer,intent(in) :: ntot
+    real(DP) :: total
+      if ( .not. allocated(gb_cellVol) ) then
+          allocate( gb_cellVol(ntot) )
+          call cellVolumes( gb_problem, gb_solution, gb_cellVol )
+      endif
+      if ( allocated(gb_metric_w) ) deallocate( gb_metric_w )
+      allocate( gb_metric_w(ntot) )
+      gb_metric_w = abs(gb_problem%Ms) * gb_cellVol
+      total = sum( gb_metric_w )
+      if ( total > 0.0_DP ) then
+          gb_metric_w = gb_metric_w / total
+      else
+          gb_metric_w = 1.0_DP / real(ntot, DP)
+      endif
+    end subroutine setMetricWeights
+
+    !> Moment-weighted mean magnetisation <m> = sum_i w_i m_i (see setMetricWeights)
+    function weightedMeanMagnetisation(m, ntot) result(M_mean)
+    real(DP),dimension(:),intent(in) :: m
+    integer,intent(in) :: ntot
+    real(DP) :: M_mean(3)
+      M_mean(1) = sum(gb_metric_w * m(1:ntot))
+      M_mean(2) = sum(gb_metric_w * m(ntot+1:2*ntot))
+      M_mean(3) = sum(gb_metric_w * m(2*ntot+1:3*ntot))
+    end function weightedMeanMagnetisation
+
+    !> dM = |<m>_trial - <m>_before| with the moment-weighted mean
     real(DP) function adaptiveStepMetric(m_before, m_trial, ntot) result(dM_rms)
     real(DP),dimension(:),intent(in) :: m_before, m_trial
     integer,intent(in) :: ntot
-    real(DP) :: M_sum_before(3), M_sum_trial(3)
-      M_sum_before(1) = sum(m_before(1:ntot)) / real(ntot, DP)
-      M_sum_before(2) = sum(m_before(ntot+1:2*ntot)) / real(ntot, DP)
-      M_sum_before(3) = sum(m_before(2*ntot+1:3*ntot)) / real(ntot, DP)
-      M_sum_trial(1)  = sum(m_trial(1:ntot)) / real(ntot, DP)
-      M_sum_trial(2)  = sum(m_trial(ntot+1:2*ntot)) / real(ntot, DP)
-      M_sum_trial(3)  = sum(m_trial(2*ntot+1:3*ntot)) / real(ntot, DP)
-      dM_rms = sqrt(sum((M_sum_trial - M_sum_before)**2))
+      dM_rms = sqrt(sum((weightedMeanMagnetisation(m_trial, ntot) - weightedMeanMagnetisation(m_before, ntot))**2))
     end function adaptiveStepMetric
 
     real(DP) function meanMagnetisationAlongField(m, ntot, H_dir) result(M_parallel)
     real(DP),dimension(:),intent(in) :: m
     integer,intent(in) :: ntot
     real(DP),dimension(3),intent(in) :: H_dir
-    real(DP) :: M_mean(3)
-      M_mean(1) = sum(m(1:ntot)) / real(ntot, DP)
-      M_mean(2) = sum(m(ntot+1:2*ntot)) / real(ntot, DP)
-      M_mean(3) = sum(m(2*ntot+1:3*ntot)) / real(ntot, DP)
-      M_parallel = dot_product(M_mean, H_dir)
+      M_parallel = dot_product(weightedMeanMagnetisation(m, ntot), H_dir)
     end function meanMagnetisationAlongField
     !>-----------------------------------------
     !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
@@ -891,20 +1095,9 @@
         !--------------- effective field at m: fills gb_solution%Mx.. and HeffX/Y/Z ------------------
         call computeHeff( t, m )
         !-------------------------------------------------------------
-        !--------------- calculate precession term: m x Heff -------------
-        crossX = 1.0_DP * ( gb_solution%My * HeffZ - gb_solution%Mz * HeffY )
-        crossY = 1.0_DP * ( gb_solution%Mz * HeffX - gb_solution%Mx * HeffZ )
-        crossZ = 1.0_DP * ( gb_solution%Mx * HeffY - gb_solution%My * HeffX )
-        !-------------------------------------------------------------
-        !--------------- calculate damping term: m x (m x Heff) -------------
-        HeffX2 = gb_solution%My * crossZ - gb_solution%Mz * crossY
-        HeffY2 = gb_solution%Mz * crossX - gb_solution%Mx * crossZ
-        HeffZ2 = gb_solution%Mx * crossY - gb_solution%My * crossX
-        !-------------------------------------------------------------
-        !--------------- assemble dm/dt -------------------------------------
-        dmdt(1:ntot)               = -gb_problem%gamma * crossX - alpha(t,gb_problem) * HeffX2
-        dmdt(ntot+1:2*ntot)        = -gb_problem%gamma * crossY - alpha(t,gb_problem) * HeffY2
-        dmdt(2*ntot+1:3*ntot)      = -gb_problem%gamma * crossZ - alpha(t,gb_problem) * HeffZ2
+        !--------------- precession m x Heff, damping m x (m x Heff), dm/dt -------------
+        call llRhs( gb_solution%Mx, gb_solution%My, gb_solution%Mz, HeffX, HeffY, HeffZ, gb_problem%gamma, &
+                    alpha( t, gb_problem ), crossX, crossY, crossZ, HeffX2, HeffY2, HeffZ2, dmdt )
         !---------------------------------------------------------------------
         call trace%end("dmdt_fct", itimer=itimer, verbose=1 )
     end subroutine dmdt_fct
@@ -949,9 +1142,8 @@
         n_feval_count = n_feval_count + 1
 
         !------------- Update magnetisation (load from m)-------------
-        gb_solution%Mx = m(1:ntot)
-        gb_solution%My = m(ntot+1:2*ntot)
-        gb_solution%Mz = m(2*ntot+1:3*ntot)
+        !The loops over the cells here and in the callers are taskloops (see splitState)
+        call splitState( m, gb_solution%Mx, gb_solution%My, gb_solution%Mz )
         !-------------------------------------------------------------
 
         !------------ add exchange term -----------------------------
@@ -972,28 +1164,25 @@
         !-------------- add demagnetization field --------------------
                 ! NOTE - we don't run updateDemagfield as a task as this is the most expensive part
                 ! instead, we run this on the main thread and then.
-#if USE_FMM3D
-        !-------------------- if use_fmm then use FMM otherwise shortcircuit to normal demag field --------------
-        if ( gb_problem%use_fmm)  then
-          call updateDemagfieldFMM( gb_problem, gb_solution )
+#if USE_CDFMM
+        if (gb_problem%use_cdfmm) then
+          call updateDemagfieldDipFmm(gb_problem, gb_solution)
         else
-           call updateDemagfield( gb_problem, gb_solution )
-        end if
-        !--------------------------------------------------------------------------------------------------------------
-#else
-         call updateDemagfield( gb_problem, gb_solution )
+#endif
+        call updateDemagfield( gb_problem, gb_solution )
+#if USE_CDFMM
+        endif
 #endif
         !-------------------------------------------------------------
         !------------------ wait for all task to finish before calculating the effective field and the dm/dt ----------------
         call trace%begin( "dmdt_fct_taskwait", itimer=itimer_wait, verbose=1 )
-        !NOTE:      Not needed when running FMM, since it already contains a taskwait
         !$omp taskwait
         call trace%end( "dmdt_fct_taskwait", itimer=itimer_wait, verbose=1 )
         !--------------------------------------------------------------------------------------------------------------------
         !--------------- combine to get effective field, Heff -------------
-        HeffX = gb_solution%HhX + gb_solution%HjX + gb_solution%HmX + gb_solution%HkX + gb_solution%HtX
-        HeffY = gb_solution%HhY + gb_solution%HjY + gb_solution%HmY + gb_solution%HkY + gb_solution%HtY
-        HeffZ = gb_solution%HhZ + gb_solution%HjZ + gb_solution%HmZ + gb_solution%HkZ + gb_solution%HtZ
+        call sumFieldTerms( gb_solution%HhX, gb_solution%HjX, gb_solution%HmX, gb_solution%HkX, gb_solution%HtX, HeffX )
+        call sumFieldTerms( gb_solution%HhY, gb_solution%HjY, gb_solution%HmY, gb_solution%HkY, gb_solution%HtY, HeffY )
+        call sumFieldTerms( gb_solution%HhZ, gb_solution%HjZ, gb_solution%HmZ, gb_solution%HkZ, gb_solution%HtZ, HeffZ )
         !-------------------------------------------------------------
         call trace%end("computeHeff", itimer=itimer, verbose=1 )
     end subroutine computeHeff
@@ -1024,6 +1213,14 @@
     else
         call MagTense_ODE( fct, gb_problem%t, gb_problem%m0, gb_solution%t_out, M_out_i, gb_problem%includeThermal, fct_thermal, cb_fct, &
                 gb_problem%setTimeDisplay, gb_problem%tol, gb_problem%thres_value, gb_problem%useCVODE, gb_problem%t_conv, gb_problem%conv_tol )
+        !-1: the time integration stopped because its convergence check passed (or no check was
+        !configured, in which case the window is all there is); -2: it ran to the end of the window
+        !without passing the check. The adaptive loop treats -2 like a rejected step.
+        if ( size(gb_problem%t_conv) > 1 .and. gb_problem%conv_tol > 0.0_DP .and. .not. gb_problem%includeThermal ) then
+            gb_solution%min_status(i_field) = merge( -1, -2, ode_last_converged )
+        else
+            gb_solution%min_status(i_field) = -1
+        endif
     endif
 
     !Accumulated rather than assigned: the adaptive hysteresis loop retries a rejected field step under
@@ -1053,7 +1250,8 @@
     type(MicroMagSolution),intent(in) :: solution
     real(DP),dimension(4),intent(out) :: E
     integer :: ntot
-    real(DP),dimension(:),allocatable :: w, mdotu, mx, my, mz, e_an
+    real(DP),dimension(:),allocatable :: mx, my, mz, e_an
+    real(DP) :: e1, e2, e3
     integer, save :: itimer = 0
 
     call trace%begin( "computeEnergies", itimer=itimer, verbose=1 )
@@ -1064,19 +1262,18 @@
         call cellVolumes( problem, solution, gb_cellVol )
     endif
 
-    allocate( w(ntot) )
-    w = mu0 * problem%Ms * gb_cellVol
-
-    E(1) = -0.5_DP * sum( w * ( solution%Mx * solution%HjX + solution%My * solution%HjY + solution%Mz * solution%HjZ ) )
-    E(2) = -          sum( w * ( solution%Mx * solution%HhX + solution%My * solution%HhY + solution%Mz * solution%HhZ ) )
-    E(3) = -0.5_DP * sum( w * ( solution%Mx * real(solution%HmX,DP) + solution%My * real(solution%HmY,DP) + solution%Mz * real(solution%HmZ,DP) ) )
+    !One pass over the cells for the three field energies and the uniaxial anisotropy (taskloop, see
+    !computeHeff); the weight of cell i is w = mu0 Ms_i V_i
+    call fieldEnergySums( problem%Ms, gb_cellVol, solution%Mx, solution%My, solution%Mz, &
+                          solution%HjX, solution%HjY, solution%HjZ, solution%HhX, solution%HhY, solution%HhZ, &
+                          solution%HmX, solution%HmY, solution%HmZ, e1, e2, e3 )
+    E(1) = -0.5_DP * e1
+    E(2) = -e2
+    E(3) = -0.5_DP * e3
 
     if ( any(problem%K0 .ne. 0) ) then
         !Uniaxial: K0 (1 - (u.m)^2) per unit volume
-        allocate( mdotu(ntot) )
-        mdotu = problem%u_ea(:,1) * solution%Mx + problem%u_ea(:,2) * solution%My + problem%u_ea(:,3) * solution%Mz
-        E(4) = sum( gb_cellVol * problem%K0 * ( 1.0_DP - mdotu**2 ) )
-        deallocate( mdotu )
+        E(4) = uniaxialEnergySum( gb_cellVol, problem%K0, problem%u_ea, solution%Mx, solution%My, solution%Mz )
     else if ( allocated(problem%Kfact_arr) ) then
         !General expansion in the local crystal frame. Kfact_arr is K0_arr/(mu0 Ms) with the cubic K1, K2
         !folded in (see ComputeAnisotropyTerm3D), so w * Kfact_arr is the coefficient in J.
@@ -1091,13 +1288,12 @@
                 + problem%Kfact_arr(:,5,1)*mx**4*(my**2 + mz**2) + problem%Kfact_arr(:,5,2)*my**4*(mz**2 + mx**2) &
                 + problem%Kfact_arr(:,5,3)*mz**4*(mx**2 + my**2) &
                 + problem%Kfact_arr(:,6,1)*mx**2*my**2*mz**2 )
-        E(4) = sum( w * e_an )
+        E(4) = sum( mu0 * problem%Ms * gb_cellVol * e_an )
         deallocate( mx, my, mz, e_an )
     else
         E(4) = 0.0_DP
     endif
 
-    deallocate( w )
     call trace%end( "computeEnergies", itimer=itimer, verbose=1 )
     end subroutine computeEnergies
 
@@ -1109,18 +1305,75 @@
     subroutine minimizerHeff( m, H )
     real(DP),dimension(:),intent(in) :: m
     real(DP),dimension(:),intent(out) :: H
-    integer :: ntot
-    ntot = gb_problem%grid%nx * gb_problem%grid%ny * gb_problem%grid%nz
     call computeHeff( 0.0_DP, m )
-    H(1:ntot)          = HeffX
-    H(ntot+1:2*ntot)   = HeffY
-    H(2*ntot+1:3*ntot) = HeffZ
+    call joinState( HeffX, HeffY, HeffZ, H )
     end subroutine minimizerHeff
 
     subroutine minimizerEnergy( E )
     real(DP),dimension(4),intent(out) :: E
     call computeEnergies( gb_problem, gb_solution, E )
     end subroutine minimizerEnergy
+
+    !>-----------------------------------------
+    !> Diagonal preconditioner of the minimizer at the applied field with index i_field: pc_i =
+    !> sqrt( min(d) / d_i ) with d_i a bound on the curvature of cell i in field units - its own
+    !> exchange coupling 2 Jfact_i |A_ii|, the anisotropy 2 |Kfact_i|, the applied field and the self
+    !> demagnetisation Ms_i. The scale of pc is immaterial (the step lengths absorb it). The square
+    !> root: the full Jacobi scaling min(d)/d stalls once the nonlocal demagnetisation field is
+    !> included (10k-tetrahedron grain mesh, dip-fmm: torque stuck at 3e-4 at +1 T), while its square
+    !> root converges with 8x fewer iterations than plain steps over +1..-4 T (tools/precond_bb_test.py).
+    !>-----------------------------------------
+    subroutine minimizerPrecond( ntot, i_field, pc )
+    integer,intent(in) :: ntot, i_field
+    real(DP),dimension(:),allocatable,intent(inout) :: pc
+    real(DP),dimension(:),allocatable :: d
+    logical :: ok
+
+    if ( .not. allocated(gb_exch_diag) ) then
+        allocate( gb_exch_diag(ntot) )
+        call exchangeDiagonal( gb_problem%A_exch, gb_exch_diag, ok )
+        if ( .not. ok ) then
+            gb_exch_diag = 0.0_DP
+            call displayGUIMessage( 'Minimizer preconditioner: the exchange operator could not be read; anisotropy and field terms only' )
+        endif
+    endif
+    allocate( d(ntot) )
+    d = 2.0_DP * gb_problem%Jfact * abs( gb_exch_diag ) + 2.0_DP * abs( gb_problem%Kfact ) &
+        + sqrt( sum( gb_problem%Hext(i_field,2:4)**2 ) ) + gb_problem%Ms
+    pc = sqrt( minval( d ) / d )
+    deallocate( d )
+    end subroutine minimizerPrecond
+
+    !>-----------------------------------------
+    !> The diagonal of the sparse operator A (MKL handle), from its exported CSR, as in cudaExchangeInit.
+    !> ok is false when the export fails or A does not have size(d) rows.
+    !>-----------------------------------------
+    subroutine exchangeDiagonal( A, d, ok )
+    use, intrinsic :: iso_c_binding, only : c_ptr, c_f_pointer
+    type(sparse_matrix_t),intent(in) :: A
+    real(DP),dimension(:),intent(out) :: d
+    logical,intent(out) :: ok
+    integer :: stat, indexing, nrows, ncols, base, i, j
+    type(c_ptr) :: rs_c, re_c, ci_c, v_c
+    integer,pointer :: rs(:), re(:), ci(:)
+    real(DP),pointer :: v(:)
+
+    d = 0.0_DP
+    ok = .false.
+    stat = mkl_sparse_d_export_csr( A, indexing, nrows, ncols, rs_c, re_c, ci_c, v_c )
+    if ( stat .ne. SPARSE_STATUS_SUCCESS .or. nrows .ne. size(d) ) return
+    base = merge( 1, 0, indexing .eq. SPARSE_INDEX_BASE_ONE )
+    call c_f_pointer( rs_c, rs, [nrows] )
+    call c_f_pointer( re_c, re, [nrows] )
+    call c_f_pointer( ci_c, ci, [maxval(re) - base] )
+    call c_f_pointer( v_c, v, [maxval(re) - base] )
+    do i = 1, nrows
+        do j = rs(i) - base + 1, re(i) - base
+            if ( ci(j) - base + 1 .eq. i ) d(i) = d(i) + v(j)
+        enddo
+    enddo
+    ok = .true.
+    end subroutine exchangeDiagonal
 
     !>-----------------------------------------
     !> @author Rasmus Bjoerk, rabj@dtu.dk, DTU, 2026
@@ -1162,6 +1415,9 @@
     settings%maxrot = gb_problem%min_maxrot
     settings%fallback = gb_problem%min_fallback
     settings%saddle_check = gb_problem%min_saddle_check
+    settings%stall_window = gb_problem%min_stall_window
+    settings%stall_mult = gb_problem%min_stall_mult
+    if ( gb_problem%min_precond .ne. 0 ) call minimizerPrecond( ntot, i_field, settings%precond )
     !The eigenvalue check needs the weight of every cell in the energy, Ms_i V_i, to make the
     !Hessian self-adjoint in its inner product
     if ( gb_problem%min_saddle_check .eq. 2 ) then
@@ -1176,6 +1432,12 @@
     !With the predictor on, the first step also starts from the step length the previous field
     !ended with (a curvature estimate), see predictorStart
     if ( gb_problem%min_predictor .ne. 0 ) settings%tau_init = pred_tau
+    !Short-circuit of the adaptive field loop (set there per trial; 0 everywhere else)
+    if ( gb_abort_dM > 0.0_DP .and. allocated(gb_metric_w) ) then
+        settings%abort_dM = gb_abort_dM
+        settings%abort_ref = gb_abort_ref
+        settings%abort_w = gb_metric_w
+    endif
 
     allocate( m(3*ntot) )
     call MagTense_Minimize( minimizerHeff, minimizerEnergy, gb_problem%m0, m, ntot, settings, result, cb_fct, &
@@ -1192,17 +1454,20 @@
     gb_solution%min_iter(i_field) = gb_solution%min_iter(i_field) + result%n_iter
     gb_solution%min_torque(i_field) = result%torque
     gb_solution%min_status(i_field) = result%status
+    !An abandoned trial (status 3) is retried closer to the accepted state, whose warm start (the
+    !eigenvector and step length of the last accepted field) is kept for it. A state accepted while
+    !stuck within the stall band (status 4) is a usable equilibrium and warm-starts the next field.
     if ( gb_problem%min_saddle_check .eq. 2 ) then
         gb_solution%min_eig(i_field) = result%eig_min
-        if ( result%status .le. 1 .and. allocated(result%eig_vec) ) then
+        if ( ( result%status .le. 1 .or. result%status .eq. 4 ) .and. allocated(result%eig_vec) ) then
             pred_u = result%eig_vec
-        else if ( allocated(pred_u) ) then
+        else if ( result%status .ne. 3 .and. allocated(pred_u) ) then
             deallocate( pred_u )
         endif
     endif
-    if ( result%status .le. 1 ) then
+    if ( result%status .le. 1 .or. result%status .eq. 4 ) then
         pred_tau = result%tau_last
-    else
+    else if ( result%status .ne. 3 ) then
         pred_tau = 0.0_DP
     endif
 
@@ -1210,7 +1475,7 @@
     !after the if with the converged message commented out, so on convergence an
     !uninitialised buffer went to displayGUIMessage. Python printed the garbage silently,
     !but in the MEX mxCreateString asserts on non-UTF-8 input and takes MATLAB down.
-    if ( result%status .gt. 1 ) then
+    if ( result%status .eq. 2 ) then
         write(prog_str,'(A,I7,A,I7,A,ES9.2)') 'Minimizer NOT converged: iter ', result%n_iter, ' feval ', n_feval_count, ' torque/Ms ', result%torque
         call displayGUIMessage( trim(prog_str) )
     endif
@@ -1418,7 +1683,20 @@
     if ( .not. problem%useExchange ) return
 
     call trace%begin( "updateExchangeTerms", itimer=itimer, verbose=1 )
-    
+
+#if USE_CUDA
+    if ( gb_exch_gpu ) then
+        call cudaExchangeApply( solution%Mx, solution%My, solution%Mz, solution%HjX, solution%HjY, solution%HjZ, stat )
+        if ( stat .eq. 0 ) then
+            call trace%end( "updateExchangeTerms", itimer=itimer, verbose=1 )
+            return
+        endif
+        call displayGUIMessage( 'Exchange field on the GPU failed - continuing on the CPU' )
+        call cudaExchangeDestroy()
+        gb_exch_gpu = .false.
+    endif
+#endif
+
     descr%type = SPARSE_MATRIX_TYPE_GENERAL
     descr%mode = SPARSE_FILL_MODE_FULL
     descr%diag = SPARSE_DIAG_NON_UNIT
@@ -1446,6 +1724,252 @@
 
     call trace%end( "updateExchangeTerms", itimer=itimer, verbose=1 )
     end subroutine updateExchangeTerms
+
+    !>-----------------------------------------
+    !> Loops over the cells of the per-evaluation work. computeHeff, the minimizer and the
+    !> Landau-Lifshitz right-hand side run on the master thread of the parallel region in
+    !> SolveLandauLifshitzEquation, so these loops are split into blocks of par_grain cells, each an
+    !> OpenMP task for the other threads of the team (outside a parallel region the tasks run at
+    !> once, serially). Explicit tasks rather than taskloops: ifx 2025.2 stops with internal compiler
+    !> errors on several of these as taskloops, and one that compiled crashed at run time. Sums are
+    !> formed per block and added in block order, so they do not depend on the number of threads.
+    !>-----------------------------------------
+
+    !> x = m(1:n), y = m(n+1:2n), z = m(2n+1:3n)
+    subroutine splitState( m, x, y, z )
+    real(DP),dimension(:),intent(in) :: m
+    real(DP),dimension(:),intent(inout) :: x, y, z
+    integer :: i, n, c, lo, hi
+    n = size(x)
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i)
+        do i = lo, hi
+            x(i) = m(i)
+            y(i) = m(n+i)
+            z(i) = m(2*n+i)
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine splitState
+
+    !> m = [x; y; z]
+    subroutine joinState( x, y, z, m )
+    real(DP),dimension(:),intent(in) :: x, y, z
+    real(DP),dimension(:),intent(inout) :: m
+    integer :: i, n, c, lo, hi
+    n = size(x)
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i)
+        do i = lo, hi
+            m(i) = x(i)
+            m(n+i) = y(i)
+            m(2*n+i) = z(i)
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine joinState
+
+    !> One component of the effective field: H = H_ext + H_exc + H_dem + H_ani + H_th
+    subroutine sumFieldTerms( Hh, Hj, Hm, Hk, Ht, H )
+    real(DP),dimension(:),intent(in) :: Hh, Hj, Hk, Ht
+    real(SP),dimension(:),intent(in) :: Hm
+    real(DP),dimension(:),intent(inout) :: H
+    integer :: i, n, c, lo, hi
+    n = size(H)
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i)
+        do i = lo, hi
+            H(i) = Hh(i) + Hj(i) + Hm(i) + Hk(i) + Ht(i)
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine sumFieldTerms
+
+    !> The Landau-Lifshitz right-hand side dm/dt = -gamma m x H - alpha m x (m x H), keeping the
+    !> precession c = m x H and the damping term d = m x (m x H) in the module work arrays
+    subroutine llRhs( mx, my, mz, hx, hy, hz, gam, alp, cx, cy, cz, dx, dy, dz, dmdt )
+    real(DP),dimension(:),intent(in) :: mx, my, mz, hx, hy, hz
+    real(DP),intent(in) :: gam, alp
+    real(DP),dimension(:),intent(inout) :: cx, cy, cz, dx, dy, dz, dmdt
+    integer :: i, n, c, lo, hi
+    n = size(mx)
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i)
+        do i = lo, hi
+            cx(i) = my(i) * hz(i) - mz(i) * hy(i)
+            cy(i) = mz(i) * hx(i) - mx(i) * hz(i)
+            cz(i) = mx(i) * hy(i) - my(i) * hx(i)
+            dx(i) = my(i) * cz(i) - mz(i) * cy(i)
+            dy(i) = mz(i) * cx(i) - mx(i) * cz(i)
+            dz(i) = mx(i) * cy(i) - my(i) * cx(i)
+            dmdt(i)     = -gam * cx(i) - alp * dx(i)
+            dmdt(n+i)   = -gam * cy(i) - alp * dy(i)
+            dmdt(2*n+i) = -gam * cz(i) - alp * dz(i)
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine llRhs
+
+    !> The sums sum_i w_i m_i . H_i, w_i = mu0 Ms_i V_i, of the exchange (e1), external (e2) and
+    !> demagnetization (e3) fields, in one pass
+    subroutine fieldEnergySums( Ms, V, mx, my, mz, hjx, hjy, hjz, hhx, hhy, hhz, hmx, hmy, hmz, e1, e2, e3 )
+    real(DP),dimension(:),intent(in) :: Ms, V, mx, my, mz, hjx, hjy, hjz, hhx, hhy, hhz
+    real(SP),dimension(:),intent(in) :: hmx, hmy, hmz
+    real(DP),intent(out) :: e1, e2, e3
+    real(DP),dimension(:,:),allocatable :: part
+    integer :: i, n, c, lo, hi
+    real(DP) :: w
+    n = size(mx)
+    allocate( part(3,cellBlocks(n)) )
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(c, lo, hi) private(i, w)
+        part(:,c) = 0.0_DP
+        do i = lo, hi
+            w = mu0 * Ms(i) * V(i)
+            part(1,c) = part(1,c) + w * ( mx(i) * hjx(i) + my(i) * hjy(i) + mz(i) * hjz(i) )
+            part(2,c) = part(2,c) + w * ( mx(i) * hhx(i) + my(i) * hhy(i) + mz(i) * hhz(i) )
+            part(3,c) = part(3,c) + w * ( mx(i) * real(hmx(i),DP) + my(i) * real(hmy(i),DP) + mz(i) * real(hmz(i),DP) )
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    e1 = sum( part(1,:) )
+    e2 = sum( part(2,:) )
+    e3 = sum( part(3,:) )
+    deallocate( part )
+    end subroutine fieldEnergySums
+
+    !> The uniaxial anisotropy energy sum_i V_i K0_i (1 - (u_i . m_i)^2)
+    function uniaxialEnergySum( V, K0, u, mx, my, mz ) result( e4 )
+    real(DP),dimension(:),intent(in) :: V, K0, mx, my, mz
+    real(DP),dimension(:,:),intent(in) :: u
+    real(DP) :: e4, mdotu
+    real(DP),dimension(:),allocatable :: part
+    integer :: i, n, c, lo, hi
+    n = size(mx)
+    allocate( part(cellBlocks(n)) )
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(c, lo, hi) private(i, mdotu)
+        part(c) = 0.0_DP
+        do i = lo, hi
+            mdotu = u(i,1) * mx(i) + u(i,2) * my(i) + u(i,3) * mz(i)
+            part(c) = part(c) + V(i) * K0(i) * ( 1.0_DP - mdotu**2 )
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    e4 = sum( part )
+    deallocate( part )
+    end function uniaxialEnergySum
+
+    !> Uniaxial anisotropy field H_k = 2 Kfact A m, A the symmetric 3x3 matrix u u^T of every cell
+    subroutine uniaxialAnisotropyField( Kf, Axx, Axy, Axz, Ayy, Ayz, Azz, mx, my, mz, hx, hy, hz )
+    real(DP),dimension(:),intent(in) :: Kf, Axx, Axy, Axz, Ayy, Ayz, Azz, mx, my, mz
+    real(DP),dimension(:),intent(inout) :: hx, hy, hz
+    integer :: i, n, c, lo, hi
+    n = size(mx)
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i)
+        do i = lo, hi
+            hx(i) = 2. * Kf(i) * ( Axx(i) * mx(i) + Axy(i) * my(i) + Axz(i) * mz(i) )
+            hy(i) = 2. * Kf(i) * ( Axy(i) * mx(i) + Ayy(i) * my(i) + Ayz(i) * mz(i) )
+            hz(i) = 2. * Kf(i) * ( Axz(i) * mx(i) + Ayz(i) * my(i) + Azz(i) * mz(i) )
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine uniaxialAnisotropyField
+
+    !> General anisotropy field from the expansion in the local crystal frame (see updateAnisotropy):
+    !> m is rotated into the frame of cell i, the field evaluated there and rotated back
+    subroutine generalAnisotropyField( CA, Kf, mx, my, mz, hx, hy, hz )
+    real(DP),dimension(:,:,:),intent(in) :: CA, Kf
+    real(DP),dimension(:),intent(in) :: mx, my, mz
+    real(DP),dimension(:),intent(inout) :: hx, hy, hz
+    real(DP) :: x, y, z, x2, y2, z2, hxr, hyr, hzr
+    integer :: i, n, c, lo, hi
+    n = size(mx)
+    do c = 1, cellBlocks(n)
+        lo = (c-1) * par_grain + 1
+        hi = min( c * par_grain, n )
+        !$omp task default(shared) firstprivate(lo, hi) private(i, x, y, z, x2, y2, z2, hxr, hyr, hzr)
+        do i = lo, hi
+            x = CA(i,1,1)*mx(i) + CA(i,1,2)*my(i) + CA(i,1,3)*mz(i)
+            y = CA(i,2,1)*mx(i) + CA(i,2,2)*my(i) + CA(i,2,3)*mz(i)
+            z = CA(i,3,1)*mx(i) + CA(i,3,2)*my(i) + CA(i,3,3)*mz(i)
+            x2 = x**2
+            y2 = y**2
+            z2 = z**2
+            hxr = -2*x*( Kf(i,1,1) + 2*Kf(i,2,1)*x2 + Kf(i,3,3)*y2 + Kf(i,3,2)*z2 + 3*Kf(i,4,1)*x2**2 + Kf(i,5,2)*y2**2 &
+                       + Kf(i,5,3)*z2**2 + 2*Kf(i,5,1)*x2*y2 + 2*Kf(i,5,1)*x2*z2 + Kf(i,6,1)*y2*z2 )
+            hyr = -2*y*( Kf(i,1,2) + 2*Kf(i,2,2)*y2 + Kf(i,3,3)*x2 + Kf(i,3,1)*z2 + 3*Kf(i,4,2)*y2**2 + Kf(i,5,1)*x2**2 &
+                       + Kf(i,5,3)*z2**2 + 2*Kf(i,5,2)*x2*y2 + 2*Kf(i,5,2)*y2*z2 + Kf(i,6,1)*x2*z2 )
+            hzr = -2*z*( Kf(i,1,3) + 2*Kf(i,2,3)*z2 + Kf(i,3,2)*x2 + Kf(i,3,1)*y2 + 3*Kf(i,4,3)*z2**2 + Kf(i,5,1)*x2**2 &
+                       + Kf(i,5,2)*y2**2 + 2*Kf(i,5,3)*x2*z2 + 2*Kf(i,5,3)*y2*z2 + Kf(i,6,1)*x2*y2 )
+            hx(i) = - CA(i,1,1)*hxr - CA(i,2,1)*hyr - CA(i,3,1)*hzr
+            hy(i) = - CA(i,1,2)*hxr - CA(i,2,2)*hyr - CA(i,3,2)*hzr
+            hz(i) = - CA(i,1,3)*hxr - CA(i,2,3)*hyr - CA(i,3,3)*hzr
+        end do
+        !$omp end task
+    end do
+    !$omp taskwait
+    end subroutine generalAnisotropyField
+
+    !> Number of blocks of par_grain cells that n cells are split into
+    pure integer function cellBlocks( n )
+    integer,intent(in) :: n
+    cellBlocks = max( 1, (n + par_grain - 1) / par_grain )
+    end function cellBlocks
+
+    !>-----------------------------------------
+    !> @brief
+    !> Moves the exchange operator to the GPU in a CUDA run, so that updateExchangeTerms computes
+    !> the exchange field there (in FP64, as on the CPU) instead of with three sequential MKL
+    !> products. The CPU stays in use when MagTense is built without CUDA, when useCuda is off,
+    !> when MAGTENSE_EXCHANGE_GPU=0 and when the upload fails.
+    !> @param[in] problem, the struct containing the current problem, with A_exch and Jfact set
+    !>-----------------------------------------
+    subroutine initExchangeGpu( problem )
+    type(MicroMagProblem),intent(in) :: problem
+    integer :: status, nnz
+    character(len=100) :: prog_str
+
+    gb_exch_gpu = .false.
+#if USE_CUDA
+    if ( problem%useCuda .ne. useCudaTrue ) return
+    call cudaExchangeInit( problem%A_exch, 2.0_DP * problem%Jfact, status, nnz )
+    gb_exch_gpu = ( status .eq. 0 )
+    select case ( status )
+    case ( 0 )
+        write(prog_str,'(A,I0,A,F6.2,A)') 'Exchange field on the GPU (', nnz, ' non-zeros, ', &
+            real(nnz,DP) / size(problem%Jfact), ' per row)'
+        call displayGUIMessage( trim(prog_str) )
+    case ( 1 )
+        call displayGUIMessage( 'Exchange field on the CPU (MAGTENSE_EXCHANGE_GPU=0)' )
+    case default
+        write(prog_str,'(A,I3,A)') 'Exchange field on the CPU (GPU initialization failed, status ', status, ')'
+        call displayGUIMessage( trim(prog_str) )
+    end select
+#endif
+    end subroutine initExchangeGpu
 
     
     !>-----------------------------------------
@@ -1502,8 +2026,7 @@
     
     !real :: prefact                                    !> Multiplicative scalar factor
     type(MATRIX_DESCR) :: descr                         !>descriptor for the sparse matrix-vector multiplication
-    real(DP),dimension(:),allocatable   :: Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot
-    integer, save :: itimer = 0, itimer1 = 0, itimer2 = 0
+    integer, save :: itimer = 0, itimer2 = 0
 
     call trace%begin( "updateAnisotropy", itimer=itimer, verbose=1 )
     
@@ -1542,31 +2065,17 @@
     !                      [0 0 0]
     !                      [Kfact2 0 0]
     
+    !Both branches loop over blocks of cells as child tasks of the task computeHeff runs this in
+    !(see splitState)
     if (any(problem%K0 .ne. 0)) then
-        solution%Hkx = 2. * problem%Kfact * ( problem%Axx * solution%Mx + problem%Axy * solution%My + problem%Axz * solution%Mz )
-        solution%Hky = 2. * problem%Kfact * ( problem%Axy * solution%Mx + problem%Ayy * solution%My + problem%Ayz * solution%Mz )
-        solution%Hkz = 2. * problem%Kfact * ( problem%Axz * solution%Mx + problem%Ayz * solution%My + problem%Azz * solution%Mz )
-    else 
-        call trace%begin( "updateAnisotropy_alloc", itimer=itimer1, verbose=2 )
-        allocate(Mx_rot(size(solution%Mx)), My_rot(size(solution%My)), Mz_rot(size(solution%Mz)))
-        allocate(Hkx_rot(size(Mx_rot)), Hky_rot(size(My_rot)), Hkz_rot(size(Mz_rot)))
-        call trace%end( "updateAnisotropy_alloc", itimer=itimer1, verbose=2 )
+        call uniaxialAnisotropyField( problem%Kfact, problem%Axx, problem%Axy, problem%Axz, problem%Ayy, problem%Ayz, &
+            problem%Azz, solution%Mx, solution%My, solution%Mz, solution%Hkx, solution%Hky, solution%Hkz )
+    else
         call trace%begin( "updateAnisotropy_calc", itimer=itimer2, verbose=2 )
-        Mx_rot = problem%CrystalAxis(:,1,1)*solution%Mx(:) + problem%CrystalAxis(:,1,2)*solution%My(:) + problem%CrystalAxis(:,1,3)*solution%Mz(:)
-        My_rot = problem%CrystalAxis(:,2,1)*solution%Mx(:) + problem%CrystalAxis(:,2,2)*solution%My(:) + problem%CrystalAxis(:,2,3)*solution%Mz(:)
-        Mz_rot = problem%CrystalAxis(:,3,1)*solution%Mx(:) + problem%CrystalAxis(:,3,2)*solution%My(:) + problem%CrystalAxis(:,3,3)*solution%Mz(:)
-        
-        Hkx_rot = -2*Mx_rot(:)*(problem%Kfact_arr(:,1,1) + 2*problem%Kfact_arr(:,2,1)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,3)*My_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,1)*Mx_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*My_rot(:)**2*Mz_rot(:)**2 )
-        Hky_rot = -2*My_rot(:)*(problem%Kfact_arr(:,1,2) + 2*problem%Kfact_arr(:,2,2)*My_rot(:)**2 + problem%Kfact_arr(:,3,3)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*Mz_rot(:)**2 + 3*problem%Kfact_arr(:,4,2)*My_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,3)*Mz_rot(:)**4 + 2*problem%Kfact_arr(:,5,2)*Mx_rot(:)**2*My_rot(:)**2 + 2*problem%Kfact_arr(:,5,2)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*Mz_rot(:)**2 )
-        Hkz_rot = -2*Mz_rot(:)*(problem%Kfact_arr(:,1,3) + 2*problem%Kfact_arr(:,2,3)*Mz_rot(:)**2 + problem%Kfact_arr(:,3,2)*Mx_rot(:)**2 + problem%Kfact_arr(:,3,1)*My_rot(:)**2 + 3*problem%Kfact_arr(:,4,3)*Mz_rot(:)**4 + problem%Kfact_arr(:,5,1)*Mx_rot(:)**4 + problem%Kfact_arr(:,5,2)*My_rot(:)**4 + 2*problem%Kfact_arr(:,5,3)*Mx_rot(:)**2*Mz_rot(:)**2 + 2*problem%Kfact_arr(:,5,3)*My_rot(:)**2*Mz_rot(:)**2 + problem%Kfact_arr(:,6,1)*Mx_rot(:)**2*My_rot(:)**2 )
+        call generalAnisotropyField( problem%CrystalAxis, problem%Kfact_arr, solution%Mx, solution%My, solution%Mz, &
+            solution%Hkx, solution%Hky, solution%Hkz )
         call trace%end( "updateAnisotropy_calc", itimer=itimer2, verbose=2 )
-
-        solution%Hkx(:) = - problem%CrystalAxis(:,1,1)*Hkx_rot(:) - problem%CrystalAxis(:,2,1)*Hky_rot(:) - problem%CrystalAxis(:,3,1)*Hkz_rot(:)
-        solution%Hky(:) = - problem%CrystalAxis(:,1,2)*Hkx_rot(:) - problem%CrystalAxis(:,2,2)*Hky_rot(:) - problem%CrystalAxis(:,3,2)*Hkz_rot(:)
-        solution%Hkz(:) = - problem%CrystalAxis(:,1,3)*Hkx_rot(:) - problem%CrystalAxis(:,2,3)*Hky_rot(:) - problem%CrystalAxis(:,3,3)*Hkz_rot(:)
-        
-        deallocate(Mx_rot, My_rot, Mz_rot, Hkx_rot, Hky_rot, Hkz_rot)
-    end if 
+    end if
     call trace%end( "updateAnisotropy", itimer=itimer, verbose=1 )
 
     end subroutine updateAnisotropy    
@@ -1665,176 +2174,44 @@
     end subroutine updateThermal_wrapper
 
 
-subroutine updateDemagfieldFMM(problem, solution)
-  implicit none
-  !------------------ Arguments ------------------
-  type(MicroMagProblem),  intent(inout) :: problem
+#if USE_CDFMM
+subroutine updateDemagfieldDipFmm(problem, solution)
+  type(MicroMagProblem), intent(inout) :: problem
   type(MicroMagSolution), intent(inout) :: solution
+  integer :: ierr
+  character(len=512) :: message
+  integer, save :: itimer = 0
 
-#if USE_FMM3D
-  !------------------ Timing ---------------------
-  !------------------ Locals ---------------------
-  integer :: ntot, i
-  real(DP) :: fourpi
-  integer :: nd, ier
-  double precision , contiguous, pointer :: source(:,:), dipvec(:,:,:)
-  double precision , contiguous, pointer :: grad(:,:,:)
-  double precision :: vol_i
-  double precision :: mx, my, mz
-  double precision :: eps_fmm
+  call trace%begin( "updateDemagfieldDipFmm", itimer=itimer, verbose=1 )
 
-  class(FMM3DTree), pointer :: fmm_tree
-  logical :: built_tree
-  integer, save :: itimer = 0, itimer_wait = 0 
-  !------------------------------------------------
-    
-  if ( problem%useDemag .eq. useDemagFalse ) then
-        solution%HmX(:) = 0.
-        solution%HmY(:) = 0.
-        solution%HmZ(:) = 0.
-        return
-  endif
-  
-  call trace%begin( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
-
-  fourpi  = 12.566370614359172D0
-  ntot = size(problem%grid%pts, dim=1)
-  ier = 0
-
-  !----------- cast Mx,My,Mz to single precision -----------
-  solution%Mx_s = real(solution%Mx, SP)
-  solution%My_s = real(solution%My, SP)
-  solution%Mz_s = real(solution%Mz, SP)
-  !--------------------------------------------------------------
-
-
-  !-------------- reset field ---------------------------------------------
-solution%HmX = 0.0_SP
-solution%HmY = 0.0_SP
-solution%HmZ = 0.0_SP
-  !-------------------------------------------------------------------------
-
-    !------------- add correction from neighbouring tiles ---------------------
-    !$omp task untied default(shared)
-    call add_near_field(problem, solution)
-    !$omp end task
-    !-------------------------------------------------------------------------
-
-
-  !------------------ Allocate FMM work arrays ------------------
-    built_tree = .false.
-    if (.not. associated(solution%fmm_tree)) then
-        allocate(solution%fmm_tree)
-        built_tree = .true.
-        allocate(source(3, ntot))
-    end if
-    fmm_tree => solution%fmm_tree
-
-  allocate(dipvec(1, 3, ntot))
-  allocate(grad(1, 3, ntot))
-  grad(:,:,:) = 0.0_DP 
-  !------------------------------------------------------------
-  !------------------ Pack sources and dipoles ------------------
-    if (built_tree) then
-        do i = 1, ntot
-            !------------------ positions -> FMM (3, N) ------------------
-            source(1,i) = real(problem%grid%pts(i,1), DP)
-            source(2,i) = real(problem%grid%pts(i,2), DP)
-            source(3,i) = real(problem%grid%pts(i,3), DP)
-            !------------------------------------------------------------
-        end do
-    end if
-  do i = 1, ntot
-    !------------- get cell volume ------------------------------
-    ! TODO - implement non-uniform and non-cubic grids here
-    if (problem%grid%gridType /= gridTypeUniform) then
-      vol_i = real(problem%grid%abc(i,1), DP) * &
-              real(problem%grid%abc(i,2), DP) * &
-              real(problem%grid%abc(i,3), DP)
-    else
-    vol_i = real(problem%grid%dx, DP) * &
-            real(problem%grid%dy, DP) * &
-            real(problem%grid%dz, DP)
-    end if
-    !------------------------------------------------------------
-    !--------- conert to dipole moment m = M * ΔV --------------
-    mx = solution%Mx(i) * vol_i * problem%Ms(i)
-    my = solution%My(i) * vol_i * problem%Ms(i)
-    mz = solution%Mz(i) * vol_i * problem%Ms(i)
-    !------------------------------------------------------------
-    !-------------- pack dipole vector ---------------------------
-    dipvec(1,1,i) = mx 
-    dipvec(1,2,i) = my
-    dipvec(1,3,i) = mz
-    !------------------------------------------------------------ 
-  end do
-    !--------------------------------------------------------------
-   !------------------ Call FMM (sources->sources) ------------------
-   nd = 1
-   fmm_tree%nterms_in = problem%fmm_nterms
-   !Only build on the call that allocated the source array. build_tree returns immediately once
-   !is_built is set, but reaching it on a later call meant passing a local pointer whose
-   !association status is undefined, since source is only allocated in the branch above.
-   if (built_tree) then
-       call fmm_tree%build_tree( source, problem%fmm_eps, problem%fmm_cells_per_node , ier, problem%ifunif, problem%nlmin, problem%nlmax)
-   end if
-   !------- only run if number of boxes > 9 -----------
-   !--- NOTE - if nboxes <= 9 then we have all-to-all and the is no need for FMM ---
-   if (fmm_tree%nboxes > 9) then
-       call fmm_tree%make_and_eval(dipvec, grad)
-   end if
-   !--------------------------------------------------
-
-  if (ier /= 0) then
-    write(*,*) 'FMM3D returned error code in updateDemagfieldFMM: ier =', ier
-    stop " FMM3D error"
+  call evaluateDipFmm(problem, solution, ierr, message)
+  if (ierr /= 0) then
+      ! Evaluation errors are rare and normally indicate a lost CUDA context.
+      ! Preserve the Python process and complete the solve with the established
+      ! CPU demag implementation instead of invoking STOP/ERROR STOP.
+      !$omp taskwait
+      call displayGUIMessage('dip-fmm evaluation failed: '//trim(message))
+      call displayGUIMessage('Falling back to the regular CPU demag calculation')
+      call destroyDipFmm()
+      problem%use_cdfmm = .false.
+      problem%useCuda = useCudaFalse
+      call ComputeDemagfieldTensor(problem)
+      call updateDemagfield(problem, solution)
+      call trace%end( "updateDemagfieldDipFmm", itimer=itimer, verbose=1 )
+      return
   end if
-  !-----------------------------------------------------------------
-  !------------------ Map grad -> H (and to single) ----------------
-  ! include factor 4pi to match Magtense units
-   if (fmm_tree%nboxes > 9) then 
-      !$omp critical (solution_update)
-        solution%HmX = solution%HmX - real( grad(1,1,:) / fourpi, SP )
-        solution%HmY = solution%HmY - real( grad(1,2,:) / fourpi, SP )
-        solution%HmZ = solution%HmZ - real( grad(1,3,:) / fourpi, SP ) 
-      !$omp end critical (solution_update)
-  end if
-  !-----------------------------------------------------------------
 
-  !------------------- Wait for near-field task to complete ------------------
-  call trace%begin( "updateDemagfieldFMM_taskwait", itimer=itimer_wait, verbose=1 )
-  !$omp taskwait
-  call trace%end( "updateDemagfieldFMM_taskwait", itimer=itimer_wait, verbose=1 )
-  !---------------------------------------------------------------------------
+  call applyShapeCorrection(problem, solution)
 
-  !------------------ Shape correction ----------------------------
-  ! Applied after the taskwait so the near-field contribution is already in HmX/HmY/HmZ, and
-  ! through the same routine the non-FMM path uses so the two demag paths agree.
-  call applyShapeCorrection( problem, solution )
-  !----------------------------------------------------------------
-
-    !------------------ Cleanup -------------------------------------
-  ! The source array is owned by the tree from build_tree onwards - fmm_tree%source points at it
-  ! for as long as the tree lives - so fmm_tree%dealloc releases it. It must not be released here:
-  ! doing so left that component dangling for every later call while keep_tree was set.
-  if (.not. fmm_tree%keep_tree) then
-      call fmm_tree%dealloc()
-      deallocate( fmm_tree )
-      nullify(solution%fmm_tree)
-  end if
-  deallocate(dipvec, grad)
-    !--------------------------------------------------------------
-  !------------------ Optional field noise (CV) --------------------
   if (problem%CV > 0) then
       solution%HmX = solution%HmX + solution%HmX*problem%CV*sqrt(-2d0*log(solution%u1))*cos(2d0*pi*solution%u2)
       solution%HmY = solution%HmY + solution%HmY*problem%CV*sqrt(-2d0*log(solution%u3))*cos(2d0*pi*solution%u4)
       solution%HmZ = solution%HmZ + solution%HmZ*problem%CV*sqrt(-2d0*log(solution%u5))*cos(2d0*pi*solution%u6)
   end if
-    call trace%end( "updateDemagfieldFMM", itimer=itimer, verbose=1 )
+
+  call trace%end( "updateDemagfieldDipFmm", itimer=itimer, verbose=1 )
+end subroutine updateDemagfieldDipFmm
 #endif
-
-end subroutine updateDemagfieldFMM
-
 
 
     !>-----------------------------------------
@@ -2055,9 +2432,8 @@ end subroutine updateDemagfieldFMM
     !> @author Frederik L. Durhuus, fladu@dtu.dk, DTU, 2025
     !> @brief
     !> Adds the macrogeometry/sample shape correction onto the demagnetisation field.
-    !> Factored out of updateDemagfield so that the FMM demag path applies exactly the same
-    !> correction - it previously had no equivalent block, so setting use_fmm silently discarded
-    !> macroShape and sampleShape while still accepting them as inputs.
+    !> Factored out of updateDemagfield so that the dip-fmm demag path applies exactly the same
+    !> correction.
     !> @param[in] problem, the struct containing the problem
     !> @param[inout] solution, struct containing the current solution
     !>-----------------------------------------
@@ -2096,6 +2472,10 @@ end subroutine updateDemagfieldFMM
     type(MicroMagSolution),intent(inout) :: solution        !> Solution data structure
 
     integer, save :: itimer = 0
+#if USE_CDFMM
+    integer :: cdfmm_ierr
+    character(len=512) :: cdfmm_message
+#endif
     call trace%begin( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     
     if ( problem%useDemag .eq. useDemagTrue ) then
@@ -2103,20 +2483,26 @@ end subroutine updateDemagfieldFMM
         call checkMacrogeometrySpacing( problem )
 
         !Demagnetization tensor matrix
-#if USE_FMM3D
-        !------------- build neighbour demag tensor -------------------------------------------------------------------
-        if (problem%use_fmm) then
-            call BuildNeighbourDemagTensor( problem )
-        end if
-        
-        !---------- if BuildNeighbourDemagTensor sets use_fmm to false then compute the demag tensor normally -----
-        if (.not. problem%use_fmm) then
-           call ComputeDemagfieldTensor( problem )
-        end if
-            !-----------------------------------------------------------------------------------------------------------
-        !---------------------------------------------------------------------------------------------------------------
-#else
+#if USE_CDFMM
+        if (problem%use_cdfmm) then
+            call initialiseDipFmm(problem, cdfmm_ierr, cdfmm_message)
+            if (cdfmm_ierr /= 0) then
+                call displayGUIMessage('dip-fmm plan creation failed: '//trim(cdfmm_message))
+                ! The dense tensor holds 6 x ntot^2 entries: a fallback for a large mesh
+                ! would exhaust the memory instead of reporting the dip-fmm error.
+                if (size(problem%grid%pts, dim=1) > 50000) then
+                    !abortMagTense rather than error stop: in a MEX an error stop ends MATLAB itself
+                    call abortMagTense( 'dip-fmm plan creation failed and the mesh is too large for the dense demag fallback' )
+                end if
+                call displayGUIMessage('Falling back to the regular demag calculation')
+                problem%use_cdfmm = .false.
+                call ComputeDemagfieldTensor(problem)
+            end if
+        else
+#endif
         call ComputeDemagfieldTensor( problem )
+#if USE_CDFMM
+        endif
 #endif
     endif
     
@@ -2129,8 +2515,9 @@ end subroutine updateDemagfieldFMM
     
     !Exhange term matrix
     call ComputeExchangeTerm3D( problem%grid, problem%A_exch, problem, solution )
-    
-    
+    call initExchangeGpu( problem )
+
+
     call trace%end( "initializeInteractionMatrices", itimer=itimer, verbose=1 )
     end subroutine initializeInteractionMatrices
 
@@ -2268,6 +2655,13 @@ end subroutine updateDemagfieldFMM
     real(DP), dimension(:,:),allocatable :: obs_size_arr          !> Array containing the size of the observation tile for the average prism demag tensor
     real(DP),dimension(:,:,:,:),allocatable :: Nout,Noutave       !> Temporary storage for the demag tensor            
     integer,dimension(4) :: indx_ele
+    integer,dimension(4) :: indx_ele_tgt                          !> Node indices of the receiving tetrahedron
+    real(DP),dimension(3,4) :: vert_src, vert_tgt                 !> Vertices of the source and receiving tetrahedron
+    real(DP),dimension(3,3) :: N_tet                              !> Exact tetrahedron-tetrahedron averaged demag tensor
+    integer :: ierr_tet                                           !> Status of the exact tetrahedron-tetrahedron tensor
+    integer :: n_tet_pair_err                                     !> Number of element pairs the exact tensor could not evaluate
+    real(8) :: tet_stats_t0                                       !> Assembly start (tet-pair-stats measurement)
+    character(200) :: tet_err_str
     real :: rate
     !integer :: c1,c2,cr,cm
     character(10) :: prog_str
@@ -2405,61 +2799,120 @@ end subroutine updateDemagfieldFMM
             
             deallocate(obs_size_arr)
         elseif ( problem%grid%gridType .eq. gridTypeTetrahedron ) then
-        
-            if (nx_ave*ny_ave*nz_ave > 1) then
-                call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
+
+            if ( problem%useAvgN .eq. useAvgNTrue ) then
+
+                !Exact, analytically averaged tetrahedron-source to
+                !tetrahedron-target demagnetization tensor. Both the source and
+                !the receiving cell are finite tetrahedra here, so the tensor is
+                !the one that satisfies < H >_{V_t} = N M rather than the field
+                !of the source evaluated at the receiving centroid.
+                !
+                !The average is analytical, so the nx_ave/ny_ave/nz_ave
+                !sub-sampling counts play no role for this grid type.
+                !
+                !This is markedly more expensive than the centroid evaluation
+                !below (sixteen analytical face-pair integrals per element pair
+                !instead of four face solutions per point), which is the price
+                !of the exact average. Setting useAvgN to false selects the
+                !previous centroid behaviour.
+
+                !displayGUIMessage performs Fortran I/O, which must not be called
+                !from inside the parallel region, so failures are counted here
+                !and reported once the loop has finished.
+                n_tet_pair_err = 0
+                call tet_pair_stats_reset()
+                tet_stats_t0 = omp_get_wtime()
+
+                !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, i, j, indx_ele, indx_ele_tgt, vert_src, vert_tgt, N_tet, ierr_tet) REDUCTION(+:n_tet_pair_err)
+                do i=1,nx
+                    indx_ele = problem%grid%elements(:,i)
+                    vert_src = problem%grid%nodes(:,indx_ele)
+
+                    ind = i
+
+                    do j=1,ntot
+                        indx_ele_tgt = problem%grid%elements(:,j)
+                        vert_tgt = problem%grid%nodes(:,indx_ele_tgt)
+
+                        call getN_tensor_tetrahedron_tetrahedron( vert_src, vert_tgt, N_tet, ierr_tet )
+
+                        if ( ierr_tet .ne. tetPairOk ) then
+                            n_tet_pair_err = n_tet_pair_err + 1
+                        endif
+
+                        problem%Kxx(j,ind) = sngl(N_tet(1,1))
+                        problem%Kxy(j,ind) = sngl(N_tet(1,2))
+                        problem%Kxz(j,ind) = sngl(N_tet(1,3))
+
+                        !Not stored due to symmetry  (Kxy = Kyx)
+                        problem%Kyy(j,ind) = sngl(N_tet(2,2))
+                        problem%Kyz(j,ind) = sngl(N_tet(2,3))
+
+                        !Not stored due to symmetry (Kxz = Kzx, Kyz = Kzy)
+                        problem%Kzz(j,ind) = sngl(N_tet(3,3))
+                    enddo
+                enddo
+                !$OMP END PARALLEL DO
+                call tet_pair_stats_report( omp_get_wtime() - tet_stats_t0 )
+
+                if ( n_tet_pair_err .gt. 0 ) then
+                    write(tet_err_str,'(A,I0,A)') 'Exact tetrahedron-tetrahedron demag tensor failed for ', &
+                        n_tet_pair_err, ' element pairs - check the mesh for degenerate elements'
+                    call displayGUIMessage( trim(tet_err_str) )
+                endif
+
+            else
+
+                if (nx_ave*ny_ave*nz_ave > 1) then
+                    call displayGUIMessage( 'Averaging the N_tensor not supported for this tile type' )
+                endif
+
+                !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, indx_ele, tile, H, Nout, pts_arr, i)
+
+                !for each tile find the tensor for all evaluation points (i.e. all tiles)
+                do i=1,nx
+                    !Setup template tile
+                    tile(1)%tileType = 5 !(for tetrahedron)
+                    tile(1)%exploitSymmetry = 0 !0 for no and this is important
+                    tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
+                    tile(1)%M(:) = 0.
+
+                    indx_ele = problem%grid%elements(:,i)
+                    tile(1)%vert(:,:) = problem%grid%nodes(:,indx_ele)
+
+                    allocate(Nout(1,ntot,3,3))
+                    allocate(H(ntot,3))
+
+                    call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
+
+                    !Copy Nout into the proper structure used by the micro mag model
+                    ind = i
+
+                    problem%Kxx(:,ind) = sngl(Nout(1,:,1,1))
+                    problem%Kxy(:,ind) = sngl(Nout(1,:,1,2))
+                    problem%Kxz(:,ind) = sngl(Nout(1,:,1,3))
+
+                    !Not stored due to symmetry  (Kxy = Kyx)
+                    !Kyx(ind,:) = Nout(1,:,2,1)
+                    problem%Kyy(:,ind) = sngl(Nout(1,:,2,2))
+                    problem%Kyz(:,ind) = sngl(Nout(1,:,2,3))
+
+                    !Not stored due to symmetry (Kxz = Kzx)
+                    !Kzx(ind,:) = Nout(1,:,3,1)
+                    !Not stored due to symmetry (Kyz = Kzy)
+                    !Kzy(ind,:) = Nout(1,:,3,2)
+                    problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
+
+                    !Clean up
+                    deallocate(Nout)
+                    deallocate(H)
+                end do
+
+                !$OMP END PARALLEL DO
+
             endif
-    
-            !$OMP PARALLEL DO SHARED(problem) PRIVATE(ind, indx_ele, tile, H, Nout, pts_arr, i)
-                        
-            !for each tile find the tensor for all evaluation points (i.e. all tiles)
-            do i=1,nx
-                !Setup template tile
-                tile(1)%tileType = 5 !(for tetrahedron)
-                tile(1)%exploitSymmetry = 0 !0 for no and this is important
-                tile(1)%rotAngles(:) = 0. !ensure that these are indeed zero
-                tile(1)%M(:) = 0.
-            
-                indx_ele = problem%grid%elements(:,i)
-                tile(1)%vert(:,:) = problem%grid%nodes(:,indx_ele)   
-                
-                allocate(Nout(1,ntot,3,3))
-                allocate(H(ntot,3))
-                
-                !allocate(pts_arr(ntot,3))
-                !pts_arr(:,1) =  problem%grid%pts(:,1)
-                !pts_arr(:,2) =  problem%grid%pts(:,2)
-                !pts_arr(:,3) =  problem%grid%pts(:,3)
-                
-                call getFieldFromTiles( tile, H, problem%grid%pts, 1, ntot, Nout, .false. )
-                !call getFieldFromTiles( tile, H, pts_arr, 1, ntot, Nout, .false. )
-                    
-                !Copy Nout into the proper structure used by the micro mag model
-                ind = i
-                    
-                problem%Kxx(:,ind) = sngl(Nout(1,:,1,1))
-                problem%Kxy(:,ind) = sngl(Nout(1,:,1,2))
-                problem%Kxz(:,ind) = sngl(Nout(1,:,1,3))
-                    
-                !Not stored due to symmetry  (Kxy = Kyx)
-                !Kyx(ind,:) = Nout(1,:,2,1)
-                problem%Kyy(:,ind) = sngl(Nout(1,:,2,2))
-                problem%Kyz(:,ind) = sngl(Nout(1,:,2,3))
-                    
-                !Not stored due to symmetry (Kxz = Kzx)
-                !Kzx(ind,:) = Nout(1,:,3,1)
-                !Not stored due to symmetry (Kyz = Kzy)
-                !Kzy(ind,:) = Nout(1,:,3,2)
-                problem%Kzz(:,ind) = sngl(Nout(1,:,3,3))
-                
-                !Clean up
-                !deallocate(pts_arr)
-                deallocate(Nout)
-                deallocate(H)
-            end do
-            
-            !$OMP END PARALLEL DO
-            
+
         elseif ( problem%grid%gridType .eq. gridTypeUnstructuredPrisms ) then
             !call displayGUIMessage( 'Constructing the Tensormap' )
             !call ConstructDemagTensorMap( problem )
@@ -2719,780 +3172,6 @@ end subroutine updateDemagfieldFMM
     deallocate(Nshape)
 
     end subroutine ComputeShapeCorrectionTensor
-    
-    !>-----------------------------------------
-    !> @author Kaspar K. Nielsen, kasparkn@gmail.com, DTU, 2019
-    !> @brief
-    !> Calculates the exhange term matrix
-    !> which means it produces the differential operator d^2/dx^2 + d^2/dy^2 + d^2/dz^2 and returns this in the sparse matrix A
-    !---------------------------------------------------------------------------   
-    subroutine ComputeExchangeTerm3D( grid, A, problem, solution )
-    type(MicroMagGrid),intent(in) :: grid               !> Struct containing the grid information    
-    type(sparse_matrix_t),intent(inout) :: A            !> The returned matrix from the sparse matrix creator
-    type(MicroMagProblem),intent(inout) :: problem      !> Problem data structure    
-    type(MicroMagSolution),intent(inout) :: solution    !> Solution data structure
-    real(DP),dimension(:),allocatable :: A0_normalized  !> Normalized A0 for uneven anisotropy
-    real(DP),dimension(:,:),allocatable :: A_int_normalized  !> Interface exchange, same scaling
-    integer,dimension(:),allocatable :: phase_local     !> Material index of each tile
-        
-
-    if ( problem%passExch .eq. passExchTrue) return ! Skip this if the exchange has already been passed from outside
-
-    !With A0 = 0 in every tile there is no exchange at all, and the operator is identically zero.
-    !It has to be caught here: the normalisation below is then 0/0, which is NaN inside the
-    !python and MATLAB extensions (where /fpe:0 does not trap), and on an unstructured mesh the
-    !NaN zeroes every interpolation weight, all sparse matrices come out empty and the solver
-    !segfaults. The uniform grid survived only because it never reads A0_normalized.
-    if ( .not. any( problem%A0 .gt. 0.0_DP ) ) then
-        call displayGUIMessage( 'No exchange terms (A0 = 0 in every tile)' )
-        call ComputeZeroExchangeOperator( grid%nx * grid%ny * grid%nz, A )
-        call create_COO_values_from_CSR( A, solution%gridinfo )
-        problem%useExchange = .false.
-        return
-    endif
-
-    allocate( A0_normalized(size(problem%A0)) )
-    A0_normalized = problem%A0 / ( maxval(problem%A0) )   ! Normalized by the largest exchange factor
-
-    !The interface values have to be scaled exactly as A0 is, since they replace a harmonic
-    !mean of the scaled values. The negative entries are sentinels meaning 'use the harmonic
-    !mean' and are passed through untouched so that they stay recognisable after scaling.
-    if ( allocated(problem%A_int) ) then
-        allocate( A_int_normalized(size(problem%A_int,1),size(problem%A_int,2)) )
-        where ( problem%A_int .ge. 0.0_DP )
-            A_int_normalized = problem%A_int / ( maxval(problem%A0) )
-        elsewhere
-            A_int_normalized = -1.0_DP
-        end where
-    else
-        allocate( A_int_normalized(1,1) )
-        A_int_normalized = -1.0_DP
-    endif
-
-    if ( allocated(problem%phase_id) ) then
-        allocate( phase_local(size(problem%phase_id)) )
-        phase_local = problem%phase_id
-    else
-        allocate( phase_local(size(problem%A0)) )
-        phase_local = 1
-    endif
-        
-    if ( grid%gridType .eq. gridTypeUniform ) then
-        call ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
-    elseif (( grid%gridType .eq. gridTypeTetrahedron ) .or. (grid%gridType .eq. gridTypeUnstructuredPrisms)) then
-    
-         if ( problem%macrogrid%exchPBC(1) .or. problem%macrogrid%exchPBC(2) .or. problem%macrogrid%exchPBC(3) ) then
-            !The tiles at the two ends of each periodic direction have been linked together in the mesh
-            !analysis, i.e. they share a face and enter each others interpolation stencils, so the
-            !exchange operator below is computed in exactly the same way as without periodic boundaries.
-            !Both mesh analyses do this, the prisms geometrically and the tetrahedra by identifying the
-            !nodes on the two boundary planes. An exchange matrix passed from the outside carries its
-            !own boundary conditions and has already returned above.
-            call displayGUIMessage( 'Using periodic exchange boundary conditions' )
-        endif
-        call computeDifferentialOperatorsFromMesh_DirectLap(solution%gridinfo, problem%exch_interpn, problem%exch_weight, problem%exch_method, A0_normalized, phase_local, A_int_normalized, problem%A_exch)
-    endif
-
-    
-    end subroutine ComputeExchangeTerm3D
-    
-        
-    !>-----------------------------------------
-    !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2026
-    !> @brief
-    !> Calculates the exhange term matrix on a uniform grid
-    !> which means it produces the differential operator d^2/dx^2 + d^2/dy^2 + d^2/dz^2 and returns this in the sparse matrix A
-    !> Includes position dependent exchange stiffness A0 through the modified stencil described in 
-    !> Heistracher et al. "Proposal for a micromagnetic standard problem: Domain wall pinning at phase boundaries", DOI: 10.1016/j.jmmm.2021.168875
-    !---------------------------------------------------------------------------   
-    subroutine ComputeExchangeTerm3D_Uniform( grid, A, problem, solution )
-    type(MicroMagGrid),intent(in) :: grid              !> Struct containing the grid information    
-    type(sparse_matrix_t),intent(inout) :: A           !> The returned matrix from the sparse matrix creator
-    type(MicroMagProblem),intent(inout) :: problem     !> Problem data structure
-    type(MicroMagSolution),intent(inout) :: solution   !> Solution data structure
-        
-    integer :: stat                                    !> Status value for the various sparse matrix operations        
-    type(MagTenseSparse_d) :: d2dx2, d2dy2, d2dz2      !> Sparse matrices for the double derivatives with respect to x, y and z, respectively.
-    type(sparse_matrix_t) :: tmp                       !> Temporary sparse matrices used for internal calculations
-    integer :: ind,ntot,nNonZero,colInd,rowInd         !> Internal counter for indexing, the total no. of elements in the current sparse matrix being manipulated
-    integer :: i,j,k,nx,ny,nz                          !> For-loop counters
-    type(matrix_descr) :: descr                        !> Describes a sparse matrix operation
-    real(DP) :: const
-    character*(100) :: prog_str 
-    integer, save :: itimer = 0
-    logical :: PBCx, PBCy, PBCz                        !> Whether to have periodic boundary conditions along x, y and z respectively
-    
-    call trace%begin( "ComputeExchangeTerm3D_Uniform", itimer=itimer, verbose=1 )
-    
-    !Find the three sparse matrices for the individual directions. Then add them to get the total matrix
-    !It is assumed that the magnetization vector to operate on is in fact a single column of Mx, My or Mz respectively.
-
-    !The sparse matrices are encoded using an older version of Intels Compressed Sparse Row (CSR) format
-    !cols(i) and values(i) give the column index and value of the i'th non-zero element
-    !rows_start(i) and rows_end(i)-1 give the first and last index corresponding to the i'th row
-    !If rows_start(i) = rows_end(i), the row is empty
-    !For instance the matrix [[1, 0, 2], [0, -1, 0], [0, 0, 0], [-2, 5, 4]] has cols = (1, 3, 2, 1, 2, 3),
-    !values = (1, 2, -1, -2, 5, 4), rows_start = (1, 3, 4, 4) and rows_end = (3, 4, 4, 7)
-    !Note how size(rows_start) and size(rows_end) equal the number of rows, while size(cols) and size(values) equal the number of non-zero elements
-    
-    nx = grid%nx
-    ny = grid%ny
-    nz = grid%nz
-    ntot = nx*ny*nz     ! Total number of micromagnetic tiles
-    PBCx = problem%macrogrid%exchPBC(1)
-    PBCy = problem%macrogrid%exchPBC(2)
-    PBCz = problem%macrogrid%exchPBC(3)
-
-    !A periodic direction needs at least three cells. With exactly two, the wrap-around neighbour
-    !and the ordinary neighbour of a boundary cell are the same cell, so the row would carry two
-    !entries with the same column index, which is not a valid CSR row. The unstructured mesh
-    !analysis already refuses this case; the uniform grid used to build the degenerate matrix
-    !silently. A single cell along a direction is fine - the direction is simply dropped below,
-    !which is the correct periodic answer for one cell.
-    if ( ( PBCx .and. nx .eq. 2 ) .or. ( PBCy .and. ny .eq. 2 ) .or. ( PBCz .and. nz .eq. 2 ) ) then
-        call displayGUIMessage( 'MagTense: periodic exchange requires at least three cells along a periodic direction' )
-        call displayGUIMessage( 'MagTense: with two cells a tile becomes its own neighbour through the periodic image' )
-        call abortMagTense( 'ComputeExchangeTerm3D_Uniform: too few cells along a periodic direction' )
-    endif
-
-
-    !----------------------------------d^2dx^2 begins -----------------------------!
-    if ( nx .gt. 1 ) then
-        ! Make the d^2/dx^2 matrix
-        if ( PBCx ) then
-            nNonZero = 3*ntot             ! For each tile, there are 3 non-zero elements corresponding to itself and the two neighbours along x
-        else
-            nNonZero = 3*ntot - 2*ny*nz   ! With a vacuum boundary, the 2*ny*nz tiles at the two end surfaces only have one neighbour each
-        end if
-        allocate(d2dx2%values(nNonZero),d2dx2%cols(nNonZero),d2dx2%rows_start(ntot),d2dx2%rows_end(ntot))
-    
-        ind = 1
-        rowInd = 1
-        colInd = 1
-    
-        do k=1,nz
-            do j=1,ny
-                ! The left boundary
-                if ( PBCx ) then
-                    ! Entries are emitted in ascending column order: the wrap-around neighbour of
-                    ! the left boundary is the rightmost tile and therefore comes last, not first.
-                    ! MKL's sparse routines take sorted column indices within a row as given.
-
-                    ! Current tile
-                    d2dx2%values(ind) = -( exchCoeff( problem, 1,j,k, nx,j,k ) + exchCoeff( problem, 1,j,k, 2,j,k ) )
-                    d2dx2%cols(ind) = colInd
-                    d2dx2%rows_start(rowInd) = ind
-                    ind = ind + 1
-
-                    ! Coupling to the right
-                    d2dx2%values(ind) = exchCoeff( problem, 1,j,k, 2,j,k )
-                    d2dx2%cols(ind) = colInd + 1
-                    ind = ind + 1
-
-                    ! Coupling to the left (loops around and connects with rightmost tile)
-                    d2dx2%values(ind) = exchCoeff( problem, 1,j,k, nx,j,k )
-                    d2dx2%cols(ind) = colInd + nx - 1
-                    d2dx2%rows_end(rowInd) = ind + 1
-                    rowInd = rowInd + 1
-                    ind = ind + 1
-                else
-                    !The left boundary
-                    const = exchCoeff( problem, 1,j,k, 2,j,k )
-
-                    d2dx2%values(ind) = -const
-                    d2dx2%cols(ind) = colInd
-                    d2dx2%rows_start(rowInd) = ind            
-                    ind = ind + 1
-                
-                    d2dx2%values(ind) = const
-                    d2dx2%cols(ind) = colInd + 1
-                    d2dx2%rows_end(rowInd) = ind+1
-                    rowInd = rowInd + 1
-                    ind = ind + 1
-                end if
-                        
-            
-                !Go through one row at a time
-                do i=2,nx-1
-                            
-                    !Left-most point
-                    d2dx2%values( ind ) = exchCoeff( problem, i,j,k, i-1,j,k )
-                    
-                    d2dx2%cols(ind) = colInd
-                    !update where the row starts
-                    d2dx2%rows_start(rowInd) = ind                           
-                    ind = ind + 1
-                
-                    !Center point
-                    d2dx2%values( ind ) = -( exchCoeff( problem, i,j,k, i-1,j,k ) + exchCoeff( problem, i,j,k, i+1,j,k ) )
-                    d2dx2%cols(ind) = colInd + 1
-                    ind = ind + 1
-                
-                    !Right-most point
-                    d2dx2%values( ind ) = exchCoeff( problem, i,j,k, i+1,j,k )
-                    d2dx2%cols(ind) = colInd + 2
-                    d2dx2%rows_end(rowInd) = ind+1
-                    rowInd = rowInd + 1
-                    ind = ind + 1
-
-                    colInd = colInd + 1
-                enddo            
-
-                ! The right boundary
-                if ( PBCx ) then
-                    ! Ascending column order: here the wrap-around neighbour is the leftmost tile,
-                    ! so it is the smallest column index and comes first.
-
-                    ! Coupling to the right (loops around and connects with leftmost tile)
-                    d2dx2%values(ind) = exchCoeff( problem, nx,j,k, 1,j,k )
-                    d2dx2%cols(ind) = colInd - nx + 2
-                    ! Update where the row starts
-                    d2dx2%rows_start(rowInd) = ind
-                    ind = ind + 1
-
-                    ! Coupling to the left
-                    d2dx2%values(ind) = exchCoeff( problem, nx,j,k, nx-1,j,k )
-                    d2dx2%cols(ind) = colInd
-                    ind = ind + 1
-
-                    ! Current tile
-                    d2dx2%values(ind) = -( exchCoeff( problem, nx,j,k, nx-1,j,k ) + exchCoeff( problem, nx,j,k, 1,j,k ) )
-                    d2dx2%cols(ind) = colInd + 1
-                    d2dx2%rows_end(rowInd) = ind + 1
-                    rowInd = rowInd + 1
-                    ind = ind + 1
-
-                    colInd = colInd + 2
-                else
-                    const = exchCoeff( problem, nx,j,k, nx-1,j,k )
-                    !The right boundary
-                    d2dx2%values(ind) = const 
-                    d2dx2%cols(ind) = colInd
-                    !update where the row starts
-                    d2dx2%rows_start(rowInd) = ind            
-                    ind = ind + 1
-            
-                    d2dx2%values(ind) = -const
-                    d2dx2%cols(ind) = colInd+1
-                    d2dx2%rows_end(rowInd) = ind+1
-                    rowInd = rowInd + 1
-                    ind = ind + 1     
-            
-                    colInd = colInd + 2
-                endif
-            enddo
-        enddo
-    
-        !Multiply by the discretization
-        d2dx2%values = d2dx2%values * 1.0/grid%dx**2
-        
-        ! Create the sparse matrix for the d^2dx^2
-        stat = mkl_sparse_d_create_csr ( d2dx2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dx2%rows_start, d2dx2%rows_end, d2dx2%cols, d2dx2%values)
-    
-    endif
-    
-    !----------------------------------d^2dx^2 ends ---------------------------- -!
-    
-    
-    !----------------------------------d^2dy^2 begins ----------------------------!
-    if ( ny .gt. 1 ) then
-        ! Make the d^2/dy^2 matrix
-        if ( PBCy ) then
-            nNonZero = 3*ntot             ! For each tile, there are 3 non-zero elements corresponding to itself and the two neighbours along y
-        else
-            nNonZero = 3*ntot - 2*nx*nz   ! With a vacuum boundary, the 2*nx*nz tiles at the two end surfaces only have one neighbour each
-        end if
-        allocate(d2dy2%values(nNonZero),d2dy2%cols(nNonZero),d2dy2%rows_start(ntot),d2dy2%rows_end(ntot))
-    
-        ind = 1
-        rowInd = 1
-        colInd = 1
-        do k=1,nz
-            !The bottom boundary
-             ! The backwards boundary (Imagine standing on the origin, eyes pointed along the positive y-axis)
-            if ( PBCy ) then
-                do i=1,nx
-                    ! Ascending column order: the wrap-around neighbour is the forwardmost tile and
-                    ! therefore has the largest column index, so it is emitted last.
-
-                    ! Current tile
-                    d2dy2%values(ind) = -( exchCoeff( problem, i,1,k, i,ny,k ) + exchCoeff( problem, i,1,k, i,2,k ) )
-                    d2dy2%cols(ind) = colInd
-                    d2dy2%rows_start(rowInd) = ind
-                    ind = ind + 1  ! Increment to next element
-
-                    ! Forwards coupling
-                    d2dy2%values(ind) = exchCoeff( problem, i,1,k, i,2,k )
-                    d2dy2%cols(ind) = colInd + nx
-                    ind = ind + 1  ! Increment to next element
-
-                    ! Backwards coupling (loops around and couples to forwardmost tile)
-                    d2dy2%values(ind) = exchCoeff( problem, i,1,k, i,ny,k )
-                    d2dy2%cols(ind) = colInd + nx*(ny-1)
-                    d2dy2%rows_end(rowInd) = ind + 1
-                    rowInd = rowInd + 1
-                    ind = ind + 1  ! Increment to next element
-                    colInd = colInd + 1
-                end do
-            else
-            
-                do i=1,nx
-                    const = exchCoeff( problem, i,1,k, i,2,k )
-
-                    d2dy2%values(ind) = -const
-                    d2dy2%cols(ind) = colInd
-                    d2dy2%rows_start(rowInd) = ind
-            
-                    !increment to next element
-                    ind = ind + 1
-            
-                    d2dy2%values(ind) = const
-                    d2dy2%cols(ind) = colInd + nx
-                    d2dy2%rows_end(rowInd) = ind+1
-                    rowInd = rowInd + 1
-            
-                    !increment to next element
-                    ind = ind + 1
-            
-                    colInd = colInd + 1
-                enddo
-            endif
-            
-            ! Everything in between
-            do j=2,ny-1
-                do i=1,nx
-                
-                    !lower value
-                    d2dy2%values(ind) = exchCoeff( problem, i,j,k, i,j-1,k )
-                    d2dy2%cols(ind) = colInd-nx
-                    d2dy2%rows_start(rowInd) = ind
-                    ind = ind + 1  ! Increment to next element
-                
-                    !central value
-                    d2dy2%values(ind) = -( exchCoeff( problem, i,j,k, i,j-1,k ) + exchCoeff( problem, i,j,k, i,j+1,k ) )
-                    d2dy2%cols(ind) = colInd
-                    ind = ind + 1  ! Increment to next element
-            
-            
-                    !upper value
-                    d2dy2%values(ind) = exchCoeff( problem, i,j,k, i,j+1,k )
-                    d2dy2%cols(ind) = colInd + nx
-                    d2dy2%rows_end(rowInd) = ind + 1
-                    rowInd = rowInd + 1
-                    ind = ind + 1  ! Increment to next element
-                    colInd = colInd + 1
-                end do
-            end do
-        
-            !The forwards boundary
-            if ( PBCy ) then
-                do i=1,nx
-                    ! Ascending column order: the wrap-around neighbour is the backmost tile and
-                    ! therefore has the smallest column index, so it is emitted first.
-
-                    ! Forwards coupling (loops around and couples to backmost tile)
-                    d2dy2%values(ind) = exchCoeff( problem, i,ny,k, i,1,k )
-                    d2dy2%cols(ind) = colInd - nx*(ny-1)
-                    d2dy2%rows_start(rowInd) = ind
-                    ind = ind + 1  ! Increment to next element
-
-                    ! Backwards coupling
-                    d2dy2%values(ind) = exchCoeff( problem, i,ny,k, i,ny-1,k )
-                    d2dy2%cols(ind) = colInd - nx
-                    ind = ind + 1  ! Increment to next element
-
-                    ! Current tile
-                    d2dy2%values(ind) = -( exchCoeff( problem, i,ny,k, i,ny-1,k ) + exchCoeff( problem, i,ny,k, i,1,k ) )
-                    d2dy2%cols(ind) = colInd
-                    d2dy2%rows_end(rowInd) = ind + 1
-                    rowInd = rowInd + 1
-                    ind = ind + 1  ! Increment to next element
-                    colInd = colInd + 1
-                enddo
-            else
-                do i=1,nx
-                   const = exchCoeff( problem, i,ny,k, i,ny-1,k )
-                    !lower element
-                    d2dy2%values(ind) = const
-                    d2dy2%cols(ind) = colInd - nx
-                    d2dy2%rows_start(rowInd) = ind
-            
-                    !increment to next element
-                    ind = ind + 1            
-            
-                    !central element
-                    d2dy2%values(ind) = -const
-                    d2dy2%cols(ind) = colInd
-                    d2dy2%rows_end(rowInd) = ind + 1
-                    rowInd = rowInd + 1
-            
-                    ind = ind + 1
-                    colInd = colInd + 1
-                enddo
-            endif
-        enddo
-                    
-        !Multiply by the discretization
-        d2dy2%values = d2dy2%values * 1./grid%dy**2
-        
-        ! Create the sparse matrix for the d^2dy^2
-        stat = mkl_sparse_d_create_csr ( d2dy2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dy2%rows_start, d2dy2%rows_end, d2dy2%cols, d2dy2%values)
-    endif
-    
-    !----------------------------------d^2dy^2 ends ----------------------------!
-    
-    
-    !----------------------------------d^2dz^2 begins ----------------------------!
-    if ( nz .gt. 1 ) then
-        ! Make the d^2/dz^2 matrix
-        if ( PBCz ) then
-            nNonZero = 3*ntot             ! For each tile, there are 3 non-zero elements corresponding to itself and the two neighbours along z
-        else
-            nNonZero = 3*ntot - 2*nx*ny   ! With a vacuum boundary, the 2*nx*ny tiles at the two end surfaces only have one neighbour each
-        end if
-        allocate(d2dz2%values(nNonZero),d2dz2%cols(nNonZero),d2dz2%rows_start(ntot),d2dz2%rows_end(ntot))
-    
-        ind = 1
-        rowInd = 1
-        colInd = 1
-        ! The bottom boundary
-        if ( PBCz ) then
-            do j=1,ny
-                do i=1,nx
-                    ! Ascending column order: the wrap-around neighbour is the topmost tile and
-                    ! therefore has the largest column index, so it is emitted last.
-
-                    ! Current tile
-                    d2dz2%values(ind) = -( exchCoeff( problem, i,j,1, i,j,nz ) + exchCoeff( problem, i,j,1, i,j,2 ) )
-                    d2dz2%cols(ind) = colInd
-                    d2dz2%rows_start(rowInd) = ind
-                    ind = ind + 1   ! Increment to next element
-
-                    ! Upwards coupling
-                    d2dz2%values(ind) = exchCoeff( problem, i,j,1, i,j,2 )
-                    d2dz2%cols(ind) = nx*ny + colInd
-                    ind = ind + 1   ! Increment to next element
-
-                    ! Downwards coupling (loops around and couples to topmost tile)
-                    d2dz2%values(ind) = exchCoeff( problem, i,j,1, i,j,nz )
-                    d2dz2%cols(ind) = colInd + ny*nx*(nz-1)
-                    d2dz2%rows_end(rowInd) = ind + 1
-                    rowInd = rowInd + 1
-                    ind = ind + 1   ! Increment to next element
-                    colInd = colInd + 1
-                end do
-            end do
-        else
-            do j=1,ny
-                do i=1,nx
-                    const = exchCoeff( problem, i,j,1, i,j,2 )
-                    !central value
-                    d2dz2%values(ind) = -const
-                    d2dz2%cols(ind) = colInd
-                    d2dz2%rows_start(rowInd) = ind
-            
-                    !increment position
-                    ind = ind + 1
-            
-                    !right-most value
-                    d2dz2%values(ind) = const
-                    d2dz2%cols(ind) = nx * ny + colInd
-                    d2dz2%rows_end(rowInd) = ind + 1
-                    rowInd = rowInd + 1
-            
-                    !increment position
-                    ind = ind + 1
-                    colInd = colInd + 1
-                end do
-            end do
-        endif
-
-        ! Everything in between
-        do k=2,nz-1            
-            do j=1,ny
-                do i=1,nx
-                    !left-most value
-                    d2dz2%values(ind) = exchCoeff( problem, i,j,k, i,j,k-1 )
-                    d2dz2%cols(ind) = colInd - nx * ny
-                    d2dz2%rows_start(rowInd) = ind
-                    ind = ind + 1   ! Increment to next element
-                
-                    !central value
-                    d2dz2%values(ind) = -( exchCoeff( problem, i,j,k, i,j,k-1 ) + exchCoeff( problem, i,j,k, i,j,k+1 ) )
-                    d2dz2%cols(ind) = colInd
-                    ind = ind + 1   ! Increment to next element
-                
-                    !right-most value
-                    d2dz2%values(ind) = exchCoeff( problem, i,j,k, i,j,k+1 )
-                    d2dz2%cols(ind) = colInd + nx * ny
-                    d2dz2%rows_end(rowInd) = ind + 1
-                    rowInd = rowInd + 1
-                    ind = ind + 1   ! Increment to next element
-                    colInd = colInd + 1
-                end do
-            end do
-        end do
-
-        ! The top boundary
-        if ( PBCz ) then
-            do j=1,ny
-                do i=1,nx
-                    ! Ascending column order: the wrap-around neighbour is the bottommost tile and
-                    ! therefore has the smallest column index, so it is emitted first.
-
-                    ! Upwards coupling (loops around and couples to bottommost tile)
-                    d2dz2%values(ind) = exchCoeff( problem, i,j,nz, i,j,1 )
-                    d2dz2%cols(ind) = colInd - nx*ny*(nz - 1)
-                    d2dz2%rows_start(rowInd) = ind
-                    ind = ind + 1   ! Increment to next element
-
-                    ! Downwards coupling
-                    d2dz2%values(ind) = exchCoeff( problem, i,j,nz, i,j,nz-1 )
-                    d2dz2%cols(ind) = colInd - nx*ny
-                    ind = ind + 1   ! Increment to next element
-
-                    ! Current tile
-                    d2dz2%values(ind) = -( exchCoeff( problem, i,j,nz, i,j,nz-1 ) + exchCoeff( problem, i,j,nz, i,j,1 ) )
-                    d2dz2%cols(ind) = colInd
-                    d2dz2%rows_end(rowInd) = ind + 1
-                    rowInd = rowInd + 1
-                    ind = ind + 1   ! Increment to next element
-                    colInd = colInd + 1
-                end do
-            end do
-        else
-            do j=1,ny
-                do i=1,nx
-                    const = exchCoeff( problem, i,j,nz, i,j,nz-1 )
-
-                    !left-most value
-                    d2dz2%values(ind) = const
-                    d2dz2%cols(ind) = colInd - nx * ny
-                    d2dz2%rows_start(rowInd) = ind
-                
-                    !increment position
-                    ind = ind + 1
-                
-                    !central value
-                    d2dz2%values(ind) = -const
-                    d2dz2%cols(ind) = colInd
-                    d2dz2%rows_end(rowInd) = ind + 1
-                    rowInd = rowInd + 1
-                
-                    !increment position
-                    ind = ind + 1
-                    colInd = colInd + 1
-                end do
-            end do
-        endif
-        
-        !Multiply by the discretization
-        d2dz2%values = d2dz2%values * 1./grid%dz**2
-        
-        !Create the sparse matrix for the d^2dz^2
-        stat = mkl_sparse_d_create_csr ( d2dz2%A, SPARSE_INDEX_BASE_ONE, nx*ny*nz, nx*ny*nz, d2dz2%rows_start, d2dz2%rows_end, d2dz2%cols, d2dz2%values)
-    endif
-    
-    !----------------------------------d^2dz^2 ends ----------------------------!
-    
-            
-    !Finally, add up the three diagonals and store in the output sparse matrix, A
-    !Store the results temporarily in tmp4
-    
-    !call writeSparseMatrixToDisk( d2dz2%A, nx*ny*nz, 'd2dz2.dat' )
-    !call writeSparseMatrixToDisk( d2dy2%A, nx*ny*nz, 'd2dy2.dat' )
-    
-    const = 1.
-    
-    if ( nx .gt. 1) then
-        if ( ny .gt. 1) then
-            stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dy2%A, tmp)  
-            deallocate(d2dy2%values,d2dy2%cols,d2dy2%rows_start,d2dy2%rows_end)
-            stat = mkl_sparse_destroy (d2dy2%A)
-            
-            if ( nz .gt. 1) then
-                !nx+ny+nz
-                call displayGUIMessage( 'Exchange in x,y,z' )
-                stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dz2%A, const, tmp, A)       
-                deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
-                stat = mkl_sparse_destroy (d2dz2%A)
-            else
-                !nx+ny
-                call displayGUIMessage( 'Exchange in x,y' )
-                descr%type = SPARSE_MATRIX_TYPE_GENERAL
-                descr%mode = SPARSE_FILL_MODE_FULL
-                descr%diag = SPARSE_DIAG_NON_UNIT
-                stat = mkl_sparse_copy ( tmp, descr, A )
-                stat = mkl_sparse_destroy (tmp)
-            endif
-        else
-            if ( nz .gt. 1) then
-                !nx+nz
-                call displayGUIMessage( 'Exchange in x,z' )
-                stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dx2%A, const, d2dz2%A, A)  
-                deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
-                stat = mkl_sparse_destroy (d2dz2%A)
-            else
-                !nx
-                call displayGUIMessage( 'Exchange in x' )
-                descr%type = SPARSE_MATRIX_TYPE_GENERAL
-                descr%mode = SPARSE_FILL_MODE_FULL
-                descr%diag = SPARSE_DIAG_NON_UNIT
-                stat = mkl_sparse_copy ( d2dx2%A, descr, A )
-            endif
-        endif
-        deallocate(d2dx2%values,d2dx2%cols,d2dx2%rows_start,d2dx2%rows_end)
-        stat = mkl_sparse_destroy (d2dx2%A)
-    else
-        if ( ny .gt. 1) then
-            if ( nz .gt. 1) then
-                !ny+nz
-                call displayGUIMessage( 'Exchange in y,z' )
-                stat = mkl_sparse_d_add (SPARSE_OPERATION_NON_TRANSPOSE, d2dy2%A, const, d2dz2%A, A) 
-                deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
-                stat = mkl_sparse_destroy (d2dz2%A)
-            else
-                !ny
-                call displayGUIMessage( 'Exchange in y' )
-                descr%type = SPARSE_MATRIX_TYPE_GENERAL
-                descr%mode = SPARSE_FILL_MODE_FULL
-                descr%diag = SPARSE_DIAG_NON_UNIT
-                stat = mkl_sparse_copy ( d2dy2%A, descr, A )
-            endif
-            deallocate(d2dy2%values,d2dy2%cols,d2dy2%rows_start,d2dy2%rows_end)
-            stat = mkl_sparse_destroy (d2dy2%A)
-        else
-            if ( nz .gt. 1) then
-                !nz
-                call displayGUIMessage( 'Exchange in z' )
-                descr%type = SPARSE_MATRIX_TYPE_GENERAL
-                descr%mode = SPARSE_FILL_MODE_FULL
-                descr%diag = SPARSE_DIAG_NON_UNIT
-                stat = mkl_sparse_copy ( d2dz2%A, descr, A )
-                deallocate(d2dz2%values,d2dz2%cols,d2dz2%rows_start,d2dz2%rows_end)
-                stat = mkl_sparse_destroy (d2dz2%A)
-            else
-                !No exchange terms: a single cell along every direction, i.e. a macrospin. The rest of
-                !the code expects an exchange operator, so build one with an explicit zero on every
-                !diagonal. This used to fall through with d2dz2 unallocated and die in the deallocate.
-                call displayGUIMessage( 'No exchange terms (single cell)' )
-                call ComputeZeroExchangeOperator( ntot, A )
-                problem%useExchange = .false.
-            endif
-        endif
-    endif
-    
-    !call writeSparseMatrixToDisk( tmp, nx*ny*nz, 'A_exch.dat' )
-    
-    !call writeSparseMatrixToDisk( A, nx*ny*nz, 'A_exch.dat' )
-    
-    call create_COO_values_from_CSR(A,solution%gridinfo)
-    
-
-    call trace%end( "ComputeExchangeTerm3D_Uniform", itimer=itimer, verbose=1 )
-    end subroutine ComputeExchangeTerm3D_Uniform
-
-
-    !>-----------------------------------------
-    !> @brief
-    !> Pairwise exchange coefficient between a cell and one of its neighbours on a uniform
-    !> grid, following Heistracher et al., DOI: 10.1016/j.jmmm.2021.168875.
-    !>
-    !> This is the harmonic mean of the two exchange stiffnesses divided by the stiffness of
-    !> the cell owning the matrix row, 2*A_nb/(A_nb + A_self) = A_harm/A_self. The division by
-    !> A_self is there because Jfact on a uniform grid is A0/(mu0*Ms) per cell, whereas the
-    !> unstructured mesh normalises by the global A0_max instead and so uses A_harm directly.
-    !>
-    !> The expression used to be written out by hand at 39 places in the routine above, which
-    !> made any change to it - such as an interface value specified per pair of materials -
-    !> 39 chances to introduce an inconsistency that no test would localise.
-    !> @param[in] A_self exchange stiffness of the cell owning the row
-    !> @param[in] A_nb exchange stiffness of the neighbouring cell
-    !>-----------------------------------------
-    !> If the two cells belong to different materials and the user has given an interface
-    !> value for that pair, that value replaces the harmonic mean. The coefficient is still
-    !> divided by A_self, because Jfact on a uniform grid carries the per-cell A0.
-    !>
-    !> A cell with A0 = 0 is not magnetic, so a face touching one ignores the interface table
-    !> entirely and keeps the ordinary formula. That already leaves the magnetic side
-    !> uncoupled, since 2*A_nb/(A_nb + A_self) vanishes when the neighbour is dead, and it is
-    !> the same rule the unstructured mesh follows, so the two grid types agree.
-    pure function exchCoeff( problem, i_s, j_s, k_s, i_n, j_n, k_n ) result( coeff )
-    type(MicroMagProblem),intent(in) :: problem        !> Problem, for A0_map and the phases
-    integer,intent(in) :: i_s, j_s, k_s                !> Grid index of the cell owning the row
-    integer,intent(in) :: i_n, j_n, k_n                !> Grid index of the neighbouring cell
-    real(DP) :: coeff
-    real(DP) :: A_self, A_nb, A_face
-    integer :: p_self, p_nb
-
-    A_self = problem%A0_map(i_s,j_s,k_s)
-    A_nb   = problem%A0_map(i_n,j_n,k_n)
-
-    A_face = -1.0_DP
-    if ( problem%n_phase .gt. 1 .and. allocated(problem%A_int) &
-         .and. allocated(problem%phase_map) ) then
-        p_self = problem%phase_map(i_s,j_s,k_s)
-        p_nb   = problem%phase_map(i_n,j_n,k_n)
-        !A cell with A0 = 0 is not magnetic, so the override is simply not taken for a face
-        !touching one and the ordinary formula below applies unchanged - which already gives
-        !no coupling to the magnetic side, since 2*A_nb/(A_nb + A_self) vanishes when A_nb is
-        !zero. Declining the override rather than forcing the coefficient to zero is what
-        !makes the interface value have no effect at all on such a face, and it mirrors what
-        !the unstructured mesh does. It also guarantees A_self > 0 wherever the override is
-        !used, so the division below is safe.
-        if ( p_self .ne. p_nb .and. A_self .gt. 0.0_DP .and. A_nb .gt. 0.0_DP ) &
-            A_face = problem%A_int(p_self,p_nb)
-    endif
-
-    if ( A_face .ge. 0.0_DP ) then
-        coeff = A_face / A_self
-    else if ( ( A_nb + A_self ) .gt. 0.0_DP ) then
-        coeff = 2 * A_nb / ( A_nb + A_self )
-    else
-        !Two neighbouring cells that are both non-magnetic. The harmonic mean is 0/0 there,
-        !which with /fpe:0 is an invalid operation rather than a quiet NaN. Two cells with no
-        !exchange are not exchange coupled, so the coefficient is zero.
-        coeff = 0.0_DP
-    endif
-
-    end function exchCoeff
-
-
-    !>-----------------------------------------
-    !> @brief
-    !> An exchange operator that is identically zero, for a problem without exchange: A0 = 0
-    !> in every tile, or a uniform grid of one cell in total (a macrospin). A problem where
-    !> only some tiles have A0 = 0 still has exchange between the others and does not come
-    !> here. It is stored with an explicit zero on
-    !> every diagonal rather than as an empty matrix, which keeps every row of the CSR arrays
-    !> non-empty and gives the returned GridInfo a well-formed operator of the right size.
-    !> @param[in] ntot the number of tiles
-    !> @param[inout] A the returned sparse matrix
-    !---------------------------------------------------------------------------
-    subroutine ComputeZeroExchangeOperator( ntot, A )
-    integer,intent(in) :: ntot                         !> Number of tiles
-    type(sparse_matrix_t),intent(inout) :: A           !> The returned zero operator
-    type(MagTenseSparse_d) :: Z                        !> Holds the CSR arrays until A owns a copy
-    type(matrix_descr) :: descr
-    integer :: i, stat
-
-    allocate(Z%values(ntot),Z%cols(ntot),Z%rows_start(ntot),Z%rows_end(ntot))
-    do i = 1, ntot
-        Z%values(i) = 0.0_DP
-        Z%cols(i) = i
-        Z%rows_start(i) = i
-        Z%rows_end(i) = i + 1
-    end do
-    !mkl_sparse_d_create_csr only references the arrays, so A is made as a copy before they go
-    stat = mkl_sparse_d_create_csr ( Z%A, SPARSE_INDEX_BASE_ONE, ntot, ntot, Z%rows_start, Z%rows_end, Z%cols, Z%values)
-    descr%type = SPARSE_MATRIX_TYPE_GENERAL
-    descr%mode = SPARSE_FILL_MODE_FULL
-    descr%diag = SPARSE_DIAG_NON_UNIT
-    stat = mkl_sparse_copy ( Z%A, descr, A )
-    stat = mkl_sparse_destroy ( Z%A )
-    deallocate(Z%values,Z%cols,Z%rows_start,Z%rows_end)
-
-    end subroutine ComputeZeroExchangeOperator
 
     !>-----------------------------------------
     !> @author Rasmus Bjørk, rabj@dtu.dk, DTU, 2020
@@ -3578,110 +3257,4 @@ end subroutine updateDemagfieldFMM
     
     end subroutine ComputeAnisotropyTerm3D
 
-    
-
-
-    !================== Helper functions for FMM correction =========================================
-!>======================================================================
-!> Add demagnitization field from nearfield 
-!> uses K_nbrcorr, which depending on the setup contains either
-!>      1. The correction tensors (Nnbr - Kdip*V) stored in sparse format
-!>      2. The demagnetization tensor Nnbr stored in sparse format
-!> adds computed field to the existing solution%H
-!>======================================================================
-subroutine add_near_field(problem, solution)
-  implicit none
-  type(MicroMagProblem),  intent(in)    :: problem
-  type(MicroMagSolution), intent(inout) :: solution
-
-  !-----------------------------------------------------------------------------
-  real(SP), contiguous, pointer :: hx_tmp(:), hy_tmp(:), hz_tmp(:), temp(:)
-  integer :: ntot
-  real(SP) :: pref
-  integer :: stat
-  real(SP) :: alpha, beta
-  integer, save :: itimer = 0
-  call trace%begin( "add_near_field", itimer=itimer, verbose=2 )
-
-
-  ntot = size(problem%grid%pts, dim=1)
-
-
-#if USE_CUDA
-    !The GPU holds the near-field matrices only when the solver was asked to use CUDA
-    !(cudaInit_sparse is called on problem%useCuda, not on the build flag), so a CUDA build
-    !with useCuda off must take the MKL path below like any other build.
-    if ( problem%useCuda .eq. useCudaTrue ) then
-        allocate( hx_tmp(ntot), hy_tmp(ntot), hz_tmp(ntot) )
-        hx_tmp = 0.0_SP
-        hy_tmp = 0.0_SP
-        hz_tmp = 0.0_SP
-
-        pref = sngl(1.0)
-        call cudaMatrVecMult_sparse( solution%Mx_s , solution%My_s , solution%Mz_s , hx_tmp, hy_tmp, hz_tmp, pref )
-
-        !$omp critical (solution_update)
-        solution%HmX = solution%HmX + hx_tmp 
-        solution%HmY = solution%HmY + hy_tmp 
-        solution%HmZ = solution%HmZ + hz_tmp 
-        !$omp end critical (solution_update)
-
-        deallocate(hx_tmp, hy_tmp, hz_tmp)
-
-        call trace%end( "add_near_field", itimer=itimer, verbose=2 )
-        return
-    endif
-#endif
-    allocate(temp(ntot))
-
-    alpha = 1.0_SP
-    ! ---------------- Hx correction = xx*Mx + xy*My + xz*Mz ----------------
-    beta = 0.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(1)%A, problem%K_fmm_descr_s, solution%Mx_s , beta, temp)
-    beta = 1.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(2)%A, problem%K_fmm_descr_s, solution%My_s, beta, temp)
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(3)%A, problem%K_fmm_descr_s, solution%Mz_s, beta, temp)
-
-    !--- Accumulated with '+', matching the CUDA branch above. That branch
-    !    calls cu_MVMult_GetH_sparse, which computes alpha*(K.M) with
-    !    alpha = pref = 1 and applies no negation of its own, so both paths
-    !    have to add K.M. This used to subtract, which put a systematic error
-    !    of order 10x the field norm on every non-CUDA FMM run - independent
-    !    of fmm_nterms, since it is not an expansion-order effect.
-    !$omp critical (solution_update)
-    solution%HmX = solution%HmX + temp
-    !$omp end critical (solution_update)
-    ! ---------------- Hy correction = xy*Mx + yy*My + yz*Mz ----------------
-    beta = 0.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(2)%A, problem%K_fmm_descr_s, solution%Mx_s , beta, temp)
-    beta = 1.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(4)%A, problem%K_fmm_descr_s, solution%My_s, beta, temp)
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(5)%A, problem%K_fmm_descr_s, solution%Mz_s, beta, temp)
-
-    !$omp critical (solution_update)
-    solution%HmY = solution%HmY + temp
-    !$omp end critical (solution_update)
-    ! ---------------- Hz correction = xz*Mx + yz*My + zz*Mz ----------------
-    beta = 0.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(3)%A, problem%K_fmm_descr_s, solution%Mx_s , beta, temp)
-    beta = 1.0_SP
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(5)%A, problem%K_fmm_descr_s, solution%My_s, beta, temp)
-    stat = mkl_sparse_s_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, problem%K_fmm_s(6)%A, problem%K_fmm_descr_s, solution%Mz_s, beta, temp)
-
-    !$omp critical (solution_update)
-    solution%HmZ = solution%HmZ + temp
-    !$omp end critical (solution_update)
-    deallocate(temp)
-
-    call trace%end( "add_near_field", itimer=itimer, verbose=2 )
-end subroutine add_near_field
-
-        !------------------------------------------------------------------------------------------------
-    !============================================================================================================
-
-
-
-
-    
 end module LandauLifshitzSolution
-    

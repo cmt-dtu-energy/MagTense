@@ -6,167 +6,189 @@ computationally demanding part of a micromagnetic simulation. MagTense's
 default approach - the fully analytical demagnetization tensor - is exact, with
 memory and work that scale as :math:`O(N^2)` in the number of cells.
 
-For very large systems MagTense includes an implementation of the **Fast
-Multipole Method (FMM)**, which reduces the computational complexity to
-:math:`O(N)` while keeping the analytical tensor for all near-field
-interactions.
+For such systems MagTense can evaluate the demagnetization field with the
+**Fast Multipole Method (FMM)** through the dip-fmm library, which reduces the
+cost of a field evaluation to :math:`O(N)`.
 
 .. note::
-   The FMM path is selected explicitly with ``use_fmm``, in a library built
-   with ``USE_FMM3D=1``, so a problem keeps its demagnetization path when the
-   library is rebuilt.
-
-Implementation and attribution
-------------------------------
-
-The FMM acceleration in MagTense is built upon the **FMM3D** library developed
-by the **Flatiron Institute**.
-
-* **Core library:** `Flatiron Institute FMM3D <https://github.com/flatironinstitute/fmm3d>`_
-* **Linking:** MagTense links against a fork, `Ximtecs/FMM3D
-  <https://github.com/Ximtecs/FMM3D>`_, which contains updated build
-  configurations and makefiles to allow integration with the MagTense Fortran
-  core.
+   The FMM path is **off by default**. It has to be enabled explicitly with
+   ``use_cdfmm`` (``use_fmm`` in MATLAB), and it is only available when the
+   library was built with ``USE_CDFMM=1``. The earlier FMM3D-based backend
+   (``USE_FMM3D``, ``fmm_eps``, ``fmm_cells``, ...) has been removed; in MATLAB
+   the names ``use_fmm`` and ``USE_FMM`` now refer to dip-fmm.
 
 Compilation
 -----------
 
-To enable FMM support during the build, include the FMM flag in the make
-command. This links the FMM3D libraries and enables the specialised Fortran
-modules:
+dip-fmm is built from a ``dip-fmm`` checkout inside the MagTense repository or
+next to it, and installed under ``dip-fmm/local`` by the root Makefile:
 
 .. code-block:: bash
 
-    make USE_FMM3D=1
+    make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_CDFMM=1
 
-On Linux, ``$(MagTense)/external/FMM3D/local`` must be on ``LD_LIBRARY_PATH``
-when building. ``USE_FMM3D=1`` is what compiles the FMM source and activates
-the ``use_fmm`` flag.
+The dip-fmm CUDA backend is enabled only with ``USE_CUDA=1``. A checkout
+somewhere else is selected with ``CDFMM_DIR=<path>``.
 
-Optimization: persistent tree structure
----------------------------------------
+On Linux ``dip-fmm/local/lib`` must be on ``LD_LIBRARY_PATH`` when running.
 
-In micromagnetic simulations the spatial distribution of cells is static
-throughout the simulation. To exploit this, MagTense uses a *magtense-local*
-tree structure that caches the octree setup between consecutive calls to the
-solver. By reusing the tree, the cost of re-partitioning space at every time
-step is eliminated.
+On Windows the same command is run from the shell used for the rest of the
+build (conda environment activated, then ``vcvars64.bat``). dip-fmm is compiled
+with the environment's ``icx`` and, for CUDA, its ``nvcc`` with MSVC as host
+compiler, and ``cdfmm_c.dll`` is copied next to the Python extension, so nothing
+has to be added to ``PATH``. This needs a dip-fmm that carries its Windows
+port (file mapping in the cache layer, the link order of the UCRT and Intel's
+``libmmd``). There ``long double`` is the 64-bit ``double``, so the exact
+prism and tetrahedron pair tensors are evaluated in double rather than
+extended precision. ``python\build_python_fmm.cmd`` sets that shell up
+(through ``tools\windows\env.cmd`` of the dip-fmm checkout) and runs the
+command; ``matlab\build_mex_fmm.cmd`` does the same for the MEX files
+described next.
 
-.. note::
-   MagTense uses a fully grown (uniform) tree, **ifunif = 1**, which is what
-   lets the cached tree be reused unchanged from call to call.
+For MATLAB the libraries are built with ``USE_MATLAB=1 USE_CDFMM=1`` and the
+MEX files with ``buildMagTenseMEX('USE_FMM', true, 'fmm_root',
+'<dip-fmm>/local', ...)``; ``fmm_root`` defaults to a dip-fmm checkout next to
+the MagTense repository. With ``USE_MATLAB=1`` dip-fmm is linked with oneMKL
+inside the library (``CDFMM_MKL_LINK=static``) and, on Linux, with its C++
+runtime as well: MATLAB brings its own MKL and ``libstdc++`` into the process,
+and a dip-fmm that shares the environment's would bind to those instead. Add
+``CDFMM_ENABLE_CUDA=ON`` when building the libraries of the NoCUDA solver, so
+that one dip-fmm library serves both solver MEX files. On Windows
+``buildMagTenseMEX`` copies ``cdfmm_c.dll`` into ``MEX_files``; on Linux the
+MEX files get the run path of ``<dip-fmm>/local/lib``.
 
-Near-field evaluation and neighbour tensors
--------------------------------------------
+In the Visual Studio solution every configuration without ``_no_FMM`` in its
+name builds ``MagTenseMicroMag`` with dip-fmm (``USE_CDFMM`` is defined and
+``DipFmmDemag.f90`` and dip-fmm's ``cdfmm_fortran.f90`` are compiled); the
+``_no_FMM`` configurations leave it out. Visual Studio does not build dip-fmm
+itself: it expects an installed dip-fmm in ``dip-fmm/local`` of a checkout next
+to the MagTense repository, built for MATLAB as described above
+(``tools\windows\build.cmd static`` in the dip-fmm repository). The MEX files
+are then built with ``buildMagTenseMEX('VS_STUDIO', true, 'USE_FMM', true,
+...)``, which links the ``_no_FMM`` libraries when ``USE_FMM`` is false.
 
-In standard FMM implementations, near-field interactions are handled by a
-direct point-to-point (P2P) evaluation. MagTense replaces this by the
-high-precision analytical demagnetization tensors for all near-field
-interactions:
+How it is used
+--------------
 
-1. **Neighbour identification:** based on *List 1* from the FMM tree creation,
-   MagTense identifies neighbour pairs, i.e. cells within the same or adjacent
-   leaf nodes.
-2. **Sparse neighbour tensor:** a sparse tensor structure is created to map
-   these neighbour interactions.
-3. **Analytical calculation:** the exact analytical demagnetization tensor is
-   evaluated for every neighbour pair.
-4. **Sparse matrix storage:** the values are converted into a sparse matrix. On
-   **CPU** this is an Intel MKL sparse matrix; on **GPU** it is stored
-   persistently in global memory for **CUDA** evaluation at each time step.
+* The cells are treated as point dipoles with moment
+  :math:`\mathbf{m} = \Delta V \, M_s \, \hat{\mathbf{m}}`, and the field is
+  :math:`\mathbf{H} = -\nabla \phi`.
+* The FMM plan (octree and translation operators) is built once per solve for
+  the fixed cell geometry and reused for every field evaluation. The octree is
+  either uniform (fixed depth ``cdfmm_depth``) or adaptive (split by
+  ``cdfmm_capacity`` up to ``cdfmm_max_depth``); by default its root is aligned
+  so that every leaf holds whole cells.
+* The macrogeometry/sample shape correction and the demag-field noise
+  (``CV``) are applied exactly as on the dense path.
+* CUDA is used when MagTense is built with CUDA and the problem is run with
+  ``cuda=True``; otherwise dip-fmm runs on the CPU (oneMKL, or a portable
+  fallback). If the dip-fmm plan cannot be created, or an evaluation fails,
+  the solve continues with the regular dense demagnetization tensor.
 
-The macrogeometry and sample :ref:`Sample shape correction` are applied on the
-FMM path as well, so switching to FMM does not change those terms.
+.. warning::
+   dip-fmm supports **uniform grids** (``grid_type='uniform'``) and grids of
+   axis-aligned prisms (``grid_type='unstructuredPrisms'``, e.g. octree-refined
+   meshes) only. The field is computed in single precision (FP32), matching
+   MagTense's demagnetization arrays. It is available from Python and from
+   MATLAB.
 
 FMM input variables
 -------------------
 
 .. list-table::
-   :widths: 24 22 8 46
    :header-rows: 1
+   :widths: 20 10 70
 
    * - Python
-     - Matlab
-     - Type
+     - Default
      - Description
-   * - ``use_fmm``
-     - ``use_fmm``
-     - int
-     - **1** to use the FMM demagnetization path, **0** for the dense
-       analytical tensor. Default **0**.
-   * - ``fmm_eps``
-     - ``fmm_eps``
-     - float
-     - Requested accuracy, which controls the exponential order of the
-       plane-wave expansion. Default ``1e-4``.
-   * - ``fmm_nterms``
-     - ``fmm_nterms``
-     - int
-     - Multipole expansion order. A negative value (default ``-1``) derives the
-       order from ``fmm_eps`` during the tree build.
-   * - ``ifunif``
-     - ``ifunif``
-     - int
-     - Tree type. MagTense uses the uniform tree, **1**.
-   * - ``nlmin``
-     - ``nlmin``
-     - int
-     - Minimum level of the octree hierarchy. Default 1.
-   * - ``nlmax``
-     - ``nlmax``
-     - int
-     - Maximum level of the octree hierarchy, which for the uniform tree is
-       its depth. Default 5.
-   * - ``allow_fmm_short_circuit``
-     - ``fmm_short``
-     - int
-     - **1** to fall back to the direct calculation for small problems, **0**
-       to force FMM. Default 1.
-   * - ``fmm_min_n``
-     - ``fmm_min_n``
-     - int
-     - Cell count below which FMM is disabled when the short circuit is
-       allowed. Default 20000.
+   * - ``use_cdfmm``
+     - ``False``
+     - Use dip-fmm instead of the dense demagnetization tensor.
+   * - ``cdfmm_order``
+     - 6
+     - Expansion order.
+   * - ``cdfmm_depth``
+     - 4
+     - Depth of the uniform tree.
+   * - ``cdfmm_basis``
+     - ``"spherical"``
+     - Expansion basis, ``"spherical"`` or ``"cartesian"``.
+   * - ``cdfmm_tree``
+     - ``"uniform"``
+     - ``"uniform"``, ``"uniform_strict"`` (every occupied box split to
+       ``cdfmm_depth``) or ``"adaptive"``.
+   * - ``cdfmm_capacity``
+     - 32
+     - Adaptive tree: maximum number of tiles per leaf before a split.
+   * - ``cdfmm_max_depth``
+     - 5
+     - Adaptive tree: deepest level, 0 to 8.
+   * - ``cdfmm_root``
+     - ``None``
+     - Root cube as (centre x, y, z, half-width) [m]; ``None`` lets MagTense
+       choose it.
+   * - ``cdfmm_align``
+     - ``True``
+     - With ``cdfmm_root=None``, choose a root on which every leaf holds whole
+       cells, so no cell sticks out of its leaf box.
 
-When the short circuit triggers, the solver reports
-``MagTense: problem smaller than fmm_min_n - disabling FMM and using the full
-demag tensor`` and continues with the dense tensor. The test is made before the
-octree is built, so a small or effectively one-dimensional geometry never
-reaches the tree construction.
-
-The FMM path works with rectangular-prism cells, i.e. the ``uniform`` and
-``unstructuredPrisms`` grid types, taking the cell dimensions from the
-uniform-grid spacings ``dx``, ``dy`` and ``dz`` or from the per-cell
-``grid_abc`` of an unstructured prism grid.
+In MATLAB the same settings are properties of ``DefaultMicroMagProblem``,
+named ``fmm_`` instead of ``cdfmm_`` and with integer codes instead of names:
+``use_fmm`` (set with ``setUseDipFmm``), ``fmm_order``, ``fmm_depth``,
+``fmm_basis`` (0 spherical, 1 Cartesian), ``fmm_tree`` (0 uniform, 1 adaptive,
+2 adaptive with ``fmm_cap`` as the occupancy to aim for), ``fmm_cap``
+(``cdfmm_capacity``), ``fmm_maxdep`` (``cdfmm_max_depth``), ``fmm_root``
+(``[0, 0, 0, -1]`` for none) and ``fmm_align`` (0 or 1). ``"uniform_strict"``
+has no MATLAB counterpart.
 
 FMM Python example
 ------------------
 
 .. code-block:: python
 
-    problem.use_fmm = 1
-    problem.fmm_eps = 1e-4
-    problem.fmm_nterms = 12
-    problem.ifunif = 1
-    problem.nlmin = 1
-    problem.nlmax = 2
-    problem.allow_fmm_short_circuit = 1
-    problem.fmm_min_n = 20000
+    problem = MicromagProblem(
+        res=[64, 64, 64],
+        grid_L=[500e-9, 500e-9, 500e-9],
+        cuda=True,
+        use_cdfmm=True,
+        cdfmm_order=6,
+        cdfmm_depth=4,
+        cdfmm_basis="spherical",
+    )
 
     result = problem.run_simulation(
         t_end=t_end, nt=nt, fct_h_ext=h_ext_fct, nt_h_ext=nt_h_ext
     )
 
-FMM Matlab example
+See ``python/examples/micromagnetism/FMM`` for a comparison of dip-fmm against
+the dense demagnetization tensor.
+
+FMM MATLAB example
 ------------------
 
 .. code-block:: matlab
 
-    problem.use_fmm    = int32(1);
-    problem.fmm_eps    = 1e-4;
-    problem.fmm_nterms = int32(12);
-    problem.ifunif     = int32(1);
-    problem.nlmin      = int32(1);
-    problem.nlmax      = int32(2);
-    problem.fmm_short  = int32(1);
-    problem.fmm_min_n  = int32(20000);
+    problem = DefaultMicroMagProblem(64, 64, 64);
+    problem.grid_L = [500e-9, 500e-9, 500e-9];
+    problem = problem.setUseCuda(true);
+    problem = problem.setUseDipFmm(true);
+    problem.fmm_order = int32(6);
+    problem.fmm_depth = int32(4);
+
+    solution = problem.MagTenseLandauLifshitzSolver_mex(struct(problem), struct());
+
+``matlab/examples/Micromagnetism/FMM/fmm_vs_regular.m`` is the MATLAB
+counterpart of the Python comparison.
+
+Tests
+-----
+
+``python/examples/micromagnetism/FMM/fmm_smoke_test.py`` is a one-minute
+version of the comparison, meant as the check after a build. The demagnetizing
+field of dip-fmm at ``t = 0`` is tested against the dense tensor by
+``dipfmm_octree_test`` (a graded mesh of prisms, the uniform and the adaptive
+tree, the aligned root) and ``dipfmm_tetra_test`` (a tetrahedral mesh), in
+``python/examples/micromagnetism/MagTense_tests`` and, with the same problems
+and limits, in ``matlab/examples/Micromagnetism/MagTense_tests``. They need a
+build with dip-fmm and are therefore not part of ``testMagTenseFunctions``.

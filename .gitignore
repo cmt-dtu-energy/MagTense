@@ -205,6 +205,10 @@ docs/source/_build
 *.lib
 *.so
 *.pyd
+# dip-fmm runtime copied next to the Python extension and the MEX files by a
+# Windows USE_CDFMM=1 build
+python/src/magtense/lib/cdfmm_c.dll
+matlab/MEX_files/cdfmm_c.dll
 
 *.whl
 
@@ -229,6 +233,7 @@ cvode*/
 
 # Build configuration stamp written by the Makefile
 .build_flags
+# Stamp left behind by the removed FMM3D build
 .fmm3d_toolchain
 
 docs/.doctrees/

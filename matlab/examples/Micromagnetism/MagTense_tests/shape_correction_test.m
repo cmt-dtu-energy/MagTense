@@ -241,7 +241,6 @@ problem = problem.setMicroMagSolver('Dynamic');
 % The shape correction is evaluated at the cell centres, so the cells have to be as well for the
 % field of the cells and of the macrogeometry prism to cancel
 problem.useAvgN = int32(0);
-problem.use_fmm = int32(0);
 problem.ReturnHall = int32(1);
 
 problem.gamma = 0;
