@@ -83,7 +83,8 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
 
 - Compile with the dip-fmm micromagnetic demagnetisation backend
 
-  Place or clone dip-fmm at `dip-fmm/` in the MagTense repository. The build
+  Place or clone dip-fmm at `dip-fmm/` in the MagTense repository or next to
+  it (the Visual Studio project and `buildMagTenseMEX` expect the latter). The build
   below uses dip-fmm's `release` preset, with oneMKL enabled and CUDA
   following `USE_CUDA`, installs its shared C API under `dip-fmm/local`, and
   links the MagTense Python extension against it. Override `CDFMM_DIR`,
@@ -188,6 +189,26 @@ The tool `f2py` of the NumPy package is used to wrap the [interface file](./Fort
     make auxmt magnetostatic micromagnetism USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 CVODE_ROOT="cvode-7.4.0/install"
 	make python-win USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 CVODE_ROOT="cvode-7.4.0/install"
     ```
+
+- *Optional* dip-fmm micromagnetic demagnetisation backend
+
+  Clone dip-fmm (the branch with the adaptive-tree and tetrahedron C API,
+  currently `develop/v0.3`, including its Windows port) to `dip-fmm/` in the
+  MagTense repository, or point `CDFMM_DIR` at a checkout elsewhere. In a
+  shell with the conda environment activated first and `vcvars64.bat` called
+  second, add `USE_CDFMM=1` to the full build:
+
+    ```bash
+    make python USE_CUDA=1 USE_CVODE=0 USE_MATLAB=0 USE_CDFMM=1 CDFMM_DIR=D:/path/to/dip-fmm
+    ```
+
+  dip-fmm is built with the environment's `icx` (and `nvcc` with MSVC as host
+  compiler when `USE_CUDA=1`), installed under `<CDFMM_DIR>/local`, and
+  `cdfmm_c.dll` is copied next to the Python extension in
+  `python/src/magtense/lib`. Do not put `<env>\Library\bin` in front of the
+  MSVC directories on `PATH`: make's shell maps it onto the directory holding
+  the msys `link.exe`, and the final link then fails with
+  `link: unknown option -- d`.
 
 - Install local editable magtense package
   To install the compiled MagTense package locally, so that simulations can be run, do

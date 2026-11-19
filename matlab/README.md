@@ -65,7 +65,7 @@ On Windows there are two compilation options for building the Fortran objective 
   
 ### Compilation with Visual Studio
 
-For compiling MagTense with Visual Studio, we provide a VS project file for Windows, [MagTense.sln](../MagTense.sln). The Visual Studio environment has configuration for Release, Debug as well as for configurations included NO_CUDA and NO_CVODE. The `_no_FMM` configurations are left over from the removed FMM3D backend and now build the same as their counterparts without the suffix; `buildMagTenseMEX` uses the latter. Remember to set the correct paths to Matlab and CUDA in `properties` in each project in Visual Studio. An installation of Intel oneAPI is necessary to compile using Visual Studio.
+For compiling MagTense with Visual Studio, we provide a VS project file for Windows, [MagTense.sln](../MagTense.sln). The Visual Studio environment has configuration for Release, Debug as well as for configurations included NO_CUDA and NO_CVODE. The configurations without `_no_FMM` in their name build the micromagnetic solver with the dip-fmm library, which has to be installed in `dip-fmm/local` next to the MagTense repository; the `_no_FMM` configurations build without it. `buildMagTenseMEX` links the former with `'USE_FMM', true` and the latter otherwise, see the FMM page of the TechManual. Remember to set the correct paths to Matlab and CUDA in `properties` in each project in Visual Studio. An installation of Intel oneAPI is necessary to compile using Visual Studio.
 
 #### Building the MEX-files
 Once the objective files have been build, start up Matlab, and first setup the MEX-compiler using `mex -setup FORTRAN` and then run 

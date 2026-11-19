@@ -247,6 +247,27 @@ properties
     min_saddle
     min_pred
 
+    %Demagnetization field through the dip-fmm fast multipole library instead of the dense
+    %tensor, see 'Demag field - FMM' in the TechManual. It needs MEX files built with
+    %dip-fmm (buildMagTenseMEX with USE_FMM); otherwise the dense tensor is used and a message says so.
+    %use_fmm: 1 to use it (setUseDipFmm). fmm_order: expansion order. fmm_depth: depth
+    %of the uniform tree. fmm_basis: 0 spherical, 1 Cartesian. fmm_tree: 0 uniform tree
+    %of depth fmm_depth, 1 adaptive tree (a box is split while it holds more than
+    %fmm_cap tiles, at most fmm_maxdep levels), 2 adaptive tree with fmm_cap as the
+    %occupancy to aim for. fmm_root: root cube [centre x, y, z, half-width] in m; a
+    %half-width <= 0 leaves the choice to MagTense. fmm_align: with no root given, 1
+    %chooses a root on which every leaf holds whole cells (struct() then fills in
+    %fmm_root, see getDipFmmRoot); it is not itself passed to Fortran.
+    use_fmm
+    fmm_order
+    fmm_depth
+    fmm_basis
+    fmm_tree
+    fmm_cap
+    fmm_maxdep
+    fmm_root
+    fmm_align
+
     %Optional exchange stiffness at the interface between two materials. phase_id gives
     %the material index (1..n_phase) of every tile and A_int is a symmetric
     %n_phase-by-n_phase table of interface exchange values in J/m. A negative entry means
@@ -518,6 +539,17 @@ methods
         obj.min_saddle = int32(2);
         obj.min_pred = int32(1);
 
+        %dip-fmm demagnetization: off, with the defaults of the Fortran type
+        obj.use_fmm = int32(0);
+        obj.fmm_order = int32(6);
+        obj.fmm_depth = int32(4);
+        obj.fmm_basis = int32(0);
+        obj.fmm_tree = int32(0);
+        obj.fmm_cap = int32(32);
+        obj.fmm_maxdep = int32(5);
+        obj.fmm_root = [0, 0, 0, -1];
+        obj.fmm_align = int32(1);
+
         %One material, i.e. the harmonic mean everywhere, which is the previous behaviour.
         obj.n_phase = int32(1);
         obj.phase_id = ones(obj.ntot,1);
@@ -577,6 +609,78 @@ methods
        end
     end
     
+    function obj = setUseDipFmm( obj, enabled )
+    % Evaluate the demagnetization field with dip-fmm instead of the dense tensor. The
+    % settings are the fmm_* properties; on the GPU when useCuda is set.
+        if enabled
+           obj.use_fmm = int32(1);
+        else
+           obj.use_fmm = int32(0);
+        end
+    end
+
+    function root = getDipFmmRoot( obj )
+    % The root cube [centre x, y, z, half-width] in m that struct() hands to dip-fmm; a
+    % half-width <= 0 means none, and dip-fmm then encloses the tiles itself.
+    %
+    % A fmm_root with a positive half-width is used as given. Otherwise, with
+    % fmm_align, the aligned root of alignedDipFmmRoot; without it, the bounding cube of
+    % the tiles for an adaptive tree and none for the uniform tree. A tetrahedron mesh has
+    % no lattice to align with and never gets one.
+        root = double(obj.fmm_root(:)');
+        if numel(root) ~= 4
+            error('DefaultMicroMagProblem:dipFmmRoot', ...
+                  'fmm_root has to be [centre x, y, z, half-width]');
+        end
+        if root(4) > 0 || obj.grid_type == 2
+            return
+        end
+        if obj.fmm_align
+            root = obj.alignedDipFmmRoot();
+        elseif obj.fmm_tree ~= 0
+            [low, high] = obj.dipFmmCellExtent();
+            root = [0.5*(low + high), 0.5*max(high - low)];
+        end
+    end
+
+    function root = alignedDipFmmRoot( obj )
+    % A root cube whose leaves hold whole cells: its lower corner is that of the tiles and
+    % its side is a multiple of the smallest length every cell side divides. For the uniform
+    % tree the leaf at fmm_depth is ceil(extent / 2^depth) such units, for an adaptive
+    % tree the side is the next power of two of them.
+        [low, high, h] = obj.dipFmmCellExtent();
+        [unit, found] = DefaultMicroMagProblem.commonUnit(h);
+        if ~found
+            warning('DefaultMicroMagProblem:dipFmmAlign', ...
+                    ['the cell sides have no common multiple: the dip-fmm root cannot ' ...
+                     'align the leaves with the cells along every axis']);
+        end
+        n_units = max(high - low)/unit;
+        if obj.fmm_tree == 0
+            n_leaves = 2^double(obj.fmm_depth);
+            side = unit*ceil(n_units/n_leaves - 1e-9)*n_leaves;
+        else
+            side = unit*2^ceil(log2(max(n_units, 1)) - 1e-9);
+        end
+        root = [low + 0.5*side, 0.5*side];
+    end
+
+    function [low, high, h] = dipFmmCellExtent( obj )
+    % Lower corner, upper corner and cell (finest tile) side lengths of the grid in m
+        if obj.grid_type == 3
+            pts = double(obj.grid_pts);
+            abc = double(obj.grid_abc);
+            low = min(pts - 0.5*abc, [], 1);
+            high = max(pts + 0.5*abc, [], 1);
+            h = min(abc, [], 1);
+        else
+            L = double(obj.grid_L(:)');
+            low = -0.5*L;
+            high = 0.5*L;
+            h = L./double(obj.grid_n(:)');
+        end
+    end
+
     function obj = setUseCVODE( obj, enabled )
        if enabled
            obj.useCVODE = int32(1);
@@ -865,7 +969,11 @@ methods
                    'setMicroMagSolver(''ExplicitLL'') to relax by integrating the ' ...
                    'Landau-Lifshitz equation instead.']);
         end
-        if (obj.useDemag)
+        if obj.use_fmm
+            %The root is resolved here, once the grid is final, and handed over as doubles
+            obj.fmm_root = obj.getDipFmmRoot();
+        end
+        if (obj.useDemag) && ~obj.use_fmm
            disp(['The demag tensor will require around ' num2str(((3*numel(obj.m0)*(3*numel(obj.m0) + 1)/2))*4/(2^30)) ' Gb'])
         end
         warning('off','MATLAB:structOnObject')
@@ -882,6 +990,22 @@ methods (Static)
         rtmp = repelem(find(dr > 0)+1,dr(dr>0));
         rs = [1; rtmp];
         re = [rtmp; length(r)+1];
+    end
+
+    function [unit, found] = commonUnit(h)
+    % Smallest length that is a whole multiple of every side length in h (up to 64 times
+    % the largest), and whether one was found; otherwise the largest side.
+        hmax = max(h);
+        for k = 1:64
+            unit = k*hmax;
+            q = unit./h;
+            if all(abs(q - round(q)) < 1e-6*q)
+                found = true;
+                return
+            end
+        end
+        unit = hmax;
+        found = false;
     end
 end
 end

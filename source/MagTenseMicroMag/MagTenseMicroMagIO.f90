@@ -51,6 +51,8 @@
         mwPointer :: dM_minPtr, dM_targetPtr, dM_rejectPtr, switch_refine_dHPtr, use_switch_refinePtr
         mwPointer :: rng_seedPtr
         mwPointer :: minimizerPtr
+        mwPointer :: cdfmmPtr
+        integer :: use_cdfmm_flag
         integer :: use_switch_refine
         integer,dimension(3) :: int_arr
         real(DP),dimension(3) :: real_arr
@@ -643,6 +645,39 @@
         minimizerPtr = mxGetField( prhs, i, problemFields(99) )
         if ( minimizerPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(minimizerPtr), problem%timer_ena, sx )
 
+        !dip-fmm demagnetization, the settings of MicroMagParameters; in the MATLAB struct they
+        !are use_fmm and fmm_* (see getProblemFieldnames). They are optional in the struct, so
+        !that an older DefaultMicroMagProblem keeps working, and off by default. cdfmm_precision
+        !is not read: the demag arrays of MagTense are FP32, which is its default.
+        sx = 1
+        cdfmmPtr = mxGetField( prhs, i, problemFields(101) )
+        if ( cdfmmPtr .ne. 0 ) then
+            call mxCopyPtrToInteger4(mxGetPr(cdfmmPtr), use_cdfmm_flag, sx )
+            problem%use_cdfmm = ( use_cdfmm_flag .ne. 0 )
+        endif
+        cdfmmPtr = mxGetField( prhs, i, problemFields(102) )
+        if ( cdfmmPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(cdfmmPtr), problem%cdfmm_order, sx )
+        cdfmmPtr = mxGetField( prhs, i, problemFields(103) )
+        if ( cdfmmPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(cdfmmPtr), problem%cdfmm_depth, sx )
+        cdfmmPtr = mxGetField( prhs, i, problemFields(104) )
+        if ( cdfmmPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(cdfmmPtr), problem%cdfmm_basis, sx )
+        cdfmmPtr = mxGetField( prhs, i, problemFields(105) )
+        if ( cdfmmPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(cdfmmPtr), problem%cdfmm_tree, sx )
+        cdfmmPtr = mxGetField( prhs, i, problemFields(106) )
+        if ( cdfmmPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(cdfmmPtr), problem%cdfmm_capacity, sx )
+        cdfmmPtr = mxGetField( prhs, i, problemFields(107) )
+        if ( cdfmmPtr .ne. 0 ) call mxCopyPtrToInteger4(mxGetPr(cdfmmPtr), problem%cdfmm_max_depth, sx )
+        sx = 4
+        cdfmmPtr = mxGetField( prhs, i, problemFields(108) )
+        if ( cdfmmPtr .ne. 0 ) call mxCopyPtrToReal8(mxGetPr(cdfmmPtr), problem%cdfmm_root, sx )
+#if !USE_CDFMM
+        if ( problem%use_cdfmm ) then
+            call displayGUIMessage( 'use_fmm is set, but the MEX files were built without USE_FMM' )
+            call displayGUIMessage( 'The regular demagnetization tensor is used instead' )
+            problem%use_cdfmm = .false.
+        endif
+#endif
+
         !Clean-up
         deallocate(problemFields)
     end subroutine loadMicroMagProblem
@@ -656,7 +691,7 @@
     !>-----------------------------------------
     subroutine getProblemFieldnames( fieldnames, nfields)
         integer,intent(out) :: nfields        
-        integer,parameter :: nf=100
+        integer,parameter :: nf=108
         character(len=12),dimension(:),intent(out),allocatable :: fieldnames
             
         nfields = nf
@@ -770,6 +805,17 @@
 
         !Timing log switch, optional so that older problem structs keep working
         fieldnames(99) = 'timer_ena'
+
+        !dip-fmm demagnetization, optional as well. The names are at most 12 characters:
+        !fmm_cap is cdfmm_capacity and fmm_maxdep is cdfmm_max_depth of the Fortran type.
+        fieldnames(101) = 'use_fmm'
+        fieldnames(102) = 'fmm_order'
+        fieldnames(103) = 'fmm_depth'
+        fieldnames(104) = 'fmm_basis'
+        fieldnames(105) = 'fmm_tree'
+        fieldnames(106) = 'fmm_cap'
+        fieldnames(107) = 'fmm_maxdep'
+        fieldnames(108) = 'fmm_root'
 
     end subroutine getProblemFieldnames
     

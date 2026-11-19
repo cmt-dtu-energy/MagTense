@@ -113,7 +113,7 @@ optional components are selected with make flags:
      - The CVODE time integrator from SUNDIALS, see
        :ref:`ODE solver settings`.
    * - ``USE_CDFMM=1``
-     - The dip-fmm demagnetization path (Linux), see :ref:`Demag field - FMM`.
+     - The dip-fmm demagnetization path, see :ref:`Demag field - FMM`.
    * - ``USE_MATLAB=1``
      - Compile the Fortran objects needed by the Matlab MEX-files.
 

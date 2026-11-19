@@ -69,7 +69,9 @@
 			<File RelativePath=".\TileRectangularPrismAvgTensor.f90"/>
 			<File RelativePath=".\TileRectangularPrismTensor.f90"/>
 			<File RelativePath=".\TileTensorHelperFunctions.f90"/>
+			<File RelativePath=".\TileTetrahedronPairTensor.f90"/>
 			<File RelativePath=".\TileTriangle.f90"/>
+			<File RelativePath=".\TileTriangleTriangle.f90"/>
 		</Filter>
 	</Files>
 	<Globals/>

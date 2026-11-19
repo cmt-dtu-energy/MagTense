@@ -106,6 +106,10 @@ module TileTetrahedronPairTensor
     !> is invariant under a common translation of the two tetrahedra.
     !---------------------------------------------------------------------------
     subroutine getN_tensor_tetrahedron_tetrahedron( vert_source, vert_target, N, ierr )
+    !Called from python/FortranToPythonIO.f90, which f2py compiles on Windows with
+    !/names:lowercase /assume:underscore; without a fixed external name that caller
+    !looks for a differently decorated symbol than the one this library defines.
+    !DEC$ ATTRIBUTES ALIAS:"getn_tensor_tetrahedron_tetrahedron_" :: getN_tensor_tetrahedron_tetrahedron
     real(ttReal),dimension(3,4),intent(in) :: vert_source, vert_target
     real(ttReal),dimension(3,3),intent(out) :: N
     integer,intent(out),optional :: ierr

@@ -14,6 +14,16 @@ LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LI
   make python USE_CUDA=1 USE_CVODE=1 USE_MATLAB=0 USE_CDFMM=1
 ```
 
+On Windows `python\build_python_fmm.cmd` runs the same build from a
+plain command prompt.
+
+Check the build with a one-minute version of the comparison (one grid, three
+orders, two depths, 2 ns):
+
+```bash
+python python/examples/micromagnetism/FMM/fmm_smoke_test.py both 12
+```
+
 Prepare all 160 persistent plans without running time evolution:
 
 ```bash
