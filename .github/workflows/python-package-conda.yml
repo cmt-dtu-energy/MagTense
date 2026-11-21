@@ -476,7 +476,11 @@ jobs:
           & $env:PYTHON_EXE -m pip install $_.FullName
         }
 
+        # Windows PowerShell does not stop on a failing native command: only the
+        # exit code of the last one decides the step. While pytest still ran after
+        # this line, a failing import here went unnoticed.
         & $env:PYTHON_EXE -c "from magtense.lib import magtensesource; print('magtensesource OK:', magtensesource.__file__)"
+        if ($LASTEXITCODE -ne 0) { throw "the magtense extension module does not import (exit $LASTEXITCODE)" }
 
     - name: Run the combined micromagnetic test suite with CUDA (Windows)
       if: ${{ matrix.cuda_runner.os_name == 'windows' }}
